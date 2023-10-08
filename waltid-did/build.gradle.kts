@@ -13,12 +13,17 @@ repositories {
     maven("https://jitpack.io")
 }
 
+java {
+    sourceCompatibility = JavaVersion.VERSION_11
+    targetCompatibility = JavaVersion.VERSION_11
+}
+
 /*tasks.test {
     useJUnitPlatform()
 }*/
 
 kotlin {
-    jvmToolchain(8)
+    jvmToolchain(11)
 }
 
 /*application {
@@ -28,7 +33,7 @@ kotlin {
 kotlin {
     jvm {
         compilations.all {
-            kotlinOptions.jvmTarget = "1.8" // JVM got Ed25519 at version 15
+            kotlinOptions.jvmTarget = "11" // JVM got Ed25519 at version 15
         }
         withJava()
         tasks.withType<Test>().configureEach {
