@@ -1,0 +1,26 @@
+{
+  "assertionMethod" : [
+    "did:web:localhost%3A8080:secp256r1#292dfabd1f9d477eb5cef239909111a1"
+  ],
+  "authentication" : [
+    "did:web:localhost%3A8080:secp256r1#292dfabd1f9d477eb5cef239909111a1"
+  ],
+  "@context" : "https://www.w3.org/ns/did/v1",
+  "id" : "did:web:localhost%3A8080:secp256r1",
+  "verificationMethod" : [
+    {
+      "controller" : "did:web:localhost%3A8080:secp256r1",
+      "id" : "did:web:localhost%3A8080:secp256r1#292dfabd1f9d477eb5cef239909111a1",
+      "publicKeyJwk" : {
+        "alg" : "ES256",
+        "crv" : "P-256",
+        "kid" : "292dfabd1f9d477eb5cef239909111a1",
+        "kty" : "EC",
+        "use" : "sig",
+        "x" : "NN9jDT3CL9yxgYEjaEkP80CB8q1WBbUHIlVuPIBQhi8",
+        "y" : "op40OaekSUJynfo1hClZWu8SAYMTf1OcaCUr0YErNSc"
+      },
+      "type" : "EcdsaSecp256r1VerificationKey2019"
+    }
+  ]
+}
