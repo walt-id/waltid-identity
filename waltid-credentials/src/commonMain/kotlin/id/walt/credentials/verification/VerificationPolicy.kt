@@ -7,7 +7,4 @@ import kotlinx.serialization.Transient
 abstract class VerificationPolicy(
     open val name: String,
     @Transient open val description: String? = null
-) {
-
-
-}
+)

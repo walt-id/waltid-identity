@@ -14,7 +14,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.assertNotNull
 
-abstract class DidResolverTestBase() {
+abstract class DidResolverTestBase {
     protected abstract val sut: LocalResolverMethod
 
     open fun `given a did String, when calling resolve, then the result is a valid did document`(

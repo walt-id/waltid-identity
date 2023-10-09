@@ -14,7 +14,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 
-class DidWebResolver() : LocalResolverMethod("web") {
+class DidWebResolver : LocalResolverMethod("web") {
 
     companion object {
         var URL_PROTOCOL = "https"//TODO: fix (exposed for test purpose)
