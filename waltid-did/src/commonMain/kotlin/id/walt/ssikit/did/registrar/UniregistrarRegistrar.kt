@@ -2,7 +2,6 @@ package id.walt.ssikit.did.registrar
 
 import id.walt.core.crypto.keys.Key
 import id.walt.ssikit.did.registrar.dids.DidCreateOptions
-import id.walt.ssikit.did.registrar.dids.DidEbsiCreateOptions
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.plugins.*
@@ -61,10 +60,4 @@ class UniregistrarRegistrar : DidRegistrar {
     override suspend fun delete() {
         TODO("Not yet implemented")
     }
-}
-
-suspend fun main() {
-    //println(UniregistrarRegistrar().getSupportedMethods())
-    //println(UniregistrarRegistrar().create(DidKeyCreateOptions(KeyType.Ed25519)))
-    println(UniregistrarRegistrar().create(DidEbsiCreateOptions("eyJhbGciOiJFUzI1NksiLCJ0eXAiOiJKV1QiLCJraWQiOiJkaWQ6ZWJzaTp6cjJyV0RISHJVQ2RaQVc3d3NTYjVuUSNrZXlzLTEifQ.eyJvbmJvYXJkaW5nIjoicmVjYXB0Y2hhIiwidmFsaWRhdGVkSW5mbyI6eyJzdWNjZXNzIjp0cnVlLCJjaGFsbGVuZ2VfdHMiOiIyMDIzLTA3LTI2VDA5OjA4OjM1WiIsImhvc3RuYW1lIjoiYXBwLXBpbG90LmVic2kuZXUiLCJzY29yZSI6MC45LCJhY3Rpb24iOiJsb2dpbiJ9LCJpc3MiOiJkaWQ6ZWJzaTp6cjJyV0RISHJVQ2RaQVc3d3NTYjVuUSIsImlhdCI6MTY5MDM2MjUxNiwiZXhwIjoxNjkwMzYzNDE2fQ.SBKaY7rBn_CrEQ_PerbIFICobSMuUBwejxfAymDEbSgnbKz8HfJyLv_DP8OZA5tCW00GIvSODUX2GliA-dXEHA")))
 }

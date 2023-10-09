@@ -49,9 +49,3 @@ class UniresolverResolver : DidResolver {
         TODO("Not yet implemented")
     }
 }
-
-suspend fun main() {
-    println(UniresolverResolver().getSupportedMethods() ?: "Resolver disabled")
-    println(UniresolverResolver().resolve("did:key:z6Mkfriq1MqLBoPWecGoDLjguo1sB9brj6wT3qZ5BxkKpuP6"))
-    println(UniresolverResolver().resolveToKey("did:key:z6Mkfriq1MqLBoPWecGoDLjguo1sB9brj6wT3qZ5BxkKpuP6"))
-}

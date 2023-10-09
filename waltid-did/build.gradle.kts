@@ -64,7 +64,6 @@ kotlin {
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.4.1")
 
                 // Crypto
-                //api("id.walt:waltid-crypto:1.0.0")
                 api(project(":waltid-crypto"))
 
                 // Logging
