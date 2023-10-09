@@ -1,9 +1,9 @@
 package resolvers
 
 import id.walt.core.crypto.keys.Key
-import id.walt.ssikit.did.document.DidDocument
-import id.walt.ssikit.did.resolver.local.DidJwkResolver
-import id.walt.ssikit.did.resolver.local.LocalResolverMethod
+import id.walt.didlib.did.document.DidDocument
+import id.walt.didlib.did.resolver.local.DidJwkResolver
+import id.walt.didlib.did.resolver.local.LocalResolverMethod
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import org.junit.jupiter.params.ParameterizedTest

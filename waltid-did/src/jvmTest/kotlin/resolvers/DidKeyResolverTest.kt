@@ -1,9 +1,9 @@
 package resolvers
 
 import id.walt.core.crypto.keys.Key
-import id.walt.ssikit.did.document.DidDocument
-import id.walt.ssikit.did.resolver.local.DidKeyResolver
-import id.walt.ssikit.did.resolver.local.LocalResolverMethod
+import id.walt.didlib.did.document.DidDocument
+import id.walt.didlib.did.resolver.local.DidKeyResolver
+import id.walt.didlib.did.resolver.local.LocalResolverMethod
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import org.junit.jupiter.params.ParameterizedTest
@@ -56,7 +56,7 @@ class DidKeyResolverTest : DidResolverTestBase() {
                     Json.decodeFromString<JsonObject>("{\"kty\":\"OKP\",\"crv\":\"Ed25519\",\"x\":\"sTgvlFxftGMKOpengFu-N9AwgiSKwzdzmH75rxJh1ZE\"}"),
                     ed25519Assertions
                 ),
-                //secp256r1 (ssikit)
+                //secp256r1 (didlib)
                 arguments(
                     "did:key:zDnaeWUm6JXpipAtL1N1hQFA4BQUwGCdaAVbpEZjN3Pf9nMrb",
                     Json.decodeFromString<JsonObject>("{\"kty\":\"EC\",\"use\":\"sig\",\"crv\":\"P-256\",\"kid\":\"488499670a514871aa39e8d0f7ef1b39\",\"x\":\"Wd1Y_UHnoM5zt-SSJeQWlAlLi4o8SIk8AvOvimIZeNQ\",\"y\":\"nNtkZmMNJp8kVJRtvO627KLMavvbfYHItTt7xNR84D4\",\"alg\":\"ES256\"}"),

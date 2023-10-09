@@ -3,11 +3,11 @@ package registrars
 import id.walt.core.crypto.keys.Key
 import id.walt.core.crypto.keys.KeyType
 import id.walt.core.crypto.keys.LocalKey
-import id.walt.ssikit.did.DidUtils
-import id.walt.ssikit.did.registrar.dids.DidCreateOptions
-import id.walt.ssikit.did.registrar.dids.DidWebCreateOptions
-import id.walt.ssikit.did.registrar.local.web.DidWebRegistrar
-import id.walt.ssikit.utils.EncodingUtils
+import id.walt.didlib.did.DidUtils
+import id.walt.didlib.did.registrar.dids.DidCreateOptions
+import id.walt.didlib.did.registrar.dids.DidWebCreateOptions
+import id.walt.didlib.did.registrar.local.web.DidWebRegistrar
+import id.walt.didlib.utils.EncodingUtils
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.Arguments
