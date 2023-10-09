@@ -9,7 +9,6 @@ import id.walt.ssikit.did.registrar.DidResult
 import id.walt.ssikit.did.registrar.dids.DidCreateOptions
 import id.walt.ssikit.did.registrar.local.LocalRegistrarMethod
 import id.walt.ssikit.utils.EncodingUtils.urlEncode
-import id.walt.ssikit.utils.ExtensionMethods.ensurePrefix
 
 class DidWebRegistrar : LocalRegistrarMethod("web") {
     override suspend fun register(options: DidCreateOptions): DidResult = options.get<KeyType>("keyType")?.let {
@@ -21,11 +20,11 @@ class DidWebRegistrar : LocalRegistrarMethod("web") {
             it.isNotEmpty()
         }?.let {
             val domain = urlEncode(it)
-            val path = options.get<String>("path")?.ensurePrefix("/")?.let {
+            val path = options.get<String>("path")?.takeIf { it.isNotEmpty() }?.let {
                 it.split("/").joinToString(":") { part -> urlEncode(part) }
             } ?: ""
             DidResult(
-                it, DidDocument(
+                "did:web:$domain$path", DidDocument(
                     DidWebDocument(
                         did = "did:web:$domain$path", keyId = key.getKeyId(), didKey = key.exportJWKObject()
                     ).toMap()

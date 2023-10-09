@@ -1,7 +1,7 @@
 package id.walt.ssikit.did.resolver.local
 
-import id.walt.core.crypto.keys.LocalKey
 import id.walt.core.crypto.keys.Key
+import id.walt.core.crypto.keys.LocalKey
 import id.walt.ssikit.did.document.DidDocument
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -14,10 +14,10 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 
-class DidWebResolver : LocalResolverMethod("web") {
+class DidWebResolver() : LocalResolverMethod("web") {
 
     companion object {
-        const val URL_PROTOCOL = "https"
+        var URL_PROTOCOL = "https"//TODO: fix (exposed for test purpose)
         val json = Json { ignoreUnknownKeys = true }
     }
 
@@ -46,9 +46,7 @@ class DidWebResolver : LocalResolverMethod("web") {
 
         val response = runCatching {
             DidDocument(
-                jsonObject = http
-                    .get(url)
-                    .body<JsonObject>()
+                jsonObject = http.get(url).body<JsonObject>()
             )
         }
 
@@ -80,14 +78,3 @@ class DidWebResolver : LocalResolverMethod("web") {
         return tryConvertAnyPublicKeyJwkToKey(publicKeyJwks)
     }
 }
-
-/*
-suspend fun main() {
-    val r = DidWebResolver()
-    println(r.resolveToKey("did:web:wallet.walt.id:api:did-registry:7fd65e17bb624eccbf2d52b12de93706"))
-    r.resolve("did:web:w3c-ccg.github.io")
-    r.resolve("did:web:w3c-ccg.github.io:user:alice")
-    r.resolve("did:web:example.com%3A3000")
-    r.resolve("did:web:example.com:u:bob")
-}
-*/

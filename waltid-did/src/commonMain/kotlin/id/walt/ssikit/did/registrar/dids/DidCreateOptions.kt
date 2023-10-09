@@ -16,6 +16,7 @@ open class DidCreateOptions(val method: String, val options: JsonElement) {
             Boolean::class -> it.toBoolean()
             Int::class -> it.toIntOrNull()
             Long::class -> it.toLongOrNull()
+            Double::class -> it.toDoubleOrNull()
             KeyType::class -> enumValueIgnoreCase<KeyType>(it)
             String::class -> it
             else -> null

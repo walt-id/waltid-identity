@@ -1,5 +1,5 @@
 plugins {
-    val kotlinVersion = "1.9.0"
+    val kotlinVersion = "1.9.10"
     kotlin("multiplatform") version kotlinVersion
     kotlin("plugin.serialization") version kotlinVersion
     id("maven-publish")
@@ -67,7 +67,7 @@ kotlin {
                 //api("id.walt:waltid-crypto:1.0.0")
                 api(project(":waltid-crypto"))
 
-                // Loggin
+                // Logging
                 implementation("io.github.oshai:kotlin-logging:5.1.0")
 
             }
@@ -93,6 +93,11 @@ kotlin {
         val jvmTest by getting {
             dependencies {
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0")
+                implementation(kotlin("test"))
+                implementation("org.junit.jupiter:junit-jupiter-params:5.9.0")
+                implementation("io.ktor:ktor-server-test-host:2.3.5")
+                implementation("io.ktor:ktor-server-content-negotiation:2.3.5")
+                implementation("io.ktor:ktor-server-netty:2.3.5")
             }
         }
         publishing {
