@@ -1,9 +1,8 @@
 plugins {
-    val kotlinVersion = "1.9.0"
-    kotlin("multiplatform") version kotlinVersion
-    kotlin("plugin.serialization") version kotlinVersion
+    kotlin("multiplatform")
+    kotlin("plugin.serialization")
     id("maven-publish")
-    id("com.github.ben-manes.versions") version "0.48.0"
+    id("com.github.ben-manes.versions")
 }
 
 group = "id.walt.credentials"
