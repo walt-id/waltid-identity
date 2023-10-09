@@ -1,9 +1,8 @@
 import id.walt.core.crypto.keys.KeyType
-import id.walt.core.crypto.keys.LocalKey
 import id.walt.core.crypto.keys.TSEKey
-import id.walt.ssikit.did.DidService
-import id.walt.ssikit.helpers.WaltidServices
-import id.walt.ssikit.vc.list.W3CVC
+import id.walt.didlib.did.DidService
+import id.walt.didlib.helpers.WaltidServices
+import id.walt.didlib.vc.list.W3CVC
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 

@@ -1,0 +1,25 @@
+{
+  "assertionMethod" : [
+    "did:web:localhost%3A8080:rsa#ab269ce10ce94b7c9565e30c034b5692"
+  ],
+  "authentication" : [
+    "did:web:localhost%3A8080:rsa#ab269ce10ce94b7c9565e30c034b5692"
+  ],
+  "@context" : "https://www.w3.org/ns/did/v1",
+  "id" : "did:web:localhost%3A8080:rsa",
+  "verificationMethod" : [
+    {
+      "controller" : "did:web:localhost%3A8080:rsa",
+      "id" : "did:web:localhost%3A8080:rsa#ab269ce10ce94b7c9565e30c034b5692",
+      "publicKeyJwk" : {
+        "alg" : "RS256",
+        "e" : "AQAB",
+        "kid" : "ab269ce10ce94b7c9565e30c034b5692",
+        "kty" : "RSA",
+        "n" : "0qbslQ5uMXL1Wk4dUD5ftrGWLhgaQENQn8AaPVREg12H_Mfr2GEL0IkBd7EQPeRFzRzngF2kWpij_nyueYKGQ3um_hione72pozP76etXNk4imTzmg3RsHcfPC5JBJAGpb5htnUQ5-VsuqbzlCUTOWNK4kIDWzbU0o-neglLAwU846_h6lTRI7xE1kh0iZyseAdx7sZ8Cd5eSYuvwQVxnNn0w-m9Bwd30g-s8xmqn9-7LBa0-UdumMLwtan4IGXltMJGYU9br1wsmz9vlG-TvfmxlgXzilJOJQMvlMKGXRmbUJRaNSYdrVJciEQEWK0tkaT45r3_LJw7dwx4DnNxzw",
+        "use" : "sig"
+      },
+      "type" : "RsaVerificationKey2018"
+    }
+  ]
+}
