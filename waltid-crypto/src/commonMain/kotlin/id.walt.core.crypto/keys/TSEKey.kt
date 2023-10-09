@@ -13,25 +13,62 @@ import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.util.*
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import kotlin.random.Random
 
 // Works with the Hashicorp Transit Secret Engine
+@Suppress("TRANSIENT_IS_REDUNDANT")
 @Serializable
 @SerialName("tse")
 class TSEKey(
-    private val _tseId: String,
-    private val _rawPublicKey: ByteArray,
-    override val keyType: KeyType
+    val server: String,
+    private val accessKey: String,
+    val id: String,
+    //private var publicKey: ByteArray? = null,
+    //override var keyType: KeyType? = null
+    private var _publicKey: ByteArray? = null,
+    private var _keyType: KeyType? = null
 ) : Key() {
+
+    @Transient val retrievedKeyType by lazy { runBlocking { retrieveKeyType() } }
+    @Transient val retrievedPublicKey by lazy { runBlocking { retrievePublicKey() } }
+
+    @Transient
+    override var keyType: KeyType
+        get() = _keyType ?: retrievedKeyType
+        set(value) { _keyType = value }
+
+    @Transient
+    var publicKey: ByteArray
+        get() = _publicKey ?: retrievedPublicKey
+        set(value) { _publicKey = value }
+
+    private suspend fun retrievePublicKey(): ByteArray {
+        val keyData = http.get("$server/keys/$id") {
+            this.header("X-Vault-Token", accessKey)
+        }.body<JsonObject>()["data"]!!.jsonObject["keys"]!!.jsonObject
+
+        // TODO: try this
+        return keyData["1"]!!
+            .jsonObject["public_key"]!!
+            .jsonPrimitive.content
+            .decodeBase64Bytes()
+    }
+
+    private suspend fun retrieveKeyType(): KeyType =
+        tseKeyToKeyTypeMapping(http.get("$server/keys/$id") {
+            this.header("X-Vault-Token", accessKey)
+        }.body<JsonObject>()["data"]!!.jsonObject["type"]!!.jsonPrimitive.content)
 
     override val hasPrivateKey: Boolean
         get() = TODO("Not yet implemented")
 
-    override suspend fun getKeyId(): String = _tseId
+    override suspend fun getKeyId(): String = id
 
     override suspend fun getThumbprint(): String {
         TODO("Not yet implemented")
@@ -47,8 +84,8 @@ class TSEKey(
         throw IllegalArgumentException("The private key should not be exposed.")
 
     override suspend fun signRaw(plaintext: ByteArray): Any {
-        val signatureBase64 = http.post("$url/transit/sign/${_tseId}") {
-            header("X-Vault-Token", "dev-only-token") // TODO
+        val signatureBase64 = http.post("$server/sign/${id}") {
+            header("X-Vault-Token", accessKey) // TODO
             setBody(
                 mapOf(
                     "input" to plaintext.encodeBase64()
@@ -82,8 +119,8 @@ class TSEKey(
         val localPublicKey = when (keyType) {
             KeyType.Ed25519 -> LocalKey.importRawPublicKey(
                 type = keyType,
-                metadata = KeyMetadata(),
-                rawPublicKey = _rawPublicKey
+                rawPublicKey = publicKey,
+                metadata = LocalKeyMetadata() // todo: explicit `keySize`
             )
 
             KeyType.RSA, KeyType.secp256r1 -> LocalKey.importPEM(getEncodedPublicKey()).getOrThrow()
@@ -94,8 +131,8 @@ class TSEKey(
 
         check(detachedPlaintext != null) { "An detached plaintext is needed." }
 
-        val valid = http.post("$url/transit/verify/${_tseId}") {
-            header("X-Vault-Token", "dev-only-token")
+        val valid = http.post("$server/verify/${id}") {
+            header("X-Vault-Token", accessKey)
             setBody(
                 mapOf(
                     "input" to detachedPlaintext.encodeBase64(),
@@ -132,8 +169,8 @@ class TSEKey(
 
     suspend fun getEncodedPublicKey(): String = // TODO add to base Key
         lazyOf(
-            http.get("${url}/transit/keys/$_tseId") {
-                header("X-Vault-Token", "dev-only-token")
+            http.get("$server/keys/$id") {
+                header("X-Vault-Token", accessKey)
             }.body<JsonObject>()["data"]!!
                 .jsonObject["keys"]!!
                 .jsonObject["1"]!!
@@ -141,28 +178,32 @@ class TSEKey(
                 .jsonPrimitive.content
         ).value
 
-    override suspend fun getPublicKey(): Key = LocalKey.importRawPublicKey(
-        type = keyType,
-        metadata = KeyMetadata(),
-        rawPublicKey = _rawPublicKey
-    )
+    override suspend fun getPublicKey(): Key {
+        return LocalKey.importRawPublicKey(
+            type = keyType,
+            rawPublicKey = publicKey,
+            metadata = LocalKeyMetadata(), // todo: import with explicit `keySize`
+        )
+    }
 
-    override suspend fun getPublicKeyRepresentation(): ByteArray = _rawPublicKey
+    override suspend fun getPublicKeyRepresentation(): ByteArray {
+        return publicKey
+    }
 
     /*
         val user = "corecrypto"
         val password = "Eibaekie0eeshieph1vahho6fengei7vioph"
 
-        val token = http.post("$url/auth/userpass/login/$user") {
+        val token = http.post("$server/auth/userpass/login/$user") {
             setBody(mapOf("password" to password))
         }.body<JsonObject>()["auth"]!!.jsonObject["client_token"]!!.jsonPrimitive.content
         */
 
-    override fun toString(): String = "[TSE ${keyType.name} key @ $url]"
+    override fun toString(): String = "[TSE ${keyType.name} key @ $server]"
 
     suspend fun delete() {
-        http.post("$url/transit/keys/$_tseId/config") {
-            header("X-Vault-Token", "dev-only-token")
+        http.post("$server/keys/$id/config") {
+            header("X-Vault-Token", accessKey)
             setBody(
                 mapOf(
                     "deletion_allowed" to true
@@ -170,27 +211,32 @@ class TSEKey(
             )
         }
 
-        http.delete("$url/transit/keys/$_tseId") {
-            header("X-Vault-Token", "dev-only-token")
+        http.delete("$server/keys/$id") {
+            header("X-Vault-Token", accessKey)
         }
     }
 
-    companion object : KeyCreator {
-        val url = "http://127.0.0.1:8200/v1"
-
-        private fun tseKeyTypeMapping(type: KeyType) = when (type) {
+    companion object : TSEKeyCreator {
+        private fun keyTypeToTseKeyMapping(type: KeyType) = when (type) {
             KeyType.Ed25519 -> "ed25519"
             KeyType.secp256r1 -> "ecdsa-p256"
             KeyType.RSA -> "rsa-2048"
             KeyType.secp256k1 -> throw IllegalArgumentException("Not supported: $type")
         }
 
-        override suspend fun generate(type: KeyType, metadata: KeyMetadata): TSEKey {
-            val keyData = http.post("$url/transit/keys/k${Random.nextInt()}") {
-                header("X-Vault-Token", "dev-only-token")
+        private fun tseKeyToKeyTypeMapping(type: String) = when (type) {
+            "ed25519" -> KeyType.Ed25519
+            "ecdsa-p256" -> KeyType.secp256r1
+            "rsa-2048" -> KeyType.RSA
+            else -> throw IllegalArgumentException("Not supported: $type")
+        }
+
+        override suspend fun generate(type: KeyType, metadata: TSEKeyMetadata): TSEKey {
+            val keyData = http.post("${metadata.server}/keys/k${metadata.id ?: Random.nextInt()}") {
+                header("X-Vault-Token", metadata.accessKey)
                 setBody(
                     mapOf(
-                        "type" to tseKeyTypeMapping(type)
+                        "type" to keyTypeToTseKeyMapping(type)
                     )
                 )
             }.body<JsonObject>()["data"]!!.jsonObject
@@ -203,18 +249,7 @@ class TSEKey(
                 .jsonPrimitive.content
                 .decodeBase64Bytes()
 
-            return TSEKey(keyName, publicKey, type)
-        }
-
-        override suspend fun importRawPublicKey(type: KeyType, metadata: KeyMetadata, rawPublicKey: ByteArray): Key =
-            throw IllegalArgumentException("This function is only for loading public keys, TSE is meant for private keys.")
-
-        override suspend fun importJWK(jwk: String): Result<TSEKey> {
-            TODO() // relevant?
-        }
-
-        override suspend fun importPEM(pem: String): Result<TSEKey> {
-            TODO() // relevant?
+            return TSEKey(metadata.server, metadata.accessKey, keyName, publicKey, type)
         }
 
         private val http = HttpClient {
@@ -233,7 +268,7 @@ class TSEKey(
 }
 
 suspend fun main() {
-    val tseKey = TSEKey.generate(KeyType.Ed25519)
+    val tseKey = TSEKey.generate(KeyType.Ed25519, TSEKeyMetadata("http://127.0.0.1:8200/v1/transit", "dev-only-token"))
     val plaintext = "This is a plaintext 123".encodeToByteArray()
 
     val signed = tseKey.signRaw(plaintext) as String

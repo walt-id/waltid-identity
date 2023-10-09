@@ -52,9 +52,11 @@ expect class LocalKey(jwk: String?) : Key {
     override val hasPrivateKey: Boolean
 
 
-    companion object : KeyCreator {
-        override suspend fun generate(type: KeyType, metadata: KeyMetadata): LocalKey
-        override suspend fun importRawPublicKey(type: KeyType, metadata: KeyMetadata, rawPublicKey: ByteArray): Key
+
+    companion object : LocalKeyCreator {
+
+        override suspend fun generate(type: KeyType, metadata: LocalKeyMetadata): LocalKey
+        override suspend fun importRawPublicKey(type: KeyType, rawPublicKey: ByteArray, metadata: LocalKeyMetadata): Key
 
         override suspend fun importJWK(jwk: String): Result<LocalKey>
 

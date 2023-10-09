@@ -9,10 +9,10 @@ import DidDocumentChecks.rsaKeyChecks
 import DidDocumentChecks.secp256DidChecks
 import DidDocumentChecks.secp256KeyChecks
 import id.walt.core.crypto.keys.Key
-import id.walt.didlib.did.DidUtils
-import id.walt.didlib.did.registrar.DidResult
-import id.walt.didlib.did.registrar.dids.DidCreateOptions
-import id.walt.didlib.did.registrar.local.LocalRegistrarMethod
+import id.walt.did.dids.DidUtils
+import id.walt.did.dids.registrar.DidResult
+import id.walt.did.dids.registrar.dids.DidCreateOptions
+import id.walt.did.dids.registrar.local.LocalRegistrarMethod
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject

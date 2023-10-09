@@ -1,5 +1,6 @@
 import id.walt.core.crypto.keys.KeyType
 import id.walt.core.crypto.keys.TSEKey
+import id.walt.core.crypto.keys.TSEKeyMetadata
 import io.ktor.util.*
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -26,10 +27,12 @@ class TSEKeyTest {
 
     @Test
     fun testAll() = runTest {
+        val tseMetadata = TSEKeyMetadata("http://127.0.0.1:8200/v1/transit", "dev-only-token")
+
         listOf(
-            TSEKey.generate(KeyType.Ed25519),
-            TSEKey.generate(KeyType.RSA),
-            TSEKey.generate(KeyType.secp256r1)
+            TSEKey.generate(KeyType.Ed25519, tseMetadata),
+            TSEKey.generate(KeyType.RSA, tseMetadata),
+            TSEKey.generate(KeyType.secp256r1, tseMetadata)
         ).forEach {
             test(it)
         }

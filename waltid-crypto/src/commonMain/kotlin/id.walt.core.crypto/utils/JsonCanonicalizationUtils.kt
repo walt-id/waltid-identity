@@ -17,6 +17,7 @@ object JsonCanonicalizationUtils {
             KeyType.Ed25519 -> okpPublicKeyRequiredMembers(it)
             KeyType.secp256k1, KeyType.secp256r1 -> ecPublicKeyRequiredMembers(it)
             KeyType.RSA -> rsaPublicKeyRequiredMembers(it)
+            null -> throw IllegalArgumentException("KeyType is not initialized!")
         }
     }.toString()
 

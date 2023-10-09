@@ -1,15 +1,16 @@
 package id.walt.core.crypto.keys
 
+/*
 interface KeyCreator {
     /**
      * generate a key
      * @param type the type of key to generate
-     * @param metadata key algorithm options or JWK header fields
+     * @param metadata key options
      * @return generated key
      */
-    suspend fun generate(type: KeyType, metadata: KeyMetadata = KeyMetadata()): Key
+    suspend fun generate(type: KeyType, arguments: Map<String, Any>): Key
 
-    suspend fun importRawPublicKey(type: KeyType, metadata: KeyMetadata, rawPublicKey: ByteArray): Key
+    suspend fun importRawPublicKey(type: KeyType, rawPublicKey: ByteArray, arguments: Map<String, Any>): Key
 
     /**
      * import a key from an encoded JWK
@@ -24,3 +25,4 @@ interface KeyCreator {
      */
     suspend fun importPEM(pem: String): Result<Key>
 }
+*/

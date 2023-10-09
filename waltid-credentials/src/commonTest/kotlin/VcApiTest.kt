@@ -1,8 +1,9 @@
 import id.walt.core.crypto.keys.KeyType
 import id.walt.core.crypto.keys.TSEKey
-import id.walt.didlib.did.DidService
-import id.walt.didlib.helpers.WaltidServices
-import id.walt.didlib.vc.list.W3CVC
+import id.walt.core.crypto.keys.TSEKeyMetadata
+import id.walt.did.dids.DidService
+import id.walt.did.helpers.WaltidServices
+import id.walt.credentials.vc.vcs.W3CVC
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 
@@ -13,8 +14,10 @@ class VcApiTest {
         // Initialize services
         WaltidServices.init()
 
+        val tseMetadata = TSEKeyMetadata("http://127.0.0.1:8200/v1/transit", "dev-only-token")
+
         // Generate key & derive DID from key
-        val key = TSEKey.generate(KeyType.Ed25519)
+        val key = TSEKey.generate(KeyType.Ed25519, tseMetadata)
         //val key = LocalKey.generate(KeyType.Ed25519)
         val did = DidService.registerByKey("jwk", key).did
 
@@ -64,6 +67,7 @@ class VcApiTest {
         )
         println(jws)
 
+        key.delete()
 
     }
 

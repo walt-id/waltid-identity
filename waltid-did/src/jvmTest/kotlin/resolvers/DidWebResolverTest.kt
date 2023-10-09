@@ -2,9 +2,9 @@ package resolvers
 
 import TestServer
 import id.walt.core.crypto.keys.Key
-import id.walt.didlib.did.document.DidDocument
-import id.walt.didlib.did.resolver.local.DidWebResolver
-import id.walt.didlib.did.resolver.local.LocalResolverMethod
+import id.walt.did.dids.document.DidDocument
+import id.walt.did.dids.resolver.local.DidWebResolver
+import id.walt.did.dids.resolver.local.LocalResolverMethod
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import org.junit.jupiter.api.AfterAll

@@ -3,9 +3,9 @@ package registrars
 import id.walt.core.crypto.keys.Key
 import id.walt.core.crypto.keys.KeyType
 import id.walt.core.crypto.keys.LocalKey
-import id.walt.didlib.did.registrar.dids.DidCreateOptions
-import id.walt.didlib.did.registrar.dids.DidJwkCreateOptions
-import id.walt.didlib.did.registrar.local.jwk.DidJwkRegistrar
+import id.walt.did.dids.registrar.dids.DidCreateOptions
+import id.walt.did.dids.registrar.dids.DidJwkCreateOptions
+import id.walt.did.dids.registrar.local.jwk.DidJwkRegistrar
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.Arguments
