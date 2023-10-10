@@ -1,4 +1,4 @@
-package id.walt.issuer.config
+package id.walt.issuer.base.config
 
 import kotlinx.serialization.Serializable
 

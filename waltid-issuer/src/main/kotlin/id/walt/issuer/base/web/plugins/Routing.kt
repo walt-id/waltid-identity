@@ -1,4 +1,4 @@
-package id.walt.issuer.web.plugins
+package id.walt.issuer.base.web.plugins
 
 import io.ktor.server.application.*
 import io.ktor.server.plugins.autohead.*

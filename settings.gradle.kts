@@ -10,4 +10,13 @@ plugins {
 }
 
 rootProject.name = "waltid-identity"
-include("waltid-crypto", "waltid-did", "waltid-credentials", "waltid-issuer")
+include(
+    // Base libs
+    "waltid-crypto",
+    "waltid-did",
+    "waltid-credentials",
+
+    // Services based on libs
+    "waltid-issuer",
+    "waltid-verifier",
+)

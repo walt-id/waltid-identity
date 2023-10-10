@@ -9,20 +9,20 @@ object Versions {
     const val KTOR_VERSION = "2.3.5" // also change 1 plugin
     const val COROUTINES_VERSION = "1.7.3"
     const val EXPOSED_VERSION = "0.43.0"
-    const val HOPLITE_VERSION = "2.8.0.RC2"
+    const val HOPLITE_VERSION = "2.8.0.RC3"
 }
 
 plugins {
     kotlin("jvm") // Versions.KOTLIN_VERSION
-    id("org.jetbrains.kotlin.plugin.serialization")  // Versions.KOTLIN_VERSION
+    id("org.jetbrains.kotlin.plugin.serialization") // Versions.KOTLIN_VERSION
 
-    id("io.ktor.plugin") version "2.3.4" // Versions.KTOR_VERSION
+    id("io.ktor.plugin") version "2.3.5" // Versions.KTOR_VERSION
     id("org.owasp.dependencycheck") version "8.4.0"
     id("com.github.jk1.dependency-license-report") version "2.5"
     application
     `maven-publish`
 
-    id("com.github.ben-manes.versions") //version "0.48.0"
+    id("com.github.ben-manes.versions")
 }
 
 group = "id.walt"
@@ -34,9 +34,9 @@ repositories {
     maven("https://jitpack.io")
     maven("https://maven.walt.id/repository/waltid/")
     maven("https://maven.walt.id/repository/waltid-ssi-kit/")
-    //maven("https://repo.danubetech.com/repository/maven-public/")
-    //maven("https://maven.walt.id/repository/waltid/id/walt/core-crypto/")
-    //maven("https://maven.walt.id/repository/waltid/id/walt/waltid-ssikit2")
+    maven("https://repo.danubetech.com/repository/maven-public/")
+    maven("https://maven.walt.id/repository/waltid/id/walt/core-crypto/")
+    maven("https://maven.walt.id/repository/waltid/id/walt/waltid-ssikit2")
     mavenLocal()
 }
 
@@ -107,7 +107,7 @@ dependencies {
     //implementation("com.github.ajalt.clikt:clikt:4.2.0")
 
     // OIDC
-    implementation("id.walt:waltid-openid4vc:1.2310041452.0")
+    implementation("id.walt:waltid-openid4vc:1.2310051844.0")
 
     // SSIKit
     //implementation("id.walt:waltid-ssikit:1.2309171812.0")
@@ -118,8 +118,8 @@ dependencies {
     api(project(":waltid-crypto"))
     api(project(":waltid-credentials"))
     api(project(":waltid-did"))
-    //implementation("id.walt:waltid-ssikit2:1.0.8a-SNAPSHOT")
-    // implementation id.walt:core-crypto -> provided by id.walt:waltid-ssikit2
+    // implementation("id.walt:waltid-ssikit2:1.0.8-SNAPSHOT")
+    // implementation("id.walt:core-crypto:1.0.7-SNAPSHOT")
 }
 
 tasks.withType<Test> {
@@ -151,7 +151,7 @@ tasks.named<CreateStartScripts>("startScripts") {
 }
 
 application {
-    mainClass.set("id.walt.issuer.MainKt")
+    mainClass.set("id.walt.verifier.MainKt")
     val isDevelopment: Boolean = project.ext.has("development")
     applicationDefaultJvmArgs = listOf("-Dio.ktor.development=$isDevelopment")
 }
@@ -160,10 +160,10 @@ publishing {
     publications {
         create<MavenPublication>("mavenJava") {
             pom {
-                name.set("walt.id XYZ Kit")
+                name.set("walt.id verifier")
                 description.set(
                     """
-                    Kotlin/Java library for XYZ core services
+                    Kotlin/Java library for the walt.id verifier
                     """.trimIndent()
                 )
                 url.set("https://walt.id")
@@ -192,7 +192,7 @@ publishing {
     }
 }
 
-/*licenseReport {
-    renderers = arrayOf<ReportRenderer>(InventoryHtmlReportRenderer("xyzkit-licenses-report.html", "XYZ Kit"))
-    filters = arrayOf<DependencyFilter>(LicenseBundleNormalizer())
-}*/
+//licenseReport {
+//    renderers = arrayOf<ReportRenderer>(InventoryHtmlReportRenderer("waltid-verifier-licenses-report.html", "walt.id verifier"))
+//    filters = arrayOf<DependencyFilter>(LicenseBundleNormalizer())
+//}

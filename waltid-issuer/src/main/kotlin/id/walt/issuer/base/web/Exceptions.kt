@@ -1,4 +1,4 @@
-package id.walt.issuer.web
+package id.walt.issuer.base.web
 
 import io.ktor.http.*
 

@@ -1,4 +1,4 @@
-package id.walt.issuer.web
+package id.walt.issuer
 
 
 import id.walt.oid4vc.data.ResponseMode
@@ -10,7 +10,6 @@ import id.walt.oid4vc.requests.BatchCredentialRequest
 import id.walt.oid4vc.requests.CredentialRequest
 import id.walt.oid4vc.requests.TokenRequest
 import id.walt.oid4vc.responses.AuthorizationErrorCode
-import id.walt.issuer.oidc.CITestProvider2
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.github.smiley4.ktorswaggerui.dsl.get
 import io.github.smiley4.ktorswaggerui.dsl.route
@@ -29,7 +28,7 @@ import kotlin.io.encoding.ExperimentalEncodingApi
 @Serializable
 data class UserData(val email: String, val password: String, val id: String? = null)
 
-object OidcApi : CITestProvider2() {
+object OidcApi : CIProvider() {
 
     val logger = KotlinLogging.logger { }
 

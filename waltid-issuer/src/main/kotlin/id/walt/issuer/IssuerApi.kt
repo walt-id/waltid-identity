@@ -1,4 +1,4 @@
-package id.walt.issuer.web
+package id.walt.issuer
 
 import id.walt.core.crypto.keys.KeySerialization
 import id.walt.core.crypto.keys.KeyType
@@ -11,7 +11,6 @@ import id.walt.oid4vc.data.JsonLDCredentialDefinition
 import id.walt.oid4vc.data.OfferedCredential
 import id.walt.oid4vc.definitions.CROSS_DEVICE_CREDENTIAL_OFFER_URL
 import id.walt.oid4vc.requests.CredentialOfferRequest
-import id.walt.issuer.oidc.CITestProvider2
 import io.github.smiley4.ktorswaggerui.dsl.get
 import io.github.smiley4.ktorswaggerui.dsl.post
 import io.github.smiley4.ktorswaggerui.dsl.route
@@ -271,7 +270,7 @@ fun Application.issuerApi() {
 
                 //val nonce = issuanceSession.cNonce ?: throw IllegalArgumentException("No cNonce set in issuanceSession?")
 
-                OidcApi.setIssuanceDataForIssuanceId(issuanceSession.id, CITestProvider2.IssuanceSessionData(key, issuerDid, vc))
+                OidcApi.setIssuanceDataForIssuanceId(issuanceSession.id, CIProvider.IssuanceSessionData(key, issuerDid, vc))
 
                 println("issuanceSession: $issuanceSession")
 

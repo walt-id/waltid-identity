@@ -1,4 +1,4 @@
-package id.walt.issuer.config
+package id.walt.verifier.base.config
 
 import com.sksamuel.hoplite.*
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -27,6 +27,7 @@ object ConfigManager {
                 .addCommandLineSource(args)
                 .addFileSource("config/$id.conf", optional = true)
                 .addEnvironmentSource()
+
                 .withExplicitSealedTypes()
                 .build().loadConfigOrThrow(type, emptyList())
         }.onSuccess {
@@ -61,7 +62,7 @@ object ConfigManager {
      */
     private fun registerConfigurations() {
         registerConfig("web", WebConfig::class)
-        registerConfig("issuer-service", OIDCIssuerServiceConfig::class)
+        registerConfig("verifier-service", OIDCVerifierServiceConfig::class)
     }
 
     fun loadConfigs(args: Array<String>) {

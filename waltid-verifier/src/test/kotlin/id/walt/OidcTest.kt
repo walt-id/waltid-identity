@@ -1,27 +1,13 @@
 package id.walt
 
-import id.walt.issuer.CIProvider
-import id.walt.oid4vc.data.*
-import id.walt.oid4vc.requests.CredentialOfferRequest
 import kotlin.test.Test
 
 class OidcTest {
 
     @Test
     fun x() {
-        val ciTestProvider = CIProvider()
 
 
-        // -------- CREDENTIAL ISSUER ----------
-        // as CI provider, initialize credential offer for user
-        val issuanceSession = ciTestProvider.initializeCredentialOffer(
-            CredentialOffer.Builder(ciTestProvider.baseUrl).addOfferedCredential("VerifiableId"),
-            600, allowPreAuthorized = false
-        )
-
-        val offerRequest = CredentialOfferRequest(issuanceSession.credentialOffer!!)
-        val offerUri = ciTestProvider.getCredentialOfferRequestUrl(offerRequest)
-        println("Offer URI: $offerUri")
     }
 
     /*
@@ -32,8 +18,8 @@ class OidcTest {
         // parse credential URI
         val parsedOfferReq = CredentialOfferRequest.fromHttpParameters(Url(offerUri).parameters.toMap())
 
-        // get issuer metadata
-        val providerMetadataUri = credentialWallet.getCIProviderMetadataUrl(parsedOfferReq.credentialOffer!!.credentialIssuer)
+        // get verfier metadata
+        val providerMetadataUri = credentialWallet.getCIProviderMetadataUrl(parsedOfferReq.credentialOffer!!.credentialVerfier)
         val providerMetadata = ktorClient.get(providerMetadataUri).call.body<OpenIDProviderMetadata>()
         providerMetadata.credentialsSupported shouldNotBe null
 
@@ -46,7 +32,7 @@ class OidcTest {
         val authReq = AuthorizationRequest(
             ResponseType.code.name, testCIClientConfig.clientID,
             redirectUri = credentialWallet.config.redirectUri,
-            issuerState = parsedOfferReq.credentialOffer!!.grants[GrantType.authorization_code.value]!!.issuerState
+            verfierState = parsedOfferReq.credentialOffer!!.grants[GrantType.authorization_code.value]!!.verfierState
         )
         val authResp = ktorClient.get(providerMetadata.authorizationEndpoint!!) {
             url {
@@ -91,7 +77,7 @@ class OidcTest {
         // parse and verify credential
         val credential = VerifiableCredential.fromString(credentialResp.credential!!.jsonPrimitive.content)
         println("Issued credential: $credential")
-        credential.issuer?.id shouldBe ciTestProvider.CI_ISSUER_DID
+        credential.verfier?.id shouldBe ciTestProvider.CI_VERIFIER_DID
         credential.credentialSubject?.id shouldBe credentialWallet.TEST_DID
         Auditor.getService().verify(credential, listOf(SignaturePolicy())).result shouldBe true
     }

@@ -1,10 +1,10 @@
 @file:Suppress("ExtractKtorModule")
 
-package id.walt.issuer.oidc
+package id.walt.issuer
 
 
-import id.walt.issuer.config.ConfigManager
-import id.walt.issuer.config.OIDCIssuerServiceConfig
+import id.walt.issuer.base.config.ConfigManager
+import id.walt.issuer.base.config.OIDCIssuerServiceConfig
 import id.walt.core.crypto.keys.Key
 import id.walt.core.crypto.keys.KeyType
 import id.walt.core.crypto.keys.LocalKey
@@ -25,7 +25,6 @@ import id.walt.oid4vc.responses.CredentialErrorCode
 import id.walt.oid4vc.util.randomUUID
 import id.walt.issuer.utils.W3CVcUtils.overwrite
 import id.walt.issuer.utils.W3CVcUtils.update
-import id.walt.issuer.web.openBadgeCredentialExample
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Clock
 import kotlinx.serialization.encodeToString
@@ -37,7 +36,7 @@ import kotlin.io.encoding.ExperimentalEncodingApi
 /**
  * OIDC for Verifiable Credential Issuance service provider, implementing abstract service provider from OIDC4VC library.
  */
-open class CITestProvider2 : OpenIDCredentialIssuer(
+open class CIProvider : OpenIDCredentialIssuer(
     baseUrl = let {
         ConfigManager.getConfig<OIDCIssuerServiceConfig>().baseUrl
     },
