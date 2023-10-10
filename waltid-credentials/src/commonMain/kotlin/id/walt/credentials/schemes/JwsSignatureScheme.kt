@@ -33,21 +33,18 @@ class JwsSignatureScheme : SignatureScheme {
         /** Set additional options in the JWT header */
         jwtHeaders: Map<String, String> = emptyMap(),
         /** Set additional options in the JWT payload */
-        jwtOptions: Map<String, String> = emptyMap(),
+        jwtOptions: Map<String, JsonElement> = emptyMap(),
     ): String {
-        val header = mapOf(
-            JwsHeader.KEY_ID to jwtHeaders[JwsHeader.KEY_ID].toString(),
-        ).also { println("Header: $it") }
-
         val payload = Json.encodeToString(
             mapOf(
-                JwsOption.SUBJECT to JsonPrimitive(jwtOptions["subjectDid"]),
-                JwsOption.ISSUER to JsonPrimitive(jwtOptions["issuerDid"]),
+                JwsOption.ISSUER to jwtOptions[JwsOption.ISSUER],
+                JwsOption.SUBJECT to jwtOptions[JwsOption.SUBJECT],
                 JwsOption.VC to data,
+                *(jwtOptions.entries.map { it.toPair() }.toTypedArray())
             )
-        ).also { println("Payload: $it") }.encodeToByteArray()
+        ).encodeToByteArray()
 
-        return key.signJws(payload, header)
+        return key.signJws(payload, jwtHeaders)
     }
 
     suspend fun verify(data: String): Result<JsonObject> = runCatching {

@@ -9,6 +9,8 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlin.time.Duration
 
 data class W3CVC(
     private val content: Map<String, JsonElement>
@@ -27,18 +29,20 @@ data class W3CVC(
         /** Set additional options in the JWT header */
         additionalJwtHeader: Map<String, String> = emptyMap(),
         /** Set additional options in the JWT payload */
-        additionalJwtOptions: Map<String, String> = emptyMap()
+        additionalJwtOptions: Map<String, JsonElement> = emptyMap()
     ): String {
         return JwsSignatureScheme().sign(
             data = this.toJsonObject(),
             key = issuerKey,
             jwtHeaders = mapOf(
                 JwsHeader.KEY_ID to issuerDid,
-                JwsOption.ISSUER to issuerDid,
-                JwsOption.SUBJECT to subjectDid,
                 *(additionalJwtHeader.entries.map { it.toPair() }.toTypedArray())
             ),
-            jwtOptions = additionalJwtOptions,
+            jwtOptions = mapOf(
+                JwsOption.ISSUER to JsonPrimitive(issuerDid),
+                JwsOption.SUBJECT to JsonPrimitive(subjectDid),
+                *(additionalJwtOptions.entries.map { it.toPair() }.toTypedArray())
+            ),
         )
     }
 
@@ -62,4 +66,8 @@ data class W3CVC(
         private val prettyJson = Json { prettyPrint = true }
     }
 
+}
+
+fun main() {
+    println(Duration.parse("1d12h").toIsoString())
 }
