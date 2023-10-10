@@ -16,13 +16,9 @@ object PolicyManager {
      *  multi signature?
      *
      * >>> NEXT:
-            "expired",
-            "not-before",
             "challenge",
             "webhook"
      */
-
-
 
     fun registerPolicies(vararg policies: VerificationPolicy) {
         policies.forEach { policy ->

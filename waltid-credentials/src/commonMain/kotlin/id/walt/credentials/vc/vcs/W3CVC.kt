@@ -5,6 +5,7 @@ import id.walt.core.crypto.utils.JsonUtils.toJsonElement
 import id.walt.credentials.schemes.JwsSignatureScheme
 import id.walt.credentials.schemes.JwsSignatureScheme.JwsHeader
 import id.walt.credentials.schemes.JwsSignatureScheme.JwsOption
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
@@ -12,6 +13,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlin.time.Duration
 
+@Serializable
 data class W3CVC(
     private val content: Map<String, JsonElement>
 ) : Map<String, JsonElement> by content {

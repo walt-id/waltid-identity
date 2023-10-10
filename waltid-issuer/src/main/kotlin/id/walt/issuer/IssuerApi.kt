@@ -3,8 +3,12 @@ package id.walt.issuer
 import id.walt.core.crypto.keys.KeySerialization
 import id.walt.core.crypto.keys.KeyType
 import id.walt.core.crypto.keys.LocalKey
+import id.walt.core.crypto.utils.JwsUtils.decodeJws
+import id.walt.credentials.issuance.Issuer.mergingIssue
 import id.walt.credentials.vc.vcs.W3CVC
 import id.walt.did.dids.DidService
+import id.walt.did.dids.registrar.LocalRegistrar
+import id.walt.did.dids.resolver.LocalResolver
 import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.data.CredentialOffer
 import id.walt.oid4vc.data.JsonLDCredentialDefinition
@@ -19,46 +23,83 @@ import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 
+@Serializable
+data class IssuanceRequest(
+    val vc: W3CVC,
+    val mapping: JsonObject? = null
+) {
+    companion object {
+        /**
+         * Return IssuanceRequest of W3CVC in `vc` and mapping in `mapping` if it has `vc`. Otherwise,
+         * return complete JSON as W3CVC and no mapping.
+         */
+        fun fromJsonObject(jsonObj: JsonObject): IssuanceRequest {
+            val maybeHasVc = jsonObj["vc"]?.jsonObject
+            return when {
+                maybeHasVc != null -> IssuanceRequest(W3CVC(maybeHasVc), jsonObj["mapping"]?.jsonObject)
+                else -> IssuanceRequest(W3CVC(jsonObj), null)
+            }
+        }
+    }
+}
 
+//language=json
 val openBadgeCredentialExampleJsonString = """
 {
-  "@context": [
-    "https://www.w3.org/2018/credentials/v1",
-    "https://purl.imsglobal.org/spec/ob/v3p0/context.json"
-  ],
-  "id": "urn:uuid:63c8140b-1b77-4c39-babc-825e4cfd69ba",
-  "type": [
-    "VerifiableCredential",
-    "OpenBadgeCredential"
-  ],
-  "name": "JFF x vc-edu PlugFest 3 Interoperability",
-  "issuer": {
-    "type": ["Profile"],
-    "id": "did:key:z6MktiSzqF9kqwdU8VkdBKx56EYzXfpgnNPUAGznpicNiWfn",
-    "name": "Jobs for the Future (JFF)",
-    "url": "https://www.jff.org/",
-    "image": "https://w3c-ccg.github.io/vc-ed/plugfest-1-2022/images/JFF_LogoLockup.png"
-  },
-  "issuanceDate": "2023-07-20T07:05:44Z",
-  "credentialSubject": {
-    "type": ["AchievementSubject"],
-    "id": "did:key:123",
-    "achievement": {
-      "id": "urn:uuid:ac254bd5-8fad-4bb1-9d29-efd938536926",
-      "type": ["Achievement"],
-      "name": "JFF x vc-edu PlugFest 3 Interoperability",
-      "description": "This wallet supports the use of W3C Verifiable Credentials and has demonstrated interoperability during the presentation request workflow during JFF x VC-EDU PlugFest 3.",
-      "criteria": {
-        "type": "Criteria",
-        "narrative": "Wallet solutions providers earned this badge by demonstrating interoperability during the presentation request workflow. This includes successfully receiving a presentation request, allowing the holder to select at least two types of verifiable credentials to create a verifiable presentation, returning the presentation to the requestor, and passing verification of the presentation and the included credentials."
-      },
-      "image": {
-        "id":"https://w3c-ccg.github.io/vc-ed/plugfest-3-2023/images/JFF-VC-EDU-PLUGFEST3-badge-image.png",
-        "type": "Image"
+  "vc": {
+    "@context": [
+      "https://www.w3.org/2018/credentials/v1",
+      "https://purl.imsglobal.org/spec/ob/v3p0/context.json"
+    ],
+    "id": "urn:uuid:THIS WILL BE REPLACED WITH DYNAMIC DATA FUNCTION (see below)",
+    "type": [
+      "VerifiableCredential",
+      "OpenBadgeCredential"
+    ],
+    "name": "JFF x vc-edu PlugFest 3 Interoperability",
+    "issuer": {
+      "type": [
+        "Profile"
+      ],
+      "id": "did:key:THIS WILL BE REPLACED WITH DYNAMIC DATA FUNCTION FROM CONTEXT (see below)",
+      "name": "Jobs for the Future (JFF)",
+      "url": "https://www.jff.org/",
+      "image": "https://w3c-ccg.github.io/vc-ed/plugfest-1-2022/images/JFF_LogoLockup.png"
+    },
+    "issuanceDate": "2023-07-20T07:05:44Z (THIS WILL BE REPLACED BY DYNAMIC DATA FUNCTION (see below))",
+    "expirationDate": "WILL BE MAPPED BY DYNAMIC DATA FUNCTION (see below)",
+    "credentialSubject": {
+      "id": "did:key:123 (THIS WILL BE REPLACED BY DYNAMIC DATA FUNCTION (see below))",
+      "type": [
+        "AchievementSubject"
+      ],
+      "achievement": {
+        "id": "urn:uuid:ac254bd5-8fad-4bb1-9d29-efd938536926",
+        "type": [
+          "Achievement"
+        ],
+        "name": "JFF x vc-edu PlugFest 3 Interoperability",
+        "description": "This wallet supports the use of W3C Verifiable Credentials and has demonstrated interoperability during the presentation request workflow during JFF x VC-EDU PlugFest 3.",
+        "criteria": {
+          "type": "Criteria",
+          "narrative": "Wallet solutions providers earned this badge by demonstrating interoperability during the presentation request workflow. This includes successfully receiving a presentation request, allowing the holder to select at least two types of verifiable credentials to create a verifiable presentation, returning the presentation to the requestor, and passing verification of the presentation and the included credentials."
+        },
+        "image": {
+          "id": "https://w3c-ccg.github.io/vc-ed/plugfest-3-2023/images/JFF-VC-EDU-PLUGFEST3-badge-image.png",
+          "type": "Image"
+        }
       }
     }
+  },
+  "mapping": {
+    "id": "<uuid>",
+    "issuer": {"id": "<issuerDid>" },
+    "credentialSubject": {"id": "<subjectDid>"},
+    "issuanceDate": "<timestamp>",
+    "expirationDate": "<timestamp-in:365d>"
   }
 }
 """.trimIndent()
@@ -208,11 +249,11 @@ fun Application.issuerApi() {
                         example = "did:key:..."
                         required = true
                     }*/
-                    body<JsonObject> {
+                    body<IssuanceRequest> {
                         description =
                             "Pass the unsigned credential that you intend to issue as the body of the request."
                         example("OpenBadgeCredential example", openBadgeCredentialExampleJsonString)
-                        example("UniversityDegreeCredential example", universityDegreeCredentialExample2)
+                        //example("UniversityDegreeCredential example", universityDegreeCredentialExample2)
                         required = true
                     }
                 }
@@ -238,8 +279,11 @@ fun Application.issuerApi() {
                     ?: throw IllegalArgumentException("No subjectDid was passed.")*/
                 val issuerDid = context.request.header("walt-issuerDid") ?: DidService.registerByKey("key", key).did
 
-                val body = context.receive<Map<String, JsonElement>>()
-                val vc = W3CVC(body)
+                val body = context.receive<JsonObject>()
+
+                val issuanceRequest = IssuanceRequest.fromJsonObject(body)
+
+                val vc = issuanceRequest.vc
 
                 fun W3CVC.getJsonStringArray(key: String): List<String> {
                     val keyElement = this[key] ?: throw IllegalArgumentException("Missing key in JSON: $key")
@@ -270,7 +314,10 @@ fun Application.issuerApi() {
 
                 //val nonce = issuanceSession.cNonce ?: throw IllegalArgumentException("No cNonce set in issuanceSession?")
 
-                OidcApi.setIssuanceDataForIssuanceId(issuanceSession.id, CIProvider.IssuanceSessionData(key, issuerDid, vc))
+                OidcApi.setIssuanceDataForIssuanceId(
+                    issuanceSession.id,
+                    CIProvider.IssuanceSessionData(key, issuerDid, issuanceRequest)
+                )
 
                 println("issuanceSession: $issuanceSession")
 
@@ -315,5 +362,39 @@ fun Application.issuerApi() {
                 context.respond(HttpStatusCode.OK, "mdoc issued")
             }
         }
+    }
+}
+
+suspend fun main() {
+    DidService.apply {
+        registerResolver(LocalResolver())
+        registerRegistrar(LocalRegistrar())
+        updateRegistrarsForMethods()
+        updateResolversForMethods()
+    }
+
+    val ir = IssuanceRequest.fromJsonObject(Json.parseToJsonElement(openBadgeCredentialExampleJsonString).jsonObject)
+
+    val issuerKey =
+        KeySerialization.deserializeKey("""{"type":"local","jwk":"{\"kty\":\"OKP\",\"d\":\"mi_10iiMhRzWpc8S97W5mW3nW_Llv6FJWQreODqV6os\",\"crv\":\"Ed25519\",\"kid\":\"-sPnHUacW7L3lWc4t33UjMektLlyufzosu_GzNgb7v4\",\"x\":\"RKrOFFf5mR_Tva7Vbi_OgE5PoUYCS6sODxaLgSxkQ8U\"}"}""")
+            .getOrThrow()
+    val issuerDid = "did:key:z6Mkj5Jq5UaRznynC7wviUnMEekGry4vsggRuZbAb2BiCc1J"
+
+    val subjectDid = "did:key:z6MkmqY96sGNppYEtB2wwfi1HBD3cm9NuWpgxpWyhD1zWts6"
+
+    val jwt = ir.vc.mergingIssue(
+        issuerKey,
+        issuerDid,
+        subjectDid,
+        ir.mapping ?: JsonObject(emptyMap()),
+        emptyMap(),
+        emptyMap()
+    )
+
+    println("JWT: $jwt")
+
+    jwt.decodeJws().apply {
+        println("Header:  $header")
+        println("Payload: $payload")
     }
 }

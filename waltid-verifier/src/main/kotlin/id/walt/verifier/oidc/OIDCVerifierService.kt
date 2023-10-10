@@ -33,6 +33,7 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
         val vcPolicies: List<PolicyRequest>,
         val specificPolicies: Map<String, List<PolicyRequest>>
     )
+
     val sessionPolicies = HashMap<String, SessionPolicyRequests>()
     val policyResults = HashMap<String, PresentationVerificationResponse>()
 
@@ -61,9 +62,8 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
     // ------------------------------------
     // Simple cryptographic operations interface implementation
     override fun doVerify(tokenResponse: TokenResponse, session: PresentationSession): Boolean {
-        // TODO: apply other policies
-
-        val policies = sessionPolicies[session.id] ?: throw IllegalArgumentException("Could not find policy listing for session: ${session.id}")
+        val policies = sessionPolicies[session.id]
+            ?: throw IllegalArgumentException("Could not find policy listing for session: ${session.id}")
 
         val vpToken = when (tokenResponse.vpToken) {
             is JsonObject -> tokenResponse.vpToken.toString()

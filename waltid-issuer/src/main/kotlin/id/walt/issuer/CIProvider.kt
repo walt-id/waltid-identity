@@ -3,13 +3,14 @@
 package id.walt.issuer
 
 
-import id.walt.issuer.base.config.ConfigManager
-import id.walt.issuer.base.config.OIDCIssuerServiceConfig
 import id.walt.core.crypto.keys.Key
 import id.walt.core.crypto.keys.KeyType
 import id.walt.core.crypto.keys.LocalKey
+import id.walt.credentials.issuance.Issuer.mergingIssue
 import id.walt.credentials.vc.vcs.W3CVC
 import id.walt.did.dids.DidService
+import id.walt.issuer.base.config.ConfigManager
+import id.walt.issuer.base.config.OIDCIssuerServiceConfig
 import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.data.CredentialSupported
 import id.walt.oid4vc.definitions.JWTClaims
@@ -23,13 +24,9 @@ import id.walt.oid4vc.providers.TokenTarget
 import id.walt.oid4vc.requests.CredentialRequest
 import id.walt.oid4vc.responses.CredentialErrorCode
 import id.walt.oid4vc.util.randomUUID
-import id.walt.issuer.utils.W3CVcUtils.overwrite
-import id.walt.issuer.utils.W3CVcUtils.update
 import kotlinx.coroutines.runBlocking
-import kotlinx.datetime.Clock
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
-import java.util.*
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 
@@ -191,7 +188,7 @@ open class CIProvider : OpenIDCredentialIssuer(
             repeat(10) {
                 println("WARNING: RETURNING DEMO/EXAMPLE (= BOGUS) CREDENTIAL: subjectDid or nonce is null (was deferred issuance tried?)")
             }
-            IssuanceSessionData(exampleIssuerKey, exampleIssuerDid, W3CVC(openBadgeCredentialExample))
+            IssuanceSessionData(exampleIssuerKey, exampleIssuerDid, IssuanceRequest(W3CVC(openBadgeCredentialExample)))
         } else {
             println("RETRIEVING VC FROM TOKEN MAPPING: $nonce")
             tokenCredentialMapping[nonce]
@@ -202,22 +199,16 @@ open class CIProvider : OpenIDCredentialIssuer(
             format = credentialRequest.format,
             credential = JsonPrimitive(
                 runBlocking {
+                    val vc = data.request.vc
+
                     data.run {
-                        vc.overwrite(
-                            mapOf(
-                                "id" to JsonPrimitive("urn:uuid:${UUID.randomUUID().toString().lowercase()}"),
-                                "issuanceDate" to JsonPrimitive(Clock.System.now().toString())
-                            )
-                        ).update(
-                            key = "credentialSubject",
-                            mapOf("id" to JsonPrimitive(holderKid))
-                        ).update(
-                            key = "issuer",
-                            mapOf("id" to JsonPrimitive(data.issuerDid))
-                        ).signJws(
-                            issuerKey = issuerKey,
-                            issuerDid = issuerDid,
-                            subjectDid = holderKid
+                        vc.mergingIssue(
+                            issuerKey,
+                            issuerDid,
+                            holderKid,
+                            request.mapping ?: JsonObject(emptyMap()),
+                            emptyMap(),
+                            emptyMap()
                         )
                     }
                 }
@@ -229,7 +220,7 @@ open class CIProvider : OpenIDCredentialIssuer(
     data class IssuanceSessionData(
         val issuerKey: Key,
         val issuerDid: String,
-        val vc: W3CVC
+        val request: IssuanceRequest
     )
 
     private val sessionCredentialPreMapping = HashMap<String, IssuanceSessionData>() // session id -> VC

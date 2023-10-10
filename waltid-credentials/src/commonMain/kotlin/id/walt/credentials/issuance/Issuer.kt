@@ -62,24 +62,28 @@ object Issuer {
     }
 
 
-    val dataFunctions = mapOf<String, suspend (call: W3CDataMergeUtils.FunctionCall?) -> JsonElement>(
-        "subjectDid" to { JsonPrimitive("xxSubjectDidxx") },
+    val dataFunctions = mapOf<String, suspend (call: W3CDataMergeUtils.FunctionCall) -> JsonElement>(
+        "subjectDid" to { it.fromContext() },
+        "issuerDid" to { it.fromContext() },
+
+        "context" to { it.context[it.args!!]!! },
 
         "timestamp" to { JsonPrimitive(Clock.System.now().toString()) },
         "timestamp-seconds" to { JsonPrimitive(Clock.System.now().epochSeconds) },
 
-        "timestamp-in" to { JsonPrimitive((Clock.System.now() + Duration.parse(it!!.args!!)).toString()) },
-        "timestamp-in-seconds" to { JsonPrimitive((Clock.System.now() + Duration.parse(it!!.args!!)).epochSeconds) },
+        "timestamp-in" to { JsonPrimitive((Clock.System.now() + Duration.parse(it.args!!)).toString()) },
+        "timestamp-in-seconds" to { JsonPrimitive((Clock.System.now() + Duration.parse(it.args!!)).epochSeconds) },
 
-        "timestamp-before" to { JsonPrimitive((Clock.System.now() - Duration.parse(it!!.args!!)).toString()) },
-        "timestamp-before-seconds" to { JsonPrimitive((Clock.System.now() - Duration.parse(it!!.args!!)).epochSeconds) },
+        "timestamp-before" to { JsonPrimitive((Clock.System.now() - Duration.parse(it.args!!)).toString()) },
+        "timestamp-before-seconds" to { JsonPrimitive((Clock.System.now() - Duration.parse(it.args!!)).epochSeconds) },
 
         "uuid" to { JsonPrimitive("urn:uuid:${randomUUID()}") },
-        "webhook" to { JsonPrimitive(HttpClient().get(it!!.args!!).bodyAsText()) },
-        "webhook-json" to { Json.parseToJsonElement(HttpClient().get(it!!.args!!).bodyAsText()) },
+        "webhook" to { JsonPrimitive(HttpClient().get(it.args!!).bodyAsText()) },
+        "webhook-json" to { Json.parseToJsonElement(HttpClient().get(it.args!!).bodyAsText()) },
 
         "last" to {
-            it!!.history[it.args!!] ?: throw IllegalArgumentException("No such function in history: ${it.args}")
+            it.history?.get(it.args!!)
+                ?: throw IllegalArgumentException("No such function in history or no history: ${it.args}")
         }
     )
 
@@ -88,8 +92,8 @@ object Issuer {
      */
     suspend fun W3CVC.mergingIssue(
         key: Key,
-        did: String,
-        subject: String,
+        issuerDid: String,
+        subjectDid: String,
 
         mappings: JsonObject,
 
@@ -107,7 +111,12 @@ object Issuer {
 
         val dataMappings = JsonObject(mappings.filterKeys { !it.startsWith("jwt") })*/
 
-        val mapped = this.mergeWithMapping(mappings, dataFunctions)
+        val context = mapOf(
+            "issuerDid" to JsonPrimitive(issuerDid),
+            "subjectDid" to JsonPrimitive(subjectDid)
+        )
+
+        val mapped = this.mergeWithMapping(mappings, context, dataFunctions)
 
         val vc = mapped.vc
         val jwtRes = mapped.results.mapKeys { it.key.removePrefix("jwt:") }.toMutableMap()
@@ -140,8 +149,8 @@ object Issuer {
 
         return vc.signJws(
             issuerKey = key,
-            issuerDid = did,
-            subjectDid = subject,
+            issuerDid = issuerDid,
+            subjectDid = subjectDid,
             additionalJwtHeader = additionalJwtHeader.toMutableMap().apply {
                 put("typ", "JWT")
             },
@@ -200,4 +209,9 @@ suspend fun main() {
         println("Header:  $header")
         println("Payload: $payload")
     }
+
+    println(
+        issuerKey.getPublicKey()
+            .verifyJws(jwt)
+    )
 }

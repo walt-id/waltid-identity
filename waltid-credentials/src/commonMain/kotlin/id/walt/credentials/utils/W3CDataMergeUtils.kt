@@ -3,29 +3,21 @@ package id.walt.credentials.utils
 import id.walt.credentials.vc.vcs.W3CVC
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.json.*
-import kotlin.collections.HashMap
-import kotlin.collections.Map
-import kotlin.collections.MutableMap
 import kotlin.collections.component1
 import kotlin.collections.component2
-import kotlin.collections.emptyList
-import kotlin.collections.emptyMap
-import kotlin.collections.forEach
 import kotlin.collections.set
-import kotlin.collections.toList
-import kotlin.collections.toMutableList
-import kotlin.collections.toMutableMap
 
 object W3CDataMergeUtils {
 
-    val log = KotlinLogging.logger {  }
+    val log = KotlinLogging.logger { }
 
     fun JsonPrimitive.isTemplate() =
         this.content.let { it.first() == '<' && it.last() == '>' && it.length > 2 && !it.contains(" ") }
 
     suspend fun getTemplateData(
         functionCall: String,
-        dataFunctions: Map<String, suspend (FunctionCall?) -> JsonElement>,
+        dataFunctions: Map<String, suspend (FunctionCall) -> JsonElement>,
+        context: Map<String, JsonElement>,
         functionHistory: MutableMap<String, JsonElement>
     ): JsonElement {
         val cmdLine = functionCall.substring(1, functionCall.length - 1)
@@ -37,12 +29,13 @@ object W3CDataMergeUtils {
 
         val result = if (hasArgs) {
             val args = cmdLine.substring(cmd.length + 1)
-            func.invoke(FunctionCall(functionHistory, args))
+            func.invoke(FunctionCall(cmd, functionHistory, context, args))
         } else {
             try {
-                func.invoke(null)
+                func.invoke(FunctionCall(cmd, null, context, null))
             } catch (e: NullPointerException) {
-                throw IllegalArgumentException("Could not execute dynamic data function \"$cmd\": Missing argument!")
+                e.printStackTrace()
+                throw IllegalArgumentException("Could not execute dynamic data function \"$cmd\" - missing argument! At function call: $cmdLine")
             }
         }
         if (result is JsonPrimitive) {
@@ -56,13 +49,14 @@ object W3CDataMergeUtils {
     suspend fun MutableMap<String, JsonElement>.patch(
         k: String,
         v: JsonElement,
-        dataFunctions: Map<String, suspend (FunctionCall?) -> JsonElement>,
+        dataFunctions: Map<String, suspend (FunctionCall) -> JsonElement>,
+        context: Map<String, JsonElement>,
         functionHistory: MutableMap<String, JsonElement>
     ): MutableMap<String, JsonElement> {
         when (v) {
             is JsonPrimitive -> {
                 when {
-                    v.isTemplate() -> this[k] = getTemplateData(v.content, dataFunctions, functionHistory)
+                    v.isTemplate() -> this[k] = getTemplateData(v.content, dataFunctions, context, functionHistory)
                     else -> this[k] = v
                 }
             }
@@ -78,7 +72,9 @@ object W3CDataMergeUtils {
                     //println("Sub-patching for $k: (current is: ${this[k]})")
 
                     this[k] =
-                        JsonObject(this[k]!!.jsonObject.toMutableMap().patch(k2, v2, dataFunctions, functionHistory))
+                        JsonObject(
+                            this[k]!!.jsonObject.toMutableMap().patch(k2, v2, dataFunctions, context, functionHistory)
+                        )
                 }
             }
 
@@ -107,11 +103,22 @@ object W3CDataMergeUtils {
     data class MergeResult(val vc: W3CVC, val results: Map<String, JsonElement>)
 
 
-    data class FunctionCall(val history: Map<String, JsonElement>, val args: String?)
+    data class FunctionCall(
+        val func: String,
+        val history: Map<String, JsonElement>?,
+        val context: Map<String, JsonElement>,
+        val args: String?
+    ) {
+        fun fromContext(): JsonElement {
+            println("CONTEXT: $context")
+            return context[func] ?: throw IllegalArgumentException("Cannot find in context: $func")
+        }
+    }
 
     suspend fun W3CVC.mergeWithMapping(
         mapping: JsonObject,
-        data: Map<String, suspend (FunctionCall?) -> JsonElement>
+        context: Map<String, JsonElement>,
+        data: Map<String, suspend (FunctionCall) -> JsonElement>
     ): MergeResult {
         val vcm = this.toMutableMap()
 
@@ -120,9 +127,9 @@ object W3CDataMergeUtils {
 
         mapping.forEach { (k, v) ->
             if (!k.startsWith("jwt:")) {
-                vcm.patch(k, v, data, functionHistory)
+                vcm.patch(k, v, data, context, functionHistory)
             } else {
-                results[k] = getTemplateData(v.jsonPrimitive.content, data, functionHistory)
+                results[k] = getTemplateData(v.jsonPrimitive.content, data, context, functionHistory)
             }
         }
         return MergeResult(W3CVC(vcm), results)
