@@ -1,12 +1,12 @@
 package id.walt.verifier
 
+import id.walt.credentials.verification.models.PolicyRequest
+import id.walt.credentials.verification.models.PolicyRequest.Companion.parsePolicyRequests
+import id.walt.credentials.verification.policies.JwtSignaturePolicy
 import id.walt.oid4vc.data.ResponseMode
 import id.walt.oid4vc.data.dif.*
 import id.walt.verifier.oidc.OIDCVerifierService
 import id.walt.verifier.oidc.PresentationSessionInfo
-import id.walt.ssikit.verification.models.PolicyRequest
-import id.walt.ssikit.verification.models.PolicyRequest.Companion.parsePolicyRequests
-import id.walt.ssikit.verification.policies.JwtSignaturePolicy
 import io.github.smiley4.ktorswaggerui.dsl.get
 import io.github.smiley4.ktorswaggerui.dsl.post
 import io.github.smiley4.ktorswaggerui.dsl.route

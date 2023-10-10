@@ -1,10 +1,10 @@
 package id.walt.verifier
 
+import id.walt.did.dids.DidService
+import id.walt.did.dids.resolver.LocalResolver
+import id.walt.verifier.OidcApi.oidcApi
 import id.walt.verifier.base.config.ConfigManager
 import id.walt.verifier.base.config.WebConfig
-import id.walt.ssikit.did.DidService
-import id.walt.ssikit.did.resolver.LocalResolver
-import id.walt.verifier.OidcApi.oidcApi
 import id.walt.verifier.base.web.plugins.*
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.server.application.*

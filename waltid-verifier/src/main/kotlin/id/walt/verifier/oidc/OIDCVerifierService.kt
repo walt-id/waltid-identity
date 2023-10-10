@@ -2,19 +2,21 @@
 
 package id.walt.verifier.oidc
 
-import id.walt.verifier.base.config.ConfigManager
-import id.walt.verifier.base.config.OIDCVerifierServiceConfig
+import id.walt.credentials.verification.PolicyRunner
+import id.walt.credentials.verification.models.PolicyRequest
+import id.walt.credentials.verification.models.PresentationVerificationResponse
 import id.walt.oid4vc.data.ResponseMode
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.providers.CredentialVerifierConfig
 import id.walt.oid4vc.providers.OpenIDCredentialVerifier
 import id.walt.oid4vc.providers.PresentationSession
 import id.walt.oid4vc.responses.TokenResponse
-import id.walt.ssikit.verification.PolicyRunner
-import id.walt.ssikit.verification.models.PolicyRequest
-import id.walt.ssikit.verification.models.PresentationVerificationResponse
+import id.walt.verifier.base.config.ConfigManager
+import id.walt.verifier.base.config.OIDCVerifierServiceConfig
 import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.json.*
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonPrimitive
 
 /**
  * OIDC for Verifiable Presentations service provider, implementing abstract base provider from OIDC4VC library.
