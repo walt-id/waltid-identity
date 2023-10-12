@@ -1,7 +1,8 @@
 package resolvers
 
+import TestClient
 import TestServer
-import id.walt.core.crypto.keys.Key
+import id.walt.crypto.keys.Key
 import id.walt.did.dids.document.DidDocument
 import id.walt.did.dids.resolver.local.DidWebResolver
 import id.walt.did.dids.resolver.local.LocalResolverMethod
@@ -16,7 +17,7 @@ import org.junit.jupiter.params.provider.MethodSource
 import java.util.stream.Stream
 
 class DidWebResolverTest : DidResolverTestBase() {
-    override val sut: LocalResolverMethod = DidWebResolver()
+    override val sut: LocalResolverMethod = DidWebResolver(TestClient.http)
 
     @ParameterizedTest
     @MethodSource
@@ -42,7 +43,6 @@ class DidWebResolverTest : DidResolverTestBase() {
         @JvmStatic
         @BeforeAll
         fun startServer() {
-            DidWebResolver.URL_PROTOCOL = "http"
             TestServer.server.start()
         }
 
@@ -50,7 +50,6 @@ class DidWebResolverTest : DidResolverTestBase() {
         @AfterAll
         fun stopServer() {
             TestServer.server.stop()
-            DidWebResolver.URL_PROTOCOL = "https"
         }
 
         @JvmStatic

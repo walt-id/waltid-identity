@@ -1,12 +1,12 @@
 package id.walt.did.dids.registrar.local.key
 
-import id.walt.core.crypto.keys.Key
-import id.walt.core.crypto.keys.KeyType
-import id.walt.core.crypto.keys.LocalKey
-import id.walt.core.crypto.utils.JsonCanonicalizationUtils
-import id.walt.core.crypto.utils.MultiBaseUtils.convertRawKeyToMultiBase58Btc
-import id.walt.core.crypto.utils.MultiCodecUtils
-import id.walt.core.crypto.utils.MultiCodecUtils.getMultiCodecKeyCode
+import id.walt.crypto.keys.Key
+import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.LocalKey
+import id.walt.crypto.utils.JsonCanonicalizationUtils
+import id.walt.crypto.utils.MultiBaseUtils.convertRawKeyToMultiBase58Btc
+import id.walt.crypto.utils.MultiCodecUtils
+import id.walt.crypto.utils.MultiCodecUtils.getMultiCodecKeyCode
 import id.walt.did.dids.document.DidDocument
 import id.walt.did.dids.document.DidKeyDocument
 import id.walt.did.dids.registrar.DidResult

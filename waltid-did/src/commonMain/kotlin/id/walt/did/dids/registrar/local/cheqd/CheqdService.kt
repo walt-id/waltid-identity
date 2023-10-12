@@ -1,8 +1,8 @@
 package id.walt.did.dids.registrar.local.cheqd
 
-import id.walt.core.crypto.keys.Key
-import id.walt.core.crypto.keys.KeyType
-import id.walt.core.crypto.utils.Base64Utils.base64toBase64Url
+import id.walt.crypto.utils.Base64Utils.base64toBase64Url
+import id.walt.crypto.keys.Key
+import id.walt.crypto.keys.KeyType
 import id.walt.did.dids.document.DidDocument
 import id.walt.did.dids.registrar.DidResult
 import id.walt.did.dids.registrar.dids.DidCreateOptions

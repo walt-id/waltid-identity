@@ -1,6 +1,6 @@
 package id.walt.did.dids.registrar.dids
 
-class DidEbsiCreateOptions(token: String) : DidCreateOptions(
+class DidEbsiCreateOptions(version: Int, token: String) : DidCreateOptions(
     method = "ebsi",
-    options = options(emptyMap(), secret = mapOf("token" to token))
+    options = options(options = mapOf("version" to version), secret = mapOf("token" to token))
 )

@@ -1,4 +1,4 @@
-package id.walt.core.crypto.utils
+package id.walt.crypto.utils
 
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi

@@ -18,17 +18,9 @@ java {
 }
 
 
-/*tasks.test {
-    useJUnitPlatform()
-}*/
-
 kotlin {
     jvmToolchain(11)
 }
-
-/*application {
-    mainClass.set("id.walt.did.DidMainKt")
-}*/
 
 kotlin {
     jvm {

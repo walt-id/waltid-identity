@@ -1,9 +1,14 @@
-import id.walt.core.crypto.keys.*
+import id.walt.crypto.keys.*
+import io.ktor.client.*
+import io.ktor.client.request.*
+import io.ktor.http.*
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import org.junit.jupiter.api.condition.EnabledIf
 import kotlin.reflect.KClass
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -12,6 +17,7 @@ import kotlin.test.assertNotEquals
 class KeySerializationTest {
 
     @Test
+    @EnabledIf("hostCondition")
     fun test() = runTest {
         val localKey = LocalKey.generate(KeyType.Ed25519)
         val localKeySerialized = KeySerialization.serializeKey(localKey)
@@ -74,4 +80,8 @@ class KeySerializationTest {
 
         println()
     }
+
+    private fun hostCondition() = runCatching {
+        runBlocking { HttpClient().get("http://127.0.0.1:8200") }.status == HttpStatusCode.OK
+    }.fold(onSuccess = { true }, onFailure = { false })
 }

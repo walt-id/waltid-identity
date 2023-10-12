@@ -9,29 +9,29 @@ import io.ktor.server.routing.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import java.io.File
+import javax.security.auth.x500.X500Principal
 
 object TestServer {
-    private val keyStoreFile = File("src/jvmTest/resources/keystore.jks")
+    private val keyStoreFile = File(this.javaClass.classLoader.getResource("")!!.path.plus("keystore.jks"))
+    private val ed25519DocumentResponse =
+        this.javaClass.classLoader.getResource("did-doc/ed25519.json")!!.path.let { File(it).readText() }
+    private val secp256k1DocumentResponse =
+        this.javaClass.classLoader.getResource("did-doc/secp256k1.json")!!.path.let { File(it).readText() }
+    private val secp256r1DocumentResponse =
+        this.javaClass.classLoader.getResource("did-doc/secp256r1.json")!!.path.let { File(it).readText() }
+    private val rsaDocumentResponse =
+        this.javaClass.classLoader.getResource("did-doc/rsa.json")!!.path.let { File(it).readText() }
     private val keyStore = buildKeyStore {
         certificate("test") {
             password = "test123"
             domains = listOf("localhost", "127.0.0.1", "0.0.0.0")
+            subject = X500Principal("CN=localhost, OU=walt.id, O=walt.id, C=AT")
         }
-    }
-
+    }.also { it.saveToFile(keyStoreFile, "test123") }
     private val environment = applicationEngineEnvironment {
         envConfig()
     }
-    private val ed25519DocumentResponse = File("src/jvmTest/resources/did-doc/ed25519.json").readText()
-    private val secp256k1DocumentResponse = File("src/jvmTest/resources/did-doc/secp256k1.json").readText()
-    private val secp256r1DocumentResponse = File("src/jvmTest/resources/did-doc/secp256r1.json").readText()
-    private val rsaDocumentResponse = File("src/jvmTest/resources/did-doc/rsa.json").readText()
-
-    val server = embeddedServer(Netty, environment) {}
-
-    init {
-        keyStore.saveToFile(keyStoreFile, "test123")
-    }
+    val server: ApplicationEngine by lazy { embeddedServer(Netty, environment) }
 
     private fun Application.module() {
         install(ContentNegotiation) {
@@ -58,15 +58,16 @@ object TestServer {
             module()
         }
         connector {
-            port = 8080
+            port = 8000
         }
-//        sslConnector(
-//            keyStore = keyStore,
-//            keyAlias = "test",
-//            keyStorePassword = { "test123".toCharArray() },
-//            privateKeyPassword = { "test123".toCharArray() }) {
-//            port = 8443
-//            keyStorePath = keyStoreFile
-//        }
+        sslConnector(
+            keyStore = keyStore,
+            keyAlias = "test",
+            keyStorePassword = { "test123".toCharArray() },
+            privateKeyPassword = { "test123".toCharArray() }) {
+            port = 8080
+            keyStorePath = keyStoreFile
+        }
     }
+
 }

@@ -1,6 +1,6 @@
 package id.walt.did.dids.resolver
 
-import id.walt.core.crypto.keys.Key
+import id.walt.crypto.keys.Key
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.plugins.*

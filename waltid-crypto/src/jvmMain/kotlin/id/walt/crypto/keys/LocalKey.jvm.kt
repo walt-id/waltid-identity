@@ -1,11 +1,11 @@
-package id.walt.core.crypto.keys
+package id.walt.crypto.keys
 
 import com.nimbusds.jose.*
 import com.nimbusds.jose.crypto.*
 import com.nimbusds.jose.crypto.bc.BouncyCastleProviderSingleton
 import com.nimbusds.jose.jwk.*
 import com.nimbusds.jose.jwk.KeyType.*
-import id.walt.core.crypto.utils.JsonUtils.toJsonElement
+import id.walt.crypto.utils.JsonUtils.toJsonElement
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
