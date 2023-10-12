@@ -1,6 +1,6 @@
 package id.walt.did.dids.resolver
 
-import id.walt.core.crypto.keys.Key
+import id.walt.crypto.keys.Key
 import id.walt.did.dids.DidUtils.methodFromDid
 import id.walt.did.dids.resolver.local.DidJwkResolver
 import id.walt.did.dids.resolver.local.DidKeyResolver

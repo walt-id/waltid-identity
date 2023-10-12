@@ -1,7 +1,7 @@
 package id.walt.did.dids.resolver.local
 
-import id.walt.core.crypto.keys.Key
-import id.walt.core.crypto.keys.LocalKey
+import id.walt.crypto.keys.Key
+import id.walt.crypto.keys.LocalKey
 import id.walt.did.dids.DidUtils
 import id.walt.did.dids.document.DidDocument
 import io.ktor.client.*

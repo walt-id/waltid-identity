@@ -1,5 +1,5 @@
-import id.walt.core.crypto.keys.KeyType
-import id.walt.core.crypto.keys.LocalKey
+import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.LocalKey
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject

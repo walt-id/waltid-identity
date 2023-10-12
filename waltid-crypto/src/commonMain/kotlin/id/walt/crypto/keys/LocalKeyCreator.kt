@@ -1,4 +1,4 @@
-package id.walt.core.crypto.keys
+package id.walt.crypto.keys
 
 interface LocalKeyCreator {
     suspend fun generate(type: KeyType, metadata: LocalKeyMetadata = LocalKeyMetadata()): LocalKey

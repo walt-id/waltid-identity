@@ -1,8 +1,8 @@
 package id.walt.did.dids.resolver.local
 
-import id.walt.core.crypto.keys.Key
-import id.walt.core.crypto.keys.LocalKey
-import id.walt.core.crypto.utils.Base64Utils.base64UrlDecode
+import id.walt.crypto.keys.Key
+import id.walt.crypto.keys.LocalKey
+import id.walt.crypto.utils.Base64Utils.base64UrlDecode
 import id.walt.did.dids.DidUtils
 import id.walt.did.dids.document.DidDocument
 import id.walt.did.dids.document.DidJwkDocument

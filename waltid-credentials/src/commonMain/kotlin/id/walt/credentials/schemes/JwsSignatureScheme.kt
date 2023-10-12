@@ -1,10 +1,13 @@
 package id.walt.credentials.schemes
 
-import id.walt.core.crypto.keys.Key
-import id.walt.core.crypto.utils.JwsUtils.decodeJws
+import id.walt.crypto.keys.Key
+import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.did.dids.DidService
 import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.*
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonPrimitive
 
 
 class JwsSignatureScheme : SignatureScheme {

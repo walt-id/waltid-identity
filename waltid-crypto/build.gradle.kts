@@ -17,17 +17,9 @@ java {
     targetCompatibility = JavaVersion.VERSION_1_8
 }
 
-/*tasks.test {
-    useJUnitPlatform()
-}*/
-
 kotlin {
     jvmToolchain(8)
 }
-
-/*application {
-    mainClass.set("id.walt.credentials.CryptoMainKt")
-}*/
 
 kotlin {
     jvm {

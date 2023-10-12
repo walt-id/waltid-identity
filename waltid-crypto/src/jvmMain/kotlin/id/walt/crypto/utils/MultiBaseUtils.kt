@@ -1,4 +1,4 @@
-package id.walt.core.crypto.utils
+package id.walt.crypto.utils
 
 import io.ipfs.multibase.Multibase
 
