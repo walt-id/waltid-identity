@@ -16,7 +16,7 @@ plugins {
     kotlin("jvm") // Versions.KOTLIN_VERSION
     id("org.jetbrains.kotlin.plugin.serialization")  // Versions.KOTLIN_VERSION
 
-    id("io.ktor.plugin") version "2.3.4" // Versions.KTOR_VERSION
+    id("io.ktor.plugin") version "2.3.5" // Versions.KTOR_VERSION
     id("org.owasp.dependencycheck") version "8.4.0"
     id("com.github.jk1.dependency-license-report") version "2.5"
     application
