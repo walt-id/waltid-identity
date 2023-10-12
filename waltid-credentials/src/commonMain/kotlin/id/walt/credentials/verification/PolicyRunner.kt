@@ -1,6 +1,6 @@
 package id.walt.credentials.verification
 
-import id.walt.core.crypto.utils.JwsUtils.decodeJws
+import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.credentials.verification.models.PolicyRequest
 import id.walt.credentials.verification.models.PolicyRequest.Companion.parsePolicyRequests
 import id.walt.credentials.verification.models.PolicyResult

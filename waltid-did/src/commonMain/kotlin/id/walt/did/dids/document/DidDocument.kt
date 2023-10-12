@@ -1,6 +1,6 @@
 package id.walt.did.dids.document
 
-import id.walt.core.crypto.utils.JsonUtils.printAsJson
+import id.walt.crypto.utils.JsonUtils.printAsJson
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject

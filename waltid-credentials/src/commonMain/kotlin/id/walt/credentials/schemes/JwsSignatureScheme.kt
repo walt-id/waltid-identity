@@ -1,7 +1,7 @@
 package id.walt.credentials.schemes
 
-import id.walt.core.crypto.keys.Key
-import id.walt.core.crypto.utils.JwsUtils.decodeJws
+import id.walt.crypto.keys.Key
+import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.did.dids.DidService
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json

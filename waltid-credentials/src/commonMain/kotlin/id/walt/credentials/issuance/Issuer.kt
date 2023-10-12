@@ -1,8 +1,8 @@
 package id.walt.credentials.issuance
 
-import id.walt.core.crypto.keys.Key
-import id.walt.core.crypto.keys.KeySerialization
-import id.walt.core.crypto.utils.JwsUtils.decodeJws
+import id.walt.crypto.keys.Key
+import id.walt.crypto.keys.KeySerialization
+import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.credentials.issuance.Issuer.mergingIssue
 import id.walt.credentials.utils.W3CDataMergeUtils
 import id.walt.credentials.utils.W3CDataMergeUtils.mergeWithMapping

@@ -107,7 +107,7 @@ dependencies {
     //implementation("com.github.ajalt.clikt:clikt:4.2.0")
 
     // OIDC
-    implementation("id.walt:waltid-openid4vc:1.2310041452.0")
+    api(project(":waltid-openid4vc"))
 
     // SSIKit
     //implementation("id.walt:waltid-ssikit:1.2309171812.0")

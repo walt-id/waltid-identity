@@ -1,6 +1,6 @@
 package id.walt.credentials.verification.models
 
-import id.walt.core.crypto.utils.JsonUtils.toJsonElement
+import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.credentials.verification.SerializableRuntimeException
 import kotlinx.serialization.json.*
 

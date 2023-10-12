@@ -11,10 +11,13 @@ plugins {
 
 rootProject.name = "waltid-identity"
 include(
-    // Base libs
+    // Base SSI libs
     "waltid-crypto",
     "waltid-did",
     "waltid-credentials",
+
+    // Protocols
+    "waltid-openid4vc",
 
     // Services based on libs
     "waltid-issuer",
