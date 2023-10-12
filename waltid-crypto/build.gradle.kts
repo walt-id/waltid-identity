@@ -5,7 +5,7 @@ plugins {
     id("com.github.ben-manes.versions")
 }
 
-group = "id.walt.cypto"
+group = "id.walt.crypto"
 
 repositories {
     mavenCentral()
