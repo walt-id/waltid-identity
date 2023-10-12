@@ -1,9 +1,9 @@
 package id.walt.did
 
-import id.walt.core.crypto.keys.KeyType
-import id.walt.core.crypto.keys.LocalKey
-import id.walt.core.crypto.keys.TSEKey
-import id.walt.core.crypto.keys.TSEKeyMetadata
+import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.LocalKey
+import id.walt.crypto.keys.TSEKey
+import id.walt.crypto.keys.TSEKeyMetadata
 import id.walt.did.dids.DidService
 import id.walt.did.dids.registrar.dids.DidKeyCreateOptions
 import id.walt.did.helpers.WaltidServices

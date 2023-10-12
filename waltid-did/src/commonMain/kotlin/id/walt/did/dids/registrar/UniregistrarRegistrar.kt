@@ -1,6 +1,6 @@
 package id.walt.did.dids.registrar
 
-import id.walt.core.crypto.keys.Key
+import id.walt.crypto.keys.Key
 import id.walt.did.dids.registrar.dids.DidCreateOptions
 import io.ktor.client.*
 import io.ktor.client.call.*

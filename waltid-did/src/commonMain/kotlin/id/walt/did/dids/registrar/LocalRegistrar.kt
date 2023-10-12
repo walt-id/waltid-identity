@@ -1,6 +1,6 @@
 package id.walt.did.dids.registrar
 
-import id.walt.core.crypto.keys.Key
+import id.walt.crypto.keys.Key
 import id.walt.did.dids.registrar.dids.DidCreateOptions
 import id.walt.did.dids.registrar.local.jwk.DidJwkRegistrar
 import id.walt.did.dids.registrar.local.key.DidKeyRegistrar

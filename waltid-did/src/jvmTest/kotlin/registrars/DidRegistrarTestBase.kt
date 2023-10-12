@@ -8,7 +8,7 @@ import DidDocumentChecks.rsaDidChecks
 import DidDocumentChecks.rsaKeyChecks
 import DidDocumentChecks.secp256DidChecks
 import DidDocumentChecks.secp256KeyChecks
-import id.walt.core.crypto.keys.Key
+import id.walt.crypto.keys.Key
 import id.walt.did.dids.DidUtils
 import id.walt.did.dids.registrar.DidResult
 import id.walt.did.dids.registrar.dids.DidCreateOptions

@@ -17,17 +17,9 @@ java {
     targetCompatibility = JavaVersion.VERSION_11
 }
 
-/*tasks.test {
-    useJUnitPlatform()
-}*/
-
 kotlin {
     jvmToolchain(11)
 }
-
-/*application {
-    mainClass.set("id.walt.did.DidMainKt")
-}*/
 
 kotlin {
     jvm {
@@ -73,6 +65,7 @@ kotlin {
             dependencies {
                 implementation(kotlin("test"))
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
+                implementation("org.junit.jupiter:junit-jupiter-api:5.9.0")
             }
         }
         val jvmMain by getting {

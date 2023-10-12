@@ -2,7 +2,7 @@ package resolvers
 
 import TestClient
 import TestServer
-import id.walt.core.crypto.keys.Key
+import id.walt.crypto.keys.Key
 import id.walt.did.dids.document.DidDocument
 import id.walt.did.dids.resolver.local.DidWebResolver
 import id.walt.did.dids.resolver.local.LocalResolverMethod

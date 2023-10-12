@@ -1,4 +1,4 @@
-package id.walt.core.crypto.keys
+package id.walt.crypto.keys
 
 import kotlinx.serialization.Serializable
 

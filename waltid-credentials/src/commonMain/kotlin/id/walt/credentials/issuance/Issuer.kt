@@ -1,9 +1,9 @@
 package id.walt.credentials.issuance
 
-import id.walt.core.crypto.keys.Key
 import id.walt.credentials.utils.W3CVcUtils.overwrite
 import id.walt.credentials.utils.W3CVcUtils.update
 import id.walt.credentials.vc.vcs.W3CVC
+import id.walt.crypto.keys.Key
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 

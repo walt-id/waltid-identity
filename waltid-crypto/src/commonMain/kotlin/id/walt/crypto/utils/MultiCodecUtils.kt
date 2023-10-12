@@ -1,7 +1,7 @@
-package id.walt.core.crypto.utils
+package id.walt.crypto.utils
 
-import id.walt.core.crypto.keys.KeyType
-import id.walt.core.crypto.utils.MultiBaseUtils.decodeMultiBase58Btc
+import id.walt.crypto.keys.KeyType
+import id.walt.crypto.utils.MultiBaseUtils.decodeMultiBase58Btc
 
 // https://github.com/multiformats/multicodec
 // https://github.com/multiformats/multicodec/blob/master/table.csv

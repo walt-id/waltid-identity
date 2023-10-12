@@ -1,6 +1,6 @@
-package id.walt.core.crypto.utils
+package id.walt.crypto.utils
 
-import id.walt.core.crypto.keys.KeyType
+import id.walt.crypto.keys.KeyType
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
