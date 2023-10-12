@@ -4,12 +4,9 @@ import id.walt.credentials.vc.vcs.W3CVC
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
-import kotlin.collections.Map
 import kotlin.collections.component1
 import kotlin.collections.component2
-import kotlin.collections.forEach
 import kotlin.collections.set
-import kotlin.collections.toMutableMap
 
 object W3CVcUtils {
 

@@ -1,11 +1,10 @@
 package id.walt.issuer
 
-import id.walt.issuer.base.config.ConfigManager
-import id.walt.issuer.base.config.WebConfig
 import id.walt.did.helpers.WaltidServices
 import id.walt.issuer.OidcApi.oidcApi
+import id.walt.issuer.base.config.ConfigManager
+import id.walt.issuer.base.config.WebConfig
 import id.walt.issuer.base.web.plugins.*
-import id.walt.issuer.web.plugins.*
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.server.application.*
 import io.ktor.server.cio.*
