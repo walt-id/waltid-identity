@@ -65,6 +65,7 @@ kotlin {
             dependencies {
                 implementation(kotlin("test"))
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
+                implementation("org.junit.jupiter:junit-jupiter-api:5.9.0")
             }
         }
         val jvmMain by getting {

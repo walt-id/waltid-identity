@@ -4,12 +4,18 @@ import id.walt.crypto.keys.TSEKey
 import id.walt.crypto.keys.TSEKeyMetadata
 import id.walt.did.dids.DidService
 import id.walt.did.helpers.WaltidServices
+import io.ktor.client.*
+import io.ktor.client.request.*
+import io.ktor.http.*
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
+import org.junit.jupiter.api.condition.EnabledIf
 import kotlin.test.Test
 
 class VcApiTest {
 
     @Test
+    @EnabledIf("hostCondition")
     fun testVcApi() = runTest {
         // Initialize services
         WaltidServices.init()
@@ -70,5 +76,9 @@ class VcApiTest {
         key.delete()
 
     }
+
+    private fun hostCondition() = runCatching {
+        runBlocking { HttpClient().get("http://127.0.0.1:8200") }.status == HttpStatusCode.OK
+    }.fold(onSuccess = { true }, onFailure = { false })
 
 }

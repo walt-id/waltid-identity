@@ -1,8 +1,13 @@
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.TSEKey
 import id.walt.crypto.keys.TSEKeyMetadata
+import io.ktor.client.*
+import io.ktor.client.request.*
+import io.ktor.http.*
 import io.ktor.util.*
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
+import org.junit.jupiter.api.condition.EnabledIf
 import kotlin.test.Test
 
 class TSEKeyTest {
@@ -26,6 +31,7 @@ class TSEKeyTest {
     }
 
     @Test
+    @EnabledIf("hostCondition")
     fun testAll() = runTest {
         val tseMetadata = TSEKeyMetadata("http://127.0.0.1:8200/v1/transit", "dev-only-token")
 
@@ -37,4 +43,8 @@ class TSEKeyTest {
             test(it)
         }
     }
+
+    private fun hostCondition() = runCatching {
+        runBlocking { HttpClient().get("http://127.0.0.1:8200") }.status == HttpStatusCode.OK
+    }.fold(onSuccess = { true }, onFailure = { false })
 }
