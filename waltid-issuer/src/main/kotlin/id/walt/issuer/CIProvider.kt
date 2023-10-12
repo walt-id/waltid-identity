@@ -3,9 +3,9 @@
 package id.walt.issuer
 
 
-import id.walt.core.crypto.keys.Key
-import id.walt.core.crypto.keys.KeyType
-import id.walt.core.crypto.keys.LocalKey
+import id.walt.crypto.keys.Key
+import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.LocalKey
 import id.walt.credentials.issuance.Issuer.mergingIssue
 import id.walt.credentials.vc.vcs.W3CVC
 import id.walt.did.dids.DidService
