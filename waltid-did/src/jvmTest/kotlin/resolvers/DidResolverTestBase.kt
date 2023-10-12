@@ -4,7 +4,7 @@ import DidDocumentChecks.defaultKeyChecks
 import DidDocumentChecks.ed25519KeyChecks
 import DidDocumentChecks.rsaKeyChecks
 import DidDocumentChecks.secp256KeyChecks
-import id.walt.core.crypto.keys.Key
+import id.walt.crypto.keys.Key
 import id.walt.did.dids.document.DidDocument
 import id.walt.did.dids.resolver.local.LocalResolverMethod
 import kotlinx.coroutines.runBlocking

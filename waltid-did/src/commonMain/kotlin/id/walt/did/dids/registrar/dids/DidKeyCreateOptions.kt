@@ -1,6 +1,6 @@
 package id.walt.did.dids.registrar.dids
 
-import id.walt.core.crypto.keys.KeyType
+import id.walt.crypto.keys.KeyType
 
 class DidKeyCreateOptions(keyType: KeyType = KeyType.Ed25519, useJwkJcsPub: Boolean = false) : DidCreateOptions(
     method = "key",

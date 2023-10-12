@@ -1,4 +1,4 @@
-package id.walt.core.crypto.keys
+package id.walt.crypto.keys
 
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -17,7 +17,9 @@ object KeySerialization {
         }
     }
 
-    private val keySerializationJson = Json { serializersModule = keySerializationModule }
+    private val keySerializationJson = Json { serializersModule =
+        keySerializationModule
+    }
 
     fun serializeKey(key: Key): String = keySerializationJson.encodeToString(key)
     fun deserializeKey(json: String): Result<Key> = runCatching { keySerializationJson.decodeFromString<Key>(json) }

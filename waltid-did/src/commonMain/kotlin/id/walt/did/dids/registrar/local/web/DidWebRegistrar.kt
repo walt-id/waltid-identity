@@ -1,8 +1,8 @@
 package id.walt.did.dids.registrar.local.web
 
-import id.walt.core.crypto.keys.Key
-import id.walt.core.crypto.keys.KeyType
-import id.walt.core.crypto.keys.LocalKey
+import id.walt.crypto.keys.Key
+import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.LocalKey
 import id.walt.did.dids.document.DidDocument
 import id.walt.did.dids.document.DidWebDocument
 import id.walt.did.dids.registrar.DidResult

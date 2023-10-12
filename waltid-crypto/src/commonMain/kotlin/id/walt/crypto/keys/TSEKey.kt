@@ -1,9 +1,9 @@
-package id.walt.core.crypto.keys
+package id.walt.crypto.keys
 
-import id.walt.core.crypto.utils.Base64Utils.base64UrlDecode
-import id.walt.core.crypto.utils.Base64Utils.base64toBase64Url
-import id.walt.core.crypto.utils.Base64Utils.encodeToBase64Url
-import id.walt.core.crypto.utils.JwsUtils.jwsAlg
+import id.walt.crypto.utils.Base64Utils.base64UrlDecode
+import id.walt.crypto.utils.Base64Utils.base64toBase64Url
+import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
+import id.walt.crypto.utils.JwsUtils.jwsAlg
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.plugins.*
@@ -33,7 +33,7 @@ class TSEKey(
     //override var keyType: KeyType? = null
     private var _publicKey: ByteArray? = null,
     private var _keyType: KeyType? = null
-) : Key() {
+) : id.walt.crypto.keys.Key() {
 
     @Transient val retrievedKeyType by lazy { runBlocking { retrieveKeyType() } }
     @Transient val retrievedPublicKey by lazy { runBlocking { retrievePublicKey() } }
@@ -178,7 +178,7 @@ class TSEKey(
                 .jsonPrimitive.content
         ).value
 
-    override suspend fun getPublicKey(): Key {
+    override suspend fun getPublicKey(): id.walt.crypto.keys.Key {
         return LocalKey.importRawPublicKey(
             type = keyType,
             rawPublicKey = publicKey,

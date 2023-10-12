@@ -1,8 +1,8 @@
-package id.walt.core.crypto.utils
+package id.walt.crypto.utils
 
-import id.walt.core.crypto.keys.Key
-import id.walt.core.crypto.keys.KeyType
-import id.walt.core.crypto.utils.JsonUtils.toJsonElement
+import id.walt.crypto.keys.Key
+import id.walt.crypto.keys.KeyType
+import id.walt.crypto.utils.JsonUtils.toJsonElement
 import kotlinx.serialization.json.JsonObject
 
 object JsonCanonicalizationUtils {
@@ -17,7 +17,6 @@ object JsonCanonicalizationUtils {
             KeyType.Ed25519 -> okpPublicKeyRequiredMembers(it)
             KeyType.secp256k1, KeyType.secp256r1 -> ecPublicKeyRequiredMembers(it)
             KeyType.RSA -> rsaPublicKeyRequiredMembers(it)
-            null -> throw IllegalArgumentException("KeyType is not initialized!")
         }
     }.toString()
 

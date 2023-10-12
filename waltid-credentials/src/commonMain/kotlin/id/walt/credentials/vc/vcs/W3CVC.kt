@@ -1,10 +1,10 @@
 package id.walt.credentials.vc.vcs
 
-import id.walt.core.crypto.keys.Key
-import id.walt.core.crypto.utils.JsonUtils.toJsonElement
 import id.walt.credentials.schemes.JwsSignatureScheme
 import id.walt.credentials.schemes.JwsSignatureScheme.JwsHeader
 import id.walt.credentials.schemes.JwsSignatureScheme.JwsOption
+import id.walt.crypto.keys.Key
+import id.walt.crypto.utils.JsonUtils.toJsonElement
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement

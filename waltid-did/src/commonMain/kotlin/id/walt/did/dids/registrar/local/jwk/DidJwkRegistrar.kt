@@ -1,9 +1,9 @@
 package id.walt.did.dids.registrar.local.jwk
 
-import id.walt.core.crypto.keys.Key
-import id.walt.core.crypto.keys.KeyType
-import id.walt.core.crypto.keys.LocalKey
-import id.walt.core.crypto.utils.Base64Utils.encodeToBase64Url
+import id.walt.crypto.keys.Key
+import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.LocalKey
+import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.did.dids.document.DidDocument
 import id.walt.did.dids.document.DidJwkDocument
 import id.walt.did.dids.registrar.DidResult
