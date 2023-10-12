@@ -11,7 +11,6 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlin.time.Duration
 
 @Serializable
 data class W3CVC(
@@ -68,8 +67,4 @@ data class W3CVC(
         private val prettyJson = Json { prettyPrint = true }
     }
 
-}
-
-fun main() {
-    println(Duration.parse("1d12h").toIsoString())
 }

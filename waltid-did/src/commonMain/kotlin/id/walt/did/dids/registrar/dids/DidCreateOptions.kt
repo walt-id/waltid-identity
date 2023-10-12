@@ -1,7 +1,7 @@
 package id.walt.did.dids.registrar.dids
 
-import id.walt.core.crypto.keys.KeyType
-import id.walt.core.crypto.utils.JsonUtils.toJsonElement
+import id.walt.crypto.keys.KeyType
+import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.did.utils.EnumUtils.enumValueIgnoreCase
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.jsonObject

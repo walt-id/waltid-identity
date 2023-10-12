@@ -1,4 +1,4 @@
-package id.walt.core.crypto.keys
+package id.walt.crypto.keys
 
 import com.nimbusds.jose.crypto.bc.BouncyCastleProviderSingleton
 import com.nimbusds.jose.jwk.Curve

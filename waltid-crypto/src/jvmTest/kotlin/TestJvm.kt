@@ -1,5 +1,5 @@
-import id.walt.core.crypto.keys.LocalKey
-import id.walt.core.crypto.keys.KeyType
+import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.LocalKey
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch

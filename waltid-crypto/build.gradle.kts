@@ -5,7 +5,7 @@ plugins {
     id("com.github.ben-manes.versions")
 }
 
-group = "id.walt.cypto"
+group = "id.walt.crypto"
 
 repositories {
     mavenCentral()
@@ -17,17 +17,9 @@ java {
     targetCompatibility = JavaVersion.VERSION_1_8
 }
 
-/*tasks.test {
-    useJUnitPlatform()
-}*/
-
 kotlin {
     jvmToolchain(8)
 }
-
-/*application {
-    mainClass.set("id.walt.credentials.CryptoMainKt")
-}*/
 
 kotlin {
     jvm {
@@ -65,6 +57,7 @@ kotlin {
             dependencies {
                 implementation(kotlin("test"))
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
+                implementation("org.junit.jupiter:junit-jupiter-api:5.9.0")
             }
         }
         val jvmMain by getting {

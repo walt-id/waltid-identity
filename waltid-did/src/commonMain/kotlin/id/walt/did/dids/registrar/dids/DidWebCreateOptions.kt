@@ -1,6 +1,6 @@
 package id.walt.did.dids.registrar.dids
 
-import id.walt.core.crypto.keys.KeyType
+import id.walt.crypto.keys.KeyType
 
 class DidWebCreateOptions(domain: String, path: String = "", keyType: KeyType = KeyType.Ed25519) : DidCreateOptions(
     method = "web",

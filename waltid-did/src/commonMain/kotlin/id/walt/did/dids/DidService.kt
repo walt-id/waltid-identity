@@ -1,6 +1,6 @@
 package id.walt.did.dids
 
-import id.walt.core.crypto.keys.Key
+import id.walt.crypto.keys.Key
 import id.walt.did.dids.DidUtils.methodFromDid
 import id.walt.did.dids.registrar.DidRegistrar
 import id.walt.did.dids.registrar.DidRegistrarRegistrations
