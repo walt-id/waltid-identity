@@ -4,6 +4,7 @@ import id.walt.credentials.verification.policies.JsonSchemaPolicy
 import kotlinx.datetime.Instant
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonObject
 import kotlin.time.Duration
 
 
@@ -48,3 +49,11 @@ data class ExpirationDatePolicyException(
     val policyAvailable: Boolean = true
 ) :
     SerializableRuntimeException()
+
+@Serializable
+@SerialName("WebhookPolicyException")
+data class WebhookPolicyException(
+    val response: JsonObject
+) :
+    SerializableRuntimeException()
+
