@@ -1,11 +1,13 @@
 package id.walt.verifier
 
+import id.walt.credentials.verification.PolicyManager
 import id.walt.did.dids.DidService
 import id.walt.did.dids.resolver.LocalResolver
 import id.walt.verifier.OidcApi.oidcApi
 import id.walt.verifier.base.config.ConfigManager
 import id.walt.verifier.base.config.WebConfig
 import id.walt.verifier.base.web.plugins.*
+import id.walt.verifier.policies.PresentationDefinitionPolicy
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.server.application.*
 import io.ktor.server.cio.*
@@ -22,6 +24,8 @@ suspend fun main(args: Array<String>) {
         registerResolver(LocalResolver())
         updateResolversForMethods()
     }
+    PolicyManager.registerPolicies(PresentationDefinitionPolicy())
+
     //ServiceMatrix("service-matrix.properties")
 
     log.info { "Reading configurations..." }
