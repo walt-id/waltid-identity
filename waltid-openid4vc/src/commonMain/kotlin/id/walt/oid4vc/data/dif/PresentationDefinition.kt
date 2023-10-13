@@ -20,33 +20,45 @@ data class PresentationDefinition(
 ) : JsonDataObject() {
     override fun toJSON() = Json.encodeToJsonElement(PresentationDefinitionSerializer, this).jsonObject
 
+
+    /**
+     * https://identity.foundation/presentation-exchange/spec/v1.0.0/#input-descriptor
+     */
+    // FIXME: proper PresentationDefinition checker
+    fun primitiveVerificationGetTypeList(): List<String> {
+        val fields = inputDescriptors.mapNotNull { it.constraints?.fields }.flatten()
+            .filter { field -> field.path.any { "type" in it } && field.filter?.get("type")?.jsonPrimitive?.contentOrNull == "string" }
+
+        val types = fields.mapNotNull { it.filter?.get("pattern")?.jsonPrimitive?.contentOrNull }
+
+        return types
+    }
+
     companion object : JsonDataObjectFactory<PresentationDefinition>() {
         override fun fromJSON(jsonObject: JsonObject) =
             Json.decodeFromJsonElement(PresentationDefinitionSerializer, jsonObject)
 
-        fun primitiveGenerationFromVcTypes(types: List<String>) {
-            PresentationDefinition(
-                inputDescriptors = types.map { type ->
-                    InputDescriptor(
-                        id = type,
-                        format = mapOf(VCFormat.jwt_vc_json to VCFormatDefinition(alg = setOf("EdDSA"))),
-                        constraints = InputDescriptorConstraints(
-                            listOf(
-                                InputDescriptorField(
-                                    path = listOf("$.type"),
-                                    filter = JsonObject(mapOf(
-                                        "type" to JsonPrimitive("string"),
-                                        "pattern" to JsonPrimitive(type)
-                                    ))
+        fun primitiveGenerationFromVcTypes(types: List<String>): PresentationDefinition {
+            return PresentationDefinition(inputDescriptors = types.map { type ->
+                InputDescriptor(
+                    id = type,
+                    format = mapOf(VCFormat.jwt_vc_json to VCFormatDefinition(alg = setOf("EdDSA"))),
+                    constraints = InputDescriptorConstraints(
+                        listOf(
+                            InputDescriptorField(
+                                path = listOf("$.type"), filter = JsonObject(
+                                    mapOf(
+                                        "type" to JsonPrimitive("string"), "pattern" to JsonPrimitive(type)
+                                    )
                                 )
                             )
                         )
                     )
-                }
-            )
+                )
+            })
         }
 
-        //fun primitiveVerificationGetTypeList()
+
     }
 }
 
@@ -55,7 +67,8 @@ object PresentationDefinitionSerializer :
 
 fun main() {
     //language=json
-    val presDef = Json.parseToJsonElement("""
+    val presDef = Json.parseToJsonElement(
+        """
   {
     "id": "\u003cautomatically assigned\u003e",
     "input_descriptors": [
@@ -84,7 +97,8 @@ fun main() {
       }
     ]
   }
-    """.trimIndent())
+    """.trimIndent()
+    )
 
-    println(Json.encodeToString(Json.decodeFromJsonElement<PresentationDefinition>(presDef)))
+    println(Json.decodeFromJsonElement<PresentationDefinition>(presDef).primitiveVerificationGetTypeList())
 }

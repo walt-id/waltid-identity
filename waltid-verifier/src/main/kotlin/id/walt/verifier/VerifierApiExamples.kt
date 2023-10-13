@@ -7,7 +7,7 @@ object VerifierApiExamples {
     //language=json
     val minimal = """
 {
-  "requestCredentials": [
+  "request_credentials": [
     "OpenBadgeCredential"
   ]
 }
@@ -21,7 +21,7 @@ object VerifierApiExamples {
     { "policy": "minimum-credentials", "args": 2 },
     { "policy": "maximum-credentials", "args": 100 }
   ],
-  "requestCredentials": [
+  "request_credentials": [
     "OpenBadgeCredential",
     "VerifiableId"
   ]
@@ -43,7 +43,7 @@ object VerifierApiExamples {
     "expired",
     "not-before"
   ],
-  "requestCredentials": [
+  "request_credentials": [
     "OpenBadgeCredential",
     "VerifiableId"
   ]

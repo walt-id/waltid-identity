@@ -93,18 +93,26 @@ object PolicyRunner {
                 ) {
                     policyRequests.forEach { policyRequest ->
                         launch {
-                            val dataForPolicy: JsonElement = when (policyRequest.policy) {
-                                is JwtVerificationPolicy -> JsonPrimitive(jwt)
+                            runCatching {
+                                val dataForPolicy: JsonElement = when (policyRequest.policy) {
+                                    is JwtVerificationPolicy -> JsonPrimitive(jwt)
 
-                                is CredentialDataValidatorPolicy, is CredentialWrapperValidatorPolicy -> jwt.decodeJws().payload
+                                    is CredentialDataValidatorPolicy, is CredentialWrapperValidatorPolicy -> jwt.decodeJws().payload
 
-                                else -> throw IllegalArgumentException("Unsupported policy type: ${policyRequest.policy::class.simpleName}")
-                            }
-                            val runResult = policyRequest.runPolicyRequest(dataForPolicy, context)
-                            val policyResult = PolicyResult(policyRequest, runResult)
-                            resultMutex.withLock {
-                                results[resultIdx].policyResults.add(policyResult)
-                                policiesRun++
+                                    else -> throw IllegalArgumentException("Unsupported policy type: ${policyRequest.policy::class.simpleName}")
+                                }
+                                val runResult = policyRequest.runPolicyRequest(dataForPolicy, context)
+                                val policyResult = PolicyResult(policyRequest, runResult)
+                                resultMutex.withLock {
+                                    policiesRun++
+                                    results[resultIdx].policyResults.add(policyResult)
+                                }
+                            }.onFailure {
+                                println("Error executing policy: ${policyRequest.policy.name}")
+                                it.printStackTrace()
+                                resultMutex.withLock {
+                                    results[resultIdx].policyResults.add(PolicyResult(policyRequest, Result.failure(it)))
+                                }
                             }
                         }
                     }

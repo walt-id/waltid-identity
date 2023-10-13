@@ -94,14 +94,9 @@ fun Application.verfierApi() {
 
                 val body = context.receive<JsonObject>()
 
-                val presentationDefinition = (body["presentation_definition"]
+                /*val presentationDefinition = (body["presentation_definition"]
                     ?: throw IllegalArgumentException("No `presentation_definition` supplied!"))
-                    .let { PresentationDefinition.fromJSON(it.jsonObject) }
-
-                val session =
-                    OIDCVerifierService.initializeAuthorization(presentationDefinition, responseMode = responseMode)
-
-                //val policies = body["policies"]?.jsonArray
+                    .let { PresentationDefinition.fromJSON(it.jsonObject) }*/
 
                 val vpPolicies = body["vp_policies"]?.jsonArray?.parsePolicyRequests()
                     ?: listOf(PolicyRequest(JwtSignaturePolicy()))
@@ -110,6 +105,21 @@ fun Application.verfierApi() {
                     ?: listOf(PolicyRequest(JwtSignaturePolicy()))
 
                 val requestCredentialsArr = body["request_credentials"]!!.jsonArray
+
+                val requestedTypes = requestCredentialsArr.map {
+                    when (it) {
+                        is JsonPrimitive -> it.contentOrNull
+                        is JsonObject -> it["credential"]?.jsonPrimitive?.contentOrNull
+                        else -> throw IllegalArgumentException("Invalid JSON type for requested credential: $it")
+                    } ?: throw IllegalArgumentException("Invalid VC type for requested credential: $it")
+                }
+
+                val presentationDefinition = (body["presentation_definition"]?.let { PresentationDefinition.fromJSON(it.jsonObject) })
+                    ?: PresentationDefinition.primitiveGenerationFromVcTypes(requestedTypes)
+                println("Presentation definition: " + presentationDefinition.toJSON())
+
+                val session =
+                    OIDCVerifierService.initializeAuthorization(presentationDefinition, responseMode = responseMode)
 
                 val specificPolicies = requestCredentialsArr
                     .filterIsInstance<JsonObject>()

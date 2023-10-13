@@ -87,7 +87,7 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
                 globalVcPolicies = policies.vcPolicies,
                 specificCredentialPolicies = policies.specificPolicies,
                 presentationContext = mapOf(
-                    "presentationDefinition" to session.presentationDefinition.toJSON(),
+                    "presentationDefinition" to session.presentationDefinition,
                     "challenge" to session.id
                 )
             )
