@@ -23,6 +23,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
+import kotlin.time.Duration.Companion.minutes
 
 
 @Serializable
@@ -64,7 +65,7 @@ object OidcApi : CIProvider() {
             post("/par") {
                 val authReq = AuthorizationRequest.fromHttpParameters(call.receiveParameters().toMap())
                 try {
-                    val session = initializeAuthorization(authReq, 600)
+                    val session = initializeAuthorization(authReq, 5.minutes)
                     call.respond(getPushedAuthorizationSuccessResponse(session).toJSON())
                 } catch (exc: AuthorizationError) {
                     logger.error(exc) { "Authorization error: " }
