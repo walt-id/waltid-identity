@@ -142,6 +142,16 @@ fun Application.issuerApi() {
         get("/example-key") {
             context.respond(KeySerialization.serializeKey(LocalKey.generate(KeyType.Ed25519)))
         }
+        get("/example-key-transit", {
+            request {
+                queryParameter<String>("server") { required = true }
+                queryParameter<String>("token") { required = true }
+            }
+        }) {
+            val key = TSEKey.generate(KeyType.Ed25519, TSEKeyMetadata(call.parameters["server"]!!, call.parameters["token"]!!))
+
+            context.respond(KeySerialization.serializeKey(key))
+        }
         get("/example-did", {
             request { headerParameter<String>("key") }
         }) {
