@@ -1,11 +1,9 @@
 package id.walt.issuer
 
-import id.walt.crypto.keys.KeySerialization
-import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.LocalKey
-import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.credentials.issuance.Issuer.mergingIssue
 import id.walt.credentials.vc.vcs.W3CVC
+import id.walt.crypto.keys.*
+import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.did.dids.DidService
 import id.walt.did.dids.registrar.LocalRegistrar
 import id.walt.did.dids.resolver.LocalResolver
@@ -25,6 +23,7 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
+import kotlin.time.Duration.Companion.minutes
 
 @Serializable
 data class IssuanceRequest(
@@ -309,7 +308,7 @@ fun Application.issuerApi() {
                                 )
                             )
                         ),
-                    600, allowPreAuthorized = true
+                    5.minutes, allowPreAuthorized = true
                 )
 
                 //val nonce = issuanceSession.cNonce ?: throw IllegalArgumentException("No cNonce set in issuanceSession?")
