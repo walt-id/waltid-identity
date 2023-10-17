@@ -161,5 +161,46 @@ object VerifierApiExamples {
 }
 """.trimIndent()
 
+    //language=JSON
+    val presentationDefinitionPolicy =
+        """
+{
+  "vp_policies": [
+    "signature",
+    "expired",
+    "not-before",
+    "presentation-definition"
+  ],
+  "vc_policies": [
+    "signature",
+    "expired",
+    "not-before"
+  ],
+  "request_credentials": [
+    "ProofOfResidence",
+    {
+      "credential": "OpenBadgeCredential",
+      "policies": [
+        "signature",
+        {
+          "policy": "schema",
+          "args": {
+            "type": "object",
+            "required": [
+              "issuer"
+            ],
+            "properties": {
+              "issuer": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
+""".trimIndent()
+
 
 }

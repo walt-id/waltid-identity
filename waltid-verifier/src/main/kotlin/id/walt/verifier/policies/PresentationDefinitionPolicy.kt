@@ -28,11 +28,15 @@ class PresentationDefinitionPolicy : CredentialWrapperValidatorPolicy(
 
         return if (success)
             Result.success(Unit)
-        else
+        else {
+            println("Requested types: $requestedTypes")
+            println("Presented types: $presentedTypes")
+
             Result.failure(
                 PresentationDefinitionException(
                     requestedTypes.minus(presentedTypes.toSet())
                 )
             )
+        }
     }
 }
