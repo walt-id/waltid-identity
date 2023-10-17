@@ -85,6 +85,7 @@ fun Application.verfierApi() {
                         example("Example with VP & global VC policies", VerifierApiExamples.vpGlobalVcPolicies)
                         example("Example with VP, VC & specific credential policies", VerifierApiExamples.vcVpIndividualPolicies)
                         example("Example with VP, VC & specific policies, and explicit presentation_definition  (maximum example)", VerifierApiExamples.maxExample)
+                        example("Example with presentation definition policy", VerifierApiExamples.presentationDefinitionPolicy)
                     }
                 }
             }) {
