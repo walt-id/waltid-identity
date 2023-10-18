@@ -6,5 +6,5 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class JobActionResponse(
     val didState: DidState,
-    val jobId: String
+    val jobId: String? = null,
 )
