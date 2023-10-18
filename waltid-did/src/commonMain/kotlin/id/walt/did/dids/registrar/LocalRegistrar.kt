@@ -2,6 +2,7 @@ package id.walt.did.dids.registrar
 
 import id.walt.crypto.keys.Key
 import id.walt.did.dids.registrar.dids.DidCreateOptions
+import id.walt.did.dids.registrar.local.cheqd.DidCheqdRegistrar
 import id.walt.did.dids.registrar.local.jwk.DidJwkRegistrar
 import id.walt.did.dids.registrar.local.key.DidKeyRegistrar
 import id.walt.did.dids.registrar.local.web.DidWebRegistrar
@@ -13,9 +14,10 @@ class LocalRegistrar : DidRegistrar {
         DidJwkRegistrar(),
         DidKeyRegistrar(),
         DidWebRegistrar(),
+        DidCheqdRegistrar(),
     ).associateBy { it.method }
 
-    override suspend fun getSupportedMethods() = Result.success(setOf("key", "jwk", "web", "ebsi", "cheqd"))
+    override suspend fun getSupportedMethods() = Result.success(setOf("key", "jwk", "web", "cheqd" /*"ebsi",*/))
     //override suspend fun getSupportedMethods() = Result.success(registrarMethods.values.toSet())
 
     private fun getRegistrarForMethod(method: String) =
