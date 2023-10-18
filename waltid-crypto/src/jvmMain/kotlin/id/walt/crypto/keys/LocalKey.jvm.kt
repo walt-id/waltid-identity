@@ -5,6 +5,7 @@ import com.nimbusds.jose.crypto.*
 import com.nimbusds.jose.crypto.bc.BouncyCastleProviderSingleton
 import com.nimbusds.jose.jwk.*
 import com.nimbusds.jose.jwk.KeyType.*
+import com.nimbusds.jose.util.Base64URL
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -12,7 +13,13 @@ import kotlinx.serialization.Transient
 import kotlinx.serialization.json.*
 import org.bouncycastle.asn1.ASN1BitString
 import org.bouncycastle.asn1.ASN1Sequence
-import java.security.PublicKey
+import org.bouncycastle.asn1.DEROctetString
+import org.bouncycastle.asn1.edec.EdECObjectIdentifiers
+import org.bouncycastle.asn1.pkcs.PrivateKeyInfo
+import org.bouncycastle.asn1.x509.AlgorithmIdentifier
+import java.security.*
+import java.security.spec.PKCS8EncodedKeySpec
+import java.util.*
 
 @Serializable
 @SerialName("local")
@@ -39,8 +46,7 @@ actual class LocalKey actual constructor(
     actual override suspend fun getPublicKeyRepresentation(): ByteArray = when (keyType) {
         KeyType.Ed25519 -> _internalJwk.toOctetKeyPair().decodedX
         KeyType.RSA -> getRsaPublicKeyBytes(_internalJwk.toRSAKey().toPublicKey())
-        KeyType.secp256r1 -> _internalJwk.toECKey().toPublicKey().encoded
-        KeyType.secp256k1 -> _internalJwk.toECKey().toPublicKey().encoded
+        KeyType.secp256k1, KeyType.secp256r1 -> _internalJwk.toECKey().toPublicKey().encoded
         else -> TODO("Not yet implemented for: $keyType")
     }
 
@@ -90,7 +96,17 @@ actual class LocalKey actual constructor(
     }
 
     actual override suspend fun signRaw(plaintext: ByteArray): ByteArray {
-        TODO("Not yet implemented")
+        check(hasPrivateKey) { "No private key is attached to this key!" }
+        val signature = getSignature()
+        signature.initSign(getPrivateKey())
+        signature.update(plaintext)
+        val sig = signature.sign()
+        return sig
+//        var signature = ByteArray(Sign.BYTES)
+//        val privateKeyBytes = getPrivateKey().encoded
+//        val sigResult = sodium.cryptoSignDetached(signature, plaintext, plaintext.size.toLong(), privateKeyBytes)
+//        if (!sigResult) throw Exception("Couldn't provide a signature")
+//        return signature
     }
 
     /**
@@ -102,9 +118,7 @@ actual class LocalKey actual constructor(
     actual override suspend fun signJws(plaintext: ByteArray, headers: Map<String, String>): String {
         check(hasPrivateKey) { "No private key is attached to this key!" }
         val jwsObject = JWSObject(
-            JWSHeader.Builder(_internalJwsAlgorithm)
-                .customParams(headers)
-                .build(),
+            JWSHeader.Builder(_internalJwsAlgorithm).customParams(headers).build(),
             Payload(plaintext)
         )
 
@@ -173,6 +187,34 @@ actual class LocalKey actual constructor(
     private fun getRsaPublicKeyBytes(key: PublicKey): ByteArray {
         val pubPrim = ASN1Sequence.fromByteArray(key.encoded) as ASN1Sequence
         return (pubPrim.getObjectAt(1) as ASN1BitString).octets
+    }
+
+    private fun getPrivateKey() = when (keyType) {
+        KeyType.secp256r1, KeyType.secp256k1 -> _internalJwk.toECKey().toPrivateKey()
+        KeyType.Ed25519 -> decodeEd25519RawPrivKey(_internalJwk.toOctetKeyPair().d.toString(), getKeyFactory())
+        KeyType.RSA -> _internalJwk.toRSAKey().toPrivateKey()
+    }
+
+    private fun getSignature(): Signature = when (keyType) {
+        KeyType.secp256k1, KeyType.secp256r1 -> Signature.getInstance("SHA256withECDSA")
+        KeyType.Ed25519 -> Signature.getInstance("Ed25519")
+        KeyType.RSA -> Signature.getInstance("SHA256withRSA")
+    }
+
+    private fun getKeyFactory() = when (keyType) {
+        KeyType.secp256r1, KeyType.secp256k1 -> KeyFactory.getInstance("ECDSA")
+        KeyType.Ed25519 -> KeyFactory.getInstance("Ed25519")
+        KeyType.RSA -> KeyFactory.getInstance("RSA")
+    }
+
+    private fun decodeEd25519RawPrivKey(base64: String, kf: KeyFactory): PrivateKey {
+        val privKeyInfo =
+            PrivateKeyInfo(
+                AlgorithmIdentifier(EdECObjectIdentifiers.id_Ed25519),
+                DEROctetString(Base64URL.from(base64).decode())
+            )
+        val pkcs8KeySpec = PKCS8EncodedKeySpec(privKeyInfo.encoded)
+        return kf.generatePrivate(pkcs8KeySpec)
     }
 
     actual companion object : LocalKeyCreator {

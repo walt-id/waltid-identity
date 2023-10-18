@@ -12,6 +12,7 @@ import id.walt.did.dids.registrar.local.cheqd.models.job.didstates.Secret
 import id.walt.did.dids.registrar.local.cheqd.models.job.didstates.SigningResponse
 import id.walt.did.dids.registrar.local.cheqd.models.job.didstates.action.ActionDidState
 import id.walt.did.dids.registrar.local.cheqd.models.job.didstates.didStateSerializationModule
+import id.walt.did.dids.registrar.local.cheqd.models.job.didstates.failed.FailedDidState
 import id.walt.did.dids.registrar.local.cheqd.models.job.didstates.finished.DidDocument
 import id.walt.did.dids.registrar.local.cheqd.models.job.didstates.finished.FinishedDidState
 import id.walt.did.dids.registrar.local.cheqd.models.job.request.JobCreateRequest
@@ -32,8 +33,6 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.encodeToJsonElement
-import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
 
 class DidCheqdRegistrar() : LocalRegistrarMethod("cheqd") {
 
@@ -78,6 +77,7 @@ class DidCheqdRegistrar() : LocalRegistrarMethod("cheqd") {
                     "&publicKeyHex=$pubKeyHex"
         ).bodyAsText()
         // step#2. onboard did with cheqd registrar
+        //TODO: handle error responses (have only a 'message' field)
         json.decodeFromString<DidGetResponse>(response).let { did ->
             // step#2a. initialize
             val job = initiateDidJob(didRegisterUrl, json.encodeToJsonElement(JobCreateRequest(did.didDoc)))
@@ -86,10 +86,10 @@ class DidCheqdRegistrar() : LocalRegistrarMethod("cheqd") {
             // step#2c. finalize
             job.jobId?.let {
                 // TODO: associate verificationMethodId with signature
-                (finalizeDidJob(
-                    didRegisterUrl, it, did.didDoc.verificationMethod.first().id, signatures
-                ).didState as? FinishedDidState)?.didDocument
-                    ?: throw IllegalArgumentException("Failed to finalize the did onboarding process")
+                val didState =
+                    finalizeDidJob(didRegisterUrl, it, did.didDoc.verificationMethod.first().id, signatures).didState
+                (didState as? FinishedDidState)?.didDocument
+                    ?: throw IllegalArgumentException("Failed to finalize the did onboarding process.\nCheqd registrar returning \"${(didState as FailedDidState).description}\"")
             } ?: throw Exception("Initialize job didn't return any jobId.")
         }
     }
@@ -131,16 +131,15 @@ class DidCheqdRegistrar() : LocalRegistrarMethod("cheqd") {
         }.body<JobActionResponse>()
     }
 
-    @OptIn(ExperimentalEncodingApi::class)
     private suspend fun signPayload(key: Key, job: JobActionResponse): List<String> = let {
         val state = (job.didState as? ActionDidState) ?: throw IllegalArgumentException("Unexpected did state")
         val payloads = state.signingRequest.map {
-            Base64.decode(it.serializedPayload)
+            java.util.Base64.getDecoder().decode(it.serializedPayload)
         }
         // TODO: sign with key having alias from verification method
 
         payloads.map {
-            Base64.encode(key.signRaw(it) as ByteArray)
+            java.util.Base64.getUrlEncoder().encodeToString(key.signRaw(it) as ByteArray)
         }
     }
 
