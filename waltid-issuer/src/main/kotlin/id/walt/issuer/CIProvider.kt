@@ -3,11 +3,11 @@
 package id.walt.issuer
 
 
+import id.walt.credentials.issuance.Issuer.mergingIssue
+import id.walt.credentials.vc.vcs.W3CVC
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.LocalKey
-import id.walt.credentials.issuance.Issuer.mergingIssue
-import id.walt.credentials.vc.vcs.W3CVC
 import id.walt.did.dids.DidService
 import id.walt.issuer.base.config.ConfigManager
 import id.walt.issuer.base.config.OIDCIssuerServiceConfig
@@ -21,14 +21,18 @@ import id.walt.oid4vc.providers.CredentialIssuerConfig
 import id.walt.oid4vc.providers.IssuanceSession
 import id.walt.oid4vc.providers.OpenIDCredentialIssuer
 import id.walt.oid4vc.providers.TokenTarget
+import id.walt.oid4vc.requests.BatchCredentialRequest
 import id.walt.oid4vc.requests.CredentialRequest
+import id.walt.oid4vc.responses.BatchCredentialResponse
 import id.walt.oid4vc.responses.CredentialErrorCode
+import id.walt.oid4vc.responses.CredentialResponse
 import id.walt.oid4vc.util.randomUUID
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
+import kotlin.time.Duration.Companion.minutes
 
 /**
  * OIDC for Verifiable Credential Issuance service provider, implementing abstract service provider from OIDC4VC library.
@@ -36,23 +40,19 @@ import kotlin.io.encoding.ExperimentalEncodingApi
 open class CIProvider : OpenIDCredentialIssuer(
     baseUrl = let {
         ConfigManager.getConfig<OIDCIssuerServiceConfig>().baseUrl
-    },
-    config = CredentialIssuerConfig(
-        credentialsSupported = listOf(
-            "VerifiableCredential" to listOf("VerifiableCredential")
-            /*"VerifiableId" to listOf("VerifiableCredential", "VerifiableId"),
+    }, config = CredentialIssuerConfig(credentialsSupported = listOf(
+        "VerifiableCredential" to listOf("VerifiableCredential")/*"VerifiableId" to listOf("VerifiableCredential", "VerifiableId"),
             "VerifiableDiploma" to listOf("VerifiableCredential", "VerifiableAttestation", "VerifiableDiploma"),
             "OpenBadgeCredential" to listOf("VerifiableCredential", "OpenBadgeCredential"),*/
-        ).map {
-            CredentialSupported(
-                format = CredentialFormat.jwt_vc_json,
-                id = it.first,
-                cryptographicBindingMethodsSupported = setOf("did"),
-                cryptographicSuitesSupported = setOf("EdDSA", "ES256", "ES256K", "RSA"),
-                types = it.second
-            )
-        }
-    )
+    ).map {
+        CredentialSupported(
+            format = CredentialFormat.jwt_vc_json,
+            id = it.first,
+            cryptographicBindingMethodsSupported = setOf("did"),
+            cryptographicSuitesSupported = setOf("EdDSA", "ES256", "ES256K", "RSA"),
+            types = it.second
+        )
+    })
 ) {
     companion object {
 
@@ -97,22 +97,21 @@ open class CIProvider : OpenIDCredentialIssuer(
         }
 
     @OptIn(ExperimentalEncodingApi::class)
-    override fun verifyTokenSignature(target: TokenTarget, token: String) =
-        runBlocking {
-            println("Verifying JWS: $token")
-            println("JWS Verification: target: $target")
+    override fun verifyTokenSignature(target: TokenTarget, token: String) = runBlocking {
+        println("Verifying JWS: $token")
+        println("JWS Verification: target: $target")
 
-            val tokenHeader = Json.parseToJsonElement(Base64.decode(token.split(".")[0]).decodeToString()).jsonObject
-            if (tokenHeader["kid"] != null) {
-                val did = tokenHeader["kid"]!!.jsonPrimitive.content.split("#")[0]
-                println("Resolving DID: $did")
-                val key = DidService.resolveToKey(did).getOrThrow()
-                println("Got key: $key")
-                key.verifyJws(token)
-            } else {
-                CI_TOKEN_KEY.verifyJws(token)
-            }
-        }.isSuccess
+        val tokenHeader = Json.parseToJsonElement(Base64.decode(token.split(".")[0]).decodeToString()).jsonObject
+        if (tokenHeader["kid"] != null) {
+            val did = tokenHeader["kid"]!!.jsonPrimitive.content.split("#")[0]
+            println("Resolving DID: $did")
+            val key = DidService.resolveToKey(did).getOrThrow()
+            println("Got key: $key")
+            key.verifyJws(token)
+        } else {
+            CI_TOKEN_KEY.verifyJws(token)
+        }
+    }.isSuccess
 
     // -------------------------------------
     // Implementation of abstract issuer service provider interface
@@ -149,32 +148,23 @@ open class CIProvider : OpenIDCredentialIssuer(
     override fun getDeferredCredential(credentialID: String): CredentialResult {
         if (deferredCredentialRequests.containsKey(credentialID)) {
             return doGenerateCredential(
-                deferredCredentialRequests[credentialID]!!,
-                null,
-                null
+                deferredCredentialRequests[credentialID]!!, null, null
             ) // TODO: the null parameters
         }
         throw DeferredCredentialError(CredentialErrorCode.invalid_request, message = "Invalid credential ID given")
     }
 
-
     private fun doGenerateCredential(
-        credentialRequest: CredentialRequest,
-        subjectDid: String?,
-        nonce: String?
+        credentialRequest: CredentialRequest, subjectDid: String?, nonce: String?
     ): CredentialResult {
         if (credentialRequest.format == CredentialFormat.mso_mdoc) throw CredentialError(
-            credentialRequest,
-            CredentialErrorCode.unsupported_credential_format
+            credentialRequest, CredentialErrorCode.unsupported_credential_format
         )
-        val types = credentialRequest.types ?: credentialRequest.credentialDefinition?.types ?: throw CredentialError(
-            credentialRequest,
-            CredentialErrorCode.unsupported_credential_type
-        )
+        /*val types = credentialRequest.types ?: credentialRequest.credentialDefinition?.types ?: throw CredentialError(
+            credentialRequest, CredentialErrorCode.unsupported_credential_type
+        )*/
         val proofHeader = credentialRequest.proof?.jwt?.let { parseTokenHeader(it) } ?: throw CredentialError(
-            credentialRequest,
-            CredentialErrorCode.invalid_or_missing_proof,
-            message = "Proof must be JWT proof"
+            credentialRequest, CredentialErrorCode.invalid_or_missing_proof, message = "Proof must be JWT proof"
         )
         val holderKid = proofHeader[JWTClaims.Header.keyID]?.jsonPrimitive?.content ?: throw CredentialError(
             credentialRequest,
@@ -184,51 +174,117 @@ open class CIProvider : OpenIDCredentialIssuer(
 
         //val vc = W3CVC(universityDegreeCredentialExample.toList().associate { it.first to it.second.toJsonElement() })
 
-        val data: IssuanceSessionData = if (subjectDid == null || nonce == null) {
+        val data: IssuanceSessionData = (if (subjectDid == null || nonce == null) {
             repeat(10) {
                 println("WARNING: RETURNING DEMO/EXAMPLE (= BOGUS) CREDENTIAL: subjectDid or nonce is null (was deferred issuance tried?)")
             }
-            IssuanceSessionData(exampleIssuerKey, exampleIssuerDid, IssuanceRequest(W3CVC(openBadgeCredentialExample)))
+            listOf(
+                IssuanceSessionData(
+                    exampleIssuerKey, exampleIssuerDid, IssuanceRequest(W3CVC(openBadgeCredentialExample))
+                )
+            )
         } else {
             println("RETRIEVING VC FROM TOKEN MAPPING: $nonce")
             tokenCredentialMapping[nonce]
                 ?: throw IllegalArgumentException("The issuanceIdCredentialMapping does not contain a mapping for: $nonce!")
+        }).first()
+
+        return CredentialResult(format = credentialRequest.format, credential = JsonPrimitive(runBlocking {
+            val vc = data.request.vc
+
+            data.run {
+                vc.mergingIssue(
+                    key = issuerKey,
+                    issuerDid = issuerDid,
+                    subjectDid = holderKid,
+                    mappings = request.mapping ?: JsonObject(emptyMap()),
+                    additionalJwtHeader = emptyMap(),
+                    additionalJwtOptions = emptyMap()
+                )
+            }
+        }))
+    }
+
+
+    @OptIn(ExperimentalEncodingApi::class)
+    override fun generateBatchCredentialResponse(
+        batchCredentialRequest: BatchCredentialRequest,
+        accessToken: String
+    ): BatchCredentialResponse {
+        if (batchCredentialRequest.credentialRequests.map { it.format }.distinct().size >= 2) {
+            throw IllegalArgumentException("Credential request don't have the same format")
         }
 
-        return CredentialResult(
-            format = credentialRequest.format,
-            credential = JsonPrimitive(
-                runBlocking {
-                    val vc = data.request.vc
+        val keyIdsDistinct = batchCredentialRequest.credentialRequests.map { credReq ->
+            credReq.proof?.jwt?.let { jwt -> parseTokenHeader(jwt) }
+                ?.get(JWTClaims.Header.keyID)
+                ?.jsonPrimitive?.content
+                ?: throw CredentialError(credReq, CredentialErrorCode.invalid_or_missing_proof, message = "Proof must be JWT proof")
+        }.distinct()
 
-                    data.run {
-                        vc.mergingIssue(
-                            issuerKey,
-                            issuerDid,
-                            holderKid,
-                            request.mapping ?: JsonObject(emptyMap()),
-                            emptyMap(),
-                            emptyMap()
-                        )
-                    }
-                }
-            )
-        )
+        if (keyIdsDistinct.size >= 2) {
+            throw IllegalArgumentException("More than one key id requested")
+        }
+
+        val keyId = keyIdsDistinct.first()
+
+
+
+
+        batchCredentialRequest.credentialRequests.first().let { credentialRequest ->
+            val jwt = credentialRequest.proof?.jwt ?: throw IllegalArgumentException("No proof.jwt in credential request!")
+            val jwtParts = jwt.split(".")
+
+            fun decodeJwtPart(idx: Int) = Json.parseToJsonElement(Base64.decode(jwtParts[idx]).decodeToString()).jsonObject
+
+            val header = decodeJwtPart(0)
+            val payload = decodeJwtPart(1)
+
+            val subjectDid =
+                header["kid"]?.jsonPrimitive?.contentOrNull ?: throw IllegalArgumentException("No kid in proof.jwt header!")
+            val nonce = payload["nonce"]?.jsonPrimitive?.contentOrNull
+                ?: throw IllegalArgumentException("No nonce in proof.jwt payload!")
+
+            println("RETRIEVING VC FROM TOKEN MAPPING: $nonce")
+            val issuanceSessionData = tokenCredentialMapping[nonce]
+                ?: throw IllegalArgumentException("The issuanceIdCredentialMapping does not contain a mapping for: $nonce!")
+
+            val credentialResults = issuanceSessionData.map { data ->
+                CredentialResponse.success(
+                    format = credentialRequest.format,
+                    credential = JsonPrimitive(
+                        runBlocking {
+                            val vc = data.request.vc
+
+                            data.run {
+                                vc.mergingIssue(
+                                    key = issuerKey,
+                                    issuerDid = issuerDid,
+                                    subjectDid = subjectDid,
+                                    mappings = request.mapping ?: JsonObject(emptyMap()),
+                                    additionalJwtHeader = emptyMap(),
+                                    additionalJwtOptions = emptyMap()
+                                )
+                            }
+                        }
+                    )
+                )
+            }
+
+            return BatchCredentialResponse.success(credentialResults, accessToken, 5.minutes)
+        }
     }
 
 
     data class IssuanceSessionData(
-        val issuerKey: Key,
-        val issuerDid: String,
-        val request: IssuanceRequest
+        val issuerKey: Key, val issuerDid: String, val request: IssuanceRequest
     )
 
-    private val sessionCredentialPreMapping = HashMap<String, IssuanceSessionData>() // session id -> VC
-
+    private val sessionCredentialPreMapping = HashMap<String, List<IssuanceSessionData>>() // session id -> VC
+    private val tokenCredentialMapping = HashMap<String, List<IssuanceSessionData>>() // token -> VC
     //private val sessionTokenMapping = HashMap<String, String>() // session id -> token
 
-    private val tokenCredentialMapping = HashMap<String, IssuanceSessionData>() // token -> VC
-    fun setIssuanceDataForIssuanceId(issuanceId: String, data: IssuanceSessionData) {
+    fun setIssuanceDataForIssuanceId(issuanceId: String, data: List<IssuanceSessionData>) {
         println("DEPOSITED CREDENTIAL FOR ISSUANCE ID: $issuanceId")
         sessionCredentialPreMapping[issuanceId] = data
     }
