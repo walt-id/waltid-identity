@@ -1,7 +1,7 @@
 package id.walt.credentials.verification.models
 
-import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.credentials.verification.SerializableRuntimeException
+import id.walt.crypto.utils.JsonUtils.toJsonElement
 import kotlinx.serialization.json.*
 
 data class PolicyResult(val request: PolicyRequest, val result: Result<Any?>) {

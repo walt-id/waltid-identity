@@ -5,7 +5,6 @@ import id.walt.oid4vc.data.JsonDataObjectFactory
 import id.walt.oid4vc.data.JsonDataObjectSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 
 @Serializable

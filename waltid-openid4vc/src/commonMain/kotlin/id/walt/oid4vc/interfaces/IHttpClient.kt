@@ -1,8 +1,6 @@
 package id.walt.oid4vc.interfaces
 
 import io.ktor.http.*
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 
 data class SimpleHttpResponse (

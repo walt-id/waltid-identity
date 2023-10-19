@@ -5,7 +5,10 @@ import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.providers.PresentationSession
 import id.walt.oid4vc.responses.TokenResponse
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.*
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
 
 @Serializable
 data class PresentationSessionInfo(
