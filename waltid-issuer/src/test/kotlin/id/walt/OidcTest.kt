@@ -1,9 +1,10 @@
 package id.walt
 
 import id.walt.issuer.CIProvider
-import id.walt.oid4vc.data.*
+import id.walt.oid4vc.data.CredentialOffer
 import id.walt.oid4vc.requests.CredentialOfferRequest
 import kotlin.test.Test
+import kotlin.time.Duration.Companion.minutes
 
 class OidcTest {
 
@@ -16,7 +17,7 @@ class OidcTest {
         // as CI provider, initialize credential offer for user
         val issuanceSession = ciTestProvider.initializeCredentialOffer(
             CredentialOffer.Builder(ciTestProvider.baseUrl).addOfferedCredential("VerifiableId"),
-            600, allowPreAuthorized = false
+            5.minutes, allowPreAuthorized = false
         )
 
         val offerRequest = CredentialOfferRequest(issuanceSession.credentialOffer!!)

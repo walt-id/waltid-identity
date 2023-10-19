@@ -5,12 +5,12 @@ import id.walt.auditor.policies.SignaturePolicy
 import id.walt.credentials.w3c.VerifiableCredential
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.definitions.OPENID_CREDENTIAL_AUTHORIZATION_TYPE
-import id.walt.oid4vc.providers.OpenIDClientConfig
 import id.walt.oid4vc.providers.CredentialWalletConfig
+import id.walt.oid4vc.providers.OpenIDClientConfig
 import id.walt.oid4vc.requests.*
 import id.walt.oid4vc.responses.*
 import id.walt.servicematrix.ServiceMatrix
-import io.kotest.assertions.json.shouldMatchJson
+import io.kotest.assertions.json.shouldEqualJson
 import io.kotest.core.spec.style.AnnotationSpec
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldContainExactly
@@ -165,7 +165,7 @@ class CI_JVM_Test : AnnotationSpec() {
                 "}"
         val credentialSupported = CredentialSupported.fromJSONString(credentialSupportedJson)
         credentialSupported.format shouldBe CredentialFormat.jwt_vc_json
-        credentialSupported.toJSONString() shouldMatchJson credentialSupportedJson
+        credentialSupported.toJSONString() shouldEqualJson credentialSupportedJson
     }
 
     @Test
@@ -173,7 +173,7 @@ class CI_JVM_Test : AnnotationSpec() {
         val metadataJson = testMetadata.toJSONString()
         println("metadataJson: $metadataJson")
         val metadataParsed = OpenIDProviderMetadata.fromJSONString(metadataJson)
-        metadataParsed.toJSONString() shouldMatchJson metadataJson
+        metadataParsed.toJSONString() shouldEqualJson metadataJson
         println("metadataParsed: $metadataParsed")
     }
 
@@ -185,7 +185,7 @@ class CI_JVM_Test : AnnotationSpec() {
         val respText = response.bodyAsText()
         val metadata: OpenIDProviderMetadata = OpenIDProviderMetadata.fromJSONString(respText)
         println("metadata: $metadata")
-        metadata.toJSONString() shouldMatchJson ciTestProvider.metadata.toJSONString()
+        metadata.toJSONString() shouldEqualJson ciTestProvider.metadata.toJSONString()
     }
 
     @Test

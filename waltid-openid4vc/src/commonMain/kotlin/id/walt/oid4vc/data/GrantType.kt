@@ -1,5 +1,6 @@
 package id.walt.oid4vc.data
 
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Serializer
@@ -21,6 +22,7 @@ enum class GrantType(val value: String) {
     }
 }
 
+@OptIn(ExperimentalSerializationApi::class)
 @Serializer(forClass = GrantType::class)
 object GrantTypeSerializer : KSerializer<GrantType> {
     override fun serialize(encoder: Encoder, value: GrantType) {
