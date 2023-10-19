@@ -1,7 +1,7 @@
 package id.walt.oid4vc
 
-import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.credentials.w3c.PresentableCredential
+import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.custodian.Custodian
 import id.walt.model.DidMethod
 import id.walt.oid4vc.data.OpenIDProviderMetadata
@@ -15,8 +15,8 @@ import id.walt.oid4vc.errors.AuthorizationError
 import id.walt.oid4vc.errors.PresentationError
 import id.walt.oid4vc.interfaces.PresentationResult
 import id.walt.oid4vc.interfaces.SimpleHttpResponse
-import id.walt.oid4vc.providers.OpenIDCredentialWallet
 import id.walt.oid4vc.providers.CredentialWalletConfig
+import id.walt.oid4vc.providers.OpenIDCredentialWallet
 import id.walt.oid4vc.providers.SIOPSession
 import id.walt.oid4vc.providers.TokenTarget
 import id.walt.oid4vc.requests.AuthorizationRequest
@@ -44,6 +44,7 @@ import io.ktor.server.routing.*
 import io.ktor.util.*
 import kotlinx.datetime.Instant
 import kotlinx.serialization.json.*
+import kotlin.js.ExperimentalJsExport
 
 const val WALLET_PORT = 8001
 const val WALLET_BASE_URL = "http://localhost:${WALLET_PORT}"
@@ -68,6 +69,7 @@ class TestCredentialWallet(
     override fun signToken(target: TokenTarget, payload: JsonObject, header: JsonObject?, keyId: String?) =
         JwtService.getService().sign(payload, keyId)
 
+    @OptIn(ExperimentalJsExport::class)
     override fun verifyTokenSignature(target: TokenTarget, token: String) =
         JwtService.getService().verify(token).verified
 
@@ -129,46 +131,6 @@ class TestCredentialWallet(
                 .jsonObject["verifiableCredential"]
                 ?: throw IllegalArgumentException("VerifiablePresentation does not contain verifiableCredential list?"))
                 .jsonArray.map { it.jsonPrimitive.content }
-
-        //language=JSON
-        val tmpSubmission = """
-        {
-          "id": "submission 1",
-          "definition_id": "0279fde1-7db6-4bd1-b131-b5a1d340e125",
-          "descriptor_map": [
-            {
-              "id": "OpenBadgeCredential",
-              "format": "jwt_vp_json",
-              "path": "$",
-              "path_nested": {
-                "format": "jwt_vc_json",
-                "path": "$.verifiableCredential[0]"
-              }
-            }
-          ]
-        }
-        """
-
-        //language=JSON
-        val tmpSubmission2 = """
-            {
-              "id": "Example submission",
-              "definition_id": "000011f4-0b48-4ab3-86fe-d74833f6d0d9",
-              "descriptor_map": [
-                {
-                  "id": "OpenBadgeCredential",
-                  "format": "jwt_vp_json",
-                  "path": "$",
-                  "path_nested": {
-                    "format": "jwt_vc_json",
-                    "path": "$.vp.verifiableCredential[0]"
-                  }
-                }
-              ]
-            }
-        """.trimIndent()
-
-
 
         return PresentationResult(
             listOf(JsonPrimitive(presentationJwtStr)), PresentationSubmission(

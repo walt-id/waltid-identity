@@ -1,5 +1,6 @@
 package id.walt.oid4vc.data
 
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Serializer
@@ -25,6 +26,7 @@ enum class CredentialFormat(val value: String) {
     }
 }
 
+@OptIn(ExperimentalSerializationApi::class)
 @Serializer(CredentialFormat::class)
 object CredentialFormatSerializer : KSerializer<CredentialFormat> {
     override fun serialize(encoder: Encoder, value: CredentialFormat) {

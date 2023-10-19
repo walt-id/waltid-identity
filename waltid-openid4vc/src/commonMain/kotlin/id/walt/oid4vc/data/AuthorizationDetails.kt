@@ -1,10 +1,7 @@
 package id.walt.oid4vc.data
 
 import id.walt.oid4vc.definitions.OPENID_CREDENTIAL_AUTHORIZATION_TYPE
-import kotlinx.serialization.EncodeDefault
-import kotlinx.serialization.KSerializer
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
+import kotlinx.serialization.*
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
@@ -26,7 +23,7 @@ import kotlinx.serialization.json.jsonObject
  * @param credentialDefinition REQUIRED (W3C ldp_vc, jwt_vc_json-ld credential formats). JSON object containing (and isolating) the detailed description of the credential type. This object MUST be processed using full JSON-LD processing.
  */
 @Serializable
-data class AuthorizationDetails(
+data class AuthorizationDetails @OptIn(ExperimentalSerializationApi::class) constructor(
     @EncodeDefault val type: String = OPENID_CREDENTIAL_AUTHORIZATION_TYPE,
     val format: CredentialFormat? = null,
     val types: List<String>? = null,

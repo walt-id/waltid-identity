@@ -3,7 +3,6 @@ package id.walt.oid4vc.providers
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.definitions.JWTClaims
-import id.walt.oid4vc.definitions.OPENID_CREDENTIAL_AUTHORIZATION_TYPE
 import id.walt.oid4vc.errors.*
 import id.walt.oid4vc.interfaces.IHttpClient
 import id.walt.oid4vc.interfaces.ITokenProvider
@@ -22,6 +21,7 @@ import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.*
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
+import kotlin.js.ExperimentalJsExport
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 
@@ -265,6 +265,7 @@ abstract class OpenIDCredentialWallet<S: SIOPSession>(
         return CredentialResponse.fromJSONString(httpResp.body)
     }
 
+    @OptIn(ExperimentalJsExport::class)
     protected open fun executeIdTokenAuthorization(idTokenRequestUri: Url, holderDid: String, client: OpenIDClientConfig): Url {
         var authReq = AuthorizationRequest.fromHttpQueryString(idTokenRequestUri.encodedQuery).let { authorizationRequest ->
             authorizationRequest.customParameters["request"]?.let { AuthorizationJSONRequest.fromJSON(SDJwt.parse(it.first()).fullPayload) } ?: authorizationRequest

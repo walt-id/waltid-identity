@@ -1,5 +1,6 @@
 package id.walt.oid4vc.data
 
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.descriptors.elementNames
@@ -21,6 +22,7 @@ abstract class JsonDataObjectSerializer<T : JsonDataObject>(serializer: KSeriali
     JsonTransformingSerializer<T>(serializer) {
 
     private val customParametersName = "customParameters"
+    @OptIn(ExperimentalSerializationApi::class)
     private val knownElementNames get() = descriptor.elementNames.filter { it != customParametersName }.toSet()
 
     open fun serializeKnownElement(name: String, element: JsonElement, builderMap: MutableMap<String, JsonElement>) {

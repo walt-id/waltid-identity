@@ -1,6 +1,7 @@
 package id.walt.oid4vc.data
 
 import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -9,7 +10,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 
 @Serializable
-data class ProofOfPossession(
+data class ProofOfPossession @OptIn(ExperimentalSerializationApi::class) constructor(
     @EncodeDefault @SerialName("proof_type") val proofType: ProofType = ProofType.jwt,
     val jwt: String?,
     override val customParameters: Map<String, JsonElement> = mapOf()
