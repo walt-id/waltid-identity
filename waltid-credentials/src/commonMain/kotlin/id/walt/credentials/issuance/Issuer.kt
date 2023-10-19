@@ -1,17 +1,11 @@
 package id.walt.credentials.issuance
 
-import id.walt.crypto.keys.Key
-import id.walt.crypto.keys.KeySerialization
-import id.walt.crypto.utils.JwsUtils.decodeJws
-import id.walt.credentials.issuance.Issuer.mergingIssue
 import id.walt.credentials.utils.W3CDataMergeUtils
 import id.walt.credentials.utils.W3CDataMergeUtils.mergeWithMapping
 import id.walt.credentials.utils.W3CVcUtils.overwrite
 import id.walt.credentials.utils.W3CVcUtils.update
 import id.walt.credentials.vc.vcs.W3CVC
-import id.walt.did.dids.DidService
-import id.walt.did.dids.registrar.LocalRegistrar
-import id.walt.did.dids.resolver.LocalResolver
+import id.walt.crypto.keys.Key
 import id.walt.did.utils.randomUUID
 import io.ktor.client.*
 import io.ktor.client.request.*
@@ -159,59 +153,4 @@ object Issuer {
             }
         )
     }
-}
-
-
-suspend fun main() {
-    DidService.apply {
-        registerResolver(LocalResolver())
-        registerRegistrar(LocalRegistrar())
-        updateRegistrarsForMethods()
-        updateResolversForMethods()
-    }
-    val issuerKey =
-        KeySerialization.deserializeKey("""{"type":"local","jwk":"{\"kty\":\"OKP\",\"d\":\"mi_10iiMhRzWpc8S97W5mW3nW_Llv6FJWQreODqV6os\",\"crv\":\"Ed25519\",\"kid\":\"-sPnHUacW7L3lWc4t33UjMektLlyufzosu_GzNgb7v4\",\"x\":\"RKrOFFf5mR_Tva7Vbi_OgE5PoUYCS6sODxaLgSxkQ8U\"}"}""")
-            .getOrThrow()
-    val issuerDid = "did:key:z6Mkj5Jq5UaRznynC7wviUnMEekGry4vsggRuZbAb2BiCc1J"
-
-    //val subjectKey =KeySerialization.deserializeKey("""{"type":"local","jwk":"{\"kty\":\"OKP\",\"d\":\"nL_6G-cpUi5PgQHBCE1hScxOBNFwXyCpueuRgoyl--M\",\"crv\":\"Ed25519\",\"kid\":\"_4zODEzU66fXCza1TiNLIePaaMusNFcnw7hl59n77gA\",\"x\":\"bbbI8_OdO92i4wZLNKTfy5QJ27cfVA13oAUKe3LVxZ0\"}"}""")
-    val subjectDid = "did:key:z6MkmqY96sGNppYEtB2wwfi1HBD3cm9NuWpgxpWyhD1zWts6"
-
-    //language=JSON
-    val mappings = Json.parseToJsonElement(
-        """
-        {
-          "id": "<uuid>",
-          "credentialSubject": {"id": "<subjectDid>"},
-          
-          "issuanceDate": "<timestamp>",
-          "expirationDate": "<timestamp-in:14d>"
-        }
-    """.trimIndent()
-    ).jsonObject
-
-    //language=JSON
-    val vcStr = """
-        {
-            "@context": ["ctx"],
-            "type": ["type"],
-            "credentialSubject": {"name": "Muster", "image": {"url": "URL"}}
-        }
-    """.trimIndent()
-
-    val vc = W3CVC.fromJson(vcStr)
-
-    val jwt = vc.mergingIssue(issuerKey, issuerDid, subjectDid, mappings, emptyMap(), emptyMap())
-
-    println("JWT: $jwt")
-
-    jwt.decodeJws().apply {
-        println("Header:  $header")
-        println("Payload: $payload")
-    }
-
-    println(
-        issuerKey.getPublicKey()
-            .verifyJws(jwt)
-    )
 }

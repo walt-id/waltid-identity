@@ -48,7 +48,7 @@ object CheqdService : LocalRegistrarMethod("cheqd") {
     @OptIn(ExperimentalSerializationApi::class)
     private val json = Json { explicitNulls = false }
 
-    @OptIn(ExperimentalStdlibApi::class)
+    @OptIn(ExperimentalStdlibApi::class, ExperimentalSerializationApi::class)
     suspend fun createDid(key: Key, network: String): DidDocument = let {
         if (key.keyType != KeyType.Ed25519) throw IllegalArgumentException("Key of type Ed25519 expected")
 //        step#0. get public key hex
@@ -68,7 +68,6 @@ object CheqdService : LocalRegistrarMethod("cheqd") {
         json.decodeFromString<DidGetResponse>(response).let {
 //            step#2a. initialize
             val job = initiateDidJob(didRegisterUrl, json.encodeToJsonElement(JobCreateRequest(it.didDoc)))
-                ?: throw Exception("Failed to initialize the did onboarding process")
 //            step#2b. sign the serialized payload
             val signatures = signPayload(key, job)
 //            step#2c. finalize
@@ -86,7 +85,6 @@ object CheqdService : LocalRegistrarMethod("cheqd") {
 
     suspend fun deactivateDid(key: Key, did: String) {
         val job = initiateDidJob(didDeactivateUrl, json.encodeToJsonElement(JobDeactivateRequest(did)))
-            ?: throw Exception("Failed to initialize the did onboarding process")
         val signatures = signPayload(key, job)
         val didDocument = (finalizeDidJob(
             didDeactivateUrl,
