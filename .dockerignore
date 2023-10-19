@@ -1,0 +1,9 @@
+*/build
+.gradle
+.idea
+.run
+**.md
+**.png
+**.jpeg
+**.jpg
+*/k8s
