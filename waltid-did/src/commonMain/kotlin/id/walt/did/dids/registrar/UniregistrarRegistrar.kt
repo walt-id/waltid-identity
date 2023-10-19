@@ -43,9 +43,9 @@ class UniregistrarRegistrar : DidRegistrar {
             .map { it.jsonPrimitive.content }
             .toSet()
 
-    override suspend fun create(didCreate: DidCreateOptions): DidResult {
-        return DidResult("TODO" /* TODO */, http.post("$registrarUrl/create?method=${didCreate.method}") {
-            setBody(didCreate.options)
+    override suspend fun create(options: DidCreateOptions): DidResult {
+        return DidResult("TODO" /* TODO */, http.post("$registrarUrl/create?method=${options.method}") {
+            setBody(options.options)
         }.body())
     }
 

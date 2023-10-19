@@ -1,5 +1,6 @@
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.LocalKey
+import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -61,6 +62,7 @@ class TestJvm {
         KeyType.entries.forEach { test(it) }
     }
 
+    @OptIn(DelicateCoroutinesApi::class)
     @Test
     fun signatureSpeedTestAll() = runTest(timeout = 5.minutes) {
         KeyType.entries.forEach { keyType ->
