@@ -1,27 +1,20 @@
 package id.walt.oid4vc
 
-import id.walt.oid4vc.data.GrantType
-import id.walt.oid4vc.data.OpenIDProviderMetadata
-import id.walt.oid4vc.data.ResponseMode
 import id.walt.oid4vc.providers.CredentialWalletConfig
 import id.walt.oid4vc.providers.OpenIDClientConfig
-import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.requests.CredentialOfferRequest
 import id.walt.servicematrix.ServiceMatrix
 import io.kotest.common.runBlocking
 import io.kotest.core.spec.style.AnnotationSpec
 import io.kotest.core.spec.style.Test
-import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import io.ktor.client.*
-import io.ktor.client.call.*
 import io.ktor.client.engine.java.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
-import kotlinx.serialization.json.JsonObject
 
 class EBSI_Conformance_Test: AnnotationSpec() {
 

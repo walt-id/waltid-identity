@@ -1,11 +1,11 @@
 package id.walt.credentials.verification
 
-import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.credentials.verification.models.PolicyRequest
 import id.walt.credentials.verification.models.PolicyRequest.Companion.parsePolicyRequests
 import id.walt.credentials.verification.models.PolicyResult
 import id.walt.credentials.verification.models.PresentationResultEntry
 import id.walt.credentials.verification.models.PresentationVerificationResponse
+import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.did.dids.DidService
 import id.walt.did.dids.resolver.LocalResolver
 import kotlinx.coroutines.coroutineScope

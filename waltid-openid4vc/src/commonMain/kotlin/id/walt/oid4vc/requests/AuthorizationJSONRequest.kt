@@ -1,7 +1,6 @@
 package id.walt.oid4vc.requests
 
 import id.walt.oid4vc.data.*
-import id.walt.oid4vc.data.dif.PresentationDefinition
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json

@@ -1,6 +1,5 @@
 package id.walt.did.dids.resolver.local
 
-import id.walt.crypto.keys.Key
 import id.walt.did.dids.document.DidDocument
 
 abstract class LocalResolverMethod(val method: String) {
