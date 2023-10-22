@@ -13,18 +13,18 @@ repositories {
 }
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_1_8
-    targetCompatibility = JavaVersion.VERSION_1_8
+    sourceCompatibility = JavaVersion.VERSION_15
+    targetCompatibility = JavaVersion.VERSION_15
 }
 
 kotlin {
-    jvmToolchain(8)
+    jvmToolchain(15)
 }
 
 kotlin {
     jvm {
         compilations.all {
-            kotlinOptions.jvmTarget = "1.8" // JVM got Ed25519 at version 15
+            kotlinOptions.jvmTarget = "15" // JVM got Ed25519 at version 15
         }
         withJava()
         tasks.withType<Test>().configureEach {
