@@ -12,4 +12,14 @@ plugins {
     kotlin("multiplatform") version kotlinVersion apply false
     kotlin("plugin.serialization") version kotlinVersion apply false
     id("com.github.ben-manes.versions") version "0.48.0" apply false
+    kotlin("jvm") version "1.9.20-RC"
+}
+dependencies {
+    implementation(kotlin("stdlib-jdk8"))
+}
+repositories {
+    mavenCentral()
+}
+kotlin {
+    jvmToolchain(8)
 }
