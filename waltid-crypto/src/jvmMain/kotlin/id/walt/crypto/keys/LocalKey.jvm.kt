@@ -102,11 +102,6 @@ actual class LocalKey actual constructor(
         signature.update(plaintext)
         val sig = signature.sign()
         return sig
-//        var signature = ByteArray(Sign.BYTES)
-//        val privateKeyBytes = getPrivateKey().encoded
-//        val sigResult = sodium.cryptoSignDetached(signature, plaintext, plaintext.size.toLong(), privateKeyBytes)
-//        if (!sigResult) throw Exception("Couldn't provide a signature")
-//        return signature
     }
 
     /**

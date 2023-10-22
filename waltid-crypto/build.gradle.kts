@@ -79,10 +79,6 @@ kotlin {
 
                 // Multibase
                 implementation("com.github.multiformats:java-multibase:v1.1.1")
-
-                // sodium
-//                implementation("com.goterl:lazysodium-java:5.1.4")
-//                implementation("net.java.dev.jna:jna:5.13.0")
             }
         }
         val jvmTest by getting {

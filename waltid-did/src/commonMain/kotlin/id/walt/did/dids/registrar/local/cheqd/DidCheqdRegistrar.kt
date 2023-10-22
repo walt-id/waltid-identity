@@ -63,8 +63,16 @@ class DidCheqdRegistrar() : LocalRegistrarMethod("cheqd") {
         }
     }
 
+    override suspend fun register(options: DidCreateOptions): DidResult =
+        registerByKey(LocalKey.generate(KeyType.Ed25519), options)
+
+    override suspend fun registerByKey(key: Key, options: DidCreateOptions): DidResult =
+        createDid(key, options.get<String>("network") ?: "testnet").let {
+            DidResult(it.id, id.walt.did.dids.document.DidDocument(DidCheqdDocument(it, key.exportJWKObject()).toMap()))
+        }
+
     @OptIn(ExperimentalStdlibApi::class)
-    suspend fun createDid(key: Key, network: String): DidDocument = let {
+    private suspend fun createDid(key: Key, network: String): DidDocument = let {
         if (key.keyType != KeyType.Ed25519) throw IllegalArgumentException("Key of type Ed25519 expected")
         // step#0. get public key hex
         val pubKeyHex = key.getPublicKeyRepresentation().toHexString()
@@ -95,7 +103,7 @@ class DidCheqdRegistrar() : LocalRegistrarMethod("cheqd") {
     }
 
     // TODO: finish implementation
-    suspend fun deactivateDid(key: Key, did: String) {
+    private suspend fun deactivateDid(key: Key, did: String) {
         val job = initiateDidJob(didDeactivateUrl, json.encodeToJsonElement(JobDeactivateRequest(did)))
         val signatures = signPayload(key, job)
         job.jobId?.let {
@@ -105,7 +113,7 @@ class DidCheqdRegistrar() : LocalRegistrarMethod("cheqd") {
         } ?: throw Exception("Initialize job didn't return any jobId.")
     }
 
-    fun updateDid(did: String) {
+    private fun updateDid(did: String) {
         TODO()
     }
 
@@ -142,12 +150,4 @@ class DidCheqdRegistrar() : LocalRegistrarMethod("cheqd") {
             java.util.Base64.getUrlEncoder().encodeToString(key.signRaw(it) as ByteArray)
         }
     }
-
-    override suspend fun register(options: DidCreateOptions): DidResult =
-        registerByKey(LocalKey.generate(KeyType.Ed25519), options)
-
-    override suspend fun registerByKey(key: Key, options: DidCreateOptions): DidResult =
-        createDid(key, options.get<String>("network") ?: "testnet").let {
-            DidResult(it.id, id.walt.did.dids.document.DidDocument(DidCheqdDocument(it, key.exportJWKObject()).toMap()))
-        }
 }
