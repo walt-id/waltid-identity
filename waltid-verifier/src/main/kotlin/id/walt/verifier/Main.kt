@@ -49,6 +49,5 @@ fun Application.configurePlugins() {
 
 fun Application.module() {
     configurePlugins()
-    oidcApi()
     verfierApi()
 }
