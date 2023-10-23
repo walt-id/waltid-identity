@@ -29,7 +29,7 @@ class EBSI_Conformance_Test: AnnotationSpec() {
 
   @BeforeAll
   fun init() {
-    ServiceMatrix("service-matrix.properties")
+    ServiceMatrix("test-config/service-matrix.properties")
     credentialWallet = EBSITestWallet(CredentialWalletConfig("https://blank/"))
   }
 

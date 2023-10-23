@@ -56,7 +56,7 @@ class wallettest : AnnotationSpec() {
 
     //@BeforeAll   /* Uncomment me */
     fun init() {
-        ServiceMatrix("service-matrix.properties")
+        ServiceMatrix("test-config/service-matrix.properties")
         ciTestProvider = CITestProvider()
         credentialWallet = TestCredentialWallet(CredentialWalletConfig("http://blank"))
         //ciTestProvider.start()

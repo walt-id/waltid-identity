@@ -50,7 +50,7 @@ class VP_JVM_Test : AnnotationSpec() {
 
     @BeforeAll
     fun init() {
-        ServiceMatrix("service-matrix.properties")
+        ServiceMatrix("test-config/service-matrix.properties")
         testWallet = TestCredentialWallet(CredentialWalletConfig(WALLET_BASE_URL))
         testWallet.start()
 

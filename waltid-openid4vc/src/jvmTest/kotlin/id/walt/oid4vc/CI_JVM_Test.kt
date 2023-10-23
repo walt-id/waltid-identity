@@ -103,7 +103,7 @@ class CI_JVM_Test : AnnotationSpec() {
 
     @BeforeAll
     fun init() {
-        ServiceMatrix("service-matrix.properties")
+        ServiceMatrix("test-config/service-matrix.properties")
         ciTestProvider = CITestProvider()
         credentialWallet = TestCredentialWallet(CredentialWalletConfig("http://blank"))
         ciTestProvider.start()
