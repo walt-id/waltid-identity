@@ -93,20 +93,20 @@ kotlin {
                     val envUsername = System.getenv("MAVEN_USERNAME")
                     val envPassword = System.getenv("MAVEN_PASSWORD")
 
-//                    val usernameFile = File("secret_maven_username.txt")
-//                    val passwordFile = File("secret_maven_password.txt")
-//
-//                    val secretMavenUsername = envUsername ?: usernameFile.let { if (it.isFile) it.readLines().first() else "" }
-                    //println("Deploy username length: ${secretMavenUsername.length}")
-//                    val secretMavenPassword = envPassword ?: passwordFile.let { if (it.isFile) it.readLines().first() else "" }
+                    val usernameFile = File("$rootDir/secret_maven_username.txt")
+                    val passwordFile = File("$rootDir/secret_maven_password.txt")
+
+                    val secretMavenUsername = envUsername ?: usernameFile.let { if (it.isFile) it.readLines().first() else "" }
+                    println("Deploy username length: ${secretMavenUsername.length}")
+                    val secretMavenPassword = envPassword ?: passwordFile.let { if (it.isFile) it.readLines().first() else "" }
 
                     //if (secretMavenPassword.isBlank()) {
                     //   println("WARNING: Password is blank!")
                     //}
 
                     credentials {
-                        username = envUsername
-                        password = envPassword
+                        username = secretMavenUsername
+                        password = secretMavenPassword
                     }
                 }
             }
