@@ -26,7 +26,9 @@ class DidWebRegistrar : LocalRegistrarMethod("web") {
             DidResult(
                 "did:web:$domain$path", DidDocument(
                     DidWebDocument(
-                        did = "did:web:$domain$path", keyId = key.getKeyId(), didKey = key.exportJWKObject()
+                        did = "did:web:$domain$path",
+                        keyId = key.getKeyId(),
+                        didKey = key.getPublicKey().exportJWKObject()
                     ).toMap()
                 )
             )
