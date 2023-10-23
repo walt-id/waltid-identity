@@ -200,267 +200,275 @@ fun Application.issuerApi() {
             context.respond(DidService.registerByKey("key", key).did)
         }
 
-        route("vc", {
-            tags = listOf("Verifiable Credentials")
+        route("", {
+            tags = listOf("Credential Issuance")
         }) {
 
-            post("sign", {
-                summary = "Signs credential without using an credential exchange mechanism."
-                description =
-                    "This endpoint issues (signs) an Verifiable Credential, but does not utilize an credential exchange " +
-                            "mechanism flow like OIDC or DIDComm to adapt and send the signed credential to an user. This means, that the " +
-                            "caller will have to utilize such an credential exchange mechanism themselves."
+            route("raw") {
+                route("jwt") {
+                    post("sign", {
+                        summary = "Signs credential without using an credential exchange mechanism."
+                        description =
+                            "This endpoint issues (signs) an Verifiable Credential, but does not utilize an credential exchange " +
+                                    "mechanism flow like OIDC or DIDComm to adapt and send the signed credential to an user. This means, that the " +
+                                    "caller will have to utilize such an credential exchange mechanism themselves."
 
-                request {
-                    headerParameter<String>("walt-key") {
-                        description = "Supply a core-crypto key representation to use to issue the credential, " +
-                                "e.g. a local key (internal JWK) or a TSE key."
-                        example = mapOf(
-                            "type" to "local", "jwk" to "{ ... }"
-                        )
-                        required = true
-                    }
-                    headerParameter<String>("walt-issuerDid") {
-                        description = "Optionally, supply a DID to use in the proof. If no DID is passed, " +
-                                "a did:key of the supplied key will be used."
-                        example = "did:ebsi:..."
-                        required = false
-                    }
-                    headerParameter<String>("walt-subjectDid") {
-                        description = "Supply the DID of the subject that will receive the credential"
-                        example = "did:key:..."
-                        required = true
-                    }
-
-                    body<JsonObject> {
-                        description = "Pass the unsigned credential that you intend to sign as the body of the request."
-                        example("OpenBadgeCredential example", openBadgeCredentialExampleJsonString)
-                        example("UniversityDegreeCredential example", universityDegreeCredentialExample2)
-                        required = true
-                    }
-                }
-
-                response {
-                    "200" to {
-                        description = "Signed Credential (with the *proof* attribute added)"
-                        body<JsonObject> {
-                            example(
-                                "Signed UniversityDegreeCredential example",
-                                universityDegreeCredentialSignedExample
-                            )
-                        }
-                    }
-                }
-            }) {
-                val keyJson = context.request.header("walt-key") ?: throw IllegalArgumentException("No key was passed.")
-                val subjectDid = context.request.header("walt-subjectDid")
-                    ?: throw IllegalArgumentException("No subjectDid was passed.")
-
-                val key = KeySerialization.deserializeKey(keyJson).getOrThrow()
-
-                val issuerDid = context.request.header("walt-issuerDid") ?: DidService.registerByKey("key", key).did
-
-                val body = context.receive<Map<String, JsonElement>>()
-
-                val vc = W3CVC(body)
-
-                // Sign VC
-                val jws = vc.signJws(
-                    issuerKey = key,
-                    issuerDid = issuerDid,
-                    subjectDid = subjectDid
-                )
-
-                context.respond(HttpStatusCode.OK, jws)
-            }
-
-            route("oidc") {
-                post("issueBatch", {
-                    summary = "Signs a list of credentials and starts an OIDC credential exchange flow."
-                    description = "This endpoint issues a list W3C Verifiable Credentials, and returns an issuance URL "
-
-                    request {
-                        headerParameter<String>("walt-key") {
-                            description = "Supply a core-crypto key representation to use to issue the credential, " +
-                                    "e.g. a local key (internal JWK) or a TSE key."
-                            example = mapOf(
-                                "type" to "local", "jwk" to "{ ... }"
-                            )
-                            required = true
-                        }
-                        headerParameter<String>("walt-issuerDid") {
-                            description = "Optionally, supply a DID to use in the proof. If no DID is passed, " +
-                                    "a did:key of the supplied key will be used."
-                            example = "did:ebsi:..."
-                            required = false
-                        }
-                        body<IssuanceRequest> {
-                            description =
-                                "Pass the unsigned credential that you intend to issue as the body of the request."
-                            example("Batch example", batchExample)
-                            required = true
-                        }
-                    }
-
-                    response {
-                        "200" to {
-                            description = "Credential signed (with the *proof* attribute added)"
-                            body<String> {
-                                example(
-                                    "Issuance URL URL",
-                                    "openid-credential-offer://localhost/?credential_offer=%7B%22credential_issuer%22%3A%22http%3A%2F%2Flocalhost%3A8000%22%2C%22credentials%22%3A%5B%22VerifiableId%22%5D%2C%22grants%22%3A%7B%22authorization_code%22%3A%7B%22issuer_state%22%3A%22501414a4-c461-43f0-84b2-c628730c7c02%22%7D%7D%7D"
+                        request {
+                            headerParameter<String>("walt-key") {
+                                description =
+                                    "Supply a core-crypto key representation to use to issue the credential, " +
+                                            "e.g. a local key (internal JWK) or a TSE key."
+                                example = mapOf(
+                                    "type" to "local", "jwk" to "{ ... }"
                                 )
+                                required = true
+                            }
+                            headerParameter<String>("walt-issuerDid") {
+                                description = "Optionally, supply a DID to use in the proof. If no DID is passed, " +
+                                        "a did:key of the supplied key will be used."
+                                example = "did:ebsi:..."
+                                required = false
+                            }
+                            headerParameter<String>("walt-subjectDid") {
+                                description = "Supply the DID of the subject that will receive the credential"
+                                example = "did:key:..."
+                                required = true
+                            }
+
+                            body<JsonObject> {
+                                description =
+                                    "Pass the unsigned credential that you intend to sign as the body of the request."
+                                example("OpenBadgeCredential example", openBadgeCredentialExampleJsonString)
+                                example("UniversityDegreeCredential example", universityDegreeCredentialExample2)
+                                required = true
                             }
                         }
-                    }
-                }) {
-                    val keyJson =
-                        context.request.header("walt-key") ?: throw IllegalArgumentException("No key was passed.")
-                    val key = KeySerialization.deserializeKey(keyJson)
-                        .onFailure { throw IllegalArgumentException("Invalid key was supplied, error occurred is: $it") }
-                        .getOrThrow()
-                    val issuerDid = context.request.header("walt-issuerDid") ?: DidService.registerByKey("key", key).did
 
-                    val body = context.receive<JsonArray>()
-                    val issuanceRequests = body.map { IssuanceRequest.fromJsonObject(it.jsonObject) }
-
-                    val credentialOfferBuilder = OidcIssuance.issuanceRequestsToCredentialOfferBuilder(issuanceRequests)
-
-                    val issuanceSession = OidcApi.initializeCredentialOffer(
-                        credentialOfferBuilder = credentialOfferBuilder,
-                        expiresIn = 5.minutes,
-                        allowPreAuthorized = true,
-                        //preAuthUserPin = "1234"
-                    )
-
-
-                    OidcApi.setIssuanceDataForIssuanceId(
-                        issuanceSession.id,
-                        issuanceRequests.map { CIProvider.IssuanceSessionData(key, issuerDid, it) }
-                    )
-                    println("issuanceSession: $issuanceSession")
-
-                    val offerRequest = CredentialOfferRequest(issuanceSession.credentialOffer!!)
-                    println("offerRequest: $offerRequest")
-
-                    val offerUri = OidcApi.getCredentialOfferRequestUrl(
-                        offerRequest = offerRequest,
-                        walletCredentialOfferEndpoint = CROSS_DEVICE_CREDENTIAL_OFFER_URL + OidcApi.baseUrl.removePrefix(
-                            "https://"
-                        ).removePrefix("http://") + "/"
-                    )
-                    println("Offer URI: $offerUri")
-
-                    context.respond(
-                        HttpStatusCode.OK,
-                        offerUri
-                    )
-                }
-
-                post("issue", {
-                    summary = "Signs credential and starts an OIDC credential exchange flow."
-                    description = "This endpoint issues a W3C Verifiable Credential, and returns an issuance URL "
-
-                    request {
-                        headerParameter<String>("walt-key") {
-                            description = "Supply a core-crypto key representation to use to issue the credential, " +
-                                    "e.g. a local key (internal JWK) or a TSE key."
-                            example = mapOf(
-                                "type" to "local", "jwk" to "{ ... }"
-                            )
-                            required = true
-                        }
-                        headerParameter<String>("walt-issuerDid") {
-                            description = "Optionally, supply a DID to use in the proof. If no DID is passed, " +
-                                    "a did:key of the supplied key will be used."
-                            example = "did:ebsi:..."
-                            required = false
-                        }
-                        body<IssuanceRequest> {
-                            description =
-                                "Pass the unsigned credential that you intend to issue as the body of the request."
-                            example("OpenBadgeCredential example", openBadgeCredentialExampleJsonString)
-                            example("UniversityDegreeCredential example", universityDegreeCredential)
-                            required = true
-                        }
-                    }
-
-                    response {
-                        "200" to {
-                            description = "Credential signed (with the *proof* attribute added)"
-                            body<String> {
-                                example(
-                                    "Issuance URL URL",
-                                    "openid-credential-offer://localhost/?credential_offer=%7B%22credential_issuer%22%3A%22http%3A%2F%2Flocalhost%3A8000%22%2C%22credentials%22%3A%5B%22VerifiableId%22%5D%2C%22grants%22%3A%7B%22authorization_code%22%3A%7B%22issuer_state%22%3A%22501414a4-c461-43f0-84b2-c628730c7c02%22%7D%7D%7D"
-                                )
+                        response {
+                            "200" to {
+                                description = "Signed Credential (with the *proof* attribute added)"
+                                body<JsonObject> {
+                                    example(
+                                        "Signed UniversityDegreeCredential example",
+                                        universityDegreeCredentialSignedExample
+                                    )
+                                }
                             }
                         }
+                    }) {
+                        val keyJson =
+                            context.request.header("walt-key") ?: throw IllegalArgumentException("No key was passed.")
+                        val subjectDid = context.request.header("walt-subjectDid")
+                            ?: throw IllegalArgumentException("No subjectDid was passed.")
+
+                        val key = KeySerialization.deserializeKey(keyJson).getOrThrow()
+
+                        val issuerDid =
+                            context.request.header("walt-issuerDid") ?: DidService.registerByKey("key", key).did
+
+                        val body = context.receive<Map<String, JsonElement>>()
+
+                        val vc = W3CVC(body)
+
+                        // Sign VC
+                        val jws = vc.signJws(
+                            issuerKey = key,
+                            issuerDid = issuerDid,
+                            subjectDid = subjectDid
+                        )
+
+                        context.respond(HttpStatusCode.OK, jws)
                     }
-                }) {
-                    val keyJson = context.request.header("walt-key") ?: throw IllegalArgumentException("No key was passed.")
-                    val key = KeySerialization.deserializeKey(keyJson)
-                        .onFailure { throw IllegalArgumentException("Invalid key was supplied, error occurred is: $it") }
-                        .getOrThrow()
-                    val issuerDid = context.request.header("walt-issuerDid") ?: DidService.registerByKey("key", key).did
-
-                    val body = context.receive<JsonObject>()
-                    val issuanceRequest = IssuanceRequest.fromJsonObject(body)
-
-                    val credentialOfferBuilder = OidcIssuance.issuanceRequestsToCredentialOfferBuilder(issuanceRequest)
-
-                    val issuanceSession = OidcApi.initializeCredentialOffer(
-                        credentialOfferBuilder = credentialOfferBuilder,
-                        expiresIn = 5.minutes,
-                        allowPreAuthorized = true
-                    )
-
-                    //val nonce = issuanceSession.cNonce ?: throw IllegalArgumentException("No cNonce set in issuanceSession?")
-
-                    OidcApi.setIssuanceDataForIssuanceId(
-                        issuanceSession.id,
-                        listOf(CIProvider.IssuanceSessionData(key, issuerDid, issuanceRequest))
-                    )
-                    println("issuanceSession: $issuanceSession")
-
-                    val offerRequest = CredentialOfferRequest(issuanceSession.credentialOffer!!)
-                    println("offerRequest: $offerRequest")
-
-                    val offerUri = OidcApi.getCredentialOfferRequestUrl(
-                        offerRequest,
-                        CROSS_DEVICE_CREDENTIAL_OFFER_URL + OidcApi.baseUrl.removePrefix("https://")
-                            .removePrefix("http://") + "/"
-                    )
-                    println("Offer URI: $offerUri")
-
-                    context.respond(
-                        HttpStatusCode.OK,
-                        offerUri
-                    )
                 }
             }
-        }
 
+            route("openid4vc") {
+                route("jwt") {
+                    post("issue", {
+                        summary = "Signs credential and starts an OIDC credential exchange flow."
+                        description = "This endpoint issues a W3C Verifiable Credential, and returns an issuance URL "
 
+                        request {
+                            headerParameter<String>("walt-key") {
+                                description =
+                                    "Supply a core-crypto key representation to use to issue the credential, " +
+                                            "e.g. a local key (internal JWK) or a TSE key."
+                                example = mapOf(
+                                    "type" to "local", "jwk" to "{ ... }"
+                                )
+                                required = true
+                            }
+                            headerParameter<String>("walt-issuerDid") {
+                                description = "Optionally, supply a DID to use in the proof. If no DID is passed, " +
+                                        "a did:key of the supplied key will be used."
+                                example = "did:ebsi:..."
+                                required = false
+                            }
+                            body<IssuanceRequest> {
+                                description =
+                                    "Pass the unsigned credential that you intend to issue as the body of the request."
+                                example("OpenBadgeCredential example", openBadgeCredentialExampleJsonString)
+                                example("UniversityDegreeCredential example", universityDegreeCredential)
+                                required = true
+                            }
+                        }
 
-        route("mdoc", {
-            tags = listOf("Mdocs")
-        }) {
-            post("issue", {
-                summary = "Signs a credential based on the IEC/ISO18013-5 mdoc/mDL format."
-                description = "This endpoint issues a mdoc and returns an issuance URL "
+                        response {
+                            "200" to {
+                                description = "Credential signed (with the *proof* attribute added)"
+                                body<String> {
+                                    example(
+                                        "Issuance URL URL",
+                                        "openid-credential-offer://localhost/?credential_offer=%7B%22credential_issuer%22%3A%22http%3A%2F%2Flocalhost%3A8000%22%2C%22credentials%22%3A%5B%22VerifiableId%22%5D%2C%22grants%22%3A%7B%22authorization_code%22%3A%7B%22issuer_state%22%3A%22501414a4-c461-43f0-84b2-c628730c7c02%22%7D%7D%7D"
+                                    )
+                                }
+                            }
+                        }
+                    }) {
+                        val keyJson =
+                            context.request.header("walt-key") ?: throw IllegalArgumentException("No key was passed.")
+                        val key = KeySerialization.deserializeKey(keyJson)
+                            .onFailure { throw IllegalArgumentException("Invalid key was supplied, error occurred is: $it") }
+                            .getOrThrow()
+                        val issuerDid =
+                            context.request.header("walt-issuerDid") ?: DidService.registerByKey("key", key).did
 
-                request {
-                    headerParameter<String>("walt-key") {
-                        description = "Supply a core-crypto key representation to use to issue the credential, " +
-                                "e.g. a local key (internal JWK) or a TSE key."
-                        example = mapOf(
-                            "type" to "local", "jwk" to "{ ... }"
+                        val body = context.receive<JsonObject>()
+                        val issuanceRequest = IssuanceRequest.fromJsonObject(body)
+
+                        val credentialOfferBuilder =
+                            OidcIssuance.issuanceRequestsToCredentialOfferBuilder(issuanceRequest)
+
+                        val issuanceSession = OidcApi.initializeCredentialOffer(
+                            credentialOfferBuilder = credentialOfferBuilder,
+                            expiresIn = 5.minutes,
+                            allowPreAuthorized = true
                         )
-                        required = false
+
+                        //val nonce = issuanceSession.cNonce ?: throw IllegalArgumentException("No cNonce set in issuanceSession?")
+
+                        OidcApi.setIssuanceDataForIssuanceId(
+                            issuanceSession.id,
+                            listOf(CIProvider.IssuanceSessionData(key, issuerDid, issuanceRequest))
+                        )
+                        println("issuanceSession: $issuanceSession")
+
+                        val offerRequest = CredentialOfferRequest(issuanceSession.credentialOffer!!)
+                        println("offerRequest: $offerRequest")
+
+                        val offerUri = OidcApi.getCredentialOfferRequestUrl(
+                            offerRequest,
+                            CROSS_DEVICE_CREDENTIAL_OFFER_URL + OidcApi.baseUrl.removePrefix("https://")
+                                .removePrefix("http://") + "/"
+                        )
+                        println("Offer URI: $offerUri")
+
+                        context.respond(
+                            HttpStatusCode.OK,
+                            offerUri
+                        )
+                    }
+                    post("issueBatch", {
+                        summary = "Signs a list of credentials and starts an OIDC credential exchange flow."
+                        description = "This endpoint issues a list W3C Verifiable Credentials, and returns an issuance URL "
+
+                        request {
+                            headerParameter<String>("walt-key") {
+                                description = "Supply a core-crypto key representation to use to issue the credential, " +
+                                        "e.g. a local key (internal JWK) or a TSE key."
+                                example = mapOf(
+                                    "type" to "local", "jwk" to "{ ... }"
+                                )
+                                required = true
+                            }
+                            headerParameter<String>("walt-issuerDid") {
+                                description = "Optionally, supply a DID to use in the proof. If no DID is passed, " +
+                                        "a did:key of the supplied key will be used."
+                                example = "did:ebsi:..."
+                                required = false
+                            }
+                            body<IssuanceRequest> {
+                                description =
+                                    "Pass the unsigned credential that you intend to issue as the body of the request."
+                                example("Batch example", batchExample)
+                                required = true
+                            }
+                        }
+
+                        response {
+                            "200" to {
+                                description = "Credential signed (with the *proof* attribute added)"
+                                body<String> {
+                                    example(
+                                        "Issuance URL URL",
+                                        "openid-credential-offer://localhost/?credential_offer=%7B%22credential_issuer%22%3A%22http%3A%2F%2Flocalhost%3A8000%22%2C%22credentials%22%3A%5B%22VerifiableId%22%5D%2C%22grants%22%3A%7B%22authorization_code%22%3A%7B%22issuer_state%22%3A%22501414a4-c461-43f0-84b2-c628730c7c02%22%7D%7D%7D"
+                                    )
+                                }
+                            }
+                        }
+                    }) {
+                        val keyJson =
+                            context.request.header("walt-key") ?: throw IllegalArgumentException("No key was passed.")
+                        val key = KeySerialization.deserializeKey(keyJson)
+                            .onFailure { throw IllegalArgumentException("Invalid key was supplied, error occurred is: $it") }
+                            .getOrThrow()
+                        val issuerDid = context.request.header("walt-issuerDid") ?: DidService.registerByKey("key", key).did
+
+                        val body = context.receive<JsonArray>()
+                        val issuanceRequests = body.map { IssuanceRequest.fromJsonObject(it.jsonObject) }
+
+                        val credentialOfferBuilder = OidcIssuance.issuanceRequestsToCredentialOfferBuilder(issuanceRequests)
+
+                        val issuanceSession = OidcApi.initializeCredentialOffer(
+                            credentialOfferBuilder = credentialOfferBuilder,
+                            expiresIn = 5.minutes,
+                            allowPreAuthorized = true,
+                            //preAuthUserPin = "1234"
+                        )
+
+
+                        OidcApi.setIssuanceDataForIssuanceId(
+                            issuanceSession.id,
+                            issuanceRequests.map { CIProvider.IssuanceSessionData(key, issuerDid, it) }
+                        )
+                        println("issuanceSession: $issuanceSession")
+
+                        val offerRequest = CredentialOfferRequest(issuanceSession.credentialOffer!!)
+                        println("offerRequest: $offerRequest")
+
+                        val offerUri = OidcApi.getCredentialOfferRequestUrl(
+                            offerRequest = offerRequest,
+                            walletCredentialOfferEndpoint = CROSS_DEVICE_CREDENTIAL_OFFER_URL + OidcApi.baseUrl.removePrefix(
+                                "https://"
+                            ).removePrefix("http://") + "/"
+                        )
+                        println("Offer URI: $offerUri")
+
+                        context.respond(
+                            HttpStatusCode.OK,
+                            offerUri
+                        )
                     }
                 }
-            }) {
-                context.respond(HttpStatusCode.OK, "mdoc issued")
+                route("mdoc") {
+                    post("issue", {
+                        summary = "Signs a credential based on the IEC/ISO18013-5 mdoc/mDL format."
+                        description = "This endpoint issues a mdoc and returns an issuance URL "
+
+                        request {
+                            headerParameter<String>("walt-key") {
+                                description = "Supply a core-crypto key representation to use to issue the credential, " +
+                                        "e.g. a local key (internal JWK) or a TSE key."
+                                example = mapOf(
+                                    "type" to "local", "jwk" to "{ ... }"
+                                )
+                                required = false
+                            }
+                        }
+                    }) {
+                        context.respond(HttpStatusCode.OK, "mdoc issued")
+                    }
+                }
             }
         }
     }
