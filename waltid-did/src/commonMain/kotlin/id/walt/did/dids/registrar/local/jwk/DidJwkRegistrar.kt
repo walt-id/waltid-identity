@@ -20,7 +20,7 @@ class DidJwkRegistrar : LocalRegistrarMethod("jwk") {
         val did = "did:jwk:${key.exportJWK().toByteArray().encodeToBase64Url()}"
 
         val didDocument = DidDocument(
-            DidJwkDocument(did, key.exportJWKObject())
+            DidJwkDocument(did, key.getPublicKey().exportJWKObject())
                 .toMap()
         )
 

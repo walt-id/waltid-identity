@@ -26,7 +26,7 @@ class LocalRegistrar : DidRegistrar {
     override suspend fun create(options: DidCreateOptions): DidResult =
         getRegistrarForMethod(options.method).register(options)
     override suspend fun createByKey(key: Key, options: DidCreateOptions): DidResult =
-        getRegistrarForMethod(options.method).registerByKey(key.getPublicKey(), options)
+        getRegistrarForMethod(options.method).registerByKey(key, options)
 
 
     override suspend fun update() {

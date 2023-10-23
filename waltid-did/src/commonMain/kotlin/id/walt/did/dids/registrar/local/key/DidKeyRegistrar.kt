@@ -29,9 +29,10 @@ class DidKeyRegistrar : LocalRegistrarMethod("key") {
                 KeyType.secp256r1
             )
         ) throw IllegalArgumentException("did:key can not be created with a ${key.keyType} key.")
-        val identifierComponents = getIdentifierComponents(key, it)
+        val pubKey = key.getPublicKey()
+        val identifierComponents = getIdentifierComponents(pubKey, it)
         val identifier = convertRawKeyToMultiBase58Btc(identifierComponents.pubKeyBytes, identifierComponents.multiCodecKeyCode)
-        createDid(identifier, key.exportJWKObject())
+        createDid(identifier, pubKey.exportJWKObject())
     }
 
     private suspend fun getIdentifierComponents(key: Key, options: DidCreateOptions): IdentifierComponents =
