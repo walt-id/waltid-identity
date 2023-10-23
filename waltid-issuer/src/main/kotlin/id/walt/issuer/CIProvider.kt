@@ -41,9 +41,10 @@ open class CIProvider : OpenIDCredentialIssuer(
     baseUrl = let {
         ConfigManager.getConfig<OIDCIssuerServiceConfig>().baseUrl
     }, config = CredentialIssuerConfig(credentialsSupported = listOf(
-        "VerifiableCredential" to listOf("VerifiableCredential")/*"VerifiableId" to listOf("VerifiableCredential", "VerifiableId"),
-            "VerifiableDiploma" to listOf("VerifiableCredential", "VerifiableAttestation", "VerifiableDiploma"),
-            "OpenBadgeCredential" to listOf("VerifiableCredential", "OpenBadgeCredential"),*/
+//        "VerifiableCredential" to listOf("VerifiableCredential"),
+        "VerifiableId" to listOf("VerifiableCredential", "VerifiableId"),
+        "VerifiableDiploma" to listOf("VerifiableCredential", "VerifiableAttestation", "VerifiableDiploma"),
+        "OpenBadgeCredential" to listOf("VerifiableCredential", "OpenBadgeCredential"),
     ).map {
         CredentialSupported(
             format = CredentialFormat.jwt_vc_json,
