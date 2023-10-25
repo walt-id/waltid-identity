@@ -71,9 +71,12 @@ object W3CDataMergeUtils {
 
                     //println("Sub-patching for $k: (current is: ${this[k]})")
 
+                    val kJson = runCatching { this[k]?.jsonObject }.getOrElse { ex -> throw IllegalArgumentException("Invalid mapping for credential, when processing \"$k\": ${ex.message}", ex) }
+                        ?: throw IllegalArgumentException("This key does not exist to map to: $k")
+
                     this[k] =
                         JsonObject(
-                            this[k]!!.jsonObject.toMutableMap().patch(k2, v2, dataFunctions, context, functionHistory)
+                            kJson.toMutableMap().patch(k2, v2, dataFunctions, context, functionHistory)
                         )
                 }
             }
