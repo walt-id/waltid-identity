@@ -44,4 +44,5 @@ fun Application.module() {
     configurePlugins()
     oidcApi()
     issuerApi()
+    auditApi()
 }
