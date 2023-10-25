@@ -3,7 +3,6 @@ package id.walt.verifier
 import id.walt.credentials.verification.PolicyManager
 import id.walt.did.dids.DidService
 import id.walt.did.dids.resolver.LocalResolver
-import id.walt.verifier.OidcApi.oidcApi
 import id.walt.verifier.base.config.ConfigManager
 import id.walt.verifier.base.config.WebConfig
 import id.walt.verifier.base.web.plugins.*
@@ -49,6 +48,5 @@ fun Application.configurePlugins() {
 
 fun Application.module() {
     configurePlugins()
-    oidcApi()
     verfierApi()
 }
