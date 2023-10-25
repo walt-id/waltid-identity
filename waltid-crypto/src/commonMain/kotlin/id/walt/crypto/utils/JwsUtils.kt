@@ -1,6 +1,7 @@
 package id.walt.crypto.utils
 
 import id.walt.crypto.keys.KeyType
+import id.walt.crypto.utils.Base64Utils.base64UrlToBase64
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
@@ -18,7 +19,7 @@ object JwsUtils {
 
     @OptIn(ExperimentalEncodingApi::class)
     fun String.decodeJwsPart(): JsonObject =
-        Json.parseToJsonElement(Base64.decode(this).decodeToString()).jsonObject
+        Json.parseToJsonElement(Base64.decode(this.base64UrlToBase64()).decodeToString()).jsonObject
 
     data class JwsParts(val header: JsonObject, val payload: JsonObject)
 
