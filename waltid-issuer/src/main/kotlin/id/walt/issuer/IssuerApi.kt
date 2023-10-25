@@ -178,20 +178,25 @@ val universityDegreeCredentialSignedExample = universityDegreeCredentialExample2
 fun Application.issuerApi() {
     routing {
         get("/example-key") {
-            context.respond(KeySerialization.serializeKey(LocalKey.generate(KeyType.Ed25519)))
+            context.respondText(ContentType.Application.Json) {
+                KeySerialization.serializeKey(LocalKey.generate(KeyType.Ed25519))
+            }
         }
         get("/example-key-transit", {
             request {
-                queryParameter<String>("server") { required = true }
-                queryParameter<String>("token") { required = true }
+                queryParameter<String>("tse-server") { required = true }
+                queryParameter<String>("tse-token") { required = true }
             }
         }) {
+            println("example key transit")
             val key = TSEKey.generate(
                 KeyType.Ed25519,
-                TSEKeyMetadata(call.parameters["server"]!!, call.parameters["token"]!!)
+                TSEKeyMetadata(call.parameters["tse-server"]!!, call.parameters["tse-token"]!!)
             )
 
-            context.respond(KeySerialization.serializeKey(key))
+            context.respondText(ContentType.Application.Json) {
+                KeySerialization.serializeKey(key)
+            }
         }
         get("/example-did", {
             request { headerParameter<String>("key") }
