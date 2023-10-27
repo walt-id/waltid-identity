@@ -19,6 +19,8 @@ object PolicyManager {
             "webhook"
      */
 
+    fun listPolicyDescriptions() = mappedPolicies.mapValues { it.value.description }
+
     fun registerPolicies(vararg policies: VerificationPolicy) {
         policies.forEach { policy ->
             if (mappedPolicies.containsKey(policy.name))

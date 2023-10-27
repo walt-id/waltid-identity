@@ -1,5 +1,6 @@
 package id.walt.verifier
 
+import id.walt.credentials.verification.PolicyManager
 import id.walt.credentials.verification.models.PolicyRequest
 import id.walt.credentials.verification.models.PolicyRequest.Companion.parsePolicyRequests
 import id.walt.credentials.verification.policies.JwtSignaturePolicy
@@ -248,6 +249,13 @@ fun Application.verfierApi() {
                 } else {
                     call.respond(HttpStatusCode.NotFound)
                 }
+            }
+            get("policy-list", {
+                tags = listOf("Credential Verification")
+                summary = "List registered policies"
+                response { HttpStatusCode.OK to { body<Map<String, String?>>() } }
+            }) {
+                call.respond(PolicyManager.listPolicyDescriptions())
             }
         }
     }
