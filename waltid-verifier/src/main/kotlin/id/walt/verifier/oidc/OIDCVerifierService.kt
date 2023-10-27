@@ -22,7 +22,7 @@ import kotlinx.serialization.json.jsonPrimitive
  * OIDC for Verifiable Presentations service provider, implementing abstract base provider from OIDC4VC library.
  */
 object OIDCVerifierService : OpenIDCredentialVerifier(
-    config = CredentialVerifierConfig(ConfigManager.getConfig<OIDCVerifierServiceConfig>().baseUrl.let { "$it/oidc/verify" })
+    config = CredentialVerifierConfig(ConfigManager.getConfig<OIDCVerifierServiceConfig>().baseUrl.let { "$it/openid4vc/verify" })
 ) {
     // ------------------------------------
     // Simple in-memory session management
