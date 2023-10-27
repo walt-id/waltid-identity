@@ -1,6 +1,8 @@
 package id.walt.credentials.verification
 
 import id.walt.credentials.verification.policies.*
+import id.walt.credentials.verification.policies.vp.MaximumCredentialsPolicy
+import id.walt.credentials.verification.policies.vp.MinimumCredentialsPolicy
 
 object PolicyManager {
     private val mappedPolicies = HashMap<String, VerificationPolicy>()
@@ -32,7 +34,9 @@ object PolicyManager {
             JsonSchemaPolicy(),
             ExpirationDatePolicy(),
             NotBeforeDatePolicy(),
-            WebhookPolicy()
+            WebhookPolicy(),
+            MinimumCredentialsPolicy(),
+            MaximumCredentialsPolicy()
         )
     }
 
