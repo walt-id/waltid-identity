@@ -82,9 +82,9 @@ fun Application.verfierApi() {
     routing {
 
         route("openid4vc", {
-            tags = listOf("Credential Verification")
         }) {
             post("verify", {
+                tags = listOf("Credential Verification")
                 summary = "Initialize OIDC presentation session"
                 description =
                     "Initializes an OIDC presentation session, with the given presentation definition and parameters. The URL returned can be rendered as QR code for the holder wallet to scan, or called directly on the holder if the wallet base URL is given."
@@ -160,6 +160,7 @@ fun Application.verfierApi() {
                 context.respond(authorizeBaseUrl.plus("?").plus(session.authorizationRequest!!.toHttpQueryString()))
             }
             post("/verify/{state}", {
+                tags = listOf("OIDC")
                 summary = "Verify vp_token response, for a verification request identified by the state"
                 description =
                     "Called in direct_post response mode by the SIOP provider (holder wallet) with the verifiable presentation in the vp_token and the presentation_submission parameter, describing the submitted presentation. The presentation session is identified by the given state parameter."
@@ -196,6 +197,7 @@ fun Application.verfierApi() {
                     call.respond(HttpStatusCode.BadRequest, "Response could not be verified.")
             }
             get("/session/{id}", {
+                tags = listOf("Credential Verification")
                 summary = "Get info about OIDC presentation session, that was previously initialized"
                 description =
                     "Session info, containing current state and result information about an ongoing OIDC presentation session"
@@ -223,6 +225,7 @@ fun Application.verfierApi() {
                 )
             }
             get("/pd/{id}", {
+                tags = listOf("OIDC")
                 summary = "Get presentation definition object by ID"
                 description =
                     "Gets a presentation definition object, previously uploaded during initialization of OIDC presentation session."
