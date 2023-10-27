@@ -207,6 +207,11 @@ fun Application.verfierApi() {
                         required = true
                     }
                 }
+                response {
+                    HttpStatusCode.OK to {
+                        description = "Session info"
+                    }
+                }
             }) {
                 val id = call.parameters["id"] ?: throw IllegalArgumentException("No id provided!")
                 val session = OIDCVerifierService.getSession(id)
