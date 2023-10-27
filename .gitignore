@@ -40,3 +40,5 @@ bin/
 
 # walt.id
 secret*
+*/data
+/kotlin-js-store/
