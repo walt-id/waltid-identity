@@ -43,8 +43,19 @@ open class CIProvider : OpenIDCredentialIssuer(
     }, config = CredentialIssuerConfig(credentialsSupported = listOf(
 //        "VerifiableCredential" to listOf("VerifiableCredential"),
         "VerifiableId" to listOf("VerifiableCredential", "VerifiableId"),
-        "VerifiableDiploma" to listOf("VerifiableCredential", "VerifiableAttestation", "VerifiableDiploma"),
         "OpenBadgeCredential" to listOf("VerifiableCredential", "OpenBadgeCredential"),
+        "BankId" to listOf("VerifiableCredential", "BankId"),
+        "KycChecksCredential" to listOf("VerifiableCredential", "VerifiableAttestation", "KycChecksCredential"),
+        "KycDataCredential" to listOf("VerifiableCredential", "VerifiableAttestation", "KycDataCredential"),
+        "PassportCh" to listOf("VerifiableCredential", "VerifiableAttestation", "VerifiableId", "PassportCh"),
+        "PND91Credential" to listOf("VerifiableCredential", "PND91Credential"),
+        "MortgageEligibility" to listOf("VerifiableCredential", "VerifiableAttestation", "VerifiableId", "MortgageEligibility"),
+        "PortableDocumentA1" to listOf("VerifiableCredential", "VerifiableAttestation", "PortableDocumentA1"),
+        "OpenBadgeCredential" to listOf("VerifiableCredential", "OpenBadgeCredential"),
+        "VaccinationCertificate" to listOf("VerifiableCredential", "VerifiableAttestation", "VaccinationCertificate"),
+        "WalletHolderCredential" to listOf("VerifiableCredential", "WalletHolderCredential"),
+        "UniversityDegree" to listOf("VerifiableCredential", "UniversityDegree"),
+        "VerifiableId" to listOf("VerifiableCredential", "VerifiableAttestation", "VerifiableId"),
     ).map {
         CredentialSupported(
             format = CredentialFormat.jwt_vc_json,
