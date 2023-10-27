@@ -218,13 +218,13 @@ fun Application.verfierApi() {
                     ?: throw IllegalArgumentException("Invalid id provided (expired?): $id")
 
                 val policyResults = OIDCVerifierService.policyResults[session.id]
-                    ?: throw IllegalStateException("No policy results found for id")
+                    //?: throw IllegalStateException("No policy results found for id")
 
                 call.respond(
                     Json { prettyPrint = true }.encodeToString(
                         PresentationSessionInfo.fromPresentationSession(
                             session,
-                            policyResults.toJson()
+                            policyResults?.toJson()
                         )
                     )
                 )
