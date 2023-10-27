@@ -22,4 +22,7 @@ include(
     // Services based on libs
     "waltid-issuer",
     "waltid-verifier",
+
+    // Reporting
+    "waltid-reporting"
 )
