@@ -27,12 +27,16 @@ fun Application.configureStatusPages() {
 
             call.respond(
                 statusCodeForException(cause), Json.encodeToString(
-                    mapOf(
+                    mutableMapOf(
                         "exception" to "true",
                         "status" to statusCodeForException(cause).description,
                         "code" to statusCodeForException(cause).value.toString(),
                         "message" to cause.message
-                    )
+                    ).apply {
+                        if (cause.cause != null) {
+                            put("cause", cause.cause!!.message)
+                        }
+                    }
                 )
             )
         }
