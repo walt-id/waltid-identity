@@ -192,7 +192,7 @@ fun Application.verfierApi() {
                         "State parameter doesn't refer to an existing session, or session expired"
                     )
                 } else if (OIDCVerifierService.verify(tokenResponse, session).verificationResult == true) {
-                    call.respond(HttpStatusCode.OK)
+                    call.respond(HttpStatusCode.OK, "https://portal.walt.id/success/${session.id}")
                 } else
                     call.respond(HttpStatusCode.BadRequest, "Response could not be verified.")
             }
