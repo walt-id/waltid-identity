@@ -57,3 +57,22 @@ data class WebhookPolicyException(
 ) :
     SerializableRuntimeException()
 
+@Serializable
+@SerialName("PresentationDefinitionException")
+class PresentationDefinitionException(
+    val missingCredentialTypes: List<String>
+) : SerializableRuntimeException()
+
+@Serializable
+@SerialName("MinimumCredentialsException")
+class MinimumCredentialsException(
+    val total: Int,
+    val missing: Int
+) : SerializableRuntimeException()
+
+@Serializable
+@SerialName("MaximumCredentialsException")
+class MaximumCredentialsException(
+    val total: Int,
+    val exceeded: Int
+) : SerializableRuntimeException()
