@@ -51,7 +51,7 @@ abstract class DidRegistrarTestBase(private val registrar: LocalRegistrarMethod)
             assert(doc["id"]!!.jsonPrimitive.content == did)
             // assert [verificationMethod id] and [did] are identical
             assert(doc["verificationMethod"]!!.jsonArray.any {
-                it.jsonObject["id"]!!.jsonPrimitive.content == did
+                it.jsonObject["id"]!!.jsonPrimitive.content.substringBefore("#") == did
             })
             // assert [verificationMethod controller] and [did] are identical
             assert(doc["verificationMethod"]!!.jsonArray.any {
