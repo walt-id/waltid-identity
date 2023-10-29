@@ -17,6 +17,7 @@ import org.bouncycastle.asn1.DEROctetString
 import org.bouncycastle.asn1.edec.EdECObjectIdentifiers
 import org.bouncycastle.asn1.pkcs.PrivateKeyInfo
 import org.bouncycastle.asn1.x509.AlgorithmIdentifier
+import org.bouncycastle.jce.provider.BouncyCastleProvider
 import java.security.*
 import java.security.spec.PKCS8EncodedKeySpec
 import java.util.*
@@ -35,6 +36,7 @@ actual class LocalKey actual constructor(
         if (jwk != null) {
             _internalJwk = JWK.parse(jwk)
         }
+        Security.addProvider(BouncyCastleProvider())
     }
 
 
@@ -191,7 +193,8 @@ actual class LocalKey actual constructor(
     }
 
     private fun getSignature(): Signature = when (keyType) {
-        KeyType.secp256k1, KeyType.secp256r1 -> Signature.getInstance("SHA256withECDSA")
+        KeyType.secp256k1 -> Signature.getInstance("SHA256withECDSA", "BC")//Legacy SunEC curve disabled
+        KeyType.secp256r1 -> Signature.getInstance("SHA256withECDSA")
         KeyType.Ed25519 -> Signature.getInstance("Ed25519")
         KeyType.RSA -> Signature.getInstance("SHA256withRSA")
     }
