@@ -18,7 +18,7 @@ data:
     webHost = "0.0.0.0"
     webPort = 3000
   issuer-service.conf: |
-    baseUrl = "https://issuer.walt-test.cloud"
+    baseUrl = "https://issuer.portal.walt-test.cloud"
 ---
 kind: Deployment
 apiVersion: apps/v1
@@ -38,7 +38,7 @@ spec:
     spec:
       containers:
         - name: issuer
-          image: waltid/issuer:latest
+          image: waltid/issuer:dev
           volumeMounts:
             - name: issuer-web-config
               mountPath: "/waltid-issuer/config/"
@@ -79,10 +79,10 @@ metadata:
 spec:
   tls:
     - hosts:
-        - issuer.walt-test.cloud
+        - issuer.portal.walt-test.cloud
       secretName: issuer-tls-secret
   rules:
-    - host: issuer.walt-test.cloud
+    - host: issuer.portal.walt-test.cloud
       http:
         paths:
           - path: /

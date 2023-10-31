@@ -18,7 +18,7 @@ data:
     webHost = "0.0.0.0"
     webPort = 3000
   issuer-service.conf: |
-    baseUrl = "https://issuer.walt.id"
+    baseUrl = "https://issuer.portal.walt.id"
 ---
 kind: Deployment
 apiVersion: apps/v1
@@ -79,10 +79,10 @@ metadata:
 spec:
   tls:
     - hosts:
-        - issuer.walt.id
+        - issuer.portal.walt.id
       secretName: issuer-tls-secret
   rules:
-    - host: issuer.walt.id
+    - host: issuer.portal.walt.id
       http:
         paths:
           - path: /

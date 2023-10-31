@@ -18,7 +18,7 @@ data:
     webHost = "0.0.0.0"
     webPort = 3000
   verifier-service.conf: |
-    baseUrl = "https://verifier.walt-test.cloud"
+    baseUrl = "https://verifier.portal.walt-test.cloud"
 ---
 kind: Deployment
 apiVersion: apps/v1
@@ -38,7 +38,7 @@ spec:
     spec:
       containers:
         - name: verifier
-          image: waltid/verifier:latest
+          image: waltid/verifier:dev
           volumeMounts:
             - name: verifier-web-config
               mountPath: "/waltid-verifier/config/"
@@ -79,10 +79,10 @@ metadata:
 spec:
   tls:
     - hosts:
-        - verifier.walt-test.cloud
+        - verifier.portal.walt-test.cloud
       secretName: verifier-tls-secret
   rules:
-    - host: verifier.walt-test.cloud
+    - host: verifier.portal.walt-test.cloud
       http:
         paths:
           - path: /

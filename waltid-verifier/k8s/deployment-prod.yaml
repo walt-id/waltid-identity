@@ -18,7 +18,7 @@ data:
     webHost = "0.0.0.0"
     webPort = 3000
   verifier-service.conf: |
-    baseUrl = "https://verifier.walt.id"
+    baseUrl = "https://verifier.portal.walt.id"
 ---
 kind: Deployment
 apiVersion: apps/v1
@@ -79,10 +79,10 @@ metadata:
 spec:
   tls:
     - hosts:
-        - verifier.walt.id
+        - verifier.portal.walt.id
       secretName: verifier-tls-secret
   rules:
-    - host: verifier.walt.id
+    - host: verifier.portal.walt.id
       http:
         paths:
           - path: /
