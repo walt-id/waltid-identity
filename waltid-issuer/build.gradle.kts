@@ -17,7 +17,7 @@ plugins {
     id("org.jetbrains.kotlin.plugin.serialization")  // Versions.KOTLIN_VERSION
 
     id("io.ktor.plugin") version "2.3.5" // Versions.KTOR_VERSION
-    id("org.owasp.dependencycheck") version "8.4.0"
+    id("org.owasp.dependencycheck") version "8.4.2"
     id("com.github.jk1.dependency-license-report") version "2.5"
     application
     `maven-publish`
@@ -63,7 +63,7 @@ dependencies {
     implementation("io.ktor:ktor-server-cio-jvm:${Versions.KTOR_VERSION}")
 
     // Ktor server external libs
-    implementation("io.github.smiley4:ktor-swagger-ui:2.5.0")
+    implementation("io.github.smiley4:ktor-swagger-ui:2.6.0")
 
     // Ktor client
     implementation("io.ktor:ktor-client-core-jvm:${Versions.KTOR_VERSION}")
