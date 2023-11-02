@@ -1,8 +1,8 @@
 package id.walt.issuer.base.web.plugins
 
 import io.github.smiley4.ktorswaggerui.SwaggerUI
-import io.github.smiley4.ktorswaggerui.dsl.AuthKeyLocation
-import io.github.smiley4.ktorswaggerui.dsl.AuthType
+import io.github.smiley4.ktorswaggerui.data.AuthKeyLocation
+import io.github.smiley4.ktorswaggerui.data.AuthType
 import io.ktor.server.application.*
 
 fun Application.configureOpenApi() {
