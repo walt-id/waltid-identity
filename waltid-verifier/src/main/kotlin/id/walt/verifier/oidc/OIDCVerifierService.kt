@@ -28,13 +28,15 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
     // Simple in-memory session management
     val presentationSessions = HashMap<String, PresentationSession>()
 
-    data class SessionPolicyRequests(
+    data class SessionVerificationInformation(
         val vpPolicies: List<PolicyRequest>,
         val vcPolicies: List<PolicyRequest>,
-        val specificPolicies: Map<String, List<PolicyRequest>>
+        val specificPolicies: Map<String, List<PolicyRequest>>,
+        val successRedirectUri: String?,
+        val errorRedirectUri: String?,
     )
 
-    val sessionPolicies = HashMap<String, SessionPolicyRequests>()
+    val sessionVerificationInfos = HashMap<String, SessionVerificationInformation>()
     val policyResults = HashMap<String, PresentationVerificationResponse>()
 
     data class CredentialPolicyResult(val type: String, val policyResults: List<JsonObject>)
@@ -62,7 +64,7 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
     // ------------------------------------
     // Simple cryptographic operations interface implementation
     override fun doVerify(tokenResponse: TokenResponse, session: PresentationSession): Boolean {
-        val policies = sessionPolicies[session.id]
+        val policies = sessionVerificationInfos[session.id]
             ?: throw IllegalArgumentException("Could not find policy listing for session: ${session.id}")
 
         val vpToken = when (tokenResponse.vpToken) {
