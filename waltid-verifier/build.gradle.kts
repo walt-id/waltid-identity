@@ -116,7 +116,7 @@ dependencies {
 
     // SSI Kit 2
     api(project(":waltid-crypto"))
-    api(project(":waltid-credentials"))
+    api(project(":waltid-verifiable-credentials"))
     api(project(":waltid-did"))
     // implementation("id.walt:waltid-ssikit2:1.0.8-SNAPSHOT")
     // implementation("id.walt:core-crypto:1.0.7-SNAPSHOT")

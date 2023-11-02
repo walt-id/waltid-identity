@@ -87,11 +87,7 @@ class TSEKey(
     override suspend fun signRaw(plaintext: ByteArray): Any {
         val signatureBase64 = http.post("$server/sign/${id}") {
             header("X-Vault-Token", accessKey) // TODO
-            setBody(
-                mapOf(
-                    "input" to plaintext.encodeBase64()
-                )
-            )
+            setBody(mapOf("input" to plaintext.encodeBase64()))
         }.tseJsonDataBody().jsonObject["signature"]?.jsonPrimitive?.content?.removePrefix("vault:v1:")
             ?: throwTSEError("No signature in data response")
 
@@ -198,11 +194,7 @@ class TSEKey(
     suspend fun delete() {
         http.post("$server/keys/$id/config") {
             header("X-Vault-Token", accessKey)
-            setBody(
-                mapOf(
-                    "deletion_allowed" to true
-                )
-            )
+            setBody(mapOf("deletion_allowed" to true))
         }
 
         http.delete("$server/keys/$id") {
@@ -231,19 +223,15 @@ class TSEKey(
             if (!status.isSuccess()) throw RuntimeException(baseMsg.invoke() + "non-success status: $status")
 
             return runCatching { this.body<JsonObject>() }.getOrElse {
-                    val bodyStr = this.bodyAsText()
-                    throw IllegalArgumentException(baseMsg.invoke() + if (bodyStr == "") "empty response (instead of JSON data)" else "invalid response: $bodyStr")
-                }["data"]?.jsonObject ?: throw IllegalArgumentException(baseMsg.invoke() + "no data in response: ${this.bodyAsText()}")
+                val bodyStr = this.bodyAsText()
+                throw IllegalArgumentException(baseMsg.invoke() + if (bodyStr == "") "empty response (instead of JSON data)" else "invalid response: $bodyStr")
+            }["data"]?.jsonObject ?: throw IllegalArgumentException(baseMsg.invoke() + "no data in response: ${this.bodyAsText()}")
         }
 
         override suspend fun generate(type: KeyType, metadata: TSEKeyMetadata): TSEKey {
             val keyData = http.post("${metadata.server}/keys/k${metadata.id ?: Random.nextInt()}") {
                 header("X-Vault-Token", metadata.accessKey)
-                setBody(
-                    mapOf(
-                        "type" to keyTypeToTseKeyMapping(type)
-                    )
-                )
+                setBody(mapOf("type" to keyTypeToTseKeyMapping(type)))
             }.tseJsonDataBody()
 
             fun throwTSEError(msg: String): Nothing = throw RuntimeException("Invalid TSE server (${metadata.server}) response: $msg")
