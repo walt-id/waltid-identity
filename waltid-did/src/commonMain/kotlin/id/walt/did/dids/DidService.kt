@@ -76,7 +76,11 @@ object DidService {
                     registerRegistrarForMethod(method, registrar)
                 }
 
-                else -> log.warn { "DID Registrar ${registrar.name} cannot be used, error: ${methods.exceptionOrNull().let { it?.message ?: it.toString() }}" }
+                else -> log.warn {
+                    "DID Registrar ${registrar.name} cannot be used, error: ${
+                        methods.exceptionOrNull().let { it?.message ?: it.toString() }
+                    }"
+                }
             }
         }
     }

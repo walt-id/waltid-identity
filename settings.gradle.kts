@@ -15,6 +15,7 @@ include(
     "waltid-crypto",
     "waltid-did",
     "waltid-verifiable-credentials",
+    "waltid-sdjwt",
 
     // Protocols
     "waltid-openid4vc",

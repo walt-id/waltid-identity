@@ -6,7 +6,7 @@ import id.walt.oid4vc.providers.SIOPSession
 import id.walt.oid4vc.requests.TokenRequest
 import kotlinx.serialization.json.JsonElement
 
-interface IVPTokenProvider<S: SIOPSession> {
+interface IVPTokenProvider<S : SIOPSession> {
 
     /**
      * Generates and signs the verifiable presentation as requested in the presentation definition for the vp_token response of the given TokenRequest.

@@ -943,7 +943,8 @@ class CI_JVM_Test : AnnotationSpec() {
         println("// as WALLET: receive credential offer, either being called via deeplink or by scanning QR code")
         println("// parse credential URI")
 
-        val credentialOffer = credentialWallet.getCredentialOffer(CredentialOfferRequest.fromHttpParameters(Url(offerUri).parameters.toMap()))
+        val credentialOffer =
+            credentialWallet.getCredentialOffer(CredentialOfferRequest.fromHttpParameters(Url(offerUri).parameters.toMap()))
 
         credentialOffer.credentialIssuer shouldNotBe null
         credentialOffer.grants.keys shouldContain GrantType.pre_authorized_code.value

@@ -17,8 +17,9 @@ object KeySerialization {
         }
     }
 
-    private val keySerializationJson = Json { serializersModule =
-        keySerializationModule
+    private val keySerializationJson = Json {
+        serializersModule =
+            keySerializationModule
     }
 
     fun serializeKey(key: Key): String = keySerializationJson.encodeToString(key)

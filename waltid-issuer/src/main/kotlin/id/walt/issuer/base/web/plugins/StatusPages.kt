@@ -26,12 +26,15 @@ fun Application.configureStatusPages() {
             cause.printStackTrace()
 
             call.respond(
-                statusCodeForException(cause), Json.encodeToString(mapOf(
-                "exception" to "true",
-                "status" to statusCodeForException(cause).description,
-                "code" to statusCodeForException(cause).value.toString(),
-                "message" to cause.message
-            )))
+                statusCodeForException(cause), Json.encodeToString(
+                    mapOf(
+                        "exception" to "true",
+                        "status" to statusCodeForException(cause).description,
+                        "code" to statusCodeForException(cause).value.toString(),
+                        "message" to cause.message
+                    )
+                )
+            )
         }
     }
 }

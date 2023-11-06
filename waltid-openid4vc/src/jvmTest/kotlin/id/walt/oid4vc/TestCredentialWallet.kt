@@ -74,39 +74,49 @@ class TestCredentialWallet(
         JwtService.getService().verify(token).verified
 
     override fun httpGet(url: Url, headers: Headers?): SimpleHttpResponse {
-        return runBlocking { ktorClient.get(url) {
-            headers {
-                headers?.let { appendAll(it) }
-            }
-        }.let { httpResponse -> SimpleHttpResponse(httpResponse.status, httpResponse.headers, httpResponse.bodyAsText()) } }
+        return runBlocking {
+            ktorClient.get(url) {
+                headers {
+                    headers?.let { appendAll(it) }
+                }
+            }.let { httpResponse -> SimpleHttpResponse(httpResponse.status, httpResponse.headers, httpResponse.bodyAsText()) }
+        }
     }
 
     override fun httpPostObject(url: Url, jsonObject: JsonObject, headers: Headers?): SimpleHttpResponse {
-        return runBlocking { ktorClient.post(url) {
-            headers {
-                headers?.let { appendAll(it) }
-            }
-            contentType(ContentType.Application.Json)
-            setBody(jsonObject)
-        }.let { httpResponse -> SimpleHttpResponse(httpResponse.status, httpResponse.headers, httpResponse.bodyAsText()) } }
+        return runBlocking {
+            ktorClient.post(url) {
+                headers {
+                    headers?.let { appendAll(it) }
+                }
+                contentType(ContentType.Application.Json)
+                setBody(jsonObject)
+            }.let { httpResponse -> SimpleHttpResponse(httpResponse.status, httpResponse.headers, httpResponse.bodyAsText()) }
+        }
     }
 
     override fun httpSubmitForm(url: Url, formParameters: Parameters, headers: Headers?): SimpleHttpResponse {
-        return runBlocking { ktorClient.submitForm {
-            url(url)
-            headers {
-                headers?.let { appendAll(it) }
-            }
-            parameters {
-                appendAll(formParameters)
-            }
-        }.let { httpResponse -> SimpleHttpResponse(httpResponse.status, httpResponse.headers, httpResponse.bodyAsText()) } }
+        return runBlocking {
+            ktorClient.submitForm {
+                url(url)
+                headers {
+                    headers?.let { appendAll(it) }
+                }
+                parameters {
+                    appendAll(formParameters)
+                }
+            }.let { httpResponse -> SimpleHttpResponse(httpResponse.status, httpResponse.headers, httpResponse.bodyAsText()) }
+        }
     }
 
     override fun generatePresentationForVPToken(session: SIOPSession, tokenRequest: TokenRequest): PresentationResult {
         // find credential(s) matching the presentation definition
         // for this test wallet implementation, present all credentials in the wallet
-        val presentationDefinition = session.presentationDefinition ?: throw PresentationError(TokenErrorCode.invalid_request, tokenRequest, session.presentationDefinition)
+        val presentationDefinition = session.presentationDefinition ?: throw PresentationError(
+            TokenErrorCode.invalid_request,
+            tokenRequest,
+            session.presentationDefinition
+        )
         val filterString = presentationDefinition.inputDescriptors.flatMap { it.constraints?.fields ?: listOf() }
             .firstOrNull { field -> field.path.any { it.contains("type") } }?.filter?.jsonObject.toString()
         val presentationJwtStr = Custodian.getService()

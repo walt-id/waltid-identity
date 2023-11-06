@@ -30,7 +30,7 @@ import kotlin.time.Duration.Companion.minutes
  * in reply to OpenID4VP authorization requests.
  * e.g.: Verifiable Credentials holder wallets
  */
-abstract class OpenIDCredentialWallet<S: SIOPSession>(
+abstract class OpenIDCredentialWallet<S : SIOPSession>(
     baseUrl: String,
     override val config: CredentialWalletConfig
 ) : OpenIDProvider<S>(baseUrl), ITokenProvider, IVPTokenProvider<S>, IHttpClient {
@@ -163,20 +163,37 @@ abstract class OpenIDCredentialWallet<S: SIOPSession>(
     open fun getCredentialOffer(credentialOfferRequest: CredentialOfferRequest): CredentialOffer {
         return credentialOfferRequest.credentialOffer ?: credentialOfferRequest.credentialOfferUri?.let { uri ->
             httpGetAsJson(Url(uri))?.jsonObject?.let { CredentialOffer.fromJSON(it) }
-        } ?: throw CredentialOfferError(credentialOfferRequest, CredentialOfferErrorCode.invalid_request, "No credential offer value found on request, and credential offer could not be fetched by reference from given credential_offer_uri")
+        } ?: throw CredentialOfferError(
+            credentialOfferRequest,
+            CredentialOfferErrorCode.invalid_request,
+            "No credential offer value found on request, and credential offer could not be fetched by reference from given credential_offer_uri"
+        )
     }
 
     @OptIn(ExperimentalEncodingApi::class)
-    open fun executeFullAuthIssuance(credentialOfferRequest: CredentialOfferRequest, holderDid: String, client: OpenIDClientConfig): List<CredentialResponse> {
+    open fun executeFullAuthIssuance(
+        credentialOfferRequest: CredentialOfferRequest,
+        holderDid: String,
+        client: OpenIDClientConfig
+    ): List<CredentialResponse> {
         val credentialOffer = getCredentialOffer(credentialOfferRequest)
-        if(!credentialOffer.grants.containsKey(GrantType.authorization_code.value)) throw CredentialOfferError(credentialOfferRequest, CredentialOfferErrorCode.invalid_request, "Full authorization issuance flow executed, but no authorization_code found on credential offer")
+        if (!credentialOffer.grants.containsKey(GrantType.authorization_code.value)) throw CredentialOfferError(
+            credentialOfferRequest,
+            CredentialOfferErrorCode.invalid_request,
+            "Full authorization issuance flow executed, but no authorization_code found on credential offer"
+        )
         val issuerMetadataUrl = getCIProviderMetadataUrl(credentialOffer.credentialIssuer)
-        val issuerMetadata = httpGetAsJson(Url(issuerMetadataUrl))?.jsonObject?.let { OpenIDProviderMetadata.fromJSON(it) } ?: throw CredentialOfferError(credentialOfferRequest, CredentialOfferErrorCode.invalid_issuer, "Could not resolve issuer provider metadata from $issuerMetadataUrl")
+        val issuerMetadata =
+            httpGetAsJson(Url(issuerMetadataUrl))?.jsonObject?.let { OpenIDProviderMetadata.fromJSON(it) } ?: throw CredentialOfferError(
+                credentialOfferRequest,
+                CredentialOfferErrorCode.invalid_issuer,
+                "Could not resolve issuer provider metadata from $issuerMetadataUrl"
+            )
         val authorizationServerMetadata = issuerMetadata.authorizationServer?.let { authServer ->
             httpGetAsJson(Url(getCommonProviderMetadataUrl(authServer)))?.jsonObject?.let { OpenIDProviderMetadata.fromJSON(it) }
         } ?: issuerMetadata
         val offeredCredentials = credentialOffer.resolveOfferedCredentials(issuerMetadata)
-        val codeVerifier = if(client.useCodeChallenge) randomUUID() else null
+        val codeVerifier = if (client.useCodeChallenge) randomUUID() else null
         val codeChallenge = codeVerifier?.let { Base64.UrlSafe.encode(sha256(it.toByteArray(Charsets.UTF_8))).trimEnd('=') }
 
         val authReq = AuthorizationRequest(
@@ -185,7 +202,12 @@ abstract class OpenIDCredentialWallet<S: SIOPSession>(
             redirectUri = config.redirectUri,
             scope = setOf("openid"),
             issuerState = credentialOffer.grants[GrantType.authorization_code.value]?.issuerState,
-            authorizationDetails = offeredCredentials.map { AuthorizationDetails.fromOfferedCredential(it, issuerMetadata.credentialIssuer) },
+            authorizationDetails = offeredCredentials.map {
+                AuthorizationDetails.fromOfferedCredential(
+                    it,
+                    issuerMetadata.credentialIssuer
+                )
+            },
             codeChallenge = codeChallenge,
             codeChallengeMethod = codeChallenge?.let { "S256" }
         ).let { authReq ->
@@ -218,30 +240,51 @@ abstract class OpenIDCredentialWallet<S: SIOPSession>(
             it.parameters.appendAll(parametersOf(authReq.toHttpParameters()))
         }.build())
         println("authResp: $authResp")
-        if(authResp.status != HttpStatusCode.Found) throw AuthorizationError(authReq, AuthorizationErrorCode.server_error, "Got unexpected status code ${authResp.status.value} from issuer")
+        if (authResp.status != HttpStatusCode.Found) throw AuthorizationError(
+            authReq,
+            AuthorizationErrorCode.server_error,
+            "Got unexpected status code ${authResp.status.value} from issuer"
+        )
         var location = Url(authResp.headers[HttpHeaders.Location]!!)
         println("location: $location")
-        location = if(location.parameters.contains("response_type") && location.parameters["response_type"] == ResponseType.id_token.name) {
-            executeIdTokenAuthorization(location, holderDid, client)
-        } else location
+        location =
+            if (location.parameters.contains("response_type") && location.parameters["response_type"] == ResponseType.id_token.name) {
+                executeIdTokenAuthorization(location, holderDid, client)
+            } else location
 
-        val code = location.parameters["code"] ?: throw AuthorizationError(authReq, AuthorizationErrorCode.server_error, "No authorization code received from server")
+        val code = location.parameters["code"] ?: throw AuthorizationError(
+            authReq,
+            AuthorizationErrorCode.server_error,
+            "No authorization code received from server"
+        )
 
         val tokenReq = TokenRequest(GrantType.authorization_code, client.clientID, config.redirectUri, code, codeVerifier = codeVerifier)
         val tokenHttpResp = httpSubmitForm(Url(authorizationServerMetadata.tokenEndpoint!!), parametersOf(tokenReq.toHttpParameters()))
-        if(!tokenHttpResp.status.isSuccess() || tokenHttpResp.body == null) throw TokenError(tokenReq, TokenErrorCode.server_error, "Server returned error code ${tokenHttpResp.status}, or empty body")
+        if (!tokenHttpResp.status.isSuccess() || tokenHttpResp.body == null) throw TokenError(
+            tokenReq,
+            TokenErrorCode.server_error,
+            "Server returned error code ${tokenHttpResp.status}, or empty body"
+        )
         val tokenResp = TokenResponse.fromJSONString(tokenHttpResp.body)
-        if(tokenResp.accessToken == null) throw TokenError(tokenReq, TokenErrorCode.server_error, "No access token returned by server")
+        if (tokenResp.accessToken == null) throw TokenError(tokenReq, TokenErrorCode.server_error, "No access token returned by server")
 
         var nonce = tokenResp.cNonce
-        return if(issuerMetadata.batchCredentialEndpoint.isNullOrEmpty() || offeredCredentials.size == 1) {
+        return if (issuerMetadata.batchCredentialEndpoint.isNullOrEmpty() || offeredCredentials.size == 1) {
             // execute credential requests individually
             offeredCredentials.map { offeredCredential ->
-                val credReq = CredentialRequest.forOfferedCredential(offeredCredential, generateDidProof(holderDid, credentialOffer.credentialIssuer, nonce, client))
+                val credReq = CredentialRequest.forOfferedCredential(
+                    offeredCredential,
+                    generateDidProof(holderDid, credentialOffer.credentialIssuer, nonce, client)
+                )
                 executeCredentialRequest(
-                    issuerMetadata.credentialEndpoint ?: throw CredentialError(credReq, CredentialErrorCode.server_error, "No credential endpoint specified in issuer metadata"),
-                    tokenResp.accessToken, credReq).also {
-                        nonce = it.cNonce ?: nonce
+                    issuerMetadata.credentialEndpoint ?: throw CredentialError(
+                        credReq,
+                        CredentialErrorCode.server_error,
+                        "No credential endpoint specified in issuer metadata"
+                    ),
+                    tokenResp.accessToken, credReq
+                ).also {
+                    nonce = it.cNonce ?: nonce
                 }
             }
         } else {
@@ -252,26 +295,51 @@ abstract class OpenIDCredentialWallet<S: SIOPSession>(
         }
     }
 
-    protected open fun executeBatchCredentialRequest(batchEndpoint: String, accessToken: String, credentialRequests: List<CredentialRequest>): List<CredentialResponse> {
+    protected open fun executeBatchCredentialRequest(
+        batchEndpoint: String,
+        accessToken: String,
+        credentialRequests: List<CredentialRequest>
+    ): List<CredentialResponse> {
         val req = BatchCredentialRequest(credentialRequests)
-        val httpResp = httpPostObject(Url(batchEndpoint), req.toJSON(), Headers.build { set(HttpHeaders.Authorization, "Bearer $accessToken") })
-        if(!httpResp.status.isSuccess() || httpResp.body == null) throw BatchCredentialError(req, CredentialErrorCode.server_error, "Batch credential endpoint returned error status ${httpResp.status}, or body is empty")
+        val httpResp =
+            httpPostObject(Url(batchEndpoint), req.toJSON(), Headers.build { set(HttpHeaders.Authorization, "Bearer $accessToken") })
+        if (!httpResp.status.isSuccess() || httpResp.body == null) throw BatchCredentialError(
+            req,
+            CredentialErrorCode.server_error,
+            "Batch credential endpoint returned error status ${httpResp.status}, or body is empty"
+        )
         return BatchCredentialResponse.fromJSONString(httpResp.body).credentialResponses ?: listOf()
     }
 
-    protected open fun executeCredentialRequest(credentialEndpoint: String, accessToken: String, credentialRequest: CredentialRequest): CredentialResponse {
-        val httpResp = httpPostObject(Url(credentialEndpoint), credentialRequest.toJSON(), Headers.build { set(HttpHeaders.Authorization, "Bearer $accessToken") })
-        if(!httpResp.status.isSuccess() || httpResp.body == null) throw CredentialError(credentialRequest, CredentialErrorCode.server_error, "Credential error returned error status ${httpResp.status}, or body is empty")
+    protected open fun executeCredentialRequest(
+        credentialEndpoint: String,
+        accessToken: String,
+        credentialRequest: CredentialRequest
+    ): CredentialResponse {
+        val httpResp = httpPostObject(
+            Url(credentialEndpoint),
+            credentialRequest.toJSON(),
+            Headers.build { set(HttpHeaders.Authorization, "Bearer $accessToken") })
+        if (!httpResp.status.isSuccess() || httpResp.body == null) throw CredentialError(
+            credentialRequest,
+            CredentialErrorCode.server_error,
+            "Credential error returned error status ${httpResp.status}, or body is empty"
+        )
         return CredentialResponse.fromJSONString(httpResp.body)
     }
 
     @OptIn(ExperimentalJsExport::class)
     protected open fun executeIdTokenAuthorization(idTokenRequestUri: Url, holderDid: String, client: OpenIDClientConfig): Url {
         var authReq = AuthorizationRequest.fromHttpQueryString(idTokenRequestUri.encodedQuery).let { authorizationRequest ->
-            authorizationRequest.customParameters["request"]?.let { AuthorizationJSONRequest.fromJSON(SDJwt.parse(it.first()).fullPayload) } ?: authorizationRequest
+            authorizationRequest.customParameters["request"]?.let { AuthorizationJSONRequest.fromJSON(SDJwt.parse(it.first()).fullPayload) }
+                ?: authorizationRequest
         }
-        if(authReq.responseMode != ResponseMode.direct_post || authReq.responseType != ResponseType.id_token.name || authReq.redirectUri.isNullOrEmpty())
-            throw AuthorizationError(authReq, AuthorizationErrorCode.server_error, "Unexpected response_mode ${authReq.responseMode}, or response_type ${authReq.responseType} returned from server, or redirect_uri is missing")
+        if (authReq.responseMode != ResponseMode.direct_post || authReq.responseType != ResponseType.id_token.name || authReq.redirectUri.isNullOrEmpty())
+            throw AuthorizationError(
+                authReq,
+                AuthorizationErrorCode.server_error,
+                "Unexpected response_mode ${authReq.responseMode}, or response_type ${authReq.responseType} returned from server, or redirect_uri is missing"
+            )
 
         val keyId = resolveDID(holderDid)
         val idToken = signToken(TokenTarget.TOKEN, buildJsonObject {
@@ -283,10 +351,21 @@ abstract class OpenIDCredentialWallet<S: SIOPSession>(
             put("state", authReq.state)
             put("nonce", authReq.nonce)
         }, keyId = keyId)
-        val httpResp = httpSubmitForm(Url(authReq.redirectUri!!), parametersOf(Pair("id_token", listOf(idToken)), Pair("state", listOf(authReq.state!!))))
-        if(httpResp.status != HttpStatusCode.Found) throw AuthorizationError(authReq, AuthorizationErrorCode.server_error, "Unexpected status code ${httpResp.status} returned from server for id_token response")
+        val httpResp = httpSubmitForm(
+            Url(authReq.redirectUri!!),
+            parametersOf(Pair("id_token", listOf(idToken)), Pair("state", listOf(authReq.state!!)))
+        )
+        if (httpResp.status != HttpStatusCode.Found) throw AuthorizationError(
+            authReq,
+            AuthorizationErrorCode.server_error,
+            "Unexpected status code ${httpResp.status} returned from server for id_token response"
+        )
         return httpResp.headers[HttpHeaders.Location]?.let { Url(it) }
-            ?: throw AuthorizationError(authReq, AuthorizationErrorCode.server_error, "Location parameter missing on http response for id_token response")
+            ?: throw AuthorizationError(
+                authReq,
+                AuthorizationErrorCode.server_error,
+                "Location parameter missing on http response for id_token response"
+            )
     }
 
 }
