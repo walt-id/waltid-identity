@@ -20,7 +20,7 @@ object MultiCodecUtils {
         KeyType.RSA -> 0x1205u
     }
 
-    fun getKeyTypeFromKeyCode(code: UInt): KeyType = when (code){
+    fun getKeyTypeFromKeyCode(code: UInt): KeyType = when (code) {
         0xEDu -> KeyType.Ed25519
         0xE7u -> KeyType.secp256k1
         0x1205u -> KeyType.RSA

@@ -39,6 +39,7 @@ abstract class Key {
      * @return raw signature
      */
     abstract suspend fun signRaw(plaintext: ByteArray): Any
+
     /**
      * signs a message using this private key (with the algorithm this key is based on)
      * @exception IllegalArgumentException when this is not a private key

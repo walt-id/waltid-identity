@@ -28,8 +28,12 @@ object JwsUtils {
         check(count { it == '.' } == 2) { "String does not have JWS part amount of 3 (= 2 dots): $this" }
 
         val splitted = split(".")
-        val header = runCatching { splitted[0].decodeJwsPart() }.getOrElse { throw IllegalArgumentException("Could not parse JWT header (base64/json issue): ${splitted[0]}", it) }
-        val payload = runCatching { splitted[1].decodeJwsPart() }.getOrElse { throw IllegalArgumentException("Could not parse JWT payload (base64/json issue): ${splitted[1]}", it) }
+        val header = runCatching { splitted[0].decodeJwsPart() }.getOrElse { ex ->
+            throw IllegalArgumentException("Could not parse JWT header (base64/json issue): ${splitted[0]}", ex)
+        }
+        val payload = runCatching { splitted[1].decodeJwsPart() }.getOrElse { ex ->
+            throw IllegalArgumentException("Could not parse JWT payload (base64/json issue): ${splitted[1]}", ex)
+        }
 
         return JwsParts(header, payload)
     }

@@ -23,7 +23,7 @@ abstract class DidRegistrarTestBase(private val registrar: LocalRegistrarMethod)
     open fun `given did options with no key when register then returns a valid did result`(
         options: DidCreateOptions,
         assert: registrarDidAssertion
-    ){
+    ) {
         val docResult = runBlocking { registrar.register(options) }
         assert(docResult, options)
     }
@@ -32,7 +32,7 @@ abstract class DidRegistrarTestBase(private val registrar: LocalRegistrarMethod)
         key: Key,
         options: DidCreateOptions,
         assert: registrarKeyAssertion
-    ){
+    ) {
         val docResult = runBlocking { registrar.registerByKey(key, options) }
         val publicKey = runBlocking { key.getPublicKey() }
         assert(docResult, options, publicKey)

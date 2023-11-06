@@ -46,5 +46,4 @@ object PolicyManager {
         mappedPolicies[name] ?: throw IllegalArgumentException("No policy found by name: $name")
 
 
-
 }

@@ -343,7 +343,7 @@ abstract class OpenIDCredentialIssuer(
     open fun getCredentialOfferRequest(
         issuanceSession: IssuanceSession, byReference: Boolean = false
     ): CredentialOfferRequest {
-        return if(byReference) {
+        return if (byReference) {
             CredentialOfferRequest(null, getCredentialOfferByReferenceUri(issuanceSession))
         } else {
             CredentialOfferRequest(issuanceSession.credentialOffer)

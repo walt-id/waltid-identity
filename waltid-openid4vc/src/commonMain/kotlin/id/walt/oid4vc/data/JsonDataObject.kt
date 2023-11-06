@@ -22,6 +22,7 @@ abstract class JsonDataObjectSerializer<T : JsonDataObject>(serializer: KSeriali
     JsonTransformingSerializer<T>(serializer) {
 
     private val customParametersName = "customParameters"
+
     @OptIn(ExperimentalSerializationApi::class)
     private val knownElementNames get() = descriptor.elementNames.filter { it != customParametersName }.toSet()
 

@@ -15,7 +15,7 @@ import org.junit.jupiter.params.provider.Arguments.arguments
 import org.junit.jupiter.params.provider.MethodSource
 import java.util.stream.Stream
 
-class DidWebRegistrarTest : DidRegistrarTestBase(DidWebRegistrar()){
+class DidWebRegistrarTest : DidRegistrarTestBase(DidWebRegistrar()) {
     @ParameterizedTest
     @MethodSource
     override fun `given did options with no key when register then returns a valid did result`(
