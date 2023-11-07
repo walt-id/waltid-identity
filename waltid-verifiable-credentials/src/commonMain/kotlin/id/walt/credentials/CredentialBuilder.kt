@@ -64,6 +64,16 @@ class CredentialBuilder(
         _customCredentialSubjectData = data
     }
 
+    var _extraCustomData: MutableMap<String, JsonElement> = HashMap()
+    fun useData(key: String, data: JsonElement) {
+        _extraCustomData[key] = data
+    }
+    fun useData(pair: Pair<String, JsonElement>) = useData(pair.first, pair.second)
+
+    infix fun String.set(data: JsonElement) {
+        useData(this, data)
+    }
+
     fun buildW3CV2DataModel(): W3CV2DataModel {
 
         val buildSubject = _customCredentialSubjectData?.let {
@@ -91,6 +101,11 @@ class CredentialBuilder(
     }
 
     fun buildW3C(): W3CVC {
-        return W3CVC(Json.encodeToJsonElement(buildW3CV2DataModel()).jsonObject)
+        return W3CVC(
+            Json.encodeToJsonElement(buildW3CV2DataModel()).jsonObject.toMutableMap()
+                .apply {
+                    putAll(_extraCustomData)
+                }
+        )
     }
 }
