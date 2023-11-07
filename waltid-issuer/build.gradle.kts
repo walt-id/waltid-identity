@@ -119,6 +119,11 @@ dependencies {
     api(project(":waltid-did"))
 
     api(project(":waltid-verifiable-credentials"))
+    api(project(":waltid-sdjwt"))
+
+    // TODO: REMOVE:
+    implementation("com.nimbusds:nimbus-jose-jwt:9.37")
+
     //api(project(":waltid-mdocs"))
     //implementation("id.walt:waltid-ssikit2:1.0.8a-SNAPSHOT")
     // implementation id.walt:core-crypto -> provided by id.walt:waltid-ssikit2

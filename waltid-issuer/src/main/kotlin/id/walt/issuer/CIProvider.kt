@@ -190,7 +190,7 @@ open class CIProvider : OpenIDCredentialIssuer(
             }
             listOf(
                 IssuanceSessionData(
-                    exampleIssuerKey, exampleIssuerDid, IssuanceRequest(W3CVC(openBadgeCredentialExample))
+                    exampleIssuerKey, exampleIssuerDid, JwtIssuanceRequest(W3CVC(openBadgeCredentialExample))
                 )
             )
         } else {
@@ -287,7 +287,7 @@ open class CIProvider : OpenIDCredentialIssuer(
 
 
     data class IssuanceSessionData(
-        val issuerKey: Key, val issuerDid: String, val request: IssuanceRequest
+        val issuerKey: Key, val issuerDid: String, val request: BaseIssuanceRequest
     )
 
     private val sessionCredentialPreMapping = HashMap<String, List<IssuanceSessionData>>() // session id -> VC

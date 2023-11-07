@@ -37,6 +37,8 @@ object JsonUtils {
         return JsonObject(map)
     }
 
+    fun Map<*, *>.toJsonObject() = this.toJsonElement().jsonObject
+
     private fun toHexChar(i: Int): Char {
         val d = i and 0xf
         return if (d < 10) (d + '0'.code).toChar()

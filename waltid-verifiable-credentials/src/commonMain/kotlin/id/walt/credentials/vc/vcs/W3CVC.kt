@@ -61,6 +61,7 @@ data class W3CVC(
             )
         }
 
+
         fun fromJson(json: String) =
             W3CVC(Json.decodeFromString<Map<String, JsonElement>>(json))
 
