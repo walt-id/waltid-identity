@@ -5,6 +5,7 @@ import id.walt.crypto.keys.*
 import id.walt.did.dids.DidService
 import id.walt.oid4vc.definitions.CROSS_DEVICE_CREDENTIAL_OFFER_URL
 import id.walt.oid4vc.requests.CredentialOfferRequest
+import id.walt.sdjwt.SDMap
 import io.github.smiley4.ktorswaggerui.dsl.get
 import io.github.smiley4.ktorswaggerui.dsl.post
 import io.github.smiley4.ktorswaggerui.dsl.route
@@ -18,25 +19,7 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import kotlin.time.Duration.Companion.minutes
 
-@Serializable
-data class IssuanceRequest(
-    val vc: W3CVC,
-    val mapping: JsonObject? = null
-) {
-    companion object {
-        /**
-         * Return IssuanceRequest of W3CVC in `vc` and mapping in `mapping` if it has `vc`. Otherwise,
-         * return complete JSON as W3CVC and no mapping.
-         */
-        fun fromJsonObject(jsonObj: JsonObject): IssuanceRequest {
-            val maybeHasVc = jsonObj["vc"]?.jsonObject
-            return when {
-                maybeHasVc != null -> IssuanceRequest(W3CVC(maybeHasVc), jsonObj["mapping"]?.jsonObject)
-                else -> IssuanceRequest(W3CVC(jsonObj), null)
-            }
-        }
-    }
-}
+
 
 //language=json
 val universityDegreeCredential = """
@@ -290,7 +273,7 @@ fun Application.issuerApi() {
             route("openid4vc") {
                 route("jwt") {
                     post("issue", {
-                        summary = "Signs credential and starts an OIDC credential exchange flow."
+                        summary = "Signs credential with JWT and starts an OIDC credential exchange flow."
                         description = "This endpoint issues a W3C Verifiable Credential, and returns an issuance URL "
 
                         request {
@@ -309,7 +292,7 @@ fun Application.issuerApi() {
                                 example = "did:ebsi:..."
                                 required = false
                             }
-                            body<IssuanceRequest> {
+                            body<JwtIssuanceRequest> {
                                 description =
                                     "Pass the unsigned credential that you intend to issue as the body of the request."
                                 example("OpenBadgeCredential example", openBadgeCredentialExampleJsonString)
@@ -339,7 +322,7 @@ fun Application.issuerApi() {
                             context.request.header("walt-issuerDid") ?: DidService.registerByKey("key", key).did
 
                         val body = context.receive<JsonObject>()
-                        val issuanceRequest = IssuanceRequest.fromJsonObject(body)
+                        val issuanceRequest = JwtIssuanceRequest.fromJsonObject(body)
 
                         val credentialOfferBuilder =
                             OidcIssuance.issuanceRequestsToCredentialOfferBuilder(issuanceRequest)
@@ -392,7 +375,7 @@ fun Application.issuerApi() {
                                 example = "did:ebsi:..."
                                 required = false
                             }
-                            body<IssuanceRequest> {
+                            body<JwtIssuanceRequest> {
                                 description =
                                     "Pass the unsigned credential that you intend to issue as the body of the request."
                                 example("Batch example", batchExample)
@@ -420,7 +403,7 @@ fun Application.issuerApi() {
                         val issuerDid = context.request.header("walt-issuerDid") ?: DidService.registerByKey("key", key).did
 
                         val body = context.receive<JsonArray>()
-                        val issuanceRequests = body.map { IssuanceRequest.fromJsonObject(it.jsonObject) }
+                        val issuanceRequests = body.map { JwtIssuanceRequest.fromJsonObject(it.jsonObject) }
 
                         val credentialOfferBuilder = OidcIssuance.issuanceRequestsToCredentialOfferBuilder(issuanceRequests)
 
@@ -446,6 +429,81 @@ fun Application.issuerApi() {
                             walletCredentialOfferEndpoint = CROSS_DEVICE_CREDENTIAL_OFFER_URL + OidcApi.baseUrl.removePrefix(
                                 "https://"
                             ).removePrefix("http://") + "/"
+                        )
+                        println("Offer URI: $offerUri")
+
+                        context.respond(
+                            HttpStatusCode.OK,
+                            offerUri
+                        )
+                    }
+                }
+                route("sdjwt") {
+                    post("issue", {
+                        summary = "Signs credential and starts an OIDC credential exchange flow."
+                        description = "This endpoint issues a W3C Verifiable Credential, and returns an issuance URL "
+
+                        request {
+                            body<SdJwtIssuanceRequest> {
+                                description =
+                                    "Pass the unsigned credential that you intend to issue as the body of the request."
+                                //example("OpenBadgeCredential example", openBadgeCredentialExampleJsonString)
+                                //example("UniversityDegreeCredential example", universityDegreeCredential)
+                                required = true
+                            }
+                        }
+
+                        response {
+                            "200" to {
+                                description = "Credential signed (with the *proof* attribute added)"
+                                body<String> {
+                                    example(
+                                        "Issuance URL URL",
+                                        "openid-credential-offer://localhost/?credential_offer=%7B%22credential_issuer%22%3A%22http%3A%2F%2Flocalhost%3A8000%22%2C%22credentials%22%3A%5B%22VerifiableId%22%5D%2C%22grants%22%3A%7B%22authorization_code%22%3A%7B%22issuer_state%22%3A%22501414a4-c461-43f0-84b2-c628730c7c02%22%7D%7D%7D"
+                                    )
+                                }
+                            }
+                        }
+                    }) {
+                        val reqJson = context.receive<JsonObject>()
+
+                        val req = SdJwtIssuanceRequest(
+                            issuanceKey = reqJson["issuanceKey"]!!.jsonObject,
+                            issuerDid = reqJson["issuanceDid"]!!.jsonPrimitive.content,
+                            vc = W3CVC(reqJson["vc"]!!.jsonObject),
+                            mapping = reqJson["mapping"]!!.jsonObject,
+                            selectiveDisclosure = SDMap.fromJSON(reqJson["selectiveDisclosure"]!!.jsonObject)
+                        )
+
+                        val key = KeySerialization.deserializeKey(req.issuanceKey)
+                            .onFailure { throw IllegalArgumentException("Invalid key was supplied, error occurred is: $it") }
+                            .getOrThrow()
+                        val issuerDid = req.issuerDid ?: DidService.registerByKey("key", key).did
+
+                        val credentialOfferBuilder =
+                            OidcIssuance.issuanceRequestsToCredentialOfferBuilder(JwtIssuanceRequest(req.vc, req.mapping))
+
+                        val issuanceSession = OidcApi.initializeCredentialOffer(
+                            credentialOfferBuilder = credentialOfferBuilder,
+                            expiresIn = 5.minutes,
+                            allowPreAuthorized = true
+                        )
+
+                        //val nonce = issuanceSession.cNonce ?: throw IllegalArgumentException("No cNonce set in issuanceSession?")
+
+                        OidcApi.setIssuanceDataForIssuanceId(
+                            issuanceSession.id,
+                            listOf(CIProvider.IssuanceSessionData(key, issuerDid, req))
+                        )
+                        println("issuanceSession: $issuanceSession")
+
+                        val offerRequest = CredentialOfferRequest(issuanceSession.credentialOffer!!)
+                        println("offerRequest: $offerRequest")
+
+                        val offerUri = OidcApi.getCredentialOfferRequestUrl(
+                            offerRequest,
+                            CROSS_DEVICE_CREDENTIAL_OFFER_URL + OidcApi.baseUrl.removePrefix("https://")
+                                .removePrefix("http://") + "/"
                         )
                         println("Offer URI: $offerUri")
 
