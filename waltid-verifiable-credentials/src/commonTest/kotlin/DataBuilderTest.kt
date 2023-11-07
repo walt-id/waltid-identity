@@ -40,6 +40,7 @@ class DataBuilderTest {
             useStatusList2021Revocation("https://university.example/credentials/status/3", 94567)
 
             useCredentialSubject(myCustomData)
+            // "custom" set myCustomData
         }.buildW3C()
 
         print(vc.toPrettyJson())
