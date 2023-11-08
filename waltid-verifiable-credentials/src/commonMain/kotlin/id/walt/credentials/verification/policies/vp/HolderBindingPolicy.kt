@@ -1,25 +1,22 @@
 package id.walt.credentials.verification.policies.vp
 
 import id.walt.credentials.schemes.JwsSignatureScheme.JwsOption
+import id.walt.credentials.verification.CredentialWrapperValidatorPolicy
 import id.walt.credentials.verification.HolderBindingException
-import id.walt.credentials.verification.JwtVerificationPolicy
 import id.walt.crypto.utils.JwsUtils.decodeJws
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
-class HolderBindingPolicy : JwtVerificationPolicy(
+class HolderBindingPolicy : CredentialWrapperValidatorPolicy(
     "holder-binding",
     "Verifies that issuer of the Verifiable Presentation (presenter) is also the subject of all Verifiable Credentials contained within."
 ) {
-    override suspend fun verify(credential: String, args: Any?, context: Map<String, Any>): Result<Any> {
-        val jws = credential.decodeJws()
+    override suspend fun verify(data: JsonObject, args: Any?, context: Map<String, Any>): Result<Any> {
+        val presenterDid = data[JwsOption.ISSUER]!!.jsonPrimitive.content
 
-        val payload = jws.payload
-
-        val presenterDid = payload[JwsOption.ISSUER]!!.jsonPrimitive.content
-
-        val vp = payload["vp"]?.jsonObject ?: throw IllegalArgumentException("No \"vp\" field in VP!")
+        val vp = data["vp"]?.jsonObject ?: throw IllegalArgumentException("No \"vp\" field in VP!")
 
         val credentials =
             vp["verifiableCredential"]?.jsonArray ?: throw IllegalArgumentException("No \"verifiableCredential\" field in \"vp\"!")
