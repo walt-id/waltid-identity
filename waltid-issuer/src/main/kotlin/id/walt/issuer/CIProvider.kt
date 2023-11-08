@@ -6,9 +6,11 @@ package id.walt.issuer
 import id.walt.credentials.issuance.Issuer.mergingIssue
 import id.walt.credentials.vc.vcs.W3CVC
 import id.walt.crypto.keys.Key
+import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.LocalKey
 import id.walt.did.dids.DidService
+import id.walt.issuer.IssuanceExamples.openBadgeCredentialExample
 import id.walt.issuer.base.config.ConfigManager
 import id.walt.issuer.base.config.OIDCIssuerServiceConfig
 import id.walt.oid4vc.data.CredentialFormat
@@ -190,7 +192,7 @@ open class CIProvider : OpenIDCredentialIssuer(
             }
             listOf(
                 IssuanceSessionData(
-                    exampleIssuerKey, exampleIssuerDid, JwtIssuanceRequest(W3CVC(openBadgeCredentialExample))
+                    exampleIssuerKey, exampleIssuerDid, JwtIssuanceRequest(Json.parseToJsonElement(KeySerialization.serializeKey(exampleIssuerKey)).jsonObject, exampleIssuerDid, W3CVC(openBadgeCredentialExample))
                 )
             )
         } else {
