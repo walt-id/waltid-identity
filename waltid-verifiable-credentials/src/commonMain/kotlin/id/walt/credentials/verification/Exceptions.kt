@@ -83,3 +83,10 @@ class HolderBindingException(
     val presenterDid: String,
     val credentialDids: List<String>
 ) : SerializableRuntimeException()
+
+@Serializable
+@SerialName("NotAllowedIssuerException")
+class NotAllowedIssuerException(
+    val issuer: String,
+    val allowedIssuers: List<String>
+) : SerializableRuntimeException()

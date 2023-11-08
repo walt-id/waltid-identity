@@ -40,7 +40,8 @@ object PolicyManager {
             WebhookPolicy(),
             MinimumCredentialsPolicy(),
             MaximumCredentialsPolicy(),
-            HolderBindingPolicy()
+            HolderBindingPolicy(),
+            AllowedIssuerPolicy()
         )
     }
 
