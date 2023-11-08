@@ -7,6 +7,11 @@ object IssuanceExamples {
     //language=json
     val universityDegreeCredential = """
 {
+  "issuanceKey": {
+    "type": "local",
+    "jwk": "{\"kty\":\"OKP\",\"d\":\"mDhpwaH6JYSrD2Bq7Cs-pzmsjlLj4EOhxyI-9DM1mFI\",\"crv\":\"Ed25519\",\"kid\":\"Vzx7l5fh56F3Pf9aR3DECU5BwfrY6ZJe05aiWYWzan8\",\"x\":\"T3T4-u1Xz3vAV2JwPNxWfs4pik_JLiArz_WTCvrCFUM\"}"
+  },
+  "issuerDid": "did:key:z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp",
   "vc": {
     "@context": [
       "https://www.w3.org/2018/credentials/v1",
@@ -30,11 +35,15 @@ object IssuanceExamples {
     }
   },
   "mapping": {
-    "id": "<uuid>",
-    "issuer": {"id": "<issuerDid>" },
-    "credentialSubject": {"id": "<subjectDid>"},
-    "issuanceDate": "<timestamp>",
-    "expirationDate": "<timestamp-in:365d>"
+    "id": "\u003cuuid\u003e",
+    "issuer": {
+      "id": "\u003cissuerDid\u003e"
+    },
+    "credentialSubject": {
+      "id": "\u003csubjectDid\u003e"
+    },
+    "issuanceDate": "\u003ctimestamp\u003e",
+    "expirationDate": "\u003ctimestamp-in:365d\u003e"
   }
 }
 """.trimIndent()
@@ -42,6 +51,11 @@ object IssuanceExamples {
     //language=json
     val openBadgeCredentialExampleJsonString = """
 {
+  "issuanceKey": {
+    "type": "local",
+    "jwk": "{\"kty\":\"OKP\",\"d\":\"mDhpwaH6JYSrD2Bq7Cs-pzmsjlLj4EOhxyI-9DM1mFI\",\"crv\":\"Ed25519\",\"kid\":\"Vzx7l5fh56F3Pf9aR3DECU5BwfrY6ZJe05aiWYWzan8\",\"x\":\"T3T4-u1Xz3vAV2JwPNxWfs4pik_JLiArz_WTCvrCFUM\"}"
+  },
+  "issuerDid": "did:key:z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp",
   "vc": {
     "@context": [
       "https://www.w3.org/2018/credentials/v1",
@@ -88,11 +102,15 @@ object IssuanceExamples {
     }
   },
   "mapping": {
-    "id": "<uuid>",
-    "issuer": {"id": "<issuerDid>" },
-    "credentialSubject": {"id": "<subjectDid>"},
-    "issuanceDate": "<timestamp>",
-    "expirationDate": "<timestamp-in:365d>"
+    "id": "\u003cuuid\u003e",
+    "issuer": {
+      "id": "\u003cissuerDid\u003e"
+    },
+    "credentialSubject": {
+      "id": "\u003csubjectDid\u003e"
+    },
+    "issuanceDate": "\u003ctimestamp\u003e",
+    "expirationDate": "\u003ctimestamp-in:365d\u003e"
   }
 }
 """.trimIndent()
