@@ -76,3 +76,10 @@ class MaximumCredentialsException(
     val total: Int,
     val exceeded: Int
 ) : SerializableRuntimeException()
+
+@Serializable
+@SerialName("HolderBindingException")
+class HolderBindingException(
+    val presenterDid: String,
+    val credentialDids: List<String>
+) : SerializableRuntimeException()
