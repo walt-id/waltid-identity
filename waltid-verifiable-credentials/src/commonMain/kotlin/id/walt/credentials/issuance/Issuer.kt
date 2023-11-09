@@ -1,33 +1,16 @@
 package id.walt.credentials.issuance
 
-import id.walt.credentials.utils.W3CDataMergeUtils
 import id.walt.credentials.utils.W3CDataMergeUtils.mergeWithMapping
 import id.walt.credentials.utils.W3CVcUtils.overwrite
 import id.walt.credentials.utils.W3CVcUtils.update
 import id.walt.credentials.vc.vcs.W3CVC
 import id.walt.crypto.keys.Key
-import id.walt.did.utils.randomUUID
-import io.ktor.client.*
-import io.ktor.client.request.*
-import io.ktor.client.statement.*
-import kotlinx.datetime.Clock
+import id.walt.sdjwt.SDMap
 import kotlinx.datetime.Instant
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
-import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
 object Issuer {
-
-    /**
-     * @param id: id
-     */
-    @Serializable
-    data class ExtraData(
-        val idLocation: String = "id",
-
-
-        )
 
     /**
      * Manually set data and issue credential
@@ -55,56 +38,84 @@ object Issuer {
         )
     }
 
-
-    val dataFunctions = mapOf<String, suspend (call: W3CDataMergeUtils.FunctionCall) -> JsonElement>(
-        "subjectDid" to { it.fromContext() },
-        "issuerDid" to { it.fromContext() },
-
-        "context" to { it.context[it.args!!]!! },
-
-        "timestamp" to { JsonPrimitive(Clock.System.now().toString()) },
-        "timestamp-seconds" to { JsonPrimitive(Clock.System.now().epochSeconds) },
-
-        "timestamp-in" to { JsonPrimitive((Clock.System.now() + Duration.parse(it.args!!)).toString()) },
-        "timestamp-in-seconds" to { JsonPrimitive((Clock.System.now() + Duration.parse(it.args!!)).epochSeconds) },
-
-        "timestamp-before" to { JsonPrimitive((Clock.System.now() - Duration.parse(it.args!!)).toString()) },
-        "timestamp-before-seconds" to { JsonPrimitive((Clock.System.now() - Duration.parse(it.args!!)).epochSeconds) },
-
-        "uuid" to { JsonPrimitive("urn:uuid:${randomUUID()}") },
-        "webhook" to { JsonPrimitive(HttpClient().get(it.args!!).bodyAsText()) },
-        "webhook-json" to { Json.parseToJsonElement(HttpClient().get(it.args!!).bodyAsText()) },
-
-        "last" to {
-            it.history?.get(it.args!!)
-                ?: throw IllegalArgumentException("No such function in history or no history: ${it.args}")
-        }
-    )
-
-    /**
-     * Merge data with mappings and issue
-     */
-    suspend fun W3CVC.mergingIssue(
-        key: Key,
+    suspend fun W3CVC.mergingJwtIssue(
+        issuerKey: Key,
         issuerDid: String,
         subjectDid: String,
 
         mappings: JsonObject,
 
-//
-//        dataOverwrites: Map<String, JsonElement>,
-//        dataUpdates: Map<String, Map<String, JsonElement>>,
         additionalJwtHeader: Map<String, String>,
         additionalJwtOptions: Map<String, JsonElement>,
 
-        completeJwtWithDefaultCredentialData: Boolean = true
-    ): String {
+        completeJwtWithDefaultCredentialData: Boolean = true,
+    ) = mergingToVc(
+        issuerDid = issuerDid,
+        subjectDid = subjectDid,
+        mappings = mappings,
+        completeJwtWithDefaultCredentialData
+    ).run {
+        w3cVc.signJws(
+            issuerKey = issuerKey,
+            issuerDid = issuerDid,
+            subjectDid = subjectDid,
+            additionalJwtHeader = additionalJwtHeader.toMutableMap().apply {
+                put("typ", "JWT")
+            },
+            additionalJwtOptions = additionalJwtOptions.toMutableMap().apply {
+                putAll(jwtOptions)
+            }
+        )
+    }
 
-        /*val jwtMappings = mappings.filterKeys { it.startsWith("jwt:") }.mapKeys { it.key.removePrefix("jwt:") }
-        println("JWT MAPPINGS: $jwtMappings")
+    suspend fun W3CVC.mergingSdJwtIssue(
+        issuerKey: Key,
+        issuerDid: String,
+        subjectDid: String,
 
-        val dataMappings = JsonObject(mappings.filterKeys { !it.startsWith("jwt") })*/
+        mappings: JsonObject,
 
+        additionalJwtHeader: Map<String, String>,
+        additionalJwtOptions: Map<String, JsonElement>,
+
+        completeJwtWithDefaultCredentialData: Boolean = true,
+        disclosureMap: SDMap
+    ) = mergingToVc(
+        issuerDid = issuerDid,
+        subjectDid = subjectDid,
+        mappings = mappings,
+        completeJwtWithDefaultCredentialData
+    ).run {
+        w3cVc.signSdJwt(
+            issuerKey = issuerKey,
+            issuerDid = issuerDid,
+            subjectDid = subjectDid,
+            disclosureMap = disclosureMap,
+            additionalJwtHeader = additionalJwtHeader.toMutableMap().apply {
+                put("typ", "JWT")
+            },
+            additionalJwtOptions = additionalJwtOptions.toMutableMap().apply {
+                putAll(jwtOptions)
+            }
+        )
+    }
+
+    data class IssuanceInformation(
+        val w3cVc: W3CVC,
+        val jwtOptions: Map<String, JsonElement>
+    )
+
+    /**
+     * Merge data with mappings and issue
+     */
+    suspend fun W3CVC.mergingToVc(
+        issuerDid: String,
+        subjectDid: String,
+
+        mappings: JsonObject,
+
+        completeJwtWithDefaultCredentialData: Boolean = true,
+    ): IssuanceInformation {
         val context = mapOf(
             "issuerDid" to JsonPrimitive(issuerDid),
             "subjectDid" to JsonPrimitive(subjectDid)
@@ -141,16 +152,6 @@ object Issuer {
             }
         }
 
-        return vc.signJws(
-            issuerKey = key,
-            issuerDid = issuerDid,
-            subjectDid = subjectDid,
-            additionalJwtHeader = additionalJwtHeader.toMutableMap().apply {
-                put("typ", "JWT")
-            },
-            additionalJwtOptions = additionalJwtOptions.toMutableMap().apply {
-                putAll(jwtRes)
-            }
-        )
+        return IssuanceInformation(vc, jwtRes)
     }
 }
