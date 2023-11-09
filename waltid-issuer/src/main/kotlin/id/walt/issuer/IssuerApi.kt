@@ -5,6 +5,7 @@ import id.walt.crypto.keys.*
 import id.walt.did.dids.DidService
 import id.walt.issuer.IssuanceExamples.batchExample
 import id.walt.issuer.IssuanceExamples.openBadgeCredentialExampleJsonString
+import id.walt.issuer.IssuanceExamples.sdJwtExample
 import id.walt.issuer.IssuanceExamples.universityDegreeCredential
 import id.walt.issuer.IssuanceExamples.universityDegreeCredentialExample2
 import id.walt.issuer.IssuanceExamples.universityDegreeCredentialSignedExample
@@ -276,7 +277,7 @@ fun Application.issuerApi() {
                             body<SdJwtIssuanceRequest> {
                                 description =
                                     "Pass the unsigned credential that you intend to issue as the body of the request."
-                                //example("OpenBadgeCredential example", openBadgeCredentialExampleJsonString)
+                                example("SD-JWT example", sdJwtExample)
                                 //example("UniversityDegreeCredential example", universityDegreeCredential)
                                 required = true
                             }
