@@ -6,7 +6,7 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 object Versions {
     const val KOTLIN_VERSION = "1.9.10" // also change 2 plugins
-    const val KTOR_VERSION = "2.3.5" // also change 1 plugin
+    const val KTOR_VERSION = "2.3.6" // also change 1 plugin
     const val COROUTINES_VERSION = "1.7.3"
     const val EXPOSED_VERSION = "0.43.0"
     const val HOPLITE_VERSION = "2.8.0.RC2"
