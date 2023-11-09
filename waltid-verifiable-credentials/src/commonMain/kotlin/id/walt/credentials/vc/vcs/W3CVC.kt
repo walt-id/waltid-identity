@@ -5,6 +5,9 @@ import id.walt.credentials.schemes.JwsSignatureScheme.JwsHeader
 import id.walt.credentials.schemes.JwsSignatureScheme.JwsOption
 import id.walt.crypto.keys.Key
 import id.walt.crypto.utils.JsonUtils.toJsonElement
+import id.walt.sdjwt.SDJwt
+import id.walt.sdjwt.SDMap
+import id.walt.sdjwt.SDPayload
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.descriptors.SerialDescriptor
@@ -32,6 +35,26 @@ data class W3CVC(
     fun toJson(): String = Json.encodeToString(content)
     fun toPrettyJson(): String = prettyJson.encodeToString(content)
 
+
+    suspend fun signSdJwt(
+        issuerKey: Key,
+        issuerDid: String,
+        subjectDid: String,
+        disclosureMap: SDMap,
+        /** Set additional options in the JWT header */
+        additionalJwtHeader: Map<String, String> = emptyMap(),
+        /** Set additional options in the JWT payload */
+        additionalJwtOptions: Map<String, JsonElement> = emptyMap()
+    ): String {
+        val vc = this.toJsonObject()
+
+        val sdPayload = SDPayload.createSDPayload(vc, disclosureMap)
+        val signable = Json.encodeToString(sdPayload.undisclosedPayload).toByteArray()
+
+        val signed = issuerKey.signJws(signable, mapOf("typ" to "JWT", "kid" to issuerDid))
+
+        return SDJwt.createFromSignedJwt(signed, sdPayload).toString()
+    }
 
     suspend fun signJws(
         issuerKey: Key,
