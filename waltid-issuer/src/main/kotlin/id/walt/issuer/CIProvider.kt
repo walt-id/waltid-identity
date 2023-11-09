@@ -3,7 +3,8 @@
 package id.walt.issuer
 
 
-import id.walt.credentials.issuance.Issuer.mergingIssue
+import id.walt.credentials.issuance.Issuer.mergingJwtIssue
+import id.walt.credentials.issuance.Issuer.mergingSdJwtIssue
 import id.walt.credentials.vc.vcs.W3CVC
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeySerialization
@@ -29,6 +30,7 @@ import id.walt.oid4vc.responses.BatchCredentialResponse
 import id.walt.oid4vc.responses.CredentialErrorCode
 import id.walt.oid4vc.responses.CredentialResponse
 import id.walt.oid4vc.util.randomUUID
+import id.walt.sdjwt.SDMap
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
@@ -192,7 +194,13 @@ open class CIProvider : OpenIDCredentialIssuer(
             }
             listOf(
                 IssuanceSessionData(
-                    exampleIssuerKey, exampleIssuerDid, JwtIssuanceRequest(Json.parseToJsonElement(KeySerialization.serializeKey(exampleIssuerKey)).jsonObject, exampleIssuerDid, W3CVC(openBadgeCredentialExample))
+                    exampleIssuerKey,
+                    exampleIssuerDid,
+                    JwtIssuanceRequest(
+                        Json.parseToJsonElement(KeySerialization.serializeKey(exampleIssuerKey)).jsonObject,
+                        exampleIssuerDid,
+                        W3CVC(openBadgeCredentialExample)
+                    )
                 )
             )
         } else {
@@ -205,15 +213,30 @@ open class CIProvider : OpenIDCredentialIssuer(
             val vc = data.request.vc
 
             data.run {
-                vc.mergingIssue(
-                    key = issuerKey,
-                    issuerDid = issuerDid,
-                    subjectDid = holderKid,
-                    mappings = request.mapping ?: JsonObject(emptyMap()),
-                    additionalJwtHeader = emptyMap(),
-                    additionalJwtOptions = emptyMap()
-                )
-            }
+                when (data.request) {
+                    is JwtIssuanceRequest -> vc.mergingJwtIssue(
+                        issuerKey = issuerKey,
+                        issuerDid = issuerDid,
+                        subjectDid = holderKid,
+                        mappings = request.mapping ?: JsonObject(emptyMap()),
+                        additionalJwtHeader = emptyMap(),
+                        additionalJwtOptions = emptyMap(),
+                    )
+
+                    is SdJwtIssuanceRequest -> vc.mergingSdJwtIssue(
+                        issuerKey = issuerKey,
+                        issuerDid = issuerDid,
+                        subjectDid = holderKid,
+                        mappings = request.mapping ?: JsonObject(emptyMap()),
+                        additionalJwtHeader = emptyMap(),
+                        additionalJwtOptions = emptyMap(),
+                        disclosureMap = data.request.selectiveDisclosure ?: SDMap.Companion.generateSDMap(
+                            JsonObject(emptyMap()),
+                            JsonObject(emptyMap())
+                        )
+                    )
+                }
+            }.also { println("Respond VC: $it") }
         }))
     }
 
@@ -269,15 +292,31 @@ open class CIProvider : OpenIDCredentialIssuer(
                             val vc = data.request.vc
 
                             data.run {
-                                vc.mergingIssue(
-                                    key = issuerKey,
-                                    issuerDid = issuerDid,
-                                    subjectDid = subjectDid,
-                                    mappings = request.mapping ?: JsonObject(emptyMap()),
-                                    additionalJwtHeader = emptyMap(),
-                                    additionalJwtOptions = emptyMap()
-                                )
-                            }
+                                when (data.request) {
+                                    is JwtIssuanceRequest -> vc.mergingJwtIssue(
+                                        issuerKey = issuerKey,
+                                        issuerDid = issuerDid,
+                                        subjectDid = subjectDid,
+                                        mappings = request.mapping ?: JsonObject(emptyMap()),
+                                        additionalJwtHeader = emptyMap(),
+                                        additionalJwtOptions = emptyMap(),
+                                    )
+
+                                    is SdJwtIssuanceRequest -> vc.mergingSdJwtIssue(
+                                        issuerKey = issuerKey,
+                                        issuerDid = issuerDid,
+                                        subjectDid = subjectDid,
+                                        mappings = request.mapping ?: JsonObject(emptyMap()),
+                                        additionalJwtHeader = emptyMap(),
+                                        additionalJwtOptions = emptyMap(),
+                                        disclosureMap = data.request.selectiveDisclosure ?: SDMap.Companion.generateSDMap(
+                                            JsonObject(emptyMap()),
+                                            JsonObject(emptyMap())
+                                        )
+                                    )
+                                }
+
+                            }.also { println("Respond VC: $it") }
                         }
                     )
                 )
