@@ -183,7 +183,7 @@ open class SDJwt internal constructor(
             return parse(sdJwt).verifyAsync(jwtCryptoProvider)
         }
 
-        private fun createFromSignedJwt(signedJwt: String, sdPayload: SDPayload, withHolderJwt: String? = null): SDJwt {
+        fun createFromSignedJwt(signedJwt: String, sdPayload: SDPayload, withHolderJwt: String? = null): SDJwt {
             val sdJwt = parse(signedJwt)
             return SDJwt(
                 jwt = sdJwt.jwt,
