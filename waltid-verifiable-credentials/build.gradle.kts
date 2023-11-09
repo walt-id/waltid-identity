@@ -58,6 +58,7 @@ kotlin {
 
                 // walt.id
                 api(project(":waltid-crypto"))
+                api(project(":waltid-sdjwt"))
                 api(project(":waltid-did"))
             }
         }
