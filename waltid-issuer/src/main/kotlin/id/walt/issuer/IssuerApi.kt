@@ -476,5 +476,22 @@ fun Application.issuerApi() {
                 }
             }
         }
+        route("credentials", {
+            tags = listOf("Credential Status")
+        }){
+            route("proxy") {
+                // register proxy
+            }
+            route("status") {
+                // return status-vc
+            }
+            route("check") {
+                // return status result
+            }
+            route("revoke") {
+                // perform revocation
+                // return revocation result
+            }
+        }
     }
 }
