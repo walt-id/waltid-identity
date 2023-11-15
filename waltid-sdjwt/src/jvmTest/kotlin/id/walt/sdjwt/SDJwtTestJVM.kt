@@ -60,19 +60,19 @@ class SDJwtTestJVM {
 
         // present without disclosing SD fields
         val presentedUndisclosedJwt = sdJwt.present(discloseAll = false)
-        println(presentedUndisclosedJwt)
+        println("present without disclosing SD fields: " + presentedUndisclosedJwt)
 
-        // present disclosing all SD fields
+        //
         val presentedDisclosedJwt = sdJwt.present(discloseAll = true)
-        println(presentedDisclosedJwt)
+        println("present disclosing all SD fields: " + presentedDisclosedJwt)
 
         // present disclosing selective fields, using SDMap
         val presentedSelectiveJwt = sdJwt.present(SDMapBuilder().addField("sub", true).build())
-        println(presentedSelectiveJwt)
+        println("present disclosing selective fields, using SDMap: " + presentedSelectiveJwt)
 
         // present disclosing fields, using JSON paths
         val presentedSelectiveJwt2 = sdJwt.present(SDMap.generateSDMap(listOf("sub")))
-        println(presentedSelectiveJwt2)
+        println("present disclosing fields, using JSON paths: " + presentedSelectiveJwt2)
 
     }
 
