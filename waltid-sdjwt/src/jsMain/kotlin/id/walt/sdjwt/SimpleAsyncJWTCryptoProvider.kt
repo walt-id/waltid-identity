@@ -24,7 +24,8 @@ open class SimpleAsyncJWTCryptoProvider(
         console.log("SIGNING", payload.toString())
         jose.SignJWT(JSON.parse(payload.toString())).setProtectedHeader(buildJsonObject {
             put("alg", algorithm)
-            put("typ", "JWT")
+            put("cty", "credential-claims-set+json")
+            put("typ", "vc+sd-jwt")
             keyID?.also { put("kid", it) }
         }.let { JSON.parse(it.toString()) }).sign(keyParam, options).then({
             console.log("SIGNED")
