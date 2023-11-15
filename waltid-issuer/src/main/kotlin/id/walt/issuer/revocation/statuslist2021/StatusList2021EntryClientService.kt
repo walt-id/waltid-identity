@@ -1,32 +1,47 @@
 package id.walt.issuer.revocation.statuslist2021
 
-import com.beust.klaxon.Json
-import id.walt.common.createEncodedBitString
-import id.walt.common.decodeBitSet
-import id.walt.common.uncompressGzip
-import id.walt.credentials.w3c.VerifiableCredential
+import id.walt.credentials.vc.vcs.Credential
 import id.walt.credentials.w3c.W3CCredentialSubject
 import id.walt.credentials.w3c.builder.W3CCredentialBuilder
 import id.walt.credentials.w3c.templates.VcTemplateService
 import id.walt.credentials.w3c.toVerifiableCredential
-import id.walt.crypto.decBase64
 import id.walt.issuer.revocation.*
-import id.walt.model.credential.status.StatusList2021EntryCredentialStatus
+import id.walt.issuer.revocation.models.CredentialStatus
+import id.walt.issuer.revocation.models.StatusList2021EntryCredentialStatus
+import id.walt.issuer.revocation.models.statusSerializerModule
+import id.walt.issuer.revocation.statuslist2021.index.StatusListIndexService
+import id.walt.issuer.revocation.statuslist2021.storage.StatusListCredentialStorageService
+import id.walt.issuer.utils.createEncodedBitString
+import id.walt.issuer.utils.decBase64
+import id.walt.issuer.utils.decodeBitSet
+import id.walt.issuer.utils.uncompressGzip
 import id.walt.signatory.ProofConfig
 import id.walt.signatory.ProofType
 import id.walt.signatory.Signatory
 import id.walt.signatory.revocation.*
-import id.walt.issuer.revocation.statuslist2021.index.StatusListIndexService
-import id.walt.issuer.revocation.statuslist2021.storage.StatusListCredentialStorageService
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
-class StatusList2021EntryClientService: CredentialStatusClientService {
+class StatusList2021EntryClientService(
+    private val storageService: StatusListCredentialStorageService,
+    private val indexingService: StatusListIndexService,
+    private val signatoryService: Signatory,
+    private val templateService: VcTemplateService,
+): CredentialStatusClientService {
 
-    private val storageService = StatusListCredentialStorageService.getService()
-    private val indexingService = StatusListIndexService.getService()
     private val templateId = "StatusList2021Credential"
-    private val signatoryService = Signatory.getService()
-    private val templateService = VcTemplateService.getService()
+    @OptIn(ExperimentalSerializationApi::class)
+    private val json = Json {
+        serializersModule = statusSerializerModule
+        ignoreUnknownKeys = true
+        prettyPrint = true
+        isLenient = true
+        explicitNulls = false
+    }
 
     override fun checkRevocation(parameter: RevocationCheckParameter): RevocationStatus = let {
         val credentialStatus = (parameter as StatusListRevocationCheckParameter).credentialStatus
@@ -41,12 +56,12 @@ class StatusList2021EntryClientService: CredentialStatusClientService {
     override fun revoke(parameter: RevocationConfig): Unit = (parameter as StatusListRevocationConfig).run {
         storageService.fetch(this.credentialStatus.statusListCredential)?.let { credential ->
             extractStatusListCredentialSubject(credential)?.encodedList?.let { bitString ->
-                credential.issuer?.let { issuer ->
+                credential.jsonObject["issuer"]?.jsonPrimitive?.content?.let { issuer ->
                     issue(
-                        credential.id ?: parameter.credentialStatus.id,
+                        credential.jsonObject["id"]?.jsonPrimitive?.content ?: parameter.credentialStatus.id,
                         parameter.credentialStatus.statusPurpose,
                         parameter.credentialStatus.statusListCredential,
-                        issuer.id,
+                        issuer,
                         updateBitString(bitString, parameter.credentialStatus.statusListIndex, 1)
                     )
                 }
@@ -63,7 +78,8 @@ class StatusList2021EntryClientService: CredentialStatusClientService {
                 id = "${parameter.credentialUrl}#$idx",
                 statusPurpose = parameter.purpose,
                 statusListIndex = idx,
-                statusListCredential = parameter.credentialUrl
+                statusListCredential = parameter.credentialUrl,
+                type = CredentialStatus.Types.StatusList2021Entry.value,
             )
         }.let {
             val bitString = storageService.fetch(parameter.credentialUrl)?.let {
@@ -82,7 +98,7 @@ class StatusList2021EntryClientService: CredentialStatusClientService {
         }
 
 
-    private fun issue(id: String, purpose: String, url: String, issuer: String, bitString: String) = W3CCredentialSubject(
+    private fun issue(id: String, purpose: String, url: String, issuer: String, bitString: String): Credential = W3CCredentialSubject(
         id, mapOf("type" to "StatusList2021Credential", "statusPurpose" to purpose, "encodedList" to bitString)
     ).let {
         W3CCredentialBuilder.fromPartial(templateService.getTemplate(templateId).template!!).apply {
@@ -117,13 +133,13 @@ class StatusList2021EntryClientService: CredentialStatusClientService {
     private fun extractStatusListCredentialSubject(statusCredentialUrl: String): StatusListCredentialSubject? =
         storageService.fetch(statusCredentialUrl)?.let { extractStatusListCredentialSubject(it) }
 
-    private fun extractStatusListCredentialSubject(statusCredential: VerifiableCredential) =
-        statusCredential.credentialSubject?.let {
+    private fun extractStatusListCredentialSubject(statusCredential: JsonObject) =
+        statusCredential.jsonObject["credentialSubject"]?.let {
             StatusListCredentialSubject(
-                id = it.id,
-                type = it.properties["type"] as? String ?: "",
-                statusPurpose = it.properties["statusPurpose"] as? String ?: "",
-                encodedList = it.properties["encodedList"] as? String ?: "",
+                id = it.jsonObject["id"]?.jsonPrimitive?.content,
+                type = it.jsonObject["type"]?.jsonPrimitive?.content ?: "",
+                statusPurpose = it.jsonObject["statusPurpose"]?.jsonPrimitive?.content ?: "",
+                encodedList = it.jsonObject["encodedList"]?.jsonPrimitive?.content ?: "",
             )
         }
 
@@ -140,7 +156,6 @@ class StatusList2021EntryClientService: CredentialStatusClientService {
 
     @Serializable
     data class StatusListCredentialSubject(
-        @Json(serializeNull = false)
         val id: String? = null,
         val type: String,
         val statusPurpose: String,

@@ -1,6 +1,7 @@
 package id.walt.issuer.revocation
 
 import id.walt.issuer.revocation.statuslist2021.StatusList2021EntryClientService
+import id.walt.issuer.utils.asMap
 
 object CredentialStatusFactory {
     private val statusList2021 = StatusList2021EntryClientService()

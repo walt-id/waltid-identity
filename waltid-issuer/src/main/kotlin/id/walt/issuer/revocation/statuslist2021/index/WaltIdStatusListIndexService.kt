@@ -1,16 +1,16 @@
 package id.walt.issuer.revocation.statuslist2021.index
 
 import id.walt.issuer.utils.resolveContent
-import id.walt.services.WaltIdServices
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.File
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 
-class WaltIdStatusListIndexService: StatusListIndexService() {
-    private val indexingStrategy = IndexingStrategy.getService()
-    private val indexRootPath = WaltIdServices.revocationDir
+class WaltIdStatusListIndexService(
+    private val indexingStrategy: IndexingStrategy,
+) : StatusListIndexService {
+    private val indexRootPath = "data/revocation"//TODO: config
 
     override fun index(url: String): String = let {
         checkIndex(url).takeIf { it } ?: createIndex(url)

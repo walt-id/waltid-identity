@@ -2,10 +2,10 @@ package id.walt.issuer.revocation.statuslist2021.index
 
 import kotlin.random.Random
 
-class RandomIndexingStrategy : IndexingStrategy() {
+class RandomIndexingStrategy : IndexingStrategy {
     private val trialAttempts = 100
-    override fun next(bitset: Array<String>): String =
-        generate(bitset) ?: throw Exception("Couldn't find an empty bit, exhausted the given attempts limit: $trialAttempts")
+    override fun next(bitset: Array<String>): String = generate(bitset)
+        ?: throw Exception("Couldn't find an empty bit, exhausted the given attempts limit: $trialAttempts")
 
     private fun generate(bitset: Array<String>) = let {
         var idx: String? = null
