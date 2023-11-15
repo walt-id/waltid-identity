@@ -21,9 +21,9 @@ object JwsUtils {
     fun String.decodeJwsPart(): JsonObject =
         Json.parseToJsonElement(Base64.decode(this.base64UrlToBase64()).decodeToString()).jsonObject
 
-    data class JwsParts(val header: JsonObject, val payload: JsonObject)
+    data class JwsParts(val header: JsonObject, val payload: JsonObject, val signature: String)
 
-    fun String.decodeJws(): JwsParts {
+    fun String.decodeJws(withSignature: Boolean = false): JwsParts {
         check(startsWith("ey")) { "String does not look like JWS: $this" }
         check(count { it == '.' } == 2) { "String does not have JWS part amount of 3 (= 2 dots): $this" }
 
@@ -34,8 +34,9 @@ object JwsUtils {
         val payload = runCatching { splitted[1].decodeJwsPart() }.getOrElse { ex ->
             throw IllegalArgumentException("Could not parse JWT payload (base64/json issue): ${splitted[1]}", ex)
         }
+        val signature = if (withSignature) splitted[2] else ""
 
-        return JwsParts(header, payload)
+        return JwsParts(header, payload, signature)
     }
 
 }
