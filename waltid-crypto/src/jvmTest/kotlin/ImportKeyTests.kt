@@ -1,3 +1,5 @@
+import TestUtils.loadJwk
+import TestUtils.loadPem
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.LocalKey
 import kotlinx.coroutines.test.runTest
@@ -5,12 +7,11 @@ import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.Arguments
 import org.junit.jupiter.params.provider.Arguments.arguments
 import org.junit.jupiter.params.provider.MethodSource
-import java.io.File
 import java.util.stream.Stream
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-class ImportTestsJvm {
+class ImportKeyTests {
 
     @ParameterizedTest
     @MethodSource
@@ -59,6 +60,13 @@ class ImportTestsJvm {
 //        )
     }
 
+    fun `given raw string, when imported then the import succeeds having the correct key type, key id and hasPrivate values`() =
+        runTest {
+
+        }
+
+
+
     companion object {
         @JvmStatic
         fun `given jwk string, when imported then the import succeeds having the correct key type, key id and hasPrivate values`(): Stream<Arguments> =
@@ -104,9 +112,6 @@ class ImportTestsJvm {
                 arguments(loadPem("rsa.private.pem"), KeyType.RSA, true),
             )
 
-        private fun loadJwk(filename: String): String = loadKey("jwk/$filename")
-        private fun loadPem(filename: String): String = loadKey("pem/$filename")
-        private fun loadKey(relativePath: String): String =
-            this::class.java.classLoader.getResource(relativePath)!!.path.let { File(it).readText() }
+
     }
 }
