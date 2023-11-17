@@ -15,7 +15,7 @@ import java.util.stream.Stream
 import kotlin.reflect.KClass
 import kotlin.test.assertEquals
 
-class KeySerializationTest {
+class KeySerializationTests {
 
     @ParameterizedTest
     @MethodSource
