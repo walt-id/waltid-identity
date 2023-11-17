@@ -48,7 +48,7 @@ class TestJvm {
     }
 
     @Test
-    fun testJwt() = runTest {
+    fun exampleSignJws() = runTest {
         val localKey by lazy { runBlocking { LocalKey.generate(KeyType.Ed25519) } }
 
         val payload = JsonObject(
