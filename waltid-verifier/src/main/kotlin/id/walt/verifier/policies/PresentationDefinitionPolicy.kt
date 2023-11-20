@@ -20,9 +20,9 @@ class PresentationDefinitionPolicy : CredentialWrapperValidatorPolicy(
         println(data)
         val presentedTypes =
             data["vp"]!!.jsonObject["verifiableCredential"]?.jsonArray?.mapNotNull {
-            it.jsonPrimitive.contentOrNull?.decodeJws()?.payload
-            ?.jsonObject?.get("vc")?.jsonObject?.get("type")?.jsonArray?.last()?.jsonPrimitive?.contentOrNull
-        }?.filterNotNull() ?: emptyList()
+                it.jsonPrimitive.contentOrNull?.decodeJws()?.payload
+                    ?.jsonObject?.get("vc")?.jsonObject?.get("type")?.jsonArray?.last()?.jsonPrimitive?.contentOrNull
+            }?.filterNotNull() ?: emptyList()
 
         val success = presentedTypes.containsAll(requestedTypes)
 

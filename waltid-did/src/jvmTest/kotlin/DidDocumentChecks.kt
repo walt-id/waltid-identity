@@ -53,7 +53,7 @@ object DidDocumentChecks {
      * Checks [actual] and [expected] **y** is identical
      * @return True if all checks pass, False otherwise
      */
-    fun secp256KeyChecks(actual: JsonObject, expected: JsonObject)= let{
+    fun secp256KeyChecks(actual: JsonObject, expected: JsonObject) = let {
         actual["y"]!!.jsonPrimitive.content == expected["y"]!!.jsonPrimitive.content
     }
 

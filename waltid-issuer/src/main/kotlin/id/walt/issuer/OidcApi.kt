@@ -119,7 +119,13 @@ object OidcApi : CIProvider() {
                     val tokenResp = processTokenRequest(tokenReq)
                     println("/token tokenResp: $tokenResp")
 
-                    val sessionId = Json.parseToJsonElement(Base64.decode((tokenResp.accessToken ?: throw IllegalArgumentException("No access token was responded with tokenResp?")).split(".")[1]).decodeToString()).jsonObject["sub"]?.jsonPrimitive?.contentOrNull ?: throw IllegalArgumentException("Could not get session ID from token response!")
+                    val sessionId = Json.parseToJsonElement(
+                        Base64.decode(
+                            (tokenResp.accessToken
+                                ?: throw IllegalArgumentException("No access token was responded with tokenResp?")).split(".")[1]
+                        ).decodeToString()
+                    ).jsonObject["sub"]?.jsonPrimitive?.contentOrNull
+                        ?: throw IllegalArgumentException("Could not get session ID from token response!")
                     val nonceToken = tokenResp.cNonce ?: throw IllegalArgumentException("No nonce token was responded with the tokenResp?")
                     OidcApi.mapSessionIdToToken(sessionId, nonceToken)
 

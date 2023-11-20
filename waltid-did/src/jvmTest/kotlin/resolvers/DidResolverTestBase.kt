@@ -104,6 +104,7 @@ abstract class DidResolverTestBase {
             val publicKey = runBlocking { result.getOrNull()!!.getPublicKey().exportJWKObject() }
             assert(ed25519KeyChecks(publicKey, key))
         }
+
         /**
          * Runs tests against **secp256-k1/-r1** specific fields.
          * Inherits [ed25519KeyAssertions]
@@ -113,6 +114,7 @@ abstract class DidResolverTestBase {
             val publicKey = runBlocking { result.getOrNull()!!.getPublicKey().exportJWKObject() }
             assert(secp256KeyChecks(publicKey, key))
         }
+
         /**
          * Runs tests against **rsa** specific fields.
          * Inherits [keyAssertions]

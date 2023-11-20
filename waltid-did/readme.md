@@ -1,7 +1,7 @@
 <div align="center">
  <h1>walt.id did-lib - Kotlin multiplatform library</h1>
  <span>by </span><a href="https://walt.id">walt.id</a>
- 
+
 [![CI/CD Workflow for walt.id did]()]()
 <a href="https://walt.id/community">
 <img src="https://img.shields.io/badge/Join-The Community-blue.svg?style=flat" alt="Join community!" />
@@ -17,14 +17,16 @@
 
 _**walt.id did**_ library provides functionality for registering and resolving DIDs.
 There are 2 options offered for each function:
+
 - universal - relies on the universal DID registrar / resolver, e.g.:
-  - uni-registrar - https://uniregistrar.io
-  - uni-resolver - https://dev.uniresolver.io
+    - uni-registrar - https://uniregistrar.io
+    - uni-resolver - https://dev.uniresolver.io
 - local - provides local implementations of DID methods
 
 For the cryptographic part, _**walt.id did**_ library relies on _**walt.id crypto**_ library.
 
 ## Class diagram
+
 ![walt.id did class diagram](did-lib_class.drawio.png)
 
 The top-level interface to access the registrar / resolver functions is provided
@@ -33,7 +35,9 @@ by the `DidService` singleton.
 ## Usage examples
 
 ### Register DID
+
 Create the key and register the Did:
+
 ```kotlin
 val options = DidWebCreateOptions(
     domain = "localhost:3000",
@@ -44,6 +48,7 @@ val didResult = DidService.register(options = options)
 ```
 
 Register the Did with the given key:
+
 ```kotlin
 val key = LocalKey.generate(KeyType.Ed25519)
 val options = DidKeyCreateOptions(
@@ -57,14 +62,16 @@ val didResult = DidService.register(
 ```
 
 Both calls return a `DidResult` object:
+
 ```kotlin
 data class DidResult(
     val did: String,
     val didDocument: DidDocument
 )
 ```
+
 where `did` - is the Did url string, while `didDocument` is the corresponding
-DidDocument represented as a key-value pair, having the key as a `String` and 
+DidDocument represented as a key-value pair, having the key as a `String` and
 value as a `JsonElement`.
 
 Currently available local did methods are:
@@ -96,5 +103,5 @@ Both calls return the result using the _operation result pattern_,
 the data being wrapped by the `Result` object. This allows checking for
 a successful operation and handling the result accordingly.
 
-The Did Document data is represented as `JsonObject`. The key data is 
+The Did Document data is represented as `JsonObject`. The key data is
 represented as **_walt.id crypto_** `Key`.

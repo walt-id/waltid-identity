@@ -8,7 +8,8 @@ import id.walt.oid4vc.responses.CredentialResponse
 import kotlin.time.Duration
 
 class CredentialError(
-    credentialRequest: CredentialRequest, val errorCode: CredentialErrorCode,
+    credentialRequest: CredentialRequest?,
+    val errorCode: CredentialErrorCode,
     val errorUri: String? = null, val cNonce: String? = null, val cNonceExpiresIn: Duration? = null,
     override val message: String? = null
 ) : Exception() {
