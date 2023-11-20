@@ -66,13 +66,13 @@ class JvmLocalKeyCreatorTest {
         @JvmStatic
         fun importRawPublicKey(): Stream<Arguments> = Stream.of(
             // ed25519
-            arguments(loadResourceBytes("public-bytes/ed25519.txt"), KeyType.Ed25519, loadResource("serialized/ed25519.public.json"), ed25519RawAssertions),
+            arguments(loadResourceBytes("public-bytes/ed25519.bin"), KeyType.Ed25519, loadResource("serialized/ed25519.public.json"), ed25519RawAssertions),
             // secp256k1 (throwing Invalid point encoding 0x30)
-//            arguments(loadResourceBytes("public-bytes/secp256k1.txt"), KeyType.secp256k1, loadResource("serialized/secp256k1.public.json")),
+//            arguments(loadResourceBytes("public-bytes/secp256k1.bin"), KeyType.secp256k1, loadResource("serialized/secp256k1.public.json")),
             // secp256r1 (throwing Invalid point encoding 0x30)
-//            arguments(loadResourceBytes("public-bytes/secp256r1.txt"), KeyType.secp256r1, loadResource("serialized/secp256r1.public.json")),
+//            arguments(loadResourceBytes("public-bytes/secp256r1.bin"), KeyType.secp256r1, loadResource("serialized/secp256r1.public.json")),
             // rsa (not implemented)
-//            arguments(loadResourceBytes("public-bytes/rsa.txt"), KeyType.RSA, loadResource("serialized/rsa.public.json")),
+//            arguments(loadResourceBytes("public-bytes/rsa.bin"), KeyType.RSA, loadResource("serialized/rsa.public.json")),
         )
         @JvmStatic
         fun importJWK(): Stream<Arguments> = Stream.of(
