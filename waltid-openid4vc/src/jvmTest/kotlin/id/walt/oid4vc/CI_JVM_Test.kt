@@ -944,7 +944,7 @@ class CI_JVM_Test : AnnotationSpec() {
         println("// parse credential URI")
 
         val credentialOffer =
-            credentialWallet.getCredentialOffer(CredentialOfferRequest.fromHttpParameters(Url(offerUri).parameters.toMap()))
+            credentialWallet.resolveCredentialOffer(CredentialOfferRequest.fromHttpParameters(Url(offerUri).parameters.toMap()))
 
         credentialOffer.credentialIssuer shouldNotBe null
         credentialOffer.grants.keys shouldContain GrantType.pre_authorized_code.value
