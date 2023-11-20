@@ -1,38 +1,37 @@
 package id.walt.sdjwt
 
-import com.nimbusds.jose.JWSAlgorithm
-import com.nimbusds.jose.crypto.MACSigner
-import com.nimbusds.jose.crypto.MACVerifier
-import com.nimbusds.jwt.JWTClaimsSet
-import io.kotest.assertions.json.shouldEqualJson
+import io.kotest.assertions.json.shouldMatchJson
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.maps.shouldContainKey
 import io.kotest.matchers.maps.shouldNotContainKey
 import io.kotest.matchers.shouldBe
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 
-class SDJwtTestJVM {
-    // Generate shared secret for HMAC crypto algorithm
+class SDJwtTestIOS {
     private val sharedSecret = "ef23f749-7238-481a-815c-f0c2157dfa8e"
 
     @Test
     fun testSignJwt() {
+        val cryptoProvider = HMACJWTCryptoProvider("HS256", sharedSecret.encodeToByteArray())
 
-        // Create SimpleJWTCryptoProvider with MACSigner and MACVerifier
-        val cryptoProvider = SimpleJWTCryptoProvider(JWSAlgorithm.HS256, MACSigner(sharedSecret), MACVerifier(sharedSecret))
+        val originalSet = mutableMapOf<String, JsonElement> (
+            "sub" to  JsonPrimitive("123"),
+            "aud" to JsonPrimitive("456")
+        )
 
-        // Create original JWT claims set, using nimbusds claims set builder
-        val originalClaimsSet = JWTClaimsSet.Builder()
-            .subject("123")
-            .audience("456")
-            .build()
+        val originalClaimsSet = JsonObject(originalSet)
 
         // Create undisclosed claims set, by removing e.g. subject property from original claims set
-        val undisclosedClaimsSet = JWTClaimsSet.Builder(originalClaimsSet)
-            .subject(null)
-            .build()
+        val undisclosedSet = mutableMapOf<String, JsonElement> (
+            "aud" to JsonPrimitive("456")
+        )
+
+        val undisclosedClaimsSet = JsonObject(undisclosedSet)
 
         // Create SD payload by comparing original claims set with undisclosed claims set
         val sdPayload = SDPayload.createSDPayload(originalClaimsSet, undisclosedClaimsSet)
@@ -47,7 +46,7 @@ class SDJwtTestJVM {
         sdJwt.undisclosedPayload shouldContainKey "aud"
         sdJwt.disclosures shouldHaveSize 1
         sdJwt.digestedDisclosures[sdJwt.undisclosedPayload[SDJwt.DIGESTS_KEY]!!.jsonArray[0].jsonPrimitive.content]!!.key shouldBe "sub"
-        sdJwt.fullPayload.toString() shouldEqualJson originalClaimsSet.toString()
+        sdJwt.fullPayload.toString() shouldMatchJson originalClaimsSet.toString()
 
         sdJwt.verify(cryptoProvider).verified shouldBe true
     }
@@ -60,29 +59,27 @@ class SDJwtTestJVM {
 
         // present without disclosing SD fields
         val presentedUndisclosedJwt = sdJwt.present(discloseAll = false)
-        println("present without disclosing SD fields: " + presentedUndisclosedJwt)
+        println(presentedUndisclosedJwt)
 
         // present disclosing all SD fields
         val presentedDisclosedJwt = sdJwt.present(discloseAll = true)
-        println("present disclosing all SD fields: " + presentedDisclosedJwt)
+        println(presentedDisclosedJwt)
 
         // present disclosing selective fields, using SDMap
         val presentedSelectiveJwt = sdJwt.present(SDMapBuilder().addField("sub", true).build())
-        println("present disclosing selective fields, using SDMap: " + presentedSelectiveJwt)
+        println(presentedSelectiveJwt)
 
         // present disclosing fields, using JSON paths
         val presentedSelectiveJwt2 = sdJwt.present(SDMap.generateSDMap(listOf("sub")))
-        println("present disclosing fields, using JSON paths: " + presentedSelectiveJwt2)
+        println(presentedSelectiveJwt2)
 
     }
 
     @Test
     fun parseAndVerify() {
         // Create SimpleJWTCryptoProvider with MACSigner and MACVerifier
-        val cryptoProvider = SimpleJWTCryptoProvider(JWSAlgorithm.HS256, jwsSigner = null, jwsVerifier = MACVerifier(sharedSecret))
-
-        val undisclosedJwt =
-            "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI0NTYiLCJfc2QiOlsiaGx6ZmpmMDRvNVpzTFIyNWhhNGMtWS05SFcyRFVseGNnaU1ZZDMyNE5nWSJdfQ.2fsLqzujWt0hS0peLS8JLHyyo3D5KCDkNnHcBYqQwVo~"
+        val cryptoProvider = HMACJWTCryptoProvider("HS256", sharedSecret.encodeToByteArray())
+        val undisclosedJwt = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI0NTYiLCJfc2QiOlsiaGx6ZmpmMDRvNVpzTFIyNWhhNGMtWS05SFcyRFVseGNnaU1ZZDMyNE5nWSJdfQ.2fsLqzujWt0hS0peLS8JLHyyo3D5KCDkNnHcBYqQwVo~"
 
         // verify and parse presented SD-JWT with all fields undisclosed, throws Exception if verification fails!
         val parseAndVerifyResult = SDJwt.verifyAndParse(undisclosedJwt, cryptoProvider)
