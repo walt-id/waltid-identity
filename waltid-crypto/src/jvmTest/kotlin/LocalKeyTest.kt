@@ -4,11 +4,6 @@ import TestUtils.loadResource
 import TestUtils.loadResourceBytes
 import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.LocalKey
-import id.walt.crypto.keys.LocalKeyMetadata
-import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
-import io.ktor.util.*
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -18,7 +13,6 @@ import org.junit.jupiter.params.provider.Arguments
 import org.junit.jupiter.params.provider.Arguments.arguments
 import org.junit.jupiter.params.provider.MethodSource
 import org.junit.jupiter.params.provider.ValueSource
-import java.io.File
 import java.util.stream.Stream
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -64,8 +58,7 @@ class LocalKeyTest {
         val key = KeySerialization.deserializeKey(keyFile).getOrThrow()
         assertEquals(isPrivate, key.hasPrivateKey)
     }
-    fun getKeyId() = runTest {}
-    fun getThumbprint() = runTest {}
+
     @ParameterizedTest
     @ValueSource(strings = ["ed25519.private.json", "secp256k1.private.json", "secp256r1.private.json", "rsa.private.json"])
     @Disabled // not implemented
@@ -86,8 +79,23 @@ class LocalKeyTest {
         assertTrue(verificationResult.isSuccess)
         assertEquals(payload, verificationResult.getOrThrow())
     }
+
+    @ParameterizedTest
+    @MethodSource
+    fun getKeyId(keyFile: String, keyId: String) = runTest {
+        val key = KeySerialization.deserializeKey(keyFile).getOrThrow()
+        assertEquals(keyId, key.getKeyId())
+    }
+    fun getThumbprint() = runTest {}
     fun verifyRaw() = runTest {}
-    fun verifyJws() = runTest {}
+    @ParameterizedTest
+    @MethodSource
+    fun verifyJws(keyFile: String, signature: String) = runTest {
+        val key = KeySerialization.deserializeKey(keyFile).getOrThrow()
+        val verificationResult = key.verifyJws(signature)
+        assertTrue(verificationResult.isSuccess)
+        assertEquals(payload, verificationResult.getOrThrow())
+    }
     @ParameterizedTest
     @MethodSource
     fun exportJWK(keyFile: String, jwkFile: String) = runTest {
@@ -114,7 +122,15 @@ class LocalKeyTest {
     companion object {
         @JvmStatic
         fun getPublicKeyRepresentation(): Stream<Arguments> = Stream.of(
-
+            arguments(loadResource("serialized/ed25519.private.json"), loadResourceBytes("public-bytes/ed25519.bin")),
+            arguments(loadResource("serialized/secp256k1.private.json"), loadResourceBytes("public-bytes/secp256k1.bin")),
+            arguments(loadResource("serialized/secp256r1.private.json"), loadResourceBytes("public-bytes/secp256r1.bin")),
+            arguments(loadResource("serialized/rsa.private.json"), loadResourceBytes("public-bytes/rsa.bin")),
+            // public
+            arguments(loadResource("serialized/ed25519.public.json"), loadResourceBytes("public-bytes/ed25519.bin")),
+            arguments(loadResource("serialized/secp256k1.public.json"), loadResourceBytes("public-bytes/secp256k1.bin")),
+            arguments(loadResource("serialized/secp256r1.public.json"), loadResourceBytes("public-bytes/secp256r1.bin")),
+            arguments(loadResource("serialized/rsa.public.json"), loadResourceBytes("public-bytes/rsa.bin")),
         )
         @JvmStatic
         fun getPublicKey(): Stream<Arguments> = Stream.of(
@@ -152,6 +168,27 @@ class LocalKeyTest {
             arguments(loadResource("serialized/secp256k1.public.json"), false),
             arguments(loadResource("serialized/secp256r1.public.json"), false),
             arguments(loadResource("serialized/rsa.public.json"), false),
+        )
+
+        @JvmStatic
+        fun getKeyId(): Stream<Arguments> = Stream.of(
+            arguments(loadResource("serialized/ed25519.private.json"), "DJ-kT9JRDYwlJfYjhmJgNwIcuaU6RcSuR8eHIwbsnHQ"),
+            arguments(loadResource("serialized/secp256k1.private.json"), "PIv-EHegS0qL__8D4t36kULI8vzBsH4yBshhmY036yA"),
+            arguments(loadResource("serialized/secp256r1.private.json"), "LtObdob_k1-dw59-MwdA7auJUJCsqGQ7x2-ufXcB6gY"),
+            arguments(loadResource("serialized/rsa.private.json"), "288WlRQvku-zrHFmvcAW86jnTF3qsMoEUKEbteI2K4A"),
+            // public
+            arguments(loadResource("serialized/ed25519.public.json"), "DJ-kT9JRDYwlJfYjhmJgNwIcuaU6RcSuR8eHIwbsnHQ"),
+            arguments(loadResource("serialized/secp256k1.public.json"), "PIv-EHegS0qL__8D4t36kULI8vzBsH4yBshhmY036yA"),
+            arguments(loadResource("serialized/secp256r1.public.json"), "LtObdob_k1-dw59-MwdA7auJUJCsqGQ7x2-ufXcB6gY"),
+            arguments(loadResource("serialized/rsa.public.json"), "288WlRQvku-zrHFmvcAW86jnTF3qsMoEUKEbteI2K4A"),
+        )
+
+        @JvmStatic
+        fun verifyJws(): Stream<Arguments> = Stream.of(
+            arguments(loadResource("serialized/ed25519.public.json"), loadResource("signatures/ed25519.txt")),
+            arguments(loadResource("serialized/secp256k1.public.json"), loadResource("signatures/secp256k1.txt")),
+            arguments(loadResource("serialized/secp256r1.public.json"), loadResource("signatures/secp256r1.txt")),
+            arguments(loadResource("serialized/rsa.public.json"), loadResource("signatures/rsa.txt")),
         )
 
         @JvmStatic
@@ -193,14 +230,4 @@ class LocalKeyTest {
             arguments(loadResource("serialized/rsa.public.json"), loadPem("rsa.public.pem")),
         )
     }
-}
-
-fun main() = runBlocking{
-    val key = KeySerialization.deserializeKey(loadResource("serialized/ed25519.public.json")).getOrThrow()
-    val bytes = key.getPublicKeyRepresentation()
-//    File("waltid-crypto/src/jvmTest/resources/public-bytes/ed25519.txt").writeBytes(bytes)
-    val raw = loadResource("public-bytes/ed25519.txt").decodeBase64Bytes()
-    val rawKey = LocalKey.importRawPublicKey(KeyType.Ed25519, raw, LocalKeyMetadata())
-    println(key.exportJWK())
-    println(rawKey.exportJWK())
 }
