@@ -1,7 +1,9 @@
 import TestUtils.loadJwk
 import TestUtils.loadPem
+import TestUtils.loadResourceBytes
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.LocalKey
+import id.walt.crypto.keys.LocalKeyMetadata
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.Arguments
@@ -51,10 +53,20 @@ class ImportKeyTests {
         assertEquals(key.getThumbprint(), key.getKeyId())
     }
 
-    fun `given raw string, when imported then the import succeeds having the correct key type, key id and hasPrivate values`() =
-        runTest {
-
-        }
+    @ParameterizedTest
+    @MethodSource
+    fun `given raw string, when imported then the import succeeds having the correct key type, key id and hasPrivate values`(
+        bytes: ByteArray, keyType: KeyType, isPrivate: Boolean
+    ) = runTest {
+        // Importing
+        val key = LocalKey.importRawPublicKey(keyType, bytes, LocalKeyMetadata())
+        // Checking for private key
+        assertEquals(isPrivate, key.hasPrivateKey)
+        // Checking for key type
+        assertEquals(keyType, key.keyType)
+        // Checking keyId from thumbprint
+        assertEquals(key.getThumbprint(), key.getKeyId())
+    }
 
 
 
@@ -103,6 +115,17 @@ class ImportKeyTests {
                 arguments(loadPem("rsa.public.pem"), KeyType.RSA, false),
             )
 
+        @JvmStatic
+        fun `given raw string, when imported then the import succeeds having the correct key type, key id and hasPrivate values`(): Stream<Arguments> =
+            Stream.of(
+                arguments(loadResourceBytes("public-bytes/ed25519.bin"), KeyType.Ed25519, false),
+                // secp256r1 (throwing Invalid point encoding 0x30)
+//                arguments(loadResourceBytes("public-bytes/secp256k1.bin"), KeyType.secp256k1, false),
+                // secp256r1 (throwing Invalid point encoding 0x30)
+//                arguments(loadResourceBytes("public-bytes/secp256r1.bin"), KeyType.secp256r1, false),
+                // rsa (not implemented)
+//                arguments(loadResourceBytes("public-bytes/rsa.bin"), KeyType.RSA, false),
+            )
 
     }
 }
