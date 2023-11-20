@@ -84,7 +84,7 @@ class ImportKeyTests {
         @JvmStatic
         fun `given pem string, when imported then the import succeeds having the correct key type, key id and hasPrivate values`(): Stream<Arguments> =
             Stream.of(
-                // ed25519 (not supported)
+                // ed25519 (not implemented)
 //                arguments(loadPem("ed25519.private.pem"), KeyType.Ed25519, true),
                 // secp256k1
                 arguments(loadPem("secp256k1.private.pem"), KeyType.secp256k1, true),
@@ -93,7 +93,7 @@ class ImportKeyTests {
                 // rsa
                 arguments(loadPem("rsa.private.pem"), KeyType.RSA, true),
                 // public
-                // ed25519 (not supported)
+                // ed25519 (not implemented)
 //                arguments(loadPem("ed25519.public.pem"), KeyType.Ed25519, false),
                 // secp256k1
                 arguments(loadPem("secp256k1.public.pem"), KeyType.secp256k1, false),

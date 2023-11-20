@@ -12,7 +12,7 @@ import kotlin.test.Test
 
 class TSEKeyTest {
 
-    private suspend fun test(key: TSEKey) {
+    private suspend fun exampleKeySignRaw(key: TSEKey) {
         try {
             println("TSEKey: $key")
             val plaintext = "This is a plaintext for ${key.keyType.name}... 123".encodeToByteArray()
@@ -40,7 +40,7 @@ class TSEKeyTest {
             TSEKey.generate(KeyType.RSA, tseMetadata),
             TSEKey.generate(KeyType.secp256r1, tseMetadata)
         ).forEach {
-            test(it)
+            exampleKeySignRaw(it)
         }
     }
 

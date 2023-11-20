@@ -37,7 +37,7 @@ class KeySignTests {
     @ParameterizedTest
     @ValueSource(strings = ["ed25519.private.json", "secp256k1.private.json", "secp256r1.private.json", "rsa.private.json"])
     @Disabled // not implemented
-    fun `given key and payload, when signing raw then the result is a valid jws signature`(keyFile: String) = runTest {
+    fun `given key and payload, when signing raw then the result is a valid signature`(keyFile: String) = runTest {
         // given
         val key = KeySerialization.deserializeKey(loadResource("serialized/$keyFile")).getOrThrow()
         // when
