@@ -52,7 +52,6 @@ expect class LocalKey(jwk: String?) : Key {
     override val hasPrivateKey: Boolean
 
 
-
     companion object : LocalKeyCreator {
 
         override suspend fun generate(type: KeyType, metadata: LocalKeyMetadata): LocalKey

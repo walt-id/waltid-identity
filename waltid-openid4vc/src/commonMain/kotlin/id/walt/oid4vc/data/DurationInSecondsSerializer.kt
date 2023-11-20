@@ -8,16 +8,16 @@ import kotlinx.serialization.encoding.Encoder
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
-object DurationInSecondsSerializer: KSerializer<Duration> {
-  override val descriptor: SerialDescriptor
-    get() = Duration.serializer().descriptor
+object DurationInSecondsSerializer : KSerializer<Duration> {
+    override val descriptor: SerialDescriptor
+        get() = Duration.serializer().descriptor
 
-  override fun deserialize(decoder: Decoder): Duration {
-    return decoder.decodeLong().seconds
-  }
+    override fun deserialize(decoder: Decoder): Duration {
+        return decoder.decodeLong().seconds
+    }
 
-  override fun serialize(encoder: Encoder, value: Duration) {
-    encoder.encodeLong(value.inWholeSeconds)
-  }
+    override fun serialize(encoder: Encoder, value: Duration) {
+        encoder.encodeLong(value.inWholeSeconds)
+    }
 
 }

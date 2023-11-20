@@ -1,26 +1,26 @@
 {
-  "assertionMethod" : [
+  "assertionMethod": [
     "did:web:localhost%3A8080:secp256k1#d5c5048d0e7440a4830ea0b407174f83"
   ],
-  "authentication" : [
+  "authentication": [
     "did:web:localhost%3A8080:secp256k1#d5c5048d0e7440a4830ea0b407174f83"
   ],
-  "@context" : "https://www.w3.org/ns/did/v1",
-  "id" : "did:web:localhost%3A8080:secp256k1",
-  "verificationMethod" : [
+  "@context": "https://www.w3.org/ns/did/v1",
+  "id": "did:web:localhost%3A8080:secp256k1",
+  "verificationMethod": [
     {
-      "controller" : "did:web:localhost%3A8080:secp256k1",
-      "id" : "did:web:localhost%3A8080:secp256k1#d5c5048d0e7440a4830ea0b407174f83",
-      "publicKeyJwk" : {
-        "alg" : "ES256K",
-        "crv" : "secp256k1",
-        "kid" : "d5c5048d0e7440a4830ea0b407174f83",
-        "kty" : "EC",
-        "use" : "sig",
-        "x" : "eKx_FaLzPMT4ndwvImdV_pTv-JX1SQpJ8tDK6GLiYIE",
-        "y" : "-TzpGxGLPnXWMJWTqYvqn55Z8Xi-J_ZM40bjtjGaELs"
+      "controller": "did:web:localhost%3A8080:secp256k1",
+      "id": "did:web:localhost%3A8080:secp256k1#d5c5048d0e7440a4830ea0b407174f83",
+      "publicKeyJwk": {
+        "alg": "ES256K",
+        "crv": "secp256k1",
+        "kid": "d5c5048d0e7440a4830ea0b407174f83",
+        "kty": "EC",
+        "use": "sig",
+        "x": "eKx_FaLzPMT4ndwvImdV_pTv-JX1SQpJ8tDK6GLiYIE",
+        "y": "-TzpGxGLPnXWMJWTqYvqn55Z8Xi-J_ZM40bjtjGaELs"
       },
-      "type" : "EcdsaSecp256k1VerificationKey2019"
+      "type": "EcdsaSecp256k1VerificationKey2019"
     }
   ]
 }

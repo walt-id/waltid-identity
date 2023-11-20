@@ -1,9 +1,8 @@
 package id.walt.reporting
+
 import it.justwrote.kjob.InMem
 import it.justwrote.kjob.kjob
-import it.justwrote.kjob.kron.Kron
 import it.justwrote.kjob.kron.KronModule
-import java.time.Instant
 
 object ReportingClient {
 

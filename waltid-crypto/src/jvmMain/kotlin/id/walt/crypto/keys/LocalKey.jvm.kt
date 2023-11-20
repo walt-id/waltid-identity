@@ -216,7 +216,9 @@ actual class LocalKey actual constructor(
     }
 
     actual companion object : LocalKeyCreator {
-        actual override suspend fun generate(type: KeyType, metadata: LocalKeyMetadata): LocalKey = JvmLocalKeyCreator.generate(type, metadata)
+        actual override suspend fun generate(type: KeyType, metadata: LocalKeyMetadata): LocalKey =
+            JvmLocalKeyCreator.generate(type, metadata)
+
         actual override suspend fun importJWK(jwk: String): Result<LocalKey> = JvmLocalKeyCreator.importJWK(jwk)
         actual override suspend fun importPEM(pem: String): Result<LocalKey> = JvmLocalKeyCreator.importPEM(pem)
         actual override suspend fun importRawPublicKey(

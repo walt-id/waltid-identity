@@ -26,8 +26,8 @@ data class CredentialResponse private constructor(
     @SerialName("error_uri") val errorUri: String? = null,
     override val customParameters: Map<String, JsonElement> = mapOf()
 ) : JsonDataObject() {
-    val isSuccess get() = format != null
-    val isDeferred get() = isSuccess && credential == null
+    val isSuccess get() = (format != null && credential != null) || isDeferred
+    val isDeferred get() = acceptanceToken != null
     override fun toJSON() = Json.encodeToJsonElement(CredentialResponseSerializer, this).jsonObject
 
     companion object : JsonDataObjectFactory<CredentialResponse>() {

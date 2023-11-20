@@ -10,20 +10,20 @@ import kotlinx.serialization.json.jsonObject
 
 @Serializable
 data class AuthorizationJSONRequest(
-  @SerialName("response_type") override val responseType: String = ResponseType.getResponseTypeString(ResponseType.code),
-  @SerialName("client_id") override val clientId: String,
-  @SerialName("response_mode") override val responseMode: ResponseMode? = null,
-  @SerialName("redirect_uri") override val redirectUri: String? = null,
-  override val scope: Set<String> = setOf(),
-  override val state: String? = null,
-  override val nonce: String? = null,
-  override val customParameters: Map<String, JsonElement> = mapOf()
-): JsonDataObject(), IAuthorizationRequest {
-  override fun toJSON() = Json.encodeToJsonElement(AuthorizationJSONRequestSerializer, this).jsonObject
+    @SerialName("response_type") override val responseType: String = ResponseType.getResponseTypeString(ResponseType.code),
+    @SerialName("client_id") override val clientId: String,
+    @SerialName("response_mode") override val responseMode: ResponseMode? = null,
+    @SerialName("redirect_uri") override val redirectUri: String? = null,
+    override val scope: Set<String> = setOf(),
+    override val state: String? = null,
+    override val nonce: String? = null,
+    override val customParameters: Map<String, JsonElement> = mapOf()
+) : JsonDataObject(), IAuthorizationRequest {
+    override fun toJSON() = Json.encodeToJsonElement(AuthorizationJSONRequestSerializer, this).jsonObject
 
-  companion object: JsonDataObjectFactory<AuthorizationJSONRequest>() {
-    override fun fromJSON(jsonObject: JsonObject) = Json.decodeFromJsonElement(AuthorizationJSONRequestSerializer, jsonObject)
-  }
+    companion object : JsonDataObjectFactory<AuthorizationJSONRequest>() {
+        override fun fromJSON(jsonObject: JsonObject) = Json.decodeFromJsonElement(AuthorizationJSONRequestSerializer, jsonObject)
+    }
 }
 
-object AuthorizationJSONRequestSerializer: JsonDataObjectSerializer<AuthorizationJSONRequest>(AuthorizationJSONRequest.serializer())
+object AuthorizationJSONRequestSerializer : JsonDataObjectSerializer<AuthorizationJSONRequest>(AuthorizationJSONRequest.serializer())

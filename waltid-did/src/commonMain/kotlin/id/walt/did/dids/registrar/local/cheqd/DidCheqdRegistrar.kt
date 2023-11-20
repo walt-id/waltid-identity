@@ -56,6 +56,7 @@ class DidCheqdRegistrar() : LocalRegistrarMethod("cheqd") {
         isLenient = true
         explicitNulls = false
     }
+
     //TODO: inject
     private val client = HttpClient(CIO) {
         install(ContentNegotiation) {

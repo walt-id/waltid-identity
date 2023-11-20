@@ -215,7 +215,8 @@ fun Application.verfierApi() {
                     )
 
                 val tokenResponse = TokenResponse.fromHttpParameters(context.request.call.receiveParameters().toMap())
-                val sessionVerificationInfo = OIDCVerifierService.sessionVerificationInfos[session.id] ?: throw IllegalStateException("No session verification information found for session id!")
+                val sessionVerificationInfo = OIDCVerifierService.sessionVerificationInfos[session.id]
+                    ?: throw IllegalStateException("No session verification information found for session id!")
 
                 val maybePresentationSessionResult = runCatching { OIDCVerifierService.verify(tokenResponse, session) }
 

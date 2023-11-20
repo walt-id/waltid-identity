@@ -1,6 +1,7 @@
 package id.walt.credentials.verification
 
 import id.walt.credentials.verification.policies.*
+import id.walt.credentials.verification.policies.vp.HolderBindingPolicy
 import id.walt.credentials.verification.policies.vp.MaximumCredentialsPolicy
 import id.walt.credentials.verification.policies.vp.MinimumCredentialsPolicy
 
@@ -38,13 +39,14 @@ object PolicyManager {
             NotBeforeDatePolicy(),
             WebhookPolicy(),
             MinimumCredentialsPolicy(),
-            MaximumCredentialsPolicy()
+            MaximumCredentialsPolicy(),
+            HolderBindingPolicy(),
+            AllowedIssuerPolicy()
         )
     }
 
     fun getPolicy(name: String): VerificationPolicy =
         mappedPolicies[name] ?: throw IllegalArgumentException("No policy found by name: $name")
-
 
 
 }

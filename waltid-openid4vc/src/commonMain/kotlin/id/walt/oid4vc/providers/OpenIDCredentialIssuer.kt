@@ -336,14 +336,14 @@ abstract class OpenIDCredentialIssuer(
      * Override, to use custom path, by default, the path will be: "$baseUrl/credential_offer/<session_id>, e.g.: "https://issuer.myhost.com/api/credential_offer/1234-4567-8900"
      * @param issuanceSession   The issuance session for which the credential offer uri is created
      */
-    open protected fun getCredentialOfferByReferenceUri(issuanceSession: IssuanceSession): String {
+    protected open fun getCredentialOfferByReferenceUri(issuanceSession: IssuanceSession): String {
         return URLBuilder(baseUrl).appendPathSegments("credential_offer", issuanceSession.id).buildString()
     }
 
     open fun getCredentialOfferRequest(
         issuanceSession: IssuanceSession, byReference: Boolean = false
     ): CredentialOfferRequest {
-        return if(byReference) {
+        return if (byReference) {
             CredentialOfferRequest(null, getCredentialOfferByReferenceUri(issuanceSession))
         } else {
             CredentialOfferRequest(issuanceSession.credentialOffer)

@@ -5,16 +5,29 @@ import id.walt.credentials.schemes.JwsSignatureScheme.JwsHeader
 import id.walt.credentials.schemes.JwsSignatureScheme.JwsOption
 import id.walt.crypto.keys.Key
 import id.walt.crypto.utils.JsonUtils.toJsonElement
+import id.walt.sdjwt.SDJwt
+import id.walt.sdjwt.SDMap
+import id.walt.sdjwt.SDPayload
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encodeToString
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
-@Serializable
+class W3CVCSerializer : KSerializer<W3CVC> {
+    override val descriptor: SerialDescriptor = JsonObject.serializer().descriptor
+    override fun deserialize(decoder: Decoder): W3CVC = W3CVC(decoder.decodeSerializableValue(JsonObject.serializer()))
+    override fun serialize(encoder: Encoder, value: W3CVC) = encoder.encodeSerializableValue(JsonObject.serializer(), value.toJsonObject())
+}
+
+@Serializable(with = W3CVCSerializer::class)
 data class W3CVC(
-    private val content: Map<String, JsonElement>
+    private val content: Map<String, JsonElement> = emptyMap()
 ) : Map<String, JsonElement> by content {
 
 
@@ -22,6 +35,32 @@ data class W3CVC(
     fun toJson(): String = Json.encodeToString(content)
     fun toPrettyJson(): String = prettyJson.encodeToString(content)
 
+
+    suspend fun signSdJwt(
+        issuerKey: Key,
+        issuerDid: String,
+        subjectDid: String,
+        disclosureMap: SDMap,
+        /** Set additional options in the JWT header */
+        additionalJwtHeader: Map<String, String> = emptyMap(),
+        /** Set additional options in the JWT payload */
+        additionalJwtOptions: Map<String, JsonElement> = emptyMap()
+    ): String {
+        val vc = this.toJsonObject()
+
+        val sdPayload = SDPayload.createSDPayload(vc, disclosureMap)
+        val signable = Json.encodeToString(sdPayload.undisclosedPayload).toByteArray()
+
+        val signed = issuerKey.signJws(
+            signable, mapOf(
+                "typ" to "vc+sd-jwt",
+                "cty" to "credential-claims-set+json",
+                "kid" to issuerDid
+            )
+        )
+
+        return SDJwt.createFromSignedJwt(signed, sdPayload).toString()
+    }
 
     suspend fun signJws(
         issuerKey: Key,
@@ -60,6 +99,7 @@ data class W3CVC(
                 ).apply { putAll(data.toMap().mapValues { it.value.toJsonElement() }) }
             )
         }
+
 
         fun fromJson(json: String) =
             W3CVC(Json.decodeFromString<Map<String, JsonElement>>(json))
