@@ -1,8 +1,10 @@
-import TestUtils.loadJwk
-import TestUtils.loadResource
+import TestUtils.loadJwkLocal
+import TestUtils.loadSerializedLocal
+import TestUtils.loadSerializedTse
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.LocalKey
+import id.walt.crypto.keys.TSEKey
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -20,25 +22,22 @@ class KeySerializationTests {
     @ParameterizedTest
     @MethodSource
     fun `given key, when serializing it then the serialization result contains the correct type and key-string`(
-        filename: String, type: String
+        keyFile: String, type: String
     ) = runTest {
         // given
-        val keyString = loadJwk(filename)
-        val key = LocalKey.importJWK(keyString).getOrThrow()
+        val key = LocalKey.importJWK(keyFile).getOrThrow()
         // when
         val serialized = KeySerialization.serializeKey(key)
         val decoded = Json.decodeFromString<JsonObject>(serialized)
         // then
         assertEquals(type, decoded["type"]!!.jsonPrimitive.content)
-        assertEquals(keyString.replace("\\s".toRegex(), ""), decoded["jwk"]!!.jsonPrimitive.content)
+        assertEquals(keyFile.replace("\\s".toRegex(), ""), decoded["jwk"]!!.jsonPrimitive.content)
     }
 
     @ParameterizedTest
     @MethodSource
-    fun `given a serialized key string, when deserializing then the result has the correct class type`(filename: String, clazz: KClass<Key>) =
+    fun `given a serialized key string, when deserializing then the result has the correct class type`(serialized: String, clazz: KClass<Key>) =
         runTest {
-            // given
-            val serialized = loadResource("serialized/$filename")
             // when
             val key = KeySerialization.deserializeKey(serialized).getOrThrow()
             // then
@@ -48,28 +47,31 @@ class KeySerializationTests {
     companion object {
         @JvmStatic
         fun `given key, when serializing it then the serialization result contains the correct type and key-string`(): Stream<Arguments> = Stream.of(
-            arguments("ed25519.private.json", "local"),
-            arguments("secp256k1.private.json", "local"),
-            arguments("secp256r1.private.json", "local"),
-            arguments("rsa.private.json", "local"),
+            arguments(loadJwkLocal("ed25519.private.json"), "local"),
+            arguments(loadJwkLocal("secp256k1.private.json"), "local"),
+            arguments(loadJwkLocal("secp256r1.private.json"), "local"),
+            arguments(loadJwkLocal("rsa.private.json"), "local"),
             // public
-            arguments("ed25519.public.json", "local"),
-            arguments("secp256k1.public.json", "local"),
-            arguments("secp256r1.public.json", "local"),
-            arguments("rsa.public.json", "local"),
+            arguments(loadJwkLocal("ed25519.public.json"), "local"),
+            arguments(loadJwkLocal("secp256k1.public.json"), "local"),
+            arguments(loadJwkLocal("secp256r1.public.json"), "local"),
+            arguments(loadJwkLocal("rsa.public.json"), "local"),
         )
 
         @JvmStatic
         fun `given a serialized key string, when deserializing then the result has the correct class type`(): Stream<Arguments> = Stream.of (
-            arguments("ed25519.private.json", LocalKey::class),
-            arguments("secp256k1.private.json", LocalKey::class),
-            arguments("secp256r1.private.json", LocalKey::class),
-            arguments("rsa.private.json", LocalKey::class),
+            arguments(loadSerializedLocal("ed25519.private.json"), LocalKey::class),
+            arguments(loadSerializedLocal("secp256k1.private.json"), LocalKey::class),
+            arguments(loadSerializedLocal("secp256r1.private.json"), LocalKey::class),
+            arguments(loadSerializedLocal("rsa.private.json"), LocalKey::class),
             // public
-            arguments("ed25519.public.json", LocalKey::class),
-            arguments("secp256k1.public.json", LocalKey::class),
-            arguments("secp256r1.public.json", LocalKey::class),
-            arguments("rsa.public.json", LocalKey::class),
+            arguments(loadSerializedLocal("ed25519.public.json"), LocalKey::class),
+            arguments(loadSerializedLocal("secp256k1.public.json"), LocalKey::class),
+            arguments(loadSerializedLocal("secp256r1.public.json"), LocalKey::class),
+            arguments(loadSerializedLocal("rsa.public.json"), LocalKey::class),
+            //// tse
+            arguments(loadSerializedTse("ed25519.private.json"), TSEKey::class),
+            arguments(loadSerializedTse("ed25519.public.json"), TSEKey::class),
         )
     }
 

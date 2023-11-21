@@ -1,5 +1,5 @@
-import TestUtils.loadJwk
-import TestUtils.loadPem
+import TestUtils.loadJwkLocal
+import TestUtils.loadPemLocal
 import TestUtils.loadResourceBytes
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.LocalKey
@@ -75,22 +75,22 @@ class ImportKeyTests {
         fun `given jwk string, when imported then the import succeeds having the correct key type, key id and hasPrivate values`(): Stream<Arguments> =
             Stream.of(
                 // ed25519
-                arguments(loadJwk("ed25519.private.json"), KeyType.Ed25519, true),
+                arguments(loadJwkLocal("ed25519.private.json"), KeyType.Ed25519, true),
                 // secp256k1
-                arguments(loadJwk("secp256k1.private.json"), KeyType.secp256k1, true),
+                arguments(loadJwkLocal("secp256k1.private.json"), KeyType.secp256k1, true),
                 // secp256r1
-                arguments(loadJwk("secp256r1.private.json"), KeyType.secp256r1, true),
+                arguments(loadJwkLocal("secp256r1.private.json"), KeyType.secp256r1, true),
                 // rsa
-                arguments(loadJwk("rsa.private.json"), KeyType.RSA, true),
+                arguments(loadJwkLocal("rsa.private.json"), KeyType.RSA, true),
                 // public
                 // ed25519
-                arguments(loadJwk("ed25519.public.json"), KeyType.Ed25519, false),
+                arguments(loadJwkLocal("ed25519.public.json"), KeyType.Ed25519, false),
                 // secp256k1
-                arguments(loadJwk("secp256k1.public.json"), KeyType.secp256k1, false),
+                arguments(loadJwkLocal("secp256k1.public.json"), KeyType.secp256k1, false),
                 // secp256r1
-                arguments(loadJwk("secp256r1.public.json"), KeyType.secp256r1, false),
+                arguments(loadJwkLocal("secp256r1.public.json"), KeyType.secp256r1, false),
                 // rsa
-                arguments(loadJwk("rsa.public.json"), KeyType.RSA, false),
+                arguments(loadJwkLocal("rsa.public.json"), KeyType.RSA, false),
             )
 
         @JvmStatic
@@ -99,20 +99,20 @@ class ImportKeyTests {
                 // ed25519 (not implemented)
 //                arguments(loadPem("ed25519.private.pem"), KeyType.Ed25519, true),
                 // secp256k1
-                arguments(loadPem("secp256k1.private.pem"), KeyType.secp256k1, true),
+                arguments(loadPemLocal("secp256k1.private.pem"), KeyType.secp256k1, true),
                 // secp256r1
-                arguments(loadPem("secp256r1.private.pem"), KeyType.secp256r1, true),
+                arguments(loadPemLocal("secp256r1.private.pem"), KeyType.secp256r1, true),
                 // rsa
-                arguments(loadPem("rsa.private.pem"), KeyType.RSA, true),
+                arguments(loadPemLocal("rsa.private.pem"), KeyType.RSA, true),
                 // public
                 // ed25519 (not implemented)
 //                arguments(loadPem("ed25519.public.pem"), KeyType.Ed25519, false),
                 // secp256k1
-                arguments(loadPem("secp256k1.public.pem"), KeyType.secp256k1, false),
+                arguments(loadPemLocal("secp256k1.public.pem"), KeyType.secp256k1, false),
                 // secp256r1
-                arguments(loadPem("secp256r1.public.pem"), KeyType.secp256r1, false),
+                arguments(loadPemLocal("secp256r1.public.pem"), KeyType.secp256r1, false),
                 // rsa
-                arguments(loadPem("rsa.public.pem"), KeyType.RSA, false),
+                arguments(loadPemLocal("rsa.public.pem"), KeyType.RSA, false),
             )
 
         @JvmStatic

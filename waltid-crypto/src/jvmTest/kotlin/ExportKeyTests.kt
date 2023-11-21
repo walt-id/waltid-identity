@@ -1,6 +1,6 @@
-import TestUtils.loadJwk
-import TestUtils.loadPem
-import TestUtils.loadResource
+import TestUtils.loadJwkLocal
+import TestUtils.loadPemLocal
+import TestUtils.loadSerializedLocal
 import id.walt.crypto.keys.KeySerialization
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Disabled
@@ -52,41 +52,41 @@ class ExportKeyTests {
     companion object {
         @JvmStatic
         fun `given key, when exporting jwk then the result is a valid jwk string`(): Stream<Arguments> = Stream.of(
-            arguments(loadResource("serialized/ed25519.private.json"), loadJwk("ed25519.private.json")),
-            arguments(loadResource("serialized/secp256k1.private.json"), loadJwk("secp256k1.private.json")),
-            arguments(loadResource("serialized/secp256r1.private.json"), loadJwk("secp256r1.private.json")),
-            arguments(loadResource("serialized/rsa.private.json"), loadJwk("rsa.private.json")),
+            arguments(loadSerializedLocal("ed25519.private.json"), loadJwkLocal("ed25519.private.json")),
+            arguments(loadSerializedLocal("secp256k1.private.json"), loadJwkLocal("secp256k1.private.json")),
+            arguments(loadSerializedLocal("secp256r1.private.json"), loadJwkLocal("secp256r1.private.json")),
+            arguments(loadSerializedLocal("rsa.private.json"), loadJwkLocal("rsa.private.json")),
             // public
-            arguments(loadResource("serialized/ed25519.public.json"), loadJwk("ed25519.public.json")),
-            arguments(loadResource("serialized/secp256k1.public.json"), loadJwk("secp256k1.public.json")),
-            arguments(loadResource("serialized/secp256r1.public.json"), loadJwk("secp256r1.public.json")),
-            arguments(loadResource("serialized/rsa.public.json"), loadJwk("rsa.public.json")),
+            arguments(loadSerializedLocal("ed25519.public.json"), loadJwkLocal("ed25519.public.json")),
+            arguments(loadSerializedLocal("secp256k1.public.json"), loadJwkLocal("secp256k1.public.json")),
+            arguments(loadSerializedLocal("secp256r1.public.json"), loadJwkLocal("secp256r1.public.json")),
+            arguments(loadSerializedLocal("rsa.public.json"), loadJwkLocal("rsa.public.json")),
         )
 
         @JvmStatic
         fun `given key, when exporting JsonObject then the result is a valid jwk string`(): Stream<Arguments> = Stream.of(
-            arguments(loadResource("serialized/ed25519.private.json"), loadJwk("ed25519.private.json")),
-            arguments(loadResource("serialized/secp256k1.private.json"), loadJwk("secp256k1.private.json")),
-            arguments(loadResource("serialized/secp256r1.private.json"), loadJwk("secp256r1.private.json")),
-            arguments(loadResource("serialized/rsa.private.json"), loadJwk("rsa.private.json")),
+            arguments(loadSerializedLocal("ed25519.private.json"), loadJwkLocal("ed25519.private.json")),
+            arguments(loadSerializedLocal("secp256k1.private.json"), loadJwkLocal("secp256k1.private.json")),
+            arguments(loadSerializedLocal("secp256r1.private.json"), loadJwkLocal("secp256r1.private.json")),
+            arguments(loadSerializedLocal("rsa.private.json"), loadJwkLocal("rsa.private.json")),
             // public
-            arguments(loadResource("serialized/ed25519.public.json"), loadJwk("ed25519.public.json")),
-            arguments(loadResource("serialized/secp256k1.public.json"), loadJwk("secp256k1.public.json")),
-            arguments(loadResource("serialized/secp256r1.public.json"), loadJwk("secp256r1.public.json")),
-            arguments(loadResource("serialized/rsa.public.json"), loadJwk("rsa.public.json")),
+            arguments(loadSerializedLocal("ed25519.public.json"), loadJwkLocal("ed25519.public.json")),
+            arguments(loadSerializedLocal("secp256k1.public.json"), loadJwkLocal("secp256k1.public.json")),
+            arguments(loadSerializedLocal("secp256r1.public.json"), loadJwkLocal("secp256r1.public.json")),
+            arguments(loadSerializedLocal("rsa.public.json"), loadJwkLocal("rsa.public.json")),
         )
 
         @JvmStatic
         fun `given key, when exporting pem then the result is a valid pem string`(): Stream<Arguments> = Stream.of(
-            arguments(loadResource("serialized/ed25519.private.json"), loadPem("ed25519.private.pem")),
-            arguments(loadResource("serialized/secp256k1.private.json"), loadPem("secp256k1.private.pem")),
-            arguments(loadResource("serialized/secp256r1.private.json"), loadPem("secp256r1.private.pem")),
-            arguments(loadResource("serialized/rsa.private.json"), loadPem("rsa.private.pem")),
+            arguments(loadSerializedLocal("ed25519.private.json"), loadPemLocal("ed25519.private.pem")),
+            arguments(loadSerializedLocal("secp256k1.private.json"), loadPemLocal("secp256k1.private.pem")),
+            arguments(loadSerializedLocal("secp256r1.private.json"), loadPemLocal("secp256r1.private.pem")),
+            arguments(loadSerializedLocal("rsa.private.json"), loadPemLocal("rsa.private.pem")),
             // public
-            arguments(loadResource("serialized/ed25519.public.json"), loadPem("ed25519.public.pem")),
-            arguments(loadResource("serialized/secp256k1.public.json"), loadPem("secp256k1.public.pem")),
-            arguments(loadResource("serialized/secp256r1.public.json"), loadPem("secp256r1.public.pem")),
-            arguments(loadResource("serialized/rsa.public.json"), loadPem("rsa.public.pem")),
+            arguments(loadSerializedLocal("ed25519.public.json"), loadPemLocal("ed25519.public.pem")),
+            arguments(loadSerializedLocal("secp256k1.public.json"), loadPemLocal("secp256k1.public.pem")),
+            arguments(loadSerializedLocal("secp256r1.public.json"), loadPemLocal("secp256r1.public.pem")),
+            arguments(loadSerializedLocal("rsa.public.json"), loadPemLocal("rsa.public.pem")),
         )
     }
 }

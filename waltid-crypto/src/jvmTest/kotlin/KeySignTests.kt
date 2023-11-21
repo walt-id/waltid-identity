@@ -1,4 +1,4 @@
-import TestUtils.loadResource
+import TestUtils.loadSerializedLocal
 import id.walt.crypto.keys.KeySerialization
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
@@ -25,7 +25,7 @@ class KeySignTests {
         keyFile: String
     ) = runTest {
         // given
-        val key = KeySerialization.deserializeKey(loadResource("serialized/$keyFile")).getOrThrow()
+        val key = KeySerialization.deserializeKey(loadSerializedLocal(keyFile)).getOrThrow()
         // when
         val signature = key.signJws(payload.toString().encodeToByteArray())
         val verificationResult = key.getPublicKey().verifyJws(signature)
@@ -39,7 +39,7 @@ class KeySignTests {
     @Disabled // not implemented
     fun `given key and payload, when signing raw then the result is a valid signature`(keyFile: String) = runTest {
         // given
-        val key = KeySerialization.deserializeKey(loadResource("serialized/$keyFile")).getOrThrow()
+        val key = KeySerialization.deserializeKey(loadSerializedLocal(keyFile)).getOrThrow()
         // when
         val signature = key.signRaw(payload.toString().encodeToByteArray())
         val verificationResult = key.getPublicKey().verifyRaw(signature as ByteArray)
