@@ -17,24 +17,19 @@
 
 ### Platforms available:
 
-- Java / JVM
-- JS / Node.js or WebCrypto
-- Native / libsodium & OpenSSL (todo)
+- Java: JVM
+- JS: Node.js or WebCrypto
+- Native: libsodium & OpenSSL (todo)
+- WebAssembly (WASM): (todo)
 
 ### Signature schemes available:
 
-|  EdDSA  | JOSE ID | Description        |
-|:-------:|:-------:|:-------------------|
-| Ed25519 |  EdDSA  | EdDSA + Curve25519 |
-
-|   ECDSA   | JOSE ID | Description                                                     |
-|:---------:|:-------:|:----------------------------------------------------------------|
-| secp256r1 |  ES256  | ECDSA + SECG curve secp256r1 ("NIST P-256")                     |
-| secp256k1 | ES256K  | ECDSA + SECG curve secp256k1 (Koblitz curve as used in Bitcoin) |
-
-| RSA | JOSE ID |
-|:---:|:-------:|
-| RSA |  RS256  |
+| Type  |   ECDSA   | JOSE ID | Description                                                     |
+|:-----:|:---------:|:-------:|:----------------------------------------------------------------|
+| EdDSA |  Ed25519  |  EdDSA  | EdDSA + Curve25519                                              |
+| ECDSA | secp256r1 |  ES256  | ECDSA + SECG curve secp256r1 ("NIST P-256")                     |
+| ECDSA | secp256k1 | ES256K  | ECDSA + SECG curve secp256k1 (Koblitz curve as used in Bitcoin) |
+|  RSA  |    RSA    |  RS256  | RSA                                                             |
 
 ### Compatibility matrix:
 
@@ -69,15 +64,22 @@ docker build -t waltid/verifier -f docker/verifier.Dockerfile .
 docker run -p 7001:7001 waltid/verifier --webHost=0.0.0.0 --webPort=7001 --baseUrl=http://localhost:7001
 ```
 
-### Setup Vault
+### (Optional) Setup Vault
 
-#### Download
+#### apt
 
+```shell
 wget -O- https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
 echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo
 tee /etc/apt/sources.list.d/hashicorp.list
 sudo apt update && sudo apt install vault
+```
 
-#### Run Vault in Dev mode
-
+```shell
 vault server -dev -dev-root-token-id="dev-only-token"
+```
+#### Docker
+
+```shell
+docker run -p 8200:8200 --cap-add=IPC_LOCK -e VAULT_DEV_ROOT_TOKEN_ID=myroot -e VAULT_DEV_LISTEN_ADDRESS=0.0.0.0:8200 hashicorp/vault
+```
