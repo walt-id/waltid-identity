@@ -7,10 +7,77 @@ import io.ktor.http.*
 import io.ktor.util.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import org.junit.jupiter.api.AfterAll
+import org.junit.jupiter.api.BeforeAll
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.condition.EnabledIf
 import kotlin.test.Test
 
 class TSEKeyTest {
+    private val payload = JsonObject(
+        mapOf(
+            "sub" to JsonPrimitive("16bb17e0-e733-4622-9384-122bc2fc6290"),
+            "iss" to JsonPrimitive("http://localhost:3000"),
+            "aud" to JsonPrimitive("TOKEN"),
+        )
+    )
+
+    fun getPublicKeyRepresentation() = runTest {
+
+    }
+
+    fun getPublicKey() = runTest {
+
+    }
+
+    fun getKeyType() = runTest {
+
+    }
+
+    fun getHasPrivateKey() = runTest {
+
+    }
+
+    fun signRaw() = runTest {
+
+    }
+
+    fun signJws() = runTest {
+
+    }
+
+    fun getKeyId() = runTest {
+
+    }
+
+    fun verifyJws() = runTest {
+
+    }
+
+    fun exportJWK() = runTest {
+
+    }
+
+    fun exportJWKObject() = runTest {
+
+    }
+
+    fun exportPEM() = runTest {
+
+    }
+
+
+
+    @Test
+    @EnabledIf("hostCondition")
+    @Disabled
+    fun testAll() = runTest {
+        keys.forEach {
+            exampleKeySignRaw(it)
+        }
+    }
 
     private suspend fun exampleKeySignRaw(key: TSEKey) {
         try {
@@ -30,21 +97,25 @@ class TSEKeyTest {
         }
     }
 
-    @Test
-    @EnabledIf("hostCondition")
-    fun testAll() = runTest {
-        val tseMetadata = TSEKeyMetadata("http://127.0.0.1:8200/v1/transit", "dev-only-token")
-
-        listOf(
-            TSEKey.generate(KeyType.Ed25519, tseMetadata),
-            TSEKey.generate(KeyType.RSA, tseMetadata),
-            TSEKey.generate(KeyType.secp256r1, tseMetadata)
-        ).forEach {
-            exampleKeySignRaw(it)
+    companion object {
+        private lateinit var keys: List<TSEKey>
+        @JvmStatic
+        @BeforeAll
+        fun initKeys() = runTest {
+            hostCondition().takeIf { it }?.run {
+                val tseMetadata = TSEKeyMetadata("http://127.0.0.1:8200/v1/transit", "dev-only-token")
+                keys = enumValues<KeyType>().map { TSEKey.generate(KeyType.Ed25519, tseMetadata) }
+            }
         }
-    }
 
-    private fun hostCondition() = runCatching {
-        runBlocking { HttpClient().get("http://127.0.0.1:8200") }.status == HttpStatusCode.OK
-    }.fold(onSuccess = { true }, onFailure = { false })
+        @JvmStatic
+        @AfterAll
+        fun cleanup() = runTest {
+            hostCondition().takeIf { it }?.run { keys.forEach { it.delete() } }
+        }
+
+        private fun hostCondition() = runCatching {
+            runBlocking { HttpClient().get("http://127.0.0.1:8200") }.status == HttpStatusCode.OK
+        }.fold(onSuccess = { true }, onFailure = { false })
+    }
 }
