@@ -39,6 +39,7 @@
 
 
 ## Feature set status
+
 <table>
     <tbody>
         <!-- header -->
@@ -72,10 +73,10 @@
             <td align="center" rowspan="3">export</td>
             <td align="center">jwk</td>
             <!-- local -->
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
             <!-- tse -->
             <td align="center">&dash;</td>
             <td align="center">&dash;</td>
@@ -86,10 +87,10 @@
         <tr>
             <td align="center">pem</td>
             <!-- local -->
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
             <!-- tse -->
             <td align="center">&dash;</td>
             <td align="center">&dash;</td>
@@ -100,10 +101,10 @@
         <tr>
             <td align="center">JsonObject</td>
             <!-- local -->
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
             <!-- tse -->
             <td align="center">&dash;</td>
             <td align="center">&dash;</td>
@@ -118,10 +119,10 @@
             <td align="center" rowspan="3">import</td>
             <td align="center">jwk</td>
             <!-- local -->
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
             <!-- tse -->
             <td align="center">&dash;</td>
             <td align="center">&dash;</td>
@@ -132,10 +133,10 @@
         <tr>
             <td align="center">pem</td>
             <!-- local -->
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
             <!-- tse -->
             <td align="center">&dash;</td>
             <td align="center">&dash;</td>
@@ -146,10 +147,10 @@
         <tr>
             <td align="center">raw</td>
             <!-- local -->
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
+            <td align="center">&check;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
             <!-- tse -->
             <td align="center">&dash;</td>
             <td align="center">&dash;</td>
@@ -164,10 +165,10 @@
             <td align="center" rowspan="2">sign</td>
             <td align="center">jws</td>
             <!-- local -->
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
             <!-- tse -->
             <td align="center">&dash;</td>
             <td align="center">&dash;</td>
@@ -178,10 +179,10 @@
         <tr>
             <td align="center">raw</td>
             <!-- local -->
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
             <!-- tse -->
             <td align="center">&dash;</td>
             <td align="center">&dash;</td>
@@ -196,10 +197,10 @@
             <td align="center" rowspan="2">verify</td>
             <td align="center">jws</td>
             <!-- local -->
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
             <!-- tse -->
             <td align="center">&dash;</td>
             <td align="center">&dash;</td>
@@ -210,10 +211,10 @@
         <tr>
             <td align="center">raw</td>
             <!-- local -->
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
             <!-- tse -->
             <td align="center">&dash;</td>
             <td align="center">&dash;</td>
