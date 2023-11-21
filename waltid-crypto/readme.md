@@ -1,186 +1,230 @@
+# walt.id Crypto
+
+## Platforms available:
+
+- Java / JVM
+- JS / Node.js or WebCrypto
+- Native / libsodium & OpenSSL (todo)
+
+## Signature schemes available:
+
+|  EdDSA  | JOSE ID | Description        |
+|:-------:|:-------:|:-------------------|
+| Ed25519 |  EdDSA  | EdDSA + Curve25519 |
+
+|   ECDSA   | JOSE ID | Description                                                     |
+|:---------:|:-------:|:----------------------------------------------------------------|
+| secp256r1 |  ES256  | ECDSA + SECG curve secp256r1 ("NIST P-256")                     |
+| secp256k1 | ES256K  | ECDSA + SECG curve secp256k1 (Koblitz curve as used in Bitcoin) |
+
+| RSA | JOSE ID |
+|:---:|:-------:|
+| RSA |  RS256  |
+
+## Compatibility matrix:
+
+### JWS (recommended)
+
+| Algorithm | JVM provider |   JS provider / platform    |
+|:---------:|:------------:|:---------------------------:|
+|   EdDSA   | Nimbus JOSE  |       jose / Node.js        |
+|   ES256   | Nimbus JOSE  | jose / Node.js & Web Crypto |
+|  ES256K   | Nimbus JOSE  |       jose / Node.js        |
+|   RS256   | Nimbus JOSE  | jose / Node.js & Web Crypto |
+
+### LD Signatures (happy to add upon request - office@walt.id)
+
+|            Suite            |    JVM provider    |    JS provider    |
+|:---------------------------:|:------------------:|:-----------------:|
+|    Ed25519Signature2018     | ld-signatures-java |                   |
+|    Ed25519Signature2020     | ld-signatures-java | jsonld-signatures |
+| EcdsaSecp256k1Signature2019 | ld-signatures-java |                   |
+|      RsaSignature2018       | ld-signatures-java |                   |
+|    JsonWebSignature2020     | ld-signatures-java |                   |
 
 
 
-<table style="text-align:center">
+## Feature set status
+<table>
     <tbody>
         <!-- header -->
         <tr>
-            <td rowspan="3">Feature</td>
-            <td rowspan="3">Category</td>
-            <td colspan="8">Key</td>
+            <td align="center" rowspan="3">Feature</td>
+            <td align="center" rowspan="3">Category</td>
+            <td align="center" colspan="8">Key</td>
         </tr>
         <!-- sub-header key type -->
         <tr>
-            <td colspan="4">Local</td>
-            <td colspan="4">TSE</td>
+            <td align="center" colspan="4">Local</td>
+            <td align="center" colspan="4">TSE</td>
         </tr>
         <!-- sub-sub-header key algorithm -->
         <tr>
             <!-- local -->
-            <td>ed25519</td>
-            <td>secp256k1</td>
-            <td>secp256r1</td>
-            <td>rsa</td>
+            <td align="center">ed25519</td>
+            <td align="center">secp256k1</td>
+            <td align="center">secp256r1</td>
+            <td align="center">rsa</td>
             <!-- tse -->
-            <td>ed25519</td>
-            <td>secp256k1</td>
-            <td>secp256r1</td>
-            <td>rsa</td>
+            <td align="center">ed25519</td>
+            <td align="center">secp256k1</td>
+            <td align="center">secp256r1</td>
+            <td align="center">rsa</td>
         </tr>
         <!-- content -->
         <!-- export -->
         <!-- jwk -->
         <tr>
-            <td rowspan="3">export</td>
-            <td>jwk</td>
+            <td align="center" rowspan="3">export</td>
+            <td align="center">jwk</td>
             <!-- local -->
-            <td>&dash;</td>
-            <td>&dash;</td>
-            <td>&dash;</td>
-            <td>&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
             <!-- tse -->
-            <td>&dash;</td>
-            <td>&dash;</td>
-            <td>&dash;</td>
-            <td>&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
         </tr>
         <!-- pem -->
         <tr>
-            <td>pem</td>
+            <td align="center">pem</td>
             <!-- local -->
-            <td>&dash;</td>
-            <td>&dash;</td>
-            <td>&dash;</td>
-            <td>&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
             <!-- tse -->
-            <td>&dash;</td>
-            <td>&dash;</td>
-            <td>&dash;</td>
-            <td>&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
         </tr>
         <!-- JsonObject -->
         <tr>
-            <td>JsonObject</td>
+            <td align="center">JsonObject</td>
             <!-- local -->
-            <td>&dash;</td>
-            <td>&dash;</td>
-            <td>&dash;</td>
-            <td>&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
             <!-- tse -->
-            <td>&dash;</td>
-            <td>&dash;</td>
-            <td>&dash;</td>
-            <td>&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
         </tr>
         <!-- end export -->
-        <tr><td colspan="10"></td></tr>
+        <tr><td align="center" colspan="10"></td></tr>
         <!-- import -->
         <!-- jwk -->
         <tr>
-            <td rowspan="3">import</td>
-            <td>jwk</td>
+            <td align="center" rowspan="3">import</td>
+            <td align="center">jwk</td>
             <!-- local -->
-            <td>&dash;</td>
-            <td>&dash;</td>
-            <td>&dash;</td>
-            <td>&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
             <!-- tse -->
-            <td>&dash;</td>
-            <td>&dash;</td>
-            <td>&dash;</td>
-            <td>&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
         </tr>
         <!-- pem -->
         <tr>
-            <td>pem</td>
+            <td align="center">pem</td>
             <!-- local -->
-            <td>&dash;</td>
-            <td>&dash;</td>
-            <td>&dash;</td>
-            <td>&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
             <!-- tse -->
-            <td>&dash;</td>
-            <td>&dash;</td>
-            <td>&dash;</td>
-            <td>&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
         </tr>
         <!-- raw -->
         <tr>
-            <td>raw</td>
+            <td align="center">raw</td>
             <!-- local -->
-            <td>&dash;</td>
-            <td>&dash;</td>
-            <td>&dash;</td>
-            <td>&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
             <!-- tse -->
-            <td>&dash;</td>
-            <td>&dash;</td>
-            <td>&dash;</td>
-            <td>&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
         </tr>
         <!-- end import -->
-        <tr><td colspan="10"></td></tr>
+        <tr><td align="center" colspan="10"></td></tr>
         <!-- sign -->
         <!-- jws -->
         <tr>
-            <td rowspan="2">sign</td>
-            <td>jws</td>
+            <td align="center" rowspan="2">sign</td>
+            <td align="center">jws</td>
             <!-- local -->
-            <td>&dash;</td>
-            <td>&dash;</td>
-            <td>&dash;</td>
-            <td>&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
             <!-- tse -->
-            <td>&dash;</td>
-            <td>&dash;</td>
-            <td>&dash;</td>
-            <td>&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
         </tr>
         <!-- raw -->
         <tr>
-            <td>raw</td>
+            <td align="center">raw</td>
             <!-- local -->
-            <td>&dash;</td>
-            <td>&dash;</td>
-            <td>&dash;</td>
-            <td>&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
             <!-- tse -->
-            <td>&dash;</td>
-            <td>&dash;</td>
-            <td>&dash;</td>
-            <td>&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
         </tr>
         <!-- end sign -->
-        <tr><td colspan="10"></td></tr>
+        <tr><td align="center" colspan="10"></td></tr>
         <!-- verify -->
         <!-- jws -->
         <tr>
-            <td rowspan="2">verify</td>
-            <td>jws</td>
+            <td align="center" rowspan="2">verify</td>
+            <td align="center">jws</td>
             <!-- local -->
-            <td>&dash;</td>
-            <td>&dash;</td>
-            <td>&dash;</td>
-            <td>&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
             <!-- tse -->
-            <td>&dash;</td>
-            <td>&dash;</td>
-            <td>&dash;</td>
-            <td>&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
         </tr>
         <!-- raw -->
         <tr>
-            <td>raw</td>
+            <td align="center">raw</td>
             <!-- local -->
-            <td>&dash;</td>
-            <td>&dash;</td>
-            <td>&dash;</td>
-            <td>&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
             <!-- tse -->
-            <td>&dash;</td>
-            <td>&dash;</td>
-            <td>&dash;</td>
-            <td>&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
         </tr>
         <!-- end verify -->
     </tbody>

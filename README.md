@@ -11,52 +11,6 @@
 | W3C VC          | JSON-LD / Soon | Signature type not recommended for new applications |
 | mdoc            | COSE1          | Supports mDL & mID                                  |
 
-## walt.id CoreCrypto
-
-## Supported
-
-### Platforms available:
-
-- Java / JVM
-- JS / Node.js or WebCrypto
-- Native / libsodium & OpenSSL (todo)
-
-### Signature schemes available:
-
-|  EdDSA  | JOSE ID | Description        |
-|:-------:|:-------:|:-------------------|
-| Ed25519 |  EdDSA  | EdDSA + Curve25519 |
-
-|   ECDSA   | JOSE ID | Description                                                     |
-|:---------:|:-------:|:----------------------------------------------------------------|
-| secp256r1 |  ES256  | ECDSA + SECG curve secp256r1 ("NIST P-256")                     |
-| secp256k1 | ES256K  | ECDSA + SECG curve secp256k1 (Koblitz curve as used in Bitcoin) |
-
-| RSA | JOSE ID |
-|:---:|:-------:|
-| RSA |  RS256  |
-
-### Compatibility matrix:
-
-#### JWS (recommended)
-
-| Algorithm | JVM provider |   JS provider / platform    |
-|:---------:|:------------:|:---------------------------:|
-|   EdDSA   | Nimbus JOSE  |       jose / Node.js        |
-|   ES256   | Nimbus JOSE  | jose / Node.js & Web Crypto |
-|  ES256K   | Nimbus JOSE  |       jose / Node.js        |
-|   RS256   | Nimbus JOSE  | jose / Node.js & Web Crypto |
-
-#### LD Signatures (happy to add upon request - office@walt.id)
-
-|            Suite            |    JVM provider    |    JS provider    |
-|:---------------------------:|:------------------:|:-----------------:|
-|    Ed25519Signature2018     | ld-signatures-java |                   |
-|    Ed25519Signature2020     | ld-signatures-java | jsonld-signatures |
-| EcdsaSecp256k1Signature2019 | ld-signatures-java |                   |
-|      RsaSignature2018       | ld-signatures-java |                   |
-|    JsonWebSignature2020     | ld-signatures-java |                   |
-
 ## Docker container builds:
 
 ```shell
