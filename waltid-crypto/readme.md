@@ -84,10 +84,10 @@
             <td align="center">&check;</td>
             <td align="center">&check;</td>
             <!-- tse -->
+            <td align="center">&cross;</td>
             <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
         </tr>
         <!-- pem -->
         <tr>
@@ -98,10 +98,10 @@
             <td align="center">&cross;</td>
             <td align="center">&cross;</td>
             <!-- tse -->
+            <td align="center">&cross;</td>
             <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
         </tr>
         <!-- JsonObject -->
         <tr>
@@ -112,10 +112,10 @@
             <td align="center">&check;</td>
             <td align="center">&check;</td>
             <!-- tse -->
+            <td align="center">&cross;</td>
             <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
         </tr>
         <!-- end export -->
         <tr><td align="center" colspan="10"></td></tr>
@@ -130,10 +130,10 @@
             <td align="center">&check;</td>
             <td align="center">&check;</td>
             <!-- tse -->
+            <td align="center">&cross;</td>
             <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
         </tr>
         <!-- pem -->
         <tr>
@@ -144,10 +144,10 @@
             <td align="center">&check;</td>
             <td align="center">&check;</td>
             <!-- tse -->
+            <td align="center">&cross;</td>
             <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
         </tr>
         <!-- raw -->
         <tr>
@@ -158,10 +158,10 @@
             <td align="center">&cross;</td>
             <td align="center">&cross;</td>
             <!-- tse -->
+            <td align="center">&cross;</td>
             <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
         </tr>
         <!-- end import -->
         <tr><td align="center" colspan="10"></td></tr>
@@ -176,10 +176,10 @@
             <td align="center">&check;</td>
             <td align="center">&check;</td>
             <!-- tse -->
+            <td align="center">&cross;</td>
             <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
         </tr>
         <!-- raw -->
         <tr>
@@ -190,10 +190,10 @@
             <td align="center">&check;</td>
             <td align="center">&check;</td>
             <!-- tse -->
+            <td align="center">&cross;</td>
             <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
         </tr>
         <!-- end sign -->
         <tr><td align="center" colspan="10"></td></tr>
@@ -208,10 +208,10 @@
             <td align="center">&check;</td>
             <td align="center">&check;</td>
             <!-- tse -->
+            <td align="center">&cross;</td>
             <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
         </tr>
         <!-- raw -->
         <tr>
@@ -222,10 +222,10 @@
             <td align="center">&cross;</td>
             <td align="center">&cross;</td>
             <!-- tse -->
+            <td align="center">&cross;</td>
             <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
         </tr>
         <!-- end verify -->
     </tbody>
