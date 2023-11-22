@@ -45,7 +45,7 @@
         <!-- header -->
         <tr>
             <td align="center" rowspan="3">Feature</td>
-            <td align="center" rowspan="3">Category</td>
+            <td align="center" rowspan="3" colspan="2">Category</td>
             <td align="center" colspan="8">Key</td>
         </tr>
         <!-- sub-header key type -->
@@ -67,103 +67,11 @@
             <td align="center">rsa</td>
         </tr>
         <!-- content -->
-        <!-- export -->
-        <!-- jwk -->
-        <tr>
-            <td align="center" rowspan="3">export</td>
-            <td align="center">jwk</td>
-            <!-- local -->
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <!-- tse -->
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-        </tr>
-        <!-- pem -->
-        <tr>
-            <td align="center">pem</td>
-            <!-- local -->
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-            <!-- tse -->
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-        </tr>
-        <!-- JsonObject -->
-        <tr>
-            <td align="center">JsonObject</td>
-            <!-- local -->
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <!-- tse -->
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-        </tr>
-        <!-- end export -->
-        <tr><td align="center" colspan="10"></td></tr>
-        <!-- import -->
-        <!-- jwk -->
-        <tr>
-            <td align="center" rowspan="3">import</td>
-            <td align="center">jwk</td>
-            <!-- local -->
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <!-- tse -->
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-        </tr>
-        <!-- pem -->
-        <tr>
-            <td align="center">pem</td>
-            <!-- local -->
-            <td align="center">&cross;</td>
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <!-- tse -->
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-        </tr>
-        <!-- raw -->
-        <tr>
-            <td align="center">raw</td>
-            <!-- local -->
-            <td align="center">&check;</td>
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-            <!-- tse -->
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-        </tr>
-        <!-- end import -->
-        <tr><td align="center" colspan="10"></td></tr>
         <!-- sign -->
         <!-- jws -->
         <tr>
             <td align="center" rowspan="2">sign</td>
-            <td align="center">jws</td>
+            <td align="center" colspan="2">jws</td>
             <!-- local -->
             <td align="center">&check;</td>
             <td align="center">&check;</td>
@@ -177,7 +85,7 @@
         </tr>
         <!-- raw -->
         <tr>
-            <td align="center">raw</td>
+            <td align="center" colspan="2">raw</td>
             <!-- local -->
             <td align="center">&check;</td>
             <td align="center">&check;</td>
@@ -195,7 +103,7 @@
         <!-- jws -->
         <tr>
             <td align="center" rowspan="2">verify</td>
-            <td align="center">jws</td>
+            <td align="center" colspan="2">jws</td>
             <!-- local -->
             <td align="center">&check;</td>
             <td align="center">&check;</td>
@@ -209,7 +117,7 @@
         </tr>
         <!-- raw -->
         <tr>
-            <td align="center">raw</td>
+            <td align="center" colspan="2">raw</td>
             <!-- local -->
             <td align="center">&cross;</td>
             <td align="center">&cross;</td>
@@ -222,5 +130,193 @@
             <td align="center">&check;</td>
         </tr>
         <!-- end verify -->
+        <tr><td align="center" colspan="10"></td></tr>
+        <!-- export -->
+        <!-- jwk -->
+        <!-- private -->
+        <tr>
+            <td align="center" rowspan="6">export</td>
+            <td align="center" rowspan="2">jwk</td>
+            <td align="center">private</td>
+            <!-- local -->
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <!-- tse -->
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+        </tr>
+        <!-- public -->
+        <tr>
+            <td align="center">public</td>
+            <!-- local -->
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <!-- tse -->
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+        </tr>
+        <!-- pem -->
+        <!-- private -->
+        <tr>
+            <td align="center" rowspan="2">pem</td>
+            <td align="center">private</td>
+            <!-- local -->
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <!-- tse -->
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+        </tr>
+        <!-- public -->
+        <tr>
+            <td align="center">public</td>
+            <!-- local -->
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <!-- tse -->
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+        </tr>
+        <!-- JsonObject -->
+        <!-- private -->
+        <tr>
+            <td align="center" rowspan="2">JsonObject</td>
+            <td align="center">private</td>
+            <!-- local -->
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <!-- tse -->
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+        </tr>
+        <!-- public -->
+        <tr>
+            <td align="center">public</td>
+            <!-- local -->
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <!-- tse -->
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+        </tr>
+        <!-- end export -->
+        <tr><td align="center" colspan="11"></td></tr>
+        <!-- import -->
+        <!-- jwk -->
+        <!-- private -->
+        <tr>
+            <td align="center" rowspan="6">import</td>
+            <td align="center" rowspan="2">jwk</td>
+            <td align="center">private</td>
+            <!-- local -->
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <!-- tse -->
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+        </tr>
+        <!-- public -->
+        <tr>
+            <td align="center">public</td>
+            <!-- local -->
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <!-- tse -->
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+        </tr>
+        <!-- pem -->
+        <!-- private -->
+        <tr>
+            <td align="center" rowspan="2">pem</td>
+            <td align="center">private</td>
+            <!-- local -->
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <!-- tse -->
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+        </tr>
+        <!-- public -->
+        <tr>
+            <td align="center">public</td>
+            <!-- local -->
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <!-- tse -->
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+        </tr>
+        <!-- raw -->
+        <!-- private -->
+        <tr>
+            <td align="center" rowspan="2">raw</td>
+            <td align="center">private</td>
+            <!-- local -->
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <!-- tse -->
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+        </tr>
+        <!-- public -->
+        <tr>
+            <td align="center">public</td>
+            <!-- local -->
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <!-- tse -->
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+        </tr>
+        <!-- end import -->
     </tbody>
 </table>
