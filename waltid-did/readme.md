@@ -1,5 +1,5 @@
 <div align="center">
- <h1>walt.id did-lib - Kotlin multiplatform library</h1>
+ <h1>Kotlin Multiplatform DID library</h1>
  <span>by </span><a href="https://walt.id">walt.id</a>
 
 [![CI/CD Workflow for walt.id did]()]()
@@ -107,7 +107,68 @@ The Did Document data is represented as `JsonObject`. The key data is
 represented as **_walt.id crypto_** `Key`.
 
 
-## Feature set status
+## Local DID operations implemented natively
+
+<table>
+    <tbody>
+        <!-- header -->
+        <tr>
+            <td align="center" rowspan="2">Method</td>
+            <td align="center" colspan="3">Feature</td>
+        </tr>
+        <!-- function sub-header -->
+        <tr>
+            <td align="center">create</td>
+            <td align="center">register</td>
+            <td align="center">resolve</td>
+        </tr>
+        <!-- content -->
+        <!-- key -->
+        <tr>
+            <td align="center">key</td>
+            <td align="center">&check;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&check;</td>
+        </tr>
+        <!-- jwk -->
+        <tr>
+            <td align="center">jwk</td>
+            <td align="center">&check;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&check;</td>
+        </tr>
+        <!-- web -->
+        <tr>
+            <td align="center">web</td>
+            <td align="center">&check;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+        </tr>
+        <!-- cheqd -->
+        <tr>
+            <td align="center">cheqd</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&cross;</td>
+        </tr>
+        <!-- ebsi -->
+        <tr>
+            <td align="center">ebsi</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+        </tr>
+        <!-- iota -->
+        <tr>
+            <td align="center">iota</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+        </tr>
+    </tbody>
+</table>
+
+## Remote DID operations by 3d party services (fallback)
 
 <table>
     <tbody>
@@ -126,19 +187,19 @@ represented as **_walt.id crypto_** `Key`.
         <tr>
             <td align="center">key</td>
             <td align="center">&check;</td>
-            <td align="center">&check;</td>
+            <td align="center">&dash;</td>
         </tr>
         <!-- jwk -->
         <tr>
             <td align="center">jwk</td>
             <td align="center">&check;</td>
-            <td align="center">&check;</td>
+            <td align="center">&dash;</td>
         </tr>
         <!-- web -->
         <tr>
             <td align="center">web</td>
             <td align="center">&check;</td>
-            <td align="center">&check;</td>
+            <td align="center">&cross;</td>
         </tr>
         <!-- cheqd -->
         <tr>
