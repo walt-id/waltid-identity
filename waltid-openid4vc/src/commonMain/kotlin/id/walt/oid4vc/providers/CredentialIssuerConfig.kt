@@ -4,6 +4,6 @@ import id.walt.oid4vc.data.CredentialSupported
 import kotlinx.serialization.Serializable
 
 @Serializable
-class CredentialIssuerConfig(
+open class CredentialIssuerConfig(
     val credentialsSupported: List<CredentialSupported> = listOf()
 ) : OpenIDProviderConfig()
