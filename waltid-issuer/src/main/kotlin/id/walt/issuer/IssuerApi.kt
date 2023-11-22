@@ -184,7 +184,7 @@ fun Application.issuerApi() {
                         OidcApi.setIssuanceDataForIssuanceId(
                             issuanceSession.id,
                             listOf(CIProvider.IssuanceSessionData(key, issuerDid, issuanceRequest))
-                        )
+                        )  // TODO: Hack as this is non stateless because of oidc4vc lib API
                         println("issuanceSession: $issuanceSession")
 
                         val offerRequest = CredentialOfferRequest(issuanceSession.credentialOffer!!)
@@ -248,7 +248,7 @@ fun Application.issuerApi() {
                                     KeySerialization.deserializeKey(it.issuanceKey).getOrThrow(), it.issuerDid, it
                                 )
                             }
-                        )
+                        )  // TODO: Hack as this is non stateless because of oidc4vc lib API
                         println("issuanceSession: $issuanceSession")
 
                         val offerRequest = CredentialOfferRequest(issuanceSession.credentialOffer!!)
@@ -323,7 +323,7 @@ fun Application.issuerApi() {
                         OidcApi.setIssuanceDataForIssuanceId(
                             issuanceSession.id,
                             listOf(CIProvider.IssuanceSessionData(key, issuerDid, req))
-                        )
+                        )  // TODO: Hack as this is non stateless because of oidc4vc lib API
                         println("issuanceSession: $issuanceSession")
 
                         val offerRequest = CredentialOfferRequest(issuanceSession.credentialOffer!!)

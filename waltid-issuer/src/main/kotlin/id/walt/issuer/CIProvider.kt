@@ -331,15 +331,21 @@ open class CIProvider : OpenIDCredentialIssuer(
         val issuerKey: Key, val issuerDid: String, val request: BaseIssuanceRequest
     )
 
+    // TODO: Hack as this is non stateless because of oidc4vc lib API
     private val sessionCredentialPreMapping = HashMap<String, List<IssuanceSessionData>>() // session id -> VC
+
+    // TODO: Hack as this is non stateless because of oidc4vc lib API
     private val tokenCredentialMapping = HashMap<String, List<IssuanceSessionData>>() // token -> VC
+
     //private val sessionTokenMapping = HashMap<String, String>() // session id -> token
 
+    // TODO: Hack as this is non stateless because of oidc4vc lib API
     fun setIssuanceDataForIssuanceId(issuanceId: String, data: List<IssuanceSessionData>) {
         println("DEPOSITED CREDENTIAL FOR ISSUANCE ID: $issuanceId")
         sessionCredentialPreMapping[issuanceId] = data
     }
 
+    // TODO: Hack as this is non stateless because of oidc4vc lib API
     fun mapSessionIdToToken(sessionId: String, token: String) {
         println("MAPPING SESSION ID TO TOKEN: $sessionId -->> $token")
         val premappedVc = sessionCredentialPreMapping.remove(sessionId)
