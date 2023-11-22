@@ -19,6 +19,9 @@ private fun statusCodeForException(cause: Throwable) = when (cause) {
 
 fun Application.configureStatusPages() {
     install(StatusPages) {
+        exception<NotFoundException> { call, ex ->
+            call.respond(HttpStatusCode.NotFound, ex.message ?: "Not found")
+        }
         exception<UnauthorizedException> { call, cause ->
             call.respond(HttpStatusCode.Unauthorized, cause.message ?: "")
         }

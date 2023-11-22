@@ -5,7 +5,7 @@ import com.github.jk1.license.render.ReportRenderer*/
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 object Versions {
-    const val KOTLIN_VERSION = "1.9.10" // also change 2 plugins
+    const val KOTLIN_VERSION = "1.9.20" // also change 2 plugins
     const val KTOR_VERSION = "2.3.6" // also change 1 plugin
     const val COROUTINES_VERSION = "1.7.3"
     const val EXPOSED_VERSION = "0.43.0"
@@ -16,8 +16,8 @@ plugins {
     kotlin("jvm") // Versions.KOTLIN_VERSION
     id("org.jetbrains.kotlin.plugin.serialization") // Versions.KOTLIN_VERSION
 
-    id("io.ktor.plugin") version "2.3.5" // Versions.KTOR_VERSION
-    id("org.owasp.dependencycheck") version "8.4.2"
+    id("io.ktor.plugin") version "2.3.6" // Versions.KTOR_VERSION
+    id("org.owasp.dependencycheck") version "8.4.3"
     id("com.github.jk1.dependency-license-report") version "2.5"
     application
     `maven-publish`
@@ -63,7 +63,7 @@ dependencies {
     implementation("io.ktor:ktor-server-cio-jvm:${Versions.KTOR_VERSION}")
 
     // Ktor server external libs
-    implementation("io.github.smiley4:ktor-swagger-ui:2.6.0")
+    implementation("io.github.smiley4:ktor-swagger-ui:2.7.1")
 
     // Ktor client
     implementation("io.ktor:ktor-client-core-jvm:${Versions.KTOR_VERSION}")
