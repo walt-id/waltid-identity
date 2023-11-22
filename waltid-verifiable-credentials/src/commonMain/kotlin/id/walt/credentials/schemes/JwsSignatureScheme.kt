@@ -53,9 +53,11 @@ class JwsSignatureScheme : SignatureScheme {
     suspend fun verify(data: String): Result<JsonObject> = runCatching {
         val jws = data.decodeJws()
 
+        val header = jws.header
         val payload = jws.payload
 
-        val issuerDid = payload[JwsOption.ISSUER]!!.jsonPrimitive.content
+        val issuerDid = (payload[JwsOption.ISSUER] ?: header[JwsHeader.KEY_ID])!!.jsonPrimitive.content
+
 //        val subjectDid = payload["sub"]!!.jsonPrimitive.content
 //        println("Issuer: $issuerDid")
 //        println("Subject: $subjectDid")
