@@ -64,7 +64,7 @@ class LocalKeyTest {
     @ValueSource(strings = ["ed25519.private.json", "secp256k1.private.json", "secp256r1.private.json", "rsa.private.json"])
     @Disabled // not implemented
     fun signRaw(keyFile: String) = runTest {
-        val key = KeySerialization.deserializeKey(loadSerializedLocal("$keyFile")).getOrThrow()
+        val key = KeySerialization.deserializeKey(loadSerializedLocal(keyFile)).getOrThrow()
         val signature = key.signRaw(payload.toString().encodeToByteArray())
         val verificationResult = key.getPublicKey().verifyRaw(signature as ByteArray)
         assertTrue(verificationResult.isSuccess)
@@ -74,7 +74,7 @@ class LocalKeyTest {
     @ParameterizedTest
     @ValueSource(strings = ["ed25519.private.json", "secp256k1.private.json", "secp256r1.private.json", "rsa.private.json"])
     fun signJws(keyFile: String) = runTest {
-        val key = KeySerialization.deserializeKey(loadSerializedLocal("$keyFile")).getOrThrow()
+        val key = KeySerialization.deserializeKey(loadSerializedLocal(keyFile)).getOrThrow()
         val signature = key.signJws(payload.toString().encodeToByteArray())
         val verificationResult = key.getPublicKey().verifyJws(signature)
         assertTrue(verificationResult.isSuccess)
@@ -213,9 +213,9 @@ class LocalKeyTest {
             arguments(loadSerializedLocal("rsa.private.json"), loadJwkLocal("rsa.private.json")),
             // public
             arguments(loadSerializedLocal("ed25519.public.json"), loadJwkLocal("ed25519.public.json")),
-            arguments(loadSerializedLocal("serialized/secp256k1.public.json"), loadJwkLocal("secp256k1.public.json")),
-            arguments(loadSerializedLocal("serialized/secp256r1.public.json"), loadJwkLocal("secp256r1.public.json")),
-            arguments(loadSerializedLocal("serialized/rsa.public.json"), loadJwkLocal("rsa.public.json")),
+            arguments(loadSerializedLocal("secp256k1.public.json"), loadJwkLocal("secp256k1.public.json")),
+            arguments(loadSerializedLocal("secp256r1.public.json"), loadJwkLocal("secp256r1.public.json")),
+            arguments(loadSerializedLocal("rsa.public.json"), loadJwkLocal("rsa.public.json")),
         )
 
         @JvmStatic
