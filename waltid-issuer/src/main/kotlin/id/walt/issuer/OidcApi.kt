@@ -127,7 +127,7 @@ object OidcApi : CIProvider() {
                     ).jsonObject["sub"]?.jsonPrimitive?.contentOrNull
                         ?: throw IllegalArgumentException("Could not get session ID from token response!")
                     val nonceToken = tokenResp.cNonce ?: throw IllegalArgumentException("No nonce token was responded with the tokenResp?")
-                    OidcApi.mapSessionIdToToken(sessionId, nonceToken)
+                    OidcApi.mapSessionIdToToken(sessionId, nonceToken)  // TODO: Hack as this is non stateless because of oidc4vc lib API
 
                     call.respond(tokenResp.toJSON())
                 } catch (exc: TokenError) {
