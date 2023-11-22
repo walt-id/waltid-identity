@@ -18,7 +18,7 @@ repositories {
 @OptIn(org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi::class)
 kotlin {
     jvm {
-        jvmToolchain(18) // 16 possible?
+        jvmToolchain(17) // 16 possible?
         withJava()
         testRuns["test"].executionTask.configure {
             useJUnitPlatform()
@@ -105,7 +105,7 @@ kotlin {
         }
         val jvmMain by getting {
             dependencies {
-                implementation("com.nimbusds:nimbus-jose-jwt:9.37")
+                implementation("com.nimbusds:nimbus-jose-jwt:9.37.1")
             }
         }
         val jvmTest by getting {
