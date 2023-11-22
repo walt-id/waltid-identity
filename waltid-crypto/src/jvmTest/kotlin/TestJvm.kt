@@ -2,6 +2,7 @@ import id.walt.crypto.keys.*
 import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.http.*
+import io.ktor.util.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.encodeToString
@@ -18,7 +19,7 @@ class TestJvm {
 
     @Test
     fun apiTestAll() = runTest {
-        KeyType.entries.forEach { runKeyCompleteFlow(it) }
+        KeyType.entries.forEach { exampleKeyCompleteFlow(it) }
     }
 
     @OptIn(DelicateCoroutinesApi::class)
@@ -45,26 +46,6 @@ class TestJvm {
 
             println("$keyType: Dispatch $dispatchMs ms, Signing: $signMs ms (for $n signatures)")
         }
-    }
-
-    @Test
-    fun exampleSignJwsLocalKey() = runTest {
-        val localKey by lazy { runBlocking { LocalKey.generate(KeyType.Ed25519) } }
-
-        val payload = JsonObject(
-            mapOf(
-                "sub" to JsonPrimitive("16bb17e0-e733-4622-9384-122bc2fc6290"),
-                "iss" to JsonPrimitive("http://localhost:3000"),
-                "aud" to JsonPrimitive("TOKEN"),
-            )
-        )
-
-        println("Signing JWS: $payload")
-        val signed = localKey.signJws(payload.toString().toByteArray())
-        println("Signed: $signed")
-
-        println("Verifying signed: $signed")
-        localKey.verifyJws(signed).also { println("Verified: $it") }
     }
 
     @Test
@@ -115,7 +96,7 @@ class TestJvm {
         assertEquals(testObj, res.getOrThrow())
     }
 
-    private suspend fun runKeyCompleteFlow(keyType: KeyType) {
+    private suspend fun exampleKeyCompleteFlow(keyType: KeyType) {
         val plaintext = JsonObject(
             mapOf("id" to JsonPrimitive("abc123-${keyType.name}-JVM"))
         )
@@ -169,6 +150,43 @@ class TestJvm {
         assertNotEquals("Key", key::class.simpleName)
 
         println()
+    }
+
+    fun exampleSignJwsLocalKey() = runTest {
+        val localKey by lazy { runBlocking { LocalKey.generate(KeyType.Ed25519) } }
+
+        val payload = JsonObject(
+            mapOf(
+                "sub" to JsonPrimitive("16bb17e0-e733-4622-9384-122bc2fc6290"),
+                "iss" to JsonPrimitive("http://localhost:3000"),
+                "aud" to JsonPrimitive("TOKEN"),
+            )
+        )
+
+        println("Signing JWS: $payload")
+        val signed = localKey.signJws(payload.toString().toByteArray())
+        println("Signed: $signed")
+
+        println("Verifying signed: $signed")
+        localKey.verifyJws(signed).also { println("Verified: $it") }
+    }
+
+    private suspend fun exampleSignRawTSEKey(key: TSEKey) {
+        try {
+            println("TSEKey: $key")
+            val plaintext = "This is a plaintext for ${key.keyType.name}... 123".encodeToByteArray()
+            println("Plaintext: ${plaintext.decodeToString()}")
+
+            val signed = key.signRaw(plaintext) as String
+            println("Signed: $signed")
+
+            val verified = key.verifyRaw(signed.decodeBase64Bytes(), plaintext)
+            println("Verified signature success: ${verified.isSuccess}")
+            println("Verified plaintext: ${verified.getOrNull()!!.decodeToString()}")
+        } finally {
+            println("Deleting $key...")
+            key.delete()
+        }
     }
 
     private fun hostCondition() = runCatching {
