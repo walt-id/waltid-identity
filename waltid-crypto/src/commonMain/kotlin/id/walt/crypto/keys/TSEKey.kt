@@ -31,7 +31,7 @@ class TSEKey(
     //private var publicKey: ByteArray? = null,
     //override var keyType: KeyType? = null
     private var _publicKey: ByteArray? = null, private var _keyType: KeyType? = null
-) : id.walt.crypto.keys.Key() {
+) : Key() {
 
     @Transient
     val retrievedKeyType by lazy { runBlocking { retrieveKeyType() } }
@@ -168,7 +168,7 @@ class TSEKey(
                 ?: throwTSEError("No keys/1/public_key in data response")
         ).value
 
-    override suspend fun getPublicKey(): id.walt.crypto.keys.Key {
+    override suspend fun getPublicKey(): Key {
         return LocalKey.importRawPublicKey(
             type = keyType,
             rawPublicKey = publicKey,
