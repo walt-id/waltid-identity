@@ -64,7 +64,7 @@ class LocalKeyTest {
     @ValueSource(strings = ["ed25519.private.json", "secp256k1.private.json", "secp256r1.private.json", "rsa.private.json"])
     @Disabled // not implemented
     fun signRaw(keyFile: String) = runTest {
-        val key = KeySerialization.deserializeKey(loadSerializedLocal("$keyFile")).getOrThrow()
+        val key = KeySerialization.deserializeKey(loadSerializedLocal(keyFile)).getOrThrow()
         val signature = key.signRaw(payload.toString().encodeToByteArray())
         val verificationResult = key.getPublicKey().verifyRaw(signature as ByteArray)
         assertTrue(verificationResult.isSuccess)
@@ -74,7 +74,7 @@ class LocalKeyTest {
     @ParameterizedTest
     @ValueSource(strings = ["ed25519.private.json", "secp256k1.private.json", "secp256r1.private.json", "rsa.private.json"])
     fun signJws(keyFile: String) = runTest {
-        val key = KeySerialization.deserializeKey(loadSerializedLocal("$keyFile")).getOrThrow()
+        val key = KeySerialization.deserializeKey(loadSerializedLocal(keyFile)).getOrThrow()
         val signature = key.signJws(payload.toString().encodeToByteArray())
         val verificationResult = key.getPublicKey().verifyJws(signature)
         assertTrue(verificationResult.isSuccess)
