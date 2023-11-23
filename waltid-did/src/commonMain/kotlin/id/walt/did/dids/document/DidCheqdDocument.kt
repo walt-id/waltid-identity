@@ -35,11 +35,14 @@ data class DidCheqdDocument(
 
     fun toMap() = Json.encodeToJsonElement(this).jsonObject.toMap()
 
-    constructor(didDoc: DidDocument, jwk: JsonObject) : this(
+    constructor(didDoc: DidDocument, jwk: JsonObject? = null) : this(
         context = DEFAULT_CONTEXT,
         id = didDoc.id,
-        verificationMethod = didDoc.verificationMethod.map {
-            VerificationMethod(it.id, "JsonWebKey2020", it.controller, jwk)
+        //TODO: publicKeyMultibase
+        verificationMethod = jwk?.let { key ->
+            didDoc.verificationMethod.map {
+                VerificationMethod(it.id, "JsonWebKey2020", it.controller, key)
+            }
         },
         authentication = didDoc.authentication,
         assertionMethod = didDoc.authentication,

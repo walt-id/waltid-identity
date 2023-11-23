@@ -39,10 +39,10 @@ class DidKeyRegistrarTest : DidRegistrarTestBase(DidKeyRegistrar()) {
         @JvmStatic
         fun `given did options with no key when register then returns a valid did result`(): Stream<Arguments> =
             Stream.of(
-//                arguments(DidKeyCreateOptions(useJwkJcsPub = true), ed25519DidAssertions),
-//                arguments(DidKeyCreateOptions(KeyType.Ed25519), ed25519DidAssertions),
-//                arguments(DidKeyCreateOptions(KeyType.RSA), rsaDidAssertions),
-//                arguments(DidKeyCreateOptions(KeyType.secp256k1), secp256DidAssertions),
+                arguments(DidKeyCreateOptions(useJwkJcsPub = true), ed25519DidAssertions),
+                arguments(DidKeyCreateOptions(KeyType.Ed25519), ed25519DidAssertions),
+                arguments(DidKeyCreateOptions(KeyType.RSA), rsaDidAssertions),
+                arguments(DidKeyCreateOptions(KeyType.secp256k1), secp256DidAssertions),
                 arguments(DidKeyCreateOptions(KeyType.secp256r1), secp256DidAssertions),
             )
 

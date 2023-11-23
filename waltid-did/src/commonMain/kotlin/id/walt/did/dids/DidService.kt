@@ -105,8 +105,9 @@ object DidService {
         getRegistrarForMethod(options.method).create(options)
     }
 
-    suspend fun registerByKey(method: String, key: Key, options: DidCreateOptions = DidCreateOptions(method, emptyMap())): DidResult =
-        getRegistrarForMethod(method).createByKey(key, options)
+    suspend fun registerByKey(
+        method: String, key: Key, options: DidCreateOptions = DidCreateOptions(method, emptyMap())
+    ): DidResult = getRegistrarForMethod(method).createByKey(key, options)
 
     fun update() {
         TODO("Not yet implemented")

@@ -34,7 +34,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.encodeToJsonElement
 
-class DidCheqdRegistrar() : LocalRegistrarMethod("cheqd") {
+class DidCheqdRegistrar : LocalRegistrarMethod("cheqd") {
 
     private val log = KotlinLogging.logger { }
 

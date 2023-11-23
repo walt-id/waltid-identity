@@ -7,14 +7,18 @@ import id.walt.crypto.keys.TSEKeyMetadata
 import id.walt.did.dids.DidService
 import id.walt.did.dids.registrar.dids.DidKeyCreateOptions
 import id.walt.did.helpers.WaltidServices
+import io.ktor.client.*
+import io.ktor.client.request.*
+import io.ktor.http.*
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.time.Duration.Companion.minutes
 
-class DidTest {
+class DidExamples {
 
-    val remoteKey = false
+    private val tseMetadata = TSEKeyMetadata("http://127.0.0.1:8200/v1/transit", "dev-only-token")
 
     @BeforeTest
     fun init() {
@@ -28,9 +32,6 @@ class DidTest {
 
     @Test
     fun listDidMethods() {
-//        println("Registrar: " + DidService.registrarMethods.toList().groupBy { it.second.name })
-//        println("Resolver: " + DidService.resolverMethods.toList().groupBy { it.second.name })
-
         println("Resolver:")
         println(
             groupDidList(DidService.resolverMethods.mapValues { it.value.name })
@@ -42,13 +43,12 @@ class DidTest {
         )
     }
 
-
-    val tseMetadata = TSEKeyMetadata("http://127.0.0.1:8200/v1/transit", "dev-only-token")
-
     @Test
-    fun createDidJwk() = runTest {
+    fun exampleCreateDidJwk() = runTest {
 
-        val key = if (remoteKey) TSEKey.generate(KeyType.Ed25519, tseMetadata) else LocalKey.generate(KeyType.Ed25519)
+        val key = if (isVaultAvailable()) TSEKey.generate(
+            KeyType.Ed25519, tseMetadata
+        ) else LocalKey.generate(KeyType.Ed25519)
 
         val did = DidService.registerByKey("jwk", key)
 
@@ -56,13 +56,19 @@ class DidTest {
     }
 
     @Test
-    fun createDidKeyJcs() = runTest {
+    fun exampleCreateDidKeyJcs() = runTest {
 
-        val key = if (remoteKey) TSEKey.generate(KeyType.Ed25519, tseMetadata) else LocalKey.generate(KeyType.Ed25519)
+        val key = if (isVaultAvailable()) TSEKey.generate(
+            KeyType.Ed25519, tseMetadata
+        ) else LocalKey.generate(KeyType.Ed25519)
 
         val options = DidKeyCreateOptions(KeyType.Ed25519, useJwkJcsPub = true)
         val did = DidService.registerByKey("key", key, options)
 
         println(did.didDocument.toJsonObject())
     }
+
+    private fun isVaultAvailable() = runCatching {
+        runBlocking { HttpClient().get("http://127.0.0.1:8200") }.status == HttpStatusCode.OK
+    }.fold(onSuccess = { it }, onFailure = { false })
 }

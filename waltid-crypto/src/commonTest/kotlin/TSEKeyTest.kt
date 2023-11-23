@@ -37,7 +37,7 @@ class TSEKeyTest {
     @ParameterizedTest
     @MethodSource
     fun getPublicKey(key: TSEKey?) = runTest {
-        assumeTrue(hostCondition())
+        assumeTrue(isVaultAvailable())
         assumeTrue(key != null)
         val publicKey = key!!.getPublicKey()
         assertTrue(!publicKey.hasPrivateKey)
@@ -55,7 +55,7 @@ class TSEKeyTest {
     @ParameterizedTest
     @MethodSource
     fun signRaw(key: TSEKey?) = runTest {
-        assumeTrue(hostCondition())
+        assumeTrue(isVaultAvailable())
         assumeTrue(key != null)
         val signed = key!!.signRaw(payload.toString().encodeToByteArray()) as String
         val verificationResult = key.verifyRaw(signed.decodeBase64Bytes(), payload.toString().encodeToByteArray())
@@ -66,7 +66,7 @@ class TSEKeyTest {
     @ParameterizedTest
     @MethodSource
     fun signJws(key: TSEKey?) = runTest {
-        assumeTrue(hostCondition())
+        assumeTrue(isVaultAvailable())
         val signed = key!!.signJws(payload.toString().encodeToByteArray())
         val verificationResult = key.verifyJws(signed)
         assertTrue(verificationResult.isSuccess)
@@ -99,7 +99,7 @@ class TSEKeyTest {
         @JvmStatic
         @BeforeAll
         fun initKeys() = runTest {
-            hostCondition().takeIf { it }?.let {
+            isVaultAvailable().takeIf { it }?.let {
                 val tseMetadata = TSEKeyMetadata("http://127.0.0.1:8200/v1/transit", "dev-only-token")
                 keys = enumValues<KeyType>().map { TSEKey.generate(KeyType.Ed25519, tseMetadata) }
             }
@@ -116,7 +116,7 @@ class TSEKeyTest {
         @JvmStatic
         fun signJws(): Stream<Arguments> = keys.map { arguments(it) }.asSequence().asStream()
 
-        private fun hostCondition() = runCatching {
+        private fun isVaultAvailable() = runCatching {
             runBlocking { HttpClient().get("http://127.0.0.1:8200") }.status == HttpStatusCode.OK
         }.fold(onSuccess = { it }, onFailure = { false })
     }

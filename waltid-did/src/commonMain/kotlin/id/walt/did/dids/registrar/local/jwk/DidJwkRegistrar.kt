@@ -17,7 +17,7 @@ class DidJwkRegistrar : LocalRegistrarMethod("jwk") {
     } ?: throw IllegalArgumentException("KeyType option not found.")
 
     override suspend fun registerByKey(key: Key, options: DidCreateOptions): DidResult {
-        val did = "did:jwk:${key.exportJWK().toByteArray().encodeToBase64Url()}"
+        val did = "did:jwk:${key.getPublicKey().exportJWK().toByteArray().encodeToBase64Url()}"
 
         val didDocument = DidDocument(
             DidJwkDocument(did, key.getPublicKey().exportJWKObject())
