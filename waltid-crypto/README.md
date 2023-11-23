@@ -320,3 +320,61 @@
         <!-- end import -->
     </tbody>
 </table>
+
+
+## Working with TSE keys
+
+A Hashicorp Vault's transit secret engine instance is required in order to be able to use
+`TSEKey` features.
+
+1. set up the vault
+2. enable a Transit Secrets Engine instance
+
+### Setup Vault
+
+#### Linux
+
+- [binary download](https://developer.hashicorp.com/vault/install)
+- package manager
+
+```shell
+wget -O- https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo
+tee /etc/apt/sources.list.d/hashicorp.list
+sudo apt update && sudo apt install vault
+```
+
+```shell
+vault server -dev -dev-root-token-id="dev-only-token"
+```
+
+#### Windows
+
+- [binary download](https://developer.hashicorp.com/vault/install)
+
+#### MacOS
+
+- [binary download](https://developer.hashicorp.com/vault/install)
+- package manager
+
+```shell
+brew tap hashicorp/tap
+brew install hashicorp/tap/vault
+```
+
+#### Docker
+
+```shell
+docker run -p 8200:8200 --cap-add=IPC_LOCK -e VAULT_DEV_ROOT_TOKEN_ID=myroot -e VAULT_DEV_LISTEN_ADDRESS=0.0.0.0:8200 hashicorp/vault
+```
+
+More details about installing Hashicorp Vault can be found in the Hashicorp Vault
+[documentation](https://developer.hashicorp.com/vault/docs/install)
+and [tutorials](https://developer.hashicorp.com/vault/install).
+
+### Enable a Transit Secrets Engine instance
+1. log into the Vault using the token
+2. on the left-side menu, select 'Secrets Engines'
+3. on the 'Secrets Engines' page, select 'enable new engine'
+4. on the 'Enable a secrets engine' page, select 'Transit' from the 'Generic' group
+5. click 'Next', then 'Enable Engine'
