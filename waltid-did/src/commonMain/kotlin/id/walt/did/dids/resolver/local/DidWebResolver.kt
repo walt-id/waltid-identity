@@ -15,25 +15,6 @@ import kotlinx.serialization.json.jsonObject
 
 class DidWebResolver(private val client: HttpClient) : LocalResolverMethod("web") {
 
-    companion object {
-        const val URL_PROTOCOL = "https"
-        val json = Json { ignoreUnknownKeys = true }
-    }
-
-    private fun resolveDidToUrl(did: String): String = DidUtils.identifierFromDid(did)?.let {
-        val didParts = it.split(":")
-
-        val domain = didParts[0].replace("%3A", ":")
-        val selectedPath = didParts.drop(1)
-
-        val path = when {
-            selectedPath.isEmpty() -> "/.well-known/did.json"
-            else -> "/${selectedPath.joinToString("/")}/did.json"
-        }
-
-        "$URL_PROTOCOL://$domain$path"
-    } ?: throw IllegalArgumentException("Unexpected did format (missing identifier): $did")
-
     override suspend fun resolve(did: String): Result<DidDocument> {
         val url = resolveDidToUrl(did)
 
@@ -44,14 +25,6 @@ class DidWebResolver(private val client: HttpClient) : LocalResolverMethod("web"
         }
 
         return response
-    }
-
-    suspend fun tryConvertAnyPublicKeyJwkToKey(publicKeyJwks: List<String>): Result<LocalKey> {
-        publicKeyJwks.forEach { publicKeyJwk ->
-            val result = LocalKey.importJWK(publicKeyJwk)
-            if (result.isSuccess) return result
-        }
-        return Result.failure(NoSuchElementException("No key could be imported"))
     }
 
     override suspend fun resolveToKey(did: String): Result<Key> {
@@ -69,5 +42,32 @@ class DidWebResolver(private val client: HttpClient) : LocalResolverMethod("web"
             }.filter { it.isSuccess }.map { it.getOrThrow() }
 
         return tryConvertAnyPublicKeyJwkToKey(publicKeyJwks)
+    }
+
+    private fun resolveDidToUrl(did: String): String = DidUtils.identifierFromDid(did)?.let {
+        val didParts = it.split(":")
+
+        val domain = didParts[0].replace("%3A", ":")
+        val selectedPath = didParts.drop(1)
+
+        val path = when {
+            selectedPath.isEmpty() -> "/.well-known/did.json"
+            else -> "/${selectedPath.joinToString("/")}/did.json"
+        }
+
+        "$URL_PROTOCOL://$domain$path"
+    } ?: throw IllegalArgumentException("Unexpected did format (missing identifier): $did")
+
+    suspend fun tryConvertAnyPublicKeyJwkToKey(publicKeyJwks: List<String>): Result<LocalKey> {
+        publicKeyJwks.forEach { publicKeyJwk ->
+            val result = LocalKey.importJWK(publicKeyJwk)
+            if (result.isSuccess) return result
+        }
+        return Result.failure(NoSuchElementException("No key could be imported"))
+    }
+
+    companion object {
+        const val URL_PROTOCOL = "https"
+        val json = Json { ignoreUnknownKeys = true }
     }
 }
