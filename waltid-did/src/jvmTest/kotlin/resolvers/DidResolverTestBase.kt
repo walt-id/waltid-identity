@@ -8,10 +8,7 @@ import id.walt.crypto.keys.Key
 import id.walt.did.dids.document.DidDocument
 import id.walt.did.dids.resolver.local.LocalResolverMethod
 import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.*
 import kotlin.test.assertNotNull
 
 abstract class DidResolverTestBase {
@@ -44,9 +41,9 @@ abstract class DidResolverTestBase {
             assertNotNull(doc)
             // assert [id] and [did] are identical
             assert(doc["id"]!!.jsonPrimitive.content == did)
-            assert(doc["verificationMethod"]!!.jsonArray.any {
-                defaultKeyChecks(it.jsonObject["publicKeyJwk"]!!.jsonObject, key)
-            })
+            verificationMethodAssertions(doc, key) { v, k ->
+                defaultKeyChecks(v, k)
+            }
         }
 
         /**
@@ -56,9 +53,9 @@ abstract class DidResolverTestBase {
         val ed25519DidAssertions: resolverAssertion<DidDocument> = { did, key, result ->
             didDocAssertions(did, key, result)
             val doc = result.getOrNull()!!
-            assert(doc["verificationMethod"]!!.jsonArray.any {
-                ed25519KeyChecks(it.jsonObject["publicKeyJwk"]!!.jsonObject, key)
-            })
+            verificationMethodAssertions(doc, key) { v, k ->
+                ed25519KeyChecks(v, k)
+            }
         }
 
         /**
@@ -68,9 +65,9 @@ abstract class DidResolverTestBase {
         val secp256DidAssertions: resolverAssertion<DidDocument> = { did, key, result ->
             ed25519DidAssertions(did, key, result)
             val doc = result.getOrNull()!!
-            assert(doc["verificationMethod"]!!.jsonArray.any {
-                secp256KeyChecks(it.jsonObject["publicKeyJwk"]!!.jsonObject, key)
-            })
+            verificationMethodAssertions(doc, key) { v, k ->
+                secp256KeyChecks(v, k)
+            }
         }
 
         /**
@@ -80,9 +77,9 @@ abstract class DidResolverTestBase {
         val rsaDidAssertions: resolverAssertion<DidDocument> = { did, key, result ->
             didDocAssertions(did, key, result)
             val doc = result.getOrNull()!!
-            assert(doc["verificationMethod"]!!.jsonArray.any {
-                rsaKeyChecks(it.jsonObject["publicKeyJwk"]!!.jsonObject, key)
-            })
+            verificationMethodAssertions(doc, key) { v, k ->
+                rsaKeyChecks(v, k)
+            }
         }
         //endregion -DidDocument assertions-
 
@@ -125,6 +122,17 @@ abstract class DidResolverTestBase {
             assert(rsaKeyChecks(publicKey, key))
         }
         //endregion -Key assertions-
+
+        private val verificationMethodAssertions: (
+            doc: DidDocument, key: JsonObject, runChecks: (actual: JsonObject, expected: JsonObject) -> Boolean
+        ) -> Unit = { doc, key, runChecks ->
+            // verification method is optional
+            doc["verificationMethod"]?.takeIf { it != JsonNull }?.run {
+                assert(this.jsonArray.any {
+                    runChecks(it.jsonObject["publicKeyJwk"]!!.jsonObject, key)
+                })
+            }
+        }
     }
 }
 

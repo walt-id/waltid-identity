@@ -49,7 +49,7 @@ class TestJvm {
     }
 
     @Test
-    @EnabledIf("hostCondition")
+    @EnabledIf("isVaultAvailable")
     fun testKeySerialization() = runTest {
         val localKey = LocalKey.generate(KeyType.Ed25519)
         val localKeySerialized = KeySerialization.serializeKey(localKey)
@@ -189,7 +189,7 @@ class TestJvm {
         }
     }
 
-    private fun hostCondition() = runCatching {
+    private fun isVaultAvailable() = runCatching {
         runBlocking { HttpClient().get("http://127.0.0.1:8200") }.status == HttpStatusCode.OK
     }.fold(onSuccess = { true }, onFailure = { false })
 
