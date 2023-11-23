@@ -8,6 +8,7 @@ import id.walt.did.dids.registrar.dids.DidCreateOptions
 import id.walt.did.dids.registrar.dids.DidWebCreateOptions
 import id.walt.did.dids.registrar.local.web.DidWebRegistrar
 import id.walt.did.utils.EncodingUtils
+import id.walt.did.utils.ExtensionMethods.ensurePrefix
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.Arguments
@@ -75,11 +76,7 @@ class DidWebRegistrarTest : DidRegistrarTestBase(DidWebRegistrar()) {
             val domain = options.get<String>("domain")!!
             val path = options.get<String>("path")
             defaultDidAssertions(result, options)
-            // assert [did identifier] and [domain + path] are identical
-            assert(
-                EncodingUtils.urlDecode(DidUtils.identifierFromDid(did)!!) ==
-                        domain.plus(path?.replace("/", ":"))
-            )
+            identifierAssertions(did, domain, path)
         }
 
         private val webKeyAssertions: registrarKeyAssertion = { result, options, key ->
@@ -87,10 +84,16 @@ class DidWebRegistrarTest : DidRegistrarTestBase(DidWebRegistrar()) {
             val domain = options.get<String>("domain")!!
             val path = options.get<String>("path")
             defaultKeyAssertions(result, options, key)
+            identifierAssertions(did, domain, path)
+        }
+
+        private fun identifierAssertions(did: String, domain: String, path: String?) {
             // assert [did identifier] and [domain + path] are identical
             assert(
-                EncodingUtils.urlDecode(DidUtils.identifierFromDid(did)!!) ==
-                        domain.plus(path?.replace("/", ":"))
+                //TODO: avoid computations in result comparison
+                EncodingUtils.urlDecode(DidUtils.identifierFromDid(did)!!) == domain.plus(
+                    path.takeIf { !it.isNullOrEmpty() }?.ensurePrefix("/")?.replace("/", ":") ?: ""
+                )
             )
         }
     }
