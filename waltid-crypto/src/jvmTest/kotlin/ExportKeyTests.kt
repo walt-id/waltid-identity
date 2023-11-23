@@ -27,14 +27,15 @@ class ExportKeyTests {
 
     @ParameterizedTest
     @MethodSource
-    fun `given key, when exporting JsonObject then the result is a valid jwk string`(keyFile: String, jwkFile: String) = runTest {
-        // given
-        val key = KeySerialization.deserializeKey(keyFile).getOrThrow()
-        // when
-        val export = key.exportJWKObject()
-        // then
-        assertEquals(jwkFile.replace("\\s".toRegex(), ""), export.toString())
-    }
+    fun `given key, when exporting JsonObject then the result is a valid jwk string`(keyFile: String, jwkFile: String) =
+        runTest {
+            // given
+            val key = KeySerialization.deserializeKey(keyFile).getOrThrow()
+            // when
+            val export = key.exportJWKObject()
+            // then
+            assertEquals(jwkFile.replace("\\s".toRegex(), ""), export.toString())
+        }
 
     @ParameterizedTest
     @MethodSource
