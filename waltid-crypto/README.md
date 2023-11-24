@@ -212,7 +212,31 @@ docker run -p 8200:8200 --cap-add=IPC_LOCK -e VAULT_DEV_ROOT_TOKEN_ID=myroot -e 
 
 ### Enable a Transit Secrets Engine instance
 
-1. log into the Vault (http://localhost:8200) using the token (_dev-only-token_)
+Check
+the [encryption as a service tutorial](https://developer.hashicorp.com/vault/tutorials/encryption-as-a-service/eaas-transit#configure-transit-secrets-engine)
+for more details on how to enable a Transit Secrets Engine.
+
+**Command line interface**
+
+Linux / MacOS
+
+```shell
+export VAULT_TOKEN="dev-only-token"
+export VAULT_ADDR='http://localhost:8200'
+vault secrets enable transit
+```
+
+Windows
+
+```shell
+set VAULT_TOKEN="dev-only-token"
+set VAULT_ADDR=http://localhost:8200
+vault secrets enable transit
+```
+
+**User interface**
+
+1. log into the Vault (http://localhost:8200) with token (_dev-only-token_)
 2. on the left-side menu, select 'Secrets Engines'
 3. on the 'Secrets Engines' page, select 'enable new engine'
 4. on the 'Enable a secrets engine' page, select 'Transit' from the 'Generic' group
