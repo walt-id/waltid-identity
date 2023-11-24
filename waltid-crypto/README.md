@@ -306,7 +306,7 @@ For usage examples on _create_, _sign_, _verify_, _import_ and _export_ function
             <td align="center">&check;</td>
         </tr>
         <!-- end sign -->
-        <tr><td align="center" colspan="10"></td></tr>
+        <tr><td align="center" colspan="11"></td></tr>
         <!-- verify -->
         <!-- jws -->
         <tr>
@@ -338,7 +338,7 @@ For usage examples on _create_, _sign_, _verify_, _import_ and _export_ function
             <td align="center">&check;</td>
         </tr>
         <!-- end verify -->
-        <tr><td align="center" colspan="10"></td></tr>
+        <tr><td align="center" colspan="11"></td></tr>
         <!-- export -->
         <!-- jwk -->
         <!-- private -->
