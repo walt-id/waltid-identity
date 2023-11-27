@@ -1,35 +1,302 @@
 <div align="center">
- <h1>Crypto - Kotlin multiplatform library</h1>
+ <h1>Kotlin Multiplatform Crypto library</h1>
  <span>by </span><a href="https://walt.id">walt.id</a>
- <p>Multiplatform library implementing cryptographic functionality, such as
-signing and verifying content.<p>
+  <p>Create JSON Web Tokens (JWTs) that support <b>Selective Disclosure</b><p>
 
-[![CI/CD Workflow for walt.id Crypto](https://github.com/walt-id/waltid-crypto/actions/workflows/release.yml/badge.svg?branch=main)](https://github.com/walt-id/waltid-crypto/actions/workflows/release.yml)
 <a href="https://walt.id/community">
 <img src="https://img.shields.io/badge/Join-The Community-blue.svg?style=flat" alt="Join community!" />
 </a>
 <a href="https://twitter.com/intent/follow?screen_name=walt_id">
 <img src="https://img.shields.io/twitter/follow/walt_id.svg?label=Follow%20@walt_id" alt="Follow @walt_id" />
 </a>
-
-
 </div>
-
-## Available on platforms
-
-|  Platform   |           | Availability |
-|:-----------:|:---------:|:------------:|
-|    Java     |    JVM    |   &check;    |
-|     JS      |   Node    |   &check;    |
-|             | WebCrypto |   &check;    |
-|   Native    | libsodium |   &cross;    |
-|             |  OpenSSL  |   &cross;    |
-| WebAssembly |   WASM    |   &cross;    |
 
 ## What it provides
 
-- key import / export functions - _jwk_, _pem_, _raw_ formats
-- key sign / verify functions - _jws_, _raw_ formats
+<table>
+    <tbody>
+        <!-- header -->
+        <tr>
+            <td align="center" rowspan="3">Feature</td>
+            <td align="center" rowspan="3" colspan="2">Category</td>
+            <td align="center" colspan="8">Key</td>
+        </tr>
+        <!-- sub-header key type -->
+        <tr>
+            <td align="center" colspan="4">Local</td>
+            <td align="center" colspan="4">TSE</td>
+        </tr>
+        <!-- sub-sub-header key algorithm -->
+        <tr>
+            <!-- local -->
+            <td align="center">ed25519</td>
+            <td align="center">secp256k1</td>
+            <td align="center">secp256r1</td>
+            <td align="center">rsa</td>
+            <!-- tse -->
+            <td align="center">ed25519</td>
+            <td align="center">secp256k1</td>
+            <td align="center">secp256r1</td>
+            <td align="center">rsa</td>
+        </tr>
+        <!-- content -->
+        <!-- sign -->
+        <!-- jws -->
+        <tr>
+            <td align="center" rowspan="2">sign</td>
+            <td align="center" colspan="2">jws</td>
+            <!-- local -->
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <!-- tse -->
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+        </tr>
+        <!-- raw -->
+        <tr>
+            <td align="center" colspan="2">raw</td>
+            <!-- local -->
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <!-- tse -->
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+        </tr>
+        <!-- end sign -->
+        <tr><td align="center" colspan="11"></td></tr>
+        <!-- verify -->
+        <!-- jws -->
+        <tr>
+            <td align="center" rowspan="2">verify</td>
+            <td align="center" colspan="2">jws</td>
+            <!-- local -->
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <!-- tse -->
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+        </tr>
+        <!-- raw -->
+        <tr>
+            <td align="center" colspan="2">raw</td>
+            <!-- local -->
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <!-- tse -->
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+        </tr>
+        <!-- end verify -->
+        <tr><td align="center" colspan="11"></td></tr>
+        <!-- export -->
+        <!-- jwk -->
+        <!-- private -->
+        <tr>
+            <td align="center" rowspan="6">export</td>
+            <td align="center" rowspan="2">jwk</td>
+            <td align="center">private</td>
+            <!-- local -->
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <!-- tse -->
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+        </tr>
+        <!-- public -->
+        <tr>
+            <td align="center">public</td>
+            <!-- local -->
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <!-- tse -->
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+        </tr>
+        <!-- pem -->
+        <!-- private -->
+        <tr>
+            <td align="center" rowspan="2">pem</td>
+            <td align="center">private</td>
+            <!-- local -->
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <!-- tse -->
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+        </tr>
+        <!-- public -->
+        <tr>
+            <td align="center">public</td>
+            <!-- local -->
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <!-- tse -->
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+        </tr>
+        <!-- JsonObject -->
+        <!-- private -->
+        <tr>
+            <td align="center" rowspan="2">JsonObject</td>
+            <td align="center">private</td>
+            <!-- local -->
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <!-- tse -->
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+        </tr>
+        <!-- public -->
+        <tr>
+            <td align="center">public</td>
+            <!-- local -->
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <!-- tse -->
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+        </tr>
+        <!-- end export -->
+        <tr><td align="center" colspan="11"></td></tr>
+        <!-- import -->
+        <!-- jwk -->
+        <!-- private -->
+        <tr>
+            <td align="center" rowspan="6">import</td>
+            <td align="center" rowspan="2">jwk</td>
+            <td align="center">private</td>
+            <!-- local -->
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <!-- tse -->
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+        </tr>
+        <!-- public -->
+        <tr>
+            <td align="center">public</td>
+            <!-- local -->
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <!-- tse -->
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+        </tr>
+        <!-- pem -->
+        <!-- private -->
+        <tr>
+            <td align="center" rowspan="2">pem</td>
+            <td align="center">private</td>
+            <!-- local -->
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <!-- tse -->
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+        </tr>
+        <!-- public -->
+        <tr>
+            <td align="center">public</td>
+            <!-- local -->
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <!-- tse -->
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+        </tr>
+        <!-- raw -->
+        <!-- private -->
+        <tr>
+            <td align="center" rowspan="2">raw</td>
+            <td align="center">private</td>
+            <!-- local -->
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <!-- tse -->
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+        </tr>
+        <!-- public -->
+        <tr>
+            <td align="center">public</td>
+            <!-- local -->
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <!-- tse -->
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+        </tr>
+        <!-- end import -->
+    </tbody>
+</table>
+
+- &check; implemented
+- &cross; not implemented
+- &dash; not available
 
 ### Signature schemes
 
@@ -40,6 +307,21 @@ signing and verifying content.<p>
 | ECDSA | secp256k1 | ES256K  | ECDSA + SECG curve secp256k1 (Koblitz curve as used in Bitcoin) |
 |  RSA  |    RSA    |  RS256  | RSA                                                             |
 
+
+### Available on platforms
+
+|  Platform   |           | Availability |
+|:-----------:|:---------:|:------------:|
+|    Java     |    JVM    |   &check;    |
+|     JS      |   Node    |   &check;    |
+|             | WebCrypto |   &check;    |
+|   Native    | libsodium |   &cross;    |
+|             |  OpenSSL  |   &cross;    |
+| WebAssembly |   WASM    |   &cross;    |
+
+
+
+
 ### JWS compatibility (recommended)
 
 | Algorithm | JVM provider |   JS provider / platform    |
@@ -49,17 +331,6 @@ signing and verifying content.<p>
 |  ES256K   | Nimbus JOSE  |       jose / Node.js        |
 |   RS256   | Nimbus JOSE  | jose / Node.js & Web Crypto |
 
-### LD Signatures compatibility
-
-(happy to add upon request - office@walt.id)
-
-|            Suite            |    JVM provider    |    JS provider    |
-|:---------------------------:|:------------------:|:-----------------:|
-|    Ed25519Signature2018     | ld-signatures-java |                   |
-|    Ed25519Signature2020     | ld-signatures-java | jsonld-signatures |
-| EcdsaSecp256k1Signature2019 | ld-signatures-java |                   |
-|      RsaSignature2018       | ld-signatures-java |                   |
-|    JsonWebSignature2020     | ld-signatures-java |                   |
 
 ## How to use it
 
@@ -244,291 +515,3 @@ vault secrets enable transit
 
 For usage examples on _create_, _sign_, _verify_, _import_ and _export_ functions see
 [Working with LocalKey](#working-with-localkey).
-
-
-## Feature set status
-
-<table>
-    <tbody>
-        <!-- header -->
-        <tr>
-            <td align="center" rowspan="3">Feature</td>
-            <td align="center" rowspan="3" colspan="2">Category</td>
-            <td align="center" colspan="8">Key</td>
-        </tr>
-        <!-- sub-header key type -->
-        <tr>
-            <td align="center" colspan="4">Local</td>
-            <td align="center" colspan="4">TSE</td>
-        </tr>
-        <!-- sub-sub-header key algorithm -->
-        <tr>
-            <!-- local -->
-            <td align="center">ed25519</td>
-            <td align="center">secp256k1</td>
-            <td align="center">secp256r1</td>
-            <td align="center">rsa</td>
-            <!-- tse -->
-            <td align="center">ed25519</td>
-            <td align="center">secp256k1</td>
-            <td align="center">secp256r1</td>
-            <td align="center">rsa</td>
-        </tr>
-        <!-- content -->
-        <!-- sign -->
-        <!-- jws -->
-        <tr>
-            <td align="center" rowspan="2">sign</td>
-            <td align="center" colspan="2">jws</td>
-            <!-- local -->
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <!-- tse -->
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-        </tr>
-        <!-- raw -->
-        <tr>
-            <td align="center" colspan="2">raw</td>
-            <!-- local -->
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <!-- tse -->
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-        </tr>
-        <!-- end sign -->
-        <tr><td align="center" colspan="11"></td></tr>
-        <!-- verify -->
-        <!-- jws -->
-        <tr>
-            <td align="center" rowspan="2">verify</td>
-            <td align="center" colspan="2">jws</td>
-            <!-- local -->
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <!-- tse -->
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-        </tr>
-        <!-- raw -->
-        <tr>
-            <td align="center" colspan="2">raw</td>
-            <!-- local -->
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-            <!-- tse -->
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-        </tr>
-        <!-- end verify -->
-        <tr><td align="center" colspan="11"></td></tr>
-        <!-- export -->
-        <!-- jwk -->
-        <!-- private -->
-        <tr>
-            <td align="center" rowspan="6">export</td>
-            <td align="center" rowspan="2">jwk</td>
-            <td align="center">private</td>
-            <!-- local -->
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <!-- tse -->
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-        </tr>
-        <!-- public -->
-        <tr>
-            <td align="center">public</td>
-            <!-- local -->
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <!-- tse -->
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-        </tr>
-        <!-- pem -->
-        <!-- private -->
-        <tr>
-            <td align="center" rowspan="2">pem</td>
-            <td align="center">private</td>
-            <!-- local -->
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <!-- tse -->
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-        </tr>
-        <!-- public -->
-        <tr>
-            <td align="center">public</td>
-            <!-- local -->
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-            <!-- tse -->
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-        </tr>
-        <!-- JsonObject -->
-        <!-- private -->
-        <tr>
-            <td align="center" rowspan="2">JsonObject</td>
-            <td align="center">private</td>
-            <!-- local -->
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <!-- tse -->
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-        </tr>
-        <!-- public -->
-        <tr>
-            <td align="center">public</td>
-            <!-- local -->
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <!-- tse -->
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-        </tr>
-        <!-- end export -->
-        <tr><td align="center" colspan="11"></td></tr>
-        <!-- import -->
-        <!-- jwk -->
-        <!-- private -->
-        <tr>
-            <td align="center" rowspan="6">import</td>
-            <td align="center" rowspan="2">jwk</td>
-            <td align="center">private</td>
-            <!-- local -->
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <!-- tse -->
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-        </tr>
-        <!-- public -->
-        <tr>
-            <td align="center">public</td>
-            <!-- local -->
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <!-- tse -->
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-        </tr>
-        <!-- pem -->
-        <!-- private -->
-        <tr>
-            <td align="center" rowspan="2">pem</td>
-            <td align="center">private</td>
-            <!-- local -->
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-            <!-- tse -->
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-        </tr>
-        <!-- public -->
-        <tr>
-            <td align="center">public</td>
-            <!-- local -->
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-            <!-- tse -->
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-        </tr>
-        <!-- raw -->
-        <!-- private -->
-        <tr>
-            <td align="center" rowspan="2">raw</td>
-            <td align="center">private</td>
-            <!-- local -->
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <!-- tse -->
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-        </tr>
-        <!-- public -->
-        <tr>
-            <td align="center">public</td>
-            <!-- local -->
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <!-- tse -->
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-        </tr>
-        <!-- end import -->
-    </tbody>
-</table>
-
-- &check; implemented
-- &cross; not implemented
-- &dash; not available
