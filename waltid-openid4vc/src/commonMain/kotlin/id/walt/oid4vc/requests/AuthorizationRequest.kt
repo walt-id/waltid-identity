@@ -2,7 +2,12 @@ package id.walt.oid4vc.requests
 
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.data.dif.PresentationDefinition
-import kotlinx.serialization.json.Json
+import id.walt.oid4vc.interfaces.IHttpClient
+import id.walt.oid4vc.interfaces.SimpleHttpResponse
+import id.walt.oid4vc.util.httpGet
+import id.walt.sdjwt.SDJwt
+import io.ktor.http.*
+import kotlinx.serialization.json.*
 
 interface IAuthorizationRequest {
     val responseType: String
@@ -37,7 +42,7 @@ data class AuthorizationRequest(
     val codeChallengeMethod: String? = null,
     override val customParameters: Map<String, List<String>> = mapOf()
 ) : HTTPDataObject(), IAuthorizationRequest {
-    val isReferenceToPAR get() = requestUri != null
+    val isReferenceToPAR get() = requestUri?.startsWith("urn:ietf:params:oauth:request_uri:") ?: false
     override fun toHttpParameters(): Map<String, List<String>> {
         return buildMap {
             put("response_type", listOf(responseType))
@@ -93,6 +98,31 @@ data class AuthorizationRequest(
             "code_challenge_method"
         )
 
+        suspend fun fromRequestObjectByReference(requestUri: String): AuthorizationRequest {
+           return fromRequestObject(httpGet(requestUri))
+        }
+
+        fun fromRequestObject(request: String): AuthorizationRequest {
+            return fromHttpParameters(
+                SDJwt.parse(request).fullPayload.mapValues { e -> when(e.value) {
+                    is JsonArray -> e.value.jsonArray.map { it.toString() }.toList()
+                    else -> listOf(e.toString())
+                } }
+            )
+        }
+
+        suspend fun fromHttpParametersAuto(parameters: Map<String, List<String>>): AuthorizationRequest {
+            if(parameters.containsKey("response_type") && parameters.containsKey("client_id")) {
+                return fromHttpParameters(parameters)
+            } else if(parameters.containsKey("request_uri")) {
+                return fromRequestObjectByReference(parameters["request_uri"]!!.first())
+            } else if(parameters.containsKey("request")) {
+                return fromRequestObject(parameters["request"]!!.first())
+            } else {
+                throw Exception("Could not find request parameters or object in given parameters")
+            }
+        }
+
         override fun fromHttpParameters(parameters: Map<String, List<String>>): AuthorizationRequest {
             return AuthorizationRequest(
                 parameters["response_type"]!!.first(),
@@ -123,7 +153,6 @@ data class AuthorizationRequest(
                 parameters.filterKeys { !knownKeys.contains(it) }
             )
         }
-
     }
 
 }
