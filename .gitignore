@@ -42,3 +42,4 @@ bin/
 secret*
 */data
 /kotlin-js-store/
+.idea/misc.xml
