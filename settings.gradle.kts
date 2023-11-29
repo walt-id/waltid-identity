@@ -24,6 +24,9 @@ include(
     "waltid-issuer",
     "waltid-verifier",
 
+    // CLI
+    "waltid-cli",
+
     // Reporting
     "waltid-reporting"
 )
