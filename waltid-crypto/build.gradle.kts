@@ -102,11 +102,17 @@ kotlin {
         }
         val jsMain by getting {
             dependencies {
-                implementation(npm("jose", "5.1.3"))
+                // JOSE
+                implementation(npm("jose", "4.14.4"))
+
+                // Multibase
+                implementation(npm("multiformats", "12.1.2"))
             }
         }
         val jsTest by getting {
-
+            dependencies {
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0")
+            }
         }
         publishing {
             repositories {
