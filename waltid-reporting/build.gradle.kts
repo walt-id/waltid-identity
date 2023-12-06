@@ -97,7 +97,7 @@ kotlin {
                     val passwordFile = File("$rootDir/secret_maven_password.txt")
 
                     val secretMavenUsername = envUsername ?: usernameFile.let { if (it.isFile) it.readLines().first() else "" }
-                    println("Deploy username length: ${secretMavenUsername.length}")
+                    //println("Deploy username length: ${secretMavenUsername.length}")
                     val secretMavenPassword = envPassword ?: passwordFile.let { if (it.isFile) it.readLines().first() else "" }
 
                     //if (secretMavenPassword.isBlank()) {

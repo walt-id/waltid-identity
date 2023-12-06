@@ -31,6 +31,19 @@ kotlin {
             useJUnitPlatform()
         }
     }
+    js(IR) {
+        browser {
+            commonWebpackConfig {
+                cssSupport {
+                    enabled.set(true)
+                }
+            }
+        }
+        nodejs {
+            generateTypeScriptDefinitions()
+        }
+        binaries.library()
+    }
 
     sourceSets {
         val commonMain by getting {
@@ -57,7 +70,6 @@ kotlin {
             dependencies {
                 implementation(kotlin("test"))
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
-                implementation("org.junit.jupiter:junit-jupiter-api:5.9.0")
             }
         }
         val jvmMain by getting {
@@ -83,9 +95,22 @@ kotlin {
         }
         val jvmTest by getting {
             dependencies {
+                implementation("org.junit.jupiter:junit-jupiter-api:5.9.0")
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0")
                 implementation("org.junit.jupiter:junit-jupiter-params:5.9.0")
             }
+        }
+        val jsMain by getting {
+            dependencies {
+                // JOSE
+                implementation(npm("jose", "4.14.4"))
+
+                // Multibase
+                implementation(npm("multiformats", "12.1.2"))
+            }
+        }
+        val jsTest by getting {
+
         }
         publishing {
             repositories {
@@ -98,7 +123,7 @@ kotlin {
                     val passwordFile = File("$rootDir/secret_maven_password.txt")
 
                     val secretMavenUsername = envUsername ?: usernameFile.let { if (it.isFile) it.readLines().first() else "" }
-                    println("Deploy username length: ${secretMavenUsername.length}")
+                    //println("Deploy username length: ${secretMavenUsername.length}")
                     val secretMavenPassword = envPassword ?: passwordFile.let { if (it.isFile) it.readLines().first() else "" }
 
                     //if (secretMavenPassword.isBlank()) {
