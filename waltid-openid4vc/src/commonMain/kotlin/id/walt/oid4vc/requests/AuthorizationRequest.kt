@@ -106,7 +106,8 @@ data class AuthorizationRequest(
             return fromHttpParameters(
                 SDJwt.parse(request).fullPayload.mapValues { e -> when(e.value) {
                     is JsonArray -> e.value.jsonArray.map { it.toString() }.toList()
-                    else -> listOf(e.toString())
+                    is JsonPrimitive -> listOf(e.value.jsonPrimitive.content)
+                    else -> listOf(e.value.jsonObject.toString())
                 } }
             )
         }
