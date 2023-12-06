@@ -95,6 +95,7 @@ kotlin {
         }
         val jvmTest by getting {
             dependencies {
+                implementation("org.junit.jupiter:junit-jupiter-api:5.9.0")
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0")
                 implementation("org.junit.jupiter:junit-jupiter-params:5.9.0")
             }
