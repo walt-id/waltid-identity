@@ -3,10 +3,7 @@ package id.walt.oid4vc
 import id.walt.auditor.Auditor
 import id.walt.auditor.policies.SignaturePolicy
 import id.walt.crypto.utils.JwsUtils.decodeJws
-import id.walt.oid4vc.data.ClientIdScheme
-import id.walt.oid4vc.data.OpenIDClientMetadata
-import id.walt.oid4vc.data.ResponseMode
-import id.walt.oid4vc.data.ResponseType
+import id.walt.oid4vc.data.*
 import id.walt.oid4vc.data.dif.*
 import id.walt.oid4vc.providers.CredentialWalletConfig
 import id.walt.oid4vc.requests.AuthorizationRequest
@@ -28,6 +25,7 @@ import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.util.*
+import io.ktor.utils.io.*
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import kotlin.time.Duration.Companion.minutes
@@ -584,4 +582,64 @@ class VP_JVM_Test : AnnotationSpec() {
     //    "openid4vp://authorize?client_id=https%3A%2F%2Flaunchpad.mattrlabs.com%2Fapi%2Fvp%2Fcallback&client_id_scheme=redirect_uri&response_uri=https%3A%2F%2Flaunchpad.mattrlabs.com%2Fapi%2Fvp%2Fcallback&response_type=vp_token&response_mode=direct_post&presentation_definition_uri=https%3A%2F%2Flaunchpad.mattrlabs.com%2Fapi%2Fvp%2Frequest%3Fstate%3D6-obA38Nu9qMPn6GT26flQ&nonce=ddZ6JA75YljfoOBj-9I-nA&state=6-obA38Nu9qMPn6GT26flQ"
     val mattrLaunchpadPresentationDefinitionData =
         "{\"id\":\"vp token example\",\"input_descriptors\":[{\"id\":\"OpenBadgeCredential\",\"format\":{\"jwt_vc_json\":{\"alg\":[\"EdDSA\"]}},\"constraints\":{\"fields\":[{\"path\":[\"\$.type\"],\"filter\":{\"type\":\"string\",\"pattern\":\"OpenBadgeCredential\"}}]}}]}"
+
+
+    val ONLINE_TEST: Boolean = true
+    @Test
+    suspend fun testRequestByReference() {
+        val reqUri = when(ONLINE_TEST) {
+            true -> testCreateEntraPresentationRequest()
+            else -> "openid-vc://?request_uri=$VP_VERIFIER_BASE_URL/req/6af1f46f-8d91-4eaa-b0c0-f042b7a621f8"
+        }
+        reqUri shouldNotBe null
+        val authReq = AuthorizationRequest.fromHttpParametersAuto(parseQueryString(Url(reqUri!!).encodedQuery).toMap())
+        authReq.clientId shouldBe "did:web:entra.walt.id"
+    }
+
+    suspend fun entraAuthorize(): String {
+        val tenantId = "8bc955d9-38fd-4c15-a520-0c656407537a"
+        val clientId = "e50ceaa6-8554-4ae6-bfdf-fd95e2243ae0"
+        val clientSecret = "ctL8Q~Ezdrcrju85gEtvbCmQQDmm7bXjJKsdXbCr"
+        val response = http.submitForm("https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token", parameters {
+            append("client_id", clientId)
+            append("scope", "3db474b9-6a0c-4840-96ac-1fceb342124f/.default")
+            append("client_secret", clientSecret)
+            append("grant_type", "client_credentials")
+        }).body<JsonObject>()
+        return "${response["token_type"]!!.jsonPrimitive.content} ${response["access_token"]!!.jsonPrimitive.content}"
+    }
+
+    suspend fun testCreateEntraPresentationRequest(): String? {
+        val accessToken = entraAuthorize()
+        val createPresentationRequestBody = "{\n" +
+            "    \"authority\": \"did:web:entra.walt.id\",\n" +
+            "    \"callback\": {\n" +
+            "        \"headers\": {\n" +
+            "            \"api-key\": \"1234\"\n" +
+            "        },\n" +
+            "        \"state\": \"1234\",\n" +
+            "        \"url\": \"https://entra.walt.id/verified\"\n" +
+            "    },\n" +
+            "    \"registration\": {\n" +
+            "        \"clientName\": \"verifiable-credentials-app\"\n" +
+            "    },\n" +
+            "    \"requestedCredentials\": [\n" +
+            "        {\n" +
+            "            \"acceptedIssuers\": [\n" +
+            "                \"did:web:entra.walt.id\"\n" +
+            "            ],\n" +
+            "            \"purpose\": \"TEST\",\n" +
+            "            \"type\": \"VerifiedEmployee\"\n" +
+            "        }\n" +
+            "    ]\n" +
+            "}"
+        val response = http.post("https://verifiedid.did.msidentity.com/v1.0/verifiableCredentials/createPresentationRequest") {
+            header(HttpHeaders.Authorization, accessToken)
+            contentType(ContentType.Application.Json)
+            setBody(createPresentationRequestBody)
+        }
+        response.status shouldBe HttpStatusCode.Created
+        val responseObj = response.body<JsonObject>()
+        return responseObj["url"]?.jsonPrimitive?.content
+    }
 }

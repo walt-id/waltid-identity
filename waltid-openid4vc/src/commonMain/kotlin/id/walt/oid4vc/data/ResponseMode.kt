@@ -4,5 +4,6 @@ enum class ResponseMode {
     query,
     fragment,
     form_post,
-    direct_post
+    direct_post,
+    post
 }
