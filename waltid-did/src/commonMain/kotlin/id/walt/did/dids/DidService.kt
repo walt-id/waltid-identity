@@ -101,9 +101,8 @@ object DidService {
     private fun getRegistrarForMethod(method: String): DidRegistrar =
         registrarMethods[method] ?: throw IllegalArgumentException("No registrar for did method: $method")
 
-    suspend fun register(options: DidCreateOptions) {
+    suspend fun register(options: DidCreateOptions) =
         getRegistrarForMethod(options.method).create(options)
-    }
 
     suspend fun registerByKey(
         method: String, key: Key, options: DidCreateOptions = DidCreateOptions(method, emptyMap())

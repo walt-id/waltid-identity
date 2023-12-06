@@ -75,8 +75,7 @@ kotlin {
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
                 implementation("io.ktor:ktor-http:$ktor_version")
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.4.1")
-                // TODO: set to project version: implementation(project(":waltid-sdjwt"))
-                implementation("id.walt:waltid-sd-jwt:1.2310101347.0")
+                implementation(project(":waltid-sdjwt"))
             }
         }
         val commonTest by getting {
