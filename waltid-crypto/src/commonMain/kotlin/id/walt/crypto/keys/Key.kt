@@ -73,9 +73,10 @@ abstract class Key {
     abstract suspend fun decrypt(encrypted: ByteArray): Result<ByteArray>
      */
 
-    abstract suspend fun getPublicKey(): id.walt.crypto.keys.Key
+    abstract suspend fun getPublicKey(): Key
     abstract suspend fun getPublicKeyRepresentation(): ByteArray
 
     override fun toString() = "[walt.id CoreCrypto ${if (hasPrivateKey) "private" else "public"} $keyType key]"
 
+    open suspend fun init() {}
 }

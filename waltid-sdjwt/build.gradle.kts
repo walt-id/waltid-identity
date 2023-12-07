@@ -1,11 +1,11 @@
 plugins {
-    kotlin("multiplatform") version "1.9.20"
+    kotlin("multiplatform")
 
     id("org.jetbrains.kotlin.plugin.serialization")
 
     id("dev.petuska.npm.publish") version "3.4.1"
     `maven-publish`
-    id("com.github.ben-manes.versions") version "0.49.0"
+    id("com.github.ben-manes.versions")
 }
 
 group = "id.walt"
@@ -72,7 +72,7 @@ kotlin {
         it.compilations.getByName("main") {
             cinterops.create("id.walt.sdjwt.cinterop.ios") {
                 val interopTask = tasks[interopProcessingTaskName]
-                interopTask.dependsOn(":waltid-sd-jwt-ios:build${platform.capitalize()}")
+                interopTask.dependsOn(":waltid-sd-jwt-ios:build${platform.uppercase()}")
 
                 defFile("$projectDir/src/nativeInterop/cinterop/waltid-sd-jwt-ios.def")
                 packageName("id.walt.sdjwt.cinterop.ios")
@@ -125,8 +125,8 @@ kotlin {
         val jsTest by getting {
 
         }
-        val nativeMain by getting
-        val nativeTest by getting
+        //val nativeMain by getting
+        //val nativeTest by getting
 
         if (hostOs == "Mac OS X") {
             val iosArm64Main by getting
