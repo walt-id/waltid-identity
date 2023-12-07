@@ -68,7 +68,8 @@ kotlin {
         }
         val commonTest by getting {
             dependencies {
-                implementation(kotlin("test"))
+                implementation(kotlin("test-common"))
+                implementation(kotlin("test-annotations-common"))
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
             }
         }
@@ -95,6 +96,8 @@ kotlin {
         }
         val jvmTest by getting {
             dependencies {
+                implementation(kotlin("test"))
+
                 implementation("org.junit.jupiter:junit-jupiter-api:5.9.0")
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0")
                 implementation("org.junit.jupiter:junit-jupiter-params:5.9.0")
@@ -110,7 +113,9 @@ kotlin {
             }
         }
         val jsTest by getting {
-
+            dependencies {
+                implementation(kotlin("test-js"))
+            }
         }
         publishing {
             repositories {

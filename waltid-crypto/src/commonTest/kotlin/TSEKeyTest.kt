@@ -1,3 +1,4 @@
+import TSEKeyTest.Config.TESTABLE_KEY_TYPES
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.TSEKey
 import id.walt.crypto.keys.TSEKeyMetadata
@@ -5,119 +6,93 @@ import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.util.*
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import org.junit.jupiter.api.AfterAll
-import org.junit.jupiter.api.Assumptions.assumeTrue
-import org.junit.jupiter.api.BeforeAll
-import org.junit.jupiter.params.ParameterizedTest
-import org.junit.jupiter.params.provider.Arguments
-import org.junit.jupiter.params.provider.Arguments.arguments
-import org.junit.jupiter.params.provider.MethodSource
-import java.util.stream.Stream
-import kotlin.streams.asStream
+import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class TSEKeyTest {
-    private val payload = JsonObject(
-        mapOf(
-            "sub" to JsonPrimitive("16bb17e0-e733-4622-9384-122bc2fc6290"),
-            "iss" to JsonPrimitive("http://localhost:3000"),
-            "aud" to JsonPrimitive("TOKEN"),
+
+    private object Config {
+        internal const val BASE_SERVER = "http://127.0.0.1:8200"
+        internal const val BASE_URL = "$BASE_SERVER/v1/transit"
+        internal const val TOKEN = "dev-only-token"
+
+        internal val payload = JsonObject(
+            mapOf(
+                "sub" to JsonPrimitive("16bb17e0-e733-4622-9384-122bc2fc6290"),
+                "iss" to JsonPrimitive("http://localhost:3000"),
+                "aud" to JsonPrimitive("TOKEN"),
+            )
         )
-    )
 
-    fun getPublicKeyRepresentation() = runTest {
-
+        //val TESTABLE_KEY_TYPES = KeyType.entries.filterNot { it in listOf(KeyType.secp256k1) } // TODO get working: this line
+        val TESTABLE_KEY_TYPES = listOf(KeyType.Ed25519)
     }
 
-    @ParameterizedTest
-    @MethodSource
-    fun getPublicKey(key: TSEKey?) = runTest {
-        assumeTrue(isVaultAvailable())
-        assumeTrue(key != null)
-        val publicKey = key!!.getPublicKey()
-        assertTrue(!publicKey.hasPrivateKey)
-        //TODO: assert keyId, thumbprint, export
+    private val http = HttpClient()
+    private suspend fun isVaultAvailable() = runCatching {
+        http.get(Config.BASE_SERVER).status == HttpStatusCode.OK
+    }.fold(onSuccess = { it }, onFailure = { false })
+
+    lateinit var keys: List<TSEKey>
+
+    @Test
+    fun testTse() = runTest {
+        println("Testing key creation of: $TESTABLE_KEY_TYPES...")
+        tse1TestKeyCreation()
+
+        println("Testing resolving to public key for: $keys...")
+        tse2TestPublicKeys()
+
+        println("Testing sign & verify raw (payload: ${Config.payload})...")
+        tse3TestSignRaw()
+
+        println("Testing sign & verify JWS (payload: ${Config.payload})...")
+        tse4TestSignJws()
+
+        println("Testing key deletion of: $keys...")
+        tse99TestKeyDeletion()
     }
 
-    fun getKeyType() = runTest {
-
-    }
-
-    fun getHasPrivateKey() = runTest {
-
-    }
-
-    @ParameterizedTest
-    @MethodSource
-    fun signRaw(key: TSEKey?) = runTest {
-        assumeTrue(isVaultAvailable())
-        assumeTrue(key != null)
-        val signed = key!!.signRaw(payload.toString().encodeToByteArray()) as String
-        val verificationResult = key.verifyRaw(signed.decodeBase64Bytes(), payload.toString().encodeToByteArray())
-        assertTrue(verificationResult.isSuccess)
-        assertEquals(payload.toString(), String(verificationResult.getOrThrow()))
-    }
-
-    @ParameterizedTest
-    @MethodSource
-    fun signJws(key: TSEKey?) = runTest {
-        assumeTrue(isVaultAvailable())
-        val signed = key!!.signJws(payload.toString().encodeToByteArray())
-        val verificationResult = key.verifyJws(signed)
-        assertTrue(verificationResult.isSuccess)
-        assertEquals(payload, verificationResult.getOrThrow())
-    }
-
-    fun getKeyId() = runTest {
-
-    }
-
-    fun verifyJws() = runTest {
-
-    }
-
-    fun exportJWK() = runTest {
-
-    }
-
-    fun exportJWKObject() = runTest {
-
-    }
-
-    fun exportPEM() = runTest {
-
-    }
-
-    companion object {
-        private var keys: List<TSEKey?> = listOf(null)//ugly way to have test parameterization and condition at once
-
-        @JvmStatic
-        @BeforeAll
-        fun initKeys() = runTest {
-            isVaultAvailable().takeIf { it }?.let {
-                val tseMetadata = TSEKeyMetadata("http://127.0.0.1:8200/v1/transit", "dev-only-token")
-                keys = enumValues<KeyType>().map { TSEKey.generate(KeyType.Ed25519, tseMetadata) }
-            }
+    private suspend fun tse1TestKeyCreation() {
+        isVaultAvailable().takeIf { it }?.let {
+            val tseMetadata = TSEKeyMetadata(Config.BASE_URL, Config.TOKEN)
+            keys = TESTABLE_KEY_TYPES.map { TSEKey.generate(it, tseMetadata) }
         }
-        @JvmStatic
-        @AfterAll
-        fun cleanup() = runTest {
-            keys.forEach { it?.delete() }
-        }
-        @JvmStatic
-        fun getPublicKey(): Stream<Arguments> = keys.map { arguments(it) }.asSequence().asStream()
-        @JvmStatic
-        fun signRaw(): Stream<Arguments> = keys.map { arguments(it) }.asSequence().asStream()
-        @JvmStatic
-        fun signJws(): Stream<Arguments> = keys.map { arguments(it) }.asSequence().asStream()
-
-        private fun isVaultAvailable() = runCatching {
-            runBlocking { HttpClient().get("http://127.0.0.1:8200") }.status == HttpStatusCode.OK
-        }.fold(onSuccess = { it }, onFailure = { false })
     }
+
+    private suspend fun tse2TestPublicKeys() {
+        keys.forEach { key ->
+            val publicKey = key.getPublicKey()
+            assertTrue { !publicKey.hasPrivateKey }
+        }
+        // TODO: assert keyId, thumbprint, export
+    }
+
+    private suspend fun tse3TestSignRaw() {
+        keys.forEach { key ->
+            val signed = key.signRaw(Config.payload.toString().encodeToByteArray()) as String
+            val verificationResult = key.verifyRaw(signed.decodeBase64Bytes(), Config.payload.toString().encodeToByteArray())
+            assertTrue(verificationResult.isSuccess)
+            assertEquals(Config.payload.toString(), verificationResult.getOrThrow().decodeToString())
+        }
+    }
+
+    private suspend fun tse4TestSignJws() {
+        keys.forEach { key ->
+            val signed = key.signJws(Config.payload.toString().encodeToByteArray())
+            val verificationResult = key.verifyJws(signed)
+            assertTrue(verificationResult.isSuccess)
+            assertEquals(Config.payload, verificationResult.getOrThrow())
+        }
+    }
+
+    private suspend fun tse99TestKeyDeletion() {
+        keys.forEach { it.delete() }
+    }
+
+
 }
