@@ -14,7 +14,7 @@ import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.util.*
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.*
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
@@ -33,36 +33,48 @@ class TSEKey(
     private var _publicKey: ByteArray? = null, private var _keyType: KeyType? = null
 ) : Key() {
 
-    @Transient
-    val retrievedKeyType by lazy { runBlocking { retrieveKeyType() } }
+    @OptIn(DelicateCoroutinesApi::class)
+    private inline fun <T> lazySuspended(
+        crossinline block: suspend CoroutineScope.() -> T
+    ): Deferred<T> = GlobalScope.async(Dispatchers.Unconfined, start = CoroutineStart.LAZY) {
+        block.invoke(this)
+        //retrieveKeyType()
+    }
 
     @Transient
-    val retrievedPublicKey by lazy { runBlocking { retrievePublicKey() } }
+    //val retrievedKeyType = lazySuspended { retrieveKeyType() }
+    val retrievedKeyType = lazySuspended { retrieveKeyType() }
+
+    @Transient
+    val retrievedPublicKey = lazySuspended { retrievePublicKey() }
 
     @Transient
     override var keyType: KeyType
-        get() = _keyType ?: retrievedKeyType
+        get() = _keyType!!
         set(value) {
             _keyType = value
         }
 
-    @Transient
-    var publicKey: ByteArray
-        get() = _publicKey ?: retrievedPublicKey
-        set(value) {
-            _publicKey = value
-        }
+    override suspend fun init() {
+        if (_keyType == null) _keyType = coroutineScope {  retrievedKeyType.await() }
+    }
+
+    private suspend fun getBackingPublicKey(): ByteArray = _publicKey ?: retrievedPublicKey.await()
 
     private fun throwTSEError(msg: String): Nothing = throw RuntimeException("Invalid TSE server ($server) response: $msg")
 
     private suspend fun retrievePublicKey(): ByteArray {
+//        println("Retrieving public key: ${this.id}")
         val keyData = http.get("$server/keys/$id") {
             this.header("X-Vault-Token", accessKey)
         }.tseJsonDataBody().jsonObject["keys"]?.jsonObject ?: throwTSEError("No keys in data response")
 
         // TO\\DO: try this
-        return keyData["1"]?.jsonObject?.get("public_key")?.jsonPrimitive?.content?.decodeBase64Bytes()
+        val keyStr = keyData["1"]?.jsonObject?.get("public_key")?.jsonPrimitive?.content
             ?: throwTSEError("No data/keys/1/publicKey returned: $keyData")
+//        println("Key string is: $keyStr")
+
+        return keyStr.decodeBase64Bytes()
     }
 
     private suspend fun retrieveKeyType(): KeyType = tseKeyToKeyTypeMapping(http.get("$server/keys/$id") {
@@ -113,7 +125,7 @@ class TSEKey(
     override suspend fun verifyRaw(signed: ByteArray, detachedPlaintext: ByteArray?): Result<ByteArray> {
         val localPublicKey = when (keyType) {
             KeyType.Ed25519 -> LocalKey.importRawPublicKey(
-                type = keyType, rawPublicKey = publicKey, metadata = LocalKeyMetadata() // todo: explicit `keySize`
+                type = keyType, rawPublicKey = getBackingPublicKey(), metadata = LocalKeyMetadata() // todo: explicit `keySize`
             )
 
             KeyType.RSA, KeyType.secp256r1 -> LocalKey.importPEM(getEncodedPublicKey()).getOrThrow()
@@ -169,16 +181,16 @@ class TSEKey(
         ).value
 
     override suspend fun getPublicKey(): Key {
+        println("Getting public key: $keyType")
+
         return LocalKey.importRawPublicKey(
             type = keyType,
-            rawPublicKey = publicKey,
+            rawPublicKey = getBackingPublicKey(),
             metadata = LocalKeyMetadata(), // todo: import with explicit `keySize`
         )
     }
 
-    override suspend fun getPublicKeyRepresentation(): ByteArray {
-        return publicKey
-    }
+    override suspend fun getPublicKeyRepresentation(): ByteArray = getBackingPublicKey()
 
     /*
         val user = "corecrypto"
@@ -241,7 +253,7 @@ class TSEKey(
             val publicKey = (keyData["keys"]
                 ?: throwTSEError("no keys array in key data: $keyData")).jsonObject["1"]!!.jsonObject["public_key"]!!.jsonPrimitive.content.decodeBase64Bytes()
 
-            return TSEKey(metadata.server, metadata.accessKey, keyName, publicKey, type)
+            return TSEKey(metadata.server, metadata.accessKey, keyName, publicKey, type).apply { init() }
         }
 
         private val http = HttpClient {

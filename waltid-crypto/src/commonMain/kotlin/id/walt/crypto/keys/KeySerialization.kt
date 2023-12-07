@@ -23,6 +23,6 @@ object KeySerialization {
     }
 
     fun serializeKey(key: Key): String = keySerializationJson.encodeToString(key)
-    fun deserializeKey(json: String): Result<Key> = runCatching { keySerializationJson.decodeFromString<Key>(json) }
-    fun deserializeKey(json: JsonObject): Result<Key> = runCatching { keySerializationJson.decodeFromJsonElement<Key>(json) }
+    suspend fun deserializeKey(json: String): Result<Key> = runCatching { keySerializationJson.decodeFromString<Key>(json).apply { init() } }
+    suspend fun deserializeKey(json: JsonObject): Result<Key> = runCatching { keySerializationJson.decodeFromJsonElement<Key>(json).apply { init() } }
 }
