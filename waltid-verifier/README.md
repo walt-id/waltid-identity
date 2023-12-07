@@ -13,10 +13,14 @@ protocol.<p>
 </a>
 </div>
 
+Refer to the
+[walt.id documentation](https://docs.oss.walt.id/verifier/api/verify-oidc4vc)
+for a detailed view on using the verifier service.
+
 ## What it provides
 
-- OIDC service provider for Verifiable Presentations
-- OIDC presentation session initialization and retrieval
+- OID4VC service provider for Verifiable Presentations
+- OID4VC presentation session initialization and retrieval
 - *vp_token* response verification
 - presentation definition retrieval
 
@@ -28,7 +32,7 @@ can be found in the table below:
         <!-- header -->
         <tr>
             <td align="center" colspan="2">Format</td>
-            <td align="center">OIDC</td>
+            <td align="center">OID4VC</td>
             <td align="center">DIDComm</td>
         </tr>
         <!-- content -->
@@ -46,9 +50,9 @@ can be found in the table below:
             <td align="center">&check;</td>
             <td align="center">&cross;</td>
         </tr>
-        <!-- mDoc -->
+        <!-- mdoc -->
         <tr>
-            <td align="center" colspan="2">mDoc</td>
+            <td align="center" colspan="2">mdoc</td>
             <td align="center">&cross;</td>
             <td align="center">&dash;</td>
         </tr>
@@ -58,7 +62,7 @@ can be found in the table below:
 Verifier service relies on the following walt.id libraries:
 
 - [waltid-openid4vc library](https://github.com/walt-id/waltid-identity/tree/main/waltid-openid4vc)
-  for OIDC interactions
+  for OID4VC interactions
 - [waltid-verifiable-credentials library](https://github.com/walt-id/waltid-identity/tree/main/waltid-verifiable-credentials)
   for performing verifiable credential related tasks
 - [waltid-did library](https://github.com/walt-id/waltid-identity/tree/main/waltid-did)
@@ -70,15 +74,12 @@ Verifier service relies on the following walt.id libraries:
 
 ### Endpoints
 
-- `/openid4vc/verify` - initialize an OIDC presentation session
+- `/openid4vc/verify` - initialize an OID4VC presentation session
 - `/openid4vc/verify/{state}` - submit a Verifiable Presentation in direct_post response mode
 - `/openid4vc/session/{id}` - get the current state and result information about
-  an ongoing OIDC presentation session
-- `/openid4vc/pd/{id}` - get the presentation definition of an ongoing OIDC presentation session
+  an ongoing OID4VC presentation session
+- `/openid4vc/pd/{id}` - get the presentation definition of an ongoing OID4VC presentation session
 - `/openid4vc/policy-list` - get the list of the registered policies
-
-More details on using the verifier service are available in the
-[walt.id documentation](https://docs.oss.walt.id/verifier/api/verify-oidc4vc).
 
 ### Running from source
 
