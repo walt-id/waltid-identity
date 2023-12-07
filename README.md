@@ -1,6 +1,6 @@
 <div align="center">
  <h1>Identity by walt.id</h1>
- <p>Multi-Platform libraries, powerful APIs and easy-to-use white label apps to build end-to-end identity and wallet solutions.</p>
+ <p>Multi-Platform libraries, powerful APIs and easy-to-use white label apps to build identity and wallet solutions.</p>
 
 <a href="https://walt.id/community">
 <img src="https://img.shields.io/badge/Join-The Community-blue.svg?style=flat" alt="Join community!" />
