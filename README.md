@@ -17,13 +17,13 @@
 ### Multi-Platform Libaries 
 Available for Kotlin/Java and JavaScript environments.
 
-- [Crypto](https://github.com/walt-id/waltid-identity/blob/main/waltid-crypto/README.md) - create, manage and use keypairs based on different algorithms to sign and verify any type of document.
+- [Crypto](https://github.com/walt-id/waltid-identity/blob/main/waltid-crypto/README.md) - create and use keys based on different algorithms.
 - [DID](https://github.com/walt-id/waltid-identity/blob/main/waltid-did/README.md) - create, register and resolve DIDs on different ecosystems.
-- [Openid4vc](https://github.com/walt-id/waltid-identity/blob/main/waltid-openid4vc/README.md) - impelmention of the OID4VCI and OIDC4VP protocols.
-- [SD-JWT](https://github.com/walt-id/waltid-identity/blob/main/waltid-sdjwt/README.md) - create and verify Seletive Disclousure JWTs.
+- [Openid4vc](https://github.com/walt-id/waltid-identity/blob/main/waltid-openid4vc/README.md) - implementation of the OID4VCI and OIDC4VP protocols.
+- [SD-JWT](https://github.com/walt-id/waltid-identity/blob/main/waltid-sdjwt/README.md) - create and verify Selective Disclosure JWTs.
 
 ### Services
-A set of api's to build issuer, verifier and wallet capabilities into any app.
+A set of API's to build issuer, verifier and wallet capabilities into any app.
 
 - Issuer API - enable apps issue credentials (W3C JWTs, SD-JWTs and JSON-LD) via OID4VC.
 - Verifier API - enable apps to verify credentials (W3C JWTs, SD-JWTs and JSON-LD) via OID4VP/SIOPv2.
