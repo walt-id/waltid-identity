@@ -13,13 +13,17 @@ protocol.<p>
 </a>
 </div>
 
+Refer to the
+[walt.id documentation](https://docs.oss.walt.id/issuer/api/issue-oidc4vc)
+for a detailed view on using the issuer service.
+
 ## What it provides
 
-- OIDC service provider for Verifiable Credential issuance
+- OID4VC service provider for Verifiable Credential issuance
 - credential raw signing without using a credential exchange mechanism
-- credential signing using an OIDC credential exchange flow:
+- credential signing using an OID4VC credential exchange flow:
     - W3C format (jwt, sdjwt)
-    - IEC / ISO18013-5 mDoc / mDL format
+    - IEC / ISO18013-5 mdoc / mDL format
 
 A summary of the available issuance flows and credential formats
 can be found in the table below:
@@ -33,11 +37,11 @@ can be found in the table below:
         </tr>
         <!-- function sub-header -->
         <tr>
-            <td align="center" colspan="2">OIDC</td>
+            <td align="center" colspan="2">OID4VC</td>
             <td align="center" rowspan="2">raw</td>
             <td align="center" rowspan="2">DIDcomm</td>
         </tr>
-        <!-- oidc sub-header -->
+        <!-- OID4VC sub-header -->
         <tr>
             <td align="center">single</td>
             <td align="center">batch</td>
@@ -63,7 +67,7 @@ can be found in the table below:
         </tr>
         <!-- mdoc -->
         <tr>
-            <td align="center" colspan="2">mDoc</td>
+            <td align="center" colspan="2">mdoc</td>
             <td align="center">&dash;</td>
             <td align="center">&dash;</td>
             <td align="center">&cross;</td>
@@ -77,7 +81,7 @@ Issuer service relies on the following walt.id libraries:
 - [waltid-sd-jwt library](https://github.com/walt-id/waltid-identity/tree/main/waltid-sdjwt)
   for sd-jwt related processing
 - [waltid-openid4vc library](https://github.com/walt-id/waltid-identity/tree/main/waltid-openid4vc)
-  for OIDC interactions
+  for OID4VC interactions
 - [waltid-verifiable-credentials library](https://github.com/walt-id/waltid-identity/tree/main/waltid-verifiable-credentials)
   for performing verifiable credential related tasks
 - [waltid-did library](https://github.com/walt-id/waltid-identity/tree/main/waltid-did)
@@ -92,15 +96,12 @@ Issuer service relies on the following walt.id libraries:
 - `/.well-known/openid-configuration` - service provider configuration
 - `/.well-known/openid-credential-issuer` - issuer service configuration
 - `/raw/jwt/sign` - sign a jwt-formatted w3c credential without involving an exchange flow
-- `/openid4vc/jwt/issue` - sign a jwt-formatted w3c credential and initiate an OIDC exchange
+- `/openid4vc/jwt/issue` - sign a jwt-formatted w3c credential and initiate an OID4VC exchange
 - `/openid4vc/jwt/issueBatch` - sign a list jwt-formatted w3c credentials and initiate
-  an OIDC exchange
-- `/openid4vc/sdjwt/issue`- sign an sd-jwt-formatted w3c credential and initiate an OIDC exchange
+  an OID4VC exchange
+- `/openid4vc/sdjwt/issue`- sign an sd-jwt-formatted w3c credential and initiate an OID4VC exchange
 - `/openid4vc/mdoc/issue` - sign an IEC / ISO18013-5 mdoc / mDL credential and initiate
-  an OIDC exchange
-
-More details on using the issuer service are available in the
-[walt.id documentation](https://docs.oss.walt.id/issuer/api/issue-oidc4vc).
+  an OID4VC exchange
 
 ### Running from source
 
