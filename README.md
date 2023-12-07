@@ -1,17 +1,44 @@
-# walt.id Identity
+<div align="center">
+ <h1>Identity by walt.id</h1>
+ <p>Multi-Platform libraries, powerful APIs and easy-to-use white label apps to build end-to-end identity and wallet solutions.</p>
 
-## Credentials
+<a href="https://walt.id/community">
+<img src="https://img.shields.io/badge/Join-The Community-blue.svg?style=flat" alt="Join community!" />
+</a>
+<a href="https://twitter.com/intent/follow?screen_name=walt_id">
+<img src="https://img.shields.io/twitter/follow/walt_id.svg?label=Follow%20@walt_id" alt="Follow @walt_id" />
+</a>
 
-### (to be) Supported combinations:
 
-| Credential type | Signature type | Notes                                               |
-|-----------------|----------------|-----------------------------------------------------|
-| W3C VC          | JOSE (JWT/JWS) | Simplest format to start                            |
-| SD-JWT          | JOSE (JWT/JWS) | Selective disclosure                                |
-| W3C VC          | JSON-LD / Soon | Signature type not recommended for new applications |
-| mdoc            | COSE1          | Supports mDL & mID                                  |
+</div>
 
-## Docker container builds:
+## Getting Started
+
+### Multi-Platform Libaries 
+Available for Kotlin/Java and JavaScript environments.
+
+- [Crypto](https://github.com/walt-id/waltid-identity/blob/main/waltid-crypto/README.md) - create, manage and use keypairs based on different algorithms to sign and verify any type of document.
+- [DID](https://github.com/walt-id/waltid-identity/blob/main/waltid-did/README.md) - create, register and resolve DIDs on different ecosystems.
+- [Openid4vc](https://github.com/walt-id/waltid-identity/blob/main/waltid-openid4vc/README.md) - impelmention of the OID4VCI and OIDC4VP protocols.
+- [SD-JWT](https://github.com/walt-id/waltid-identity/blob/main/waltid-sdjwt/README.md) - create and verify Seletive Disclousure JWTs.
+
+### Services
+A set of api's to build issuer, verifier and wallet capabilities into any app.
+
+- Issuer API - enable apps issue credentials (W3C JWTs, SD-JWTs and JSON-LD) via OID4VC.
+- Verifier API - enable apps to verify credentials (W3C JWTs, SD-JWTs and JSON-LD) via OID4VP/SIOPv2.
+- Wallet API - extend apps with holistic identity wallet capabilities like collecting, storing, managing and sharing of identity credentials.
+
+### Apps
+A set of white-label apps to get started in no time.
+
+- Web-Wallet - A custodial web-wallet (PWA) solution for credentials and tokens.
+- Portal - An issuer and verifier portal for credentials.
+
+
+## Building the Project
+
+### Docker container builds:
 
 ```shell
 docker build -t waltid/issuer -f docker/issuer.Dockerfile .
