@@ -2,7 +2,7 @@
  <h1>Kotlin Multiplatform DID library</h1>
  <span>by </span><a href="https://walt.id">walt.id</a>
 
-[![CI/CD Workflow for walt.id did]()]()
+</p>
 <a href="https://walt.id/community">
 <img src="https://img.shields.io/badge/Join-The Community-blue.svg?style=flat" alt="Join community!" />
 </a>
@@ -15,12 +15,13 @@
 
 ## What it provides
 
-_**walt.id did**_ library provides functionality for registering and resolving DIDs.
-There are 2 options offered for each function:
+_**walt.id did**_ library provides functionality for registering and resolving
+Decentralized Identifiers (DIDs).
+There are 2 options available for each function:
 
 - universal - relies on the universal DID registrar / resolver, e.g.:
-  - uni-registrar - https://uniregistrar.io
-  - uni-resolver - https://dev.uniresolver.io
+    - uni-registrar - https://uniregistrar.io
+    - uni-resolver - https://dev.uniresolver.io
 - local - provides local implementations of DID methods
 
 For the cryptographic part, _**walt.id did**_ library relies on _**walt.id crypto**_ library.
@@ -49,7 +50,7 @@ Register the Did with a given key:
 ```kotlin
 val key = LocalKey.generate(KeyType.Ed25519)
 val options = DidKeyCreateOptions(
-  useJwkJcsPub = true
+    useJwkJcsPub = true
 )
 val didResult = DidService.register(
     method = "key",
@@ -84,7 +85,8 @@ val document = didDocumentResult.getOrNull()
 Resolve the Did url to its public Key:
 
 ```kotlin
-val did = "did:key:zmYg9bgKmRiCqTTd9MA1ufVE9tfzUptwQp4GMRxptXquJWw4Uj5cqKBi2vyiwwxC3v7ixvJ8SB9DvDdrK7UemySWDPhvHhUcZ7pgtZtFchLtzK4YC"
+val did =
+    "did:key:zmYg9bgKmRiCqTTd9MA1ufVE9tfzUptwQp4GMRxptXquJWw4Uj5cqKBi2vyiwwxC3v7ixvJ8SB9DvDdrK7UemySWDPhvHhUcZ7pgtZtFchLtzK4YC"
 val keyResult = DidService.resolveToKey(did = did)
 val key = keyResult.getOrNull()
 ```
@@ -95,7 +97,6 @@ a successful operation and handling the result accordingly.
 
 The Did Document data is represented as `JsonObject`. The key data is
 represented as **_walt.id crypto_** `Key`.
-
 
 ## Local DID operations implemented natively
 

@@ -334,7 +334,7 @@
 
 ## How to use it
 
-The library offers the following key entities to work with:
+The library provides the following key entities to work with:
 
 - [LocalKey
   ](https://github.com/walt-id/waltid-identity/blob/main/waltid-crypto/src/commonMain/kotlin/id/walt/crypto/keys/LocalKey.kt) -
