@@ -17,14 +17,13 @@ object W3CVcUtils {
             }
         })
 
-    fun W3CVC.update(key: String, map: Map<String, JsonElement>): W3CVC {
-        return W3CVC(this.toMutableMap().apply {
+    fun W3CVC.update(key: String, map: Map<String, JsonElement>): W3CVC = W3CVC(
+        this.toMutableMap().apply {
             this[key] = JsonObject(this[key]!!.jsonObject.toMutableMap().apply {
                 map.forEach { (k, v) ->
                     this[k] = v
                 }
             })
         })
-    }
 
 }
