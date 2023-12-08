@@ -1,0 +1,26 @@
+# Intellij
+.idea/
+*.iml
+*.iws
+out
+
+# Mac
+.DS_Store
+
+# Maven
+log/
+target/
+
+# Gradle
+.gradle
+build/
+gradle-app.setting
+!gradle-wrapper.jar
+.gradletasknamecache
+**/build/
+gradle.properties
+
+.vscode
+
+# walt.id
+secret_*
