@@ -28,5 +28,9 @@ include(
     "waltid-cli",
 
     // Reporting
-    "waltid-reporting"
+    "waltid-reporting",
+
+    // Apps
+    "waltid-web-wallet"
 )
+
