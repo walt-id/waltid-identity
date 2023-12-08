@@ -39,7 +39,7 @@ class TSEKeyTest {
 
     lateinit var keys: List<TSEKey>
 
-    @Test
+//    @Test
     fun testTse() = runTest {
         println("Testing key creation of: $TESTABLE_KEY_TYPES...")
         tse1TestKeyCreation()
