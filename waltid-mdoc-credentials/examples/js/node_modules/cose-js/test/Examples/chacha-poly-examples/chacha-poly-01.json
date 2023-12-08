@@ -1,0 +1,41 @@
+{
+   "title":"ChaCha-Poly1305-01: Encryption example for spec - ",
+   "input":{
+     "plaintext":"This is the content.",
+     "enveloped":{
+       "protected":{
+         "alg":"ChaCha-Poly1305"
+       },
+       "recipients":[
+         {
+           "key":{
+             "kty":"oct",
+             "kid":"sec-256",
+             "use":"enc",
+             "k":"Dx4tPEtaaXiHlqW0w9Lh8B8uPUxbanmIl6a1xNPi8QA"
+           },
+           "unprotected":{
+             "alg":"direct",
+             "kid":"sec-256"
+           }
+         }
+       ]
+     },
+     "rng_stream":[
+       "26682306D4FB28CA01B43B80"
+     ]
+   },
+   "intermediates":{
+     "AAD_hex":"8367456E637279707444A101181840",
+     "CEK_hex":"0F1E2D3C4B5A69788796A5B4C3D2E1F01F2E3D4C5B6A798897A6B5C4D3E2F100",
+     "recipients":[
+       {
+         
+       }
+     ]
+   },
+   "output":{
+     "cbor_diag":"96([h'A1011818', {5: h'26682306D4FB28CA01B43B80'}, h'5F2BD5381BBB04921A8477E55C0D850069674A05E683D416583AA0CEE0E2929CDF648094', [[h'', {1: -6, 4: h'7365632D323536'}, h'']]])",
+     "cbor":"D8608444A1011818A1054C26682306D4FB28CA01B43B8058245F2BD5381BBB04921A8477E55C0D850069674A05E683D416583AA0CEE0E2929CDF648094818340A2012504477365632D32353640"
+   }
+ }

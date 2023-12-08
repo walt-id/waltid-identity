@@ -1,0 +1,40 @@
+{
+   "title":"AES-GCM-02: Encryption example for spec - ",
+   "input":{
+      "plaintext":"This is the content.",
+      "enveloped":{
+         "protected":{
+            "alg":"A192GCM"
+         },
+         "recipients":[
+            {
+               "key":{
+                  "kty":"oct",
+                  "kid":"sec-192",
+                  "use":"enc",
+                  "k":"Dx4tPEtaaXiHlqW0w9Lh8B8uPUxbanmI"
+               },
+               "unprotected":{
+                  "alg":"direct",
+                  "kid":"sec-48"
+               }
+            }
+         ]
+      },
+      "rng_stream":[
+         "02D1F7E6F26C43D4868D87CE"
+      ]
+   },
+   "intermediates":{
+      "AAD_hex":"8367456E637279707443A1010240",
+      "CEK_hex":"0F1E2D3C4B5A69788796A5B4C3D2E1F01F2E3D4C5B6A7988",
+      "recipients":[
+         {
+         }
+      ]
+   },
+   "output":{
+      "cbor_diag":"96([h'A10102', {5: h'02D1F7E6F26C43D4868D87CE'}, h'134D3B9223A00C1552C77585C157F467F295919D12124F19F521484C0725410947B4D1CA', [[h'', {1: -6, 4: h'7365632D3438'}, h'']]])",
+      "cbor":"D8608443A10102A1054C02D1F7E6F26C43D4868D87CE5824134D3B9223A00C1552C77585C157F467F295919D12124F19F521484C0725410947B4D1CA818340A2012504467365632D343840"
+   }
+}

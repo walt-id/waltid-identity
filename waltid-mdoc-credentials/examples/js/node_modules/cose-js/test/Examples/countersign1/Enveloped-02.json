@@ -1,0 +1,61 @@
+{
+   "title":"Enveloped-02: Enveloped w/ one Countersignature0 ",
+   "input":{
+      "plaintext":"This is the content.",
+      "enveloped":{
+         "protected":{
+            "alg":"A128GCM"
+         },
+         "recipients":[
+            {
+               "key":{
+                  "kty":"oct",
+                  "kid":"our-secret",
+                  "use":"enc",
+                  "k":"hJtXIZ2uSN5kbQfbtTNWbg"
+               },
+               "unprotected":{
+                  "alg":"direct",
+                  "kid":"our-secret"
+               },
+         "countersign0":{
+             "signers":[
+                 {
+                     "key":{
+                         "kty":"OKP",
+                         "kid":"11",
+                         "crv":"Ed25519",
+                         "x_hex":"d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a",
+                         "d_hex":"9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60"
+                     },
+                  "unsent":{
+                     "alg":"EdDSA"
+                     }
+                 }
+             ]
+         }
+            }
+         ]
+      },
+      "rng_stream":[
+         "02D1F7E6F26C43D4868D87CE"
+      ]
+   },
+   "intermediates":{
+      "AAD_hex":"8367456E637279707443A1010140",
+      "CEK_hex":"849B57219DAE48DE646D07DBB533566E",
+      "recipients":[
+          {
+            "countersign0":[
+               {
+                  "ToBeSign_hex":"8571436F756E7465725369676E61747572653040404040"
+               }
+            ]
+         }
+      ]
+   },
+   "output":{
+      "cbor_diag":"96([h'A10101', {5: h'02D1F7E6F26C43D4868D87CE'}, h'60973A94BB2898009EE52ECFD9AB1DD25867374B3581F2C80039826350B97AE2300E42FC', [[h'', {1: -6, 4: h'6F75722D736563726574', 9: h'96EA1993B2B2018D33C176FC43F2BC4DA7AFE0147748BE52A54F3C8784A79FE8127DB32017224E0B929D5C1D60B8989262D5D8F501A058F97B3FB9871C841C0D'}, h'']]])",
+      "cbor":"D8608443A10101A1054C02D1F7E6F26C43D4868D87CE582460973A94BB2898009EE52ECFD9AB1DD25867374B3581F2C80039826350B97AE2300E42FC818340A30125044A6F75722D73656372657409584096EA1993B2B2018D33C176FC43F2BC4DA7AFE0147748BE52A54F3C8784A79FE8127DB32017224E0B929D5C1D60B8989262D5D8F501A058F97B3FB9871C841C0D40"
+   }
+}

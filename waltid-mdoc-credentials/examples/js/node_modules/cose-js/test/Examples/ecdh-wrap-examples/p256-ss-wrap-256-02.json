@@ -1,0 +1,55 @@
+{
+   "title":"p256-ss-wrap-256-02: ECDH-SS direct w/ wrap 256 for 256-bit key",
+   "input":{
+      "plaintext":"This is the content.",
+      "enveloped":{
+         "protected":{
+            "alg":"A256GCM"
+         },
+         "recipients":[
+            {
+               "key":{
+                  "kty":"EC",
+                  "kid":"meriadoc.brandybuck@buckland.example",
+                  "crv":"P-256",
+                  "x":"Ze2loSV3wrroKUN_4zhwGhCqo3Xhu1td4QjeQ5wIVR0",
+                  "y":"HlLtdXARY_f55A3fnzQbPcm6hgr34Mp8p-nuzQCE0Zw",
+                  "d":"r_kHyZ-a06rmxM3yESK84r1otSg-aQcVStkRhA-iCM8"
+               },
+               "protected":{
+                  "alg":"ECDH-SS-A256KW"
+               },
+               "unprotected":{
+                  "kid":"meriadoc.brandybuck@buckland.example"
+               },
+               "sender_key":{
+                  "kty":"EC",
+                  "crv":"P-256",
+                  "x":"7cvYCcdU22WCwW1tZXR8iuzJLWGcd46xfxO1XJs-SPU",
+                  "y":"DzhJXgz9RI6TseNmwEfLoNVns8UmvONsPzQDop2dKoo",
+                  "d":"Uqr4fay_qYQykwcNCB2efj_NFaQRRQ-6fHZm763jt5w"
+               }
+            }
+         ]
+      },
+      "rng_stream":[
+         "B2353161740AACF1F7163647984B522A848DF1C3C9CF4DF2FE6C632BF7886413",
+         "02D1F7E6F26C43D4868D87CE"
+      ]
+   },
+   "intermediates":{
+      "AAD_hex":"8367456E637279707443A1010340",
+      "CEK_hex":"B2353161740AACF1F7163647984B522A848DF1C3C9CF4DF2FE6C632BF7886413",
+      "recipients":[
+         {
+            "Context_hex":"842483F6F6F683F6F6F68219010044A1013821",
+            "Secret_hex":"8CA18423C89DB8842D5FD119F90E98650243AD77848BBBBE146FCFE2E802751D",
+            "KEK_hex":"7EACAA8F388AA56382E0CAB617F1636B9EAC857DEDC5123DD26781BD7BA0F5A4"
+         }
+      ]
+   },
+   "output":{
+      "cbor_diag":"96([h'A10103', {5: h'02D1F7E6F26C43D4868D87CE'}, h'256B748DEB647131C12A10AC261DA0628E420492A36F3DED8642B4B6FA1EB15DCEC80A0F', [[h'A1013821', {-2: {-1: 1, -2: h'EDCBD809C754DB6582C16D6D65747C8AECC92D619C778EB17F13B55C9B3E48F5', -3: h'0F38495E0CFD448E93B1E366C047CBA0D567B3C526BCE36C3F3403A29D9D2A8A', 1: 2}, 4: h'6D65726961646F632E6272616E64796275636B406275636B6C616E642E6578616D706C65'}, h'352126297E8D63A0E8FCD16B891ED3CAF970C18F3F7028C31C4A16BB6494FFBF8B0E7DBD7C787734']]])",
+      "cbor":"D8608443A10103A1054C02D1F7E6F26C43D4868D87CE5824256B748DEB647131C12A10AC261DA0628E420492A36F3DED8642B4B6FA1EB15DCEC80A0F818344A1013821A221A42001215820EDCBD809C754DB6582C16D6D65747C8AECC92D619C778EB17F13B55C9B3E48F52258200F38495E0CFD448E93B1E366C047CBA0D567B3C526BCE36C3F3403A29D9D2A8A01020458246D65726961646F632E6272616E64796275636B406275636B6C616E642E6578616D706C655828352126297E8D63A0E8FCD16B891ED3CAF970C18F3F7028C31C4A16BB6494FFBF8B0E7DBD7C787734"
+   }
+}

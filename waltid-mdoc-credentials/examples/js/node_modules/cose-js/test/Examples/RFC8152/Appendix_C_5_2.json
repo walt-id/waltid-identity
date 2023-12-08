@@ -1,0 +1,55 @@
+{
+   "title":"MAC example with direct ECDH static-static and HMAC-SHA256",
+   "input":{
+      "plaintext":"This is the content.",
+      "mac":{
+         "protected":{
+            "alg":"HS256"
+         },
+         "recipients":[
+            {
+               "protected":{
+                  "alg":"ECDH-SS"
+               },
+               "unprotected":{
+                  "kid":"meriadoc.brandybuck@buckland.example",
+                  "spk_kid":"peregrin.took@tuckborough.example",
+                  "apu_nonce_hex":"4d8553e7e74f3c6a3a9dd3ef286a8195cbf8a23d19558ccfec7d34b824f42d92bd06bd2c7f0271f0214e141fb779ae2856abf585a58368b017e7f2a9e5ce4db5"
+               },
+               "key":{
+                  "kty":"EC",
+                  "kid":"meriadoc.brandybuck@buckland.example",
+                  "use":"enc",
+                  "crv":"P-256",
+                  "x":"Ze2loSV3wrroKUN_4zhwGhCqo3Xhu1td4QjeQ5wIVR0",
+                  "y":"HlLtdXARY_f55A3fnzQbPcm6hgr34Mp8p-nuzQCE0Zw",
+                  "d":"r_kHyZ-a06rmxM3yESK84r1otSg-aQcVStkRhA-iCM8"
+               },
+               "sender_key":{
+                  "kty":"EC",
+                  "crv":"P-256",
+                  "use":"enc",
+                  "kid":"peregrin.took@tuckborough.example",
+                  "x":"mPUKT_bAWGHIhg0TpjjqVsP1rXWQu_vwVOHHtNkdYoA",
+                  "y":"8BQAsImGeAS46fyWw5MhYfGTT0IjBpFw2SS34Dv4Irs",
+                  "d":"AtH35vJsQ9SGjYfOsjUxYXQKrPH3FjZHmEtSKoSN8cM"
+               }
+            }
+         ]
+      }
+   },
+   "intermediates":{
+      "ToMac_hex":"84634D414343A101054054546869732069732074686520636F6E74656E742E",
+      "CEK_hex":"1C86606741D3C5C7683BD8767B5A6E6D7DDA6735C76DF3E885546E4BDCA838AB",
+      "recipients":[
+         {
+            "Context_hex":"840583F658404D8553E7E74F3C6A3A9DD3EF286A8195CBF8A23D19558CCFEC7D34B824F42D92BD06BD2C7F0271F0214E141FB779AE2856ABF585A58368B017E7F2A9E5CE4DB5F683F6F6F68219010044A101381A",
+            "Secret_hex":"4B31712E096E5F20B4ECF9790FD8CC7C8B7E2C8AD90BDA81CB224F62C0E7B9A6"
+         }
+      ]
+   },
+   "output":{
+      "cbor_diag":"97([h'A10105', {}, h'546869732069732074686520636F6E74656E742E', h'81A03448ACD3D305376EAA11FB3FE416A955BE2CBE7EC96F012C994BC3F16A41', [[h'A101381A', {-3: h'706572656772696E2E746F6F6B407475636B626F726F7567682E6578616D706C65', 4: h'6D65726961646F632E6272616E64796275636B406275636B6C616E642E6578616D706C65', -22: h'4D8553E7E74F3C6A3A9DD3EF286A8195CBF8A23D19558CCFEC7D34B824F42D92BD06BD2C7F0271F0214E141FB779AE2856ABF585A58368B017E7F2A9E5CE4DB5'}, h'']]])",
+      "cbor":"D8618543A10105A054546869732069732074686520636F6E74656E742E582081A03448ACD3D305376EAA11FB3FE416A955BE2CBE7EC96F012C994BC3F16A41818344A101381AA3225821706572656772696E2E746F6F6B407475636B626F726F7567682E6578616D706C650458246D65726961646F632E6272616E64796275636B406275636B6C616E642E6578616D706C653558404D8553E7E74F3C6A3A9DD3EF286A8195CBF8A23D19558CCFEC7D34B824F42D92BD06BD2C7F0271F0214E141FB779AE2856ABF585A58368B017E7F2A9E5CE4DB540"
+   }
+}

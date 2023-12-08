@@ -1,0 +1,69 @@
+[
+  {
+    / kty / 1:2, 
+    / kid / 2:'11', 
+    / crv / -1:1, 
+    / x / -2:h'bac5b11cad8f99f9c72b05cf4b9e26d244dc189f745228255a219
+a86d6a09eff', 
+    / y / -3:h'20138bf82dc1b6d562be0fa54ab7804a3a64b6d72ccfed6b6fb6e
+d28bbfc117e', 
+    / d / -4:h'57c92077664146e876760c9520d054aa93c3afb04e306705db609
+0308507b4d3'
+  }, 
+  {
+    / kty / 1:2, 
+    / kid / 2:'meriadoc.brandybuck@buckland.example', 
+    / crv / -1:1, 
+    / x / -2:h'65eda5a12577c2bae829437fe338701a10aaa375e1bb5b5de108d
+e439c08551d', 
+    / y / -3:h'1e52ed75701163f7f9e40ddf9f341b3dc9ba860af7e0ca7ca7e9e
+ecd0084d19c', 
+    / d / -4:h'aff907c99f9ad3aae6c4cdf21122bce2bd68b5283e6907154ad91
+1840fa208cf'
+  }, 
+  {
+    / kty / 1:4, 
+    / kid / 2:'our-secret', 
+    / k / -1:h'849b57219dae48de646d07dbb533566e976686457c1491be3a76d
+cea6c427188'
+  }, 
+  {
+    / kty / 1:2, 
+    / kid / 2:'bilbo.baggins@hobbiton.example', 
+    / crv / -1:3, 
+    / x / -2:h'0072992cb3ac08ecf3e5c63dedec0d51a8c1f79ef2f82f94f3c73
+7bf5de7986671eac625fe8257bbd0394644caaa3aaf8f27a4585fbbcad0f24576200
+85e5c8f42ad', 
+    / y / -3:h'01dca6947bce88bc5790485ac97427342bc35f887d86d65a08937
+7e247e60baa55e4e8501e2ada5724ac51d6909008033ebc10ac999b9d7f5cc2519f3
+fe1ea1d9475', 
+    / d / -4:h'00085138ddabf5ca975f5860f91a08e91d6d5f9a76ad4018766a4
+76680b55cd339e8ab6c72b5facdb2a2a50ac25bd086647dd3e2e6e99e84ca2c3609f
+df177feb26d'
+  }, 
+  {
+    / kty / 1:4, 
+    / kid / 2:'our-secret2', 
+    / k / -1:h'849b5786457c1491be3a76dcea6c4271'
+  }, 
+  {
+    / kty / 1:2, 
+    / crv / -1:1, 
+    / kid / 2:'peregrin.took@tuckborough.example', 
+    / x / -2:h'98f50a4ff6c05861c8860d13a638ea56c3f5ad7590bbfbf054e1c
+7b4d91d6280', 
+    / y / -3:h'f01400b089867804b8e9fc96c3932161f1934f4223069170d924b
+7e03bf822bb', 
+    / d / -4:h'02d1f7e6f26c43d4868d87ceb2353161740aacf1f7163647984b5
+22a848df1c3'
+  }, 
+  {
+    / kty / 1:4, 
+    / kid / 2:'018c0ae5-4d9b-471b-bfd6-eef314bc7037', 
+    / k / -1:h'849b57219dae48de646d07dbb533566e976686457c1491be3a76d
+cea6c427188'
+},
+{"1":2,"-1":"P-384","-2":"7cvYCcdU22WCwW1tZXR8iuzJLWGcd46xfxO1XJs-SPU","-3":"DzhJXgz9RI6TseNmwEfLoNVns8UmvONsPzQDop2dKoo","-4":"Uqr4fay_qYQykwcNCB2efj_NFaQRRQ-6fHZm763jt5w"},
+{"1":2,"-1":"P-384","-2":"u824K6sAZAbypMg_f0WPDE4-zq8RInaGPCvk02d3zawMrSUBZNYASSj7wYrLtQ7m","-3":"W1AqPxy6wxLM9pAl_AMJulsC9ToiOjSRcg4MBMLTHClO8p8boUwE8OfjTwharQFC","-4":"Tpz0-PNSmn_8L4FLxgKOoTZS0_3FYEDNtv3ghWbLYUTyLGa5uwExbkm599isJTgl"},
+{"1":2,"-1":"P-384","-2":"8_W0gLUTLb__hp6SDTqeJykre69AQtfsc9plRdh_ap35gJhmVHsvpGpbQKIaM2_27InmyvF1Fv9K3zunBt9nHgE","-3":"AQMe7-xEu5s49sLiFXIGsY4FVgAxFe6HW1nT3sqOcqgkFs0_Y7fWpDkAGLc1Og3Qqmt7-8-7d0fTW1nNtf5RJqdM","-4":"Af9IsRGlT6A-iPBgaSukjyB6A0LP6GTcw9wO-e71yUfMbb9YJMnjYFq1DBjjvxEyI35mjP-k115wW0q9LxYPvlRt"}             b
+]

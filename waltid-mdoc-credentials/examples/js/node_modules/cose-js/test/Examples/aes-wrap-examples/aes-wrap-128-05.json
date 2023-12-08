@@ -1,0 +1,41 @@
+{
+   "title":"wrap-128-05: 128-bit key wrap for 192-bit encrypt",
+   "input":{
+      "plaintext":"This is the content.",
+      "enveloped":{
+         "protected":{
+            "alg":"A192GCM"
+         },
+         "recipients":[
+            {
+               "unprotected":{
+                  "kid":"our-secret",
+                  "alg":"A128KW"
+               },
+               "key":{
+                  "kty":"oct",
+                  "kid":"our-secret",
+                  "use":"enc",
+                  "k":"hJtXIZ2uSN5kbQfbtTNWbg"
+               }
+            }
+         ]
+      },
+      "rng_stream":[
+         "7A1B4CF7C5F085E2A829685D99C1810251E162022A65CDB9",
+         "DDDC08972DF9BE62855291A1"
+      ]
+   },
+   "intermediates":{
+      "recipients":[
+         {
+         }
+      ],
+      "AAD_hex":"8367456E637279707443A1010240",
+      "CEK_hex":"7A1B4CF7C5F085E2A829685D99C1810251E162022A65CDB9"
+   },
+   "output":{
+      "cbor_diag":"96([h'A10102', {5: h'DDDC08972DF9BE62855291A1'}, h'3CA8EE3F7927A730BC9DBD6FA3070764F6F6319CF2C31FBDA4C288F19CF6F064C8B32E28', [[h'', {1: -3, 4: h'6F75722D736563726574'}, h'23A276FE917EF97D9D60E1732C02E6B7E5820C2FD2712DE9E36000F74559BC38']]])",
+      "cbor":"D8608443A10102A1054CDDDC08972DF9BE62855291A158243CA8EE3F7927A730BC9DBD6FA3070764F6F6319CF2C31FBDA4C288F19CF6F064C8B32E28818340A20122044A6F75722D736563726574582023A276FE917EF97D9D60E1732C02E6B7E5820C2FD2712DE9E36000F74559BC38"
+   }
+}

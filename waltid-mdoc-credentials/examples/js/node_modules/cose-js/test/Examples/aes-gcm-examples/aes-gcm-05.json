@@ -1,0 +1,43 @@
+{
+   "title":"AES-GCM-05: Encryption partial IV",
+   "input":{
+      "plaintext":"This is the content.",
+      "enveloped":{
+         "protected":{
+            "alg":"A128GCM"
+         },
+         "unprotected":{
+            "partialIV_hex":"61A7"
+         },
+         "unsent":{
+            "IV_hex":"89F52F65A1C58093000061A7"
+         },
+         "recipients":[
+            {
+               "key":{
+                  "kty":"oct",
+                  "kid":"our-secret",
+                  "use":"enc",
+                  "k":"hJtXIZ2uSN5kbQfbtTNWbg"
+               },
+               "unprotected":{
+                  "alg":"direct",
+                  "kid":"our-secret"
+               }
+            }
+         ]
+      }
+   },
+   "intermediates":{
+      "AAD_hex":"8367456E637279707443A1010140",
+      "CEK_hex":"849B57219DAE48DE646D07DBB533566E",
+      "recipients":[
+         {
+         }
+      ]
+   },
+   "output":{
+      "cbor_diag":"96([h'A10101', {6: h'61A7'}, h'D3D893DFF22BDCF09A58CBBE701371AEE31EE0AA3C1C8A6CE8409D5E5E81A6B5C355A644', [[h'', {1: -6, 4: h'6F75722D736563726574'}, h'']]])",
+      "cbor":"D8608443A10101A1064261A75824D3D893DFF22BDCF09A58CBBE701371AEE31EE0AA3C1C8A6CE8409D5E5E81A6B5C355A644818340A20125044A6F75722D73656372657440"
+   }
+}

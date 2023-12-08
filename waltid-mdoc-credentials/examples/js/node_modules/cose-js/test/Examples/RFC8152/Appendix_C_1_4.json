@@ -1,0 +1,44 @@
+{
+   "title":"Sig-04: Add crit flag and origination time",
+   "input":{
+      "plaintext":"This is the content.",
+      "sign":{
+         "protected":{
+            "reserved":false,
+            "crit":[
+               "reserved"
+            ]
+         },
+         "signers":[
+            {
+               "key":{
+                  "kty":"EC",
+                  "kid":"11",
+                  "crv":"P-256",
+                  "x":"usWxHK2PmfnHKwXPS54m0kTcGJ90UiglWiGahtagnv8",
+                  "y":"IBOL-C3BttVivg-lSreASjpkttcsz-1rb7btKLv8EX4",
+                  "d":"V8kgd2ZBRuh2dgyVINBUqpPDr7BOMGcF22CQMIUHtNM"
+               },
+               "unprotected":{
+                  "kid":"11"
+               },
+               "protected":{
+                  "alg":"ES256"
+               }
+            }
+         ]
+      },
+      "rng_description":"seed for signature"
+   },
+   "intermediates":{
+      "signers":[
+         {
+            "ToBeSign_hex":"85695369676E617475726556A2687265736572766564F4028168726573657276656443A101264054546869732069732074686520636F6E74656E742E"
+         }
+      ]
+   },
+   "output":{
+      "cbor_diag":"98([h'A2687265736572766564F40281687265736572766564', {}, h'546869732069732074686520636F6E74656E742E', [[h'A10126', {4: h'3131'}, h'3FC54702AA56E1B2CB20284294C9106A63F91BAC658D69351210A031D8FC7C5FF3E4BE39445B1A3E83E1510D1ACA2F2E8A7C081C7645042B18ABA9D1FAD1BD9C']]])",
+      "cbor":"D8628456A2687265736572766564F40281687265736572766564A054546869732069732074686520636F6E74656E742E818343A10126A10442313158403FC54702AA56E1B2CB20284294C9106A63F91BAC658D69351210A031D8FC7C5FF3E4BE39445B1A3E83E1510D1ACA2F2E8A7C081C7645042B18ABA9D1FAD1BD9C"
+   }
+}

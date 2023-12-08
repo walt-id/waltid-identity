@@ -1,0 +1,47 @@
+{
+   "title":"HKDF-HMAC-SHA-256-09: Direct HKDF HMAC-SHA-256 - U id + u nonce + v id + v nonce",
+   "input":{
+      "plaintext":"This is the content.",
+      "enveloped":{
+         "protected":{
+            "alg":"AES-CCM-16-128/64"
+         },
+         "recipients":[
+            {
+               "key":{
+                  "kty":"oct",
+                  "kid":"our-secret",
+                  "use":"enc",
+                  "k":"hJtXIZ2uSN5kbQfbtTNWbpdmhkV8FJG-Onbc6mxCcYg"
+               },
+               "protected":{
+                  "alg":"HKDF-HMAC-SHA-256"
+               },
+               "unprotected":{
+                  "kid":"our-secret",
+                  "apu_id":"Sender",
+                  "apv_id":"Recipient",
+                  "apu_nonce":"S101",
+                  "apv_nonce":"R102"
+               }
+            }
+         ]
+      },
+      "rng_stream":[
+         "BFE89563EE070CE187BDF1C472"
+      ]
+   },
+   "intermediates":{
+      "AAD_hex":"8367456E637279707443A1010A40",
+      "CEK_hex":"052B7540EEE119A13779C16AF4520012",
+      "recipients":[
+         {
+            "Context_hex":"840A834653656E6465724453313031F68349526563697069656E744452313032F682188043A10129"
+         }
+      ]
+   },
+   "output":{
+      "cbor_diag":"96([h'A1010A', {5: h'BFE89563EE070CE187BDF1C472'}, h'E1FC8942C576DE776EEC2DCBE302743C82404AB8642A4D9193A90EC2', [[h'A10129', {-21: h'53656E646572', 4: h'6F75722D736563726574', -24: h'526563697069656E74', -22: h'53313031', -25: h'52313032'}, h'']]])",
+      "cbor":"D8608443A1010AA1054DBFE89563EE070CE187BDF1C472581CE1FC8942C576DE776EEC2DCBE302743C82404AB8642A4D9193A90EC2818343A10129A5344653656E646572044A6F75722D7365637265743749526563697069656E743544533130313818445231303240"
+   }
+}

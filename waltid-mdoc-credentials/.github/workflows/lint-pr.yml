@@ -1,0 +1,66 @@
+name: "Lint PR"
+
+on:
+  pull_request_target:
+    types:
+      - opened
+      - edited
+      - synchronize
+
+jobs:
+  main:
+    name: Validate PR
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - uses: walt-id/commitlint-github-action@v4
+        with:
+          noMerges: true
+        id: lint_commit_messages
+        continue-on-error: true
+      - name: semantic-pull-request
+        if: always() && !contains(fromJSON(steps.lint_commit_messages.outputs.results).*.valid, true)
+        id: lint_pr_title
+        uses: amannn/action-semantic-pull-request@v5.2.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: marocchino/sticky-pull-request-comment@v2
+        # When the previous steps fails, the workflow would stop. By adding this
+        # condition you can continue the execution with the populated error message.
+        if: always() && (steps.lint_pr_title.outputs.error_message != null || contains(fromJSON(steps.lint_commit_messages.outputs.results).*.valid, false))
+        with:
+          header: pr-title-lint-error
+          message: |
+            Hey there and thank you for opening this pull request! 👋🏼
+            
+            Some or all of your commit messages do not seem to follow the [Conventional Commits specification](https://www.conventionalcommits.org/en/v1.0.0/).
+            To allow the merge of this pull request, we require that at least one commit message <b>or</b> the PR title follow that convention.
+            
+            You have the <b>following possibilities to proceed</b> with this PR:
+            1) Make sure at least one commit message complies with the [Conventional Commits specification](https://www.conventionalcommits.org/en/v1.0.0/).
+               Note, if not all messages comply, the merge will be allowed, but you will still see this warning.
+            2) Update the title of this pull request to comply with the [Conventional Commits specification](https://www.conventionalcommits.org/en/v1.0.0/).
+            
+            <b>Further information:</b>
+            The commit messages and PR title will be parsed according to the [Conventional Commits specification](https://www.conventionalcommits.org/en/v1.0.0/), to automatically populate the release notes for the next official release.
+            Therefore, make sure the commit messages <b>or</b> PR title contain the necessary and relevant information describing the changes of this pull request.
+
+            <b>Commit message details:</b>
+            
+            ```
+            ${{ toJSON(fromJSON(steps.lint_commit_messages.outputs.results)) }}
+            ```
+
+            <b>PR title details:</b>
+            ```
+            ${{ steps.lint_pr_title.outputs.error_message }}
+            ```
+
+      # Delete a previous comment when the issue has been resolved
+      - if: ${{ steps.lint_pr_title.outputs.error_message == null && !contains(fromJSON(steps.lint_commit_messages.outputs.results).*.valid, false) }}
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:   
+          header: pr-title-lint-error
+          delete: true

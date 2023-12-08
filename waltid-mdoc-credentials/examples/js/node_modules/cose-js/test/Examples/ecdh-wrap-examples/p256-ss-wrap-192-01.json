@@ -1,0 +1,55 @@
+{
+   "title":"p256-ss-wrap-128-01: ECDH-SS direct w/ key wrap 192 for 128-bit key",
+   "input":{
+      "plaintext":"This is the content.",
+      "enveloped":{
+         "protected":{
+            "alg":"A128GCM"
+         },
+         "recipients":[
+            {
+               "key":{
+                  "kty":"EC",
+                  "kid":"meriadoc.brandybuck@buckland.example",
+                  "crv":"P-256",
+                  "x":"Ze2loSV3wrroKUN_4zhwGhCqo3Xhu1td4QjeQ5wIVR0",
+                  "y":"HlLtdXARY_f55A3fnzQbPcm6hgr34Mp8p-nuzQCE0Zw",
+                  "d":"r_kHyZ-a06rmxM3yESK84r1otSg-aQcVStkRhA-iCM8"
+               },
+               "protected":{
+                  "alg":"ECDH-SS-A192KW"
+               },
+               "unprotected":{
+                  "kid":"meriadoc.brandybuck@buckland.example"
+               },
+               "sender_key":{
+                  "kty":"EC",
+                  "crv":"P-256",
+                  "x":"7cvYCcdU22WCwW1tZXR8iuzJLWGcd46xfxO1XJs-SPU",
+                  "y":"DzhJXgz9RI6TseNmwEfLoNVns8UmvONsPzQDop2dKoo",
+                  "d":"Uqr4fay_qYQykwcNCB2efj_NFaQRRQ-6fHZm763jt5w"
+               }
+            }
+         ]
+      },
+      "rng_stream":[
+         "B2353161740AACF1F7163647984B522A",
+         "02D1F7E6F26C43D4868D87CE"
+      ]
+   },
+   "intermediates":{
+      "AAD_hex":"8367456E637279707443A1010140",
+      "CEK_hex":"B2353161740AACF1F7163647984B522A",
+      "recipients":[
+         {
+            "Context_hex":"842383F6F6F683F6F6F68218C044A1013820",
+            "Secret_hex":"8CA18423C89DB8842D5FD119F90E98650243AD77848BBBBE146FCFE2E802751D",
+            "KEK_hex":"99118A23090E360857A91B20A31A239EB89183D55535FD5F"
+         }
+      ]
+   },
+   "output":{
+      "cbor_diag":"96([h'A10101', {5: h'02D1F7E6F26C43D4868D87CE'}, h'64F84D913BA60A76070A9A48F26E97E863E2852948658F0811139868826E89218A75715B', [[h'A1013820', {-2: {-1: 1, -2: h'EDCBD809C754DB6582C16D6D65747C8AECC92D619C778EB17F13B55C9B3E48F5', -3: h'0F38495E0CFD448E93B1E366C047CBA0D567B3C526BCE36C3F3403A29D9D2A8A', 1: 2}, 4: h'6D65726961646F632E6272616E64796275636B406275636B6C616E642E6578616D706C65'}, h'FB271774C7AD02BCE547EE7170CE02A2E2BD493EEAEB5641']]])",
+      "cbor":"D8608443A10101A1054C02D1F7E6F26C43D4868D87CE582464F84D913BA60A76070A9A48F26E97E863E2852948658F0811139868826E89218A75715B818344A1013820A221A42001215820EDCBD809C754DB6582C16D6D65747C8AECC92D619C778EB17F13B55C9B3E48F52258200F38495E0CFD448E93B1E366C047CBA0D567B3C526BCE36C3F3403A29D9D2A8A01020458246D65726961646F632E6272616E64796275636B406275636B6C616E642E6578616D706C655818FB271774C7AD02BCE547EE7170CE02A2E2BD493EEAEB5641"
+   }
+}

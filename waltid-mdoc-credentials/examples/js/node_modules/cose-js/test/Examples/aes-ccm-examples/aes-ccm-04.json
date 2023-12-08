@@ -1,0 +1,40 @@
+{
+   "title":"AES-CCM-04: Encrypt w/ AES-CCM 64-128/128 - direct",
+   "input":{
+      "plaintext":"This is the content.",
+      "enveloped":{
+         "protected":{
+            "alg":"AES-CCM-64-128/128"
+         },
+         "recipients":[
+            {
+               "key":{
+                  "kty":"oct",
+                  "kid":"our-secret",
+                  "use":"enc",
+                  "k":"hJtXIZ2uSN5kbQfbtTNWbg"
+               },
+               "unprotected":{
+                  "alg":"direct",
+                  "kid":"our-secret"
+               }
+            }
+         ]
+      },
+      "rng_stream":[
+         "89F52F65A1C580"
+      ]
+   },
+   "intermediates":{
+      "recipients":[
+         {
+         }
+      ],
+      "AAD_hex":"8367456E637279707444A101182040",
+      "CEK_hex":"849B57219DAE48DE646D07DBB533566E"
+   },
+   "output":{
+      "cbor_diag":"96([h'A1011820', {5: h'89F52F65A1C580'}, h'191BD858DEC79FC11DA3428BDFA446AC240D591F59482AEA4157167842D7BF5EDD68EC92', [[h'', {1: -6, 4: h'6F75722D736563726574'}, h'']]])",
+      "cbor":"D8608444A1011820A1054789F52F65A1C5805824191BD858DEC79FC11DA3428BDFA446AC240D591F59482AEA4157167842D7BF5EDD68EC92818340A20125044A6F75722D73656372657440"
+   }
+}

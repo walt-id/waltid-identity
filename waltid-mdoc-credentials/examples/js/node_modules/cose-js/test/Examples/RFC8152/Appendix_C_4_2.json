@@ -1,0 +1,38 @@
+{
+   "title":"Encryption example for spec - Direct key - partial IV",
+   "input":{
+      "plaintext":"This is the content.",
+      "encrypted":{
+         "protected":{
+            "alg":"AES-CCM-16-128/64"
+         },
+         "unprotected":{
+            "partialIV_hex":"61A7"
+         },
+         "unsent":{
+            "IV_hex":"89F52F65A1C5809300000061A7"
+         },
+         "recipients":[
+            {
+               "key":{
+                  "kty":"oct",
+                  "kid":"our-secret2",
+                  "use":"enc",
+                  "k":"hJtXhkV8FJG-Onbc6mxCcY"
+               },
+               "unprotected":{
+                  "alg":"direct"
+               }
+            }
+         ]
+      }
+   },
+   "intermediates":{
+      "AAD_hex":"8368456E63727970743043A1010A40",
+      "CEK_hex":"849B5786457C1491BE3A76DCEA6C4271"
+   },
+   "output":{
+      "cbor_diag":"16([h'A1010A', {6: h'61A7'}, h'252A8911D465C125B6764739700F0141ED09192DE139E053BD09ABCA'])",
+      "cbor":"D08343A1010AA1064261A7581C252A8911D465C125B6764739700F0141ED09192DE139E053BD09ABCA"
+   }
+}

@@ -1,0 +1,38 @@
+{
+   "title":"HMAC-03: Direct key + HMAC-SHA512",
+   "input":{
+      "plaintext":"This is the content.",
+      "mac":{
+         "alg":"HS512",
+         "protected":{
+            "alg":"HS512"
+         },
+         "recipients":[
+            {
+               "unprotected":{
+                  "alg":"direct",
+                  "kid":"sec-64"
+               },
+               "key":{
+                  "kty":"oct",
+                  "kid":"sec-64",
+                  "use":"enc",
+                  "k":"hJtXIZ2uSN5kbQfbtTNWbpdmhkV8FJG-Onbc6mxCcYgAESIzd4iZqiEiIyQlJicoqrvM3e7_paanqKmgsbKztA"
+               }
+            }
+         ]
+      }
+   },
+   "intermediates":{
+      "ToMac_hex":"84634D414343A101074054546869732069732074686520636F6E74656E742E",
+      "CEK_hex":"849B57219DAE48DE646D07DBB533566E976686457C1491BE3A76DCEA6C42718800112233778899AA2122232425262728AABBCCDDEEFFA5A6A7A8A9A0B1B2B3B4",
+      "recipients":[
+         {
+         }
+      ]
+   },
+   "output":{
+      "cbor_diag":"97([h'A10107', {}, h'546869732069732074686520636F6E74656E742E', h'CD28A6B3CFBBBF214851B906E050056CB438A8B88905B8B7461977022711A9D8AC5DBC54E29A56D926046B40FC2607C25B344454AA5F68DE09A3E525D3865A05', [[h'', {1: -6, 4: h'7365632D3634'}, h'']]])",
+      "cbor":"D8618543A10107A054546869732069732074686520636F6E74656E742E5840CD28A6B3CFBBBF214851B906E050056CB438A8B88905B8B7461977022711A9D8AC5DBC54E29A56D926046B40FC2607C25B344454AA5F68DE09A3E525D3865A05818340A2012504467365632D363440"
+   }
+}

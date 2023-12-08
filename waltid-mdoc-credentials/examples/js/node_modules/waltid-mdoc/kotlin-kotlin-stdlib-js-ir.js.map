@@ -1,0 +1,1 @@
+{"version":3,"sources":["runtime/coreRuntime.kt"],"sourcesContent":[null],"names":["protoOf","constructor","defineProp","obj","name","getter","setter"],"mappings":";;;;;;;;;;;kBA+ISA,CAAYC,WAAZD,EACL;A,IAA2B,mBAAX,S;EAAU,C;qBAsCrBE,CAAeC,G,EAAUC,I,EAAcC,M,EAAcC,MAArDJ,EACL;A,IAAwF,OAApF,MAAqB,CAAd,cAAc,YAAY,CAAE,YAAF,EAAgB,IAAhB,EAAsB,GAAtB,UAAmC,GAAnC,SAAZ,C;EAA8D,C;;;;"}

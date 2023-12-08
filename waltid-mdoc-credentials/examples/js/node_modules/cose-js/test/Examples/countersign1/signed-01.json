@@ -1,0 +1,61 @@
+{
+   "title":"signed-01: Signed message w/ one countersignature0 on signer",
+   "input":{
+      "plaintext":"This is the content.",
+      "sign":{
+         "protected":{
+            "ctyp":0
+         },
+         "signers":[
+            {
+               "key":{
+                  "kty":"OKP",
+                  "kid":"11",
+                  "crv":"Ed25519",
+                  "x_hex":"d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a",
+                  "d_hex":"9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60"
+               },
+               "unprotected":{
+                  "kid":"11"
+               },
+               "protected":{
+                   "alg":"EdDSA"
+               },
+               "countersign0":{
+                    "signers":[
+                        {
+                            "key":{
+                                "kty":"OKP",
+                                "kid":"11",
+                                "crv":"Ed25519",
+                                "x_hex":"d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a",
+                                "d_hex":"9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60"
+                            },
+                        "unsent":{
+                           "alg":"EdDSA"
+                            }
+                        }
+                    ]
+                }
+            }
+         ]
+      },
+      "rng_description":"seed for signature"
+   },
+   "intermediates":{
+      "signers":[
+         {
+            "ToBeSign_hex":"85695369676E617475726543A1030043A101274054546869732069732074686520636F6E74656E742E",
+            "countersign0":[
+               {
+                  "ToBeSign_hex":"8571436F756E7465725369676E61747572653043A101274040584077F3EACD11852C4BF9CB1D72FABE6B26FBA1D76092B2B5B7EC83B83557652264E69690DBC1172DDC0BF88411C0D25A507FDB247A20C40D5E245FABD3FC9EC106"
+            }
+                             ]
+         }
+      ]
+   },
+   "output":{
+      "cbor_diag":"98([h'A10300', {}, h'546869732069732074686520636F6E74656E742E', [[h'A10127', {9: h'36739BEE3AA76D601E9C5F8AA391D9D67168F80DE3968A39FCA86CA00C7B9CC8C8239A6D5317C8CCFE1F6308931C739FFA151DF214604C7DA21B85BF0EE7D70F', 4: h'3131'}, h'77F3EACD11852C4BF9CB1D72FABE6B26FBA1D76092B2B5B7EC83B83557652264E69690DBC1172DDC0BF88411C0D25A507FDB247A20C40D5E245FABD3FC9EC106']]])",
+      "cbor":"D8628443A10300A054546869732069732074686520636F6E74656E742E818343A10127A209584036739BEE3AA76D601E9C5F8AA391D9D67168F80DE3968A39FCA86CA00C7B9CC8C8239A6D5317C8CCFE1F6308931C739FFA151DF214604C7DA21B85BF0EE7D70F04423131584077F3EACD11852C4BF9CB1D72FABE6B26FBA1D76092B2B5B7EC83B83557652264E69690DBC1172DDC0BF88411C0D25A507FDB247A20C40D5E245FABD3FC9EC106"
+   }
+}

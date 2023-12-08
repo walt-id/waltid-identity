@@ -1,0 +1,74 @@
+{
+   "title":"signed1-02: Sign 1 structure w/ two counter signatures",
+   "input":{
+      "plaintext":"This is the content.",
+      "sign0":{
+         "key":{
+            "kty":"OKP",
+            "kid":"11",
+            "crv":"Ed25519",
+            "x_hex":"d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a",
+            "d_hex":"9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60"
+         },
+         "unprotected":{
+            "kid":"11"
+         },
+         "protected":{
+            "alg":"EdDSA",
+            "ctyp":0
+         },
+         "alg":"EdDSA",
+         "countersign":{
+             "signers":[
+                 {
+                     "key":{
+                         "kty":"OKP",
+                         "kid":"11",
+                         "crv":"Ed25519",
+                         "x_hex":"d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a",
+                         "d_hex":"9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60"
+                     },
+                     "unprotected":{
+                         "kid":"11"
+                     },
+                     "protected":{
+                         "alg":"EdDSA"
+                     }
+                 },
+                 {
+                     "key":{
+                         "kty":"EC",
+                         "kid":"11",
+                         "crv":"P-256",
+                         "x":"usWxHK2PmfnHKwXPS54m0kTcGJ90UiglWiGahtagnv8",
+                         "y":"IBOL-C3BttVivg-lSreASjpkttcsz-1rb7btKLv8EX4",
+                         "d":"V8kgd2ZBRuh2dgyVINBUqpPDr7BOMGcF22CQMIUHtNM"
+                     },
+                     "unprotected":{
+                         "kid":"11"
+                     },
+                     "protected":{
+                         "alg":"ES256"
+                     }
+                 }
+             ]
+         }
+      },
+      "rng_description":"seed for signature"
+   },
+   "intermediates":{
+       "ToBeSign_hex":"846A5369676E61747572653145A2012703004054546869732069732074686520636F6E74656E742E",
+      "countersigners":[
+         {
+            "ToBeSign_hex":"8570436F756E7465725369676E617475726545A20127030043A101274054546869732069732074686520636F6E74656E742E"
+         },
+         {
+            "ToBeSign_hex":"8570436F756E7465725369676E617475726545A20127030043A101264054546869732069732074686520636F6E74656E742E"
+         }
+      ]
+   },
+   "output":{
+      "cbor_diag":"18([h'A201270300', {7: [[h'A10127', {4: h'3131'}, h'6DAED158AFE4032E8DD477D3D2B7F667E7957AA8302BB5E568B4DCBCCE3CF0ED5A90F831351C85D6155A42A17CA1F25F501CC13F67108AE53BDA92DB88272E00'], [h'A10126', {4: h'3131'}, h'93487D09256A3EF4963719BA5CF101ACE2FC13D6314B49582171FFA4A1314DC93E4A4ADFA42A79E31B35D7304358585B41799678CE00CA47C3E023863923F8C8']], 4: h'3131'}, h'546869732069732074686520636F6E74656E742E', h'7142FD2FF96D56DB85BEE905A76BA1D0B7321A95C8C4D3607C5781932B7AFB8711497DFA751BF40B58B3BCC32300B1487F3DB34085EEF013BF08F4A44D6FEF0D'])",
+      "cbor":"D28445A201270300A207828343A10127A10442313158406DAED158AFE4032E8DD477D3D2B7F667E7957AA8302BB5E568B4DCBCCE3CF0ED5A90F831351C85D6155A42A17CA1F25F501CC13F67108AE53BDA92DB88272E008343A10126A104423131584093487D09256A3EF4963719BA5CF101ACE2FC13D6314B49582171FFA4A1314DC93E4A4ADFA42A79E31B35D7304358585B41799678CE00CA47C3E023863923F8C80442313154546869732069732074686520636F6E74656E742E58407142FD2FF96D56DB85BEE905A76BA1D0B7321A95C8C4D3607C5781932B7AFB8711497DFA751BF40B58B3BCC32300B1487F3DB34085EEF013BF08F4A44D6FEF0D"
+   }
+}

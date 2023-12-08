@@ -1,0 +1,41 @@
+{
+   "title":"wrap-256-05: 256-bit key wrap for 192-bit encrypt",
+   "input":{
+      "plaintext":"This is the content.",
+      "enveloped":{
+         "protected":{
+            "alg":"A192GCM"
+         },
+         "recipients":[
+            {
+               "unprotected":{
+                  "kid":"018c0ae5-4d9b-471b-bfd6-eef314bc7037",
+                  "alg":"A256KW"
+               },
+               "key":{
+                  "kty":"oct",
+                  "kid":"018c0ae5-4d9b-471b-bfd6-eef314bc7037",
+                  "use":"enc",
+                  "k":"hJtXIZ2uSN5kbQfbtTNWbpdmhkV8FJG-Onbc6mxCcYg"
+               }
+            }
+         ]
+      },
+      "rng_stream":[
+         "7A1B4CF7D3F44E14D7E01D160EB3B6A9FD6836C8E9AA27F2",
+         "DDDC08972DF9BE62855291A1"
+      ]
+   },
+   "intermediates":{
+      "recipients":[
+         {
+         }
+      ],
+      "AAD_hex":"8367456E637279707443A1010240",
+      "CEK_hex":"7A1B4CF7D3F44E14D7E01D160EB3B6A9FD6836C8E9AA27F2"
+   },
+   "output":{
+      "cbor_diag":"96([h'A10102', {5: h'DDDC08972DF9BE62855291A1'}, h'56469FC7CA43E0F7F1970156D7D3C5EDAE33915C6DDFC0D2AC38AC13C3D00818E806D9C9', [[h'', {1: -5, 4: h'30313863306165352D346439622D343731622D626664362D656566333134626337303337'}, h'E23608D3E444847B45BD6FEBFF3CC83C5C0769E65D441CCEF0B70C09121A79F6']]])",
+      "cbor":"D8608443A10102A1054CDDDC08972DF9BE62855291A1582456469FC7CA43E0F7F1970156D7D3C5EDAE33915C6DDFC0D2AC38AC13C3D00818E806D9C9818340A2012404582430313863306165352D346439622D343731622D626664362D6565663331346263373033375820E23608D3E444847B45BD6FEBFF3CC83C5C0769E65D441CCEF0B70C09121A79F6"
+   }
+}

@@ -1,0 +1,41 @@
+{
+   "title":"wrap-129-02: 129-bit key wrap for 256-bit MAC",
+   "input":{
+      "plaintext":"This is the content.",
+      "mac":{
+         "alg":"AES-MAC-256/64",
+         "protected":{
+            "alg":"AES-MAC-256/64"
+         },
+         "recipients":[
+            {
+               "unprotected":{
+                  "kid":"sec-192",
+                  "alg":"A192KW"
+               },
+               "key":{
+                  "kty":"oct",
+                  "kid":"sec-192",
+                  "use":"enc",
+                  "k":"Dx4tPEtaaXiHlqW0w9Lh8B8uPUxbanmI"
+               }
+            }
+         ]
+      },
+      "rng_stream":[
+         "DDDC08972DF9BE62855291A17A1B4CF7823E187F795DD52817F2D71AEC89359E"
+      ]
+   },
+   "intermediates":{
+      "recipients":[
+         {
+         }
+      ],
+      "ToMac_hex":"84634D414343A1010F4054546869732069732074686520636F6E74656E742E",
+      "CEK_hex":"DDDC08972DF9BE62855291A17A1B4CF7823E187F795DD52817F2D71AEC89359E"
+   },
+   "output":{
+      "cbor_diag":"97([h'A1010F', {}, h'546869732069732074686520636F6E74656E742E', h'6DDE04729881CDFF', [[h'', {1: -4, 4: h'7365632D313932'}, h'C3F9C4CB155D284187E84C34BAD08FD89E7263C093166DCC63723A94E08F97E6601F397360BBD114']]])",
+      "cbor":"D8618543A1010FA054546869732069732074686520636F6E74656E742E486DDE04729881CDFF818340A2012304477365632D3139325828C3F9C4CB155D284187E84C34BAD08FD89E7263C093166DCC63723A94E08F97E6601F397360BBD114"
+   }
+}

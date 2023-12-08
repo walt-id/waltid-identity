@@ -1,0 +1,41 @@
+{
+   "title":"wrap-129-01: 129-bit key wrap for 128-bi MAC",
+   "input":{
+      "plaintext":"This is the content.",
+      "mac":{
+         "alg":"AES-MAC-128/64",
+         "protected":{
+            "alg":"AES-MAC-128/64"
+         },
+         "recipients":[
+            {
+               "unprotected":{
+                  "kid":"sec-192",
+                  "alg":"A192KW"
+               },
+               "key":{
+                  "kty":"oct",
+                  "kid":"sec-192",
+                  "use":"enc",
+                  "k":"Dx4tPEtaaXiHlqW0w9Lh8B8uPUxbanmI"
+               }
+            }
+         ]
+      },
+      "rng_stream":[
+         "DDDC08972DF9BE62855291A17A1B4CF7"
+      ]
+   },
+   "intermediates":{
+      "recipients":[
+         {
+         }
+      ],
+      "ToMac_hex":"84634D414343A1010E4054546869732069732074686520636F6E74656E742E",
+      "CEK_hex":"DDDC08972DF9BE62855291A17A1B4CF7"
+   },
+   "output":{
+      "cbor_diag":"97([h'A1010E', {}, h'546869732069732074686520636F6E74656E742E', h'36F5AFAF0BAB5D43', [[h'', {1: -4, 4: h'7365632D313932'}, h'0C60CBB6DB490AF990714848D249FB599A3E2F23B18FF29E']]])",
+      "cbor":"D8618543A1010EA054546869732069732074686520636F6E74656E742E4836F5AFAF0BAB5D43818340A2012304477365632D31393258180C60CBB6DB490AF990714848D249FB599A3E2F23B18FF29E"
+   }
+}

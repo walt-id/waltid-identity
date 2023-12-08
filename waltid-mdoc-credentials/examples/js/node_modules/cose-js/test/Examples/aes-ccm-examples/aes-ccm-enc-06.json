@@ -1,0 +1,40 @@
+{
+   "title":"AES-CCM-ENC-06: Encrypt w/ AES-CCM 16-256/128 - implicit",
+   "input":{
+      "plaintext":"This is the content.",
+      "encrypted":{
+         "protected":{
+            "alg":"AES-CCM-16-256/128"
+         },
+         "recipients":[
+            {
+               "key":{
+                  "kty":"oct",
+                  "kid":"sec-256",
+                  "use":"enc",
+                  "k":"Dx4tPEtaaXiHlqW0w9Lh8B8uPUxbanmIl6a1xNPi8QA"
+               },
+               "unprotected":{
+                  "alg":"direct",
+                  "kid":"our-secret"
+               }
+            }
+         ]
+      },
+      "rng_stream":[
+         "89F52F65A1C580933B5261A72F"
+      ]
+   },
+   "intermediates":{
+      "recipients":[
+         {
+         }
+      ],
+      "AAD_hex":"8368456E63727970743044A101181F40",
+      "CEK_hex":"0F1E2D3C4B5A69788796A5B4C3D2E1F01F2E3D4C5B6A798897A6B5C4D3E2F100"
+   },
+   "output":{
+      "cbor_diag":"16([h'A101181F', {5: h'89F52F65A1C580933B5261A72F'}, h'28B3BDDFF844A736C5F0EE0F8C691FD0B7ADF917B0CFA0D187C769A4BA100372A585BCCC'])",
+      "cbor":"D08344A101181FA1054D89F52F65A1C580933B5261A72F582428B3BDDFF844A736C5F0EE0F8C691FD0B7ADF917B0CFA0D187C769A4BA100372A585BCCC"
+   }
+}

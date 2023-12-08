@@ -1,0 +1,66 @@
+{
+   "title":"Triple layer encryption example",
+   "input":{
+      "plaintext":"This is the content.",
+      "enveloped":{
+         "protected":{
+            "alg":"A128GCM"
+         },
+         "recipients":[
+            {
+               "unprotected":{
+                  "alg":"A128KW"
+               },
+               "recipients":[
+                  {
+                     "key":{
+                        "kty":"EC",
+                        "kid":"meriadoc.brandybuck@buckland.example",
+                        "crv":"P-256",
+                        "x":"Ze2loSV3wrroKUN_4zhwGhCqo3Xhu1td4QjeQ5wIVR0",
+                        "y":"HlLtdXARY_f55A3fnzQbPcm6hgr34Mp8p-nuzQCE0Zw",
+                        "d":"r_kHyZ-a06rmxM3yESK84r1otSg-aQcVStkRhA-iCM8"
+                     },
+                     "protected":{
+                        "alg":"ECDH-ES"
+                     },
+                     "unprotected":{
+                        "kid":"meriadoc.brandybuck@buckland.example",
+                        "epk":{
+                           "kty":"EC",
+                           "crv":"P-256",
+                           "x":"mPUKT_bAWGHIhg0TpjjqVsP1rXWQu_vwVOHHtNkdYoA",
+                           "y":"8BQAsImGeAS46fyWw5MhYfGTT0IjBpFw2SS34Dv4Irs"
+                        }
+                     }
+                  }
+               ]
+            }
+         ]
+      },
+      "rng_stream":[
+         "B2353161740AACF1F7163647984B522A",
+         "02D1F7E6F26C43D4868D87CE",
+         "848DF1C3C9CF4DF2FE6C632BF7886413F76E88525AD90E360EE04AC1A0CC274D"
+      ]
+   },
+   "intermediates":{
+      "AAD_hex":"8367456E637279707443A1010140",
+      "CEK_hex":"B2353161740AACF1F7163647984B522A",
+      "recipients":[
+         {
+            "KEK_hex":"11B37A6A9D933BA85869E748982E5A3A",
+            "recipients":[
+               {
+                  "Context_hex":"842283F6F6F683F6F6F682188044A1013818",
+                  "Secret_hex":"B50754C19898B5FAA3A5C4B68D0859D4DBEED265A474F1CE1E8B7245F1D137E3"
+               }
+            ]
+         }
+      ]
+   },
+   "output":{
+      "cbor_diag":"96([h'A10101', {5: h'02D1F7E6F26C43D4868D87CE'}, h'64F84D913BA60A76070A9A48F26E97E863E2852948658F0811139868826E89218A75715B', [[h'', {1: -3}, h'DBD43C4E9D719C27C6275C67D628D493F090593DB8218F11', [[h'A1013818', {-1: {1: 2, -1: 1, -2: h'B2ADD44368EA6D641F9CA9AF308B4079AEB519F11E9B8A55A600B21233E86E68', -3: false}, 4: h'6D65726961646F632E6272616E64796275636B406275636B6C616E642E6578616D706C65'}, h'']]]]])",
+      "cbor":"D8608443A10101A1054C02D1F7E6F26C43D4868D87CE582464F84D913BA60A76070A9A48F26E97E863E2852948658F0811139868826E89218A75715B818440A101225818DBD43C4E9D719C27C6275C67D628D493F090593DB8218F11818344A1013818A220A401022001215820B2ADD44368EA6D641F9CA9AF308B4079AEB519F11E9B8A55A600B21233E86E6822F40458246D65726961646F632E6272616E64796275636B406275636B6C616E642E6578616D706C6540"
+   }
+}

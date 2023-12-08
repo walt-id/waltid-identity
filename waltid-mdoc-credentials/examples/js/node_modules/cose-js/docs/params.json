@@ -1,0 +1,6 @@
+{
+  "name": "cose-js",
+  "tagline": "JavaScript implementation of COSE",
+  "body": "[![Build Status](https://travis-ci.org/erdtman/cose-js.svg?branch=master)](https://travis-ci.org/erdtman/cose-js)\r\n[![Coverage Status](https://coveralls.io/repos/github/erdtman/cose-js/badge.svg?branch=master)](https://coveralls.io/github/erdtman/cose-js?branch=master)\r\n# cose-js\r\nJavaScript implementation of [COSE](https://tools.ietf.org/html/draft-ietf-cose-msg)\r\n\r\n## install\r\n```\r\nnpm install cose-js --save\r\n```\r\n",
+  "note": "Don't delete this file! It's used internally to help with page regeneration."
+}

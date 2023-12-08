@@ -1,0 +1,42 @@
+{
+   "title":"sign-fail-01: Wrong CBOR Tag",
+   "fail":true,
+   "input":{
+      "plaintext":"This is the content.",
+      "sign":{
+         "signers":[
+            {
+               "key":{
+                  "kty":"EC",
+                  "kid":"11",
+                  "crv":"P-256",
+                  "x":"usWxHK2PmfnHKwXPS54m0kTcGJ90UiglWiGahtagnv8",
+                  "y":"IBOL-C3BttVivg-lSreASjpkttcsz-1rb7btKLv8EX4",
+                  "d":"V8kgd2ZBRuh2dgyVINBUqpPDr7BOMGcF22CQMIUHtNM"
+               },
+               "unprotected":{
+                  "kid":"11"
+               },
+               "protected":{
+                  "alg":"ES256"
+               }
+            }
+         ]
+      },
+      "failures":{
+         "ChangeCBORTag":998
+      },
+      "rng_description":"seed for signature"
+   },
+   "intermediates":{
+      "signers":[
+         {
+            "ToBeSign_hex":"85695369676E61747572654043A101264054546869732069732074686520636F6E74656E742E"
+         }
+      ]
+   },
+   "output":{
+      "cbor_diag":"998([h'', {}, h'546869732069732074686520636F6E74656E742E', [[h'A10126', {4: h'3131'}, h'E2AEAFD40D69D19DFE6E52077C5D7FF4E408282CBEFB5D06CBF414AF2E19D982AC45AC98B8544C908B4507DE1E90B717C3D34816FE926A2B98F53AFD2FA0F30A']]])",
+      "cbor":"D903E68440A054546869732069732074686520636F6E74656E742E818343A10126A1044231315840E2AEAFD40D69D19DFE6E52077C5D7FF4E408282CBEFB5D06CBF414AF2E19D982AC45AC98B8544C908B4507DE1E90B717C3D34816FE926A2B98F53AFD2FA0F30A"
+   }
+}
