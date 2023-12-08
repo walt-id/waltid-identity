@@ -13,7 +13,7 @@ jobs:
       - uses: actions/checkout@v3
       - name: Calculate release version
         run: |
-          echo "release_version=1.$(date +'%g%m%d%H%M').0" >> $GITHUB_ENV
+          echo "release_version=1.$(date +'%g%m%d%H%M').0-alpha" >> $GITHUB_ENV
       - name: Set version
         run: |
           sed -i "s/1.SNAPSHOT/${{ env.release_version }}/g" build.gradle.kts
