@@ -1,0 +1,33 @@
+{
+    "hello": "hello",
+    "follow": "Follow Me",
+    "modal": "Modal",
+    "loading": "Loading...",
+    "tokens": {
+        "viewAccount": "View Account",
+        "addAccount": "Add wallet address",
+        "messages": {
+            "noAccounts": "No connected addresses.",
+            "yourAccounts": "Your connected addresses"
+        }
+    },
+    "nft": {
+        "name": "Name",
+        "description": "Description",
+        "contractAddress": "Contract address",
+        "tokenId": "Token Id",
+        "tokenStandard": "Token standard",
+        "blockchain": "Blockchain",
+        "viewOn": "View on ",
+        "blockchainExplorer": "blockchain explorer",
+        "redeem": "Redeem",
+        "redeemed": "Token redeemed",
+        "showQr": "Show QR code",
+        "closeQr": "Close QR code",
+        "messages": {
+            "noNfts": "No NFTs yet.",
+            "yourNfts": "Your NFTs",
+            "alreadyRedeemed": "This token has already been redeemed."
+        }
+    }
+}
