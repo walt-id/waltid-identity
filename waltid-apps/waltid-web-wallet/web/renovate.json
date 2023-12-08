@@ -1,0 +1,21 @@
+{
+    "extends": ["config:base"],
+    "schedule": ["before 6am on the first day of the month"],
+    "packageRules": [
+        {
+            "groupName": "Types",
+            "packagePatterns": ["^@types/"],
+            "automerge": true
+        },
+        {
+            "matchDatasources": ["npm"],
+            "matchUpdateTypes": ["major"],
+            "groupName": "NPM dependencies (major)"
+        },
+        {
+            "matchDatasources": ["npm"],
+            "matchUpdateTypes": ["minor", "patch"],
+            "groupName": "NPM dependencies (non-major)"
+        }
+    ]
+}
