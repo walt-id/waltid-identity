@@ -1,0 +1,36 @@
+{
+   "title":"ChaCha20-Poly-enc-03: Encryption example for ChaCha20-Poly1305 - implicit",
+   "input":{
+     "plaintext":"This is the content.",
+     "encrypted":{
+       "protected":{
+         "alg":"ChaCha-Poly1305"
+       },
+       "recipients":[
+         {
+           "key":{
+             "kty":"oct",
+             "kid":"sec-256",
+             "use":"enc",
+             "k":"Dx4tPEtaaXiHlqW0w9Lh8B8uPUxbanmIl6a1xNPi8QA"
+           },
+           "unprotected":{
+             "alg":"direct",
+             "kid":"sec-64"
+           }
+         }
+       ]
+     },
+     "rng_stream":[
+       "5C3A9950BD2852F66E6C8D4F"
+     ]
+   },
+   "intermediates":{
+     "AAD_hex":"8368456E63727970743144A101181840",
+     "CEK_hex":"0F1E2D3C4B5A69788796A5B4C3D2E1F01F2E3D4C5B6A798897A6B5C4D3E2F100"
+   },
+   "output":{
+     "cbor_diag":"16([h'A1011818', {5: h'5C3A9950BD2852F66E6C8D4F'}, h'3E536D4992A21591575C55FA22981B31AE1C045946D0E41A8A1ABD12BC9525922F4EB618'])",
+     "cbor":"D08344A1011818A1054C5C3A9950BD2852F66E6C8D4F58243E536D4992A21591575C55FA22981B31AE1C045946D0E41A8A1ABD12BC9525922F4EB618"
+   }
+ }

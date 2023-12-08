@@ -1,0 +1,62 @@
+{
+   "title":"MAC0-01: MAC0 message w/ one countersignature",
+   "input":{
+      "plaintext":"This is the content.",
+      "mac0":{
+         "alg":"HS256",
+         "protected":{
+            "alg":"HS256"
+         },
+         "recipients":[
+            {
+               "unprotected":{
+                  "alg":"direct",
+                  "kid":"our-secret"
+               },
+               "key":{
+                  "kty":"oct",
+                  "kid":"our-secret",
+                  "use":"enc",
+                  "k":"hJtXIZ2uSN5kbQfbtTNWbpdmhkV8FJG-Onbc6mxCcYg"
+               }
+            }
+         ],
+         "countersign":{
+             "signers":[
+                 {
+                     "key":{
+                         "kty":"OKP",
+                         "kid":"11",
+                         "crv":"Ed25519",
+                         "x_hex":"d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a",
+                         "d_hex":"9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60"
+                     },
+                     "unprotected":{
+                         "kid":"11"
+                     },
+                     "protected":{
+                         "alg":"EdDSA"
+                     }
+                 }
+             ]
+         }
+      }
+   },
+   "intermediates":{
+      "ToMac_hex":"84644D41433043A101054054546869732069732074686520636F6E74656E742E",
+      "CEK_hex":"849B57219DAE48DE646D07DBB533566E976686457C1491BE3A76DCEA6C427188",
+      "recipients":[
+         {
+         }
+      ],
+      "countersigners":[
+         {
+            "ToBeSign_hex":"8570436F756E7465725369676E617475726543A1010543A101274054546869732069732074686520636F6E74656E742E"
+         }
+      ]
+   },
+   "output":{
+      "cbor_diag":"17([h'A10105', {7: [h'A10127', {4: h'3131'}, h'B4924B18EB4E047313C707B0EDA4AB844345F2C44987D6F9EBCC777EFD4078CC0F4C108DEF959F78F1EDB2765425785FCD17D512BE31EEB66BEFF1E8FC274707']}, h'546869732069732074686520636F6E74656E742E', h'A1A848D3471F9D61EE49018D244C824772F223AD4F935293F1789FC3A08D8C58'])",
+      "cbor":"D18443A10105A1078343A10127A1044231315840B4924B18EB4E047313C707B0EDA4AB844345F2C44987D6F9EBCC777EFD4078CC0F4C108DEF959F78F1EDB2765425785FCD17D512BE31EEB66BEFF1E8FC27470754546869732069732074686520636F6E74656E742E5820A1A848D3471F9D61EE49018D244C824772F223AD4F935293F1789FC3A08D8C58"
+   }
+}

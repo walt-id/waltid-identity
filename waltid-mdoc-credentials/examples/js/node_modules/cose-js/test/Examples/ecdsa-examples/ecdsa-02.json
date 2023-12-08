@@ -1,0 +1,38 @@
+{
+   "title":"ECDSA-02: ECDSA - P-384",
+   "input":{
+      "plaintext":"This is the content.",
+      "sign":{
+         "signers":[
+            {
+               "key":{
+                  "kty":"EC",
+                  "kid":"P384",
+                  "crv":"P-384",
+                  "x":"kTJyP2KSsBBhnb4kjWmMF7WHVsY55xUPgb7k64rDcjatChoZ1nvjKmYmPh5STRKc",
+                  "y":"mM0weMVU2DKsYDxDJkEP9hZiRZtB8fPfXbzINZj_fF7YQRynNWedHEyzAJOX2e8s",
+                  "d":"ok3Nq97AXlpEusO7jIy1FZATlBP9PNReMU7DWbkLQ5dU90snHuuHVDjEPmtV0fTo"
+               },
+               "unprotected":{
+                  "kid":"P384"
+               },
+               "protected":{
+                  "alg":"ES384"
+               }
+            }
+         ]
+      },
+      "rng_description":"seed for signature"
+   },
+   "intermediates":{
+      "signers":[
+         {
+            "ToBeSign_hex":"85695369676E61747572654044A10138224054546869732069732074686520636F6E74656E742E"
+         }
+      ]
+   },
+   "output":{
+      "cbor_diag":"98([h'', {}, h'546869732069732074686520636F6E74656E742E', [[h'A1013822', {4: h'50333834'}, h'230DF24B9F31DD2D7D1B9C33CE59073FC21E02BB63DC55847626B5B7F43905D59ACC186890BC1FE8B6D12E61B0373FFBA131ECC6C21958CDFF28AD77E0C32F9A0C6CA247135F538496228B2BE5557E7DBD7280DB24B46B68C0772D1BAEF09DE5']]])",
+      "cbor":"D8628440A054546869732069732074686520636F6E74656E742E818344A1013822A10444503338345860230DF24B9F31DD2D7D1B9C33CE59073FC21E02BB63DC55847626B5B7F43905D59ACC186890BC1FE8B6D12E61B0373FFBA131ECC6C21958CDFF28AD77E0C32F9A0C6CA247135F538496228B2BE5557E7DBD7280DB24B46B68C0772D1BAEF09DE5"
+   }
+}

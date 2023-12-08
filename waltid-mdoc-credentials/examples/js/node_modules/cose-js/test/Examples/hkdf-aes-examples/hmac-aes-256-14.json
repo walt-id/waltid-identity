@@ -1,0 +1,46 @@
+{
+   "title":"HKDF-AES-256-14: Direct HKDF AES-256 - Priv Other",
+   "input":{
+      "plaintext":"This is the content.",
+      "enveloped":{
+         "protected":{
+            "alg":"AES-CCM-16-128/64"
+         },
+         "recipients":[
+            {
+               "key":{
+                  "kty":"oct",
+                  "kid":"sec-256",
+                  "use":"enc",
+                  "k":"Dx4tPEtaaXiHlqW0w9Lh8B8uPUxbanmIl6a1xNPi8QA"
+               },
+               "protected":{
+                  "alg":"HKDF-AES-256"
+               },
+               "unprotected":{
+                  "kid":"our-secret"
+               },
+               "unsent":{
+                  "priv_other":"Private Other Data"
+               }
+            }
+         ]
+      },
+      "rng_stream":[
+         "BFE89563EE070CE187BDF1C472"
+      ]
+   },
+   "intermediates":{
+      "AAD_hex":"8367456E637279707443A1010A40",
+      "CEK_hex":"4B8A160155D7CBD853E5684E6C5D75BB",
+      "recipients":[
+         {
+            "Context_hex":"850A83F6F6F683F6F6F682188043A1012C5250726976617465204F746865722044617461"
+         }
+      ]
+   },
+   "output":{
+      "cbor_diag":"96([h'A1010A', {5: h'BFE89563EE070CE187BDF1C472'}, h'65215970E1BE57DE0C7E38F43249D88C2769088B85266475F5096D1D', [[h'A1012C', {4: h'6F75722D736563726574'}, h'']]])",
+      "cbor":"D8608443A1010AA1054DBFE89563EE070CE187BDF1C472581C65215970E1BE57DE0C7E38F43249D88C2769088B85266475F5096D1D818343A1012CA1044A6F75722D73656372657440"
+   }
+}

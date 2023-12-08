@@ -1,0 +1,40 @@
+{
+   "title":"AES-CCM-ENC-04: Encrypt w/ AES-CCM 64-128/128 - implicit",
+   "input":{
+      "plaintext":"This is the content.",
+      "encrypted":{
+         "protected":{
+            "alg":"AES-CCM-64-128/128"
+         },
+         "recipients":[
+            {
+               "key":{
+                  "kty":"oct",
+                  "kid":"our-secret",
+                  "use":"enc",
+                  "k":"hJtXIZ2uSN5kbQfbtTNWbg"
+               },
+               "unprotected":{
+                  "alg":"direct",
+                  "kid":"our-secret"
+               }
+            }
+         ]
+      },
+      "rng_stream":[
+         "89F52F65A1C580"
+      ]
+   },
+   "intermediates":{
+      "recipients":[
+         {
+         }
+      ],
+      "AAD_hex":"8368456E63727970743044A101182040",
+      "CEK_hex":"849B57219DAE48DE646D07DBB533566E"
+   },
+   "output":{
+      "cbor_diag":"16([h'A1011820', {5: h'89F52F65A1C580'}, h'191BD858DEC79FC11DA3428BDFA446AC240D591F3965FA7CA156FE666BC262807DF0EE99'])",
+      "cbor":"D08344A1011820A1054789F52F65A1C5805824191BD858DEC79FC11DA3428BDFA446AC240D591F3965FA7CA156FE666BC262807DF0EE99"
+   }
+}

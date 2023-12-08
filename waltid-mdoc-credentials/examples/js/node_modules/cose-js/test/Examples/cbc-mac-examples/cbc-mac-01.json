@@ -1,0 +1,38 @@
+{
+   "title":"CBC-MAC-01: MAC example with direct shared key and AES-CBC-MAC-128/64",
+   "input":{
+      "plaintext":"This is the content.",
+      "mac":{
+         "alg":"AES-MAC-128/64",
+         "protected":{
+            "alg":"AES-MAC-128/64"
+         },
+         "recipients":[
+            {
+               "unprotected":{
+                  "alg":"direct",
+                  "kid":"our-secret"
+               },
+               "key":{
+                  "kty":"oct",
+                  "kid":"our-secret",
+                  "use":"enc",
+                  "k":"hJtXIZ2uSN5kbQfbtTNWbg"
+               }
+            }
+         ]
+      }
+   },
+   "intermediates":{
+      "ToMac_hex":"84634D414343A1010E4054546869732069732074686520636F6E74656E742E",
+      "CEK_hex":"849B57219DAE48DE646D07DBB533566E",
+      "recipients":[
+         {
+         }
+      ]
+   },
+   "output":{
+      "cbor_diag":"97([h'A1010E', {}, h'546869732069732074686520636F6E74656E742E', h'C1CA820E6E247089', [[h'', {1: -6, 4: h'6F75722D736563726574'}, h'']]])",
+      "cbor":"D8618543A1010EA054546869732069732074686520636F6E74656E742E48C1CA820E6E247089818340A20125044A6F75722D73656372657440"
+   }
+}

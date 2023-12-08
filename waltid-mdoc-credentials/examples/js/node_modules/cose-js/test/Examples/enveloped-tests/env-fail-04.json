@@ -1,0 +1,46 @@
+{
+   "title":"env-fail-04: Failure tests",
+   "fail":true,
+   "input":{
+      "plaintext":"This is the content.",
+      "enveloped":{
+         "protected":{
+            "alg":"A128GCM"
+         },
+         "recipients":[
+            {
+               "key":{
+                  "kty":"oct",
+                  "kid":"our-secret",
+                  "use":"enc",
+                  "k":"hJtXIZ2uSN5kbQfbtTNWbg"
+               },
+               "unprotected":{
+                  "alg":"direct",
+                  "kid":"our-secret"
+               }
+            }
+         ]
+      },
+      "failures":{
+         "ChangeAttr":{
+            "alg":"Unknown"
+         }
+      },
+      "rng_stream":[
+         "02D1F7E6F26C43D4868D87CE"
+      ]
+   },
+   "intermediates":{
+      "AAD_hex":"8367456E637279707443A1010140",
+      "CEK_hex":"849B57219DAE48DE646D07DBB533566E",
+      "recipients":[
+         {
+         }
+      ]
+   },
+   "output":{
+      "cbor_diag":"96([h'A10167556E6B6E6F776E', {5: h'02D1F7E6F26C43D4868D87CE'}, h'60973A94BB2898009EE52ECFD9AB1DD25867374B3581F2C80039826350B97AE2300E42FC', [[h'', {1: -6, 4: h'6F75722D736563726574'}, h'']]])",
+      "cbor":"D860844AA10167556E6B6E6F776EA1054C02D1F7E6F26C43D4868D87CE582460973A94BB2898009EE52ECFD9AB1DD25867374B3581F2C80039826350B97AE2300E42FC818340A20125044A6F75722D73656372657440"
+   }
+}

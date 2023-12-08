@@ -1,0 +1,47 @@
+{
+   "title":"sign-fail-07: Remove protected attribute",
+   "fail":true,
+   "input":{
+      "plaintext":"This is the content.",
+      "sign":{
+         "protected":{
+            "ctyp":0
+         },
+         "signers":[
+            {
+               "key":{
+                  "kty":"EC",
+                  "kid":"11",
+                  "crv":"P-256",
+                  "x":"usWxHK2PmfnHKwXPS54m0kTcGJ90UiglWiGahtagnv8",
+                  "y":"IBOL-C3BttVivg-lSreASjpkttcsz-1rb7btKLv8EX4",
+                  "d":"V8kgd2ZBRuh2dgyVINBUqpPDr7BOMGcF22CQMIUHtNM"
+               },
+               "unprotected":{
+                  "kid":"11"
+               },
+               "protected":{
+                  "alg":"ES256"
+               }
+            }
+         ]
+      },
+      "failures":{
+         "RemoveProtected":{
+            "ctyp":0
+         }
+      },
+      "rng_description":"seed for signature"
+   },
+   "intermediates":{
+      "signers":[
+         {
+            "ToBeSign_hex":"85695369676E617475726543A1030043A101264054546869732069732074686520636F6E74656E742E"
+         }
+      ]
+   },
+   "output":{
+      "cbor_diag":"98([h'A0', {}, h'546869732069732074686520636F6E74656E742E', [[h'A10126', {4: h'3131'}, h'D71C05DB52C9CE7F1BF5AAC01334BBEACAC1D86A2303E6EEAA89266F45C01ED602CA649EAF790D8BC99D2458457CA6A872061940E7AFBE48E289DFAC146AE258']]])",
+      "cbor":"D8628441A0A054546869732069732074686520636F6E74656E742E818343A10126A1044231315840D71C05DB52C9CE7F1BF5AAC01334BBEACAC1D86A2303E6EEAA89266F45C01ED602CA649EAF790D8BC99D2458457CA6A872061940E7AFBE48E289DFAC146AE258"
+   }
+}

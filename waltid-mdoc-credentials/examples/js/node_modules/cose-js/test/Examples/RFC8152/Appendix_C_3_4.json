@@ -1,0 +1,60 @@
+{
+   "title":"ENC-06: Encryption example for spec - Direct ECDH + A128 Key Wrap",
+   "input":{
+      "plaintext":"This is the content.",
+      "enveloped":{
+         "protected":{
+            "alg":"A128GCM"
+         },
+         "external":"0011bbcc22dd44ee55ff660077",
+         "recipients":[
+            {
+               "key":{
+                  "kty":"EC",
+                  "kid":"meriadoc.brandybuck@buckland.example",
+                  "crv":"P-256",
+                  "x":"Ze2loSV3wrroKUN_4zhwGhCqo3Xhu1td4QjeQ5wIVR0",
+                  "y":"HlLtdXARY_f55A3fnzQbPcm6hgr34Mp8p-nuzQCE0Zw",
+                  "d":"r_kHyZ-a06rmxM3yESK84r1otSg-aQcVStkRhA-iCM8"
+               },
+               "protected":{
+                  "alg":"ECDH-SS+A128KW"
+               },
+               "unprotected":{
+                  "kid":"meriadoc.brandybuck@buckland.example",
+                  "spk_kid":"peregrin.took@tuckborough.example",
+                  "apu_nonce_hex":"0101"
+               },
+               "sender_key":{
+                  "kty":"EC",
+                  "crv":"P-256",
+                  "use":"enc",
+                  "kid":"peregrin.took@tuckborough.example",
+                  "x":"mPUKT_bAWGHIhg0TpjjqVsP1rXWQu_vwVOHHtNkdYoA",
+                  "y":"8BQAsImGeAS46fyWw5MhYfGTT0IjBpFw2SS34Dv4Irs",
+                  "d":"AtH35vJsQ9SGjYfOsjUxYXQKrPH3FjZHmEtSKoSN8cM"
+               }
+            }
+         ]
+      },
+      "rng_stream":[
+         "B2353161740AACF1F7163647984B522A",
+         "02D1F7E6F26C43D4868D87CE"
+      ]
+   },
+   "intermediates":{
+      "AAD_hex":"8367456E637279707443A101014D0011BBCC22DD44EE55FF660077",
+      "CEK_hex":"B2353161740AACF1F7163647984B522A",
+      "recipients":[
+         {
+            "Context_hex":"842283F6420101F683F6F6F682188044A101381F",
+            "Secret_hex":"4B31712E096E5F20B4ECF9790FD8CC7C8B7E2C8AD90BDA81CB224F62C0E7B9A6",
+            "KEK_hex":"381C67D48619D8880EAD76D9F793E860"
+         }
+      ]
+   },
+   "output":{
+      "cbor_diag":"96([h'A10101', {5: h'02D1F7E6F26C43D4868D87CE'}, h'64F84D913BA60A76070A9A48F26E97E863E28529D8F5335E5F0165EEE976B4A5F6C6F09D', [[h'A101381F', {-3: h'706572656772696E2E746F6F6B407475636B626F726F7567682E6578616D706C65', 4: h'6D65726961646F632E6272616E64796275636B406275636B6C616E642E6578616D706C65', -22: h'0101'}, h'41E0D76F579DBD0D936A662D54D8582037DE2E366FDE1C62']]])",
+      "cbor":"D8608443A10101A1054C02D1F7E6F26C43D4868D87CE582464F84D913BA60A76070A9A48F26E97E863E28529D8F5335E5F0165EEE976B4A5F6C6F09D818344A101381FA3225821706572656772696E2E746F6F6B407475636B626F726F7567682E6578616D706C650458246D65726961646F632E6272616E64796275636B406275636B6C616E642E6578616D706C6535420101581841E0D76F579DBD0D936A662D54D8582037DE2E366FDE1C62"
+   }
+}

@@ -1,0 +1,107 @@
+Example = {
+   title: tstr,                                 # summary of test
+   ? description: tstr,                         # longer description of test
+   ? fail : bool,                               # Is this a success or failure test
+   input: Inputs,                               # Inputs to create the test
+   ? intermediates : Intermediates,             # Intermediate values for debugging
+   output: Outputs                              # Outputs of the test
+}
+
+Inputs = {
+   plaintext: bstr / tstr,
+   ? detached: bool,
+   (enveloped: Enveloped) /                     # Create an enveloped Message
+   (encrypt: Encrypt) /                         # Create an encrypt Message
+   (mac: Mac) /                                 # Create a MAC message
+   (mac0: Mac0) /                               # Craete a MAC0 message
+   (sign: Sign),
+   ? failures : FailureSet,                     # Description of failure changes applied
+   ? rng_description : tstr,                    # What is what in the RNG stream
+   ? rng_stream: [+ tstr]                       # Random number generator stream - encoded as hex
+}
+
+Sign = {
+  signers: [+ Signers]
+}
+
+headers = (
+   ? protected: { +header_items },          # Protected headers to be sent
+   ? unprotected: { +header_items },        # Unprotected headers to be sent
+   ? unsent: { +header_items }              # Headers not to be sent
+}
+
+header_items = (
+   "alg" : tstr,                                # Algorithm parameter
+   "kid" : tstr,                                # key identifier - cast to bstr
+   "kid_hex" : tstr,                            # key identifier - encoded as hex
+   "epk" : key,                                 # ephemeral key
+   "spk" : key,                                 # static key
+   "spk_kid" : tstr,                            # static key identifier - cast to bstr
+   "spk_kid_hex" : tstr,                        # static key identifier - encoded as hex
+   "apu_id" : tstr,                             # PartyU identifier - cast to bstr
+   "apu_nonce_hex" : tstr,                      # PartyU nonce - encoded as hex
+   "apv_id" : tstr,                             # PartyV identifier - cast to bstr
+   "pub_other" : tstr,                          # Public other Info - cast to bstr
+   "salt" : tstr,                               # Salt value - cast to bstr
+)
+
+Signers = {
+  alg: tstr,
+  key: Key,
+  headers
+}
+
+Mac = {
+  alg: tstr,
+  headers,
+  recipients: [+ Recipients]
+}
+
+Mac0 = {
+  alg: tstr,
+  headers
+}
+
+Encrypt = {
+    alg: tstr,
+    headers
+}
+
+Enveloped = {
+    alg: tstr,
+    headers,
+    recipients: [+ Recipients]
+}
+
+Recipient = {
+   alg: tstr,
+   ? fail: bool,                                # does this recipient fail
+   headers,                                     # Headers for the recipient
+   key: Key,                                    # Recipient Key
+   ? sender_key: Key,                           # Sender key
+   failures: Failures                           # Set of failures to apply to recipient
+}
+
+Key = {
+  (tstr/int) => *
+}
+
+Failures = {
+}
+
+Outputs = {
+   ? cbor: bstr,                                # CBOR encoding in HEX
+   ? cbor_diag: tstr,                           # CBOR Diagnositc encoding
+   ? content : bstr                             # deatched content encoded in HEX
+}
+
+Intermediates = {
+   ? "ToMax_hex": tstr,                         # Value to be MAC-ed encoded in HEX
+   ? "CEK_hex": tstr,                           # CEK used in MAC or encryption encoded in hex
+   ? "AAD_hex": tstr,                           # AEAD Additional Data encoded in hex
+   ? "recipients" : [ +{
+       ? "Context_hex": tstr,                   # Context structure encoded in hex
+       ? "Secret_hex" : tstr,                   # ECDH shared secret encoded in hex
+   }]
+   ]
+}

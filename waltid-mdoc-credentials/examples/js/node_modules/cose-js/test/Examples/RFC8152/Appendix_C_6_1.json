@@ -1,0 +1,33 @@
+{
+   "title":"MAC0 example with direct shared key and AES-MAC/64",
+   "input":{
+      "plaintext":"This is the content.",
+      "mac0":{
+         "protected":{
+            "alg":"AES-MAC-256/64"
+         },
+         "recipients":[
+            {
+               "unprotected":{
+                  "kid":"our-secret",
+                  "alg":"direct"
+               },
+               "key":{
+                  "kty":"oct",
+                  "kid":"our-secret",
+                  "use":"enc",
+                  "k":"hJtXIZ2uSN5kbQfbtTNWbpdmhkV8FJG-Onbc6mxCcYg"
+               }
+            }
+         ]
+      }
+   },
+   "intermediates":{
+      "ToMac_hex":"84644D41433043A1010F4054546869732069732074686520636F6E74656E742E",
+      "CEK_hex":"849B57219DAE48DE646D07DBB533566E976686457C1491BE3A76DCEA6C427188"
+   },
+   "output":{
+      "cbor_diag":"17([h'A1010F', {}, h'546869732069732074686520636F6E74656E742E', h'726043745027214F'])",
+      "cbor":"D18443A1010FA054546869732069732074686520636F6E74656E742E48726043745027214F"
+   }
+}

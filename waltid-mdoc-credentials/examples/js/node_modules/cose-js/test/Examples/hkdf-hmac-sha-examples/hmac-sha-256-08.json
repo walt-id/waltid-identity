@@ -1,0 +1,45 @@
+{
+   "title":"HKDF-HMAC-SHA-256-08: Direct HKDF HMAC-SHA-256 - U other + v other",
+   "input":{
+      "plaintext":"This is the content.",
+      "enveloped":{
+         "protected":{
+            "alg":"AES-CCM-16-128/64"
+         },
+         "recipients":[
+            {
+               "key":{
+                  "kty":"oct",
+                  "kid":"our-secret",
+                  "use":"enc",
+                  "k":"hJtXIZ2uSN5kbQfbtTNWbpdmhkV8FJG-Onbc6mxCcYg"
+               },
+               "protected":{
+                  "alg":"HKDF-HMAC-SHA-256"
+               },
+               "unprotected":{
+                  "kid":"our-secret",
+                  "apu_other":"S-other",
+                  "apv_other":"R-other"
+               }
+            }
+         ]
+      },
+      "rng_stream":[
+         "BFE89563EE070CE187BDF1C472"
+      ]
+   },
+   "intermediates":{
+      "AAD_hex":"8367456E637279707443A1010A40",
+      "CEK_hex":"482252A30EAA7DFE47CB04DA2A9FA452",
+      "recipients":[
+         {
+            "Context_hex":"840A83F6F647532D6F7468657283F6F647522D6F7468657282188043A10129"
+         }
+      ]
+   },
+   "output":{
+      "cbor_diag":"96([h'A1010A', {5: h'BFE89563EE070CE187BDF1C472'}, h'29A84BB9DC7F2E130DE1BB5E5A9240DE247D263A02735B336DA27ECD', [[h'A10129', {-23: h'532D6F74686572', 4: h'6F75722D736563726574', -26: h'522D6F74686572'}, h'']]])",
+      "cbor":"D8608443A1010AA1054DBFE89563EE070CE187BDF1C472581C29A84BB9DC7F2E130DE1BB5E5A9240DE247D263A02735B336DA27ECD818343A10129A33647532D6F74686572044A6F75722D736563726574381947522D6F7468657240"
+   }
+}

@@ -1,0 +1,49 @@
+{
+   "title":"Encryption example for spec - Direct ECDH",
+   "input":{
+      "plaintext":"This is the content.",
+      "enveloped":{
+         "protected":{
+            "alg":"AES-CCM-16-128/64"
+         },
+         "recipients":[
+            {
+               "key":{
+                  "kty":"oct",
+                  "kid":"our-secret",
+                  "use":"enc",
+                  "k":"hJtXIZ2uSN5kbQfbtTNWbpdmhkV8FJG-Onbc6mxCcYg"
+               },
+               "protected":{
+                  "alg":"HKDF-HMAC-SHA-256"
+               },
+               "unprotected":{
+                  "kid":"our-secret",
+                  "salt":"aabbccddeeffgghh"
+               },
+               "unsent":{
+                  "apu_id":"lighting-client",
+                  "apv_id":"lighting-server",
+                  "pub_other":"Encryption Example 02"
+               }
+            }
+         ]
+      },
+      "rng_stream":[
+         "89F52F65A1C580933B5261A76C"
+      ]
+   },
+   "intermediates":{
+      "AAD_hex":"8367456E637279707443A1010A40",
+      "CEK_hex":"C3B3584E0EC878C041281299EBE60D98",
+      "recipients":[
+         {
+            "Context_hex":"840A834F6C69676874696E672D636C69656E74F6F6834F6C69676874696E672D736572766572F6F683188043A1012955456E6372797074696F6E204578616D706C65203032"
+         }
+      ]
+   },
+   "output":{
+      "cbor_diag":"96([h'A1010A', {5: h'89F52F65A1C580933B5261A76C'}, h'753548A19B1307084CA7B2056924ED95F2E3B17006DFE931B687B847', [[h'A10129', {-20: h'61616262636364646565666667676868', 4: h'6F75722D736563726574'}, h'']]])",
+      "cbor":"D8608443A1010AA1054D89F52F65A1C580933B5261A76C581C753548A19B1307084CA7B2056924ED95F2E3B17006DFE931B687B847818343A10129A2335061616262636364646565666667676868044A6F75722D73656372657440"
+   }
+}

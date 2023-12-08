@@ -1,0 +1,52 @@
+{
+   "title":"signed1-01: Sign 1 structure w/  counter signature 0",
+   "input":{
+      "plaintext":"This is the content.",
+      "sign0":{
+         "key":{
+            "kty":"OKP",
+            "kid":"11",
+            "crv":"Ed25519",
+            "x_hex":"d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a",
+            "d_hex":"9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60"
+         },
+         "unprotected":{
+            "kid":"11"
+         },
+         "protected":{
+            "alg":"EdDSA",
+            "ctyp":0
+         },
+         "alg":"EdDSA",
+         "countersign0":{
+             "signers":[
+                 {
+                     "key":{
+                         "kty":"OKP",
+                         "kid":"11",
+                         "crv":"Ed25519",
+                         "x_hex":"d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a",
+                         "d_hex":"9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60"
+                            },
+                  "unsent":{
+                     "alg":"EdDSA"
+                     }
+                 }
+             ]
+         }
+      },
+      "rng_description":"seed for signature"
+   },
+   "intermediates":{
+       "ToBeSign_hex":"846A5369676E61747572653145A2012703004054546869732069732074686520636F6E74656E742E",
+      "countersign0":[
+         {
+            "ToBeSign_hex":"8571436F756E7465725369676E61747572653045A201270300404054546869732069732074686520636F6E74656E742E"
+         }
+      ]
+   },
+   "output":{
+      "cbor_diag":"18([h'A201270300', {9: h'845E748A28577E94928D91C06CC3835DE31F1E6C64A24219EFEB2C2DC167B17FC8E1F79966FB09271D38DF60D2749B20B6A09948042B0BB21D7F48AA325A6502', 4: h'3131'}, h'546869732069732074686520636F6E74656E742E', h'7142FD2FF96D56DB85BEE905A76BA1D0B7321A95C8C4D3607C5781932B7AFB8711497DFA751BF40B58B3BCC32300B1487F3DB34085EEF013BF08F4A44D6FEF0D'])",
+      "cbor":"D28445A201270300A2095840845E748A28577E94928D91C06CC3835DE31F1E6C64A24219EFEB2C2DC167B17FC8E1F79966FB09271D38DF60D2749B20B6A09948042B0BB21D7F48AA325A65020442313154546869732069732074686520636F6E74656E742E58407142FD2FF96D56DB85BEE905A76BA1D0B7321A95C8C4D3607C5781932B7AFB8711497DFA751BF40B58B3BCC32300B1487F3DB34085EEF013BF08F4A44D6FEF0D"
+   }
+}

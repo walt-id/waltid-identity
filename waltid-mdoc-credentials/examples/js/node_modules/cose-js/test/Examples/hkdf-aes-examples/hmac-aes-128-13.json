@@ -1,0 +1,47 @@
+{
+   "title":"HKDF-AES-128-13: Direct HKDF AES-128 - U id + Pub Other",
+   "input":{
+      "plaintext":"This is the content.",
+      "enveloped":{
+         "protected":{
+            "alg":"AES-CCM-16-128/64"
+         },
+         "recipients":[
+            {
+               "key":{
+                  "kty":"oct",
+                  "kid":"our-secret",
+                  "use":"enc",
+                  "k":"hJtXIZ2uSN5kbQfbtTNWbg"
+               },
+               "protected":{
+                  "alg":"HKDF-AES-128"
+               },
+               "unprotected":{
+                  "kid":"our-secret",
+                  "apu_id":"Sender"
+               },
+               "unsent":{
+                  "pub_other":"Public Other"
+               }
+            }
+         ]
+      },
+      "rng_stream":[
+         "BFE89563EE070CE187BDF1C472"
+      ]
+   },
+   "intermediates":{
+      "AAD_hex":"8367456E637279707443A1010A40",
+      "CEK_hex":"5E0E9C9FB760ED409A45B8B335F50175",
+      "recipients":[
+         {
+            "Context_hex":"840A834653656E646572F6F683F6F6F683188043A1012B4C5075626C6963204F74686572"
+         }
+      ]
+   },
+   "output":{
+      "cbor_diag":"96([h'A1010A', {5: h'BFE89563EE070CE187BDF1C472'}, h'1C13CAB7971BFDE757EF20AE086FEE3FD06E173D101132D85A02A996', [[h'A1012B', {-21: h'53656E646572', 4: h'6F75722D736563726574'}, h'']]])",
+      "cbor":"D8608443A1010AA1054DBFE89563EE070CE187BDF1C472581C1C13CAB7971BFDE757EF20AE086FEE3FD06E173D101132D85A02A996818343A1012BA2344653656E646572044A6F75722D73656372657440"
+   }
+}

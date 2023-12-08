@@ -1,0 +1,46 @@
+{
+   "title":"env-fail-03: Failure tests",
+   "fail":true,
+   "input":{
+      "plaintext":"This is the content.",
+      "encrypted":{
+         "protected":{
+            "alg":"A128GCM"
+         },
+         "recipients":[
+            {
+               "key":{
+                  "kty":"oct",
+                  "kid":"our-secret",
+                  "use":"enc",
+                  "k":"hJtXIZ2uSN5kbQfbtTNWbg"
+               },
+               "unprotected":{
+                  "alg":"direct",
+                  "kid":"our-secret"
+               }
+            }
+         ]
+      },
+      "failures":{
+         "ChangeAttr":{
+            "alg":-999
+         }
+      },
+      "rng_stream":[
+         "02D1F7E6F26C43D4868D87CE"
+      ]
+   },
+   "intermediates":{
+      "AAD_hex":"8368456E63727970743043A1010140",
+      "CEK_hex":"849B57219DAE48DE646D07DBB533566E",
+      "recipients":[
+         {
+         }
+      ]
+   },
+   "output":{
+      "cbor_diag":"16([h'A1013903E6', {5: h'02D1F7E6F26C43D4868D87CE'}, h'60973A94BB2898009EE52ECFD9AB1DD25867374B162E2C03568B41F57C3CC16F9166250A'])",
+      "cbor":"D08345A1013903E6A1054C02D1F7E6F26C43D4868D87CE582460973A94BB2898009EE52ECFD9AB1DD25867374B162E2C03568B41F57C3CC16F9166250A"
+   }
+}

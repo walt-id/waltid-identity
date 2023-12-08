@@ -1,0 +1,41 @@
+{
+   "title":"mac-pass-01: Direct key + HMAC-SHA256",
+   "input":{
+      "plaintext":"This is the content.",
+      "mac":{
+         "alg":"HS256",
+         "unprotected":{
+            "alg":"HS256"
+         },
+         "recipients":[
+            {
+               "unprotected":{
+                  "alg":"direct",
+                  "kid":"our-secret"
+               },
+               "key":{
+                  "kty":"oct",
+                  "kid":"our-secret",
+                  "use":"enc",
+                  "k":"hJtXIZ2uSN5kbQfbtTNWbpdmhkV8FJG-Onbc6mxCcYg"
+               }
+            }
+         ]
+      },
+      "failures":{
+         "ChangeProtected":"a0"
+      }
+   },
+   "intermediates":{
+      "ToMac_hex":"84634D4143404054546869732069732074686520636F6E74656E742E",
+      "CEK_hex":"849B57219DAE48DE646D07DBB533566E976686457C1491BE3A76DCEA6C427188",
+      "recipients":[
+         {
+         }
+      ]
+   },
+   "output":{
+      "cbor_diag":"97([h'A0', {1: 5}, h'546869732069732074686520636F6E74656E742E', h'C2EBE664C1D996AA3026824BBBB7CAA454E2CC4212181AD9F34C7879CBA1972E', [[h'', {1: -6, 4: h'6F75722D736563726574'}, h'']]])",
+      "cbor":"D8618541A0A1010554546869732069732074686520636F6E74656E742E5820C2EBE664C1D996AA3026824BBBB7CAA454E2CC4212181AD9F34C7879CBA1972E818340A20125044A6F75722D73656372657440"
+   }
+}

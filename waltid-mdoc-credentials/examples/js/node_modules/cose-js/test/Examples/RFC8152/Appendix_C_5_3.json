@@ -1,0 +1,40 @@
+{
+   "title":"MAC example with AES Keywrap from a direct shared secret and AES-128-CBC-MAC-64",
+   "input":{
+      "plaintext":"This is the content.",
+      "mac":{
+         "protected":{
+            "alg":"AES-MAC-128/64"
+         },
+         "recipients":[
+            {
+               "unprotected":{
+                  "kid":"018c0ae5-4d9b-471b-bfd6-eef314bc7037",
+                  "alg":"A256KW"
+               },
+               "key":{
+                  "kty":"oct",
+                  "kid":"018c0ae5-4d9b-471b-bfd6-eef314bc7037",
+                  "use":"enc",
+                  "k":"hJtXIZ2uSN5kbQfbtTNWbpdmhkV8FJG-Onbc6mxCcYg"
+               }
+            }
+         ]
+      },
+      "rng_stream":[
+         "DDDC08972DF9BE62855291A17A1B4CF7"
+      ]
+   },
+   "intermediates":{
+      "ToMac_hex":"84634D414343A1010E4054546869732069732074686520636F6E74656E742E",
+      "CEK_hex":"DDDC08972DF9BE62855291A17A1B4CF7",
+      "recipients":[
+         {
+         }
+      ]
+   },
+   "output":{
+      "cbor_diag":"97([h'A1010E', {}, h'546869732069732074686520636F6E74656E742E', h'36F5AFAF0BAB5D43', [[h'', {1: -5, 4: h'30313863306165352D346439622D343731622D626664362D656566333134626337303337'}, h'711AB0DC2FC4585DCE27EFFA6781C8093EBA906F227B6EB0']]])",
+      "cbor":"D8618543A1010EA054546869732069732074686520636F6E74656E742E4836F5AFAF0BAB5D43818340A2012404582430313863306165352D346439622D343731622D626664362D6565663331346263373033375818711AB0DC2FC4585DCE27EFFA6781C8093EBA906F227B6EB0"
+   }
+}

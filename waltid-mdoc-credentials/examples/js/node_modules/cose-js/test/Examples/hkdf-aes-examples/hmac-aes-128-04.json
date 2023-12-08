@@ -1,0 +1,43 @@
+{
+   "title":"HKDF-AES-128-04: Direct HKDF AES-128 - salt ",
+   "input":{
+      "plaintext":"This is the content.",
+      "mac":{
+         "alg":"HS512",
+         "protected":{
+            "alg":"HS512"
+         },
+         "recipients":[
+            {
+               "key":{
+                  "kty":"oct",
+                  "kid":"our-secret",
+                  "use":"enc",
+                  "k":"hJtXIZ2uSN5kbQfbtTNWbg"
+               },
+               "protected":{
+                  "alg":"HKDF-AES-128"
+               },
+               "unprotected":{
+                  "kid":"our-secret",
+                  "salt":"aabbccddeeffgghh"
+               }
+            }
+         ]
+      }
+   },
+   "intermediates":{
+      "AAD_hex":"8369456E76656C6F70656443A1010A40",
+      "CEK_hex":"78FCC6C1395B8CFD3CBB893CCE3483A75B5D829DA2453B99C12E816186F7B95E65FC77C0C9C94495C22215CC6CCC1993893B224E5448B6310D3EC5CD6E1B1E49",
+      "recipients":[
+         {
+            "Context_hex":"840783F6F6F683F6F6F68219020043A1012B"
+         }
+      ],
+      "ToMac_hex":"84634D414343A101074054546869732069732074686520636F6E74656E742E"
+   },
+   "output":{
+      "cbor_diag":"97([h'A10107', {}, h'546869732069732074686520636F6E74656E742E', h'414B7441D3B882AEED8BC71CFE79C07A684B2FB93DB412F9C8196AFF9C903F1F19FB6DFB27F31343A57D341351BBDE557132CB30B804CFAD2D7EBD075CF439E1', [[h'A1012B', {-20: h'61616262636364646565666667676868', 4: h'6F75722D736563726574'}, h'']]])",
+      "cbor":"D8618543A10107A054546869732069732074686520636F6E74656E742E5840414B7441D3B882AEED8BC71CFE79C07A684B2FB93DB412F9C8196AFF9C903F1F19FB6DFB27F31343A57D341351BBDE557132CB30B804CFAD2D7EBD075CF439E1818343A1012BA2335061616262636364646565666667676868044A6F75722D73656372657440"
+   }
+}

@@ -1,0 +1,59 @@
+{
+   "title":"MAC-01: MAC message w/ one countersignature0",
+   "input":{
+      "plaintext":"This is the content.",
+      "mac":{
+         "alg":"HS256",
+         "protected":{
+            "alg":"HS256"
+         },
+         "recipients":[
+            {
+               "unprotected":{
+                  "alg":"direct",
+                  "kid":"our-secret"
+               },
+               "key":{
+                  "kty":"oct",
+                  "kid":"our-secret",
+                  "use":"enc",
+                  "k":"hJtXIZ2uSN5kbQfbtTNWbpdmhkV8FJG-Onbc6mxCcYg"
+               }
+            }
+         ],
+         "countersign0":{
+             "signers":[
+                 {
+                     "key":{
+                         "kty":"OKP",
+                         "kid":"11",
+                         "crv":"Ed25519",
+                         "x_hex":"d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a",
+                         "d_hex":"9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60"
+                     },
+                  "unsent":{
+                     "alg":"EdDSA"
+                     }
+                 }
+             ]
+         }
+      }
+   },
+   "intermediates":{
+      "ToMac_hex":"84634D414343A101054054546869732069732074686520636F6E74656E742E",
+      "CEK_hex":"849B57219DAE48DE646D07DBB533566E976686457C1491BE3A76DCEA6C427188",
+      "recipients":[
+         {
+         }
+      ],
+      "countersign0":[
+         {
+            "ToBeSign_hex":"8571436F756E7465725369676E61747572653043A10105404054546869732069732074686520636F6E74656E742E"
+         }
+      ]
+   },
+   "output":{
+      "cbor_diag":"97([h'A10105', {9: h'E818087173D1E6A0EB6D35F7F434239DB796DB0BFACBC9DE983DC8C80D02FBEC4B61ECC7200550A6FFAF7DD76326511EB7ABDC3C07D675566CC9B7A66D390C0B'}, h'546869732069732074686520636F6E74656E742E', h'2BDCC89F058216B8A208DDC6D8B54AA91F48BD63484986565105C9AD5A6682F6', [[h'', {1: -6, 4: h'6F75722D736563726574'}, h'']]])",
+      "cbor":"D8618543A10105A1095840E818087173D1E6A0EB6D35F7F434239DB796DB0BFACBC9DE983DC8C80D02FBEC4B61ECC7200550A6FFAF7DD76326511EB7ABDC3C07D675566CC9B7A66D390C0B54546869732069732074686520636F6E74656E742E58202BDCC89F058216B8A208DDC6D8B54AA91F48BD63484986565105C9AD5A6682F6818340A20125044A6F75722D73656372657440"
+   }
+}

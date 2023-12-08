@@ -1,0 +1,39 @@
+{
+   "title":"mac-pass-02: external data",
+   "input":{
+      "plaintext":"This is the content.",
+      "mac":{
+         "alg":"HS256",
+         "unprotected":{
+            "alg":"HS256"
+         },
+         "external":"11aa22bb33cc44dd55006699",
+         "recipients":[
+            {
+               "unprotected":{
+                  "alg":"direct",
+                  "kid":"our-secret"
+               },
+               "key":{
+                  "kty":"oct",
+                  "kid":"our-secret",
+                  "use":"enc",
+                  "k":"hJtXIZ2uSN5kbQfbtTNWbpdmhkV8FJG-Onbc6mxCcYg"
+               }
+            }
+         ]
+      }
+   },
+   "intermediates":{
+      "ToMac_hex":"84634D4143404C11AA22BB33CC44DD5500669954546869732069732074686520636F6E74656E742E",
+      "CEK_hex":"849B57219DAE48DE646D07DBB533566E976686457C1491BE3A76DCEA6C427188",
+      "recipients":[
+         {
+         }
+      ]
+   },
+   "output":{
+      "cbor_diag":"97([h'', {1: 5}, h'546869732069732074686520636F6E74656E742E', h'60CFE7D9C733A758E198FF758A381E43B3CAF9867AEBAEF224CA8F11FFD3AC7A', [[h'', {1: -6, 4: h'6F75722D736563726574'}, h'']]])",
+      "cbor":"D8618540A1010554546869732069732074686520636F6E74656E742E582060CFE7D9C733A758E198FF758A381E43B3CAF9867AEBAEF224CA8F11FFD3AC7A818340A20125044A6F75722D73656372657440"
+   }
+}

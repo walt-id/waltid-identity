@@ -1,0 +1,43 @@
+{
+   "title":"enc-pass-03: Remove leading CBOR tag",
+   "input":{
+      "plaintext":"This is the content.",
+      "encrypted":{
+         "unprotected":{
+            "alg":"A128GCM"
+         },
+         "recipients":[
+            {
+               "key":{
+                  "kty":"oct",
+                  "kid":"our-secret",
+                  "use":"enc",
+                  "k":"hJtXIZ2uSN5kbQfbtTNWbg"
+               },
+               "unprotected":{
+                  "alg":"direct",
+                  "kid":"our-secret"
+               }
+            }
+         ]
+      },
+      "failures":{
+         "RemoveCBORTag":1
+      },
+      "rng_stream":[
+         "02D1F7E6F26C43D4868D87CE"
+      ]
+   },
+   "intermediates":{
+      "AAD_hex":"8368456E6372797074304040",
+      "CEK_hex":"849B57219DAE48DE646D07DBB533566E",
+      "recipients":[
+         {
+         }
+      ]
+   },
+   "output":{
+      "cbor_diag":"[h'', {1: 1, 5: h'02D1F7E6F26C43D4868D87CE'}, h'60973A94BB2898009EE52ECFD9AB1DD25867374B24BEE54AA5D797C8DC845929ACAA47EF']",
+      "cbor":"8340A20101054C02D1F7E6F26C43D4868D87CE582460973A94BB2898009EE52ECFD9AB1DD25867374B24BEE54AA5D797C8DC845929ACAA47EF"
+   }
+}

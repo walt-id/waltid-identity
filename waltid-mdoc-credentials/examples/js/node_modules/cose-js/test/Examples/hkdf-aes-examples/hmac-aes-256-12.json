@@ -1,0 +1,49 @@
+{
+   "title":"HKDF-AES-256-12: Direct HKDF AES-256 - u id + u nonce + u other + v id + v nonce  v other",
+   "input":{
+      "plaintext":"This is the content.",
+      "enveloped":{
+         "protected":{
+            "alg":"AES-CCM-16-128/64"
+         },
+         "recipients":[
+            {
+               "key":{
+                  "kty":"oct",
+                  "kid":"sec-256",
+                  "use":"enc",
+                  "k":"Dx4tPEtaaXiHlqW0w9Lh8B8uPUxbanmIl6a1xNPi8QA"
+               },
+               "protected":{
+                  "alg":"HKDF-AES-256"
+               },
+               "unprotected":{
+                  "kid":"our-secret",
+                  "apu_id":"Sender",
+                  "apv_id":"Recipient",
+                  "apu_nonce":"S101",
+                  "apv_nonce":"R102",
+                  "apu_other":"S-other",
+                  "apv_other":"R-other"
+               }
+            }
+         ]
+      },
+      "rng_stream":[
+         "BFE89563EE070CE187BDF1C472"
+      ]
+   },
+   "intermediates":{
+      "AAD_hex":"8367456E637279707443A1010A40",
+      "CEK_hex":"B0AD57736FA2356B494ECFF99B80811F",
+      "recipients":[
+         {
+            "Context_hex":"840A834653656E646572445331303147532D6F746865728349526563697069656E74445231303247522D6F7468657282188043A1012C"
+         }
+      ]
+   },
+   "output":{
+      "cbor_diag":"96([h'A1010A', {5: h'BFE89563EE070CE187BDF1C472'}, h'6EF45C1291D9CFD6F5FC0C8CED5A3480E3D7CEC586BFD98CE214105C', [[h'A1012C', {-21: h'53656E646572', 4: h'6F75722D736563726574', -24: h'526563697069656E74', -22: h'53313031', -25: h'52313032', -23: h'532D6F74686572', -26: h'522D6F74686572'}, h'']]])",
+      "cbor":"D8608443A1010AA1054DBFE89563EE070CE187BDF1C472581C6EF45C1291D9CFD6F5FC0C8CED5A3480E3D7CEC586BFD98CE214105C818343A1012CA7344653656E646572044A6F75722D7365637265743749526563697069656E74354453313031381844523130323647532D6F74686572381947522D6F7468657240"
+   }
+}
