@@ -352,6 +352,6 @@ async function deleteCredential() {
     await $fetch(`/wallet-api/wallet/${currentWallet.value}/credentials/${encodeURIComponent(credentialId)}`, {
         method: "DELETE"
     });
-    await navigateTo({ path: "/" });
+    await navigateTo({ path: `/wallet/${currentWallet.value}` });
 }
 </script>
