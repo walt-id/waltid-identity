@@ -12,11 +12,11 @@
 
             <template v-if="!immediateAccept" v-slot:menu>
                 <ActionButton
-                    class="inline-flex focus:outline focus:outline-red-700 focus:outline-offset-2 items-center rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-700 hover:scale-105 hover:animate-pulse focus:animate-none"
-                    display-text="Reject"
-                    icon="heroicons:x-mark"
-                    type="button"
-                    @click="navigateTo(`/wallet/${currentWallet.value}`)"
+                        class="inline-flex focus:outline focus:outline-red-700 focus:outline-offset-2 items-center rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-700 hover:scale-105 hover:animate-pulse focus:animate-none"
+                        display-text="Reject"
+                        icon="heroicons:x-mark"
+                        type="button"
+                        @click="navigateTo(`/wallet/${currentWallet}`)"
                 />
 
                 <div class="group flex">

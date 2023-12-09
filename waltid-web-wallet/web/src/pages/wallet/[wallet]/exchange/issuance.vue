@@ -19,7 +19,7 @@
                     display-text="Reject"
                     icon="heroicons:x-mark"
                     type="button"
-                    @click="navigateTo(`/wallet/${currentWallet.value}`)"
+                    @click="navigateTo(`/wallet/${currentWallet}`)"
                 />
 
                 <div class="group flex">
