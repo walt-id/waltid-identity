@@ -17,6 +17,7 @@ include(
     "waltid-verifiable-credentials",
     "waltid-mdoc-credentials",
     "waltid-sdjwt",
+    "waltid-mdoc-credentials",
 
     // Protocols
     "waltid-openid4vc",
@@ -24,6 +25,7 @@ include(
     // Services based on libs
     "waltid-issuer",
     "waltid-verifier",
+    "waltid-wallet",
 
     // CLI
     "waltid-cli",

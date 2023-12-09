@@ -21,7 +21,7 @@ kotlin {
             useJUnitPlatform()
         }
     }
-    js(IR) {
+//    js(IR) {
         /*browser {
             commonWebpackConfig {
                 cssSupport {
@@ -29,11 +29,11 @@ kotlin {
                 }
             }
         }*/
-        nodejs {
-            generateTypeScriptDefinitions()
-        }
-        binaries.library()
-    }
+//        nodejs {
+//            generateTypeScriptDefinitions()
+//        }
+//        binaries.library()
+//    }
     val hostOs = System.getProperty("os.name")
     val isMingwX64 = hostOs.startsWith("Windows")
     val nativeTarget = when {
@@ -80,15 +80,11 @@ kotlin {
                 implementation(kotlin("reflect"))
             }
         }
-        val jsMain by getting {
-            dependencies {
-                implementation(npm("cose-js", "0.9.0"))
-            }
-        }
-        val jsTest by getting {
-        }
-        val nativeMain by getting
-        val nativeTest by getting
+//        val jsMain by getting {
+//            dependencies {
+//                implementation(npm("cose-js", "0.9.0"))
+//            }
+//        }
     }
 
     publishing {

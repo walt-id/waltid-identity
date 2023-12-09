@@ -19,14 +19,16 @@ Available for Kotlin/Java and JavaScript environments.
 
 - [Crypto](https://github.com/walt-id/waltid-identity/blob/main/waltid-crypto/README.md) - create and use keys based on different algorithms.
 - [DID](https://github.com/walt-id/waltid-identity/blob/main/waltid-did/README.md) - create, register and resolve DIDs on different ecosystems.
-- [Openid4vc](https://github.com/walt-id/waltid-identity/blob/main/waltid-openid4vc/README.md) - implementation of the OID4VCI and OIDC4VP protocols.
+- [OpenID4VC](https://github.com/walt-id/waltid-identity/blob/main/waltid-openid4vc/README.md) - implementation of the OID4VCI and OID4VP protocols.
 - [SD-JWT](https://github.com/walt-id/waltid-identity/blob/main/waltid-sdjwt/README.md) - create and verify Selective Disclosure JWTs.
+- [mdoc credentials]() - create and verify mdoc
+  [ISO/IEC 18013-5:2021](https://www.iso.org/standard/69084.html) and mDL credentials.
 
 ### Services
 A set of API's to build issuer, verifier and wallet capabilities into any app.
 
 - Issuer API - enable apps issue credentials (W3C JWTs, SD-JWTs and JSON-LD) via OID4VC.
-- Verifier API - enable apps to verify credentials (W3C JWTs, SD-JWTs and JSON-LD) via OID4VP/SIOPv2.
+- Verifier API - enable apps to verify credentials (W3C JWTs, SD-JWTs and JSON-LD) via OID4VP / SIOPv2.
 - Wallet API - extend apps with holistic identity wallet capabilities like collecting, storing, managing and sharing of identity credentials.
 
 ### Apps

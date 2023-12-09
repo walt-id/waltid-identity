@@ -1,11 +1,11 @@
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
-    kotlin("jvm") version "1.9.21"
+    kotlin("jvm") version "1.9.20"
     id("io.ktor.plugin") version "2.3.7"
-    id("org.jetbrains.kotlin.plugin.serialization") version "1.9.21"
+    id("org.jetbrains.kotlin.plugin.serialization") version "1.9.20"
 
-    id("com.github.ben-manes.versions") version "0.48.0"
+    id("com.github.ben-manes.versions") version "0.49.0"
 }
 
 group = "id.walt"
@@ -28,7 +28,7 @@ repositories {
 }
 
 tasks.withType<KotlinCompile> {
-    kotlinOptions.jvmTarget = "19"
+    kotlinOptions.jvmTarget = "17"
 }
 
 /*java {
@@ -37,7 +37,7 @@ tasks.withType<KotlinCompile> {
 }*/
 
 kotlin {
-    jvmToolchain(19)
+    jvmToolchain(17)
 }
 
 dependencies {
@@ -103,13 +103,8 @@ dependencies {
     // Argon2
     implementation("de.mkammerer:argon2-jvm:2.11")
 
-
-    // waltid-did
-    implementation("id.walt.did:waltid-did:1.1.1")//id.walt.crypto provided by id.walt.did:waltid-did
-
-    // OIDC
-    implementation("id.walt:waltid-openid4vc:1.2310051536.0")
-    //implementation("id.walt:waltid-openid4vc:1.2311161107.0")
+    api(project(":waltid-did"))
+    api(project(":waltid-openid4vc"))
 
     /* -- Misc --*/
 
