@@ -564,7 +564,7 @@ class SSIKit2WalletService(tenant: String?, accountId: UUID, walletId: UUID) : W
     override suspend fun addOperationHistory(operationHistory: WalletOperationHistory) {
         transaction {
             WalletOperationHistories.insert {
-                it[tenant] = tenant
+                it[tenant] = operationHistory.tenant
                 it[accountId] = operationHistory.account
                 it[wallet] = operationHistory.wallet
                 it[timestamp] = operationHistory.timestamp.toJavaInstant()

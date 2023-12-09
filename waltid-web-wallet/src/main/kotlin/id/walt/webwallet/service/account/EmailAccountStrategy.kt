@@ -7,6 +7,8 @@ import id.walt.web.controllers.ByteLoginRequest
 import id.walt.webwallet.web.model.EmailAccountRequest
 import kotlinx.datetime.Clock
 import kotlinx.datetime.toJavaInstant
+import kotlinx.uuid.UUID
+import kotlinx.uuid.generateUUID
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.select
@@ -26,6 +28,7 @@ object EmailAccountStrategy : AccountStrategy<EmailAccountRequest> {
         val createdAccountId = transaction {
             Accounts.insert {
                 it[Accounts.tenant] = tenant
+                it[id] = UUID.generateUUID()
                 it[Accounts.name] = name
                 it[Accounts.email] = email
                 it[password] = hash

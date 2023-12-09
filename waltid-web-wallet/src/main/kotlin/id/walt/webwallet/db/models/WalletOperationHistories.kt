@@ -25,12 +25,14 @@ object WalletOperationHistories : KotlinxUUIDTable("wallet_operation_histories")
     val data = text("data")
 
     init {
-        AccountWalletMappings.foreignKey(AccountWalletMappings.tenant, AccountWalletMappings.accountId, target = Accounts.primaryKey)
+        foreignKey(tenant, accountId, target = Accounts.primaryKey)
+        index(false, tenant, accountId, wallet)
     }
 }
 
 @Serializable
 data class WalletOperationHistory(
+    val tenant: String?,
     val id: UUID? = UUID.generateUUID(),
     val account: UUID,
     val wallet: UUID,
@@ -39,6 +41,7 @@ data class WalletOperationHistory(
     val data: JsonObject,
 ) {
     constructor(result: ResultRow) : this(
+        tenant = result[WalletOperationHistories.tenant],
         id = result[WalletOperationHistories.id].value,
         account = result[WalletOperationHistories.accountId],
         wallet = result[WalletOperationHistories.wallet].value,
@@ -48,7 +51,8 @@ data class WalletOperationHistory(
     )
 
     companion object {
-        fun new(wallet: WalletService, operation: String, data: Map<String, String?>) = WalletOperationHistory(
+        fun new(tenant: String?, wallet: WalletService, operation: String, data: Map<String, String?>) = WalletOperationHistory(
+            tenant = tenant,
             account = wallet.accountId,
             wallet = wallet.walletId,
             timestamp = Clock.System.now(),
