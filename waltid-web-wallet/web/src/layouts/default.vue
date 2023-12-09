@@ -225,7 +225,20 @@
 <script lang="ts" setup>
 import { ref } from "vue";
 import { Dialog, DialogPanel, Menu, MenuButton, MenuItem, MenuItems, TransitionChild, TransitionRoot } from "@headlessui/vue";
-import { ArrowPathIcon, Bars3CenterLeftIcon, BellIcon, CogIcon, FingerPrintIcon, GlobeAltIcon, HomeIcon, KeyIcon, QuestionMarkCircleIcon, ShieldCheckIcon, XMarkIcon } from "@heroicons/vue/24/outline";
+import {
+    ArrowPathIcon,
+    Bars3CenterLeftIcon,
+    BellIcon,
+    ClipboardDocumentListIcon,
+    CogIcon,
+    FingerPrintIcon,
+    GlobeAltIcon,
+    HomeIcon,
+    KeyIcon,
+    QuestionMarkCircleIcon,
+    ShieldCheckIcon,
+    XMarkIcon
+} from "@heroicons/vue/24/outline";
 import { ChevronDownIcon, MagnifyingGlassIcon } from "@heroicons/vue/20/solid";
 import { useUserStore } from "~/stores/user";
 import { storeToRefs } from "pinia";
@@ -287,6 +300,7 @@ const navigation = [
             { name: "Tokens", href: `/wallet/${currentWallet.value}/settings/tokens`, icon: GlobeAltIcon },
             { name: "DIDs", href: `/wallet/${currentWallet.value}/settings/dids`, icon: FingerPrintIcon },
             { name: "Keys", href: `/wallet/${currentWallet.value}/settings/keys`, icon: KeyIcon },
+            { name: "History", href: `/wallet/${currentWallet.value}/history`, icon: ClipboardDocumentListIcon },
 
             // {name: 'History', href: '/history', icon: ClockIcon}
         ],
