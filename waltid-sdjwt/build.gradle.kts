@@ -26,19 +26,19 @@ kotlin {
     }
 
     js(IR) {
-        browser {
-            commonWebpackConfig(Action {
-                cssSupport {
-                    enabled.set(true)
-                }
-            })
-
-            testTask(Action {
-                useKarma {
-                    useChromiumHeadless()
-                }
-            })
-        }
+//        browser {
+//            commonWebpackConfig(Action {
+//                cssSupport {
+//                    enabled.set(true)
+//                }
+//            })
+//
+//            testTask(Action {
+//                useKarma {
+//                    useChromiumHeadless()
+//                }
+//            })
+//        }
         nodejs {
             generateTypeScriptDefinitions()
         }

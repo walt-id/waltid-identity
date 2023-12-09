@@ -14,6 +14,7 @@ include(
     // Base SSI libs
     "waltid-crypto",
     "waltid-did",
+    "waltid-openid4vc",
     "waltid-verifiable-credentials",
     "waltid-mdoc-credentials",
     "waltid-sdjwt",

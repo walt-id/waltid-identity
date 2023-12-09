@@ -53,6 +53,7 @@ nuxt.d.ts
 
 ### VS Code ###
 .vscode/
+node_modules/
 
 ### Mac OS ###
 .DS_Store
