@@ -28,7 +28,7 @@ repositories {
 }
 
 tasks.withType<KotlinCompile> {
-    kotlinOptions.jvmTarget = "19"
+    kotlinOptions.jvmTarget = "17"
 }
 
 /*java {
@@ -37,7 +37,7 @@ tasks.withType<KotlinCompile> {
 }*/
 
 kotlin {
-    jvmToolchain(19)
+    jvmToolchain(17)
 }
 
 dependencies {
@@ -103,13 +103,11 @@ dependencies {
     // Argon2
     implementation("de.mkammerer:argon2-jvm:2.11")
 
-
-    // waltid-did
-    implementation("id.walt.did:waltid-did:1.1.1")//id.walt.crypto provided by id.walt.did:waltid-did
-
-    // OIDC
+    // TODO: implementation doesn't match
+//    api(project(":waltid-did"))
+//    api(project(":waltid-openid4vc"))
+    implementation("id.walt.did:waltid-did:1.1.1")
     implementation("id.walt:waltid-openid4vc:1.2310051536.0")
-    //implementation("id.walt:waltid-openid4vc:1.2311161107.0")
 
     /* -- Misc --*/
 
