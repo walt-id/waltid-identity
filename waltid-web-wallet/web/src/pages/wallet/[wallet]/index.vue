@@ -3,11 +3,11 @@
         <WalletPageHeader />
         <CenterMain>
             <div>
-                <span v-if="credentials && credentials.length > 0" class="font-semibold"> Your credentials ({{ credentials.length }}):</span>
+                <span v-if="credentials && credentials.length > 0" class="font-semibold">Your credentials ({{ credentials.length }}):</span>
 
                 <LoadingIndicator v-else-if="pending">Loading credentials...</LoadingIndicator>
 
-                <div v-else class="text-center pt-6">
+                <div v-else class="text-center pt-3">
                     <svg aria-hidden="true" class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path
                             d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"
@@ -31,7 +31,7 @@
                     </div>
                 </div>
 
-                <ul class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 mt-6" role="list">
+                <ul class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 mt-3" role="list">
                     <li
                         v-for="credential in credentials"
                         :key="credential.id"
