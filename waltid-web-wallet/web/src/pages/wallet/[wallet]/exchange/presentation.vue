@@ -21,17 +21,17 @@
 
                 <div class="group flex">
                     <ActionButton
-                        :class="[
+                            :class="[
                             failed
                                 ? 'bg-red-600 animate-pulse focus:outline focus:outline-red-700 focus:outline-offset-2 hover:bg-red-700 hover:scale-105'
                                 : 'bg-green-600 focus:outline-green-700 hover:bg-green-700 hover:scale-105 hover:animate-pulse focus:animate-none',
                         ]"
-                        :failed="failed"
-                        class="inline-flex focus:outline focus:outline-offset-2 items-center rounded-md px-3 py-2 text-sm font-semibold text-white shadow-sm"
-                        display-text="Accept"
-                        icon="heroicons:check"
-                        type="button"
-                        @click="acceptPresentation"
+                            :failed="failed"
+                            class="inline-flex focus:outline focus:outline-offset-2 items-center rounded-md px-3 py-2 text-sm font-semibold text-white shadow-sm"
+                            display-text="Accept"
+                            icon="heroicons:check"
+                            type="button"
+                            @click="acceptPresentation"
                     />
                     <!-- tooltip -->
                     <span v-if="failed"
@@ -55,7 +55,14 @@
                 <div>Selected: {{ selectedCredentialIds.length }}</div>
 
                 <div class="mt-2 divide-y divide-gray-200 border-b border-t border-gray-200">
-                    <div v-for="(credential, credentialIdx) in matchedCredentials" :key="credentialIdx"
+                    <div v-if="matchedCredentials.length == 0">
+                        <span class="text-red-600 animate-pulse flex items-center gap-1 py-1">
+                            <Icon name="heroicons:exclamation-circle" class="h-6 w-6"/>
+                            You don't have any credentials matching this presentation definition in your wallet.
+                        </span>
+                    </div>
+
+                    <div v-for="(credential, credentialIdx) in matchedCredentials" v-else :key="credentialIdx"
                          class="relative flex items-start py-4"
                     >
                         <div class="mr-3 pt-2 flex h-6 items-center">
@@ -70,9 +77,9 @@
                             <div class="font-medium select-none text-gray-900">
                                 <label :for="`credential-${credential.id}`">
                                     <VerifiableCredentialCard
-                                        :class="[selection[credential.id] == true ? 'shadow-xl shadow-primary-400' : 'shadow-2xl']"
-                                        :credential="credential.parsedDocument"
-                                        :show-id="true"
+                                            :class="[selection[credential.id] == true ? 'shadow-xl shadow-primary-400' : 'shadow-2xl']"
+                                            :credential="credential.parsedDocument"
+                                            :show-id="true"
                                     />
 
                                 </label>
@@ -90,7 +97,8 @@
                                                        class="select-none font-medium text-gray-900"
                                                 >
                                                     <div class="md:flex text-gray-500 mb-3 md:mb-1">
-                                                        <div class="min-w-[19vw]">{{ disclosureIdx + 1 }}. <span class="font-semibold">{{ disclosure[1] }}</span></div>
+                                                        <div class="min-w-[19vw]">{{ disclosureIdx + 1 }}. <span class="font-semibold"
+                                                        >{{ disclosure[1] }}</span></div>
                                                         <div class="grow-0">
                                                             {{ disclosure[2] }}
                                                         </div>
@@ -124,7 +132,6 @@
                     <pre>{{ presentationDefinition }}</pre>
                 </DisclosurePanel>
             </Disclosure>
-
         </CenterMain>
     </div>
 </template>
@@ -134,12 +141,12 @@ import CenterMain from "~/components/CenterMain.vue";
 import PageHeader from "~/components/PageHeader.vue";
 import ActionButton from "~/components/buttons/ActionButton.vue";
 import LoadingIndicator from "~/components/loading/LoadingIndicator.vue";
-import { groupBy } from "~/composables/groupings";
-import { useTitle } from "@vueuse/core";
+import {groupBy} from "~/composables/groupings";
+import {useTitle} from "@vueuse/core";
 import VerifiableCredentialCard from "~/components/credentials/VerifiableCredentialCard.vue";
 
-import { Disclosure, DisclosureButton, DisclosurePanel } from "@headlessui/vue";
-import { encodeDisclosure, parseDisclosures } from "../../../../composables/disclosures";
+import {Disclosure, DisclosureButton, DisclosurePanel} from "@headlessui/vue";
+import {encodeDisclosure, parseDisclosures} from "../../../../composables/disclosures";
 
 
 const currentWallet = useCurrentWallet();
@@ -147,7 +154,10 @@ const currentWallet = useCurrentWallet();
 async function resolvePresentationRequest(request) {
     try {
         console.log("RESOLVING request", request);
-        const response = await $fetch(`/wallet-api/wallet/${currentWallet.value}/exchange/resolvePresentationRequest`, { method: "POST", body: request });
+        const response = await $fetch(`/wallet-api/wallet/${currentWallet.value}/exchange/resolvePresentationRequest`, {
+            method: "POST",
+            body: request
+        });
         console.log(response);
         return response;
     } catch (e) {
@@ -177,7 +187,7 @@ console.log("inputDescriptors: ", inputDescriptors);
 let i = 0;
 let groupedCredentialTypes = groupBy(
     inputDescriptors.map((item) => {
-        return { id: ++i, name: item.id };
+        return {id: ++i, name: item.id};
     }),
     (c) => c.name
 );
@@ -189,13 +199,21 @@ const failed = ref(false);
 const failMessage = ref("Unknown error occurred.");
 
 
-const matchedCredentials = await $fetch(`/wallet-api/wallet/${currentWallet.value}/exchange/matchCredentialsForPresentationDefinition`, {
+const matchedCredentials = await $fetch<Array<Object>>(`/wallet-api/wallet/${currentWallet.value}/exchange/matchCredentialsForPresentationDefinition`, {
     method: "POST",
     body: presentationDefinition
 });
 
 const selection = ref({});
 const selectedCredentialIds = computed(() => Object.entries(selection.value).filter((it) => it[1]).map((it) => it[0]))
+
+if (matchedCredentials.length == 1) {
+    selection.value[matchedCredentials[0].id] = true
+}
+
+/*if (matchedCredentials.value.length == 1) {
+    selection[matchedCredentials[0].id] = true
+}*/
 
 const disclosures = ref({});
 //const encodedDisclosures = computed(() => Object.keys(disclosures.value).map((cred) => disclosures.values[cred].map((disclosure) => encodeDisclosure(disclosure))))
