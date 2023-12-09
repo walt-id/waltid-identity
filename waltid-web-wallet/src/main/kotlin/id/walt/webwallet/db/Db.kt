@@ -16,13 +16,16 @@ import org.jetbrains.exposed.sql.transactions.TransactionManager
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.slf4j.bridge.SLF4JBridgeHandler
 import java.sql.Connection
+import kotlin.io.path.Path
+import kotlin.io.path.absolutePathString
 
 object Db {
 
     private val log = KotlinLogging.logger { }
 
     private fun connect() {
-        val datasourceConfig = ConfigManager.getConfig<DatasourceConfiguration>()
+        val databaseConfig = ConfigManager.getConfig<DatasourceConfiguration>()
+        val datasourceConfig = databaseConfig.hikariDataSource
 
         /*val databaseConfig = ConfigManager.getConfig<DatabaseConfiguration>()
 
@@ -34,10 +37,15 @@ object Db {
             .migrate()*/
 
         // connect
-        log.info { "Connecting to database at \"${datasourceConfig.hikariDataSource.jdbcUrl}\"..." }
-        Database.connect(datasourceConfig.hikariDataSource)
+        log.info { "Connecting to database at \"${datasourceConfig.jdbcUrl}\"..." }
+
+        if (datasourceConfig.jdbcUrl.contains("sqlite")) {
+            println("Will use sqlite database (${datasourceConfig.jdbcUrl}), working directory: ${Path(".").absolutePathString()}")
+        }
+
+        Database.connect(datasourceConfig)
         TransactionManager.manager.defaultIsolationLevel =
-            toTransactionIsolationLevel(datasourceConfig.hikariDataSource.transactionIsolation)
+            toTransactionIsolationLevel(datasourceConfig.transactionIsolation)
     }
 
     fun start() {
