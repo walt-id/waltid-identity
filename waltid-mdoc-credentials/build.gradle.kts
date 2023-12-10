@@ -1,5 +1,5 @@
 plugins {
-    val kotlinVersion = "1.9.20"
+    val kotlinVersion = "1.9.21"
     kotlin("multiplatform") version kotlinVersion
     kotlin("plugin.serialization") version kotlinVersion
     id("dev.petuska.npm.publish") version "3.3.1"
@@ -120,8 +120,6 @@ npmPublish {
         val secretNpmToken = envToken ?: npmTokenFile.let { if (it.isFile) it.readLines().first() else "" }
         val hasNPMToken = secretNpmToken.isNotEmpty()
         val isReleaseBuild = Regex("\\d+.\\d+.\\d+").matches(version.get())
-        println("NPM token: ${hasNPMToken}")
-        println("Release build: ${isReleaseBuild}")
         if (isReleaseBuild && hasNPMToken) {
             readme.set(File("README.md"))
             register("npmjs") {
