@@ -2,7 +2,7 @@ plugins {
     val kotlinVersion = "1.9.21"
     kotlin("multiplatform") version kotlinVersion
     kotlin("plugin.serialization") version kotlinVersion
-    id("dev.petuska.npm.publish") version "3.3.1"
+    id("dev.petuska.npm.publish") version "3.4.1"
     `maven-publish`
 }
 
@@ -36,12 +36,12 @@ kotlin {
     }
     val hostOs = System.getProperty("os.name")
     val isMingwX64 = hostOs.startsWith("Windows")
-    val nativeTarget = when {
+    /*val nativeTarget = when {
         hostOs == "Mac OS X" -> macosX64("native")
         hostOs == "Linux" -> linuxX64("native")
         isMingwX64 -> mingwX64("native")
         else -> throw GradleException("Host OS is not supported in Kotlin/Native.")
-    }
+    }*/
     val kryptoVersion = "4.0.1"
 
 
@@ -87,8 +87,8 @@ kotlin {
         }
         val jsTest by getting {
         }
-        val nativeMain by getting
-        val nativeTest by getting
+        //val nativeMain by getting
+        //val nativeTest by getting
     }
 
     publishing {
