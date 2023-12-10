@@ -7,7 +7,7 @@ on:
 
 jobs:
   release:
-    name: "Release"
+    name: "Pre-Release"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -43,18 +43,34 @@ jobs:
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
+#          docker issuer
       - name: Build and push Docker images (issuer)
         uses: docker/build-push-action@v4.0.0
         with:
           push: true
           file: docker/issuer.Dockerfile
           tags: waltid/issuer:latest, waltid/issuer:${{ env.release_version }}
+#          docker verifier
       - name: Build and push Docker images (verifier)
         uses: docker/build-push-action@v4.0.0
         with:
           push: true
           file: docker/verifier.Dockerfile
           tags: waltid/verifier:latest, waltid/verifier:${{ env.release_version }}
+#          docker wallet-backend
+      - name: Build and push Docker images (wallet-backend)
+        uses: docker/build-push-action@v4.0.0
+        with:
+          push: true
+          file: waltid-wallet/Dockerfile
+          tags: waltid/wallet-backend:latest, waltid/wallet-backend:${{ env.release_version }}
+#          docker wallet-frontend
+      - name: Build and push Docker images (wallet-backend)
+        uses: docker/build-push-action@v4.0.0
+        with:
+          push: true
+          file: waltid-apps/web-wallet/Dockerfile
+          tags: waltid/wallet-frontend:latest, waltid/wallet-frontend:${{ env.release_version }}
 
       - name: Changelog
         uses: ardalanamini/auto-changelog@v3
@@ -91,19 +107,30 @@ jobs:
           body: |
             ${{ steps.changelog.outputs.changelog }}
           prerelease: ${{ steps.changelog.outputs.prerelease }}
+#          issuer deployment
       - name: Prepare CD - issuer
-        run: sed "s/_DEFAULT_DEPLOYMENT_/$GITHUB_SHA/g" waltid-issuer/k8s/deployment-prod.yaml > waltid-issuer/k8s/deployment_mod.yaml
+        run: sed "s/_DEFAULT_DEPLOYMENT_/$GITHUB_SHA/g" waltid-issuer/k8s/deployment-dev.yaml > waltid-issuer/k8s/deployment_mod.yaml
       - name: Continuous deployment - issuer
         uses: actions-hub/kubectl@master
         env:
           KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
         with:
-          args: apply -n portals -f waltid-issuer/k8s/deployment_mod.yaml
+          args: apply -n dev -f waltid-issuer/k8s/deployment_mod.yaml
+#          verifier deployment
       - name: Prepare CD - verifier
-        run: sed "s/_DEFAULT_DEPLOYMENT_/$GITHUB_SHA/g" waltid-verifier/k8s/deployment-prod.yaml > waltid-verifier/k8s/deployment_mod.yaml
+        run: sed "s/_DEFAULT_DEPLOYMENT_/$GITHUB_SHA/g" waltid-verifier/k8s/deployment-dev.yaml > waltid-verifier/k8s/deployment_mod.yaml
       - name: Continuous deployment - verifier
         uses: actions-hub/kubectl@master
         env:
           KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
         with:
-          args: apply -n portals -f waltid-verifier/k8s/deployment_mod.yaml
+          args: apply -n dev -f waltid-verifier/k8s/deployment_mod.yaml
+#          wallet-backend deployment
+      - name: Prepare CD - wallet
+        run: sed "s/_DEFAULT_DEPLOYMENT_/$GITHUB_SHA/g" waltid-wallet/k8s/deployment-dev.yaml > waltid-wallet/k8s/deployment_mod.yaml
+      - name: Continuous deployment - wallet
+        uses: actions-hub/kubectl@master
+        env:
+          KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
+        with:
+          args: apply -n dev -f waltid-wallet/k8s/deployment_mod.yaml
