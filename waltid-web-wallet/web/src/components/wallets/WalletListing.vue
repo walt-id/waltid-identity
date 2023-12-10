@@ -8,8 +8,8 @@
                     <div class="flex items-start gap-x-3">
                         <p class="text-base font-semibold leading-6 text-gray-900">{{ wallet.name }}</p>
                         <p class="rounded-md whitespace-nowrap mt-0.5 px-1.5 py-0.5 text-xs font-medium ring-1 ring-inset">
-                            {{ wallet.permission
-                            }}</p>
+                            {{ wallet.permission }}
+                        </p>
                     </div>
                     <div class="mt-1 flex items-center gap-x-2 text-sm leading-5 text-gray-500">
                         <p class="whitespace-nowrap">
@@ -28,7 +28,7 @@
                 <div class="flex flex-none items-center gap-x-4">
                     <button
                         class="flex items-center gap-1 rounded-md bg-white px-2.5 py-1.5 text-base font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
-                        @click="setWallet(wallet.id)"
+                        @click="selectWalletListing(wallet)"
                     >
                         Select wallet
                         <Icon class="h-5 w-5" name="heroicons:chevron-right" />
@@ -42,15 +42,21 @@
 </template>
 
 <script lang="ts" setup>
-import { listWallets } from "~/composables/accountWallet";
-import type WalletListing from "~/components/wallets/WalletListing.vue";
 import LoadingIndicator from "~/components/loading/LoadingIndicator.vue";
 
-const wallets = (await listWallets())?.value?.wallets;
-
-defineProps<{
+const props = defineProps<{
     useUrl: (wallet: WalletListing) => string;
+    wallets: WalletListing[]
 }>();
+
+//const wallets = (await listWallets())?.value?.wallets;
+
+function selectWalletListing(wallet: WalletListing) {
+    setWallet(wallet.id, undefined)
+    const dynamicUrl = props.useUrl(wallet)
+    console.log("Dynamic url: ", dynamicUrl)
+    navigateTo(dynamicUrl)
+}
 
 </script>
 

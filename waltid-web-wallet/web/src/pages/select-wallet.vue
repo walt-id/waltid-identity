@@ -13,7 +13,7 @@
             <InboxArrowDownIcon aria-hidden="true" class="h-5 w-5 text-white mr-1" />
             <span>Create new wallet</span>
         </button>
-        <WalletListing :use-url="(wallet) => `/wallet/${wallet.id}`"/>
+        <WalletListing :use-url="(wallet) => `/wallet/${wallet.id}`" :wallets="wallets"/>
     </CenterMain>
 </template>
 
@@ -23,13 +23,7 @@ import { InboxArrowDownIcon } from "@heroicons/vue/24/outline";
 import CenterMain from "~/components/CenterMain.vue";
 import WalletListing from "~/components/wallets/WalletListing.vue";
 
-//const wallets = (await listWallets()).value.wallets
-
-// const wallets = [{
-//     name: "Wallet of X",
-//     id: "xabc",
-//     createdOn: "2023-11-15"
-// }];
+const wallets = (await listWallets())?.value?.wallets;
 </script>
 
 <style scoped>

@@ -1,23 +1,28 @@
 <template>
     <CenterMain>
-        <LoadingIndicator>Loading issuance parameters...</LoadingIndicator>
+        <WalletListing v-if="wallets && wallets.length > 1" :wallets="wallets" :use-url="walletUrlFunction"/>
+        <LoadingIndicator v-else>Loading wallets...</LoadingIndicator>
     </CenterMain>
 </template>
 
 <script lang="ts" setup>
 import CenterMain from "~/components/CenterMain.vue";
 import LoadingIndicator from "~/components/loading/LoadingIndicator.vue";
+import WalletListing from "~/components/wallets/WalletListing.vue";
 
-const currentWallet = useCurrentWallet()
+const queryRequest = new URL("http://example.invalid" + useRoute().fullPath).search // new URL(window.location.href).search
+console.log("queryRequest: ", queryRequest)
 
-if (process.client) {
-    const url = "openid-initiate-issuance://" + new URL(window.location.href).search;
-    console.log(url);
-    const encoded = btoa(url);
-    console.log(encoded);
+const walletRequestUrl = "openid-initiate-issuance://" + queryRequest;
+console.log("walletRequestUrl: ", walletRequestUrl);
+const encodedWalletRequestUrl = btoa(walletRequestUrl);
+console.log("encodedWalletRequestUrl: ", encodedWalletRequestUrl);
 
-    navigateTo(`/wallet/${currentWallet.value}/exchange/issuance?request=${encoded}`);
+const wallets = (await listWallets())?.value?.wallets;
+
+const walletUrlFunction = (wallet: WalletListing) => `/wallet/${wallet.id}/exchange/issuance?request=${encodedWalletRequestUrl}`
+
+if (wallets && wallets.length == 1) {
+    navigateTo(walletUrlFunction(wallets[0]))
 }
 </script>
-
-<style scoped></style>
