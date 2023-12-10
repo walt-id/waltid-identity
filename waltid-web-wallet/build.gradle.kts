@@ -1,17 +1,18 @@
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
-    kotlin("jvm")
+    val kotlinVersion = "1.9.21"
+    kotlin("jvm") version kotlinVersion
     id("io.ktor.plugin") version "2.3.7"
-    id("org.jetbrains.kotlin.plugin.serialization")
+    id("org.jetbrains.kotlin.plugin.serialization") version kotlinVersion
 
-    id("com.github.ben-manes.versions")
+    id("com.github.ben-manes.versions") version "0.49.0"
 }
 
 group = "id.walt"
 version = "0.0.1"
 application {
-    mainClass.set("id.walt.ApplicationKt")
+    mainClass.set("id.walt.webwallet.ApplicationKt")
 
     val isDevelopment: Boolean = project.ext.has("development")
     applicationDefaultJvmArgs = listOf("-Dio.ktor.development=$isDevelopment")
@@ -28,7 +29,7 @@ repositories {
 }
 
 tasks.withType<KotlinCompile> {
-    kotlinOptions.jvmTarget = "19"
+    kotlinOptions.jvmTarget = "21"
 }
 
 /*java {
@@ -37,7 +38,7 @@ tasks.withType<KotlinCompile> {
 }*/
 
 kotlin {
-    jvmToolchain(19)
+    jvmToolchain(21)
 }
 
 dependencies {
