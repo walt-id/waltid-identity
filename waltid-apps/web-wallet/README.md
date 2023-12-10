@@ -20,10 +20,24 @@
 
 Check out the **[Official Documentation](https://docs.walt.id/v/apps/solutions/web-wallet)**, to dive deeper into the architecture and configuration options available.
 
+## How to use it
+
+### Running from source
+
+```shell
+pnpm install && pnpm dev
+```
+
+### Running with docker
+
+```shell
+docker run -e NUXT_PUBLIC_ISSUER_CALLBACK_URL="http://localhost:3000" \
+ -p 3000:3000 wallet-frontend:latest
+```
 
 ## What is the Web-Wallet?
 
-A **white-label solution** build on top of our core libs, offering your everything to build identity POCs leveraging Verifiable Credentials and NFTs/Tokens across ecosystems.
+A **white-label solution** build on top of our core libs, offering you everything to build identity POCs leveraging Verifiable Credentials and NFTs/Tokens across ecosystems.
 
 ### Features
 
@@ -34,8 +48,8 @@ Features are provided by our libraries SSI-Kit and NFT-Kit to enable SSI and NFT
 - **Manage VCs** - Receive, Store and Present Verifiable Credentials with different formats (e.g. W3C) and proof-types (e.g. JWT, SD-JWT). Full overview of formats and proof-types [here](https://walt-id.notion.site/Features-by-Product-aab646e46a744a7d84a6b8fd6b7066ac?pvs=4).
 - **Manage DIDs** - Create and delete DIDs and onboard to different ecosystems (e.g. did:key, did:jwt, did:ebsi, did:cheqd, did:web and more) Full list [here](https://walt-id.notion.site/Features-by-Product-aab646e46a744a7d84a6b8fd6b7066ac?pvs=4).
 - **Manage Keys** - Create, import and export keys with different algorithms (e.g. Ed25519). Full list [here](https://walt-id.notion.site/Features-by-Product-aab646e46a744a7d84a6b8fd6b7066ac?pvs=4).
-  
-- **Credential Exchange** - Based on OIDC standards (OIDC4VC & OIDC4VP) using synchronous flows with same device and cross device support as well as asynchronous flows leveraging the browser notification system.
+
+- **Credential Exchange** - Based on OID4VC standards (OID4VCI & OID4VP) using synchronous flows with same device and cross device support as well as asynchronous flows leveraging the browser notification system.
 
 ### NFTs
 

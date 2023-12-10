@@ -83,10 +83,10 @@ Verifier service relies on the following walt.id libraries:
 
 ### Running from source
 
-1. run the `id.walt.verifier.Mainkt` file
+1. run the `id.walt.verifier.MainKt` file
 2. the verifier backend is available at: http://localhost:7001
 
-### Using docker
+### Running with docker
 
 ```shell
 docker run \
