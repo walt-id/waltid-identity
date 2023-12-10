@@ -31,10 +31,11 @@ export function setWallet(
 export function useCurrentWallet() {
     return useState<string | null>("wallet", () => {
         const currentRoute = useRoute();
-        const currentWalletId = currentRoute.params["wallet"] ?? null;
+        const currentWalletId = currentRoute.params["wallet"] as string ?? null;
 
         if (currentWalletId == null && currentRoute.name != "/") {
             console.log("Error for currentWallet at: ", currentRoute);
+            return null
         } else {
             console.log("Returning: " + currentWalletId + ", at: " + currentRoute.fullPath);
             return currentWalletId;
