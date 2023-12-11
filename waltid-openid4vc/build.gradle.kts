@@ -103,7 +103,10 @@ kotlin {
 
                 implementation("id.walt.servicematrix:WaltID-ServiceMatrix:1.1.3")
                 // TODO: current version implementation("id.walt:waltid-ssikit:1.2311131043.0")
-                implementation("id.walt:waltid-ssikit:1.JWTTYP")
+                implementation("id.walt:waltid-ssikit:1.JWTTYP") {
+                    exclude("waltid-sd-jwt-jvm")
+                    exclude(module = "waltid-sd-jwt-jvm")
+                }
                 implementation(project(":waltid-crypto"))
 
                 implementation("io.ktor:ktor-server-core-jvm:$ktor_version")
