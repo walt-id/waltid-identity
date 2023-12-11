@@ -40,6 +40,7 @@ data class AuthorizationRequest(
     val responseUri: String? = null,
     val codeChallenge: String? = null,
     val codeChallengeMethod: String? = null,
+    val claims: JsonObject? = null,
     override val customParameters: Map<String, List<String>> = mapOf()
 ) : HTTPDataObject(), IAuthorizationRequest {
     val isReferenceToPAR get() = requestUri?.startsWith("urn:ietf:params:oauth:request_uri:") ?: false
@@ -91,11 +92,14 @@ data class AuthorizationRequest(
             "client_id_scheme",
             "client_metadata",
             "client_metadata_uri",
+            "registration", // compatiblity with OIDC4VP 1.0.10 - replaced by client_metadata
+            "registration_uri", // compatiblity with OIDC4VP 1.0.10 - replaced by client_metadata_uri
             "nonce",
             "response_mode",
             "response_uri",
             "code_challenge",
-            "code_challenge_method"
+            "code_challenge_method",
+            "claims"
         )
 
         suspend fun fromRequestObjectByReference(requestUri: String): AuthorizationRequest {
@@ -145,12 +149,15 @@ data class AuthorizationRequest(
                 parameters["presentation_definition"]?.firstOrNull()?.let { PresentationDefinition.fromJSONString(it) },
                 parameters["presentation_definition_uri"]?.firstOrNull(),
                 parameters["client_id_scheme"]?.firstOrNull()?.let { ClientIdScheme.fromValue(it) },
-                parameters["client_metadata"]?.firstOrNull()?.let { OpenIDClientMetadata.fromJSONString(it) },
-                parameters["client_metadata_uri"]?.firstOrNull(),
+                (parameters["client_metadata"] ?: parameters["registration"])?.firstOrNull()?.let {
+                    OpenIDClientMetadata.fromJSONString(it)
+                },
+                (parameters["client_metadata_uri"] ?: parameters["registration_uri"])?.firstOrNull(),
                 parameters["nonce"]?.firstOrNull(),
                 parameters["response_uri"]?.firstOrNull(),
                 parameters["code_challenge"]?.firstOrNull(),
                 parameters["code_challenge_method"]?.firstOrNull(),
+                parameters["claims"]?.firstOrNull()?.let { Json.decodeFromString(it) },
                 parameters.filterKeys { !knownKeys.contains(it) }
             )
         }

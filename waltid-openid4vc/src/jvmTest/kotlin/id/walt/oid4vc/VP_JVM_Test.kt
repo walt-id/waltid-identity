@@ -28,7 +28,10 @@ import io.ktor.util.*
 import io.ktor.utils.io.*
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.ZERO
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
 
 class VP_JVM_Test : AnnotationSpec() {
 
@@ -594,6 +597,16 @@ class VP_JVM_Test : AnnotationSpec() {
         reqUri shouldNotBe null
         val authReq = AuthorizationRequest.fromHttpParametersAuto(parseQueryString(Url(reqUri!!).encodedQuery).toMap())
         authReq.clientId shouldBe "did:web:entra.walt.id"
+
+        val tokenResponse = testWallet.processImplicitFlowAuthorization(authReq)
+        val resp = http.submitForm(authReq.responseUri ?: authReq.redirectUri ?: throw Exception("response_uri or redirect_uri must be set"),
+            parameters {
+                tokenResponse.toHttpParameters().forEach { entry ->
+                    entry.value.forEach { append(entry.key, it) }
+                }
+            })
+        println("Resp: $resp")
+        resp.status shouldBe HttpStatusCode.OK
     }
 
     suspend fun entraAuthorize(): String {

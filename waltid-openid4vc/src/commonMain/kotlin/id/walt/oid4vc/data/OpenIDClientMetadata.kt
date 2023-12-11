@@ -9,7 +9,7 @@ import kotlinx.serialization.json.jsonObject
 
 @Serializable
 data class OpenIDClientMetadata(
-    @SerialName("redirect_uris") val redirectUris: List<String>,
+    @SerialName("redirect_uris") val redirectUris: List<String>? = null,
     @SerialName("response_types") val responseTypes: List<String>? = null,
     @SerialName("grant_types") val grantTypes: List<GrantType>? = null,
     @SerialName("application_type") val applicationType: String? = null,
