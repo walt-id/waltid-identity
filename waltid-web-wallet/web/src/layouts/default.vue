@@ -234,7 +234,7 @@ import {
     FingerPrintIcon,
     GlobeAltIcon,
     HomeIcon,
-    KeyIcon,
+    KeyIcon, ListBulletIcon,
     QuestionMarkCircleIcon,
     ShieldCheckIcon,
     XMarkIcon
@@ -300,7 +300,7 @@ const navigation = [
             { name: "Tokens", href: `/wallet/${currentWallet.value}/settings/tokens`, icon: GlobeAltIcon },
             { name: "DIDs", href: `/wallet/${currentWallet.value}/settings/dids`, icon: FingerPrintIcon },
             { name: "Keys", href: `/wallet/${currentWallet.value}/settings/keys`, icon: KeyIcon },
-            { name: "History", href: `/wallet/${currentWallet.value}/history`, icon: ClipboardDocumentListIcon },
+            // { name: "History", href: `/wallet/${currentWallet.value}/history`, icon: ClipboardDocumentListIcon },
 
             // {name: 'History', href: '/history', icon: ClockIcon}
         ],
@@ -322,6 +322,7 @@ const navigation = [
     //}
 ];
 const secondaryNavigation = [
+    { name: "Select wallet", href: "/", icon: ListBulletIcon },
     { name: "Settings", href: "/settings", icon: CogIcon },
     { name: "Help", href: "/help", icon: QuestionMarkCircleIcon },
     { name: "Privacy", href: "/help/privacy", icon: ShieldCheckIcon },
