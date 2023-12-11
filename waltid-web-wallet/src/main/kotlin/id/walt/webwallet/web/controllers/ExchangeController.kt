@@ -2,7 +2,7 @@ package id.walt.webwallet.web.controllers
 
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.web.controllers.getWalletService
-import id.walt.webwallet.db.models.WalletOperationHistory
+import id.walt.webwallet.db.models.WalletOperation
 import id.walt.webwallet.service.SSIKit2WalletService
 import io.github.smiley4.ktorswaggerui.dsl.post
 import io.github.smiley4.ktorswaggerui.dsl.route
@@ -42,8 +42,8 @@ fun Application.exchange() = walletRoute {
 
 
             wallet.useOfferRequest(offer, did)
-            wallet.addOperationHistory(
-                WalletOperationHistory.new(
+            wallet.addOperationEvent(
+                WalletOperation.new(
                     tenant = wallet.tenant,
                     wallet = wallet,
                     "useOfferRequest",
@@ -115,8 +115,8 @@ fun Application.exchange() = walletRoute {
             val result = wallet.usePresentationRequest(request, did, selectedCredentialIds, disclosures) // TODO add disclosures here
 
             if (result.isSuccess) {
-                wallet.addOperationHistory(
-                    WalletOperationHistory.new(
+                wallet.addOperationEvent(
+                    WalletOperation.new(
                         tenant = wallet.tenant,
                         wallet = wallet,
                         "usePresentationRequest",
@@ -135,8 +135,8 @@ fun Application.exchange() = walletRoute {
                 val err = result.exceptionOrNull()
                 println("Presentation failed: $err")
 
-                wallet.addOperationHistory(
-                    WalletOperationHistory.new(
+                wallet.addOperationEvent(
+                    WalletOperation.new(
                         tenant = wallet.tenant,
                         wallet = wallet,
                         "usePresentationRequest",
