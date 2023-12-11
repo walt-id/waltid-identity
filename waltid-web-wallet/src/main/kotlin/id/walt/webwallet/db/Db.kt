@@ -2,10 +2,10 @@ package id.walt.webwallet.db
 
 import id.walt.webwallet.config.ConfigManager
 import id.walt.webwallet.config.DatasourceConfiguration
+import id.walt.webwallet.db.models.*
 import id.walt.webwallet.db.models.todo.Issuers
 import id.walt.webwallet.service.account.AccountsService
 import id.walt.webwallet.web.model.EmailAccountRequest
-import id.walt.webwallet.db.models.*
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.runBlocking
 import org.jetbrains.exposed.sql.Database
@@ -23,9 +23,11 @@ object Db {
 
     private val log = KotlinLogging.logger { }
 
+    lateinit var datasourceConfig: DatasourceConfiguration
+
     private fun connect() {
-        val databaseConfig = ConfigManager.getConfig<DatasourceConfiguration>()
-        val datasourceConfig = databaseConfig.hikariDataSource
+        datasourceConfig = ConfigManager.getConfig<DatasourceConfiguration>()
+        val hikariDataSourceConfig = datasourceConfig.hikariDataSource
 
         /*val databaseConfig = ConfigManager.getConfig<DatabaseConfiguration>()
 
@@ -37,23 +39,18 @@ object Db {
             .migrate()*/
 
         // connect
-        log.info { "Connecting to database at \"${datasourceConfig.jdbcUrl}\"..." }
+        log.info { "Connecting to database at \"${hikariDataSourceConfig.jdbcUrl}\"..." }
 
-        if (datasourceConfig.jdbcUrl.contains("sqlite")) {
-            println("Will use sqlite database (${datasourceConfig.jdbcUrl}), working directory: ${Path(".").absolutePathString()}")
+        if (hikariDataSourceConfig.jdbcUrl.contains("sqlite")) {
+            println("Will use sqlite database (${hikariDataSourceConfig.jdbcUrl}), working directory: ${Path(".").absolutePathString()}")
         }
 
-        Database.connect(datasourceConfig)
+        Database.connect(hikariDataSourceConfig)
         TransactionManager.manager.defaultIsolationLevel =
-            toTransactionIsolationLevel(datasourceConfig.transactionIsolation)
+            toTransactionIsolationLevel(hikariDataSourceConfig.transactionIsolation)
     }
 
-    fun start() {
-        connect()
-
-        SLF4JBridgeHandler.removeHandlersForRootLogger()
-        SLF4JBridgeHandler.install()
-
+    fun recreateDatabase() {
         transaction {
             addLogger(StdOutSqlLogger)
 
@@ -82,23 +79,22 @@ object Db {
                 Issuers
             )
 
-            /*SchemaUtils.create(Web3Wallets)
-            SchemaUtils.create(Accounts)
-            //AccountWeb3WalletMappings,
-            SchemaUtils.create(Wallets)
-            SchemaUtils.create(AccountWalletMappings)
-            SchemaUtils.create(WalletCredentials)
-            SchemaUtils.create(WalletKeys)
-            SchemaUtils.create(WalletDids)
-            SchemaUtils.create(WalletOperationHistories)
-            SchemaUtils.create(Issuers)*/
-
             runBlocking {
                 AccountsService.register(request = EmailAccountRequest("Max Mustermann", "string@string.string", "string"))
                 AccountsService.register(request = EmailAccountRequest("Max Mustermann", "user@email.com", "password"))
             }
         }
+    }
 
+    fun start() {
+        connect()
+
+        SLF4JBridgeHandler.removeHandlersForRootLogger()
+        SLF4JBridgeHandler.install()
+
+        if (datasourceConfig.recreateDatabaseOnStart) {
+            recreateDatabase()
+        }
     }
 
     private fun toTransactionIsolationLevel(value: String): Int = when (value) {
