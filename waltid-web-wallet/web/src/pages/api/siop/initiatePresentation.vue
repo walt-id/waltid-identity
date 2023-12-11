@@ -25,6 +25,8 @@ const wallets = (await listWallets())?.value?.wallets;
 const walletUrlFunction = (wallet: WalletListing) => `/wallet/${wallet.id}/exchange/presentation?request=${encodedWalletRequestUrl}`
 
 if (wallets && wallets.length == 1) {
+    const wallet = wallets[0]
+    setWallet(wallet.id, undefined)
     navigateTo(walletUrlFunction(wallets[0]))
 }
 </script>
