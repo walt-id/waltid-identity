@@ -31,7 +31,7 @@ object DidsService {
     }
 
     fun delete(wallet: UUID, did: String): Boolean =
-        WalletDids.deleteWhere { (WalletDids.wallet eq wallet) and (WalletDids.did eq did) } > 0
+        transaction { WalletDids.deleteWhere { (WalletDids.wallet eq wallet) and (WalletDids.did eq did) } } > 0
 
 
     fun makeDidDefault(wallet: UUID, newDefaultDid: String) {

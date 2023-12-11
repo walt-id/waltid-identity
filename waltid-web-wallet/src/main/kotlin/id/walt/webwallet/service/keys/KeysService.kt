@@ -29,7 +29,7 @@ object KeysService {
         }[WalletKeys.keyId]
 
     fun delete(wallet: UUID, keyId: String): Boolean =
-        WalletKeys.deleteWhere { (WalletKeys.wallet eq wallet) and (WalletKeys.keyId eq keyId) } > 0
+        transaction { WalletKeys.deleteWhere { (WalletKeys.wallet eq wallet) and (WalletKeys.keyId eq keyId) } } > 0
 
     /*fun update(wallet: UUID, key: DbKey): Boolean {
         TO-DO
