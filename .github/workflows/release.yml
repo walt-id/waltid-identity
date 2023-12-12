@@ -56,12 +56,12 @@ jobs:
           file: waltid-verifier-api/Dockerfile
           tags: waltid/verifier:latest, waltid/verifier:${{ env.release_version }}
 
-      - name: Build and push Docker images (wallet-backend)
-        uses: docker/build-push-action@v4.0.0
-        with:
-          push: true
-          file: waltid-web-wallet/backend.Dockerfile
-          tags: waltid/wallet-backend:latest, waltid/wallet-backend:${{ env.release_version }}
+      # - name: Build and push Docker images (wallet-backend)
+      #   uses: docker/build-push-action@v4.0.0
+      #   with:
+      #     push: true
+      #     file: waltid-web-wallet/backend.Dockerfile
+      #     tags: waltid/wallet-backend:latest, waltid/wallet-backend:${{ env.release_version }}
 
       - name: Build and push Docker images (wallet-frontend)
         uses: docker/build-push-action@v4.0.0
