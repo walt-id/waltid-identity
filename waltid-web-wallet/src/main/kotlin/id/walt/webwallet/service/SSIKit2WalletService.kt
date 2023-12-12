@@ -25,12 +25,12 @@ import id.walt.oid4vc.responses.TokenResponse
 import id.walt.oid4vc.util.randomUUID
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.db.models.WalletKeys
-import id.walt.webwallet.db.models.WalletOperation
+import id.walt.webwallet.db.models.WalletOperationHistories
+import id.walt.webwallet.db.models.WalletOperationHistory
 import id.walt.webwallet.service.credentials.CredentialsService
 import id.walt.webwallet.service.dids.DidsService
 import id.walt.webwallet.service.dto.LinkedWalletDataTransferObject
 import id.walt.webwallet.service.dto.WalletDataTransferObject
-import id.walt.webwallet.service.events.EventService
 import id.walt.webwallet.service.issuers.IssuerDataTransferObject
 import id.walt.webwallet.service.issuers.IssuersService
 import id.walt.webwallet.service.keys.KeysService
@@ -52,7 +52,9 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import kotlinx.uuid.UUID
+import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.insert
+import org.jetbrains.exposed.sql.select
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.net.URLDecoder
 import kotlin.time.Duration.Companion.seconds
@@ -551,11 +553,26 @@ class SSIKit2WalletService(tenant: String?, accountId: UUID, walletId: UUID) : W
 // TODO
 //fun infoAboutOfferRequest
 
-    override fun getEvents(limit: Int, offset: Long): List<WalletOperation> =
-        EventService.get(walletId, limit, offset)
+    override fun getHistory(limit: Int, offset: Long): List<WalletOperationHistory> = transaction {
+        WalletOperationHistories
+            .select { (WalletOperationHistories.tenant eq tenant) and (WalletOperationHistories.accountId eq walletId) }
+            .orderBy(WalletOperationHistories.timestamp)
+            .limit(10)
+            .map { WalletOperationHistory(it) }
+    }
 
-    override suspend fun addOperationEvent(operationHistory: WalletOperation): Unit =
-        EventService.add(operationHistory)
+    override suspend fun addOperationHistory(operationHistory: WalletOperationHistory) {
+        transaction {
+            WalletOperationHistories.insert {
+                it[tenant] = operationHistory.tenant
+                it[accountId] = operationHistory.account
+                it[wallet] = operationHistory.wallet
+                it[timestamp] = operationHistory.timestamp.toJavaInstant()
+                it[operation] = operationHistory.operation
+                it[data] = Json.encodeToString(operationHistory.data)
+            }
+        }
+    }
 
     override suspend fun linkWallet(wallet: WalletDataTransferObject): LinkedWalletDataTransferObject =
         Web3WalletService.link(tenant, walletId, wallet)
