@@ -47,13 +47,13 @@ jobs:
         uses: docker/build-push-action@v4.0.0
         with:
           push: true
-          file: waltid-issuer/Dockerfile
+          file: waltid-issuer-api/Dockerfile
           tags: waltid/issuer:latest, waltid/issuer:${{ env.release_version }}
       - name: Build and push Docker images (verifier)
         uses: docker/build-push-action@v4.0.0
         with:
           push: true
-          file: waltid-verifier/Dockerfile
+          file: waltid-verifier-api/Dockerfile
           tags: waltid/verifier:latest, waltid/verifier:${{ env.release_version }}
 
       - name: Changelog
