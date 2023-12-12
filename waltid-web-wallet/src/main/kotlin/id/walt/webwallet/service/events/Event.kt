@@ -12,19 +12,21 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.uuid.UUID
 import org.jetbrains.exposed.sql.ResultRow
 
+const val EventDataNotAvailable = "n/a"
+
 @Serializable
 data class Event(
     val event: String,
     val action: String,
     val timestamp: Instant = Clock.System.now(),
-    val tenant: String,
-    val originator: String,
+    val tenant: String? = null,
+    val originator: String? = null,
     val account: UUID,
     val wallet: UUID,
     val data: JsonObject,
 ) {
     constructor(
-        action: EventType.Action, tenant: String, originator: String, account: UUID, wallet: UUID, data: EventData
+        action: EventType.Action, tenant: String?, originator: String?, account: UUID, wallet: UUID, data: EventData
     ) : this(
         event = action.type,
         action = action.toString(),

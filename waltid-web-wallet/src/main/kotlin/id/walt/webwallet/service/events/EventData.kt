@@ -7,8 +7,8 @@ sealed class EventData
 
 @Serializable
 data class AccountEventData(
-    val accountId: String,
-    val walletId: String,
+    val accountId: String? = null,
+    val walletId: String? = null,
 ) : EventData()
 
 @Serializable

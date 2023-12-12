@@ -24,7 +24,7 @@ bin/
 out/
 !**/src/main/**/out/
 !**/src/test/**/out/
-.run/
+!**/.run/*.xml
 
 ### NetBeans ###
 /nbproject/private/
