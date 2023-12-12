@@ -1,8 +1,8 @@
 FROM docker.io/gradle:jdk21 as buildstage
 
-COPY src/ /work/src
-COPY gradle/ /work/gradle
-COPY build.gradle.kts settings.gradle.kts gradle.properties gradlew /work/
+COPY waltid-web-wallet/src/ /work/src
+COPY waltid-web-wallet/gradle/ /work/gradle
+COPY waltid-web-wallet/build.gradle.kts waltid-web-wallet/settings.gradle.kts waltid-web-wallet/gradle.properties waltid-web-wallet/gradlew /work/
 
 WORKDIR /work
 RUN gradle clean installDist

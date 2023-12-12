@@ -7,5 +7,6 @@ data class DatabaseConfiguration(
 ) : WalletConfig
 
 data class DatasourceConfiguration(
-    val hikariDataSource: HikariDataSource
+    val hikariDataSource: HikariDataSource,
+    val recreateDatabaseOnStart: Boolean = false
 ) : WalletConfig

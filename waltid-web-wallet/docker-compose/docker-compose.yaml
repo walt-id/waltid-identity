@@ -19,7 +19,7 @@ services:
   verifier:
     image: waltid/verifier:latest
     volumes:
-      - ./verifier/config:/waltid-verifier/config
+      - ./verifier/config:/waltid-verifier-api/config
   web-portal:
     image: waltid/portal:latest
     environment:

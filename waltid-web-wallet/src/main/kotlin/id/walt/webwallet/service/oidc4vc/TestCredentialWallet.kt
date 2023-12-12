@@ -54,6 +54,21 @@ class TestCredentialWallet(
         }
     }
 
+    suspend fun resolveDidAuthentication(did: String): String {
+        return DidService.resolve(did).getOrElse {
+            ktorClient.post("https://core.ssikit.walt.id/v1/did/resolve") {
+                headers { contentType(ContentType.Application.Json) }
+                setBody("{ \"did\": \"${this@TestCredentialWallet.did}\" }")
+            }.body<JsonObject>()
+        }["authentication"]!!.jsonArray.first().let {
+            if (it is JsonObject) {
+                it.jsonObject["id"]!!.jsonPrimitive.content
+            } else {
+                it.jsonPrimitive.content
+            }
+        }
+    }
+
     override fun signToken(target: TokenTarget, payload: JsonObject, header: JsonObject?, keyId: String?): String {
         fun debugStateMsg() = "(target: $target, payload: $payload, header: $header, keyId: $keyId)"
         println("SIGNING TOKEN: ${debugStateMsg()}")
@@ -64,17 +79,8 @@ class TestCredentialWallet(
         println("KEY FOR SIGNING: $key")
 
         return runBlocking {
-            val didDoc = ktorClient.post("https://core.ssikit.walt.id/v1/did/resolve") {
-                headers { contentType(ContentType.Application.Json) }
-                setBody("{ \"did\": \"${this@TestCredentialWallet.did}\" }")
-            }.body<JsonObject>()
-            val authKeyId = didDoc["authentication"]!!.jsonArray.first().let {
-                if (it is JsonObject) {
-                    it.jsonObject["id"]!!.jsonPrimitive.content
-                } else {
-                    it.jsonPrimitive.content
-                }
-            }
+            val authKeyId = resolveDidAuthentication(did)
+
             key.signJws(Json.encodeToString(payload).encodeToByteArray(), mapOf("typ" to "JWT", "kid" to authKeyId))
         }
 
@@ -150,19 +156,7 @@ class TestCredentialWallet(
 
         val key = runBlocking { walletService.getKeyByDid(this@TestCredentialWallet.did) }
         val signed = runBlocking {
-            // TODO
-            // FIXME
-            val didDoc = ktorClient.post("https://core.ssikit.walt.id/v1/did/resolve") {
-                headers { contentType(ContentType.Application.Json) }
-                setBody("{ \"did\": \"${this@TestCredentialWallet.did}\" }")
-            }.body<JsonObject>()
-            val authKeyId = didDoc["authentication"]!!.jsonArray.first().let {
-                if (it is JsonObject) {
-                    it.jsonObject["id"]!!.jsonPrimitive.content
-                } else {
-                    it.jsonPrimitive.content
-                }
-            }
+            val authKeyId = resolveDidAuthentication(this@TestCredentialWallet.did)
 
             key.signJws(
                 vp.toByteArray(), mapOf(
