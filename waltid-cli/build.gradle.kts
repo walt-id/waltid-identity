@@ -41,6 +41,11 @@ kotlin {
                 api(project(":waltid-sdjwt"))
                 api(project(":waltid-openid4vc"))
 
+                // CLI
+                implementation("com.varabyte.kotter:kotter-jvm:1.1.1")
+                implementation("com.github.ajalt.mordant:mordant:2.2.0")
+                implementation("com.github.ajalt.clikt:clikt:4.2.1")
+
                 // Coroutines
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
 
