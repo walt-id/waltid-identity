@@ -112,6 +112,6 @@ Issuer service relies on the following walt.id libraries:
 
 ```shell
 docker run \
--v ${pwd}/waltid-issuer/config:/waltid-issuer/bin/waltid-issuer \
+-v ${pwd}/waltid-issuer-api/config:/waltid-issuer-api/bin/waltid-issuer \
 -p 7000:7000 waltid/issuer:latest
 ```

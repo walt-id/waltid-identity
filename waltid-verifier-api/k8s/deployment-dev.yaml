@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: issuer-data-volume-claim
+  name: verifier-data-volume-claim
 spec:
   accessModes:
     - ReadWriteMany
@@ -12,54 +12,54 @@ spec:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: issuer-web-config
+  name: verifier-web-config
 data:
   web.conf: |
     webHost = "0.0.0.0"
     webPort = 3000
-  issuer-service.conf: |
-    baseUrl = "https://issuer.portal.walt.id"
+  verifier-service.conf: |
+    baseUrl = "https://verifier.portal.walt-test.cloud"
 ---
 kind: Deployment
 apiVersion: apps/v1
 metadata:
-  name: issuer
+  name: verifier
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: issuer
+      app: verifier
   template:
     metadata:
       labels:
-        app: issuer
+        app: verifier
       annotations:
         deployment/id: "_DEFAULT_DEPLOYMENT_"
     spec:
       containers:
-        - name: issuer
-          image: waltid/issuer:latest
+        - name: verifier
+          image: waltid/verifier:dev
           volumeMounts:
-            - name: issuer-web-config
-              mountPath: "/waltid-issuer/config/"
+            - name: verifier-web-config
+              mountPath: "/waltid-verifier-api/config/"
               readOnly: true
-            - name: issuer-data
-              mountPath: "/waltid-issuer/data/"
+            - name: verifier-data
+              mountPath: "/waltid-verifier-api/data/"
           ports:
             - containerPort: 3000
               name: http-api
       volumes:
-        - name: issuer-data
+        - name: verifier-data
           persistentVolumeClaim:
-            claimName: issuer-data-volume-claim
-        - name: issuer-web-config
+            claimName: verifier-data-volume-claim
+        - name: verifier-web-config
           configMap:
-            name: issuer-web-config
+            name: verifier-web-config
 ---
 kind: Service
 apiVersion: v1
 metadata:
-  name: issuer
+  name: verifier
 spec:
   ports:
     - name: http
@@ -67,28 +67,28 @@ spec:
       targetPort: http-api
       protocol: TCP
   selector:
-    app: issuer
+    app: verifier
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: issuer
+  name: verifier
   annotations:
     kubernetes.io/ingress.class: "nginx"
     cert-manager.io/cluster-issuer: letsencrypt-prod
 spec:
   tls:
     - hosts:
-        - issuer.portal.walt.id
-      secretName: issuer-tls-secret
+        - verifier.portal.walt-test.cloud
+      secretName: verifier-tls-secret
   rules:
-    - host: issuer.portal.walt.id
+    - host: verifier.portal.walt-test.cloud
       http:
         paths:
           - path: /
             pathType: Prefix
             backend:
               service:
-                name: issuer
+                name: verifier
                 port:
                   name: http

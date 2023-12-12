@@ -22,8 +22,8 @@ include(
     "waltid-openid4vc",
 
     // Services based on libs
-    "waltid-issuer",
-    "waltid-verifier",
+    "waltid-issuer-api",
+    "waltid-verifier-api",
 
     // CLI
     "waltid-cli",
