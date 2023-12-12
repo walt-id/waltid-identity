@@ -14,7 +14,7 @@
 
 ## Getting Started
 
-### Multi-Platform Libaries 
+### Multi-Platform Libraries 
 Available for Kotlin/Java and JavaScript environments.
 
 - [Crypto](https://github.com/walt-id/waltid-identity/blob/main/waltid-crypto/README.md) - create and use keys based on different algorithms.
