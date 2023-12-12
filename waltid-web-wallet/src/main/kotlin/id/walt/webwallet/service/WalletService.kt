@@ -1,11 +1,12 @@
 package id.walt.webwallet.service
 
+import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.db.models.WalletDid
-import id.walt.webwallet.db.models.WalletOperation
-import id.walt.oid4vc.data.dif.PresentationDefinition
+import id.walt.webwallet.db.models.WalletOperationHistory
 import id.walt.webwallet.service.dto.LinkedWalletDataTransferObject
 import id.walt.webwallet.service.dto.WalletDataTransferObject
+import id.walt.webwallet.service.events.Event
 import id.walt.webwallet.service.issuers.IssuerDataTransferObject
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -48,8 +49,8 @@ abstract class WalletService(val tenant: String?, val accountId: UUID, val walle
     abstract suspend fun deleteKey(alias: String): Boolean
 
     // History
-    abstract fun getEvents(limit: Int = 10, offset: Long = 0): List<WalletOperation>
-    abstract suspend fun addOperationEvent(operationHistory: WalletOperation)
+    abstract fun getHistory(limit: Int = 10, offset: Long = 0): List<WalletOperationHistory>
+    abstract suspend fun addOperationHistory(operationHistory: WalletOperationHistory)
 
     // Web3 wallets
     abstract suspend fun linkWallet(wallet: WalletDataTransferObject): LinkedWalletDataTransferObject

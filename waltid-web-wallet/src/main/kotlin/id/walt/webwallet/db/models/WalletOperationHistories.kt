@@ -31,7 +31,7 @@ object WalletOperationHistories : KotlinxUUIDTable("wallet_operation_histories")
 }
 
 @Serializable
-data class WalletOperation(
+data class WalletOperationHistory(
     val tenant: String?,
     val id: UUID? = UUID.generateUUID(),
     val account: UUID,
@@ -51,7 +51,7 @@ data class WalletOperation(
     )
 
     companion object {
-        fun new(tenant: String?, wallet: WalletService, operation: String, data: Map<String, String?>) = WalletOperation(
+        fun new(tenant: String?, wallet: WalletService, operation: String, data: Map<String, String?>) = WalletOperationHistory(
             tenant = tenant,
             account = wallet.accountId,
             wallet = wallet.walletId,
