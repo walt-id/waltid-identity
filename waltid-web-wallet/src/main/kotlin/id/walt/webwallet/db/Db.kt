@@ -67,7 +67,8 @@ object Db {
                 //AccountWeb3WalletMappings,
                 Accounts,
                 Web3Wallets,
-                AccountIssuers
+                AccountIssuers,
+                Events,
             )
             SchemaUtils.create(
                 Web3Wallets,
@@ -80,7 +81,8 @@ object Db {
                 WalletDids,
                 WalletOperationHistories,
                 Issuers,
-                AccountIssuers
+                AccountIssuers,
+                Events,
             )
 
             runBlocking {
