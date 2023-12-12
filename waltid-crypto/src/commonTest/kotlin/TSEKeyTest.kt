@@ -19,6 +19,7 @@ class TSEKeyTest {
         internal const val BASE_SERVER = "http://127.0.0.1:8200"
         internal const val BASE_URL = "$BASE_SERVER/v1/transit"
         internal const val TOKEN = "dev-only-token"
+        internal val NAMESPACE = null
 
         internal val payload = JsonObject(
             mapOf(
@@ -39,29 +40,29 @@ class TSEKeyTest {
 
     lateinit var keys: List<TSEKey>
 
-//    @Test
+    @Test
     fun testTse() = runTest {
-        println("Testing key creation of: $TESTABLE_KEY_TYPES...")
-        tse1TestKeyCreation()
+        isVaultAvailable().takeIf { it }?.let {
+            println("Testing key creation of: $TESTABLE_KEY_TYPES...")
+            tse1TestKeyCreation()
 
-        println("Testing resolving to public key for: $keys...")
-        tse2TestPublicKeys()
+            println("Testing resolving to public key for: $keys...")
+            tse2TestPublicKeys()
 
-        println("Testing sign & verify raw (payload: ${Config.payload})...")
-        tse3TestSignRaw()
+            println("Testing sign & verify raw (payload: ${Config.payload})...")
+            tse3TestSignRaw()
 
-        println("Testing sign & verify JWS (payload: ${Config.payload})...")
-        tse4TestSignJws()
+            println("Testing sign & verify JWS (payload: ${Config.payload})...")
+            tse4TestSignJws()
 
-        println("Testing key deletion of: $keys...")
-        tse99TestKeyDeletion()
+            println("Testing key deletion of: $keys...")
+            tse99TestKeyDeletion()
+        }
     }
 
     private suspend fun tse1TestKeyCreation() {
-        isVaultAvailable().takeIf { it }?.let {
-            val tseMetadata = TSEKeyMetadata(Config.BASE_URL, Config.TOKEN)
-            keys = TESTABLE_KEY_TYPES.map { TSEKey.generate(it, tseMetadata) }
-        }
+        val tseMetadata = TSEKeyMetadata(Config.BASE_URL, Config.TOKEN, Config.NAMESPACE)
+        keys = TESTABLE_KEY_TYPES.map { TSEKey.generate(it, tseMetadata) }
     }
 
     private suspend fun tse2TestPublicKeys() {
