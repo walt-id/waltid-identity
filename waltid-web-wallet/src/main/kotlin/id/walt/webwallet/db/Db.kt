@@ -3,8 +3,10 @@ package id.walt.webwallet.db
 import id.walt.webwallet.config.ConfigManager
 import id.walt.webwallet.config.DatasourceConfiguration
 import id.walt.webwallet.db.models.*
+import id.walt.webwallet.db.models.todo.AccountIssuers
 import id.walt.webwallet.db.models.todo.Issuers
 import id.walt.webwallet.service.account.AccountsService
+import id.walt.webwallet.service.issuers.IssuersService
 import id.walt.webwallet.web.model.EmailAccountRequest
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.runBlocking
@@ -64,7 +66,8 @@ object Db {
                 Wallets,
                 //AccountWeb3WalletMappings,
                 Accounts,
-                Web3Wallets
+                Web3Wallets,
+                AccountIssuers
             )
             SchemaUtils.create(
                 Web3Wallets,
@@ -76,12 +79,19 @@ object Db {
                 WalletKeys,
                 WalletDids,
                 WalletOperationHistories,
-                Issuers
+                Issuers,
+                AccountIssuers
             )
 
             runBlocking {
                 AccountsService.register(request = EmailAccountRequest("Max Mustermann", "string@string.string", "string"))
                 AccountsService.register(request = EmailAccountRequest("Max Mustermann", "user@email.com", "password"))
+                IssuersService.add(
+                    name = "walt.id",
+                    description = "walt.id issuer portal",
+                    uiEndpoint = "https://portal.walt.id/credentials?ids=",
+                    configurationEndpoint = "https://issuer.portal.walt.id/.well-known/openid-credential-issuer"
+                )
             }
         }
     }
