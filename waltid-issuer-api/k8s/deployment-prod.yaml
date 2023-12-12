@@ -41,10 +41,10 @@ spec:
           image: waltid/issuer:latest
           volumeMounts:
             - name: issuer-web-config
-              mountPath: "/waltid-issuer/config/"
+              mountPath: "/waltid-issuer-api/config/"
               readOnly: true
             - name: issuer-data
-              mountPath: "/waltid-issuer/data/"
+              mountPath: "/waltid-issuer-api/data/"
           ports:
             - containerPort: 3000
               name: http-api

@@ -6,10 +6,10 @@ COPY waltid-verifiable-credentials/build.gradle.kts /work/waltid-verifiable-cred
 COPY waltid-crypto/build.gradle.kts /work/waltid-crypto/
 COPY waltid-did/build.gradle.kts /work/waltid-did/
 COPY waltid-openid4vc/build.gradle.kts /work/waltid-openid4vc/
-COPY waltid-verifier/build.gradle.kts /work/waltid-verifier/
+COPY waltid-verifier-api/build.gradle.kts /work/waltid-verifier-api/
 COPY waltid-sdjwt/build.gradle.kts /work/waltid-sdjwt/
 
-WORKDIR /work/waltid-verifier/
+WORKDIR /work/waltid-verifier-api/
 #RUN pwd && ls && pwd && ls -la *
 RUN gradle build || return 0
 
@@ -17,7 +17,7 @@ COPY waltid-verifiable-credentials/. /work/waltid-verifiable-credentials
 COPY waltid-crypto/. /work/waltid-crypto
 COPY waltid-did/. /work/waltid-did
 COPY waltid-openid4vc/. /work/waltid-openid4vc
-COPY waltid-verifier/. /work/waltid-verifier
+COPY waltid-verifier-api/. /work/waltid-verifier
 COPY waltid-sdjwt/. /work/waltid-sdjwt
 
 #RUN pwd && ls /work/ && pwd && ls -la /work/*
@@ -25,9 +25,9 @@ RUN gradle clean installDist
 
 FROM docker.io/eclipse-temurin:17
 
-COPY --from=buildstage /work/waltid-verifier/build/install/ /
+COPY --from=buildstage /work/waltid-verifier-api/build/install/ /
 WORKDIR /waltid-verifier
 
 EXPOSE 7001
 
-ENTRYPOINT ["/waltid-verifier/bin/waltid-verifier-api"]
+ENTRYPOINT ["/waltid-verifier-api/bin/waltid-verifier-api"]

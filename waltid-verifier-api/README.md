@@ -90,6 +90,6 @@ Verifier service relies on the following walt.id libraries:
 
 ```shell
 docker run \
--v ${pwd}/waltid-verifier/config:/waltid-verifier/bin/waltid-verifier \
+-v ${pwd}/waltid-verifier-api/config:/waltid-verifier-api/bin/waltid-verifier \
 -p 7001:7001 waltid/verifier:latest
 ```
