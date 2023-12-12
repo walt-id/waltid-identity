@@ -343,20 +343,20 @@ class WalletKitWalletService(tenant: String?, accountId: UUID, walletId: UUID) :
 // TODO
 //fun infoAboutOfferRequest
 
-    override fun getEvents(limit: Int, offset: Long): List<WalletOperation> = transaction {
+    override fun getHistory(limit: Int, offset: Long): List<WalletOperationHistory> = transaction {
         WalletOperationHistories
             .select { (WalletOperationHistories.tenant eq tenant) and (WalletOperationHistories.accountId eq walletId) }
             .orderBy(WalletOperationHistories.timestamp)
             .limit(10)
-            .map { WalletOperation(it) }
+            .map { WalletOperationHistory(it) }
     }
 
-    override suspend fun addOperationEvent(operationHistory: WalletOperation) {
+    override suspend fun addOperationHistory(operationHistory: WalletOperationHistory) {
         transaction {
             WalletOperationHistories.insert {
-                it[tenant] = tenant
-                it[wallet] = walletId
-                it[accountId] = accountId
+                it[tenant] = operationHistory.tenant
+                it[accountId] = operationHistory.account
+                it[wallet] = operationHistory.wallet
                 it[timestamp] = operationHistory.timestamp.toJavaInstant()
                 it[operation] = operationHistory.operation
                 it[data] = Json.encodeToString(operationHistory.data)
