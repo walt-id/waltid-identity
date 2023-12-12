@@ -30,4 +30,4 @@ WORKDIR /waltid-verifier
 
 EXPOSE 7001
 
-ENTRYPOINT ["/waltid-verifier/bin/waltid-verifier"]
+ENTRYPOINT ["/waltid-verifier/bin/waltid-verifier-api"]

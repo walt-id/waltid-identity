@@ -30,4 +30,4 @@ WORKDIR /waltid-issuer
 
 EXPOSE 7000
 
-ENTRYPOINT ["/waltid-issuer/bin/waltid-issuer"]
+ENTRYPOINT ["/waltid-issuer/bin/waltid-issuer-api"]
