@@ -1,7 +1,7 @@
 # BUILD
 FROM docker.io/gplane/pnpm:8 as buildstage
 
-COPY web /build
+COPY waltid-web-wallet/web /build
 
 WORKDIR /build
 RUN pnpm install
