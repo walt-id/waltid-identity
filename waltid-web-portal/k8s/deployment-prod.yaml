@@ -1,0 +1,100 @@
+---
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: web-portal
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: web-portal
+  template:
+    metadata:
+      labels:
+        app: web-portal
+      annotations:
+        deployment/id: "_DEFAULT_DEPLOYMENT_"
+    spec:
+      containers:
+        - name: web-portal
+          image: waltid/portal:latest
+          env:
+            - name: NEXT_PUBLIC_VC_REPO
+              value: "https://credentials.walt.id"
+            - name: NEXT_PUBLIC_ISSUER
+              value: "https://issuer.portal.walt.id"
+            - name: NEXT_PUBLIC_VERIFIER
+              value: "https://verifier.portal.walt.id"
+            - name: NEXT_PUBLIC_WALLET
+              value: "https://wallet.walt.id"
+          ports:
+            - containerPort: 3000
+              name: http-portal
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: web-portal
+spec:
+  ports:
+    - name: http
+      port: 80
+      targetPort: http-portal
+      protocol: TCP
+  selector:
+    app: web-portal
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: portal-ingress
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  tls:
+    - hosts:
+        - portal.walt.id
+      secretName: web-portal-tls-secret
+  rules:
+    - host: portal.walt.id
+      http:
+        paths:
+          - path: /offer
+            pathType: Prefix
+            backend:
+              service:
+                name: issuer
+                port:
+                  number: 80
+          - path: /verify
+            pathType: Prefix
+            backend:
+              service:
+                name: verifier
+                port:
+                  number: 80
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web-portal
+                port:
+                  name: http
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/permanent-redirect: "https://portal.walt.id/"
+  name: iss-vfr-redirect
+spec:
+  tls:
+  - hosts:
+      - verifier.walt.id
+      - issuer.walt.id
+    secretName: iss-vfr-tls-secret
+  rules:
+  - host: verifier.walt.id
+  - host: issuer.walt.id

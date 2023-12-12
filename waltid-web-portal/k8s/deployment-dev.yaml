@@ -1,0 +1,83 @@
+---
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: web-portal
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: web-portal
+  template:
+    metadata:
+      labels:
+        app: web-portal
+      annotations:
+        deployment/id: "_DEFAULT_DEPLOYMENT_"
+    spec:
+      containers:
+        - name: web-portal
+          image: waltid/portal:latest
+          env:
+            - name: NEXT_PUBLIC_VC_REPO
+              value: "https://vc-repo.walt-test.cloud"
+            - name: NEXT_PUBLIC_ISSUER
+              value: "https://issuer.portal.walt-test.cloud"
+            - name: NEXT_PUBLIC_VERIFIER
+              value: "https://verifier.portal.walt-test.cloud"
+            - name: NEXT_PUBLIC_WALLET
+              value: "https://wallet.walt-test.cloud"
+          ports:
+            - containerPort: 3000
+              name: http-portal
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: web-portal
+spec:
+  ports:
+    - name: http
+      port: 80
+      targetPort: http-portal
+      protocol: TCP
+  selector:
+    app: web-portal
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: portal-ingress
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  tls:
+    - hosts:
+        - portal.walt-test.cloud
+      secretName: web-portal-tls-secret
+  rules:
+    - host: portal.walt-test.cloud
+      http:
+        paths:
+          - path: /offer
+            pathType: Prefix
+            backend:
+              service:
+                name: issuer
+                port:
+                  number: 80
+          - path: /verify
+            pathType: Prefix
+            backend:
+              service:
+                name: verifier
+                port:
+                  number: 80
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web-portal
+                port:
+                  name: http
