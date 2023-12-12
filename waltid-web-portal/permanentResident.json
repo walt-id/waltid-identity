@@ -1,0 +1,26 @@
+{
+  "type": [
+    "VerifiableCredential",
+    "PermanentResidentCard"
+  ],
+  "credentialSubject": {
+    "givenName": "",
+    "surname": "",
+    "dateOfBirth": "",
+    "sex": "",
+    "countryOfBirth": "",
+    "category": "",
+    "uscis": "",
+    "residentSince": ""
+  },
+  "issuer": {
+    "id": "",
+    "image": {
+      "id": "https://github-production-user-asset-6210df.s3.amazonaws.com/48290617/271013046-ec675a25-a15a-4613-b3d6-310657f07ff4.png",
+      "type": "Image"
+    },
+    "name": "Example Government"
+  },
+  "expirationDate": ""
+}
+
