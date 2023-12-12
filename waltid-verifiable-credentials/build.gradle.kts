@@ -50,8 +50,9 @@ kotlin {
                 // Coroutines
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
 
-                // Date
+                // Kotlinx
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.4.1")
+                implementation("app.softwork:kotlinx-uuid-core:0.0.22")
 
                 // Loggin
                 implementation("io.github.oshai:kotlin-logging:5.1.0")

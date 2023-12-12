@@ -2,20 +2,21 @@ package id.walt.credentials
 
 import id.walt.credentials.vc.vcs.W3CV2DataModel
 import id.walt.credentials.vc.vcs.W3CVC
-import id.walt.did.utils.randomUUID
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.serialization.json.*
+import kotlinx.uuid.UUID
+import kotlinx.uuid.generateUUID
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 
 enum class CredentialBuilderType {
     W3CV2CredentialBuilder,
-    MdocsCredentialBuilder
+    MdocsCredentialBuilder // TODO
 }
 
 class CredentialBuilder(
-    builderType: CredentialBuilderType
+    builderType: CredentialBuilderType = CredentialBuilderType.W3CV2CredentialBuilder
 ) {
 
     var context: List<String> = listOf("https://www.w3.org/ns/credentials/v2")
@@ -28,9 +29,9 @@ class CredentialBuilder(
         context = context.toMutableList().apply { add(addContext) }
     }
 
-    var credentialId: String? = "urn:uuid:${randomUUID()}"
+    var credentialId: String? = "urn:uuid:${UUID.generateUUID()}"
     fun randomCredentialSubjectUUID() {
-        credentialId = "urn:uuid:${randomUUID()}"
+        credentialId = "urn:uuid:${UUID.generateUUID()}"
     }
 
     var issuerDid: String? = null
