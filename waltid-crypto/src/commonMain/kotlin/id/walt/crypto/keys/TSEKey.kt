@@ -27,7 +27,7 @@ import kotlin.random.Random
 @Serializable
 @SerialName("tse")
 class TSEKey(
-    val server: String, private val accessKey: String, val id: String,
+    val server: String, private val accessKey: String, private val namespace: String? = null, val id: String,
     //private var publicKey: ByteArray? = null,
     //override var keyType: KeyType? = null
     private var _publicKey: ByteArray? = null, private var _keyType: KeyType? = null
@@ -66,7 +66,8 @@ class TSEKey(
     private suspend fun retrievePublicKey(): ByteArray {
 //        println("Retrieving public key: ${this.id}")
         val keyData = http.get("$server/keys/$id") {
-            this.header("X-Vault-Token", accessKey)
+            header("X-Vault-Token", accessKey)
+            namespace?.let { header("X-Vault-Namespace", namespace) }
         }.tseJsonDataBody().jsonObject["keys"]?.jsonObject ?: throwTSEError("No keys in data response")
 
         // TO\\DO: try this
@@ -79,6 +80,7 @@ class TSEKey(
 
     private suspend fun retrieveKeyType(): KeyType = tseKeyToKeyTypeMapping(http.get("$server/keys/$id") {
         this.header("X-Vault-Token", accessKey)
+        namespace?.let { header("X-Vault-Namespace", namespace) }
     }.tseJsonDataBody().jsonObject["type"]?.jsonPrimitive?.content ?: throwTSEError("No type in data response"))
 
     override val hasPrivateKey: Boolean
@@ -99,6 +101,7 @@ class TSEKey(
     override suspend fun signRaw(plaintext: ByteArray): Any {
         val signatureBase64 = http.post("$server/sign/${id}") {
             header("X-Vault-Token", accessKey) // TODO
+            namespace?.let { header("X-Vault-Namespace", namespace) }
             setBody(mapOf("input" to plaintext.encodeBase64()))
         }.tseJsonDataBody().jsonObject["signature"]?.jsonPrimitive?.content?.removePrefix("vault:v1:")
             ?: throwTSEError("No signature in data response")
@@ -138,6 +141,7 @@ class TSEKey(
 
         val valid = http.post("$server/verify/${id}") {
             header("X-Vault-Token", accessKey)
+            namespace?.let { header("X-Vault-Namespace", namespace) }
             setBody(
                 mapOf(
                     "input" to detachedPlaintext.encodeBase64(), "signature" to "vault:v1:${signed.encodeBase64()}"
@@ -176,6 +180,7 @@ class TSEKey(
         lazyOf(
             http.get("$server/keys/$id") {
                 header("X-Vault-Token", accessKey)
+                namespace?.let { header("X-Vault-Namespace", namespace) }
             }.tseJsonDataBody().jsonObject["keys"]?.jsonObject?.get("1")?.jsonObject?.get("public_key")?.jsonPrimitive?.content
                 ?: throwTSEError("No keys/1/public_key in data response")
         ).value
@@ -206,11 +211,13 @@ class TSEKey(
     suspend fun delete() {
         http.post("$server/keys/$id/config") {
             header("X-Vault-Token", accessKey)
+            namespace?.let { header("X-Vault-Namespace", namespace) }
             setBody(mapOf("deletion_allowed" to true))
         }
 
         http.delete("$server/keys/$id") {
             header("X-Vault-Token", accessKey)
+            namespace?.let { header("X-Vault-Namespace", namespace) }
         }
     }
 
@@ -243,6 +250,7 @@ class TSEKey(
         override suspend fun generate(type: KeyType, metadata: TSEKeyMetadata): TSEKey {
             val keyData = http.post("${metadata.server}/keys/k${metadata.id ?: Random.nextInt()}") {
                 header("X-Vault-Token", metadata.accessKey)
+                metadata.namespace?.let { header("X-Vault-Namespace", metadata.namespace) }
                 setBody(mapOf("type" to keyTypeToTseKeyMapping(type)))
             }.tseJsonDataBody()
 
@@ -253,7 +261,7 @@ class TSEKey(
             val publicKey = (keyData["keys"]
                 ?: throwTSEError("no keys array in key data: $keyData")).jsonObject["1"]!!.jsonObject["public_key"]!!.jsonPrimitive.content.decodeBase64Bytes()
 
-            return TSEKey(metadata.server, metadata.accessKey, keyName, publicKey, type).apply { init() }
+            return TSEKey(metadata.server, metadata.accessKey, metadata.namespace, keyName, publicKey, type).apply { init() }
         }
 
         private val http = HttpClient {
