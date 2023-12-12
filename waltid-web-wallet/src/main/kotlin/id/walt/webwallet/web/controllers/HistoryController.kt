@@ -16,7 +16,7 @@ fun Application.history() = walletRoute {
         }) {
             val wallet = getWalletService()
             context.respond(transaction {
-                wallet.getHistory()
+                wallet.getEvents()
             })
         }
     }
