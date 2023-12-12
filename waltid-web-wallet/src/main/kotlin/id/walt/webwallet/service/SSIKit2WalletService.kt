@@ -31,6 +31,7 @@ import id.walt.webwallet.service.credentials.CredentialsService
 import id.walt.webwallet.service.dids.DidsService
 import id.walt.webwallet.service.dto.LinkedWalletDataTransferObject
 import id.walt.webwallet.service.dto.WalletDataTransferObject
+import id.walt.webwallet.service.events.*
 import id.walt.webwallet.service.issuers.IssuerDataTransferObject
 import id.walt.webwallet.service.issuers.IssuersService
 import id.walt.webwallet.service.keys.KeysService
@@ -82,7 +83,12 @@ class SSIKit2WalletService(tenant: String?, accountId: UUID, walletId: UUID) : W
         it.document
     }
 
-    override suspend fun deleteCredential(id: String) = transaction { CredentialsService.delete(walletId, id) }
+    override suspend fun deleteCredential(id: String) = let{
+        CredentialsService.get(walletId, id)?.run {
+            logEvent(EventType.Credential.Delete, "wallet", createCredentialEventData(this.parsedDocument, null))
+        }
+        transaction { CredentialsService.delete(walletId, id) }
+    }
 
     override suspend fun getCredential(credentialId: String): WalletCredential =
         CredentialsService.get(walletId, credentialId)
@@ -255,7 +261,7 @@ class SSIKit2WalletService(tenant: String?, accountId: UUID, walletId: UUID) : W
 
     private val credentialWallets = HashMap<String, TestCredentialWallet>()
 
-    fun getCredentialWallet(did: String) = credentialWallets.getOrPut(did) {
+    private fun getCredentialWallet(did: String) = credentialWallets.getOrPut(did) {
         TestCredentialWallet(
             SIOPProviderConfig("http://blank"),
             this,
@@ -263,7 +269,7 @@ class SSIKit2WalletService(tenant: String?, accountId: UUID, walletId: UUID) : W
         )
     }
 
-    fun getAnyCredentialWallet() = credentialWallets.values.firstOrNull() ?: getCredentialWallet("did:test:test")
+    private fun getAnyCredentialWallet() = credentialWallets.values.firstOrNull() ?: getCredentialWallet("did:test:test")
 
     private val testCIClientConfig = OpenIDClientConfig("test-client", null, redirectUri = "http://blank")
 
@@ -374,19 +380,21 @@ class SSIKit2WalletService(tenant: String?, accountId: UUID, walletId: UUID) : W
 
             val credentialJwt = credential.decodeJws(withSignature = true)
 
-            when (val typ = credentialJwt.header["typ"]?.jsonPrimitive?.content?.lowercase()) {
+            val credentialResultPair = when (val typ = credentialJwt.header["typ"]?.jsonPrimitive?.content?.lowercase()) {
                 "jwt" -> {
                     val credentialId = credentialJwt.payload["vc"]!!.jsonObject["id"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
                         ?: randomUUID()
 
                     println("Got JWT credential: $credentialJwt")
 
-                    WalletCredential(
-                        wallet = walletId,
-                        id = credentialId,
-                        document = credential,
-                        disclosures = null,
-                        addedOn = Clock.System.now()
+                    Pair(
+                        WalletCredential(
+                            wallet = walletId,
+                            id = credentialId,
+                            document = credential,
+                            disclosures = null,
+                            addedOn = Clock.System.now()
+                        ), createCredentialEventData(credentialJwt.payload["vc"]?.jsonObject, typ)
                     )
                 }
 
@@ -403,18 +411,26 @@ class SSIKit2WalletService(tenant: String?, accountId: UUID, walletId: UUID) : W
 
                     val credentialWithoutDisclosures = credential.substringBefore("~")
 
-                    WalletCredential(
-                        wallet = walletId,
-                        id = credentialId,
-                        document = credentialWithoutDisclosures,
-                        disclosures = disclosuresString,
-                        addedOn = Clock.System.now()
+                    Pair(
+                        WalletCredential(
+                            wallet = walletId,
+                            id = credentialId,
+                            document = credentialWithoutDisclosures,
+                            disclosures = disclosuresString,
+                            addedOn = Clock.System.now()
+                        ), createCredentialEventData(credentialJwt.payload["vc"]!!.jsonObject, typ)
                     )
                 }
 
                 null -> throw IllegalArgumentException("WalletCredential JWT does not have \"typ\"")
                 else -> throw IllegalArgumentException("Invalid credential \"typ\": $typ")
             }
+            logEvent(
+                EventType.Credential.Receive,
+                parsedOfferReq.credentialOffer!!.credentialIssuer,
+                credentialResultPair.second
+            )
+            credentialResultPair.first
         }
 
         transaction {
@@ -448,7 +464,11 @@ class SSIKit2WalletService(tenant: String?, accountId: UUID, walletId: UUID) : W
                 keyId = keyRef
             )
         }
-
+        logEvent(
+            EventType.Did.Create, "wallet", DidEventData(
+                did = result.did, document = result.didDocument.toString()
+            )
+        )
         return result.did
     }
 
@@ -459,7 +479,16 @@ class SSIKit2WalletService(tenant: String?, accountId: UUID, walletId: UUID) : W
     } ?: throw IllegalArgumentException("Did not found: $did for account: $walletId")
 
 
-    override suspend fun deleteDid(did: String): Boolean = DidsService.delete(walletId, did)
+    override suspend fun deleteDid(did: String): Boolean {
+        DidsService.get(walletId, did).also {
+            logEvent(
+                EventType.Did.Delete, "wallet", DidEventData(
+                    did = it?.did ?: did, document = it?.document ?: EventDataNotAvailable
+                )
+            )
+        }
+        return DidsService.delete(walletId, did)
+    }
 
     override suspend fun setDefault(did: String) = DidsService.makeDidDefault(walletId, did)
 
@@ -476,8 +505,16 @@ class SSIKit2WalletService(tenant: String?, accountId: UUID, walletId: UUID) : W
         throw it
     })
 
-    override suspend fun exportKey(alias: String, format: String, private: Boolean): String =
-        runCatching { getKey(alias) }.fold(onSuccess = {
+    override suspend fun exportKey(alias: String, format: String, private: Boolean): String = let {
+        runCatching {
+            getKey(alias).also {
+                logEvent(
+                    EventType.Key.Export, "wallet", KeyEventData(
+                        id = it.getKeyId(), algorithm = it.keyType.name, keyManagementService = EventDataNotAvailable
+                    )
+                )
+            }
+        }.fold(onSuccess = {
             when (format.lowercase()) {
                 "jwk" -> it.exportJWK()
                 "pem" -> it.exportPEM()
@@ -486,6 +523,7 @@ class SSIKit2WalletService(tenant: String?, accountId: UUID, walletId: UUID) : W
         }, onFailure = {
             throw it
         })
+    }
 
     override suspend fun loadKey(alias: String): JsonObject = getKey(alias).exportJWKObject()
 
@@ -503,6 +541,11 @@ class SSIKit2WalletService(tenant: String?, accountId: UUID, walletId: UUID) : W
 
     override suspend fun generateKey(type: String): String =
         LocalKey.generate(KeyType.valueOf(type)).let { createdKey ->
+            logEvent(EventType.Key.Create, "wallet", KeyEventData(
+                id = createdKey.getKeyId(),
+                algorithm = createdKey.keyType.name,
+                keyManagementService = "local",
+            ))
             insertKey(createdKey)
             createdKey.getKeyId()
         }
@@ -537,6 +580,11 @@ class SSIKit2WalletService(tenant: String?, accountId: UUID, walletId: UUID) : W
 
         val key = keyResult.getOrThrow()
         val keyId = key.getKeyId()
+        logEvent(EventType.Key.Import, "wallet", KeyEventData(
+            id = keyId,
+            algorithm = key.keyType.name,
+            keyManagementService = EventDataNotAvailable
+        ))
 
         insertKey(key)
 
@@ -610,4 +658,32 @@ class SSIKit2WalletService(tenant: String?, accountId: UUID, walletId: UUID) : W
 
         else -> throw IllegalArgumentException("Did method not supported: $method")
     }
+
+    private fun logEvent(action: EventType.Action, originator: String, data: EventData) = EventService.add(
+        Event(
+            action = action,
+            tenant = tenant ?: "global",
+            originator = originator,
+            account = accountId,
+            wallet = walletId,
+            data = data,
+        )
+    )
+
+    private fun createCredentialEventData(json: JsonObject?, type: String?) = CredentialEventData(
+        ecosystem = EventDataNotAvailable,
+        issuerId = json?.jsonObject?.get("issuer")?.jsonObject?.get("id")?.jsonPrimitive?.content
+            ?: EventDataNotAvailable,
+        subjectId = json?.jsonObject?.get("credentialSubject")?.jsonObject?.get(
+            "id"
+        )?.jsonPrimitive?.content ?: EventDataNotAvailable,
+        issuerKeyId = EventDataNotAvailable,
+        issuerKeyType = EventDataNotAvailable,
+        subjectKeyType = EventDataNotAvailable,
+        credentialType = type ?: EventDataNotAvailable,
+        credentialFormat = "W3C",
+        credentialProofType = EventDataNotAvailable,
+        policies = emptyList(),
+        protocol = "oid4vp",
+    )
 }

@@ -12,6 +12,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.uuid.UUID
 import org.jetbrains.exposed.sql.ResultRow
 
+const val EventDataNotAvailable = "n/a"
 @Serializable
 data class Event(
     val event: String,
