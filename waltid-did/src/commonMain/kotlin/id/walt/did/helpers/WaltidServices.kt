@@ -7,4 +7,8 @@ object WaltidServices {
     suspend fun init() {
         DidService.init()
     }
+
+    suspend fun minimalInit() {
+        DidService.minimalInit()
+    }
 }
