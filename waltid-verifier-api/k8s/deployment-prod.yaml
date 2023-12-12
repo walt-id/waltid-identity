@@ -41,10 +41,10 @@ spec:
           image: waltid/verifier:latest
           volumeMounts:
             - name: verifier-web-config
-              mountPath: "/waltid-verifier/config/"
+              mountPath: "/waltid-verifier-api/config/"
               readOnly: true
             - name: verifier-data
-              mountPath: "/waltid-verifier/data/"
+              mountPath: "/waltid-verifier-api/data/"
           ports:
             - containerPort: 3000
               name: http-api
