@@ -44,24 +44,3 @@ data class AccountWalletListing(
         val permission: AccountWalletPermissions
     )
 }
-
-/*
-fun main() {
-    val uuid1 = UUID.generateUUID()
-    val uuid2 = UUID.generateUUID()
-    val uuid3 = UUID.generateUUID()
-    val uuid4 = UUID.generateUUID()
-
-    println(
-        Json.encodeToString(
-            AccountWalletListing(
-                uuid1,
-                listOf(
-                    AccountWalletListing.WalletListing(uuid2, AccountWalletPermissions.ADMINISTRATE),
-                    AccountWalletListing.WalletListing(uuid3, AccountWalletPermissions.USE),
-                    AccountWalletListing.WalletListing(uuid4, AccountWalletPermissions.READ_ONLY)
-                )
-            )
-        )
-    )
-}*/
