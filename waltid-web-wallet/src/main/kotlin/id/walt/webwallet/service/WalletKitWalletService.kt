@@ -1,13 +1,13 @@
 package id.walt.webwallet.service
 
+import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.webwallet.config.ConfigManager
 import id.walt.webwallet.config.RemoteWalletConfig
-import id.walt.oid4vc.data.dif.PresentationDefinition
+import id.walt.webwallet.db.models.*
 import id.walt.webwallet.service.dids.DidsService
 import id.walt.webwallet.service.dto.LinkedWalletDataTransferObject
 import id.walt.webwallet.service.dto.WalletDataTransferObject
 import id.walt.webwallet.service.issuers.IssuerDataTransferObject
-import id.walt.webwallet.db.models.*
 import id.walt.webwallet.utils.JsonUtils.toJsonPrimitive
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -343,15 +343,15 @@ class WalletKitWalletService(tenant: String?, accountId: UUID, walletId: UUID) :
 // TODO
 //fun infoAboutOfferRequest
 
-    override fun getHistory(limit: Int, offset: Int): List<WalletOperationHistory> = transaction {
+    override fun getEvents(limit: Int, offset: Long): List<WalletOperation> = transaction {
         WalletOperationHistories
             .select { (WalletOperationHistories.tenant eq tenant) and (WalletOperationHistories.accountId eq walletId) }
             .orderBy(WalletOperationHistories.timestamp)
             .limit(10)
-            .map { WalletOperationHistory(it) }
+            .map { WalletOperation(it) }
     }
 
-    override suspend fun addOperationHistory(operationHistory: WalletOperationHistory) {
+    override suspend fun addOperationEvent(operationHistory: WalletOperation) {
         transaction {
             WalletOperationHistories.insert {
                 it[tenant] = tenant
