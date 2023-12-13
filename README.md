@@ -34,7 +34,7 @@ A set of API's to build issuer, verifier and wallet capabilities into any app.
 ### Apps
 A set of white-label apps to get started in no time.
 
-- [Web-Wallet](https://github.com/walt-id/waltid-identity/tree/main/waltid-web-wallet/web) - A custodial web-wallet (PWA) solution for credentials and tokens.
+- [Web-Wallet](https://github.com/walt-id/waltid-identity/tree/main/waltid-web-wallet) - A custodial web-wallet (PWA) solution for credentials and tokens.
 - [Portal](https://github.com/walt-id/waltid-identity/tree/main/waltid-web-portal) - An issuer and verifier portal for credentials.
 
 
