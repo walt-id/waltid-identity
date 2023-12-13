@@ -5,6 +5,24 @@
         <LoadingIndicator v-if="pending" class="my-6 mb-12 w-full"> Loading eventLog... </LoadingIndicator>
 
         <p class="mb-1">The list of events is shown below:</p>
+        <div class="flex items-center justify-between gap-x-6 py-4">
+            <div class="flex flex-none items-center gap-x-4">
+                <button
+                    v-if="eventLog?.currentStartingAfter"
+                    @click="prevPage(eventLog.currentStartingAfter)"
+                    class="hidden rounded-md bg-white px-2.5 py-1.5 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:block"
+                >Previous
+                </button>
+            </div>
+            <div class="flex flex-none items-center gap-x-4">
+                <button
+                    v-if="eventLog?.nextStartingAfter"
+                    @click="nextPage(eventLog.nextStartingAfter)"
+                    class="hidden rounded-md bg-white px-2.5 py-1.5 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:block"
+                >Next
+                </button>
+            </div>
+        </div>
 
         <div v-if="eventLog?.count > 0" aria-label="Credential list" class="h-full overflow-y-auto shadow-xl">
             <div class="container mx-auto px-4 sm:px-8">
@@ -105,9 +123,20 @@ import ViewEventDataModal from "~/components/modals/ViewEventDataModal.vue";
 const store = useModalStore();
 
 const currentWallet = useCurrentWallet()
+const startingAfter = ref("-1")
 console.log("Loading EventLog...");
-const { data: eventLog, pending: pending, refresh, error } = await useLazyFetch(`/wallet-api/wallet/${currentWallet.value}/eventlog`);
-refreshNuxtData();
+const { data: eventLog, pending: pending } = await useLazyAsyncData(
+    () =>
+        $fetch(`/wallet-api/wallet/${currentWallet.value}/eventlog`, {
+            params: {
+                limit: 4,
+                startingAfter: startingAfter.value,
+            },
+        }),
+    {
+        watch: [startingAfter],
+    },
+);
 function viewData(title, data) {
     console.log(`View event data: ${title}`);
 
@@ -118,6 +147,14 @@ function viewData(title, data) {
             data: data,
         },
     });
+}
+function prevPage(startingAfterParam){
+ console.log(`prev.page: ${startingAfterParam}`)
+ startingAfter.value = startingAfterParam
+}
+function nextPage(startingAfterParam){
+    console.log(`next.page: ${startingAfterParam}`)
+    startingAfter.value = startingAfterParam
 }
 </script>
 
