@@ -25,15 +25,15 @@ Available for Kotlin/Java and JavaScript environments.
 ### Services
 A set of API's to build issuer, verifier and wallet capabilities into any app.
 
-- [Issuer API](https://github.com/walt-id/waltid-identity/tree/main/waltid-issuer-api) - enable apps issue credentials (W3C JWTs, SD-JWTs and JSON-LD) via OID4VC.
-- [Verifier API](https://github.com/walt-id/waltid-identity/tree/main/waltid-verifier-api) - enable apps to verify credentials (W3C JWTs, SD-JWTs and JSON-LD) via OID4VP/SIOPv2.
-- [Wallet API](https://github.com/walt-id/waltid-identity/blob/main/waltid-web-wallet/README.md) - extend apps with holistic identity wallet capabilities like collecting, storing, managing and sharing of identity credentials.
+- **Issuer API** ([Docs](https://docs.oss.walt.id/issuer/api/vc-oid4vc) | [GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-issuer-api)) - enable apps issue credentials (W3C JWTs, SD-JWTs and JSON-LD) via OID4VC.
+- **Verifier API**  ([Docs](https://docs.oss.walt.id/verifier/api/vc-oid4vc) | [GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-verifier-api)) - enable apps to verify credentials (W3C JWTs, SD-JWTs and JSON-LD) via OID4VP/SIOPv2.
+- **Wallet API** ([Docs](https://docs.oss.walt.id/wallet/api/getting-started) | [GitHub](https://github.com/walt-id/waltid-identity/blob/main/waltid-web-wallet/README.md)) - extend apps with wallet capabilities to collect, store, manage and share identity credentials and tokens.
 
 ### Apps
 A set of white-label apps to get started in no time.
 
-- Web-Wallet - A custodial web-wallet (PWA) solution for credentials and tokens.
-- Portal - An issuer and verifier portal for credentials.
+- [Web-Wallet](https://github.com/walt-id/waltid-identity/tree/main/waltid-web-wallet/web) - A custodial web-wallet (PWA) solution for credentials and tokens.
+- [Portal](https://github.com/walt-id/waltid-identity/tree/main/waltid-web-portal) - An issuer and verifier portal for credentials.
 
 
 ## Building the Project
