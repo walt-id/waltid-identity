@@ -62,7 +62,7 @@ fun Application.eventLogs() = walletRoute {
             }
         }) {
             val wallet = getWalletService()
-            val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: 0
+            val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: -1
             val event = call.request.queryParameters["event"]
             val action = call.request.queryParameters["action"]
             val tenant = call.request.queryParameters["tenant"]

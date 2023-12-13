@@ -8,13 +8,14 @@ import kotlinx.uuid.UUID
 import org.jetbrains.exposed.sql.Query
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.insert
+import org.jetbrains.exposed.sql.or
 import org.jetbrains.exposed.sql.select
 import org.jetbrains.exposed.sql.transactions.transaction
 
 object EventService {
-    fun get(walletId: UUID, limit: Int, offset: Long, dataFilter: Map<String, String> = emptyMap()): List<Event> =
+    fun get(accountId: UUID, walletId: UUID, limit: Int, offset: Long, dataFilter: Map<String, String> = emptyMap()): List<Event> =
         addWhereClause(
-            Events.select { Events.wallet eq walletId }, dataFilter
+            Events.select { Events.account eq accountId or (Events.wallet eq walletId) }, dataFilter
         ).orderBy(Events.timestamp).limit(n = limit, offset = offset).map {
                 Event(it)
             }
