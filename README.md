@@ -21,7 +21,7 @@ Available for Kotlin/Java and JavaScript environments.
 - [DID](https://github.com/walt-id/waltid-identity/blob/main/waltid-did/README.md) - create, register and resolve DIDs on different ecosystems.
 - [Verifiable Credentials](https://github.com/walt-id/waltid-identity/tree/main/waltid-verifiable-credentials) - issue and verify W3C credentials as JWTs and SD-JWTs.
 - [mdoc Credentials](https://github.com/walt-id/waltid-identity/tree/main/waltid-mdoc-credentials) - issue and verify mdoc credentials (mDL ISO/IEC 18013-5).
-- [Openid4vc](https://github.com/walt-id/waltid-identity/blob/main/waltid-openid4vc/README.md) - implementation of the OID4VCI and OIDC4VP protocols.
+- [OpenID4VC](https://github.com/walt-id/waltid-identity/blob/main/waltid-openid4vc/README.md) - implementation of the OID4VCI and OIDC4VP protocols.
 - [SD-JWT](https://github.com/walt-id/waltid-identity/blob/main/waltid-sdjwt/README.md) - create and verify Selective Disclosure JWTs.
 
 ### Services
@@ -56,7 +56,8 @@ docker run -p 7001:7001 waltid/verifier --webHost=0.0.0.0 --webPort=7001 --baseU
 ## Architecture
 The walt.id identity repo is part of The Community Stack, walt.id's collection of open-source products to build identity and wallet solutions. Learn more [here](https://walt.id/blog/p/community-stack).
 
-![waltid-identity-architecture](https://github.com/walt-id/waltid-identity/assets/48290617/54f2273a-b917-45df-8552-8b41358ed843)
+![waltid-identity-architecture](https://github.com/walt-id/waltid-identity/assets/48290617/b7ca5662-53cc-488c-bfe5-a58c89cd2ec0)
+
 
 ## Join the community
 
