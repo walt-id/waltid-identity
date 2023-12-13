@@ -7,65 +7,78 @@
         <p class="mb-1">The last 10 operations are shown below:</p>
 
         <div v-if="eventLog?.count > 0" aria-label="Credential list" class="h-full overflow-y-auto shadow-xl">
-            <ul class="divide-y divide-gray-100 overflow-x-clip" role="list">
-                <li v-for="element in eventLog.items" :key="element" class="flex gap-x-4 px-3 py-5">
-                    <!--<CredentialIcon :credentialType="element.name" class="h-6 w-6 flex-none rounded-full bg-gray-50"></CredentialIcon>-->
-
-                    <div class="min-w-0">
-                        <div class="flex items-start gap-x-3">
-                            <!-- <span class="text-sm font-semibold leading-6 text-gray-900">{{ element.timestamp }}.</span> -->
-
-                            <!-- <div v-if="element.entry.operation === 'useOfferRequest'">
-                                <p class="text-sm font-semibold leading-6 text-gray-900">Used offer request</p>
-                                <p class="text-xs overflow-x-scroll w-1/3 h-5">
-                                    <code>{{ JSON.stringify(element.entry.data) }}</code>
-                                </p>
-                            </div>
-                            <div v-else-if="element.event === 'usePresentationRequest'">
-                                <p class="text-sm font-semibold leading-6 text-gray-900">Used presentation request</p>
-                                <p class="text-xs overflow-x-scroll w-1/3 h-5">
-                                    <code>{{ JSON.stringify(element.data) }}</code>
-                                </p>
-                            </div>
-                            <div v-else>
-                                <p class="text-sm font-semibold leading-6 text-gray-900">{{ element.event }}</p>
-                                <p class="text-xs overflow-x-scroll w-1/3 h-5">
-                                    <code>{{ JSON.stringify(element.data) }}</code>
-                                </p>
-                            </div> -->
-
-                            <!--<p :class="[statuses[project.status], 'rounded-md whitespace-nowrap mt-0.5 px-1.5 py-0.5 text-xs font-medium ring-1 ring-inset']">{{ project.status }}</p>-->
-                        </div>
-                        <div class="mt-1 flex items-center gap-x-2 text-xs leading-5 text-gray-500">
-                            <p class="whitespace-nowrap">
-                                <time :datetime="element.timestamp"
-                                    >{{
-                                        new Intl.DateTimeFormat("de-DE", {
-                                            dateStyle: "medium",
-                                            timeStyle: "long",
-                                        }).format(new Date(element.timestamp))
-                                    }}
-                                </time>
-                            </p>
-                            <p class="text-sm font-semibold leading-6 text-gray-900">{{ element.event }}</p>
-                            <p class="text-sm font-semibold leading-6 text-gray-900">{{ element.action }}</p>
-                            <p class="text-sm font-semibold leading-6 text-gray-900">{{ element.tenant }}</p>
-                            <p class="text-sm font-semibold leading-6 text-gray-900">{{ element.originator }}</p>
-                            <p class="text-sm font-semibold leading-6 text-gray-900">{{ element.account }}</p>
-                            <p class="text-sm font-semibold leading-6 text-gray-900">{{ element.wallet }}</p>
-                            <div class="flex flex-none items-center gap-x-4">
-                                <NuxtLink
-                                    :to="`/wallet/${currentWallet}/settings/dids`"
-                                    class="hidden rounded-md bg-white px-2.5 py-1.5 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:block"
-                                >
-                                    View Data
-                                </NuxtLink>
-                            </div>
-                            <!-- <span class="text-sm font-semibold leading-6 text-gray-900">{{ Json.parse(element.data) }}</span> -->
-                        </div>
-                    </div>
-                </li>
-            </ul>
+            <div class="container mx-auto px-4 sm:px-8">
+    <div class="py-8">
+        <!-- table source: https://codepen.io/superfly/pen/wvvPLZB -->
+        <div>
+            <h2 class="text-2xl font-semibold leading-tight">Event logs</h2>
+        </div>
+        <div class="-mx-4 sm:-mx-8 px-4 sm:px-8 py-4 overflow-x-auto">
+            <div class="inline-block min-w-full shadow-md rounded-lg overflow-hidden">
+                <table class="min-w-full leading-normal">
+                    <thead>
+                        <tr>
+                            <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                                Timestamp
+                            </th>
+                            <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                                Event
+                            </th>
+                            <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                                Action
+                            </th>
+                            <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                                Tenant
+                            </th>
+                            <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                                Originator
+                            </th>
+                            <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                                
+                            </th>
+                            <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template v-for="item in eventLog.items" :key="item">
+                            <tr>
+                                <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">
+                                    <div class="flex">
+                                        <div class="ml-3">
+                                            <p class="text-gray-900 whitespace-no-wrap">
+                                                {{item.timestamp}}
+                                            </p>
+                                            <p class="text-gray-600 whitespace-no-wrap">000004</p>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">
+                                    <p class="text-gray-900 whitespace-no-wrap">{{item.event}}</p>
+                                </td>
+                                <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">
+                                    <p class="text-gray-900 whitespace-no-wrap">{{item.action}}</p>
+                                </td>
+                                <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">
+                                    <p class="text-gray-900 whitespace-no-wrap">{{item.tenant}}</p>
+                                </td>
+                                <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">
+                                    <p class="text-gray-900 whitespace-no-wrap">{{item.originator}}</p>
+                                </td>
+                                <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm text-right">
+                                    <button type="button" class="inline-block text-gray-500 hover:text-gray-700">
+                                        <svg class="inline-block h-6 w-6 fill-current" viewBox="0 0 24 24">
+                                            <path d="M12 6a2 2 0 110-4 2 2 0 010 4zm0 8a2 2 0 110-4 2 2 0 010 4zm-2 6a2 2 0 104 0 2 2 0 00-4 0z" />
+                                        </svg>
+                                    </button>
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
         </div>
         <div v-else class="mt-2 border-l pl-2">
             <h3 class="mt-2 text-base font-semibold text-gray-900">No eventLog entries.</h3>
