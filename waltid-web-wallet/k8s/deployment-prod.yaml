@@ -236,7 +236,7 @@ spec:
     - host: wallet.walt.id
       http:
         paths:
-          - path: /r/
+          - path: /wallet-api/
             pathType: Prefix
             backend:
               service:
