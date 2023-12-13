@@ -6,7 +6,8 @@ import id.walt.webwallet.db.models.WalletDid
 import id.walt.webwallet.db.models.WalletOperationHistory
 import id.walt.webwallet.service.dto.LinkedWalletDataTransferObject
 import id.walt.webwallet.service.dto.WalletDataTransferObject
-import id.walt.webwallet.service.events.Event
+import id.walt.webwallet.service.events.EventLogFilter
+import id.walt.webwallet.service.events.EventLogFilterResult
 import id.walt.webwallet.service.issuers.IssuerDataTransferObject
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -51,6 +52,9 @@ abstract class WalletService(val tenant: String?, val accountId: UUID, val walle
     // History
     abstract fun getHistory(limit: Int = 10, offset: Long = 0): List<WalletOperationHistory>
     abstract suspend fun addOperationHistory(operationHistory: WalletOperationHistory)
+
+    // EventLog
+    abstract fun filterEventLog(filter: EventLogFilter): EventLogFilterResult
 
     // Web3 wallets
     abstract suspend fun linkWallet(wallet: WalletDataTransferObject): LinkedWalletDataTransferObject

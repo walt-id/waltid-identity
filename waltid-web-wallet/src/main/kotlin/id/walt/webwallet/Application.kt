@@ -69,4 +69,5 @@ fun Application.module() {
     accounts()
     nfts()
     issuers()
+    eventLog()
 }

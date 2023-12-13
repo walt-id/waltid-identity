@@ -58,6 +58,7 @@ import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.select
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.net.URLDecoder
+import kotlin.math.abs
 import kotlin.time.Duration.Companion.seconds
 
 
@@ -645,6 +646,25 @@ class SSIKit2WalletService(tenant: String?, accountId: UUID, walletId: UUID) : W
         }
     }
 
+    override fun filterEventLog(filter: EventLogFilter): EventLogFilterResult = runCatching {
+        val startingAfterItemIndex = filter.startingAfter?.toLongOrNull()?.takeIf { it >= 0 } ?: -1L
+        val dataFilter = emptyMap<String, String>()
+        val pageSize = filter.limit
+        val count = EventService.count(walletId, dataFilter)
+        val offset = startingAfterItemIndex + 1
+        val events = EventService.get(walletId, filter.limit, offset, dataFilter)
+        EventLogFilterDataResult(
+            items = events,
+            count = events.size,
+            currentStartingAfter = computeCurrentStartingAfter(startingAfterItemIndex, pageSize),
+            nextStartingAfter = computeNextStartingAfter(startingAfterItemIndex, pageSize, count)
+            )
+    }.fold(onSuccess = {
+        it
+    }, onFailure = {
+        EventLogFilterErrorResult(reason = it.localizedMessage)
+    })
+
     override suspend fun linkWallet(wallet: WalletDataTransferObject): LinkedWalletDataTransferObject =
         Web3WalletService.link(tenant, walletId, wallet)
 
@@ -709,4 +729,16 @@ class SSIKit2WalletService(tenant: String?, accountId: UUID, walletId: UUID) : W
         policies = emptyList(),
         protocol = "oid4vp",
     )
+
+    //TODO: move to related entity
+    private fun computeCurrentStartingAfter(afterItemIndex: Long, pageSize: Int): String? = let {
+        val itemIndex = afterItemIndex - pageSize
+        itemIndex.takeIf { it >= -1 }?.toString()
+    }
+
+    //TODO: move to related entity
+    private fun computeNextStartingAfter(afterItemIndex: Long, pageSize: Int, count: Long): String? = let {
+        val itemIndex = afterItemIndex + pageSize
+        itemIndex.takeIf { it <= count }?.toString()
+    }
 }
