@@ -467,8 +467,9 @@ class SSIKit2WalletService(tenant: String?, accountId: UUID, walletId: UUID) :
     /* DIDs */
 
     override suspend fun createDid(method: String, args: Map<String, JsonPrimitive>): String {
-        val key = args["keyId"]?.content?.takeIf { it.isNotEmpty() }?.let { getKey(it) }
-            ?: getKey(generateKey(KeyType.Ed25519.name))
+//        val key = args["keyId"]?.content?.takeIf { it.isNotEmpty() }?.let { getKey(it) }
+//            ?: getKey(generateKey(KeyType.Ed25519.name))
+        val key = args["keyId"]?.content?.takeIf { it.isNotEmpty() }?.let { getKey(it) } ?: LocalKey.generate(KeyType.Ed25519)
         val options = getDidOptions(method, args)
         val result = DidService.registerByKey(method, key, options)
 
