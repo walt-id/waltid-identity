@@ -19,6 +19,8 @@ Available for Kotlin/Java and JavaScript environments.
 
 - [Crypto](https://github.com/walt-id/waltid-identity/blob/main/waltid-crypto/README.md) - create and use keys based on different algorithms.
 - [DID](https://github.com/walt-id/waltid-identity/blob/main/waltid-did/README.md) - create, register and resolve DIDs on different ecosystems.
+- [Verifiable Credentials](https://github.com/walt-id/waltid-identity/tree/main/waltid-verifiable-credentials) - issue and verify W3C credentials as JWTs and SD-JWTs.
+- [mdoc Credentials](https://github.com/walt-id/waltid-identity/tree/main/waltid-mdoc-credentials) - issue and verify mdoc credentials (mDL ISO/IEC 18013-5).
 - [Openid4vc](https://github.com/walt-id/waltid-identity/blob/main/waltid-openid4vc/README.md) - implementation of the OID4VCI and OIDC4VP protocols.
 - [SD-JWT](https://github.com/walt-id/waltid-identity/blob/main/waltid-sdjwt/README.md) - create and verify Selective Disclosure JWTs.
 
