@@ -70,6 +70,13 @@ jobs:
           file: waltid-web-wallet/frontend.Dockerfile
           tags: waltid/wallet-frontend:latest, waltid/wallet-frontend:${{ env.release_version }}
 
+      - name: Build and push Docker images (wallet-portal)
+        uses: docker/build-push-action@v4
+        with:
+          push: true
+          file: waltid-web-portal/Dockerfile
+          tags: waltid/portal:latest, waltid/portal:${{ env.release_version }}
+
       - name: Changelog
         uses: ardalanamini/auto-changelog@v3
         id: changelog
@@ -129,3 +136,12 @@ jobs:
           KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
         with:
           args: apply -n default -f waltid-web-wallet/k8s/deployment_mod.yaml
+      - name: Prepare CD - portal.walt.id
+        run: sed "s/_DEFAULT_DEPLOYMENT_/$GITHUB_SHA/g" waltid-web-portal/k8s/deployment-prod.yaml > waltid-web-portal/k8s/deployment_mod.yaml
+      - name: Continuous deployment - portal.walt.id
+        uses: actions-hub/kubectl@master
+        env:
+          KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
+        with:
+          args: apply -n portals -f waltid-web-portal/k8s/deployment_mod.yaml
+
