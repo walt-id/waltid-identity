@@ -1,6 +1,6 @@
 # Web-wallet package
 
-This package is a docker compose configuration which starts all the services required to
+This package is a docker compose configuration that starts all the services required to
 run a complete credential flow:
 - issue - using issuer-portal
 - store - using web-wallet
@@ -8,7 +8,7 @@ run a complete credential flow:
 
 ## Services
 
-The complete list of services and their port mapping is following:
+The complete list of services and their port mapping is as follows:
 - web-wallet-frontend: `3000`
 - web-wallet-backend: `4545` (not published)
 - web-portal: `4000`

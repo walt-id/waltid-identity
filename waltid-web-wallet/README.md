@@ -23,7 +23,7 @@ Check out the **[Official Documentation](https://docs.walt.id/v/apps/solutions/w
 
 ## What is the Web-Wallet?
 
-A **white-label solution** build on top of our core libs, offering your everything to build identity POCs leveraging Verifiable Credentials and NFTs/Tokens across ecosystems.
+A **white-label solution** built on top of our core libs, offering you everything to build identity POCs leveraging Verifiable Credentials and NFTs/Tokens across ecosystems.
 
 ### Features
 
