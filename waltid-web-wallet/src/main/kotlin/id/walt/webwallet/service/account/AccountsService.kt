@@ -1,13 +1,17 @@
 package id.walt.webwallet.service.account
 
+import id.walt.web.controllers.generateToken
+import id.walt.webwallet.db.models.*
 import id.walt.webwallet.db.models.todo.AccountIssuers
 import id.walt.webwallet.db.models.todo.Issuers
 import id.walt.webwallet.service.WalletServiceManager
-import id.walt.web.controllers.generateToken
+import id.walt.webwallet.service.events.AccountEventData
+import id.walt.webwallet.service.events.Event
+import id.walt.webwallet.service.events.EventService
+import id.walt.webwallet.service.events.EventType
 import id.walt.webwallet.web.model.AccountRequest
 import id.walt.webwallet.web.model.AddressAccountRequest
 import id.walt.webwallet.web.model.EmailAccountRequest
-import id.walt.webwallet.db.models.*
 import kotlinx.datetime.toKotlinInstant
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonPrimitive
@@ -31,6 +35,16 @@ object AccountsService {
         }
 
         val walletService = WalletServiceManager.getWalletService(tenant, registeredUserId, createdInitialWalletId)
+        EventService.add(
+            Event(
+                action = EventType.Account.Create,
+                tenant = tenant,
+                originator = "wallet",
+                account = registeredUserId,
+                wallet = createdInitialWalletId,
+                data = AccountEventData(accountId = request.name)
+            )
+        )
 
         // Add default data:
         val createdDid = walletService.createDid("key", mapOf("alias" to JsonPrimitive("Onboarding")))
@@ -61,6 +75,16 @@ object AccountsService {
             is AddressAccountRequest -> Web3WalletAccountStrategy.authenticate(tenant, request)
         }
     }.fold(onSuccess = {
+        EventService.add(
+            Event(
+                action = EventType.Account.Login,
+                tenant = tenant,
+                originator = "wallet",
+                account = it.id,
+                wallet = null,
+                data = AccountEventData(accountId = it.username)
+            )
+        )
         Result.success(
             AuthenticationResult(
                 id = it.id,

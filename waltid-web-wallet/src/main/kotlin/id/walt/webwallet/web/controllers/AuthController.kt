@@ -5,10 +5,6 @@ import id.walt.webwallet.db.models.AccountWalletMappings
 import id.walt.webwallet.db.models.AccountWalletPermissions
 import id.walt.webwallet.service.WalletServiceManager
 import id.walt.webwallet.service.account.AccountsService
-import id.walt.webwallet.service.events.AccountEventData
-import id.walt.webwallet.service.events.Event
-import id.walt.webwallet.service.events.EventService
-import id.walt.webwallet.service.events.EventType
 import id.walt.webwallet.utils.RandomUtils
 import id.walt.webwallet.web.ForbiddenException
 import id.walt.webwallet.web.InsufficientPermissionsException
@@ -154,16 +150,6 @@ fun Application.auth() {
                             "username" to it.username
                         )
                     )
-                    EventService.add(
-                        Event(
-                            action = EventType.Account.Login,
-                            tenant = null,
-                            originator = null,
-                            account = it.id,
-                            wallet = getWalletId(),
-                            data = AccountEventData(accountId = it.username)
-                        )
-                    )
                 }.onFailure {
                     call.respond(HttpStatusCode.BadRequest, it.localizedMessage)
                 }
@@ -196,16 +182,6 @@ fun Application.auth() {
                     println("Registration succeed.")
                     call.response.status(HttpStatusCode.Created)
                     call.respond("Registration succeed.")
-                    EventService.add(
-                        Event(
-                            action = EventType.Account.Create,
-                            tenant = null,
-                            originator = null,
-                            account = it.id,
-                            wallet = getWalletId(),
-                            data = AccountEventData(accountId = req.name)
-                        )
-                    )
                 }.onFailure {
                     call.respond(HttpStatusCode.BadRequest, it.localizedMessage)
                 }
