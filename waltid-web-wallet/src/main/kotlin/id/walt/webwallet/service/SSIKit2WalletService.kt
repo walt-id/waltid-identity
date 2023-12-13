@@ -58,7 +58,6 @@ import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.select
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.net.URLDecoder
-import kotlin.math.abs
 import kotlin.time.Duration.Companion.seconds
 
 
@@ -679,7 +678,7 @@ class SSIKit2WalletService(tenant: String?, accountId: UUID, walletId: UUID) :
         val pageSize = filter.limit
         val count = EventService.count(walletId, dataFilter)
         val offset = startingAfterItemIndex + 1
-        val events = EventService.get(walletId, filter.limit, offset, dataFilter)
+        val events = EventService.get(accountId, walletId, filter.limit, offset, dataFilter)
         EventLogFilterDataResult(
             items = events,
             count = events.size,
@@ -740,6 +739,7 @@ class SSIKit2WalletService(tenant: String?, accountId: UUID, walletId: UUID) :
         )
     )
 
+    //TODO: move to related entity
     private fun createCredentialEventData(json: JsonObject?, type: String?) = CredentialEventData(
         ecosystem = EventDataNotAvailable,
         issuerId = json?.jsonObject?.get("issuer")?.jsonObject?.get("id")?.jsonPrimitive?.content
