@@ -435,7 +435,7 @@ class SSIKit2WalletService(tenant: String?, accountId: UUID, walletId: UUID) : W
                 else -> throw IllegalArgumentException("Invalid credential \"typ\": $typ")
             }
             logEvent(
-                EventType.Credential.Receive,
+                EventType.Credential.Accept,
                 parsedOfferReq.credentialOffer!!.credentialIssuer,
                 credentialResultPair.second
             )
