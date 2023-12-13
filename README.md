@@ -25,8 +25,8 @@ Available for Kotlin/Java and JavaScript environments.
 ### Services
 A set of API's to build issuer, verifier and wallet capabilities into any app.
 
-- **Issuer API** ([Docs](https://docs.oss.walt.id/issuer/api/vc-oid4vc) | [GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-issuer-api)) - enable apps issue credentials (W3C JWTs, SD-JWTs and JSON-LD) via OID4VC.
-- **Verifier API**  ([Docs](https://docs.oss.walt.id/verifier/api/vc-oid4vc) | [GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-verifier-api)) - enable apps to verify credentials (W3C JWTs, SD-JWTs and JSON-LD) via OID4VP/SIOPv2.
+- **Issuer API** ([Docs](https://docs.oss.walt.id/issuer/api/vc-oid4vc) | [GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-issuer-api)) - enable apps issue credentials (W3C JWTs and SD-JWTs) via OID4VC.
+- **Verifier API**  ([Docs](https://docs.oss.walt.id/verifier/api/vc-oid4vc) | [GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-verifier-api)) - enable apps to verify credentials (W3C JWTs and SD-JWTs) via OID4VP/SIOPv2.
 - **Wallet API** ([Docs](https://docs.oss.walt.id/wallet/api/getting-started) | [GitHub](https://github.com/walt-id/waltid-identity/blob/main/waltid-web-wallet/README.md)) - extend apps with wallet capabilities to collect, store, manage and share identity credentials and tokens.
 
 ### Apps
@@ -49,3 +49,10 @@ docker run -p 7000:7000 waltid/issuer --webHost=0.0.0.0 --webPort=7000 --baseUrl
 docker build -t waltid/verifier -f waltid-verifier-api/Dockerfile .
 docker run -p 7001:7001 waltid/verifier --webHost=0.0.0.0 --webPort=7001 --baseUrl=http://localhost:7001
 ```
+
+
+## Architecture
+The walt.id identity repo is part of The Community Stack, walt.id's collection of open-source products to build identity and wallet solutions. Learn more [here](https://walt.id/blog/p/community-stack).
+
+![waltid-identity-architecture](https://github.com/walt-id/waltid-identity/assets/48290617/54f2273a-b917-45df-8552-8b41358ed843)
+
