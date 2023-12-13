@@ -4,14 +4,14 @@
 
         <LoadingIndicator v-if="pending" class="my-6 mb-12 w-full"> Loading eventLog... </LoadingIndicator>
 
-        <p class="mb-1">The last 10 operations are shown below:</p>
+        <p class="mb-1">The list of events is shown below:</p>
 
         <div v-if="eventLog?.count > 0" aria-label="Credential list" class="h-full overflow-y-auto shadow-xl">
             <div class="container mx-auto px-4 sm:px-8">
     <div class="py-8">
         <!-- table source: https://codepen.io/superfly/pen/wvvPLZB -->
         <div>
-            <h2 class="text-2xl font-semibold leading-tight">Event logs</h2>
+            <h2 class="text-2xl font-semibold leading-tight">List of events</h2>
         </div>
         <div class="-mx-4 sm:-mx-8 px-4 sm:px-8 py-4 overflow-x-auto">
             <div class="inline-block min-w-full shadow-md rounded-lg overflow-hidden">
