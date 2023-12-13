@@ -184,8 +184,6 @@ npmPublish {
         val secretNpmToken = envToken ?: npmTokenFile.let { if (it.isFile) it.readLines().first() else "" }
         val hasNPMToken = secretNpmToken.isNotEmpty()
         val isReleaseBuild = Regex("\\d+.\\d+.\\d+").matches(version.get())
-        println("NPM token: ${hasNPMToken}")
-        println("Release build: ${isReleaseBuild}")
         if (isReleaseBuild && hasNPMToken) {
             readme.set(File("NPM_README.md"))
             register("npmjs") {

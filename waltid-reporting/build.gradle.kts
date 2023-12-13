@@ -10,7 +10,7 @@ group = "id.walt.reporting"
 repositories {
     mavenCentral()
     //maven("https://jitpack.io")
-    jcenter()
+    //jcenter()
 }
 
 java {
@@ -48,9 +48,9 @@ kotlin {
                 implementation("io.ktor:ktor-client-logging:2.3.6")
 
                 // Scheduler
-                implementation("it.justwrote:kjob-core:0.2.0")
+                /*implementation("it.justwrote:kjob-core:0.2.0")
                 implementation("it.justwrote:kjob-inmem:0.2.0")
-                implementation("it.justwrote:kjob-kron:0.2.0")
+                implementation("it.justwrote:kjob-kron:0.2.0")*/
 
                 // Coroutines
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
