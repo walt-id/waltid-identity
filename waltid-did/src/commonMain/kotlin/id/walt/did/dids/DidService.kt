@@ -5,9 +5,11 @@ import id.walt.did.dids.DidUtils.methodFromDid
 import id.walt.did.dids.registrar.DidRegistrar
 import id.walt.did.dids.registrar.DidRegistrarRegistrations
 import id.walt.did.dids.registrar.DidResult
+import id.walt.did.dids.registrar.LocalRegistrar
 import id.walt.did.dids.registrar.dids.DidCreateOptions
 import id.walt.did.dids.resolver.DidResolver
 import id.walt.did.dids.resolver.DidResolverRegistrations
+import id.walt.did.dids.resolver.LocalResolver
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.json.JsonObject
 
@@ -48,6 +50,13 @@ object DidService {
 
         log.debug { "INIT -> RESOLVERS:  $resolverMethods" }
         log.debug { "INIT -> REGISTRARS: $registrarMethods" }
+    }
+
+    suspend fun minimalInit() {
+        registerAllResolvers(setOf(LocalResolver()))
+        registerAllRegistrars(setOf(LocalRegistrar()))
+        updateResolversForMethods()
+        updateRegistrarsForMethods()
     }
 
     fun registerRegistrar(registrar: DidRegistrar) = if (registrar !in didRegistrars) didRegistrars.add(registrar) else false

@@ -56,7 +56,7 @@ For the OpenID4VCI issuance protocol, implement the following endpoints:
 
 **Well-defined endpoints:**
 
-This endpoints are well-defined, and need to be available under this exact path, relative to your issuer base URL:
+These endpoints are well-defined, and need to be available under this exact path, relative to your issuer base URL:
 
 * `GET /.well-known/openid-configuration`
 

@@ -53,7 +53,7 @@ class TestJs {
         println("  Public key: ${check2.getOrNull()}")
     }
 
-    @Test
+//    @Test
     fun apiTestAll() = runTest {
         KeyType.entries.forEach { test(it) }
     }

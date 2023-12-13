@@ -1,0 +1,47 @@
+name: Build on every push - walt.id-web-portal
+
+on:
+  push:
+    branches-ignore:
+      - xxxmain
+
+
+jobs:
+  ci:
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+
+    steps:
+      - uses: actions/checkout@v3
+      - name: Calculate release version
+        run: |
+          echo "release_version=1.$(date +'%g%m%d%H%M').$(echo ${{ github.ref_name }} | tr / -)" >> $GITHUB_ENV
+      - name: Set version
+        run: |
+          git tag v${{ env.release_version }}
+          git push --tags
+
+      - name: Setup node env 🏗
+        uses: actions/setup-node@v2.4.1
+        with:
+          node-version: '20'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
+      - name: Install dependencies 👨🏻‍💻
+        run: pnpm install
+
+      - name: Build
+        run: pnpm build
+
+      #- name: Run linter 👀
+      #  run: yarn lint
+
+      #- name: Run tests 🧪
+      #  run: yarn test --passWithNoTests

@@ -1,0 +1,58 @@
+<script lang="ts" setup>
+import { arbitrum, mainnet } from '@wagmi/core/chains'
+import {
+    createWeb3Modal,
+    defaultWagmiConfig,
+    useWeb3Modal,
+    useWeb3ModalEvents,
+    useWeb3ModalState,
+    useWeb3ModalTheme
+} from '@web3modal/wagmi/vue'
+
+// 1. Get projectId
+const projectId = "92fa9ca65f8b1bb7b140bee3dcd3245e"
+
+// 2. Create wagmiConfig
+const chains = [mainnet, arbitrum]
+const wagmiConfig = defaultWagmiConfig({
+    chains,
+    projectId,
+    metadata: {
+        name: 'Web3Modal Vue Example'
+    }
+})
+
+// 3. Create modal
+createWeb3Modal({
+    wagmiConfig,
+    projectId,
+    chains,
+    themeMode: 'light',
+    themeVariables: {
+        '--w3m-color-mix': '#00BB7F',
+        '--w3m-color-mix-strength': 20
+    }
+})
+
+// 4. Use modal composable
+const modal = useWeb3Modal()
+const state = useWeb3ModalState()
+const { setThemeMode, themeMode, themeVariables } = useWeb3ModalTheme()
+const events = useWeb3ModalEvents()
+
+definePageMeta({  auth: {    unauthenticatedOnly: true,    navigateAuthenticatedTo: '/profile',  },})
+</script>
+
+<template>
+    <w3m-button />
+    <w3m-network-button />
+    <w3m-connect-button />
+    <w3m-account-button />
+
+    <button @click="modal.open()">Open Connect Modal</button>
+    <button @click="modal.open({ view: 'Networks' })">Open Network Modal</button>
+    <button @click="setThemeMode(themeMode === 'dark' ? 'light' : 'dark')">Toggle Theme Mode</button>
+    <pre>{{ JSON.stringify(state, null, 2) }}</pre>
+    <pre>{{ JSON.stringify({ themeMode, themeVariables }, null, 2) }}</pre>
+    <pre>{{ JSON.stringify(events, null, 2) }}</pre>
+</template>
