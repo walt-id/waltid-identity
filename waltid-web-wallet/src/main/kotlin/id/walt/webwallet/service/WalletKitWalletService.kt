@@ -7,6 +7,8 @@ import id.walt.webwallet.db.models.*
 import id.walt.webwallet.service.dids.DidsService
 import id.walt.webwallet.service.dto.LinkedWalletDataTransferObject
 import id.walt.webwallet.service.dto.WalletDataTransferObject
+import id.walt.webwallet.service.events.EventLogFilter
+import id.walt.webwallet.service.events.EventLogFilterResult
 import id.walt.webwallet.service.issuers.IssuerDataTransferObject
 import id.walt.webwallet.utils.JsonUtils.toJsonPrimitive
 import io.ktor.client.*
@@ -362,6 +364,10 @@ class WalletKitWalletService(tenant: String?, accountId: UUID, walletId: UUID) :
                 it[data] = Json.encodeToString(operationHistory.data)
             }
         }
+    }
+
+    override fun filterEventLog(filter: EventLogFilter): EventLogFilterResult {
+        TODO("Not yet implemented")
     }
 
     override suspend fun linkWallet(wallet: WalletDataTransferObject): LinkedWalletDataTransferObject =
