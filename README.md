@@ -25,9 +25,9 @@ Available for Kotlin/Java and JavaScript environments.
 ### Services
 A set of API's to build issuer, verifier and wallet capabilities into any app.
 
-- Issuer API - enable apps issue credentials (W3C JWTs, SD-JWTs and JSON-LD) via OID4VC.
-- Verifier API - enable apps to verify credentials (W3C JWTs, SD-JWTs and JSON-LD) via OID4VP/SIOPv2.
-- Wallet API - extend apps with holistic identity wallet capabilities like collecting, storing, managing and sharing of identity credentials.
+- [Issuer API](https://github.com/walt-id/waltid-identity/tree/main/waltid-issuer-api) - enable apps issue credentials (W3C JWTs, SD-JWTs and JSON-LD) via OID4VC.
+- [Verifier API](https://github.com/walt-id/waltid-identity/tree/main/waltid-verifier-api) - enable apps to verify credentials (W3C JWTs, SD-JWTs and JSON-LD) via OID4VP/SIOPv2.
+- [Wallet API](https://github.com/walt-id/waltid-identity/blob/main/waltid-web-wallet/README.md) - extend apps with holistic identity wallet capabilities like collecting, storing, managing and sharing of identity credentials.
 
 ### Apps
 A set of white-label apps to get started in no time.
