@@ -1,63 +1,48 @@
-# Nuxt 3 Starter
+<div align="center">
+ <h1>Web Wallet by walt.id</h1>
+ <p>A custodial web-wallet (PWA) solution for credentials and tokens.</p>
 
-We recommend to look at the [documentation](https://v3.nuxtjs.org).
 
-## Preview
+<a href="https://walt.id/community">
+<img src="https://img.shields.io/badge/Join-The Community-blue.svg?style=flat" alt="Join community!" />
+</a>
+<a href="https://twitter.com/intent/follow?screen_name=walt_id">
+<img src="https://img.shields.io/twitter/follow/walt_id.svg?label=Follow%20@walt_id" alt="Follow @walt_id" />
+</a>
 
-![image](https://user-images.githubusercontent.com/38668796/179501879-b1efa419-8419-4c27-a79e-d185cb2884b7.png)
+</div>
 
-[![Open in StackBlitz](https://developer.stackblitz.com/img/open_in_stackblitz.svg)](https://stackblitz.com/github/productdevbook/nuxt3-app)
 
-## Deploy your own
+## Getting Started
 
-[![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/productdevbook/nuxt3-app)
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/git/external?repository-url=https://github.com/productdevbook/nuxt3-app)
+**Installing Dependencies**
+```
+npm install 
 
-This starter template also includes:
+or 
 
--   [Tailwind CSS v3](https://github.com/tailwindlabs/tailwindcss)
--   [Eslint](https://eslint.org)
--   [Headless UI](https://headlessui.dev/vue/menu) - unstyled, fully accessible UI components, designed to integrate beautifully with Tailwind CSS
--   [Icones](https://github.com/antfu/icones) - beautiful hand-crafted SVG icons with [Unocss](https://github.com/unocss/unocss) used.
+yarn install
 
-First-party plugins needed for Tailwind UI:
+or 
 
--   [tailwindcss/forms](https://github.com/tailwindlabs/tailwindcss-forms)
--   [tailwindcss/typography](https://github.com/tailwindlabs/tailwindcss-typography)
--   [tailwindcss/line-clamp](https://github.com/tailwindlabs/tailwindcss-line-clamp)
--   [tailwindcss/aspect-ratio](https://github.com/tailwindlabs/tailwindcss-aspect-ratio)
-
-Best Nuxt with Plugins:
-
--   [Pinia](https://github.com/posva/pinia)
-
-## Setup
-
-Make sure to install the dependencies
-
-```bash
-pnpm install
+bun install
 ```
 
-## Development
-
-Start the development server on http://localhost:3000
+**Running The Project**
 
 ```bash
-pnpm dev
+npm run dev
+
+or 
+
+yarn dev
+
+or 
+
+bun dev
 ```
 
-## Production
+## Documentation
 
-Build the application for production:
-
-```bash
-pnpm build
-```
-
-```bash
-pnpm start
-```
-
-Checkout the [deployment documentation](https://v3.nuxtjs.org/docs/deployment).
+Link to the official documentation [here](https://docs.walt.id/v/apps/solutions/web-wallet)https://docs.walt.id/v/apps/solutions/web-wallet
