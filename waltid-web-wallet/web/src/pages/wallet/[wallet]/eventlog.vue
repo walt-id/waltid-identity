@@ -93,10 +93,10 @@ import LoadingIndicator from "~/components/loading/LoadingIndicator.vue";
 
 const currentWallet = useCurrentWallet()
 console.log("Loading EventLog...");
-const eventLog = await useLazyFetch(`/wallet-api/wallet/${currentWallet.value}/eventlog`).data;
-refreshNuxtData();
-// const { data: eventLog, pending: pending, refresh, error } = await useLazyFetch(`/wallet-api/wallet/${currentWallet.value}/eventlog`);
+// const eventLog = await useLazyFetch(`/wallet-api/wallet/${currentWallet.value}/eventlog`).data;
 // refreshNuxtData();
+const { data: eventLog, pending: pending, refresh, error } = await useLazyFetch(`/wallet-api/wallet/${currentWallet.value}/eventlog`);
+refreshNuxtData();
 // const { data: eventLog, pending: pending, refresh, error } = await useLazyAsyncData(() => $fetch(`/wallet-api/wallet/${currentWallet.value}/eventlog`));
 </script>
 

@@ -468,8 +468,16 @@ class SSIKit2WalletService(tenant: String?, accountId: UUID, walletId: UUID) :
 
     override suspend fun createDid(method: String, args: Map<String, JsonPrimitive>): String {
 //        val key = args["keyId"]?.content?.takeIf { it.isNotEmpty() }?.let { getKey(it) }
-//            ?: getKey(generateKey(KeyType.Ed25519.name))
-        val key = args["keyId"]?.content?.takeIf { it.isNotEmpty() }?.let { getKey(it) } ?: LocalKey.generate(KeyType.Ed25519)
+//            ?: getKey(generateKey(KeyType.Ed25519.name))//TODO: throws keyid unique constraint violation
+        val key = args["keyId"]?.content?.takeIf { it.isNotEmpty() }?.let { getKey(it) } ?: let {
+            LocalKey.generate(KeyType.Ed25519)
+        }.also {
+            logEvent(
+                EventType.Key.Create, "wallet", KeyEventData(
+                    id = it.getKeyId(), algorithm = it.keyType.name, keyManagementService = "local"
+                )
+            )
+        }
         val options = getDidOptions(method, args)
         val result = DidService.registerByKey(method, key, options)
 
