@@ -7,7 +7,9 @@ import io.github.smiley4.ktorswaggerui.dsl.get
 import io.github.smiley4.ktorswaggerui.dsl.route
 import io.ktor.http.*
 import io.ktor.server.application.*
+import io.ktor.server.request.*
 import io.ktor.server.response.*
+import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.sql.transactions.transaction
 
 fun Application.eventLogs() = walletRoute {
@@ -73,12 +75,12 @@ fun Application.eventLogs() = walletRoute {
                 wallet.filterEventLog(
                     EventLogFilter(
                         limit = limit,
-                        event = event,
-                        action = action,
-                        tenant = tenant,
                         startingAfter = startingAfter,
                         sortBy = sortBy,
                         sortOrder = sortOrder,
+                        data = mapOf(
+                            "event" to event, "action" to action, "tenant" to tenant
+                        ).mapNotNull { (k, v) -> v?.let { k to v } }.toMap(),
                     )
                 )
             })
