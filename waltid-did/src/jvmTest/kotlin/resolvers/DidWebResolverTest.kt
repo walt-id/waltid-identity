@@ -40,10 +40,16 @@ class DidWebResolverTest : DidResolverTestBase() {
     }
 
     companion object {
+
+        var serverStarted = false
+
         @JvmStatic
         @BeforeAll
-        fun startServer() {
-            TestServer.server.start()
+        fun ensureServerStarted() {
+            if (!serverStarted) {
+                TestServer.server.start()
+                serverStarted = true
+            }
         }
 
         @JvmStatic
