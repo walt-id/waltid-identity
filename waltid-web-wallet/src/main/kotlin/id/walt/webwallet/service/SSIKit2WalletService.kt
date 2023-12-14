@@ -53,7 +53,6 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import kotlinx.uuid.UUID
-import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.select
 import org.jetbrains.exposed.sql.transactions.transaction
@@ -651,13 +650,11 @@ class SSIKit2WalletService(tenant: String?, accountId: UUID, walletId: UUID) :
 // TODO
 //fun infoAboutOfferRequest
 
-    override fun getHistory(limit: Int, offset: Long): List<WalletOperationHistory> = transaction {
-        WalletOperationHistories
-            .select { (WalletOperationHistories.tenant eq tenant) and (WalletOperationHistories.accountId eq walletId) }
-            .orderBy(WalletOperationHistories.timestamp)
-            .limit(10)
-            .map { WalletOperationHistory(it) }
-    }
+    override fun getHistory(limit: Int, offset: Long): List<WalletOperationHistory> =
+        WalletOperationHistories.select { WalletOperationHistories.wallet eq walletId }
+            .orderBy(WalletOperationHistories.timestamp).limit(10).map { row ->
+                WalletOperationHistory(row)
+            }
 
     override suspend fun addOperationHistory(operationHistory: WalletOperationHistory) {
         transaction {
@@ -674,11 +671,12 @@ class SSIKit2WalletService(tenant: String?, accountId: UUID, walletId: UUID) :
 
     override fun filterEventLog(filter: EventLogFilter): EventLogFilterResult = runCatching {
         val startingAfterItemIndex = filter.startingAfter?.toLongOrNull()?.takeIf { it >= 0 } ?: -1L
-        val dataFilter = emptyMap<String, String>()
         val pageSize = filter.limit
-        val count = EventService.count(walletId, dataFilter)
+        val count = EventService.count(walletId, filter.data)
         val offset = startingAfterItemIndex + 1
-        val events = EventService.get(accountId, walletId, filter.limit, offset, dataFilter)
+        val events = EventService.get(
+            accountId, walletId, filter.limit, offset, filter.sortOrder ?: "asc", filter.sortBy ?: "", filter.data
+        )
         EventLogFilterDataResult(
             items = events,
             count = events.size,
