@@ -5,24 +5,28 @@ import kotlinx.datetime.toJavaInstant
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.uuid.UUID
-import org.jetbrains.exposed.sql.Query
+import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
-import org.jetbrains.exposed.sql.insert
-import org.jetbrains.exposed.sql.or
-import org.jetbrains.exposed.sql.select
 import org.jetbrains.exposed.sql.transactions.transaction
 
 object EventService {
-    fun get(accountId: UUID, walletId: UUID, limit: Int, offset: Long, dataFilter: Map<String, String> = emptyMap()): List<Event> =
-        addWhereClause(
-            Events.select { Events.account eq accountId or (Events.wallet eq walletId) }, dataFilter
-        ).orderBy(Events.timestamp).limit(n = limit, offset = offset).map {
-                Event(it)
-            }
+    fun get(
+        accountId: UUID,
+        walletId: UUID,
+        limit: Int,
+        offset: Long,
+        sortOrder: String,
+        sortBy: String,
+        dataFilter: Map<String, String> = emptyMap()
+    ) = Events.select { Events.account eq accountId or (Events.wallet eq walletId) }
+        .orderBy(getColumn(sortBy) ?: Events.timestamp,
+            sortOrder.takeIf { it.uppercase() == "ASC" }?.let { SortOrder.ASC } ?: SortOrder.DESC)
+        .limit(n = limit, offset = offset).addWhereClause(dataFilter).map {
+            Event(it)
+        }
 
-    fun count(walletId: UUID, dataFilter: Map<String, String> = emptyMap()): Long = addWhereClause(
-        Events.select { Events.wallet eq walletId }, dataFilter
-    ).count()
+    fun count(walletId: UUID, dataFilter: Map<String, String> = emptyMap()): Long =
+        Events.select { Events.wallet eq walletId }.addWhereClause(dataFilter).count()
 
 
     fun add(event: Event): Unit = transaction {
@@ -38,19 +42,19 @@ object EventService {
         }
     }
 
-    private fun addWhereClause(query: Query, dataFilter: Map<String, String>) = let {
-        dataFilter["event"]?.let {
-            query.adjustWhere { Events.event eq it }
+    private fun Query.addWhereClause(dataFilter: Map<String, String>) = let {
+        dataFilter.forEach {
+            when (it.key) {
+                "event" -> this.andWhere { Events.event eq it.value }
+                "action" -> this.andWhere { Events.action eq it.value }
+                "tenant" -> this.andWhere { Events.tenant eq it.value }
+                "originator" -> this.andWhere { Events.originator eq it.value }
+            }
         }
-        dataFilter["action"]?.let {
-            query.adjustWhere { Events.action eq it }
-        }
-        dataFilter["tenant"]?.let {
-            query.adjustWhere { Events.tenant eq it }
-        }
-        dataFilter["originator"]?.let {
-            query.adjustWhere { Events.originator eq it }
-        }
-        query
+        this
+    }
+
+    private fun getColumn(name: String) = Events.columns.singleOrNull {
+        it.name == name.lowercase()
     }
 }

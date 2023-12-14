@@ -671,11 +671,12 @@ class SSIKit2WalletService(tenant: String?, accountId: UUID, walletId: UUID) :
 
     override fun filterEventLog(filter: EventLogFilter): EventLogFilterResult = runCatching {
         val startingAfterItemIndex = filter.startingAfter?.toLongOrNull()?.takeIf { it >= 0 } ?: -1L
-        val dataFilter = emptyMap<String, String>()
         val pageSize = filter.limit
-        val count = EventService.count(walletId, dataFilter)
+        val count = EventService.count(walletId, filter.data)
         val offset = startingAfterItemIndex + 1
-        val events = EventService.get(accountId, walletId, filter.limit, offset, dataFilter)
+        val events = EventService.get(
+            accountId, walletId, filter.limit, offset, filter.sortBy ?: "", filter.sortOrder ?: "asc", filter.data
+        )
         EventLogFilterDataResult(
             items = events,
             count = events.size,
