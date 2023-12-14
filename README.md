@@ -43,13 +43,13 @@ A set of white-label apps to get started in no time.
 ### Docker container builds:
 
 ```shell
-docker build -t waltid/issuer -f waltid-issuer-api/Dockerfile .
-docker run -p 7000:7000 waltid/issuer --webHost=0.0.0.0 --webPort=7000 --baseUrl=http://localhost:7000
+docker build -t waltid/issuer-api -f waltid-issuer-api/Dockerfile .
+docker run -p 7000:7000 waltid/issuer-api --webHost=0.0.0.0 --webPort=7000 --baseUrl=http://localhost:7000
 ```
 
 ```shell
-docker build -t waltid/verifier -f waltid-verifier-api/Dockerfile .
-docker run -p 7001:7001 waltid/verifier --webHost=0.0.0.0 --webPort=7001 --baseUrl=http://localhost:7001
+docker build -t waltid/verifier-api -f waltid-verifier-api/Dockerfile .
+docker run -p 7001:7001 waltid/verifier-api --webHost=0.0.0.0 --webPort=7001 --baseUrl=http://localhost:7001
 ```
 
 
