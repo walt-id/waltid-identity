@@ -682,7 +682,7 @@ class SSIKit2WalletService(tenant: String?, accountId: UUID, walletId: UUID) :
         EventLogFilterDataResult(
             items = events,
             count = events.size,
-            currentStartingAfter = computeCurrentStartingAfter(startingAfterItemIndex, pageSize),
+            currentStartingAfter = computeCurrentStartingAfter(startingAfterItemIndex),
             nextStartingAfter = computeNextStartingAfter(startingAfterItemIndex, pageSize, count)
         )
     }.fold(onSuccess = {
@@ -758,14 +758,13 @@ class SSIKit2WalletService(tenant: String?, accountId: UUID, walletId: UUID) :
     )
 
     //TODO: move to related entity
-    private fun computeCurrentStartingAfter(afterItemIndex: Long, pageSize: Int): String? = let {
-        val itemIndex = afterItemIndex - pageSize
-        itemIndex.takeIf { it >= -1 }?.toString()
+    private fun computeCurrentStartingAfter(afterItemIndex: Long): String? = let {
+        afterItemIndex.takeIf { it >= 0 }?.toString()
     }
 
     //TODO: move to related entity
     private fun computeNextStartingAfter(afterItemIndex: Long, pageSize: Int, count: Long): String? = let {
         val itemIndex = afterItemIndex + pageSize
-        itemIndex.takeIf { it <= count }?.toString()
+        itemIndex.takeIf { it < count }?.toString()
     }
 }
