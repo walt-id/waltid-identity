@@ -9,9 +9,9 @@
             <div class="flex flex-none items-center gap-x-4">
                 <button
                     v-if="eventLog?.currentStartingAfter"
-                    @click="prevPage(eventLog.currentStartingAfter)"
+                    @click="topPage('-1')"
                     class="hidden rounded-md bg-white px-2.5 py-1.5 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:block"
-                >Previous
+                >Top
                 </button>
             </div>
             <div class="flex flex-none items-center gap-x-4">
@@ -129,7 +129,7 @@ const { data: eventLog, pending: pending } = await useLazyAsyncData(
     () =>
         $fetch(`/wallet-api/wallet/${currentWallet.value}/eventlog`, {
             params: {
-                limit: 4,
+                limit: 2,
                 startingAfter: startingAfter.value,
             },
         }),
@@ -148,12 +148,12 @@ function viewData(title, data) {
         },
     });
 }
-function prevPage(startingAfterParam){
- console.log(`prev.page: ${startingAfterParam}`)
+function topPage(startingAfterParam){
+ console.log(`top: ${startingAfterParam}`)
  startingAfter.value = startingAfterParam
 }
 function nextPage(startingAfterParam){
-    console.log(`next.page: ${startingAfterParam}`)
+    console.log(`next: ${startingAfterParam}`)
     startingAfter.value = startingAfterParam
 }
 </script>
