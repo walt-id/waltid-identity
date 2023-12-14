@@ -99,7 +99,9 @@ object Db {
         if (datasourceConfig.recreateDatabaseOnStart) {
             recreateDatabase()
         } else {
-            SchemaUtils.createMissingTablesAndColumns(*tables)
+            transaction {
+                SchemaUtils.createMissingTablesAndColumns(*tables)
+            }
         }
     }
 
