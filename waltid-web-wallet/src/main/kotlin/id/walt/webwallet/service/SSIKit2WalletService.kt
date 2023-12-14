@@ -53,7 +53,6 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import kotlinx.uuid.UUID
-import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.select
 import org.jetbrains.exposed.sql.transactions.transaction
@@ -651,13 +650,11 @@ class SSIKit2WalletService(tenant: String?, accountId: UUID, walletId: UUID) :
 // TODO
 //fun infoAboutOfferRequest
 
-    override fun getHistory(limit: Int, offset: Long): List<WalletOperationHistory> = transaction {
-        WalletOperationHistories
-            .select { (WalletOperationHistories.tenant eq tenant) and (WalletOperationHistories.accountId eq walletId) }
-            .orderBy(WalletOperationHistories.timestamp)
-            .limit(10)
-            .map { WalletOperationHistory(it) }
-    }
+    override fun getHistory(limit: Int, offset: Long): List<WalletOperationHistory> =
+        WalletOperationHistories.select { WalletOperationHistories.wallet eq walletId }
+            .orderBy(WalletOperationHistories.timestamp).limit(10).map { row ->
+                WalletOperationHistory(row)
+            }
 
     override suspend fun addOperationHistory(operationHistory: WalletOperationHistory) {
         transaction {
