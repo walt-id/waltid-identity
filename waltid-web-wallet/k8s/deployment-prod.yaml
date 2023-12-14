@@ -25,6 +25,7 @@ data:
             fullColumnNames = false
         }
     }
+    recreateDatabaseOnStart = false
 ---
 apiVersion: v1
 kind: ConfigMap
