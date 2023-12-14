@@ -17,7 +17,7 @@ COPY waltid-verifiable-credentials/. /work/waltid-verifiable-credentials
 COPY waltid-crypto/. /work/waltid-crypto
 COPY waltid-did/. /work/waltid-did
 COPY waltid-openid4vc/. /work/waltid-openid4vc
-COPY waltid-verifier-api/. /work/waltid-verifier
+COPY waltid-verifier-api/. /work/waltid-verifier-api
 COPY waltid-sdjwt/. /work/waltid-sdjwt
 
 #RUN pwd && ls /work/ && pwd && ls -la /work/*
@@ -26,7 +26,7 @@ RUN gradle clean installDist
 FROM docker.io/eclipse-temurin:17
 
 COPY --from=buildstage /work/waltid-verifier-api/build/install/ /
-WORKDIR /waltid-verifier
+WORKDIR /waltid-verifier-api
 
 EXPOSE 7001
 
