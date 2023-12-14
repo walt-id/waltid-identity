@@ -10,7 +10,6 @@ plugins {
 }
 
 group = "id.walt"
-version = "0.0.1"
 application {
     mainClass.set("id.walt.webwallet.ApplicationKt")
 

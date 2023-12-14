@@ -25,6 +25,7 @@ data:
             fullColumnNames = false
         }
     }
+    recreateDatabaseOnStart = false
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -236,7 +237,7 @@ spec:
     - host: wallet.walt.id
       http:
         paths:
-          - path: /r/
+          - path: /wallet-api/
             pathType: Prefix
             backend:
               service:

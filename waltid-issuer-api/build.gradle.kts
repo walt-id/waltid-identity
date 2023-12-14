@@ -23,7 +23,7 @@ plugins {
 }
 
 group = "id.walt"
-version = "1.SNAPSHOT"
+//version = "1.SNAPSHOT"
 
 repositories {
     mavenCentral()
@@ -92,7 +92,6 @@ dependencies {
     implementation("io.github.oshai:kotlin-logging-jvm:5.1.0")
     implementation("org.slf4j:slf4j-simple:2.0.9")
     implementation("org.slf4j:jul-to-slf4j:2.0.9")
-    implementation("io.ktor:ktor-client-cio-jvm:${Versions.KTOR_VERSION}")
 
     // Test
     testImplementation(kotlin("test"))
