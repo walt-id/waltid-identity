@@ -1,6 +1,6 @@
 plugins {
-    kotlin("multiplatform")
-    id("org.jetbrains.kotlin.plugin.serialization")
+    kotlin("multiplatform") version "1.9.21"
+    id("org.jetbrains.kotlin.plugin.serialization") version "1.9.21"
     id("dev.petuska.npm.publish") version "3.4.1"
     id("maven-publish")
     id("com.github.ben-manes.versions")
@@ -108,6 +108,8 @@ kotlin {
                     exclude(module = "waltid-sd-jwt-jvm")
                 }
                 implementation(project(":waltid-crypto"))
+                implementation(project(":waltid-did"))
+                implementation("io.github.oshai:kotlin-logging-jvm:5.1.0")
 
                 implementation("io.ktor:ktor-server-core-jvm:$ktor_version")
                 implementation("io.ktor:ktor-server-netty-jvm:$ktor_version")
