@@ -631,7 +631,7 @@ class VP_JVM_Test : AnnotationSpec() {
             "            \"api-key\": \"1234\"\n" +
             "        },\n" +
             "        \"state\": \"1234\",\n" +
-            "        \"url\": \"https://entra.walt.id/verified\"\n" +
+            "        \"url\": \"https://e80e-62-178-27-231.ngrok-free.app\"\n" +
             "    },\n" +
             "    \"registration\": {\n" +
             "        \"clientName\": \"verifiable-credentials-app\"\n" +

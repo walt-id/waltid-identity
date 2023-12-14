@@ -3,6 +3,12 @@ package id.walt.oid4vc
 import id.walt.auditor.Auditor
 import id.walt.auditor.policies.SignaturePolicy
 import id.walt.credentials.w3c.VerifiableCredential
+import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.LocalKey
+import id.walt.crypto.keys.LocalKeyCreator
+import id.walt.did.dids.DidService
+import id.walt.did.dids.registrar.dids.DidIonCreateOptions
+import id.walt.did.dids.registrar.dids.DidJwkCreateOptions
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.definitions.OPENID_CREDENTIAL_AUTHORIZATION_TYPE
 import id.walt.oid4vc.providers.CredentialWalletConfig
@@ -36,6 +42,7 @@ import io.ktor.util.*
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonPrimitive
+import java.io.File
 import kotlin.time.Duration.Companion.minutes
 
 class CI_JVM_Test : AnnotationSpec() {
@@ -1034,5 +1041,90 @@ class CI_JVM_Test : AnnotationSpec() {
         credential.issuer?.id shouldBe ciTestProvider.baseUrl
         credential.credentialSubject?.id shouldBe credentialWallet.TEST_DID
         Auditor.getService().verify(credential, listOf(SignaturePolicy())).result shouldBe true
+    }
+
+
+    val http = HttpClient(Java) {
+        install(ContentNegotiation) {
+            json()
+        }
+        install(Logging) {
+            logger = Logger.SIMPLE
+            level = LogLevel.ALL
+        }
+        followRedirects = false
+    }
+
+    suspend fun entraAuthorize(): String {
+        val tenantId = "8bc955d9-38fd-4c15-a520-0c656407537a"
+        val clientId = "e50ceaa6-8554-4ae6-bfdf-fd95e2243ae0"
+        val clientSecret = "ctL8Q~Ezdrcrju85gEtvbCmQQDmm7bXjJKsdXbCr"
+        val response = http.submitForm("https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token", parameters {
+            append("client_id", clientId)
+            append("scope", "3db474b9-6a0c-4840-96ac-1fceb342124f/.default")
+            append("client_secret", clientSecret)
+            append("grant_type", "client_credentials")
+        }).body<JsonObject>()
+        return "${response["token_type"]!!.jsonPrimitive.content} ${response["access_token"]!!.jsonPrimitive.content}"
+    }
+
+    @Test
+    suspend fun testEntraIssuance() {
+        val accessToken = entraAuthorize()
+        val createIssuanceReq = "{\n" +
+            "    \"callback\": {\n" +
+            "        \"url\": \"https://bla.com\",\n" +
+            "        \"state\": \"1234\",\n" +
+            "        \"headers\": {\n" +
+            "            \"api-key\": \"1234\"\n" +
+            "        }\n" +
+            "    },\n" +
+            "    \"authority\": \"did:web:entra.walt.id\",\n" +
+            "    \"registration\": {\n" +
+            "        \"clientName\": \"test\"\n" +
+            "    },\n" +
+            "    \"type\": \"VerifiedCredentialExpert\",\n" +
+            "    \"manifest\": \"https://verifiedid.did.msidentity.com/v1.0/tenants/8bc955d9-38fd-4c15-a520-0c656407537a/verifiableCredentials/contracts/92162ece-39ee-abfe-87dc-ab6ac50c13a6/manifest\"\n" +
+            "}"
+
+        val response = http.post("https://verifiedid.did.msidentity.com/v1.0/verifiableCredentials/createIssuanceRequest") {
+            header(HttpHeaders.Authorization, accessToken)
+            contentType(ContentType.Application.Json)
+            setBody(createIssuanceReq)
+        }
+        response.status shouldBe HttpStatusCode.Created
+        val responseObj = response.body<JsonObject>()
+        val url = responseObj["url"]?.jsonPrimitive?.content
+        println(url)
+        val reqParams = parseQueryString(Url(url!!).encodedQuery).toMap()
+        val authReq = AuthorizationRequest.fromHttpParametersAuto(reqParams)
+        val tokenResponse = credentialWallet.processImplicitFlowAuthorization(authReq)
+        println(tokenResponse.toString())
+
+        val resp = http.submitForm((authReq.responseUri ?: authReq.redirectUri)!!,
+            parameters {
+                tokenResponse.toHttpParameters().forEach { entry ->
+                    entry.value.forEach { append(entry.key, it) }
+                }
+            })
+        println("Resp: $resp")
+        println(resp.bodyAsText())
+
+    }
+
+    @Test
+    suspend fun testCreateDidIon() {
+        DidService.init()
+        val didResult = DidService.register(DidIonCreateOptions())
+        println(didResult.did)
+    }
+
+    @Test
+    suspend fun testCreateKey() {
+        val result = LocalKey.Companion.importPEM(File("/home/work/waltid/entra/keys/ec-secp256k1-priv-key.pem").readText().trimIndent())
+        result.isSuccess shouldBe true
+        val key = result.getOrNull()!!
+        key.hasPrivateKey shouldBe true
+
     }
 }
