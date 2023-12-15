@@ -16,7 +16,7 @@ object EventService {
         offset: Long,
         sortOrder: String,
         sortBy: String,
-        dataFilter: Map<String, String> = emptyMap()
+        dataFilter: Map<String, String>
     ) = Events.select { Events.account eq accountId or (Events.wallet eq walletId) }
         .orderBy(getColumn(sortBy) ?: Events.timestamp,
             sortOrder.takeIf { it.uppercase() == "ASC" }?.let { SortOrder.ASC } ?: SortOrder.DESC)
@@ -24,7 +24,7 @@ object EventService {
             Event(it)
         }
 
-    fun count(walletId: UUID, dataFilter: Map<String, String> = emptyMap()): Long =
+    fun count(walletId: UUID, dataFilter: Map<String, String>): Long =
         Events.select { Events.wallet eq walletId }.addWhereClause(dataFilter).count()
 
 
@@ -43,7 +43,7 @@ object EventService {
 
     private fun Query.addWhereClause(dataFilter: Map<String, String>) = let {
         dataFilter.forEach {
-            when (it.key) {
+            when (it.key.lowercase()) {
                 "event" -> this.andWhere { Events.event eq it.value }
                 "action" -> this.andWhere { Events.action eq it.value }
                 "tenant" -> this.andWhere { Events.tenant eq it.value }

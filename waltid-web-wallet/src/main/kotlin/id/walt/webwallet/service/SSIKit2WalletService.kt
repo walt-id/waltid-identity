@@ -465,36 +465,17 @@ class SSIKit2WalletService(tenant: String?, accountId: UUID, walletId: UUID) :
     /* DIDs */
 
     override suspend fun createDid(method: String, args: Map<String, JsonPrimitive>): String {
-//        val key = args["keyId"]?.content?.takeIf { it.isNotEmpty() }?.let { getKey(it) }
-//            ?: getKey(generateKey(KeyType.Ed25519.name))//TODO: throws keyid unique constraint violation
-        val key = args["keyId"]?.content?.takeIf { it.isNotEmpty() }?.let { getKey(it) } ?: let {
-            LocalKey.generate(KeyType.Ed25519)
-        }.also {
-            logEvent(
-                EventType.Key.Create, "wallet", KeyEventData(
-                    id = it.getKeyId(), algorithm = it.keyType.name, keyManagementService = "local"
-                )
-            )
-        }
+        val keyId = args["keyId"]?.content?.takeIf { it.isNotEmpty() } ?: generateKey(KeyType.Ed25519.name)
+        val key = getKey(keyId)
         val options = getDidOptions(method, args)
         val result = DidService.registerByKey(method, key, options)
-
-        val keyId = key.getKeyId()
-
-        transaction {
-            val keyRef = KeysService.add(
-                wallet = walletId,
-                keyId = keyId,
-                document = KeySerialization.serializeKey(key)
-            )
-            DidsService.add(
-                wallet = walletId,
-                did = result.did,
-                document = Json.encodeToString(result.didDocument),
-                alias = args["alias"]?.content,
-                keyId = keyRef
-            )
-        }
+        DidsService.add(
+            wallet = walletId,
+            did = result.did,
+            document = Json.encodeToString(result.didDocument),
+            alias = args["alias"]?.content,
+            keyId = keyId
+        )
         logEvent(
             EventType.Did.Create, "wallet", DidEventData(
                 did = result.did, document = result.didDocument.toString()
@@ -579,21 +560,9 @@ class SSIKit2WalletService(tenant: String?, accountId: UUID, walletId: UUID) :
                     keyManagementService = "local",
                 )
             )
-            insertKey(createdKey)
+            KeysService.add(walletId, createdKey.getKeyId(), KeySerialization.serializeKey(createdKey))
             createdKey.getKeyId()
         }
-
-    private suspend fun insertKey(key: Key) {
-        val keyId = key.getKeyId()
-        transaction {
-            WalletKeys.insert {
-                it[WalletKeys.keyId] = keyId
-                it[wallet] = walletId
-                it[document] = KeySerialization.serializeKey(key)
-                it[createdOn] = Clock.System.now().toJavaInstant()
-            }
-        }
-    }
 
     override suspend fun importKey(jwkOrPem: String): String {
         val type = when {
@@ -615,14 +584,10 @@ class SSIKit2WalletService(tenant: String?, accountId: UUID, walletId: UUID) :
         val keyId = key.getKeyId()
         logEvent(
             EventType.Key.Import, "wallet", KeyEventData(
-                id = keyId,
-                algorithm = key.keyType.name,
-                keyManagementService = EventDataNotAvailable
+                id = keyId, algorithm = key.keyType.name, keyManagementService = EventDataNotAvailable
             )
         )
-
-        insertKey(key)
-
+        KeysService.add(walletId, keyId, KeySerialization.serializeKey(key))
         return keyId
     }
 
