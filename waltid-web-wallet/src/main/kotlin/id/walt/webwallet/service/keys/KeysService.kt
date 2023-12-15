@@ -20,13 +20,14 @@ object KeysService {
 
     fun list(wallet: UUID): List<WalletKey> = WalletKeys.select { WalletKeys.wallet eq wallet }.map { WalletKey(it) }
 
-    fun add(wallet: UUID, keyId: String, document: String) =
+    fun add(wallet: UUID, keyId: String, document: String) = transaction {
         WalletKeys.insert {
             it[WalletKeys.wallet] = wallet
             it[WalletKeys.keyId] = keyId
             it[WalletKeys.document] = document
             it[createdOn] = Clock.System.now().toJavaInstant()
-        }[WalletKeys.keyId]
+        }.insertedCount
+    }
 
     fun delete(wallet: UUID, keyId: String): Boolean =
         transaction { WalletKeys.deleteWhere { (WalletKeys.wallet eq wallet) and (WalletKeys.keyId eq keyId) } } > 0
