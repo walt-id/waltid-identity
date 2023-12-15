@@ -28,6 +28,7 @@ services:
       NEXT_PUBLIC_ISSUER: "http://localhost:$ISSUER_API_PORT"
       NEXT_PUBLIC_VERIFIER: "http://localhost:$VERIFIER_API_PORT"
       NEXT_PUBLIC_WALLET: "http://localhost:$WALLET_FRONTEND_PORT"
+      NEXT_PUBLIC_HOST_URL: "http://localhost:$WEB_PORTAL_PORT"
   vc-repo:
     image: waltid/vc-repository:latest
   ingress:

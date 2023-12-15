@@ -27,6 +27,8 @@ spec:
               value: "https://verifier.portal.walt.id"
             - name: NEXT_PUBLIC_WALLET
               value: "https://wallet.walt.id"
+            - name: NEXT_PUBLIC_HOST_URL
+              value: "https://portal.walt.id"
           ports:
             - containerPort: 3000
               name: http-portal

@@ -22,6 +22,8 @@ export default function Verification() {
   const [loading, setLoading] = useState(true);
   const [copyText, setCopyText] = useState(BUTTON_COPY_TEXT_DEFAULT);
 
+  const hostUrl = env.NEXT_PUBLIC_HOST_URL ? env.NEXT_PUBLIC_HOST_URL : nextConfig.publicRuntimeConfig!.NEXT_PUBLIC_HOST_URL
+
   function handleCancel() {
     router.push('/');
   }
@@ -59,8 +61,8 @@ export default function Verification() {
         },
         {
           headers: {
-            "successRedirectUri": `https://${window.location.hostname}/success/$id`,
-            "errorRedirectUri": `https://${window.location.hostname}/success/$id`,
+            "successRedirectUri": `${hostUrl}/success/$id`,
+            "errorRedirectUri": `${hostUrl}/success/$id`,
           },
         }
       );
