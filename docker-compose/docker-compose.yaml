@@ -12,20 +12,20 @@ services:
     image: waltid/wallet-frontend:latest
     environment:
       NUXT_PUBLIC_ISSUER_CALLBACK_URL: "http://localhost:$WALLET_FRONTEND_PORT"
-  issuer:
-    image: waltid/issuer:latest
+  issuer-api:
+    image: waltid/issuer-api:latest
     volumes:
-      - ./issuer/config:/waltid-issuer/config
-  verifier:
-    image: waltid/verifier:latest
+      - ./issuer-api/config:/waltid-issuer-api/config
+  verifier-api:
+    image: waltid/verifier-api:latest
     volumes:
-      - ./verifier/config:/waltid-verifier-api/config
+      - ./verifier-api/config:/waltid-verifier-api/config
   web-portal:
     image: waltid/portal:latest
     environment:
       NEXT_PUBLIC_VC_REPO: "http://localhost:$VC_REPO_PORT"
-      NEXT_PUBLIC_ISSUER: "http://localhost:$ISSUER_PORT"
-      NEXT_PUBLIC_VERIFIER: "http://localhost:$VERIFIER_PORT"
+      NEXT_PUBLIC_ISSUER: "http://localhost:$ISSUER_API_PORT"
+      NEXT_PUBLIC_VERIFIER: "http://localhost:$VERIFIER_API_PORT"
       NEXT_PUBLIC_WALLET: "http://localhost:$WALLET_FRONTEND_PORT"
   vc-repo:
     image: waltid/vc-repository:latest
@@ -44,12 +44,12 @@ services:
         published: $VC_REPO_PORT # vc-repo
         protocol: tcp
         mode: host
-      - target: $ISSUER_PORT
-        published: $ISSUER_PORT # issuer-api
+      - target: $ISSUER_API_PORT
+        published: $ISSUER_API_PORT # issuer-api
         protocol: tcp
         mode: host
-      - target: $VERIFIER_PORT
-        published: $VERIFIER_PORT # verifier-api
+      - target: $VERIFIER_API_PORT
+        published: $VERIFIER_API_PORT # verifier-api
         protocol: tcp
         mode: host
     volumes:
