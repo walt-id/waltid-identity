@@ -8,6 +8,7 @@ services:
     volumes:
       - ./wallet-backend/config:/waltid-web-wallet/config
       - ./wallet-backend/walt.yaml:/waltid-web-wallet/walt.yaml
+      - ./wallet-backend/data:/waltid-web-wallet/data
   wallet-frontend:
     image: waltid/wallet-frontend:latest
     environment:
