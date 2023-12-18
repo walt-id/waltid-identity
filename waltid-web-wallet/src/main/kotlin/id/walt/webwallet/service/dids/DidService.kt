@@ -17,7 +17,7 @@ object DidsService {
 
     fun list(wallet: UUID): List<WalletDid> = WalletDids.select { WalletDids.wallet eq wallet }.map { WalletDid(it) }
 
-    fun add(wallet: UUID, did: String, document: String, keyId: String, alias: String? = null) {
+    fun add(wallet: UUID, did: String, document: String, keyId: String, alias: String? = null) = transaction {
         val now = Clock.System.now()
 
         WalletDids.insert {
@@ -28,7 +28,7 @@ object DidsService {
             it[WalletDids.alias] = alias ?: "Unnamed from $now"
             it[createdOn] = now.toJavaInstant()
         }
-    }
+    }.insertedCount
 
     fun delete(wallet: UUID, did: String): Boolean =
         transaction { WalletDids.deleteWhere { (WalletDids.wallet eq wallet) and (WalletDids.did eq did) } } > 0

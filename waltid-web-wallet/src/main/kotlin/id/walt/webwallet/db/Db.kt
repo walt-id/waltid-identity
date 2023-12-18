@@ -52,38 +52,30 @@ object Db {
             toTransactionIsolationLevel(hikariDataSourceConfig.transactionIsolation)
     }
 
+    // Make sure the creation order is correct (references / foreignKeys have to exist)
+    val tables = listOf(
+        Issuers,
+        Accounts,
+        Wallets,
+        WalletOperationHistories,
+        WalletDids,
+        WalletKeys,
+        WalletCredentials,
+        AccountWalletMappings,
+
+        //AccountWeb3WalletMappings,
+        Web3Wallets,
+        AccountIssuers,
+        Events,
+    ).toTypedArray()
+
     fun recreateDatabase() {
         transaction {
             addLogger(StdOutSqlLogger)
 
-            SchemaUtils.drop(
-                Issuers,
-                WalletOperationHistories,
-                WalletDids,
-                WalletKeys,
-                WalletCredentials,
-                AccountWalletMappings,
-                Wallets,
-                //AccountWeb3WalletMappings,
-                Accounts,
-                Web3Wallets,
-                AccountIssuers,
-                Events,
-            )
-            SchemaUtils.create(
-                Web3Wallets,
-                Accounts,
-                //AccountWeb3WalletMappings,
-                Wallets,
-                AccountWalletMappings,
-                WalletCredentials,
-                WalletKeys,
-                WalletDids,
-                WalletOperationHistories,
-                Issuers,
-                AccountIssuers,
-                Events,
-            )
+
+            SchemaUtils.drop(*(tables.reversedArray()))
+            SchemaUtils.create(*tables)
 
             runBlocking {
                 AccountsService.register(request = EmailAccountRequest("Max Mustermann", "string@string.string", "string"))
@@ -106,6 +98,10 @@ object Db {
 
         if (datasourceConfig.recreateDatabaseOnStart) {
             recreateDatabase()
+        } else {
+            transaction {
+                SchemaUtils.createMissingTablesAndColumns(*tables)
+            }
         }
     }
 

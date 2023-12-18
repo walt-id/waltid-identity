@@ -38,21 +38,6 @@ A set of white-label apps to get started in no time.
 - [Portal](https://github.com/walt-id/waltid-identity/tree/main/waltid-web-portal) - An issuer and verifier portal for credentials.
 
 
-## Building the Project
-
-### Docker container builds:
-
-```shell
-docker build -t waltid/issuer -f waltid-issuer-api/Dockerfile .
-docker run -p 7000:7000 waltid/issuer --webHost=0.0.0.0 --webPort=7000 --baseUrl=http://localhost:7000
-```
-
-```shell
-docker build -t waltid/verifier -f waltid-verifier-api/Dockerfile .
-docker run -p 7001:7001 waltid/verifier --webHost=0.0.0.0 --webPort=7001 --baseUrl=http://localhost:7001
-```
-
-
 ## Architecture
 The walt.id identity repo is part of The Community Stack, walt.id's collection of open-source products to build identity and wallet solutions. Learn more [here](https://walt.id/blog/p/community-stack).
 

@@ -7,7 +7,9 @@ import io.github.smiley4.ktorswaggerui.dsl.get
 import io.github.smiley4.ktorswaggerui.dsl.route
 import io.ktor.http.*
 import io.ktor.server.application.*
+import io.ktor.server.request.*
 import io.ktor.server.response.*
+import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.sql.transactions.transaction
 
 fun Application.eventLogs() = walletRoute {
@@ -22,19 +24,9 @@ fun Application.eventLogs() = walletRoute {
                     example = "10"
                     required = false
                 }
-                queryParameter<String>("event") {
-                    description = "Event type"
-                    example = "Account"
-                    required = false
-                }
-                queryParameter<String>("action") {
-                    description = "Action type"
-                    example = "Login"
-                    required = false
-                }
-                queryParameter<String>("tenant") {
-                    description = "Tenant"
-                    example = "global"
+                queryParameter<List<String>>("filter") {
+                    description = "List of key=value pairs for filtering"
+                    example = "key=value"
                     required = false
                 }
                 queryParameter<String>("startingAfter") {
@@ -62,10 +54,9 @@ fun Application.eventLogs() = walletRoute {
             }
         }) {
             val wallet = getWalletService()
-            val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: 0
-            val event = call.request.queryParameters["event"]
-            val action = call.request.queryParameters["action"]
-            val tenant = call.request.queryParameters["tenant"]
+            val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: -1
+            val data = call.request.queryParameters.getAll("filter")
+                ?.associate { it.substringBefore("=") to it.substringAfter("=") } ?: emptyMap()
             val startingAfter = call.request.queryParameters["startingAfter"]
             val sortBy = call.request.queryParameters["sortBy"]
             val sortOrder = call.request.queryParameters["sortOrder"]
@@ -73,12 +64,10 @@ fun Application.eventLogs() = walletRoute {
                 wallet.filterEventLog(
                     EventLogFilter(
                         limit = limit,
-                        event = event,
-                        action = action,
-                        tenant = tenant,
                         startingAfter = startingAfter,
                         sortBy = sortBy,
                         sortOrder = sortOrder,
+                        data = data,
                     )
                 )
             })
