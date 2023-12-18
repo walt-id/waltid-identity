@@ -1,9 +1,11 @@
 package id.walt.oid4vc
 
-import id.walt.auditor.Auditor
-import id.walt.auditor.policies.SignaturePolicy
+import id.walt.credentials.verification.policies.JwtSignaturePolicy
 import id.walt.crypto.utils.JwsUtils.decodeJws
-import id.walt.oid4vc.data.*
+import id.walt.oid4vc.data.ClientIdScheme
+import id.walt.oid4vc.data.OpenIDClientMetadata
+import id.walt.oid4vc.data.ResponseMode
+import id.walt.oid4vc.data.ResponseType
 import id.walt.oid4vc.data.dif.*
 import id.walt.oid4vc.providers.CredentialWalletConfig
 import id.walt.oid4vc.requests.AuthorizationRequest
@@ -25,13 +27,9 @@ import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.util.*
-import io.ktor.utils.io.*
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
-import kotlin.time.Duration
-import kotlin.time.Duration.Companion.ZERO
 import kotlin.time.Duration.Companion.minutes
-import kotlin.time.Duration.Companion.seconds
 
 class VP_JVM_Test : AnnotationSpec() {
 
@@ -51,7 +49,6 @@ class VP_JVM_Test : AnnotationSpec() {
 
     @BeforeAll
     fun init() {
-        ServiceMatrix("test-config/service-matrix.properties")
         testWallet = TestCredentialWallet(CredentialWalletConfig(WALLET_BASE_URL))
         testWallet.start()
 
@@ -130,8 +127,7 @@ class VP_JVM_Test : AnnotationSpec() {
 
         // vpToken is NOT a string, but JSON ELEMENT
         // this will break without .content(): (if JsonPrimitive and not JsonArray!)
-        Auditor.getService()
-            .verify(tokenResponse.vpToken!!.jsonPrimitive.content, listOf(SignaturePolicy())).result shouldBe true
+        JwtSignaturePolicy().verify(tokenResponse.vpToken!!.jsonPrimitive.content, null, mapOf()).isSuccess shouldBe true
     }
 
     //@Test
@@ -604,6 +600,7 @@ class VP_JVM_Test : AnnotationSpec() {
                 tokenResponse.toHttpParameters().forEach { entry ->
                     entry.value.forEach { append(entry.key, it) }
                 }
+                append("id_token", ms_id_token)
             })
         println("Resp: $resp")
         resp.status shouldBe HttpStatusCode.OK
@@ -622,6 +619,8 @@ class VP_JVM_Test : AnnotationSpec() {
         return "${response["token_type"]!!.jsonPrimitive.content} ${response["access_token"]!!.jsonPrimitive.content}"
     }
 
+    val ms_id_token = "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsImtpZCI6IlQxU3QtZExUdnlXUmd4Ql82NzZ1OGtyWFMtSSJ9.eyJhdWQiOiJlNTBjZWFhNi04NTU0LTRhZTYtYmZkZi1mZDk1ZTIyNDNhZTAiLCJpc3MiOiJodHRwczovL2xvZ2luLm1pY3Jvc29mdG9ubGluZS5jb20vOGJjOTU1ZDktMzhmZC00YzE1LWE1MjAtMGM2NTY0MDc1MzdhL3YyLjAiLCJpYXQiOjE3MDI4OTYzMDIsIm5iZiI6MTcwMjg5NjMwMiwiZXhwIjoxNzAyOTAwMjAyLCJhaW8iOiJBYlFBUy84VkFBQUE2QlpyS1IvZkJpaHlwalFHRy9hcDJpNXJxVzBBSDY1TDVYVFI1K0VZRTRqNGhIL2RUdStheGFrRUFwd2RLU0RJN1ZKck01bXN6SEx4YklYTE5uRS9uaHVxZWZRcHJaeDF5ZGR1Z1JVN0NjcU4wdzFyZzlZTUlHRkFpeGtVV2N4cllhbmhEbmNqTlFLVnloYThKNXlVTHd2MW85MXdYQzFFZS9aQmo3dWtBczBORXdZeTd2K2JRQnpkS250Y3BaY1NWZWhlY2xVV0NkWEJUVnZpZzdqTjVRVHEzc01QSHJGUWtxMERZQjRTU3l3PSIsImlkcCI6Imh0dHBzOi8vc3RzLndpbmRvd3MubmV0LzkxODgwNDBkLTZjNjctNGM1Yi1iMTEyLTM2YTMwNGI2NmRhZC8iLCJub25jZSI6IjY3ODkxMCIsInByb3ZfZGF0YSI6W3siYXQiOnRydWUsInByb3YiOiJzYW1zdW5nLmNvbSIsImFsdHNlY2lkIjoiZDhkN2dTOVVGRUVORU1uUTZ5SmNKZWxLX2IxX3VhN0V4QXR6Z0F6WFdmUSJ9XSwicmgiOiIwLkFYa0EyVlhKaV8wNEZVeWxJQXhsWkFkVGVxYnFET1ZVaGVaS3Y5XzlsZUlrT3VDVUFCTS4iLCJzdWIiOiJobXd2QklDT0p2TEFZU2ktRW1PZ0ZXaF95ODFVRXBuRGNpa3d0dlBVdU5NIiwidGlkIjoiOGJjOTU1ZDktMzhmZC00YzE1LWE1MjAtMGM2NTY0MDc1MzdhIiwidXRpIjoiSFh3YXRnT0tOMHVVRXdGaWpnSjRBQSIsInZlciI6IjIuMCJ9.kXoMA1Y-KdL8Z_Guq5Jzq-6zhrKECdVm6uDOFeRr39oegCeFYA8FJG2fesmQq5q5MWBWcETAp6Ovyx6SmSVQIicWE8PhH2aD40NsIEq-rXkovaqNimhZzkuuwqh0LlIDBbE_l3qtIkfXaUYS2UE029ggmX16Ek0rrs6JunD3MAO_Y7K4kZrSKRjozrbBv_NN1xZPp51RC5PuU9Lb6aacXPgTJaImvA31aNwSbAJohqdZlgX6vwakRaZFQWVtIaTEeedzqOump8wyNqSkSOTJLZLehWgmPF7cSLUZ0hhsiZUH0BPby_X8dvpwVjs6155jBIFo5iFJsBgxFJRu0VO71Q"
+
     suspend fun testCreateEntraPresentationRequest(): String? {
         val accessToken = entraAuthorize()
         val createPresentationRequestBody = "{\n" +
@@ -631,7 +630,7 @@ class VP_JVM_Test : AnnotationSpec() {
             "            \"api-key\": \"1234\"\n" +
             "        },\n" +
             "        \"state\": \"1234\",\n" +
-            "        \"url\": \"https://e80e-62-178-27-231.ngrok-free.app\"\n" +
+            "        \"url\": \"https://0406-62-178-27-231.ngrok-free.app\"\n" +
             "    },\n" +
             "    \"registration\": {\n" +
             "        \"clientName\": \"verifiable-credentials-app\"\n" +
