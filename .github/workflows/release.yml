@@ -49,12 +49,14 @@ jobs:
           push: true
           file: waltid-issuer-api/Dockerfile
           tags: waltid/issuer-api:latest, waltid/issuer-api:${{ env.release_version }}
+        if: ${{ contains(github.event.workspace, 'waltid-issuer-api') }}
       - name: Build and push Docker images (verifier)
         uses: docker/build-push-action@v4.0.0
         with:
           push: true
           file: waltid-verifier-api/Dockerfile
           tags: waltid/verifier-api:latest, waltid/verifier-api:${{ env.release_version }}
+        if: ${{ contains(github.event.workspace, 'waltid-verifier-api') }}
 
       - name: Build and push Docker images (wallet-backend)
         uses: docker/build-push-action@v4.0.0
@@ -62,6 +64,7 @@ jobs:
           push: true
           file: waltid-web-wallet/backend.Dockerfile
           tags: waltid/wallet-backend:latest, waltid/wallet-backend:${{ env.release_version }}
+        if: ${{ contains(github.event.workspace, 'waltid-web-wallet') }}
 
       - name: Build and push Docker images (wallet-frontend)
         uses: docker/build-push-action@v4.0.0
@@ -69,6 +72,7 @@ jobs:
           push: true
           file: waltid-web-wallet/frontend.Dockerfile
           tags: waltid/wallet-frontend:latest, waltid/wallet-frontend:${{ env.release_version }}
+        if: ${{ contains(github.event.workspace, 'waltid-web-wallet') }}
 
       - name: Build and push Docker images (wallet-portal)
         uses: docker/build-push-action@v4
@@ -76,6 +80,7 @@ jobs:
           push: true
           file: waltid-web-portal/Dockerfile
           tags: waltid/portal:latest, waltid/portal:${{ env.release_version }}
+        if: ${{ contains(github.event.workspace, 'waltid-web-portal') }}
 
       - name: Changelog
         uses: ardalanamini/auto-changelog@v3
