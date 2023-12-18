@@ -1,9 +1,20 @@
 package id.walt.oid4vc
 
-import id.walt.credentials.w3c.PresentableCredential
+import com.nimbusds.jose.JWSAlgorithm
+import com.nimbusds.jose.crypto.ECDSASigner
+import com.nimbusds.jose.crypto.ECDSAVerifier
+import com.nimbusds.jose.crypto.Ed25519Signer
+import com.nimbusds.jose.crypto.Ed25519Verifier
+import com.nimbusds.jose.jwk.ECKey
+import com.nimbusds.jose.jwk.OctetKeyPair
+import id.walt.credentials.PresentationBuilder
+import id.walt.credentials.vc.vcs.W3CVC
+import id.walt.crypto.keys.LocalKey
 import id.walt.crypto.utils.JwsUtils.decodeJws
-import id.walt.custodian.Custodian
-import id.walt.model.DidMethod
+import id.walt.did.dids.DidService
+import id.walt.did.dids.registrar.dids.DidCreateOptions
+import id.walt.did.dids.registrar.dids.DidJwkCreateOptions
+import id.walt.did.dids.registrar.local.jwk.DidJwkRegistrar
 import id.walt.oid4vc.data.OpenIDProviderMetadata
 import id.walt.oid4vc.data.ResponseMode
 import id.walt.oid4vc.data.ResponseType
@@ -24,8 +35,7 @@ import id.walt.oid4vc.requests.TokenRequest
 import id.walt.oid4vc.responses.AuthorizationDirectPostResponse
 import id.walt.oid4vc.responses.AuthorizationErrorCode
 import id.walt.oid4vc.responses.TokenErrorCode
-import id.walt.services.did.DidService
-import id.walt.services.jwt.JwtService
+import id.walt.sdjwt.*
 import io.kotest.common.runBlocking
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -44,11 +54,13 @@ import io.ktor.server.routing.*
 import io.ktor.util.*
 import kotlinx.datetime.Instant
 import kotlinx.serialization.json.*
+import java.io.File
 import kotlin.js.ExperimentalJsExport
 
 const val WALLET_PORT = 8001
 const val WALLET_BASE_URL = "http://localhost:${WALLET_PORT}"
 
+@OptIn(ExperimentalJsExport::class)
 class TestCredentialWallet(
     config: CredentialWalletConfig
 ) : OpenIDCredentialWallet<SIOPSession>(WALLET_BASE_URL, config) {
@@ -67,11 +79,11 @@ class TestCredentialWallet(
     ) = SIOPSession(id, authorizationRequest, expirationTimestamp)
 
     override fun signToken(target: TokenTarget, payload: JsonObject, header: JsonObject?, keyId: String?) =
-        JwtService.getService().sign(payload, keyId)
+        SDJwt.sign(SDPayload.createSDPayload(payload, SDMap.Companion.fromJSON("{}")), jwtCryptoProvider, keyId).jwt
 
     @OptIn(ExperimentalJsExport::class)
     override fun verifyTokenSignature(target: TokenTarget, token: String) =
-        JwtService.getService().verify(token).verified
+        SDJwt.verifyAndParse(token, jwtCryptoProvider).signatureVerified
 
     override fun httpGet(url: Url, headers: Headers?): SimpleHttpResponse {
         return runBlocking {
@@ -119,16 +131,11 @@ class TestCredentialWallet(
         )
         val filterString = presentationDefinition.inputDescriptors.flatMap { it.constraints?.fields ?: listOf() }
             .firstOrNull { field -> field.path.any { it.contains("type") } }?.filter?.jsonObject.toString()
-        val presentationJwtStr = Custodian.getService()
-            .createPresentation(
-                Custodian.getService().listCredentials().filter { filterString.contains(it.type.last()) }.map {
-                    PresentableCredential(
-                        it,
-                        selectiveDisclosure = null,
-                        discloseAll = false
-                    )
-                }, TEST_DID, challenge = session.nonce
-            )
+        val presentationJwtStr = runBlocking { PresentationBuilder().apply {
+            did = TEST_DID
+            nonce = session.nonce
+            addCredentials(credentialStore.filter { vc -> vc.toJsonObject()["type"]?.jsonArray?.map { it.jsonPrimitive.content }?.contains(filterString) ?: false }.map { it.toJsonObject() })
+        }.buildAndSign(TEST_KEY) }
 
         println("================")
         println("PRESENTATION IS: $presentationJwtStr")
@@ -167,11 +174,15 @@ class TestCredentialWallet(
         )
     }
 
-    val TEST_DID: String = DidService.create(DidMethod.key)
+    val TEST_KEY = runBlocking { LocalKey.importJWK(File("./data/key/priv.jwk").readText().trimIndent()).getOrThrow() }
+    val TEST_DID: String = runBlocking {
+        DidJwkRegistrar().registerByKey(TEST_KEY, DidJwkCreateOptions())
+        //DidService.registerByKey("jwk", TEST_KEY)
+    }.did
 
     override fun resolveDID(did: String): String {
-        val didObj = DidService.resolve(did)
-        return (didObj.authentication ?: didObj.assertionMethod ?: didObj.verificationMethod)?.firstOrNull()?.id ?: did
+        val didObj = runBlocking { DidService.resolve(did) }.getOrThrow()
+        return (didObj["authentication"] ?: didObj["assertionMethod"] ?: didObj["verificationMethod"])?.jsonArray?.firstOrNull()?.jsonObject?.get("id")?.jsonPrimitive?.content ?: did
     }
 
     override fun isPresentationDefinitionSupported(presentationDefinition: PresentationDefinition): Boolean {
@@ -246,4 +257,13 @@ class TestCredentialWallet(
             }
         }.start()
     }
+
+    val jwtCryptoProvider = runBlocking {
+        val key = ECKey.parse(TEST_KEY.exportJWKObject().toString())
+        SimpleJWTCryptoProvider(JWSAlgorithm.ES256K, ECDSASigner(key), ECDSAVerifier(key))
+    }
+
+    val credentialStore = listOf<W3CVC>(
+
+    )
 }

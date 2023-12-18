@@ -1,7 +1,5 @@
 package id.walt.oid4vc
 
-import id.walt.credentials.w3c.VerifiableCredential
-import id.walt.custodian.Custodian
 import id.walt.oid4vc.providers.CredentialWalletConfig
 import id.walt.oid4vc.providers.OpenIDClientConfig
 import id.walt.oid4vc.requests.CredentialOfferRequest
@@ -59,9 +57,9 @@ class EBSI_Conformance_Test : StringSpec({
         credentialWallet = EBSITestWallet(CredentialWalletConfig("https://blank/"))
         ebsiClientConfig = OpenIDClientConfig(credentialWallet.TEST_DID, null, credentialWallet.config.redirectUri, useCodeChallenge = true)
         VcTestsEnabled.takeIf { it }?.run {
-            Custodian.getService().listCredentialIds().forEach {
-                Custodian.getService().deleteCredential(it)
-            }
+//            Custodian.getService().listCredentialIds().forEach {
+//                Custodian.getService().deleteCredential(it)
+//            }
         }
     }
 
@@ -157,8 +155,8 @@ class EBSI_Conformance_Test : StringSpec({
 internal typealias credentialOfferRequestCaller = (initCredentialOfferUrl: Url) -> CredentialOfferRequest
 
 internal fun storeCredentials(vararg credentialResponses: CredentialResponse) = credentialResponses.forEach {
-    val cred = VerifiableCredential.fromString(it.credential!!.jsonPrimitive.content)
-    Custodian.getService().storeCredential(cred.id ?: randomUUID(), cred)
+//    val cred = VerifiableCredential.fromString(it.credential!!.jsonPrimitive.content)
+//    Custodian.getService().storeCredential(cred.id ?: randomUUID(), cred)
 }
 
 internal fun getCredentialOfferRequest(

@@ -1,8 +1,6 @@
 package id.walt.oid4vc
 
-import id.walt.auditor.Auditor
-import id.walt.auditor.policies.SignaturePolicy
-import id.walt.credentials.w3c.VerifiableCredential
+import id.walt.credentials.verification.policies.JwtSignaturePolicy
 import id.walt.oid4vc.data.AuthorizationDetails
 import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.data.GrantType
@@ -174,9 +172,9 @@ class wallettest : AnnotationSpec() {
         credentialResp.credential.shouldBeInstanceOf<JsonPrimitive>()
 
         println("// parse and verify credential")
-        val credential = VerifiableCredential.fromString(credentialResp.credential!!.jsonPrimitive.content)
+        val credential = credentialResp.credential!!.jsonPrimitive.content
         println(">>> Issued credential: $credential")
-        Auditor.getService().verify(credential, listOf(SignaturePolicy())).result shouldBe true
+        JwtSignaturePolicy().verify(credential, null, mapOf()).isSuccess shouldBe true
     }
 
 }

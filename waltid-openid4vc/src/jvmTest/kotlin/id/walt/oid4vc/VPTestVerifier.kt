@@ -1,7 +1,6 @@
 package id.walt.oid4vc
 
-import id.walt.auditor.Auditor
-import id.walt.auditor.policies.SignaturePolicy
+import id.walt.credentials.verification.policies.JwtSignaturePolicy
 import id.walt.oid4vc.data.ResponseMode
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.providers.CredentialVerifierConfig
@@ -9,6 +8,7 @@ import id.walt.oid4vc.providers.OpenIDCredentialVerifier
 import id.walt.oid4vc.providers.PresentationSession
 import id.walt.oid4vc.responses.TokenResponse
 import id.walt.oid4vc.util.randomUUID
+import io.kotest.common.runBlocking
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
@@ -50,8 +50,9 @@ class VPTestVerifier : OpenIDCredentialVerifier(
     }
 
     override fun doVerify(tokenResponse: TokenResponse, session: PresentationSession): Boolean {
-        return tokenResponse.vpToken != null && Auditor.getService()
-            .verify(tokenResponse.vpToken!!.toString(), listOf(SignaturePolicy())).result
+        return runBlocking { tokenResponse.vpToken != null &&
+            JwtSignaturePolicy().verify(tokenResponse.vpToken!!.toString(), null, mapOf()).isSuccess
+        }
     }
 
     fun start() {

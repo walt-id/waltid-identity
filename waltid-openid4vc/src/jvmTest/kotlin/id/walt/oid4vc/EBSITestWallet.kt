@@ -1,8 +1,13 @@
 package id.walt.oid4vc
 
-import id.walt.credentials.w3c.PresentableCredential
+import com.nimbusds.jose.JWSAlgorithm
+import com.nimbusds.jose.crypto.ECDSASigner
+import com.nimbusds.jose.crypto.ECDSAVerifier
+import com.nimbusds.jose.jwk.ECKey
+import id.walt.credentials.PresentationBuilder
+import id.walt.crypto.keys.LocalKey
 import id.walt.crypto.utils.JwsUtils.decodeJws
-import id.walt.custodian.Custodian
+import id.walt.did.dids.DidService
 import id.walt.oid4vc.data.OpenIDProviderMetadata
 import id.walt.oid4vc.data.dif.DescriptorMapping
 import id.walt.oid4vc.data.dif.PresentationDefinition
@@ -18,9 +23,10 @@ import id.walt.oid4vc.providers.TokenTarget
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.requests.TokenRequest
 import id.walt.oid4vc.responses.TokenErrorCode
-import id.walt.services.did.DidService
-import id.walt.services.jwt.JwtService
-import id.walt.services.key.KeyService
+import id.walt.sdjwt.SDJwt
+import id.walt.sdjwt.SDMap
+import id.walt.sdjwt.SDPayload
+import id.walt.sdjwt.SimpleJWTCryptoProvider
 import io.kotest.common.runBlocking
 import io.ktor.client.*
 import io.ktor.client.engine.java.*
@@ -32,15 +38,13 @@ import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.datetime.Instant
-import kotlinx.datetime.toJavaInstant
 import kotlinx.serialization.json.*
 import java.util.*
 import kotlin.js.ExperimentalJsExport
-import kotlin.time.Duration.Companion.days
 
 const val EBSI_WALLET_PORT = 8011
 const val EBSI_WALLET_BASE_URL = "http://localhost:${EBSI_WALLET_PORT}"
-const val EBSI_WALLET_TEST_KEY =
+const val EBSI_WALLET_TEST_KEY_JWK =
     "{\"kty\":\"EC\",\"d\":\"AENUGJiPF4zRlF1uXV1NTWE5zcQPz-8Ie8SGLdQugec\",\"use\":\"sig\",\"crv\":\"P-256\",\"kid\":\"de8aca52c110485a87fa6fda8d1f2f4e\",\"x\":\"hJ0hFBtp72j1V2xugQI51ernWY_vPXzXjnEg7A709Fc\",\"y\":\"-Mm1j5Zz1mWJU7Nqylk0_6qKjZ5fn6ddzziEFscQPhQ\",\"alg\":\"ES256\"}"
 const val EBSI_WALLET_TEST_DID =
     "did:key:z2dmzD81cgPx8Vki7JbuuMmFYrWPgYoytykUZ3eyqht1j9KbrksdXfcbvmhgF2h7YfpxWuywkXxDZ7ohTPNPTQpD39Rm9WiBWuEpvvgtfuPHtHi2wTEkZ95KC2ijUMUowyKMueaMhtA5bLYkt9k8Y8Gq4sm6PyTCHTxuyedMMrBKdRXNZS"
@@ -61,20 +65,11 @@ class EBSITestWallet(
     }
 
     val TEST_DID = EBSI_WALLET_TEST_DID
-
-    init {
-        if (!KeyService.getService().hasKey(EBSI_WALLET_TEST_DID)) {
-            val keyId = KeyService.getService().importKey(EBSI_WALLET_TEST_KEY)
-            KeyService.getService().addAlias(keyId, EBSI_WALLET_TEST_DID)
-            val didDoc = DidService.resolve(EBSI_WALLET_TEST_DID)
-            KeyService.getService().addAlias(keyId, didDoc.verificationMethod!!.first().id)
-            DidService.importDid(EBSI_WALLET_TEST_DID)
-        }
-    }
+    val TEST_KEY = runBlocking { LocalKey.importJWK(EBSI_WALLET_TEST_KEY_JWK).getOrThrow() }
 
     override fun resolveDID(did: String): String {
-        val didObj = DidService.resolve(did)
-        return (didObj.authentication ?: didObj.assertionMethod ?: didObj.verificationMethod)?.firstOrNull()?.id ?: did
+        val didObj = runBlocking { DidService.resolve(did) }.getOrThrow()
+        return (didObj["authentication"] ?: didObj["assertionMethod"] ?: didObj["verificationMethod"])?.jsonArray?.firstOrNull()?.jsonObject?.get("id")?.jsonPrimitive?.content ?: did
     }
 
     override fun isPresentationDefinitionSupported(presentationDefinition: PresentationDefinition): Boolean {
@@ -94,12 +89,17 @@ class EBSITestWallet(
 
     override fun removeSession(id: String): SIOPSession? = sessionCache.remove(id)
 
+    val jwtCryptoProvider = runBlocking {
+        SimpleJWTCryptoProvider(JWSAlgorithm.ES256, ECDSASigner(ECKey.parse(EBSI_WALLET_TEST_KEY_JWK)), ECDSAVerifier(ECKey.parse(
+            EBSI_WALLET_TEST_KEY_JWK)))
+    }
+
     override fun signToken(target: TokenTarget, payload: JsonObject, header: JsonObject?, keyId: String?) =
-        JwtService.getService().sign(payload, keyId, header?.get("typ")?.jsonPrimitive?.content ?: "JWT")
+        SDJwt.sign(SDPayload.createSDPayload(payload, SDMap.Companion.fromJSON("{}")), jwtCryptoProvider, keyId).jwt
 
     @OptIn(ExperimentalJsExport::class)
     override fun verifyTokenSignature(target: TokenTarget, token: String) =
-        JwtService.getService().verify(token).verified
+        SDJwt.verifyAndParse(token, jwtCryptoProvider).signatureVerified
 
     override fun httpGet(url: Url, headers: Headers?): SimpleHttpResponse {
         return runBlocking {
@@ -197,23 +197,12 @@ class EBSITestWallet(
     override fun putSession(id: String, session: SIOPSession): SIOPSession? = sessionCache.put(id, session)
 
     private fun generatePresentationJwt(credentialTypes: List<String>, session: SIOPSession): String =
-        let {
-            val presentationJwtStr = Custodian.getService().createPresentation(
-                vcs = Custodian.getService().listCredentials()
-                    .filter { c -> credentialTypes.contains(c.type.last()) }
-                    .map {
-                        PresentableCredential(
-                            verifiableCredential = it,
-                            selectiveDisclosure = null,
-                            discloseAll = false
-                        )
-                    },
-                holderDid = TEST_DID,
-                verifierDid = "https://api-conformance.ebsi.eu/conformance/v3/auth-mock",
-                expirationDate = kotlinx.datetime.Clock.System.now().plus(1.days).toJavaInstant(),
-                challenge = session.nonce,
-            )
-            presentationJwtStr
+        runBlocking {
+            PresentationBuilder().apply {
+                did = TEST_DID
+                nonce = session.nonce
+                addCredentials(listOf())
+            }.buildAndSign(TEST_KEY)
         }
 
     private fun mapCredentialTypes(presentationDefinition: PresentationDefinition) =
