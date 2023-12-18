@@ -68,7 +68,7 @@ actual class LocalKey actual constructor(jwk: String?) : Key() {
         JSON.stringify(_internalJwk)
 
     actual override suspend fun exportJWKObject(): JsonObject {
-        TODO("Not yet implemented")
+        return Json.parseToJsonElement(exportJWK()).jsonObject
     }
 
     actual override suspend fun exportPEM(): String {
