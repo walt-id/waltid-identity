@@ -8,7 +8,6 @@ interface DidRegistrar {
     val name: String
 
     suspend fun getSupportedMethods(): Result<Set<String>>
-
     suspend fun create(options: DidCreateOptions): DidResult
     suspend fun createByKey(key: Key, options: DidCreateOptions): DidResult
     suspend fun update()
