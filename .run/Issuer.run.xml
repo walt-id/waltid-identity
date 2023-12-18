@@ -1,11 +1,13 @@
 <component name="ProjectRunConfigurationManager">
-    <configuration default="false" name="Issuer" type="JetRunConfigurationType">
-        <option name="MAIN_CLASS_NAME" value="id.walt.issuer.MainKt"/>
-        <module name="waltid-identity.waltid-issuer.main"/>
-        <option name="PROGRAM_PARAMETERS" value="--webHost=0.0.0.0 --webPort=7000 --baseUrl=http://dev.local:7000"/>
-        <shortenClasspath name="NONE"/>
-        <method v="2">
-            <option name="Make" enabled="true"/>
-        </method>
-    </configuration>
+  <configuration default="false" name="Issuer" type="JetRunConfigurationType">
+    <option name="ALTERNATIVE_JRE_PATH" value="21 OpenJDK" />
+    <option name="ALTERNATIVE_JRE_PATH_ENABLED" value="true" />
+    <option name="MAIN_CLASS_NAME" value="id.walt.issuer.MainKt" />
+    <module name="waltid-identity.waltid-issuer-api.main" />
+    <option name="PROGRAM_PARAMETERS" value="--webHost=0.0.0.0 --webPort=7000 --baseUrl=http://dev.local:7000" />
+    <shortenClasspath name="NONE" />
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
 </component>

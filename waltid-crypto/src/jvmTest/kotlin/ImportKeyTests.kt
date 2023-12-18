@@ -39,10 +39,12 @@ class ImportKeyTests {
     fun `given pem string, when imported then the import succeeds having the correct key type, key id and hasPrivate values`(
         keyString: String, keyType: KeyType, isPrivate: Boolean
     ) = runTest {
+        println("> Importing supposed $keyType (${if (isPrivate) "private" else "public"}) as PEM:")
+
         // Importing
         val imported = LocalKey.importPEM(keyString)
         // Checking import success
-        assertTrue { imported.isSuccess }
+        assertTrue("Import of ${if (isPrivate) "private" else "public"} $keyType: ${imported.exceptionOrNull()}") { imported.isSuccess }
         // Getting key
         val key = imported.getOrThrow()
         // Checking for private key
@@ -51,6 +53,8 @@ class ImportKeyTests {
         assertEquals(keyType, key.keyType)
         // Checking keyId from thumbprint
         assertEquals(key.getThumbprint(), key.getKeyId())
+
+        println("All checks succeeded for: $keyType (${if (isPrivate) "private" else "public"})")
     }
 
     @ParameterizedTest
@@ -97,7 +101,7 @@ class ImportKeyTests {
         fun `given pem string, when imported then the import succeeds having the correct key type, key id and hasPrivate values`(): Stream<Arguments> =
             Stream.of(
                 // ed25519 (not implemented)
-//                arguments(loadPem("ed25519.private.pem"), KeyType.Ed25519, true),
+                //arguments(loadPemLocal("ed25519.private.pem"), KeyType.Ed25519, true),
                 // secp256k1
                 arguments(loadPemLocal("secp256k1.private.pem"), KeyType.secp256k1, true),
                 // secp256r1
@@ -106,7 +110,7 @@ class ImportKeyTests {
                 arguments(loadPemLocal("rsa.private.pem"), KeyType.RSA, true),
                 // public
                 // ed25519 (not implemented)
-//                arguments(loadPem("ed25519.public.pem"), KeyType.Ed25519, false),
+                //arguments(loadPemLocal("ed25519.public.pem"), KeyType.Ed25519, false),
                 // secp256k1
                 arguments(loadPemLocal("secp256k1.public.pem"), KeyType.secp256k1, false),
                 // secp256r1
