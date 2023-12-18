@@ -8,7 +8,7 @@ import id.walt.did.dids.registrar.local.key.DidKeyRegistrar
 import id.walt.did.dids.registrar.local.web.DidWebRegistrar
 
 class LocalRegistrar : DidRegistrar {
-    override val name = "ssikit2 local registrar"
+    override val name = "walt.id local registrar"
 
     private val registrarMethods = setOf(
         DidJwkRegistrar(),

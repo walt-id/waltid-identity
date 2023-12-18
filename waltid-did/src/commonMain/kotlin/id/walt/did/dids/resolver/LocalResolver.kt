@@ -13,7 +13,7 @@ import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.json.JsonObject
 
 class LocalResolver : DidResolver {
-    override val name = "core-crypto local resolver"
+    override val name = "walt.id local resolver"
     private val http = HttpClient(CIO) {
         install(ContentNegotiation) {
             json(DidWebResolver.json)
