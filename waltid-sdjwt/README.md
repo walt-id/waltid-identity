@@ -55,7 +55,7 @@ specification:  [draft-ietf-oauth-selective-disclosure-jwt-04](https://datatrack
 
 **Maven / Gradle repository**:
 
-`https://maven.walt.id/repository/waltid-ssi-kit/`
+`https://maven.walt.id/repository/waltid/`
 
 **Maven**
 
@@ -63,9 +63,9 @@ specification:  [draft-ietf-oauth-selective-disclosure-jwt-04](https://datatrack
 [...]
 <repositories>
     <repository>
-        <id>waltid-ssikit</id>
-        <name>waltid-ssikit</name>
-        <url>https://maven.walt.id/repository/waltid-ssi-kit/</url>
+        <id>waltid</id>
+        <name>waltid</name>
+        <url>https://maven.walt.id/repository/waltid/</url>
     </repository>
 </repositories>
         [...]
@@ -83,7 +83,7 @@ _Kotlin DSL_
 ```kotlin
 [...]
 repositories {
-    maven("https://maven.walt.id/repository/waltid-ssi-kit/")
+    maven("https://maven.walt.id/repository/waltid/")
 }
 [...]
 val sdJwtVersion = "1.2306071235.0"
