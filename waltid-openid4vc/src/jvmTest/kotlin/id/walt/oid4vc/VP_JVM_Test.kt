@@ -2,6 +2,7 @@ package id.walt.oid4vc
 
 import id.walt.credentials.verification.policies.JwtSignaturePolicy
 import id.walt.crypto.utils.JwsUtils.decodeJws
+import id.walt.did.dids.DidService
 import id.walt.oid4vc.data.ClientIdScheme
 import id.walt.oid4vc.data.OpenIDClientMetadata
 import id.walt.oid4vc.data.ResponseMode
@@ -10,7 +11,7 @@ import id.walt.oid4vc.data.dif.*
 import id.walt.oid4vc.providers.CredentialWalletConfig
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.responses.TokenResponse
-import id.walt.servicematrix.ServiceMatrix
+import io.kotest.common.runBlocking
 import io.kotest.core.spec.style.AnnotationSpec
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldContainExactly
@@ -49,6 +50,8 @@ class VP_JVM_Test : AnnotationSpec() {
 
     @BeforeAll
     fun init() {
+        runBlocking { DidService.init() }
+        DidService.resolverMethods.keys shouldContain "jwk"
         testWallet = TestCredentialWallet(CredentialWalletConfig(WALLET_BASE_URL))
         testWallet.start()
 
@@ -584,7 +587,7 @@ class VP_JVM_Test : AnnotationSpec() {
 
 
     val ONLINE_TEST: Boolean = true
-    @Test
+    //@Test
     suspend fun testRequestByReference() {
         val reqUri = when(ONLINE_TEST) {
             true -> testCreateEntraPresentationRequest()

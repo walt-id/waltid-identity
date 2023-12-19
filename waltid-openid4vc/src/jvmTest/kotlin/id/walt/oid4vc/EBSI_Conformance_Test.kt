@@ -4,8 +4,6 @@ import id.walt.oid4vc.providers.CredentialWalletConfig
 import id.walt.oid4vc.providers.OpenIDClientConfig
 import id.walt.oid4vc.requests.CredentialOfferRequest
 import id.walt.oid4vc.responses.CredentialResponse
-import id.walt.oid4vc.util.randomUUID
-import id.walt.servicematrix.ServiceMatrix
 import io.kotest.common.runBlocking
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.data.forAll
@@ -53,7 +51,6 @@ class EBSI_Conformance_Test : StringSpec({
     }
 
     beforeSpec {
-        ServiceMatrix("service-matrix.properties")
         credentialWallet = EBSITestWallet(CredentialWalletConfig("https://blank/"))
         ebsiClientConfig = OpenIDClientConfig(credentialWallet.TEST_DID, null, credentialWallet.config.redirectUri, useCodeChallenge = true)
         VcTestsEnabled.takeIf { it }?.run {
