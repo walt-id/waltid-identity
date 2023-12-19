@@ -20,6 +20,9 @@
 
 Check out the **[Official Documentation](https://docs.walt.id/v/apps/solutions/web-wallet)**, to dive deeper into the architecture and configuration options available.
 
+_Run it (from the root-folder)_: 
+
+    docker run -p 4545:4545 -itv $(pwd)/waltid-web-wallet/config:/waltid-web-wallet/config -itv $(pwd)/waltid-web-wallet/data:/waltid-web-wallet/data -t waltid/wallet-api
 
 ## What is the Web-Wallet?
 
