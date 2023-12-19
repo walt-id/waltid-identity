@@ -1,14 +1,18 @@
 package id.walt.oid4vc
 
+import com.nimbusds.jose.JWSHeader
+import com.nimbusds.jwt.JWTParser
 import id.walt.credentials.CredentialBuilder
 import id.walt.credentials.CredentialBuilderType
 import id.walt.credentials.issuance.Issuer.baseIssue
 import id.walt.credentials.utils.W3CVcUtils
 import id.walt.credentials.vc.vcs.W3CVC
+import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.LocalKey
 import id.walt.did.dids.DidService
 import id.walt.did.dids.registrar.dids.DidKeyCreateOptions
+import id.walt.did.dids.resolver.DidResolver
 import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.data.CredentialSupported
 import id.walt.oid4vc.data.ResponseMode
@@ -83,8 +87,11 @@ class CITestProvider : OpenIDCredentialIssuer(
     override fun signToken(target: TokenTarget, payload: JsonObject, header: JsonObject?, keyId: String?) =
         runBlocking { CI_TOKEN_KEY.signJws(payload.toString().toByteArray()) }
 
+    fun getKeyFor(token: String): Key {
+        return runBlocking { DidService.resolveToKey((JWTParser.parse(token).header as JWSHeader).keyID) }.getOrThrow()
+    }
     override fun verifyTokenSignature(target: TokenTarget, token: String) =
-        runBlocking { CI_TOKEN_KEY.verifyJws(token).isSuccess }
+        runBlocking { (if(target == TokenTarget.PROOF_OF_POSSESSION) getKeyFor(token) else CI_TOKEN_KEY).verifyJws(token).isSuccess }
 
     override fun generateCredential(credentialRequest: CredentialRequest): CredentialResult {
         if (deferIssuance) return CredentialResult(credentialRequest.format, null, randomUUID()).also {
@@ -122,8 +129,12 @@ class CITestProvider : OpenIDCredentialIssuer(
             CredentialErrorCode.invalid_or_missing_proof,
             message = "Proof JWT header must contain kid claim"
         )
-        return runBlocking { W3CVC.build(listOf(), types).baseIssue(CI_DID_KEY, CI_ISSUER_DID, holderKid, mapOf(), mapOf(), mapOf(), mapOf()) }.let {
-            CredentialResult(CredentialFormat.jwt_vc, JsonPrimitive(it))
+        return runBlocking { CredentialBuilder(CredentialBuilderType.W3CV2CredentialBuilder).apply {
+            type = credentialRequest.types ?: listOf("VerifiableCredential")
+            issuerDid = CI_ISSUER_DID
+            subjectDid = holderKid
+        }.buildW3C().baseIssue(CI_DID_KEY, CI_ISSUER_DID, holderKid, mapOf(), mapOf(), mapOf(), mapOf()) }.let {
+            CredentialResult(CredentialFormat.jwt_vc_json, JsonPrimitive(it))
         }
     }
 

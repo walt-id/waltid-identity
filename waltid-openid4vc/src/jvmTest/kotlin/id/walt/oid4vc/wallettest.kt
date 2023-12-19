@@ -13,7 +13,6 @@ import id.walt.oid4vc.requests.CredentialRequest
 import id.walt.oid4vc.requests.TokenRequest
 import id.walt.oid4vc.responses.CredentialResponse
 import id.walt.oid4vc.responses.TokenResponse
-import id.walt.servicematrix.ServiceMatrix
 import io.kotest.core.spec.style.AnnotationSpec
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.shouldBe
@@ -54,7 +53,6 @@ class wallettest : AnnotationSpec() {
 
     //@BeforeAll   /* Uncomment me */
     fun init() {
-        ServiceMatrix("test-config/service-matrix.properties")
         ciTestProvider = CITestProvider()
         credentialWallet = TestCredentialWallet(CredentialWalletConfig("http://blank"))
         //ciTestProvider.start()

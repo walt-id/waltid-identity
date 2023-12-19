@@ -9,6 +9,7 @@ import com.nimbusds.jose.jwk.ECKey
 import com.nimbusds.jose.jwk.OctetKeyPair
 import id.walt.credentials.PresentationBuilder
 import id.walt.credentials.vc.vcs.W3CVC
+import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.LocalKey
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.did.dids.DidService
@@ -174,7 +175,7 @@ class TestCredentialWallet(
         )
     }
 
-    val TEST_KEY = runBlocking { LocalKey.importJWK(File("./data/key/priv.jwk").readText().trimIndent()).getOrThrow() }
+    val TEST_KEY = runBlocking { LocalKey.generate(KeyType.Ed25519) }
     val TEST_DID: String = runBlocking {
         DidJwkRegistrar().registerByKey(TEST_KEY, DidJwkCreateOptions())
         //DidService.registerByKey("jwk", TEST_KEY)
@@ -182,7 +183,10 @@ class TestCredentialWallet(
 
     override fun resolveDID(did: String): String {
         val didObj = runBlocking { DidService.resolve(did) }.getOrThrow()
-        return (didObj["authentication"] ?: didObj["assertionMethod"] ?: didObj["verificationMethod"])?.jsonArray?.firstOrNull()?.jsonObject?.get("id")?.jsonPrimitive?.content ?: did
+        return (didObj["authentication"] ?: didObj["assertionMethod"] ?: didObj["verificationMethod"])?.jsonArray?.firstOrNull()?.let {
+            if(it is JsonObject) it.jsonObject?.get("id")?.jsonPrimitive?.content
+            else it.jsonPrimitive?.contentOrNull
+        }?: did
     }
 
     override fun isPresentationDefinitionSupported(presentationDefinition: PresentationDefinition): Boolean {
@@ -259,8 +263,8 @@ class TestCredentialWallet(
     }
 
     val jwtCryptoProvider = runBlocking {
-        val key = ECKey.parse(TEST_KEY.exportJWKObject().toString())
-        SimpleJWTCryptoProvider(JWSAlgorithm.ES256K, ECDSASigner(key), ECDSAVerifier(key))
+        val key = OctetKeyPair.parse(TEST_KEY.jwk)
+        SimpleJWTCryptoProvider(JWSAlgorithm.EdDSA, Ed25519Signer(key), Ed25519Verifier(key.toPublicJWK()))
     }
 
     val credentialStore = listOf<W3CVC>(

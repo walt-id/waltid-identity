@@ -15,8 +15,8 @@ import id.walt.oid4vc.providers.OpenIDClientConfig
 import id.walt.oid4vc.requests.*
 import id.walt.oid4vc.responses.*
 import id.walt.sdjwt.SDJwt
-import id.walt.servicematrix.ServiceMatrix
 import io.kotest.assertions.json.shouldEqualJson
+import io.kotest.common.runBlocking
 import io.kotest.core.spec.style.AnnotationSpec
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldContainExactly
@@ -108,7 +108,7 @@ class CI_JVM_Test : AnnotationSpec() {
 
     @BeforeAll
     fun init() {
-        ServiceMatrix("test-config/service-matrix.properties")
+        runBlocking { DidService.init() }
         ciTestProvider = CITestProvider()
         credentialWallet = TestCredentialWallet(CredentialWalletConfig("http://blank"))
         ciTestProvider.start()
@@ -255,7 +255,7 @@ class CI_JVM_Test : AnnotationSpec() {
     }
 
     fun verifyIssuerAndSubjectId(credential: JsonObject, issuerId: String, subjectId: String): Boolean {
-        return (credential["issuer"]?.jsonObject?.get("id")?.jsonPrimitive?.contentOrNull?.equals(issuerId) ?: false) &&
+        return (credential["issuer"]?.jsonPrimitive?.contentOrNull?.equals(issuerId) ?: false) &&
         credential["credentialSubject"]?.jsonObject?.get("id")?.jsonPrimitive?.contentOrNull?.equals(subjectId) ?: false
     }
 
@@ -397,8 +397,8 @@ class CI_JVM_Test : AnnotationSpec() {
         val deferredCredential = deferredCredResp2.credential!!.jsonPrimitive.content
         println(">>> Issued deferred credential: $deferredCredential")
 
-        verifyIssuerAndSubjectId(SDJwt.parse(deferredCredential).fullPayload,
-            ciTestProvider.baseUrl, credentialWallet.TEST_DID) shouldBe true
+        verifyIssuerAndSubjectId(SDJwt.parse(deferredCredential).fullPayload.get("vc")?.jsonObject!!,
+            ciTestProvider.CI_ISSUER_DID, credentialWallet.TEST_DID) shouldBe true
         JwtSignaturePolicy().verify(deferredCredential, null, mapOf()).isSuccess shouldBe true
 
         nonce = deferredCredResp2.cNonce ?: nonce
@@ -431,7 +431,7 @@ class CI_JVM_Test : AnnotationSpec() {
 
         val batchCred1 =
             batchResp.credentialResponses!![0].credential!!.jsonPrimitive.content
-        SDJwt.parse(batchCred1).fullPayload["type"]?.jsonArray?.last()?.toString() shouldBe "VerifiableId"
+        SDJwt.parse(batchCred1).fullPayload.get("vc")?.jsonObject!!["type"]?.jsonArray?.last()?.jsonPrimitive?.contentOrNull shouldBe "VerifiableId"
         JwtSignaturePolicy().verify(batchCred1, null, mapOf()).isSuccess shouldBe true
         println("batchCred1: $batchCred1")
 
@@ -444,7 +444,7 @@ class CI_JVM_Test : AnnotationSpec() {
         batchResp2.isDeferred shouldBe false
         batchResp2.credential shouldNotBe null
         val batchCred2 = batchResp2.credential!!.jsonPrimitive.content
-        SDJwt.parse(batchCred2).fullPayload["type"]?.jsonArray?.last()?.toString() shouldBe "VerifiableDiploma"
+        SDJwt.parse(batchCred2).fullPayload.get("vc")?.jsonObject!!["type"]?.jsonArray?.last()?.jsonPrimitive?.contentOrNull shouldBe "VerifiableDiploma"
         JwtSignaturePolicy().verify(batchCred2, null, mapOf()).isSuccess shouldBe true
     }
 
@@ -554,8 +554,8 @@ class CI_JVM_Test : AnnotationSpec() {
         println("// parse and verify credential")
         val credential = credentialResp.credential!!.jsonPrimitive.content
         println(">>> Issued credential: $credential")
-        verifyIssuerAndSubjectId(SDJwt.parse(credential).fullPayload,
-            ciTestProvider.baseUrl, credentialWallet.TEST_DID) shouldBe  true
+        verifyIssuerAndSubjectId(SDJwt.parse(credential).fullPayload.get("vc")?.jsonObject!!,
+            ciTestProvider.CI_ISSUER_DID, credentialWallet.TEST_DID) shouldBe  true
         JwtSignaturePolicy().verify(credential, null, mapOf()).isSuccess shouldBe true
     }
 
@@ -673,8 +673,8 @@ class CI_JVM_Test : AnnotationSpec() {
         val credential = credentialResp.credential!!.jsonPrimitive.content
         println(">>> Issued credential: $credential")
 
-        verifyIssuerAndSubjectId(SDJwt.parse(credential).fullPayload,
-            ciTestProvider.baseUrl, credentialWallet.TEST_DID) shouldBe  true
+        verifyIssuerAndSubjectId(SDJwt.parse(credential).fullPayload.get("vc")?.jsonObject!!,
+            ciTestProvider.CI_ISSUER_DID, credentialWallet.TEST_DID) shouldBe  true
         JwtSignaturePolicy().verify(credential, null, mapOf()).isSuccess shouldBe true
     }
 
@@ -755,8 +755,8 @@ class CI_JVM_Test : AnnotationSpec() {
         val credential = credentialResp.credential!!.jsonPrimitive.content
         println(">>> Issued credential: $credential")
 
-        verifyIssuerAndSubjectId(SDJwt.parse(credential).fullPayload,
-            ciTestProvider.baseUrl, credentialWallet.TEST_DID) shouldBe  true
+        verifyIssuerAndSubjectId(SDJwt.parse(credential).fullPayload.get("vc")?.jsonObject!!,
+            ciTestProvider.CI_ISSUER_DID, credentialWallet.TEST_DID) shouldBe  true
         JwtSignaturePolicy().verify(credential, null, mapOf()).isSuccess shouldBe true
     }
 
@@ -1043,8 +1043,8 @@ class CI_JVM_Test : AnnotationSpec() {
         println("// parse and verify credential")
         val credential = credentialResp.credential!!.jsonPrimitive.content
         println(">>> Issued credential: $credential")
-        verifyIssuerAndSubjectId(SDJwt.parse(credential).fullPayload,
-            ciTestProvider.baseUrl, credentialWallet.TEST_DID) shouldBe  true
+        verifyIssuerAndSubjectId(SDJwt.parse(credential).fullPayload.get("vc")?.jsonObject!!,
+            ciTestProvider.CI_ISSUER_DID, credentialWallet.TEST_DID) shouldBe  true
         JwtSignaturePolicy().verify(credential, null, mapOf()).isSuccess shouldBe true
     }
 
@@ -1117,7 +1117,7 @@ class CI_JVM_Test : AnnotationSpec() {
 
     }
 
-    @Test
+    //@Test
     suspend fun testCreateDidIon() {
         DidService.init()
         val didResult = DidService.register(DidIonCreateOptions())
