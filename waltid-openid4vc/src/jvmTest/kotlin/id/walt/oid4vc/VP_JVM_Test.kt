@@ -52,6 +52,7 @@ class VP_JVM_Test : AnnotationSpec() {
     fun init() {
         runBlocking { DidService.init() }
         DidService.resolverMethods.keys shouldContain "jwk"
+        DidService.registrarMethods.keys shouldContain "ion"
         testWallet = TestCredentialWallet(CredentialWalletConfig(WALLET_BASE_URL))
         testWallet.start()
 
@@ -587,7 +588,7 @@ class VP_JVM_Test : AnnotationSpec() {
 
 
     val ONLINE_TEST: Boolean = true
-    //@Test
+    @Test
     suspend fun testRequestByReference() {
         val reqUri = when(ONLINE_TEST) {
             true -> testCreateEntraPresentationRequest()
@@ -621,8 +622,8 @@ class VP_JVM_Test : AnnotationSpec() {
         }).body<JsonObject>()
         return "${response["token_type"]!!.jsonPrimitive.content} ${response["access_token"]!!.jsonPrimitive.content}"
     }
-
-    val ms_id_token = "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsImtpZCI6IlQxU3QtZExUdnlXUmd4Ql82NzZ1OGtyWFMtSSJ9.eyJhdWQiOiJlNTBjZWFhNi04NTU0LTRhZTYtYmZkZi1mZDk1ZTIyNDNhZTAiLCJpc3MiOiJodHRwczovL2xvZ2luLm1pY3Jvc29mdG9ubGluZS5jb20vOGJjOTU1ZDktMzhmZC00YzE1LWE1MjAtMGM2NTY0MDc1MzdhL3YyLjAiLCJpYXQiOjE3MDI4OTYzMDIsIm5iZiI6MTcwMjg5NjMwMiwiZXhwIjoxNzAyOTAwMjAyLCJhaW8iOiJBYlFBUy84VkFBQUE2QlpyS1IvZkJpaHlwalFHRy9hcDJpNXJxVzBBSDY1TDVYVFI1K0VZRTRqNGhIL2RUdStheGFrRUFwd2RLU0RJN1ZKck01bXN6SEx4YklYTE5uRS9uaHVxZWZRcHJaeDF5ZGR1Z1JVN0NjcU4wdzFyZzlZTUlHRkFpeGtVV2N4cllhbmhEbmNqTlFLVnloYThKNXlVTHd2MW85MXdYQzFFZS9aQmo3dWtBczBORXdZeTd2K2JRQnpkS250Y3BaY1NWZWhlY2xVV0NkWEJUVnZpZzdqTjVRVHEzc01QSHJGUWtxMERZQjRTU3l3PSIsImlkcCI6Imh0dHBzOi8vc3RzLndpbmRvd3MubmV0LzkxODgwNDBkLTZjNjctNGM1Yi1iMTEyLTM2YTMwNGI2NmRhZC8iLCJub25jZSI6IjY3ODkxMCIsInByb3ZfZGF0YSI6W3siYXQiOnRydWUsInByb3YiOiJzYW1zdW5nLmNvbSIsImFsdHNlY2lkIjoiZDhkN2dTOVVGRUVORU1uUTZ5SmNKZWxLX2IxX3VhN0V4QXR6Z0F6WFdmUSJ9XSwicmgiOiIwLkFYa0EyVlhKaV8wNEZVeWxJQXhsWkFkVGVxYnFET1ZVaGVaS3Y5XzlsZUlrT3VDVUFCTS4iLCJzdWIiOiJobXd2QklDT0p2TEFZU2ktRW1PZ0ZXaF95ODFVRXBuRGNpa3d0dlBVdU5NIiwidGlkIjoiOGJjOTU1ZDktMzhmZC00YzE1LWE1MjAtMGM2NTY0MDc1MzdhIiwidXRpIjoiSFh3YXRnT0tOMHVVRXdGaWpnSjRBQSIsInZlciI6IjIuMCJ9.kXoMA1Y-KdL8Z_Guq5Jzq-6zhrKECdVm6uDOFeRr39oegCeFYA8FJG2fesmQq5q5MWBWcETAp6Ovyx6SmSVQIicWE8PhH2aD40NsIEq-rXkovaqNimhZzkuuwqh0LlIDBbE_l3qtIkfXaUYS2UE029ggmX16Ek0rrs6JunD3MAO_Y7K4kZrSKRjozrbBv_NN1xZPp51RC5PuU9Lb6aacXPgTJaImvA31aNwSbAJohqdZlgX6vwakRaZFQWVtIaTEeedzqOump8wyNqSkSOTJLZLehWgmPF7cSLUZ0hhsiZUH0BPby_X8dvpwVjs6155jBIFo5iFJsBgxFJRu0VO71Q"
+    // Point browser to: https://login.microsoftonline.com/8bc955d9-38fd-4c15-a520-0c656407537a/oauth2/v2.0/authorize?client_id=e50ceaa6-8554-4ae6-bfdf-fd95e2243ae0&response_type=id_token&redirect_uri=http%3A%2F%2Flocalhost:8000%2F&response_mode=fragment&scope=openid&state=12345&nonce=678910&login_hint=test%40severinstamplergmail.onmicrosoft.com
+    val ms_id_token = "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsImtpZCI6IlQxU3QtZExUdnlXUmd4Ql82NzZ1OGtyWFMtSSJ9.eyJhdWQiOiJlNTBjZWFhNi04NTU0LTRhZTYtYmZkZi1mZDk1ZTIyNDNhZTAiLCJpc3MiOiJodHRwczovL2xvZ2luLm1pY3Jvc29mdG9ubGluZS5jb20vOGJjOTU1ZDktMzhmZC00YzE1LWE1MjAtMGM2NTY0MDc1MzdhL3YyLjAiLCJpYXQiOjE3MDMwMDExMjQsIm5iZiI6MTcwMzAwMTEyNCwiZXhwIjoxNzAzMDA1MDI0LCJhaW8iOiJBVVFBdS84VkFBQUF0ZTdkTWtZcFN2WWhwaUxpVmluSXF4V1hJREhXb1FoRnpUZVAwc0RLRGxiTWtRT0ZtRzJqckwxQ0dlVXlzTDlyVEg2emhPOTBJenJ3VExFbWc3elBJUT09IiwiY2MiOiJDZ0VBRWlSelpYWmxjbWx1YzNSaGJYQnNaWEpuYldGcGJDNXZibTFwWTNKdmMyOW1kQzVqYjIwYUVnb1FoY0UxZmwvS1lFMmJZT0c5R1FZN2VTSVNDaEJ6TVltQTdXQTFTNFNubmxyY3RXNEFNZ0pGVlRnQSIsIm5vbmNlIjoiNjc4OTEwIiwicmgiOiIwLkFYa0EyVlhKaV8wNEZVeWxJQXhsWkFkVGVxYnFET1ZVaGVaS3Y5XzlsZUlrT3VDVUFGVS4iLCJzdWIiOiI0cDgyb3hySGhiZ2x4V01oTDBIUmpKbDNRTjZ2eDhMS1pQWkVyLW9wako0IiwidGlkIjoiOGJjOTU1ZDktMzhmZC00YzE1LWE1MjAtMGM2NTY0MDc1MzdhIiwidXRpIjoiY3pHSmdPMWdOVXVFcDU1YTNMVnVBQSIsInZlciI6IjIuMCJ9.DE9LEsmzx9BG0z4Q7d-g_CH8ach4-cm7yztGHuHJykdLCjznu131nRsOFc9HdnIIqzHUX8kj1ZtAlPMLRaDYVYasKomRO4Fx7GCLY6kG5szQZJ8t8hkwX4O_zk7IaDHtn4HiyfwfSPwZjknMiQpTyiAqUqt0tR8ojSf5VeKnQmChvmp0w86izNYwTmWx5OOx2FXLsDEmvF42mp96bSsvyQt6hn4FcmhYkE4nf_5nHssb3SsL485ppHjWOvj81nGanK_u4iKVkfY_9KFF98hOwtWEi1UyvlTo5CdyYkehV0ZVs4gFAKiV7L5uasI-MYIlg0kUEK-mtMjHhU9TWIa4SA"
 
     suspend fun testCreateEntraPresentationRequest(): String? {
         val accessToken = entraAuthorize()
