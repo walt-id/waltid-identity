@@ -41,6 +41,7 @@ data class AuthorizationRequest(
     val codeChallenge: String? = null,
     val codeChallengeMethod: String? = null,
     val claims: JsonObject? = null,
+    val idTokenHint: String? = null,
     override val customParameters: Map<String, List<String>> = mapOf()
 ) : HTTPDataObject(), IAuthorizationRequest {
     val isReferenceToPAR get() = requestUri?.startsWith("urn:ietf:params:oauth:request_uri:") ?: false
@@ -72,6 +73,7 @@ data class AuthorizationRequest(
             responseUri?.let { put("response_uri", listOf(it)) }
             codeChallenge?.let { put("code_challenge", listOf(it)) }
             codeChallengeMethod?.let { put("code_challenge_method", listOf(it)) }
+            idTokenHint?.let { put("id_token_hint", listOf(it)) }
             putAll(customParameters)
         }
     }
@@ -99,6 +101,7 @@ data class AuthorizationRequest(
             "response_uri",
             "code_challenge",
             "code_challenge_method",
+            "id_token_hint",
             "claims"
         )
 
@@ -158,6 +161,7 @@ data class AuthorizationRequest(
                 parameters["code_challenge"]?.firstOrNull(),
                 parameters["code_challenge_method"]?.firstOrNull(),
                 parameters["claims"]?.firstOrNull()?.let { Json.decodeFromString(it) },
+                parameters["id_token_hint"]?.firstOrNull(),
                 parameters.filterKeys { !knownKeys.contains(it) }
             )
         }

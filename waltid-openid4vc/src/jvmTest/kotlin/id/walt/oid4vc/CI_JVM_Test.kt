@@ -1,10 +1,21 @@
 package id.walt.oid4vc
 
+import com.nimbusds.jose.JWSAlgorithm
+import com.nimbusds.jose.crypto.ECDSASigner
+import com.nimbusds.jose.crypto.ECDSAVerifier
+import com.nimbusds.jose.crypto.Ed25519Signer
+import com.nimbusds.jose.crypto.Ed25519Verifier
+import com.nimbusds.jose.crypto.bc.BouncyCastleProviderSingleton
+import com.nimbusds.jose.jwk.ECKey
+import com.nimbusds.jose.jwk.OctetKeyPair
+import com.nimbusds.jose.util.Base64
+import com.nimbusds.jwt.JWTParser
 import id.walt.credentials.vc.vcs.W3CVC
 import id.walt.credentials.verification.policies.JwtSignaturePolicy
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.LocalKey
 import id.walt.crypto.keys.LocalKeyCreator
+import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.did.dids.DidService
 import id.walt.did.dids.registrar.dids.DidIonCreateOptions
 import id.walt.did.dids.registrar.dids.DidJwkCreateOptions
@@ -14,7 +25,7 @@ import id.walt.oid4vc.providers.CredentialWalletConfig
 import id.walt.oid4vc.providers.OpenIDClientConfig
 import id.walt.oid4vc.requests.*
 import id.walt.oid4vc.responses.*
-import id.walt.sdjwt.SDJwt
+import id.walt.sdjwt.*
 import io.kotest.assertions.json.shouldEqualJson
 import io.kotest.common.runBlocking
 import io.kotest.core.spec.style.AnnotationSpec
@@ -39,7 +50,14 @@ import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.util.*
+import io.ktor.utils.io.*
+import korlibs.crypto.SHA
+import korlibs.crypto.SHA256
+import kotlinx.datetime.Clock
+import kotlinx.datetime.Instant
 import kotlinx.serialization.json.*
+import kotlinx.uuid.UUID
+import kotlinx.uuid.generateUUID
 import java.io.File
 import kotlin.time.Duration.Companion.minutes
 
@@ -1080,12 +1098,18 @@ class CI_JVM_Test : AnnotationSpec() {
     val ms_id_token = "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsImtpZCI6IlQxU3QtZExUdnlXUmd4Ql82NzZ1OGtyWFMtSSJ9.eyJhdWQiOiJlNTBjZWFhNi04NTU0LTRhZTYtYmZkZi1mZDk1ZTIyNDNhZTAiLCJpc3MiOiJodHRwczovL2xvZ2luLm1pY3Jvc29mdG9ubGluZS5jb20vOGJjOTU1ZDktMzhmZC00YzE1LWE1MjAtMGM2NTY0MDc1MzdhL3YyLjAiLCJpYXQiOjE3MDMwMDExMjQsIm5iZiI6MTcwMzAwMTEyNCwiZXhwIjoxNzAzMDA1MDI0LCJhaW8iOiJBVVFBdS84VkFBQUF0ZTdkTWtZcFN2WWhwaUxpVmluSXF4V1hJREhXb1FoRnpUZVAwc0RLRGxiTWtRT0ZtRzJqckwxQ0dlVXlzTDlyVEg2emhPOTBJenJ3VExFbWc3elBJUT09IiwiY2MiOiJDZ0VBRWlSelpYWmxjbWx1YzNSaGJYQnNaWEpuYldGcGJDNXZibTFwWTNKdmMyOW1kQzVqYjIwYUVnb1FoY0UxZmwvS1lFMmJZT0c5R1FZN2VTSVNDaEJ6TVltQTdXQTFTNFNubmxyY3RXNEFNZ0pGVlRnQSIsIm5vbmNlIjoiNjc4OTEwIiwicmgiOiIwLkFYa0EyVlhKaV8wNEZVeWxJQXhsWkFkVGVxYnFET1ZVaGVaS3Y5XzlsZUlrT3VDVUFGVS4iLCJzdWIiOiI0cDgyb3hySGhiZ2x4V01oTDBIUmpKbDNRTjZ2eDhMS1pQWkVyLW9wako0IiwidGlkIjoiOGJjOTU1ZDktMzhmZC00YzE1LWE1MjAtMGM2NTY0MDc1MzdhIiwidXRpIjoiY3pHSmdPMWdOVXVFcDU1YTNMVnVBQSIsInZlciI6IjIuMCJ9.DE9LEsmzx9BG0z4Q7d-g_CH8ach4-cm7yztGHuHJykdLCjznu131nRsOFc9HdnIIqzHUX8kj1ZtAlPMLRaDYVYasKomRO4Fx7GCLY6kG5szQZJ8t8hkwX4O_zk7IaDHtn4HiyfwfSPwZjknMiQpTyiAqUqt0tR8ojSf5VeKnQmChvmp0w86izNYwTmWx5OOx2FXLsDEmvF42mp96bSsvyQt6hn4FcmhYkE4nf_5nHssb3SsL485ppHjWOvj81nGanK_u4iKVkfY_9KFF98hOwtWEi1UyvlTo5CdyYkehV0ZVs4gFAKiV7L5uasI-MYIlg0kUEK-mtMjHhU9TWIa4SA"
     // "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsImtpZCI6IlQxU3QtZExUdnlXUmd4Ql82NzZ1OGtyWFMtSSJ9.eyJhdWQiOiJlNTBjZWFhNi04NTU0LTRhZTYtYmZkZi1mZDk1ZTIyNDNhZTAiLCJpc3MiOiJodHRwczovL2xvZ2luLm1pY3Jvc29mdG9ubGluZS5jb20vOGJjOTU1ZDktMzhmZC00YzE1LWE1MjAtMGM2NTY0MDc1MzdhL3YyLjAiLCJpYXQiOjE3MDI4OTYzMDIsIm5iZiI6MTcwMjg5NjMwMiwiZXhwIjoxNzAyOTAwMjAyLCJhaW8iOiJBYlFBUy84VkFBQUE2QlpyS1IvZkJpaHlwalFHRy9hcDJpNXJxVzBBSDY1TDVYVFI1K0VZRTRqNGhIL2RUdStheGFrRUFwd2RLU0RJN1ZKck01bXN6SEx4YklYTE5uRS9uaHVxZWZRcHJaeDF5ZGR1Z1JVN0NjcU4wdzFyZzlZTUlHRkFpeGtVV2N4cllhbmhEbmNqTlFLVnloYThKNXlVTHd2MW85MXdYQzFFZS9aQmo3dWtBczBORXdZeTd2K2JRQnpkS250Y3BaY1NWZWhlY2xVV0NkWEJUVnZpZzdqTjVRVHEzc01QSHJGUWtxMERZQjRTU3l3PSIsImlkcCI6Imh0dHBzOi8vc3RzLndpbmRvd3MubmV0LzkxODgwNDBkLTZjNjctNGM1Yi1iMTEyLTM2YTMwNGI2NmRhZC8iLCJub25jZSI6IjY3ODkxMCIsInByb3ZfZGF0YSI6W3siYXQiOnRydWUsInByb3YiOiJzYW1zdW5nLmNvbSIsImFsdHNlY2lkIjoiZDhkN2dTOVVGRUVORU1uUTZ5SmNKZWxLX2IxX3VhN0V4QXR6Z0F6WFdmUSJ9XSwicmgiOiIwLkFYa0EyVlhKaV8wNEZVeWxJQXhsWkFkVGVxYnFET1ZVaGVaS3Y5XzlsZUlrT3VDVUFCTS4iLCJzdWIiOiJobXd2QklDT0p2TEFZU2ktRW1PZ0ZXaF95ODFVRXBuRGNpa3d0dlBVdU5NIiwidGlkIjoiOGJjOTU1ZDktMzhmZC00YzE1LWE1MjAtMGM2NTY0MDc1MzdhIiwidXRpIjoiSFh3YXRnT0tOMHVVRXdGaWpnSjRBQSIsInZlciI6IjIuMCJ9.kXoMA1Y-KdL8Z_Guq5Jzq-6zhrKECdVm6uDOFeRr39oegCeFYA8FJG2fesmQq5q5MWBWcETAp6Ovyx6SmSVQIicWE8PhH2aD40NsIEq-rXkovaqNimhZzkuuwqh0LlIDBbE_l3qtIkfXaUYS2UE029ggmX16Ek0rrs6JunD3MAO_Y7K4kZrSKRjozrbBv_NN1xZPp51RC5PuU9Lb6aacXPgTJaImvA31aNwSbAJohqdZlgX6vwakRaZFQWVtIaTEeedzqOump8wyNqSkSOTJLZLehWgmPF7cSLUZ0hhsiZUH0BPby_X8dvpwVjs6155jBIFo5iFJsBgxFJRu0VO71Q"
 
+    val TEST_WALLET_KEY = "{\"kty\":\"EC\",\"d\":\"uD-uxub011cplvr5Bd6MrIPSEUBsgLk-C1y3tnmfetQ\",\"use\":\"sig\",\"crv\":\"secp256k1\",\"kid\":\"48d8a34263cf492aa7ff61b6183e8bcf\",\"x\":\"TKaQ6sCocTDsmuj9tTR996tFXpEcS2EJN-1gOadaBvk\",\"y\":\"0TrIYHcfC93VpEuvj-HXTnyKt0snayOMwGSJA1XiDX8\"}"
+    val TEST_WALLET_DID = "did:ion:EiDh0EL8wg8oF-7rRiRzEZVfsJvh4sQX4Jock2Kp4j_zxg:eyJkZWx0YSI6eyJwYXRjaGVzIjpbeyJhY3Rpb24iOiJyZXBsYWNlIiwiZG9jdW1lbnQiOnsicHVibGljS2V5cyI6W3siaWQiOiI0OGQ4YTM0MjYzY2Y0OTJhYTdmZjYxYjYxODNlOGJjZiIsInB1YmxpY0tleUp3ayI6eyJjcnYiOiJzZWNwMjU2azEiLCJraWQiOiI0OGQ4YTM0MjYzY2Y0OTJhYTdmZjYxYjYxODNlOGJjZiIsImt0eSI6IkVDIiwidXNlIjoic2lnIiwieCI6IlRLYVE2c0NvY1REc211ajl0VFI5OTZ0RlhwRWNTMkVKTi0xZ09hZGFCdmsiLCJ5IjoiMFRySVlIY2ZDOTNWcEV1dmotSFhUbnlLdDBzbmF5T013R1NKQTFYaURYOCJ9LCJwdXJwb3NlcyI6WyJhdXRoZW50aWNhdGlvbiJdLCJ0eXBlIjoiRWNkc2FTZWNwMjU2azFWZXJpZmljYXRpb25LZXkyMDE5In1dfX1dLCJ1cGRhdGVDb21taXRtZW50IjoiRWlCQnlkZ2R5WHZkVERob3ZsWWItQkV2R3ExQnR2TWJSLURmbDctSHdZMUhUZyJ9LCJzdWZmaXhEYXRhIjp7ImRlbHRhSGFzaCI6IkVpRGJxa05ldzdUcDU2cEJET3p6REc5bThPZndxamlXRjI3bTg2d1k3TS11M1EiLCJyZWNvdmVyeUNvbW1pdG1lbnQiOiJFaUFGOXkzcE1lQ2RQSmZRYjk1ZVV5TVlfaUdCRkMwdkQzeDNKVTB6V0VjWUtBIn19"
+
     @Test
     suspend fun testEntraIssuance() {
+
+        val pin = 3539
+        // ============ Issuer ========================
         val accessToken = entraAuthorize()
         val createIssuanceReq = "{\n" +
             "    \"callback\": {\n" +
-            "        \"url\": \"https://bla.com\",\n" +
+            "        \"url\": \"https://0603-62-178-27-231.ngrok-free.app\",\n" +
             "        \"state\": \"1234\",\n" +
             "        \"headers\": {\n" +
             "            \"api-key\": \"1234\"\n" +
@@ -1095,8 +1119,16 @@ class CI_JVM_Test : AnnotationSpec() {
             "    \"registration\": {\n" +
             "        \"clientName\": \"test\"\n" +
             "    },\n" +
-            "    \"type\": \"VerifiedEmployee\",\n" +
-            "    \"manifest\": \"https://verifiedid.did.msidentity.com/v1.0/tenants/8bc955d9-38fd-4c15-a520-0c656407537a/verifiableCredentials/contracts/715aafa9-aaf5-b178-50dc-41af7de9647d/manifest\"\n" +
+            "    \"type\": \"VerifiableCredential,MyID\",\n" +
+            "    \"manifest\": \"https://verifiedid.did.msidentity.com/v1.0/tenants/8bc955d9-38fd-4c15-a520-0c656407537a/verifiableCredentials/contracts/569aca2a-0fd8-9973-80f7-b8e5163d64e3/manifest\",\n" +
+            "    \"pin\": {\n" +
+            "       \"value\": \"$pin\",\n" +
+            "       \"length\": 4\n" +
+            "   }," +
+            "   \"claims\": { \n" +
+            "       \"given_name\": \"Sev\",\n" +
+            "       \"family_name\": \"Sta\"\n" +
+            "   }\n" +
             "}"
 
         val response = http.post("https://verifiedid.did.msidentity.com/v1.0/verifiableCredentials/createIssuanceRequest") {
@@ -1108,21 +1140,80 @@ class CI_JVM_Test : AnnotationSpec() {
         val responseObj = response.body<JsonObject>()
         val url = responseObj["url"]?.jsonPrimitive?.content
         println(url)
+        //val url = "openid-vc://?request_uri=https://verifiedid.did.msidentity.com/v1.0/tenants/3c32ed40-8a10-465b-8ba4-0b1e86882668/verifiableCredentials/issuanceRequests/7cb9062e-5f9f-4971-b836-446e03b20967"
+        // ============ Wallet ========================
+        // Load key:
+        val testWalletKey = LocalKey.importJWK(TEST_WALLET_KEY).getOrThrow()
+        testWalletKey.hasPrivateKey shouldBe true
+
+        // 1) parse issuance request
         val reqParams = parseQueryString(Url(url!!).encodedQuery).toMap()
         val authReq = AuthorizationRequest.fromHttpParametersAuto(reqParams)
         //val tokenResponse = credentialWallet.processImplicitFlowAuthorization(authReq)
         //println(tokenResponse.toString())
 
-        val resp = http.submitForm((authReq.responseUri ?: authReq.redirectUri)!!,
-            parameters {
-//                tokenResponse.toHttpParameters().forEach { entry ->
-//                    entry.value.forEach { append(entry.key, it) }
-//                }
-                append("id_token", ms_id_token)
-                authReq.state?.let { append("state", it) }
+        // 2) detect that this is an MS Entra issuance request and trigger custom protocol flow!
+
+        // 3) Load and parse manifest, to find return address (weird concept)
+        val manifestUrl = authReq.claims!!["vp_token"]!!.jsonObject["presentation_definition"]!!.jsonObject["input_descriptors"]!!.jsonArray.first().jsonObject["issuance"]!!.jsonArray.first().jsonObject["manifest"]!!.jsonPrimitive.content
+        val manifest = Json.parseToJsonElement(http.get(manifestUrl).bodyAsText()).jsonObject["token"]!!.jsonPrimitive.content.let {
+            SDJwt.parse(it).fullPayload
+        }
+        val issuerReturnAddress = manifest["input"]!!.jsonObject["credentialIssuer"]!!.jsonPrimitive.content
+
+        // 4) Get id_token_hint, if any, to add to response, or else generate id_token/input claims according to alternative attestation mode
+        // Attestation modes: https://learn.microsoft.com/en-us/entra/verified-id/rules-and-display-definitions-model
+
+        // Assume we have id_token_hint for now:
+        val idTokenHint = authReq.idTokenHint!!
+
+        // 5) Get hashed PIN, if required
+        val hashedPin: String? = (authReq.customParameters["pin"]?.firstOrNull()?.let {
+            Json.parseToJsonElement(it)
+        }?.jsonObject?.get("salt")?.jsonPrimitive?.content + pin).let {
+            Base64.encode(SHA256().update(it.toByteArray()).digest().bytes).toString()
+        }
+
+        // 6) Create response JWT token, signed by key for folder DID
+        //credentialWallet.
+        val responseTokenPayload = SDPayload.createSDPayload(buildJsonObject {
+            put("sub", testWalletKey.getThumbprint()) // key thumbprint
+            put("aud", issuerReturnAddress)
+            put("did", TEST_WALLET_DID) // holder DID
+            hashedPin?.let { put("pin", it) }
+            put("sub_jwk", testWalletKey.getPublicKey().jwk!!.let { Json.parseToJsonElement(it) }) // pub key JWK
+            Clock.System.now().epochSeconds.let {
+                put("iat", it)
+                put("exp", it + 3600)
+            }
+            put("jti", UUID.generateUUID().toString())
+            put("idTokens", buildJsonObject {
+                put("attestations", buildJsonObject {
+                    put("https://self-issued.me", idTokenHint)
+                })
             })
+            put("iss", "https://self-issued.me")
+            put("contract", manifestUrl)
+        }, SDMap.fromJSON("{}"))
+        val jwtCryptoProvider = runBlocking {
+            val key = ECKey.parse(TEST_WALLET_KEY)
+            SimpleJWTCryptoProvider(JWSAlgorithm.ES256K, ECDSASigner(key).apply {
+                jcaContext.provider = BouncyCastleProviderSingleton.getInstance()
+            }, ECDSAVerifier(key.toPublicJWK()).apply {
+                jcaContext.provider = BouncyCastleProviderSingleton.getInstance()
+            })
+        }
+        val responseToken = SDJwt.sign(responseTokenPayload, jwtCryptoProvider, TEST_WALLET_DID).toString()
+
+        // 7) POST response JWT token to return address found in manifest
+
+        val resp = http.post(issuerReturnAddress,{
+            contentType(ContentType.Text.Plain)
+            setBody(responseToken)
+        })
         println("Resp: $resp")
         println(resp.bodyAsText())
+        resp.status shouldBe HttpStatusCode.Created
 
     }
 
