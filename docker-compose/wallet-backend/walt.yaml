@@ -1,0 +1,61 @@
+hikariDataSource:
+  jdbcUrl: jdbc:sqlite:data/walt.db
+  maximumPoolSize: 5
+  autoCommit: false
+  dataSource:
+    journalMode: WAL
+    fullColumnNames: false
+
+azureKeyVaultConfig:
+  baseURL:
+  id:
+  secret:
+
+providers:
+  ethereum: "ethereum"
+  goerli: "https://eth-goerli.g.alchemy.com/v2/5TYSteGJgJwJjaQTNN3j_4JtYcvdr3Uy"
+  sepolia: "https://eth-sepolia.g.alchemy.com/v2/MBOqmZ2X5rRqHqA4Mu_nB3cy9LqndpCX"
+  polygon: "https://polygon-mainnet.g.alchemy.com/v2/5TYSteGJgJwJjaQTNN3j_4JtYcvdr3Uy"
+  mumbai: "https://polygon-mumbai.g.alchemy.com/v2/5TYSteGJgJwJjaQTNN3j_4JtYcvdr3Uy"
+  astar: "https://evm.astar.network"
+  moonbeam: "https://rpc.api.moonbeam.network"
+  unique: "https://rpc.unique.network"
+  opal: "https://rpc-opal.unique.network"
+
+privateKey: "bd4cb3e507f342ee3a710370cef39dda48f17b0a158b0b8dd3f000fbd5b2c2d9"
+
+keys:
+  0xaf87c5Ce7a1fb6BD5aaDB6dd9C0b8EF51EF1BC31: "bd4cb3e507f342ee3a710370cef39dda48f17b0a158b0b8dd3f000fbd5b2c2d9"
+  0x8448Ff4b2733b52f62d81ca46d64bD16786299Cd: "d720ef2cb49c6cbe94175ed413d27e635c5acaa1b7cf03d1faad3a0abc2f53f3"
+  0x6E7448a6335d5C947953994d071D4Dc1F6e5BE96: "b4680ed04f685a2334dea52c069dfa696c02bd3c14e94b99187f5925a555eebe"
+  0xc8ca7c4f2dc014d7e4fc6973052da1517b4c54da: "9b9c46d0873a9982ade718ab3f4cfc57172b2f07c21b9901ddf239e931d2d6dc"
+
+
+indexersUrl:
+  uniqueUrl: "https://api-unique.uniquescan.io/v1/graphql"
+  opalUrl: "https://api-opal.uniquescan.io/v1/graphql"
+
+
+polkadotAccounts:
+  - seed: "unhappy crew auto cloud seat trial room later label sight letter famous"
+    seedPassword: "testtest"
+  - seed: "motor swim often garbage often year fly raccoon summer van home swallow"
+    seedPassword: "testtest"
+  - seed: "word monkey pride fitness viable leave own eight title joy genre online"
+    seedPassword: "testtest"
+  - seed: "clip review orange grocery menu cram gaze job input control cup fetch"
+    seedPassword: "testtest"
+  - seed: "loyal parade runway vote myself gossip climb select reflect brass science spray"
+    seedPassword: "testtest"
+
+
+
+
+apiKeys:
+  ethereumBlockExplorer: "JGD5ZUUBHE8CUXPNKZASVQPHRGBMB7A5XV"
+  polygonBlockExplorer: "DZ3PFVWGJE5B8DMDQPRZ5JFBR6U484B82G"
+  alchemy: "5TYSteGJgJwJjaQTNN3j_4JtYcvdr3Uy"
+  nftstorage: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkaWQ6ZXRocjoweDYwNDNEYThENjU2RTU3NTg2ZDk3MkM1ZDM5RUNENzI1NTNCM2Q1NjAiLCJpc3MiOiJuZnQtc3RvcmFnZSIsImlhdCI6MTY1NDYxNTQ2NjIwNCwibmFtZSI6Ik5GVCBLSVQifQ.PkMJpU3aJMQXqzq1nPnHJcWJR-32as3bQed3GBszMdg"
+  subscan: ""
+
+tezosBackendServer: "http://nftkit-js:80"
