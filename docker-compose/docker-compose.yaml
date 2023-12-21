@@ -1,0 +1,57 @@
+services:
+  # postgresdb:  # Uncomment to connect a Postgres DB
+  #   image: postgres
+  #   environment:
+  #     POSTGRES_PASSWORD: secret
+  wallet-backend:
+    image: waltid/wallet-backend:latest
+    volumes:
+      - ./wallet-backend/config:/waltid-web-wallet/config
+      - ./wallet-backend/walt.yaml:/waltid-web-wallet/walt.yaml
+      - ./wallet-backend/data:/waltid-web-wallet/data
+  wallet-frontend:
+    image: waltid/wallet-frontend:latest
+    environment:
+      NUXT_PUBLIC_ISSUER_CALLBACK_URL: "http://localhost:$WALLET_FRONTEND_PORT"
+  issuer-api:
+    image: waltid/issuer-api:latest
+    volumes:
+      - ./issuer-api/config:/waltid-issuer-api/config
+  verifier-api:
+    image: waltid/verifier-api:latest
+    volumes:
+      - ./verifier-api/config:/waltid-verifier-api/config
+  web-portal:
+    image: waltid/portal:latest
+    environment:
+      NEXT_PUBLIC_VC_REPO: "http://localhost:$VC_REPO_PORT"
+      NEXT_PUBLIC_ISSUER: "http://localhost:$ISSUER_API_PORT"
+      NEXT_PUBLIC_VERIFIER: "http://localhost:$VERIFIER_API_PORT"
+      NEXT_PUBLIC_WALLET: "http://localhost:$WALLET_FRONTEND_PORT"
+  vc-repo:
+    image: waltid/vc-repository:latest
+  ingress:
+    image: nginx:1.15.10-alpine
+    ports:
+      - target: $WALLET_FRONTEND_PORT
+        published: $WALLET_FRONTEND_PORT # wallet-frontend
+        protocol: tcp
+        mode: host
+      - target: $WEB_PORTAL_PORT
+        published: $WEB_PORTAL_PORT # web-portal
+        protocol: tcp
+        mode: host
+      - target: $VC_REPO_PORT
+        published: $VC_REPO_PORT # vc-repo
+        protocol: tcp
+        mode: host
+      - target: $ISSUER_API_PORT
+        published: $ISSUER_API_PORT # issuer-api
+        protocol: tcp
+        mode: host
+      - target: $VERIFIER_API_PORT
+        published: $VERIFIER_API_PORT # verifier-api
+        protocol: tcp
+        mode: host
+    volumes:
+      - ./ingress.conf:/etc/nginx/conf.d/default.conf # API gateway configuration

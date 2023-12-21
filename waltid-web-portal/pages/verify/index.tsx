@@ -59,8 +59,8 @@ export default function Verification() {
         },
         {
           headers: {
-            "successRedirectUri": `https://${window.location.hostname}/success/$id`,
-            "errorRedirectUri": `https://${window.location.hostname}/success/$id`,
+            "successRedirectUri": `${window.location.origin}/success/$id`,
+            "errorRedirectUri": `${window.location.origin}/success/$id`,
           },
         }
       );
