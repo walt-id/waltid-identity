@@ -31,6 +31,8 @@ export default function Success() {
   }
 
   useEffect(() => {
+    if (!router.isReady) return;
+
     axios
       .get(
         `${env.NEXT_PUBLIC_VERIFIER ? env.NEXT_PUBLIC_VERIFIER : nextConfig.publicRuntimeConfig!.NEXT_PUBLIC_VERIFIER}/openid4vc/session/${router.query.sessionId}`
@@ -40,7 +42,7 @@ export default function Success() {
         setCredentials(vcs.map((vc: string) => parseJwt(vc).vc));
         setPolicyResults(response.data.policyResults.results);
       });
-  }, [router.query.sessionId]);
+  }, [router.isReady, env]);
 
   return (
     <div className="h-screen flex justify-center items-center bg-gray-50">
