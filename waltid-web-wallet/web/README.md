@@ -42,7 +42,3 @@ or
 
 bun dev
 ```
-
-## Documentation
-
-Link to the official documentation [here](https://docs.walt.id/v/apps/solutions/web-wallet)https://docs.walt.id/v/apps/solutions/web-wallet
