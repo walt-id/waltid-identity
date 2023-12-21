@@ -137,7 +137,7 @@ kotlin {
             val hasMavenAuth = secretMavenUsername.isNotEmpty() && secretMavenPassword.isNotEmpty()
             if (hasMavenAuth) {
                 maven {
-                    url = uri("https://maven.walt.id/repository/waltid-ssi-kit/")
+                    url = uri("https://maven.walt.id/repository/waltid/")
                     credentials {
                         username = secretMavenUsername
                         password = secretMavenPassword
