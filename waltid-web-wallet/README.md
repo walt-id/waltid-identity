@@ -15,14 +15,20 @@
 
 ## Getting Started
 
-- [Quick Start](https://docs.walt.id/v/apps/solutions/web-wallet/quick-start) - Launch the wallet in your local environment with default settings.
 - [Intro Video](https://youtu.be/HW9CNFmRFlI) - Learn about features and see a demo.
 
-Check out the **[Official Documentation](https://docs.walt.id/v/apps/solutions/web-wallet)**, to dive deeper into the architecture and configuration options available.
 
-_Run it (from the root-folder)_: 
+### Running The Project
 
-    docker run -p 4545:4545 -itv $(pwd)/waltid-web-wallet/config:/waltid-web-wallet/config -itv $(pwd)/waltid-web-wallet/data:/waltid-web-wallet/data -t waltid/wallet-api
+Make sure you are in the root of the walt.id identity repo.
+
+```bash
+cd docker-compose && docker compose up
+```
+
+- Visit the web wallet hosted under localhost:3000.
+- Visit the wallet-api hosted under localhost:4545.
+
 
 ## What is the Web-Wallet?
 
