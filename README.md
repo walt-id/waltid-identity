@@ -45,6 +45,7 @@ Use the [walt.id identity package](https://github.com/walt-id/waltid-identity/tr
 cd docker-compose && docker compose up
 ```
 
+Learn more about the exposed ports [here](https://github.com/walt-id/waltid-identity/tree/main/docker-compose).
 
 ## Architecture
 The walt.id identity repo is part of The Community Stack, walt.id's collection of open-source products to build identity and wallet solutions. Learn more [here](https://walt.id/blog/p/community-stack).
