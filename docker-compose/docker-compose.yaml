@@ -37,6 +37,10 @@ services:
         published: $WALLET_FRONTEND_PORT # wallet-frontend
         protocol: tcp
         mode: host
+      - target: $WALLET_BACKEND_PORT
+        published: $WALLET_BACKEND_PORT # wallet-backend
+        protocol: tcp
+        mode: host
       - target: $WEB_PORTAL_PORT
         published: $WEB_PORTAL_PORT # web-portal
         protocol: tcp
