@@ -20,7 +20,7 @@ port mapping below
 
 - Web Wallet: `3000`
 - Web Portal: `4000`
-- VC Repo: `5000`
+- Credential Repo: `5000`
 
 
 ## Configurations

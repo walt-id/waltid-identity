@@ -29,6 +29,11 @@ cd docker-compose && docker compose up
 - Visit the web wallet hosted under localhost:3000.
 - Visit the wallet-api hosted under localhost:4545.
 
+Update the containers by running the following commands from the root folder: 
+```bash
+docker build -f waltid-web-wallet/backend.Dockerfile -t waltid/wallet-backend . 
+docker build -f waltid-web-wallet/frontend.Dockerfile -t waltid/wallet-frontend .
+```
 
 ## What is the Web-Wallet?
 
