@@ -37,7 +37,7 @@ A set of white-label apps to get started in no time.
 - [Web-Wallet](https://github.com/walt-id/waltid-identity/tree/main/waltid-web-wallet) - A custodial web-wallet (PWA) solution for credentials and tokens.
 - [Portal](https://github.com/walt-id/waltid-identity/tree/main/waltid-web-portal) - An issuer and verifier portal for credentials.
 
-## Using The Services And Apps
+## Use Services And Apps
 
 Use the [walt.id identity package](https://github.com/walt-id/waltid-identity/tree/main/docker-compose) to run all APIs and Apps with docker: 
 
