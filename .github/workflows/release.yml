@@ -80,7 +80,7 @@ jobs:
           push: true
           file: waltid-web-portal/Dockerfile
           tags: waltid/portal:latest, waltid/portal:${{ env.release_version }}
-        if: ${{ contains(github.event.workspace, 'waltid-web-portal') }}
+        # if: ${{ contains(github.event.workspace, 'waltid-web-portal') }}
 
       - name: Changelog
         uses: ardalanamini/auto-changelog@v3
