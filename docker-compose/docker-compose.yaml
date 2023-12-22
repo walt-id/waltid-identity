@@ -18,10 +18,12 @@ services:
     volumes:
       - ./issuer-api/config:/waltid-issuer-api/config
   verifier-api:
+    platform: linux/x86_64
     image: waltid/verifier-api:latest
     volumes:
       - ./verifier-api/config:/waltid-verifier-api/config
   web-portal:
+    platform: linux/x86_64
     image: waltid/portal:latest
     environment:
       NEXT_PUBLIC_VC_REPO: "http://localhost:$VC_REPO_PORT"
@@ -29,6 +31,7 @@ services:
       NEXT_PUBLIC_VERIFIER: "http://localhost:$VERIFIER_API_PORT"
       NEXT_PUBLIC_WALLET: "http://localhost:$WALLET_FRONTEND_PORT"
   vc-repo:
+    platform: linux/x86_64
     image: waltid/vc-repository:latest
   ingress:
     image: nginx:1.15.10-alpine
