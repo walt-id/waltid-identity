@@ -705,8 +705,12 @@ class SSIKit2WalletService(tenant: String?, accountId: UUID, walletId: UUID) :
     //TODO: move to related entity
     private fun createCredentialEventData(json: JsonObject?, type: String?) = CredentialEventData(
         ecosystem = EventDataNotAvailable,
-        issuerId = json?.jsonObject?.get("issuer")?.jsonObject?.get("id")?.jsonPrimitive?.content
-            ?: EventDataNotAvailable,
+        issuerId = json?.jsonObject?.get("issuer")?.let {
+            if(it is JsonObject)
+                it.jsonObject["id"]?.jsonPrimitive?.content
+            else
+                it.jsonPrimitive.content
+        } ?: EventDataNotAvailable,
         subjectId = json?.jsonObject?.get("credentialSubject")?.jsonObject?.get(
             "id"
         )?.jsonPrimitive?.content ?: EventDataNotAvailable,
