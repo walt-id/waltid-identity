@@ -10,7 +10,6 @@ import id.walt.did.helpers.WaltidServices
 import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.http.*
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -27,8 +26,8 @@ class DidExamples {
         }
     }
 
-    private fun isVaultAvailable() = runCatching {
-        runBlocking { HttpClient().get("http://127.0.0.1:8200") }.status == HttpStatusCode.OK
+    private suspend fun isVaultAvailable() = runCatching {
+       HttpClient().get("http://127.0.0.1:8200").status == HttpStatusCode.OK
     }.fold(onSuccess = { it }, onFailure = { false })
 
     private fun groupDidList(resolverMethods: Map<String, String>): Map<String, List<String>> =
