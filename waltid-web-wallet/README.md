@@ -26,8 +26,8 @@ Make sure you are in the root of the walt.id identity repo.
 cd docker-compose && docker compose up
 ```
 
-- Visit the web wallet hosted under localhost:3000.
-- Visit the wallet-api hosted under localhost:4545.
+- Visit the web wallet hosted under [localhost:3000](http://localhost:3000).
+- Visit the wallet-api hosted under [localhost:4545](http://localhost:4545).
 
 Update the containers by running the following commands from the root folder: 
 ```bash
