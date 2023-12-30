@@ -1,4 +1,4 @@
-FROM docker.io/gradle:jdk21 as buildstage
+FROM docker.io/gradle:jdk17 as buildstage
 
 COPY waltid-web-wallet/src/ /work/src
 COPY waltid-web-wallet/gradle/ /work/gradle
@@ -7,7 +7,7 @@ COPY waltid-web-wallet/build.gradle.kts waltid-web-wallet/settings.gradle.kts wa
 WORKDIR /work
 RUN gradle clean installDist
 
-FROM docker.io/eclipse-temurin:21
+FROM docker.io/eclipse-temurin:17
 
 COPY --from=buildstage /work/build/install/ /
 WORKDIR /waltid-web-wallet
