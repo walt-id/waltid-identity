@@ -1,5 +1,5 @@
 <div align="center">
- <h1>Web Wallet (Frontend)</h1>
+ <h1>Web Wallet (API/Backend)</h1>
  <span>by </span><a href="https://walt.id">walt.id</a>
  <p>Custodian white-label web-wallet solution for Verifiable Credentials and NFTs<p>
 
@@ -21,6 +21,7 @@
 ### Running The Project
 
 From the root-folder you can run the wallet-api including the necessary configuration as well as other relevant services and apps like the wallet frontend by the following command:
+
 ```bash
 cd docker-compose && docker compose up
 ```
@@ -28,12 +29,12 @@ cd docker-compose && docker compose up
 - Visit the web wallet hosted under [localhost:3000](http://localhost:3000).
 - Visit the wallet-api hosted under [localhost:4545](http://localhost:4545).
 
-Update the containers by running the following commands from the root folder: 
+Update the wallet-api container by running the following commands from the root folder: 
 ```bash
-docker build -f waltid-web-wallet/Dockerfile -t waltid/waltid-web-wallet .
+docker build -t waltid/wallet-api -f waltid-wallet-api/Dockerfile .
 ```
 
-Note that this is project only the frontend of the web-wallet. The corresponding backend is in the /waltid-wallet-api folder.
+Note that this is project only the backend of the web-wallet. The corresponding frontend is in the /waltid-web-wallet folder.
 
 ## What is the Web-Wallet?
 

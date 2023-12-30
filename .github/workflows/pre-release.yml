@@ -75,20 +75,20 @@ jobs:
         uses: tj-actions/changed-files@v40
         with:
           files: 'waltid-web-wallet/**'
-      - name: Build and push Docker images (wallet-backend)
+      - name: Build and push Docker images (wallet-api)
         uses: docker/build-push-action@v4.0.0
         with:
           push: true
-          file: waltid-web-wallet/backend.Dockerfile
-          tags: waltid/wallet-backend:latest, waltid/wallet-backend:${{ env.release_version }}
+          file: waltid-wallet-api/Dockerfile
+          tags: waltid/wallet-api:latest, waltid/wallet-api:${{ env.release_version }}
         if: ${{ steps.wallet-changed-files.outputs.any_changed == 'true' }}
 
-      - name: Build and push Docker images (wallet-frontend)
+      - name: Build and push Docker images (waltid-web-wallet)
         uses: docker/build-push-action@v4.0.0
         with:
           push: true
-          file: waltid-web-wallet/frontend.Dockerfile
-          tags: waltid/wallet-frontend:latest, waltid/wallet-frontend:${{ env.release_version }}
+          file: waltid-web-wallet/Dockerfile
+          tags: waltid/waltid-web-wallet:latest, waltid/waltid-web-wallet:${{ env.release_version }}
         if: ${{ steps.wallet-changed-files.outputs.any_changed == 'true' }}
 
       - name: Get changed files in the waltid-web-portal directory

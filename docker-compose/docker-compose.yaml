@@ -4,13 +4,13 @@ services:
   #   environment:
   #     POSTGRES_PASSWORD: secret
   wallet-backend:
-    image: waltid/wallet-backend:latest
+    image: waltid/wallet-api:latest
     volumes:
-      - ./wallet-backend/config:/waltid-web-wallet/config
-      - ./wallet-backend/walt.yaml:/waltid-web-wallet/walt.yaml
-      - ./wallet-backend/data:/waltid-web-wallet/data
-  wallet-frontend:
-    image: waltid/wallet-frontend:latest
+      - ./wallet-backend/config:/waltid-wallet-api/config
+      - ./wallet-backend/walt.yaml:/waltid-wallet-api/walt.yaml
+      - ./wallet-backend/data:/waltid-wallet-api/data
+  waltid-web-wallet:
+    image: waltid/waltid-web-wallet:latest
     environment:
       NUXT_PUBLIC_ISSUER_CALLBACK_URL: "http://localhost:$WALLET_FRONTEND_PORT"
   issuer-api:
@@ -37,11 +37,11 @@ services:
     image: nginx:1.15.10-alpine
     ports:
       - target: $WALLET_FRONTEND_PORT
-        published: $WALLET_FRONTEND_PORT # wallet-frontend
+        published: $WALLET_FRONTEND_PORT # waltid-web-wallet
         protocol: tcp
         mode: host
       - target: $WALLET_BACKEND_PORT
-        published: $WALLET_BACKEND_PORT # wallet-backend
+        published: $WALLET_BACKEND_PORT # wallet-api
         protocol: tcp
         mode: host
       - target: $WEB_PORTAL_PORT
