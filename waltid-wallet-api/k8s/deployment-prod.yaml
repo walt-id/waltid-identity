@@ -13,7 +13,7 @@ metadata:
 data:
   db.sqlite.conf: |
     hikariDataSource {
-        jdbcUrl = "jdbc:sqlite:/waltid-web-wallet/data/data.db"
+        jdbcUrl = "jdbc:sqlite:/waltid-wallet-api/data/data.db"
         driverClassName = "org.sqlite.JDBC"
         username = ""
         password = ""
@@ -104,38 +104,38 @@ spec:
           image: waltid/wallet-backend:latest
           volumeMounts:
             - name: wallet-db-config
-              mountPath: "/waltid-web-wallet/config/db.conf"
+              mountPath: "/waltid-wallet-api/config/db.conf"
               subPath: "db.conf"
               readOnly: true
             - name: wallet-datasource-config
-              mountPath: "/waltid-web-wallet/config/db.sqlite.conf"
+              mountPath: "/waltid-wallet-api/config/db.sqlite.conf"
               subPath: "db.sqlite.conf"
               readOnly: true
             - name: wallet-wallet-config
-              mountPath: "/waltid-web-wallet/config/wallet.conf"
+              mountPath: "/waltid-wallet-api/config/wallet.conf"
               subPath: "wallet.conf"
               readOnly: true
             - name: wallet-web-config
-              mountPath: "/waltid-web-wallet/config/web.conf"
+              mountPath: "/waltid-wallet-api/config/web.conf"
               subPath: "web.conf"
               readOnly: true
             - name: wallet-marketplace-config
-              mountPath: "/waltid-web-wallet/config/marketplace.conf"
+              mountPath: "/waltid-wallet-api/config/marketplace.conf"
               subPath: "marketplace.conf"
               readOnly: true
             - name: wallet-chainexplorer-config
-              mountPath: "/waltid-web-wallet/config/chainexplorer.conf"
+              mountPath: "/waltid-wallet-api/config/chainexplorer.conf"
               subPath: "chainexplorer.conf"
               readOnly: true
             - name: wallet-push-config
-              mountPath: "/waltid-web-wallet/config/push.conf"
+              mountPath: "/waltid-wallet-api/config/push.conf"
               subPath: "push.conf"
               readOnly: true
             - name: wallet-nft-config
-              mountPath: "/waltid-web-wallet/walt.yaml"
+              mountPath: "/waltid-wallet-api/walt.yaml"
               subPath: "walt.yaml"
               readOnly: true
-            - mountPath: "/waltid-web-wallet/data/"
+            - mountPath: "/waltid-wallet-api/data/"
               name: wallet-data
           ports:
             - containerPort: 4545
@@ -185,22 +185,22 @@ spec:
 kind: Deployment
 apiVersion: apps/v1
 metadata:
-  name: wallet-frontend
+  name: waltid-web-wallet
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: wallet-frontend
+      app: waltid-web-wallet
   template:
     metadata:
       labels:
-        app: wallet-frontend
+        app: waltid-web-wallet
       annotations:
         deployment/id: "_DEFAULT_DEPLOYMENT_"
     spec:
       containers:
-        - name: wallet-frontend
-          image: waltid/wallet-frontend:latest
+        - name: waltid-web-wallet
+          image: waltid/waltid-web-wallet:latest
           env:
             - name: NUXT_PUBLIC_ISSUER_CALLBACK_URL
               value: "https://wallet.walt.id"
@@ -211,7 +211,7 @@ spec:
 kind: Service
 apiVersion: v1
 metadata:
-  name: wallet-frontend
+  name: waltid-web-wallet
 spec:
   ports:
     - name: http
@@ -219,7 +219,7 @@ spec:
       targetPort: http-api
       protocol: TCP
   selector:
-    app: wallet-frontend
+    app: waltid-web-wallet
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -255,6 +255,6 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: wallet-frontend
+                name: waltid-web-wallet
                 port:
                   name: http
