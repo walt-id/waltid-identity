@@ -1,4 +1,4 @@
-name: Release on push to main
+name: Pre-release on push to main
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
 
 jobs:
   release:
-    name: "Release"
+    name: "Pre-release"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
