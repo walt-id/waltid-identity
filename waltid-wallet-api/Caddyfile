@@ -1,0 +1,9 @@
+{
+	auto_https off
+	admin off
+}
+
+:3000
+
+reverse_proxy localhost:3001 # frontend
+reverse_proxy /r/* localhost:8080 # backend
