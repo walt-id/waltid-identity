@@ -56,18 +56,34 @@ jobs:
           push: true
           file: waltid-verifier-api/Dockerfile
           tags: waltid/verifier-api:latest, waltid/verifier-api:${{ env.release_version }}
-      - name: Build and push Docker images (wallet-backend)
+        if: ${{ steps.verifier-changed-files.outputs.any_changed == 'true' }}
+
+      - name: Get changed files in the waltid-web-wallet directory
+        id: wallet-changed-files
+        uses: tj-actions/changed-files@v40
+        with:
+          files: 'waltid-web-wallet/**'
+      - name: Build and push Docker images (wallet-api)
         uses: docker/build-push-action@v4.0.0
         with:
           push: true
-          file: waltid-web-wallet/backend.Dockerfile
-          tags: waltid/wallet-backend:latest, waltid/wallet-backend:${{ env.release_version }}
-      - name: Build and push Docker images (wallet-frontend)
+          file: waltid-wallet-api/Dockerfile
+          tags: waltid/wallet-api:latest, waltid/wallet-api:${{ env.release_version }}
+        if: ${{ steps.wallet-changed-files.outputs.any_changed == 'true' }}
+
+      - name: Build and push Docker images (waltid-web-wallet)
         uses: docker/build-push-action@v4.0.0
         with:
           push: true
-          file: waltid-web-wallet/frontend.Dockerfile
-          tags: waltid/wallet-frontend:latest, waltid/wallet-frontend:${{ env.release_version }}
+          file: waltid-web-wallet/Dockerfile
+          tags: waltid/waltid-web-wallet:latest, waltid/waltid-web-wallet:${{ env.release_version }}
+        if: ${{ steps.wallet-changed-files.outputs.any_changed == 'true' }}
+
+      - name: Get changed files in the waltid-web-portal directory
+        id: portal-changed-files
+        uses: tj-actions/changed-files@v40
+        with:
+          files: 'waltid-web-portal/**'
       - name: Build and push Docker images (wallet-portal)
         uses: docker/build-push-action@v4
         with:
