@@ -85,22 +85,22 @@ spec:
 kind: Deployment
 apiVersion: apps/v1
 metadata:
-  name: wallet-backend
+  name: wallet-api
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: wallet-backend
+      app: wallet-api
   template:
     metadata:
       labels:
-        app: wallet-backend
+        app: wallet-api
       annotations:
         deployment/id: "_DEFAULT_DEPLOYMENT_"
     spec:
       containers:
-        - name: wallet-backend
-          image: waltid/wallet-backend:portal-latest
+        - name: wallet-api
+          image: waltid/wallet-api:portal-latest
           imagePullPolicy: Always
           volumeMounts:
             - name: wallet-db-config
@@ -172,7 +172,7 @@ spec:
 kind: Service
 apiVersion: v1
 metadata:
-  name: wallet-backend
+  name: wallet-api
 spec:
   ports:
     - name: http
@@ -180,7 +180,7 @@ spec:
       targetPort: http-api
       protocol: TCP
   selector:
-    app: wallet-backend
+    app: wallet-api
 ---
 kind: Deployment
 apiVersion: apps/v1
@@ -242,14 +242,14 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: wallet-backend
+                name: wallet-api
                 port:
                   name: http
           - path: /swagger
             pathType: Prefix
             backend:
               service:
-                name: wallet-backend
+                name: wallet-api
                 port:
                   name: http
           - path: /
