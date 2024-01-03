@@ -1104,12 +1104,12 @@ class CI_JVM_Test : AnnotationSpec() {
     @Test
     suspend fun testEntraIssuance() {
 
-        val pin = "0288"
+        val pin: String? = null //"0288"
         // ============ Issuer ========================
         val accessToken = entraAuthorize()
         val createIssuanceReq = "{\n" +
             "    \"callback\": {\n" +
-            "        \"url\": \"https://0603-62-178-27-231.ngrok-free.app\",\n" +
+            "        \"url\": \"https://9ffd-62-178-27-231.ngrok-free.app\",\n" +
             "        \"state\": \"1234\",\n" +
             "        \"headers\": {\n" +
             "            \"api-key\": \"1234\"\n" +
@@ -1120,11 +1120,12 @@ class CI_JVM_Test : AnnotationSpec() {
             "        \"clientName\": \"test\"\n" +
             "    },\n" +
             "    \"type\": \"VerifiableCredential,MyID\",\n" +
-            "    \"manifest\": \"https://verifiedid.did.msidentity.com/v1.0/tenants/8bc955d9-38fd-4c15-a520-0c656407537a/verifiableCredentials/contracts/569aca2a-0fd8-9973-80f7-b8e5163d64e3/manifest\",\n" +
-            "    \"pin\": {\n" +
+            "    \"manifest\": \"https://verifiedid.did.msidentity.com/v1.0/tenants/8bc955d9-38fd-4c15-a520-0c656407537a/verifiableCredentials/contracts/133d7e92-d227-f74d-1a5b-354cbc8df49a/manifest\",\n" +
+            (pin?.let {
+                "\"pin\": {\n" +
             "       \"value\": \"$pin\",\n" +
             "       \"length\": 4\n" +
-            "   }," +
+            "   }," } ?: "") +
             "   \"claims\": { \n" +
             "       \"given_name\": \"Sev\",\n" +
             "       \"family_name\": \"Sta\"\n" +
@@ -1170,8 +1171,8 @@ class CI_JVM_Test : AnnotationSpec() {
         // 5) Get hashed PIN, if required
         val hashedPin: String? = (authReq.customParameters["pin"]?.firstOrNull()?.let {
             Json.parseToJsonElement(it)
-        }?.jsonObject?.get("salt")?.jsonPrimitive?.content + pin).let {
-            Base64.encode(SHA256().update(it.toByteArray()).digest().bytes).toString()
+        }?.jsonObject?.get("salt")?.jsonPrimitive?.content)?.let {
+            Base64.encode(SHA256().update((it + pin).toByteArray()).digest().bytes).toString()
         }
 
         // 6) Create response JWT token, signed by key for folder DID
@@ -1215,7 +1216,6 @@ class CI_JVM_Test : AnnotationSpec() {
         println("Resp: $resp")
         println(resp.bodyAsText())
         resp.status shouldBe HttpStatusCode.OK
-
     }
 
     //@Test
