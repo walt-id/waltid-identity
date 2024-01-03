@@ -69,16 +69,16 @@ kotlin {
         }
 
         it.compilations.getByName("main") {
-            cinterops.create("id.walt.sdjwt.cinterop.ios") {
-                val interopTask = tasks[interopProcessingTaskName]
-                interopTask.dependsOn(":waltid-sd-jwt-ios:build${platform.uppercase()}")
-
-                defFile("$projectDir/src/nativeInterop/cinterop/waltid-sd-jwt-ios.def")
-                packageName("id.walt.sdjwt.cinterop.ios")
-                includeDirs("$projectDir/waltid-sd-jwt-ios/build/Release-$platform/include/")
-
-                headers("$projectDir/waltid-sd-jwt-ios/build/Release-$platform/include/waltid_sd_jwt_ios/waltid_sd_jwt_ios-Swift.h")
-            }
+//            cinterops.create("id.walt.sdjwt.cinterop.ios") {
+//                val interopTask = tasks[interopProcessingTaskName]
+//                interopTask.dependsOn(":waltid-sd-jwt-ios:build${platform.uppercase()}")
+//
+//                defFile("$projectDir/src/nativeInterop/cinterop/waltid-sd-jwt-ios.def")
+//                packageName("id.walt.sdjwt.cinterop.ios")
+//                includeDirs("$projectDir/waltid-sd-jwt-ios/build/Release-$platform/include/")
+//
+//                headers("$projectDir/waltid-sd-jwt-ios/build/Release-$platform/include/waltid_sd_jwt_ios/waltid_sd_jwt_ios-Swift.h")
+//            }
         }
     }
 
@@ -152,7 +152,7 @@ kotlin {
     publishing {
         repositories {
             maven {
-                url = uri("https://maven.walt.id/repository/waltid-ssi-kit/")
+                url = uri("https://maven.walt.id/repository/waltid/")
                 val envUsername = System.getenv("MAVEN_USERNAME")
                 val envPassword = System.getenv("MAVEN_PASSWORD")
 

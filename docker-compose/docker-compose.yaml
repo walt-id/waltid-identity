@@ -1,0 +1,64 @@
+services:
+  # postgresdb:  # Uncomment to connect a Postgres DB
+  #   image: postgres
+  #   environment:
+  #     POSTGRES_PASSWORD: secret
+  wallet-backend:
+    image: waltid/wallet-api:latest
+    volumes:
+      - ./wallet-backend/config:/waltid-wallet-api/config
+      - ./wallet-backend/walt.yaml:/waltid-wallet-api/walt.yaml
+      - ./wallet-backend/data:/waltid-wallet-api/data
+  waltid-web-wallet:
+    image: waltid/waltid-web-wallet:latest
+    environment:
+      NUXT_PUBLIC_ISSUER_CALLBACK_URL: "http://localhost:$WALLET_FRONTEND_PORT"
+  issuer-api:
+    image: waltid/issuer-api:latest
+    volumes:
+      - ./issuer-api/config:/waltid-issuer-api/config
+  verifier-api:
+    platform: linux/x86_64
+    image: waltid/verifier-api:latest
+    volumes:
+      - ./verifier-api/config:/waltid-verifier-api/config
+  web-portal:
+    platform: linux/x86_64
+    image: waltid/portal:latest
+    environment:
+      NEXT_PUBLIC_VC_REPO: "http://localhost:$VC_REPO_PORT"
+      NEXT_PUBLIC_ISSUER: "http://localhost:$ISSUER_API_PORT"
+      NEXT_PUBLIC_VERIFIER: "http://localhost:$VERIFIER_API_PORT"
+      NEXT_PUBLIC_WALLET: "http://localhost:$WALLET_FRONTEND_PORT"
+  vc-repo:
+    platform: linux/x86_64
+    image: waltid/vc-repository:latest
+  ingress:
+    image: nginx:1.15.10-alpine
+    ports:
+      - target: $WALLET_FRONTEND_PORT
+        published: $WALLET_FRONTEND_PORT # waltid-web-wallet
+        protocol: tcp
+        mode: host
+      - target: $WALLET_BACKEND_PORT
+        published: $WALLET_BACKEND_PORT # wallet-api
+        protocol: tcp
+        mode: host
+      - target: $WEB_PORTAL_PORT
+        published: $WEB_PORTAL_PORT # web-portal
+        protocol: tcp
+        mode: host
+      - target: $VC_REPO_PORT
+        published: $VC_REPO_PORT # vc-repo
+        protocol: tcp
+        mode: host
+      - target: $ISSUER_API_PORT
+        published: $ISSUER_API_PORT # issuer-api
+        protocol: tcp
+        mode: host
+      - target: $VERIFIER_API_PORT
+        published: $VERIFIER_API_PORT # verifier-api
+        protocol: tcp
+        mode: host
+    volumes:
+      - ./ingress.conf:/etc/nginx/conf.d/default.conf # API gateway configuration

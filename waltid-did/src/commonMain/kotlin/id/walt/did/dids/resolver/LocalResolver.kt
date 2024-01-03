@@ -7,14 +7,13 @@ import id.walt.did.dids.resolver.local.DidKeyResolver
 import id.walt.did.dids.resolver.local.DidWebResolver
 import id.walt.did.dids.resolver.local.LocalResolverMethod
 import io.ktor.client.*
-import io.ktor.client.engine.cio.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.json.JsonObject
 
 class LocalResolver : DidResolver {
-    override val name = "core-crypto local resolver"
-    private val http = HttpClient(CIO) {
+    override val name = "walt.id local resolver"
+    private val http = HttpClient() {
         install(ContentNegotiation) {
             json(DidWebResolver.json)
         }

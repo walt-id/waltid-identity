@@ -1,0 +1,161 @@
+name: Pre-release on push to main
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  release:
+    name: "Pre-release"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Calculate release version
+        run: |
+          echo "release_version=1.0.$(date +'%g%m%d%H%M')-SNAPSHOT" >> $GITHUB_ENV
+      - name: Set version
+        run: |
+          sed -i "s/1.0.0-SNAPSHOT/${{ env.release_version }}/g" build.gradle.kts
+      - run: |
+          git tag v${{ env.release_version }}
+          git push --tags
+      - name: Setup cache
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+      - name: Gradle wrapper validation
+        uses: gradle/wrapper-validation-action@v1
+      - name: Running gradle build
+        uses: eskatos/gradle-command-action@v1.3.3
+        env:
+          MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
+          MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
+        with:
+          arguments: build publish --no-daemon
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build and push Docker images (issuer)
+        uses: docker/build-push-action@v4.0.0
+        with:
+          push: true
+          file: waltid-issuer-api/Dockerfile
+          tags: waltid/issuer-api:latest, waltid/issuer-api:${{ env.release_version }}
+      - name: Build and push Docker images (verifier)
+        uses: docker/build-push-action@v4.0.0
+        with:
+          push: true
+          file: waltid-verifier-api/Dockerfile
+          tags: waltid/verifier-api:latest, waltid/verifier-api:${{ env.release_version }}
+        if: ${{ steps.verifier-changed-files.outputs.any_changed == 'true' }}
+
+      - name: Get changed files in the waltid-web-wallet directory
+        id: wallet-changed-files
+        uses: tj-actions/changed-files@v40
+        with:
+          files: 'waltid-web-wallet/**'
+      - name: Build and push Docker images (wallet-api)
+        uses: docker/build-push-action@v4.0.0
+        with:
+          push: true
+          file: waltid-wallet-api/Dockerfile
+          tags: waltid/wallet-api:latest, waltid/wallet-api:${{ env.release_version }}
+        if: ${{ steps.wallet-changed-files.outputs.any_changed == 'true' }}
+
+      - name: Build and push Docker images (waltid-web-wallet)
+        uses: docker/build-push-action@v4.0.0
+        with:
+          push: true
+          file: waltid-web-wallet/Dockerfile
+          tags: waltid/waltid-web-wallet:latest, waltid/waltid-web-wallet:${{ env.release_version }}
+        if: ${{ steps.wallet-changed-files.outputs.any_changed == 'true' }}
+
+      - name: Get changed files in the waltid-web-portal directory
+        id: portal-changed-files
+        uses: tj-actions/changed-files@v40
+        with:
+          files: 'waltid-web-portal/**'
+      - name: Build and push Docker images (wallet-portal)
+        uses: docker/build-push-action@v4
+        with:
+          push: true
+          file: waltid-web-portal/Dockerfile
+          tags: waltid/portal:latest, waltid/portal:${{ env.release_version }}
+
+      - name: Changelog
+        uses: ardalanamini/auto-changelog@v3
+        id: changelog
+        with:
+          github-token: ${{ github.token }}
+          commit-types: |
+            breaking: Breaking Changes
+            feat: New Features
+            fix: Bug Fixes
+            revert: Reverts
+            perf: Performance Improvements
+            refactor: Refactors
+            deps: Dependencies
+            docs: Documentation Changes
+            style: Code Style Changes
+            build: Build System
+            ci: Continuous Integration
+            test: Tests
+            chore: Chores
+            other: Other Changes
+          default-commit-type: Other Changes
+          release-name: v${{ env.release_version }}
+          mention-authors: true
+          mention-new-contributors: true
+          include-compare: true
+          semver: true
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ env.release_version }}
+          body: |
+            ${{ steps.changelog.outputs.changelog }}
+          prerelease: ${{ steps.changelog.outputs.prerelease }}
+
+      - name: Prepare CD - issuer
+        run: sed "s/_DEFAULT_DEPLOYMENT_/$GITHUB_SHA/g" waltid-issuer-api/k8s/deployment-prod.yaml > waltid-issuer-api/k8s/deployment_mod.yaml
+      - name: Continuous deployment - issuer
+        uses: actions-hub/kubectl@master
+        env:
+          KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
+        with:
+          args: apply -n portals -f waltid-issuer-api/k8s/deployment_mod.yaml
+      - name: Prepare CD - verifier
+        run: sed "s/_DEFAULT_DEPLOYMENT_/$GITHUB_SHA/g" waltid-verifier-api/k8s/deployment-prod.yaml > waltid-verifier-api/k8s/deployment_mod.yaml
+      - name: Continuous deployment - verifier
+        uses: actions-hub/kubectl@master
+        env:
+          KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
+        with:
+          args: apply -n portals -f waltid-verifier-api/k8s/deployment_mod.yaml
+      - name: Prepare CD - wallet.walt.id
+        run: sed "s/_DEFAULT_DEPLOYMENT_/$GITHUB_SHA/g" waltid-wallet-api/k8s/deployment-prod.yaml > waltid-wallet-api/k8s/deployment_mod.yaml
+      - name: Continuous deployment - wallet.walt.id
+        uses: actions-hub/kubectl@master
+        env:
+          KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
+        with:
+          args: apply -n default -f waltid-wallet-api/k8s/deployment_mod.yaml
+      - name: Prepare CD - portal.walt.id
+        run: sed "s/_DEFAULT_DEPLOYMENT_/$GITHUB_SHA/g" waltid-web-portal/k8s/deployment-prod.yaml > waltid-web-portal/k8s/deployment_mod.yaml
+      - name: Continuous deployment - portal.walt.id
+        uses: actions-hub/kubectl@master
+        env:
+          KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
+        with:
+          args: apply -n portals -f waltid-web-portal/k8s/deployment_mod.yaml

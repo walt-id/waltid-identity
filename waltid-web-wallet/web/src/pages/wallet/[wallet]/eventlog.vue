@@ -129,7 +129,7 @@ const { data: eventLog, pending: pending } = await useLazyAsyncData(
     () =>
         $fetch(`/wallet-api/wallet/${currentWallet.value}/eventlog`, {
             params: {
-                limit: 2,
+                limit: 10,
                 startingAfter: startingAfter.value,
             },
         }),
