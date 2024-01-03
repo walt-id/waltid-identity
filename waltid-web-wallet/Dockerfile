@@ -9,7 +9,7 @@ RUN pnpm install
 RUN pnpm build
 
 # RUN
-FROM docker.io/node:20
+FROM docker.io/node:alpine
 COPY --from=buildstage /build/.output/ /app
 
 WORKDIR /app
