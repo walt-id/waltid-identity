@@ -14,6 +14,7 @@ services:
     environment:
       NUXT_PUBLIC_ISSUER_CALLBACK_URL: "http://localhost:$WALLET_FRONTEND_PORT"
   issuer-api:
+    platform: linux/x86_64
     image: waltid/issuer-api:latest
     volumes:
       - ./issuer-api/config:/waltid-issuer-api/config
