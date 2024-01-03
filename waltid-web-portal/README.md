@@ -30,8 +30,7 @@ pnpm build
 Using Docker:
 
 ```bash
-docker build . -t waltid/portal
-docker push waltid/portal
+docker build -t waltid/portal -f waltid-web-portal/Dockerfile .
 docker run -p3000:3000 -i -t waltid/portal
 ```
 

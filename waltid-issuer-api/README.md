@@ -110,8 +110,9 @@ Issuer service relies on the following walt.id libraries:
 
 ### Using docker
 
+Run the following commands from the waltid-identity root path:
+
 ```shell
-docker run \
--v ${pwd}/waltid-issuer-api/config:/waltid-issuer-api/bin/waltid-issuer \
--p 7000:7000 waltid/issuer:latest
+docker build -t waltid/issuer-api -f waltid-issuer-api/Dockerfile .
+docker run -p 7000:7000 waltid/issuer-api --webHost=0.0.0.0 --webPort=7000 --baseUrl=http://localhost:7000
 ```

@@ -30,8 +30,6 @@ repositories {
     //jcenter()
     maven("https://jitpack.io")
     maven("https://maven.walt.id/repository/waltid/")
-    maven("https://maven.walt.id/repository/waltid-ssi-kit/")
-    //maven("https://repo.danubetech.com/repository/maven-public/")
     //maven("https://maven.walt.id/repository/waltid/id/walt/core-crypto/")
     //maven("https://maven.walt.id/repository/waltid/id/walt/waltid-ssikit2")
     mavenLocal()

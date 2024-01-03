@@ -23,7 +23,6 @@ import id.walt.did.dids.registrar.local.cheqd.models.job.response.didresponse.Di
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
 import io.ktor.client.call.*
-import io.ktor.client.engine.cio.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
@@ -58,7 +57,7 @@ class DidCheqdRegistrar : LocalRegistrarMethod("cheqd") {
     }
 
     //TODO: inject
-    private val client = HttpClient(CIO) {
+    private val client = HttpClient() {
         install(ContentNegotiation) {
             json(json)
         }
@@ -143,12 +142,12 @@ class DidCheqdRegistrar : LocalRegistrarMethod("cheqd") {
     private suspend fun signPayload(key: Key, job: JobActionResponse): List<String> = let {
         val state = (job.didState as? ActionDidState) ?: throw IllegalArgumentException("Unexpected did state")
         val payloads = state.signingRequest.map {
-            java.util.Base64.getDecoder().decode(it.serializedPayload)
+            id.walt.did.utils.EncodingUtils.base64Decode(it.serializedPayload)
         }
         // TODO: sign with key having alias from verification method
 
         payloads.map {
-            java.util.Base64.getUrlEncoder().encodeToString(key.signRaw(it) as ByteArray)
+            id.walt.did.utils.EncodingUtils.base64Encode(key.signRaw(it) as ByteArray)
         }
     }
 }

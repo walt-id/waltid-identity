@@ -32,6 +32,19 @@ kotlin {
             useJUnitPlatform()
         }
     }
+    js(IR) {
+        browser {
+            commonWebpackConfig {
+                cssSupport {
+                    enabled.set(true)
+                }
+            }
+        }
+        nodejs {
+            generateTypeScriptDefinitions()
+        }
+        binaries.library()
+    }
 
     sourceSets {
         val commonMain by getting {
@@ -88,6 +101,12 @@ kotlin {
                 implementation("io.ktor:ktor-server-test-host:2.3.6")
                 implementation("io.ktor:ktor-server-content-negotiation:2.3.6")
                 implementation("io.ktor:ktor-server-netty:2.3.6")
+            }
+        }
+        val jsMain by getting {
+            dependencies {
+                implementation(npm("canonicalize", "2.0.0"))
+                implementation(npm("uuid", "9.0.1"))
             }
         }
         publishing {
