@@ -8,6 +8,7 @@ import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.sdjwt.SDJwt
 import id.walt.sdjwt.SDMap
 import id.walt.sdjwt.SDPayload
+import io.ktor.utils.io.core.*
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.descriptors.SerialDescriptor
