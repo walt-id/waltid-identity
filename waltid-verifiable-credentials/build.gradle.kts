@@ -31,6 +31,19 @@ kotlin {
             useJUnitPlatform()
         }
     }
+    js(IR) {
+        browser {
+            commonWebpackConfig {
+                cssSupport {
+                    enabled.set(true)
+                }
+            }
+        }
+        nodejs {
+            generateTypeScriptDefinitions()
+        }
+        binaries.library()
+    }
 
     sourceSets {
         val commonMain by getting {
@@ -67,7 +80,6 @@ kotlin {
             dependencies {
                 implementation(kotlin("test"))
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
-                implementation("org.junit.jupiter:junit-jupiter-api:5.9.0")
             }
         }
         val jvmMain by getting {
@@ -85,6 +97,11 @@ kotlin {
         val jvmTest by getting {
             dependencies {
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0")
+            }
+        }
+        val jsMain by getting {
+            dependencies {
+                implementation(npm("uuid", "9.0.1"))
             }
         }
         publishing {
