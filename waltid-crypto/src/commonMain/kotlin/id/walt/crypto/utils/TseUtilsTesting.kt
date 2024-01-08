@@ -1,12 +1,13 @@
 package id.walt.crypto.utils
 
-import kotlinx.serialization.json.Json
+/*import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
+import kotlin.io.encoding.ExperimentalEncodingApi*/
 
+/*
 @OptIn(ExperimentalEncodingApi::class)
 fun main() {
     val tseKeyExportJson = """
@@ -34,3 +35,4 @@ fun main() {
 
     println(jwk)
 }
+*/
