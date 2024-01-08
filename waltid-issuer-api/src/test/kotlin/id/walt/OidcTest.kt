@@ -10,7 +10,7 @@ import kotlin.time.Duration.Companion.minutes
 class OidcTest {
 
     @Test
-    fun x() {
+    fun testInitCredentialOffer() {
         ConfigManager.loadConfigs(emptyArray())
         val ciTestProvider = CIProvider()
 
@@ -28,7 +28,7 @@ class OidcTest {
     }
 
     /*
-    fun y() {
+    fun testClientFlow() {
 
         // -------- WALLET ----------
         // as WALLET: receive credential offer, either being called via deeplink or by scanning QR code

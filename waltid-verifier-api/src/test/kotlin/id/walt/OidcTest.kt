@@ -1,17 +1,9 @@
 package id.walt
 
-import kotlin.test.Test
-
 class OidcTest {
 
-    @Test
-    fun x() {
-
-
-    }
-
     /*
-    fun y() {
+    fun testClientFlow() {
 
         // -------- WALLET ----------
         // as WALLET: receive credential offer, either being called via deeplink or by scanning QR code
