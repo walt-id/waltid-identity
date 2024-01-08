@@ -69,8 +69,8 @@ class PresentationBuilder {
     fun buildPresentationJson() = buildPresentationMap().toJsonElement()
     fun buildPresentationJsonString() = Json.encodeToString(buildPresentationJson())
 
-    suspend fun buildAndSign(key: Key) {
-        key.signJws(
+    suspend fun buildAndSign(key: Key): String {
+        return key.signJws(
             plaintext = buildPresentationJsonString().encodeToByteArray(),
             headers = mapOf(
                 "kid" to resolveDidAuthentication(did ?: throw IllegalStateException("No DID set in PresentationBuilder")),

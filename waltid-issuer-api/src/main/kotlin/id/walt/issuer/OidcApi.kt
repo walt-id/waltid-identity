@@ -19,6 +19,7 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.util.*
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import kotlin.io.encoding.Base64
@@ -73,7 +74,7 @@ object OidcApi : CIProvider() {
                 }
             }
             get("/authorize") {
-                val authReq = AuthorizationRequest.fromHttpParameters(call.parameters.toMap())
+                val authReq = runBlocking { AuthorizationRequest.fromHttpParametersAuto(call.parameters.toMap()) }
                 try {
                     val authResp = if (authReq.responseType == ResponseType.code.name) {
                         processCodeFlowAuthorization(authReq)

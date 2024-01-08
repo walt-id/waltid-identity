@@ -78,10 +78,13 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
     protected abstract fun isPresentationDefinitionSupported(presentationDefinition: PresentationDefinition): Boolean
 
     override fun validateAuthorizationRequest(authorizationRequest: AuthorizationRequest): Boolean {
-        return (authorizationRequest.responseType == ResponseType.vp_token.name &&
-                authorizationRequest.presentationDefinition != null &&
-                isPresentationDefinitionSupported(authorizationRequest.presentationDefinition)
-                ) //|| true // FIXME
+        return ((authorizationRequest.responseType == ResponseType.vp_token.name ||
+                    authorizationRequest.responseType == ResponseType.id_token.name &&
+                    authorizationRequest.claims?.containsKey(ResponseType.vp_token.name) == true
+                ) &&
+            authorizationRequest.presentationDefinition != null &&
+            isPresentationDefinitionSupported(authorizationRequest.presentationDefinition)
+            )
     }
 
     protected open fun resolveVPAuthorizationParameters(authorizationRequest: AuthorizationRequest): AuthorizationRequest {
@@ -97,6 +100,8 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
                                     message = "Presentation definition URI cannot be resolved."
                                 )
                         )
+                    } ?: authorizationRequest.claims?.get("vp_token")?.jsonObject?.get("presentation_definition")?.jsonObject?.let {
+                        PresentationDefinition.fromJSON(it)
                     } ?: throw AuthorizationError(
                         authorizationRequest,
                         AuthorizationErrorCode.invalid_request,

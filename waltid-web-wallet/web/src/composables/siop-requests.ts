@@ -8,6 +8,7 @@ const siopPrefixMapping: Map<string, SiopRequestType> = new Map([
     ["openid4vp://", SiopRequestType.PRESENTATION],
     ["openid-initiate-issuance://", SiopRequestType.ISSUANCE],
     ["openid-credential-offer://", SiopRequestType.ISSUANCE],
+    ["openid-vc://", SiopRequestType.ISSUANCE],
 ]);
 
 export function fixRequest(req: string) {
