@@ -20,9 +20,14 @@ object DidService {
 
     val didResolvers = ArrayList<DidResolver>()
     val didRegistrars = ArrayList<DidRegistrar>()
+//    val didResolvers = arrayListOf<DidResolver>(LocalResolver())
+//    val didRegistrars = arrayListOf<DidRegistrar>(LocalRegistrar())
 
-    val resolverMethods = HashMap<String, DidResolver>() // method -> resolver
-    val registrarMethods = HashMap<String, DidRegistrar>() // method -> registrar
+    /** method -> resolver */
+    val resolverMethods = HashMap<String, DidResolver>()
+
+    /** method -> registrar */
+    val registrarMethods = HashMap<String, DidRegistrar>()
 
     fun registerResolver(resolver: DidResolver) = if (resolver !in didResolvers) didResolvers.add(resolver) else false
     fun unregisterResolver(resolver: DidResolver) = didResolvers.remove(resolver)
