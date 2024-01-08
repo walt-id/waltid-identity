@@ -7,16 +7,15 @@ import id.walt.did.helpers.WaltidServices
 import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.http.*
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
-import org.junit.jupiter.api.condition.EnabledIf
 import kotlin.test.Test
 
 class VcApiTest {
 
     @Test
-    @EnabledIf("hostCondition")
     fun testVcApi() = runTest {
+        if (!hostCondition()) return@runTest
+
         // Initialize services
         WaltidServices.init()
 
@@ -77,8 +76,8 @@ class VcApiTest {
 
     }
 
-    private fun hostCondition() = runCatching {
-        runBlocking { HttpClient().get("http://127.0.0.1:8200") }.status == HttpStatusCode.OK
+    private suspend fun hostCondition() = runCatching {
+        HttpClient().get("http://127.0.0.1:8200").status == HttpStatusCode.OK
     }.fold(onSuccess = { true }, onFailure = { false })
 
 }

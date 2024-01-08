@@ -18,18 +18,18 @@
 Available for Kotlin/Java and JavaScript environments.
 
 - [Crypto](https://github.com/walt-id/waltid-identity/blob/main/waltid-crypto/README.md) - create and use keys based on different algorithms.
-- [DID](https://github.com/walt-id/waltid-identity/blob/main/waltid-did/README.md) - create, register and resolve DIDs on different ecosystems.
+- [DID](https://github.com/walt-id/waltid-identity/blob/main/waltid-did/README.md) - create, register, and resolve DIDs on different ecosystems.
 - [Verifiable Credentials](https://github.com/walt-id/waltid-identity/tree/main/waltid-verifiable-credentials) - issue and verify W3C credentials as JWTs and SD-JWTs.
 - [mdoc Credentials](https://github.com/walt-id/waltid-identity/tree/main/waltid-mdoc-credentials) - issue and verify mdoc credentials (mDL ISO/IEC 18013-5).
 - [OpenID4VC](https://github.com/walt-id/waltid-identity/blob/main/waltid-openid4vc/README.md) - implementation of the OID4VCI and OIDC4VP protocols.
 - [SD-JWT](https://github.com/walt-id/waltid-identity/blob/main/waltid-sdjwt/README.md) - create and verify Selective Disclosure JWTs.
 
 ### Services
-A set of API's to build issuer, verifier and wallet capabilities into any app.
+A set of APIs to build issuer, verifier, and wallet capabilities into any app.
 
 - **Issuer API** ([Docs](https://docs.oss.walt.id/issuer/api/getting-started) | [GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-issuer-api)) - enable apps to issue credentials (W3C JWTs and SD-JWTs) via OID4VC.
 - **Verifier API**  ([Docs](https://docs.oss.walt.id/verifier/api/getting-started) | [GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-verifier-api)) - enable apps to verify credentials (W3C JWTs and SD-JWTs) via OID4VP/SIOPv2.
-- **Wallet API** ([Docs](https://docs.oss.walt.id/wallet/api/getting-started) | [GitHub](https://github.com/walt-id/waltid-identity/blob/main/waltid-web-wallet/README.md)) - extend apps with wallet capabilities to collect, store, manage and share identity credentials and tokens.
+- **Wallet API** ([Docs](https://docs.oss.walt.id/wallet/api/getting-started) | [GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-wallet-api)) - extend apps with wallet capabilities to collect, store, manage and share identity credentials and tokens.
 
 ### Apps
 A set of white-label apps to get started in no time.
@@ -42,7 +42,7 @@ A set of white-label apps to get started in no time.
 Use the [walt.id identity package](https://github.com/walt-id/waltid-identity/tree/main/docker-compose) to run all APIs and Apps with docker: 
 
 ```bash
-cd docker-compose && docker compose up
+cd docker-compose && docker-compose up
 ```
 
 Learn more about the exposed ports [here](https://github.com/walt-id/waltid-identity/tree/main/docker-compose).
