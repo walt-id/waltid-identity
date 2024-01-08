@@ -1212,7 +1212,7 @@ class CI_JVM_Test : AnnotationSpec() {
         println(didResult.did)
     }
 
-    @Test
+    //@Test
     suspend fun testCreateKey() {
         val result = LocalKey.Companion.importJWK(File("/home/work/waltid/entra/keys/priv.jwk").readText().trimIndent())
         result.isSuccess shouldBe true
