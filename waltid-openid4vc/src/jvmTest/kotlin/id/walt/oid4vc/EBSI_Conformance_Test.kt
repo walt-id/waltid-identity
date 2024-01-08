@@ -1,13 +1,9 @@
 package id.walt.oid4vc
 
-import id.walt.credentials.w3c.VerifiableCredential
-import id.walt.custodian.Custodian
 import id.walt.oid4vc.providers.CredentialWalletConfig
 import id.walt.oid4vc.providers.OpenIDClientConfig
 import id.walt.oid4vc.requests.CredentialOfferRequest
 import id.walt.oid4vc.responses.CredentialResponse
-import id.walt.oid4vc.util.randomUUID
-import id.walt.servicematrix.ServiceMatrix
 import io.kotest.common.runBlocking
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.data.forAll
@@ -55,13 +51,12 @@ class EBSI_Conformance_Test : StringSpec({
     }
 
     beforeSpec {
-        ServiceMatrix("service-matrix.properties")
         credentialWallet = EBSITestWallet(CredentialWalletConfig("https://blank/"))
         ebsiClientConfig = OpenIDClientConfig(credentialWallet.TEST_DID, null, credentialWallet.config.redirectUri, useCodeChallenge = true)
         VcTestsEnabled.takeIf { it }?.run {
-            Custodian.getService().listCredentialIds().forEach {
-                Custodian.getService().deleteCredential(it)
-            }
+//            Custodian.getService().listCredentialIds().forEach {
+//                Custodian.getService().deleteCredential(it)
+//            }
         }
     }
 
@@ -157,8 +152,8 @@ class EBSI_Conformance_Test : StringSpec({
 internal typealias credentialOfferRequestCaller = (initCredentialOfferUrl: Url) -> CredentialOfferRequest
 
 internal fun storeCredentials(vararg credentialResponses: CredentialResponse) = credentialResponses.forEach {
-    val cred = VerifiableCredential.fromString(it.credential!!.jsonPrimitive.content)
-    Custodian.getService().storeCredential(cred.id ?: randomUUID(), cred)
+//    val cred = VerifiableCredential.fromString(it.credential!!.jsonPrimitive.content)
+//    Custodian.getService().storeCredential(cred.id ?: randomUUID(), cred)
 }
 
 internal fun getCredentialOfferRequest(

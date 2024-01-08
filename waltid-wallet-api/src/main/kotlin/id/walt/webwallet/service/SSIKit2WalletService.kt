@@ -1,5 +1,10 @@
 package id.walt.webwallet.service
 
+import com.nimbusds.jose.JWSAlgorithm
+import com.nimbusds.jose.crypto.ECDSASigner
+import com.nimbusds.jose.crypto.ECDSAVerifier
+import com.nimbusds.jose.crypto.bc.BouncyCastleProviderSingleton
+import com.nimbusds.jose.jwk.ECKey
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.KeyType
@@ -13,16 +18,23 @@ import id.walt.did.dids.registrar.dids.DidKeyCreateOptions
 import id.walt.did.dids.registrar.dids.DidWebCreateOptions
 import id.walt.did.dids.resolver.LocalResolver
 import id.walt.did.utils.EnumUtils.enumValueIgnoreCase
+import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.data.GrantType
 import id.walt.oid4vc.data.OpenIDProviderMetadata
 import id.walt.oid4vc.data.dif.PresentationDefinition
+import id.walt.oid4vc.providers.CredentialWalletConfig
 import id.walt.oid4vc.providers.OpenIDClientConfig
-import id.walt.oid4vc.providers.SIOPProviderConfig
+import id.walt.oid4vc.providers.TokenTarget
 import id.walt.oid4vc.requests.*
 import id.walt.oid4vc.responses.BatchCredentialResponse
 import id.walt.oid4vc.responses.CredentialResponse
 import id.walt.oid4vc.responses.TokenResponse
+import id.walt.oid4vc.util.httpGet
 import id.walt.oid4vc.util.randomUUID
+import id.walt.sdjwt.SDJwt
+import id.walt.sdjwt.SDMap
+import id.walt.sdjwt.SDPayload
+import id.walt.sdjwt.SimpleJWTCryptoProvider
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.db.models.WalletKeys
 import id.walt.webwallet.db.models.WalletOperationHistories
@@ -39,7 +51,9 @@ import id.walt.webwallet.service.oidc4vc.TestCredentialWallet
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.engine.cio.*
+import io.ktor.client.engine.java.*
 import io.ktor.client.plugins.contentnegotiation.*
+import io.ktor.client.plugins.logging.*
 import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
@@ -53,6 +67,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import kotlinx.uuid.UUID
+import kotlinx.uuid.generateUUID
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.select
 import org.jetbrains.exposed.sql.transactions.transaction
@@ -279,7 +294,7 @@ class SSIKit2WalletService(tenant: String?, accountId: UUID, walletId: UUID) :
 
     private fun getCredentialWallet(did: String) = credentialWallets.getOrPut(did) {
         TestCredentialWallet(
-            SIOPProviderConfig("http://blank"),
+            CredentialWalletConfig("http://blank"),
             this,
             did
         )
@@ -290,19 +305,21 @@ class SSIKit2WalletService(tenant: String?, accountId: UUID, walletId: UUID) :
 
     private val testCIClientConfig = OpenIDClientConfig("test-client", null, redirectUri = "http://blank")
 
+    val http = HttpClient(Java) {
+        install(ContentNegotiation) {
+            json()
+        }
+        install(Logging) {
+            logger = Logger.SIMPLE
+            level = LogLevel.ALL
+        }
+        followRedirects = false
+    }
 
-    override suspend fun useOfferRequest(offer: String, did: String) {
-        val credentialWallet = getCredentialWallet(did)
-
-        println("// -------- WALLET ----------")
-        println("// as WALLET: receive credential offer, either being called via deeplink or by scanning QR code")
-        println("// parse credential URI")
-        val parsedOfferReq = CredentialOfferRequest.fromHttpParameters(Url(offer).parameters.toMap())
-        println("parsedOfferReq: $parsedOfferReq")
-
+    private suspend fun processCredentialOfferRequest(credentialOfferRequest: CredentialOfferRequest, credentialWallet: TestCredentialWallet): List<CredentialResponse> {
         println("// get issuer metadata")
         val providerMetadataUri =
-            credentialWallet.getCIProviderMetadataUrl(parsedOfferReq.credentialOffer!!.credentialIssuer)
+            credentialWallet.getCIProviderMetadataUrl(credentialOfferRequest.credentialOffer!!.credentialIssuer)
         println("Getting provider metadata from: $providerMetadataUri")
         val providerMetadataResult = ktorClient.get(providerMetadataUri)
         println("Provider metadata returned: " + providerMetadataResult.bodyAsText())
@@ -311,7 +328,7 @@ class SSIKit2WalletService(tenant: String?, accountId: UUID, walletId: UUID) :
         println("providerMetadata: $providerMetadata")
 
         println("// resolve offered credentials")
-        val offeredCredentials = parsedOfferReq.credentialOffer!!.resolveOfferedCredentials(providerMetadata)
+        val offeredCredentials = credentialOfferRequest.credentialOffer!!.resolveOfferedCredentials(providerMetadata)
         println("offeredCredentials: $offeredCredentials")
 
         //val offeredCredential = offeredCredentials.first()
@@ -322,7 +339,7 @@ class SSIKit2WalletService(tenant: String?, accountId: UUID, walletId: UUID) :
             grantType = GrantType.pre_authorized_code,
             clientId = testCIClientConfig.clientID,
             redirectUri = credentialWallet.config.redirectUri,
-            preAuthorizedCode = parsedOfferReq.credentialOffer!!.grants[GrantType.pre_authorized_code.value]!!.preAuthorizedCode,
+            preAuthorizedCode = credentialOfferRequest.credentialOffer!!.grants[GrantType.pre_authorized_code.value]!!.preAuthorizedCode,
             userPin = null
         )
         println("tokenReq: $tokenReq")
@@ -342,14 +359,14 @@ class SSIKit2WalletService(tenant: String?, accountId: UUID, walletId: UUID) :
         val nonce = tokenResp.cNonce
 
 
-        println("Using issuer URL: ${parsedOfferReq.credentialOfferUri ?: parsedOfferReq.credentialOffer!!.credentialIssuer}")
+        println("Using issuer URL: ${credentialOfferRequest.credentialOfferUri ?: credentialOfferRequest.credentialOffer!!.credentialIssuer}")
         val credReqs = offeredCredentials.map { offeredCredential ->
             CredentialRequest.forOfferedCredential(
                 offeredCredential = offeredCredential,
                 proof = credentialWallet.generateDidProof(
                     did = credentialWallet.did,
-                    issuerUrl =  /*ciTestProvider.baseUrl*/ parsedOfferReq.credentialOfferUri
-                        ?: parsedOfferReq.credentialOffer!!.credentialIssuer,
+                    issuerUrl =  /*ciTestProvider.baseUrl*/ credentialOfferRequest.credentialOfferUri
+                        ?: credentialOfferRequest.credentialOffer!!.credentialIssuer,
                     nonce = nonce
                 )
             )
@@ -357,7 +374,7 @@ class SSIKit2WalletService(tenant: String?, accountId: UUID, walletId: UUID) :
         println("credReqs: $credReqs")
 
 
-        val credentialResponses = when {
+        return when {
             credReqs.size >= 2 -> {
                 val batchCredentialRequest = BatchCredentialRequest(credReqs)
 
@@ -387,7 +404,52 @@ class SSIKit2WalletService(tenant: String?, accountId: UUID, walletId: UUID) :
 
             else -> throw IllegalStateException("No credentials offered")
         }
+    }
 
+    private suspend fun processMSEntraIssuanceRequest(entraIssuanceRequest: EntraIssuanceRequest, credentialWallet: TestCredentialWallet, pin: String? = null): List<CredentialResponse> {
+        // *) Load key:
+        val walletKey = getKeyByDid(credentialWallet.did)
+
+        // *) Create response JWT token, signed by key for holder DID
+        val responseObject = entraIssuanceRequest.getResponseObject(walletKey.getThumbprint(), credentialWallet.did, walletKey.getPublicKey().exportJWK(), pin)
+        val responseToken = credentialWallet.signToken(TokenTarget.TOKEN, responseObject, keyId = credentialWallet.did)
+//        val jwtCryptoProvider = runBlocking {
+//            val key = ECKey.parse(TEST_WALLET_KEY)
+//            SimpleJWTCryptoProvider(JWSAlgorithm.ES256K, ECDSASigner(key).apply {
+//                jcaContext.provider = BouncyCastleProviderSingleton.getInstance()
+//            }, ECDSAVerifier(key.toPublicJWK()).apply {
+//                jcaContext.provider = BouncyCastleProviderSingleton.getInstance()
+//            })
+//        }
+//        val responseToken = SDJwt.sign(responseTokenPayload, jwtCryptoProvider, TEST_WALLET_DID + "#${testWalletKey.getKeyId()}").toString()
+
+        // *) POST response JWT token to return address found in manifest
+        val resp = http.post(entraIssuanceRequest.issuerReturnAddress,{
+            contentType(ContentType.Text.Plain)
+            setBody(responseToken)
+        })
+        println("Resp: $resp")
+        println(resp.bodyAsText())
+        val vc = Json.parseToJsonElement(resp.bodyAsText()).jsonObject["vc"]!!.jsonPrimitive.content
+        return listOf(CredentialResponse.Companion.success(CredentialFormat.jwt_vc_json, vc))
+    }
+
+    override suspend fun useOfferRequest(offer: String, did: String) {
+
+        val credentialWallet = getCredentialWallet(did)
+
+        println("// -------- WALLET ----------")
+        println("// as WALLET: receive credential offer, either being called via deeplink or by scanning QR code")
+        println("// parse credential URI")
+        val reqParams = Url(offer).parameters.toMap()
+
+        // entra or openid4vc credential offer
+        val credentialResponses = if(EntraIssuanceRequest.isEntraIssuanceRequestUri(offer))
+            processMSEntraIssuanceRequest(EntraIssuanceRequest.fromAuthorizationRequest(AuthorizationRequest.fromHttpParametersAuto(reqParams)), credentialWallet)
+        else
+            processCredentialOfferRequest(CredentialOfferRequest.fromHttpParameters(reqParams), credentialWallet)
+
+        // === original ===
         println("// parse and verify credential(s)")
         if (credentialResponses.all { it.credential == null }) {
             throw IllegalStateException("No credential was returned from credentialEndpoint: $credentialResponses")
@@ -448,7 +510,7 @@ class SSIKit2WalletService(tenant: String?, accountId: UUID, walletId: UUID) :
                 }
             logEvent(
                 EventType.Credential.Accept,
-                parsedOfferReq.credentialOffer!!.credentialIssuer,
+                "", //parsedOfferReq.credentialOffer!!.credentialIssuer,
                 credentialResultPair.second
             )
             credentialResultPair.first

@@ -1,8 +1,6 @@
 package id.walt.oid4vc
 
-import id.walt.auditor.Auditor
-import id.walt.auditor.policies.SignaturePolicy
-import id.walt.credentials.w3c.VerifiableCredential
+import id.walt.credentials.verification.policies.JwtSignaturePolicy
 import id.walt.oid4vc.data.AuthorizationDetails
 import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.data.GrantType
@@ -15,7 +13,6 @@ import id.walt.oid4vc.requests.CredentialRequest
 import id.walt.oid4vc.requests.TokenRequest
 import id.walt.oid4vc.responses.CredentialResponse
 import id.walt.oid4vc.responses.TokenResponse
-import id.walt.servicematrix.ServiceMatrix
 import io.kotest.core.spec.style.AnnotationSpec
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.shouldBe
@@ -56,7 +53,6 @@ class wallettest : AnnotationSpec() {
 
     //@BeforeAll   /* Uncomment me */
     fun init() {
-        ServiceMatrix("test-config/service-matrix.properties")
         ciTestProvider = CITestProvider()
         credentialWallet = TestCredentialWallet(CredentialWalletConfig("http://blank"))
         //ciTestProvider.start()
@@ -174,9 +170,9 @@ class wallettest : AnnotationSpec() {
         credentialResp.credential.shouldBeInstanceOf<JsonPrimitive>()
 
         println("// parse and verify credential")
-        val credential = VerifiableCredential.fromString(credentialResp.credential!!.jsonPrimitive.content)
+        val credential = credentialResp.credential!!.jsonPrimitive.content
         println(">>> Issued credential: $credential")
-        Auditor.getService().verify(credential, listOf(SignaturePolicy())).result shouldBe true
+        JwtSignaturePolicy().verify(credential, null, mapOf()).isSuccess shouldBe true
     }
 
 }
