@@ -48,7 +48,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.time.Duration.Companion.minutes
 
-const val CI_PROVIDER_PORT = 8000
+const val CI_PROVIDER_PORT = 9001
 const val CI_PROVIDER_BASE_URL = "http://localhost:$CI_PROVIDER_PORT"
 
 class CITestProvider : OpenIDCredentialIssuer(
