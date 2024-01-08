@@ -24,6 +24,7 @@ import id.walt.oid4vc.data.OpenIDProviderMetadata
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.providers.CredentialWalletConfig
 import id.walt.oid4vc.providers.OpenIDClientConfig
+import id.walt.oid4vc.providers.TokenTarget
 import id.walt.oid4vc.requests.*
 import id.walt.oid4vc.responses.BatchCredentialResponse
 import id.walt.oid4vc.responses.CredentialResponse
@@ -304,8 +305,6 @@ class SSIKit2WalletService(tenant: String?, accountId: UUID, walletId: UUID) :
 
     private val testCIClientConfig = OpenIDClientConfig("test-client", null, redirectUri = "http://blank")
 
-    val TEST_WALLET_KEY = "{\"kty\":\"EC\",\"d\":\"uD-uxub011cplvr5Bd6MrIPSEUBsgLk-C1y3tnmfetQ\",\"use\":\"sig\",\"crv\":\"secp256k1\",\"kid\":\"48d8a34263cf492aa7ff61b6183e8bcf\",\"x\":\"TKaQ6sCocTDsmuj9tTR996tFXpEcS2EJN-1gOadaBvk\",\"y\":\"0TrIYHcfC93VpEuvj-HXTnyKt0snayOMwGSJA1XiDX8\"}"
-    val TEST_WALLET_DID = "did:ion:EiDh0EL8wg8oF-7rRiRzEZVfsJvh4sQX4Jock2Kp4j_zxg:eyJkZWx0YSI6eyJwYXRjaGVzIjpbeyJhY3Rpb24iOiJyZXBsYWNlIiwiZG9jdW1lbnQiOnsicHVibGljS2V5cyI6W3siaWQiOiI0OGQ4YTM0MjYzY2Y0OTJhYTdmZjYxYjYxODNlOGJjZiIsInB1YmxpY0tleUp3ayI6eyJjcnYiOiJzZWNwMjU2azEiLCJraWQiOiI0OGQ4YTM0MjYzY2Y0OTJhYTdmZjYxYjYxODNlOGJjZiIsImt0eSI6IkVDIiwidXNlIjoic2lnIiwieCI6IlRLYVE2c0NvY1REc211ajl0VFI5OTZ0RlhwRWNTMkVKTi0xZ09hZGFCdmsiLCJ5IjoiMFRySVlIY2ZDOTNWcEV1dmotSFhUbnlLdDBzbmF5T013R1NKQTFYaURYOCJ9LCJwdXJwb3NlcyI6WyJhdXRoZW50aWNhdGlvbiJdLCJ0eXBlIjoiRWNkc2FTZWNwMjU2azFWZXJpZmljYXRpb25LZXkyMDE5In1dfX1dLCJ1cGRhdGVDb21taXRtZW50IjoiRWlCQnlkZ2R5WHZkVERob3ZsWWItQkV2R3ExQnR2TWJSLURmbDctSHdZMUhUZyJ9LCJzdWZmaXhEYXRhIjp7ImRlbHRhSGFzaCI6IkVpRGJxa05ldzdUcDU2cEJET3p6REc5bThPZndxamlXRjI3bTg2d1k3TS11M1EiLCJyZWNvdmVyeUNvbW1pdG1lbnQiOiJFaUFGOXkzcE1lQ2RQSmZRYjk1ZVV5TVlfaUdCRkMwdkQzeDNKVTB6V0VjWUtBIn19"
     val http = HttpClient(Java) {
         install(ContentNegotiation) {
             json()
@@ -316,60 +315,116 @@ class SSIKit2WalletService(tenant: String?, accountId: UUID, walletId: UUID) :
         }
         followRedirects = false
     }
-    private suspend fun processMSEntraIssuanceOffer(authReq: AuthorizationRequest, did: String): List<CredentialResponse> {
-        // Load key:
-        val testWalletKey = LocalKey.importJWK(TEST_WALLET_KEY).getOrThrow()
-        // 3) Load and parse manifest, to find return address (weird concept)
-        val manifestUrl = authReq.claims!!["vp_token"]!!.jsonObject["presentation_definition"]!!.jsonObject["input_descriptors"]!!.jsonArray.first().jsonObject["issuance"]!!.jsonArray.first().jsonObject["manifest"]!!.jsonPrimitive.content
-        val manifest = Json.parseToJsonElement(httpGet(manifestUrl)).jsonObject["token"]!!.jsonPrimitive.content.let {
-            SDJwt.parse(it).fullPayload
+
+    private suspend fun processCredentialOfferRequest(credentialOfferRequest: CredentialOfferRequest, credentialWallet: TestCredentialWallet): List<CredentialResponse> {
+        println("// get issuer metadata")
+        val providerMetadataUri =
+            credentialWallet.getCIProviderMetadataUrl(credentialOfferRequest.credentialOffer!!.credentialIssuer)
+        println("Getting provider metadata from: $providerMetadataUri")
+        val providerMetadataResult = ktorClient.get(providerMetadataUri)
+        println("Provider metadata returned: " + providerMetadataResult.bodyAsText())
+
+        val providerMetadata = providerMetadataResult.body<JsonObject>().let { OpenIDProviderMetadata.fromJSON(it) }
+        println("providerMetadata: $providerMetadata")
+
+        println("// resolve offered credentials")
+        val offeredCredentials = credentialOfferRequest.credentialOffer!!.resolveOfferedCredentials(providerMetadata)
+        println("offeredCredentials: $offeredCredentials")
+
+        //val offeredCredential = offeredCredentials.first()
+        //println("offeredCredentials[0]: $offeredCredential")
+
+        println("// fetch access token using pre-authorized code (skipping authorization step)")
+        val tokenReq = TokenRequest(
+            grantType = GrantType.pre_authorized_code,
+            clientId = testCIClientConfig.clientID,
+            redirectUri = credentialWallet.config.redirectUri,
+            preAuthorizedCode = credentialOfferRequest.credentialOffer!!.grants[GrantType.pre_authorized_code.value]!!.preAuthorizedCode,
+            userPin = null
+        )
+        println("tokenReq: $tokenReq")
+
+        val tokenResp = ktorClient.submitForm(
+            providerMetadata.tokenEndpoint!!, formParameters = parametersOf(tokenReq.toHttpParameters())
+        ).let {
+            println("tokenResp raw: $it")
+            it.body<JsonObject>().let { TokenResponse.fromJSON(it) }
         }
-        println("Manifest: ${manifest}")
-        val issuerReturnAddress = manifest["input"]!!.jsonObject["credentialIssuer"]!!.jsonPrimitive.content
 
-        // 4) Get id_token_hint, if any, to add to response, or else generate id_token/input claims according to alternative attestation mode
-        // Attestation modes: https://learn.microsoft.com/en-us/entra/verified-id/rules-and-display-definitions-model
+        println("tokenResp: $tokenResp")
 
-        // Assume we have id_token_hint for now:
-        val idTokenHint = authReq.idTokenHint!!
+        println(">>> Token response = success: ${tokenResp.isSuccess}")
 
-        // 5. ignore PIN for now
-        val hashedPin = null
-        // 6) Create response JWT token, signed by key for folder DID
-        //credentialWallet.
-        val responseTokenPayload = SDPayload.createSDPayload(buildJsonObject {
-            put("sub", testWalletKey.getThumbprint()) // key thumbprint
-            put("aud", issuerReturnAddress)
-            put("did", TEST_WALLET_DID) // holder DID
-            hashedPin?.let { put("pin", it) }
-            put("sub_jwk", testWalletKey.getPublicKey().jwk!!.let { Json.parseToJsonElement(it) }) // pub key JWK
-            Clock.System.now().epochSeconds.let {
-                put("iat", it)
-                put("exp", it + 3600)
+        println("// receive credential")
+        val nonce = tokenResp.cNonce
+
+
+        println("Using issuer URL: ${credentialOfferRequest.credentialOfferUri ?: credentialOfferRequest.credentialOffer!!.credentialIssuer}")
+        val credReqs = offeredCredentials.map { offeredCredential ->
+            CredentialRequest.forOfferedCredential(
+                offeredCredential = offeredCredential,
+                proof = credentialWallet.generateDidProof(
+                    did = credentialWallet.did,
+                    issuerUrl =  /*ciTestProvider.baseUrl*/ credentialOfferRequest.credentialOfferUri
+                        ?: credentialOfferRequest.credentialOffer!!.credentialIssuer,
+                    nonce = nonce
+                )
+            )
+        }
+        println("credReqs: $credReqs")
+
+
+        return when {
+            credReqs.size >= 2 -> {
+                val batchCredentialRequest = BatchCredentialRequest(credReqs)
+
+                val credentialResponses = ktorClient.post(providerMetadata.batchCredentialEndpoint!!) {
+                    contentType(ContentType.Application.Json)
+                    bearerAuth(tokenResp.accessToken!!)
+                    setBody(batchCredentialRequest.toJSON())
+                }.body<JsonObject>().let { BatchCredentialResponse.fromJSON(it) }
+                println("credentialResponses: $credentialResponses")
+
+                credentialResponses.credentialResponses
+                    ?: throw IllegalArgumentException("No credential responses returned")
             }
-            put("jti", UUID.generateUUID().toString())
-            put("attestations", buildJsonObject {
-                put("idTokens", buildJsonObject {
-                    put("https://self-issued.me", idTokenHint)
-                })
-            })
-            put("iss", "https://self-issued.me")
-            put("contract", manifestUrl)
-        }, SDMap.fromJSON("{}"))
-        val jwtCryptoProvider = runBlocking {
-            val key = ECKey.parse(TEST_WALLET_KEY)
-            SimpleJWTCryptoProvider(JWSAlgorithm.ES256K, ECDSASigner(key).apply {
-                jcaContext.provider = BouncyCastleProviderSingleton.getInstance()
-            }, ECDSAVerifier(key.toPublicJWK()).apply {
-                jcaContext.provider = BouncyCastleProviderSingleton.getInstance()
-            })
-        }
-        val responseToken = SDJwt.sign(responseTokenPayload, jwtCryptoProvider, TEST_WALLET_DID + "#${testWalletKey.getKeyId()}").toString()
 
-        // 7) POST response JWT token to return address found in manifest
-//        val issuerReturnAddress = "https://beta.did.msidentity.com/v1.0/tenants/3c32ed40-8a10-465b-8ba4-0b1e86882668/verifiableCredentials/issue"
-//        val responseToken = "eyJraWQiOiJkaWQ6aW9uOkVpRGgwRUw4d2c4b0YtN3JSaVJ6RVpWZnNKdmg0c1FYNEpvY2syS3A0al96eGc6ZXlKa1pXeDBZU0k2ZXlKd1lYUmphR1Z6SWpwYmV5SmhZM1JwYjI0aU9pSnlaWEJzWVdObElpd2laRzlqZFcxbGJuUWlPbnNpY0hWaWJHbGpTMlY1Y3lJNlczc2lhV1FpT2lJME9HUTRZVE0wTWpZelkyWTBPVEpoWVRkbVpqWXhZall4T0RObE9HSmpaaUlzSW5CMVlteHBZMHRsZVVwM2F5STZleUpqY25ZaU9pSnpaV053TWpVMmF6RWlMQ0pyYVdRaU9pSTBPR1E0WVRNME1qWXpZMlkwT1RKaFlUZG1aall4WWpZeE9ETmxPR0pqWmlJc0ltdDBlU0k2SWtWRElpd2lkWE5sSWpvaWMybG5JaXdpZUNJNklsUkxZVkUyYzBOdlkxUkVjMjExYWpsMFZGSTVPVFowUmxod1JXTlRNa1ZLVGkweFowOWhaR0ZDZG1zaUxDSjVJam9pTUZSeVNWbElZMlpET1ROV2NFVjFkbW90U0ZoVWJubExkREJ6Ym1GNVQwMTNSMU5LUVRGWWFVUllPQ0o5TENKd2RYSndiM05sY3lJNld5SmhkWFJvWlc1MGFXTmhkR2x2YmlKZExDSjBlWEJsSWpvaVJXTmtjMkZUWldOd01qVTJhekZXWlhKcFptbGpZWFJwYjI1TFpYa3lNREU1SW4xZGZYMWRMQ0oxY0dSaGRHVkRiMjF0YVhSdFpXNTBJam9pUldsQ1FubGtaMlI1V0haa1ZFUm9iM1pzV1dJdFFrVjJSM0V4UW5SMlRXSlNMVVJtYkRjdFNIZFpNVWhVWnlKOUxDSnpkV1ptYVhoRVlYUmhJanA3SW1SbGJIUmhTR0Z6YUNJNklrVnBSR0p4YTA1bGR6ZFVjRFUyY0VKRVQzcDZSRWM1YlRoUFpuZHhhbWxYUmpJM2JUZzJkMWszVFMxMU0xRWlMQ0p5WldOdmRtVnllVU52YlcxcGRHMWxiblFpT2lKRmFVRkdPWGt6Y0UxbFEyUlFTbVpSWWprMVpWVjVUVmxmYVVkQ1JrTXdka1F6ZUROS1ZUQjZWMFZqV1V0QkluMTkjNDhkOGEzNDI2M2NmNDkyYWE3ZmY2MWI2MTgzZThiY2YiLCJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NksifQ.eyJzdWIiOiJKb1I1T1hicGVldlRpeVM4S0Zma2NSN3NlMGMwSVhLbGU0REk1YlVXTncwIiwiYXVkIjoiaHR0cHM6Ly9iZXRhLmRpZC5tc2lkZW50aXR5LmNvbS92MS4wL3RlbmFudHMvM2MzMmVkNDAtOGExMC00NjViLThiYTQtMGIxZTg2ODgyNjY4L3ZlcmlmaWFibGVDcmVkZW50aWFscy9pc3N1ZSIsInN1Yl9qd2siOnsia3R5IjoiRUMiLCJraWQiOiI0OGQ4YTM0MjYzY2Y0OTJhYTdmZjYxYjYxODNlOGJjZiIsInVzZSI6InNpZyIsImNydiI6InNlY3AyNTZrMSIsIngiOiJUS2FRNnNDb2NURHNtdWo5dFRSOTk2dEZYcEVjUzJFSk4tMWdPYWRhQnZrIiwieSI6IjBUcklZSGNmQzkzVnBFdXZqLUhYVG55S3Qwc25heU9Nd0dTSkExWGlEWDgifSwiaWF0IjoxNzAzMTAzNDg4LCJleHAiOjE3MDMxMDcwNzIsImp0aSI6IjkwYjkzMThlLWVkMGEtNGMzZC1hMGJiLTg2OTYwOGE3OWYzNCIsImlzcyI6Imh0dHBzOi8vc2VsZi1pc3N1ZWQubWUiLCJwaW4iOiJTQ2NVaHo1MThscWZxbVFQVkpIVVdaOU9scTVVeUZPL2dQYmNOaW93cTNNPSIsImNvbnRyYWN0IjoiaHR0cHM6Ly92ZXJpZmllZGlkLmRpZC5tc2lkZW50aXR5LmNvbS92MS4wL3RlbmFudHMvM2MzMmVkNDAtOGExMC00NjViLThiYTQtMGIxZTg2ODgyNjY4L3ZlcmlmaWFibGVDcmVkZW50aWFscy9jb250cmFjdHMvMDVkN2JhNTctZjRlNi0yNjBjLWNjYjYtMGNkNzQxNzk3NzljL21hbmlmZXN0IiwiYXR0ZXN0YXRpb25zIjp7ImlkVG9rZW5zIjp7Imh0dHBzOi8vc2VsZi1pc3N1ZWQubWUiOiJleUpoYkdjaU9pSkZVekkxTmtzaUxDSnJhV1FpT2lKa2FXUTZkMlZpT21ScFpDNTNiMjlrWjNKdmRtVmtaVzF2TG1OdmJTTTVZMlZoTVRVeU5XWmtOV1kwWkRKak9URTROMlF6TXpBMU9HRTNaVFExT1haalUybG5ibWx1WjB0bGVTMDJaR1V3T1NJc0luUjVjQ0k2SWtwWFZDSjkuZXlKemRXSWlPaUozYkVOeGRYQnhaWGt3Y2xoeGNtdHVSbE5oVW1wQk56QkNNMHRUT1dST05WQllXVjluUXkxS2FuWmpJaXdpWVhWa0lqb2lhSFIwY0hNNkx5OWlaWFJoTG1ScFpDNXRjMmxrWlc1MGFYUjVMbU52YlM5Mk1TNHdMM1JsYm1GdWRITXZNMk16TW1Wa05EQXRPR0V4TUMwME5qVmlMVGhpWVRRdE1HSXhaVGcyT0RneU5qWTRMM1psY21sbWFXRmliR1ZEY21Wa1pXNTBhV0ZzY3k5cGMzTjFaU0lzSW01dmJtTmxJam9pU2tSRk5FVktOa1Y0WWpWQ1VFNDVOMm8zTVZWSFFUMDlJaXdpYzNWaVgycDNheUk2ZXlKamNuWWlPaUp6WldOd01qVTJhekVpTENKcmFXUWlPaUprYVdRNmQyVmlPbVJwWkM1M2IyOWtaM0p2ZG1Wa1pXMXZMbU52YlNNNVkyVmhNVFV5Tldaa05XWTBaREpqT1RFNE4yUXpNekExT0dFM1pUUTFPWFpqVTJsbmJtbHVaMHRsZVMwMlpHVXdPU0lzSW10MGVTSTZJa1ZESWl3aWVDSTZJa3RNYmpWRmFuZFlaazlxZVhkaVZIbzFiRU5hVVdGbFdWbDNObmxEUkROMFlURTNkak5ZVDNOaVJVa2lMQ0o1SWpvaVNFRkdjRlJYWDJNMWJGOUhaamhQVlhKelkzbGZabE5KUjFkUGVWbGxSMDFxZVVkU1lrbzJOemhZYXlKOUxDSmthV1FpT2lKa2FXUTZkMlZpT21ScFpDNTNiMjlrWjNKdmRtVmtaVzF2TG1OdmJTSXNJbVpwY25OMFRtRnRaU0k2SWsxaGRIUm9aWGNpTENKc1lYTjBUbUZ0WlNJNklrMXBZMmhoWld3aUxDSnpZMkZ1Ym1Wa1pHOWpJam9pVGxrZ1UzUmhkR1VnUkhKcGRtVnljeUJNYVdObGJuTmxJaXdpYzJWc1ptbGxJam9pVm1WeWFXWnBaV1FnVTJWc1ptbGxJaXdpZG1WeWFXWnBZMkYwYVc5dUlqb2lSblZzYkhrZ1ZtVnlhV1pwWldRaUxDSmhaR1J5WlhOeklqb2lNak0wTlNCQmJubDNhR1Z5WlNCVGRISmxaWFFzSUZsdmRYSWdRMmwwZVN3Z1Rsa2dNVEl6TkRVaUxDSmhaMlYyWlhKcFptbGxaQ0k2SWs5c1pHVnlJSFJvWVc0Z01qRWlMQ0pwYzNNaU9pSm9kSFJ3Y3pvdkwzTmxiR1l0YVhOemRXVmtMbTFsSWl3aWFXRjBJam94TnpBek1UQXpORFV5TENKcWRHa2lPaUpqWlRSaFpqRXpZeTAwWTJVeUxUUTBNbUV0WVROaVlTMDFaR0V3WVdOa056RmpZamNpTENKbGVIQWlPakUzTURNeE1ETTNOVElzSW5CcGJpSTZleUpzWlc1bmRHZ2lPalFzSW5SNWNHVWlPaUp1ZFcxbGNtbGpJaXdpWVd4bklqb2ljMmhoTWpVMklpd2lhWFJsY21GMGFXOXVjeUk2TVN3aWMyRnNkQ0k2SWpBNU1HTTRabVl6TVdKbU1qUTRaamc0T1RSaU5UaGxZemc0TlRnM1l6Z3dJaXdpYUdGemFDSTZJblZWUW5sNVJXWnpNVzFXYlRBMlZtaGhNelIwT1U5eU5tOVJXVEoyV0RWaGJrZFFiMDVuZGxselUwVTlJbjE5Ll9vUTR1TzVnVDJ2WmZRWGdpcm5YX1BEdG9POS1nZGF0dERqQlpSeEZVZklLUGpYbXJYRjU4RmlFdGNseWxpWHhGTHZ2dnNZeDBFeDhiNWQ3YzZ0ZWFBIn19LCJkaWQiOiJkaWQ6aW9uOkVpRGgwRUw4d2c4b0YtN3JSaVJ6RVpWZnNKdmg0c1FYNEpvY2syS3A0al96eGc6ZXlKa1pXeDBZU0k2ZXlKd1lYUmphR1Z6SWpwYmV5SmhZM1JwYjI0aU9pSnlaWEJzWVdObElpd2laRzlqZFcxbGJuUWlPbnNpY0hWaWJHbGpTMlY1Y3lJNlczc2lhV1FpT2lJME9HUTRZVE0wTWpZelkyWTBPVEpoWVRkbVpqWXhZall4T0RObE9HSmpaaUlzSW5CMVlteHBZMHRsZVVwM2F5STZleUpqY25ZaU9pSnpaV053TWpVMmF6RWlMQ0pyYVdRaU9pSTBPR1E0WVRNME1qWXpZMlkwT1RKaFlUZG1aall4WWpZeE9ETmxPR0pqWmlJc0ltdDBlU0k2SWtWRElpd2lkWE5sSWpvaWMybG5JaXdpZUNJNklsUkxZVkUyYzBOdlkxUkVjMjExYWpsMFZGSTVPVFowUmxod1JXTlRNa1ZLVGkweFowOWhaR0ZDZG1zaUxDSjVJam9pTUZSeVNWbElZMlpET1ROV2NFVjFkbW90U0ZoVWJubExkREJ6Ym1GNVQwMTNSMU5LUVRGWWFVUllPQ0o5TENKd2RYSndiM05sY3lJNld5SmhkWFJvWlc1MGFXTmhkR2x2YmlKZExDSjBlWEJsSWpvaVJXTmtjMkZUWldOd01qVTJhekZXWlhKcFptbGpZWFJwYjI1TFpYa3lNREU1SW4xZGZYMWRMQ0oxY0dSaGRHVkRiMjF0YVhSdFpXNTBJam9pUldsQ1FubGtaMlI1V0haa1ZFUm9iM1pzV1dJdFFrVjJSM0V4UW5SMlRXSlNMVVJtYkRjdFNIZFpNVWhVWnlKOUxDSnpkV1ptYVhoRVlYUmhJanA3SW1SbGJIUmhTR0Z6YUNJNklrVnBSR0p4YTA1bGR6ZFVjRFUyY0VKRVQzcDZSRWM1YlRoUFpuZHhhbWxYUmpJM2JUZzJkMWszVFMxMU0xRWlMQ0p5WldOdmRtVnllVU52YlcxcGRHMWxiblFpT2lKRmFVRkdPWGt6Y0UxbFEyUlFTbVpSWWprMVpWVjVUVmxmYVVkQ1JrTXdka1F6ZUROS1ZUQjZWMFZqV1V0QkluMTkifQ.RwwcxrVxu_S5V_tWGbBBq-09o8OeQ92ueA8tGJSPjkG7YsmKq1oXOKsL3-hsq0gl30c9tb7O-P4YyZegNoomOA"
-        val resp = http.post(issuerReturnAddress,{
+            credReqs.size == 1 -> {
+                val credReq = credReqs.first()
+
+                val credentialResponse = ktorClient.post(providerMetadata.credentialEndpoint!!) {
+                    contentType(ContentType.Application.Json)
+                    bearerAuth(tokenResp.accessToken!!)
+                    setBody(credReq.toJSON())
+                }.body<JsonObject>().let { CredentialResponse.fromJSON(it) }
+                println("credentialResponse: $credentialResponse")
+
+                listOf(credentialResponse)
+            }
+
+            else -> throw IllegalStateException("No credentials offered")
+        }
+    }
+
+    private suspend fun processMSEntraIssuanceRequest(entraIssuanceRequest: EntraIssuanceRequest, credentialWallet: TestCredentialWallet, pin: String? = null): List<CredentialResponse> {
+        // *) Load key:
+        val walletKey = getKeyByDid(credentialWallet.did)
+
+        // *) Create response JWT token, signed by key for holder DID
+        val responseObject = entraIssuanceRequest.getResponseObject(walletKey.getThumbprint(), credentialWallet.did, walletKey.getPublicKey().exportJWK(), pin)
+        val responseToken = credentialWallet.signToken(TokenTarget.TOKEN, responseObject, keyId = credentialWallet.did)
+//        val jwtCryptoProvider = runBlocking {
+//            val key = ECKey.parse(TEST_WALLET_KEY)
+//            SimpleJWTCryptoProvider(JWSAlgorithm.ES256K, ECDSASigner(key).apply {
+//                jcaContext.provider = BouncyCastleProviderSingleton.getInstance()
+//            }, ECDSAVerifier(key.toPublicJWK()).apply {
+//                jcaContext.provider = BouncyCastleProviderSingleton.getInstance()
+//            })
+//        }
+//        val responseToken = SDJwt.sign(responseTokenPayload, jwtCryptoProvider, TEST_WALLET_DID + "#${testWalletKey.getKeyId()}").toString()
+
+        // *) POST response JWT token to return address found in manifest
+        val resp = http.post(entraIssuanceRequest.issuerReturnAddress,{
             contentType(ContentType.Text.Plain)
             setBody(responseToken)
         })
@@ -380,104 +435,21 @@ class SSIKit2WalletService(tenant: String?, accountId: UUID, walletId: UUID) :
     }
 
     override suspend fun useOfferRequest(offer: String, did: String) {
-        val reqParams = parseQueryString(Url(offer).encodedQuery).toMap()
-        val authReq = AuthorizationRequest.fromHttpParametersAuto(reqParams)
-//        val credentialWallet = getCredentialWallet(did)
-//
-//        println("// -------- WALLET ----------")
-//        println("// as WALLET: receive credential offer, either being called via deeplink or by scanning QR code")
-//        println("// parse credential URI")
-//        val parsedOfferReq = CredentialOfferRequest.fromHttpParameters(Url(offer).parameters.toMap())
-//        println("parsedOfferReq: $parsedOfferReq")
-//
-//        println("// get issuer metadata")
-//        val providerMetadataUri =
-//            credentialWallet.getCIProviderMetadataUrl(parsedOfferReq.credentialOffer!!.credentialIssuer)
-//        println("Getting provider metadata from: $providerMetadataUri")
-//        val providerMetadataResult = ktorClient.get(providerMetadataUri)
-//        println("Provider metadata returned: " + providerMetadataResult.bodyAsText())
-//
-//        val providerMetadata = providerMetadataResult.body<JsonObject>().let { OpenIDProviderMetadata.fromJSON(it) }
-//        println("providerMetadata: $providerMetadata")
-//
-//        println("// resolve offered credentials")
-//        val offeredCredentials = parsedOfferReq.credentialOffer!!.resolveOfferedCredentials(providerMetadata)
-//        println("offeredCredentials: $offeredCredentials")
-//
-//        //val offeredCredential = offeredCredentials.first()
-//        //println("offeredCredentials[0]: $offeredCredential")
-//
-//        println("// fetch access token using pre-authorized code (skipping authorization step)")
-//        val tokenReq = TokenRequest(
-//            grantType = GrantType.pre_authorized_code,
-//            clientId = testCIClientConfig.clientID,
-//            redirectUri = credentialWallet.config.redirectUri,
-//            preAuthorizedCode = parsedOfferReq.credentialOffer!!.grants[GrantType.pre_authorized_code.value]!!.preAuthorizedCode,
-//            userPin = null
-//        )
-//        println("tokenReq: $tokenReq")
-//
-//        val tokenResp = ktorClient.submitForm(
-//            providerMetadata.tokenEndpoint!!, formParameters = parametersOf(tokenReq.toHttpParameters())
-//        ).let {
-//            println("tokenResp raw: $it")
-//            it.body<JsonObject>().let { TokenResponse.fromJSON(it) }
-//        }
-//
-//        println("tokenResp: $tokenResp")
-//
-//        println(">>> Token response = success: ${tokenResp.isSuccess}")
-//
-//        println("// receive credential")
-//        val nonce = tokenResp.cNonce
-//
-//
-//        println("Using issuer URL: ${parsedOfferReq.credentialOfferUri ?: parsedOfferReq.credentialOffer!!.credentialIssuer}")
-//        val credReqs = offeredCredentials.map { offeredCredential ->
-//            CredentialRequest.forOfferedCredential(
-//                offeredCredential = offeredCredential,
-//                proof = credentialWallet.generateDidProof(
-//                    did = credentialWallet.did,
-//                    issuerUrl =  /*ciTestProvider.baseUrl*/ parsedOfferReq.credentialOfferUri
-//                        ?: parsedOfferReq.credentialOffer!!.credentialIssuer,
-//                    nonce = nonce
-//                )
-//            )
-//        }
-//        println("credReqs: $credReqs")
-//
-//
-//        val credentialResponses = when {
-//            credReqs.size >= 2 -> {
-//                val batchCredentialRequest = BatchCredentialRequest(credReqs)
-//
-//                val credentialResponses = ktorClient.post(providerMetadata.batchCredentialEndpoint!!) {
-//                    contentType(ContentType.Application.Json)
-//                    bearerAuth(tokenResp.accessToken!!)
-//                    setBody(batchCredentialRequest.toJSON())
-//                }.body<JsonObject>().let { BatchCredentialResponse.fromJSON(it) }
-//                println("credentialResponses: $credentialResponses")
-//
-//                credentialResponses.credentialResponses
-//                    ?: throw IllegalArgumentException("No credential responses returned")
-//            }
-//
-//            credReqs.size == 1 -> {
-//                val credReq = credReqs.first()
-//
-//                val credentialResponse = ktorClient.post(providerMetadata.credentialEndpoint!!) {
-//                    contentType(ContentType.Application.Json)
-//                    bearerAuth(tokenResp.accessToken!!)
-//                    setBody(credReq.toJSON())
-//                }.body<JsonObject>().let { CredentialResponse.fromJSON(it) }
-//                println("credentialResponse: $credentialResponse")
-//
-//                listOf(credentialResponse)
-//            }
-//
-//            else -> throw IllegalStateException("No credentials offered")
-//        }
-        val credentialResponses = processMSEntraIssuanceOffer(authReq, did)
+
+        val credentialWallet = getCredentialWallet(did)
+
+        println("// -------- WALLET ----------")
+        println("// as WALLET: receive credential offer, either being called via deeplink or by scanning QR code")
+        println("// parse credential URI")
+        val reqParams = Url(offer).parameters.toMap()
+
+        // entra or openid4vc credential offer
+        val credentialResponses = if(EntraIssuanceRequest.isEntraIssuanceRequestUri(offer))
+            processMSEntraIssuanceRequest(EntraIssuanceRequest.fromAuthorizationRequest(AuthorizationRequest.fromHttpParametersAuto(reqParams)), credentialWallet)
+        else
+            processCredentialOfferRequest(CredentialOfferRequest.fromHttpParameters(reqParams), credentialWallet)
+
+        // === original ===
         println("// parse and verify credential(s)")
         if (credentialResponses.all { it.credential == null }) {
             throw IllegalStateException("No credential was returned from credentialEndpoint: $credentialResponses")
