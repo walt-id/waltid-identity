@@ -1,9 +1,18 @@
 package id.walt.oid4vc
 
-import id.walt.credentials.w3c.W3CIssuer
-import id.walt.crypto.KeyAlgorithm
-import id.walt.model.DidMethod
-import id.walt.model.DidUrl
+import com.nimbusds.jose.JWSHeader
+import com.nimbusds.jwt.JWTParser
+import id.walt.credentials.CredentialBuilder
+import id.walt.credentials.CredentialBuilderType
+import id.walt.credentials.issuance.Issuer.baseIssue
+import id.walt.credentials.utils.W3CVcUtils
+import id.walt.credentials.vc.vcs.W3CVC
+import id.walt.crypto.keys.Key
+import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.LocalKey
+import id.walt.did.dids.DidService
+import id.walt.did.dids.registrar.dids.DidKeyCreateOptions
+import id.walt.did.dids.resolver.DidResolver
 import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.data.CredentialSupported
 import id.walt.oid4vc.data.ResponseMode
@@ -22,11 +31,7 @@ import id.walt.oid4vc.requests.TokenRequest
 import id.walt.oid4vc.responses.AuthorizationErrorCode
 import id.walt.oid4vc.responses.CredentialErrorCode
 import id.walt.oid4vc.util.randomUUID
-import id.walt.services.did.DidService
-import id.walt.services.jwt.JwtService
-import id.walt.services.key.KeyService
-import id.walt.signatory.ProofConfig
-import id.walt.signatory.Signatory
+import io.kotest.common.runBlocking
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
@@ -43,7 +48,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.time.Duration.Companion.minutes
 
-const val CI_PROVIDER_PORT = 8000
+const val CI_PROVIDER_PORT = 9001
 const val CI_PROVIDER_BASE_URL = "http://localhost:$CI_PROVIDER_PORT"
 
 class CITestProvider : OpenIDCredentialIssuer(
@@ -73,17 +78,20 @@ class CITestProvider : OpenIDCredentialIssuer(
     override fun removeSession(id: String) = authSessions.remove(id)
 
     // crypto operations and credential issuance
-    private val CI_TOKEN_KEY = KeyService.getService().generate(KeyAlgorithm.RSA)
-    private val CI_DID_KEY = KeyService.getService().generate(KeyAlgorithm.EdDSA_Ed25519)
-    val CI_ISSUER_DID = DidService.create(DidMethod.key, CI_DID_KEY.id)
+    private val CI_TOKEN_KEY = runBlocking { LocalKey.generate(KeyType.RSA) }
+    private val CI_DID_KEY = runBlocking { LocalKey.generate(KeyType.Ed25519) }
+    val CI_ISSUER_DID = runBlocking { DidService.registerByKey("key", CI_DID_KEY).did }
     val deferredCredentialRequests = mutableMapOf<String, CredentialRequest>()
     var deferIssuance = false
 
     override fun signToken(target: TokenTarget, payload: JsonObject, header: JsonObject?, keyId: String?) =
-        JwtService.getService().sign(keyId ?: CI_TOKEN_KEY.id, payload.toString())
+        runBlocking { CI_TOKEN_KEY.signJws(payload.toString().toByteArray()) }
 
+    fun getKeyFor(token: String): Key {
+        return runBlocking { DidService.resolveToKey((JWTParser.parse(token).header as JWSHeader).keyID) }.getOrThrow()
+    }
     override fun verifyTokenSignature(target: TokenTarget, token: String) =
-        JwtService.getService().verify(token).verified
+        runBlocking { (if(target == TokenTarget.PROOF_OF_POSSESSION) getKeyFor(token) else CI_TOKEN_KEY).verifyJws(token).isSuccess }
 
     override fun generateCredential(credentialRequest: CredentialRequest): CredentialResult {
         if (deferIssuance) return CredentialResult(credentialRequest.format, null, randomUUID()).also {
@@ -121,21 +129,13 @@ class CITestProvider : OpenIDCredentialIssuer(
             CredentialErrorCode.invalid_or_missing_proof,
             message = "Proof JWT header must contain kid claim"
         )
-        return Signatory.getService().issue(
-            types.last(),
-            ProofConfig(CI_ISSUER_DID, subjectDid = resolveDIDFor(holderKid)),
-            issuer = W3CIssuer(baseUrl),
-            storeCredential = false
-        ).let {
-            when (credentialRequest.format) {
-                CredentialFormat.ldp_vc -> Json.decodeFromString<JsonObject>(it)
-                else -> JsonPrimitive(it)
-            }
-        }.let { CredentialResult(credentialRequest.format, it) }
-    }
-
-    private fun resolveDIDFor(keyId: String): String {
-        return DidUrl.from(keyId).did
+        return runBlocking { CredentialBuilder(CredentialBuilderType.W3CV2CredentialBuilder).apply {
+            type = credentialRequest.types ?: listOf("VerifiableCredential")
+            issuerDid = CI_ISSUER_DID
+            subjectDid = holderKid
+        }.buildW3C().baseIssue(CI_DID_KEY, CI_ISSUER_DID, holderKid, mapOf(), mapOf(), mapOf(), mapOf()) }.let {
+            CredentialResult(CredentialFormat.jwt_vc_json, JsonPrimitive(it))
+        }
     }
 
     fun start() {
