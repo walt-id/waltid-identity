@@ -1,8 +1,8 @@
 package id.walt.oid4vc
 
-import id.walt.auditor.Auditor
-import id.walt.auditor.policies.SignaturePolicy
+import id.walt.credentials.verification.policies.JwtSignaturePolicy
 import id.walt.crypto.utils.JwsUtils.decodeJws
+import id.walt.did.dids.DidService
 import id.walt.oid4vc.data.ClientIdScheme
 import id.walt.oid4vc.data.OpenIDClientMetadata
 import id.walt.oid4vc.data.ResponseMode
@@ -11,7 +11,7 @@ import id.walt.oid4vc.data.dif.*
 import id.walt.oid4vc.providers.CredentialWalletConfig
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.responses.TokenResponse
-import id.walt.servicematrix.ServiceMatrix
+import io.kotest.common.runBlocking
 import io.kotest.core.spec.style.AnnotationSpec
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldContainExactly
@@ -50,7 +50,9 @@ class VP_JVM_Test : AnnotationSpec() {
 
     @BeforeAll
     fun init() {
-        ServiceMatrix("test-config/service-matrix.properties")
+        runBlocking { DidService.init() }
+        DidService.resolverMethods.keys shouldContain "jwk"
+        DidService.registrarMethods.keys shouldContain "ion"
         testWallet = TestCredentialWallet(CredentialWalletConfig(WALLET_BASE_URL))
         testWallet.start()
 
@@ -129,8 +131,7 @@ class VP_JVM_Test : AnnotationSpec() {
 
         // vpToken is NOT a string, but JSON ELEMENT
         // this will break without .content(): (if JsonPrimitive and not JsonArray!)
-        Auditor.getService()
-            .verify(tokenResponse.vpToken!!.jsonPrimitive.content, listOf(SignaturePolicy())).result shouldBe true
+        JwtSignaturePolicy().verify(tokenResponse.vpToken!!.jsonPrimitive.content, null, mapOf()).isSuccess shouldBe true
     }
 
     //@Test
@@ -584,4 +585,77 @@ class VP_JVM_Test : AnnotationSpec() {
     //    "openid4vp://authorize?client_id=https%3A%2F%2Flaunchpad.mattrlabs.com%2Fapi%2Fvp%2Fcallback&client_id_scheme=redirect_uri&response_uri=https%3A%2F%2Flaunchpad.mattrlabs.com%2Fapi%2Fvp%2Fcallback&response_type=vp_token&response_mode=direct_post&presentation_definition_uri=https%3A%2F%2Flaunchpad.mattrlabs.com%2Fapi%2Fvp%2Frequest%3Fstate%3D6-obA38Nu9qMPn6GT26flQ&nonce=ddZ6JA75YljfoOBj-9I-nA&state=6-obA38Nu9qMPn6GT26flQ"
     val mattrLaunchpadPresentationDefinitionData =
         "{\"id\":\"vp token example\",\"input_descriptors\":[{\"id\":\"OpenBadgeCredential\",\"format\":{\"jwt_vc_json\":{\"alg\":[\"EdDSA\"]}},\"constraints\":{\"fields\":[{\"path\":[\"\$.type\"],\"filter\":{\"type\":\"string\",\"pattern\":\"OpenBadgeCredential\"}}]}}]}"
+
+
+    val ONLINE_TEST: Boolean = true
+    @Test
+    suspend fun testRequestByReference() {
+        val reqUri = when(ONLINE_TEST) {
+            true -> testCreateEntraPresentationRequest()
+            else -> "openid-vc://?request_uri=$VP_VERIFIER_BASE_URL/req/6af1f46f-8d91-4eaa-b0c0-f042b7a621f8"
+        }
+        reqUri shouldNotBe null
+        val authReq = AuthorizationRequest.fromHttpParametersAuto(parseQueryString(Url(reqUri!!).encodedQuery).toMap())
+        authReq.clientId shouldBe "did:web:entra.walt.id"
+
+        val tokenResponse = testWallet.processImplicitFlowAuthorization(authReq)
+        val resp = http.submitForm(authReq.responseUri ?: authReq.redirectUri ?: throw Exception("response_uri or redirect_uri must be set"),
+            parameters {
+                tokenResponse.toHttpParameters().forEach { entry ->
+                    entry.value.forEach { append(entry.key, it) }
+                }
+                append("id_token", ms_id_token)
+            })
+        println("Resp: $resp")
+        resp.status shouldBe HttpStatusCode.OK
+    }
+
+    suspend fun entraAuthorize(): String {
+        val tenantId = "8bc955d9-38fd-4c15-a520-0c656407537a"
+        val clientId = "e50ceaa6-8554-4ae6-bfdf-fd95e2243ae0"
+        val clientSecret = "ctL8Q~Ezdrcrju85gEtvbCmQQDmm7bXjJKsdXbCr"
+        val response = http.submitForm("https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token", parameters {
+            append("client_id", clientId)
+            append("scope", "3db474b9-6a0c-4840-96ac-1fceb342124f/.default")
+            append("client_secret", clientSecret)
+            append("grant_type", "client_credentials")
+        }).body<JsonObject>()
+        return "${response["token_type"]!!.jsonPrimitive.content} ${response["access_token"]!!.jsonPrimitive.content}"
+    }
+    // Point browser to: https://login.microsoftonline.com/8bc955d9-38fd-4c15-a520-0c656407537a/oauth2/v2.0/authorize?client_id=e50ceaa6-8554-4ae6-bfdf-fd95e2243ae0&response_type=id_token&redirect_uri=http%3A%2F%2Flocalhost:8000%2F&response_mode=fragment&scope=openid&state=12345&nonce=678910&login_hint=test%40severinstamplergmail.onmicrosoft.com
+    val ms_id_token = "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsImtpZCI6IlQxU3QtZExUdnlXUmd4Ql82NzZ1OGtyWFMtSSJ9.eyJhdWQiOiJlNTBjZWFhNi04NTU0LTRhZTYtYmZkZi1mZDk1ZTIyNDNhZTAiLCJpc3MiOiJodHRwczovL2xvZ2luLm1pY3Jvc29mdG9ubGluZS5jb20vOGJjOTU1ZDktMzhmZC00YzE1LWE1MjAtMGM2NTY0MDc1MzdhL3YyLjAiLCJpYXQiOjE3MDMwMDExMjQsIm5iZiI6MTcwMzAwMTEyNCwiZXhwIjoxNzAzMDA1MDI0LCJhaW8iOiJBVVFBdS84VkFBQUF0ZTdkTWtZcFN2WWhwaUxpVmluSXF4V1hJREhXb1FoRnpUZVAwc0RLRGxiTWtRT0ZtRzJqckwxQ0dlVXlzTDlyVEg2emhPOTBJenJ3VExFbWc3elBJUT09IiwiY2MiOiJDZ0VBRWlSelpYWmxjbWx1YzNSaGJYQnNaWEpuYldGcGJDNXZibTFwWTNKdmMyOW1kQzVqYjIwYUVnb1FoY0UxZmwvS1lFMmJZT0c5R1FZN2VTSVNDaEJ6TVltQTdXQTFTNFNubmxyY3RXNEFNZ0pGVlRnQSIsIm5vbmNlIjoiNjc4OTEwIiwicmgiOiIwLkFYa0EyVlhKaV8wNEZVeWxJQXhsWkFkVGVxYnFET1ZVaGVaS3Y5XzlsZUlrT3VDVUFGVS4iLCJzdWIiOiI0cDgyb3hySGhiZ2x4V01oTDBIUmpKbDNRTjZ2eDhMS1pQWkVyLW9wako0IiwidGlkIjoiOGJjOTU1ZDktMzhmZC00YzE1LWE1MjAtMGM2NTY0MDc1MzdhIiwidXRpIjoiY3pHSmdPMWdOVXVFcDU1YTNMVnVBQSIsInZlciI6IjIuMCJ9.DE9LEsmzx9BG0z4Q7d-g_CH8ach4-cm7yztGHuHJykdLCjznu131nRsOFc9HdnIIqzHUX8kj1ZtAlPMLRaDYVYasKomRO4Fx7GCLY6kG5szQZJ8t8hkwX4O_zk7IaDHtn4HiyfwfSPwZjknMiQpTyiAqUqt0tR8ojSf5VeKnQmChvmp0w86izNYwTmWx5OOx2FXLsDEmvF42mp96bSsvyQt6hn4FcmhYkE4nf_5nHssb3SsL485ppHjWOvj81nGanK_u4iKVkfY_9KFF98hOwtWEi1UyvlTo5CdyYkehV0ZVs4gFAKiV7L5uasI-MYIlg0kUEK-mtMjHhU9TWIa4SA"
+
+    suspend fun testCreateEntraPresentationRequest(): String? {
+        val accessToken = entraAuthorize()
+        val createPresentationRequestBody = "{\n" +
+            "    \"authority\": \"did:web:entra.walt.id\",\n" +
+            "    \"callback\": {\n" +
+            "        \"headers\": {\n" +
+            "            \"api-key\": \"1234\"\n" +
+            "        },\n" +
+            "        \"state\": \"1234\",\n" +
+            "        \"url\": \"https://0406-62-178-27-231.ngrok-free.app\"\n" +
+            "    },\n" +
+            "    \"registration\": {\n" +
+            "        \"clientName\": \"verifiable-credentials-app\"\n" +
+            "    },\n" +
+            "    \"requestedCredentials\": [\n" +
+            "        {\n" +
+            "            \"acceptedIssuers\": [\n" +
+            "                \"did:web:entra.walt.id\"\n" +
+            "            ],\n" +
+            "            \"purpose\": \"TEST\",\n" +
+            "            \"type\": \"VerifiedEmployee\"\n" +
+            "        }\n" +
+            "    ]\n" +
+            "}"
+        val response = http.post("https://verifiedid.did.msidentity.com/v1.0/verifiableCredentials/createPresentationRequest") {
+            header(HttpHeaders.Authorization, accessToken)
+            contentType(ContentType.Application.Json)
+            setBody(createPresentationRequestBody)
+        }
+        response.status shouldBe HttpStatusCode.Created
+        val responseObj = response.body<JsonObject>()
+        return responseObj["url"]?.jsonPrimitive?.content
+    }
 }
