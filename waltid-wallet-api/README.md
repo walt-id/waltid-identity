@@ -1,7 +1,7 @@
 <div align="center">
- <h1>Web Wallet (API/Backend)</h1>
+ <h1>Wallet API</h1>
  <span>by </span><a href="https://walt.id">walt.id</a>
- <p>Custodian white-label web-wallet solution for Verifiable Credentials and NFTs<p>
+ <p>Identity wallets to manage Keys, DIDs, Credentials, and NFTs/SBTs<p>
 
 <a href="https://walt.id/community">
 <img src="https://img.shields.io/badge/Join-The Community-blue.svg?style=flat" alt="Join community!" />
@@ -15,12 +15,13 @@
 
 ## Getting Started
 
-- [Intro Video](https://youtu.be/HW9CNFmRFlI) - Learn about features and see a demo.
+- [Intro Video](https://www.youtube.com/watch?v=ILaSAxjoHbw&t=1s) - Learn about features and see a demo.
+- [Documentation](https://docs.oss.walt.id/wallet/api/getting-started) - Learn how to create and manage identity wallets.
 
 
 ### Running The Project
 
-From the root-folder you can run the wallet-api including the necessary configuration as well as other relevant services and apps like the wallet frontend by the following command:
+From the root folder, you can run the wallet-api, including the necessary configuration as well as other relevant services and apps like the wallet frontend by the following command:
 
 ```bash
 cd docker-compose && docker compose up
@@ -34,27 +35,11 @@ Update the wallet-api container by running the following commands from the root 
 docker build -t waltid/wallet-api -f waltid-wallet-api/Dockerfile .
 ```
 
-Note that this is project only the backend of the web-wallet. The corresponding frontend is in the /waltid-web-wallet folder.
+Note the wallet-api is used by the waltid-web-wallet to provide all the functionality.
 
-## What is the Web-Wallet?
+## What is the Wallet API?
 
-A **white-label solution** built on top of our core libs, offering you everything to build identity POCs leveraging Verifiable Credentials and NFTs/Tokens across ecosystems.
-
-### Features
-
-Features are provided by our libraries SSI-Kit and NFT-Kit to enable SSI and NFT functionality
-
-### SSI
-
-- **Manage VCs** - Receive, Store and Present Verifiable Credentials with different formats (e.g. W3C) and proof-types (e.g. JWT, SD-JWT). Full overview of formats and proof-types [here](https://walt-id.notion.site/Features-by-Product-aab646e46a744a7d84a6b8fd6b7066ac?pvs=4).
-- **Manage DIDs** - Create and delete DIDs and onboard to different ecosystems (e.g. did:key, did:jwt, did:ebsi, did:cheqd, did:web and more) Full list [here](https://walt-id.notion.site/Features-by-Product-aab646e46a744a7d84a6b8fd6b7066ac?pvs=4).
-- **Manage Keys** - Create, import and export keys with different algorithms (e.g. Ed25519). Full list [here](https://walt-id.notion.site/Features-by-Product-aab646e46a744a7d84a6b8fd6b7066ac?pvs=4).
-  
-- **Credential Exchange** - Based on OIDC standards (OIDC4VC & OIDC4VP) using synchronous flows with same device and cross device support as well as asynchronous flows leveraging the browser notification system.
-
-### NFTs
-
-- **View NFTs** - Display NFTs from different ecosystems (e.g. Ethereum, Near, Flow and more) in one coherent interface.
+The Wallet-API is designed to provide a broad range of API endpoints that let you offer identity wallets to users capable of handling different keys, DIDs, and credential types and facilitate the receipt and presentation of credentials from various issuers and verifiers using the OIDC4VC protocol standard. Alongside digital identity capabilities, it also supports the integration of web3 wallets. This feature enables your users to view their tokens from different blockchain ecosystems like Ethereum, Polygon, and more.
 
 
 ## Join the community
