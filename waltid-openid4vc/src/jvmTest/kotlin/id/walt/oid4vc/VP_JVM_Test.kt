@@ -588,7 +588,7 @@ class VP_JVM_Test : AnnotationSpec() {
 
 
     val ONLINE_TEST: Boolean = true
-    @Test
+    //@Test
     suspend fun testRequestByReference() {
         val reqUri = when(ONLINE_TEST) {
             true -> testCreateEntraPresentationRequest()
@@ -634,7 +634,7 @@ class VP_JVM_Test : AnnotationSpec() {
             "            \"api-key\": \"1234\"\n" +
             "        },\n" +
             "        \"state\": \"1234\",\n" +
-            "        \"url\": \"https://0406-62-178-27-231.ngrok-free.app\"\n" +
+            "        \"url\": \"https://d1b9-62-178-27-231.ngrok-free.app/callback\"\n" +
             "    },\n" +
             "    \"registration\": {\n" +
             "        \"clientName\": \"verifiable-credentials-app\"\n" +
@@ -645,7 +645,7 @@ class VP_JVM_Test : AnnotationSpec() {
             "                \"did:web:entra.walt.id\"\n" +
             "            ],\n" +
             "            \"purpose\": \"TEST\",\n" +
-            "            \"type\": \"VerifiedEmployee\"\n" +
+            "            \"type\": \"MyID\"\n" +
             "        }\n" +
             "    ]\n" +
             "}"
