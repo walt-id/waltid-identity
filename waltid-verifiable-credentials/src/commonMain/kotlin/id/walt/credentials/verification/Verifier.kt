@@ -19,19 +19,17 @@ import kotlin.time.measureTime
 
 object Verifier {
 
-    private fun JsonObject.getW3CType() =
-        (this["type"] ?: this["vc"]?.jsonObject?.get("type") ?: this["vp"]?.jsonObject?.get("type")
-        ?: throw IllegalArgumentException("No `type` supplied: $this")).let {
-            when (it) {
-                is JsonArray -> (it.lastOrNull()
-                    ?: throw IllegalArgumentException("Empty `type` array! Please provide an type in the list."))
-                    .jsonPrimitive.content
+    private fun JsonObject.getW3CType() = (this["type"] ?: this["vc"]?.jsonObject?.get("type") ?: this["vp"]?.jsonObject?.get("type")
+    ?: throw IllegalArgumentException("No `type` supplied: $this")).let {
+        when (it) {
+            is JsonArray -> (it.lastOrNull()
+                ?: throw IllegalArgumentException("Empty `type` array! Please provide an type in the list.")).jsonPrimitive.content
 
-                is JsonPrimitive -> it.content
-                else -> throw IllegalArgumentException("Invalid type of `type`-attribute: ${it::class.simpleName}")
+            is JsonPrimitive -> it.content
+            else -> throw IllegalArgumentException("Invalid type of `type`-attribute: ${it::class.simpleName}")
 
-            }
         }
+    }
 
 
     suspend fun PolicyRequest.runPolicyRequest(dataToVerify: JsonElement, context: Map<String, Any>): Result<Any> {
@@ -60,6 +58,56 @@ object Verifier {
         }
     }
 
+    suspend fun verifyCredential(
+        jwt: String, policies: List<PolicyRequest>, context: Map<String, Any> = emptyMap()
+    ): List<PolicyResult> {
+        val results = ArrayList<PolicyResult>()
+        val resultMutex = Mutex()
+
+        runPolicyRequests(jwt, policies, context, onSuccess = { policyResult ->
+            resultMutex.withLock {
+                results.add(policyResult)
+            }
+        }, onError = { policyResult, exception ->
+            println("Error executing policy: ${policyResult.request.policy.name}")
+            exception.printStackTrace()
+            resultMutex.withLock {
+                results.add(policyResult)
+            }
+        })
+
+        return results
+    }
+
+
+    suspend fun runPolicyRequests(
+        jwt: String,
+        policyRequests: List<PolicyRequest>,
+        context: Map<String, Any> = emptyMap(),
+        onSuccess: suspend (PolicyResult) -> Unit,
+        onError: suspend (PolicyResult, Throwable) -> Unit
+    ) {
+        coroutineScope {
+            policyRequests.forEach { policyRequest ->
+                launch {
+                    runCatching {
+                        val dataForPolicy: JsonElement = when (policyRequest.policy) {
+                            is JwtVerificationPolicy -> JsonPrimitive(jwt)
+
+                            is CredentialDataValidatorPolicy, is CredentialWrapperValidatorPolicy -> jwt.decodeJws().payload
+
+                            else -> throw IllegalArgumentException("Unsupported policy type: ${policyRequest.policy::class.simpleName}")
+                        }
+                        val runResult = policyRequest.runPolicyRequest(dataForPolicy, context)
+                        val policyResult = PolicyResult(policyRequest, runResult)
+                        onSuccess(policyResult)
+                    }.onFailure {
+                        onError(PolicyResult(policyRequest, Result.failure(it)), it)
+                    }
+                }
+            }
+        }
+    }
 
     suspend fun verifyPresentation(
         vpTokenJwt: String,
@@ -72,11 +120,8 @@ object Verifier {
         val payload = providedJws.payload
         val vpType = payload.getW3CType()
 
-        val verifiableCredentialJwts =
-            (payload["vp"]?.jsonObject?.get("verifiableCredential") ?: payload["verifiableCredential"]
-            ?: TODO("Provided data does not have `verifiableCredential` array."))
-                .jsonArray
-                .map { it.jsonPrimitive.content }
+        val verifiableCredentialJwts = (payload["vp"]?.jsonObject?.get("verifiableCredential") ?: payload["verifiableCredential"]
+        ?: TODO("Provided data does not have `verifiableCredential` array.")).jsonArray.map { it.jsonPrimitive.content }
 
 
         val results = ArrayList<PresentationResultEntry>()
@@ -86,47 +131,29 @@ object Verifier {
 
         val time = measureTime {
             coroutineScope {
-                suspend fun runPolicyRequests(
-                    resultIdx: Int,
-                    policyRequests: List<PolicyRequest>,
-                    jwt: String,
-                    context: Map<String, Any> = emptyMap()
-                ) {
-                    policyRequests.forEach { policyRequest ->
-                        launch {
-                            runCatching {
-                                val dataForPolicy: JsonElement = when (policyRequest.policy) {
-                                    is JwtVerificationPolicy -> JsonPrimitive(jwt)
-
-                                    is CredentialDataValidatorPolicy, is CredentialWrapperValidatorPolicy -> jwt.decodeJws().payload
-
-                                    else -> throw IllegalArgumentException("Unsupported policy type: ${policyRequest.policy::class.simpleName}")
-                                }
-                                val runResult = policyRequest.runPolicyRequest(dataForPolicy, context)
-                                val policyResult = PolicyResult(policyRequest, runResult)
-                                resultMutex.withLock {
-                                    policiesRun++
-                                    results[resultIdx].policyResults.add(policyResult)
-                                }
-                            }.onFailure {
-                                println("Error executing policy: ${policyRequest.policy.name}")
-                                it.printStackTrace()
-                                resultMutex.withLock {
-                                    results[resultIdx].policyResults.add(PolicyResult(policyRequest, Result.failure(it)))
-                                }
-                            }
-                        }
-                    }
-                }
-
                 fun addResultEntryFor(type: String): Int {
                     results.add(PresentationResultEntry(type))
                     return results.size - 1
                 }
 
+                suspend fun runPolicyRequests(idx: Int, jwt: String, policies: List<PolicyRequest>) =
+                    runPolicyRequests(jwt, policies, presentationContext, onSuccess = { policyResult ->
+                        resultMutex.withLock {
+                            policiesRun++
+                            results[idx].policyResults.add(policyResult)
+                        }
+                    }, onError = { policyResult, exception ->
+                        println("Error executing policy: ${policyResult.request.policy.name}")
+                        exception.printStackTrace()
+                        resultMutex.withLock {
+                            policiesRun++
+                            results[idx].policyResults.add(policyResult)
+                        }
+                    })
+
                 /* VP Policies */
                 val vpIdx = addResultEntryFor(vpType)
-                runPolicyRequests(vpIdx, vpPolicies, vpTokenJwt, presentationContext)
+                runPolicyRequests(vpIdx, vpTokenJwt, vpPolicies)
 
                 // VCs
                 verifiableCredentialJwts.forEach { credentialJwt ->
@@ -134,14 +161,13 @@ object Verifier {
                     val vcIdx = addResultEntryFor(credentialType)
 
                     /* Global VC Policies */
-                    runPolicyRequests(vcIdx, globalVcPolicies, credentialJwt)
+                    runPolicyRequests(vcIdx, credentialJwt, globalVcPolicies)
 
                     /* Specific Credential Policies */
                     specificCredentialPolicies[credentialType]?.let { specificPolicyRequests ->
-                        runPolicyRequests(vcIdx, specificPolicyRequests, credentialJwt)
+                        runPolicyRequests(vcIdx, credentialJwt, specificPolicyRequests)
                     }
                 }
-
             }
         }
 
@@ -151,9 +177,8 @@ object Verifier {
     private val EMPTY_MAP = emptyMap<String, Any>()
 
     @Suppress("UNCHECKED_CAST" /* as? */)
-    suspend fun verifyJws(jwt: String): Result<JsonObject> =
-        JwtSignaturePolicy().verify(jwt, null, EMPTY_MAP) as? Result<JsonObject>
-            ?: Result.failure(IllegalArgumentException("Could not get JSONObject from VC verification"))
+    suspend fun verifyJws(jwt: String): Result<JsonObject> = JwtSignaturePolicy().verify(jwt, null, EMPTY_MAP) as? Result<JsonObject>
+        ?: Result.failure(IllegalArgumentException("Could not get JSONObject from VC verification"))
 
 
 }
@@ -217,13 +242,8 @@ suspend fun main() {
     println("SP Policies: $specificPolicies")
 
     val r = Verifier.verifyPresentation(
-        vpTokenJwt = vpToken,
-        vpPolicies = vpPolicies,
-        globalVcPolicies = vcPolicies,
-        specificCredentialPolicies = specificPolicies,
-        mapOf(
-            "presentationSubmission" to JsonObject(emptyMap()),
-            "challenge" to "abc"
+        vpTokenJwt = vpToken, vpPolicies = vpPolicies, globalVcPolicies = vcPolicies, specificCredentialPolicies = specificPolicies, mapOf(
+            "presentationSubmission" to JsonObject(emptyMap()), "challenge" to "abc"
         )
     )
 
@@ -232,4 +252,8 @@ suspend fun main() {
             r.toJson()
         )
     )
+
+    val x = r.results.flatMap { it.policyResults }
+    println("Results: " + x.size)
+    println("OK: ${x.count { it.isSuccess() }}")
 }
