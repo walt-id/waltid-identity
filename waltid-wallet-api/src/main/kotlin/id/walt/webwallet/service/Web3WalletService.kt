@@ -16,7 +16,7 @@ object Web3WalletService {
      * @param wallet the [WalletDataTransferObject]
      * @return the [LinkedWalletDataTransferObject] representing the web3 wallet
      */
-    fun link(tenant: String?, accountId: UUID, wallet: WalletDataTransferObject): LinkedWalletDataTransferObject =
+    fun link(tenant: String, accountId: UUID, wallet: WalletDataTransferObject): LinkedWalletDataTransferObject =
         Web3Wallets.insert {
             it[Web3Wallets.tenant] = tenant
             it[Web3Wallets.accountId] = accountId
@@ -32,7 +32,7 @@ object Web3WalletService {
      * @param walletId the wallet's [UUID]
      * @return true - if operation succeeded, false - otherwise
      */
-    fun unlink(tenant: String?, accountId: UUID, walletId: UUID): Boolean = transaction {
+    fun unlink(tenant: String, accountId: UUID, walletId: UUID): Boolean = transaction {
         Web3Wallets.deleteWhere { (Web3Wallets.tenant eq tenant) and (Web3Wallets.accountId eq accountId) and (id eq walletId) }
     } == 1
 
@@ -43,7 +43,7 @@ object Web3WalletService {
      * @param walletId the [WalletDataTransferObject]
      * @return true - if operation succeeded, false - otherwise
      */
-    fun connect(tenant: String?, accountId: UUID, walletId: UUID): Boolean = setIsOwner(tenant, accountId, walletId, true) == 1
+    fun connect(tenant: String, accountId: UUID, walletId: UUID): Boolean = setIsOwner(tenant, accountId, walletId, true) == 1
 
     /**
      * Resets the owner property for the given account
@@ -51,14 +51,14 @@ object Web3WalletService {
      * @param walletId the wallet's [UUID]
      * @return true - if operation succeeded, false - otherwise
      */
-    fun disconnect(tenant: String?, accountId: UUID, walletId: UUID): Boolean = setIsOwner(tenant, accountId, walletId, false) == 1
+    fun disconnect(tenant: String, accountId: UUID, walletId: UUID): Boolean = setIsOwner(tenant, accountId, walletId, false) == 1
 
     /**
      * Fetches the wallets for a given account
      * @param accountId the account's [UUID]
      * @return A list of [LinkedWalletDataTransferObject]s
      */
-    fun getLinked(tenant: String?, accountId: UUID) =
+    fun getLinked(tenant: String, accountId: UUID) =
         /** TODO:
          * include accounts created from wallet-addresses
          * which are owners for 'accountId' (i.e. account-wallet pairs where wallet is owner)
@@ -80,7 +80,7 @@ object Web3WalletService {
             }
         }
 
-    private fun setIsOwner(tenant: String?, accountId: UUID, walletId: UUID, isOwner: Boolean) = transaction {
+    private fun setIsOwner(tenant: String, accountId: UUID, walletId: UUID, isOwner: Boolean) = transaction {
         Web3Wallets.update(
             {(Web3Wallets.tenant eq tenant) and (Web3Wallets.accountId eq accountId) and (Web3Wallets.id eq walletId) }
         ) {

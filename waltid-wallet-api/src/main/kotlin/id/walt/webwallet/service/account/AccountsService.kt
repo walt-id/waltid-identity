@@ -24,7 +24,7 @@ import org.jetbrains.exposed.sql.transactions.transaction
 
 object AccountsService {
 
-    suspend fun register(tenant: String? = null, request: AccountRequest): Result<RegistrationResult> = when (request) {
+    suspend fun register(tenant: String = "", request: AccountRequest): Result<RegistrationResult> = when (request) {
         is EmailAccountRequest -> EmailAccountStrategy.register(tenant, request)
         is AddressAccountRequest -> Web3WalletAccountStrategy.register(tenant, request)
     }.onSuccess { registrationResult ->
@@ -69,7 +69,7 @@ object AccountsService {
             it[Issuers.id]
         }?.value
 
-    suspend fun authenticate(tenant: String?, request: AccountRequest): Result<AuthenticationResult> = runCatching {
+    suspend fun authenticate(tenant: String, request: AccountRequest): Result<AuthenticationResult> = runCatching {
         when (request) {
             is EmailAccountRequest -> EmailAccountStrategy.authenticate(tenant, request)
             is AddressAccountRequest -> Web3WalletAccountStrategy.authenticate(tenant, request)
@@ -95,7 +95,7 @@ object AccountsService {
     },
         onFailure = { Result.failure(it) })
 
-    fun getAccountWalletMappings(tenant: String?, account: UUID) =
+    fun getAccountWalletMappings(tenant: String, account: UUID) =
         AccountWalletListing(account, wallets =
         transaction {
             AccountWalletMappings.innerJoin(Wallets)
@@ -113,7 +113,7 @@ object AccountsService {
         )
 
 
-    fun hasAccountEmail(tenant: String?, email: String) = transaction { Accounts.select { (Accounts.tenant eq tenant) and (Accounts.email eq email) }.count() > 0 }
+    fun hasAccountEmail(tenant: String, email: String) = transaction { Accounts.select { (Accounts.tenant eq tenant) and (Accounts.email eq email) }.count() > 0 }
     fun hasAccountWeb3WalletAddress(address: String) =
         transaction {
             Accounts.innerJoin(Web3Wallets)
@@ -149,6 +149,6 @@ data class AuthenticatedUser(
 )
 
 interface AccountStrategy<in T : AccountRequest> {
-    fun register(tenant: String?, request: T): Result<RegistrationResult>
-    suspend fun authenticate(tenant: String?, request: T): AuthenticatedUser
+    fun register(tenant: String, request: T): Result<RegistrationResult>
+    suspend fun authenticate(tenant: String, request: T): AuthenticatedUser
 }

@@ -13,7 +13,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.uuid.UUID
 
-abstract class WalletService(val tenant: String?, val accountId: UUID, val walletId: UUID) {
+abstract class WalletService(val tenant: String, val accountId: UUID, val walletId: UUID) {
 
     // WalletCredentials
     abstract fun listCredentials(): List<WalletCredential>

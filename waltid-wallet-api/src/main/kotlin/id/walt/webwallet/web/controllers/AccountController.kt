@@ -1,8 +1,8 @@
 package id.walt.webwallet.web.controllers
 
+import id.walt.web.controllers.getUserUUID
 import id.walt.webwallet.db.models.AccountWalletListing
 import id.walt.webwallet.service.account.AccountsService
-import id.walt.web.controllers.getUserUUID
 import id.walt.webwallet.web.WebBaseRoutes.authenticatedWebWalletRoute
 import io.github.smiley4.ktorswaggerui.dsl.get
 import io.github.smiley4.ktorswaggerui.dsl.route
@@ -21,7 +21,7 @@ fun Application.accounts() {
                     response { HttpStatusCode.OK to { body<AccountWalletListing>() } }
                 }) {
                     val user = getUserUUID()
-                    context.respond(AccountsService.getAccountWalletMappings(null, user)) // FIX ME -> TENANT HERE
+                    context.respond(AccountsService.getAccountWalletMappings("", user)) // FIX ME -> TENANT HERE
                 }
             }
         }

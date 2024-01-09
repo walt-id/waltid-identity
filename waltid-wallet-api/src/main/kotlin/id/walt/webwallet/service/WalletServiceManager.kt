@@ -18,13 +18,13 @@ object WalletServiceManager {
 
     private val walletServices = ConcurrentHashMap<Pair<UUID, UUID>, WalletService>()
 
-    fun getWalletService(tenant: String?, account: UUID, wallet: UUID): WalletService =
+    fun getWalletService(tenant: String, account: UUID, wallet: UUID): WalletService =
         walletServices.getOrPut(Pair(account, wallet)) {
             //WalletKitWalletService(account, wallet)
             SSIKit2WalletService(tenant, account, wallet)
         }
 
-    fun createWallet(tenant: String?, forAccount: UUID): UUID {
+    fun createWallet(tenant: String, forAccount: UUID): UUID {
         val accountName = AccountsService.getNameFor(forAccount)
 
         // TODO: remove testing code / lock behind dev-mode
@@ -61,7 +61,7 @@ object WalletServiceManager {
     }
 
     @Deprecated(replaceWith = ReplaceWith("AccountsService.getAccountWalletMappings(account)", "id.walt.service.account.AccountsService"), message = "depreacted")
-    fun listWallets(tenant: String?, account: UUID): List<UUID> =
+    fun listWallets(tenant: String, account: UUID): List<UUID> =
         AccountWalletMappings.innerJoin(Wallets).select { (AccountWalletMappings.tenant eq tenant) and (AccountWalletMappings.accountId eq account) }.map {
             it[Wallets.id].value
         }
