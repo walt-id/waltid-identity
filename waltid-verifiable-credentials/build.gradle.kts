@@ -2,6 +2,7 @@ plugins {
     kotlin("multiplatform")
     kotlin("plugin.serialization")
     id("maven-publish")
+    id("dev.petuska.npm.publish") version "3.4.1"
     id("com.github.ben-manes.versions")
 }
 
@@ -131,6 +132,23 @@ kotlin {
         }
         all {
             languageSettings.enableLanguageFeature("InlineClasses")
+        }
+    }
+}
+
+npmPublish {
+    registries {
+        val envToken = System.getenv("NPM_TOKEN")
+        val npmTokenFile = File("secret_npm_token.txt")
+        val secretNpmToken = envToken ?: npmTokenFile.let { if (it.isFile) it.readLines().first() else "" }
+        val hasNPMToken = secretNpmToken.isNotEmpty()
+        val isReleaseBuild = Regex("\\d+.\\d+.\\d+").matches(version.get())
+        if (isReleaseBuild && hasNPMToken) {
+            readme.set(File("README.md"))
+            register("npmjs") {
+                uri.set(uri("https://registry.npmjs.org"))
+                authToken.set(secretNpmToken)
+            }
         }
     }
 }
