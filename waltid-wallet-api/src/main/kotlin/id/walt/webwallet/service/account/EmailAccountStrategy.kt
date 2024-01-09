@@ -1,9 +1,9 @@
 package id.walt.webwallet.service.account
 
 import de.mkammerer.argon2.Argon2Factory
+import id.walt.web.controllers.ByteLoginRequest
 import id.walt.webwallet.db.models.Accounts
 import id.walt.webwallet.web.UnauthorizedException
-import id.walt.web.controllers.ByteLoginRequest
 import id.walt.webwallet.web.model.EmailAccountRequest
 import kotlinx.datetime.Clock
 import kotlinx.datetime.toJavaInstant
@@ -15,7 +15,7 @@ import org.jetbrains.exposed.sql.select
 import org.jetbrains.exposed.sql.transactions.transaction
 
 object EmailAccountStrategy : AccountStrategy<EmailAccountRequest> {
-    override fun register(tenant: String?, request: EmailAccountRequest): Result<RegistrationResult> = runCatching {
+    override fun register(tenant: String, request: EmailAccountRequest): Result<RegistrationResult> = runCatching {
         val name = request.name ?: throw IllegalArgumentException("No name provided!")
         val email = request.email
 
@@ -39,7 +39,7 @@ object EmailAccountStrategy : AccountStrategy<EmailAccountRequest> {
         RegistrationResult(createdAccountId)
     }
 
-    override suspend fun authenticate(tenant: String?, request: EmailAccountRequest): AuthenticatedUser = ByteLoginRequest(request).let { req ->
+    override suspend fun authenticate(tenant: String, request: EmailAccountRequest): AuthenticatedUser = ByteLoginRequest(request).let { req ->
         val email = request.email
 
         if (!AccountsService.hasAccountEmail(tenant, email)) {

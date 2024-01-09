@@ -1,12 +1,12 @@
 package id.walt.webwallet.service.nft
 
+import id.walt.nftkit.services.*
 import id.walt.webwallet.config.ChainExplorerConfiguration
 import id.walt.webwallet.config.ConfigManager
 import id.walt.webwallet.config.MarketPlaceConfiguration
 import id.walt.webwallet.db.models.Web3Wallets
-import id.walt.nftkit.services.*
-import id.walt.webwallet.service.nft.fetchers.DataFetcher
 import id.walt.webwallet.service.dto.*
+import id.walt.webwallet.service.nft.fetchers.DataFetcher
 import id.walt.webwallet.service.nft.fetchers.parameters.*
 import kotlinx.uuid.UUID
 import org.jetbrains.exposed.sql.and
@@ -49,7 +49,7 @@ class NftKitNftService : NftService {
             }
         }
 
-    override suspend fun filterTokens(tenant: String?, parameter: FilterParameter): List<FilterNftDataTransferObject> =
+    override suspend fun filterTokens(tenant: String, parameter: FilterParameter): List<FilterNftDataTransferObject> =
         parameter.ids.mapNotNull { id ->
             getWalletById(tenant, id)?.let { wallet -> //TODO: fix double conversion to wallet (here + inside getTokens)
                 getChains(wallet.ecosystem).filter { net ->
@@ -62,12 +62,12 @@ class NftKitNftService : NftService {
             }
         }
 
-    override suspend fun getTokens(tenant: String?, parameter: ListFetchParameter): List<NftDetailDataTransferObject> =
+    override suspend fun getTokens(tenant: String, parameter: ListFetchParameter): List<NftDetailDataTransferObject> =
         getWalletById(tenant, parameter.walletId)?.let {
             DataFetcher.select(it.ecosystem).all(TokenListParameter(chain = parameter.chain, accountId = it.address))
         } ?: emptyList()
 
-    override suspend fun getTokenDetails(tenant: String?, parameter: DetailFetchParameter): NftDetailDataTransferObject =
+    override suspend fun getTokenDetails(tenant: String, parameter: DetailFetchParameter): NftDetailDataTransferObject =
         getWalletById(tenant, parameter.walletId)?.let {
             DataFetcher.select(it.ecosystem).byId(
                 TokenDetailParameter(
@@ -80,9 +80,9 @@ class NftKitNftService : NftService {
             )
         } ?: throw IllegalArgumentException("Token details not available: $parameter")
 
-    private fun getWalletById(tenant: String?, accountId: String) = getWalletById(tenant, UUID(accountId))
+    private fun getWalletById(tenant: String, accountId: String) = getWalletById(tenant, UUID(accountId))
 
-    private fun getWalletById(tenant: String?, accountId: UUID) =
+    private fun getWalletById(tenant: String, accountId: UUID) =
         transaction { Web3Wallets.select { (Web3Wallets.tenant eq tenant) and (Web3Wallets.accountId eq accountId) }.firstOrNull() }?.let {
             WalletDataTransferObject(address = it[Web3Wallets.address], ecosystem = it[Web3Wallets.ecosystem])
         }

@@ -30,7 +30,7 @@ object EventService {
 
     fun add(event: Event): Unit = transaction {
         Events.insert {
-            it[tenant] = event.tenant ?: "global"
+            it[tenant] = event.tenant
             it[originator] = event.originator ?: "unknown"
             it[account] = event.account
             it[wallet] = event.wallet

@@ -5,7 +5,7 @@ import kotlinx.uuid.exposed.kotlinxUUID
 import org.jetbrains.exposed.sql.Table
 
 object Web3Wallets : Table("web3wallets") {
-    val tenant = varchar("tenant", 128).nullable() // null = global
+    val tenant = varchar("tenant", 128).default("")
     val accountId = kotlinxUUID("accountId")
 
     val id = kotlinxUUID("id").autoGenerate()

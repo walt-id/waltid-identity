@@ -17,7 +17,7 @@ import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.javatime.timestamp
 
 object WalletOperationHistories : KotlinxUUIDTable("wallet_operation_histories") {
-    val tenant = varchar("tenant", 128).nullable()
+    val tenant = varchar("tenant", 128).default("")
     val accountId = kotlinxUUID("accountId")
     val wallet = reference("wallet", Wallets)
     val timestamp = timestamp("timestamp")
@@ -32,7 +32,7 @@ object WalletOperationHistories : KotlinxUUIDTable("wallet_operation_histories")
 
 @Serializable
 data class WalletOperationHistory(
-    val tenant: String?,
+    val tenant: String,
     val id: UUID? = UUID.generateUUID(),
     val account: UUID,
     val wallet: UUID,
@@ -51,7 +51,7 @@ data class WalletOperationHistory(
     )
 
     companion object {
-        fun new(tenant: String?, wallet: WalletService, operation: String, data: Map<String, String?>) = WalletOperationHistory(
+        fun new(tenant: String, wallet: WalletService, operation: String, data: Map<String, String?>) = WalletOperationHistory(
             tenant = tenant,
             account = wallet.accountId,
             wallet = wallet.walletId,
