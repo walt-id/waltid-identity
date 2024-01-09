@@ -2,7 +2,7 @@
 
 package id.walt.verifier.oidc
 
-import id.walt.credentials.verification.PolicyRunner
+import id.walt.credentials.verification.Verifier
 import id.walt.credentials.verification.models.PolicyRequest
 import id.walt.credentials.verification.models.PresentationVerificationResponse
 import id.walt.oid4vc.data.ResponseMode
@@ -83,7 +83,7 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
 
         println("VP token: $vpToken")
         val results = runBlocking {
-            PolicyRunner.verifyPresentation(
+            Verifier.verifyPresentation(
                 vpTokenJwt = vpToken,
                 vpPolicies = policies.vpPolicies,
                 globalVcPolicies = policies.vcPolicies,

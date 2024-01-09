@@ -17,7 +17,7 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import kotlin.time.measureTime
 
-object PolicyRunner {
+object Verifier {
 
     private fun JsonObject.getW3CType() =
         (this["type"] ?: this["vc"]?.jsonObject?.get("type") ?: this["vp"]?.jsonObject?.get("type")
@@ -216,7 +216,7 @@ suspend fun main() {
     println("VC Policies: $vcPolicies")
     println("SP Policies: $specificPolicies")
 
-    val r = PolicyRunner.verifyPresentation(
+    val r = Verifier.verifyPresentation(
         vpTokenJwt = vpToken,
         vpPolicies = vpPolicies,
         globalVcPolicies = vcPolicies,

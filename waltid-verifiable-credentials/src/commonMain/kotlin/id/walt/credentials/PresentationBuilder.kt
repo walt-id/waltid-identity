@@ -3,10 +3,6 @@ package id.walt.credentials
 import id.walt.crypto.keys.Key
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.did.dids.DidService
-import io.ktor.client.call.*
-import io.ktor.client.request.*
-import io.ktor.client.request.headers
-import io.ktor.http.*
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.serialization.encodeToString

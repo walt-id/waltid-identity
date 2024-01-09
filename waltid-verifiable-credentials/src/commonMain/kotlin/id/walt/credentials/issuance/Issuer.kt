@@ -7,7 +7,10 @@ import id.walt.credentials.vc.vcs.W3CVC
 import id.walt.crypto.keys.Key
 import id.walt.sdjwt.SDMap
 import kotlinx.datetime.Instant
-import kotlinx.serialization.json.*
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.time.Duration.Companion.seconds
 
 object Issuer {
