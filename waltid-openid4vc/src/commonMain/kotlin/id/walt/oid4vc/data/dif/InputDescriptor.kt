@@ -20,6 +20,7 @@ data class InputDescriptor(
     val purpose: String? = null,
     @Serializable(VCFormatMapSerializer::class) val format: Map<VCFormat, VCFormatDefinition>? = null,
     @Serializable(InputDescriptorConstraintsSerializer::class) val constraints: InputDescriptorConstraints? = null,
+    @Serializable(InputDescriptorSchemaListSerializer::class) val schema: List<InputDescriptorSchema>? = null,
     val group: Set<String>? = null,
     override val customParameters: Map<String, JsonElement> = mapOf()
 ) : JsonDataObject() {
