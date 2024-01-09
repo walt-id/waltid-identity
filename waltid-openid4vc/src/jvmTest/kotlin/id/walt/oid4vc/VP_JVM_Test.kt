@@ -589,7 +589,6 @@ class VP_JVM_Test : AnnotationSpec() {
 
     val ONLINE_TEST: Boolean = true
 
-    @Ignore
     @Test
     suspend fun testRequestByReference() {
         val reqUri = when (ONLINE_TEST) {
@@ -633,27 +632,27 @@ class VP_JVM_Test : AnnotationSpec() {
     suspend fun testCreateEntraPresentationRequest(): String? {
         val accessToken = entraAuthorize()
         val createPresentationRequestBody = "{\n" +
-                "    \"authority\": \"did:web:entra.walt.id\",\n" +
-                "    \"callback\": {\n" +
-                "        \"headers\": {\n" +
-                "            \"api-key\": \"1234\"\n" +
-                "        },\n" +
-                "        \"state\": \"1234\",\n" +
-                "        \"url\": \"https://0406-62-178-27-231.ngrok-free.app\"\n" +
-                "    },\n" +
-                "    \"registration\": {\n" +
-                "        \"clientName\": \"verifiable-credentials-app\"\n" +
-                "    },\n" +
-                "    \"requestedCredentials\": [\n" +
-                "        {\n" +
-                "            \"acceptedIssuers\": [\n" +
-                "                \"did:web:entra.walt.id\"\n" +
-                "            ],\n" +
-                "            \"purpose\": \"TEST\",\n" +
-                "            \"type\": \"VerifiedEmployee\"\n" +
-                "        }\n" +
-                "    ]\n" +
-                "}"
+            "    \"authority\": \"did:web:entra.walt.id\",\n" +
+            "    \"callback\": {\n" +
+            "        \"headers\": {\n" +
+            "            \"api-key\": \"1234\"\n" +
+            "        },\n" +
+            "        \"state\": \"1234\",\n" +
+            "        \"url\": \"https://d1b9-62-178-27-231.ngrok-free.app/callback\"\n" +
+            "    },\n" +
+            "    \"registration\": {\n" +
+            "        \"clientName\": \"verifiable-credentials-app\"\n" +
+            "    },\n" +
+            "    \"requestedCredentials\": [\n" +
+            "        {\n" +
+            "            \"acceptedIssuers\": [\n" +
+            "                \"did:web:entra.walt.id\"\n" +
+            "            ],\n" +
+            "            \"purpose\": \"TEST\",\n" +
+            "            \"type\": \"MyID\"\n" +
+            "        }\n" +
+            "    ]\n" +
+            "}"
         val response = http.post("https://verifiedid.did.msidentity.com/v1.0/verifiableCredentials/createPresentationRequest") {
             header(HttpHeaders.Authorization, accessToken)
             contentType(ContentType.Application.Json)
