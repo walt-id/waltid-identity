@@ -8,7 +8,6 @@ const siopPrefixMapping: Map<string, SiopRequestType> = new Map([
     ["openid4vp://", SiopRequestType.PRESENTATION],
     ["openid-initiate-issuance://", SiopRequestType.ISSUANCE],
     ["openid-credential-offer://", SiopRequestType.ISSUANCE],
-    ["openid-vc://", SiopRequestType.ISSUANCE],
 ]);
 
 export function fixRequest(req: string) {
@@ -33,5 +32,10 @@ export function getSiopRequestType(req: string): SiopRequestType | null {
     for (let [key, value] of siopPrefixMapping) {
         if (req.startsWith(key)) return value;
     }
-    return null;
+    if(req.contains("presentationRequests")) // MS Entra!
+        return SiopRequestType.PRESENTATION;
+    else if(req.contains("issuanceRequests")) // MS Entra
+        return SiopRequestType.ISSUANCE;
+    else
+        return null;
 }
