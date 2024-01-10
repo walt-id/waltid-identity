@@ -39,6 +39,11 @@ class PresentationBuilder {
      */
     var nonce: String? = null
 
+    /**
+     * aud: ID of verifier or likewise
+     */
+    var audience: String? = null
+
     var vpContext = listOf("https://www.w3.org/2018/credentials/v1")
     var vpType = listOf("VerifiablePresentation")
 
@@ -53,6 +58,7 @@ class PresentationBuilder {
         "jti" to presentationId,
         "iss" to did,
         "nonce" to (nonce ?: ""),
+        "aud" to (audience ?: ""),
         "vp" to mapOf(
             "@context" to vpContext,
             "type" to vpType,
