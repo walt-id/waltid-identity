@@ -104,8 +104,8 @@ class SSIKit2WalletService(tenant: String, accountId: UUID, walletId: UUID) :
 
         data class TypeFilter(val path: String, val type: String? = null, val pattern: String)
 
-        val filters = presentationDefinition.inputDescriptors.mapNotNull {
-            it.constraints?.fields?.map {
+        val filters = presentationDefinition.inputDescriptors.mapNotNull { inputDescriptor ->
+            inputDescriptor.constraints?.fields?.filter { field -> field.path.any { path -> path.contains("type") } }?.map {
                 val path = it.path.first().removePrefix("$.")
                 val filterType = it.filter?.get("type")?.jsonPrimitive?.content
                 val filterPattern = it.filter?.get("pattern")?.jsonPrimitive?.content
@@ -113,7 +113,14 @@ class SSIKit2WalletService(tenant: String, accountId: UUID, walletId: UUID) :
 
                 TypeFilter(path, filterType, filterPattern)
             }
-        }
+        }.plus(
+            presentationDefinition.inputDescriptors.mapNotNull { inputDescriptor ->
+                inputDescriptor.schema?.map { schema ->
+                    TypeFilter("type", "string", schema.uri)
+                }
+            }
+        )
+
         println("Using filters: $filters")
 
         val matchedCredentials = credentialList.filter { credential ->
