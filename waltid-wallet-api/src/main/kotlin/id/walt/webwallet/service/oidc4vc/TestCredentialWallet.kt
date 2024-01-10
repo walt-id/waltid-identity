@@ -24,6 +24,7 @@ import io.ktor.client.engine.cio.*
 import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
+import io.ktor.util.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
@@ -275,8 +276,9 @@ class TestCredentialWallet(
     override fun putSession(id: String, session: VPresentationSession) = sessionCache.put(id, session)
     override fun removeSession(id: String) = sessionCache.remove(id)
 
-    fun parsePresentationRequest(request: String): AuthorizationRequest {
-        return resolveVPAuthorizationParameters(AuthorizationRequest.fromHttpQueryString(Url(request).encodedQuery))
+    suspend fun parsePresentationRequest(request: String): AuthorizationRequest {
+        val reqParams = Url(request).parameters.toMap()
+        return resolveVPAuthorizationParameters(AuthorizationRequest.fromHttpParametersAuto(reqParams))
     }
 
     fun initializeAuthorization(
