@@ -3,6 +3,7 @@ package id.walt.oid4vc.responses
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.data.dif.PresentationSubmission
 import id.walt.oid4vc.data.dif.PresentationSubmissionSerializer
+import io.ktor.util.*
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
@@ -17,6 +18,7 @@ data class TokenResponse private constructor(
     @SerialName("refresh_token") val refreshToken: String? = null,
     //@SerialName("vp_token") val vpToken: JsonElement? = null,
     @SerialName("vp_token") val vpToken: JsonElement? = null, // FIXME shouldn't this just be a String?
+    @SerialName("id_token") val idToken: String? = null,
     val scope: String? = null,
     @SerialName("c_nonce") val cNonce: String? = null,
     @Serializable(DurationInSecondsSerializer::class)
@@ -42,9 +44,8 @@ data class TokenResponse private constructor(
             authorizationPending: Boolean? = null, interval: Long? = null, state: String?
         ) = TokenResponse(accessToken, tokenType, expiresIn, refreshToken, scope = scope, state = state)
 
-        fun success(vpToken: JsonElement, presentationSubmission: PresentationSubmission, state: String?) =
-            TokenResponse(vpToken = vpToken, presentationSubmission = presentationSubmission, state = state)
-
+        fun success(vpToken: JsonElement, presentationSubmission: PresentationSubmission?, idToken: String?, state: String?) =
+            TokenResponse(vpToken = vpToken, presentationSubmission = presentationSubmission, idToken = idToken, state = state)
         fun error(error: TokenErrorCode, errorDescription: String? = null, errorUri: String? = null) =
             TokenResponse(error = error.name, errorDescription = errorDescription, errorUri = errorUri)
 
@@ -73,6 +74,7 @@ data class TokenResponse private constructor(
                 parameters["expires_in"]?.firstOrNull()?.toLong(),
                 parameters["refresh_token"]?.firstOrNull(),
                 parameters["vp_token"]?.firstOrNull()?.let { Json.parseToJsonElement(it) },
+                parameters["id_token"]?.firstOrNull(),
                 parameters["scope"]?.firstOrNull(),
                 parameters["c_nonce"]?.firstOrNull(),
                 parameters["c_nonce_expires_in"]?.firstOrNull()?.toLong()?.seconds,
@@ -103,6 +105,7 @@ data class TokenResponse private constructor(
                     else -> throw IllegalArgumentException("vpToken is of unsupported JSON type: $it")
                 }
             }
+            idToken?.let { put("id_token", listOf(it)) }
             scope?.let { put("scope", listOf(it)) }
             cNonce?.let { put("c_nonce", listOf(it)) }
             cNonceExpiresIn?.let { put("c_nonce_expires_in", listOf(it.inWholeSeconds.toString())) }
