@@ -175,7 +175,7 @@ console.log("Decoded request: " + request);
 const presentationUrl = new URL(request);
 const presentationParams = presentationUrl.searchParams;
 
-const verifierHost = new URL(presentationParams.get("response_uri") ?? "").host;
+const verifierHost = new URL(presentationParams.get("response_uri") ?? presentationParams.get("redirect_uri") ?? "").host;
 console.log("verifierHost: ", verifierHost);
 
 const presentationDefinition = presentationParams.get("presentation_definition");
