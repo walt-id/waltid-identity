@@ -112,14 +112,12 @@ class SSIKit2WalletService(tenant: String, accountId: UUID, walletId: UUID) :
                     ?: throw IllegalArgumentException("No filter pattern in presentation definition constraint")
 
                 TypeFilter(path, filterType, filterPattern)
-            }
-        }.plus(
-            presentationDefinition.inputDescriptors.mapNotNull { inputDescriptor ->
+            }?.plus(
                 inputDescriptor.schema?.map { schema ->
                     TypeFilter("type", "string", schema.uri)
-                }
-            }
-        )
+                } ?: listOf()
+            )
+        }
 
         println("Using filters: $filters")
 
