@@ -72,6 +72,10 @@ class EBSITestWallet(
         return (didObj["authentication"] ?: didObj["assertionMethod"] ?: didObj["verificationMethod"])?.jsonArray?.firstOrNull()?.jsonObject?.get("id")?.jsonPrimitive?.content ?: did
     }
 
+    override fun getDidFor(session: SIOPSession): String {
+        return TEST_DID
+    }
+
     override fun isPresentationDefinitionSupported(presentationDefinition: PresentationDefinition): Boolean {
         return true
     }
