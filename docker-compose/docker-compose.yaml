@@ -1,14 +1,30 @@
+volumes:
+  postgresdb:
+  pgadmin:
 services:
-  # postgresdb:  # Uncomment to connect a Postgres DB
-  #   image: postgres
-  #   environment:
-  #     POSTGRES_PASSWORD: secret
-  wallet-backend:
-    image: waltid/wallet-api:latest
+  db:
+    image: postgres:alpine
+    healthcheck:
+      test: [ "CMD", "pg_isready", "-q", "-U", "postgres" ]
+      interval: 5s
+      timeout: 1s
+      retries: 2
+    restart: always
+    env_file:
+      - ./postgres.env
     volumes:
-      - ./wallet-backend/config:/waltid-wallet-api/config
-      - ./wallet-backend/walt.yaml:/waltid-wallet-api/walt.yaml
-      - ./wallet-backend/data:/waltid-wallet-api/data
+      - postgresdb:/waltid/wallet-api/data/postgresql
+      - ./db-init.sh:/docker-entrypoint-initdb.d/db-init.sh
+    ports:
+      - '5432:5432'
+  wallet-api:
+    image: waltid/wallet-api:latest
+    depends_on:
+      - db
+    volumes:
+      - ./wallet-api/config:/waltid-wallet-api/config
+      - ./wallet-api/walt.yaml:/waltid-wallet-api/walt.yaml
+      - ./wallet-api/data:/waltid-wallet-api/data # for sqlite database
   waltid-web-wallet:
     image: waltid/waltid-web-wallet:latest
     environment:
@@ -34,6 +50,17 @@ services:
   vc-repo:
     platform: linux/x86_64
     image: waltid/vc-repository:latest
+  pgadmin:
+    image: dpage/pgadmin4
+    links:
+      - db
+    env_file:
+      - ./pgadmin.env
+    volumes:
+      - pgadmin:/waltid/wallet-api/data/pgadmin
+    restart: always
+    ports:
+      - 8081:80
   ingress:
     image: nginx:1.15.10-alpine
     ports:
@@ -41,8 +68,8 @@ services:
         published: $WALLET_FRONTEND_PORT # waltid-web-wallet
         protocol: tcp
         mode: host
-      - target: $WALLET_BACKEND_PORT
-        published: $WALLET_BACKEND_PORT # wallet-api
+      - target: $WALLET_API_PORT
+        published: $WALLET_API_PORT # wallet-api
         protocol: tcp
         mode: host
       - target: $WEB_PORTAL_PORT
