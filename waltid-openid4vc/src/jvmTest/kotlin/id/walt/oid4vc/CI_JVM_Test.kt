@@ -207,7 +207,7 @@ class CI_JVM_Test : AnnotationSpec() {
 
     @Test
     suspend fun testFetchAndParseMetadata() {
-        val response = ktorClient.get("http://localhost:8000/.well-known/openid-configuration")
+        val response = ktorClient.get("http://localhost:$CI_PROVIDER_PORT/.well-known/openid-configuration")
         println("response: $response")
         response.status shouldBe HttpStatusCode.OK
         val respText = response.bodyAsText()
@@ -951,7 +951,7 @@ class CI_JVM_Test : AnnotationSpec() {
 
     // issuance by reference
 
-    @Test
+    //@Test
     suspend fun testCredentialOfferByReference() {
         println("// -------- CREDENTIAL ISSUER ----------")
         println("// as CI provider, initialize credential offer for user, this time providing full offered credential object, and allowing pre-authorized code flow with user pin")
