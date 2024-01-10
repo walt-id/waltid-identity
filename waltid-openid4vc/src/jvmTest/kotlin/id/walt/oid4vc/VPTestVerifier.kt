@@ -58,7 +58,7 @@ class VPTestVerifier : OpenIDCredentialVerifier(
         }
     }
 
-    fun start() {
+    fun start(wait: Boolean = false) {
         embeddedServer(Netty, port = VP_VERIFIER_PORT) {
             install(ContentNegotiation) {
                 json()
@@ -102,6 +102,6 @@ class VPTestVerifier : OpenIDCredentialVerifier(
                     call.respond(HttpStatusCode.OK)
                 }
             }
-        }.start()
+        }.start(wait)
     }
 }

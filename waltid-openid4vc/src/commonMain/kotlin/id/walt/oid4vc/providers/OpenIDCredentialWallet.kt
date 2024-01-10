@@ -7,6 +7,7 @@ import id.walt.oid4vc.errors.*
 import id.walt.oid4vc.interfaces.IHttpClient
 import id.walt.oid4vc.interfaces.ITokenProvider
 import id.walt.oid4vc.interfaces.IVPTokenProvider
+import id.walt.oid4vc.interfaces.PresentationResult
 import id.walt.oid4vc.requests.*
 import id.walt.oid4vc.responses.*
 import id.walt.oid4vc.util.randomUUID
@@ -40,6 +41,11 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
      * @return Key ID of resolved DID, as resolvable by given crypto provider
      */
     abstract fun resolveDID(did: String): String
+
+    /**
+     * Get the DID to use for this session
+     */
+    abstract fun getDidFor(session: S): String
 
     fun httpGetAsJson(url: Url): JsonElement? = httpGet(url).body?.let { Json.decodeFromString<JsonElement>(it) }
 
@@ -148,17 +154,34 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
             TokenErrorCode.invalid_request
         )
         val result = generatePresentationForVPToken(session, tokenRequest)
+        val holderDid = getDidFor(session)
+        val idToken = if(session.authorizationRequest?.responseType?.contains("id_token") == true) {
+            signToken(TokenTarget.TOKEN, buildJsonObject {
+                put("iss", "https://self-issued.me/v2/openid-vc")
+                put("sub", holderDid)
+                put("aud", session.authorizationRequest!!.clientId)
+                put("exp", Clock.System.now().plus(5.minutes).epochSeconds)
+                put("iat", Clock.System.now().epochSeconds)
+                put("state", session.id)
+                put("nonce", session.nonce)
+                put("_vp_token", buildJsonObject {
+                    put("presentation_submission",  result.presentationSubmission.toJSON())
+                })
+            }, keyId = resolveDID(holderDid))
+        } else null
         return if (result.presentations.size == 1) {
             TokenResponse.success(
                 result.presentations.first(),
-                result.presentationSubmission,
-                session.authorizationRequest?.state
+                if(idToken == null) result.presentationSubmission else null,
+                idToken = idToken,
+                state = session.authorizationRequest?.state
             )
         } else {
             TokenResponse.success(
                 JsonArray(result.presentations),
-                result.presentationSubmission,
-                session.authorizationRequest?.state
+                if(idToken == null) result.presentationSubmission else null,
+                idToken = idToken,
+                state = session.authorizationRequest?.state
             )
         }
     }

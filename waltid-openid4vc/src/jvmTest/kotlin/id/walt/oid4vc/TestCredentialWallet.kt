@@ -134,9 +134,12 @@ class TestCredentialWallet(
         val filterString = presentationDefinition.inputDescriptors.flatMap { it.constraints?.fields ?: listOf() }
             .firstOrNull { field -> field.path.any { it.contains("type") } }?.filter?.jsonObject?.get("pattern")?.jsonPrimitive?.contentOrNull
             ?: presentationDefinition.inputDescriptors.flatMap { it.schema?.map { it.uri } ?: listOf() }.firstOrNull()
-        val presentationJwtStr = runBlocking { PresentationBuilder().apply {
+        val presentationBuilder = PresentationBuilder()
+        val presentationJwtStr = runBlocking { presentationBuilder.apply {
+            session.presentationDefinition?.id?.let { presentationId = it }
             did = TEST_DID
             nonce = session.nonce
+            audience = session.authorizationRequest?.clientId
             addCredentials(credentialStore[filterString]?.let { listOf(JsonPrimitive(it)) } ?: listOf())
         }.buildAndSign(TEST_KEY) }
 
@@ -154,7 +157,7 @@ class TestCredentialWallet(
 
         return PresentationResult(
             listOf(JsonPrimitive(presentationJwtStr)), PresentationSubmission(
-                id = "submission 1",
+                id = session.presentationDefinition!!.id,
                 definitionId = session.presentationDefinition!!.id,
                 descriptorMap = jwtCredentials.mapIndexed { index, vcJwsStr ->
 
@@ -164,12 +167,13 @@ class TestCredentialWallet(
                             ?: "VerifiableCredential"
 
                     DescriptorMapping(
-                        id = type,
+                        id = session.presentationDefinition?.inputDescriptors?.get(0)?.id,
                         format = VCFormat.jwt_vp,  // jwt_vp_json
                         path = "$",
                         pathNested = DescriptorMapping(
+                            id = session.presentationDefinition?.inputDescriptors?.get(0)?.id,
                             format = VCFormat.jwt_vc,
-                            path = "$.vp.verifiableCredential[0]",
+                            path = "$.verifiableCredential[0]",
                         )
                     )
                 }
@@ -192,6 +196,10 @@ class TestCredentialWallet(
             if(it is JsonObject) it.jsonObject?.get("id")?.jsonPrimitive?.content
             else it.jsonPrimitive?.contentOrNull
         }?: did
+    }
+
+    override fun getDidFor(session: SIOPSession): String {
+        return TEST_DID
     }
 
     override fun isPresentationDefinitionSupported(presentationDefinition: PresentationDefinition): Boolean {
