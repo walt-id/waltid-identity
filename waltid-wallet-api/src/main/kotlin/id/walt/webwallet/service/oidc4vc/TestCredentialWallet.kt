@@ -146,19 +146,20 @@ class TestCredentialWallet(
 
         println("Credentials presented: $credentialsPresented")
 
-
+        val presentationId = (session.presentationDefinition?.id ?: "urn:uuid:${UUID.generateUUID().toString().lowercase()}")
         val vp = Json.encodeToString(
             mapOf(
                 "sub" to this.did,
                 "nbf" to Clock.System.now().minus(1.minutes).epochSeconds,
                 "iat" to Clock.System.now().epochSeconds,
-                "jti" to "urn:uuid:" + UUID.generateUUID().toString(),
+                "jti" to presentationId,
                 "iss" to this.did,
                 "nonce" to (session.nonce ?: ""),
+                "aud" to session.authorizationRequest.clientId,
                 "vp" to mapOf(
                     "@context" to listOf("https://www.w3.org/2018/credentials/v1"),
                     "type" to listOf("VerifiablePresentation"),
-                    "id" to "urn:uuid:${UUID.generateUUID().toString().lowercase()}",
+                    "id" to presentationId,
                     "holder" to this.did,
                     "verifiableCredential" to credentialsPresented
                 )
@@ -181,8 +182,8 @@ class TestCredentialWallet(
 
         return PresentationResult(
             listOf(JsonPrimitive(signed)), PresentationSubmission(
-                id = "submission 1",
-                definitionId = session.presentationDefinition?.id ?: "",
+                id = presentationId,
+                definitionId = presentationId,
                 descriptorMap = matchedCredentials.map { it.document }.mapIndexed { index, vcJwsStr ->
                     val vcJws = vcJwsStr.base64UrlToBase64().decodeJws()
                     val type =
@@ -190,12 +191,13 @@ class TestCredentialWallet(
                             ?: "VerifiableCredential"
 
                     DescriptorMapping(
-                        id = type,
-                        format = VCFormat.jwt_vp_json,  // jwt_vp_json
-                        path = "$[$index]",
+                        id = session.presentationDefinition?.inputDescriptors?.get(index)?.id,
+                        format = VCFormat.jwt_vp,  // jwt_vp_json
+                        path = "$",
                         pathNested = DescriptorMapping(
+                            id = session.presentationDefinition?.inputDescriptors?.get(index)?.id,
                             format = VCFormat.jwt_vc_json,
-                            path = "$.vp.verifiableCredential[0]",
+                            path = "$.verifiableCredential[$index]",
                         )
                     )
                 }
@@ -264,6 +266,10 @@ class TestCredentialWallet(
         authorizationRequest: AuthorizationRequest?,
         expirationTimestamp: Instant
     ) = VPresentationSession(id, authorizationRequest, expirationTimestamp, setOf())
+
+    override fun getDidFor(session: VPresentationSession): String {
+        return did
+    }
 
     override fun getSession(id: String) = sessionCache[id]
     override fun putSession(id: String, session: VPresentationSession) = sessionCache.put(id, session)

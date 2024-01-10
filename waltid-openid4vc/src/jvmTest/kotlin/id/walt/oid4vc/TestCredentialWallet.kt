@@ -167,11 +167,11 @@ class TestCredentialWallet(
                             ?: "VerifiableCredential"
 
                     DescriptorMapping(
-                        id = session.presentationDefinition?.inputDescriptors?.get(0)?.id,
+                        id = session.presentationDefinition?.inputDescriptors?.get(index)?.id,
                         format = VCFormat.jwt_vp,  // jwt_vp_json
                         path = "$",
                         pathNested = DescriptorMapping(
-                            id = session.presentationDefinition?.inputDescriptors?.get(0)?.id,
+                            id = session.presentationDefinition?.inputDescriptors?.get(index)?.id,
                             format = VCFormat.jwt_vc,
                             path = "$.verifiableCredential[0]",
                         )
