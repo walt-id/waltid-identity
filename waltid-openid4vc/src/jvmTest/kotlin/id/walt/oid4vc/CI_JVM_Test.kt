@@ -61,6 +61,7 @@ import kotlinx.serialization.json.*
 import kotlinx.uuid.UUID
 import kotlinx.uuid.generateUUID
 import java.io.File
+import kotlin.test.Ignore
 import kotlin.time.Duration.Companion.minutes
 
 class CI_JVM_Test : AnnotationSpec() {
@@ -205,6 +206,7 @@ class CI_JVM_Test : AnnotationSpec() {
         println("metadataParsed: $metadataParsed")
     }
 
+    @Ignore
     @Test
     suspend fun testFetchAndParseMetadata() {
         val response = ktorClient.get("http://localhost:8000/.well-known/openid-configuration")

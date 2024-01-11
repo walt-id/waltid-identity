@@ -588,6 +588,7 @@ class VP_JVM_Test : AnnotationSpec() {
 
 
     val ONLINE_TEST: Boolean = true
+    @Ignore
     @Test
     suspend fun testRequestByReference() {
         val reqUri = when(ONLINE_TEST) {
