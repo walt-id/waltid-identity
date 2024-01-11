@@ -17,7 +17,7 @@ repositories {
 @OptIn(org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi::class)
 kotlin {
     jvm {
-        jvmToolchain(17) // 16 possible?
+        jvmToolchain(15) // 16 possible?
         withJava()
         testRuns["test"].executionTask.configure {
             useJUnitPlatform()

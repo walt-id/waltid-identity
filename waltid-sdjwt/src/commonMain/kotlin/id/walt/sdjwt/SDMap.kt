@@ -10,7 +10,7 @@ import kotlinx.serialization.json.*
  * @param decoys  **For SD-JWT issuance:** Num (fixed mode) or max num (random mode) of decoy digests to add for this hierarchical level. 0 if NONE, **for presentation:** _unused_
  */
 @Serializable
-class SDMap internal constructor(
+class SDMap(
     val fields: Map<String, SDField>,
     val decoyMode: DecoyMode = DecoyMode.NONE,
     val decoys: Int = 0
