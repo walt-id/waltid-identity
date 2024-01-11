@@ -70,4 +70,5 @@ fun Application.module() {
     nfts()
     issuers()
     eventLogs()
+    manifest()
 }

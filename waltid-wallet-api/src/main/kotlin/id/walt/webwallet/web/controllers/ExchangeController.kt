@@ -4,7 +4,6 @@ import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.web.controllers.getWalletService
 import id.walt.webwallet.db.models.WalletOperationHistory
 import id.walt.webwallet.service.SSIKit2WalletService
-import io.github.smiley4.ktorswaggerui.dsl.get
 import io.github.smiley4.ktorswaggerui.dsl.post
 import io.github.smiley4.ktorswaggerui.dsl.route
 import io.ktor.http.*
@@ -179,46 +178,6 @@ fun Application.exchange() = walletRoute {
             val request = call.receiveText()
             val parsedRequest = wallet.resolvePresentationRequest(request)
             context.respond(parsedRequest)
-        }
-        route("manifest") {
-            get("info", {
-                summary = "Get offer manifest info, if available, otherwise null"//<--TODO: decide empty response type
-                request {
-                    pathParameter<String>("wallet") {
-                        required = true
-                        allowEmptyValue = false
-                        description = "Offer request URI"
-                    }
-                }
-                response {
-                    HttpStatusCode.OK to {
-                        body<JsonObject> {
-                            description = "The manifest info json object"
-                        }
-                    }
-                }
-            }){
-
-            }
-            get("issuer", {
-                summary = "Get offer manifest issuer info, if available, otherwise null"//<--TODO: decide empty response type
-                request {
-                    pathParameter<String>("wallet") {
-                        required = true
-                        allowEmptyValue = false
-                        description = "Offer request URI"
-                    }
-                }
-                response {
-                    HttpStatusCode.OK to {
-                        body<JsonObject> {
-                            description = "The manifest issuer info json object"
-                        }
-                    }
-                }
-            }){
-
-            }
         }
     }
 }
