@@ -54,7 +54,7 @@ class VP_JVM_Test : AnnotationSpec() {
         DidService.resolverMethods.keys shouldContain "jwk"
         DidService.registrarMethods.keys shouldContain "ion"
         testWallet = TestCredentialWallet(CredentialWalletConfig(WALLET_BASE_URL))
-        testWallet.start()
+        //testWallet.start()
 
         testVerifier = VPTestVerifier()
         testVerifier.start()
@@ -588,7 +588,7 @@ class VP_JVM_Test : AnnotationSpec() {
 
 
     val ONLINE_TEST: Boolean = true
-    //@Test
+    @Test
     suspend fun testRequestByReference() {
         val reqUri = when(ONLINE_TEST) {
             true -> testCreateEntraPresentationRequest()
@@ -632,7 +632,7 @@ class VP_JVM_Test : AnnotationSpec() {
             "            \"api-key\": \"1234\"\n" +
             "        },\n" +
             "        \"state\": \"1234\",\n" +
-            "        \"url\": \"https://b29d-62-178-27-231.ngrok-free.app/callback\"\n" +
+            "        \"url\": \"https://e370-62-178-27-231.ngrok-free.app/callback\"\n" +
             "    },\n" +
             "    \"registration\": {\n" +
             "        \"clientName\": \"verifiable-credentials-app\"\n" +
