@@ -489,7 +489,7 @@ class SSIKit2WalletService(tenant: String, accountId: UUID, walletId: UUID) :
                                 document = credentialWithoutDisclosures,
                                 disclosures = disclosuresString,
                                 addedOn = Clock.System.now()
-                            ), createCredentialEventData(credentialJwt.payload["vc"]!!.jsonObject, typ)
+                            ), createCredentialEventData(credentialJwt.payload, typ)
                         )
                     }
 
