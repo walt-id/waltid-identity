@@ -206,10 +206,9 @@ class CI_JVM_Test : AnnotationSpec() {
         println("metadataParsed: $metadataParsed")
     }
 
-    @Ignore
     @Test
     suspend fun testFetchAndParseMetadata() {
-        val response = ktorClient.get("http://localhost:8000/.well-known/openid-configuration")
+        val response = ktorClient.get("${CI_PROVIDER_BASE_URL}/.well-known/openid-configuration")
         println("response: $response")
         response.status shouldBe HttpStatusCode.OK
         val respText = response.bodyAsText()

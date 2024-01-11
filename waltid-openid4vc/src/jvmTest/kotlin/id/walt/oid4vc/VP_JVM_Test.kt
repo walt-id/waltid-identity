@@ -588,10 +588,11 @@ class VP_JVM_Test : AnnotationSpec() {
 
 
     val ONLINE_TEST: Boolean = true
+
     @Ignore
     @Test
     suspend fun testRequestByReference() {
-        val reqUri = when(ONLINE_TEST) {
+        val reqUri = when (ONLINE_TEST) {
             true -> testCreateEntraPresentationRequest()
             else -> "openid-vc://?request_uri=$VP_VERIFIER_BASE_URL/req/6af1f46f-8d91-4eaa-b0c0-f042b7a621f8"
         }
@@ -600,13 +601,14 @@ class VP_JVM_Test : AnnotationSpec() {
         authReq.clientId shouldBe "did:web:entra.walt.id"
 
         val tokenResponse = testWallet.processImplicitFlowAuthorization(authReq)
-        val resp = http.submitForm(authReq.responseUri ?: authReq.redirectUri ?: throw Exception("response_uri or redirect_uri must be set"),
-            parameters {
-                tokenResponse.toHttpParameters().forEach { entry ->
-                    entry.value.forEach { append(entry.key, it) }
-                }
-                append("id_token", ms_id_token)
-            })
+        val resp =
+            http.submitForm(authReq.responseUri ?: authReq.redirectUri ?: throw Exception("response_uri or redirect_uri must be set"),
+                parameters {
+                    tokenResponse.toHttpParameters().forEach { entry ->
+                        entry.value.forEach { append(entry.key, it) }
+                    }
+                    append("id_token", ms_id_token)
+                })
         println("Resp: $resp")
         resp.status shouldBe HttpStatusCode.OK
     }
@@ -623,33 +625,35 @@ class VP_JVM_Test : AnnotationSpec() {
         }).body<JsonObject>()
         return "${response["token_type"]!!.jsonPrimitive.content} ${response["access_token"]!!.jsonPrimitive.content}"
     }
+
     // Point browser to: https://login.microsoftonline.com/8bc955d9-38fd-4c15-a520-0c656407537a/oauth2/v2.0/authorize?client_id=e50ceaa6-8554-4ae6-bfdf-fd95e2243ae0&response_type=id_token&redirect_uri=http%3A%2F%2Flocalhost:8000%2F&response_mode=fragment&scope=openid&state=12345&nonce=678910&login_hint=test%40severinstamplergmail.onmicrosoft.com
-    val ms_id_token = "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsImtpZCI6IlQxU3QtZExUdnlXUmd4Ql82NzZ1OGtyWFMtSSJ9.eyJhdWQiOiJlNTBjZWFhNi04NTU0LTRhZTYtYmZkZi1mZDk1ZTIyNDNhZTAiLCJpc3MiOiJodHRwczovL2xvZ2luLm1pY3Jvc29mdG9ubGluZS5jb20vOGJjOTU1ZDktMzhmZC00YzE1LWE1MjAtMGM2NTY0MDc1MzdhL3YyLjAiLCJpYXQiOjE3MDMwMDExMjQsIm5iZiI6MTcwMzAwMTEyNCwiZXhwIjoxNzAzMDA1MDI0LCJhaW8iOiJBVVFBdS84VkFBQUF0ZTdkTWtZcFN2WWhwaUxpVmluSXF4V1hJREhXb1FoRnpUZVAwc0RLRGxiTWtRT0ZtRzJqckwxQ0dlVXlzTDlyVEg2emhPOTBJenJ3VExFbWc3elBJUT09IiwiY2MiOiJDZ0VBRWlSelpYWmxjbWx1YzNSaGJYQnNaWEpuYldGcGJDNXZibTFwWTNKdmMyOW1kQzVqYjIwYUVnb1FoY0UxZmwvS1lFMmJZT0c5R1FZN2VTSVNDaEJ6TVltQTdXQTFTNFNubmxyY3RXNEFNZ0pGVlRnQSIsIm5vbmNlIjoiNjc4OTEwIiwicmgiOiIwLkFYa0EyVlhKaV8wNEZVeWxJQXhsWkFkVGVxYnFET1ZVaGVaS3Y5XzlsZUlrT3VDVUFGVS4iLCJzdWIiOiI0cDgyb3hySGhiZ2x4V01oTDBIUmpKbDNRTjZ2eDhMS1pQWkVyLW9wako0IiwidGlkIjoiOGJjOTU1ZDktMzhmZC00YzE1LWE1MjAtMGM2NTY0MDc1MzdhIiwidXRpIjoiY3pHSmdPMWdOVXVFcDU1YTNMVnVBQSIsInZlciI6IjIuMCJ9.DE9LEsmzx9BG0z4Q7d-g_CH8ach4-cm7yztGHuHJykdLCjznu131nRsOFc9HdnIIqzHUX8kj1ZtAlPMLRaDYVYasKomRO4Fx7GCLY6kG5szQZJ8t8hkwX4O_zk7IaDHtn4HiyfwfSPwZjknMiQpTyiAqUqt0tR8ojSf5VeKnQmChvmp0w86izNYwTmWx5OOx2FXLsDEmvF42mp96bSsvyQt6hn4FcmhYkE4nf_5nHssb3SsL485ppHjWOvj81nGanK_u4iKVkfY_9KFF98hOwtWEi1UyvlTo5CdyYkehV0ZVs4gFAKiV7L5uasI-MYIlg0kUEK-mtMjHhU9TWIa4SA"
+    val ms_id_token =
+        "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsImtpZCI6IlQxU3QtZExUdnlXUmd4Ql82NzZ1OGtyWFMtSSJ9.eyJhdWQiOiJlNTBjZWFhNi04NTU0LTRhZTYtYmZkZi1mZDk1ZTIyNDNhZTAiLCJpc3MiOiJodHRwczovL2xvZ2luLm1pY3Jvc29mdG9ubGluZS5jb20vOGJjOTU1ZDktMzhmZC00YzE1LWE1MjAtMGM2NTY0MDc1MzdhL3YyLjAiLCJpYXQiOjE3MDMwMDExMjQsIm5iZiI6MTcwMzAwMTEyNCwiZXhwIjoxNzAzMDA1MDI0LCJhaW8iOiJBVVFBdS84VkFBQUF0ZTdkTWtZcFN2WWhwaUxpVmluSXF4V1hJREhXb1FoRnpUZVAwc0RLRGxiTWtRT0ZtRzJqckwxQ0dlVXlzTDlyVEg2emhPOTBJenJ3VExFbWc3elBJUT09IiwiY2MiOiJDZ0VBRWlSelpYWmxjbWx1YzNSaGJYQnNaWEpuYldGcGJDNXZibTFwWTNKdmMyOW1kQzVqYjIwYUVnb1FoY0UxZmwvS1lFMmJZT0c5R1FZN2VTSVNDaEJ6TVltQTdXQTFTNFNubmxyY3RXNEFNZ0pGVlRnQSIsIm5vbmNlIjoiNjc4OTEwIiwicmgiOiIwLkFYa0EyVlhKaV8wNEZVeWxJQXhsWkFkVGVxYnFET1ZVaGVaS3Y5XzlsZUlrT3VDVUFGVS4iLCJzdWIiOiI0cDgyb3hySGhiZ2x4V01oTDBIUmpKbDNRTjZ2eDhMS1pQWkVyLW9wako0IiwidGlkIjoiOGJjOTU1ZDktMzhmZC00YzE1LWE1MjAtMGM2NTY0MDc1MzdhIiwidXRpIjoiY3pHSmdPMWdOVXVFcDU1YTNMVnVBQSIsInZlciI6IjIuMCJ9.DE9LEsmzx9BG0z4Q7d-g_CH8ach4-cm7yztGHuHJykdLCjznu131nRsOFc9HdnIIqzHUX8kj1ZtAlPMLRaDYVYasKomRO4Fx7GCLY6kG5szQZJ8t8hkwX4O_zk7IaDHtn4HiyfwfSPwZjknMiQpTyiAqUqt0tR8ojSf5VeKnQmChvmp0w86izNYwTmWx5OOx2FXLsDEmvF42mp96bSsvyQt6hn4FcmhYkE4nf_5nHssb3SsL485ppHjWOvj81nGanK_u4iKVkfY_9KFF98hOwtWEi1UyvlTo5CdyYkehV0ZVs4gFAKiV7L5uasI-MYIlg0kUEK-mtMjHhU9TWIa4SA"
 
     suspend fun testCreateEntraPresentationRequest(): String? {
         val accessToken = entraAuthorize()
         val createPresentationRequestBody = "{\n" +
-            "    \"authority\": \"did:web:entra.walt.id\",\n" +
-            "    \"callback\": {\n" +
-            "        \"headers\": {\n" +
-            "            \"api-key\": \"1234\"\n" +
-            "        },\n" +
-            "        \"state\": \"1234\",\n" +
-            "        \"url\": \"https://0406-62-178-27-231.ngrok-free.app\"\n" +
-            "    },\n" +
-            "    \"registration\": {\n" +
-            "        \"clientName\": \"verifiable-credentials-app\"\n" +
-            "    },\n" +
-            "    \"requestedCredentials\": [\n" +
-            "        {\n" +
-            "            \"acceptedIssuers\": [\n" +
-            "                \"did:web:entra.walt.id\"\n" +
-            "            ],\n" +
-            "            \"purpose\": \"TEST\",\n" +
-            "            \"type\": \"VerifiedEmployee\"\n" +
-            "        }\n" +
-            "    ]\n" +
-            "}"
+                "    \"authority\": \"did:web:entra.walt.id\",\n" +
+                "    \"callback\": {\n" +
+                "        \"headers\": {\n" +
+                "            \"api-key\": \"1234\"\n" +
+                "        },\n" +
+                "        \"state\": \"1234\",\n" +
+                "        \"url\": \"https://0406-62-178-27-231.ngrok-free.app\"\n" +
+                "    },\n" +
+                "    \"registration\": {\n" +
+                "        \"clientName\": \"verifiable-credentials-app\"\n" +
+                "    },\n" +
+                "    \"requestedCredentials\": [\n" +
+                "        {\n" +
+                "            \"acceptedIssuers\": [\n" +
+                "                \"did:web:entra.walt.id\"\n" +
+                "            ],\n" +
+                "            \"purpose\": \"TEST\",\n" +
+                "            \"type\": \"VerifiedEmployee\"\n" +
+                "        }\n" +
+                "    ]\n" +
+                "}"
         val response = http.post("https://verifiedid.did.msidentity.com/v1.0/verifiableCredentials/createPresentationRequest") {
             header(HttpHeaders.Authorization, accessToken)
             contentType(ContentType.Application.Json)
