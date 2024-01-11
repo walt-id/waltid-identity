@@ -110,10 +110,12 @@ dependencies {
     // OIDC
     //implementation("id.walt:waltid-openid4vc:1.2310051536.0")
     //implementation("id.walt:waltid-openid4vc:1.2311161107.0")
-    implementation("id.walt:waltid-openid4vc:1.0.0-SNAPSHOT")
-    implementation("id.walt:waltid-sdjwt:1.0.0-SNAPSHOT")
+//    implementation("id.walt:waltid-openid4vc:1.0.0-SNAPSHOT")
+    implementation(project(":waltid-openid4vc"))
+//    implementation("id.walt:waltid-openid4vc:1.0.0-SNAPSHOT")
+//    implementation("id.walt:waltid-sdjwt:1.0.0-SNAPSHOT")
     //implementation(project(":waltid-openid4vc"))
-    //implementation(project(":waltid-sdjwt"))
+    implementation(project(":waltid-sdjwt"))
     implementation("com.nimbusds:nimbus-jose-jwt:9.37.1")
     implementation("io.ktor:ktor-client-java:$ktorVersion")
 
