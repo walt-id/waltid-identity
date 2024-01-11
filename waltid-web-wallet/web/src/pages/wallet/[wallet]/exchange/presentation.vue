@@ -249,7 +249,7 @@ function removeDisclosure(credentialId: string, disclosure: string) {
 
 async function acceptPresentation() {
     const req = {
-        //did: String, // todo: choose DID of shared credential
+        //did: String, // todo: choose DID of shared credential // for now wallet-api chooses the default wallet did
         presentationRequest: request,
         selectedCredentials: selectedCredentialIds.value,
         disclosures: encodedDisclosures.value
