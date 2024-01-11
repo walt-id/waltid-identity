@@ -450,6 +450,7 @@ class SSIKit2WalletService(tenant: String?, accountId: UUID, walletId: UUID) :
         println("// parse credential URI")
         val reqParams = Url(offer).parameters.toMap()
 
+        // TODO: this check is performed twice (see [Manifest -> new])
         // entra or openid4vc credential offer
         val credentialResponses = if(EntraIssuanceRequest.isEntraIssuanceRequestUri(offer))
             processMSEntraIssuanceRequest(EntraIssuanceRequest.fromAuthorizationRequest(AuthorizationRequest.fromHttpParametersAuto(reqParams)), credentialWallet)
