@@ -54,7 +54,7 @@ class CredentialBuilder(
     var subjectDid: String? = null
     var validFrom: Instant? = Clock.System.now()
     fun validFromNow() {
-        validFrom = Clock.System.now() - (1.5.minutes)
+        validFrom = Clock.System.now()
     }
 
     var validUntil: Instant? = null

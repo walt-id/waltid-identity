@@ -11,7 +11,6 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonPrimitive
-import kotlin.time.Duration.Companion.seconds
 
 object Issuer {
 
@@ -150,7 +149,7 @@ object Issuer {
                     ?.epochSeconds?.let { JsonPrimitive(it) }
             }
             completeJwtAttributes("nbf") {
-                vc["issuanceDate"]?.let { Instant.parse(it.jsonPrimitive.content) - 90.seconds }
+                vc["issuanceDate"]?.let { Instant.parse(it.jsonPrimitive.content) }
                     ?.epochSeconds?.let { JsonPrimitive(it) }
             }
         }
