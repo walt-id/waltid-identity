@@ -84,10 +84,8 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
     protected abstract fun isPresentationDefinitionSupported(presentationDefinition: PresentationDefinition): Boolean
 
     override fun validateAuthorizationRequest(authorizationRequest: AuthorizationRequest): Boolean {
-        return ((authorizationRequest.responseType == ResponseType.vp_token.name ||
-                    authorizationRequest.responseType == ResponseType.id_token.name &&
-                    authorizationRequest.claims?.containsKey(ResponseType.vp_token.name) == true
-                ) &&
+        return ((authorizationRequest.responseType.contains(ResponseType.vp_token.name) ||
+                    authorizationRequest.responseType.contains(ResponseType.id_token.name)) &&
             authorizationRequest.presentationDefinition != null &&
             isPresentationDefinitionSupported(authorizationRequest.presentationDefinition)
             )

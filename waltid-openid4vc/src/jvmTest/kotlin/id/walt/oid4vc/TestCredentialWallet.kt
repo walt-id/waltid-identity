@@ -195,6 +195,17 @@ class TestCredentialWallet(
     val TEST_KEY = runBlocking { LocalKey.importJWK(TEST_WALLET_DID_WEB_KEY).getOrThrow() }
     val TEST_DID: String = TEST_WALLET_DID_WEB
 
+    val jwtCryptoProvider = runBlocking {
+       // val key = OctetKeyPair.parse(TEST_KEY.jwk)
+       // SimpleJWTCryptoProvider(JWSAlgorithm.EdDSA, Ed25519Signer(key), Ed25519Verifier(key.toPublicJWK()))
+    // Enable for Entra tests
+        val key = ECKey.parse(TEST_WALLET_DID_WEB_KEY)
+        SimpleJWTCryptoProvider(JWSAlgorithm.ES256K, ECDSASigner(key).apply {
+            jcaContext.provider = BouncyCastleProviderSingleton.getInstance()
+        }, ECDSAVerifier(key.toPublicJWK()).apply {
+            jcaContext.provider = BouncyCastleProviderSingleton.getInstance()
+        })
+    }
 
     override fun resolveDID(did: String): String {
         val didObj = runBlocking { DidService.resolve(did) }.getOrThrow()
@@ -279,19 +290,6 @@ class TestCredentialWallet(
                 }
             }
         }.start()
-    }
-
-    val jwtCryptoProvider = runBlocking {
-//        val key = OctetKeyPair.parse(TEST_KEY.jwk)
-//        SimpleJWTCryptoProvider(JWSAlgorithm.EdDSA, Ed25519Signer(key), Ed25519Verifier(key.toPublicJWK()))
-// Enable for Entra tests
-
-        val key = ECKey.parse(TEST_WALLET_DID_WEB_KEY)
-        SimpleJWTCryptoProvider(JWSAlgorithm.ES256K, ECDSASigner(key).apply {
-            jcaContext.provider = BouncyCastleProviderSingleton.getInstance()
-        }, ECDSAVerifier(key.toPublicJWK()).apply {
-            jcaContext.provider = BouncyCastleProviderSingleton.getInstance()
-        })
     }
 
     val credentialStore = mapOf(
