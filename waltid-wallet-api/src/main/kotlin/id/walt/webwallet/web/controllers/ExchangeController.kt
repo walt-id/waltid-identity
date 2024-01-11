@@ -105,7 +105,7 @@ fun Application.exchange() = walletRoute {
             val request = req.presentationRequest
 
             val did = req.did
-                ?: wallet.listDids().firstOrNull()?.did
+                ?: wallet.listDids().firstOrNull { it.default }?.did
                 ?: throw IllegalArgumentException("No DID to use supplied")
             val selectedCredentialIds = req.selectedCredentials
             // TODO -> ?: auto matching
