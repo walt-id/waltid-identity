@@ -595,6 +595,7 @@ class VP_JVM_Test : AnnotationSpec() {
             else -> "openid-vc://?request_uri=$VP_VERIFIER_BASE_URL/req/6af1f46f-8d91-4eaa-b0c0-f042b7a621f8"
         }
         reqUri shouldNotBe null
+        //return
         //testVerifier.start(wait = true)
         val authReq = AuthorizationRequest.fromHttpParametersAuto(parseQueryString(Url(reqUri!!).encodedQuery).toMap())
         authReq.clientId shouldBe "did:web:entra.walt.id"
@@ -632,7 +633,7 @@ class VP_JVM_Test : AnnotationSpec() {
             "            \"api-key\": \"1234\"\n" +
             "        },\n" +
             "        \"state\": \"1234\",\n" +
-            "        \"url\": \"https://e370-62-178-27-231.ngrok-free.app/callback\"\n" +
+            "        \"url\": \"https://httpstat.us/200\"\n" +
             "    },\n" +
             "    \"registration\": {\n" +
             "        \"clientName\": \"verifiable-credentials-app\"\n" +
