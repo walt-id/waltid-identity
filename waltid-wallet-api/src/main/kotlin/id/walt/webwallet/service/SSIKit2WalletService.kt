@@ -17,10 +17,12 @@ import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.data.GrantType
 import id.walt.oid4vc.data.OpenIDProviderMetadata
 import id.walt.oid4vc.data.dif.PresentationDefinition
+import id.walt.oid4vc.errors.AuthorizationError
 import id.walt.oid4vc.providers.CredentialWalletConfig
 import id.walt.oid4vc.providers.OpenIDClientConfig
 import id.walt.oid4vc.providers.TokenTarget
 import id.walt.oid4vc.requests.*
+import id.walt.oid4vc.responses.AuthorizationErrorCode
 import id.walt.oid4vc.responses.BatchCredentialResponse
 import id.walt.oid4vc.responses.CredentialResponse
 import id.walt.oid4vc.responses.TokenResponse
@@ -210,7 +212,7 @@ class SSIKit2WalletService(tenant: String, accountId: UUID, walletId: UUID) :
     ): Result<String?> {
         val credentialWallet = getCredentialWallet(did)
 
-        val authReq = AuthorizationRequest.fromHttpQueryString(Url(request).encodedQuery)
+        val authReq = AuthorizationRequest.fromHttpParametersAuto(parseQueryString( Url(request).encodedQuery).toMap())
         println("Auth req: $authReq")
 
         println("USING PRESENTATION REQUEST, SELECTED CREDENTIALS: $selectedCredentialIds")
@@ -230,7 +232,7 @@ class SSIKit2WalletService(tenant: String, accountId: UUID, walletId: UUID) :
 
         val tokenResponse = credentialWallet.processImplicitFlowAuthorization(presentationSession.authorizationRequest)
         val resp = ktorClient.submitForm(
-            presentationSession.authorizationRequest.responseUri!!,
+            presentationSession.authorizationRequest.responseUri ?: presentationSession.authorizationRequest.redirectUri ?: throw AuthorizationError(presentationSession.authorizationRequest, AuthorizationErrorCode.invalid_request, "No response_uri or redirect_uri found on authorization request"),
             parameters {
                 tokenResponse.toHttpParameters().forEach { entry ->
                     entry.value.forEach { append(entry.key, it) }
