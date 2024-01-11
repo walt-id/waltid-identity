@@ -149,7 +149,7 @@ class TestCredentialWallet(
         println("Credentials presented: $credentialsPresented")
 
 
-        val vp = Json.encodeToString(
+        val vp = Json.encodeToString( // TODO: Use PresentationBuilder
             mapOf(
                 "sub" to this.did,
                 "nbf" to Clock.System.now().minus(1.minutes).epochSeconds,
