@@ -47,6 +47,7 @@ class DidWebResolverTest : DidResolverTestBase() {
         @BeforeAll
         fun ensureServerStarted() {
             if (!serverStarted) {
+                println("Starting test web server...")
                 TestServer.server.start()
                 serverStarted = true
             }
