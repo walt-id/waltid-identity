@@ -1127,7 +1127,7 @@ class CI_JVM_Test : AnnotationSpec() {
         println(didKeyResult.did)
     }
 
-    //@Test
+    @Test
     suspend fun testEntraIssuance() {
         val pin: String? = null //"0288"
         // ============ Issuer ========================
@@ -1167,7 +1167,7 @@ class CI_JVM_Test : AnnotationSpec() {
         val url = responseObj["url"]?.jsonPrimitive?.content
         //val url = "openid-vc://?request_uri=https://verifiedid.did.msidentity.com/v1.0/tenants/37a99dab-212b-44d9-9b49-7756cb4dd915/verifiableCredentials/issuanceRequests/67e271be-be8b-42f8-9cb9-1b57ee010e41"
         println(url)
-        return
+//        return
         //val url = "openid-vc://?request_uri=https://verifiedid.did.msidentity.com/v1.0/tenants/3c32ed40-8a10-465b-8ba4-0b1e86882668/verifiableCredentials/issuanceRequests/a7e5db5b-2fba-4d02-bc0d-21ee82191386"
         // ============ Wallet ========================
         // Load key:

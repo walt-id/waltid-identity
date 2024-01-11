@@ -183,16 +183,17 @@ class TestCredentialWallet(
 
     val TEST_WALLET_DID_WEB = "did:web:entra.walt.id:holder"
     val TEST_WALLET_DID_ION = "did:ion:EiDh0EL8wg8oF-7rRiRzEZVfsJvh4sQX4Jock2Kp4j_zxg:eyJkZWx0YSI6eyJwYXRjaGVzIjpbeyJhY3Rpb24iOiJyZXBsYWNlIiwiZG9jdW1lbnQiOnsicHVibGljS2V5cyI6W3siaWQiOiI0OGQ4YTM0MjYzY2Y0OTJhYTdmZjYxYjYxODNlOGJjZiIsInB1YmxpY0tleUp3ayI6eyJjcnYiOiJzZWNwMjU2azEiLCJraWQiOiI0OGQ4YTM0MjYzY2Y0OTJhYTdmZjYxYjYxODNlOGJjZiIsImt0eSI6IkVDIiwidXNlIjoic2lnIiwieCI6IlRLYVE2c0NvY1REc211ajl0VFI5OTZ0RlhwRWNTMkVKTi0xZ09hZGFCdmsiLCJ5IjoiMFRySVlIY2ZDOTNWcEV1dmotSFhUbnlLdDBzbmF5T013R1NKQTFYaURYOCJ9LCJwdXJwb3NlcyI6WyJhdXRoZW50aWNhdGlvbiJdLCJ0eXBlIjoiRWNkc2FTZWNwMjU2azFWZXJpZmljYXRpb25LZXkyMDE5In1dfX1dLCJ1cGRhdGVDb21taXRtZW50IjoiRWlCQnlkZ2R5WHZkVERob3ZsWWItQkV2R3ExQnR2TWJSLURmbDctSHdZMUhUZyJ9LCJzdWZmaXhEYXRhIjp7ImRlbHRhSGFzaCI6IkVpRGJxa05ldzdUcDU2cEJET3p6REc5bThPZndxamlXRjI3bTg2d1k3TS11M1EiLCJyZWNvdmVyeUNvbW1pdG1lbnQiOiJFaUFGOXkzcE1lQ2RQSmZRYjk1ZVV5TVlfaUdCRkMwdkQzeDNKVTB6V0VjWUtBIn19"
-    //val TEST_WALLET_DID_WEB_KEY = "{\"kty\":\"EC\",\"d\":\"uD-uxub011cplvr5Bd6MrIPSEUBsgLk-C1y3tnmfetQ\",\"use\":\"sig\",\"crv\":\"secp256k1\",\"kid\":\"48d8a34263cf492aa7ff61b6183e8bcf\",\"x\":\"TKaQ6sCocTDsmuj9tTR996tFXpEcS2EJN-1gOadaBvk\",\"y\":\"0TrIYHcfC93VpEuvj-HXTnyKt0snayOMwGSJA1XiDX8\"}"
-    val TEST_KEY = runBlocking { LocalKey.generate(KeyType.Ed25519) }
+
+    val TEST_WALLET_DID_WEB_KEY = "{\"kty\":\"EC\",\"d\":\"uD-uxub011cplvr5Bd6MrIPSEUBsgLk-C1y3tnmfetQ\",\"use\":\"sig\",\"crv\":\"secp256k1\",\"kid\":\"48d8a34263cf492aa7ff61b6183e8bcf\",\"x\":\"TKaQ6sCocTDsmuj9tTR996tFXpEcS2EJN-1gOadaBvk\",\"y\":\"0TrIYHcfC93VpEuvj-HXTnyKt0snayOMwGSJA1XiDX8\"}"
+    /*val TEST_KEY = runBlocking { LocalKey.generate(KeyType.Ed25519) }
     val TEST_DID: String = runBlocking {
         DidJwkRegistrar().registerByKey(TEST_KEY, DidJwkCreateOptions())
         //DidService.registerByKey("jwk", TEST_KEY)
-    }.did
+    }.did*/
 
     // enable for Entra tests
-    //val TEST_KEY = runBlocking { LocalKey.importJWK(TEST_WALLET_DID_WEB_KEY).getOrThrow() }
-    //val TEST_DID: String = TEST_WALLET_DID_WEB /*runBlocking {
+    val TEST_KEY = runBlocking { LocalKey.importJWK(TEST_WALLET_DID_WEB_KEY).getOrThrow() }
+    val TEST_DID: String = TEST_WALLET_DID_WEB
 
 
     override fun resolveDID(did: String): String {
@@ -281,15 +282,16 @@ class TestCredentialWallet(
     }
 
     val jwtCryptoProvider = runBlocking {
-        val key = OctetKeyPair.parse(TEST_KEY.jwk)
-        SimpleJWTCryptoProvider(JWSAlgorithm.EdDSA, Ed25519Signer(key), Ed25519Verifier(key.toPublicJWK()))
+//        val key = OctetKeyPair.parse(TEST_KEY.jwk)
+//        SimpleJWTCryptoProvider(JWSAlgorithm.EdDSA, Ed25519Signer(key), Ed25519Verifier(key.toPublicJWK()))
 // Enable for Entra tests
-//        val key = ECKey.parse(TEST_WALLET_DID_WEB_KEY)
-//        SimpleJWTCryptoProvider(JWSAlgorithm.ES256K, ECDSASigner(key).apply {
-//            jcaContext.provider = BouncyCastleProviderSingleton.getInstance()
-//        }, ECDSAVerifier(key.toPublicJWK()).apply {
-//            jcaContext.provider = BouncyCastleProviderSingleton.getInstance()
-//        })
+
+        val key = ECKey.parse(TEST_WALLET_DID_WEB_KEY)
+        SimpleJWTCryptoProvider(JWSAlgorithm.ES256K, ECDSASigner(key).apply {
+            jcaContext.provider = BouncyCastleProviderSingleton.getInstance()
+        }, ECDSAVerifier(key.toPublicJWK()).apply {
+            jcaContext.provider = BouncyCastleProviderSingleton.getInstance()
+        })
     }
 
     val credentialStore = mapOf(
