@@ -33,13 +33,13 @@ kotlin {
         }
     }
     js(IR) {
-        browser {
+        /*browser {
             commonWebpackConfig {
                 cssSupport {
                     enabled.set(true)
                 }
             }
-        }
+        }*/
         nodejs {
             generateTypeScriptDefinitions()
         }
