@@ -41,6 +41,8 @@ import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.db.models.WalletKeys
 import id.walt.webwallet.db.models.WalletOperationHistories
 import id.walt.webwallet.db.models.WalletOperationHistory
+import id.walt.webwallet.manifest.extractor.DefaultManifestExtractor
+import id.walt.webwallet.manifest.extractor.EntraManifestExtractor
 import id.walt.webwallet.service.credentials.CredentialsService
 import id.walt.webwallet.service.dids.DidsService
 import id.walt.webwallet.service.dto.LinkedWalletDataTransferObject
@@ -450,12 +452,24 @@ class SSIKit2WalletService(tenant: String?, accountId: UUID, walletId: UUID) :
         println("// parse credential URI")
         val reqParams = Url(offer).parameters.toMap()
 
-        // TODO: this check is performed twice (see [Manifest -> new])
+        // TODO: use manifest extractor factory method, but fix offer double-checking first
         // entra or openid4vc credential offer
-        val credentialResponses = if(EntraIssuanceRequest.isEntraIssuanceRequestUri(offer))
-            processMSEntraIssuanceRequest(EntraIssuanceRequest.fromAuthorizationRequest(AuthorizationRequest.fromHttpParametersAuto(reqParams)), credentialWallet)
-        else
-            processCredentialOfferRequest(CredentialOfferRequest.fromHttpParameters(reqParams), credentialWallet)
+        val (credentialResponses, manifest) = if(EntraIssuanceRequest.isEntraIssuanceRequestUri(offer)) {
+            Pair(processMSEntraIssuanceRequest(
+                EntraIssuanceRequest.fromAuthorizationRequest(
+                    AuthorizationRequest.fromHttpParametersAuto(
+                        reqParams
+                    )
+                ), credentialWallet
+                // TODO: entra multiple credentials / manifests case
+            ), EntraManifestExtractor().extract(offer))
+        }
+        else {
+            Pair(
+                processCredentialOfferRequest(CredentialOfferRequest.fromHttpParameters(reqParams), credentialWallet),
+                DefaultManifestExtractor().extract(offer)
+            )
+        }
 
         // === original ===
         println("// parse and verify credential(s)")
@@ -483,7 +497,8 @@ class SSIKit2WalletService(tenant: String?, accountId: UUID, walletId: UUID) :
                                 id = credentialId,
                                 document = credential,
                                 disclosures = null,
-                                addedOn = Clock.System.now()
+                                addedOn = Clock.System.now(),
+                                manifest = manifest.toString()
                             ), createCredentialEventData(credentialJwt.payload["vc"]?.jsonObject, typ)
                         )
                     }
@@ -508,7 +523,8 @@ class SSIKit2WalletService(tenant: String?, accountId: UUID, walletId: UUID) :
                                 id = credentialId,
                                 document = credentialWithoutDisclosures,
                                 disclosures = disclosuresString,
-                                addedOn = Clock.System.now()
+                                addedOn = Clock.System.now(),
+                                manifest = manifest.toString()
                             ), createCredentialEventData(credentialJwt.payload["vc"]!!.jsonObject, typ)
                         )
                     }
