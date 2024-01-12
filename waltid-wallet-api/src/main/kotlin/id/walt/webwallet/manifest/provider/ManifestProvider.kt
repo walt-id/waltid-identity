@@ -1,6 +1,6 @@
 package id.walt.webwallet.manifest.provider
 
-import id.walt.crypto.utils.JsonUtils.toJsonElement
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -11,8 +11,9 @@ interface ManifestProvider {
 
     companion object{
         const val EntraManifestType = "msentra"
+        val json = Json { ignoreUnknownKeys }
         fun new(manifest: String): ManifestProvider =
-            when (manifest.toJsonElement().jsonObject["type"]?.jsonPrimitive?.content) {
+            when (json.decodeFromString<JsonObject>(manifest).jsonObject["type"]?.jsonPrimitive?.content) {
                 EntraManifestType -> EntraManifestProvider(manifest)
                 else -> DefaultManifestProvider()
             }

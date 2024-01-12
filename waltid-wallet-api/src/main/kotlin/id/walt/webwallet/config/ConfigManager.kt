@@ -72,6 +72,7 @@ object ConfigManager {
         registerConfig(ConfigData("wallet", RemoteWalletConfig::class))
         registerConfig(ConfigData("marketplace", MarketPlaceConfiguration::class))
         registerConfig(ConfigData("chainexplorer", ChainExplorerConfiguration::class))
+        registerConfig(ConfigData("runtime", RuntimeConfig::class))
     }
 
     fun loadConfigs(args: Array<String>) {
