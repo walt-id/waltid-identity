@@ -1,6 +1,8 @@
 package id.walt.webwallet.web.controllers
 
-import id.walt.crypto.utils.JsonUtils.toJsonElement
+import id.walt.webwallet.config.ConfigManager
+import id.walt.webwallet.config.RuntimeConfig
+import id.walt.webwallet.manifest.extractor.EntraMockManifestExtractor
 import id.walt.webwallet.manifest.extractor.ManifestExtractor
 import id.walt.webwallet.manifest.provider.ManifestProvider
 import id.walt.webwallet.service.credentials.CredentialsService
@@ -34,8 +36,10 @@ fun Application.manifest() = walletRoute {
                     }
                 }
             }) {
-                val manifest = getManifestByRequestParameters(call.parameters)
-                context.respond(manifest.toJsonElement())
+                val manifest = callManifest(call.parameters) {
+                    getManifest(it)
+                }
+                context.respond(manifest)
             }
             get("display", {
                 summary =
@@ -55,7 +59,9 @@ fun Application.manifest() = walletRoute {
                     }
                 }
             }) {
-                val manifest = getManifestByRequestParameters(call.parameters)
+                val manifest = callManifest(call.parameters){
+                    getManifest(it)
+                }.toString()
                 context.respond(ManifestProvider.new(manifest).display())
             }
             get("issuer", {
@@ -76,7 +82,9 @@ fun Application.manifest() = walletRoute {
                     }
                 }
             }) {
-                val manifest = getManifestByRequestParameters(call.parameters)
+                val manifest = callManifest(call.parameters){
+                    getManifest(it)
+                }.toString()
                 context.respond(ManifestProvider.new(manifest).issuer())
             }
         }
@@ -104,16 +112,35 @@ fun Application.manifest() = walletRoute {
                     }
                 }
             }) {
-                call.parameters["offer"]?.let {
-                    context.respond<JsonObject>(ManifestExtractor.new(it).extract(it))
-                } ?: context.respond(HttpStatusCode.BadRequest, "No offer request uri provided.")
+                val manifest = callManifest(call.parameters){
+                    extractManifest(it)
+                }
+                context.respond(manifest)
             }
         }
     }
 }
 
-internal fun getManifestByRequestParameters(parameters: Parameters): String {
-    val walletId = parameters["walletId"] ?: throw IllegalArgumentException("Missing wallet id")
-    val credentialId = parameters["credentialId"] ?: throw IllegalArgumentException("Missing credential id")
-    return CredentialsService.Manifest.get(kotlinx.uuid.UUID(walletId), credentialId) ?: ""
+internal suspend fun callManifest(parameters: Parameters, method: suspend (Parameters) -> JsonObject): JsonObject {
+    val runtimeConfig = ConfigManager.getConfig<RuntimeConfig>()
+    return if (runtimeConfig.mock) {
+        EntraMockManifestExtractor().extract("")
+    } else {
+        return method.invoke(parameters)
+    }
+}
+
+internal fun getManifest(parameters: Parameters): JsonObject {
+    val walletId = parameters["walletId"] ?: throw IllegalArgumentException("Missing wallet id.")
+    val credentialId = parameters["credentialId"] ?: throw IllegalArgumentException("Missing credential id.")
+    return ManifestProvider.json.decodeFromString(
+        CredentialsService.Manifest.get(
+            kotlinx.uuid.UUID(walletId), credentialId
+        ) ?: ""
+    )
+}
+
+internal suspend fun extractManifest(parameters: Parameters): JsonObject {
+    val offer = parameters["offer"] ?: throw IllegalArgumentException("Missing offer request uri.")
+    return ManifestExtractor.new(offer).extract(offer)
 }

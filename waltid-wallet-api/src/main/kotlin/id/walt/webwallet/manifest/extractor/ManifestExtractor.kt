@@ -8,15 +8,18 @@ interface ManifestExtractor {
     suspend fun extract(offerRequestUrl: String): JsonObject
 
     companion object {
+        private val entraExtractor = EntraManifestExtractor()
+        private val defaultExtractor = DefaultManifestExtractor()
+
         fun new(offerRequestUrl: String): ManifestExtractor {
             // TODO: this check is performed twice (see [SSIKit2WalletService -> useOfferRequest])
             if (EntraIssuanceRequest.isEntraIssuanceRequestUri(offerRequestUrl)) {
-                return EntraManifestExtractor()
+                return entraExtractor
             }
             if (offerRequestUrl.startsWith(CROSS_DEVICE_CREDENTIAL_OFFER_URL)) {
-                return DefaultManifestExtractor()
+                return defaultExtractor
             }
-            return DefaultManifestExtractor()
+            return defaultExtractor
         }
     }
 }
