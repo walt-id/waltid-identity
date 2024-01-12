@@ -39,4 +39,8 @@ object CredentialsService {
     /*fun update(account: UUID, did: DidUpdateDataObject): Boolean {
         TO-DO
     }*/
+
+    object Manifest {
+        fun get(wallet: UUID, credentialId: String): String? = CredentialsService.get(wallet, credentialId)?.manifest
+    }
 }

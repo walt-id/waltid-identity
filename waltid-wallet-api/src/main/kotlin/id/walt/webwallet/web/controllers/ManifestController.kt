@@ -1,12 +1,15 @@
 package id.walt.webwallet.web.controllers
 
 import id.walt.webwallet.manifests.ManifestExtractor
+import id.walt.webwallet.service.credentials.CredentialsService
 import io.github.smiley4.ktorswaggerui.dsl.get
 import io.github.smiley4.ktorswaggerui.dsl.route
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.response.*
 import kotlinx.serialization.json.JsonObject
+import kotlinx.uuid.fromString
+import java.util.*
 
 fun Application.manifest() = walletRoute {
     route("manifest", {
@@ -32,6 +35,7 @@ fun Application.manifest() = walletRoute {
                 }
             }) {
                 val credentialId = call.parameters["credentialId"]
+                val walletId = call.parameters["walletId"]
                 println(credentialId)
             }
             get("display", {
@@ -53,6 +57,7 @@ fun Application.manifest() = walletRoute {
                 }
             }) {
                 val credentialId = call.parameters["credentialId"]
+                val walletId = call.parameters["walletId"]
                 println(credentialId)
             }
             get("issuer", {
@@ -73,8 +78,10 @@ fun Application.manifest() = walletRoute {
                     }
                 }
             }) {
-                val credentialId = call.parameters["credentialId"]
-                println(credentialId)
+                val credentialId =
+                    call.parameters["credentialId"] ?: throw IllegalArgumentException("Missing credential id")
+                val walletId = call.parameters["walletId"] ?: throw IllegalArgumentException("Missing wallet id")
+                val manifest = CredentialsService.Manifest.get(kotlinx.uuid.UUID(walletId), credentialId)
             }
         }
         route("extract") {
