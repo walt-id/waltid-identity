@@ -1,4 +1,4 @@
-package id.walt.webwallet.manifests
+package id.walt.webwallet.manifest.extractor
 
 import id.walt.oid4vc.definitions.CROSS_DEVICE_CREDENTIAL_OFFER_URL
 import id.walt.oid4vc.requests.EntraIssuanceRequest

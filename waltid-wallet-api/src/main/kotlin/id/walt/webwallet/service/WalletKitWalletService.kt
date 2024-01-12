@@ -126,9 +126,11 @@ class WalletKitWalletService(tenant: String?, accountId: UUID, walletId: UUID) :
     /* WalletCredentials */
 
     override fun listCredentials() = runBlocking {
-        authenticatedJsonGet("/api/wallet/credentials/list")
-            .body<JsonObject>()["list"]!!.jsonArray.toList()
-            .map { WalletCredential(walletId, it.jsonObject["id"]!!.jsonPrimitive.content, it.toString(), null, Instant.DISTANT_PAST) }
+        authenticatedJsonGet("/api/wallet/credentials/list").body<JsonObject>()["list"]!!.jsonArray.toList().map {
+                WalletCredential(
+                    walletId, it.jsonObject["id"]!!.jsonPrimitive.content, it.toString(), null, Instant.DISTANT_PAST, ""
+                )
+            }
     }
 
     override suspend fun listRawCredentials(): List<String> {
@@ -140,13 +142,17 @@ class WalletKitWalletService(tenant: String?, accountId: UUID, walletId: UUID) :
     override suspend fun deleteCredential(id: String) =
         authenticatedJsonDelete("/api/wallet/credentials/delete/$id").status.isSuccess()
 
-    override suspend fun getCredential(credentialId: String) = WalletCredential(
-        wallet = walletId,
-        id = credentialId,
-        document = listCredentials().first { it.parsedDocument?.get("id")?.jsonPrimitive?.content == credentialId }.toString(),
-        disclosures = null,
-        addedOn = Instant.DISTANT_PAST
-    )
+    override suspend fun getCredential(credentialId: String) =
+        listCredentials().first { it.parsedDocument?.get("id")?.jsonPrimitive?.content == credentialId }.let {
+            WalletCredential(
+                wallet = walletId,
+                id = credentialId,
+                document = it.toString(),
+                disclosures = null,
+                addedOn = Instant.DISTANT_PAST,
+                manifest = it.manifest
+            )
+        }
 
     override fun matchCredentialsByPresentationDefinition(presentationDefinition: PresentationDefinition): List<WalletCredential> {
         TODO("Not yet implemented")
