@@ -1,6 +1,6 @@
 package id.walt.webwallet.web.controllers
 
-import id.walt.webwallet.manifests.Manifest
+import id.walt.webwallet.manifests.ManifestExtractor
 import io.github.smiley4.ktorswaggerui.dsl.get
 import io.github.smiley4.ktorswaggerui.dsl.route
 import io.ktor.http.*
@@ -9,56 +9,102 @@ import io.ktor.server.response.*
 import kotlinx.serialization.json.JsonObject
 
 fun Application.manifest() = walletRoute {
-    route("info", {
-        tags = listOf("WalletCredential exchange manifest")
+    route("manifest", {
+        tags = listOf("WalletCredential manifest")
     }) {
-        get("display", {
-            summary =
-                "Get offer display info, if available, otherwise empty object"//<--TODO: decide empty response type
-            request {
-                queryParameter<String>("offer") {
-                    required = true
-                    allowEmptyValue = false
-                    description = "Offer request URI"
-                }
-            }
-            response {
-                HttpStatusCode.OK to {
-                    body<JsonObject> {
-                        description = "The display info json object"
+        route("{credentialId}") {
+            get({
+                summary =
+                    "Get credential manifest, if available, otherwise empty object"//<--TODO: decide empty response type
+                request {
+                    pathParameter<String>("credentialId") {
+                        required = true
+                        allowEmptyValue = false
+                        description = "Credential id"
                     }
                 }
+                response {
+                    HttpStatusCode.OK to {
+                        body<JsonObject> {
+                            description = "The display info json object"
+                        }
+                    }
+                }
+            }) {
+                val credentialId = call.parameters["credentialId"]
+                println(credentialId)
             }
-        }) {
-            context.respond<JsonObject>(manifestCall(call.parameters["offer"]) {
-                Manifest.new(it).display()
-            })
+            get("display", {
+                summary =
+                    "Get offer display info, if available, otherwise empty object"//<--TODO: decide empty response type
+                request {
+                    pathParameter<String>("credentialId") {
+                        required = true
+                        allowEmptyValue = false
+                        description = "Credential id"
+                    }
+                }
+                response {
+                    HttpStatusCode.OK to {
+                        body<JsonObject> {
+                            description = "The display info json object"
+                        }
+                    }
+                }
+            }) {
+                val credentialId = call.parameters["credentialId"]
+                println(credentialId)
+            }
+            get("issuer", {
+                summary =
+                    "Get offer issuer info, if available, otherwise empty object"//<--TODO: decide empty response type
+                request {
+                    pathParameter<String>("credentialId") {
+                        required = true
+                        allowEmptyValue = false
+                        description = "Credential id"
+                    }
+                }
+                response {
+                    HttpStatusCode.OK to {
+                        body<JsonObject> {
+                            description = "The issuer info json object"
+                        }
+                    }
+                }
+            }) {
+                val credentialId = call.parameters["credentialId"]
+                println(credentialId)
+            }
         }
-        get("issuer", {
-            summary = "Get offer issuer info, if available, otherwise empty object"//<--TODO: decide empty response type
-            request {
-                queryParameter<String>("offer") {
-                    required = true
-                    allowEmptyValue = false
-                    description = "Offer request URI"
-                }
-            }
-            response {
-                HttpStatusCode.OK to {
-                    body<JsonObject> {
-                        description = "The manifest issuer info json object"
+        route("extract") {
+            get({
+                summary =
+                    "Extract manifest info from issuance request offer, if available, otherwise empty object"//<--TODO: decide empty response type
+                request {
+                    queryParameter<String>("offer") {
+                        required = true
+                        allowEmptyValue = false
+                        description = "Offer request URI"
                     }
                 }
+                response {
+                    HttpStatusCode.OK to {
+                        body<JsonObject> {
+                            description = "The manifest issuer info json object"
+                        }
+                    }
+                    HttpStatusCode.BadRequest to {
+                        body<String> {
+                            description = "Error message"
+                        }
+                    }
+                }
+            }) {
+                call.parameters["offer"]?.let {
+                    context.respond<JsonObject>(ManifestExtractor.new(it).extract(it))
+                } ?: context.respond(HttpStatusCode.BadRequest, "No offer request uri provided.")
             }
-        }) {
-            context.respond<JsonObject>(manifestCall(call.parameters["offer"]) {
-                Manifest.new(it).issuer()
-            })
         }
     }
 }
-
-internal suspend fun manifestCall(offerRequestUrl: String?, method: suspend (String) -> JsonObject?): JsonObject =
-    offerRequestUrl?.let {
-        method.invoke(it) ?: JsonObject(emptyMap())
-    } ?: throw IllegalArgumentException("No offer request url provided.")
