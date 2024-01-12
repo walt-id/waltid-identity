@@ -13,13 +13,14 @@
 
 </div>
 
-## Getting Started
+Watch the [Intro Video](https://www.youtube.com/watch?v=ILaSAxjoHbw&t=1s) to learn about features and see a demo. 
+The [documentation](https://docs.oss.walt.id/wallet/api/getting-started) examplains how to create and manage identity wallets.
 
-- [Intro Video](https://www.youtube.com/watch?v=ILaSAxjoHbw&t=1s) - Learn about features and see a demo.
-- [Documentation](https://docs.oss.walt.id/wallet/api/getting-started) - Learn how to create and manage identity wallets.
+## What it provides
 
+The Wallet-API is designed to provide a broad range of API endpoints that let you offer identity wallets to users capable of handling different keys, DIDs, and credential types and facilitate the receipt and presentation of credentials from various issuers and verifiers using the OIDC4VC protocol standard. Alongside digital identity capabilities, it also supports the integration of web3 wallets. This feature enables your users to view their tokens from different blockchain ecosystems like Ethereum, Polygon, and more.
 
-### Running The Project
+## How to use it
 
 From the root folder, you can run the wallet-api, including the necessary configuration as well as other relevant services and apps like the wallet frontend by the following command:
 
@@ -37,9 +38,15 @@ docker build -t waltid/wallet-api -f waltid-wallet-api/Dockerfile .
 
 Note the wallet-api is used by the waltid-web-wallet to provide all the functionality.
 
-## What is the Wallet API?
+### Switching to Posgress
 
-The Wallet-API is designed to provide a broad range of API endpoints that let you offer identity wallets to users capable of handling different keys, DIDs, and credential types and facilitate the receipt and presentation of credentials from various issuers and verifiers using the OIDC4VC protocol standard. Alongside digital identity capabilities, it also supports the integration of web3 wallets. This feature enables your users to view their tokens from different blockchain ecosystems like Ethereum, Polygon, and more.
+1. update config/db.config
+   - set database = "db.postgres"
+2. start postgres
+```bash
+docker run --name postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_USER=postgres -p 5432:5432 -d postgres
+```
+3. In your IDE run _src/main/kotlin/id/walt/webwallet/Application.kt_ 
 
 
 ## Join the community
