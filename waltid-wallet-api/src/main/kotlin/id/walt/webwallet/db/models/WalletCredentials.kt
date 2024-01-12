@@ -21,6 +21,7 @@ object WalletCredentials : Table("credentials") {
     val disclosures = text("disclosures").nullable()
 
     val addedOn = timestamp("added_on")
+    val manifest = text("manifest")
 
     override val primaryKey = PrimaryKey(wallet, id)
 }
@@ -32,6 +33,7 @@ data class WalletCredential(
     val document: String,
     val disclosures: String?,
     val addedOn: Instant,
+    val manifest: String,
 
     val parsedDocument: JsonObject? = parseDocument(document, id)
 ) {
@@ -79,5 +81,6 @@ data class WalletCredential(
         document = result[WalletCredentials.document],
         disclosures = result[WalletCredentials.disclosures],
         addedOn = result[WalletCredentials.addedOn].toKotlinInstant(),
+        manifest = result[WalletCredentials.manifest],
     )
 }
