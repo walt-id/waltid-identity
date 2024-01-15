@@ -1,8 +1,8 @@
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 object Versions {
-    const val KOTLIN_VERSION = "1.9.21" // also change 2 plugins
-    const val KTOR_VERSION = "2.3.6" // also change 1 plugin
+    const val KOTLIN_VERSION = "1.9.22" // also change 2 plugins
+    const val KTOR_VERSION = "2.3.7" // also change 1 plugin
     const val COROUTINES_VERSION = "1.7.3"
     const val EXPOSED_VERSION = "0.43.0"
     const val HOPLITE_VERSION = "2.8.0.RC3"
@@ -12,8 +12,8 @@ plugins {
     kotlin("jvm") // Versions.KOTLIN_VERSION
     id("org.jetbrains.kotlin.plugin.serialization")  // Versions.KOTLIN_VERSION
 
-    //id("io.ktor.plugin") version "2.3.6" // Versions.KTOR_VERSION
-    id("io.ktor.plugin") version "2.3.6" // Versions.KTOR_VERSION
+    //id("io.ktor.plugin") version "2.3.7" // Versions.KTOR_VERSION
+    id("io.ktor.plugin") version "2.3.7" // Versions.KTOR_VERSION
     id("org.owasp.dependencycheck") version "8.4.3"
     id("com.github.jk1.dependency-license-report") version "2.5"
     application
