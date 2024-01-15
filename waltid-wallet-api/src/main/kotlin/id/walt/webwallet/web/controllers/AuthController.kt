@@ -232,7 +232,7 @@ fun PipelineContext<Unit, ApplicationCall>.getUserUUID() =
 fun PipelineContext<Unit, ApplicationCall>.getWalletId() =
     runCatching {
         UUID(call.parameters["wallet"] ?: throw IllegalArgumentException("No wallet ID provided"))
-    }.getOrElse { throw IllegalArgumentException("Invalid wallet ID provided") }
+    }.getOrElse { throw IllegalArgumentException("Invalid wallet ID provided: ${it.message}") }
 
 fun PipelineContext<Unit, ApplicationCall>.getWalletService(walletId: UUID) =
     WalletServiceManager.getWalletService("", getUserUUID(), walletId) // FIX ME -> TENANT HERE
