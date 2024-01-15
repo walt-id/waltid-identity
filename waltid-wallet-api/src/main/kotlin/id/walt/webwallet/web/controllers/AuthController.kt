@@ -139,7 +139,7 @@ fun Application.auth() {
             }) {
                 println("Login request")
                 val reqBody = LoginRequestJson.decodeFromString<AccountRequest>(call.receive())
-                AccountsService.authenticate(null, reqBody).onSuccess { // FIX ME -> TENANT HERE
+                AccountsService.authenticate("", reqBody).onSuccess { // FIX ME -> TENANT HERE
                     securityUserTokenMapping[it.token] = it.id
                     call.sessions.set(LoginTokenSession(it.token))
                     call.response.status(HttpStatusCode.OK)
@@ -178,7 +178,7 @@ fun Application.auth() {
                 }
             }) {
                 val req = LoginRequestJson.decodeFromString<AccountRequest>(call.receive())
-                AccountsService.register(null, req).onSuccess {
+                AccountsService.register("", req).onSuccess {
                     println("Registration succeed.")
                     call.response.status(HttpStatusCode.Created)
                     call.respond("Registration succeed.")
@@ -232,13 +232,13 @@ fun PipelineContext<Unit, ApplicationCall>.getUserUUID() =
 fun PipelineContext<Unit, ApplicationCall>.getWalletId() =
     runCatching {
         UUID(call.parameters["wallet"] ?: throw IllegalArgumentException("No wallet ID provided"))
-    }.getOrElse { throw IllegalArgumentException("Invalid wallet ID provided") }
+    }.getOrElse { throw IllegalArgumentException("Invalid wallet ID provided: ${it.message}") }
 
 fun PipelineContext<Unit, ApplicationCall>.getWalletService(walletId: UUID) =
-    WalletServiceManager.getWalletService(null, getUserUUID(), walletId) // FIX ME -> TENANT HERE
+    WalletServiceManager.getWalletService("", getUserUUID(), walletId) // FIX ME -> TENANT HERE
 
 fun PipelineContext<Unit, ApplicationCall>.getWalletService() =
-    WalletServiceManager.getWalletService(null, getUserUUID(), getWalletId()) // FIX ME -> TENANT HERE
+    WalletServiceManager.getWalletService("", getUserUUID(), getWalletId()) // FIX ME -> TENANT HERE
 
 fun PipelineContext<Unit, ApplicationCall>.getUsersSessionToken(): String? =
     call.sessions.get(LoginTokenSession::class)?.token
@@ -251,7 +251,7 @@ fun PipelineContext<Unit, ApplicationCall>.ensurePermissionsForWallet(required: 
     val walletId = getWalletId()
 
     val permissions = transaction {
-        (AccountWalletMappings.select { (AccountWalletMappings.tenant eq null) and (AccountWalletMappings.accountId eq userId) and (AccountWalletMappings.wallet eq walletId) } // FIX ME -> TENANT HERE
+        (AccountWalletMappings.select { (AccountWalletMappings.tenant eq "") and (AccountWalletMappings.accountId eq userId) and (AccountWalletMappings.wallet eq walletId) } // FIX ME -> TENANT HERE
             .firstOrNull()
             ?: throw ForbiddenException("This account does not have access to the specified wallet.")
                 )[AccountWalletMappings.permissions]

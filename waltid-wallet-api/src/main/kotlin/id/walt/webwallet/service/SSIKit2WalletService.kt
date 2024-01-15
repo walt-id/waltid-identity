@@ -1,10 +1,5 @@
 package id.walt.webwallet.service
 
-import com.nimbusds.jose.JWSAlgorithm
-import com.nimbusds.jose.crypto.ECDSASigner
-import com.nimbusds.jose.crypto.ECDSAVerifier
-import com.nimbusds.jose.crypto.bc.BouncyCastleProviderSingleton
-import com.nimbusds.jose.jwk.ECKey
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.KeyType
@@ -31,14 +26,8 @@ import id.walt.oid4vc.responses.AuthorizationErrorCode
 import id.walt.oid4vc.responses.BatchCredentialResponse
 import id.walt.oid4vc.responses.CredentialResponse
 import id.walt.oid4vc.responses.TokenResponse
-import id.walt.oid4vc.util.httpGet
 import id.walt.oid4vc.util.randomUUID
-import id.walt.sdjwt.SDJwt
-import id.walt.sdjwt.SDMap
-import id.walt.sdjwt.SDPayload
-import id.walt.sdjwt.SimpleJWTCryptoProvider
 import id.walt.webwallet.db.models.WalletCredential
-import id.walt.webwallet.db.models.WalletKeys
 import id.walt.webwallet.db.models.WalletOperationHistories
 import id.walt.webwallet.db.models.WalletOperationHistory
 import id.walt.webwallet.manifest.extractor.DefaultManifestExtractor
@@ -71,7 +60,6 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import kotlinx.uuid.UUID
-import kotlinx.uuid.generateUUID
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.select
 import org.jetbrains.exposed.sql.transactions.transaction
@@ -79,7 +67,7 @@ import java.net.URLDecoder
 import kotlin.time.Duration.Companion.seconds
 
 
-class SSIKit2WalletService(tenant: String?, accountId: UUID, walletId: UUID) :
+class SSIKit2WalletService(tenant: String, accountId: UUID, walletId: UUID) :
     WalletService(tenant, accountId, walletId) {
 
     companion object {

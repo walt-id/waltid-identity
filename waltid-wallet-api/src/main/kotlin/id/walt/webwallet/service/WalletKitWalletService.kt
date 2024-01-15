@@ -36,7 +36,7 @@ import org.jetbrains.exposed.sql.transactions.transaction
 import java.net.URLDecoder
 import java.nio.charset.Charset
 
-class WalletKitWalletService(tenant: String?, accountId: UUID, walletId: UUID) : WalletService(tenant, accountId, walletId) {
+class WalletKitWalletService(tenant: String, accountId: UUID, walletId: UUID) : WalletService(tenant, accountId, walletId) {
 
     private var token: Lazy<String> = lazy { runBlocking { auth() } }
 

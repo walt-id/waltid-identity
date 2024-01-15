@@ -31,7 +31,10 @@ object TestServer {
     private val environment = applicationEngineEnvironment {
         envConfig()
     }
-    val server: ApplicationEngine by lazy { embeddedServer(Netty, environment) }
+    val server: ApplicationEngine by lazy {
+        println("Initializing embedded webserver...")
+        embeddedServer(Netty, environment)
+    }
 
     private fun Application.module() {
         install(ContentNegotiation) {

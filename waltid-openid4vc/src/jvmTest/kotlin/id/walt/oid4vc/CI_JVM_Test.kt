@@ -195,7 +195,7 @@ class CI_JVM_Test : AnnotationSpec() {
 
     @Test
     suspend fun testFetchAndParseMetadata() {
-        val response = ktorClient.get("http://localhost:$CI_PROVIDER_PORT/.well-known/openid-configuration")
+        val response = ktorClient.get("${CI_PROVIDER_BASE_URL}/.well-known/openid-configuration")
         println("response: $response")
         response.status shouldBe HttpStatusCode.OK
         val respText = response.bodyAsText()
@@ -265,9 +265,9 @@ class CI_JVM_Test : AnnotationSpec() {
         parResp.error shouldBe "invalid_request"
     }
 
-    fun verifyIssuerAndSubjectId(credential: JsonObject, issuerId: String, subjectId: String): Boolean {
-        return (credential["issuer"]?.jsonPrimitive?.contentOrNull?.equals(issuerId) ?: false) &&
-                credential["credentialSubject"]?.jsonObject?.get("id")?.jsonPrimitive?.contentOrNull?.equals(subjectId) ?: false
+    private fun verifyIssuerAndSubjectId(credential: JsonObject, issuerId: String, subjectId: String) {
+        credential["issuer"]?.jsonPrimitive?.contentOrNull shouldBe issuerId
+        credential["credentialSubject"]?.jsonObject?.get("id")?.jsonPrimitive?.contentOrNull shouldBe subjectId
     }
 
     @Test
@@ -411,7 +411,7 @@ class CI_JVM_Test : AnnotationSpec() {
         verifyIssuerAndSubjectId(
             SDJwt.parse(deferredCredential).fullPayload.get("vc")?.jsonObject!!,
             ciTestProvider.CI_ISSUER_DID, credentialWallet.TEST_DID
-        ) shouldBe true
+        )
         JwtSignaturePolicy().verify(deferredCredential, null, mapOf()).isSuccess shouldBe true
 
         nonce = deferredCredResp2.cNonce ?: nonce
@@ -570,7 +570,7 @@ class CI_JVM_Test : AnnotationSpec() {
         verifyIssuerAndSubjectId(
             SDJwt.parse(credential).fullPayload.get("vc")?.jsonObject!!,
             ciTestProvider.CI_ISSUER_DID, credentialWallet.TEST_DID
-        ) shouldBe true
+        )
         JwtSignaturePolicy().verify(credential, null, mapOf()).isSuccess shouldBe true
     }
 
@@ -691,7 +691,7 @@ class CI_JVM_Test : AnnotationSpec() {
         verifyIssuerAndSubjectId(
             SDJwt.parse(credential).fullPayload.get("vc")?.jsonObject!!,
             ciTestProvider.CI_ISSUER_DID, credentialWallet.TEST_DID
-        ) shouldBe true
+        )
         JwtSignaturePolicy().verify(credential, null, mapOf()).isSuccess shouldBe true
     }
 
@@ -775,7 +775,7 @@ class CI_JVM_Test : AnnotationSpec() {
         verifyIssuerAndSubjectId(
             SDJwt.parse(credential).fullPayload.get("vc")?.jsonObject!!,
             ciTestProvider.CI_ISSUER_DID, credentialWallet.TEST_DID
-        ) shouldBe true
+        )
         JwtSignaturePolicy().verify(credential, null, mapOf()).isSuccess shouldBe true
     }
 
@@ -1065,7 +1065,7 @@ class CI_JVM_Test : AnnotationSpec() {
         verifyIssuerAndSubjectId(
             SDJwt.parse(credential).fullPayload.get("vc")?.jsonObject!!,
             ciTestProvider.CI_ISSUER_DID, credentialWallet.TEST_DID
-        ) shouldBe true
+        )
         JwtSignaturePolicy().verify(credential, null, mapOf()).isSuccess shouldBe true
     }
 
@@ -1146,6 +1146,7 @@ class CI_JVM_Test : AnnotationSpec() {
 
         val createIssuanceReq = "{\n" +
                 "    \"callback\": {\n" +
+                //"        \"url\": \"https://httpstat.us/200\",\n" +
                 "        \"url\": \"https://9ffd-62-178-27-231.ngrok-free.app\",\n" +
                 "        \"state\": \"1234\",\n" +
                 "        \"headers\": {\n" +

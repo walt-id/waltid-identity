@@ -15,7 +15,7 @@ enum class AccountWalletPermissions(val power: Int) {
 }
 
 object AccountWalletMappings : Table("account_wallet_mapping") {
-    val tenant = varchar("tenant", 128).nullable()
+    val tenant = varchar("tenant", 128).default("")
     val accountId = kotlinxUUID("id")
     val wallet = reference("wallet", Wallets)
 

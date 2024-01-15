@@ -9,7 +9,7 @@ import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.transactions.transaction
 
 object Web3WalletAccountStrategy : AccountStrategy<AddressAccountRequest> {
-    override fun register(tenant: String?, request: AddressAccountRequest): Result<RegistrationResult> = runCatching {
+    override fun register(tenant: String, request: AddressAccountRequest): Result<RegistrationResult> = runCatching {
         val name = request.name
 
         if (AccountsService.hasAccountWeb3WalletAddress(request.address)) {
@@ -37,7 +37,7 @@ object Web3WalletAccountStrategy : AccountStrategy<AddressAccountRequest> {
         return Result.success(RegistrationResult(createdAccountId))
     }
 
-    override suspend fun authenticate(tenant: String?, request: AddressAccountRequest): AuthenticatedUser {
+    override suspend fun authenticate(tenant: String, request: AddressAccountRequest): AuthenticatedUser {
         val registeredUserId = if (AccountsService.hasAccountWeb3WalletAddress(request.address)) {
             AccountsService.getAccountByWeb3WalletAddress(request.address).first().id
         } else {

@@ -1,4 +1,3 @@
 package id.walt.credentials.schemes
 
-interface SignatureScheme {
-}
+interface SignatureScheme

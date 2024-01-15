@@ -29,5 +29,4 @@ COPY --from=buildstage /work/waltid-issuer-api/build/install/ /
 WORKDIR /waltid-issuer-api
 
 EXPOSE 7000
-
 ENTRYPOINT ["/waltid-issuer-api/bin/waltid-issuer-api"]

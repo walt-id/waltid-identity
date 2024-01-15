@@ -1,12 +1,14 @@
 package id.walt.webwallet
 
+import id.walt.web.controllers.auth
+import id.walt.web.controllers.configureSecurity
+import id.walt.web.controllers.issuers
 import id.walt.webwallet.config.ConfigManager
 import id.walt.webwallet.db.Db
 import id.walt.webwallet.web.Administration.configureAdministration
-import id.walt.web.controllers.*
+import id.walt.webwallet.web.controllers.*
 import id.walt.webwallet.web.controllers.NotificationController.notifications
 import id.walt.webwallet.web.controllers.PushController.push
-import id.walt.webwallet.web.controllers.*
 import id.walt.webwallet.web.plugins.*
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.server.application.*

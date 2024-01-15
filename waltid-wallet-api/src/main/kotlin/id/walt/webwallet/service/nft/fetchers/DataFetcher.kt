@@ -1,9 +1,9 @@
 package id.walt.webwallet.service.nft.fetchers
 
 import id.walt.webwallet.service.dto.NftDetailDataTransferObject
+import id.walt.webwallet.service.nft.converters.*
 import id.walt.webwallet.service.nft.fetchers.parameters.TokenDetailParameter
 import id.walt.webwallet.service.nft.fetchers.parameters.TokenListParameter
-import id.walt.webwallet.service.nft.converters.*
 
 interface DataFetcher {
     fun all(parameter: TokenListParameter): List<NftDetailDataTransferObject>

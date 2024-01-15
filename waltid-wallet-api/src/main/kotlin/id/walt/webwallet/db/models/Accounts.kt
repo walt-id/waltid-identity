@@ -10,7 +10,7 @@ import org.jetbrains.exposed.sql.Table
 import org.jetbrains.exposed.sql.javatime.timestamp
 
 object Accounts : Table("accounts") {
-    val tenant = varchar("tenant", 128).nullable() // null = global
+    val tenant = varchar("tenant", 128).default("")
     val id = kotlinxUUID("id")
 
     val name = varchar("name", 128).nullable()
@@ -35,7 +35,7 @@ object Accounts : Table("accounts") {
 
 @Serializable
 data class Account(
-    val tenant: String? = null, // null = global
+    val tenant: String,
     val id: UUID,
     val name: String? = null,
     val email: String? = null,
