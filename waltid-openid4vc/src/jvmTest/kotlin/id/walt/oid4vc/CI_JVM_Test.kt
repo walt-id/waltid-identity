@@ -3,19 +3,11 @@ package id.walt.oid4vc
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.crypto.ECDSASigner
 import com.nimbusds.jose.crypto.ECDSAVerifier
-import com.nimbusds.jose.crypto.Ed25519Signer
-import com.nimbusds.jose.crypto.Ed25519Verifier
 import com.nimbusds.jose.crypto.bc.BouncyCastleProviderSingleton
 import com.nimbusds.jose.jwk.ECKey
-import com.nimbusds.jose.jwk.OctetKeyPair
-import com.nimbusds.jose.util.Base64
-import com.nimbusds.jwt.JWTParser
-import id.walt.credentials.vc.vcs.W3CVC
 import id.walt.credentials.verification.policies.JwtSignaturePolicy
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.LocalKey
-import id.walt.crypto.keys.LocalKeyCreator
-import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.did.dids.DidService
 import id.walt.did.dids.registrar.dids.DidIonCreateOptions
 import id.walt.did.dids.registrar.dids.DidJwkCreateOptions
@@ -27,7 +19,10 @@ import id.walt.oid4vc.providers.CredentialWalletConfig
 import id.walt.oid4vc.providers.OpenIDClientConfig
 import id.walt.oid4vc.requests.*
 import id.walt.oid4vc.responses.*
-import id.walt.sdjwt.*
+import id.walt.sdjwt.SDJwt
+import id.walt.sdjwt.SDMap
+import id.walt.sdjwt.SDPayload
+import id.walt.sdjwt.SimpleJWTCryptoProvider
 import io.kotest.assertions.json.shouldEqualJson
 import io.kotest.common.runBlocking
 import io.kotest.core.spec.style.AnnotationSpec
@@ -52,14 +47,7 @@ import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.util.*
-import io.ktor.utils.io.*
-import korlibs.crypto.SHA
-import korlibs.crypto.SHA256
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
 import kotlinx.serialization.json.*
-import kotlinx.uuid.UUID
-import kotlinx.uuid.generateUUID
 import java.io.File
 import kotlin.time.Duration.Companion.minutes
 
@@ -277,9 +265,9 @@ class CI_JVM_Test : AnnotationSpec() {
         parResp.error shouldBe "invalid_request"
     }
 
-    fun verifyIssuerAndSubjectId(credential: JsonObject, issuerId: String, subjectId: String): Boolean {
-        return (credential["issuer"]?.jsonPrimitive?.contentOrNull?.equals(issuerId) ?: false) &&
-        credential["credentialSubject"]?.jsonObject?.get("id")?.jsonPrimitive?.contentOrNull?.equals(subjectId) ?: false
+    private fun verifyIssuerAndSubjectId(credential: JsonObject, issuerId: String, subjectId: String) {
+        credential["issuer"]?.jsonPrimitive?.contentOrNull shouldBe issuerId
+        credential["credentialSubject"]?.jsonObject?.get("id")?.jsonPrimitive?.contentOrNull shouldBe subjectId
     }
 
     @Test
@@ -420,8 +408,10 @@ class CI_JVM_Test : AnnotationSpec() {
         val deferredCredential = deferredCredResp2.credential!!.jsonPrimitive.content
         println(">>> Issued deferred credential: $deferredCredential")
 
-        verifyIssuerAndSubjectId(SDJwt.parse(deferredCredential).fullPayload.get("vc")?.jsonObject!!,
-            ciTestProvider.CI_ISSUER_DID, credentialWallet.TEST_DID) shouldBe true
+        verifyIssuerAndSubjectId(
+            SDJwt.parse(deferredCredential).fullPayload.get("vc")?.jsonObject!!,
+            ciTestProvider.CI_ISSUER_DID, credentialWallet.TEST_DID
+        )
         JwtSignaturePolicy().verify(deferredCredential, null, mapOf()).isSuccess shouldBe true
 
         nonce = deferredCredResp2.cNonce ?: nonce
@@ -577,8 +567,10 @@ class CI_JVM_Test : AnnotationSpec() {
         println("// parse and verify credential")
         val credential = credentialResp.credential!!.jsonPrimitive.content
         println(">>> Issued credential: $credential")
-        verifyIssuerAndSubjectId(SDJwt.parse(credential).fullPayload.get("vc")?.jsonObject!!,
-            ciTestProvider.CI_ISSUER_DID, credentialWallet.TEST_DID) shouldBe  true
+        verifyIssuerAndSubjectId(
+            SDJwt.parse(credential).fullPayload.get("vc")?.jsonObject!!,
+            ciTestProvider.CI_ISSUER_DID, credentialWallet.TEST_DID
+        )
         JwtSignaturePolicy().verify(credential, null, mapOf()).isSuccess shouldBe true
     }
 
@@ -696,8 +688,10 @@ class CI_JVM_Test : AnnotationSpec() {
         val credential = credentialResp.credential!!.jsonPrimitive.content
         println(">>> Issued credential: $credential")
 
-        verifyIssuerAndSubjectId(SDJwt.parse(credential).fullPayload.get("vc")?.jsonObject!!,
-            ciTestProvider.CI_ISSUER_DID, credentialWallet.TEST_DID) shouldBe  true
+        verifyIssuerAndSubjectId(
+            SDJwt.parse(credential).fullPayload.get("vc")?.jsonObject!!,
+            ciTestProvider.CI_ISSUER_DID, credentialWallet.TEST_DID
+        )
         JwtSignaturePolicy().verify(credential, null, mapOf()).isSuccess shouldBe true
     }
 
@@ -778,8 +772,10 @@ class CI_JVM_Test : AnnotationSpec() {
         val credential = credentialResp.credential!!.jsonPrimitive.content
         println(">>> Issued credential: $credential")
 
-        verifyIssuerAndSubjectId(SDJwt.parse(credential).fullPayload.get("vc")?.jsonObject!!,
-            ciTestProvider.CI_ISSUER_DID, credentialWallet.TEST_DID) shouldBe  true
+        verifyIssuerAndSubjectId(
+            SDJwt.parse(credential).fullPayload.get("vc")?.jsonObject!!,
+            ciTestProvider.CI_ISSUER_DID, credentialWallet.TEST_DID
+        )
         JwtSignaturePolicy().verify(credential, null, mapOf()).isSuccess shouldBe true
     }
 
@@ -1066,8 +1062,10 @@ class CI_JVM_Test : AnnotationSpec() {
         println("// parse and verify credential")
         val credential = credentialResp.credential!!.jsonPrimitive.content
         println(">>> Issued credential: $credential")
-        verifyIssuerAndSubjectId(SDJwt.parse(credential).fullPayload.get("vc")?.jsonObject!!,
-            ciTestProvider.CI_ISSUER_DID, credentialWallet.TEST_DID) shouldBe  true
+        verifyIssuerAndSubjectId(
+            SDJwt.parse(credential).fullPayload.get("vc")?.jsonObject!!,
+            ciTestProvider.CI_ISSUER_DID, credentialWallet.TEST_DID
+        )
         JwtSignaturePolicy().verify(credential, null, mapOf()).isSuccess shouldBe true
     }
 
@@ -1097,18 +1095,24 @@ class CI_JVM_Test : AnnotationSpec() {
     }
 
     // Point browser to: https://login.microsoftonline.com/8bc955d9-38fd-4c15-a520-0c656407537a/oauth2/v2.0/authorize?client_id=e50ceaa6-8554-4ae6-bfdf-fd95e2243ae0&response_type=id_token&redirect_uri=http%3A%2F%2Flocalhost:8000%2F&response_mode=fragment&scope=openid&state=12345&nonce=678910&login_hint=test%40severinstamplergmail.onmicrosoft.com
-    val ms_id_token = "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsImtpZCI6IlQxU3QtZExUdnlXUmd4Ql82NzZ1OGtyWFMtSSJ9.eyJhdWQiOiJlNTBjZWFhNi04NTU0LTRhZTYtYmZkZi1mZDk1ZTIyNDNhZTAiLCJpc3MiOiJodHRwczovL2xvZ2luLm1pY3Jvc29mdG9ubGluZS5jb20vOGJjOTU1ZDktMzhmZC00YzE1LWE1MjAtMGM2NTY0MDc1MzdhL3YyLjAiLCJpYXQiOjE3MDMwMDExMjQsIm5iZiI6MTcwMzAwMTEyNCwiZXhwIjoxNzAzMDA1MDI0LCJhaW8iOiJBVVFBdS84VkFBQUF0ZTdkTWtZcFN2WWhwaUxpVmluSXF4V1hJREhXb1FoRnpUZVAwc0RLRGxiTWtRT0ZtRzJqckwxQ0dlVXlzTDlyVEg2emhPOTBJenJ3VExFbWc3elBJUT09IiwiY2MiOiJDZ0VBRWlSelpYWmxjbWx1YzNSaGJYQnNaWEpuYldGcGJDNXZibTFwWTNKdmMyOW1kQzVqYjIwYUVnb1FoY0UxZmwvS1lFMmJZT0c5R1FZN2VTSVNDaEJ6TVltQTdXQTFTNFNubmxyY3RXNEFNZ0pGVlRnQSIsIm5vbmNlIjoiNjc4OTEwIiwicmgiOiIwLkFYa0EyVlhKaV8wNEZVeWxJQXhsWkFkVGVxYnFET1ZVaGVaS3Y5XzlsZUlrT3VDVUFGVS4iLCJzdWIiOiI0cDgyb3hySGhiZ2x4V01oTDBIUmpKbDNRTjZ2eDhMS1pQWkVyLW9wako0IiwidGlkIjoiOGJjOTU1ZDktMzhmZC00YzE1LWE1MjAtMGM2NTY0MDc1MzdhIiwidXRpIjoiY3pHSmdPMWdOVXVFcDU1YTNMVnVBQSIsInZlciI6IjIuMCJ9.DE9LEsmzx9BG0z4Q7d-g_CH8ach4-cm7yztGHuHJykdLCjznu131nRsOFc9HdnIIqzHUX8kj1ZtAlPMLRaDYVYasKomRO4Fx7GCLY6kG5szQZJ8t8hkwX4O_zk7IaDHtn4HiyfwfSPwZjknMiQpTyiAqUqt0tR8ojSf5VeKnQmChvmp0w86izNYwTmWx5OOx2FXLsDEmvF42mp96bSsvyQt6hn4FcmhYkE4nf_5nHssb3SsL485ppHjWOvj81nGanK_u4iKVkfY_9KFF98hOwtWEi1UyvlTo5CdyYkehV0ZVs4gFAKiV7L5uasI-MYIlg0kUEK-mtMjHhU9TWIa4SA"
+    val ms_id_token =
+        "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsImtpZCI6IlQxU3QtZExUdnlXUmd4Ql82NzZ1OGtyWFMtSSJ9.eyJhdWQiOiJlNTBjZWFhNi04NTU0LTRhZTYtYmZkZi1mZDk1ZTIyNDNhZTAiLCJpc3MiOiJodHRwczovL2xvZ2luLm1pY3Jvc29mdG9ubGluZS5jb20vOGJjOTU1ZDktMzhmZC00YzE1LWE1MjAtMGM2NTY0MDc1MzdhL3YyLjAiLCJpYXQiOjE3MDMwMDExMjQsIm5iZiI6MTcwMzAwMTEyNCwiZXhwIjoxNzAzMDA1MDI0LCJhaW8iOiJBVVFBdS84VkFBQUF0ZTdkTWtZcFN2WWhwaUxpVmluSXF4V1hJREhXb1FoRnpUZVAwc0RLRGxiTWtRT0ZtRzJqckwxQ0dlVXlzTDlyVEg2emhPOTBJenJ3VExFbWc3elBJUT09IiwiY2MiOiJDZ0VBRWlSelpYWmxjbWx1YzNSaGJYQnNaWEpuYldGcGJDNXZibTFwWTNKdmMyOW1kQzVqYjIwYUVnb1FoY0UxZmwvS1lFMmJZT0c5R1FZN2VTSVNDaEJ6TVltQTdXQTFTNFNubmxyY3RXNEFNZ0pGVlRnQSIsIm5vbmNlIjoiNjc4OTEwIiwicmgiOiIwLkFYa0EyVlhKaV8wNEZVeWxJQXhsWkFkVGVxYnFET1ZVaGVaS3Y5XzlsZUlrT3VDVUFGVS4iLCJzdWIiOiI0cDgyb3hySGhiZ2x4V01oTDBIUmpKbDNRTjZ2eDhMS1pQWkVyLW9wako0IiwidGlkIjoiOGJjOTU1ZDktMzhmZC00YzE1LWE1MjAtMGM2NTY0MDc1MzdhIiwidXRpIjoiY3pHSmdPMWdOVXVFcDU1YTNMVnVBQSIsInZlciI6IjIuMCJ9.DE9LEsmzx9BG0z4Q7d-g_CH8ach4-cm7yztGHuHJykdLCjznu131nRsOFc9HdnIIqzHUX8kj1ZtAlPMLRaDYVYasKomRO4Fx7GCLY6kG5szQZJ8t8hkwX4O_zk7IaDHtn4HiyfwfSPwZjknMiQpTyiAqUqt0tR8ojSf5VeKnQmChvmp0w86izNYwTmWx5OOx2FXLsDEmvF42mp96bSsvyQt6hn4FcmhYkE4nf_5nHssb3SsL485ppHjWOvj81nGanK_u4iKVkfY_9KFF98hOwtWEi1UyvlTo5CdyYkehV0ZVs4gFAKiV7L5uasI-MYIlg0kUEK-mtMjHhU9TWIa4SA"
     // "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsImtpZCI6IlQxU3QtZExUdnlXUmd4Ql82NzZ1OGtyWFMtSSJ9.eyJhdWQiOiJlNTBjZWFhNi04NTU0LTRhZTYtYmZkZi1mZDk1ZTIyNDNhZTAiLCJpc3MiOiJodHRwczovL2xvZ2luLm1pY3Jvc29mdG9ubGluZS5jb20vOGJjOTU1ZDktMzhmZC00YzE1LWE1MjAtMGM2NTY0MDc1MzdhL3YyLjAiLCJpYXQiOjE3MDI4OTYzMDIsIm5iZiI6MTcwMjg5NjMwMiwiZXhwIjoxNzAyOTAwMjAyLCJhaW8iOiJBYlFBUy84VkFBQUE2QlpyS1IvZkJpaHlwalFHRy9hcDJpNXJxVzBBSDY1TDVYVFI1K0VZRTRqNGhIL2RUdStheGFrRUFwd2RLU0RJN1ZKck01bXN6SEx4YklYTE5uRS9uaHVxZWZRcHJaeDF5ZGR1Z1JVN0NjcU4wdzFyZzlZTUlHRkFpeGtVV2N4cllhbmhEbmNqTlFLVnloYThKNXlVTHd2MW85MXdYQzFFZS9aQmo3dWtBczBORXdZeTd2K2JRQnpkS250Y3BaY1NWZWhlY2xVV0NkWEJUVnZpZzdqTjVRVHEzc01QSHJGUWtxMERZQjRTU3l3PSIsImlkcCI6Imh0dHBzOi8vc3RzLndpbmRvd3MubmV0LzkxODgwNDBkLTZjNjctNGM1Yi1iMTEyLTM2YTMwNGI2NmRhZC8iLCJub25jZSI6IjY3ODkxMCIsInByb3ZfZGF0YSI6W3siYXQiOnRydWUsInByb3YiOiJzYW1zdW5nLmNvbSIsImFsdHNlY2lkIjoiZDhkN2dTOVVGRUVORU1uUTZ5SmNKZWxLX2IxX3VhN0V4QXR6Z0F6WFdmUSJ9XSwicmgiOiIwLkFYa0EyVlhKaV8wNEZVeWxJQXhsWkFkVGVxYnFET1ZVaGVaS3Y5XzlsZUlrT3VDVUFCTS4iLCJzdWIiOiJobXd2QklDT0p2TEFZU2ktRW1PZ0ZXaF95ODFVRXBuRGNpa3d0dlBVdU5NIiwidGlkIjoiOGJjOTU1ZDktMzhmZC00YzE1LWE1MjAtMGM2NTY0MDc1MzdhIiwidXRpIjoiSFh3YXRnT0tOMHVVRXdGaWpnSjRBQSIsInZlciI6IjIuMCJ9.kXoMA1Y-KdL8Z_Guq5Jzq-6zhrKECdVm6uDOFeRr39oegCeFYA8FJG2fesmQq5q5MWBWcETAp6Ovyx6SmSVQIicWE8PhH2aD40NsIEq-rXkovaqNimhZzkuuwqh0LlIDBbE_l3qtIkfXaUYS2UE029ggmX16Ek0rrs6JunD3MAO_Y7K4kZrSKRjozrbBv_NN1xZPp51RC5PuU9Lb6aacXPgTJaImvA31aNwSbAJohqdZlgX6vwakRaZFQWVtIaTEeedzqOump8wyNqSkSOTJLZLehWgmPF7cSLUZ0hhsiZUH0BPby_X8dvpwVjs6155jBIFo5iFJsBgxFJRu0VO71Q"
 
-    val TEST_WALLET_KEY1 = "{\"kty\":\"EC\",\"d\":\"uD-uxub011cplvr5Bd6MrIPSEUBsgLk-C1y3tnmfetQ\",\"use\":\"sig\",\"crv\":\"secp256k1\",\"kid\":\"48d8a34263cf492aa7ff61b6183e8bcf\",\"x\":\"TKaQ6sCocTDsmuj9tTR996tFXpEcS2EJN-1gOadaBvk\",\"y\":\"0TrIYHcfC93VpEuvj-HXTnyKt0snayOMwGSJA1XiDX8\"}"
-    val TEST_WALLET_KEY2 = "{\"kty\":\"OKP\",\"d\":\"q-ET7OMlI_chsYr0bV4mWDGTWuU-Cw_xWLvQkqExnwM\",\"crv\":\"Ed25519\",\"kid\":\"4cULZU4BQEJYax3vyqRKpGfkc_jcYtth0Wh-iPJa1hk\",\"x\":\"B0XctHANkPzJdjSoHrumdOh0wtsAQuNKas0N_QfzvDo\"}"
+    val TEST_WALLET_KEY1 =
+        "{\"kty\":\"EC\",\"d\":\"uD-uxub011cplvr5Bd6MrIPSEUBsgLk-C1y3tnmfetQ\",\"use\":\"sig\",\"crv\":\"secp256k1\",\"kid\":\"48d8a34263cf492aa7ff61b6183e8bcf\",\"x\":\"TKaQ6sCocTDsmuj9tTR996tFXpEcS2EJN-1gOadaBvk\",\"y\":\"0TrIYHcfC93VpEuvj-HXTnyKt0snayOMwGSJA1XiDX8\"}"
+    val TEST_WALLET_KEY2 =
+        "{\"kty\":\"OKP\",\"d\":\"q-ET7OMlI_chsYr0bV4mWDGTWuU-Cw_xWLvQkqExnwM\",\"crv\":\"Ed25519\",\"kid\":\"4cULZU4BQEJYax3vyqRKpGfkc_jcYtth0Wh-iPJa1hk\",\"x\":\"B0XctHANkPzJdjSoHrumdOh0wtsAQuNKas0N_QfzvDo\"}"
     val TEST_WALLET_KEY = TEST_WALLET_KEY1
 
-    val TEST_WALLET_DID_ION = "did:ion:EiDh0EL8wg8oF-7rRiRzEZVfsJvh4sQX4Jock2Kp4j_zxg:eyJkZWx0YSI6eyJwYXRjaGVzIjpbeyJhY3Rpb24iOiJyZXBsYWNlIiwiZG9jdW1lbnQiOnsicHVibGljS2V5cyI6W3siaWQiOiI0OGQ4YTM0MjYzY2Y0OTJhYTdmZjYxYjYxODNlOGJjZiIsInB1YmxpY0tleUp3ayI6eyJjcnYiOiJzZWNwMjU2azEiLCJraWQiOiI0OGQ4YTM0MjYzY2Y0OTJhYTdmZjYxYjYxODNlOGJjZiIsImt0eSI6IkVDIiwidXNlIjoic2lnIiwieCI6IlRLYVE2c0NvY1REc211ajl0VFI5OTZ0RlhwRWNTMkVKTi0xZ09hZGFCdmsiLCJ5IjoiMFRySVlIY2ZDOTNWcEV1dmotSFhUbnlLdDBzbmF5T013R1NKQTFYaURYOCJ9LCJwdXJwb3NlcyI6WyJhdXRoZW50aWNhdGlvbiJdLCJ0eXBlIjoiRWNkc2FTZWNwMjU2azFWZXJpZmljYXRpb25LZXkyMDE5In1dfX1dLCJ1cGRhdGVDb21taXRtZW50IjoiRWlCQnlkZ2R5WHZkVERob3ZsWWItQkV2R3ExQnR2TWJSLURmbDctSHdZMUhUZyJ9LCJzdWZmaXhEYXRhIjp7ImRlbHRhSGFzaCI6IkVpRGJxa05ldzdUcDU2cEJET3p6REc5bThPZndxamlXRjI3bTg2d1k3TS11M1EiLCJyZWNvdmVyeUNvbW1pdG1lbnQiOiJFaUFGOXkzcE1lQ2RQSmZRYjk1ZVV5TVlfaUdCRkMwdkQzeDNKVTB6V0VjWUtBIn19"
+    val TEST_WALLET_DID_ION =
+        "did:ion:EiDh0EL8wg8oF-7rRiRzEZVfsJvh4sQX4Jock2Kp4j_zxg:eyJkZWx0YSI6eyJwYXRjaGVzIjpbeyJhY3Rpb24iOiJyZXBsYWNlIiwiZG9jdW1lbnQiOnsicHVibGljS2V5cyI6W3siaWQiOiI0OGQ4YTM0MjYzY2Y0OTJhYTdmZjYxYjYxODNlOGJjZiIsInB1YmxpY0tleUp3ayI6eyJjcnYiOiJzZWNwMjU2azEiLCJraWQiOiI0OGQ4YTM0MjYzY2Y0OTJhYTdmZjYxYjYxODNlOGJjZiIsImt0eSI6IkVDIiwidXNlIjoic2lnIiwieCI6IlRLYVE2c0NvY1REc211ajl0VFI5OTZ0RlhwRWNTMkVKTi0xZ09hZGFCdmsiLCJ5IjoiMFRySVlIY2ZDOTNWcEV1dmotSFhUbnlLdDBzbmF5T013R1NKQTFYaURYOCJ9LCJwdXJwb3NlcyI6WyJhdXRoZW50aWNhdGlvbiJdLCJ0eXBlIjoiRWNkc2FTZWNwMjU2azFWZXJpZmljYXRpb25LZXkyMDE5In1dfX1dLCJ1cGRhdGVDb21taXRtZW50IjoiRWlCQnlkZ2R5WHZkVERob3ZsWWItQkV2R3ExQnR2TWJSLURmbDctSHdZMUhUZyJ9LCJzdWZmaXhEYXRhIjp7ImRlbHRhSGFzaCI6IkVpRGJxa05ldzdUcDU2cEJET3p6REc5bThPZndxamlXRjI3bTg2d1k3TS11M1EiLCJyZWNvdmVyeUNvbW1pdG1lbnQiOiJFaUFGOXkzcE1lQ2RQSmZRYjk1ZVV5TVlfaUdCRkMwdkQzeDNKVTB6V0VjWUtBIn19"
     val TEST_WALLET_DID_WEB1 = "did:web:entra.walt.id:holder"
     val TEST_WALLET_DID_WEB2 = "did:web:entra.walt.id:holder2"
-    val TEST_WALLET_DID_JWK = "did:jwk:eyJrdHkiOiJFQyIsInVzZSI6InNpZyIsImNydiI6InNlY3AyNTZrMSIsImtpZCI6IjQ4ZDhhMzQyNjNjZjQ5MmFhN2ZmNjFiNjE4M2U4YmNmIiwieCI6IlRLYVE2c0NvY1REc211ajl0VFI5OTZ0RlhwRWNTMkVKTi0xZ09hZGFCdmsiLCJ5IjoiMFRySVlIY2ZDOTNWcEV1dmotSFhUbnlLdDBzbmF5T013R1NKQTFYaURYOCJ9"
-    val TEST_WALLET_DID_KEY = "did:key:zdCru39GRVTj7Y6gKRbT9axbErpR9xAq9GmQkBz1DwnYxpMv4GsjWxZM3anG94V4PsTg12RDWt7Ss7dN2SDBd2A948UKMDxTD8oxRPujyyZ9Fcvv2saXeyp41jst"
+    val TEST_WALLET_DID_JWK =
+        "did:jwk:eyJrdHkiOiJFQyIsInVzZSI6InNpZyIsImNydiI6InNlY3AyNTZrMSIsImtpZCI6IjQ4ZDhhMzQyNjNjZjQ5MmFhN2ZmNjFiNjE4M2U4YmNmIiwieCI6IlRLYVE2c0NvY1REc211ajl0VFI5OTZ0RlhwRWNTMkVKTi0xZ09hZGFCdmsiLCJ5IjoiMFRySVlIY2ZDOTNWcEV1dmotSFhUbnlLdDBzbmF5T013R1NKQTFYaURYOCJ9"
+    val TEST_WALLET_DID_KEY =
+        "did:key:zdCru39GRVTj7Y6gKRbT9axbErpR9xAq9GmQkBz1DwnYxpMv4GsjWxZM3anG94V4PsTg12RDWt7Ss7dN2SDBd2A948UKMDxTD8oxRPujyyZ9Fcvv2saXeyp41jst"
     val TEST_WALLET_DID = TEST_WALLET_DID_WEB1
 
     //@Test
@@ -1117,7 +1121,8 @@ class CI_JVM_Test : AnnotationSpec() {
         val didWebResult = DidService.registerByKey(
             "web",
             pubKey,
-            DidWebCreateOptions("entra.walt.id", "holder", KeyType.secp256k1))
+            DidWebCreateOptions("entra.walt.id", "holder", KeyType.secp256k1)
+        )
         println(didWebResult.didDocument)
         // NEED TO UPDATE did document, so that verificationMethod id #0 equals ids of other methods!
 
@@ -1133,29 +1138,31 @@ class CI_JVM_Test : AnnotationSpec() {
         // ============ Issuer ========================
         val accessToken = entraAuthorize()
         val createIssuanceReq = "{\n" +
-            "    \"callback\": {\n" +
-            "        \"url\": \"https://9ffd-62-178-27-231.ngrok-free.app\",\n" +
-            "        \"state\": \"1234\",\n" +
-            "        \"headers\": {\n" +
-            "            \"api-key\": \"1234\"\n" +
-            "        }\n" +
-            "    },\n" +
-            "    \"authority\": \"did:web:entra.walt.id\",\n" +
-            "    \"registration\": {\n" +
-            "        \"clientName\": \"test\"\n" +
-            "    },\n" +
-            "    \"type\": \"VerifiableCredential,MyID\",\n" +
-            "    \"manifest\": \"https://verifiedid.did.msidentity.com/v1.0/tenants/8bc955d9-38fd-4c15-a520-0c656407537a/verifiableCredentials/contracts/133d7e92-d227-f74d-1a5b-354cbc8df49a/manifest\",\n" +
-            (pin?.let {
-                "\"pin\": {\n" +
-            "       \"value\": \"$pin\",\n" +
-            "       \"length\": 4\n" +
-            "   }," } ?: "") +
-            "   \"claims\": { \n" +
-            "       \"given_name\": \"Sev\",\n" +
-            "       \"family_name\": \"Sta\"\n" +
-            "   }\n" +
-            "}"
+                "    \"callback\": {\n" +
+                //"        \"url\": \"https://httpstat.us/200\",\n" +
+                "        \"url\": \"https://9ffd-62-178-27-231.ngrok-free.app\",\n" +
+                "        \"state\": \"1234\",\n" +
+                "        \"headers\": {\n" +
+                "            \"api-key\": \"1234\"\n" +
+                "        }\n" +
+                "    },\n" +
+                "    \"authority\": \"did:web:entra.walt.id\",\n" +
+                "    \"registration\": {\n" +
+                "        \"clientName\": \"test\"\n" +
+                "    },\n" +
+                "    \"type\": \"VerifiableCredential,MyID\",\n" +
+                "    \"manifest\": \"https://verifiedid.did.msidentity.com/v1.0/tenants/8bc955d9-38fd-4c15-a520-0c656407537a/verifiableCredentials/contracts/133d7e92-d227-f74d-1a5b-354cbc8df49a/manifest\",\n" +
+                (pin?.let {
+                    "\"pin\": {\n" +
+                            "       \"value\": \"$pin\",\n" +
+                            "       \"length\": 4\n" +
+                            "   },"
+                } ?: "") +
+                "   \"claims\": { \n" +
+                "       \"given_name\": \"Sev\",\n" +
+                "       \"family_name\": \"Sta\"\n" +
+                "   }\n" +
+                "}"
 
         val response = http.post("https://verifiedid.did.msidentity.com/v1.0/verifiableCredentials/createIssuanceRequest") {
             header(HttpHeaders.Authorization, accessToken)
