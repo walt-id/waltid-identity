@@ -1,62 +1,82 @@
 <template>
-    <div class="bg-white p-6 rounded-2xl shadow-2xl h-full">
+    <div ref="vcCardDiv" class="bg-white p-6 rounded-2xl shadow-2xl h-full text-gray-900">
         <div class="flex justify-end gap-1.5">
-            <CredentialIcon :credentialType="credential.type.at(-1)" class="h-6 w-6 flex-none rounded-full bg-gray-50 justify-self-start"/>
-            <div
-                :class="credential.expirationDate
-                    ? (new Date(credential.expirationDate).getTime() > new Date().getTime()
-                    ? 'bg-cyan-100' : 'bg-red-50') : 'bg-cyan-50'
-                "
-                class="rounded-lg px-3 mb-2"
-            >
-                <span
-                    :class="
-                        credential.expirationDate
-                            ? new Date(credential.expirationDate).getTime() > new Date().getTime()
-                                ? 'text-cyan-900'
-                                : 'text-orange-900'
-                            : 'text-cyan-900'
-                    "
-                >{{ credential.expirationDate ?
-                    (new Date(credential.expirationDate).getTime() > new Date().getTime() ? "Valid" : "Expired")
-                    : "Valid" }}
+            <CredentialIcon :credentialType="title" class="h-6 w-6 flex-none rounded-full bg-gray-50 justify-self-start" />
+            <div :class="credential.expirationDate ? (isNotExpired ? 'bg-cyan-100' : 'bg-red-50') : 'bg-cyan-50'" class="rounded-lg px-3 mb-2">
+                <span :class="isNotExpired ? 'text-cyan-900' : 'text-orange-900'">
+                    {{ isNotExpired ? "Valid" : "Expired" }}
                 </span>
             </div>
 
-            <div class="rounded-lg px-3 mb-2 bg-cyan-100" v-if="credential._sd">
+            <div v-if="credential._sd" class="rounded-lg px-3 mb-2 bg-cyan-100">
                 <span>SD</span>
             </div>
-        </div>
 
-        <h2 class="text-2xl font-bold text-gray-900 bold mb-8">
-            {{ credential.type.at(-1).replace(/([a-z0-9])([A-Z])/g, "$1 $2") }}
-            <p v-if="credential?.name" class="text-lg">{{ credential.name }}</p>
-        </h2>
-
-        <div v-if="credential.issuer" class="flex items-center">
-            <img :src="credential.issuer?.image?.id ? credential.issuer?.image?.id : credential.issuer?.image" class="w-12" />
-            <div class="text-natural-600 ml-2 w-32">
-                {{ credential.issuer?.name }}
+            <div v-if="manifest" class="rounded-lg px-3 mb-2 text-cyn-100 bg-cyan-400">
+                <span>Entra</span>
             </div>
         </div>
 
-        <div class="font-mono mt-3" v-if="showId">ID: {{ credential.id }}</div>
+        <h2 class="text-2xl font-bold bold mb-8">
+            {{ titleTitelized }}
+            <p v-if="credentialSubtitle" class="text-lg">{{ credentialSubtitle }}</p>
+        </h2>
+
+        <div v-if="issuerName" class="flex items-center">
+            <img v-if="credentialImageUrl" :src="credentialImageUrl" alt="Issuer image" class="w-12" />
+            <div class="text-natural-600 ml-2 w-32">
+                {{ issuerName }}
+            </div>
+        </div>
+
+        <div v-if="showId" class="font-mono mt-3">ID: {{ credential.id }}</div>
     </div>
 </template>
 
 <script lang="ts" setup>
 const props = defineProps({
     credential: {
-        type: undefined
+        type: Object,
+        required: true,
+    },
+    manifest: {
+        type: Object,
+        required: false,
     },
     showId: {
         type: Boolean,
         required: false,
-        default: false
-    }
+        default: false,
+    },
 });
+
+const credential = props.credential;
+const manifestDisplay = props.manifest ? JSON.parse(props.manifest)?.display : null;
+const manifestCard = manifestDisplay?.card;
+
+const title = manifestDisplay?.title ?? credential.type.at(-1);
+const titleTitelized = manifestDisplay?.title ?? credential.type.at(-1).replace(/([a-z0-9])([A-Z])/g, "$1 $2");
+const credentialSubtitle = manifestCard?.description ?? credential?.name;
+
+const credentialImageUrl = manifestCard?.logo?.uri ?? credential.issuer?.image?.id ?? credential.issuer?.image;
+
+const isNotExpired = credential.expirationDate ? new Date(credential.expirationDate).getTime() > new Date().getTime() : true;
+
+const issuerName = manifestCard?.issuedBy ?? credential.issuer?.name;
+
+const vcCardDiv = ref(null)
+
+nextTick(() => {
+    if (manifestCard) {
+        if (manifestCard?.backgroundColor) {
+            vcCardDiv.value.style.background = manifestCard?.backgroundColor
+        }
+
+        if (manifestCard?.textColor) {
+            vcCardDiv.value.style.color = manifestCard?.textColor
+        }
+    }
+})
+
+
 </script>
-
-<style scoped>
-
-</style>
