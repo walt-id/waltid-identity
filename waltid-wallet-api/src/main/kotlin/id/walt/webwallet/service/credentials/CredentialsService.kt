@@ -31,6 +31,7 @@ object CredentialsService {
             this[WalletCredentials.document] = credential.document
             this[WalletCredentials.disclosures] = credential.disclosures
             this[WalletCredentials.addedOn] = Clock.System.now().toJavaInstant()
+            this[WalletCredentials.manifest] = credential.manifest
         }.map { it[WalletCredentials.id] }
 
     fun delete(wallet: UUID, credentialId: String): Boolean =
