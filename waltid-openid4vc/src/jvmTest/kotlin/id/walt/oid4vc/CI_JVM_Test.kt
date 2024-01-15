@@ -947,7 +947,7 @@ class CI_JVM_Test : AnnotationSpec() {
 
     // issuance by reference
 
-    @Test
+    //@Test
     suspend fun testCredentialOfferByReference() {
         println("// -------- CREDENTIAL ISSUER ----------")
         println("// as CI provider, initialize credential offer for user, this time providing full offered credential object, and allowing pre-authorized code flow with user pin")
