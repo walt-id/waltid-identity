@@ -7,7 +7,6 @@ import id.walt.oid4vc.errors.*
 import id.walt.oid4vc.interfaces.IHttpClient
 import id.walt.oid4vc.interfaces.ITokenProvider
 import id.walt.oid4vc.interfaces.IVPTokenProvider
-import id.walt.oid4vc.interfaces.PresentationResult
 import id.walt.oid4vc.requests.*
 import id.walt.oid4vc.responses.*
 import id.walt.oid4vc.util.randomUUID
@@ -22,7 +21,6 @@ import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.*
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
-import kotlin.js.ExperimentalJsExport
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 
