@@ -1,6 +1,6 @@
 plugins {
-    kotlin("multiplatform") version "1.9.21"
-    id("org.jetbrains.kotlin.plugin.serialization") version "1.9.21"
+    kotlin("multiplatform") version "1.9.22"
+    id("org.jetbrains.kotlin.plugin.serialization") version "1.9.22"
     id("dev.petuska.npm.publish") version "3.4.1"
     id("maven-publish")
     id("com.github.ben-manes.versions")
@@ -62,7 +62,7 @@ kotlin {
 //        isMingwX64 -> mingwX64("native")
 //        else -> throw GradleException("Host OS is not supported in Kotlin/Native.")
 //    }
-    val ktor_version = "2.3.6"
+    val ktor_version = "2.3.7"
     val HOPLITE_VERSION = "2.8.0.RC3"
 
     val kryptoVersion = "4.0.10"

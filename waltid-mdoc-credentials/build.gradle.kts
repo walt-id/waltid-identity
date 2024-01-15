@@ -1,5 +1,5 @@
 plugins {
-    val kotlinVersion = "1.9.21"
+    val kotlinVersion = "1.9.22"
     kotlin("multiplatform") version kotlinVersion
     kotlin("plugin.serialization") version kotlinVersion
     id("dev.petuska.npm.publish") version "3.4.1"
