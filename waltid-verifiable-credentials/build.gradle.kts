@@ -2,6 +2,7 @@ plugins {
     kotlin("multiplatform")
     kotlin("plugin.serialization")
     id("maven-publish")
+    id("dev.petuska.npm.publish") version "3.4.1"
     id("com.github.ben-manes.versions")
 }
 
@@ -32,13 +33,13 @@ kotlin {
         }
     }
     js(IR) {
-        browser {
+        /*browser {
             commonWebpackConfig {
                 cssSupport {
                     enabled.set(true)
                 }
             }
-        }
+        }*/
         nodejs {
             generateTypeScriptDefinitions()
         }
@@ -53,12 +54,12 @@ kotlin {
                 implementation("io.github.optimumcode:json-schema-validator:0.0.2")
 
                 // Ktor client
-                implementation("io.ktor:ktor-client-core:2.3.6")
-                implementation("io.ktor:ktor-client-serialization:2.3.6")
-                implementation("io.ktor:ktor-client-content-negotiation:2.3.6")
-                implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.6")
-                implementation("io.ktor:ktor-client-json:2.3.6")
-                implementation("io.ktor:ktor-client-logging:2.3.6")
+                implementation("io.ktor:ktor-client-core:2.3.7")
+                implementation("io.ktor:ktor-client-serialization:2.3.7")
+                implementation("io.ktor:ktor-client-content-negotiation:2.3.7")
+                implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.7")
+                implementation("io.ktor:ktor-client-json:2.3.7")
+                implementation("io.ktor:ktor-client-logging:2.3.7")
 
                 // Coroutines
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
@@ -85,7 +86,7 @@ kotlin {
         val jvmMain by getting {
             dependencies {
                 // Ktor client
-                implementation("io.ktor:ktor-client-cio:2.3.6")
+                implementation("io.ktor:ktor-client-cio:2.3.7")
 
                 // Logging
                 implementation("org.slf4j:slf4j-simple:2.0.9")
@@ -131,6 +132,23 @@ kotlin {
         }
         all {
             languageSettings.enableLanguageFeature("InlineClasses")
+        }
+    }
+}
+
+npmPublish {
+    registries {
+        val envToken = System.getenv("NPM_TOKEN")
+        val npmTokenFile = File("secret_npm_token.txt")
+        val secretNpmToken = envToken ?: npmTokenFile.let { if (it.isFile) it.readLines().first() else "" }
+        val hasNPMToken = secretNpmToken.isNotEmpty()
+        val isReleaseBuild = Regex("\\d+.\\d+.\\d+").matches(version.get())
+        if (isReleaseBuild && hasNPMToken) {
+            readme.set(File("README.md"))
+            register("npmjs") {
+                uri.set(uri("https://registry.npmjs.org"))
+                authToken.set(secretNpmToken)
+            }
         }
     }
 }

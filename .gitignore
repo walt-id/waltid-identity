@@ -47,3 +47,4 @@ secret*
 **/*.db
 /kotlin-js-store/
 .idea/misc.xml
+**/bun.lockb

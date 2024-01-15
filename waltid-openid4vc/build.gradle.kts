@@ -1,6 +1,9 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+
 plugins {
-    kotlin("multiplatform") version "1.9.21"
-    id("org.jetbrains.kotlin.plugin.serialization") version "1.9.21"
+    kotlin("multiplatform") version "1.9.22"
+    id("org.jetbrains.kotlin.plugin.serialization") version "1.9.22"
     id("dev.petuska.npm.publish") version "3.4.1"
     id("maven-publish")
     id("com.github.ben-manes.versions")
@@ -33,9 +36,23 @@ repositories {
     mavenLocal()
 }
 
+val targetVersion = JavaVersion.VERSION_1_8
+val toolingRuntime = JavaVersion.VERSION_21
+
+java {
+    sourceCompatibility = targetVersion
+    targetCompatibility = targetVersion
+}
+
+tasks.withType(KotlinCompile::class.java) {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.fromTarget(targetVersion.toString()))
+    }
+}
+
 kotlin {
     jvm {
-        jvmToolchain(17)
+        jvmToolchain(targetVersion.majorVersion.toInt())
         withJava()
         testRuns["test"].executionTask.configure {
             useJUnitPlatform()
@@ -62,7 +79,7 @@ kotlin {
 //        isMingwX64 -> mingwX64("native")
 //        else -> throw GradleException("Host OS is not supported in Kotlin/Native.")
 //    }
-    val ktor_version = "2.3.6"
+    val ktor_version = "2.3.7"
     val HOPLITE_VERSION = "2.8.0.RC3"
 
     val kryptoVersion = "4.0.10"

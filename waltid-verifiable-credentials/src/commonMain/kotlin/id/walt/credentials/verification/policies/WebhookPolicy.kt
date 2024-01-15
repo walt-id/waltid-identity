@@ -16,7 +16,7 @@ class WebhookPolicy : CredentialWrapperValidatorPolicy(
     "Sends the credential data to an webhook URL as HTTP POST, and returns the verified status based on the webhooks set status code (success = 200 - 299)."
 ) {
 
-    val http = HttpClient() {
+    val http = HttpClient {
         install(ContentNegotiation) {
             json()
         }

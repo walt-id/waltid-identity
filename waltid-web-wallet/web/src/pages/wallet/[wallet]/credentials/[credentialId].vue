@@ -27,17 +27,17 @@
                                         </div>
                                     </div>
                                 </div>-->
-                <VerifiableCredentialCard :credential="jwtJson" />
+                <VerifiableCredentialCard :credential="jwtJson" :manifest="credential.manifest" />
             </div>
             <div class="px-7 py-1">
                 <div class="text-gray-600 font-bold">
                     {{ jwtJson?.type[jwtJson?.type.length - 1].replace(/([a-z0-9])([A-Z])/g, "$1 $2") }}
                     Details
                 </div>
-                <hr class="my-5" />
 
                 <!-- VerifiableDiploma -->
                 <div v-if="jwtJson?.type[jwtJson?.type.length - 1] == 'VerifiableDiploma'">
+                    <hr class="my-5" />
                     <div class="text-gray-500 mb-4 font-bold">Subject</div>
                     <div class="md:flex text-gray-500 mb-3 md:mb-1">
                         <div class="min-w-[19vw]">Given Name</div>
@@ -122,7 +122,8 @@
                 </div>
 
                 <!-- Open Badge 3.0 -->
-                <div v-if="jwtJson?.type[jwtJson?.type.length - 1] == 'OpenBadgeCredential'">
+                <div v-else-if="jwtJson?.type[jwtJson?.type.length - 1] == 'OpenBadgeCredential'">
+                    <hr class="my-5" />
                     <div class="flex items-center">
                         <div>
                             <div class="text-gray-500 mb-4 font-bold">Subject</div>
@@ -151,6 +152,7 @@
 
                 <!-- Permanent Resident Card -->
                 <div v-else-if="jwtJson?.type[jwtJson?.type.length - 1] == 'PermanentResidentCard'">
+                    <hr class="my-5" />
                     <div>
                         <div class="text-gray-500 mb-4 font-bold">Subject Info</div>
                         <div class="md:flex text-gray-500 mb-3 md:mb-1">
@@ -204,8 +206,8 @@
                     </div>
                 </div>
 
-                <hr class="my-5" />
                 <div v-if="jwtJson?.issuer">
+                    <hr class="my-5" />
                     <div class="text-gray-500 mb-4 font-bold">Issuer</div>
                     <div class="md:flex text-gray-500 mb-3 md:mb-1">
                         <div class="min-w-[19vw]">Name</div>
@@ -217,80 +219,97 @@
                             {{ jwtJson?.issuer?.id ?? jwtJson?.issuer }}
                         </div>
                     </div>
+                </div>
 
-                    <div v-if="disclosures">
-                        <hr class="my-5" />
-                        <div class="text-gray-500 mb-4 font-bold">Selectively disclosable attributes</div>
-                        <ul v-if="disclosures.length > 0">
-                            <li class="md:flex text-gray-500 mb-3 md:mb-1" v-for="disclosure in disclosures">
-                                <div class="min-w-[19vw]">Attribute "{{ disclosure[1] }}"</div>
-                                <div class="font-bold">{{ disclosure[2] }}</div>
-                            </li>
-                        </ul>
-                        <div v-else>No disclosable attributes!</div>
-                    </div>
+                <div v-if="manifestClaims">
+                    <hr class="my-5" />
+                    <div class="text-gray-500 mb-4 font-bold">Entra Manifest Claims</div>
+                    <ul>
+                        <li v-for="[jsonKey, nameDescriptor] in Object.entries(manifestClaims)" class="md:flex text-gray-500 mb-3 md:mb-1">
+                            <div class="min-w-[19vw]">{{ nameDescriptor?.label ?? "Unknown" }}</div>
+                            <div class="font-bold">
+                                {{
+                                    credential ? (JSONPath({path: jsonKey.replace(/^vc\./, ''), json: jwtJson})
+                                            .find((elem) => elem)
+                                            ?? `Not found: ${jsonKey}`) : null
+                                }}
+                            </div>
+                        </li>
+                    </ul>
+                </div>
 
+                <div v-if="disclosures">
+                    <hr class="my-5" />
+                    <div class="text-gray-500 mb-4 font-bold">Selectively disclosable attributes</div>
+                    <ul v-if="disclosures?.length > 0">
+                        <li v-for="disclosure in disclosures" class="md:flex text-gray-500 mb-3 md:mb-1">
+                            <div class="min-w-[19vw]">Attribute "{{ disclosure[1] }}"</div>
+                            <div class="font-bold">{{ disclosure[2] }}</div>
+                        </li>
+                    </ul>
+                    <div v-else>No disclosable attributes!</div>
+                </div>
+
+                <div class="text-gray-600 flex justify-between">
                     <hr class="mt-5 mb-3" />
-                    <div class="text-gray-600 flex justify-between">
-                        <div>
-                            {{
-                                jwtJson?.expirationDate && jwtJson?.issuanceDate
-                                    ? "Valid from " + new Date(jwtJson?.issuanceDate).toISOString().slice(0, 10) + " to " + new Date(jwtJson?.expirationDate).toISOString().slice(0, 10)
-                                    : ""
-                            }}
-                        </div>
-                        <div class="text-gray-900">
-                            Issued
-                            {{ jwtJson?.issuanceDate ? new Date(jwtJson?.issuanceDate).toISOString().slice(0, 10) : "No issuancedate" }}
-                        </div>
+                    <div>
+                        {{
+                            jwtJson?.expirationDate && jwtJson?.issuanceDate
+                                ? "Valid from " + new Date(jwtJson?.issuanceDate).toISOString().slice(0, 10) + " to " + new Date(jwtJson?.expirationDate).toISOString().slice(0, 10)
+                                : ""
+                        }}
+                    </div>
+                    <div class="text-gray-900">
+                        Issued:
+                        {{ issuanceDate ? issuanceDate : "No issuance date" }}
                     </div>
                 </div>
             </div>
-            <div class="flex justify-between mt-12">
-                <button
-                    class="rounded bg-primary-400 px-2 py-1 text-white shadow-sm hover:bg-primary-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-400"
-                    type="button"
-                    @click="showCredentialJson = !showCredentialJson"
-                >
-                    View Credential In JSON
-                </button>
-                <button
-                    class="rounded bg-red-500 px-2 py-1 text-white shadow-sm hover:bg-red-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-500"
-                    type="button"
-                    @click="deleteCredential"
-                >
-                    Delete Credential
-                </button>
-            </div>
-            <div v-if="showCredentialJson">
-                <div class="flex space-x-3 mt-10">
-                    <div class="min-w-0 flex-1">
-                        <p class="text-sm font-semibold text-gray-900 whitespace-pre-wrap">
-                            {{ credentialId }}
-                        </p>
-                        <p class="text-sm text-gray-500">Verifiable Credential data below:</p>
-                    </div>
+        </div>
+        <div class="flex justify-between mt-12">
+            <button
+                class="rounded bg-primary-400 px-2 py-1 text-white shadow-sm hover:bg-primary-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-400"
+                type="button"
+                @click="showCredentialJson = !showCredentialJson"
+            >
+                View Credential In JSON
+            </button>
+            <button
+                class="rounded bg-red-500 px-2 py-1 text-white shadow-sm hover:bg-red-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-500"
+                type="button"
+                @click="deleteCredential"
+            >
+                Delete Credential
+            </button>
+        </div>
+        <div v-if="showCredentialJson">
+            <div class="flex space-x-3 mt-10">
+                <div class="min-w-0 flex-1">
+                    <p class="text-sm font-semibold text-gray-900 whitespace-pre-wrap">
+                        {{ credentialId }}
+                    </p>
+                    <p class="text-sm text-gray-500">Verifiable Credential data below:</p>
                 </div>
-                <!-- <div class="p-3 shadow mt-3">
-                        <h3 class="font-semibold mb-2">QR code</h3>
-                        <div v-if="credential && credential.length">
-                            <qrcode-vue v-if="credential.length <= 4296" :value="credential" level="L" size="300"></qrcode-vue>
-                            <p v-else>Unfortunately, this Verifiable Credential is too big to be viewable as QR code (credential size is {{ credential.length }} characters, but the maximum a QR code
-                                can hold is 4296).</p>
-                        </div>
+            </div>
+            <!-- <div class="p-3 shadow mt-3">
+                    <h3 class="font-semibold mb-2">QR code</h3>
+                    <div v-if="credential && credential.length">
+                        <qrcode-vue v-if="credential.length <= 4296" :value="credential" level="L" size="300"></qrcode-vue>
+                        <p v-else>Unfortunately, this Verifiable Credential is too big to be viewable as QR code (credential size is {{ credential.length }} characters, but the maximum a QR code
+                            can hold is 4296).</p>
+                    </div>
 
-                    </div>-->
-                <div class="shadow p-3 mt-2 font-mono overflow-scroll">
-                    <h3 class="font-semibold mb-2">JWT</h3>
-                    <pre v-if="credential && credential?.document">{{
-                            /*JSON.stringify(JSON.parse(*/
-                            credential.document /*), null, 2)*/ ?? ""
-                        }}</pre>
-                </div>
-                <div class="shadow p-3 mt-2 font-mono overflow-scroll">
-                    <h3 class="font-semibold mb-2">JSON</h3>
-                    <pre v-if="credential && credential?.document">{{ jwtJson }} </pre>
-                </div>
+                </div>-->
+            <div class="shadow p-3 mt-2 font-mono overflow-scroll">
+                <h3 class="font-semibold mb-2">JWT</h3>
+                <pre v-if="credential && credential?.document">{{
+                    /*JSON.stringify(JSON.parse(*/
+                    credential.document /*), null, 2)*/ ?? ""
+                }}</pre>
+            </div>
+            <div class="shadow p-3 mt-2 font-mono overflow-scroll">
+                <h3 class="font-semibold mb-2">JSON</h3>
+                <pre v-if="credential && credential?.document">{{ jwtJson }} </pre>
             </div>
         </div>
     </CenterMain>
@@ -300,10 +319,12 @@
 import LoadingIndicator from "~/components/loading/LoadingIndicator.vue";
 import CenterMain from "~/components/CenterMain.vue";
 import BackButton from "~/components/buttons/BackButton.vue";
-import { ref } from "vue";
-import { decodeBase64ToUtf8 } from "~/composables/base64";
+import {ref} from "vue";
+import {decodeBase64ToUtf8} from "~/composables/base64";
 import VerifiableCredentialCard from "~/components/credentials/VerifiableCredentialCard.vue";
-import { parseDisclosures } from "~/composables/disclosures";
+import {parseDisclosures} from "~/composables/disclosures";
+import {JSONPath} from 'jsonpath-plus';
+
 
 const route = useRoute();
 const credentialId = route.params.credentialId as string;
@@ -341,17 +362,38 @@ type WalletCredential = {
     document: string,
     disclosures: string | null,
     addedOn: string,
+    manifest: string | null,
+    parsedDocument: object | null
 }
 
-const { data: credential, pending, refresh, error } = await useLazyFetch<WalletCredential>(`/wallet-api/wallet/${currentWallet.value}/credentials/${encodeURIComponent(credentialId)}`);
+
+const {
+    data: credential,
+    pending,
+    refresh,
+    error
+} = await useLazyFetch<WalletCredential>(`/wallet-api/wallet/${currentWallet.value}/credentials/${encodeURIComponent(credentialId)}`);
 refreshNuxtData();
 
-useHead({ title: "View credential - walt.id" });
+const manifest = computed(() => credential.value?.manifest ? JSON.parse(credential.value?.manifest) : null)
+const manifestClaims = computed(() => manifest.value?.display?.claims)
+
+const issuanceDate = computed(() => {
+    if (jwtJson?.issuanceDate) {
+        return new Date(jwtJson?.issuanceDate).toISOString().slice(0, 10)
+    } else if (jwtJson?.validFrom) {
+        return new Date(jwtJson?.validFrom).toISOString().slice(0, 10)
+    } else {
+        return null
+    }
+})
+
+useHead({title: "View credential - walt.id"});
 
 async function deleteCredential() {
     await $fetch(`/wallet-api/wallet/${currentWallet.value}/credentials/${encodeURIComponent(credentialId)}`, {
         method: "DELETE"
     });
-    await navigateTo({ path: `/wallet/${currentWallet.value}` });
+    await navigateTo({path: `/wallet/${currentWallet.value}`});
 }
 </script>

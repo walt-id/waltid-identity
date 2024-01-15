@@ -279,7 +279,7 @@ class TSEKey(
     }
 }
 
-suspend fun main() {
+/*suspend fun main() {
     val tseKey = TSEKey.generate(KeyType.Ed25519, TSEKeyMetadata("http://127.0.0.1:8200/v1/transit", "dev-only-token"))
     val plaintext = "This is a plaintext 123".encodeToByteArray()
 
@@ -294,4 +294,4 @@ suspend fun main() {
     println("Verified plaintext: ${verified.getOrNull()!!.decodeToString()}")
 
     tseKey.delete()
-}
+}*/

@@ -34,7 +34,7 @@ class DataBuilderTest {
             issuerDid = "did:key:abc"     // possibly later overridden by data mapping during issuance
             subjectDid = "did:key:xyz"    // possibly later overridden by data mapping during issuance
 
-            validFromNow()                // set validFrom per current time - 1.5 min
+            validFromNow()                // set validFrom per current time
             validFor(90.days)             // set expiration date to now + 3 months
 
             useStatusList2021Revocation("https://university.example/credentials/status/3", 94567)
