@@ -1,3 +1,6 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+
 plugins {
     kotlin("multiplatform") version "1.9.22"
     id("org.jetbrains.kotlin.plugin.serialization") version "1.9.22"
@@ -33,14 +36,23 @@ repositories {
     mavenLocal()
 }
 
+val targetVersion = JavaVersion.VERSION_1_8
+val toolingRuntime = JavaVersion.VERSION_21
+
 java {
-    sourceCompatibility = JavaVersion.VERSION_1_8
-    targetCompatibility = JavaVersion.VERSION_1_8
+    sourceCompatibility = targetVersion
+    targetCompatibility = targetVersion
+}
+
+tasks.withType(KotlinCompile::class.java) {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.fromTarget(targetVersion.toString()))
+    }
 }
 
 kotlin {
     jvm {
-        jvmToolchain(8)
+        jvmToolchain(targetVersion.majorVersion.toInt())
         withJava()
         testRuns["test"].executionTask.configure {
             useJUnitPlatform()

@@ -608,7 +608,7 @@ class VP_JVM_Test : AnnotationSpec() {
                     tokenResponse.toHttpParameters().forEach { entry ->
                         entry.value.forEach { append(entry.key, it) }
                     }
-                    append("id_token", ms_id_token) // <--
+                    //append("id_token", ms_id_token) // <--
                 })
         println("Resp: $resp")
         resp.status shouldBe HttpStatusCode.OK
