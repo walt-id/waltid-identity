@@ -198,16 +198,21 @@ console.log("issuanceParamsJson: ", issuanceParamsJson);
 
 console.log("Issuer host...");
 const issuer = issuanceParamsJson["credential_issuer"];
+const manifest = await $fetch(`/wallet-api/wallet/${currentWallet.value}/manifest/extract?offer=${request}`, {
+    method: "GET",
+});
 
 let issuerHost: String;
 try {
-    issuerHost = new URL(issuer).host;
+    issuerHost = manifest.input ? manifest.input.credentialIssuer : new URL(issuer).host;
+    // issuerHost = new URL(issuer).host;
 } catch {
     issuerHost = issuer;
 }
 
 console.log("Issuer host:", issuerHost);
-const credentialList = issuanceParamsJson["credentials"];
+const credentialList = manifest.display ? manifest.display.card.title : issuanceParamsJson["credentials"];
+// const credentialList = issuanceParamsJson["credentials"];
 
 let credentialTypes: String[] = [];
 
