@@ -27,7 +27,7 @@
                                         </div>
                                     </div>
                                 </div>-->
-                <VerifiableCredentialCard :credential="jwtJson" :manifest="credential.manifest" />
+                <VerifiableCredentialCard :credential="credential"/>
             </div>
             <div class="px-7 py-1">
                 <div class="text-gray-600 font-bold">

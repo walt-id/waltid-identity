@@ -9,6 +9,7 @@ import io.github.smiley4.ktorswaggerui.dsl.route
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.response.*
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 
 fun Application.credentials() = walletRoute {
@@ -24,7 +25,13 @@ fun Application.credentials() = walletRoute {
                 }
             }
         }) {
-            context.respond(getWalletService().listCredentials().map { it.parsedDocument })
+            context.respond(getWalletService().listCredentials())
+//                .map {
+//                CredentialDTO(
+//                    document = it.parsedDocument,
+//                    manifest = it.manifest,
+//                )
+//            })
         }
 
         put({
@@ -76,3 +83,9 @@ fun Application.credentials() = walletRoute {
         }
     }
 }
+
+@Serializable
+data class CredentialDTO(
+    val document: JsonObject?,
+    val manifest: String,
+)
