@@ -4,28 +4,43 @@ services:
   #   environment:
   #     POSTGRES_PASSWORD: secret
   wallet-backend:
-    image: waltid/wallet-api:latest
+    image: "${DEVELOPER_MODE:-waltid/wallet-api:latest}"
+    build:
+      context: ../
+      dockerfile: waltid-wallet-api/Dockerfile
     volumes:
       - ./wallet-backend/config:/waltid-wallet-api/config
       - ./wallet-backend/walt.yaml:/waltid-wallet-api/walt.yaml
       - ./wallet-backend/data:/waltid-wallet-api/data
   waltid-web-wallet:
-    image: waltid/waltid-web-wallet:latest
+    image: "${DEVELOPER_MODE:-waltid/waltid-web-wallet:latest}"
+    build:
+      context: ../
+      dockerfile: waltid-web-wallet/Dockerfile
     environment:
       NUXT_PUBLIC_ISSUER_CALLBACK_URL: "http://localhost:$WALLET_FRONTEND_PORT"
   issuer-api:
     platform: linux/x86_64
-    image: waltid/issuer-api:latest
+    image: "${DEVELOPER_MODE:-waltid/issuer-api:latest}"
+    build:
+      context: ../
+      dockerfile: waltid-issuer-api/Dockerfile
     volumes:
       - ./issuer-api/config:/waltid-issuer-api/config
   verifier-api:
     platform: linux/x86_64
-    image: waltid/verifier-api:latest
+    image: "${DEVELOPER_MODE:-waltid/verifier-api:latest}"
+    build:
+      context: ../
+      dockerfile: waltid-verifier-api/Dockerfile
     volumes:
       - ./verifier-api/config:/waltid-verifier-api/config
   web-portal:
     platform: linux/x86_64
-    image: waltid/portal:latest
+    image: "${DEVELOPER_MODE:-waltid/portal:latest}"
+    build:
+      context: ../
+      dockerfile: waltid-web-portal/Dockerfile
     environment:
       NEXT_PUBLIC_VC_REPO: "http://localhost:$VC_REPO_PORT"
       NEXT_PUBLIC_ISSUER: "http://localhost:$ISSUER_API_PORT"
