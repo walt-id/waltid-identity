@@ -39,10 +39,6 @@ const props = defineProps({
         type: Object,
         required: true,
     },
-    manifest: {
-        type: Object,
-        required: false,
-    },
     showId: {
         type: Boolean,
         required: false,
