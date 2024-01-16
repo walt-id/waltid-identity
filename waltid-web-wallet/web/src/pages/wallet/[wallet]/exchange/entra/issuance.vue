@@ -3,9 +3,7 @@
         <PageHeader>
             <template v-slot:title>
                 <div class="ml-3">
-                    <h1 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:leading-9">
-                        Receive entra credentials
-                    </h1>
+                    <h1 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:leading-9">Receive entra credentials</h1>
                     <p>
                         issued by <span class="underline">{{ issuerHost }}</span>
                     </p>
@@ -51,7 +49,7 @@
             <div class="flex col-2">
                 <div v-if="!pendingDids" class="relative w-full">
                     <Listbox v-if="dids?.length !== 1" v-model="selectedDid" as="div">
-                        <ListboxLabel class="block text-sm font-medium leading-6 text-gray-900">Select DID: </ListboxLabel>
+                        <ListboxLabel class="block text-sm font-medium leading-6 text-gray-900">Select DID:</ListboxLabel>
 
                         <div class="relative mt-2">
                             <ListboxButton
@@ -97,8 +95,7 @@
                                     Will issue to DID: {{ selectedDid.alias }} ({{ selectedDid.did }})
                                 </span>
                                 <button class="text-sm md:ml-6">
-                                    <NuxtLink class="whitespace-nowrap font-medium text-blue-700 hover:text-blue-600"
-                                              :to="`/wallet/${currentWallet}/settings/dids`">
+                                    <NuxtLink :to="`/wallet/${currentWallet}/settings/dids`" class="whitespace-nowrap font-medium text-blue-700 hover:text-blue-600">
                                         DID management
                                         <span aria-hidden="true"> &rarr;</span>
                                     </NuxtLink>
@@ -111,15 +108,16 @@
                     <div aria-label="Credential list" class="h-full overflow-y-auto shadow-xl">
                         <div v-for="group in groupedCredentialTypes.keys()" :key="group.id" class="relative">
                             <div class="top-0 z-10 border-y border-b-gray-200 border-t-gray-100 bg-gray-50 px-3 py-1.5 text-sm font-semibold leading-6 text-gray-900">
-                                <h3>{{ group }}s:</h3>
+                                <!--<h3>{{ JSON.stringify(group).slice(1, -1) }}s:</h3>-->
+                                <h3>{{ group.value }}s:</h3>
                             </div>
                             <ul class="divide-y divide-gray-100" role="list">
                                 <li v-for="credential in groupedCredentialTypes.get(group)" :key="credential" class="flex gap-x-4 px-3 py-5">
-                                    <CredentialIcon :credentialType="credential.name" class="h-6 w-6 flex-none rounded-full bg-gray-50"></CredentialIcon>
+                                    <CredentialIcon :credentialType="credential.name.value" class="h-6 w-6 flex-none rounded-full bg-gray-50"></CredentialIcon>
 
                                     <div class="flex min-w-0 flex-row items-center">
                                         <span class="text-lg font-semibold leading-6 text-gray-900">{{ credential.id }}.</span>
-                                        <span class="ml-1 truncate text-sm leading-5 text-gray-800">{{ credential.name }}</span>
+                                        <span class="ml-1 truncate text-sm leading-5 text-gray-800">{{ credential.name.value }}</span>
                                     </div>
                                 </li>
                             </ul>
@@ -138,13 +136,12 @@ import PageHeader from "~/components/PageHeader.vue";
 import CredentialIcon from "~/components/CredentialIcon.vue";
 import ActionButton from "~/components/buttons/ActionButton.vue";
 import LoadingIndicator from "~/components/loading/LoadingIndicator.vue";
-import VerifiableCredentialCard from "~/components/credentials/VerifiableCredentialCard.vue";
 import { Listbox, ListboxButton, ListboxLabel, ListboxOption, ListboxOptions } from "@headlessui/vue";
 import { CheckIcon, ChevronUpDownIcon } from "@heroicons/vue/20/solid";
 import { useTitle } from "@vueuse/core";
 import { ref } from "vue";
 
-const currentWallet = useCurrentWallet()
+const currentWallet = useCurrentWallet();
 const { data: dids, pending: pendingDids } = await useLazyAsyncData(() => $fetch(`/wallet-api/wallet/${currentWallet.value}/dids`));
 
 const selectedDid: Ref<Object | null> = ref(null);
@@ -175,11 +172,11 @@ const issuanceUrl = new URL(request);
 console.log("issuanceUrl: ", issuanceUrl);
 
 //TODO: entra batch issuing (+mixed batch issuing)
-const { data: manifest } = useLazyFetch(`/wallet-api/wallet/${currentWallet.value}/manifest/extract?offer=${request}`)
+const { data: manifest } = useLazyFetch(`/wallet-api/wallet/${currentWallet.value}/manifest/extract?offer=${request}`);
 // credential display values
-const issuerHost = computed(() => manifest.value?.display ? manifest.value.display.card.issuedBy : "n/a")
+const issuerHost = computed(() => (manifest.value?.display ? manifest.value.display.card.issuedBy : "n/a"));
 console.log("Issuer host:", issuerHost);
-const credentialType = computed(() => manifest.value?.display ? manifest.value.display.card.title : "n/a")
+const credentialType = computed(() => (manifest.value?.display ? manifest.value.display.card.title : "n/a"));
 
 let credentialTypes: String[] = [credentialType];
 let i = 0;
@@ -189,7 +186,6 @@ const groupedCredentialTypes = groupBy(
     }),
     (c) => c.name,
 );
-
 
 const failed = ref(false);
 const failMessage = ref("Unknown error occurred.");
