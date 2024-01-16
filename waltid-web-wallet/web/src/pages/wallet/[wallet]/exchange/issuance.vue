@@ -183,8 +183,9 @@ console.log("Making issuanceUrl...");
 const issuanceUrl = new URL(request);
 console.log("issuanceUrl: ", issuanceUrl);
 
-// const credentialOffer = issuanceUrl.searchParams.get("credential_offer");
-// console.log("credentialOffer: ", credentialOffer);
+const credentialOffer = issuanceUrl.searchParams.get("credential_offer");
+console.log("credentialOffer: ", credentialOffer);
+
 // if (credentialOffer == null) {
 //     throw createError({
 //         statusCode: 400,
@@ -192,7 +193,7 @@ console.log("issuanceUrl: ", issuanceUrl);
 //     });
 // }
 
-const issuanceParamsJson = {"credential_issuer": request, "credentials": [] }
+const issuanceParamsJson = {"credential_issuer": request, "credentials": [] } //JSON.parse(credentialOffer);
 console.log("issuanceParamsJson: ", issuanceParamsJson);
 
 console.log("Issuer host...");

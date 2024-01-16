@@ -50,8 +50,9 @@ const props = defineProps({
     },
 });
 
-const credential = props.credential;
-const manifestDisplay = props.manifest ? JSON.parse(props.manifest)?.display : null;
+const credential = props.credential.parsedDocument;
+const manifest = props.credential.manifest
+const manifestDisplay = manifest ? JSON.parse(manifest)?.display : null;
 const manifestCard = manifestDisplay?.card;
 
 const title = manifestDisplay?.title ?? credential.type.at(-1);
@@ -67,6 +68,7 @@ const issuerName = manifestCard?.issuedBy ?? credential.issuer?.name;
 const vcCardDiv = ref(null)
 
 nextTick(() => {
+    try{
     if (manifestCard) {
         if (manifestCard?.backgroundColor) {
             vcCardDiv.value.style.background = manifestCard?.backgroundColor
@@ -76,6 +78,7 @@ nextTick(() => {
             vcCardDiv.value.style.color = manifestCard?.textColor
         }
     }
+    }catch(_){}
 })
 
 
