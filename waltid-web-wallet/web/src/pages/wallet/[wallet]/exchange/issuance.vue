@@ -186,14 +186,14 @@ console.log("issuanceUrl: ", issuanceUrl);
 const credentialOffer = issuanceUrl.searchParams.get("credential_offer");
 console.log("credentialOffer: ", credentialOffer);
 
-// if (credentialOffer == null) {
-//     throw createError({
-//         statusCode: 400,
-//         statusMessage: "Invalid issuance request: No credential_offer",
-//     });
-// }
+if (credentialOffer == null) {
+    throw createError({
+        statusCode: 400,
+        statusMessage: "Invalid issuance request: No credential_offer",
+    });
+}
 
-const issuanceParamsJson = {"credential_issuer": request, "credentials": [] } //JSON.parse(credentialOffer);
+const issuanceParamsJson = JSON.parse(credentialOffer);
 console.log("issuanceParamsJson: ", issuanceParamsJson);
 
 console.log("Issuer host...");
