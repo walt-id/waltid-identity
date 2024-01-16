@@ -1,7 +1,7 @@
 <template>
     <div ref="vcCardDiv" class="bg-white p-6 rounded-2xl shadow-2xl h-full text-gray-900">
         <div class="flex justify-end gap-1.5">
-            <CredentialIcon :credentialType="title" class="h-6 w-6 flex-none rounded-full bg-gray-50 justify-self-start" />
+            <CredentialIcon :credentialType="title" class="h-6 w-6 p-0.5 flex-none rounded-full backdrop-contrast-50 justify-self-start" />
             <div :class="credential.expirationDate ? (isNotExpired ? 'bg-cyan-100' : 'bg-red-50') : 'bg-cyan-50'" class="rounded-lg px-3 mb-2">
                 <span :class="isNotExpired ? 'text-cyan-900' : 'text-orange-900'">
                     {{ isNotExpired ? "Valid" : "Expired" }}
