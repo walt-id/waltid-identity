@@ -1,6 +1,6 @@
 <template>
     <AcademicCapIcon v-if="credentialType === 'VerifiableDiploma'" />
-    <IdentificationIcon v-else-if="credentialType === 'VerifiableId' || credentialType === 'Europass'" />
+    <IdentificationIcon v-else-if="['VerifiableId', 'Europass', 'MyID'].includes(credentialType)" />
     <HomeIcon v-else-if="credentialType === 'ProofOfResidence'" />
     <UserGroupIcon v-else-if="credentialType === 'ParticipantCredential'" />
     <CheckBadgeIcon v-else-if="credentialType === 'OpenBadgeCredential'" />
