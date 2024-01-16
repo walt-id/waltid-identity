@@ -229,9 +229,12 @@
                             <div class="min-w-[19vw]">{{ nameDescriptor?.label ?? "Unknown" }}</div>
                             <div class="font-bold">
                                 {{
-                                    credential ? (JSONPath({path: jsonKey.replace(/^vc\./, ''), json: jwtJson})
-                                            .find((elem) => elem)
-                                            ?? `Not found: ${jsonKey}`) : null
+                                    credential
+                                        ? JSONPath({
+                                              path: jsonKey.replace(/^vc\./, ""),
+                                              json: jwtJson,
+                                          }).find((elem) => elem) ?? `Not found: ${jsonKey}`
+                                        : null
                                 }}
                             </div>
                         </li>
@@ -267,13 +270,23 @@
             </div>
         </div>
         <div class="flex justify-between mt-12">
-            <button
-                class="rounded bg-primary-400 px-2 py-1 text-white shadow-sm hover:bg-primary-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-400"
-                type="button"
-                @click="showCredentialJson = !showCredentialJson"
-            >
-                View Credential In JSON
-            </button>
+            <div class="flex gap-3">
+                <button
+                    class="rounded bg-primary-400 px-2 py-1 text-white shadow-sm hover:bg-primary-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-400"
+                    type="button"
+                    @click="showCredentialJson = !showCredentialJson"
+                >
+                    View Credential In JSON
+                </button>
+                <button
+                    v-if="manifest"
+                    class="rounded bg-primary-400 px-2 py-1 text-white shadow-sm hover:bg-primary-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-400"
+                    type="button"
+                    @click="showCredentialManifest = !showCredentialManifest"
+                >
+                    View Credential Manifest
+                </button>
+            </div>
             <button
                 class="rounded bg-red-500 px-2 py-1 text-white shadow-sm hover:bg-red-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-500"
                 type="button"
@@ -312,6 +325,21 @@
                 <pre v-if="credential && credential?.document">{{ jwtJson }} </pre>
             </div>
         </div>
+
+        <div v-if="showCredentialManifest">
+            <div class="flex space-x-3 mt-10">
+                <div class="min-w-0 flex-1">
+                    <p class="text-sm font-semibold text-gray-900 whitespace-pre-wrap">
+                        {{ credentialId }}
+                    </p>
+                    <p class="text-sm text-gray-500">Verifiable Credential Manifest below:</p>
+                </div>
+            </div>
+            <div class="shadow p-3 mt-2 font-mono overflow-scroll">
+                <h3 class="font-semibold mb-2">Credential manifest</h3>
+                <pre v-if="manifest">{{ manifest }} </pre>
+            </div>
+        </div>
     </CenterMain>
 </template>
 
@@ -319,18 +347,18 @@
 import LoadingIndicator from "~/components/loading/LoadingIndicator.vue";
 import CenterMain from "~/components/CenterMain.vue";
 import BackButton from "~/components/buttons/BackButton.vue";
-import {ref} from "vue";
-import {decodeBase64ToUtf8} from "~/composables/base64";
+import { ref } from "vue";
+import { decodeBase64ToUtf8 } from "~/composables/base64";
 import VerifiableCredentialCard from "~/components/credentials/VerifiableCredentialCard.vue";
-import {parseDisclosures} from "~/composables/disclosures";
-import {JSONPath} from 'jsonpath-plus';
-
+import { parseDisclosures } from "~/composables/disclosures";
+import { JSONPath } from "jsonpath-plus";
 
 const route = useRoute();
 const credentialId = route.params.credentialId as string;
 const currentWallet = useCurrentWallet();
 
-let showCredentialJson = ref(false);
+const showCredentialJson = ref(false);
+const showCredentialManifest = ref(false);
 
 const jwtJson = computed(() => {
     if (credential.value) {
@@ -352,48 +380,42 @@ const jwtJson = computed(() => {
 
 const disclosures = computed(() => {
     if (credential.value && credential.value.disclosures) {
-        return parseDisclosures(credential.value.disclosures)
+        return parseDisclosures(credential.value.disclosures);
     } else return null;
 });
 
 type WalletCredential = {
-    wallet: string,
-    id: string,
-    document: string,
-    disclosures: string | null,
-    addedOn: string,
-    manifest: string | null,
-    parsedDocument: object | null
-}
+    wallet: string;
+    id: string;
+    document: string;
+    disclosures: string | null;
+    addedOn: string;
+    manifest: string | null;
+    parsedDocument: object | null;
+};
 
-
-const {
-    data: credential,
-    pending,
-    refresh,
-    error
-} = await useLazyFetch<WalletCredential>(`/wallet-api/wallet/${currentWallet.value}/credentials/${encodeURIComponent(credentialId)}`);
+const { data: credential, pending, refresh, error } = await useLazyFetch<WalletCredential>(`/wallet-api/wallet/${currentWallet.value}/credentials/${encodeURIComponent(credentialId)}`);
 refreshNuxtData();
 
-const manifest = computed(() => credential.value?.manifest ? JSON.parse(credential.value?.manifest) : null)
-const manifestClaims = computed(() => manifest.value?.display?.claims)
+const manifest = computed(() => (credential.value?.manifest ? JSON.parse(credential.value?.manifest) : null));
+const manifestClaims = computed(() => manifest.value?.display?.claims);
 
 const issuanceDate = computed(() => {
     if (jwtJson?.issuanceDate) {
-        return new Date(jwtJson?.issuanceDate).toISOString().slice(0, 10)
+        return new Date(jwtJson?.issuanceDate).toISOString().slice(0, 10);
     } else if (jwtJson?.validFrom) {
-        return new Date(jwtJson?.validFrom).toISOString().slice(0, 10)
+        return new Date(jwtJson?.validFrom).toISOString().slice(0, 10);
     } else {
-        return null
+        return null;
     }
-})
+});
 
-useHead({title: "View credential - walt.id"});
+useHead({ title: "View credential - walt.id" });
 
 async function deleteCredential() {
     await $fetch(`/wallet-api/wallet/${currentWallet.value}/credentials/${encodeURIComponent(credentialId)}`, {
-        method: "DELETE"
+        method: "DELETE",
     });
-    await navigateTo({path: `/wallet/${currentWallet.value}`});
+    await navigateTo({ path: `/wallet/${currentWallet.value}` });
 }
 </script>
