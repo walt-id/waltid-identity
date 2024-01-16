@@ -150,7 +150,7 @@ open class SDJwt internal constructor(
          * Parse SD-JWT from a token string
          */
         fun parse(sdJwt: String): SDJwt {
-            val matchResult = Regex(SD_JWT_PATTERN).matchEntire(sdJwt) ?: throw Exception("Invalid SD-JWT format")
+            val matchResult = Regex(SD_JWT_PATTERN).matchEntire(sdJwt) ?: throw Exception("Invalid SD-JWT format: $sdJwt")
             val matchedGroups = matchResult.groups as MatchNamedGroupCollection
             val disclosures = matchedGroups["disclosures"]?.value?.trim(SEPARATOR)?.split(SEPARATOR)?.toSet() ?: setOf()
             return SDJwt(

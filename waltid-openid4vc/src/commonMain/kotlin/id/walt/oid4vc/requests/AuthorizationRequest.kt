@@ -2,11 +2,8 @@ package id.walt.oid4vc.requests
 
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.data.dif.PresentationDefinition
-import id.walt.oid4vc.interfaces.IHttpClient
-import id.walt.oid4vc.interfaces.SimpleHttpResponse
 import id.walt.oid4vc.util.httpGet
 import id.walt.sdjwt.SDJwt
-import io.ktor.http.*
 import kotlinx.serialization.json.*
 
 interface IAuthorizationRequest {
@@ -106,28 +103,28 @@ data class AuthorizationRequest(
         )
 
         suspend fun fromRequestObjectByReference(requestUri: String): AuthorizationRequest {
-           return fromRequestObject(httpGet(requestUri))
+            println("Request object by reference: $requestUri")
+            return fromRequestObject(httpGet(requestUri))
         }
 
         fun fromRequestObject(request: String): AuthorizationRequest {
             return fromHttpParameters(
-                SDJwt.parse(request).fullPayload.mapValues { e -> when(e.value) {
-                    is JsonArray -> e.value.jsonArray.map { it.toString() }.toList()
-                    is JsonPrimitive -> listOf(e.value.jsonPrimitive.content)
-                    else -> listOf(e.value.jsonObject.toString())
-                } }
+                SDJwt.parse(request).fullPayload.mapValues { e ->
+                    when (e.value) {
+                        is JsonArray -> e.value.jsonArray.map { it.toString() }.toList()
+                        is JsonPrimitive -> listOf(e.value.jsonPrimitive.content)
+                        else -> listOf(e.value.jsonObject.toString())
+                    }
+                }
             )
         }
 
         suspend fun fromHttpParametersAuto(parameters: Map<String, List<String>>): AuthorizationRequest {
-            if(parameters.containsKey("response_type") && parameters.containsKey("client_id")) {
-                return fromHttpParameters(parameters)
-            } else if(parameters.containsKey("request_uri")) {
-                return fromRequestObjectByReference(parameters["request_uri"]!!.first())
-            } else if(parameters.containsKey("request")) {
-                return fromRequestObject(parameters["request"]!!.first())
-            } else {
-                throw Exception("Could not find request parameters or object in given parameters")
+            return when {
+                parameters.containsKey("response_type") && parameters.containsKey("client_id") -> fromHttpParameters(parameters)
+                parameters.containsKey("request_uri") -> fromRequestObjectByReference(parameters["request_uri"]!!.first())
+                parameters.containsKey("request") -> fromRequestObject(parameters["request"]!!.first())
+                else -> throw Exception("Could not find request parameters or object in given parameters")
             }
         }
 
