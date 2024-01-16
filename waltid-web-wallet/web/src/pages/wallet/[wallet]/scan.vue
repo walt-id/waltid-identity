@@ -36,12 +36,20 @@ async function startRequest(request) {
     console.log("Using encoded request:", encoded);
 
     if (type === SiopRequestType.ISSUANCE) {
-        await navigateTo({ path: `/wallet/${currentWallet.value}/exchange/issuance`, query: { request: encoded } });
+        await redirectByOfferType(request, encoded)//navigateTo({ path: `/wallet/${currentWallet.value}/exchange/issuance`, query: { request: encoded } });
     } else if (type === SiopRequestType.PRESENTATION) {
         await navigateTo({ path: `/wallet/${currentWallet.value}/exchange/presentation`, query: { request: encoded } });
     } else {
         console.error("Unknown SIOP request type");
         await navigateTo({ path: `/wallet/${currentWallet.value}/exchange/error`, query: { message: btoa("Unknown request type") } });
+    }
+}
+
+function redirectByOfferType(offerUrl, encoded){
+    if(offerUrl.startsWith("openid-vc://")){
+        return navigateTo({ path: `/wallet/${currentWallet.value}/exchange/entra/issuance`, query: { request: encoded } });
+    }else{
+        return navigateTo({ path: `/wallet/${currentWallet.value}/exchange/issuance`, query: { request: encoded } });
     }
 }
 </script>
