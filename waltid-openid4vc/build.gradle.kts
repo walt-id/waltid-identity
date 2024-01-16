@@ -52,7 +52,7 @@ tasks.withType(KotlinCompile::class.java) {
 
 kotlin {
     jvm {
-        jvmToolchain(targetVersion.majorVersion.toInt())
+        jvmToolchain(toolingRuntime.majorVersion.toInt())
         withJava()
         testRuns["test"].executionTask.configure {
             useJUnitPlatform()
