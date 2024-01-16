@@ -300,9 +300,9 @@ const navigation = [
             { name: "Tokens", href: `/wallet/${currentWallet.value}/settings/tokens`, icon: GlobeAltIcon },
             { name: "DIDs", href: `/wallet/${currentWallet.value}/settings/dids`, icon: FingerPrintIcon },
             { name: "Keys", href: `/wallet/${currentWallet.value}/settings/keys`, icon: KeyIcon },
-            { name: "EventLog", href: `/wallet/${currentWallet.value}/eventlog`, icon: ClipboardDocumentListIcon },
+            { name: "Event log", href: `/wallet/${currentWallet.value}/eventlog`, icon: ClipboardDocumentListIcon },
             // { name: "History", href: `/wallet/${currentWallet.value}/history`, icon: ClipboardDocumentListIcon },
-            
+
 
             // {name: 'History', href: '/history', icon: ClockIcon}
         ],

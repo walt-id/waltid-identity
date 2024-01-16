@@ -1,6 +1,6 @@
 <template>
     <CenterMain>
-        <h1 class="text-2xl font-semibold mb-2">EventLog</h1>
+        <h1 class="text-2xl font-semibold mb-2">Event log</h1>
 
         <LoadingIndicator v-if="pending" class="my-6 mb-12 w-full"> Loading eventLog... </LoadingIndicator>
 
@@ -52,7 +52,7 @@
                                 Originator
                             </th>
                             <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                                
+
                             </th>
                             <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100"></th>
                         </tr>
@@ -84,7 +84,7 @@
                                 </td>
 
                                 <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm text-right">
-                                    <button 
+                                    <button
                                     class="inline-block text-gray-500 hover:text-gray-700"
                                     @click="viewData(`${item.event}.${item.action}`, item.data)"
                                     type="button">
