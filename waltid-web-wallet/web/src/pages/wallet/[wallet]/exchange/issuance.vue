@@ -197,21 +197,16 @@ console.log("issuanceParamsJson: ", issuanceParamsJson);
 
 console.log("Issuer host...");
 const issuer = issuanceParamsJson["credential_issuer"];
-const { data: manifest } = useFetch(`/wallet-api/wallet/${currentWallet.value}/manifest/extract?offer=${request}`);
 
 let issuerHost: String;
 try {
-    console.log(`manifest: ${manifest.display.card.issuedBy}`)
-    issuerHost = manifest != null ? manifest.display.card.issuedBy : new URL(issuer).host;
-    // issuerHost = new URL(issuer).host;
+    issuerHost = new URL(issuer).host;
 } catch {
-    console.error("error manifest")
     issuerHost = issuer;
 }
 
 console.log("Issuer host:", issuerHost);
-const credentialList = manifest.display ? manifest.display.card.title : issuanceParamsJson["credentials"];
-// const credentialList = issuanceParamsJson["credentials"];
+const credentialList = issuanceParamsJson["credentials"];
 
 let credentialTypes: String[] = [];
 
