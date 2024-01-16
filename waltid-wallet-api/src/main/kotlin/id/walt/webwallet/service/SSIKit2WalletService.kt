@@ -607,7 +607,7 @@ class SSIKit2WalletService(tenant: String, accountId: UUID, walletId: UUID) :
                 EventType.Key.Create, "wallet", KeyEventData(
                     id = createdKey.getKeyId(),
                     algorithm = createdKey.keyType.name,
-                    keyManagementService = "local",
+                    keyManagementService = "TSE",
                 )
             )
             KeysService.add(walletId, createdKey.getKeyId(), KeySerialization.serializeKey(createdKey))
