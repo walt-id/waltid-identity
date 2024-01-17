@@ -215,13 +215,13 @@
                     </div>
                     <div class="md:flex text-gray-500 mb-3 md:mb-1">
                         <div class="min-w-[19vw]">DID</div>
-                        <div class="font-bold overflow-scroll lg:overflow-auto">
+                        <div class="font-bold truncate hover:overflow-auto">
                             {{ issuerDid }}
                         </div>
                     </div>
                     <div class="md:flex text-gray-500 mb-3 md:mb-1">
                         <div class="min-w-[19vw]">Service endpoint</div>
-                        <NuxtLink class="font-bold overflow-scroll lg:overflow-auto" :to="credentialIssuerService ?? ''" _blank>
+                        <NuxtLink class="font-bold truncate" :to="credentialIssuerService ?? ''" _blank>
                             {{ credentialIssuerService }}
                         </NuxtLink>
                     </div>
@@ -233,7 +233,7 @@
                     <ul>
                         <li v-for="[jsonKey, nameDescriptor] in Object.entries(manifestClaims)" class="md:flex text-gray-500 mb-3 md:mb-1">
                             <div class="min-w-[19vw]">{{ nameDescriptor?.label ?? "Unknown" }}</div>
-                            <div class="font-bold">
+                            <div class="font-bold truncate hover:overflow-auto">
                                 {{
                                     credential
                                         ? JSONPath({
