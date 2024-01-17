@@ -125,23 +125,29 @@ class SSIKit2WalletService(tenant: String, accountId: UUID, walletId: UUID) :
 
         println("Using filters: $filters")
 
-        val matchedCredentials = credentialList.filter { credential ->
-            filters.any { fields ->
-                fields.all { typeFilter ->
-                    val credField = credential.parsedDocument!![typeFilter.path] ?: return@all false
+        val matchedCredentials = when {
+                filters.isNotEmpty() -> credentialList.filter { credential ->
+                    filters.any { fields ->
+                        fields.all { typeFilter ->
+                            val credField = credential.parsedDocument!![typeFilter.path] ?: return@all false
 
-                    when (credField) {
-                        is JsonPrimitive -> credField.jsonPrimitive.content == typeFilter.pattern
-                        is JsonArray -> credField.jsonArray.last().jsonPrimitive.content == typeFilter.pattern
-                        else -> false
+                            when (credField) {
+                                is JsonPrimitive -> credField.jsonPrimitive.content == typeFilter.pattern
+                                is JsonArray -> credField.jsonArray.last().jsonPrimitive.content == typeFilter.pattern
+                                else -> false
+                            }
+                        }
                     }
                 }
+                else -> credentialList.filter {  cred ->
+                    presentationDefinition.inputDescriptors.any { desc -> desc.name == cred.parsedDocument?.get("type")?.jsonArray?.last()?.jsonPrimitive?.content }
+                }
             }
-        }
+
+
         println("Matched credentials: $matchedCredentials")
 
-
-        return matchedCredentials
+        return matchedCredentials.ifEmpty { credentialList }
     }
 
     private fun getQueryParams(url: String): Map<String, MutableList<String>> {
@@ -214,7 +220,7 @@ class SSIKit2WalletService(tenant: String, accountId: UUID, walletId: UUID) :
     ): Result<String?> {
         val credentialWallet = getCredentialWallet(did)
 
-        val authReq = AuthorizationRequest.fromHttpParametersAuto(parseQueryString( Url(request).encodedQuery).toMap())
+        val authReq = AuthorizationRequest.fromHttpParametersAuto(parseQueryString(Url(request).encodedQuery).toMap())
         println("Auth req: $authReq")
 
         println("USING PRESENTATION REQUEST, SELECTED CREDENTIALS: $selectedCredentialIds")
@@ -234,7 +240,12 @@ class SSIKit2WalletService(tenant: String, accountId: UUID, walletId: UUID) :
 
         val tokenResponse = credentialWallet.processImplicitFlowAuthorization(presentationSession.authorizationRequest)
         val resp = ktorClient.submitForm(
-            presentationSession.authorizationRequest.responseUri ?: presentationSession.authorizationRequest.redirectUri ?: throw AuthorizationError(presentationSession.authorizationRequest, AuthorizationErrorCode.invalid_request, "No response_uri or redirect_uri found on authorization request"),
+            presentationSession.authorizationRequest.responseUri ?: presentationSession.authorizationRequest.redirectUri
+            ?: throw AuthorizationError(
+                presentationSession.authorizationRequest,
+                AuthorizationErrorCode.invalid_request,
+                "No response_uri or redirect_uri found on authorization request"
+            ),
             parameters {
                 tokenResponse.toHttpParameters().forEach { entry ->
                     entry.value.forEach { append(entry.key, it) }
@@ -313,7 +324,10 @@ class SSIKit2WalletService(tenant: String, accountId: UUID, walletId: UUID) :
         followRedirects = false
     }
 
-    private suspend fun processCredentialOfferRequest(credentialOfferRequest: CredentialOfferRequest, credentialWallet: TestCredentialWallet): List<CredentialResponse> {
+    private suspend fun processCredentialOfferRequest(
+        credentialOfferRequest: CredentialOfferRequest,
+        credentialWallet: TestCredentialWallet
+    ): List<CredentialResponse> {
         println("// get issuer metadata")
         val providerMetadataUri =
             credentialWallet.getCIProviderMetadataUrl(credentialOfferRequest.credentialOffer!!.credentialIssuer)
@@ -403,12 +417,21 @@ class SSIKit2WalletService(tenant: String, accountId: UUID, walletId: UUID) :
         }
     }
 
-    private suspend fun processMSEntraIssuanceRequest(entraIssuanceRequest: EntraIssuanceRequest, credentialWallet: TestCredentialWallet, pin: String? = null): List<CredentialResponse> {
+    private suspend fun processMSEntraIssuanceRequest(
+        entraIssuanceRequest: EntraIssuanceRequest,
+        credentialWallet: TestCredentialWallet,
+        pin: String? = null
+    ): List<CredentialResponse> {
         // *) Load key:
         val walletKey = getKeyByDid(credentialWallet.did)
 
         // *) Create response JWT token, signed by key for holder DID
-        val responseObject = entraIssuanceRequest.getResponseObject(walletKey.getThumbprint(), credentialWallet.did, walletKey.getPublicKey().exportJWK(), pin)
+        val responseObject = entraIssuanceRequest.getResponseObject(
+            walletKey.getThumbprint(),
+            credentialWallet.did,
+            walletKey.getPublicKey().exportJWK(),
+            pin
+        )
         val responseToken = credentialWallet.signToken(TokenTarget.TOKEN, responseObject, keyId = credentialWallet.did)
 //        val jwtCryptoProvider = runBlocking {
 //            val key = ECKey.parse(TEST_WALLET_KEY)
@@ -421,7 +444,7 @@ class SSIKit2WalletService(tenant: String, accountId: UUID, walletId: UUID) :
 //        val responseToken = SDJwt.sign(responseTokenPayload, jwtCryptoProvider, TEST_WALLET_DID + "#${testWalletKey.getKeyId()}").toString()
 
         // *) POST response JWT token to return address found in manifest
-        val resp = http.post(entraIssuanceRequest.issuerReturnAddress,{
+        val resp = http.post(entraIssuanceRequest.issuerReturnAddress, {
             contentType(ContentType.Text.Plain)
             setBody(responseToken)
         })
@@ -442,17 +465,18 @@ class SSIKit2WalletService(tenant: String, accountId: UUID, walletId: UUID) :
 
         // TODO: use manifest extractor factory method, but fix offer double-checking first
         // entra or openid4vc credential offer
-        val (credentialResponses, manifest) = if(EntraIssuanceRequest.isEntraIssuanceRequestUri(offer)) {
-            Pair(processMSEntraIssuanceRequest(
-                EntraIssuanceRequest.fromAuthorizationRequest(
-                    AuthorizationRequest.fromHttpParametersAuto(
-                        reqParams
-                    )
-                ), credentialWallet
-                // TODO: entra multiple credentials / manifests case
-            ), EntraManifestExtractor().extract(offer))
-        }
-        else {
+        val (credentialResponses, manifest) = if (EntraIssuanceRequest.isEntraIssuanceRequestUri(offer)) {
+            Pair(
+                processMSEntraIssuanceRequest(
+                    EntraIssuanceRequest.fromAuthorizationRequest(
+                        AuthorizationRequest.fromHttpParametersAuto(
+                            reqParams
+                        )
+                    ), credentialWallet
+                    // TODO: entra multiple credentials / manifests case
+                ), EntraManifestExtractor().extract(offer)
+            )
+        } else {
             Pair(
                 processCredentialOfferRequest(CredentialOfferRequest.fromHttpParameters(reqParams), credentialWallet),
                 DefaultManifestExtractor().extract(offer)
@@ -780,7 +804,7 @@ class SSIKit2WalletService(tenant: String, accountId: UUID, walletId: UUID) :
     private fun createCredentialEventData(json: JsonObject?, type: String?) = CredentialEventData(
         ecosystem = EventDataNotAvailable,
         issuerId = json?.jsonObject?.get("issuer")?.let {
-            if(it is JsonObject)
+            if (it is JsonObject)
                 it.jsonObject["id"]?.jsonPrimitive?.content
             else
                 it.jsonPrimitive.content
