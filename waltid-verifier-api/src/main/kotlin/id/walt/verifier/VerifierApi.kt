@@ -309,5 +309,19 @@ fun Application.verfierApi() {
                 call.respond(PolicyManager.listPolicyDescriptions())
             }
         }
+        route("entra", {
+
+        }) {
+            route("", {
+                tags = listOf("Entra Credential Verification")
+            }) {
+
+            }
+
+            route("", {
+                tags = listOf("Entra")
+            }) {
+            }
+        }
     }
 }

@@ -49,4 +49,5 @@ fun Application.configurePlugins() {
 fun Application.module() {
     configurePlugins()
     verfierApi()
+    entraVerifierApi()
 }

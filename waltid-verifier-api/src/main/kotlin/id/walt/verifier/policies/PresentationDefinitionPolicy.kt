@@ -11,7 +11,7 @@ class PresentationDefinitionPolicy : CredentialWrapperValidatorPolicy(
     "Verifies that with an Verifiable Presentation at minimum the list of credentials `request_credentials` has been presented."
 ) {
 
-    override suspend fun verify(data: JsonObject, args: Any?, context: Map<String, Any>): Result<Any> {
+    override suspend fun verify(data: JsonElement, args: Any?, context: Map<String, Any>): Result<Any> {
         val presentationDefinition = context["presentationDefinition"] as? PresentationDefinition
             ?: throw IllegalArgumentException("No presentationDefinition in context!")
 
@@ -19,7 +19,7 @@ class PresentationDefinitionPolicy : CredentialWrapperValidatorPolicy(
 
         println(data)
         val presentedTypes =
-            data["vp"]!!.jsonObject["verifiableCredential"]?.jsonArray?.mapNotNull {
+            data.jsonObject["vp"]!!.jsonObject["verifiableCredential"]?.jsonArray?.mapNotNull {
                 it.jsonPrimitive.contentOrNull?.decodeJws()?.payload
                     ?.jsonObject?.get("vc")?.jsonObject?.get("type")?.jsonArray?.last()?.jsonPrimitive?.contentOrNull
             }?.filterNotNull() ?: emptyList()

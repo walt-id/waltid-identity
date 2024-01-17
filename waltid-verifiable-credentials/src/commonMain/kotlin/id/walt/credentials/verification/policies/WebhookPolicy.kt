@@ -8,6 +8,7 @@ import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
@@ -22,7 +23,7 @@ class WebhookPolicy : CredentialWrapperValidatorPolicy(
         }
     }
 
-    override suspend fun verify(data: JsonObject, args: Any?, context: Map<String, Any>): Result<Any> {
+    override suspend fun verify(data: JsonElement, args: Any?, context: Map<String, Any>): Result<Any> {
         val url = (args as JsonPrimitive).content
 
         val response = http.post(url) {

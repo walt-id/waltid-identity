@@ -3,16 +3,13 @@ package id.walt.credentials.verification.policies
 import id.walt.credentials.schemes.JwsSignatureScheme.JwsOption
 import id.walt.credentials.verification.CredentialWrapperValidatorPolicy
 import id.walt.credentials.verification.NotAllowedIssuerException
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.*
 
 class AllowedIssuerPolicy : CredentialWrapperValidatorPolicy(
     "allowed-issuer",
     "Checks that the issuer of the credential is present in the supplied list."
 ) {
-    override suspend fun verify(data: JsonObject, args: Any?, context: Map<String, Any>): Result<Any> {
+    override suspend fun verify(data: JsonElement, args: Any?, context: Map<String, Any>): Result<Any> {
         val allowedIssuers = when (args) {
             is JsonPrimitive -> listOf(args.content)
             is JsonArray -> args.map { it.jsonPrimitive.content }
@@ -20,7 +17,7 @@ class AllowedIssuerPolicy : CredentialWrapperValidatorPolicy(
         }
 
         val issuer =
-            data[JwsOption.ISSUER]?.jsonPrimitive?.content ?: throw IllegalArgumentException("No issuer found in credential: \"iss\"")
+            data.jsonObject[JwsOption.ISSUER]?.jsonPrimitive?.content ?: throw IllegalArgumentException("No issuer found in credential: \"iss\"")
 
         return when (issuer) {
             in allowedIssuers -> Result.success(issuer)
