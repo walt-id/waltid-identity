@@ -206,18 +206,24 @@
                     </div>
                 </div>
 
-                <div v-if="jwtJson?.issuer">
+                <div v-if="issuerName || issuerDid || credentialIssuerService">
                     <hr class="my-5" />
                     <div class="text-gray-500 mb-4 font-bold">Issuer</div>
                     <div class="md:flex text-gray-500 mb-3 md:mb-1">
                         <div class="min-w-[19vw]">Name</div>
-                        <div class="font-bold">{{ jwtJson?.issuer?.name }}</div>
+                        <div class="font-bold">{{ issuerName }}</div>
                     </div>
                     <div class="md:flex text-gray-500 mb-3 md:mb-1">
                         <div class="min-w-[19vw]">DID</div>
                         <div class="font-bold overflow-scroll lg:overflow-auto">
-                            {{ jwtJson?.issuer?.id ?? jwtJson?.issuer }}
+                            {{ issuerDid }}
                         </div>
+                    </div>
+                    <div class="md:flex text-gray-500 mb-3 md:mb-1">
+                        <div class="min-w-[19vw]">Service endpoint</div>
+                        <NuxtLink class="font-bold overflow-scroll lg:overflow-auto" :to="credentialIssuerService ?? ''" _blank>
+                            {{ credentialIssuerService }}
+                        </NuxtLink>
                     </div>
                 </div>
 
@@ -399,6 +405,16 @@ refreshNuxtData();
 
 const manifest = computed(() => (credential.value?.manifest ? JSON.parse(credential.value?.manifest) : null));
 const manifestClaims = computed(() => manifest.value?.display?.claims);
+
+const issuerName = ref(null);
+const issuerDid = ref(null);
+const credentialIssuerService = ref(null);
+
+watchEffect(() =>{
+    issuerName.value = manifest.value?.display?.card?.issuedBy ?? jwtJson.value?.issuer?.name;
+    issuerDid.value = manifest.value?.input?.issuer ?? jwtJson.value?.issuer?.id ?? jwtJson.value?.issuer;
+    credentialIssuerService.value = manifest.value?.input?.credentialIssuer;
+});
 
 const issuanceDate = computed(() => {
     if (jwtJson?.issuanceDate) {
