@@ -17,7 +17,9 @@ class AllowedIssuerPolicy : CredentialWrapperValidatorPolicy(
         }
 
         val issuer =
-            data.jsonObject[JwsOption.ISSUER]?.jsonPrimitive?.content ?: throw IllegalArgumentException("No issuer found in credential: \"iss\"")
+            data.jsonObject[JwsOption.ISSUER]?.jsonPrimitive?.content
+                ?: data.jsonObject["issuer"]?.jsonPrimitive?.content
+                ?: throw IllegalArgumentException("No issuer found in credential: $data")
 
         return when (issuer) {
             in allowedIssuers -> Result.success(issuer)
