@@ -1,5 +1,6 @@
 <template>
-    <div ref="vcCardDiv" class="bg-white p-6 rounded-2xl shadow-2xl h-full text-gray-900">
+    <div ref="vcCardDiv"
+    :class="{ 'bg-white p-6 rounded-2xl shadow-2xl h-full text-gray-900': true, 'lg:w-[400px]': isDetailView }">
         <div class="flex justify-end gap-1.5">
             <CredentialIcon :credentialType="title" class="h-6 w-6 p-0.5 flex-none rounded-full backdrop-contrast-50 justify-self-start" />
             <div :class="credential.expirationDate ? (isNotExpired ? 'bg-cyan-100' : 'bg-red-50') : 'bg-cyan-50'" class="rounded-lg px-3 mb-2">
@@ -17,10 +18,12 @@
             </div>
         </div>
 
-        <h2 class="text-2xl font-bold bold mb-8">
-            {{ titleTitelized }}
-            <p v-if="credentialSubtitle" class="text-lg">{{ credentialSubtitle }}</p>
-        </h2>
+        <div class="mb-8">
+            <div class="text-2xl font-bold bold">
+                    {{ titleTitelized }}
+            </div>
+            <p v-if="credentialSubtitle" class="text-sm text-clip">{{ credentialSubtitle }}</p>
+        </div>
 
         <div v-if="issuerName" class="flex items-center">
             <img v-if="credentialImageUrl" :src="credentialImageUrl" alt="Issuer image" class="w-12" />
@@ -44,9 +47,15 @@ const props = defineProps({
         required: false,
         default: false,
     },
+    isDetailView: {
+        type: Boolean,
+        required: false,
+        default: false,
+    },
 });
 
 const credential = props.credential?.parsedDocument;
+const isDetailView = props.isDetailView ?? false;
 const manifest = props.credential?.manifest
 const manifestDisplay = manifest ? JSON.parse(manifest)?.display : null;
 const manifestCard = manifestDisplay?.card;
@@ -76,6 +85,5 @@ watchEffect(async () => {
         }
     } catch (_) { }
 })
-
 
 </script>
