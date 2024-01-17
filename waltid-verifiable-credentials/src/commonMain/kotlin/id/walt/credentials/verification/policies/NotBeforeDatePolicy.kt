@@ -4,20 +4,17 @@ import id.walt.credentials.verification.CredentialWrapperValidatorPolicy
 import id.walt.credentials.verification.NotBeforePolicyException
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.longOrNull
+import kotlinx.serialization.json.*
 import kotlin.time.Duration.Companion.minutes
 
 class NotBeforeDatePolicy : CredentialWrapperValidatorPolicy(
     "not-before",
     "Verifies that the credentials not-before date (for JWT: `nbf`, if unavailable: `iat` - 1 min) is correctly exceeded."
 ) {
-    override suspend fun verify(data: JsonObject, args: Any?, context: Map<String, Any>): Result<Any> {
+    override suspend fun verify(data: JsonElement, args: Any?, context: Map<String, Any>): Result<Any> {
         var successfulKey = ""
         fun getEpochTimestamp(key: String) =
-            data[key]?.jsonPrimitive?.longOrNull?.let { Instant.fromEpochSeconds(it) }.also {
+            data.jsonObject[key]?.jsonPrimitive?.longOrNull?.let { Instant.fromEpochSeconds(it) }.also {
                 successfulKey = key
             }
 

@@ -4,18 +4,21 @@ import id.walt.credentials.verification.CredentialWrapperValidatorPolicy
 import id.walt.credentials.verification.ExpirationDatePolicyException
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.longOrNull
+import kotlinx.serialization.json.*
 
 class ExpirationDatePolicy : CredentialWrapperValidatorPolicy(
     "expired", "Verifies that the credentials expiration date (`exp` for JWTs) has not been exceeded."
 ) {
-    override suspend fun verify(data: JsonObject, args: Any?, context: Map<String, Any>): Result<Any> {
-        val successfulKey = "exp"
+    override suspend fun verify(data: JsonElement, args: Any?, context: Map<String, Any>): Result<Any> {
+        var successfulKey = ""
 
-        val exp = data["exp"]?.jsonPrimitive?.longOrNull?.let { Instant.fromEpochSeconds(it) }
+        fun setKey(key: String) {
+            successfulKey = key
+        }
+
+        val exp = data.jsonObject["exp"]?.jsonPrimitive?.longOrNull?.let { setKey("jwt:exp"); Instant.fromEpochSeconds(it) }
+            ?: data.jsonObject["validUntil"]?.jsonPrimitive?.let { setKey("validUntil"); Instant.parse(it.content) }
+            ?: data.jsonObject["expirationDate"]?.jsonPrimitive?.let { setKey("expirationDate"); Instant.parse(it.content) }
             ?: return Result.success(
                 JsonObject(mapOf("policy_available" to JsonPrimitive(false)))
             )

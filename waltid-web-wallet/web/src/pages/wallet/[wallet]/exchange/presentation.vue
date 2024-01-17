@@ -78,7 +78,7 @@
                                 <label :for="`credential-${credential.id}`">
                                     <VerifiableCredentialCard
                                             :class="[selection[credential.id] == true ? 'shadow-xl shadow-primary-400' : 'shadow-2xl']"
-                                            :credential="credential.parsedDocument"
+                                            :credential="credential"
                                             :show-id="true"
                                     />
 
