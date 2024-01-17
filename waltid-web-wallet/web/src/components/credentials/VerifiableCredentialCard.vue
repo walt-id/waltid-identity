@@ -46,8 +46,8 @@ const props = defineProps({
     },
 });
 
-const credential = props.credential.parsedDocument;
-const manifest = props.credential.manifest
+const credential = props.credential?.parsedDocument;
+const manifest = props.credential?.manifest
 const manifestDisplay = manifest ? JSON.parse(manifest)?.display : null;
 const manifestCard = manifestDisplay?.card;
 
@@ -63,18 +63,18 @@ const issuerName = manifestCard?.issuedBy ?? credential.issuer?.name;
 
 const vcCardDiv = ref(null)
 
-nextTick(() => {
-    try{
-    if (manifestCard) {
-        if (manifestCard?.backgroundColor) {
-            vcCardDiv.value.style.background = manifestCard?.backgroundColor
-        }
+watchEffect(async () => {
+    try {
+        if (manifestCard) {
+            if (manifestCard?.backgroundColor) {
+                vcCardDiv.value.style.background = manifestCard?.backgroundColor
+            }
 
-        if (manifestCard?.textColor) {
-            vcCardDiv.value.style.color = manifestCard?.textColor
+            if (manifestCard?.textColor) {
+                vcCardDiv.value.style.color = manifestCard?.textColor
+            }
         }
-    }
-    }catch(_){}
+    } catch (_) { }
 })
 
 
