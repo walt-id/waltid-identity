@@ -63,3 +63,4 @@ services:
         mode: host
     volumes:
       - ./ingress.conf:/etc/nginx/conf.d/default.conf # API gateway configuration
+
