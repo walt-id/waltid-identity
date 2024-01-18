@@ -23,15 +23,15 @@ object VerificationMaterial {
         return content
     }
 
-    private fun extractVerificationMaterial(element: JsonElement): JsonElement = when (element) {
-        is JsonObject -> element.jsonObject
-        is JsonPrimitive -> element.jsonPrimitive.toJsonElement()
-        else -> throw IllegalArgumentException("Illegal verification material type")
-    }
-
     private fun extractVerificationMethod(element: JsonElement?): JsonElement = when (element) {
         is JsonArray -> element.jsonArray.first()
         is JsonObject -> element
         else -> throw IllegalArgumentException("Illegal verification method type")
+    }
+
+    private fun extractVerificationMaterial(element: JsonElement): JsonElement = when (element) {
+        is JsonObject -> element.jsonObject
+        is JsonPrimitive -> element.jsonPrimitive.toJsonElement()
+        else -> throw IllegalArgumentException("Illegal verification material type")
     }
 }
