@@ -56,7 +56,7 @@ const props = defineProps({
 
 const credential = props.credential?.parsedDocument;
 const isDetailView = props.isDetailView ?? false;
-const manifest = props.credential?.manifest
+const manifest = props.credential?.manifest != "{}" ? props.credential?.manifest : null
 const manifestDisplay = manifest ? JSON.parse(manifest)?.display : null;
 const manifestCard = manifestDisplay?.card;
 
