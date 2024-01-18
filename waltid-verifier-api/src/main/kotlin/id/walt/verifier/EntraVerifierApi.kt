@@ -125,7 +125,7 @@ object EntraVerifierApi {
 
     val callbackMapping = HashMap<UUID, MappedData>()
 
-    const val ourCallbackUrl = "https://f3d0-146-70-116-176.ngrok-free.app/entra/verification-callback/"
+    const val ourCallbackUrl = "https://d3f1-146-70-116-144.ngrok-free.app/entra/verification-callback/"
 
     fun createCallbackMapping(data: MappedData): UUID {
         val uuid = UUID.generateUUID()
@@ -223,8 +223,9 @@ fun Application.entraVerifierApi() {
                     return@post
                 }
 
-                val response = context.receive<EntraVerificationApiResponse>()
-                println("Response: " + Json.encodeToString(response))
+                val body = context.receiveText()
+                println("Response: $body")
+                val response = Json.decodeFromString<EntraVerificationApiResponse>(body)
 
                 val callMapping = EntraVerifierApi.callbackMapping[nonce]!!
 

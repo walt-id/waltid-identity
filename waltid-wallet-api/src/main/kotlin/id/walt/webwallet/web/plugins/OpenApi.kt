@@ -22,14 +22,16 @@ fun Application.configureOpenApi() {
         }
 
         securityScheme("authenticated-session") {
+            name = "Session-Cookie Authentication"
             type = AuthType.API_KEY
             location = AuthKeyLocation.COOKIE
         }
 
         securityScheme("authenticated-bearer") {
-            type = AuthType.API_KEY
-            location = AuthKeyLocation.HEADER
+            name = "Bearer token authentication"
+            description = "Set as \"Authorization: Bearer <token>\" to authenticate."
             scheme = AuthScheme.BEARER
+            type = AuthType.HTTP
         }
 
         defaultUnauthorizedResponse {
