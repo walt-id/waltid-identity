@@ -1,6 +1,7 @@
 package id.walt.did.dids.resolver
 
 import id.walt.crypto.keys.Key
+import id.walt.did.utils.VerificationMaterial
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.plugins.*
@@ -43,9 +44,16 @@ class UniresolverResolver : DidResolver {
             .filter { it.trim().startsWith("| [") }
             .map { it.removePrefix("| [").substringBefore("]").removePrefix("did-") }
 
-    override suspend fun resolve(did: String): Result<JsonObject> = runCatching { http.get("$resolverUrl/identifiers/$did").body() }
+    override suspend fun resolve(did: String): Result<JsonObject> =
+        runCatching { http.get("$resolverUrl/identifiers/$did").body() }
 
-    override suspend fun resolveToKey(did: String): Result<Key> {
-        TODO("Not yet implemented")
-    }
+    override suspend fun resolveToKey(did: String): Result<Key> = resolve(did).fold(
+        onSuccess = {
+            val verificationMaterial = VerificationMaterial.get(it)
+            TODO("Not yet implemented")
+        },
+        onFailure = {
+            Result.failure(it)
+        }
+    )
 }
