@@ -29,7 +29,7 @@ fun Application.configureOpenApi() {
 
         securityScheme("authenticated-bearer") {
             name = "Bearer token authentication"
-            description = "Set as \"Authorization: Bearer <token>\" to authenticate."
+            description = "Set as \"Authorization: Bearer %token-here%\" to authenticate."
             scheme = AuthScheme.BEARER
             type = AuthType.HTTP
         }
