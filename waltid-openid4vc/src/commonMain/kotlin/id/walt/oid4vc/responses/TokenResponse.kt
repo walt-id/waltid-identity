@@ -3,7 +3,6 @@ package id.walt.oid4vc.responses
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.data.dif.PresentationSubmission
 import id.walt.oid4vc.data.dif.PresentationSubmissionSerializer
-import io.ktor.util.*
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
