@@ -13,14 +13,12 @@ object VerificationMaterial {
         "authentication",
     )
 
-    fun get(document: JsonObject): JsonElement {
-        val verificationMethod = verificationMethods.first {
-            document.jsonObject.keys.contains(it)
-        }
-        val element = document.jsonObject[verificationMethod]
-        val verificationMaterial = extractVerificationMethod(element)
-        val content = extractVerificationMaterial(verificationMaterial)
-        return content
+    fun get(document: JsonObject): JsonElement? = verificationMethods.firstOrNull {
+        document.jsonObject.keys.contains(it)
+    }?.let {
+        val element = document.jsonObject[it]
+        val verificationMethod = extractVerificationMethod(element)
+        extractVerificationMaterial(verificationMethod)
     }
 
     private fun extractVerificationMethod(element: JsonElement?): JsonElement = when (element) {

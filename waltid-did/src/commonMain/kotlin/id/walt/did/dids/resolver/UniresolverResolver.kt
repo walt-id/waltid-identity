@@ -1,6 +1,7 @@
 package id.walt.did.dids.resolver
 
 import id.walt.crypto.keys.Key
+import id.walt.did.utils.KeyMaterial
 import id.walt.did.utils.VerificationMaterial
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -32,6 +33,20 @@ class UniresolverResolver : DidResolver {
         }
     }
 
+    override suspend fun resolve(did: String): Result<JsonObject> =
+        runCatching { http.get("$resolverUrl/identifiers/$did").body() }
+
+    override suspend fun resolveToKey(did: String): Result<Key> = resolve(did).fold(
+        onSuccess = {
+            VerificationMaterial.get(it)?.let {
+                KeyMaterial.get(it)
+            } ?: Result.failure(Exception("No verification material found."))
+        },
+        onFailure = {
+            Result.failure(it)
+        }
+    )
+
     private suspend fun getMethods(): Set<String> =
         http.get("$resolverUrl/methods") { }
             .body<JsonArray>()
@@ -43,17 +58,4 @@ class UniresolverResolver : DidResolver {
             .bodyAsText().lines()
             .filter { it.trim().startsWith("| [") }
             .map { it.removePrefix("| [").substringBefore("]").removePrefix("did-") }
-
-    override suspend fun resolve(did: String): Result<JsonObject> =
-        runCatching { http.get("$resolverUrl/identifiers/$did").body() }
-
-    override suspend fun resolveToKey(did: String): Result<Key> = resolve(did).fold(
-        onSuccess = {
-            val verificationMaterial = VerificationMaterial.get(it)
-            TODO("Not yet implemented")
-        },
-        onFailure = {
-            Result.failure(it)
-        }
-    )
 }
