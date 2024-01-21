@@ -63,3 +63,5 @@ services:
         mode: host
     volumes:
       - ./ingress.conf:/etc/nginx/conf.d/default.conf # API gateway configuration
+      - ./http-verbs-root-context.conf:/etc/nginx/http-verbs-root-context.conf
+      - ./headers-http-context.conf:/etc/nginx/headers-http-context.conf
