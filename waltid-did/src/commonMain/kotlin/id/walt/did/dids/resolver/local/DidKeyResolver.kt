@@ -10,6 +10,7 @@ import id.walt.crypto.utils.MultiCodecUtils.getMultiCodecKeyCode
 import id.walt.did.dids.DidUtils
 import id.walt.did.dids.document.DidDocument
 import id.walt.did.dids.document.DidKeyDocument
+import id.walt.did.utils.KeyUtils
 
 class DidKeyResolver : LocalResolverMethod("key") {
     override suspend fun resolve(did: String): Result<DidDocument> = resolveToKey(did).fold(
@@ -27,14 +28,6 @@ class DidKeyResolver : LocalResolverMethod("key") {
     )
 
     override suspend fun resolveToKey(did: String): Result<Key> = DidUtils.identifierFromDid(did)?.let {
-        val publicKeyRaw = convertMultiBase58BtcToRawKey(it)
-        when (val code = getMultiCodecKeyCode(it)) {
-            JwkJcsPubMultiCodecKeyCode -> LocalKey.importJWK(publicKeyRaw.decodeToString())
-            else -> Result.success(
-                LocalKey.importRawPublicKey(
-                    MultiCodecUtils.getKeyTypeFromKeyCode(code), publicKeyRaw, LocalKeyMetadata()
-                )
-            )
-        }
+        KeyUtils.fromPublicKeyMultiBase58(it)
     } ?: Result.failure(Throwable("Failed to extract identifier from: $did"))
 }
