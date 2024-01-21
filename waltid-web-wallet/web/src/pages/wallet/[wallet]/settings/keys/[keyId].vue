@@ -140,7 +140,10 @@ function exportKey() {
 
 async function deleteKey() {
     await $fetch(`/wallet-api/wallet/${currentWallet.value}/keys/${keyId}`, {
-        method: "DELETE",
+        method: "POST",
+        // headers: {
+        //     "X-HTTP-Method-Override": "DELETE"
+        // }
     }).finally(() => {
         navigateTo(`/wallet/${currentWallet.value}/settings/keys`);
     });

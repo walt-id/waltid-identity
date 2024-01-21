@@ -54,7 +54,7 @@ fun Application.dids() = walletRoute {
                 )
             }
 
-            delete({
+            post({
                 summary = "Delete a specific DID"
                 response {
                     HttpStatusCode.Accepted to { description = "DID deleted" }

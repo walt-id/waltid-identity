@@ -4,12 +4,12 @@ import id.walt.web.controllers.getWalletService
 import id.walt.webwallet.db.models.WalletCredential
 import io.github.smiley4.ktorswaggerui.dsl.delete
 import io.github.smiley4.ktorswaggerui.dsl.get
+import io.github.smiley4.ktorswaggerui.dsl.post
 import io.github.smiley4.ktorswaggerui.dsl.put
 import io.github.smiley4.ktorswaggerui.dsl.route
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.response.*
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 
 fun Application.credentials() = walletRoute {
@@ -26,12 +26,6 @@ fun Application.credentials() = walletRoute {
             }
         }) {
             context.respond(getWalletService().listCredentials())
-//                .map {
-//                CredentialDTO(
-//                    document = it.parsedDocument,
-//                    manifest = it.manifest,
-//                )
-//            })
         }
 
         put({
@@ -65,7 +59,7 @@ fun Application.credentials() = walletRoute {
                 context.respond(getWalletService().getCredential(credentialId))
             }
 
-            delete({
+            post({
                 summary = "Delete a credential"
 
                 response {
@@ -83,9 +77,3 @@ fun Application.credentials() = walletRoute {
         }
     }
 }
-
-@Serializable
-data class CredentialDTO(
-    val document: JsonObject?,
-    val manifest: String,
-)
