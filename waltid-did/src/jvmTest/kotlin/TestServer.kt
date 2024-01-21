@@ -14,13 +14,13 @@ import javax.security.auth.x500.X500Principal
 object TestServer {
     private val keyStoreFile = File(this.javaClass.classLoader.getResource("")!!.path.plus("keystore.jks"))
     private val ed25519DocumentResponse =
-        this.javaClass.classLoader.getResource("did-doc/ed25519.json")!!.path.let { File(it).readText() }
+        this.javaClass.classLoader.getResource("did-web/ed25519.json")!!.path.let { File(it).readText() }
     private val secp256k1DocumentResponse =
-        this.javaClass.classLoader.getResource("did-doc/secp256k1.json")!!.path.let { File(it).readText() }
+        this.javaClass.classLoader.getResource("did-web/secp256k1.json")!!.path.let { File(it).readText() }
     private val secp256r1DocumentResponse =
-        this.javaClass.classLoader.getResource("did-doc/secp256r1.json")!!.path.let { File(it).readText() }
+        this.javaClass.classLoader.getResource("did-web/secp256r1.json")!!.path.let { File(it).readText() }
     private val rsaDocumentResponse =
-        this.javaClass.classLoader.getResource("did-doc/rsa.json")!!.path.let { File(it).readText() }
+        this.javaClass.classLoader.getResource("did-web/rsa.json")!!.path.let { File(it).readText() }
     private val keyStore = buildKeyStore {
         certificate("test") {
             password = "test123"

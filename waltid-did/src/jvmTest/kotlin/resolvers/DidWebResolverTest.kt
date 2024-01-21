@@ -96,7 +96,7 @@ class DidWebResolverTest : DidResolverTestBase() {
 //                    "did:web:localhost%3A8080:rsa",
 //                    Json.decodeFromString<JsonObject>("{\"alg\":\"RS256\",\"e\":\"AQAB\",\"kid\":\"ab269ce10ce94b7c9565e30c034b5692\",\"kty\":\"RSA\",\"n\":\"0qbslQ5uMXL1Wk4dUD5ftrGWLhgaQENQn8AaPVREg12H_Mfr2GEL0IkBd7EQPeRFzRzngF2kWpij_nyueYKGQ3um_hione72pozP76etXNk4imTzmg3RsHcfPC5JBJAGpb5htnUQ5-VsuqbzlCUTOWNK4kIDWzbU0o-neglLAwU846_h6lTRI7xE1kh0iZyseAdx7sZ8Cd5eSYuvwQVxnNn0w-m9Bwd30g-s8xmqn9-7LBa0-UdumMLwtan4IGXltMJGYU9br1wsmz9vlG-TvfmxlgXzilJOJQMvlMKGXRmbUJRaNSYdrVJciEQEWK0tkaT45r3_LJw7dwx4DnNxzw\",\"use\":\"sig\"}"),
 //                    rsaAssertions
-//                ),//not implemented crypt-core
+//                ),//not implemented crypto-core
             )
     }
 }
