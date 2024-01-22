@@ -39,7 +39,29 @@ export default function Success() {
       )
       .then((response) => {
         let vcs = parseJwt(response.data.tokenResponse.vp_token).vp.verifiableCredential;
-        setCredentials(vcs.map((vc: string) => parseJwt(vc).vc));
+        setCredentials(vcs.map((vc: string) => {
+          let split = vc.split('~');
+          let parsed = parseJwt(split[0]);
+
+          if (split.length === 1) return parsed.vc;
+          else {
+            let credentialWithSdJWTAttributes = { ...parsed };
+            split.slice(1).forEach((item) => {
+              let parsedItem = JSON.parse(Buffer.from(item, 'base64').toString())
+              credentialWithSdJWTAttributes.credentialSubject = {
+                [parsedItem[1]]: parsedItem[2],
+                ...credentialWithSdJWTAttributes.credentialSubject
+              }
+              // credentialWithSdJWTAttributes.credentialSubject._sd.map((sdItem: string) => {
+              //   if (sdItem === parsedItem[0]) {
+              //     return `${parsedItem[1]}: ${parsedItem[2]}`
+              //   }
+              //   return sdItem;
+              // })
+            });
+            return credentialWithSdJWTAttributes;
+          }
+        }));
         setPolicyResults(response.data.policyResults.results);
       });
   }, [router.isReady, env]);
@@ -50,7 +72,7 @@ export default function Success() {
         <div className="flex flex-col items-center">
           <div className="w-full">
             <textarea
-              value={JSON.stringify(credentials[index]?.credentialSubject, null, 2)}
+              value={JSON.stringify(credentials[index]?.credentialSubject, null, 4)}
               disabled={true}
               className="w-full h-48 border-2 border-gray-300 rounded-md px-2"
             />

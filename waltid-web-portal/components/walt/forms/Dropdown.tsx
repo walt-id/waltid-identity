@@ -1,25 +1,25 @@
-import { Fragment, useState } from 'react';
+import { Fragment } from 'react';
 import { Listbox, Transition } from '@headlessui/react';
 import { CheckIcon, ChevronUpDownIcon } from '@heroicons/react/20/solid';
 
 type Props = {
-  values: { id: string; name: string }[];
+  values: String[];
+  selected: String;
+  setSelected: any;
 };
 
 function classNames(...classes: any[]) {
   return classes.filter(Boolean).join(' ');
 }
 
-export default function Dropdown({ values }: Props) {
-  const [selected, setSelected] = useState(values[0]);
-
+export default function Dropdown({ values, selected, setSelected }: Props) {
   return (
     <Listbox value={selected} onChange={setSelected}>
       {({ open }) => (
         <>
           <div className="relative">
             <Listbox.Button className="relative w-full cursor-default rounded-md bg-white py-1.5 pl-3 pr-10 text-left text-gray-900   sm:text-sm sm:leading-6">
-              <span className="block truncate text-right">{selected.name}</span>
+              <span className="block truncate text-right">{selected}</span>
               <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
                 <ChevronUpDownIcon
                   className="h-5 w-5 text-gray-400"
@@ -36,9 +36,9 @@ export default function Dropdown({ values }: Props) {
               leaveTo="opacity-0"
             >
               <Listbox.Options className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm text-left">
-                {values.map((person) => (
+                {values.map((person, index) => (
                   <Listbox.Option
-                    key={person.id}
+                    key={index}
                     className={({ active }) =>
                       classNames(
                         active
@@ -57,7 +57,7 @@ export default function Dropdown({ values }: Props) {
                             'block truncate'
                           )}
                         >
-                          <span className="block">{person.name}</span>
+                          <span className="block">{person}</span>
                         </span>
 
                         {selected ? (
