@@ -17,4 +17,12 @@ actual object EncodingUtils {
     actual fun base58Decode(base58String: String): ByteArray {
         TODO("Not yet implemented")
     }
+
+    actual fun fromHexString(hexString: String): ByteArray {
+        TODO("Not yet implemented")
+    }
+
+    actual fun toHexString(byteArray: ByteArray): String {
+        TODO("Not yet implemented")
+    }
 }

@@ -16,4 +16,9 @@ actual object EncodingUtils {
     actual fun base58Encode(byteArray: ByteArray): String = Base58.encode(byteArray)
 
     actual fun base58Decode(base58String: String): ByteArray = Base58.decode(base58String)
+    actual fun fromHexString(hexString: String): ByteArray =
+        hexString.replace(" ", "").chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+
+    actual fun toHexString(byteArray: ByteArray): String =
+        byteArray.joinToString("") { String.format("%02X ", (it.toInt() and 0xFF)) }
 }

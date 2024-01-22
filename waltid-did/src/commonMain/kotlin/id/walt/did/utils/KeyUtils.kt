@@ -8,7 +8,7 @@ import id.walt.crypto.utils.MultiBaseUtils
 import id.walt.crypto.utils.MultiCodecUtils
 
 object KeyUtils {
-    suspend fun fromPublicKeyMultiBase58(identifier: String): Result<Key> {
+    suspend fun fromPublicKeyMultiBase(identifier: String): Result<Key> {
         val publicKeyRaw = MultiBaseUtils.convertMultiBase58BtcToRawKey(identifier)
         //TODO: externalize import call
         return when (val code = MultiCodecUtils.getMultiCodecKeyCode(identifier)) {
@@ -21,7 +21,7 @@ object KeyUtils {
         }
     }
 
-    fun getKeyTypeFromVerificationMaterialType(type: String) = KeyType.entries.firstOrNull {
+    fun getKeyTypeForVerificationMaterialType(type: String) = KeyType.entries.firstOrNull {
         val regex = Regex("(${it.name.lowercase()})(.*)")
         regex.containsMatchIn(type.lowercase())
     } ?: throw IllegalArgumentException("Verification material type not supported: $type")
