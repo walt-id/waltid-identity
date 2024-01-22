@@ -119,7 +119,9 @@ export default function IssueSection() {
         <Button onClick={handleCancel} style="link" color="secondary">
           Cancel
         </Button>
-        <Button onClick={handleIssue}>Issue</Button>
+        <Button 
+        disabled={!(credentialsToIssue.length > 0 && (credentialsToIssue.length < 2 || credentialsToIssue.filter((cred) => cred.selectedFormat === "SD-JWT + VCDM").length === 0))}
+        onClick={handleIssue}>Issue</Button>
       </div>
       <div className="flex flex-col items-center mt-12">
         <div className="flex flex-row gap-2 items-center content-center text-sm text-center text-gray-500">
