@@ -1,6 +1,7 @@
 package id.walt.did.utils
 
 import id.walt.crypto.keys.Key
+import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.LocalKey
 import id.walt.crypto.keys.LocalKeyMetadata
 import id.walt.crypto.utils.MultiBaseUtils
@@ -19,4 +20,9 @@ object KeyUtils {
             )
         }
     }
+
+    fun getKeyTypeFromVerificationMaterialType(type: String) = KeyType.entries.firstOrNull {
+        val regex = Regex("(${it.name.lowercase()})(.*)")
+        regex.containsMatchIn(type.lowercase())
+    } ?: throw IllegalArgumentException("Verification material type not supported: $type")
 }

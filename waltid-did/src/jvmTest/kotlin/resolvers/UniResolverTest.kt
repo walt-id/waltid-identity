@@ -29,7 +29,6 @@ class UniResolverTest {
     fun `given a did String, when calling resolveToKey, then the result is valid key`(
         did: String, key: String
     ) = runTest {
-        //TODO: uniresolver publicKeyBase58 not implemented
         val result = sut.resolveToKey(did)
         assertEquals(true, result.isSuccess)
         assertEquals(key, result.getOrNull()?.exportJWK())
@@ -40,7 +39,10 @@ class UniResolverTest {
         fun `given a did String, when calling resolve, then the result is a valid did document`(): Stream<Arguments> =
             Stream.of(
                 arguments("did:key:z6MkfXgppgAzxNZNijP35wjPdQjThkr78S3WXpsXLN8UpPH5#z6MkfXgppgAzxNZNijP35wjPdQjThkr78S3WXpsXLN8UpPH5",
-                    Companion::class.java.classLoader.getResource("did-key/document.json")!!.path.let { File(it).readText() }
+                    Companion::class.java.classLoader.getResource("uniresolver/jwk/document.json")!!.path.let { File(it).readText() }
+                        .replace("[\\s\\n\\r]".toRegex(), "")),
+                arguments("did:v1:test:nym:z6MkoPnnkWaXsC94xPJHNLUi15TLyCBe68jrKPi7PenS3pi4",
+                    Companion::class.java.classLoader.getResource("uniresolver/base58/document.json")!!.path.let { File(it).readText() }
                         .replace("[\\s\\n\\r]".toRegex(), "")),
             )
 
@@ -49,7 +51,12 @@ class UniResolverTest {
             Stream.of(
                 arguments(
                     "did:key:z6MkfXgppgAzxNZNijP35wjPdQjThkr78S3WXpsXLN8UpPH5#z6MkfXgppgAzxNZNijP35wjPdQjThkr78S3WXpsXLN8UpPH5",
-                    Companion::class.java.classLoader.getResource("did-key/publicKeyJwk.json")!!.path.let { File(it).readText() }
+                    Companion::class.java.classLoader.getResource("uniresolver/jwk/publicKeyJwk.json")!!.path.let { File(it).readText() }
+                        .replace("[\\s\\n\\r]".toRegex(), ""),
+                ),
+                arguments(
+                    "did:v1:test:nym:z6MkoPnnkWaXsC94xPJHNLUi15TLyCBe68jrKPi7PenS3pi4",
+                    Companion::class.java.classLoader.getResource("uniresolver/base58/publicKeyJwk.json")!!.path.let { File(it).readText() }
                         .replace("[\\s\\n\\r]".toRegex(), ""),
                 ),
             )
