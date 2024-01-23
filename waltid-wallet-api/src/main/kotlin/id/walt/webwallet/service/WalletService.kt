@@ -1,7 +1,7 @@
 package id.walt.webwallet.service
 
 import id.walt.oid4vc.data.dif.PresentationDefinition
-import id.walt.webwallet.db.models.CategoryData
+import id.walt.webwallet.db.models.WalletCategoryData
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.db.models.WalletDid
 import id.walt.webwallet.db.models.WalletOperationHistory
@@ -70,7 +70,7 @@ abstract class WalletService(val tenant: String, val accountId: UUID, val wallet
     abstract fun getCredentialsByIds(credentialIds: List<String>): List<WalletCredential>
 
     // Categories
-    abstract suspend fun listCategories(): List<CategoryData>
+    abstract suspend fun listCategories(): List<WalletCategoryData>
     abstract suspend fun addCategory(name: String): Boolean
     abstract suspend fun deleteCategory(name: String): Boolean
 

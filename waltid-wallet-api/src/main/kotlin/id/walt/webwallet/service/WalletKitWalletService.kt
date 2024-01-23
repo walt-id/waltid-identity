@@ -400,7 +400,7 @@ class WalletKitWalletService(tenant: String, accountId: UUID, walletId: UUID) : 
         TODO("Not yet implemented")
     }
 
-    override suspend fun listCategories(): List<CategoryData> {
+    override suspend fun listCategories(): List<WalletCategoryData> {
         TODO("Not yet implemented")
     }
 

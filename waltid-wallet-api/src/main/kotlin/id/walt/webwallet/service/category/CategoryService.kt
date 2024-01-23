@@ -1,9 +1,9 @@
 package id.walt.webwallet.service.category
 
-import id.walt.webwallet.db.models.CategoryData
+import id.walt.webwallet.db.models.WalletCategoryData
 
 interface CategoryService {
-    fun list(): List<CategoryData>
+    fun list(): List<WalletCategoryData>
     fun add(name: String): Int
     fun delete(name: String): Int
 }

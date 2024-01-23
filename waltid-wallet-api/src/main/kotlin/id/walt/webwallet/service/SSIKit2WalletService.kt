@@ -29,7 +29,7 @@ import id.walt.oid4vc.responses.TokenResponse
 import id.walt.oid4vc.util.randomUUID
 import id.walt.webwallet.config.ConfigManager
 import id.walt.webwallet.config.RuntimeConfig
-import id.walt.webwallet.db.models.CategoryData
+import id.walt.webwallet.db.models.WalletCategoryData
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.db.models.WalletOperationHistories
 import id.walt.webwallet.db.models.WalletOperationHistory
@@ -781,7 +781,7 @@ class SSIKit2WalletService(tenant: String, accountId: UUID, walletId: UUID) :
         return listCredentials().filter { it.id in credentialIds }
     }
 
-    override suspend fun listCategories(): List<CategoryData> = categoryService.list()
+    override suspend fun listCategories(): List<WalletCategoryData> = categoryService.list()
 
     override suspend fun addCategory(name: String): Boolean = categoryService.add(name) == 1
 
