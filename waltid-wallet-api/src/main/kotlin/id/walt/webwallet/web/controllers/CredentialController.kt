@@ -2,7 +2,6 @@ package id.walt.webwallet.web.controllers
 
 import id.walt.web.controllers.getWalletService
 import id.walt.webwallet.db.models.WalletCredential
-import io.github.smiley4.ktorswaggerui.dsl.delete
 import io.github.smiley4.ktorswaggerui.dsl.get
 import io.github.smiley4.ktorswaggerui.dsl.post
 import io.github.smiley4.ktorswaggerui.dsl.put
@@ -53,9 +52,7 @@ fun Application.credentials() = walletRoute {
                     }
                 }
             }) {
-                val credentialId =
-                    call.parameters["credentialId"] ?: throw IllegalArgumentException("No credentialId provided")
-
+                val credentialId = enforceGetParameter("credentialId", call.parameters)
                 context.respond(getWalletService().getCredential(credentialId))
             }
 
@@ -67,13 +64,50 @@ fun Application.credentials() = walletRoute {
                     HttpStatusCode.BadRequest to { description = "WalletCredential could not be deleted" }
                 }
             }) {
-                val credentialId =
-                    call.parameters["credentialId"] ?: throw IllegalArgumentException("No credentialId provided")
-
+                val credentialId = enforceGetParameter("credentialId", call.parameters)
                 val success = getWalletService().deleteCredential(credentialId)
-
                 context.respond(if (success) HttpStatusCode.Accepted else HttpStatusCode.BadRequest)
+            }
+            route("category/{category}",{
+                request {
+                    pathParameter<String>("category") {
+                        description = "the category name"
+                        example = "my-category"
+                    }
+                }
+            }){
+                post("add",{
+                    summary = "Attach category to a credential"
+
+                    response {
+                        HttpStatusCode.Created to { description = "WalletCredential category added" }
+                        HttpStatusCode.BadRequest to { description = "WalletCredential category could not be added" }
+                    }
+                }){
+                    val credentialId = enforceGetParameter("credentialId", call.parameters)
+                    val category = enforceGetParameter("category", call.parameters)
+                    runCatching { getWalletService().attachCategory(credentialId, category) }.onSuccess {
+                        if (it) context.respond(HttpStatusCode.Created) else context.respond(HttpStatusCode.BadRequest)
+                    }.onFailure { context.respond(HttpStatusCode.BadRequest, it.localizedMessage) }
+                }
+                post("delete",{
+                    summary = "Detach category from credential"
+
+                    response {
+                        HttpStatusCode.Accepted to { description = "WalletCredential category deleted" }
+                        HttpStatusCode.BadRequest to { description = "WalletCredential category could not be deleted" }
+                    }
+                }){
+                    val credentialId = enforceGetParameter("credentialId", call.parameters)
+                    val category = enforceGetParameter("category", call.parameters)
+                    runCatching { getWalletService().attachCategory(credentialId, category) }.onSuccess {
+                        if (it) context.respond(HttpStatusCode.Accepted) else context.respond(HttpStatusCode.BadRequest)
+                    }.onFailure { context.respond(HttpStatusCode.BadRequest, it.localizedMessage) }
+                }
             }
         }
     }
 }
+
+internal fun enforceGetParameter(name: String, parameters: Parameters): String =
+    parameters[name] ?: throw IllegalArgumentException("No $name provided")

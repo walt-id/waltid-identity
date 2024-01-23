@@ -27,10 +27,15 @@ import id.walt.oid4vc.responses.BatchCredentialResponse
 import id.walt.oid4vc.responses.CredentialResponse
 import id.walt.oid4vc.responses.TokenResponse
 import id.walt.oid4vc.util.randomUUID
+import id.walt.webwallet.config.ConfigManager
+import id.walt.webwallet.config.RuntimeConfig
+import id.walt.webwallet.db.models.WalletCategoryData
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.db.models.WalletOperationHistories
 import id.walt.webwallet.db.models.WalletOperationHistory
 import id.walt.webwallet.manifest.extractor.EntraManifestExtractor
+import id.walt.webwallet.service.category.CategoryServiceImpl
+import id.walt.webwallet.service.category.MockCategoryService
 import id.walt.webwallet.service.credentials.CredentialsService
 import id.walt.webwallet.service.dids.DidsService
 import id.walt.webwallet.service.dto.LinkedWalletDataTransferObject
@@ -69,6 +74,8 @@ import kotlin.time.Duration.Companion.seconds
 class SSIKit2WalletService(tenant: String, accountId: UUID, walletId: UUID) :
     WalletService(tenant, accountId, walletId) {
 
+    private val categoryService =
+        if (ConfigManager.getConfig<RuntimeConfig>().mock) MockCategoryService else CategoryServiceImpl
     companion object {
         init {
             runBlocking {
@@ -99,6 +106,14 @@ class SSIKit2WalletService(tenant: String, accountId: UUID, walletId: UUID) :
     override suspend fun getCredential(credentialId: String): WalletCredential =
         CredentialsService.get(walletId, credentialId)
             ?: throw IllegalArgumentException("WalletCredential not found for credentialId: $credentialId")
+
+    override suspend fun attachCategory(credentialId: String, category: String): Boolean =
+        categoryService.get(walletId, category)?.let {// validation should be part of schema
+            CredentialsService.Category.add(walletId, credentialId, it.name) == 1
+        } ?: throw IllegalArgumentException("Category not found for wallet: $category")
+
+    override suspend fun detachCategory(credentialId: String, category: String): Boolean =
+        CredentialsService.Category.delete(walletId, credentialId, category) == 1
 
     override fun matchCredentialsByPresentationDefinition(presentationDefinition: PresentationDefinition): List<WalletCredential> {
         val credentialList = listCredentials()
@@ -573,7 +588,8 @@ class SSIKit2WalletService(tenant: String, accountId: UUID, walletId: UUID) :
         val key = getKey(keyId)
         val options = getDidOptions(method, args)
         val result = DidService.registerByKey(method, key, options)
-        DidsService.add(
+        DidsService.
+        add(
             wallet = walletId,
             did = result.did,
             document = Json.encodeToString(result.didDocument),
@@ -780,6 +796,12 @@ class SSIKit2WalletService(tenant: String, accountId: UUID, walletId: UUID) :
         return listCredentials().filter { it.id in credentialIds }
     }
 
+    override suspend fun listCategories(): List<WalletCategoryData> = categoryService.list(walletId)
+
+    override suspend fun addCategory(name: String): Boolean = categoryService.add(walletId, name) == 1
+
+    override suspend fun deleteCategory(name: String): Boolean = categoryService.delete(walletId, name) == 1
+
     private fun getDidOptions(method: String, args: Map<String, JsonPrimitive>) = when (method.lowercase()) {
         "key" -> DidKeyCreateOptions(
             args["key"]?.let { enumValueIgnoreCase<KeyType>(it.content) } ?: KeyType.Ed25519,
@@ -798,7 +820,7 @@ class SSIKit2WalletService(tenant: String, accountId: UUID, walletId: UUID) :
     private fun logEvent(action: EventType.Action, originator: String, data: EventData) = EventService.add(
         Event(
             action = action,
-            tenant = tenant ?: "global",
+            tenant = tenant,
             originator = originator,
             account = accountId,
             wallet = walletId,

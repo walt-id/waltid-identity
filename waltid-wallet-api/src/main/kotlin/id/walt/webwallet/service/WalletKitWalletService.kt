@@ -154,6 +154,14 @@ class WalletKitWalletService(tenant: String, accountId: UUID, walletId: UUID) : 
             )
         }
 
+    override suspend fun attachCategory(credentialId: String, category: String): Boolean {
+        TODO("Not yet implemented")
+    }
+
+    override suspend fun detachCategory(credentialId: String, category: String): Boolean {
+        TODO("Not yet implemented")
+    }
+
     override fun matchCredentialsByPresentationDefinition(presentationDefinition: PresentationDefinition): List<WalletCredential> {
         TODO("Not yet implemented")
     }
@@ -397,6 +405,18 @@ class WalletKitWalletService(tenant: String, accountId: UUID, walletId: UUID) : 
     }
 
     override fun getCredentialsByIds(credentialIds: List<String>): List<WalletCredential> {
+        TODO("Not yet implemented")
+    }
+
+    override suspend fun listCategories(): List<WalletCategoryData> {
+        TODO("Not yet implemented")
+    }
+
+    override suspend fun addCategory(name: String): Boolean {
+        TODO("Not yet implemented")
+    }
+
+    override suspend fun deleteCategory(name: String): Boolean {
         TODO("Not yet implemented")
     }
 }

@@ -44,4 +44,17 @@ object CredentialsService {
     object Manifest {
         fun get(wallet: UUID, credentialId: String): String? = CredentialsService.get(wallet, credentialId)?.manifest
     }
+
+    object Category {
+        fun add(wallet: UUID, credentialId: String, category: String): Int {
+            transaction {
+
+            }
+            TODO()
+        }
+
+        fun delete(wallet: UUID, credentialId: String, category: String): Int {
+            TODO()
+        }
+    }
 }
