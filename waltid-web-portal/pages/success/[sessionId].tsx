@@ -43,7 +43,7 @@ export default function Success() {
           let split = vc.split('~');
           let parsed = parseJwt(split[0]);
 
-          if (split.length === 1) return parsed.vc;
+          if (split.length === 1) return parsed.vc ? parsed.vc : parsed;
           else {
             let credentialWithSdJWTAttributes = { ...parsed };
             split.slice(1).forEach((item) => {
