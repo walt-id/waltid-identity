@@ -399,5 +399,17 @@ class WalletKitWalletService(tenant: String, accountId: UUID, walletId: UUID) : 
     override fun getCredentialsByIds(credentialIds: List<String>): List<WalletCredential> {
         TODO("Not yet implemented")
     }
+
+    override suspend fun listCategories(): List<CategoryData> {
+        TODO("Not yet implemented")
+    }
+
+    override suspend fun addCategory(name: String): Boolean {
+        TODO("Not yet implemented")
+    }
+
+    override suspend fun deleteCategory(name: String): Boolean {
+        TODO("Not yet implemented")
+    }
 }
 

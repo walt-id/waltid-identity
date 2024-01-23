@@ -27,11 +27,16 @@ import id.walt.oid4vc.responses.BatchCredentialResponse
 import id.walt.oid4vc.responses.CredentialResponse
 import id.walt.oid4vc.responses.TokenResponse
 import id.walt.oid4vc.util.randomUUID
+import id.walt.webwallet.config.ConfigManager
+import id.walt.webwallet.config.RuntimeConfig
+import id.walt.webwallet.db.models.CategoryData
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.db.models.WalletOperationHistories
 import id.walt.webwallet.db.models.WalletOperationHistory
 import id.walt.webwallet.manifest.extractor.DefaultManifestExtractor
 import id.walt.webwallet.manifest.extractor.EntraManifestExtractor
+import id.walt.webwallet.service.category.CategoryServiceImpl
+import id.walt.webwallet.service.category.MockCategoryService
 import id.walt.webwallet.service.credentials.CredentialsService
 import id.walt.webwallet.service.dids.DidsService
 import id.walt.webwallet.service.dto.LinkedWalletDataTransferObject
@@ -70,6 +75,8 @@ import kotlin.time.Duration.Companion.seconds
 class SSIKit2WalletService(tenant: String, accountId: UUID, walletId: UUID) :
     WalletService(tenant, accountId, walletId) {
 
+    private val categoryService =
+        if (ConfigManager.getConfig<RuntimeConfig>().mock) MockCategoryService else CategoryServiceImpl
     companion object {
         init {
             runBlocking {
@@ -774,6 +781,12 @@ class SSIKit2WalletService(tenant: String, accountId: UUID, walletId: UUID) :
         return listCredentials().filter { it.id in credentialIds }
     }
 
+    override suspend fun listCategories(): List<CategoryData> = categoryService.list()
+
+    override suspend fun addCategory(name: String): Boolean = categoryService.add(name) == 1
+
+    override suspend fun deleteCategory(name: String): Boolean = categoryService.delete(name) == 1
+
     private fun getDidOptions(method: String, args: Map<String, JsonPrimitive>) = when (method.lowercase()) {
         "key" -> DidKeyCreateOptions(
             args["key"]?.let { enumValueIgnoreCase<KeyType>(it.content) } ?: KeyType.Ed25519,
@@ -792,7 +805,7 @@ class SSIKit2WalletService(tenant: String, accountId: UUID, walletId: UUID) :
     private fun logEvent(action: EventType.Action, originator: String, data: EventData) = EventService.add(
         Event(
             action = action,
-            tenant = tenant ?: "global",
+            tenant = tenant,
             originator = originator,
             account = accountId,
             wallet = walletId,
