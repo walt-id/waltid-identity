@@ -191,6 +191,6 @@ class TestJvm {
 
     private fun isVaultAvailable() = runCatching {
         runBlocking { HttpClient().get("http://127.0.0.1:8200") }.status == HttpStatusCode.OK
-    }.fold(onSuccess = { true }, onFailure = { false })
+    }.fold(onSuccess = { it }, onFailure = { false })
 
 }

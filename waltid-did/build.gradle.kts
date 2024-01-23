@@ -91,6 +91,9 @@ kotlin {
 
                 // Json canonicalization
                 implementation("io.github.erdtman:java-json-canonicalization:1.1")
+
+                // Multiformat
+                implementation("com.github.multiformats:java-multibase:v1.1.1")
             }
         }
         val jvmTest by getting {
