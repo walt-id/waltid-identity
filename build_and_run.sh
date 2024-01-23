@@ -2,7 +2,7 @@
 
 # Define your Dockerfile directories and corresponding service names
 DOCKERFILE_DIRS=("waltid-wallet-api" "waltid-web-wallet" "waltid-issuer-api" "waltid-verifier-api" "waltid-web-portal")
-SERVICES=("wallet-backend" "waltid-web-wallet" "issuer-api" "verifier-api" "waltid-web-portal")
+SERVICES=("wallet-api" "waltid-web-wallet" "issuer-api" "verifier-api" "waltid-web-portal")
 
 # Build Docker images
 for ((i=0; i<${#DOCKERFILE_DIRS[@]}; i++)); do
@@ -20,7 +20,7 @@ cd "${COMPOSE_DIR}" || exit 1
 
 
 # Run Docker Compose
-docker-compose up
+docker-compose up --build
 
 # Clean up: Uncomment the following line if you want to remove the built images after running Docker Compose
 # docker-compose down --rmi local
