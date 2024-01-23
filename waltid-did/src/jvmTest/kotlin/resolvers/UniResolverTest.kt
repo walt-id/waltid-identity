@@ -1,7 +1,12 @@
 package resolvers
 
 import id.walt.did.dids.resolver.UniresolverResolver
+import io.ktor.client.*
+import io.ktor.client.request.*
+import io.ktor.http.*
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
+import org.junit.jupiter.api.condition.EnabledIf
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.Arguments
 import org.junit.jupiter.params.provider.Arguments.arguments
@@ -16,6 +21,7 @@ class UniResolverTest {
 
     @ParameterizedTest
     @MethodSource
+    @EnabledIf("isUniresolverAvailable")
     fun `given a did String, when calling resolve, then the result is a valid did document`(
         did: String, document: String
     ) = runTest {
@@ -26,6 +32,7 @@ class UniResolverTest {
 
     @ParameterizedTest
     @MethodSource
+    @EnabledIf("isUniresolverAvailable")
     fun `given a did String, when calling resolveToKey, then the result is valid key`(
         did: String, key: String
     ) = runTest {
@@ -80,5 +87,10 @@ class UniResolverTest {
                         .replace("[\\s\\n\\r]".toRegex(), ""),
                 ),
             )
+
+        @JvmStatic
+        fun isUniresolverAvailable() = runCatching {
+            runBlocking { UniresolverResolver().getSupportedMethods() }
+        }.fold(onSuccess = { it.isSuccess }, onFailure = { false })
     }
 }
