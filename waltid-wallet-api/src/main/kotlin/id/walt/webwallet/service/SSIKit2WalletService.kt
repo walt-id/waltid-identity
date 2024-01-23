@@ -651,20 +651,21 @@ class SSIKit2WalletService(
 //                    keyManagementService = "local",
 //                )
 //            )
+//            println(createdKey)
 //            KeysService.add(walletId, createdKey.getKeyId(), KeySerialization.serializeKey(createdKey))
 //            createdKey.getKeyId()
 //        }
 
-        TSEKey.generate(KeyType.valueOf(type) , TSEKeyMetadata("http://0.0.0.0:8200/v1/transit", "hvs.1eeHn0cyrzOyjeohJalj0gCW")).let { createdKey ->
+        TSEKey.generate(KeyType.valueOf(type) , TSEKeyMetadata("http://0.0.0.0:8200/v1/transit", "hvs.bnxfmRFrX7UujrmPyURObcCn")).let { createdKey ->
             logEvent(
                 EventType.Key.Create, "wallet", KeyEventData(
                     id = createdKey.getKeyId(),
                     algorithm = createdKey.keyType.name,
-                    keyManagementService = "TSE",
+                    keyManagementService = "tse",
                 )
             )
             KeysService.add(walletId, createdKey.getKeyId(), KeySerialization.serializeKey(createdKey))
-            createdKey.getEncodedPublicKey()
+            createdKey.getKeyId()
         }
 
     override suspend fun importKey(jwkOrPem: String): String {
