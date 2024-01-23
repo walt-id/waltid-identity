@@ -5,4 +5,8 @@ expect object EncodingUtils {
     fun urlDecode(path: String): String
     fun base64Encode(data: ByteArray): String
     fun base64Decode(data: String): ByteArray
+    fun base58Encode(byteArray: ByteArray): String
+    fun base58Decode(base58String: String): ByteArray
+    fun fromHexString(hexString: String): ByteArray
+    fun toHexString(byteArray: ByteArray): String
 }
