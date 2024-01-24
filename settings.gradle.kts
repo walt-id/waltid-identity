@@ -24,12 +24,15 @@ include(
     // Services based on libs
     "waltid-issuer-api",
     "waltid-verifier-api",
-    "waltid-wallet-api",
 
     // CLI
     "waltid-cli",
 
     // Reporting
-    "waltid-reporting"
+    "waltid-reporting",
+
+    // Apps
+    "waltid-web-wallet",
 )
 
+include(":sampleapp")
