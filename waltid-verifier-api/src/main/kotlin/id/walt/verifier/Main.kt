@@ -6,6 +6,7 @@ import id.walt.did.dids.resolver.LocalResolver
 import id.walt.verifier.base.config.ConfigManager
 import id.walt.verifier.base.config.WebConfig
 import id.walt.verifier.base.web.plugins.*
+import id.walt.verifier.entra.entraVerifierApi
 import id.walt.verifier.policies.PresentationDefinitionPolicy
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.server.application.*
