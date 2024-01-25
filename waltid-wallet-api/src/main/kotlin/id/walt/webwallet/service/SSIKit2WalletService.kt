@@ -90,9 +90,9 @@ class SSIKit2WalletService(tenant: String, accountId: UUID, walletId: UUID) :
         }
     }
 
-    override fun listCredentials(): List<WalletCredential> = CredentialsService.list(walletId)
+    override fun listCredentials(categoryFilter: List<String>): List<WalletCredential> = CredentialsService.list(walletId, categoryFilter)
 
-    override suspend fun listRawCredentials(): List<String> = CredentialsService.list(walletId).map {
+    override suspend fun listRawCredentials(): List<String> = CredentialsService.list(walletId, emptyList()).map {
         it.document
     }
 
@@ -116,7 +116,7 @@ class SSIKit2WalletService(tenant: String, accountId: UUID, walletId: UUID) :
         CredentialsService.Category.delete(walletId, credentialId, category) == 1
 
     override fun matchCredentialsByPresentationDefinition(presentationDefinition: PresentationDefinition): List<WalletCredential> {
-        val credentialList = listCredentials()
+        val credentialList = listCredentials(emptyList())
 
         println("WalletCredential list is: ${credentialList.map { it.parsedDocument?.get("type")!!.jsonArray }}")
 
@@ -793,7 +793,7 @@ class SSIKit2WalletService(tenant: String, accountId: UUID, walletId: UUID) :
 
     override fun getCredentialsByIds(credentialIds: List<String>): List<WalletCredential> {
         // todo: select by SQL
-        return listCredentials().filter { it.id in credentialIds }
+        return listCredentials(emptyList()).filter { it.id in credentialIds }
     }
 
     override suspend fun listCategories(): List<WalletCategoryData> = categoryService.list(walletId)

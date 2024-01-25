@@ -17,7 +17,7 @@ import kotlinx.uuid.UUID
 abstract class WalletService(val tenant: String, val accountId: UUID, val walletId: UUID) {
 
     // WalletCredentials
-    abstract fun listCredentials(): List<WalletCredential>
+    abstract fun listCredentials(categoryFilter: List<String>): List<WalletCredential>
     abstract suspend fun listRawCredentials(): List<String>
     abstract suspend fun deleteCredential(id: String): Boolean
     abstract suspend fun getCredential(credentialId: String): WalletCredential

@@ -17,6 +17,13 @@ fun Application.credentials() = walletRoute {
     }) {
         get({
             summary = "List credentials"
+            request {
+                queryParameter<List<String>>("category"){
+                    description = "the category name"
+                    example = "my-category"
+                    required = false
+                }
+            }
             response {
                 HttpStatusCode.OK to {
                     description = "Array of (verifiable credentials) JSON documents"
@@ -24,6 +31,7 @@ fun Application.credentials() = walletRoute {
                 }
             }
         }) {
+            val categories = call.request.queryParameters.getAll("category") ?: emptyList()
             context.respond(getWalletService().listCredentials())
         }
 

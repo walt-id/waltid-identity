@@ -1,15 +1,12 @@
 package id.walt.webwallet.service.credentials
 
-import id.walt.webwallet.db.models.WalletCredential
-import id.walt.webwallet.db.models.WalletCredentials
+import id.walt.webwallet.db.models.*
+import id.walt.webwallet.db.models.WalletCredentialCategoryMap.innerJoin
 import kotlinx.datetime.Clock
 import kotlinx.datetime.toJavaInstant
 import kotlinx.uuid.UUID
+import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
-import org.jetbrains.exposed.sql.and
-import org.jetbrains.exposed.sql.batchInsert
-import org.jetbrains.exposed.sql.deleteWhere
-import org.jetbrains.exposed.sql.select
 import org.jetbrains.exposed.sql.transactions.transaction
 
 object CredentialsService {
@@ -18,9 +15,36 @@ object CredentialsService {
             .singleOrNull()?.let { WalletCredential(it) }
     }
 
-    fun list(wallet: UUID) = transaction {
-        WalletCredentials.select { WalletCredentials.wallet eq wallet }
-            .map { WalletCredential(it) }
+    fun list(wallet: UUID, categories: List<String>) = transaction {
+//        val filterCredentials = WalletCredentialCategoryMap.innerJoin(
+//            otherTable = WalletCategory,
+//            onColumn = { WalletCredentialCategoryMap.category },
+//            otherColumn = { WalletCategory.id },
+//            additionalConstraint = {
+//                WalletCategory.wallet eq wallet
+//            }).selectAll().filter {
+//            categories.contains(it[WalletCategory.name])
+//        }.map {
+//            it[WalletCategory.name]
+//        }
+//        WalletCredentials.select { WalletCredentials.wallet eq wallet }
+//            .map { WalletCredential(it) }
+        WalletCredentialCategoryMap.innerJoin(
+            otherTable = WalletCredentialCategoryMap,
+            onColumn = { WalletCredentialCategoryMap.category },
+            otherColumn = { WalletCategory.id },
+            additionalConstraint = {
+                WalletCategory.wallet eq wallet
+            }).innerJoin(
+                otherTable = WalletCredentials,
+                onColumn = { WalletCredentialCategoryMap.credential},
+                otherColumn = { WalletCredentials.id},
+                additionalConstraint = {
+                    WalletCredentials.wallet eq wallet
+                }
+            ).selectAll().map {
+                WalletCredential(it)
+        }
     }
 
     fun add(wallet: UUID, vararg credentials: WalletCredential) = addAll(wallet, credentials.toList())

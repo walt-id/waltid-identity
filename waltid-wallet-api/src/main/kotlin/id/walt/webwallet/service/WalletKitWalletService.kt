@@ -125,7 +125,7 @@ class WalletKitWalletService(tenant: String, accountId: UUID, walletId: UUID) : 
 
     /* WalletCredentials */
 
-    override fun listCredentials() = runBlocking {
+    override fun listCredentials(categoryFilter: List<String>) = runBlocking {
         authenticatedJsonGet("/api/wallet/credentials/list").body<JsonObject>()["list"]!!.jsonArray.toList().map {
                 WalletCredential(
                     walletId, it.jsonObject["id"]!!.jsonPrimitive.content, it.toString(), null, Instant.DISTANT_PAST, ""
@@ -143,7 +143,7 @@ class WalletKitWalletService(tenant: String, accountId: UUID, walletId: UUID) : 
         authenticatedJsonDelete("/api/wallet/credentials/delete/$id").status.isSuccess()
 
     override suspend fun getCredential(credentialId: String) =
-        listCredentials().first { it.parsedDocument?.get("id")?.jsonPrimitive?.content == credentialId }.let {
+        listCredentials(emptyList()).first { it.parsedDocument?.get("id")?.jsonPrimitive?.content == credentialId }.let {
             WalletCredential(
                 wallet = walletId,
                 id = credentialId,
