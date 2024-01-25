@@ -1,6 +1,7 @@
 package id.walt.verifier.base.config
 
 import com.sksamuel.hoplite.*
+import id.walt.verifier.entra.EntraConfig
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.server.plugins.*
 import kotlin.reflect.KClass
@@ -63,6 +64,7 @@ object ConfigManager {
     private fun registerConfigurations() {
         registerConfig("web", WebConfig::class)
         registerConfig("verifier-service", OIDCVerifierServiceConfig::class)
+        registerConfig("entra", EntraConfig::class)
     }
 
     fun loadConfigs(args: Array<String>) {
