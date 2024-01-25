@@ -109,7 +109,7 @@ fun Application.keys() = walletRoute {
             context.respond(getWalletService().exportKey(keyId, format, loadPrivateKey))
         }
 
-        delete("{keyId}", {
+        post("{keyId}", {
             summary = "Delete a specific key"
             request {
                 pathParameter<String>("keyId") {
