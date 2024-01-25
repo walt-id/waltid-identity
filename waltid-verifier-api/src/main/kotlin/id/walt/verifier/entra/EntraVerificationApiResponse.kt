@@ -1,4 +1,4 @@
-package id.walt.verifier
+package id.walt.verifier.entra
 
 
 import kotlinx.serialization.Serializable
