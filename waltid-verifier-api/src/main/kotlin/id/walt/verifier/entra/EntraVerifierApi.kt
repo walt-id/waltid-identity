@@ -1,9 +1,10 @@
-package id.walt.verifier
+package id.walt.verifier.entra
 
 import id.walt.credentials.verification.Verifier.runPolicyRequest
 import id.walt.credentials.verification.models.PolicyRequest
 import id.walt.credentials.verification.models.PolicyRequest.Companion.parsePolicyRequests
 import id.walt.credentials.verification.models.PolicyResult
+import id.walt.verifier.base.config.ConfigManager
 import io.github.smiley4.ktorswaggerui.dsl.get
 import io.github.smiley4.ktorswaggerui.dsl.post
 import io.github.smiley4.ktorswaggerui.dsl.route
@@ -22,7 +23,6 @@ import io.ktor.server.routing.*
 import io.ktor.server.util.*
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import kotlinx.uuid.UUID
 import kotlinx.uuid.generateUUID
@@ -125,7 +125,9 @@ object EntraVerifierApi {
 
     val callbackMapping = HashMap<UUID, MappedData>()
 
-    const val ourCallbackUrl = "https://d3f1-146-70-116-144.ngrok-free.app/entra/verification-callback/"
+    val config = ConfigManager.getConfig<EntraConfig>()
+
+    val configuredCallbackUrl = config.callbackUrl
 
     fun createCallbackMapping(data: MappedData): UUID {
         val uuid = UUID.generateUUID()
@@ -141,13 +143,12 @@ object EntraVerifierApi {
         val callbackMappingId = createCallbackMapping(MappedData.fromVerifierData(data))
 
         val callback = EntraCreatePresentationRequest.EntraCreatePresentationRequestCallback(
-            url = "$ourCallbackUrl/$callbackMappingId",
+            url = "$configuredCallbackUrl/$callbackMappingId",
             state = "$callbackMappingId",
             headers = JsonObject(mapOf("api-key" to JsonPrimitive("1234")))
         )
 
-        val createPresentationRequestBody = EntraCreatePresentationRequest
-            .fromEntraVerificationRequest(req = req, callback = callback)
+        val createPresentationRequestBody = EntraCreatePresentationRequest.fromEntraVerificationRequest(req = req, callback = callback)
 
         val response = http.post("https://verifiedid.did.msidentity.com/v1.0/verifiableCredentials/createPresentationRequest") {
             header(HttpHeaders.Authorization, accessToken)
@@ -257,22 +258,25 @@ fun Application.entraVerifierApi() {
 
                     val output = buildJsonArray {
                         result.forEach {
-                           addJsonObject {
-                               put("type", it.type)
-                               put("credential", Json.encodeToJsonElement(it.credential))
-                               putJsonArray("policies") {
-                                   it.policies.forEach {
-                                       add(it.toJsonResult())
-                                   }
-                               }
-                           }
+                            addJsonObject {
+                                put("type", it.type)
+                                put("credential", Json.encodeToJsonElement(it.credential))
+                                putJsonArray("policies") {
+                                    it.policies.forEach {
+                                        add(it.toJsonResult())
+                                    }
+                                }
+                            }
                         }
                     }
 
                     context.respond(output)
-                }
-                else context.respond(HttpStatusCode.NotFound)
+                } else context.respond(HttpStatusCode.NotFound)
             }
         }
     }
+}
+
+fun main() {
+    println("entra: " + (System.getenv()["ENTRA_CALLBACK_URL"] ?: throw IllegalArgumentException("No ENTRA_CALLBACK_URL environment variable configured!")))
 }
