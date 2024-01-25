@@ -63,6 +63,6 @@ class JwsSignatureScheme : SignatureScheme {
 //        println("Subject: $subjectDid")
 
         DidService.resolveToKey(issuerDid).getOrThrow()
-            .verifyJws(data).getOrThrow()
+            .verifyJws(data.split("~")[0]).getOrThrow()
     }
 }

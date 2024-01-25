@@ -1,6 +1,6 @@
+import { AvailableCredential, CredentialFormats } from '@/types/credentials';
 import EditCredentialModal from '../modal/EditCredentialModal';
 import { PencilSquareIcon } from '@heroicons/react/24/outline';
-import { AvailableCredential } from '@/types/credentials';
 import Dropdown from '@/components/walt/forms/Dropdown';
 import React from 'react';
 
@@ -12,6 +12,7 @@ type Props = {
 
 export default function RowCredential({ credentialToEdit, credentialsToIssue, setCredentialsToIssue }: Props) {
   const [credentialSubject, setCredentialSubject] = React.useState(credentialToEdit.offer.credentialSubject);
+  const [selectedFormat, setSelectedFormat] = React.useState(CredentialFormats[0]);
   const [modalVisible, setModalVisible] = React.useState(false);
 
   React.useEffect(() => {
@@ -32,6 +33,21 @@ export default function RowCredential({ credentialToEdit, credentialsToIssue, se
     );
   }, [credentialSubject]);
 
+  React.useEffect(() => {
+    setCredentialsToIssue(
+      credentialsToIssue.map((credential) => {
+        if (credential.offer.id == credentialToEdit.offer.id) {
+          return {
+            ...credential,
+              selectedFormat: selectedFormat,
+          };
+        } else {
+          return credential;
+        }
+      })
+    );
+  }, [selectedFormat]);
+
   return (
     <>
       <div className="flex flex-row gap-5 justify-between">
@@ -44,10 +60,9 @@ export default function RowCredential({ credentialToEdit, credentialsToIssue, se
           <div className="w-[2px] h-[2px] bg-gray-200"></div>
           <div className="w-full">
             <Dropdown
-              values={credentialToEdit.formats.map((format) => ({
-                id: format,
-                name: format,
-              }))}
+              values={CredentialFormats}
+              selected={selectedFormat}
+              setSelected={setSelectedFormat}
             />
           </div>
         </div>

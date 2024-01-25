@@ -47,12 +47,6 @@ export default function EditCredentialModal({ show, onClose }: Props) {
                             {
                                 id: getType(credentialJson),
                                 title: getType(credentialJson).replace(/([A-Z])/g, ' $1').trim(),
-                                formats: [
-                                    'JWT + VCDM',
-                                    'SD-JWT + VCDM',
-                                    'Data Integrity/JSON-LD+ VCDM',
-                                    'mdoc / mdl (IEC/ISO 18013-5) ',
-                                ],
                                 offer: credentialJson ? credentialJson : {},
                             },
                             ...AvailableCredentials
