@@ -18,6 +18,7 @@ import org.bouncycastle.jce.provider.BouncyCastleProvider
 import java.security.Security
 import kotlin.io.path.Path
 import kotlin.io.path.absolutePathString
+import kotlin.io.path.createDirectories
 
 private val log = KotlinLogging.logger { }
 
@@ -28,6 +29,7 @@ fun main(args: Array<String>) {
 
     log.info { "Setting up..." }
     Security.addProvider(BouncyCastleProvider())
+    runCatching { Db.dataDirectoryPath.createDirectories() }
 
     log.info { "Reading configurations..." }
     ConfigManager.loadConfigs(args)

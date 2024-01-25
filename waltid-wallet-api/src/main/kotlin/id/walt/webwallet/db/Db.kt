@@ -27,9 +27,18 @@ object Db {
 
     lateinit var datasourceConfig: DatasourceConfiguration
 
+    val dataDirectoryPath = Path("data")
+
     private fun connect() {
         datasourceConfig = ConfigManager.getConfig<DatasourceConfiguration>()
         val hikariDataSourceConfig = datasourceConfig.hikariDataSource
+
+        /*if (hikariDataSourceConfig.jdbcUrl.startsWith("jdbc:sqlite:data/")) {
+            log.info { "Creating data directory at ${dataDirectoryPath.absolutePathString()}" }
+            dataDirectoryPath.createDirectories()
+        } else {
+            println(dataDirectoryPath.absolutePathString())
+        }*/
 
         /*val databaseConfig = ConfigManager.getConfig<DatabaseConfiguration>()
 
