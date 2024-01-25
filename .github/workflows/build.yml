@@ -1,4 +1,4 @@
-name: Build on every push
+name: Build on every push except main branch
 
 on:
   push:
@@ -11,13 +11,6 @@ jobs:
     name: "Build"
     runs-on: "ubuntu-latest"
     steps:
-      - uses: actions/checkout@v3
-      - name: Calculate release version
-        run: |
-          echo "release_version=1.0.0-$(echo ${{ github.ref_name }} | tr / -)" >> $GITHUB_ENV
-      - name: Set version
-        run: |
-          sed -i "s/1.0.0-SNAPSHOT/${{ env.release_version }}/g" build.gradle.kts
       - name: Setup java
         uses: actions/setup-java@v2.1.0
         with:
