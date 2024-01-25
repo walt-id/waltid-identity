@@ -48,12 +48,12 @@ data class DidJwkDocument(
     constructor(did: String, didJwk: JsonObject) : this(
         context = DEFAULT_CONTEXT,
         id = did,
-        verificationMethod = listOf(VerificationMethod(did, "JsonWebKey2020", did, didJwk)),
+        verificationMethod = listOf(VerificationMethod("$did#0", "JsonWebKey2020", did, didJwk)),
 
-        assertionMethod = listOf(did),
-        authentication = listOf(did),
-        capabilityInvocation = listOf(did),
-        capabilityDelegation = listOf(did),
-        keyAgreement = listOf(did),
+        assertionMethod = listOf("$did#0"),
+        authentication = listOf("$did#0"),
+        capabilityInvocation = listOf("$did#0"),
+        capabilityDelegation = listOf("$did#0"),
+        keyAgreement = listOf("$did#0"),
     )
 }

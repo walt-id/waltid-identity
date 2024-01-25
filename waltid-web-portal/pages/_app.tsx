@@ -22,12 +22,6 @@ export default function App({ Component, pageProps }: AppProps) {
             setAvailableCredentials((prev) => [...prev, {
               id: credential,
               title: credential,
-              formats: [
-                'JWT + VCDM',
-                'SD-JWT + VCDM',
-                'Data Integrity/JSON-LD+ VCDM',
-                'mdoc / mdl (IEC/ISO 18013-5) ',
-              ],
               offer: data.data,
             }]);
           });
