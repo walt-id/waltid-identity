@@ -656,7 +656,7 @@ class SSIKit2WalletService(
 //            createdKey.getKeyId()
 //        }
 
-        TSEKey.generate(KeyType.valueOf(type) , TSEKeyMetadata("http://0.0.0.0:8200/v1/transit", "hvs.bnxfmRFrX7UujrmPyURObcCn")).let { createdKey ->
+        TSEKey.generate(KeyType.valueOf(type) , TSEKeyMetadata("http://0.0.0.0:8200/v1/transit", "dev-only-token")).let { createdKey ->
             logEvent(
                 EventType.Key.Create, "wallet", KeyEventData(
                     id = createdKey.getKeyId(),
