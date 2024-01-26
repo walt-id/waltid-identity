@@ -15,8 +15,8 @@ plugins {
     kotlin("plugin.serialization") version kotlinVersion apply false
     id("com.github.ben-manes.versions") version "0.49.0" apply false
     kotlin("jvm") version kotlinVersion
-    id("org.jetbrains.kotlin.android") version kotlinVersion apply false
-    id("com.android.application")
+    id("com.android.application") version "8.2.1" apply false
+    id("org.jetbrains.kotlin.android") version "1.9.21" apply false
 }
 dependencies {
     implementation(kotlin("stdlib-jdk8"))

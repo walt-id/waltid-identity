@@ -1,5 +1,6 @@
 pluginManagement {
     repositories {
+        google()
         mavenCentral()
         gradlePluginPortal()
     }
@@ -35,4 +36,4 @@ include(
     "waltid-web-wallet",
 )
 
-include(":sampleapp")
+//include(":sampleapp")
