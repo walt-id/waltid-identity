@@ -444,13 +444,14 @@ class SSIKit2WalletService(tenant: String, accountId: UUID, walletId: UUID) :
 //        val responseToken = SDJwt.sign(responseTokenPayload, jwtCryptoProvider, TEST_WALLET_DID + "#${testWalletKey.getKeyId()}").toString()
 
         // *) POST response JWT token to return address found in manifest
-        val resp = http.post(entraIssuanceRequest.issuerReturnAddress, {
+        val resp = http.post(entraIssuanceRequest.issuerReturnAddress) {
             contentType(ContentType.Text.Plain)
             setBody(responseToken)
-        })
+        }
+        val responseBody = resp.bodyAsText()
         println("Resp: $resp")
-        println(resp.bodyAsText())
-        val vc = Json.parseToJsonElement(resp.bodyAsText()).jsonObject["vc"]!!.jsonPrimitive.content
+        println(responseBody)
+        val vc = runCatching { Json.parseToJsonElement(responseBody).jsonObject["vc"]!!.jsonPrimitive.content }.getOrElse { throw IllegalArgumentException("Could not get Verifiable Credential from response: $responseBody") }
         return listOf(CredentialResponse.Companion.success(CredentialFormat.jwt_vc_json, vc))
     }
 
