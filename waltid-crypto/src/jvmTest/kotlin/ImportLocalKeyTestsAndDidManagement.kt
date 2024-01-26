@@ -1,5 +1,6 @@
 import TestUtils.loadJwkLocal
 import TestUtils.loadPemLocal
+import TestUtils.loadResourceBase64
 import TestUtils.loadResourceBytes
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.LocalKey
@@ -70,6 +71,8 @@ class ImportLocalKeyTestsAndDidManagement {
         assertEquals(keyType, key.keyType)
         // Checking keyId from thumbprint
         assertEquals(key.getThumbprint(), key.getKeyId())
+
+        println(key.exportJWK())
     }
 
 
@@ -127,6 +130,9 @@ class ImportLocalKeyTestsAndDidManagement {
         fun `given raw string, when imported then the import succeeds having the correct key type, key id and hasPrivate values`(): Stream<Arguments> =
             Stream.of(
                 arguments(loadResourceBytes("public-bytes/ed25519.bin"), KeyType.Ed25519, false),
+
+                arguments(loadResourceBase64("public-bytes/ed25519-vault.base64"), KeyType.Ed25519, false),
+
                 // secp256r1 (throwing Invalid point encoding 0x30)
 //                arguments(loadResourceBytes("public-bytes/secp256k1.bin"), KeyType.secp256k1, false),
                 // secp256r1 (throwing Invalid point encoding 0x30)
