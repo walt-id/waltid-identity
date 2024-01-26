@@ -4,7 +4,7 @@
     <option name="ALTERNATIVE_JRE_PATH_ENABLED" value="true" />
     <option name="MAIN_CLASS_NAME" value="id.walt.verifier.MainKt" />
     <module name="waltid-identity.waltid-verifier-api.main" />
-    <option name="PROGRAM_PARAMETERS" value="--webHost=0.0.0.0 --webPort=7001 --baseUrl=http://dev.local:7001" />
+    <option name="PROGRAM_PARAMETERS" value="--webHost=0.0.0.0 --webPort=7001 --baseUrl=http://localhost:7001" />
     <shortenClasspath name="NONE" />
     <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/waltid-verifier-api" />
     <method v="2">
