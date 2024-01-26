@@ -117,6 +117,10 @@ class ImportLocalKeyTestsAndDidManagement {
                 arguments(loadPemLocal("secp256r1.public.pem"), KeyType.secp256r1, false),
                 // rsa
                 arguments(loadPemLocal("rsa.public.pem"), KeyType.RSA, false),
+                // rsa (exported from Hashicorp Vault)
+                arguments(loadPemLocal("rsa-vault.public.pem"), KeyType.RSA, false),
+                // ECDSA P-256 / Secp256r1 (exported from Hashicorp Vault)
+                arguments(loadPemLocal("ecdsa-vault.public.pem"), KeyType.secp256r1, false),
             )
 
         @JvmStatic
