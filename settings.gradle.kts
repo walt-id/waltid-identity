@@ -36,4 +36,4 @@ include(
     "waltid-web-wallet",
 )
 
-//include(":sampleapp")
+include(":sampleapp")

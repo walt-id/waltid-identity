@@ -10,13 +10,13 @@ allprojects {
 
 plugins {
 
-    val kotlinVersion = "1.9.21"
+    val kotlinVersion = "1.9.22"
     kotlin("multiplatform") version kotlinVersion apply false
     kotlin("plugin.serialization") version kotlinVersion apply false
     id("com.github.ben-manes.versions") version "0.49.0" apply false
     kotlin("jvm") version kotlinVersion
     id("com.android.application") version "8.2.1" apply false
-    id("org.jetbrains.kotlin.android") version "1.9.21" apply false
+    id("org.jetbrains.kotlin.android") version kotlinVersion apply false
 }
 dependencies {
     implementation(kotlin("stdlib-jdk8"))
