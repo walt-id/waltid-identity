@@ -1,6 +1,9 @@
+import org.jetbrains.kotlin.gradle.plugin.mpp.pm20.util.libsDirectory
+
 plugins {
     id("com.android.application")
-    id("org.jetbrains.kotlin.android")
+    kotlin("android")
+//    id("org.jetbrains.compose")
 }
 
 android {
@@ -16,7 +19,12 @@ android {
 
         testInstrumentationRunner = "android.support.test.runner.AndroidJUnitRunner"
     }
-
+    buildFeatures {
+        compose = true
+    }
+    composeOptions {
+        kotlinCompilerExtensionVersion = "1.5.8" // compose compiler version latest supports kotlin 1.9.22 and jpcompose 1.6.0
+    }
     buildTypes {
         release {
             isMinifyEnabled = false
@@ -34,11 +42,20 @@ android {
         jvmTarget = "1.8"
     }
 }
+val composeVersion = "1.6.0" // jpcompose version latest
 
 dependencies {
-
-    implementation("com.android.support:appcompat-v7:28.0.0")
+    implementation("androidx.compose.ui:ui:$composeVersion")
+    implementation("androidx.compose.ui:ui-tooling:$composeVersion")
+    implementation("androidx.compose.ui:ui-tooling-preview:$composeVersion")
+    implementation("androidx.compose.foundation:foundation:$composeVersion")
+    implementation("androidx.compose.material:material:$composeVersion")
+    implementation("androidx.activity:activity-compose:1.8.2")
+    implementation("androidx.appcompat:appcompat:1.6.1")
+    implementation("androidx.constraintlayout:constraintlayout:2.1.4")
     testImplementation("junit:junit:4.13.2")
+    implementation(project(":waltid-crypto"))
+
     androidTestImplementation("com.android.support.test:runner:1.0.2")
     androidTestImplementation("com.android.support.test.espresso:espresso-core:3.0.2")
 }

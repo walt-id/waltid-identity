@@ -3,6 +3,10 @@ pluginManagement {
         google()
         mavenCentral()
         gradlePluginPortal()
+        maven("https://maven.pkg.jetbrains.space/public/p/compose/dev")
+        maven("https://androidx.dev/storage/compose-compiler/repository/")
+        maven("https://jitpack.io")
+
     }
 }
 
@@ -34,6 +38,8 @@ include(
 
     // Apps
     "waltid-web-wallet",
+
+    // sample app android
+    "sampleapp",
 )
 
-include(":sampleapp")

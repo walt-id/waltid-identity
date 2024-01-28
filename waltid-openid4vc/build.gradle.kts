@@ -1,9 +1,12 @@
 plugins {
     kotlin("multiplatform") version "1.9.22"
     id("org.jetbrains.kotlin.plugin.serialization") version "1.9.22"
+
     id("dev.petuska.npm.publish") version "3.4.1"
     id("maven-publish")
     id("com.github.ben-manes.versions")
+
+
 }
 
 group = "id.walt"
@@ -30,6 +33,7 @@ repositories {
             //includeGroup("com.danubetech")
         }
     }
+
     mavenLocal()
 }
 

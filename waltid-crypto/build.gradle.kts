@@ -8,8 +8,10 @@ plugins {
 group = "id.walt.crypto"
 
 repositories {
+    google()
     mavenCentral()
     maven("https://jitpack.io")
+
 }
 
 java {
