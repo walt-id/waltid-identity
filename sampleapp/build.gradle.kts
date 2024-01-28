@@ -4,6 +4,8 @@ plugins {
     id("com.android.application")
     kotlin("android")
 //    id("org.jetbrains.compose")
+    id("maven-publish")
+    id("com.github.ben-manes.versions")
 }
 
 android {
@@ -55,7 +57,11 @@ dependencies {
     implementation("androidx.constraintlayout:constraintlayout:2.1.4")
     testImplementation("junit:junit:4.13.2")
     implementation(project(":waltid-crypto"))
+    // Multibase
+    implementation("com.github.multiformats:java-multibase:v1.1.1")
 
     androidTestImplementation("com.android.support.test:runner:1.0.2")
     androidTestImplementation("com.android.support.test.espresso:espresso-core:3.0.2")
 }
+
+

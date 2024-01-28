@@ -5,6 +5,8 @@ allprojects {
     repositories {
         google()
         mavenCentral()
+        maven("https://jitpack.io")
+
     }
 }
 
@@ -17,6 +19,7 @@ plugins {
     kotlin("jvm") version kotlinVersion
     id("com.android.application") version "8.2.1" apply false
     id("org.jetbrains.kotlin.android") version kotlinVersion apply false
+
 //    val  composeVersion ="1.5.4"
 //
 //    id("org.jetbrains.compose") version composeVersion apply  false
@@ -27,6 +30,8 @@ dependencies {
 repositories {
     google()
     mavenCentral()
+    maven("https://jitpack.io")
+
 }
 kotlin {
     jvmToolchain(8)
