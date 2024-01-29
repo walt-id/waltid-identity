@@ -59,7 +59,7 @@ fun Application.credentials() = walletRoute {
                 context.respond(getWalletService().getCredential(credentialId))
             }
 
-            post({
+            delete({
                 summary = "Delete a credential"
 
                 response {

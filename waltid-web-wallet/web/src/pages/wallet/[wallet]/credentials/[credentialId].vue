@@ -430,7 +430,7 @@ useHead({ title: "View credential - walt.id" });
 
 async function deleteCredential() {
     await $fetch(`/wallet-api/wallet/${currentWallet.value}/credentials/${encodeURIComponent(credentialId)}`, {
-        method: "POST",
+        method: "DELETE",
         // headers: {
         //     "X-HTTP-Method-Override": "DELETE"
         // }
