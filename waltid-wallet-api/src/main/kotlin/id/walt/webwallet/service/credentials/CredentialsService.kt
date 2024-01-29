@@ -1,6 +1,8 @@
 package id.walt.webwallet.service.credentials
 
+import id.walt.webwallet.db.models.WalletCategory
 import id.walt.webwallet.db.models.WalletCredential
+import id.walt.webwallet.db.models.WalletCredentialCategoryMap
 import id.walt.webwallet.db.models.WalletCredentials
 import kotlinx.datetime.Clock
 import kotlinx.datetime.toJavaInstant
@@ -14,43 +16,23 @@ object CredentialsService {
     fun get(wallet: UUID, credentialId: String): WalletCredential? = getCredential(wallet, credentialId, true)
 
     fun list(wallet: UUID, filter: CredentialFilterObject) = transaction {
-        WalletCredentials.select { WalletCredentials.wallet eq wallet }.orderBy(
+        WalletCredentials.innerJoin(otherTable = WalletCredentialCategoryMap,
+            onColumn = { WalletCredentials.id },
+            otherColumn = { WalletCredentialCategoryMap.credential },
+            additionalConstraint = {
+                WalletCredentials.wallet eq wallet and (WalletCredentialCategoryMap.wallet eq wallet)
+            }).innerJoin(otherTable = WalletCategory,
+            onColumn = { WalletCredentialCategoryMap.category },
+            otherColumn = { WalletCategory.name },
+            additionalConstraint = {
+                WalletCategory.wallet eq wallet and (WalletCredentialCategoryMap.wallet eq wallet) and (WalletCredentials.delete eq filter.showDeleted)
+            }).selectAll().orderBy(
             if (filter.showDeleted) WalletCredentials.deletedOn else WalletCredentials.addedOn, SortOrder.DESC
-        ).map { WalletCredential(it) }.filter {
-            it.delete == filter.showDeleted
+        ).filter {
+            filter.categories.isEmpty() || filter.categories.contains(it[WalletCategory.name])
+        }.map {
+            WalletCredential(it)
         }
-//        val filterCredentials = WalletCredentialCategoryMap.innerJoin(
-//            otherTable = WalletCategory,
-//            onColumn = { WalletCredentialCategoryMap.category },
-//            otherColumn = { WalletCategory.id },
-//            additionalConstraint = {
-//                WalletCategory.wallet eq wallet
-//            }).selectAll().filter {
-//            categories.contains(it[WalletCategory.name])
-//        }.map {
-//            it[WalletCategory.name]
-//        }
-//        WalletCredentials.select { WalletCredentials.wallet eq wallet }
-//            .map { WalletCredential(it) }
-
-
-//        WalletCredentialCategoryMap.innerJoin(
-//            otherTable = WalletCredentialCategoryMap,
-//            onColumn = { WalletCredentialCategoryMap.category },
-//            otherColumn = { WalletCategory.id },
-//            additionalConstraint = {
-//                WalletCategory.wallet eq wallet
-//            }).innerJoin(
-//                otherTable = WalletCredentials,
-//                onColumn = { WalletCredentialCategoryMap.credential},
-//                otherColumn = { WalletCredentials.id},
-//                additionalConstraint = {
-//                    WalletCredentials.wallet eq wallet
-//                }
-//            ).selectAll().map {
-//                WalletCredential(it)
-//        }.filter { !it.delete }
-
     }
 
     fun add(wallet: UUID, vararg credentials: WalletCredential) = addAll(wallet, credentials.toList())

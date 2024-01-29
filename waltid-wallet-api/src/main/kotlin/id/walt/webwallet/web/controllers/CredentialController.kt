@@ -21,13 +21,12 @@ fun Application.credentials() = walletRoute {
             summary = "List credentials"
             request {
                 queryParameter<List<String>>("category"){
-                    description = "the category name"
-                    example = "my-category"
+                    description = "list of category names"
                     required = false
                 }
                 queryParameter<Boolean>("showDeleted"){
                     description = "include the deleted credentials in the query result"
-                    example = true
+                    example = false
                     required = false
                 }
             }
