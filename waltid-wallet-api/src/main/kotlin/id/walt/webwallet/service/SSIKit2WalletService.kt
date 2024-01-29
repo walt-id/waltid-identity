@@ -30,7 +30,6 @@ import id.walt.oid4vc.util.randomUUID
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.db.models.WalletOperationHistories
 import id.walt.webwallet.db.models.WalletOperationHistory
-import id.walt.webwallet.manifest.extractor.DefaultManifestExtractor
 import id.walt.webwallet.manifest.extractor.EntraManifestExtractor
 import id.walt.webwallet.service.credentials.CredentialsService
 import id.walt.webwallet.service.dids.DidsService
@@ -126,23 +125,24 @@ class SSIKit2WalletService(tenant: String, accountId: UUID, walletId: UUID) :
         println("Using filters: $filters")
 
         val matchedCredentials = when {
-                filters.isNotEmpty() -> credentialList.filter { credential ->
-                    filters.any { fields ->
-                        fields.all { typeFilter ->
-                            val credField = credential.parsedDocument!![typeFilter.path] ?: return@all false
+            filters.isNotEmpty() -> credentialList.filter { credential ->
+                filters.any { fields ->
+                    fields.all { typeFilter ->
+                        val credField = credential.parsedDocument!![typeFilter.path] ?: return@all false
 
-                            when (credField) {
-                                is JsonPrimitive -> credField.jsonPrimitive.content == typeFilter.pattern
-                                is JsonArray -> credField.jsonArray.last().jsonPrimitive.content == typeFilter.pattern
-                                else -> false
-                            }
+                        when (credField) {
+                            is JsonPrimitive -> credField.jsonPrimitive.content == typeFilter.pattern
+                            is JsonArray -> credField.jsonArray.last().jsonPrimitive.content == typeFilter.pattern
+                            else -> false
                         }
                     }
                 }
-                else -> credentialList.filter {  cred ->
-                    presentationDefinition.inputDescriptors.any { desc -> desc.name == cred.parsedDocument?.get("type")?.jsonArray?.last()?.jsonPrimitive?.content }
-                }
             }
+
+            else -> credentialList.filter { cred ->
+                presentationDefinition.inputDescriptors.any { desc -> desc.name == cred.parsedDocument?.get("type")?.jsonArray?.last()?.jsonPrimitive?.content }
+            }
+        }
 
 
         println("Matched credentials: $matchedCredentials")
@@ -451,7 +451,9 @@ class SSIKit2WalletService(tenant: String, accountId: UUID, walletId: UUID) :
         val responseBody = resp.bodyAsText()
         println("Resp: $resp")
         println(responseBody)
-        val vc = runCatching { Json.parseToJsonElement(responseBody).jsonObject["vc"]!!.jsonPrimitive.content }.getOrElse { throw IllegalArgumentException("Could not get Verifiable Credential from response: $responseBody") }
+        val vc = runCatching { Json.parseToJsonElement(responseBody).jsonObject["vc"]!!.jsonPrimitive.content }.getOrElse {
+            throw IllegalArgumentException("Could not get Verifiable Credential from response: $responseBody")
+        }
         return listOf(CredentialResponse.Companion.success(CredentialFormat.jwt_vc_json, vc))
     }
 
@@ -480,7 +482,7 @@ class SSIKit2WalletService(tenant: String, accountId: UUID, walletId: UUID) :
         } else {
             Pair(
                 processCredentialOfferRequest(CredentialOfferRequest.fromHttpParameters(reqParams), credentialWallet),
-                DefaultManifestExtractor().extract(offer)
+                null
             )
         }
 
@@ -512,7 +514,7 @@ class SSIKit2WalletService(tenant: String, accountId: UUID, walletId: UUID) :
                                 disclosures = null,
                                 addedOn = Clock.System.now(),
                                 manifest = manifest.toString()
-                            ), createCredentialEventData(credentialJwt.payload["vc"]?.jsonObject, typ)
+                            ), createCredentialEventData(credentialJwt.payload, typ)
                         )
                     }
 
@@ -537,8 +539,11 @@ class SSIKit2WalletService(tenant: String, accountId: UUID, walletId: UUID) :
                                 document = credentialWithoutDisclosures,
                                 disclosures = disclosuresString,
                                 addedOn = Clock.System.now(),
-                                manifest = manifest.toString()
-                            ), createCredentialEventData(credentialJwt.payload["vc"]!!.jsonObject, typ)
+                                manifest = manifest?.toString()
+                            ), createCredentialEventData(
+                                json = credentialJwt.payload.jsonObject,
+                                type = typ
+                            )
                         )
                     }
 
