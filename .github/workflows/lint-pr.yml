@@ -35,16 +35,14 @@ jobs:
           message: |
             Hey there and thank you for opening this pull request! 👋🏼
             
-            Some or all of your commit messages do not seem to follow the [Conventional Commits specification](https://www.conventionalcommits.org/en/v1.0.0/).
-            To allow the merge of this pull request, we require that at least one commit message <b>or</b> the PR title follow that convention.
-            
+            Some or all of your commit messages do not seem to follow the [Conventional Commits specification](https://www.conventionalcommits.org/en/v1.0.0/).            
             You have the <b>following possibilities to proceed</b> with this PR:
-            1) Make sure at least one commit message complies with the [Conventional Commits specification](https://www.conventionalcommits.org/en/v1.0.0/).
+            1) Make sure at least one commit message complies with the above mentioned specification.
                Note, if not all messages comply, the merge will be allowed, but you will still see this warning.
-            2) Update the title of this pull request to comply with the [Conventional Commits specification](https://www.conventionalcommits.org/en/v1.0.0/).
+            2) Update the title of this pull request to comply with the above mentioned specification.
             
             <b>Further information:</b>
-            The commit messages and PR title will be parsed according to the [Conventional Commits specification](https://www.conventionalcommits.org/en/v1.0.0/), to automatically populate the release notes for the next official release.
+            The commit messages and PR title will be parsed according to the Conventional Commits specification, to automatically populate the release notes for the next official release.
             Therefore, make sure the commit messages <b>or</b> PR title contain the necessary and relevant information describing the changes of this pull request.
 
             <b>Commit message details:</b>
