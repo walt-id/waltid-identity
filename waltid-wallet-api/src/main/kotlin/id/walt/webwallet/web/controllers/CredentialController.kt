@@ -157,7 +157,7 @@ fun Application.credentials() = walletRoute {
                 }){
                     val credentialId = enforceGetParameter("credentialId", call.parameters)
                     val category = enforceGetParameter("category", call.parameters)
-                    runCatching { getWalletService().attachCategory(credentialId, category) }.onSuccess {
+                    runCatching { getWalletService().detachCategory(credentialId, category) }.onSuccess {
                         if (it) context.respond(HttpStatusCode.Accepted) else context.respond(HttpStatusCode.BadRequest)
                     }.onFailure { context.respond(HttpStatusCode.BadRequest, it.localizedMessage) }
                 }

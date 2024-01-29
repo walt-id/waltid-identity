@@ -34,6 +34,7 @@ import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.db.models.WalletOperationHistories
 import id.walt.webwallet.db.models.WalletOperationHistory
 import id.walt.webwallet.manifest.extractor.EntraManifestExtractor
+import id.walt.webwallet.service.category.CategoryService
 import id.walt.webwallet.service.category.CategoryServiceImpl
 import id.walt.webwallet.service.category.MockCategoryService
 import id.walt.webwallet.service.credentials.CredentialFilterObject
@@ -72,11 +73,12 @@ import java.net.URLDecoder
 import kotlin.time.Duration.Companion.seconds
 
 
-class SSIKit2WalletService(tenant: String, accountId: UUID, walletId: UUID) :
-    WalletService(tenant, accountId, walletId) {
-
-    private val categoryService =
-        if (ConfigManager.getConfig<RuntimeConfig>().mock) MockCategoryService else CategoryServiceImpl
+class SSIKit2WalletService(
+    tenant: String,
+    accountId: UUID,
+    walletId: UUID,
+    private val categoryService: CategoryService
+) : WalletService(tenant, accountId, walletId) {
     companion object {
         init {
             runBlocking {

@@ -4,6 +4,7 @@ import id.walt.webwallet.db.models.AccountWalletMappings
 import id.walt.webwallet.db.models.AccountWalletPermissions
 import id.walt.webwallet.db.models.Wallets
 import id.walt.webwallet.service.account.AccountsService
+import id.walt.webwallet.service.category.CategoryServiceImpl
 import id.walt.webwallet.service.nft.NftKitNftService
 import id.walt.webwallet.service.nft.NftService
 import kotlinx.datetime.Clock
@@ -17,11 +18,12 @@ import java.util.concurrent.ConcurrentHashMap
 object WalletServiceManager {
 
     private val walletServices = ConcurrentHashMap<Pair<UUID, UUID>, WalletService>()
+    private val categoryService = CategoryServiceImpl
 
     fun getWalletService(tenant: String, account: UUID, wallet: UUID): WalletService =
         walletServices.getOrPut(Pair(account, wallet)) {
             //WalletKitWalletService(account, wallet)
-            SSIKit2WalletService(tenant, account, wallet)
+            SSIKit2WalletService(tenant, account, wallet, categoryService)
         }
 
     fun createWallet(tenant: String, forAccount: UUID): UUID {

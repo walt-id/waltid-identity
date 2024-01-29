@@ -81,15 +81,18 @@ object CredentialsService {
     }
 
     object Category {
-        fun add(wallet: UUID, credentialId: String, category: String): Int {
-            transaction {
-
+        fun add(wallet: UUID, credentialId: String, category: String): Int = transaction {
+            WalletCredentialCategoryMap.insert {
+                it[WalletCredentialCategoryMap.wallet] = wallet
+                it[WalletCredentialCategoryMap.credential] = credentialId
+                it[WalletCredentialCategoryMap.category] = category
             }
-            TODO()
-        }
+        }.insertedCount
 
-        fun delete(wallet: UUID, credentialId: String, category: String): Int {
-            TODO()
+        fun delete(wallet: UUID, credentialId: String, category: String): Int = transaction {
+            WalletCredentialCategoryMap.deleteWhere {
+                WalletCredentialCategoryMap.wallet eq wallet and (WalletCredentialCategoryMap.credential eq credentialId) and (WalletCredentialCategoryMap.category eq category)
+            }
         }
     }
 }
