@@ -19,6 +19,8 @@ data:
     webPort = 3000
   verifier-service.conf: |
     baseUrl = "https://verifier.portal.walt-test.cloud"
+  entra.conf: |
+    callbackUrl = "https://verifier.portal.walt-test.cloud/entra/verification-callback/"
 ---
 kind: Deployment
 apiVersion: apps/v1
