@@ -21,7 +21,7 @@ object WalletCredentials : Table("credentials") {
     val disclosures = text("disclosures").nullable()
 
     val addedOn = timestamp("added_on")
-    val manifest = text("manifest")
+    val manifest = text("manifest").nullable()
 
     override val primaryKey = PrimaryKey(wallet, id)
 }
@@ -33,7 +33,7 @@ data class WalletCredential(
     val document: String,
     val disclosures: String?,
     val addedOn: Instant,
-    val manifest: String,
+    val manifest: String? = null,
 
     val parsedDocument: JsonObject? = parseDocument(document, id)
 ) {
