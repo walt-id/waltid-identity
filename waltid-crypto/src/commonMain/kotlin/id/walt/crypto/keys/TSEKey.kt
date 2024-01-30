@@ -4,6 +4,7 @@ import id.walt.crypto.utils.Base64Utils.base64UrlDecode
 import id.walt.crypto.utils.Base64Utils.base64toBase64Url
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto.utils.JwsUtils.jwsAlg
+import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.plugins.*
@@ -22,6 +23,8 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import kotlin.random.Random
 
+private val log = KotlinLogging.logger("TSEKey")
+
 // Works with the Hashicorp Transit Secret Engine
 @Suppress("TRANSIENT_IS_REDUNDANT")
 @Serializable
@@ -32,6 +35,7 @@ class TSEKey(
     //override var keyType: KeyType? = null
     private var _publicKey: ByteArray? = null, private var _keyType: KeyType? = null
 ) : Key() {
+
 
     @OptIn(DelicateCoroutinesApi::class)
     private inline fun <T> lazySuspended(
@@ -64,7 +68,7 @@ class TSEKey(
     private fun throwTSEError(msg: String): Nothing = throw RuntimeException("Invalid TSE server ($server) response: $msg")
 
     private suspend fun retrievePublicKey(): ByteArray {
-//        println("Retrieving public key: ${this.id}")
+        log.trace { "Retrieving public key: $id" }
         val keyData = http.get("$server/keys/$id") {
             header("X-Vault-Token", accessKey)
             namespace?.let { header("X-Vault-Namespace", namespace) }
@@ -73,7 +77,7 @@ class TSEKey(
         // TO\\DO: try this
         val keyStr = keyData["1"]?.jsonObject?.get("public_key")?.jsonPrimitive?.content
             ?: throwTSEError("No data/keys/1/publicKey returned: $keyData")
-//        println("Key string is: $keyStr")
+        log.trace { "Retrieving public key: $keyStr" }
 
         return keyStr.decodeBase64Bytes()
     }
@@ -186,7 +190,7 @@ class TSEKey(
         ).value
 
     override suspend fun getPublicKey(): Key {
-        println("Getting public key: $keyType")
+        log.trace { "Getting public key: $keyType" }
 
         return LocalKey.importRawPublicKey(
             type = keyType,
