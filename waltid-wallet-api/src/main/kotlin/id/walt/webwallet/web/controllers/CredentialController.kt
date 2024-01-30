@@ -11,6 +11,7 @@ import io.github.smiley4.ktorswaggerui.dsl.route
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.response.*
+import io.ktor.server.util.*
 import kotlinx.serialization.json.JsonObject
 
 fun Application.credentials() = walletRoute {
@@ -38,7 +39,7 @@ fun Application.credentials() = walletRoute {
             }
         }) {
             val categories = call.request.queryParameters.getAll("category") ?: emptyList()
-            val showDeleted = call.request.queryParameters["showDeleted"]?.toBoolean() ?: false
+            val showDeleted = call.request.queryParameters["showDeleted"].toBoolean()
             context.respond(getWalletService().listCredentials(CredentialFilterObject(categories, showDeleted)))
         }
 
@@ -67,7 +68,7 @@ fun Application.credentials() = walletRoute {
                     }
                 }
             }) {
-                val credentialId = enforceGetParameter("credentialId", call.parameters)
+                val credentialId = call.parameters.getOrFail("credentialId")
                 context.respond(getWalletService().getCredential(credentialId))
             }
             route("delete"){
@@ -118,7 +119,7 @@ fun Application.credentials() = walletRoute {
                     HttpStatusCode.BadRequest to { description = "WalletCredential could not be restored" }
                 }
             }){
-                val credentialId = enforceGetParameter("credentialId", call.parameters)
+                val credentialId = call.parameters.getOrFail("credentialId")
                 runCatching { getWalletService().restoreCredential(credentialId) }.onSuccess {
                     context.respond(HttpStatusCode.OK, it)
                 }.onFailure {
@@ -141,8 +142,8 @@ fun Application.credentials() = walletRoute {
                         HttpStatusCode.BadRequest to { description = "WalletCredential category could not be added" }
                     }
                 }){
-                    val credentialId = enforceGetParameter("credentialId", call.parameters)
-                    val category = enforceGetParameter("category", call.parameters)
+                    val credentialId = call.parameters.getOrFail("credentialId")
+                    val category = call.parameters.getOrFail("category")
                     runCatching { getWalletService().attachCategory(credentialId, category) }.onSuccess {
                         if (it) context.respond(HttpStatusCode.Created) else context.respond(HttpStatusCode.BadRequest)
                     }.onFailure { context.respond(HttpStatusCode.BadRequest, it.localizedMessage) }
@@ -155,8 +156,8 @@ fun Application.credentials() = walletRoute {
                         HttpStatusCode.BadRequest to { description = "WalletCredential category could not be deleted" }
                     }
                 }){
-                    val credentialId = enforceGetParameter("credentialId", call.parameters)
-                    val category = enforceGetParameter("category", call.parameters)
+                    val credentialId = call.parameters.getOrFail("credentialId")
+                    val category = call.parameters.getOrFail("category")
                     runCatching { getWalletService().detachCategory(credentialId, category) }.onSuccess {
                         if (it) context.respond(HttpStatusCode.Accepted) else context.respond(HttpStatusCode.BadRequest)
                     }.onFailure { context.respond(HttpStatusCode.BadRequest, it.localizedMessage) }
@@ -166,10 +167,7 @@ fun Application.credentials() = walletRoute {
     }
 }
 
-internal fun enforceGetParameter(name: String, parameters: Parameters): String =
-    parameters[name] ?: throw IllegalArgumentException("No $name provided")
-
 internal suspend fun deleteCredential(service: WalletService, parameters: Parameters, permanent: Boolean): Boolean {
-    val credentialId = enforceGetParameter("credentialId", parameters)
+    val credentialId = parameters.getOrFail("credentialId")
     return service.deleteCredential(credentialId, permanent)
 }

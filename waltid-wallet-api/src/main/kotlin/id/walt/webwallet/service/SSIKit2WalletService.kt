@@ -109,7 +109,7 @@ class SSIKit2WalletService(
     }
 
     override suspend fun restoreCredential(id: String): WalletCredential =
-        CredentialsService.restore(walletId, id) ?: throw IllegalArgumentException("Credential not found: $id")
+        CredentialsService.restore(walletId, id) ?: error("Credential not found: $id")
 
     override suspend fun getCredential(credentialId: String): WalletCredential =
         CredentialsService.get(walletId, credentialId)

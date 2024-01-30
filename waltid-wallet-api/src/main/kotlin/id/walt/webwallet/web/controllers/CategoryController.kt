@@ -7,6 +7,7 @@ import io.github.smiley4.ktorswaggerui.dsl.route
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.response.*
+import io.ktor.server.util.*
 import kotlinx.serialization.json.JsonObject
 
 fun Application.categories() = walletRoute {
@@ -39,7 +40,7 @@ fun Application.categories() = walletRoute {
                     HttpStatusCode.BadRequest to { description = "Category could not be added" }
                 }
             }) {
-                val name = enforceGetParameter("name", call.parameters)
+                val name = call.parameters.getOrFail("name")
                 runCatching { getWalletService().addCategory(name) }.onSuccess {
                     context.respond(if (it) HttpStatusCode.Created else HttpStatusCode.BadRequest)
                 }.onFailure { context.respond(HttpStatusCode.BadRequest, it.localizedMessage) }
@@ -51,7 +52,7 @@ fun Application.categories() = walletRoute {
                     HttpStatusCode.BadRequest to { description = "Category could not be deleted" }
                 }
             }) {
-                val name = enforceGetParameter("name", call.parameters)
+                val name = call.parameters.getOrFail("name")
                 runCatching { getWalletService().deleteCategory(name) }.onSuccess {
                     context.respond(if (it) HttpStatusCode.Accepted else HttpStatusCode.BadRequest)
                 }.onFailure { context.respond(HttpStatusCode.BadRequest, it.localizedMessage) }

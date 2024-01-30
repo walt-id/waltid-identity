@@ -129,16 +129,16 @@ class WalletKitWalletService(tenant: String, accountId: UUID, walletId: UUID) : 
     override fun listCredentials(filter: CredentialFilterObject) = runBlocking {
         authenticatedJsonGet("/api/wallet/credentials/list").body<JsonObject>()["list"]!!.jsonArray.toList().map {
             WalletCredential(
-                walletId,
-                it.jsonObject["id"]!!.jsonPrimitive.content,
-                it.toString(),
-                null,
-                Instant.DISTANT_PAST,
-                "",
-                false,
-                null
+                wallet = walletId,
+                id = it.jsonObject["id"]!!.jsonPrimitive.content,
+                document = it.toString(),
+                disclosures = null,
+                addedOn = Instant.DISTANT_PAST,
+                manifest = "",
+                delete = false,
+                deletedOn = null
             )
-            }
+        }
     }
 
     override suspend fun listRawCredentials(): List<String> {
