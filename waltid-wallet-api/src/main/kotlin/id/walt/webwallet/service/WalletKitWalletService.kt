@@ -4,6 +4,7 @@ import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.webwallet.config.ConfigManager
 import id.walt.webwallet.config.RemoteWalletConfig
 import id.walt.webwallet.db.models.*
+import id.walt.webwallet.service.credentials.CredentialFilterObject
 import id.walt.webwallet.service.dids.DidsService
 import id.walt.webwallet.service.dto.LinkedWalletDataTransferObject
 import id.walt.webwallet.service.dto.WalletDataTransferObject
@@ -125,11 +126,18 @@ class WalletKitWalletService(tenant: String, accountId: UUID, walletId: UUID) : 
 
     /* WalletCredentials */
 
-    override fun listCredentials(categoryFilter: List<String>) = runBlocking {
+    override fun listCredentials(filter: CredentialFilterObject) = runBlocking {
         authenticatedJsonGet("/api/wallet/credentials/list").body<JsonObject>()["list"]!!.jsonArray.toList().map {
-                WalletCredential(
-                    walletId, it.jsonObject["id"]!!.jsonPrimitive.content, it.toString(), null, Instant.DISTANT_PAST, ""
-                )
+            WalletCredential(
+                walletId,
+                it.jsonObject["id"]!!.jsonPrimitive.content,
+                it.toString(),
+                null,
+                Instant.DISTANT_PAST,
+                "",
+                false,
+                null
+            )
             }
     }
 
@@ -139,18 +147,24 @@ class WalletKitWalletService(tenant: String, accountId: UUID, walletId: UUID) : 
 
     //private val prettyJson = Json { prettyPrint = true }
 
-    override suspend fun deleteCredential(id: String) =
+    override suspend fun deleteCredential(id: String, permanent: Boolean) =
         authenticatedJsonDelete("/api/wallet/credentials/delete/$id").status.isSuccess()
 
+    override suspend fun restoreCredential(id: String): WalletCredential {
+        TODO("Not yet implemented")
+    }
+
     override suspend fun getCredential(credentialId: String) =
-        listCredentials(emptyList()).first { it.parsedDocument?.get("id")?.jsonPrimitive?.content == credentialId }.let {
+        listCredentials(CredentialFilterObject.default).first { it.parsedDocument?.get("id")?.jsonPrimitive?.content == credentialId }.let {
             WalletCredential(
                 wallet = walletId,
                 id = credentialId,
                 document = it.toString(),
                 disclosures = null,
                 addedOn = Instant.DISTANT_PAST,
-                manifest = it.manifest
+                manifest = it.manifest,
+                delete = false,
+                deletedOn = null,
             )
         }
 

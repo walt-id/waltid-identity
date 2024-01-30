@@ -5,6 +5,7 @@ import id.walt.webwallet.db.models.WalletCategoryData
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.db.models.WalletDid
 import id.walt.webwallet.db.models.WalletOperationHistory
+import id.walt.webwallet.service.credentials.CredentialFilterObject
 import id.walt.webwallet.service.dto.LinkedWalletDataTransferObject
 import id.walt.webwallet.service.dto.WalletDataTransferObject
 import id.walt.webwallet.service.events.EventLogFilter
@@ -17,9 +18,10 @@ import kotlinx.uuid.UUID
 abstract class WalletService(val tenant: String, val accountId: UUID, val walletId: UUID) {
 
     // WalletCredentials
-    abstract fun listCredentials(categoryFilter: List<String>): List<WalletCredential>
+    abstract fun listCredentials(filter: CredentialFilterObject): List<WalletCredential>
     abstract suspend fun listRawCredentials(): List<String>
-    abstract suspend fun deleteCredential(id: String): Boolean
+    abstract suspend fun deleteCredential(id: String, permanent: Boolean): Boolean
+    abstract suspend fun restoreCredential(id: String): WalletCredential
     abstract suspend fun getCredential(credentialId: String): WalletCredential
     abstract suspend fun attachCategory(credentialId: String, category: String): Boolean
     abstract suspend fun detachCategory(credentialId: String, category: String): Boolean

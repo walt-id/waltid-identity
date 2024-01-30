@@ -36,6 +36,7 @@ import id.walt.webwallet.db.models.WalletOperationHistory
 import id.walt.webwallet.manifest.extractor.EntraManifestExtractor
 import id.walt.webwallet.service.category.CategoryServiceImpl
 import id.walt.webwallet.service.category.MockCategoryService
+import id.walt.webwallet.service.credentials.CredentialFilterObject
 import id.walt.webwallet.service.credentials.CredentialsService
 import id.walt.webwallet.service.dids.DidsService
 import id.walt.webwallet.service.dto.LinkedWalletDataTransferObject
@@ -90,18 +91,23 @@ class SSIKit2WalletService(tenant: String, accountId: UUID, walletId: UUID) :
         }
     }
 
-    override fun listCredentials(categoryFilter: List<String>): List<WalletCredential> = CredentialsService.list(walletId, categoryFilter)
+    override fun listCredentials(filter: CredentialFilterObject): List<WalletCredential> =
+        CredentialsService.list(walletId, filter)
 
-    override suspend fun listRawCredentials(): List<String> = CredentialsService.list(walletId, emptyList()).map {
-        it.document
-    }
+    override suspend fun listRawCredentials(): List<String> =
+        CredentialsService.list(walletId, CredentialFilterObject.default).map {
+            it.document
+        }
 
-    override suspend fun deleteCredential(id: String) = let {
+    override suspend fun deleteCredential(id: String, permanent: Boolean) = let {
         CredentialsService.get(walletId, id)?.run {
             logEvent(EventType.Credential.Delete, "wallet", createCredentialEventData(this.parsedDocument, null))
         }
-        transaction { CredentialsService.delete(walletId, id) }
+        CredentialsService.delete(walletId, id, permanent)
     }
+
+    override suspend fun restoreCredential(id: String): WalletCredential =
+        CredentialsService.restore(walletId, id) ?: throw IllegalArgumentException("Credential not found: $id")
 
     override suspend fun getCredential(credentialId: String): WalletCredential =
         CredentialsService.get(walletId, credentialId)
@@ -116,7 +122,7 @@ class SSIKit2WalletService(tenant: String, accountId: UUID, walletId: UUID) :
         CredentialsService.Category.delete(walletId, credentialId, category) == 1
 
     override fun matchCredentialsByPresentationDefinition(presentationDefinition: PresentationDefinition): List<WalletCredential> {
-        val credentialList = listCredentials(emptyList())
+        val credentialList = listCredentials(CredentialFilterObject.default)
 
         println("WalletCredential list is: ${credentialList.map { it.parsedDocument?.get("type")!!.jsonArray }}")
 
@@ -528,7 +534,9 @@ class SSIKit2WalletService(tenant: String, accountId: UUID, walletId: UUID) :
                                 document = credential,
                                 disclosures = null,
                                 addedOn = Clock.System.now(),
-                                manifest = manifest.toString()
+                                manifest = manifest.toString(),
+                                delete = false,
+                                deletedOn = null,
                             ), createCredentialEventData(credentialJwt.payload, typ)
                         )
                     }
@@ -554,7 +562,9 @@ class SSIKit2WalletService(tenant: String, accountId: UUID, walletId: UUID) :
                                 document = credentialWithoutDisclosures,
                                 disclosures = disclosuresString,
                                 addedOn = Clock.System.now(),
-                                manifest = manifest?.toString()
+                                manifest = manifest?.toString(),
+                                delete = false,
+                                deletedOn = null,
                             ), createCredentialEventData(
                                 json = credentialJwt.payload.jsonObject,
                                 type = typ
@@ -793,7 +803,7 @@ class SSIKit2WalletService(tenant: String, accountId: UUID, walletId: UUID) :
 
     override fun getCredentialsByIds(credentialIds: List<String>): List<WalletCredential> {
         // todo: select by SQL
-        return listCredentials(emptyList()).filter { it.id in credentialIds }
+        return listCredentials(CredentialFilterObject.default).filter { it.id in credentialIds }
     }
 
     override suspend fun listCategories(): List<WalletCategoryData> = categoryService.list(walletId)
