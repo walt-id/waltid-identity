@@ -1,5 +1,6 @@
 plugins {
     kotlin("multiplatform")
+    id("com.android.library")
     kotlin("plugin.serialization")
     id("maven-publish")
     id("com.github.ben-manes.versions")
@@ -22,11 +23,12 @@ kotlin {
 }
 
 kotlin {
+    androidTarget()
+
     jvm {
         compilations.all {
             kotlinOptions.jvmTarget = "15" // JVM got Ed25519 at version 15
         }
-        withJava()
         tasks.withType<Test>().configureEach {
             useJUnitPlatform()
         }
@@ -46,6 +48,11 @@ kotlin {
     }
 
     sourceSets {
+        val androidMain by getting {
+            dependencies {
+                
+            }
+        }
         val commonMain by getting {
             dependencies {
                 // JSON
@@ -145,5 +152,13 @@ kotlin {
         all {
             languageSettings.enableLanguageFeature("InlineClasses")
         }
+    }
+}
+
+android {
+    namespace = "id.walt.waltid-crypto"
+    compileSdk = 33
+    defaultConfig {
+        minSdk = 28
     }
 }
