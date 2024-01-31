@@ -645,7 +645,10 @@ class SSIKit2WalletService(
 
     override suspend fun generateKey(type: String, config:KMSData?): String {
         if (config?.type == "tse") {
-            return TSEKey.generate(KeyType.valueOf(type) , TSEKeyMetadata("http://0.0.0.0:8200/v1/transit", "dev-only-token")).let { createdKey ->
+            return TSEKey.generate(KeyType.valueOf(type) , TSEKeyMetadata(
+                config.config.jsonObject["server"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("No server in config"),
+                config.config.jsonObject["accessKey"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("No accessKey in config"),
+            )).let { createdKey ->
                 val keyId = createdKey.getKeyId()
                 logEvent(
                     EventType.Key.Create, "wallet", KeyEventData(
