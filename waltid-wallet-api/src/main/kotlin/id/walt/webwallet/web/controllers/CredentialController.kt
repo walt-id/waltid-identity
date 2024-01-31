@@ -38,7 +38,7 @@ fun Application.credentials() = walletRoute {
                 }
             }
         }) {
-            val categories = call.request.queryParameters.getAll("category") ?: emptyList()
+            val categories = call.request.queryParameters.getAll("category")
             val showDeleted = call.request.queryParameters["showDeleted"].toBoolean()
             context.respond(getWalletService().listCredentials(CredentialFilterObject(categories, showDeleted)))
         }

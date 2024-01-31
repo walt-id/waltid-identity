@@ -18,25 +18,14 @@ object CredentialsService {
     fun get(wallet: UUID, credentialId: String): WalletCredential? = getCredential(wallet, credentialId, true)
 
     fun list(wallet: UUID, filter: CredentialFilterObject) = transaction {
-        WalletCredentials.leftJoin(otherTable = WalletCredentialCategoryMap,
-            onColumn = { WalletCredentials.id },
-            otherColumn = { WalletCredentialCategoryMap.credential },
-            additionalConstraint = {
-                WalletCredentials.wallet eq wallet and (WalletCredentialCategoryMap.wallet eq wallet)
-            }).leftJoin(otherTable = WalletCategory,
-            onColumn = { WalletCredentialCategoryMap.category },
-            otherColumn = { WalletCategory.name },
-            additionalConstraint = {
-                WalletCategory.wallet eq wallet and (WalletCredentialCategoryMap.wallet eq wallet) and (filter.showDeleted.takeIf { it }
-                    ?.let { deletedItemsCondition } ?: notDeletedItemsCondition)
-                //(WalletCredentials.delete eq filter.showDeleted)
-            }).selectAll().orderBy(
-            if (filter.showDeleted) WalletCredentials.deletedOn else WalletCredentials.addedOn, SortOrder.DESC
-        ).filter {
-            filter.categories.isEmpty() || filter.categories.contains(it[WalletCategory.name])
-        }.map {
-            WalletCredential(it)
-        }
+        let {
+            filter.categories?.let {
+                it.takeIf { it.isEmpty() }?.let {
+                    uncategorizedQuery(wallet, filter.showDeleted)
+                } ?: categorizedQuery(wallet, filter.showDeleted, it)
+            } ?: allQuery(wallet, filter.showDeleted)
+        }.orderBy(if (filter.showDeleted) WalletCredentials.deletedOn else WalletCredentials.addedOn, SortOrder.DESC)
+            .map { WalletCredential(it) }
     }
 
     fun add(wallet: UUID, vararg credentials: WalletCredential) = addAll(wallet, credentials.toList())
@@ -69,8 +58,10 @@ object CredentialsService {
     private fun getCredential(wallet: UUID, credentialId: String, includeDeleted: Boolean) = transaction {
         WalletCredentials.select {
             (WalletCredentials.wallet eq wallet) and (WalletCredentials.id eq credentialId)
-        }.singleOrNull()?.let { WalletCredential(it) }?.takeIf { it.deletedOn == null || includeDeleted }//?.takeIf { !it.delete || includeDeleted }
+        }.singleOrNull()?.let { WalletCredential(it) }
+            ?.takeIf { it.deletedOn == null || includeDeleted }//?.takeIf { !it.delete || includeDeleted }
     }
+
     private fun updateDelete(wallet: UUID, credentialId: String, value: Boolean): Int = transaction {
         WalletCredentials.update({ WalletCredentials.wallet eq wallet and (WalletCredentials.id eq credentialId) }) {
 //            it[this.delete] = value
@@ -80,6 +71,36 @@ object CredentialsService {
 
     private fun deleteCredential(wallet: UUID, credentialId: String) =
         transaction { WalletCredentials.deleteWhere { (WalletCredentials.wallet eq wallet) and (id eq credentialId) } }
+
+    private fun categorizedQuery(wallet: UUID, deleted: Boolean, categories: List<String>) =
+        WalletCredentials.innerJoin(otherTable = WalletCredentialCategoryMap,
+            onColumn = { WalletCredentials.id },
+            otherColumn = { WalletCredentialCategoryMap.credential },
+            additionalConstraint = {
+                WalletCredentials.wallet eq wallet and (WalletCredentialCategoryMap.wallet eq wallet) and deletedCondition(
+                    deleted
+                )
+            }).innerJoin(otherTable = WalletCategory,
+            onColumn = { WalletCredentialCategoryMap.category },
+            otherColumn = { WalletCategory.name },
+            additionalConstraint = {
+                WalletCategory.wallet eq wallet and (WalletCredentialCategoryMap.wallet eq wallet) and (WalletCategory.name inList (categories))
+                //(WalletCredentials.delete eq filter.showDeleted)
+            }).selectAll()
+
+    private fun uncategorizedQuery(wallet: UUID, deleted: Boolean) = WalletCredentials.select {
+        WalletCredentials.wallet eq wallet and (WalletCredentials.id notInSubQuery (WalletCredentialCategoryMap.slice(
+            WalletCredentialCategoryMap.credential
+        ).select {
+            WalletCredentialCategoryMap.wallet eq wallet
+        })) and deletedCondition(deleted)
+    }
+
+    private fun allQuery(wallet: UUID, deleted: Boolean) =
+        WalletCredentials.select { WalletCredentials.wallet eq wallet and deletedCondition(deleted) }
+
+    private fun deletedCondition(deleted: Boolean) =
+        deleted.takeIf { it }?.let { deletedItemsCondition } ?: notDeletedItemsCondition
 
     object Manifest {
         fun get(wallet: UUID, credentialId: String): String? = CredentialsService.get(wallet, credentialId)?.manifest
@@ -103,7 +124,7 @@ object CredentialsService {
 }
 
 data class CredentialFilterObject(
-    val categories: List<String>,
+    val categories: List<String>?,
     val showDeleted: Boolean
 ) {
     companion object {
