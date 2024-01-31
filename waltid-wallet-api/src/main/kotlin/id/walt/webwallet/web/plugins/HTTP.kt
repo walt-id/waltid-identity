@@ -8,15 +8,7 @@ import io.ktor.server.plugins.forwardedheaders.*
 import io.ktor.server.plugins.methodoverride.*
 
 fun Application.configureHTTP() {
-    install(Compression) {
-        gzip {
-            priority = 1.0
-        }
-        deflate {
-            priority = 10.0
-            minimumSize(1024) // condition
-        }
-    }
+    install(Compression)
     install(CORS) {
         allowMethod(HttpMethod.Options)
         allowNonSimpleContentTypes = true
