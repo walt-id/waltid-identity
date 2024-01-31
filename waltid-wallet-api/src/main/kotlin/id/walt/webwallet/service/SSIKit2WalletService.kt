@@ -537,7 +537,7 @@ class SSIKit2WalletService(
                                 disclosures = null,
                                 addedOn = Clock.System.now(),
                                 manifest = manifest.toString(),
-                                delete = false,
+//                                delete = false,
                                 deletedOn = null,
                             ), createCredentialEventData(credentialJwt.payload, typ)
                         )
@@ -565,7 +565,7 @@ class SSIKit2WalletService(
                                 disclosures = disclosuresString,
                                 addedOn = Clock.System.now(),
                                 manifest = manifest?.toString(),
-                                delete = false,
+//                                delete = false,
                                 deletedOn = null,
                             ), createCredentialEventData(
                                 json = credentialJwt.payload.jsonObject,

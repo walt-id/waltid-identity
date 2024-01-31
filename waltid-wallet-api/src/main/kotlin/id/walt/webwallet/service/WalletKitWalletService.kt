@@ -135,7 +135,7 @@ class WalletKitWalletService(tenant: String, accountId: UUID, walletId: UUID) : 
                 disclosures = null,
                 addedOn = Instant.DISTANT_PAST,
                 manifest = "",
-                delete = false,
+//                delete = false,
                 deletedOn = null
             )
         }
@@ -163,7 +163,7 @@ class WalletKitWalletService(tenant: String, accountId: UUID, walletId: UUID) : 
                 disclosures = null,
                 addedOn = Instant.DISTANT_PAST,
                 manifest = it.manifest,
-                delete = false,
+//                delete = false,
                 deletedOn = null,
             )
         }

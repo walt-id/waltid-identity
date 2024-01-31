@@ -13,6 +13,8 @@ import org.jetbrains.exposed.sql.transactions.transaction
 import java.time.Instant
 
 object CredentialsService {
+    private val notDeletedItemsCondition = Op.build { WalletCredentials.deletedOn eq null }
+    private val deletedItemsCondition = Op.build { WalletCredentials.deletedOn neq null }
     fun get(wallet: UUID, credentialId: String): WalletCredential? = getCredential(wallet, credentialId, true)
 
     fun list(wallet: UUID, filter: CredentialFilterObject) = transaction {
@@ -25,7 +27,9 @@ object CredentialsService {
             onColumn = { WalletCredentialCategoryMap.category },
             otherColumn = { WalletCategory.name },
             additionalConstraint = {
-                WalletCategory.wallet eq wallet and (WalletCredentialCategoryMap.wallet eq wallet) and (WalletCredentials.delete eq filter.showDeleted)
+                WalletCategory.wallet eq wallet and (WalletCredentialCategoryMap.wallet eq wallet) and (filter.showDeleted.takeIf { it }
+                    ?.let { deletedItemsCondition } ?: notDeletedItemsCondition)
+                //(WalletCredentials.delete eq filter.showDeleted)
             }).selectAll().orderBy(
             if (filter.showDeleted) WalletCredentials.deletedOn else WalletCredentials.addedOn, SortOrder.DESC
         ).filter {
@@ -44,7 +48,7 @@ object CredentialsService {
             this[WalletCredentials.disclosures] = credential.disclosures
             this[WalletCredentials.addedOn] = Clock.System.now().toJavaInstant()
             this[WalletCredentials.manifest] = credential.manifest
-            this[WalletCredentials.delete] = credential.delete
+//            this[WalletCredentials.delete] = credential.delete
         }.map { it[WalletCredentials.id] }
 
     fun delete(wallet: UUID, credentialId: String, permanent: Boolean): Boolean = (permanent.takeIf {
@@ -63,12 +67,13 @@ object CredentialsService {
 
 
     private fun getCredential(wallet: UUID, credentialId: String, includeDeleted: Boolean) = transaction {
-        WalletCredentials.select { (WalletCredentials.wallet eq wallet) and (WalletCredentials.id eq credentialId) }
-            .singleOrNull()?.let { WalletCredential(it) }?.takeIf { !it.delete || includeDeleted }
+        WalletCredentials.select {
+            (WalletCredentials.wallet eq wallet) and (WalletCredentials.id eq credentialId)
+        }.singleOrNull()?.let { WalletCredential(it) }?.takeIf { it.deletedOn == null || includeDeleted }//?.takeIf { !it.delete || includeDeleted }
     }
     private fun updateDelete(wallet: UUID, credentialId: String, value: Boolean): Int = transaction {
         WalletCredentials.update({ WalletCredentials.wallet eq wallet and (WalletCredentials.id eq credentialId) }) {
-            it[this.delete] = value
+//            it[this.delete] = value
             it[this.deletedOn] = value.takeIf { it }?.let { Instant.now() }
         }
     }

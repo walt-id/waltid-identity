@@ -13,9 +13,10 @@ object MockCategoryService : CategoryService {
 
     override fun delete(wallet: UUID, name: String) = 1
 
-    private val charPool: List<Char> = ('a'..'z') + ('A'..'Z') + ('0'..'9')
+    private val charPool: CharArray = (('a'..'z') + ('A'..'Z') + ('0'..'9')).toCharArray()
     private val listOfCategories = (1..10).map { WalletCategoryData(name = generate(Random.nextInt(4, 17))) }
-    private fun generate(length: Int) =
-        (1..length).map { Random.nextInt(0, charPool.size).let { charPool[it] } }.joinToString("")
+    private fun generate(length: Int) = buildString(length) {
+        repeat(length) { append(charPool.random()) }
+    }
 
 }

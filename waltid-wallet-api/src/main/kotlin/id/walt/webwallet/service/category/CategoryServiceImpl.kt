@@ -18,7 +18,10 @@ object CategoryServiceImpl : CategoryService {
         }
     }
 
-    override fun get(wallet: UUID, name: String): WalletCategoryData? = list(wallet).firstOrNull { it.name == name }
+    override fun get(wallet: UUID, name: String): WalletCategoryData? = transaction {
+        WalletCategory.select { WalletCategory.wallet eq wallet and (WalletCategory.name eq name) }.singleOrNull()
+            ?.let { WalletCategoryData(it) }
+    }
 
     override fun add(wallet: UUID, name: String) = transaction {
         WalletCategory.insert {
