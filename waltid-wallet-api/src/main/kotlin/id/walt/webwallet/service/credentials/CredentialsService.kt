@@ -18,12 +18,12 @@ object CredentialsService {
     fun get(wallet: UUID, credentialId: String): WalletCredential? = getCredential(wallet, credentialId, true)
 
     fun list(wallet: UUID, filter: CredentialFilterObject) = transaction {
-        WalletCredentials.innerJoin(otherTable = WalletCredentialCategoryMap,
+        WalletCredentials.leftJoin(otherTable = WalletCredentialCategoryMap,
             onColumn = { WalletCredentials.id },
             otherColumn = { WalletCredentialCategoryMap.credential },
             additionalConstraint = {
                 WalletCredentials.wallet eq wallet and (WalletCredentialCategoryMap.wallet eq wallet)
-            }).innerJoin(otherTable = WalletCategory,
+            }).leftJoin(otherTable = WalletCategory,
             onColumn = { WalletCredentialCategoryMap.category },
             otherColumn = { WalletCategory.name },
             additionalConstraint = {
