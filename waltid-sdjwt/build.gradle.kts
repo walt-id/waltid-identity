@@ -43,6 +43,44 @@ kotlin {
         }
         binaries.library()
     }
+//    val hostOs = System.getProperty("os.name")
+//    val isMingwX64 = hostOs.startsWith("Windows")
+//    val nativeTarget = when {
+//        hostOs == "Mac OS X" -> macosX64("native")
+//        hostOs == "Linux" -> linuxX64("native")
+//        isMingwX64 -> mingwX64("native")
+//        else -> throw GradleException("Host OS is not supported in Kotlin/Native.")
+//    }
+//    when(hostOs) {
+//        "Mac OS X" -> listOf (
+//            iosArm64(),
+//            iosX64(),
+//            iosSimulatorArm64()
+//        )
+//        else -> listOf()
+//    }.forEach {
+//        val platform = when (it.name) {
+//            "iosArm64" -> "iphoneos"
+//            else -> "iphonesimulator"
+//        }
+//
+//        it.binaries.framework {
+//            baseName = "shared"
+//        }
+//
+//        it.compilations.getByName("main") {
+//            cinterops.create("id.walt.sdjwt.cinterop.ios") {
+//                val interopTask = tasks[interopProcessingTaskName]
+//                interopTask.dependsOn(":waltid-sd-jwt-ios:build${platform.uppercase()}")
+//
+//                defFile("$projectDir/src/nativeInterop/cinterop/waltid-sd-jwt-ios.def")
+//                packageName("id.walt.sdjwt.cinterop.ios")
+//                includeDirs("$projectDir/waltid-sd-jwt-ios/build/Release-$platform/include/")
+//
+//                headers("$projectDir/waltid-sd-jwt-ios/build/Release-$platform/include/waltid_sd_jwt_ios/waltid_sd_jwt_ios-Swift.h")
+//            }
+//        }
+//    }
 
     val kryptoVersion = "4.0.10"
 
@@ -86,6 +124,29 @@ kotlin {
         val jsTest by getting {
 
         }
+//        val nativeMain by getting
+//        val nativeTest by getting
+
+//        if (hostOs == "Mac OS X") {
+//            val iosArm64Main by getting
+//            val iosSimulatorArm64Main by getting
+//            val iosX64Main by getting
+//            val iosMain by creating {
+//                dependsOn(commonMain)
+//                iosArm64Main.dependsOn(this)
+//                iosSimulatorArm64Main.dependsOn(this)
+//                iosX64Main.dependsOn(this)
+//            }
+//            val iosArm64Test by getting
+//            val iosSimulatorArm64Test by getting
+//            val iosX64Test by getting
+//            val iosTest by creating {
+//                dependsOn(commonTest)
+//                iosArm64Test.dependsOn(this)
+//                iosSimulatorArm64Test.dependsOn(this)
+//                iosX64Test.dependsOn(this)
+//            }
+//        }
     }
 
     publishing {
