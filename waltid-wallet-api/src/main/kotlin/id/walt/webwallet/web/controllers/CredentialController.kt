@@ -29,6 +29,16 @@ fun Application.credentials() = walletRoute {
                     example = false
                     required = false
                 }
+                queryParameter<String>("sortBy") {
+                    description = "The property to sort by"
+                    example = "tenant"
+                    required = false
+                }
+                queryParameter<Boolean>("descending") {
+                    description = "Sort descending"
+                    example = false
+                    required = false
+                }
             }
             response {
                 HttpStatusCode.OK to {
@@ -39,7 +49,18 @@ fun Application.credentials() = walletRoute {
         }) {
             val categories = call.request.queryParameters.getAll("category")
             val showDeleted = call.request.queryParameters["showDeleted"].toBoolean()
-            context.respond(getWalletService().listCredentials(CredentialFilterObject(categories, showDeleted)))
+            val sortBy = call.request.queryParameters["sortBy"] ?: "addedOn"
+            val descending = call.request.queryParameters["descending"].toBoolean()
+            context.respond(
+                getWalletService().listCredentials(
+                    CredentialFilterObject(
+                        categories = categories,
+                        showDeleted = showDeleted,
+                        sortBy = sortBy,
+                        sorDescending = descending
+                    )
+                )
+            )
         }
 
         put({

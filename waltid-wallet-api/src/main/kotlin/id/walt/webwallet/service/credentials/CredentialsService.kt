@@ -24,8 +24,10 @@ object CredentialsService {
                     uncategorizedQuery(wallet, filter.showDeleted)
                 } ?: categorizedQuery(wallet, filter.showDeleted, it)
             } ?: allQuery(wallet, filter.showDeleted)
-        }.orderBy(if (filter.showDeleted) WalletCredentials.deletedOn else WalletCredentials.addedOn, SortOrder.DESC)
-            .map { WalletCredential(it) }
+        }.orderBy(
+            column = lookupSortBy(filter.sortBy),
+            order = if (filter.sorDescending) SortOrder.DESC else SortOrder.ASC
+        ).map { WalletCredential(it) }
     }
 
     fun add(wallet: UUID, vararg credentials: WalletCredential) = addAll(wallet, credentials.toList())
@@ -102,6 +104,8 @@ object CredentialsService {
     private fun deletedCondition(deleted: Boolean) =
         deleted.takeIf { it }?.let { deletedItemsCondition } ?: notDeletedItemsCondition
 
+    private fun lookupSortBy(property: String) = WalletCredentials.addedOn
+
     object Manifest {
         fun get(wallet: UUID, credentialId: String): String? = CredentialsService.get(wallet, credentialId)?.manifest
     }
@@ -125,9 +129,11 @@ object CredentialsService {
 
 data class CredentialFilterObject(
     val categories: List<String>?,
-    val showDeleted: Boolean
+    val showDeleted: Boolean,
+    val sortBy: String,
+    val sorDescending: Boolean,
 ) {
     companion object {
-        val default = CredentialFilterObject(emptyList(), false)
+        val default = CredentialFilterObject(emptyList(), false, "", false)
     }
 }
