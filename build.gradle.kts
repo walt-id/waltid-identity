@@ -3,11 +3,15 @@ allprojects {
     version = "1.0.0-SNAPSHOT"
 
     repositories {
+        google()
         mavenCentral()
+        maven(url = "https://maven.walt.id/repository/waltid/")
+        maven(url = "https://jitpack.io")
     }
 }
 
 plugins {
+    id("com.android.application") version "8.1.2" apply false
     val kotlinVersion = "1.9.21"
     kotlin("multiplatform") version kotlinVersion apply false
     kotlin("plugin.serialization") version kotlinVersion apply false
