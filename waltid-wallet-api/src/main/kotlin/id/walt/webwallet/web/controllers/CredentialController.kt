@@ -2,7 +2,6 @@ package id.walt.webwallet.web.controllers
 
 import id.walt.web.controllers.getWalletService
 import id.walt.webwallet.db.models.WalletCredential
-import id.walt.webwallet.service.WalletService
 import id.walt.webwallet.service.credentials.CredentialFilterObject
 import io.github.smiley4.ktorswaggerui.dsl.get
 import io.github.smiley4.ktorswaggerui.dsl.post
@@ -71,41 +70,28 @@ fun Application.credentials() = walletRoute {
                 val credentialId = call.parameters.getOrFail("credentialId")
                 context.respond(getWalletService().getCredential(credentialId))
             }
-            route("delete"){
-                post("hard", {
-                    summary = "Permanently delete a credential"
-
-                    response {
-                        HttpStatusCode.Accepted to { description = "WalletCredential deleted permanently" }
-                        HttpStatusCode.BadRequest to { description = "WalletCredential could not be deleted" }
+            post("delete", {
+                summary = "Delete a credential"
+                request {
+                    queryParameter<Boolean>("permanent") {
+                        description = "Permanently delete the credential"
+                        example = false
+                        required = false
                     }
-                }) {
-                    context.respond(
-                        if (deleteCredential(
-                                getWalletService(),
-                                call.parameters,
-                                true
-                            )
-                        ) HttpStatusCode.Accepted else HttpStatusCode.BadRequest
-                    )
                 }
-                post("soft", {
-                    summary = "Temporarily delete a credential"
-
-                    response {
-                        HttpStatusCode.Accepted to { description = "WalletCredential deleted temporarily" }
-                        HttpStatusCode.BadRequest to { description = "WalletCredential could not be deleted" }
-                    }
-                }){
-                    context.respond(
-                        if (deleteCredential(
-                                getWalletService(),
-                                call.parameters,
-                                false
-                            )
-                        ) HttpStatusCode.Accepted else HttpStatusCode.BadRequest
-                    )
+                response {
+                    HttpStatusCode.Accepted to { description = "WalletCredential deleted" }
+                    HttpStatusCode.BadRequest to { description = "WalletCredential could not be deleted" }
                 }
+            }) {
+                val credentialId = call.parameters.getOrFail("credentialId")
+                val permanent = call.request.queryParameters["permanent"].toBoolean()
+                context.respond(
+                    if (getWalletService().deleteCredential(
+                            credentialId, permanent
+                        )
+                    ) HttpStatusCode.Accepted else HttpStatusCode.BadRequest
+                )
             }
             post("restore", {
                 summary = "Attempt to restore a soft delete credential"
@@ -165,9 +151,4 @@ fun Application.credentials() = walletRoute {
             }
         }
     }
-}
-
-internal suspend fun deleteCredential(service: WalletService, parameters: Parameters, permanent: Boolean): Boolean {
-    val credentialId = parameters.getOrFail("credentialId")
-    return service.deleteCredential(credentialId, permanent)
 }
