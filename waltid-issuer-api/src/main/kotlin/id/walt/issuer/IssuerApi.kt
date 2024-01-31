@@ -36,7 +36,6 @@ fun Application.issuerApi() {
                 queryParameter<String>("tse-token") { required = true }
             }
         }) {
-            println("example key transit")
             val key = TSEKey.generate(
                 KeyType.Ed25519,
                 TSEKeyMetadata(call.parameters["tse-server"]!!, call.parameters["tse-token"]!!)
