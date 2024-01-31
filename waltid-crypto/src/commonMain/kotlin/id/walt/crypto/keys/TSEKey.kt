@@ -139,7 +139,7 @@ class TSEKey(
             KeyType.secp256k1 -> throw IllegalArgumentException("Type not supported for TSE: $keyType")
         }
 
-        println(localPublicKey)
+        log.trace { localPublicKey }
 
         check(detachedPlaintext != null) { "An detached plaintext is needed." }
 
