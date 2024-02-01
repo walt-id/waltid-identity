@@ -13,7 +13,7 @@ import java.util.stream.Stream
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-class ImportKeyTests {
+class ImportLocalKeyTestsAndDidManagement {
 
     @ParameterizedTest
     @MethodSource

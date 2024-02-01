@@ -21,11 +21,13 @@ actual class LocalKey actual constructor(
     var jwk: String?
 ) : Key() {
 
+    @Transient
     private lateinit var _internalKey: KeyLike
 
     @Transient
     private lateinit var _internalJwk: JWK
 
+    @Transient
     private var jwkToInit: String? = null
 
     init {
@@ -52,12 +54,23 @@ actual class LocalKey actual constructor(
                 }
             } else {
                 _internalJwk = await(jose.exportJWK(_internalKey))
+
+                if (jwk == null) {
+                    jwk = JSON.stringify(_internalJwk)
+                }
             }
         }
 
         if (jwkToInit != null) {
             jwkToInit = null
         }
+
+        println("-- key init --")
+        println("JWK: $jwk")
+        println("jwkToInit: $jwkToInit")
+        println("_internalJwk: $_internalJwk")
+        println("_internalKey: $_internalKey")
+
     }
 
     constructor(key: KeyLike) : this(null) {
@@ -97,6 +110,7 @@ actual class LocalKey actual constructor(
      * @return signed (JWS)
      */
     actual override suspend fun signJws(plaintext: ByteArray, headers: Map<String, String>): String {
+        check(this::_internalKey.isInitialized) { "_internalKey of LocalKey.js.kt is not initialized (tried to to sign operation) - has keyInit() be called?" }
         check(hasPrivateKey) { "No private key is attached to this key!" }
 
         val headerEntries = headers.entries.toTypedArray().map { it.toPair() }.toTypedArray()
@@ -118,7 +132,11 @@ actual class LocalKey actual constructor(
      * @return Result wrapping the plaintext; Result failure when the signature fails
      */
     actual override suspend fun verifyJws(signedJws: String): Result<JsonObject> =
-        runCatching { Json.parseToJsonElement(await(jose.compactVerify(signedJws, _internalKey)).payload.toByteArray().decodeToString()).jsonObject }
+        runCatching {
+            Json.parseToJsonElement(
+                await(jose.compactVerify(signedJws, _internalKey)).payload.toByteArray().decodeToString()
+            ).jsonObject
+        }
 
     actual override suspend fun getPublicKey(): LocalKey =
         LocalKey(
