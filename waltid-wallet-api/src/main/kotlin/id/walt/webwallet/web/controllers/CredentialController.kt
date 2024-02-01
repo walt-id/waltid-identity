@@ -2,7 +2,7 @@ package id.walt.webwallet.web.controllers
 
 import id.walt.web.controllers.getWalletService
 import id.walt.webwallet.db.models.WalletCredential
-import io.github.smiley4.ktorswaggerui.dsl.delete
+import id.walt.webwallet.service.credentials.CredentialFilterObject
 import io.github.smiley4.ktorswaggerui.dsl.get
 import io.github.smiley4.ktorswaggerui.dsl.post
 import io.github.smiley4.ktorswaggerui.dsl.put
@@ -10,6 +10,7 @@ import io.github.smiley4.ktorswaggerui.dsl.route
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.response.*
+import io.ktor.server.util.*
 import kotlinx.serialization.json.JsonObject
 
 fun Application.credentials() = walletRoute {
@@ -18,6 +19,27 @@ fun Application.credentials() = walletRoute {
     }) {
         get({
             summary = "List credentials"
+            request {
+                queryParameter<List<String>>("category"){
+                    description = "list of category names"
+                    required = false
+                }
+                queryParameter<Boolean>("showDeleted"){
+                    description = "include the deleted credentials in the query result"
+                    example = false
+                    required = false
+                }
+                queryParameter<String>("sortBy") {
+                    description = "The property to sort by"
+                    example = "addedOn"
+                    required = false
+                }
+                queryParameter<Boolean>("descending") {
+                    description = "Sort descending"
+                    example = false
+                    required = false
+                }
+            }
             response {
                 HttpStatusCode.OK to {
                     description = "Array of (verifiable credentials) JSON documents"
@@ -25,7 +47,20 @@ fun Application.credentials() = walletRoute {
                 }
             }
         }) {
-            context.respond(getWalletService().listCredentials())
+            val categories = call.request.queryParameters.getAll("category")
+            val showDeleted = call.request.queryParameters["showDeleted"].toBoolean()
+            val sortBy = call.request.queryParameters["sortBy"] ?: "addedOn"
+            val descending = call.request.queryParameters["descending"].toBoolean()
+            context.respond(
+                getWalletService().listCredentials(
+                    CredentialFilterObject(
+                        categories = categories,
+                        showDeleted = showDeleted,
+                        sortBy = sortBy,
+                        sorDescending = descending
+                    )
+                )
+            )
         }
 
         put({
@@ -53,26 +88,87 @@ fun Application.credentials() = walletRoute {
                     }
                 }
             }) {
-                val credentialId =
-                    call.parameters["credentialId"] ?: throw IllegalArgumentException("No credentialId provided")
-
+                val credentialId = call.parameters.getOrFail("credentialId")
                 context.respond(getWalletService().getCredential(credentialId))
             }
-
-            post({
+            post("delete", {
                 summary = "Delete a credential"
-
+                request {
+                    queryParameter<Boolean>("permanent") {
+                        description = "Permanently delete the credential"
+                        example = false
+                        required = false
+                    }
+                }
                 response {
                     HttpStatusCode.Accepted to { description = "WalletCredential deleted" }
                     HttpStatusCode.BadRequest to { description = "WalletCredential could not be deleted" }
                 }
             }) {
-                val credentialId =
-                    call.parameters["credentialId"] ?: throw IllegalArgumentException("No credentialId provided")
+                val credentialId = call.parameters.getOrFail("credentialId")
+                val permanent = call.request.queryParameters["permanent"].toBoolean()
+                context.respond(
+                    if (getWalletService().deleteCredential(
+                            credentialId, permanent
+                        )
+                    ) HttpStatusCode.Accepted else HttpStatusCode.BadRequest
+                )
+            }
+            post("restore", {
+                summary = "Attempt to restore a soft delete credential"
+                response {
+                    HttpStatusCode.OK to {
+                        body<WalletCredential> {
+                            description =
+                                "WalletCredential in JWT (String starting with 'ey' or JSON_LD (JSON with proof) format"
+                        }
+                    }
+                    HttpStatusCode.BadRequest to { description = "WalletCredential could not be restored" }
+                }
+            }){
+                val credentialId = call.parameters.getOrFail("credentialId")
+                runCatching { getWalletService().restoreCredential(credentialId) }.onSuccess {
+                    context.respond(HttpStatusCode.OK, it)
+                }.onFailure {
+                    context.respond(HttpStatusCode.BadRequest, it.localizedMessage)
+                }
+            }
+            route("category/{category}",{
+                request {
+                    pathParameter<String>("category") {
+                        description = "the category name"
+                        example = "my-category"
+                    }
+                }
+            }){
+                post("add",{
+                    summary = "Attach category to a credential"
 
-                val success = getWalletService().deleteCredential(credentialId)
+                    response {
+                        HttpStatusCode.Created to { description = "WalletCredential category added" }
+                        HttpStatusCode.BadRequest to { description = "WalletCredential category could not be added" }
+                    }
+                }){
+                    val credentialId = call.parameters.getOrFail("credentialId")
+                    val category = call.parameters.getOrFail("category")
+                    runCatching { getWalletService().attachCategory(credentialId, category) }.onSuccess {
+                        if (it) context.respond(HttpStatusCode.Created) else context.respond(HttpStatusCode.BadRequest)
+                    }.onFailure { context.respond(HttpStatusCode.BadRequest, it.localizedMessage) }
+                }
+                post("delete",{
+                    summary = "Detach category from credential"
 
-                context.respond(if (success) HttpStatusCode.Accepted else HttpStatusCode.BadRequest)
+                    response {
+                        HttpStatusCode.Accepted to { description = "WalletCredential category deleted" }
+                        HttpStatusCode.BadRequest to { description = "WalletCredential category could not be deleted" }
+                    }
+                }){
+                    val credentialId = call.parameters.getOrFail("credentialId")
+                    val category = call.parameters.getOrFail("category")
+                    runCatching { getWalletService().detachCategory(credentialId, category) }.onSuccess {
+                        if (it) context.respond(HttpStatusCode.Accepted) else context.respond(HttpStatusCode.BadRequest)
+                    }.onFailure { context.respond(HttpStatusCode.BadRequest, it.localizedMessage) }
+                }
             }
         }
     }
