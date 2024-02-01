@@ -6,15 +6,24 @@ import id.walt.crypto.utils.ArrayUtils.toByteArray
 import id.walt.crypto.utils.JwsUtils.jwsAlg
 import id.walt.crypto.utils.PromiseUtils.await
 import jose
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import org.khronos.webgl.Uint8Array
 import kotlin.js.json
 
-actual class LocalKey actual constructor(jwk: String?) : Key() {
+@Serializable
+@SerialName("local")
+actual class LocalKey actual constructor(
+    var jwk: String?
+) : Key() {
 
     private lateinit var _internalKey: KeyLike
+
+    @Transient
     private lateinit var _internalJwk: JWK
 
     private var jwkToInit: String? = null
@@ -22,7 +31,7 @@ actual class LocalKey actual constructor(jwk: String?) : Key() {
     init {
         if (jwk != null) {
             jwkToInit = jwk
-            _internalJwk = JSON.parse(jwk)
+            _internalJwk = JSON.parse(jwk!!)
         }
     }
 
