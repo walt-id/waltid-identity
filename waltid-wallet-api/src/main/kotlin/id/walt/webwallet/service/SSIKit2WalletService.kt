@@ -103,7 +103,7 @@ class SSIKit2WalletService(
 
     override suspend fun deleteCredential(id: String, permanent: Boolean) = let {
         CredentialsService.get(walletId, id)?.run {
-            logEvent(EventType.Credential.Delete, "wallet", createCredentialEventData(this.parsedDocument, null))
+            logEvent(EventType.Credential.Delete, "wallet", createCredentialEventData(this.id, this.parsedDocument, null))
         }
         CredentialsService.delete(walletId, id, permanent)
     }
@@ -286,7 +286,7 @@ class SSIKit2WalletService(
                 logEvent(
                     EventType.Credential.Present,
                     presentationSession.presentationDefinition?.name ?: EventDataNotAvailable,
-                    createCredentialEventData(this.parsedDocument, null)
+                    createCredentialEventData(this.id, this.parsedDocument, null)
                 )
             }
         }
@@ -539,7 +539,7 @@ class SSIKit2WalletService(
                                 manifest = manifest.toString(),
 //                                delete = false,
                                 deletedOn = null,
-                            ), createCredentialEventData(credentialJwt.payload, typ)
+                            ), createCredentialEventData(credentialId, credentialJwt.payload, typ)
                         )
                     }
 
@@ -568,6 +568,7 @@ class SSIKit2WalletService(
 //                                delete = false,
                                 deletedOn = null,
                             ), createCredentialEventData(
+                                credentialId = credentialId,
                                 json = credentialJwt.payload.jsonObject,
                                 type = typ
                             )
@@ -841,7 +842,7 @@ class SSIKit2WalletService(
     )
 
     //TODO: move to related entity
-    private fun createCredentialEventData(json: JsonObject?, type: String?) = CredentialEventData(
+    private fun createCredentialEventData(credentialId: String, json: JsonObject?, type: String?) = CredentialEventData(
         ecosystem = EventDataNotAvailable,
         issuerId = json?.jsonObject?.get("issuer")?.let {
             if (it is JsonObject)
@@ -860,6 +861,7 @@ class SSIKit2WalletService(
         credentialProofType = EventDataNotAvailable,
         policies = emptyList(),
         protocol = "oid4vp",
+        credentialId = "",
     )
 
     //TODO: move to related entity
