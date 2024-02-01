@@ -1,9 +1,11 @@
 package id.walt.webwallet.service
 
 import id.walt.oid4vc.data.dif.PresentationDefinition
+import id.walt.webwallet.db.models.WalletCategoryData
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.db.models.WalletDid
 import id.walt.webwallet.db.models.WalletOperationHistory
+import id.walt.webwallet.service.credentials.CredentialFilterObject
 import id.walt.webwallet.service.dto.LinkedWalletDataTransferObject
 import id.walt.webwallet.service.dto.WalletDataTransferObject
 import id.walt.webwallet.service.events.EventLogFilter
@@ -16,10 +18,13 @@ import kotlinx.uuid.UUID
 abstract class WalletService(val tenant: String, val accountId: UUID, val walletId: UUID) {
 
     // WalletCredentials
-    abstract fun listCredentials(): List<WalletCredential>
+    abstract fun listCredentials(filter: CredentialFilterObject): List<WalletCredential>
     abstract suspend fun listRawCredentials(): List<String>
-    abstract suspend fun deleteCredential(id: String): Boolean
+    abstract suspend fun deleteCredential(id: String, permanent: Boolean): Boolean
+    abstract suspend fun restoreCredential(id: String): WalletCredential
     abstract suspend fun getCredential(credentialId: String): WalletCredential
+    abstract suspend fun attachCategory(credentialId: String, category: String): Boolean
+    abstract suspend fun detachCategory(credentialId: String, category: String): Boolean
 
     abstract fun matchCredentialsByPresentationDefinition(presentationDefinition: PresentationDefinition): List<WalletCredential>
 
@@ -67,6 +72,11 @@ abstract class WalletService(val tenant: String, val accountId: UUID, val wallet
     abstract suspend fun listIssuers(): List<IssuerDataTransferObject>
     abstract suspend fun getIssuer(name: String): IssuerDataTransferObject
     abstract fun getCredentialsByIds(credentialIds: List<String>): List<WalletCredential>
+
+    // Categories
+    abstract suspend fun listCategories(): List<WalletCategoryData>
+    abstract suspend fun addCategory(name: String): Boolean
+    abstract suspend fun deleteCategory(name: String): Boolean
 
 
     // TODO: Push

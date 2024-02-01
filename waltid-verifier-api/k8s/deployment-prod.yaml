@@ -19,6 +19,8 @@ data:
     webPort = 3000
   verifier-service.conf: |
     baseUrl = "https://verifier.portal.walt.id"
+  entra.conf: |
+    callbackUrl = "https://verifier.portal.walt.id/entra/verification-callback/"
 ---
 kind: Deployment
 apiVersion: apps/v1
@@ -38,7 +40,7 @@ spec:
     spec:
       containers:
         - name: verifier
-          image: waltid/verifier:latest
+          image: waltid/verifier-api:latest
           volumeMounts:
             - name: verifier-web-config
               mountPath: "/waltid-verifier-api/config/"

@@ -21,7 +21,9 @@ object WalletCredentials : Table("credentials") {
     val disclosures = text("disclosures").nullable()
 
     val addedOn = timestamp("added_on")
-    val manifest = text("manifest")
+    val manifest = text("manifest").nullable()
+//    val delete = bool("delete").default(false)
+    val deletedOn = timestamp("deleted_on").nullable().default(null)
 
     override val primaryKey = PrimaryKey(wallet, id)
 }
@@ -33,7 +35,9 @@ data class WalletCredential(
     val document: String,
     val disclosures: String?,
     val addedOn: Instant,
-    val manifest: String,
+    val manifest: String? = null,
+//    @Transient val delete: Boolean = false,
+    val deletedOn: Instant?,
 
     val parsedDocument: JsonObject? = parseDocument(document, id)
 ) {
@@ -82,5 +86,7 @@ data class WalletCredential(
         disclosures = result[WalletCredentials.disclosures],
         addedOn = result[WalletCredentials.addedOn].toKotlinInstant(),
         manifest = result[WalletCredentials.manifest],
+//        delete = result[WalletCredentials.delete],
+        deletedOn = result[WalletCredentials.deletedOn]?.toKotlinInstant(),
     )
 }
