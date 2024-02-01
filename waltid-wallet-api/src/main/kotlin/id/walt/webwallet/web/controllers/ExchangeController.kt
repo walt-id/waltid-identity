@@ -1,7 +1,6 @@
 package id.walt.webwallet.web.controllers
 
 import id.walt.oid4vc.data.dif.PresentationDefinition
-import id.walt.web.controllers.getWalletService
 import id.walt.webwallet.db.models.WalletOperationHistory
 import id.walt.webwallet.service.SSIKit2WalletService
 import io.github.smiley4.ktorswaggerui.dsl.post

@@ -19,10 +19,16 @@ data class EmailAccountRequest(override val name: String? = null, val email: Str
 @SerialName("address")
 data class AddressAccountRequest(override val name: String? = null, val address: String, val ecosystem: String) : AccountRequest()
 
+@Serializable
+@SerialName("oidc")
+data class OidcAccountRequest(override val name: String? = null, val token: String) : AccountRequest()
+
+
 val module = SerializersModule {
     polymorphic(AccountRequest::class) {
         EmailAccountRequest::class
         AddressAccountRequest::class
+        OidcAccountRequest::class
     }
 }
 

@@ -1,7 +1,7 @@
 package id.walt.webwallet
 
-import id.walt.web.controllers.auth
-import id.walt.web.controllers.configureSecurity
+import id.walt.webwallet.web.controllers.auth
+import id.walt.webwallet.web.controllers.configureSecurity
 import id.walt.web.controllers.issuers
 import id.walt.webwallet.config.ConfigManager
 import id.walt.webwallet.db.Db

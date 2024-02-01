@@ -8,8 +8,9 @@ import kotlinx.datetime.toJavaInstant
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.transactions.transaction
 
-object Web3WalletAccountStrategy : AccountStrategy<AddressAccountRequest> {
-    override fun register(tenant: String, request: AddressAccountRequest): Result<RegistrationResult> = runCatching {
+object Web3WalletAccountStrategy : AccountStrategy<AddressAccountRequest>("web3") {
+
+    override suspend fun register(tenant: String, request: AddressAccountRequest): Result<RegistrationResult> = runCatching {
         val name = request.name
 
         if (AccountsService.hasAccountWeb3WalletAddress(request.address)) {

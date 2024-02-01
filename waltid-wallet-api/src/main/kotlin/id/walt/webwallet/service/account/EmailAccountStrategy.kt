@@ -1,7 +1,7 @@
 package id.walt.webwallet.service.account
 
 import de.mkammerer.argon2.Argon2Factory
-import id.walt.web.controllers.ByteLoginRequest
+import id.walt.webwallet.web.controllers.ByteLoginRequest
 import id.walt.webwallet.db.models.Accounts
 import id.walt.webwallet.web.UnauthorizedException
 import id.walt.webwallet.web.model.EmailAccountRequest
@@ -14,8 +14,9 @@ import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.select
 import org.jetbrains.exposed.sql.transactions.transaction
 
-object EmailAccountStrategy : AccountStrategy<EmailAccountRequest> {
-    override fun register(tenant: String, request: EmailAccountRequest): Result<RegistrationResult> = runCatching {
+object EmailAccountStrategy : AccountStrategy<EmailAccountRequest>("email") {
+
+    override suspend fun register(tenant: String, request: EmailAccountRequest): Result<RegistrationResult> = runCatching {
         val name = request.name ?: throw IllegalArgumentException("No name provided!")
         val email = request.email
 
