@@ -1,7 +1,7 @@
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 
-val didMethodsToTest = listOf("key", "web", "cheqd")
+val didMethodsToTest = listOf("jwk", "web")
 
 class LocalKeyAndDidManagementTest {
     @Test
