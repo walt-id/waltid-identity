@@ -3,6 +3,7 @@ import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.LocalKey
 import io.ktor.utils.io.core.*
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import kotlin.test.Test
@@ -23,6 +24,7 @@ private fun getKeyTypeMap(kt: KeyType): String? {
 
 private val testObj = JsonObject(mapOf("value1" to JsonPrimitive("123456789")))
 
+@Serializable
 class KeyTest {
   
   @Test
