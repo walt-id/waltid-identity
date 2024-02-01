@@ -31,7 +31,7 @@ fun Application.credentials() = walletRoute {
                 }
                 queryParameter<String>("sortBy") {
                     description = "The property to sort by"
-                    example = "tenant"
+                    example = "addedOn"
                     required = false
                 }
                 queryParameter<Boolean>("descending") {
