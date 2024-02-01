@@ -7,15 +7,7 @@ import io.ktor.server.plugins.cors.routing.*
 import io.ktor.server.plugins.forwardedheaders.*
 
 fun Application.configureHTTP() {
-    install(Compression) {
-        gzip {
-            priority = 1.0
-        }
-        deflate {
-            priority = 10.0
-            minimumSize(1024) // condition
-        }
-    }
+    install(Compression)
     install(CORS) {
         allowHeaders { true }
         allowMethod(HttpMethod.Options)
