@@ -76,6 +76,8 @@ object Db {
         Web3Wallets,
         AccountIssuers,
         Events,
+        WalletCategory,
+        WalletCredentialCategoryMap,
     ).toTypedArray()
 
     fun recreateDatabase() {

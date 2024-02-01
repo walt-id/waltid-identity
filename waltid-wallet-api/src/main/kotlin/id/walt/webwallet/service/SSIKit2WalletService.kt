@@ -27,10 +27,17 @@ import id.walt.oid4vc.responses.BatchCredentialResponse
 import id.walt.oid4vc.responses.CredentialResponse
 import id.walt.oid4vc.responses.TokenResponse
 import id.walt.oid4vc.util.randomUUID
+import id.walt.webwallet.config.ConfigManager
+import id.walt.webwallet.config.RuntimeConfig
+import id.walt.webwallet.db.models.WalletCategoryData
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.db.models.WalletOperationHistories
 import id.walt.webwallet.db.models.WalletOperationHistory
 import id.walt.webwallet.manifest.extractor.EntraManifestExtractor
+import id.walt.webwallet.service.category.CategoryService
+import id.walt.webwallet.service.category.CategoryServiceImpl
+import id.walt.webwallet.service.category.MockCategoryService
+import id.walt.webwallet.service.credentials.CredentialFilterObject
 import id.walt.webwallet.service.credentials.CredentialsService
 import id.walt.webwallet.service.dids.DidsService
 import id.walt.webwallet.service.dto.LinkedWalletDataTransferObject
@@ -66,9 +73,12 @@ import java.net.URLDecoder
 import kotlin.time.Duration.Companion.seconds
 
 
-class SSIKit2WalletService(tenant: String, accountId: UUID, walletId: UUID) :
-    WalletService(tenant, accountId, walletId) {
-
+class SSIKit2WalletService(
+    tenant: String,
+    accountId: UUID,
+    walletId: UUID,
+    private val categoryService: CategoryService
+) : WalletService(tenant, accountId, walletId) {
     companion object {
         init {
             runBlocking {
@@ -83,25 +93,38 @@ class SSIKit2WalletService(tenant: String, accountId: UUID, walletId: UUID) :
         }
     }
 
-    override fun listCredentials(): List<WalletCredential> = CredentialsService.list(walletId)
+    override fun listCredentials(filter: CredentialFilterObject): List<WalletCredential> =
+        CredentialsService.list(walletId, filter)
 
-    override suspend fun listRawCredentials(): List<String> = CredentialsService.list(walletId).map {
-        it.document
-    }
+    override suspend fun listRawCredentials(): List<String> =
+        CredentialsService.list(walletId, CredentialFilterObject.default).map {
+            it.document
+        }
 
-    override suspend fun deleteCredential(id: String) = let {
+    override suspend fun deleteCredential(id: String, permanent: Boolean) = let {
         CredentialsService.get(walletId, id)?.run {
             logEvent(EventType.Credential.Delete, "wallet", createCredentialEventData(this.parsedDocument, null))
         }
-        transaction { CredentialsService.delete(walletId, id) }
+        CredentialsService.delete(walletId, id, permanent)
     }
+
+    override suspend fun restoreCredential(id: String): WalletCredential =
+        CredentialsService.restore(walletId, id) ?: error("Credential not found: $id")
 
     override suspend fun getCredential(credentialId: String): WalletCredential =
         CredentialsService.get(walletId, credentialId)
             ?: throw IllegalArgumentException("WalletCredential not found for credentialId: $credentialId")
 
+    override suspend fun attachCategory(credentialId: String, category: String): Boolean =
+        categoryService.get(walletId, category)?.let {// validation should be part of schema
+            CredentialsService.Category.add(walletId, credentialId, it.name) == 1
+        } ?: throw IllegalArgumentException("Category not found for wallet: $category")
+
+    override suspend fun detachCategory(credentialId: String, category: String): Boolean =
+        CredentialsService.Category.delete(walletId, credentialId, category) == 1
+
     override fun matchCredentialsByPresentationDefinition(presentationDefinition: PresentationDefinition): List<WalletCredential> {
-        val credentialList = listCredentials()
+        val credentialList = listCredentials(CredentialFilterObject.default)
 
         println("WalletCredential list is: ${credentialList.map { it.parsedDocument?.get("type")!!.jsonArray }}")
 
@@ -513,7 +536,9 @@ class SSIKit2WalletService(tenant: String, accountId: UUID, walletId: UUID) :
                                 document = credential,
                                 disclosures = null,
                                 addedOn = Clock.System.now(),
-                                manifest = manifest.toString()
+                                manifest = manifest.toString(),
+//                                delete = false,
+                                deletedOn = null,
                             ), createCredentialEventData(credentialJwt.payload, typ)
                         )
                     }
@@ -539,7 +564,9 @@ class SSIKit2WalletService(tenant: String, accountId: UUID, walletId: UUID) :
                                 document = credentialWithoutDisclosures,
                                 disclosures = disclosuresString,
                                 addedOn = Clock.System.now(),
-                                manifest = manifest?.toString()
+                                manifest = manifest?.toString(),
+//                                delete = false,
+                                deletedOn = null,
                             ), createCredentialEventData(
                                 json = credentialJwt.payload.jsonObject,
                                 type = typ
@@ -573,7 +600,8 @@ class SSIKit2WalletService(tenant: String, accountId: UUID, walletId: UUID) :
         val key = getKey(keyId)
         val options = getDidOptions(method, args)
         val result = DidService.registerByKey(method, key, options)
-        DidsService.add(
+        DidsService.
+        add(
             wallet = walletId,
             did = result.did,
             document = Json.encodeToString(result.didDocument),
@@ -777,8 +805,14 @@ class SSIKit2WalletService(tenant: String, accountId: UUID, walletId: UUID) :
 
     override fun getCredentialsByIds(credentialIds: List<String>): List<WalletCredential> {
         // todo: select by SQL
-        return listCredentials().filter { it.id in credentialIds }
+        return listCredentials(CredentialFilterObject.default).filter { it.id in credentialIds }
     }
+
+    override suspend fun listCategories(): List<WalletCategoryData> = categoryService.list(walletId)
+
+    override suspend fun addCategory(name: String): Boolean = categoryService.add(walletId, name) == 1
+
+    override suspend fun deleteCategory(name: String): Boolean = categoryService.delete(walletId, name) == 1
 
     private fun getDidOptions(method: String, args: Map<String, JsonPrimitive>) = when (method.lowercase()) {
         "key" -> DidKeyCreateOptions(
@@ -798,7 +832,7 @@ class SSIKit2WalletService(tenant: String, accountId: UUID, walletId: UUID) :
     private fun logEvent(action: EventType.Action, originator: String, data: EventData) = EventService.add(
         Event(
             action = action,
-            tenant = tenant ?: "global",
+            tenant = tenant,
             originator = originator,
             account = accountId,
             wallet = walletId,

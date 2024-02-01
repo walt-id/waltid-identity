@@ -11,12 +11,13 @@ import kotlinx.serialization.json.JsonObject
 class EntraManifestExtractor : ManifestExtractor {
 
     override suspend fun extract(offerRequestUrl: String): JsonObject =
-        JsonObject(parse(offerRequestUrl).manifest.plus(mapOf("type" to ManifestProvider.EntraManifestType.toJsonElement())))
+        JsonObject(getManifest(offerRequestUrl).plus(mapOf("type" to ManifestProvider.EntraManifestType.toJsonElement())))
 
-    private suspend fun parse(offerRequestUrl: String) =
+    private suspend fun getManifest(offerRequestUrl: String) = runCatching {
         parseQueryString(Url(offerRequestUrl).encodedQuery).toMap().let {
             AuthorizationRequest.fromHttpParametersAuto(it)
         }.let {
             EntraIssuanceRequest.fromAuthorizationRequest(it)
         }
+    }.fold(onSuccess = { it.manifest }, onFailure = { JsonObject(emptyMap()) })
 }

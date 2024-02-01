@@ -75,4 +75,5 @@ fun Application.module() {
     issuers()
     eventLogs()
     manifest()
+    categories()
 }
