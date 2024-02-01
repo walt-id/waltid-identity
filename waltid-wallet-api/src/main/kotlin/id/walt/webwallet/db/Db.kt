@@ -78,6 +78,8 @@ object Db {
         Events,
         WalletCategory,
         WalletCredentialCategoryMap,
+
+        OidcLogins
     ).toTypedArray()
 
     fun recreateDatabase() {
@@ -90,7 +92,7 @@ object Db {
 
             runBlocking {
                 AccountsService.register(request = EmailAccountRequest("Max Mustermann", "string@string.string", "string"))
-                AccountsService.register(request = EmailAccountRequest("Max Mustermann", "user@email.com", "password"))
+//                AccountsService.register(request = EmailAccountRequest("Max Mustermann", "user@email.com", "password"))
                 IssuersService.add(
                     name = "walt.id",
                     description = "walt.id issuer portal",
