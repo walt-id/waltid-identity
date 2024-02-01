@@ -64,13 +64,6 @@ actual class LocalKey actual constructor(
         if (jwkToInit != null) {
             jwkToInit = null
         }
-
-        println("-- key init --")
-        println("JWK: $jwk")
-        println("jwkToInit: $jwkToInit")
-        println("_internalJwk: $_internalJwk")
-        println("_internalKey: $_internalKey")
-
     }
 
     constructor(key: KeyLike) : this(null) {
