@@ -87,9 +87,10 @@ actual class LocalKey actual constructor(
     }
 
     actual override suspend fun exportPEM(): String {
-        //await(jose.exportSPKI())
-        //await(jose.exportPKCS8(_internalKey))
-        TODO("Not yet implemented")
+        return when {
+            hasPrivateKey -> await(jose.exportPKCS8(_internalKey))
+            else -> await(jose.exportSPKI(_internalKey))
+        }
     }
 
     actual override suspend fun signRaw(plaintext: ByteArray): ByteArray {
@@ -103,7 +104,6 @@ actual class LocalKey actual constructor(
      * @return signed (JWS)
      */
     actual override suspend fun signJws(plaintext: ByteArray, headers: Map<String, String>): String {
-        check(this::_internalKey.isInitialized) { "_internalKey of LocalKey.js.kt is not initialized (tried to to sign operation) - has init() be called on key?" }
         check(hasPrivateKey) { "No private key is attached to this key!" }
 
         val headerEntries = headers.entries.toTypedArray().map { it.toPair() }.toTypedArray()
@@ -145,6 +145,7 @@ actual class LocalKey actual constructor(
         ).apply { init() }
 
     actual override suspend fun getPublicKeyRepresentation(): ByteArray {
+
         TODO("Not yet implemented")
     }
 
@@ -182,7 +183,9 @@ actual class LocalKey actual constructor(
         }
 
     actual override val hasPrivateKey: Boolean
-        get() = _internalKey.type == "private"
+        get() = check(this::_internalKey.isInitialized) { "_internalKey of LocalKey.js.kt is not initialized (tried to to private key operation?) - has init() be called on key?" }
+            .run { _internalKey.type == "private" }
+
 
     actual override suspend fun getKeyId(): String = _internalJwk.kid ?: getThumbprint()
 
