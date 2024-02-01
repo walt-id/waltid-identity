@@ -3,10 +3,6 @@ import id.walt.crypto.keys.*
 import id.walt.did.dids.DidService
 import id.walt.did.dids.registrar.dids.DidWebCreateOptions
 import id.walt.sdjwt.SDMap
-import io.ktor.client.*
-import io.ktor.client.request.*
-import io.ktor.http.*
-import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonElement
 import kotlin.js.ExperimentalJsExport
 import kotlin.test.*
@@ -23,7 +19,6 @@ private suspend fun init(didMethodsToTest: List<String>) {
     didMethodsToTest.forEach {
         assertContains(DidService.resolverMethods.keys, it)
     }
-
 }
 
 suspend fun testDidMethodsAndKeys(methods: List<String>) {
@@ -40,7 +35,7 @@ private suspend fun testCreateSignCredential(didMethodsToTest: List<String>, key
     println("Create and Sign VC using KeyType ${keyType}...\n")
 
     didMethodsToTest.forEach {
-        if (it.equals("web")) {
+        if (it == "web") {
             // test create and sign VC with did:web
             testWeb(key)
         } else {
@@ -49,13 +44,14 @@ private suspend fun testCreateSignCredential(didMethodsToTest: List<String>, key
     }
 }
 
+@OptIn(ExperimentalJsExport::class)
 private suspend fun testDidMethod(didMethod: String, key: LocalKey) {
     if (didMethod == "cheqd" && key.keyType != KeyType.Ed25519) {
         return
     }
     println("REGISTER $didMethod, KEY $key ")
     val did = DidService.registerByKey(didMethod, key).did
-    var vc = createVC(did)
+    val vc = createVC(did)
     assertNotNull(vc)
     testIssuerDid(vc["issuer"], "did:$didMethod")
 
@@ -87,6 +83,7 @@ private fun testIssuerDid(did: JsonElement?, key: String) {
 
 }
 
+@OptIn(ExperimentalJsExport::class)
 private suspend fun testWeb(key: LocalKey) {
     val TEST_WALLET_KEY =
         "{\"kty\":\"EC\",\"d\":\"uD-uxub011cplvr5Bd6MrIPSEUBsgLk-C1y3tnmfetQ\",\"use\":\"sig\",\"crv\":\"secp256k1\",\"kid\":\"48d8a34263cf492aa7ff61b6183e8bcf\",\"x\":\"TKaQ6sCocTDsmuj9tTR996tFXpEcS2EJN-1gOadaBvk\",\"y\":\"0TrIYHcfC93VpEuvj-HXTnyKt0snayOMwGSJA1XiDX8\"}"
@@ -121,6 +118,36 @@ private suspend fun testWeb(key: LocalKey) {
     )
     assertNotNull(sdJwt)
     println("did:web (SD-JWT) SIGNATURE = $sdJwt")
+}
+
+
+suspend fun testCheqd(key: LocalKey) {
+    if (key.keyType != KeyType.Ed25519) {
+        return
+    }
+    val cheqdid = DidService.registerByKey("cheqd", key).did
+    println("\n>>>>>>>>> cheqd DID = ${cheqdid}")
+    val vc = createVC(cheqdid)
+    assertNotNull(vc)
+    testIssuerDid(vc["issuer"], "did:cheqd")
+
+    val jws = vc.signJws(
+        issuerKey = key,
+        issuerDid = cheqdid,
+        subjectDid = cheqdid
+    )
+    assertNotNull(jws)
+    println("did:cheqd (JWT) SIGNATURE = $jws")
+
+    // Sign VC with CHEQD (SD-JWT)
+    val sdJwt = vc.signSdJwt(
+        issuerKey = key,
+        issuerDid = cheqdid,
+        subjectDid = cheqdid,
+        SDMap(emptyMap()) // empty selective disclosure map, we'll test this elsewhere
+    )
+    assertNotNull(sdJwt)
+    println("did:cheqd (SD-JWT) SIGNATURE = $sdJwt")
 }
 
 private fun createVC(did: String): W3CVC {
@@ -162,3 +189,6 @@ private fun createVC(did: String): W3CVC {
         )
     )
 }
+
+
+
