@@ -82,13 +82,6 @@ class KeyTest {
     val signature = key.signRaw(testObjJson.toByteArray())
     
     assertNotNull(signature)
-    // verify the signature using public key
-    // this appears to be not yet implemented
-//    val verificationResult = key.getPublicKey().verifyRaw(signature as ByteArray)
-//    assertTrue(verificationResult.isSuccess)
-
-//    println("Verify signed object using key ${key.getPublicKey()}")
-//    assertEquals(testObj.toString().encodeToByteArray(), verificationResult.getOrThrow())
   }
   
   private suspend fun exportJwk(serializedKey: String) {
