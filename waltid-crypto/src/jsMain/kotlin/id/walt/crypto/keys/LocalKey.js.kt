@@ -37,7 +37,7 @@ actual class LocalKey actual constructor(
         }
     }
 
-    suspend fun keyInit() {
+    override suspend fun init() {
         if (!this::_internalKey.isInitialized) {
             if (jwkToInit != null) {
                 _internalKey = await(jose.importJWK(JSON.parse(jwkToInit!!)))
@@ -110,7 +110,7 @@ actual class LocalKey actual constructor(
      * @return signed (JWS)
      */
     actual override suspend fun signJws(plaintext: ByteArray, headers: Map<String, String>): String {
-        check(this::_internalKey.isInitialized) { "_internalKey of LocalKey.js.kt is not initialized (tried to to sign operation) - has keyInit() be called?" }
+        check(this::_internalKey.isInitialized) { "_internalKey of LocalKey.js.kt is not initialized (tried to to sign operation) - has init() be called on key?" }
         check(hasPrivateKey) { "No private key is attached to this key!" }
 
         val headerEntries = headers.entries.toTypedArray().map { it.toPair() }.toTypedArray()
@@ -149,7 +149,7 @@ actual class LocalKey actual constructor(
                 qi = undefined
                 k = undefined
             }
-        ).apply { keyInit() }
+        ).apply { init() }
 
     actual override suspend fun getPublicKeyRepresentation(): ByteArray {
         TODO("Not yet implemented")
