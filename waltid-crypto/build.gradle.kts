@@ -40,9 +40,12 @@ kotlin {
             }
         }*/
         nodejs {
-            generateTypeScriptDefinitions()
+            testTask {
+                useMocha()
+            }
         }
-        binaries.library()
+        generateTypeScriptDefinitions()
+        //binaries.library()
     }
 
     sourceSets {
