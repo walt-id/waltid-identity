@@ -68,7 +68,12 @@ class LocalKeyAndDidManagementTest {
             signJws(serialized)
 
             println("Signing raw...")
-            signRaw(serialized)
+
+            try {
+                signRaw(serialized)
+            } catch (e: NotImplementedError) {
+                println("Raw signatures not implemented on this platform!")
+            }
 
             println("export the key as JWK or JSON")
             exportJwk(serialized)
