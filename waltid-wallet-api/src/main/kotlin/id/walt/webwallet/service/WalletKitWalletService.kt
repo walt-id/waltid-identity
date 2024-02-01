@@ -11,6 +11,7 @@ import id.walt.webwallet.service.dto.WalletDataTransferObject
 import id.walt.webwallet.service.events.EventLogFilter
 import id.walt.webwallet.service.events.EventLogFilterResult
 import id.walt.webwallet.service.issuers.IssuerDataTransferObject
+import id.walt.webwallet.service.report.ReportRequestParameter
 import id.walt.webwallet.utils.JsonUtils.toJsonPrimitive
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -431,6 +432,10 @@ class WalletKitWalletService(tenant: String, accountId: UUID, walletId: UUID) : 
     }
 
     override suspend fun deleteCategory(name: String): Boolean {
+        TODO("Not yet implemented")
+    }
+
+    override suspend fun getFrequentCredentials(parameter: ReportRequestParameter): List<WalletCredential> {
         TODO("Not yet implemented")
     }
 }

@@ -27,16 +27,12 @@ import id.walt.oid4vc.responses.BatchCredentialResponse
 import id.walt.oid4vc.responses.CredentialResponse
 import id.walt.oid4vc.responses.TokenResponse
 import id.walt.oid4vc.util.randomUUID
-import id.walt.webwallet.config.ConfigManager
-import id.walt.webwallet.config.RuntimeConfig
 import id.walt.webwallet.db.models.WalletCategoryData
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.db.models.WalletOperationHistories
 import id.walt.webwallet.db.models.WalletOperationHistory
 import id.walt.webwallet.manifest.extractor.EntraManifestExtractor
 import id.walt.webwallet.service.category.CategoryService
-import id.walt.webwallet.service.category.CategoryServiceImpl
-import id.walt.webwallet.service.category.MockCategoryService
 import id.walt.webwallet.service.credentials.CredentialFilterObject
 import id.walt.webwallet.service.credentials.CredentialsService
 import id.walt.webwallet.service.dids.DidsService
@@ -47,6 +43,8 @@ import id.walt.webwallet.service.issuers.IssuerDataTransferObject
 import id.walt.webwallet.service.issuers.IssuersService
 import id.walt.webwallet.service.keys.KeysService
 import id.walt.webwallet.service.oidc4vc.TestCredentialWallet
+import id.walt.webwallet.service.report.ReportRequestParameter
+import id.walt.webwallet.service.report.ReportService
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.engine.cio.*
@@ -814,6 +812,8 @@ class SSIKit2WalletService(
     override suspend fun addCategory(name: String): Boolean = categoryService.add(walletId, name) == 1
 
     override suspend fun deleteCategory(name: String): Boolean = categoryService.delete(walletId, name) == 1
+    override suspend fun getFrequentCredentials(parameter: ReportRequestParameter): List<WalletCredential> =
+        ReportService.Credentials.frequent(parameter)
 
     private fun getDidOptions(method: String, args: Map<String, JsonPrimitive>) = when (method.lowercase()) {
         "key" -> DidKeyCreateOptions(
