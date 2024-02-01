@@ -18,7 +18,7 @@ import java.util.stream.Stream
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-class LocalKeyTest {
+class LocalLocalKeyAndDidManagementTest {
     private val payload = JsonObject(
         mapOf(
             "sub" to JsonPrimitive("16bb17e0-e733-4622-9384-122bc2fc6290"),
