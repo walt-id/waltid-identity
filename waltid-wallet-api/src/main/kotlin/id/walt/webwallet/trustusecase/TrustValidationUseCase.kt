@@ -1,7 +1,9 @@
 package id.walt.webwallet.trustusecase
 
+import id.walt.webwallet.db.models.WalletCredential
+
 interface TrustValidationUseCase {
-    suspend fun status(did: String, type: String, isIssuer: Boolean): TrustStatus
+    suspend fun status(credential: WalletCredential, checkIssuer: Boolean): TrustStatus
 }
 
 enum class TrustStatus {

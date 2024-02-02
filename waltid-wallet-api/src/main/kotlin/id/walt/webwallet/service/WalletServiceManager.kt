@@ -5,6 +5,8 @@ import id.walt.webwallet.config.TrustConfig
 import id.walt.webwallet.db.models.AccountWalletMappings
 import id.walt.webwallet.db.models.AccountWalletPermissions
 import id.walt.webwallet.db.models.Wallets
+import id.walt.webwallet.seeker.EntraCredentialTypeSeeker
+import id.walt.webwallet.seeker.EntraDidSeeker
 import id.walt.webwallet.service.account.AccountsService
 import id.walt.webwallet.service.category.CategoryServiceImpl
 import id.walt.webwallet.service.nft.NftKitNftService
@@ -29,7 +31,9 @@ object WalletServiceManager {
     private val entraIssuerTrustConfig = ConfigManager.getConfig<TrustConfig>().entra?.issuer
     private val entraTrustValidationUseCase = TrustValidationUseCaseImpl(
         issuerTrustValidationService = EntraIssuerTrustValidationService(http, entraIssuerTrustConfig),
-        verifierTrustValidationService = EntraVerifierTrustValidationService(http)
+        verifierTrustValidationService = EntraVerifierTrustValidationService(http),
+        didSeeker = EntraDidSeeker(),
+        credentialTypeSeeker = EntraCredentialTypeSeeker(),
     )
 
     fun getWalletService(tenant: String, account: UUID, wallet: UUID): WalletService =
@@ -80,9 +84,15 @@ object WalletServiceManager {
         return walletId
     }
 
-    @Deprecated(replaceWith = ReplaceWith("AccountsService.getAccountWalletMappings(account)", "id.walt.service.account.AccountsService"), message = "depreacted")
+    @Deprecated(
+        replaceWith = ReplaceWith(
+            "AccountsService.getAccountWalletMappings(account)",
+            "id.walt.service.account.AccountsService"
+        ), message = "depreacted"
+    )
     fun listWallets(tenant: String, account: UUID): List<UUID> =
-        AccountWalletMappings.innerJoin(Wallets).select { (AccountWalletMappings.tenant eq tenant) and (AccountWalletMappings.accountId eq account) }.map {
+        AccountWalletMappings.innerJoin(Wallets)
+            .select { (AccountWalletMappings.tenant eq tenant) and (AccountWalletMappings.accountId eq account) }.map {
             it[Wallets.id].value
         }
 
