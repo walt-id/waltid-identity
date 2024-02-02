@@ -98,13 +98,13 @@ fun Application.configureSecurity() {
                     accessTokenUrl =
                     "http://localhost:8080/realms/waltid-keycloak-ktor/protocol/openid-connect/token",
                     clientId = "waltid_backend",
-                    clientSecret = "5FXJ9IxtMTHWfGUDDU8LGZXaWEu3Qqnk",
+                    clientSecret = "uYTjPRcqo9wTguXH80MBD2Uaklc3Xnab",
                     accessTokenRequiresBasicAuth = false,
                     requestMethod = HttpMethod.Post,
                     defaultScopes = listOf("roles")
                 )
             }
-            urlProvider = { "https://dev.local/wallet-api/auth/oidc-session" }
+            urlProvider = { "http://localhost:4545/wallet-api/auth/oidc-session" }
         }
 
         jwt("auth-oauth-jwt") {
@@ -193,7 +193,7 @@ fun Application.auth() {
 
                         call.sessions.set(OidcTokenSession(principal.accessToken))
 
-                        call.respondRedirect("/login?oidc_login=true")
+                        call.respondRedirect("http://localhost:3000/login?oidc_login=true")
                     }
                 }
             }
@@ -318,7 +318,7 @@ fun Application.auth() {
                     call.sessions.clear<LoginTokenSession>()
 
                     call.respond(HttpStatusCode.OK)
-                    //call.respondRedirect("http://localhost:8080/realms/waltid-keycloak-ktor/protocol/openid-connect/logout?post_logout_redirect_uri=https://dev.local&client_id=waltid_backend")
+                    //call.respondRedirect("http://localhost:8080/realms/waltid-keycloak-ktor/protocol/openid-connect/logout?post_logout_redirect_uri=http://localhost:3000&client_id=waltid_backend")
                 } else {
                     call.respond(HttpStatusCode.OK)
                 }

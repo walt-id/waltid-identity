@@ -34,6 +34,6 @@ export async function logout() {
     if (!userWasOidc) {
         await signOut({ callbackUrl: "/login" }).then((x) => {});
     } else {
-        await signOut({ callbackUrl: "http://localhost:8080/realms/waltid-keycloak-ktor/protocol/openid-connect/logout?post_logout_redirect_uri=https://dev.local&client_id=waltid_backend", external: true })
+        await signOut({ callbackUrl: "http://localhost:8080/realms/waltid-keycloak-ktor/protocol/openid-connect/logout?post_logout_redirect_uri=http://localhost:3000&client_id=waltid_backend", external: true })
     }
 }
