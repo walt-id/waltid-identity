@@ -1,19 +1,39 @@
 package id.walt.webwallet.service.report
 
+import id.walt.webwallet.db.models.Events
 import id.walt.webwallet.db.models.WalletCredential
+import id.walt.webwallet.service.credentials.CredentialsService
+import id.walt.webwallet.service.events.EventType
 import kotlinx.uuid.UUID
+import org.jetbrains.exposed.sql.SortOrder
+import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.sql.count
+import org.jetbrains.exposed.sql.select
+import org.jetbrains.exposed.sql.transactions.transaction
 
 interface ReportService<T> {
     fun frequent(parameter: ReportRequestParameter): List<T>
 
     object Credentials : ReportService<WalletCredential> {
+
         override fun frequent(parameter: ReportRequestParameter): List<WalletCredential> =
-            (parameter as? CredentialReportRequestParameter)?.let {
-                val limit = it.limit
-                val walletId = it.walletId
-                val credentialId = it.credentialId
-                TODO()
+            (parameter as? CredentialReportRequestParameter)?.let { param ->
+                frequent(param.walletId, EventType.Credential.Present, param.limit).mapNotNull {
+                    //inefficient
+                    it?.let { CredentialsService.get(param.walletId, it) }
+                }
             } ?: emptyList()
+
+        private fun frequent(walletId: UUID, action: EventType.Action, limit: Int) = transaction {
+            Events.slice(Events.credentialId)
+                .select { Events.wallet eq walletId and (Events.event eq action.type) and (Events.action eq action.toString()) }
+                .groupBy(Events.credentialId)
+                .having { Events.credentialId neq null }
+                .orderBy(Events.credentialId.count(), SortOrder.DESC)
+                .limit(limit).map {
+                    it[Events.credentialId]
+                }
+        }
     }
 }
 
@@ -23,7 +43,6 @@ abstract class ReportRequestParameter(
 )
 
 data class CredentialReportRequestParameter(
-    override val limit: Int,
     override val walletId: UUID,
-    val credentialId: String,
+    override val limit: Int
 ) : ReportRequestParameter(walletId, limit)
