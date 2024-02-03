@@ -48,11 +48,11 @@ android {
 }
 
 dependencies {
-    implementation("id.walt.crypto:waltid-crypto:1.0.1")
-    implementation("id.walt.did:waltid-did:1.0.1")
-    implementation("id.walt.credentials:waltid-verifiable-credentials:1.0.1")
-    implementation("id.walt:waltid-openid4vc:1.0.1")
-    implementation("id.walt:waltid-sdjwt:1.0.1")
+    api(project(":waltid-crypto"))
+//    implementation(":wal")
+//    implementation("id.walt.credentials:waltid-verifiable-credentials:1.0.1")
+//    implementation("id.walt:waltid-openid4vc:1.0.1")
+//    implementation("id.walt:waltid-sdjwt:1.0.1")
 
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.2")
 
