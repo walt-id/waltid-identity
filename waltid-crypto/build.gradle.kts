@@ -23,7 +23,13 @@ kotlin {
 }
 
 kotlin {
-    androidTarget()
+    androidTarget {
+        compilations.all {
+            kotlinOptions {
+                jvmTarget = "1.8"
+            }
+        }
+    }
 
     jvm {
         compilations.all {
@@ -51,6 +57,12 @@ kotlin {
         val androidMain by getting {
             dependencies {
                 
+            }
+        }
+        val androidUnitTest by getting {
+            dependencies {
+                implementation(kotlin("test-junit"))
+                implementation("junit:junit:4.13.2")
             }
         }
         val commonMain by getting {
@@ -156,9 +168,14 @@ kotlin {
 }
 
 android {
-    namespace = "id.walt.waltid-crypto"
-    compileSdk = 33
+    compileSdk = 34
+    sourceSets["main"].manifest.srcFile("src/androidMain/AndroidManifest.xml")
     defaultConfig {
         minSdk = 28
+    }
+    namespace = "id.walt.waltid_crypto"
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_1_8
+        targetCompatibility = JavaVersion.VERSION_1_8
     }
 }
