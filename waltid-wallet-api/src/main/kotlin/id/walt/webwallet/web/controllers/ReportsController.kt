@@ -1,11 +1,14 @@
 package id.walt.webwallet.web.controllers
 
+import id.walt.web.controllers.getWalletId
 import id.walt.web.controllers.getWalletService
 import id.walt.webwallet.db.models.WalletCredential
+import id.walt.webwallet.service.report.CredentialReportRequestParameter
 import io.github.smiley4.ktorswaggerui.dsl.get
 import io.github.smiley4.ktorswaggerui.dsl.route
 import io.ktor.http.*
 import io.ktor.server.application.*
+import io.ktor.server.response.*
 
 fun Application.reports() = walletRoute {
     route("reports", {
@@ -31,8 +34,13 @@ fun Application.reports() = walletRoute {
                 }
             }) {
                 val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: -1
-                getWalletService()
-                //todo
+                context.respond(
+                    getWalletService().getFrequentCredentials(
+                        CredentialReportRequestParameter(
+                            walletId = getWalletId(), limit = limit
+                        )
+                    )
+                )
             }
         }
     }
