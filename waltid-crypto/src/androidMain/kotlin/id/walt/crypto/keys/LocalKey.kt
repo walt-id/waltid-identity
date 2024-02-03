@@ -1,25 +1,27 @@
 package id.walt.crypto.keys
 
+import id.walt.crypto.keys.AndroidLocalKeyGenerator.TRANSFORMATION
 import kotlinx.serialization.json.JsonObject
+import java.security.KeyStore
+import javax.crypto.Cipher
+import javax.crypto.SecretKey
 
 actual class LocalKey actual constructor(jwk: String?) : Key() {
 
-    /*
-    /**
-     * Encrypts as JWE: Encrypts a message using this public key (with the algorithm this key is based on)
-     * @exception IllegalArgumentException when this is not a private key, when this algorithm does not support encryption
-     * @param plaintext data to be encrypted
-     * @return encrypted (JWE)
-     */
-    override suspend fun encrypt(plaintext: ByteArray): String
+    override val keyType: KeyType
+        get() = TODO("Not yet implemented")
 
-    /**
-     * Decrypts JWE: Decrypts an encrypted message using this private key
-     * @param encrypted encrypted
-     * @return Result wrapping the plaintext; Result failure when the decryption fails
-     */
-    override suspend fun decrypt(encrypted: ByteArray): Result<ByteArray>
-     */
+    actual override val hasPrivateKey: Boolean
+        get() = TODO("Not yet implemented")
+
+    private val encryptCipher get() = Cipher.getInstance(TRANSFORMATION).apply {
+        init(Cipher.ENCRYPT_MODE, getKey())
+    }
+
+    private val keyStore = KeyStore.getInstance("AndroidKeyStore").apply {
+        load(null)
+    }
+
     actual override suspend fun getKeyId(): String {
         TODO("Not yet implemented")
     }
@@ -47,7 +49,7 @@ actual class LocalKey actual constructor(jwk: String?) : Key() {
      * @return signed (JWS)
      */
     actual override suspend fun signRaw(plaintext: ByteArray): ByteArray {
-        TODO("Not yet implemented")
+        return encryptCipher.doFinal(plaintext)
     }
 
     actual override suspend fun signJws(plaintext: ByteArray, headers: Map<String, String>): String {
@@ -75,20 +77,20 @@ actual class LocalKey actual constructor(jwk: String?) : Key() {
         TODO("Not yet implemented")
     }
 
-    override val keyType: KeyType
-        get() = TODO("Not yet implemented")
-
-    actual override val hasPrivateKey: Boolean
-        get() = TODO("Not yet implemented")
+    private fun getKey(): SecretKey {
+        val existingKey = keyStore.getEntry(AndroidLocalKeyGenerator.KEY_ALIAS, null) as? KeyStore.SecretKeyEntry
+        val secretKey = existingKey?.secretKey
+        println("key - $existingKey")
+        println("secret key - $secretKey")
+        checkNotNull(secretKey) { "No key exists in KeyStore" }
+        return secretKey
+    }
 
     actual companion object : LocalKeyCreator {
         actual override suspend fun generate(
             type: KeyType,
             metadata: LocalKeyMetadata
-        ): LocalKey {
-            println("ANDROID IMPL")
-            TODO("Not yet implemented")
-        }
+        ): LocalKey = AndroidLocalKeyGenerator.generate(type, metadata)
 
         actual override suspend fun importRawPublicKey(
             type: KeyType,

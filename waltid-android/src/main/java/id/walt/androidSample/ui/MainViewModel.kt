@@ -53,17 +53,11 @@ interface MainViewModel {
 
         private var localKey: LocalKey? = null
 
-        init {
-            viewModelScope.launch {
-                localKey = LocalKey.generate(KeyType.RSA, LocalKeyMetadata())
-            }
-        }
-
         override fun onEncrypt(plainText: String) {
             viewModelScope.launch {
                 val localKey = LocalKey.generate(KeyType.RSA, LocalKeyMetadata())
-                val signedContent = localKey.signJws(plainText.toByteArray())
-                encryptedText.value = signedContent
+                val signedContent = localKey.signRaw(plainText.toByteArray())
+                encryptedText.value = signedContent.contentToString()
             }
         }
 
