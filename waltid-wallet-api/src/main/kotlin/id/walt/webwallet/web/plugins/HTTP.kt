@@ -5,7 +5,6 @@ import io.ktor.server.application.*
 import io.ktor.server.plugins.compression.*
 import io.ktor.server.plugins.cors.routing.*
 import io.ktor.server.plugins.forwardedheaders.*
-import io.ktor.server.plugins.methodoverride.*
 
 fun Application.configureHTTP() {
     install(Compression) {
@@ -19,6 +18,8 @@ fun Application.configureHTTP() {
     }
     install(CORS) {
         allowMethod(HttpMethod.Options)
+        allowMethod(HttpMethod.Put)
+        allowMethod(HttpMethod.Delete)
         allowNonSimpleContentTypes = true
         allowCredentials = true
 
@@ -29,5 +30,4 @@ fun Application.configureHTTP() {
     }
     install(ForwardedHeaders) // WARNING: for security, do not include this if not behind a reverse proxy
     install(XForwardedHeaders) // WARNING: for security, do not include this if not behind a reverse proxy
-    install(XHttpMethodOverride)
 }

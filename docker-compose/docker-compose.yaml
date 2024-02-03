@@ -35,7 +35,7 @@ services:
     platform: linux/x86_64
     image: waltid/vc-repository:latest
   ingress:
-    image: nginx:1.15.10-alpine
+    image: nginx:1.25.3-alpine
     ports:
       - target: $WALLET_FRONTEND_PORT
         published: $WALLET_FRONTEND_PORT # waltid-web-wallet

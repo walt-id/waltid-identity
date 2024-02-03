@@ -67,7 +67,6 @@ dependencies {
     implementation("io.ktor:ktor-server-call-id-jvm:$ktorVersion")
     implementation("io.ktor:ktor-server-content-negotiation-jvm:$ktorVersion")
     implementation("io.ktor:ktor-server-cio-jvm:$ktorVersion")
-    implementation("io.ktor:ktor-server-method-override:$ktorVersion")
 
     // Ktor server external libs
     implementation("io.github.smiley4:ktor-swagger-ui:2.7.4")
