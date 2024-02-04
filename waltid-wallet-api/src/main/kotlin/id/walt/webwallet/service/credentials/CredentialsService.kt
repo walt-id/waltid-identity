@@ -17,6 +17,12 @@ object CredentialsService {
     private val deletedItemsCondition = Op.build { WalletCredentials.deletedOn neq null }
     fun get(wallet: UUID, credentialId: String): WalletCredential? = getCredential(wallet, credentialId, true)
 
+    fun get(wallet: UUID, credentialIdList: List<String>): List<WalletCredential> = transaction {
+        WalletCredentials.select { WalletCredentials.wallet eq wallet and (WalletCredentials.id inList credentialIdList) }
+    }.map {
+        WalletCredential(it)
+    }
+
     fun list(wallet: UUID, filter: CredentialFilterObject) = transaction {
         let {
             filter.categories?.let {
@@ -60,7 +66,8 @@ object CredentialsService {
     private fun getCredential(wallet: UUID, credentialId: String, includeDeleted: Boolean) = transaction {
         WalletCredentials.select {
             (WalletCredentials.wallet eq wallet) and (WalletCredentials.id eq credentialId)
-        }.singleOrNull()?.let { WalletCredential(it) }
+        }.having { notDeletedItemsCondition or (includeDeleted.takeIf { it }?.let { Op.TRUE } ?: Op.FALSE) }
+            .singleOrNull()?.let { WalletCredential(it) }
             ?.takeIf { it.deletedOn == null || includeDeleted }//?.takeIf { !it.delete || includeDeleted }
     }
 
