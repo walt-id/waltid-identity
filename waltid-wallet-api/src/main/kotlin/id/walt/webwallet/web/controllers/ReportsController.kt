@@ -15,7 +15,7 @@ fun Application.reports() = walletRoute {
         tags = listOf("WalletReports")
     }){
         route("frequent", {
-            summary = "List most frequent"
+            summary = "List most frequently used"
             request {
                 queryParameter<Int>("limit") {
                     description = "The max number of items to return"
@@ -23,8 +23,8 @@ fun Application.reports() = walletRoute {
                 }
             }
         }){
-            get({
-                summary = "View a credential"
+            get("credentials", {
+                summary = "Credentials"
                 response {
                     HttpStatusCode.OK to {
                         body<List<WalletCredential>> {
