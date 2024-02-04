@@ -1,6 +1,7 @@
 package id.walt.webwallet.service.account
 
-import id.walt.web.controllers.generateToken
+import id.walt.webwallet.config.ConfigManager
+import id.walt.webwallet.config.LoginMethodsConfig
 import id.walt.webwallet.db.models.*
 import id.walt.webwallet.db.models.todo.AccountIssuers
 import id.walt.webwallet.db.models.todo.Issuers
@@ -9,9 +10,11 @@ import id.walt.webwallet.service.events.AccountEventData
 import id.walt.webwallet.service.events.Event
 import id.walt.webwallet.service.events.EventService
 import id.walt.webwallet.service.events.EventType
+import id.walt.webwallet.web.controllers.generateToken
 import id.walt.webwallet.web.model.AccountRequest
 import id.walt.webwallet.web.model.AddressAccountRequest
 import id.walt.webwallet.web.model.EmailAccountRequest
+import id.walt.webwallet.web.model.OidcAccountRequest
 import kotlinx.datetime.toKotlinInstant
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonPrimitive
@@ -24,9 +27,15 @@ import org.jetbrains.exposed.sql.transactions.transaction
 
 object AccountsService {
 
+    fun registerAuthenticationMethods() {
+        val loginMethods = ConfigManager.getConfig<LoginMethodsConfig>().enabledLoginMethods
+
+    }
+
     suspend fun register(tenant: String = "", request: AccountRequest): Result<RegistrationResult> = when (request) {
         is EmailAccountRequest -> EmailAccountStrategy.register(tenant, request)
         is AddressAccountRequest -> Web3WalletAccountStrategy.register(tenant, request)
+        is OidcAccountRequest -> OidcAccountStrategy.register(tenant, request)
     }.onSuccess { registrationResult ->
         val registeredUserId = registrationResult.id
 
@@ -73,6 +82,7 @@ object AccountsService {
         when (request) {
             is EmailAccountRequest -> EmailAccountStrategy.authenticate(tenant, request)
             is AddressAccountRequest -> Web3WalletAccountStrategy.authenticate(tenant, request)
+            is OidcAccountRequest -> OidcAccountStrategy.authenticate(tenant, request)
         }
     }.fold(onSuccess = {
         EventService.add(
@@ -113,13 +123,22 @@ object AccountsService {
         )
 
 
-    fun hasAccountEmail(tenant: String, email: String) = transaction { Accounts.select { (Accounts.tenant eq tenant) and (Accounts.email eq email) }.count() > 0 }
-    fun hasAccountWeb3WalletAddress(address: String) =
-        transaction {
-            Accounts.innerJoin(Web3Wallets)
-                .select { Web3Wallets.address eq address }
-                .count() > 0
-        }
+    fun hasAccountEmail(tenant: String, email: String) =
+        transaction { Accounts.select { (Accounts.tenant eq tenant) and (Accounts.email eq email) }.count() > 0 }
+
+    fun hasAccountWeb3WalletAddress(address: String) = transaction {
+        Accounts.innerJoin(Web3Wallets)
+            .select { Web3Wallets.address eq address }
+            .count() > 0
+    }
+
+
+    fun hasAccountOidcId(oidcId: String): Boolean = transaction {
+        Accounts.crossJoin(OidcLogins) // TODO crossJoin
+            .select { (Accounts.tenant eq OidcLogins.tenant) and (Accounts.id eq OidcLogins.accountId) and (OidcLogins.oidcId eq oidcId) }
+            .count() > 0
+    }
+
 
     fun getAccountByWeb3WalletAddress(address: String) =
         transaction {
@@ -128,7 +147,16 @@ object AccountsService {
                 .map { Account(it) }
         }
 
+    fun getAccountByOidcId(oidcId: String) =
+        transaction {
+            Accounts.crossJoin(OidcLogins) // TODO crossJoin
+                .select { (Accounts.tenant eq OidcLogins.tenant) and (Accounts.id eq OidcLogins.accountId) and (OidcLogins.oidcId eq oidcId) }
+                .map { Account(it) }
+                .firstOrNull()
+        }
+
     fun getNameFor(account: UUID) = Accounts.select { Accounts.id eq account }.single()[Accounts.email]
+
 }
 
 @Serializable
@@ -148,7 +176,7 @@ data class AuthenticatedUser(
     val username: String
 )
 
-interface AccountStrategy<in T : AccountRequest> {
-    fun register(tenant: String, request: T): Result<RegistrationResult>
-    suspend fun authenticate(tenant: String, request: T): AuthenticatedUser
+abstract class AccountStrategy<in T : AccountRequest>(id: String) {
+    abstract suspend fun register(tenant: String, request: T): Result<RegistrationResult>
+    abstract suspend fun authenticate(tenant: String, request: T): AuthenticatedUser
 }

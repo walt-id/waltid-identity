@@ -73,6 +73,9 @@ object ConfigManager {
         registerConfig(ConfigData("marketplace", MarketPlaceConfiguration::class))
         registerConfig(ConfigData("chainexplorer", ChainExplorerConfiguration::class))
         registerConfig(ConfigData("runtime", RuntimeConfig::class))
+
+        registerConfig(ConfigData("oidc", OidcConfiguration::class))
+        registerConfig(ConfigData("logins", LoginMethodsConfig::class))
     }
 
     fun loadConfigs(args: Array<String>) {

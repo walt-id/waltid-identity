@@ -1,6 +1,5 @@
 package id.walt.webwallet.web.controllers
 
-import id.walt.web.controllers.getNftService
 import id.walt.webwallet.service.dto.*
 import id.walt.webwallet.service.nft.fetchers.parameters.*
 import io.github.smiley4.ktorswaggerui.dsl.get
