@@ -23,7 +23,7 @@ object CredentialsService {
      * @return [WalletCredential] or null, it not found
      */
     fun get(wallet: UUID, credentialId: String): WalletCredential? =
-        transaction { getCredentialsQuery(wallet, true, credentialId) }.singleOrNull()?.let { WalletCredential(it) }
+        transaction { getCredentialsQuery(wallet, true, credentialId).singleOrNull()?.let { WalletCredential(it) } }
 
     /**
      * Returns a list of credentials identifier by the [credentialIdList]
@@ -32,9 +32,9 @@ object CredentialsService {
      * @return list of [WalletCredential] that could match the specified [credentialIdList]
      */
     fun get(wallet: UUID, credentialIdList: List<String>): List<WalletCredential> = transaction {
-        getCredentialsQuery(wallet, true, *credentialIdList.toTypedArray())
-    }.map {
-        WalletCredential(it)
+        getCredentialsQuery(wallet, true, *credentialIdList.toTypedArray()).map {
+            WalletCredential(it)
+        }
     }
 
     /**
@@ -91,7 +91,7 @@ object CredentialsService {
         TO-DO
     }*/
 
-    private fun addAll(wallet: UUID, credentials: List<WalletCredential>): List<String> =
+    private fun addAll(wallet: UUID, credentials: List<WalletCredential>): List<String> = transaction {
         WalletCredentials.batchInsert(credentials) { credential: WalletCredential ->
             this[WalletCredentials.wallet] = wallet
             this[WalletCredentials.id] = credential.id
@@ -101,11 +101,13 @@ object CredentialsService {
             this[WalletCredentials.manifest] = credential.manifest
 //            this[WalletCredentials.delete] = credential.delete
         }.map { it[WalletCredentials.id] }
+    }
 
     private fun getCredentialsQuery(wallet: UUID, includeDeleted: Boolean, vararg credentialId: String) =
         WalletCredentials.select {
-            (WalletCredentials.wallet eq wallet) and (WalletCredentials.id inList credentialId.toList())
-        }.having { notDeletedItemsCondition or (includeDeleted.takeIf { it }?.let { Op.TRUE } ?: Op.FALSE) }
+            (WalletCredentials.wallet eq wallet) and (WalletCredentials.id inList credentialId.toList() and (notDeletedItemsCondition or (includeDeleted.takeIf { it }
+                ?.let { Op.TRUE } ?: Op.FALSE)))
+        }
 
     private fun updateDelete(wallet: UUID, credentialId: String, value: Boolean): Int = transaction {
         WalletCredentials.update({ WalletCredentials.wallet eq wallet and (WalletCredentials.id eq credentialId) }) {
