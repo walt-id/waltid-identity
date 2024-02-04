@@ -3,34 +3,58 @@
         <div class="flex flex-1 flex-col justify-center px-4 py-12 sm:px-6 lg:flex-none lg:px-20 xl:px-24 lg:bg-white lg:bg-opacity-50">
             <div class="mx-auto w-full max-w-sm lg:w-96 p-3 lg:backdrop-blur-md lg:rounded-3xl lg:shadow lg:bg-neutral-100 lg:bg-opacity-40">
                 <div class="">
-                    <img alt="walt.id logo" class="h-24 lg:h-16 w-auto mx-auto mt-2" :src="logoImg" />
-                    <h2 v-if="name?.includes('NEOM')" class="mt-4 text-3xl font-bold tracking-tight text-gray-800 text-center" style="direction: rtl;">تسجيل الدخول إلى محفظة SSI</h2> <!-- TODO: i18n system -->
-                    <h2 v-else class="mt-4 text-3xl font-bold tracking-tight text-gray-800">Sign in to your SSI wallet</h2>
-                    <p class="mt-2 text-sm text-gray-600">
+                    <img :src="logoImg" alt="walt.id logo" class="h-24 lg:h-16 w-auto mx-auto mt-2" />
+                    <!-- TODO: i18n system -->
+                    <h2 class="mt-4 text-3xl font-bold tracking-tight text-gray-800">Sign in to your SSI wallet</h2>
+                    <p v-if="!isOidcLogin" class="mt-2 text-sm text-gray-600">
                         Or {{ " " }}
-                        <NuxtLink class="font-medium text-blue-600 hover:text-blue-500" to="/signup">sign up for your SSI wallet</NuxtLink>!
+                        <NuxtLink class="font-medium text-blue-600 hover:text-blue-500" to="/signup">sign up for your SSI wallet</NuxtLink>
+                        !
+                    </p>
+                    <p v-if="isOidcLogin" class="flex items-center">
+                        <LoadingIndicator> OIDC Login processing... </LoadingIndicator>
                     </p>
                 </div>
 
-                <div class="mt-8">
+                <div v-if="!isOidcLogin" class="mt-5">
                     <div>
                         <!-- open modal for all 'connect with' chains -->
-                        <div class="w-full inline-flex justify-center">
-                            <button
-                                class="relative inline-flex items-center justify-center p-4 px-6 py-3 overflow-hidden font-medium text-blue-600 transition duration-300 ease-out border-2 border-blue-600 rounded-full shadow-md group"
-                                @click="openWeb3()"
-                            >
-                                <span class="absolute inset-0 flex items-center justify-center w-full h-full text-white duration-300 -translate-x-full bg-blue-600 group-hover:translate-x-0 ease">
-                                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                        <path d="M14 5l7 7m0 0l-7 7m7-7H3" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
-                                    </svg>
-                                </span>
-                                <span class="absolute flex items-center justify-center w-full h-full text-blue-600 transition-all duration-300 transform group-hover:translate-x-full ease">
-                                    Connect with web3
-                                </span>
-                                <span class="relative invisible">Connect with web3</span>
-                            </button>
+                        <div class="flex h-14 gap-5 mx-1">
+                            <div class="w-full inline-flex justify-center">
+                                <button
+                                    class="relative inline-flex items-center justify-center p-4 px-6 py-3 overflow-hidden font-medium text-blue-600 transition duration-300 ease-out border-2 border-blue-600 rounded-full shadow-md group"
+                                    @click="openWeb3()"
+                                >
+                                    <span class="absolute inset-0 flex items-center justify-center w-full h-full text-white duration-300 -translate-x-full bg-blue-600 group-hover:translate-x-0 ease">
+                                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                            <path d="M14 5l7 7m0 0l-7 7m7-7H3" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+                                        </svg>
+                                    </span>
+                                    <span class="absolute flex items-center justify-center w-full h-full text-blue-600 transition-all duration-300 transform group-hover:translate-x-full ease">
+                                        Connect with web3
+                                    </span>
+                                    <span class="relative invisible">Connect with web3</span>
+                                </button>
+                            </div>
+
+                            <div class="w-full inline-flex justify-center">
+                                <button
+                                    class="relative inline-flex items-center justify-center p-4 px-6 py-3 overflow-hidden font-medium text-blue-600 transition duration-300 ease-out border-2 border-blue-600 rounded-full shadow-md group"
+                                    @click="connectOidc()"
+                                >
+                                    <span class="absolute inset-0 flex items-center justify-center w-full h-full text-white duration-300 -translate-x-full bg-blue-600 group-hover:translate-x-0 ease">
+                                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                            <path d="M14 5l7 7m0 0l-7 7m7-7H3" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+                                        </svg>
+                                    </span>
+                                    <span class="absolute flex items-center justify-center w-full h-full text-blue-600 transition-all duration-300 transform group-hover:translate-x-full ease">
+                                        Connect with OIDC
+                                    </span>
+                                    <span class="relative invisible">Connect with OIDC</span>
+                                </button>
+                            </div>
                         </div>
+
                         <div class="relative mt-6">
                             <div aria-hidden="true" class="absolute inset-0 flex items-center">
                                 <div class="w-full border-t border-gray-300" />
@@ -129,7 +153,7 @@
             </div>
         </div>
         <div class="overflow-hidden max-h-screen absolute left-0 w-full h-full -z-10 hidden lg:block">
-            <img ref="container" :class="[isLoggingIn ? 'zoom-in' : 'zoom-out']" alt="" class="absolute inset-0 h-full w-full object-cover hidden lg:block -z-10" :src="bgImg" />
+            <img ref="container" :class="[isLoggingIn ? 'zoom-in' : 'zoom-out']" :src="bgImg" alt="" class="absolute inset-0 h-full w-full object-cover hidden lg:block -z-10" />
             <!-- src="https://images.unsplash.com/photo-1529144415895-6aaf8be872fb?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1980&q=80"/> -->
 
             <!--<div class="relative hidden w-0 flex-1 lg:block">-->
@@ -214,14 +238,16 @@ import useModalStore from "~/stores/useModalStore";
 import { useUserStore } from "~/stores/user";
 import { storeToRefs } from "pinia";
 import { useTenant } from "~/composables/tenants";
+import {CRYPTO_JWT_TTL} from "@walletconnect/core";
+import {decodeJWT} from "@walletconnect/relay-auth";
 
 const store = useModalStore();
 
-const tenant = await (useTenant()).value
-const bgImg = tenant?.bgImage
-const name = tenant?.name
-const logoImg = tenant?.logoImage
-const showWaltidLoadingSpinner = tenant?.showWaltidLoadingSpinner
+const tenant = await useTenant().value;
+const bgImg = tenant?.bgImage;
+const name = tenant?.name;
+const logoImg = tenant?.logoImage;
+const showWaltidLoadingSpinner = tenant?.showWaltidLoadingSpinner;
 
 const isLoggingIn = ref(false);
 const error = ref({});
@@ -237,6 +263,10 @@ const { status, data, signIn } = useAuth();
 
 const signInRedirectUrl = ref("/");
 
+async function connectOidc() {
+    navigateTo("/wallet-api/auth/oidc-login", { external: true });
+}
+
 async function login() {
     console.log("logging in");
     isLoggingIn.value = true;
@@ -249,6 +279,7 @@ async function login() {
     // try {
     await signIn({ email: emailInput, password: passwordInput, type: "email" }, { callbackUrl: signInRedirectUrl.value })
         .then((data) => {
+
             user.value = {
                 id: "",
                 email: userData.email,
@@ -302,6 +333,52 @@ const route = useRoute();
 if (route.redirectedFrom != undefined) {
     console.log(`Redirected from: ${JSON.stringify(route.redirectedFrom)}`);
     signInRedirectUrl.value = route.redirectedFrom.fullPath;
+}
+
+const isOidcLogin = ref(route.query.oidc_login == "true");
+
+async function tryLoginWithOidcSession() {
+    const token = await fetch("/wallet-api/auth/oidc-token", {
+        redirect: "manual",
+    });
+
+    console.log(token);
+
+    const tokenText = await token.text();
+    console.log(tokenText);
+
+    await signIn(
+        {
+            email: emailInput,
+            token: tokenText,
+            type: "oidc",
+        },
+        { callbackUrl: signInRedirectUrl.value },
+    )
+        .then(() => {
+            user.value = {
+                token: tokenText,
+                id: "",
+                email: decodeJWT(tokenText).payload.email,
+                name: decodeJWT(tokenText).payload.name,
+                oidcSession: true
+            };
+
+            console.log("Wrote to user: " + JSON.stringify(user.value))
+        })
+        .catch((err) => {
+            console.log("Could not sign in", err);
+            error.value = {
+                isError: true,
+                message: "Your OIDC sign in failed.",
+            };
+            isLoggingIn.value = false;
+            isOidcLogin.value = false;
+        });
+}
+
+if (isOidcLogin.value) {
+    tryLoginWithOidcSession();
 }
 </script>
 

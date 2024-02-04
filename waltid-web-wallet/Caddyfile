@@ -1,9 +1,5 @@
-{
-	auto_https off
-	admin off
+dev.local {
+    reverse_proxy localhost:3000 # frontend
+    reverse_proxy /wallet-api/* localhost:4545 # backend
 }
 
-:3000
-
-reverse_proxy localhost:3001 # frontend
-reverse_proxy /r/* localhost:8080 # backend
