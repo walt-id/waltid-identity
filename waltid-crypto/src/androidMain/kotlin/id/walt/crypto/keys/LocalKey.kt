@@ -51,7 +51,6 @@ actual class LocalKey actual constructor(jwk: String?) : Key() {
     actual override suspend fun signRaw(plaintext: ByteArray): ByteArray {
         check(hasPrivateKey) { "No private key is attached to this key!" }
 
-        //Retrieves the private key from the keystore
         val privateKey: PrivateKey = keyStore.getKey(KEY_ALIAS, null) as PrivateKey
 
         val signature: ByteArray? = getSignature().run {
@@ -75,17 +74,14 @@ actual class LocalKey actual constructor(jwk: String?) : Key() {
      * @return Result wrapping the plaintext; Result failure when the signature fails
      */
     actual override suspend fun verifyRaw(signed: ByteArray, detachedPlaintext: ByteArray?): Result<ByteArray> {
-        //We get the certificate from the keystore
         val certificate: Certificate? = keyStore.getCertificate(KEY_ALIAS)
 
         return if (certificate != null) {
-            //We decode the signature value
             val signature: ByteArray = Base64.decode(signed.decodeToString(), Base64.DEFAULT)
 
             println("signature to verify- ${signed.decodeToString()}")
             println("plaintext - ${detachedPlaintext!!.decodeToString()}")
 
-            //We check if the signature is valid
             val isValid: Boolean = getSignature().run {
                 initVerify(certificate)
                 update(detachedPlaintext)
