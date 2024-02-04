@@ -113,8 +113,7 @@ fun Application.configureSecurity() {
             verifier(OidcLoginService.jwkProvider)
 
             validate { credential ->
-                println("VALIDATE: $credential")
-                // TODO
+
 
                 JWTPrincipal(credential.payload)
 
@@ -177,8 +176,7 @@ fun Application.auth() {
                     description = "Redirect to OIDC provider for login"
                     response { HttpStatusCode.Found }
                 }) {
-                    // already logged in:
-                    println("OIDC LOGIN")
+
 
                     call.respondRedirect("oidc-session")
 
@@ -188,7 +186,7 @@ fun Application.auth() {
                     get("oidc-session", {
                         description = "Configure OIDC session"
                     }) {
-                        println("OIDC SESSION")
+
                         val principal: OAuthAccessTokenResponse.OAuth2 = call.principal() ?: error("No OAuth principal")
 
                         call.sessions.set(OidcTokenSession(principal.accessToken))
@@ -201,7 +199,7 @@ fun Application.auth() {
             get("oidc-token", {
                 description = "Returns OIDC token"
             }) {
-                println("OIDC TOKEN")
+
                 val oidcSession = call.sessions.get<OidcTokenSession>() ?: error("No OIDC session")
 
                 call.respond(oidcSession.token)
@@ -234,7 +232,7 @@ fun Application.auth() {
                     HttpStatusCode.BadRequest to { description = "Login failed" }
                 }
             }) {
-                println("Login request")
+
                 val reqBody = LoginRequestJson.decodeFromString<AccountRequest>(call.receive())
                 AccountsService.authenticate("", reqBody).onSuccess { // FIX ME -> TENANT HERE
                     securityUserTokenMapping[it.token] = it.id
@@ -277,7 +275,7 @@ fun Application.auth() {
             }) {
                 val req = LoginRequestJson.decodeFromString<AccountRequest>(call.receive())
                 AccountsService.register("", req).onSuccess {
-                    println("Registration succeed.")
+
                     call.response.status(HttpStatusCode.Created)
                     call.respond("Registration succeed.")
                 }.onFailure {
