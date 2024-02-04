@@ -1,24 +1,24 @@
 package id.walt.crypto.keys
 
-import id.walt.crypto.keys.AndroidLocalKeyGenerator.TRANSFORMATION
+import android.util.Base64
+import id.walt.crypto.keys.AndroidLocalKeyGenerator.KEY_ALIAS
 import kotlinx.serialization.json.JsonObject
 import java.security.KeyStore
-import javax.crypto.Cipher
-import javax.crypto.SecretKey
+import java.security.PrivateKey
+import java.security.Signature
+import java.security.cert.Certificate
 
 actual class LocalKey actual constructor(jwk: String?) : Key() {
 
     override val keyType: KeyType
-        get() = TODO("Not yet implemented")
+        get() = KeyType.RSA
 
     actual override val hasPrivateKey: Boolean
-        get() = TODO("Not yet implemented")
+        get() {
+            return (keyStore.getKey(KEY_ALIAS, null) as PrivateKey?) != null
+        }
 
-    private val encryptCipher get() = Cipher.getInstance(TRANSFORMATION).apply {
-        init(Cipher.ENCRYPT_MODE, getKey())
-    }
-
-    private val keyStore = KeyStore.getInstance("AndroidKeyStore").apply {
+    private val keyStore = KeyStore.getInstance(AndroidLocalKeyGenerator.ANDROID_KEYSTORE).apply {
         load(null)
     }
 
@@ -49,7 +49,20 @@ actual class LocalKey actual constructor(jwk: String?) : Key() {
      * @return signed (JWS)
      */
     actual override suspend fun signRaw(plaintext: ByteArray): ByteArray {
-        return encryptCipher.doFinal(plaintext)
+        check(hasPrivateKey) { "No private key is attached to this key!" }
+
+        //Retrieves the private key from the keystore
+        val privateKey: PrivateKey = keyStore.getKey(KEY_ALIAS, null) as PrivateKey
+
+        val signature: ByteArray? = getSignature().run {
+            initSign(privateKey)
+            update(plaintext)
+            sign()
+        }
+
+        println("signed with Sig - ${Base64.encodeToString(signature, Base64.DEFAULT)}")
+        println("signed plaintext - ${plaintext.decodeToString()}")
+        return Base64.encodeToString(signature, Base64.DEFAULT).toByteArray()
     }
 
     actual override suspend fun signJws(plaintext: ByteArray, headers: Map<String, String>): String {
@@ -62,7 +75,32 @@ actual class LocalKey actual constructor(jwk: String?) : Key() {
      * @return Result wrapping the plaintext; Result failure when the signature fails
      */
     actual override suspend fun verifyRaw(signed: ByteArray, detachedPlaintext: ByteArray?): Result<ByteArray> {
-        TODO("Not yet implemented")
+        //We get the certificate from the keystore
+        val certificate: Certificate? = keyStore.getCertificate(KEY_ALIAS)
+
+        return if (certificate != null) {
+            //We decode the signature value
+            val signature: ByteArray = Base64.decode(signed.decodeToString(), Base64.DEFAULT)
+
+            println("signature to verify- ${signed.decodeToString()}")
+            println("plaintext - ${detachedPlaintext!!.decodeToString()}")
+
+            //We check if the signature is valid
+            val isValid: Boolean = getSignature().run {
+                initVerify(certificate)
+                update(detachedPlaintext)
+                verify(signature)
+            }
+
+            return if (isValid) {
+                Result.success(detachedPlaintext)
+            } else {
+                Result.failure(Exception("Signature is not valid"))
+            }
+
+        } else {
+            Result.failure(Exception("Certificate not found in KeyStore"))
+        }
     }
 
     actual override suspend fun verifyJws(signedJws: String): Result<JsonObject> {
@@ -77,13 +115,11 @@ actual class LocalKey actual constructor(jwk: String?) : Key() {
         TODO("Not yet implemented")
     }
 
-    private fun getKey(): SecretKey {
-        val existingKey = keyStore.getEntry(AndroidLocalKeyGenerator.KEY_ALIAS, null) as? KeyStore.SecretKeyEntry
-        val secretKey = existingKey?.secretKey
-        println("key - $existingKey")
-        println("secret key - $secretKey")
-        checkNotNull(secretKey) { "No key exists in KeyStore" }
-        return secretKey
+    private fun getSignature(): Signature = when (keyType) {
+        KeyType.secp256k1 -> Signature.getInstance("SHA256withECDSA", "BC")//Legacy SunEC curve disabled
+        KeyType.secp256r1 -> Signature.getInstance("SHA256withECDSA")
+        KeyType.Ed25519 -> Signature.getInstance("Ed25519")
+        KeyType.RSA -> Signature.getInstance("SHA256withRSA")
     }
 
     actual companion object : LocalKeyCreator {

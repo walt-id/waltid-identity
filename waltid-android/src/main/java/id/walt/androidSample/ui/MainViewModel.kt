@@ -13,15 +13,11 @@ interface MainViewModel {
 
     val plainText: StateFlow<String>
 
-    val encryptedText: StateFlow<String>
+    val signature: StateFlow<ByteArray?>
 
-    val didText: StateFlow<String>
+    fun onSignRaw(plainText: String)
 
-    val verifiedCredentialJSON: StateFlow<String>
-
-    val signedVC: StateFlow<String>
-
-    fun onEncrypt(plainText: String)
+    fun onVerifyPlainText(signed: ByteArray, detachedPlaintext: ByteArray?): Result<ByteArray>
 
     fun onPlainTextChange(plainText: String)
 
@@ -30,12 +26,13 @@ interface MainViewModel {
     class Fake : MainViewModel {
 
         override val plainText = MutableStateFlow("placeholder text")
-        override val encryptedText = MutableStateFlow("")
-        override val didText = MutableStateFlow("")
-        override val verifiedCredentialJSON = MutableStateFlow("")
-        override val signedVC = MutableStateFlow("")
+        override val signature = MutableStateFlow<ByteArray?>(null)
 
-        override fun onEncrypt(plainText: String) = Unit
+        override fun onSignRaw(plainText: String) = Unit
+        override fun onVerifyPlainText(signed: ByteArray, detachedPlaintext: ByteArray?): Result<ByteArray> {
+            return Result.success("".encodeToByteArray())
+        }
+
         override fun onPlainTextChange(plainText: String) = Unit
         override fun onClearInput() = Unit
 
@@ -46,19 +43,20 @@ interface MainViewModel {
         private val viewModelScope = CoroutineScope(Dispatchers.Main.immediate)
 
         override val plainText = MutableStateFlow("")
-        override val encryptedText = MutableStateFlow("")
-        override val didText = MutableStateFlow("")
-        override val verifiedCredentialJSON = MutableStateFlow("")
-        override val signedVC = MutableStateFlow("")
+        override val signature = MutableStateFlow<ByteArray?>(null)
 
         private var localKey: LocalKey? = null
 
-        override fun onEncrypt(plainText: String) {
+        override fun onSignRaw(plainText: String) {
             viewModelScope.launch {
                 val localKey = LocalKey.generate(KeyType.RSA, LocalKeyMetadata())
                 val signedContent = localKey.signRaw(plainText.toByteArray())
-                encryptedText.value = signedContent.contentToString()
+                signature.value = signedContent
             }
+        }
+
+        override fun onVerifyPlainText(signed: ByteArray, detachedPlaintext: ByteArray?): Result<ByteArray> {
+            TODO("Not yet implemented")
         }
 
         override fun onPlainTextChange(plainText: String) {
@@ -67,7 +65,7 @@ interface MainViewModel {
 
         override fun onClearInput() {
             plainText.value = ""
-            encryptedText.value = ""
+            signature.value = null
         }
 
     }
