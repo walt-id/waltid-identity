@@ -1,8 +1,14 @@
 package id.walt.androidSample.ui
 
 import android.annotation.SuppressLint
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.util.Base64
+import android.widget.Toast
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -28,6 +34,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.tooling.preview.Preview
@@ -42,11 +49,9 @@ import kotlinx.coroutines.flow.StateFlow
 fun MainUi(viewModel: MainViewModel) {
 
     val plainText by viewModel.plainText.collectImmediatelyAsState()
-    val encryptedText by viewModel.encryptedText.collectAsState()
-    val didText by viewModel.didText.collectAsState()
-    val verifiedCredential by viewModel.verifiedCredentialJSON.collectAsState()
-    val signedVC by viewModel.signedVC.collectAsState()
+    val signature by viewModel.signature.collectAsState()
 
+    val context = LocalContext.current
     val systemKeyboard = LocalSoftwareKeyboardController.current
 
     Column(
@@ -61,7 +66,7 @@ fun MainUi(viewModel: MainViewModel) {
         OutlinedTextField(
             value = plainText,
             onValueChange = { viewModel.onPlainTextChange(it) },
-            label = { Text("Enter your plain text to encrypt") },
+            label = { Text("Enter plain text to sign") },
             singleLine = true,
             trailingIcon = {
                 if (plainText.isNotBlank()) {
@@ -78,7 +83,7 @@ fun MainUi(viewModel: MainViewModel) {
             keyboardActions = KeyboardActions(
                 onDone = {
                     systemKeyboard?.hide()
-                    viewModel.onEncrypt(plainText)
+                    viewModel.onSignRaw(plainText)
                 }
             ),
             modifier = Modifier
@@ -90,41 +95,40 @@ fun MainUi(viewModel: MainViewModel) {
         Button(
             onClick = {
                 systemKeyboard?.hide()
-                viewModel.onEncrypt(plainText)
+                viewModel.onSignRaw(plainText)
             },
             enabled = plainText.isNotBlank(),
         ) {
-            Text(text = "Encrypt PlainText")
+            Text(text = "Sign Plain Text")
         }
 
-        if (encryptedText.isNotBlank()) {
+        Button(
+            onClick = {
+                systemKeyboard?.hide()
+                viewModel.onVerifyPlainText(signature!!, null)
+            },
+            enabled = signature != null,
+        ) {
+            Text(text = "Verify Signature")
+        }
+
+        if (signature != null) {
             Text(
-                text = encryptedText,
+                text = "Signature: ${Base64.encodeToString(signature, Base64.DEFAULT)}}",
                 color = Color.Blue,
-                modifier = Modifier.padding(20.dp),
+                fontSize = 14.sp,
+                modifier = Modifier
+                    .padding(20.dp)
+                    .horizontalScroll(rememberScrollState())
+                    .clickable {
+                        (context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager)?.apply {
+                            val clip = ClipData.newPlainText("Cryptographic Signature", Base64.encodeToString(signature, Base64.DEFAULT))
+                            setPrimaryClip(clip)
+                            Toast.makeText(context, "Copied signature to clipboard!", Toast.LENGTH_SHORT).show()
+                        }
+                    },
             )
         }
-
-        Text(
-            text = didText,
-            modifier = Modifier.padding(20.dp)
-        )
-
-        Text(
-            text = """
-                |Signed Verified Certificate:
-                |$signedVC
-            """.trimMargin(),
-            modifier = Modifier
-                .padding(top = 40.dp, bottom = 20.dp)
-                .padding(horizontal = 20.dp)
-        )
-
-        Text(
-            text = verifiedCredential,
-            modifier = Modifier.padding(20.dp),
-            fontSize = 10.sp
-        )
     }
 }
 
