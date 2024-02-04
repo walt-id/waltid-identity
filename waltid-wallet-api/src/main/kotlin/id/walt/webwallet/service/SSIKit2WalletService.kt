@@ -590,12 +590,10 @@ class SSIKit2WalletService(
             credentialResultPair.first
         }
 
-        transaction {
-            CredentialsService.addAll(
-                wallet = walletId,
-                credentials = addableCredentials
-            )
-        }
+        CredentialsService.add(
+            wallet = walletId,
+            credentials = addableCredentials.toTypedArray()
+        )
     }
 
     /* DIDs */
