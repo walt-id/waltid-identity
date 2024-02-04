@@ -27,6 +27,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -35,14 +36,21 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.repeatOnLifecycle
+import id.walt.androidSample.ui.MainViewModel.Event.SignatureInvalid
+import id.walt.androidSample.ui.MainViewModel.Event.SignatureVerified
 import id.walt.androidSample.ui.theme.WaltIdAndroidSampleTheme
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalComposeUiApi::class)
 @Composable
@@ -53,6 +61,13 @@ fun MainUi(viewModel: MainViewModel) {
 
     val context = LocalContext.current
     val systemKeyboard = LocalSoftwareKeyboardController.current
+
+    ObserveAsEvents(viewModel.events) { event ->
+        when (event) {
+            SignatureInvalid -> Toast.makeText(context, "Signature verification failed", Toast.LENGTH_SHORT).show()
+            SignatureVerified -> Toast.makeText(context, "Signature successfully verified!", Toast.LENGTH_SHORT).show()
+        }
+    }
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -84,7 +99,7 @@ fun MainUi(viewModel: MainViewModel) {
                 onDone = {
                     systemKeyboard?.hide()
                     viewModel.onSignRaw(plainText)
-                }
+                },
             ),
             modifier = Modifier
                 .fillMaxWidth()
@@ -105,7 +120,7 @@ fun MainUi(viewModel: MainViewModel) {
         Button(
             onClick = {
                 systemKeyboard?.hide()
-                viewModel.onVerifyPlainText(signature!!, null)
+                viewModel.onVerifyPlainText(signature!!, plainText.toByteArray())
             },
             enabled = signature != null,
         ) {
@@ -124,7 +139,9 @@ fun MainUi(viewModel: MainViewModel) {
                         (context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager)?.apply {
                             val clip = ClipData.newPlainText("Cryptographic Signature", Base64.encodeToString(signature, Base64.DEFAULT))
                             setPrimaryClip(clip)
-                            Toast.makeText(context, "Copied signature to clipboard!", Toast.LENGTH_SHORT).show()
+                            Toast
+                                .makeText(context, "Copied signature to clipboard!", Toast.LENGTH_SHORT)
+                                .show()
                         }
                     },
             )
@@ -147,3 +164,15 @@ private fun Preview_MainUi() {
 @SuppressLint("StateFlowValueCalledInComposition")
 @Composable
 private fun <T> StateFlow<T>.collectImmediatelyAsState(): State<T> = collectAsState(value, Dispatchers.Main.immediate)
+
+@Composable
+private fun <T> ObserveAsEvents(flow: Flow<T>, onEvent: (T) -> Unit) {
+    val lifecycleOwner = LocalLifecycleOwner.current
+    LaunchedEffect(flow, lifecycleOwner.lifecycle) {
+        lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            withContext(Dispatchers.Main.immediate) {
+                flow.collect(onEvent)
+            }
+        }
+    }
+}

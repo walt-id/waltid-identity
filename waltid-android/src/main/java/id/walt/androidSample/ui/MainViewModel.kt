@@ -5,8 +5,12 @@ import id.walt.crypto.keys.LocalKey
 import id.walt.crypto.keys.LocalKeyMetadata
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 
 interface MainViewModel {
@@ -15,22 +19,30 @@ interface MainViewModel {
 
     val signature: StateFlow<ByteArray?>
 
+    val events: Flow<Event>
+
     fun onSignRaw(plainText: String)
 
-    fun onVerifyPlainText(signed: ByteArray, detachedPlaintext: ByteArray?): Result<ByteArray>
+    fun onVerifyPlainText(signature: ByteArray, plainText: ByteArray?)
 
     fun onPlainTextChange(plainText: String)
 
     fun onClearInput()
 
+    sealed interface Event {
+        data object SignatureVerified : Event
+        data object SignatureInvalid : Event
+    }
+
     class Fake : MainViewModel {
 
         override val plainText = MutableStateFlow("placeholder text")
         override val signature = MutableStateFlow<ByteArray?>(null)
+        override val events = emptyFlow<Event>()
 
         override fun onSignRaw(plainText: String) = Unit
-        override fun onVerifyPlainText(signed: ByteArray, detachedPlaintext: ByteArray?): Result<ByteArray> {
-            return Result.success("".encodeToByteArray())
+        override fun onVerifyPlainText(signature: ByteArray, plainText: ByteArray?) {
+            Result.success("".encodeToByteArray())
         }
 
         override fun onPlainTextChange(plainText: String) = Unit
@@ -45,18 +57,32 @@ interface MainViewModel {
         override val plainText = MutableStateFlow("")
         override val signature = MutableStateFlow<ByteArray?>(null)
 
+        private val eventsChannel = Channel<Event>()
+        override val events = eventsChannel.receiveAsFlow()
+
         private var localKey: LocalKey? = null
 
         override fun onSignRaw(plainText: String) {
             viewModelScope.launch {
-                val localKey = LocalKey.generate(KeyType.RSA, LocalKeyMetadata())
-                val signedContent = localKey.signRaw(plainText.toByteArray())
-                signature.value = signedContent
+                LocalKey.generate(KeyType.RSA, LocalKeyMetadata()).run {
+                    localKey = this
+                    val signedContent = this.signRaw(plainText.toByteArray())
+                    signature.value = signedContent
+                }
             }
         }
 
-        override fun onVerifyPlainText(signed: ByteArray, detachedPlaintext: ByteArray?): Result<ByteArray> {
-            TODO("Not yet implemented")
+        override fun onVerifyPlainText(signature: ByteArray, plainText: ByteArray?) {
+            viewModelScope.launch {
+                localKey?.let {
+                    val result = it.verifyRaw(signature, plainText)
+                    if (result.isSuccess) {
+                        eventsChannel.send(Event.SignatureVerified)
+                    } else {
+                        eventsChannel.send(Event.SignatureInvalid)
+                    }
+                }
+            }
         }
 
         override fun onPlainTextChange(plainText: String) {
