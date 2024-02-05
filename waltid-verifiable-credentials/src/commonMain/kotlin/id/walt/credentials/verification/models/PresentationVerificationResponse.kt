@@ -1,9 +1,12 @@
 package id.walt.credentials.verification.models
 
 import kotlinx.serialization.json.*
+import kotlin.js.ExperimentalJsExport
+import kotlin.js.JsExport
 import kotlin.time.Duration
 import kotlin.time.DurationUnit
-
+@ExperimentalJsExport
+@JsExport
 data class PresentationVerificationResponse(
     val results: ArrayList<PresentationResultEntry>,
     val time: Duration,

@@ -15,8 +15,14 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
+import love.forte.plugin.suspendtrans.annotation.JsPromise
+import love.forte.plugin.suspendtrans.annotation.JvmAsync
+import love.forte.plugin.suspendtrans.annotation.JvmBlocking
+import kotlin.js.ExperimentalJsExport
+import kotlin.js.JsExport
 import kotlin.time.measureTime
-
+@ExperimentalJsExport
+@JsExport
 object Verifier {
 
     private fun JsonObject.getW3CType() = (this["type"] ?: this["vc"]?.jsonObject?.get("type") ?: this["vp"]?.jsonObject?.get("type")
@@ -31,7 +37,10 @@ object Verifier {
         }
     }
 
-
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     suspend fun PolicyRequest.runPolicyRequest(dataToVerify: JsonElement, context: Map<String, Any>): Result<Any> {
         return when (policy) {
             is JwtVerificationPolicy -> {
@@ -57,7 +66,10 @@ object Verifier {
             else -> throw IllegalArgumentException("Unsupported policy type: ${policy::class.simpleName}")
         }
     }
-
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     suspend fun verifyCredential(
         jwt: String, policies: List<PolicyRequest>, context: Map<String, Any> = emptyMap()
     ): List<PolicyResult> {
@@ -78,8 +90,10 @@ object Verifier {
 
         return results
     }
-
-
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     suspend fun runPolicyRequests(
         jwt: String,
         policyRequests: List<PolicyRequest>,
@@ -108,7 +122,10 @@ object Verifier {
             }
         }
     }
-
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     suspend fun verifyPresentation(
         vpTokenJwt: String,
         vpPolicies: List<PolicyRequest>,
@@ -175,7 +192,10 @@ object Verifier {
     }
 
     private val EMPTY_MAP = emptyMap<String, Any>()
-
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     @Suppress("UNCHECKED_CAST" /* as? */)
     suspend fun verifyJws(jwt: String): Result<JsonObject> = JwtSignaturePolicy().verify(jwt, null, EMPTY_MAP) as? Result<JsonObject>
         ?: Result.failure(IllegalArgumentException("Could not get JSONObject from VC verification"))

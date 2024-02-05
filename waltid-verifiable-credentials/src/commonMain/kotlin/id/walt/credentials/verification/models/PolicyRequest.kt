@@ -3,7 +3,11 @@ package id.walt.credentials.verification.models
 import id.walt.credentials.verification.PolicyManager
 import id.walt.credentials.verification.VerificationPolicy
 import kotlinx.serialization.json.*
+import kotlin.js.ExperimentalJsExport
+import kotlin.js.JsExport
 
+@ExperimentalJsExport
+@JsExport
 data class PolicyRequest(
     val policy: VerificationPolicy,
     val args: JsonElement? = null,
