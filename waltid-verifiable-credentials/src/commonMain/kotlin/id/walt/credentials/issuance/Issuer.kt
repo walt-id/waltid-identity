@@ -11,12 +11,23 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonPrimitive
+import love.forte.plugin.suspendtrans.annotation.JsPromise
+import love.forte.plugin.suspendtrans.annotation.JvmAsync
+import love.forte.plugin.suspendtrans.annotation.JvmBlocking
+import kotlin.js.ExperimentalJsExport
+import kotlin.js.JsExport
 
+@ExperimentalJsExport
+@JsExport
 object Issuer {
 
     /**
      * Manually set data and issue credential
      */
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     suspend fun W3CVC.baseIssue(
         key: Key,
         did: String,
@@ -39,7 +50,10 @@ object Issuer {
             additionalJwtOptions = additionalJwtOptions
         )
     }
-
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     suspend fun W3CVC.mergingJwtIssue(
         issuerKey: Key,
         issuerDid: String,
@@ -69,7 +83,10 @@ object Issuer {
             }
         )
     }
-
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     suspend fun W3CVC.mergingSdJwtIssue(
         issuerKey: Key,
         issuerDid: String,
@@ -110,6 +127,10 @@ object Issuer {
     /**
      * Merge data with mappings and issue
      */
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     suspend fun W3CVC.mergingToVc(
         issuerDid: String,
         subjectDid: String,

@@ -5,10 +5,21 @@ import id.walt.credentials.verification.ExpirationDatePolicyException
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.serialization.json.*
+import love.forte.plugin.suspendtrans.annotation.JsPromise
+import love.forte.plugin.suspendtrans.annotation.JvmAsync
+import love.forte.plugin.suspendtrans.annotation.JvmBlocking
+import kotlin.js.ExperimentalJsExport
+import kotlin.js.JsExport
 
+@ExperimentalJsExport
+@JsExport
 class ExpirationDatePolicy : CredentialWrapperValidatorPolicy(
     "expired", "Verifies that the credentials expiration date (`exp` for JWTs) has not been exceeded."
 ) {
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     override suspend fun verify(data: JsonElement, args: Any?, context: Map<String, Any>): Result<Any> {
         var successfulKey = ""
 

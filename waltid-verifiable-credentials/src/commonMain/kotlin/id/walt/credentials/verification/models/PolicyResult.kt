@@ -3,7 +3,11 @@ package id.walt.credentials.verification.models
 import id.walt.credentials.verification.SerializableRuntimeException
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import kotlinx.serialization.json.*
+import kotlin.js.ExperimentalJsExport
+import kotlin.js.JsExport
 
+@ExperimentalJsExport
+@JsExport
 data class PolicyResult(val request: PolicyRequest, val result: Result<Any?>) {
 
     fun isSuccess() = result.isSuccess
