@@ -142,18 +142,14 @@ class WalletKitWalletService(tenant: String, accountId: UUID, walletId: UUID) : 
         }
     }
 
-    override suspend fun listRawCredentials(): List<String> {
-        TODO("Not yet implemented")
-    }
+    override suspend fun listRawCredentials(): List<String> = throw NotImplementedError("")
 
     //private val prettyJson = Json { prettyPrint = true }
 
     override suspend fun deleteCredential(id: String, permanent: Boolean) =
         authenticatedJsonDelete("/api/wallet/credentials/delete/$id").status.isSuccess()
 
-    override suspend fun restoreCredential(id: String): WalletCredential {
-        TODO("Not yet implemented")
-    }
+    override suspend fun restoreCredential(id: String): WalletCredential = throw NotImplementedError("")
 
     override suspend fun getCredential(credentialId: String) =
         listCredentials(CredentialFilterObject.default).first { it.parsedDocument?.get("id")?.jsonPrimitive?.content == credentialId }.let {
@@ -169,17 +165,12 @@ class WalletKitWalletService(tenant: String, accountId: UUID, walletId: UUID) : 
             )
         }
 
-    override suspend fun attachCategory(credentialId: String, category: String): Boolean {
-        TODO("Not yet implemented")
-    }
+    override suspend fun attachCategory(credentialId: String, category: String): Boolean = throw NotImplementedError("")
 
-    override suspend fun detachCategory(credentialId: String, category: String): Boolean {
-        TODO("Not yet implemented")
-    }
+    override suspend fun detachCategory(credentialId: String, category: String): Boolean = throw NotImplementedError("")
 
-    override fun matchCredentialsByPresentationDefinition(presentationDefinition: PresentationDefinition): List<WalletCredential> {
-        TODO("Not yet implemented")
-    }
+    override fun matchCredentialsByPresentationDefinition(presentationDefinition: PresentationDefinition): List<WalletCredential> =
+        throw NotImplementedError("")
     /*prettyJson.encodeToString(*/
     //)
     /* override suspend fun getCredential(credentialId: String): String =
@@ -395,9 +386,7 @@ class WalletKitWalletService(tenant: String, accountId: UUID, walletId: UUID) : 
         }
     }
 
-    override fun filterEventLog(filter: EventLogFilter): EventLogFilterResult {
-        TODO("Not yet implemented")
-    }
+    override fun filterEventLog(filter: EventLogFilter): EventLogFilterResult = throw NotImplementedError("")
 
     override suspend fun linkWallet(wallet: WalletDataTransferObject): LinkedWalletDataTransferObject =
         Web3WalletService.link(tenant, walletId, wallet)
@@ -411,32 +400,20 @@ class WalletKitWalletService(tenant: String, accountId: UUID, walletId: UUID) : 
 
     override suspend fun disconnectWallet(wallet: UUID) = Web3WalletService.disconnect(tenant, walletId, wallet)
 
-    override suspend fun listIssuers(): List<IssuerDataTransferObject> {
-        TODO("Not yet implemented")
-    }
+    override suspend fun listIssuers(): List<IssuerDataTransferObject> = throw NotImplementedError("")
 
-    override suspend fun getIssuer(name: String): IssuerDataTransferObject {
-        TODO("Not yet implemented")
-    }
+    override suspend fun getIssuer(name: String): IssuerDataTransferObject = throw NotImplementedError("")
 
-    override fun getCredentialsByIds(credentialIds: List<String>): List<WalletCredential> {
-        TODO("Not yet implemented")
-    }
+    override fun getCredentialsByIds(credentialIds: List<String>): List<WalletCredential> =
+        throw NotImplementedError("")
 
-    override suspend fun listCategories(): List<WalletCategoryData> {
-        TODO("Not yet implemented")
-    }
+    override suspend fun listCategories(): List<WalletCategoryData> = throw NotImplementedError("")
 
-    override suspend fun addCategory(name: String): Boolean {
-        TODO("Not yet implemented")
-    }
+    override suspend fun addCategory(name: String): Boolean = throw NotImplementedError("")
 
-    override suspend fun deleteCategory(name: String): Boolean {
-        TODO("Not yet implemented")
-    }
+    override suspend fun deleteCategory(name: String): Boolean = throw NotImplementedError("")
 
-    override suspend fun getFrequentCredentials(parameter: ReportRequestParameter): List<WalletCredential> {
-        TODO("Not yet implemented")
-    }
+    override suspend fun getFrequentCredentials(parameter: ReportRequestParameter): List<WalletCredential> =
+        throw NotImplementedError("")
 }
 
