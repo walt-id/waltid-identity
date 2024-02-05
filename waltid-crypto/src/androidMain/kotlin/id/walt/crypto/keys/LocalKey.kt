@@ -1,12 +1,13 @@
 package id.walt.crypto.keys
 
 import android.util.Base64
-import id.walt.crypto.keys.AndroidLocalKeyGenerator.KEY_ALIAS
+import id.walt.crypto.keys.AndroidLocalKeyGenerator.PUBLIC_KEY_ALIAS_PREFIX
 import kotlinx.serialization.json.JsonObject
 import java.security.KeyStore
 import java.security.PrivateKey
 import java.security.Signature
 import java.security.cert.Certificate
+import java.util.UUID
 
 actual class LocalKey actual constructor(jwk: String?) : Key() {
 
@@ -15,16 +16,21 @@ actual class LocalKey actual constructor(jwk: String?) : Key() {
 
     actual override val hasPrivateKey: Boolean
         get() {
-            return (keyStore.getKey(KEY_ALIAS, null) as PrivateKey?) != null
+            return (keyStore.getKey(internalKeyId, null) as PrivateKey?) != null
         }
 
     private val keyStore = KeyStore.getInstance(AndroidLocalKeyGenerator.ANDROID_KEYSTORE).apply {
         load(null)
     }
 
-    actual override suspend fun getKeyId(): String {
-        TODO("Not yet implemented")
+    private lateinit var internalKeyId: String
+
+    constructor(keyAlias: KeyAlias) : this(null) {
+        internalKeyId = keyAlias.alias
+        println("Initialised instance of LocalKey {keyId: '$internalKeyId'}")
     }
+
+    actual override suspend fun getKeyId(): String = internalKeyId
 
     actual override suspend fun getThumbprint(): String {
         TODO("Not yet implemented")
@@ -42,16 +48,10 @@ actual class LocalKey actual constructor(jwk: String?) : Key() {
         TODO("Not yet implemented")
     }
 
-    /**
-     * Signs as a JWS: Signs a message using this private key (with the algorithm this key is based on)
-     * @exception IllegalArgumentException when this is not a private key
-     * @param plaintext data to be signed
-     * @return signed (JWS)
-     */
     actual override suspend fun signRaw(plaintext: ByteArray): ByteArray {
         check(hasPrivateKey) { "No private key is attached to this key!" }
 
-        val privateKey: PrivateKey = keyStore.getKey(KEY_ALIAS, null) as PrivateKey
+        val privateKey: PrivateKey = keyStore.getKey(internalKeyId, null) as PrivateKey
 
         val signature: ByteArray? = getSignature().run {
             initSign(privateKey)
@@ -59,8 +59,8 @@ actual class LocalKey actual constructor(jwk: String?) : Key() {
             sign()
         }
 
-        println("signed with Sig - ${Base64.encodeToString(signature, Base64.DEFAULT)}")
-        println("signed plaintext - ${plaintext.decodeToString()}")
+        println("Raw message signed with signature {signature: '${Base64.encodeToString(signature, Base64.DEFAULT)}'}")
+        println("Raw message signed - {raw: '${plaintext.decodeToString()}'}")
         return Base64.encodeToString(signature, Base64.DEFAULT).toByteArray()
     }
 
@@ -68,13 +68,8 @@ actual class LocalKey actual constructor(jwk: String?) : Key() {
         TODO("Not yet implemented")
     }
 
-    /**
-     * Verifies JWS: Verifies a signed message using this public key
-     * @param signed signed
-     * @return Result wrapping the plaintext; Result failure when the signature fails
-     */
     actual override suspend fun verifyRaw(signed: ByteArray, detachedPlaintext: ByteArray?): Result<ByteArray> {
-        val certificate: Certificate? = keyStore.getCertificate(KEY_ALIAS)
+        val certificate: Certificate? = keyStore.getCertificate(internalKeyId)
 
         return if (certificate != null) {
             val signature: ByteArray = Base64.decode(signed.decodeToString(), Base64.DEFAULT)
@@ -104,7 +99,14 @@ actual class LocalKey actual constructor(jwk: String?) : Key() {
     }
 
     actual override suspend fun getPublicKey(): LocalKey {
-        TODO("Not yet implemented")
+        return kotlin.runCatching {
+            val keyPair = keyStore.getEntry(internalKeyId, null) as? KeyStore.PrivateKeyEntry
+            checkNotNull(keyPair) { "This LocalKey instance does not have a KeyPair!" }
+
+            val id = "$PUBLIC_KEY_ALIAS_PREFIX${UUID.randomUUID()}"
+            keyStore.setCertificateEntry(id, keyPair.certificate)
+            LocalKey(KeyAlias(id))
+        }.getOrThrow()
     }
 
     actual override suspend fun getPublicKeyRepresentation(): ByteArray {
@@ -144,3 +146,4 @@ actual class LocalKey actual constructor(jwk: String?) : Key() {
 
 
 }
+

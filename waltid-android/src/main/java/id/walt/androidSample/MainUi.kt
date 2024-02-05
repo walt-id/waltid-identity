@@ -1,4 +1,4 @@
-package id.walt.androidSample.ui
+package id.walt.androidSample
 
 import android.annotation.SuppressLint
 import android.content.ClipData
@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -44,9 +45,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.repeatOnLifecycle
-import id.walt.androidSample.ui.MainViewModel.Event.SignatureInvalid
-import id.walt.androidSample.ui.MainViewModel.Event.SignatureVerified
-import id.walt.androidSample.ui.theme.WaltIdAndroidSampleTheme
+import id.walt.androidSample.MainViewModel.Event.SignatureInvalid
+import id.walt.androidSample.MainViewModel.Event.SignatureVerified
+import id.walt.androidSample.theme.WaltIdAndroidSampleTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
@@ -57,7 +58,8 @@ import kotlinx.coroutines.withContext
 fun MainUi(viewModel: MainViewModel) {
 
     val plainText by viewModel.plainText.collectImmediatelyAsState()
-    val signature by viewModel.signature.collectAsState()
+    val signature by viewModel.signature.collectImmediatelyAsState()
+    val publicKey by viewModel.publicKey.collectImmediatelyAsState()
 
     val context = LocalContext.current
     val systemKeyboard = LocalSoftwareKeyboardController.current
@@ -127,10 +129,31 @@ fun MainUi(viewModel: MainViewModel) {
             Text(text = "Verify Signature")
         }
 
+        Button(
+            onClick = {
+                systemKeyboard?.hide()
+                viewModel.retrievePublicKey()
+            },
+            enabled = signature != null,
+        ) {
+            Text(text = "Retrieve Public Key")
+        }
+
+        if (publicKey != null) {
+            Text(
+                text = "PublicKey: $publicKey",
+                color = MaterialTheme.colorScheme.primary,
+                fontSize = 14.sp,
+                modifier = Modifier
+                    .padding(20.dp)
+                    .horizontalScroll(rememberScrollState()),
+            )
+        }
+
         if (signature != null) {
             Text(
                 text = "Signature: ${Base64.encodeToString(signature, Base64.DEFAULT)}}",
-                color = Color.Blue,
+                color = MaterialTheme.colorScheme.primary,
                 fontSize = 14.sp,
                 modifier = Modifier
                     .padding(20.dp)
