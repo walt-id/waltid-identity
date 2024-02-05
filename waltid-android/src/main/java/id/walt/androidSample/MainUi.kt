@@ -6,6 +6,10 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.util.Base64
 import android.widget.Toast
+import androidx.biometric.BiometricManager
+import androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG
+import androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_WEAK
+import androidx.biometric.BiometricPrompt
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -32,19 +36,24 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
+import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.repeatOnLifecycle
+import id.walt.androidSample.MainViewModel.Event.BiometricAuthenticationFailure
+import id.walt.androidSample.MainViewModel.Event.BiometricsUnavailable
 import id.walt.androidSample.MainViewModel.Event.SignatureInvalid
 import id.walt.androidSample.MainViewModel.Event.SignatureVerified
 import id.walt.androidSample.theme.WaltIdAndroidSampleTheme
@@ -64,12 +73,44 @@ fun MainUi(viewModel: MainViewModel) {
     val context = LocalContext.current
     val systemKeyboard = LocalSoftwareKeyboardController.current
 
+    val biometricManager = remember { BiometricManager.from(context) }
+    val isBiometricsAvailable = biometricManager.canAuthenticate(BIOMETRIC_STRONG or BIOMETRIC_WEAK) == BiometricManager.BIOMETRIC_SUCCESS
+
     ObserveAsEvents(viewModel.events) { event ->
         when (event) {
-            SignatureInvalid -> Toast.makeText(context, "Signature verification failed", Toast.LENGTH_SHORT).show()
-            SignatureVerified -> Toast.makeText(context, "Signature successfully verified!", Toast.LENGTH_SHORT).show()
+            SignatureInvalid -> Toast.makeText(context, context.getString(R.string.signature_verification_failed), Toast.LENGTH_SHORT).show()
+            SignatureVerified -> Toast.makeText(context, context.getString(R.string.signature_verified), Toast.LENGTH_SHORT).show()
+            BiometricsUnavailable -> Toast.makeText(context, context.getString(R.string.biometric_unavailable), Toast.LENGTH_SHORT).show()
+            BiometricAuthenticationFailure -> Toast.makeText(context, context.getString(R.string.biometric_authentication_failure), Toast.LENGTH_SHORT).show()
         }
     }
+
+    LaunchedEffect(Unit) {
+        if (!isBiometricsAvailable) viewModel.onBiometricsUnavailable()
+    }
+
+    val executor = remember { ContextCompat.getMainExecutor(context) }
+    val biometricPrompt = BiometricPrompt(
+        context as FragmentActivity,
+        executor,
+        object : BiometricPrompt.AuthenticationCallback() {
+            override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                super.onAuthenticationSucceeded(result)
+                viewModel.onSignRaw(plainText)
+            }
+
+            override fun onAuthenticationFailed() {
+                super.onAuthenticationFailed()
+                viewModel.onBiometricsAuthFailure()
+            }
+        }
+    )
+    val promptInfo = BiometricPrompt.PromptInfo.Builder()
+        .setAllowedAuthenticators(BIOMETRIC_STRONG or BIOMETRIC_WEAK)
+        .setTitle(stringResource(R.string.title_biometric_authentication))
+        .setSubtitle(stringResource(R.string.subtitle_biometric_authentication))
+        .setNegativeButtonText(stringResource(R.string.cancel))
+        .build()
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -83,7 +124,7 @@ fun MainUi(viewModel: MainViewModel) {
         OutlinedTextField(
             value = plainText,
             onValueChange = { viewModel.onPlainTextChange(it) },
-            label = { Text("Enter plain text to sign") },
+            label = { Text(stringResource(R.string.label_enter_plaintext)) },
             singleLine = true,
             trailingIcon = {
                 if (plainText.isNotBlank()) {
@@ -100,7 +141,7 @@ fun MainUi(viewModel: MainViewModel) {
             keyboardActions = KeyboardActions(
                 onDone = {
                     systemKeyboard?.hide()
-                    viewModel.onSignRaw(plainText)
+                    biometricPrompt.authenticate(promptInfo)
                 },
             ),
             modifier = Modifier
@@ -112,11 +153,11 @@ fun MainUi(viewModel: MainViewModel) {
         Button(
             onClick = {
                 systemKeyboard?.hide()
-                viewModel.onSignRaw(plainText)
+                biometricPrompt.authenticate(promptInfo)
             },
-            enabled = plainText.isNotBlank(),
+            enabled = plainText.isNotBlank() && isBiometricsAvailable,
         ) {
-            Text(text = "Sign Plain Text")
+            Text(text = stringResource(R.string.label_sign))
         }
 
         Button(
@@ -126,17 +167,17 @@ fun MainUi(viewModel: MainViewModel) {
             },
             enabled = signature != null,
         ) {
-            Text(text = "Verify Signature")
+            Text(text = stringResource(R.string.label_verify_signature))
         }
 
         Button(
             onClick = {
                 systemKeyboard?.hide()
-                viewModel.retrievePublicKey()
+                viewModel.onRetrievePublicKey()
             },
             enabled = signature != null,
         ) {
-            Text(text = "Retrieve Public Key")
+            Text(text = stringResource(R.string.label_get_public_key))
         }
 
         if (publicKey != null) {
@@ -152,7 +193,7 @@ fun MainUi(viewModel: MainViewModel) {
 
         if (signature != null) {
             Text(
-                text = "Signature: ${Base64.encodeToString(signature, Base64.DEFAULT)}}",
+                text = stringResource(R.string.signature, Base64.encodeToString(signature, Base64.DEFAULT)),
                 color = MaterialTheme.colorScheme.primary,
                 fontSize = 14.sp,
                 modifier = Modifier
@@ -163,7 +204,7 @@ fun MainUi(viewModel: MainViewModel) {
                             val clip = ClipData.newPlainText("Cryptographic Signature", Base64.encodeToString(signature, Base64.DEFAULT))
                             setPrimaryClip(clip)
                             Toast
-                                .makeText(context, "Copied signature to clipboard!", Toast.LENGTH_SHORT)
+                                .makeText(context, context.getString(R.string.copied_to_clipboard), Toast.LENGTH_SHORT)
                                 .show()
                         }
                     },

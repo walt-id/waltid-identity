@@ -54,6 +54,9 @@ dependencies {
 //    implementation("id.walt:waltid-openid4vc:1.0.1")
 //    implementation("id.walt:waltid-sdjwt:1.0.1")
 
+    implementation("androidx.biometric:biometric:1.2.0-alpha05")
+    implementation("androidx.biometric:biometric-ktx:1.2.0-alpha05")
+
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.2")
 
     implementation("androidx.core:core-ktx:1.9.0")

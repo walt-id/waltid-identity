@@ -29,13 +29,19 @@ interface MainViewModel {
 
     fun onPlainTextChange(plainText: String)
 
-    fun retrievePublicKey()
+    fun onRetrievePublicKey()
+
+    fun onBiometricsUnavailable()
+
+    fun onBiometricsAuthFailure()
 
     fun onClearInput()
 
     sealed interface Event {
         data object SignatureVerified : Event
         data object SignatureInvalid : Event
+        data object BiometricsUnavailable : Event
+        data object BiometricAuthenticationFailure : Event
     }
 
     class Fake : MainViewModel {
@@ -52,7 +58,9 @@ interface MainViewModel {
 
         override fun onPlainTextChange(plainText: String) = Unit
         override fun onClearInput() = Unit
-        override fun retrievePublicKey() = Unit
+        override fun onRetrievePublicKey() = Unit
+        override fun onBiometricsUnavailable() = Unit
+        override fun onBiometricsAuthFailure() = Unit
 
     }
 
@@ -92,7 +100,7 @@ interface MainViewModel {
             }
         }
 
-        override fun retrievePublicKey() {
+        override fun onRetrievePublicKey() {
             viewModelScope.launch {
                 publicKey.value = localKey?.getPublicKey()
             }
@@ -102,9 +110,22 @@ interface MainViewModel {
             this.plainText.value = plainText
         }
 
+        override fun onBiometricsUnavailable() {
+            viewModelScope.launch {
+                eventsChannel.send(Event.BiometricsUnavailable)
+            }
+        }
+
+        override fun onBiometricsAuthFailure() {
+            viewModelScope.launch {
+                eventsChannel.send(Event.BiometricAuthenticationFailure)
+            }
+        }
+
         override fun onClearInput() {
             plainText.value = ""
             signature.value = null
+            publicKey.value = null
         }
 
     }

@@ -35,6 +35,9 @@ object AndroidLocalKeyGenerator : LocalKeyCreator {
                     // Set of padding schemes with which the key can be used when signing/verifying
                     setSignaturePaddings(KeyProperties.SIGNATURE_PADDING_RSA_PKCS1)
 
+                    setUserAuthenticationRequired(true)
+                    setUserAuthenticationValidityDurationSeconds(5)
+
                     build()
                 }
             )
