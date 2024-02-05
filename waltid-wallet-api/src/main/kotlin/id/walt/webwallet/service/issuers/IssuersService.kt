@@ -1,6 +1,6 @@
 package id.walt.webwallet.service.issuers
 
-import id.walt.webwallet.db.models.todo.AccountIssuers
+import id.walt.webwallet.db.models.todo.WalletIssuers
 import id.walt.webwallet.db.models.todo.Issuers
 import io.ktor.client.*
 import io.ktor.client.engine.cio.*
@@ -27,13 +27,13 @@ object IssuersService {
         it.name == name
     }
 
-    fun list(account: UUID): List<IssuerDataTransferObject> = transaction {
+    fun list(wallet: UUID): List<IssuerDataTransferObject> = transaction {
         Issuers.innerJoin(
-            AccountIssuers,
+            WalletIssuers,
             onColumn = { Issuers.id },
-            otherColumn = { AccountIssuers.issuer },
+            otherColumn = { WalletIssuers.issuer },
             additionalConstraint = {
-                AccountIssuers.id eq account
+                WalletIssuers.wallet eq wallet
             }).selectAll().map {
             IssuerDataTransferObject(
                 name = it[Issuers.name],
