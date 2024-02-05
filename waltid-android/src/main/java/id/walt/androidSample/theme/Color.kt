@@ -1,4 +1,4 @@
-package id.walt.androidSample.ui.theme
+package id.walt.androidSample.theme
 
 import androidx.compose.ui.graphics.Color
 

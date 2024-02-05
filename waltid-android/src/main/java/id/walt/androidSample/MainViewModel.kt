@@ -1,4 +1,4 @@
-package id.walt.androidSample.ui
+package id.walt.androidSample
 
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.LocalKey
@@ -19,6 +19,8 @@ interface MainViewModel {
 
     val signature: StateFlow<ByteArray?>
 
+    val publicKey: StateFlow<LocalKey?>
+
     val events: Flow<Event>
 
     fun onSignRaw(plainText: String)
@@ -26,6 +28,8 @@ interface MainViewModel {
     fun onVerifyPlainText(signature: ByteArray, plainText: ByteArray?)
 
     fun onPlainTextChange(plainText: String)
+
+    fun retrievePublicKey()
 
     fun onClearInput()
 
@@ -38,6 +42,7 @@ interface MainViewModel {
 
         override val plainText = MutableStateFlow("placeholder text")
         override val signature = MutableStateFlow<ByteArray?>(null)
+        override val publicKey = MutableStateFlow<LocalKey?>(null)
         override val events = emptyFlow<Event>()
 
         override fun onSignRaw(plainText: String) = Unit
@@ -47,6 +52,7 @@ interface MainViewModel {
 
         override fun onPlainTextChange(plainText: String) = Unit
         override fun onClearInput() = Unit
+        override fun retrievePublicKey() = Unit
 
     }
 
@@ -56,6 +62,7 @@ interface MainViewModel {
 
         override val plainText = MutableStateFlow("")
         override val signature = MutableStateFlow<ByteArray?>(null)
+        override val publicKey = MutableStateFlow<LocalKey?>(null)
 
         private val eventsChannel = Channel<Event>()
         override val events = eventsChannel.receiveAsFlow()
@@ -82,6 +89,12 @@ interface MainViewModel {
                         eventsChannel.send(Event.SignatureInvalid)
                     }
                 }
+            }
+        }
+
+        override fun retrievePublicKey() {
+            viewModelScope.launch {
+                publicKey.value = localKey?.getPublicKey()
             }
         }
 
