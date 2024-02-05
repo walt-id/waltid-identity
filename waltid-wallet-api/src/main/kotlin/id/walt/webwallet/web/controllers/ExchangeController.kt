@@ -40,18 +40,19 @@ fun Application.exchange() = walletRoute {
 
             val offer = call.receiveText()
 
-
-            wallet.useOfferRequest(offer, did, silent)
-            wallet.addOperationHistory(
-                WalletOperationHistory.new(
-                    tenant = wallet.tenant,
-                    wallet = wallet,
-                    "useOfferRequest",
-                    mapOf("did" to did, "offer" to offer)
+            runCatching {
+                wallet.useOfferRequest(offer, did, silent)
+                wallet.addOperationHistory(
+                    WalletOperationHistory.new(
+                        tenant = wallet.tenant,
+                        wallet = wallet,
+                        "useOfferRequest",
+                        mapOf("did" to did, "offer" to offer)
+                    )
                 )
-            )
-
-            context.respond(HttpStatusCode.OK)
+            }.onSuccess {
+                context.respond(HttpStatusCode.OK)
+            }.onFailure { context.respond(HttpStatusCode.BadRequest, it.localizedMessage) }
         }
 
         post("matchCredentialsForPresentationDefinition", {

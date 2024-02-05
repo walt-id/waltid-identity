@@ -893,10 +893,11 @@ class SSIKit2WalletService(
         )
     }
 
-    private suspend fun validateTrustedIssuer(credential: WalletCredential, isEntra: Boolean) = isEntra.takeIf { it }?.let {
-        val (type, did) = getEntraDidAndCredentialType(credential)
-        trustUseCase.status(did = did, type = type, isIssuer = true)
-    } ?: TrustStatus.NotFound
+    private suspend fun validateTrustedIssuer(credential: WalletCredential, isEntra: Boolean) =
+        isEntra.takeIf { it }?.let {
+            val (type, did) = getEntraDidAndCredentialType(credential)
+            trustUseCase.status(did = did, type = type, isIssuer = true)
+        } ?: throw IllegalArgumentException("Silent claim for this credential type not supported.")//TrustStatus.NotFound
 
     //TODO: don't use pair
     private fun getEntraDidAndCredentialType(credential: WalletCredential) = let {

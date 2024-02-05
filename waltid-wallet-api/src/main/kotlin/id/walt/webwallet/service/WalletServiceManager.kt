@@ -1,5 +1,7 @@
 package id.walt.webwallet.service
 
+import id.walt.webwallet.config.ConfigManager
+import id.walt.webwallet.config.TrustConfig
 import id.walt.webwallet.db.models.AccountWalletMappings
 import id.walt.webwallet.db.models.AccountWalletPermissions
 import id.walt.webwallet.db.models.Wallets
@@ -24,8 +26,9 @@ object WalletServiceManager {
     private val walletServices = ConcurrentHashMap<Pair<UUID, UUID>, WalletService>()
     private val categoryService = CategoryServiceImpl
     private val http = HttpClient()
+    private val entraIssuerTrustConfig = ConfigManager.getConfig<TrustConfig>().entra?.issuer
     private val entraTrustValidationUseCase = TrustValidationUseCaseImpl(
-        issuerTrustValidationService = EntraIssuerTrustValidationService(http),
+        issuerTrustValidationService = EntraIssuerTrustValidationService(http, entraIssuerTrustConfig),
         verifierTrustValidationService = EntraVerifierTrustValidationService(http)
     )
 

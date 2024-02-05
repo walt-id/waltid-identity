@@ -76,6 +76,7 @@ object ConfigManager {
 
         registerConfig(ConfigData("oidc", OidcConfiguration::class))
         registerConfig(ConfigData("logins", LoginMethodsConfig::class))
+        registerConfig(ConfigData("trust", TrustConfig::class))
     }
 
     fun loadConfigs(args: Array<String>) {
