@@ -3,7 +3,7 @@ package id.walt.webwallet.db
 import id.walt.webwallet.config.ConfigManager
 import id.walt.webwallet.config.DatasourceConfiguration
 import id.walt.webwallet.db.models.*
-import id.walt.webwallet.db.models.todo.AccountIssuers
+import id.walt.webwallet.db.models.todo.WalletIssuers
 import id.walt.webwallet.db.models.todo.Issuers
 import id.walt.webwallet.service.account.AccountsService
 import id.walt.webwallet.service.issuers.IssuersService
@@ -74,7 +74,7 @@ object Db {
 
         //AccountWeb3WalletMappings,
         Web3Wallets,
-        AccountIssuers,
+        WalletIssuers,
         Events,
         WalletCategory,
         WalletCredentialCategoryMap,
@@ -91,14 +91,14 @@ object Db {
             SchemaUtils.create(*tables)
 
             runBlocking {
-                AccountsService.register(request = EmailAccountRequest("Max Mustermann", "string@string.string", "string"))
-//                AccountsService.register(request = EmailAccountRequest("Max Mustermann", "user@email.com", "password"))
                 IssuersService.add(
                     name = "walt.id",
                     description = "walt.id issuer portal",
                     uiEndpoint = "https://portal.walt.id/credentials?ids=",
                     configurationEndpoint = "https://issuer.portal.walt.id/.well-known/openid-credential-issuer"
                 )
+                AccountsService.register(request = EmailAccountRequest("Max Mustermann", "string@string.string", "string"))
+                AccountsService.register(request = EmailAccountRequest("Max Mustermann", "user@email.com", "password"))
             }
         }
     }
