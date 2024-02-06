@@ -43,7 +43,7 @@ export default function IssueSection() {
 
   async function handleIssue() {
     if (checkCallbackUrlParameter()) {
-      const offer = await getOfferUrl(credentialsToIssue, env.NEXT_PUBLIC_VC_REPO ? env.NEXT_PUBLIC_VC_REPO : nextConfig.publicRuntimeConfig!.NEXT_PUBLIC_VC_REPO, env.NEXT_PUBLIC_ISSUER ? env.NEXT_PUBLIC_ISSUER : nextConfig.publicRuntimeConfig!.NEXT_PUBLIC_ISSUER);
+      const offer = await getOfferUrl(credentialsToIssue, env.NEXT_PUBLIC_VC_REPO ?? nextConfig.publicRuntimeConfig!.NEXT_PUBLIC_VC_REPO, env.NEXT_PUBLIC_ISSUER ?? nextConfig.publicRuntimeConfig!.NEXT_PUBLIC_ISSUER);
       sendToWebWallet(decodeURI(params.callback!.toString()), 'api/siop/initiateIssuance', offer.data);
     } else {
       console.log("show qr-offer");

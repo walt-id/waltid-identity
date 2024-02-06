@@ -70,7 +70,7 @@ object AccountsService {
         val createdDid = walletService.createDid("key", mapOf("alias" to JsonPrimitive("Onboarding")))
         walletService.setDefault(createdDid)
     }.onFailure {
-        throw IllegalStateException("Could not register user", it)
+        throw IllegalStateException("Could not register user: ${it.message}", it)
     }
 
     private fun queryDefaultIssuer(name: String) =
