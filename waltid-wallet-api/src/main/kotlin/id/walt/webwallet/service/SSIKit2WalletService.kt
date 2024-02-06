@@ -540,7 +540,7 @@ class SSIKit2WalletService(
                                 document = credential,
                                 disclosures = null,
                                 addedOn = Clock.System.now(),
-                                manifest = manifest.toString(),
+                                manifest = manifest?.toString(),
 //                                delete = false,
                                 deletedOn = null,
                             ), createCredentialEventData(credentialJwt.payload, typ),
