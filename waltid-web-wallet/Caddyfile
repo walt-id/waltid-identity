@@ -1,5 +1,5 @@
 dev.local {
-    reverse_proxy localhost:3000 # frontend
-    reverse_proxy /wallet-api/* localhost:4545 # backend
+    reverse_proxy localhost:7100 # frontend
+    reverse_proxy /wallet-api/* localhost:7000 # backend
 }
 
