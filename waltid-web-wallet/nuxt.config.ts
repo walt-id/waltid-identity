@@ -181,7 +181,10 @@ export default defineNuxtConfig({
     },
 
     nitro: {
-        compressPublicAssets: true,
+        compressPublicAssets: {
+            gzip: true,
+            brotli: false
+        },
         devProxy: {
             "/wallet-api/": "http://localhost:7000/wallet-api"
         }

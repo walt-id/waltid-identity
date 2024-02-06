@@ -211,6 +211,7 @@ out
 # Nuxt.js build / generate output
 .nuxt
 dist
+.output
 
 # Gatsby files
 .cache/
@@ -499,4 +500,3 @@ Icon
 Network Trash Folder
 Temporary Items
 .apdisk
-

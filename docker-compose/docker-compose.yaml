@@ -44,9 +44,6 @@ services:
     environment:
       PORT: $VC_REPO_PORT
 
-
-
-
   caddy:
     image: caddy:2
     restart: unless-stopped
@@ -84,42 +81,5 @@ services:
         protocol: tcp
         mode: host
 
-#      - "80:80"
-#      - "443:443"
-#      - "443:443/udp"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile
-#      - $PWD/site:/srv
-#      - caddy_data:/data
-#      - caddy_config:/config
-
-
-#  ingress:
-#    image: nginx:1.15.10-alpine
-#    ports:
-#      - target: $WALLET_FRONTEND_PORT
-#        published: $WALLET_FRONTEND_PORT # waltid-web-wallet
-#        protocol: tcp
-#        mode: host
-#      - target: $WALLET_BACKEND_PORT
-#        published: $WALLET_BACKEND_PORT # wallet-api
-#        protocol: tcp
-#        mode: host
-#      - target: $WEB_PORTAL_PORT
-#        published: $WEB_PORTAL_PORT # web-portal
-#        protocol: tcp
-#        mode: host
-#      - target: $VC_REPO_PORT
-#        published: $VC_REPO_PORT # vc-repo
-#        protocol: tcp
-#        mode: host
-#      - target: $ISSUER_API_PORT
-#        published: $ISSUER_API_PORT # issuer-api
-#        protocol: tcp
-#        mode: host
-#      - target: $VERIFIER_API_PORT
-#        published: $VERIFIER_API_PORT # verifier-api
-#        protocol: tcp
-#        mode: host
-#    volumes:
-#      - ./ingress.conf:/etc/nginx/conf.d/default.conf # API gateway configuration
