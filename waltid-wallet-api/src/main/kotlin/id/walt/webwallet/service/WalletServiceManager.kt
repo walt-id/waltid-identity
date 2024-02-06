@@ -7,6 +7,10 @@ import id.walt.webwallet.service.account.AccountsService
 import id.walt.webwallet.service.category.CategoryServiceImpl
 import id.walt.webwallet.service.nft.NftKitNftService
 import id.walt.webwallet.service.nft.NftService
+import id.walt.webwallet.service.trust.EntraIssuerTrustValidationService
+import id.walt.webwallet.service.trust.EntraVerifierTrustValidationService
+import id.walt.webwallet.trustusecase.TrustValidationUseCaseImpl
+import io.ktor.client.*
 import kotlinx.datetime.Clock
 import kotlinx.datetime.toJavaInstant
 import kotlinx.uuid.UUID
@@ -19,11 +23,22 @@ object WalletServiceManager {
 
     private val walletServices = ConcurrentHashMap<Pair<UUID, UUID>, WalletService>()
     private val categoryService = CategoryServiceImpl
+    private val http = HttpClient()
+    private val entraTrustValidationUseCase = TrustValidationUseCaseImpl(
+        issuerTrustValidationService = EntraIssuerTrustValidationService(http),
+        verifierTrustValidationService = EntraVerifierTrustValidationService(http)
+    )
 
     fun getWalletService(tenant: String, account: UUID, wallet: UUID): WalletService =
         walletServices.getOrPut(Pair(account, wallet)) {
             //WalletKitWalletService(account, wallet)
-            SSIKit2WalletService(tenant, account, wallet, categoryService)
+            SSIKit2WalletService(
+                tenant = tenant,
+                accountId = account,
+                walletId = wallet,
+                categoryService = categoryService,
+                trustUseCase = entraTrustValidationUseCase
+            )
         }
 
     fun createWallet(tenant: String, forAccount: UUID): UUID {

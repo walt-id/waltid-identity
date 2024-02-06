@@ -46,6 +46,8 @@ import id.walt.webwallet.service.keys.KeysService
 import id.walt.webwallet.service.oidc4vc.TestCredentialWallet
 import id.walt.webwallet.service.report.ReportRequestParameter
 import id.walt.webwallet.service.report.ReportService
+import id.walt.webwallet.trustusecase.TrustStatus
+import id.walt.webwallet.trustusecase.TrustValidationUseCase
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.engine.cio.*
@@ -76,7 +78,8 @@ class SSIKit2WalletService(
     tenant: String,
     accountId: UUID,
     walletId: UUID,
-    private val categoryService: CategoryService
+    private val categoryService: CategoryService,
+    private val trustUseCase: TrustValidationUseCase
 ) : WalletService(tenant, accountId, walletId) {
     companion object {
         init {
@@ -105,7 +108,7 @@ class SSIKit2WalletService(
             logEvent(
                 action = EventType.Credential.Delete,
                 originator = "wallet",
-                data = createCredentialEventData(this.parsedDocument, null),
+                data = createCredentialEventData(this, null),
                 credentialId = this.id
             )
         }
@@ -135,14 +138,15 @@ class SSIKit2WalletService(
         data class TypeFilter(val path: String, val type: String? = null, val pattern: String)
 
         val filters = presentationDefinition.inputDescriptors.mapNotNull { inputDescriptor ->
-            inputDescriptor.constraints?.fields?.filter { field -> field.path.any { path -> path.contains("type") } }?.map {
-                val path = it.path.first().removePrefix("$.")
-                val filterType = it.filter?.get("type")?.jsonPrimitive?.content
-                val filterPattern = it.filter?.get("pattern")?.jsonPrimitive?.content
-                    ?: throw IllegalArgumentException("No filter pattern in presentation definition constraint")
+            inputDescriptor.constraints?.fields?.filter { field -> field.path.any { path -> path.contains("type") } }
+                ?.map {
+                    val path = it.path.first().removePrefix("$.")
+                    val filterType = it.filter?.get("type")?.jsonPrimitive?.content
+                    val filterPattern = it.filter?.get("pattern")?.jsonPrimitive?.content
+                        ?: throw IllegalArgumentException("No filter pattern in presentation definition constraint")
 
-                TypeFilter(path, filterType, filterPattern)
-            }?.plus(
+                    TypeFilter(path, filterType, filterPattern)
+                }?.plus(
                 inputDescriptor.schema?.map { schema ->
                     TypeFilter("type", "string", schema.uri)
                 } ?: listOf()
@@ -290,7 +294,7 @@ class SSIKit2WalletService(
                 logEvent(
                     action = EventType.Credential.Present,
                     originator = presentationSession.presentationDefinition?.name ?: EventDataNotAvailable,
-                    data = createCredentialEventData(this.parsedDocument, null),
+                    data = createCredentialEventData(this, null),
                     credentialId = this.id
                 )
             }
@@ -479,9 +483,10 @@ class SSIKit2WalletService(
         val responseBody = resp.bodyAsText()
         println("Resp: $resp")
         println(responseBody)
-        val vc = runCatching { Json.parseToJsonElement(responseBody).jsonObject["vc"]!!.jsonPrimitive.content }.getOrElse {
-            throw IllegalArgumentException("Could not get Verifiable Credential from response: $responseBody")
-        }
+        val vc =
+            runCatching { Json.parseToJsonElement(responseBody).jsonObject["vc"]!!.jsonPrimitive.content }.getOrElse {
+                throw IllegalArgumentException("Could not get Verifiable Credential from response: $responseBody")
+            }
         return listOf(CredentialResponse.Companion.success(CredentialFormat.jwt_vc_json, vc))
     }
 
@@ -514,16 +519,20 @@ class SSIKit2WalletService(
             throw IllegalStateException("No credential was returned from credentialEndpoint: $credentialResponses")
         }
 
-        val manifest = isEntra.takeIf { it }?.let { EntraManifestExtractor().extract(offer) }//?:DefaultManifestExtractor
+        // ??multiple credentials manifests
+        val manifest =
+            isEntra.takeIf { it }?.let { EntraManifestExtractor().extract(offer) }//?:DefaultManifestExtractor
         val addableCredentials: List<WalletCredential> = credentialResponses.map {
             getCredentialData(it, manifest, silent).also {
                 logEvent(
                     action = EventType.Credential.Accept,
                     originator = "", //parsedOfferReq.credentialOffer!!.credentialIssuer,
-                    data = getCredentialEventData(it.second, it.first.parsedDocument),
-                    credentialId = it.first.id,
+                    data = createCredentialEventData(credential = it.second, type = it.first),
+                    credentialId = it.second.id,
                 )
-            }.first//TODO: don't use pair
+            }.second//TODO: don't use pair
+        }.filter {
+            !silent || validateTrustedIssuer(it, isEntra) == TrustStatus.Trusted
         }
 
         CredentialsService.add(
@@ -539,8 +548,7 @@ class SSIKit2WalletService(
         val key = getKey(keyId)
         val options = getDidOptions(method, args)
         val result = DidService.registerByKey(method, key, options)
-        DidsService.
-        add(
+        DidsService.add(
             wallet = walletId,
             did = result.did,
             document = Json.encodeToString(result.didDocument),
@@ -784,15 +792,15 @@ class SSIKit2WalletService(
         )
 
     //TODO: move to related entity
-    private fun createCredentialEventData(json: JsonObject?, type: String?) = CredentialEventData(
+    private fun createCredentialEventData(credential: WalletCredential, type: String?) = CredentialEventData(
         ecosystem = EventDataNotAvailable,
-        issuerId = json?.jsonObject?.get("issuer")?.let {
+        issuerId = credential.parsedDocument?.jsonObject?.get("issuer")?.let {
             if (it is JsonObject)
                 it.jsonObject["id"]?.jsonPrimitive?.content
             else
                 it.jsonPrimitive.content
         } ?: EventDataNotAvailable,
-        subjectId = json?.jsonObject?.get("credentialSubject")?.jsonObject?.get(
+        subjectId = credential.parsedDocument?.jsonObject?.get("credentialSubject")?.jsonObject?.get(
             "id"
         )?.jsonPrimitive?.content ?: EventDataNotAvailable,
         issuerKeyId = EventDataNotAvailable,
@@ -803,6 +811,7 @@ class SSIKit2WalletService(
         credentialProofType = EventDataNotAvailable,
         policies = emptyList(),
         protocol = "oid4vp",
+        credentialId = credential.id,
     )
 
     //TODO: move to related entity
@@ -828,7 +837,7 @@ class SSIKit2WalletService(
             null -> throw IllegalArgumentException("WalletCredential JWT does not have \"typ\"")
             else -> throw IllegalArgumentException("Invalid credential \"typ\": $typ")
         }.let {
-            it to typ
+            typ to it
         }
     }
 
@@ -884,6 +893,20 @@ class SSIKit2WalletService(
         )
     }
 
-    private fun getCredentialEventData(type: String, document: JsonObject?) =
-        createCredentialEventData(json = document, type = type)
+    private suspend fun validateTrustedIssuer(credential: WalletCredential, isEntra: Boolean) = isEntra.takeIf { it }?.let {
+        val (type, did) = getEntraDidAndCredentialType(credential)
+        trustUseCase.status(did = did, type = type, isIssuer = true)
+    } ?: TrustStatus.NotFound
+
+    //TODO: don't use pair
+    private fun getEntraDidAndCredentialType(credential: WalletCredential) = let {
+        credential.manifest?.let {
+            Json.decodeFromString<JsonObject>(it)
+        }?.let {
+            it.jsonObject["iss"]?.jsonPrimitive?.content
+        } ?: "n/a"
+    }.let {
+        (credential.parsedDocument?.jsonObject?.get("type")?.jsonArray?.last()?.jsonPrimitive?.content ?: "n/a") to it
+    }
+
 }
