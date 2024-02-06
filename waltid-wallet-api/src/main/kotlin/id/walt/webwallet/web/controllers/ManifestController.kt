@@ -34,12 +34,18 @@ fun Application.manifest() = walletRoute {
                             description = "The display info json object"
                         }
                     }
+                    HttpStatusCode.NoContent to {
+                        body<JsonObject> {
+                            description = "The display info json object"
+                        }
+                    }
                 }
             }) {
-                val manifest = callManifest(call.parameters) {
-                    getManifest(it)
+                val manifest = callManifest(call.parameters) { getManifest(it) }
+                when (manifest) {
+                    null -> context.respond(HttpStatusCode.NoContent)
+                    else -> context.respond(manifest)
                 }
-                context.respond(manifest)
             }
             get("display", {
                 summary =
@@ -59,10 +65,16 @@ fun Application.manifest() = walletRoute {
                     }
                 }
             }) {
-                val manifest = callManifest(call.parameters){
+                val manifest = callManifest(call.parameters) {
                     getManifest(it)
-                }.toString()
-                context.respond(ManifestProvider.new(manifest).display())
+                }?.toString()
+
+                when (manifest) {
+                    null -> context.respond(HttpStatusCode.NoContent)
+                    else -> context.respond(ManifestProvider.new(manifest).display())
+                }
+
+
             }
             get("issuer", {
                 summary =
@@ -82,10 +94,14 @@ fun Application.manifest() = walletRoute {
                     }
                 }
             }) {
-                val manifest = callManifest(call.parameters){
+                val manifest = callManifest(call.parameters) {
                     getManifest(it)
-                }.toString()
-                context.respond(ManifestProvider.new(manifest).issuer())
+                }?.toString()
+
+                when (manifest) {
+                    null -> context.respond(HttpStatusCode.NoContent)
+                    else -> context.respond(ManifestProvider.new(manifest).issuer())
+                }
             }
         }
         route("extract") {
@@ -105,6 +121,11 @@ fun Application.manifest() = walletRoute {
                             description = "The manifest issuer info json object"
                         }
                     }
+                    HttpStatusCode.NoContent to {
+                        body<JsonObject> {
+                            description = "No/empty manifest"
+                        }
+                    }
                     HttpStatusCode.BadRequest to {
                         body<String> {
                             description = "Error message"
@@ -112,16 +133,18 @@ fun Application.manifest() = walletRoute {
                     }
                 }
             }) {
-                val manifest = callManifest(call.parameters){
-                    extractManifest(it)
+                val manifest = callManifest(call.parameters) { extractManifest(it) }
+
+                when (manifest) {
+                    null -> context.respond(HttpStatusCode.NoContent)
+                    else -> context.respond(manifest)
                 }
-                context.respond(manifest)
             }
         }
     }
 }
 
-internal suspend fun callManifest(parameters: Parameters, method: suspend (Parameters) -> JsonObject): JsonObject {
+internal suspend fun callManifest(parameters: Parameters, method: suspend (Parameters) -> JsonObject?): JsonObject? {
     val runtimeConfig = ConfigManager.getConfig<RuntimeConfig>()
     return if (runtimeConfig.mock) {
         EntraMockManifestExtractor().extract("")
@@ -140,7 +163,7 @@ internal fun getManifest(parameters: Parameters): JsonObject {
     )
 }
 
-internal suspend fun extractManifest(parameters: Parameters): JsonObject {
+internal suspend fun extractManifest(parameters: Parameters): JsonObject? {
     val offer = parameters["offer"] ?: throw IllegalArgumentException("Missing offer request uri.")
-    return ManifestExtractor.new(offer).extract(offer)
+    return ManifestExtractor.new(offer)?.extract(offer)
 }
