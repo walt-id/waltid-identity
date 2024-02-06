@@ -85,10 +85,7 @@ refreshNuxtData();
 
 async function deleteDid() {
     await $fetch(`/wallet-api/wallet/${currentWallet.value}/dids/${didId}`, {
-        method: "POST",
-        // headers: {
-        //     "X-HTTP-Method-Override": "DELETE"
-        // }
+        method: "DELETE",
     }).finally(() => {
         navigateTo(`/wallet/${currentWallet.value}/settings/dids`);
     });
