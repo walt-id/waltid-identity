@@ -250,7 +250,15 @@ async function acceptCredential() {
         navigateTo(`/wallet/${currentWallet.value}`);
     } catch (e) {
         failed.value = true;
-        failMessage.value = JSON.stringify(e);
+
+        let errorMessage = e?.data.startsWith("{") ? JSON.parse(e.data) : e.data ?? e;
+        errorMessage = errorMessage?.message ?? errorMessage;
+
+        failMessage.value = errorMessage;
+
+        console.log("Error: ", e?.data);
+        alert("Error occurred while trying to receive credential: " + failMessage.value);
+
         throw e;
     }
 }
