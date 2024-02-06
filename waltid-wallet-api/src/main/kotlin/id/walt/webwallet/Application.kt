@@ -76,4 +76,5 @@ fun Application.module() {
     eventLogs()
     manifest()
     categories()
+    reports()
 }
