@@ -1,7 +1,5 @@
 package id.walt.webwallet.web.controllers
 
-import id.walt.web.controllers.getWalletId
-import id.walt.web.controllers.getWalletService
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.service.report.CredentialReportRequestParameter
 import io.github.smiley4.ktorswaggerui.dsl.get
