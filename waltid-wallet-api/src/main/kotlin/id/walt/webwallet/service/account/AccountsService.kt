@@ -3,7 +3,7 @@ package id.walt.webwallet.service.account
 import id.walt.webwallet.config.ConfigManager
 import id.walt.webwallet.config.LoginMethodsConfig
 import id.walt.webwallet.db.models.*
-import id.walt.webwallet.db.models.todo.AccountIssuers
+import id.walt.webwallet.db.models.todo.WalletIssuers
 import id.walt.webwallet.db.models.todo.Issuers
 import id.walt.webwallet.service.WalletServiceManager
 import id.walt.webwallet.service.events.AccountEventData
@@ -41,6 +41,17 @@ object AccountsService {
 
         val createdInitialWalletId = transaction {
             WalletServiceManager.createWallet(tenant, registeredUserId)
+        }.also { walletId ->
+            transaction {
+                queryDefaultIssuer("walt.id")?.let { defaultIssuer ->
+                    WalletIssuers.insert {
+//                    it[WalletIssuers.tenant] = tenant
+//                    it[accountId] = registeredUserId
+                        it[issuer] = defaultIssuer
+                        it[wallet] = walletId
+                    }
+                }
+            }
         }
 
         val walletService = WalletServiceManager.getWalletService(tenant, registeredUserId, createdInitialWalletId)
@@ -58,17 +69,6 @@ object AccountsService {
         // Add default data:
         val createdDid = walletService.createDid("key", mapOf("alias" to JsonPrimitive("Onboarding")))
         walletService.setDefault(createdDid)
-
-        transaction {
-            queryDefaultIssuer("walt.id")?.let { defaultIssuer ->
-                AccountIssuers.insert {
-                    it[AccountIssuers.tenant] = tenant
-                    it[accountId] = registeredUserId
-                    it[issuer] = defaultIssuer
-                }
-            }
-        }
-
     }.onFailure {
         throw IllegalStateException("Could not register user", it)
     }
