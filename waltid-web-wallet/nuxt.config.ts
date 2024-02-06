@@ -176,14 +176,14 @@ export default defineNuxtConfig({
     runtimeConfig: {
         public: {
             projectId: process.env.ProjectId,
-            issuerCallbackUrl: process.env.IssuerCallbackUrl ?? "http://localhost:3000",
+            issuerCallbackUrl: process.env.IssuerCallbackUrl ?? "http://localhost:7100",
         }
     },
 
     nitro: {
         compressPublicAssets: true,
         devProxy: {
-            "/wallet-api/": "http://localhost:4545/wallet-api"
+            "/wallet-api/": "http://localhost:7000/wallet-api"
         }
     },
     ssr: false,

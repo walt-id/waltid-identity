@@ -1,6 +1,7 @@
 package id.walt.webwallet.web.controllers
 
 import id.walt.webwallet.web.controllers.DidCreation.didCreate
+import io.github.smiley4.ktorswaggerui.dsl.delete
 import io.github.smiley4.ktorswaggerui.dsl.get
 import io.github.smiley4.ktorswaggerui.dsl.post
 import io.github.smiley4.ktorswaggerui.dsl.route
@@ -52,7 +53,7 @@ fun Application.dids() = walletRoute {
                 )
             }
 
-            post({
+            delete({
                 summary = "Delete a specific DID"
                 response {
                     HttpStatusCode.Accepted to { description = "DID deleted" }
