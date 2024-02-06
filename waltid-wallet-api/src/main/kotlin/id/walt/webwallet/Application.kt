@@ -4,6 +4,7 @@ import id.walt.webwallet.web.controllers.auth
 import id.walt.webwallet.web.controllers.configureSecurity
 import id.walt.web.controllers.issuers
 import id.walt.webwallet.config.ConfigManager
+import id.walt.webwallet.config.WebConfig
 import id.walt.webwallet.db.Db
 import id.walt.webwallet.web.Administration.configureAdministration
 import id.walt.webwallet.web.controllers.*
@@ -36,13 +37,13 @@ fun main(args: Array<String>) {
 
     Db.start()
 
-//    val webConfig = ConfigManager.getConfig<WebConfig>()
-//    log.info { "Starting web server (binding to ${webConfig.webHost}, listening on port ${webConfig.webPort})..." }
-//    embeddedServer(CIO, port = webConfig.webPort, host = webConfig.webHost, module = Application::module)
-//        .start(wait = true)
-    log.info { "Starting web server (binding to 0.0.0.0, listening on port 4545)..." }
-    embeddedServer(CIO, port = 4545, host = "0.0.0.0", module = Application::module)
+    val webConfig = ConfigManager.getConfig<WebConfig>()
+    log.info { "Starting web server (binding to ${webConfig.webHost}, listening on port ${webConfig.webPort})..." }
+    embeddedServer(CIO, port = webConfig.webPort, host = webConfig.webHost, module = Application::module)
         .start(wait = true)
+    /*log.info { "Starting web server (binding to 0.0.0.0, listening on port 4545)..." }
+    embeddedServer(CIO, port = 4545, host = "0.0.0.0", module = Application::module)
+        .start(wait = true)*/
 }
 
 fun Application.configurePlugins() {

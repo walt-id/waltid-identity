@@ -14,6 +14,6 @@ COPY --from=buildstage /build/.output/ /app
 
 WORKDIR /app
 
-EXPOSE 3000
+EXPOSE 7100
 ENTRYPOINT node server/index.mjs
 
