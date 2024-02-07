@@ -31,7 +31,7 @@ Using Docker:
 
 ```bash
 docker build -t waltid/portal -f waltid-web-portal/Dockerfile .
-docker run -p3000:3000 -i -t waltid/portal
+docker run -p 7102:7102 -i -t waltid/portal
 ```
 
 ## Join the community

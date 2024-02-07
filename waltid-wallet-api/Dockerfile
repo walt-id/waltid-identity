@@ -24,5 +24,5 @@ FROM docker.io/eclipse-temurin:17
 COPY --from=buildstage /work/waltid-wallet-api/build/install/ /
 WORKDIR /waltid-wallet-api
 
-EXPOSE 4545
+EXPOSE 7001
 ENTRYPOINT ["/waltid-wallet-api/bin/waltid-wallet-api"]
