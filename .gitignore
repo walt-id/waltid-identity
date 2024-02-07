@@ -48,3 +48,7 @@ secret*
 /kotlin-js-store/
 .idea/misc.xml
 **/bun.lockb
+
+**/.nuxt
+**/.output
+**/node_modules

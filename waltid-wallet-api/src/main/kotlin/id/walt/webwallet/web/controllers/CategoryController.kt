@@ -1,11 +1,13 @@
 package id.walt.webwallet.web.controllers
 
+import io.github.smiley4.ktorswaggerui.dsl.delete
 import io.github.smiley4.ktorswaggerui.dsl.get
 import io.github.smiley4.ktorswaggerui.dsl.post
 import io.github.smiley4.ktorswaggerui.dsl.route
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.response.*
+import io.ktor.server.routing.*
 import io.ktor.server.util.*
 import kotlinx.serialization.json.JsonObject
 
@@ -44,7 +46,7 @@ fun Application.categories() = walletRoute {
                     context.respond(if (it) HttpStatusCode.Created else HttpStatusCode.BadRequest)
                 }.onFailure { context.respond(HttpStatusCode.BadRequest, it.localizedMessage) }
             }
-            post("delete", {
+            delete({
                 summary = "Delete category"
                 response {
                     HttpStatusCode.Accepted to { description = "Category delete" }

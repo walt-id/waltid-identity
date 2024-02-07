@@ -84,7 +84,7 @@ Verifier service relies on the following walt.id libraries:
 ### Running from source
 
 1. run the `id.walt.verifier.Mainkt` file
-2. the verifier backend is available at: http://localhost:7001
+2. the verifier backend is available at: http://localhost:7003
 
 ### Using docker
 
@@ -92,5 +92,5 @@ Run the following commands from the waltid-identity root path:
 
 ```shell
 docker build -t waltid/verifier-api -f waltid-verifier-api/Dockerfile .
-docker run -p 7001:7001 waltid/verifier-api --webHost=0.0.0.0 --webPort=7001 --baseUrl=http://localhost:7001
+docker run -p 7003:7003 waltid/verifier-api --webHost=0.0.0.0 --webPort=7003 --baseUrl=http://localhost:7003
 ```
