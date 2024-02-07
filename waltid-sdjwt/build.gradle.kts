@@ -36,7 +36,9 @@ kotlin {
 
             testTask {
                 useKarma {
-                    fun hasProgram(program: String) = ProcessBuilder(program, "--version").start().waitFor() == 0
+                    fun hasProgram(program: String) =
+                        runCatching { ProcessBuilder(program, "--version").start().waitFor() }.getOrElse { -1 } == 0
+
                     val testEngine = mapOf(
                         "chromium" to { useChromiumHeadless() },
                         "chrome" to { useChromeHeadless() },
