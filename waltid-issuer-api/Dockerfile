@@ -28,5 +28,5 @@ FROM docker.io/eclipse-temurin:17
 COPY --from=buildstage /work/waltid-issuer-api/build/install/ /
 WORKDIR /waltid-issuer-api
 
-EXPOSE 7001
+EXPOSE 7002
 ENTRYPOINT ["/waltid-issuer-api/bin/waltid-issuer-api"]
