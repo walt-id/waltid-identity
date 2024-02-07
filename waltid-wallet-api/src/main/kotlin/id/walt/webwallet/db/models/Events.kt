@@ -9,6 +9,7 @@ object Events : IntIdTable("events") {
     val originator = varchar("originator", 128).default("unknown")
     val account = kotlinxUUID("account")
     val wallet = kotlinxUUID("wallet").nullable()
+    val credentialId = varchar("credential", 256).nullable()
     val timestamp = timestamp("timestamp")
     val event = varchar("event", 48)
     val action = varchar("action", 48)

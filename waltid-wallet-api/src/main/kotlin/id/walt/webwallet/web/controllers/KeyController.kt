@@ -1,6 +1,7 @@
 package id.walt.webwallet.web.controllers
 
 import id.walt.crypto.keys.KeyType
+import io.github.smiley4.ktorswaggerui.dsl.delete
 import io.github.smiley4.ktorswaggerui.dsl.get
 import io.github.smiley4.ktorswaggerui.dsl.post
 import io.github.smiley4.ktorswaggerui.dsl.route
@@ -8,6 +9,7 @@ import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
+import io.ktor.server.routing.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonObject
 import org.jetbrains.exposed.sql.transactions.transaction
@@ -107,7 +109,7 @@ fun Application.keys() = walletRoute {
             context.respond(getWalletService().exportKey(keyId, format, loadPrivateKey))
         }
 
-        post("{keyId}", {
+        delete("{keyId}", {
             summary = "Delete a specific key"
             request {
                 pathParameter<String>("keyId") {

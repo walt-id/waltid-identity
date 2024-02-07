@@ -11,6 +11,7 @@ import id.walt.webwallet.service.dto.WalletDataTransferObject
 import id.walt.webwallet.service.events.EventLogFilter
 import id.walt.webwallet.service.events.EventLogFilterResult
 import id.walt.webwallet.service.issuers.IssuerDataTransferObject
+import id.walt.webwallet.service.report.ReportRequestParameter
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.uuid.UUID
@@ -77,6 +78,9 @@ abstract class WalletService(val tenant: String, val accountId: UUID, val wallet
     abstract suspend fun listCategories(): List<WalletCategoryData>
     abstract suspend fun addCategory(name: String): Boolean
     abstract suspend fun deleteCategory(name: String): Boolean
+
+    // Reports
+    abstract suspend fun getFrequentCredentials(parameter: ReportRequestParameter): List<WalletCredential>
 
 
     // TODO: Push
