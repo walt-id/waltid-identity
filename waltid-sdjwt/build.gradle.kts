@@ -42,6 +42,7 @@ kotlin {
                     val testEngine = mapOf(
                         "chromium" to { useChromiumHeadless() },
                         "chrome" to { useChromeHeadless() },
+                        "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" to { useChromeHeadless() }, // macOS
                         "firefox" to { useFirefoxHeadless() }
                     ).entries.firstOrNull { hasProgram(it.key) }
                     if (testEngine == null) println("No web test engine installed, please install chromium or firefox or chrome.")
