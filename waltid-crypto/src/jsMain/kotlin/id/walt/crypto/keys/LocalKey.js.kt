@@ -6,27 +6,38 @@ import id.walt.crypto.utils.ArrayUtils.toByteArray
 import id.walt.crypto.utils.JwsUtils.jwsAlg
 import id.walt.crypto.utils.PromiseUtils.await
 import jose
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import org.khronos.webgl.Uint8Array
 import kotlin.js.json
 
-actual class LocalKey actual constructor(jwk: String?) : Key() {
+@Serializable
+@SerialName("local")
+actual class LocalKey actual constructor(
+    var jwk: String?
+) : Key() {
 
+    @Transient
     private lateinit var _internalKey: KeyLike
+
+    @Transient
     private lateinit var _internalJwk: JWK
 
+    @Transient
     private var jwkToInit: String? = null
 
     init {
         if (jwk != null) {
             jwkToInit = jwk
-            _internalJwk = JSON.parse(jwk)
+            _internalJwk = JSON.parse(jwk!!)
         }
     }
 
-    suspend fun keyInit() {
+    override suspend fun init() {
         if (!this::_internalKey.isInitialized) {
             if (jwkToInit != null) {
                 _internalKey = await(jose.importJWK(JSON.parse(jwkToInit!!)))
@@ -43,6 +54,10 @@ actual class LocalKey actual constructor(jwk: String?) : Key() {
                 }
             } else {
                 _internalJwk = await(jose.exportJWK(_internalKey))
+
+                if (jwk == null) {
+                    jwk = JSON.stringify(_internalJwk)
+                }
             }
         }
 
@@ -72,9 +87,10 @@ actual class LocalKey actual constructor(jwk: String?) : Key() {
     }
 
     actual override suspend fun exportPEM(): String {
-        //await(jose.exportSPKI())
-        //await(jose.exportPKCS8(_internalKey))
-        TODO("Not yet implemented")
+        return when {
+            hasPrivateKey -> await(jose.exportPKCS8(_internalKey))
+            else -> await(jose.exportSPKI(_internalKey))
+        }
     }
 
     actual override suspend fun signRaw(plaintext: ByteArray): ByteArray {
@@ -109,7 +125,11 @@ actual class LocalKey actual constructor(jwk: String?) : Key() {
      * @return Result wrapping the plaintext; Result failure when the signature fails
      */
     actual override suspend fun verifyJws(signedJws: String): Result<JsonObject> =
-        runCatching { Json.parseToJsonElement(await(jose.compactVerify(signedJws, _internalKey)).payload.toByteArray().decodeToString()).jsonObject }
+        runCatching {
+            Json.parseToJsonElement(
+                await(jose.compactVerify(signedJws, _internalKey)).payload.toByteArray().decodeToString()
+            ).jsonObject
+        }
 
     actual override suspend fun getPublicKey(): LocalKey =
         LocalKey(
@@ -122,9 +142,10 @@ actual class LocalKey actual constructor(jwk: String?) : Key() {
                 qi = undefined
                 k = undefined
             }
-        ).apply { keyInit() }
+        ).apply { init() }
 
     actual override suspend fun getPublicKeyRepresentation(): ByteArray {
+
         TODO("Not yet implemented")
     }
 
@@ -162,7 +183,9 @@ actual class LocalKey actual constructor(jwk: String?) : Key() {
         }
 
     actual override val hasPrivateKey: Boolean
-        get() = _internalKey.type == "private"
+        get() = check(this::_internalKey.isInitialized) { "_internalKey of LocalKey.js.kt is not initialized (tried to to private key operation?) - has init() be called on key?" }
+            .run { _internalKey.type == "private" }
+
 
     actual override suspend fun getKeyId(): String = _internalJwk.kid ?: getThumbprint()
 

@@ -22,6 +22,8 @@ import java.security.*
 import java.security.spec.PKCS8EncodedKeySpec
 import java.util.*
 
+private val bouncyCastleProvider = BouncyCastleProvider()
+
 @Serializable
 @SerialName("local")
 actual class LocalKey actual constructor(
@@ -36,9 +38,11 @@ actual class LocalKey actual constructor(
         if (jwk != null) {
             _internalJwk = JWK.parse(jwk)
         }
-        Security.addProvider(BouncyCastleProvider())
-    }
 
+        if (bouncyCastleProvider !in Security.getProviders()) {
+            Security.addProvider(bouncyCastleProvider)
+        }
+    }
 
     constructor(jwkObject: JWK) : this(null) {
         _internalJwk = jwkObject
