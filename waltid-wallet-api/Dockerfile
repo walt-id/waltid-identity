@@ -14,7 +14,7 @@ COPY waltid-openid4vc/. /work/waltid-openid4vc
 COPY waltid-sdjwt/. /work/waltid-sdjwt
 
 COPY waltid-wallet-api/src/ /work/waltid-wallet-api/src
-COPY waltid-wallet-api/gradle/ /work/waltid-wallet-api/gradle
+#COPY waltid-wallet-api/gradle/ /work/waltid-wallet-api/gradle
 COPY waltid-wallet-api/build.gradle.kts waltid-wallet-api/gradle.properties waltid-wallet-api/gradlew /work/waltid-wallet-api/
 
 RUN gradle clean installDist
