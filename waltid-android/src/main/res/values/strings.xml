@@ -1,3 +1,20 @@
 <resources>
     <string name="app_name">Waltid Android Sample</string>
+
+    <string name="signature_verification_failed">Signature verification failed</string>
+    <string name="signature_verified">Signature successfully verified!</string>
+    <string name="biometric_unavailable">Please enroll fingerprint to continue</string>
+    <string name="biometric_authentication_failure">Authentication failed</string>
+
+    <string name="title_biometric_authentication">Biometric Authentication</string>
+    <string name="subtitle_biometric_authentication">Verify your identity to sign signature</string>
+    <string name="cancel">Cancel</string>
+
+    <string name="label_enter_plaintext">Enter plain text to sign</string>
+    <string name="label_sign">Sign Plain Text</string>
+    <string name="label_verify_signature">Verify Signature</string>
+    <string name="label_get_public_key">Retrieve Public Key</string>
+    <string name="signature">Signature: %s</string>
+
+    <string name="copied_to_clipboard">Copied signature to clipboard!</string>
 </resources>
