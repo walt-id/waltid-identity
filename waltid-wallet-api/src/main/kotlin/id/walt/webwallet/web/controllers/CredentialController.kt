@@ -129,6 +129,34 @@ fun Application.credentials() = walletRoute {
                     context.respond(HttpStatusCode.BadRequest, it.localizedMessage)
                 }
             }
+            post("accept", {
+                summary = "Accept credential"
+                response {
+                    HttpStatusCode.Accepted to { description = "" }
+                    HttpStatusCode.BadRequest to { description = "" }
+                }
+            }){
+                val credentialId = call.parameters.getOrFail("credentialId")
+                runCatching { getWalletService().acceptCredential(credentialId) }.onSuccess {
+                    if (it) context.respond(HttpStatusCode.Accepted) else context.respond(HttpStatusCode.BadRequest)
+                }.onFailure {
+                    context.respond(HttpStatusCode.BadRequest, it.localizedMessage)
+                }
+            }
+            post("reject", {
+                summary = "Reject credential"
+                response {
+                    HttpStatusCode.Accepted to { description = "" }
+                    HttpStatusCode.BadRequest to { description = "" }
+                }
+            }){
+                val credentialId = call.parameters.getOrFail("credentialId")
+                runCatching { getWalletService().rejectCredential(credentialId) }.onSuccess {
+                    if (it) context.respond(HttpStatusCode.Accepted) else context.respond(HttpStatusCode.BadRequest)
+                }.onFailure {
+                    context.respond(HttpStatusCode.BadRequest, it.localizedMessage)
+                }
+            }
             route("category/{category}", {
                 request {
                     pathParameter<String>("category") {

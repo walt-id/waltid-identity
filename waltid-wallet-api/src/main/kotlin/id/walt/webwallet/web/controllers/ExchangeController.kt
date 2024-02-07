@@ -43,7 +43,7 @@ fun Application.exchange() = walletRoute {
             val offer = call.receiveText()
 
             runCatching {
-                wallet.useOfferRequest(offer, did, silent)
+                wallet.useOfferRequest(offer = offer, did = did, requireUserInput = requireUserInput, silent = silent)
                 wallet.addOperationHistory(
                     WalletOperationHistory.new(
                         tenant = wallet.tenant,

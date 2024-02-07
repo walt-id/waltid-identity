@@ -28,6 +28,8 @@ abstract class WalletService(val tenant: String, val accountId: UUID, val wallet
     abstract suspend fun getCredential(credentialId: String): WalletCredential
     abstract suspend fun attachCategory(credentialId: String, category: String): Boolean
     abstract suspend fun detachCategory(credentialId: String, category: String): Boolean
+    abstract suspend fun acceptCredential(credentialId: String): Boolean
+    abstract suspend fun rejectCredential(credentialId: String): Boolean
 
     abstract fun matchCredentialsByPresentationDefinition(presentationDefinition: PresentationDefinition): List<WalletCredential>
 

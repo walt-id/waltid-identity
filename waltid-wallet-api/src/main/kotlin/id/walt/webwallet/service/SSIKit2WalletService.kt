@@ -137,6 +137,14 @@ class SSIKit2WalletService(
     override suspend fun detachCategory(credentialId: String, category: String): Boolean =
         CredentialsService.Category.delete(walletId, credentialId, category) == 1
 
+    override suspend fun acceptCredential(credentialId: String): Boolean =
+        CredentialsService.get(walletId, credentialId)?.takeIf { it.deletedOn == null }?.let {
+            CredentialsService.setPending(walletId, credentialId, false) > 0
+        } ?: error("Credential not found: $credentialId")
+
+    override suspend fun rejectCredential(credentialId: String): Boolean =
+        CredentialsService.delete(walletId, credentialId, true)
+
     override fun matchCredentialsByPresentationDefinition(presentationDefinition: PresentationDefinition): List<WalletCredential> {
         val credentialList = listCredentials(CredentialFilterObject.default)
 
