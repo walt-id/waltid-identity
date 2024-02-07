@@ -36,8 +36,17 @@ kotlin {
 
             testTask {
                 useKarma {
-                    useChromiumHeadless()
-//                    useChromeHeadless()
+                    fun hasProgram(program: String) = ProcessBuilder(program, "--version").start().waitFor() == 0
+                    val testEngine = mapOf(
+                        "chromium" to { useChromiumHeadless() },
+                        "chrome" to { useChromeHeadless() },
+                        "firefox" to { useFirefoxHeadless() }
+                    ).entries.firstOrNull { hasProgram(it.key) }
+                    if (testEngine == null) println("No web test engine installed, please install chromium or firefox or chrome.")
+                    else {
+                        println("Using web test engine: ${testEngine.key}")
+                        testEngine.value.invoke()
+                    }
                 }
             }
         }
