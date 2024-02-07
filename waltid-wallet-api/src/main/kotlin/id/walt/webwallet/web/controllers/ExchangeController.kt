@@ -9,6 +9,7 @@ import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
+import io.ktor.server.util.*
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 
@@ -21,6 +22,7 @@ fun Application.exchange() = walletRoute {
 
             request {
                 queryParameter<String>("did") { description = "The DID to issue the credential(s) to" }
+                queryParameter<Boolean>("silent") { description = "Whether to claim in background" }
                 body<String> {
                     description = "The offer request to use"
                 }
@@ -33,14 +35,14 @@ fun Application.exchange() = walletRoute {
         }) {
             val wallet = getWalletService()
 
-            val did = call.request.queryParameters["did"]
-                ?: wallet.listDids().firstOrNull()?.did
-                ?: throw IllegalArgumentException("No DID to use supplied")
+            val did = call.request.queryParameters["did"] ?: wallet.listDids().firstOrNull()?.did
+            ?: throw IllegalArgumentException("No DID to use supplied")
+            val silent = call.request.queryParameters.getOrFail("silent").toBoolean()
 
             val offer = call.receiveText()
 
 
-            wallet.useOfferRequest(offer, did)
+            wallet.useOfferRequest(offer, did, silent)
             wallet.addOperationHistory(
                 WalletOperationHistory.new(
                     tenant = wallet.tenant,

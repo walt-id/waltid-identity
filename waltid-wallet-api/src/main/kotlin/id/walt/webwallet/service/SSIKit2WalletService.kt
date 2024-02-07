@@ -4,6 +4,7 @@ import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.LocalKey
+import id.walt.crypto.utils.JwsUtils
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.did.dids.DidService
 import id.walt.did.dids.registrar.LocalRegistrar
@@ -484,7 +485,7 @@ class SSIKit2WalletService(
         return listOf(CredentialResponse.Companion.success(CredentialFormat.jwt_vc_json, vc))
     }
 
-    override suspend fun useOfferRequest(offer: String, did: String) {
+    override suspend fun useOfferRequest(offer: String, did: String, silent: Boolean) {
 
         val credentialWallet = getCredentialWallet(did)
 
@@ -493,24 +494,18 @@ class SSIKit2WalletService(
         println("// parse credential URI")
         val reqParams = Url(offer).parameters.toMap()
 
-        // TODO: use manifest extractor factory method, but fix offer double-checking first
         // entra or openid4vc credential offer
-        val (credentialResponses, manifest) = if (EntraIssuanceRequest.isEntraIssuanceRequestUri(offer)) {
-            Pair(
-                processMSEntraIssuanceRequest(
-                    EntraIssuanceRequest.fromAuthorizationRequest(
-                        AuthorizationRequest.fromHttpParametersAuto(
-                            reqParams
-                        )
-                    ), credentialWallet
-                    // TODO: entra multiple credentials / manifests case
-                ), EntraManifestExtractor().extract(offer)
+        val isEntra = EntraIssuanceRequest.isEntraIssuanceRequestUri(offer)
+        val credentialResponses = if (isEntra) {
+            processMSEntraIssuanceRequest(
+                EntraIssuanceRequest.fromAuthorizationRequest(
+                    AuthorizationRequest.fromHttpParametersAuto(
+                        reqParams
+                    )
+                ), credentialWallet
             )
         } else {
-            Pair(
-                processCredentialOfferRequest(CredentialOfferRequest.fromHttpParameters(reqParams), credentialWallet),
-                null
-            )
+            processCredentialOfferRequest(CredentialOfferRequest.fromHttpParameters(reqParams), credentialWallet)
         }
 
         // === original ===
@@ -519,75 +514,21 @@ class SSIKit2WalletService(
             throw IllegalStateException("No credential was returned from credentialEndpoint: $credentialResponses")
         }
 
+        val manifest = isEntra.takeIf { it }?.let { EntraManifestExtractor().extract(offer) }//?:DefaultManifestExtractor
         val addableCredentials: List<WalletCredential> = credentialResponses.map { credentialResp ->
             val credential = credentialResp.credential!!.jsonPrimitive.content
 
             val credentialJwt = credential.decodeJws(withSignature = true)
 
-            val credentialResultPair =
-                when (val typ = credentialJwt.header["typ"]?.jsonPrimitive?.content?.lowercase()) {
-                    "jwt" -> {
-                        val credentialId =
-                            credentialJwt.payload["vc"]!!.jsonObject["id"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
-                                ?: randomUUID()
-
-                        println("Got JWT credential: $credentialJwt")
-
-                        Pair(
-                            WalletCredential(
-                                wallet = walletId,
-                                id = credentialId,
-                                document = credential,
-                                disclosures = null,
-                                addedOn = Clock.System.now(),
-                                manifest = manifest?.toString(),
-//                                delete = false,
-                                deletedOn = null,
-                            ), createCredentialEventData(credentialJwt.payload, typ),
-                        )
-                    }
-
-                    "vc+sd-jwt" -> {
-                        val credentialId =
-                            credentialJwt.payload["id"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
-                                ?: randomUUID()
-
-                        println("Got SD-JWT credential: $credentialJwt")
-
-                        val disclosures = credentialJwt.signature.split("~").drop(1)
-                        println("Disclosures (${disclosures.size}): $disclosures")
-
-                        val disclosuresString = disclosures.joinToString("~")
-
-                        val credentialWithoutDisclosures = credential.substringBefore("~")
-
-                        Pair(
-                            WalletCredential(
-                                wallet = walletId,
-                                id = credentialId,
-                                document = credentialWithoutDisclosures,
-                                disclosures = disclosuresString,
-                                addedOn = Clock.System.now(),
-                                manifest = manifest?.toString(),
-//                                delete = false,
-                                deletedOn = null,
-                            ), createCredentialEventData(
-                                json = credentialJwt.payload.jsonObject,
-                                type = typ
-                            )
-                        )
-                    }
-
-                    null -> throw IllegalArgumentException("WalletCredential JWT does not have \"typ\"")
-                    else -> throw IllegalArgumentException("Invalid credential \"typ\": $typ")
-                }
+            val credentialData = getCredentialData(credentialJwt, credential, manifest, silent)
+            val credentialEventData = getCredentialEventData(credentialJwt)
             logEvent(
-                action = EventType.Credential.Accept,
+                action = EventType.Credential.Accept, //parsedOfferReq.credentialOffer!!.credentialIssuer,
                 originator = "", //parsedOfferReq.credentialOffer!!.credentialIssuer,
-                data = credentialResultPair.second,
-                credentialId = credentialResultPair.first.id,
+                data = credentialEventData,
+                credentialId = credentialData.id,
             )
-            credentialResultPair.first
+            credentialData
         }
 
         CredentialsService.add(
@@ -879,4 +820,68 @@ class SSIKit2WalletService(
         val itemIndex = afterItemIndex + pageSize
         itemIndex.takeIf { it < count }?.toString()
     }
+
+    private fun getCredentialData(
+        credentialJwt: JwsUtils.JwsParts, credential: String, manifest: JsonObject?, silent: Boolean
+    ) = when (val typ = credentialJwt.header["typ"]?.jsonPrimitive?.content?.lowercase()) {
+        "jwt" -> {
+            val credentialId =
+                credentialJwt.payload["vc"]!!.jsonObject["id"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
+                    ?: randomUUID()
+
+            println("Got JWT credential: $credentialJwt")
+
+            WalletCredential(
+                wallet = walletId,
+                id = credentialId,
+                document = credential,
+                disclosures = null,
+                addedOn = Clock.System.now(),
+                manifest = manifest.toString(),
+//                delete = false,
+                deletedOn = null,
+                pending = silent,
+            )
+        }
+
+        "vc+sd-jwt" -> {
+            val credentialId =
+                credentialJwt.payload["id"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() } ?: randomUUID()
+
+            println("Got SD-JWT credential: $credentialJwt")
+
+            val disclosures = credentialJwt.signature.split("~").drop(1)
+            println("Disclosures (${disclosures.size}): $disclosures")
+
+            val disclosuresString = disclosures.joinToString("~")
+
+            val credentialWithoutDisclosures = credential.substringBefore("~")
+
+            WalletCredential(
+                wallet = walletId,
+                id = credentialId,
+                document = credentialWithoutDisclosures,
+                disclosures = disclosuresString,
+                addedOn = Clock.System.now(),
+                manifest = manifest?.toString(),
+//                delete = false,
+                deletedOn = null,
+                pending = silent,
+            )
+        }
+
+        null -> throw IllegalArgumentException("WalletCredential JWT does not have \"typ\"")
+        else -> throw IllegalArgumentException("Invalid credential \"typ\": $typ")
+    }
+
+    private fun getCredentialEventData(credentialJwt: JwsUtils.JwsParts) =
+        when (val typ = credentialJwt.header["typ"]?.jsonPrimitive?.content?.lowercase()) {
+            "jwt" -> createCredentialEventData(credentialJwt.payload, typ)
+            "vc+sd-jwt" -> createCredentialEventData(
+                json = credentialJwt.payload.jsonObject, type = typ
+            )
+
+            null -> throw IllegalArgumentException("WalletCredential JWT does not have \"typ\"")
+            else -> throw IllegalArgumentException("Invalid credential \"typ\": $typ")
+        }
 }
