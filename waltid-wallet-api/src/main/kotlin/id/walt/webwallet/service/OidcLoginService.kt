@@ -1,15 +1,17 @@
 package id.walt.webwallet.service
 
 import com.auth0.jwk.JwkProviderBuilder
+import id.walt.webwallet.config.ConfigManager
+import id.walt.webwallet.config.OidcConfiguration
 import java.net.URL
 import java.util.concurrent.TimeUnit
 
 object OidcLoginService {
-
-    val jwkProvider = JwkProviderBuilder(URL("http://localhost:8080/realms/waltid-keycloak-ktor/protocol/openid-connect/certs"))
-        .cached(10, 24, TimeUnit.HOURS)
-        .rateLimited(10, 1, TimeUnit.MINUTES)
+    private val oidcConfig = ConfigManager.getConfig<OidcConfiguration>()
+    val jwkProvider = JwkProviderBuilder(URL(oidcConfig.oidcJwks))
+        .cached(oidcConfig.jwksCache.cacheSize.toLong(), oidcConfig.jwksCache.cacheExpirationHours.toLong(), TimeUnit.HOURS)
+        .rateLimited(oidcConfig.jwksCache.rateLimit.bucketSize.toLong(), oidcConfig.jwksCache.rateLimit.refillRateMinutes.toLong(), TimeUnit.MINUTES)
         .build()
-    val oidcRealm = "http://localhost:8080/realms/waltid-keycloak-ktor"
+    val oidcRealm = oidcConfig.oidcRealm
 
 }
