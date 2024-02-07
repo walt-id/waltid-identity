@@ -28,6 +28,6 @@ FROM docker.io/eclipse-temurin:17
 COPY --from=buildstage /work/waltid-verifier-api/build/install/ /
 WORKDIR /waltid-verifier-api
 
-EXPOSE 7002
+EXPOSE 7003
 
 ENTRYPOINT ["/waltid-verifier-api/bin/waltid-verifier-api"]
