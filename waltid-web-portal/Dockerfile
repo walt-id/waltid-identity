@@ -17,6 +17,6 @@ COPY --from=buildstage /build/public ./app/public
 
 WORKDIR /app
 
-EXPOSE 3000
+EXPOSE 7101
 CMD ["npm", "start"]
 
