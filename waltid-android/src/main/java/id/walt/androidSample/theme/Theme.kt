@@ -1,4 +1,4 @@
-package id.walt.androidSample.ui.theme
+package id.walt.androidSample.theme
 
 import android.app.Activity
 import android.os.Build
