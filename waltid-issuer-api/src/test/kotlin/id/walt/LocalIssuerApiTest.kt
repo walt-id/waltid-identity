@@ -96,7 +96,7 @@ class IssuerApiTest {
         ConfigManager.loadConfigs(emptyArray())
         val offerUri = createCredentialOfferUri(issueRequest)
 
-        assertEquals(true, offerUri.contains("//localhost:7000/?credential_offer"))
+        assertEquals(true, offerUri.contains("//localhost:7001/?credential_offer"))
     }
 
     @OptIn(ExperimentalJsExport::class)
@@ -113,6 +113,6 @@ class IssuerApiTest {
         ConfigManager.loadConfigs(emptyArray())
         val offerUri = createCredentialOfferUri(issueRequest)
 
-        assertEquals(true, offerUri.contains("//localhost:7000/?credential_offer"))
+        assertEquals(true, offerUri.contains("//localhost:7001/?credential_offer"))
     }
 }
