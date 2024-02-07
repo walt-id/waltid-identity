@@ -30,7 +30,7 @@ Config locations:
 - wallet API: `wallet-backend`
 - issuer API: `issuer-api/config`
 - verifier API: `verifier-api/config`
-- ingress: `ingress.conf`
+- ingress: `Caddyfile`
 - environment: `.env`
 
 ## Troubleshooting
