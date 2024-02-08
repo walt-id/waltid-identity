@@ -60,20 +60,20 @@ spec:
     - host: portal.walt.id
       http:
         paths:
-          - path: /offer
-            pathType: Prefix
-            backend:
-              service:
-                name: issuer
-                port:
-                  number: 80
-          - path: /verify
-            pathType: Prefix
-            backend:
-              service:
-                name: verifier
-                port:
-                  number: 80
+#          - path: /offer
+#            pathType: Prefix
+#            backend:
+#              service:
+#                name: issuer
+#                port:
+#                  number: 80
+#          - path: /verify
+#            pathType: Prefix
+#            backend:
+#              service:
+#                name: verifier
+#                port:
+#                  number: 80
           - path: /
             pathType: Prefix
             backend:
@@ -81,20 +81,20 @@ spec:
                 name: web-portal
                 port:
                   name: http
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  annotations:
-    kubernetes.io/ingress.class: "nginx"
-    cert-manager.io/cluster-issuer: letsencrypt-prod
-    nginx.ingress.kubernetes.io/permanent-redirect: "https://portal.walt.id/"
-  name: iss-vfr-redirect
-spec:
-  tls:
-  - hosts:
-      - verifier.walt.id
-      - issuer.walt.id
-    secretName: iss-vfr-tls-secret
-  rules:
-  - host: verifier.walt.id
-  - host: issuer.walt.id
+#apiVersion: networking.k8s.io/v1
+#kind: Ingress
+#metadata:
+#  annotations:
+#    kubernetes.io/ingress.class: "nginx"
+#    cert-manager.io/cluster-issuer: letsencrypt-prod
+#    nginx.ingress.kubernetes.io/permanent-redirect: "https://portal.walt.id/"
+#  name: iss-vfr-redirect
+#spec:
+#  tls:
+#  - hosts:
+#      - verifier.walt.id
+#      - issuer.walt.id
+#    secretName: iss-vfr-tls-secret
+#  rules:
+#  - host: verifier.walt.id
+#  - host: issuer.walt.id

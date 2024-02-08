@@ -1,0 +1,23 @@
+.github
+.idea
+.nuxt
+node_modules
+*.log
+nuxt.d.ts
+.output
+
+.yarn/*
+!.yarn/patches
+!.yarn/releases
+!.yarn/plugins
+!.yarn/sdks
+!.yarn/versions
+
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
+out/
+!**/src/main/**/out/
+!**/src/test/**/out/
