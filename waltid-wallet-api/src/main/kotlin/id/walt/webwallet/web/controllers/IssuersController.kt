@@ -82,17 +82,18 @@ fun Application.issuers() = walletRoute {
                     }
                 }
             }) {
+                val issuer = getWalletService().getIssuer(call.parameters["issuer"] ?: error("No issuer name provided."))
                 runCatching {
-                    val issuer = getWalletService().getIssuer(
-                        call.parameters["issuer"] ?: throw IllegalArgumentException("No issuer name provided.")
-                    )
                     IssuerCredentialsDataTransferObject(
                         issuer = issuer, credentials = IssuersService.fetchCredentials(issuer.configurationEndpoint)
                     )
                 }.onSuccess {
                     context.respond(it)
-                }.onFailure {
-                    context.respondText(it.localizedMessage, ContentType.Text.Plain, HttpStatusCode.InternalServerError)
+                }.onFailure { err ->
+                    throw IllegalArgumentException(
+                        "Could not fetch issuer configuration from issuer ${issuer.name} at ${issuer.configurationEndpoint}: ${err.message}",
+                        err
+                    )
                 }
             }
         }

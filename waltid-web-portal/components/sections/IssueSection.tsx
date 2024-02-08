@@ -43,8 +43,8 @@ export default function IssueSection() {
 
   async function handleIssue() {
     if (checkCallbackUrlParameter()) {
-      const offer = await getOfferUrl(credentialsToIssue, env.NEXT_PUBLIC_VC_REPO ? env.NEXT_PUBLIC_VC_REPO : nextConfig.publicRuntimeConfig!.NEXT_PUBLIC_VC_REPO, env.NEXT_PUBLIC_ISSUER ? env.NEXT_PUBLIC_ISSUER : nextConfig.publicRuntimeConfig!.NEXT_PUBLIC_ISSUER);
-      sendToWebWallet(decodeURI(params.callback!.toString()), 'exchange/issuance', offer.data);
+      const offer = await getOfferUrl(credentialsToIssue, env.NEXT_PUBLIC_VC_REPO ?? nextConfig.publicRuntimeConfig!.NEXT_PUBLIC_VC_REPO, env.NEXT_PUBLIC_ISSUER ?? nextConfig.publicRuntimeConfig!.NEXT_PUBLIC_ISSUER);
+      sendToWebWallet(decodeURI(params.callback!.toString()), 'api/siop/initiateIssuance', offer.data);
     } else {
       console.log("show qr-offer");
       localStorage.setItem('offer', JSON.stringify(credentialsToIssue));
@@ -119,9 +119,9 @@ export default function IssueSection() {
         <Button onClick={handleCancel} style="link" color="secondary">
           Cancel
         </Button>
-        <Button 
-        disabled={!(credentialsToIssue.length > 0 && (credentialsToIssue.length < 2 || credentialsToIssue.filter((cred) => cred.selectedFormat === "SD-JWT + VCDM").length === 0))}
-        onClick={handleIssue}>Issue</Button>
+        <Button
+          disabled={!(credentialsToIssue.length > 0 && (credentialsToIssue.length < 2 || credentialsToIssue.filter((cred) => cred.selectedFormat === "SD-JWT + VCDM").length === 0))}
+          onClick={handleIssue}>Issue</Button>
       </div>
       <div className="flex flex-col items-center mt-12">
         <div className="flex flex-row gap-2 items-center content-center text-sm text-center text-gray-500">

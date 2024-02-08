@@ -1,3 +1,5 @@
+import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
+
 plugins {
     kotlin("multiplatform")
 
@@ -26,49 +28,70 @@ kotlin {
 
     js(IR) {
         browser {
-            commonWebpackConfig(Action {
+            commonWebpackConfig {
                 cssSupport {
                     enabled.set(true)
                 }
-            })
+            }
 
-            testTask(Action {
+            testTask {
                 useKarma {
-                    useChromiumHeadless()
+                    fun hasProgram(program: String) =
+                        runCatching { ProcessBuilder(program, "--version").start().waitFor() }.getOrElse { -1 } == 0
+
+                    val testEngine = mapOf(
+                        "chromium" to { useChromiumHeadless() },
+                        "chrome" to { useChromeHeadless() },
+                        "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" to { useChromeHeadless() }, // macOS
+                        "firefox" to { useFirefoxHeadless() }
+                    ).entries.firstOrNull { hasProgram(it.key) }
+                    if (testEngine == null) println("No web test engine installed, please install chromium or firefox or chrome.")
+                    else {
+                        println("Using web test engine: ${testEngine.key}")
+                        testEngine.value.invoke()
+                    }
                 }
-            })
+            }
         }
         nodejs {
             generateTypeScriptDefinitions()
         }
         binaries.library()
     }
+
     val hostOs = System.getProperty("os.name")
-    val isMingwX64 = hostOs.startsWith("Windows")
-    val nativeTarget = when {
-        hostOs == "Mac OS X" -> macosX64("native")
-        hostOs == "Linux" -> linuxX64("native")
-        isMingwX64 -> mingwX64("native")
-        else -> throw GradleException("Host OS is not supported in Kotlin/Native.")
-    }
-    when(hostOs) {
-        "Mac OS X" -> listOf (
-            iosArm64(),
-            iosX64(),
-            iosSimulatorArm64()
-        )
-        else -> listOf()
-    }.forEach {
-        val platform = when (it.name) {
-            "iosArm64" -> "iphoneos"
-            else -> "iphonesimulator"
+    val hostArch = System.getProperty("os.arch")
+    if (hostOs in listOf("Windows", "Linux") && hostArch == "aarch64") {
+        println("Native compilation is not yet supported for aarch64 on Windows / Linux.")
+    } else {
+        println("Running with $hostOs under $hostArch")
+        val isMingwX64 = hostOs.startsWith("Windows")
+        val nativeTarget = when {
+            hostOs == "Mac OS X" -> macosX64("native")
+            hostOs == "Linux" -> linuxX64("native")
+            isMingwX64 -> mingwX64("native")
+            else -> throw GradleException("Host OS is not supported in Kotlin/Native.")
         }
 
-        it.binaries.framework {
-            baseName = "shared"
-        }
+        when (hostOs) {
+            "Mac OS X" -> listOf<KotlinNativeTarget>(
+//                iosArm64(),
+//                iosX64(),
+//                iosSimulatorArm64()
+            )
 
-        it.compilations.getByName("main") {
+            else -> listOf()
+        }.forEach {
+            val platform = when (it.name) {
+                "iosArm64" -> "iphoneos"
+                else -> "iphonesimulator"
+            }
+
+            it.binaries.framework {
+                baseName = "shared"
+            }
+
+            it.compilations.getByName("main") {
 //            cinterops.create("id.walt.sdjwt.cinterop.ios") {
 //                val interopTask = tasks[interopProcessingTaskName]
 //                interopTask.dependsOn(":waltid-sd-jwt-ios:build${platform.uppercase()}")
@@ -79,6 +102,7 @@ kotlin {
 //
 //                headers("$projectDir/waltid-sd-jwt-ios/build/Release-$platform/include/waltid_sd_jwt_ios/waltid_sd_jwt_ios-Swift.h")
 //            }
+            }
         }
     }
 
@@ -128,24 +152,24 @@ kotlin {
         //val nativeTest by getting
 
         if (hostOs == "Mac OS X") {
-            val iosArm64Main by getting
-            val iosSimulatorArm64Main by getting
-            val iosX64Main by getting
+//            val iosArm64Main by getting
+//            val iosSimulatorArm64Main by getting
+            /*val iosX64Main by getting
             val iosMain by creating {
                 dependsOn(commonMain)
-                iosArm64Main.dependsOn(this)
-                iosSimulatorArm64Main.dependsOn(this)
+//                iosArm64Main.dependsOn(this)
+//                iosSimulatorArm64Main.dependsOn(this)
                 iosX64Main.dependsOn(this)
-            }
-            val iosArm64Test by getting
-            val iosSimulatorArm64Test by getting
-            val iosX64Test by getting
+            }*/
+//            val iosArm64Test by getting
+//            val iosSimulatorArm64Test by getting
+            /*val iosX64Test by getting
             val iosTest by creating {
                 dependsOn(commonTest)
-                iosArm64Test.dependsOn(this)
-                iosSimulatorArm64Test.dependsOn(this)
+//                iosArm64Test.dependsOn(this)
+//                iosSimulatorArm64Test.dependsOn(this)
                 iosX64Test.dependsOn(this)
-            }
+            }*/
         }
     }
 
