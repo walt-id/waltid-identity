@@ -15,10 +15,13 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -29,6 +32,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -36,7 +40,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
@@ -57,6 +63,7 @@ import id.walt.androidSample.MainViewModel.Event.BiometricsUnavailable
 import id.walt.androidSample.MainViewModel.Event.SignatureInvalid
 import id.walt.androidSample.MainViewModel.Event.SignatureVerified
 import id.walt.androidSample.theme.WaltIdAndroidSampleTheme
+import id.walt.crypto.keys.KeyType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
@@ -76,12 +83,25 @@ fun MainUi(viewModel: MainViewModel) {
     val biometricManager = remember { BiometricManager.from(context) }
     val isBiometricsAvailable = biometricManager.canAuthenticate(BIOMETRIC_STRONG or BIOMETRIC_WEAK) == BiometricManager.BIOMETRIC_SUCCESS
 
+    val keyTypeOptions = listOf(KeyType.RSA, KeyType.secp256r1)
+    var selectedKeyType: KeyType by remember { mutableStateOf(keyTypeOptions[0]) }
+
     ObserveAsEvents(viewModel.events) { event ->
         when (event) {
             SignatureInvalid -> Toast.makeText(context, context.getString(R.string.signature_verification_failed), Toast.LENGTH_SHORT).show()
             SignatureVerified -> Toast.makeText(context, context.getString(R.string.signature_verified), Toast.LENGTH_SHORT).show()
             BiometricsUnavailable -> Toast.makeText(context, context.getString(R.string.biometric_unavailable), Toast.LENGTH_SHORT).show()
-            BiometricAuthenticationFailure -> Toast.makeText(context, context.getString(R.string.biometric_authentication_failure), Toast.LENGTH_SHORT).show()
+            BiometricAuthenticationFailure -> Toast.makeText(
+                context,
+                context.getString(R.string.biometric_authentication_failure),
+                Toast.LENGTH_SHORT
+            ).show()
+
+            is MainViewModel.Event.SignedWithKey -> Toast.makeText(
+                context,
+                context.getString(R.string.signed_with_key, event.key.name),
+                Toast.LENGTH_SHORT
+            ).show()
         }
     }
 
@@ -96,7 +116,7 @@ fun MainUi(viewModel: MainViewModel) {
         object : BiometricPrompt.AuthenticationCallback() {
             override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
                 super.onAuthenticationSucceeded(result)
-                viewModel.onSignRaw(plainText)
+                viewModel.onSignRaw(plainText, selectedKeyType)
             }
 
             override fun onAuthenticationFailed() {
@@ -120,6 +140,14 @@ fun MainUi(viewModel: MainViewModel) {
             .animateContentSize()
             .verticalScroll(rememberScrollState())
     ) {
+
+        KeyTypeOptions(
+            options = keyTypeOptions,
+            selectedOption = selectedKeyType,
+            modifier = Modifier
+        ) { newSelection ->
+            selectedKeyType = newSelection
+        }
 
         OutlinedTextField(
             value = plainText,
