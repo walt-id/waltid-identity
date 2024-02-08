@@ -79,7 +79,7 @@ interface MainViewModel {
 
         override fun onSignRaw(plainText: String) {
             viewModelScope.launch {
-                LocalKey.generate(KeyType.RSA, LocalKeyMetadata()).run {
+                LocalKey.generate(KeyType.secp256r1, LocalKeyMetadata()).run {
                     localKey = this
                     val signedContent = this.signRaw(plainText.toByteArray())
                     signature.value = signedContent
