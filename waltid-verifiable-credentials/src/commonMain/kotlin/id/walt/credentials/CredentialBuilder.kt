@@ -13,9 +13,13 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.uuid.UUID
 import kotlinx.uuid.generateUUID
+import kotlin.js.ExperimentalJsExport
+import kotlin.js.JsExport
+import kotlin.js.JsName
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
-
+@ExperimentalJsExport
+@JsExport
 enum class CredentialBuilderType {
     /** W3C Verifiable Credential version 1.1 */
     W3CV11CredentialBuilder,
@@ -25,7 +29,8 @@ enum class CredentialBuilderType {
 
     MdocsCredentialBuilder // TODO
 }
-
+@ExperimentalJsExport
+@JsExport
 class CredentialBuilder(
     val builderType: CredentialBuilderType = W3CV2CredentialBuilder
 ) {
@@ -86,6 +91,7 @@ class CredentialBuilder(
         _extraCustomData[key] = data
     }
 
+    @JsName("useDataPair")
     fun useData(pair: Pair<String, JsonElement>) = useData(pair.first, pair.second)
 
     infix fun String.set(data: JsonElement) {

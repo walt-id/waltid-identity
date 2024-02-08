@@ -19,15 +19,22 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import love.forte.plugin.suspendtrans.annotation.JsPromise
+import love.forte.plugin.suspendtrans.annotation.JvmAsync
+import love.forte.plugin.suspendtrans.annotation.JvmBlocking
 import kotlin.js.ExperimentalJsExport
+import kotlin.js.JsExport
 
+@ExperimentalJsExport
+@JsExport
 class W3CVCSerializer : KSerializer<W3CVC> {
     override val descriptor: SerialDescriptor = JsonObject.serializer().descriptor
     override fun deserialize(decoder: Decoder): W3CVC = W3CVC(decoder.decodeSerializableValue(JsonObject.serializer()))
     override fun serialize(encoder: Encoder, value: W3CVC) = encoder.encodeSerializableValue(JsonObject.serializer(), value.toJsonObject())
 }
 
-@OptIn(ExperimentalJsExport::class)
+@ExperimentalJsExport
+@JsExport
 @Serializable(with = W3CVCSerializer::class)
 data class W3CVC(
     private val content: Map<String, JsonElement> = emptyMap()
@@ -38,7 +45,10 @@ data class W3CVC(
     fun toJson(): String = Json.encodeToString(content)
     fun toPrettyJson(): String = prettyJson.encodeToString(content)
 
-
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     suspend fun signSdJwt(
         issuerKey: Key,
         issuerDid: String,
@@ -64,7 +74,10 @@ data class W3CVC(
 
         return SDJwt.createFromSignedJwt(signed, sdPayload).toString()
     }
-
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     suspend fun signJws(
         issuerKey: Key,
         issuerDid: String,
