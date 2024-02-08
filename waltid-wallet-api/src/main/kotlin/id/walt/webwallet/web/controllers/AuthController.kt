@@ -1,6 +1,9 @@
 package id.walt.webwallet.web.controllers
 
 import com.auth0.jwk.JwkProviderBuilder
+import id.walt.webwallet.config.ConfigManager
+import id.walt.webwallet.config.OidcConfiguration
+import id.walt.webwallet.config.WebConfig
 import id.walt.webwallet.db.models.AccountWalletMappings
 import id.walt.webwallet.db.models.AccountWalletPermissions
 import id.walt.webwallet.service.OidcLoginService
@@ -63,7 +66,8 @@ object AuthKeys {
 }
 
 fun Application.configureSecurity() {
-
+    val webConfig = ConfigManager.getConfig<WebConfig>()
+    val oidcConfig = ConfigManager.getConfig<OidcConfiguration>()
     install(Sessions) {
         cookie<LoginTokenSession>("login") {
             //cookie.encoding = CookieEncoding.BASE64_ENCODING
@@ -92,19 +96,19 @@ fun Application.configureSecurity() {
             client = HttpClient()
             providerLookup = {
                 OAuthServerSettings.OAuth2ServerSettings(
-                    name = "keycloak",
+                    name = oidcConfig.providerName,
                     authorizeUrl =
-                    "http://localhost:8080/realms/waltid-keycloak-ktor/protocol/openid-connect/auth",
+                    oidcConfig.authorizeUrl,
                     accessTokenUrl =
-                    "http://localhost:8080/realms/waltid-keycloak-ktor/protocol/openid-connect/token",
-                    clientId = "waltid_backend",
-                    clientSecret = "uYTjPRcqo9wTguXH80MBD2Uaklc3Xnab",
+                    oidcConfig.accessTokenUrl,
+                    clientId = oidcConfig.clientId,
+                    clientSecret = oidcConfig.clientSecret,
                     accessTokenRequiresBasicAuth = false,
                     requestMethod = HttpMethod.Post,
                     defaultScopes = listOf("roles")
                 )
             }
-            urlProvider = { "http://localhost:4545/wallet-api/auth/oidc-session" }
+            urlProvider = { "${webConfig.publicBaseUrl}/wallet-api/auth/oidc-session" }
         }
 
         jwt("auth-oauth-jwt") {
@@ -191,7 +195,7 @@ fun Application.auth() {
 
                         call.sessions.set(OidcTokenSession(principal.accessToken))
 
-                        call.respondRedirect("http://localhost:3000/login?oidc_login=true")
+                        call.respondRedirect("/login?oidc_login=true")
                     }
                 }
             }
@@ -320,6 +324,13 @@ fun Application.auth() {
                 } else {
                     call.respond(HttpStatusCode.OK)
                 }
+            }
+            get("logout-oidc", {
+                description = "Logout via OIDC provider"
+            }) {
+                val oidcConfig = ConfigManager.getConfig<OidcConfiguration>()
+                val webConfig = ConfigManager.getConfig<WebConfig>()
+                call.respondRedirect("${oidcConfig.logoutUrl}?post_logout_redirect_uri=${webConfig.publicBaseUrl}&client_id=${oidcConfig.clientId}")
             }
         }
     }

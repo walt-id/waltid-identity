@@ -23,6 +23,40 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlin.time.Duration.Companion.minutes
 
+
+suspend fun createCredentialOfferUri(issuanceRequest: BaseIssuanceRequest): String {
+    val key = KeySerialization.deserializeKey(issuanceRequest.issuanceKey)
+        .onFailure { throw IllegalArgumentException("Invalid key was supplied, error occurred is: $it") }
+        .getOrThrow()
+    val issuerDid =
+        issuanceRequest.issuerDid ?: DidService.registerByKey("key", key).did
+
+    val credentialOfferBuilder =
+        OidcIssuance.issuanceRequestsToCredentialOfferBuilder(issuanceRequest)
+
+    val issuanceSession = OidcApi.initializeCredentialOffer(
+        credentialOfferBuilder = credentialOfferBuilder,
+        expiresIn = 5.minutes,
+        allowPreAuthorized = true
+    )
+    OidcApi.setIssuanceDataForIssuanceId(
+        issuanceSession.id,
+        listOf(CIProvider.IssuanceSessionData(key, issuerDid, issuanceRequest))
+    )  // TODO: Hack as this is non stateless because of oidc4vc lib API
+
+    println("issuanceSession: $issuanceSession")
+
+    val offerRequest = CredentialOfferRequest(issuanceSession.credentialOffer!!)
+    println("offerRequest: $offerRequest")
+
+    val offerUri = OidcApi.getCredentialOfferRequestUrl(
+        offerRequest,
+        CROSS_DEVICE_CREDENTIAL_OFFER_URL + OidcApi.baseUrl.removePrefix("https://")
+            .removePrefix("http://") + "/"
+    )
+    println("Offer URI: $offerUri")
+    return offerUri
+}
 fun Application.issuerApi() {
     routing {
         get("/example-key") {
@@ -163,39 +197,8 @@ fun Application.issuerApi() {
                             }
                         }
                     }) {
-                        val issuanceRequest = context.receive<JwtIssuanceRequest>()
-                        val key = KeySerialization.deserializeKey(issuanceRequest.issuanceKey)
-                            .onFailure { throw IllegalArgumentException("Invalid key was supplied, error occurred is: $it") }
-                            .getOrThrow()
-                        val issuerDid =
-                            issuanceRequest.issuerDid ?: DidService.registerByKey("key", key).did
-
-                        val credentialOfferBuilder =
-                            OidcIssuance.issuanceRequestsToCredentialOfferBuilder(issuanceRequest)
-
-                        val issuanceSession = OidcApi.initializeCredentialOffer(
-                            credentialOfferBuilder = credentialOfferBuilder,
-                            expiresIn = 5.minutes,
-                            allowPreAuthorized = true
-                        )
-
-                        //val nonce = issuanceSession.cNonce ?: throw IllegalArgumentException("No cNonce set in issuanceSession?")
-
-                        OidcApi.setIssuanceDataForIssuanceId(
-                            issuanceSession.id,
-                            listOf(CIProvider.IssuanceSessionData(key, issuerDid, issuanceRequest))
-                        )  // TODO: Hack as this is non stateless because of oidc4vc lib API
-                        println("issuanceSession: $issuanceSession")
-
-                        val offerRequest = CredentialOfferRequest(issuanceSession.credentialOffer!!)
-                        println("offerRequest: $offerRequest")
-
-                        val offerUri = OidcApi.getCredentialOfferRequestUrl(
-                            offerRequest,
-                            CROSS_DEVICE_CREDENTIAL_OFFER_URL + OidcApi.baseUrl.removePrefix("https://")
-                                .removePrefix("http://") + "/"
-                        )
-                        println("Offer URI: $offerUri")
+                        val jwtIssuanceRequest = context.receive<JwtIssuanceRequest>()
+                        val offerUri = createCredentialOfferUri(jwtIssuanceRequest)
 
                         context.respond(
                             HttpStatusCode.OK,
@@ -204,7 +207,8 @@ fun Application.issuerApi() {
                     }
                     post("issueBatch", {
                         summary = "Signs a list of credentials and starts an OIDC credential exchange flow."
-                        description = "This endpoint issues a list W3C Verifiable Credentials, and returns an issuance URL "
+                        description =
+                            "This endpoint issues a list W3C Verifiable Credentials, and returns an issuance URL "
 
                         request {
                             body<List<JwtIssuanceRequest>> {
@@ -231,7 +235,8 @@ fun Application.issuerApi() {
 
                         val issuanceRequests = context.receive<List<JwtIssuanceRequest>>()
 
-                        val credentialOfferBuilder = OidcIssuance.issuanceRequestsToCredentialOfferBuilder(issuanceRequests)
+                        val credentialOfferBuilder =
+                            OidcIssuance.issuanceRequestsToCredentialOfferBuilder(issuanceRequests)
 
                         val issuanceSession = OidcApi.initializeCredentialOffer(
                             credentialOfferBuilder = credentialOfferBuilder,
@@ -295,46 +300,9 @@ fun Application.issuerApi() {
                             }
                         }
                     }) {
-                        val req = context.receive<SdJwtIssuanceRequest>()
+                        val sdJwtIssuanceRequest = context.receive<SdJwtIssuanceRequest>()
 
-                        val key = KeySerialization.deserializeKey(req.issuanceKey)
-                            .onFailure { throw IllegalArgumentException("Invalid key was supplied, error occurred is: $it") }
-                            .getOrThrow()
-                        val issuerDid = req.issuerDid ?: DidService.registerByKey("key", key).did
-
-                        val credentialOfferBuilder =
-                            OidcIssuance.issuanceRequestsToCredentialOfferBuilder(
-                                JwtIssuanceRequest(
-                                    req.issuanceKey,
-                                    issuerDid,
-                                    req.vc,
-                                    req.mapping
-                                )
-                            )
-
-                        val issuanceSession = OidcApi.initializeCredentialOffer(
-                            credentialOfferBuilder = credentialOfferBuilder,
-                            expiresIn = 5.minutes,
-                            allowPreAuthorized = true
-                        )
-
-                        //val nonce = issuanceSession.cNonce ?: throw IllegalArgumentException("No cNonce set in issuanceSession?")
-
-                        OidcApi.setIssuanceDataForIssuanceId(
-                            issuanceSession.id,
-                            listOf(CIProvider.IssuanceSessionData(key, issuerDid, req))
-                        )  // TODO: Hack as this is non stateless because of oidc4vc lib API
-                        println("issuanceSession: $issuanceSession")
-
-                        val offerRequest = CredentialOfferRequest(issuanceSession.credentialOffer!!)
-                        println("offerRequest: $offerRequest")
-
-                        val offerUri = OidcApi.getCredentialOfferRequestUrl(
-                            offerRequest,
-                            CROSS_DEVICE_CREDENTIAL_OFFER_URL + OidcApi.baseUrl.removePrefix("https://")
-                                .removePrefix("http://") + "/"
-                        )
-                        println("Offer URI: $offerUri")
+                        val offerUri = createCredentialOfferUri(sdJwtIssuanceRequest)
 
                         context.respond(
                             HttpStatusCode.OK,
@@ -349,8 +317,9 @@ fun Application.issuerApi() {
 
                         request {
                             headerParameter<String>("walt-key") {
-                                description = "Supply a core-crypto key representation to use to issue the credential, " +
-                                        "e.g. a local key (internal JWK) or a TSE key."
+                                description =
+                                    "Supply a core-crypto key representation to use to issue the credential, " +
+                                            "e.g. a local key (internal JWK) or a TSE key."
                                 example = mapOf(
                                     "type" to "local", "jwk" to "{ ... }"
                                 )

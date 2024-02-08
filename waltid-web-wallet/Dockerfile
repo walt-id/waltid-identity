@@ -1,12 +1,12 @@
 # BUILD
-FROM docker.io/gplane/pnpm:8 as buildstage
+FROM docker.io/oven/bun:1 as buildstage
 
-COPY waltid-web-wallet/web /build
+COPY waltid-web-wallet /build
 
 WORKDIR /build
-RUN pnpm install
+RUN bun install
 
-RUN pnpm build
+RUN bun run build
 
 # RUN
 FROM docker.io/node:alpine
@@ -14,6 +14,6 @@ COPY --from=buildstage /build/.output/ /app
 
 WORKDIR /app
 
-EXPOSE 3000
+EXPOSE 7101
 ENTRYPOINT node server/index.mjs
 

@@ -1,3 +1,4 @@
+
 package id.walt.sdjwt
 
 import io.kotest.assertions.json.shouldEqualJson
@@ -8,8 +9,10 @@ import io.kotest.matchers.maps.shouldNotContainKey
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import kotlinx.serialization.json.*
+import kotlin.js.ExperimentalJsExport
 import kotlin.test.Test
 
+@OptIn(ExperimentalJsExport::class)
 class SDJwtTest {
     @Test
     fun testParseSdJwt() {

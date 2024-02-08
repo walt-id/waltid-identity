@@ -32,6 +32,7 @@ class W3CVCSerializer : KSerializer<W3CVC> {
     override fun deserialize(decoder: Decoder): W3CVC = W3CVC(decoder.decodeSerializableValue(JsonObject.serializer()))
     override fun serialize(encoder: Encoder, value: W3CVC) = encoder.encodeSerializableValue(JsonObject.serializer(), value.toJsonObject())
 }
+
 @ExperimentalJsExport
 @JsExport
 @Serializable(with = W3CVCSerializer::class)

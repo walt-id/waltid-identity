@@ -49,7 +49,7 @@ class ImportTestsJs {
         -----END PRIVATE KEY-----
     """.trimIndent()
 
-//    @Test
+    @Test
     fun importJwk() = runTest {
         // Private
         println("Importing private JWK...")
@@ -94,7 +94,7 @@ class ImportTestsJs {
         assertEquals(publicKey.getThumbprint(), publicKey.getKeyId())
     }
 
-//    @Test
+    @Test
     fun importPem() = runTest {
         // Private
         println("Importing private PEM...")

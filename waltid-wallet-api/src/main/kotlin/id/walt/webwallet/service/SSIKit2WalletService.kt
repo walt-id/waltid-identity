@@ -27,16 +27,12 @@ import id.walt.oid4vc.responses.BatchCredentialResponse
 import id.walt.oid4vc.responses.CredentialResponse
 import id.walt.oid4vc.responses.TokenResponse
 import id.walt.oid4vc.util.randomUUID
-import id.walt.webwallet.config.ConfigManager
-import id.walt.webwallet.config.RuntimeConfig
 import id.walt.webwallet.db.models.WalletCategoryData
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.db.models.WalletOperationHistories
 import id.walt.webwallet.db.models.WalletOperationHistory
 import id.walt.webwallet.manifest.extractor.EntraManifestExtractor
 import id.walt.webwallet.service.category.CategoryService
-import id.walt.webwallet.service.category.CategoryServiceImpl
-import id.walt.webwallet.service.category.MockCategoryService
 import id.walt.webwallet.service.credentials.CredentialFilterObject
 import id.walt.webwallet.service.credentials.CredentialsService
 import id.walt.webwallet.service.dids.DidsService
@@ -47,6 +43,8 @@ import id.walt.webwallet.service.issuers.IssuerDataTransferObject
 import id.walt.webwallet.service.issuers.IssuersService
 import id.walt.webwallet.service.keys.KeysService
 import id.walt.webwallet.service.oidc4vc.TestCredentialWallet
+import id.walt.webwallet.service.report.ReportRequestParameter
+import id.walt.webwallet.service.report.ReportService
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.engine.cio.*
@@ -103,7 +101,12 @@ class SSIKit2WalletService(
 
     override suspend fun deleteCredential(id: String, permanent: Boolean) = let {
         CredentialsService.get(walletId, id)?.run {
-            logEvent(EventType.Credential.Delete, "wallet", createCredentialEventData(this.parsedDocument, null))
+            logEvent(
+                action = EventType.Credential.Delete,
+                originator = "wallet",
+                data = createCredentialEventData(this.parsedDocument, null),
+                credentialId = this.id
+            )
         }
         CredentialsService.delete(walletId, id, permanent)
     }
@@ -284,9 +287,10 @@ class SSIKit2WalletService(
         selectedCredentialIds.forEach {
             CredentialsService.get(walletId, it)?.run {
                 logEvent(
-                    EventType.Credential.Present,
-                    presentationSession.presentationDefinition?.name ?: EventDataNotAvailable,
-                    createCredentialEventData(this.parsedDocument, null)
+                    action = EventType.Credential.Present,
+                    originator = presentationSession.presentationDefinition?.name ?: EventDataNotAvailable,
+                    data = createCredentialEventData(this.parsedDocument, null),
+                    credentialId = this.id
                 )
             }
         }
@@ -536,10 +540,10 @@ class SSIKit2WalletService(
                                 document = credential,
                                 disclosures = null,
                                 addedOn = Clock.System.now(),
-                                manifest = manifest.toString(),
+                                manifest = manifest?.toString(),
 //                                delete = false,
                                 deletedOn = null,
-                            ), createCredentialEventData(credentialJwt.payload, typ)
+                            ), createCredentialEventData(credentialJwt.payload, typ),
                         )
                     }
 
@@ -578,19 +582,18 @@ class SSIKit2WalletService(
                     else -> throw IllegalArgumentException("Invalid credential \"typ\": $typ")
                 }
             logEvent(
-                EventType.Credential.Accept,
-                "", //parsedOfferReq.credentialOffer!!.credentialIssuer,
-                credentialResultPair.second
+                action = EventType.Credential.Accept,
+                originator = "", //parsedOfferReq.credentialOffer!!.credentialIssuer,
+                data = credentialResultPair.second,
+                credentialId = credentialResultPair.first.id,
             )
             credentialResultPair.first
         }
 
-        transaction {
-            CredentialsService.addAll(
-                wallet = walletId,
-                credentials = addableCredentials
-            )
-        }
+        CredentialsService.add(
+            wallet = walletId,
+            credentials = addableCredentials.toTypedArray()
+        )
     }
 
     /* DIDs */
@@ -813,6 +816,8 @@ class SSIKit2WalletService(
     override suspend fun addCategory(name: String): Boolean = categoryService.add(walletId, name) == 1
 
     override suspend fun deleteCategory(name: String): Boolean = categoryService.delete(walletId, name) == 1
+    override suspend fun getFrequentCredentials(parameter: ReportRequestParameter): List<WalletCredential> =
+        ReportService.Credentials.frequent(parameter)
 
     private fun getDidOptions(method: String, args: Map<String, JsonPrimitive>) = when (method.lowercase()) {
         "key" -> DidKeyCreateOptions(
@@ -829,16 +834,18 @@ class SSIKit2WalletService(
         else -> throw IllegalArgumentException("Did method not supported: $method")
     }
 
-    private fun logEvent(action: EventType.Action, originator: String, data: EventData) = EventService.add(
-        Event(
-            action = action,
-            tenant = tenant,
-            originator = originator,
-            account = accountId,
-            wallet = walletId,
-            data = data,
+    private fun logEvent(action: EventType.Action, originator: String, data: EventData, credentialId: String? = null) =
+        EventService.add(
+            Event(
+                action = action,
+                tenant = tenant,
+                originator = originator,
+                account = accountId,
+                wallet = walletId,
+                data = data,
+                credentialId = credentialId,
+            )
         )
-    )
 
     //TODO: move to related entity
     private fun createCredentialEventData(json: JsonObject?, type: String?) = CredentialEventData(

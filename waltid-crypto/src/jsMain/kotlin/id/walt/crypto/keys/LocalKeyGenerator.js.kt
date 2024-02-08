@@ -14,7 +14,7 @@ object JsLocalKeyCreator : LocalKeyCreator {
         @Suppress("UNCHECKED_CAST_TO_EXTERNAL_INTERFACE")
         val key = await(jose.generateKeyPair<KeyLike>(alg, json("extractable" to true) as jose.GenerateKeyPairOptions)).privateKey
 
-        return LocalKey(key).apply { keyInit() }
+        return LocalKey(key).apply { init() }
     }
 
     override suspend fun importRawPublicKey(type: KeyType, rawPublicKey: ByteArray, metadata: LocalKeyMetadata): Key {
@@ -22,7 +22,7 @@ object JsLocalKeyCreator : LocalKeyCreator {
     }
 
     override suspend fun importJWK(jwk: String): Result<LocalKey> =
-        runCatching { LocalKey(await(jose.importJWK(JSON.parse(jwk))), JSON.parse(jwk)).apply { keyInit() } }
+        runCatching { LocalKey(await(jose.importJWK(JSON.parse(jwk))), JSON.parse(jwk)).apply { init() } }
 
 
     /**
@@ -52,6 +52,6 @@ object JsLocalKeyCreator : LocalKeyCreator {
                 }
             )
 
-            LocalKey(importedPemKey).apply { keyInit() }
+            LocalKey(importedPemKey).apply { init() }
         }
 }
