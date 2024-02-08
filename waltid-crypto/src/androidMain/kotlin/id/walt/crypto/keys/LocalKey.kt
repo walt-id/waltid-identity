@@ -12,7 +12,9 @@ import java.util.UUID
 actual class LocalKey actual constructor(jwk: String?) : Key() {
 
     override val keyType: KeyType
-        get() = KeyType.RSA
+        get() = internalKeyType
+
+    private lateinit var internalKeyType: KeyType
 
     actual override val hasPrivateKey: Boolean
         get() {
@@ -25,8 +27,9 @@ actual class LocalKey actual constructor(jwk: String?) : Key() {
 
     private lateinit var internalKeyId: String
 
-    constructor(keyAlias: KeyAlias) : this(null) {
+    constructor(keyAlias: KeyAlias, keyType: KeyType) : this(null) {
         internalKeyId = keyAlias.alias
+        internalKeyType = keyType
         println("Initialised instance of LocalKey {keyId: '$internalKeyId'}")
     }
 
@@ -49,19 +52,22 @@ actual class LocalKey actual constructor(jwk: String?) : Key() {
     }
 
     actual override suspend fun signRaw(plaintext: ByteArray): ByteArray {
-        check(hasPrivateKey) { "No private key is attached to this key!" }
+        return runCatching {
+            check(hasPrivateKey) { "No private key is attached to this key!" }
 
-        val privateKey: PrivateKey = keyStore.getKey(internalKeyId, null) as PrivateKey
+            val privateKey: PrivateKey = keyStore.getKey(internalKeyId, null) as PrivateKey
 
-        val signature: ByteArray? = getSignature().run {
-            initSign(privateKey)
-            update(plaintext)
-            sign()
-        }
+            val signature: ByteArray? = getSignature().run {
+                initSign(privateKey)
+                update(plaintext)
+                sign()
+            }
 
-        println("Raw message signed with signature {signature: '${Base64.encodeToString(signature, Base64.DEFAULT)}'}")
-        println("Raw message signed - {raw: '${plaintext.decodeToString()}'}")
-        return Base64.encodeToString(signature, Base64.DEFAULT).toByteArray()
+            println("Raw message signed with signature {signature: '${Base64.encodeToString(signature, Base64.DEFAULT)}'}")
+            println("Raw message signed - {raw: '${plaintext.decodeToString()}'}")
+
+            Base64.encodeToString(signature, Base64.DEFAULT).toByteArray()
+        }.getOrThrow()
     }
 
     actual override suspend fun signJws(plaintext: ByteArray, headers: Map<String, String>): String {
@@ -105,7 +111,7 @@ actual class LocalKey actual constructor(jwk: String?) : Key() {
 
             val id = "$PUBLIC_KEY_ALIAS_PREFIX${UUID.randomUUID()}"
             keyStore.setCertificateEntry(id, keyPair.certificate)
-            LocalKey(KeyAlias(id))
+            LocalKey(KeyAlias(id), keyType)
         }.getOrThrow()
     }
 
