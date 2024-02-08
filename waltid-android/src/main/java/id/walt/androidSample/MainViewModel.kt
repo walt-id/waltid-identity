@@ -23,7 +23,7 @@ interface MainViewModel {
 
     val events: Flow<Event>
 
-    fun onSignRaw(plainText: String)
+    fun onSignRaw(plainText: String, keyType: KeyType)
 
     fun onVerifyPlainText(signature: ByteArray, plainText: ByteArray?)
 
@@ -42,6 +42,7 @@ interface MainViewModel {
         data object SignatureInvalid : Event
         data object BiometricsUnavailable : Event
         data object BiometricAuthenticationFailure : Event
+        data class SignedWithKey(val key: KeyType) : Event
     }
 
     class Fake : MainViewModel {
@@ -51,7 +52,7 @@ interface MainViewModel {
         override val publicKey = MutableStateFlow<LocalKey?>(null)
         override val events = emptyFlow<Event>()
 
-        override fun onSignRaw(plainText: String) = Unit
+        override fun onSignRaw(plainText: String, keyType: KeyType) = Unit
         override fun onVerifyPlainText(signature: ByteArray, plainText: ByteArray?) {
             Result.success("".encodeToByteArray())
         }
@@ -77,12 +78,13 @@ interface MainViewModel {
 
         private var localKey: LocalKey? = null
 
-        override fun onSignRaw(plainText: String) {
+        override fun onSignRaw(plainText: String, keyType: KeyType) {
             viewModelScope.launch {
-                LocalKey.generate(KeyType.secp256r1, LocalKeyMetadata()).run {
+                LocalKey.generate(keyType, LocalKeyMetadata()).run {
                     localKey = this
                     val signedContent = this.signRaw(plainText.toByteArray())
                     signature.value = signedContent
+                    eventsChannel.send(Event.SignedWithKey(keyType))
                 }
             }
         }
