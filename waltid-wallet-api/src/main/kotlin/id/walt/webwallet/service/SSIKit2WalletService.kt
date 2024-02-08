@@ -501,7 +501,9 @@ class SSIKit2WalletService(
         return listOf(CredentialResponse.Companion.success(CredentialFormat.jwt_vc_json, vc))
     }
 
-    override suspend fun useOfferRequest(offer: String, did: String, requireUserInput: Boolean, silent: Boolean) {
+    override suspend fun useOfferRequest(
+        offer: String, did: String, requireUserInput: Boolean, silent: Boolean
+    ): List<String> {
 
         val credentialWallet = getCredentialWallet(did)
 
@@ -550,6 +552,7 @@ class SSIKit2WalletService(
             wallet = walletId,
             credentials = addableCredentials.toTypedArray()
         )
+        return addableCredentials.map { it.id }
     }
 
     /* DIDs */

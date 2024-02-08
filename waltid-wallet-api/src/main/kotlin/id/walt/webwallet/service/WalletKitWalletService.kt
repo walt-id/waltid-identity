@@ -278,10 +278,11 @@ class WalletKitWalletService(tenant: String, accountId: UUID, walletId: UUID) : 
         return request
     }
 
-    override suspend fun useOfferRequest(offer: String, did: String, requireUserInput: Boolean, silent: Boolean) {
+    override suspend fun useOfferRequest(
+        offer: String, did: String, requireUserInput: Boolean, silent: Boolean
+    ): List<String> {
         val sessionId = authenticatedJsonPost(
-            "/api/wallet/issuance/startIssuerInitiatedIssuance",
-            mapOf("oidcUri" to offer)
+            "/api/wallet/issuance/startIssuerInitiatedIssuance", mapOf("oidcUri" to offer)
         ).bodyAsText()
 
         authenticatedJsonGet("/api/wallet/issuance/continueIssuerInitiatedIssuance") {
@@ -292,6 +293,7 @@ class WalletKitWalletService(tenant: String, accountId: UUID, walletId: UUID) : 
                 }
             }
         }
+        throw NotImplementedError("")
     }
 
     /* DIDs */

@@ -29,7 +29,9 @@ fun Application.exchange() = walletRoute {
             }
             response {
                 HttpStatusCode.OK to {
-                    description = "Successfully claimed credentials"
+                    body<List<String>> {
+                        description = "List of credential-id"
+                    }
                 }
             }
         }) {
@@ -44,16 +46,18 @@ fun Application.exchange() = walletRoute {
 
             runCatching {
                 wallet.useOfferRequest(offer = offer, did = did, requireUserInput = requireUserInput, silent = silent)
-                wallet.addOperationHistory(
-                    WalletOperationHistory.new(
-                        tenant = wallet.tenant,
-                        wallet = wallet,
-                        "useOfferRequest",
-                        mapOf("did" to did, "offer" to offer)
-                    )
-                )
+                    .also {
+                        wallet.addOperationHistory(
+                            WalletOperationHistory.new(
+                                tenant = wallet.tenant,
+                                wallet = wallet,
+                                "useOfferRequest",
+                                mapOf("did" to did, "offer" to offer)
+                            )
+                        )
+                    }
             }.onSuccess {
-                context.respond(HttpStatusCode.OK)
+                context.respond(HttpStatusCode.OK, it)
             }.onFailure { context.respond(HttpStatusCode.BadRequest, it.localizedMessage) }
         }
 
