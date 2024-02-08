@@ -7,7 +7,14 @@ import io.github.optimumcode.json.schema.ValidationError
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import love.forte.plugin.suspendtrans.annotation.JsPromise
+import love.forte.plugin.suspendtrans.annotation.JvmAsync
+import love.forte.plugin.suspendtrans.annotation.JvmBlocking
+import kotlin.js.ExperimentalJsExport
+import kotlin.js.JsExport
 
+@ExperimentalJsExport
+@JsExport
 class JsonSchemaPolicy : CredentialDataValidatorPolicy(
     "schema",
     "Verifies a credentials data against a JSON Schema (Draft 7 - see https://json-schema.org/specification-links#draft-7)."
@@ -20,7 +27,10 @@ class JsonSchemaPolicy : CredentialDataValidatorPolicy(
         val details: Map<String, String>?,
         val absoluteLocation: String?
     )
-
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     override suspend fun verify(data: JsonObject, args: Any?, context: Map<String, Any>): Result<Any> {
         val schema = runCatching {
             when (args) {

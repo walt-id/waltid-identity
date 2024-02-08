@@ -8,8 +8,14 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import love.forte.plugin.suspendtrans.annotation.JsPromise
+import love.forte.plugin.suspendtrans.annotation.JvmAsync
+import love.forte.plugin.suspendtrans.annotation.JvmBlocking
+import kotlin.js.ExperimentalJsExport
+import kotlin.js.JsExport
 
-
+@ExperimentalJsExport
+@JsExport
 class JwsSignatureScheme : SignatureScheme {
 
     object JwsHeader {
@@ -31,6 +37,10 @@ class JwsSignatureScheme : SignatureScheme {
      * - subjectDid: Holder DID
      * - issuerDid: Issuer DID
      */
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     suspend fun sign(
         data: JsonObject, key: Key,
         /** Set additional options in the JWT header */
@@ -49,7 +59,10 @@ class JwsSignatureScheme : SignatureScheme {
 
         return key.signJws(payload, jwtHeaders)
     }
-
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     suspend fun verify(data: String): Result<JsonObject> = runCatching {
         val jws = data.decodeJws()
 

@@ -6,11 +6,15 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonObject
+import kotlin.js.ExperimentalJsExport
+import kotlin.js.JsExport
 
 /**
  * W3C V2.0
  * https://www.w3.org/TR/vc-data-model-2.0/
  */
+@ExperimentalJsExport
+@JsExport
 @Serializable
 data class W3CV2DataModel(
     @SerialName("@context")

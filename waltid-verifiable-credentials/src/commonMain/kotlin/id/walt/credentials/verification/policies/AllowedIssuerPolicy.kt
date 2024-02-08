@@ -4,11 +4,22 @@ import id.walt.credentials.schemes.JwsSignatureScheme.JwsOption
 import id.walt.credentials.verification.CredentialWrapperValidatorPolicy
 import id.walt.credentials.verification.NotAllowedIssuerException
 import kotlinx.serialization.json.*
+import love.forte.plugin.suspendtrans.annotation.JsPromise
+import love.forte.plugin.suspendtrans.annotation.JvmAsync
+import love.forte.plugin.suspendtrans.annotation.JvmBlocking
+import kotlin.js.ExperimentalJsExport
+import kotlin.js.JsExport
 
+@ExperimentalJsExport
+@JsExport
 class AllowedIssuerPolicy : CredentialWrapperValidatorPolicy(
     "allowed-issuer",
     "Checks that the issuer of the credential is present in the supplied list."
 ) {
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     override suspend fun verify(data: JsonElement, args: Any?, context: Map<String, Any>): Result<Any> {
         val allowedIssuers = when (args) {
             is JsonPrimitive -> listOf(args.content)
