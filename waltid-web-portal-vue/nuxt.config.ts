@@ -6,13 +6,15 @@ export default defineNuxtConfig({
         ['@unocss/nuxt', { autoImport: false }],
         "nuxt-icon",
         "nuxt-monaco-editor",
-        "nuxt-headlessui"
+        "nuxt-headlessui",
+        "@formkit/auto-animate/nuxt"
     ],
     runtimeConfig: {
         public: {
             credentialRepository: "", // overwritten with NUXT_PUBLIC_CREDENTIAL_REPOSITORY
             issuer: "", // overwritten with NUXT_PUBLIC_ISSUER
-            verifier: "" // overwritten with NUXT_PUBLIC_VERIFIER
+            verifier: "", // overwritten with NUXT_PUBLIC_VERIFIER
+            webWalletPrefix: "", // overwritten with NUXT_PUBLIC_WEB_WALLET_PREFIX
         }
     }
 });

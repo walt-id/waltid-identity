@@ -11,6 +11,8 @@
         </ClientOnly>
     </PageOverlay>
 
+    <OidcResultDialog v-if="oidcLink" :link="oidcLink" text="Claim your credentials" @close="oidcLink = null"/>
+
     <PageOverlay :is-open="openSettings" name="Settings" @close="openSettings = false">
         <div>
             <label class="block text-sm font-semibold leading-6 text-gray-900" for="comment">Issuance key</label>
@@ -32,12 +34,15 @@
     </PageOverlay>
 
     <main class="flex flex-col">
+
         <div>
             <p class="font-semibold flex items-center gap-1">
                 <Icon class="h-5" name="heroicons:list-bullet" />
                 Selected credentials for issuance:
             </p>
-            <ul class="basis-1/3 divide-y divide-gray-100 shadow px-3 my-1 overflow-y-scroll" role="list">
+            <ul v-auto-animate="{ duration: 200 }" class="basis-1/3 divide-y divide-gray-100 shadow px-3 my-1 overflow-y-scroll"
+                role="list"
+            >
                 <li v-for="credential in credentials" :key="credential.id" class="flex items-center justify-between gap-x-5 py-3">
                     <div class="min-w-0">
                         <div class="flex items-start gap-x-3">
@@ -76,16 +81,23 @@
                                     class="absolute right-0 z-10 mt-2 w-48 origin-top-right rounded-md bg-white py-2 shadow-lg ring-1 ring-gray-900/5 focus:outline-none"
                                 >
                                     <MenuItem v-slot="{ active }">
-                                        <NuxtLink :class="[active ? 'bg-gray-50' : '', 'block px-3 py-1 text-sm leading-6 text-gray-900']"
-                                                  :external="true"
-                                                  :to="`${config.public.credentialRepository}/credentials/${credential.name.toLowerCase()}`"
-                                                  href="#"
-                                                  target="_blank"
-                                        >View in repository<span class="sr-only">, {{ credential.name }}</span></NuxtLink>
+                                        <NuxtLink
+                                            :class="[active ? 'bg-gray-50' : '', 'px-3 py-1 text-sm leading-6 text-gray-900 flex items-center gap-1']"
+                                            :external="true"
+                                            :to="`${config.public.credentialRepository}/credentials/${credential.name.toLowerCase()}`"
+                                            href="#"
+                                            target="_blank"
+                                        >
+                                            <Icon name="carbon:repo-source-code" />
+                                            View in repository<span class="sr-only">, {{ credential.name }}</span></NuxtLink>
                                     </MenuItem>
                                     <MenuItem v-slot="{ active }">
-                                        <a :class="[active ? 'bg-gray-50' : '', 'block px-3 py-1 text-sm leading-6 text-gray-900']" href="#"
-                                        >Delete<span class="sr-only">, {{ credential.name }}</span></a>
+                                        <button
+                                            class="px-3 py-1 text-sm leading-6 text-gray-900 flex items-center gap-1 bg-white w-full hover:bg-gray-50"
+                                            @click="removeCredential(credential.id)"
+                                        >
+                                            <Icon name="carbon:trash-can" />
+                                            Delete<span class="sr-only">, {{ credential.name }}</span></button>
                                     </MenuItem>
                                 </MenuItems>
                             </transition>
@@ -100,8 +112,9 @@
         </div>
 
         <div class="flex justify-end mt-2 gap-2">
-            <button class="rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 flex items-center gap-0.5"
-                    type="button" @click="openSettings = true"
+            <button
+                class="rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 flex items-center gap-0.5"
+                type="button" @click="openSettings = true"
             >
                 <Icon class="h-4 w-4" name="heroicons:cog-6-tooth" />
                 Settings
@@ -110,12 +123,14 @@
             <button v-if="credentials.length >= 2"
                     class="rounded-md bg-green-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-green-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
                     type="button"
+                    @click="issueBatch"
             >
-                Issue {{ credentials.length }} credentials
+                Issue {{ credentials.length }} credentials <span class="text-xs">(<span class="underline">Batch Issuance</span>)</span>
             </button>
             <button v-else-if="credentials.length == 1"
                     class="rounded-md bg-green-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-green-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
                     type="button"
+                    @click="issueSingle"
             >
                 Issue single credentials
             </button>
@@ -125,7 +140,7 @@
                     disabled
                     type="button"
                 >
-                    <Icon name="heroicons:exclamation-circle" class="h-5 w-5" />
+                    <Icon class="h-5 w-5" name="heroicons:exclamation-circle" />
                 Select a credential to continue.
                 </button>
             </span>
@@ -133,7 +148,7 @@
 
         <div class="mt-2 flex-shrink">
             <div class="font-semibold text-lg">
-                <Icon name="carbon:prompt-template" class="h-5 w-5"/>
+                <Icon class="h-5 w-5" name="carbon:prompt-template" />
                 Choose a template:
             </div>
             <CredentialTemplateList :actions="actions" class="overflow-y-scroll" />
@@ -143,6 +158,7 @@
 
 <script lang="ts" setup>
 import { Menu, MenuButton, MenuItem, MenuItems } from "@headlessui/vue";
+
 
 const config = useRuntimeConfig();
 
@@ -155,8 +171,38 @@ const issuanceKey = ref(JSON.stringify({
 }, null, 4));
 const issuanceDid = ref("did:key:z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp");
 
+const oidcLink: Ref<string | null> = ref(null)
+
+const issuing = ref(false)
+async function issueSingle() {
+    issuing.value = true
+    const {data, pending, error, refresh} = await useFetch<string>(`${config.public.issuer}/openid4vc/jwt/issue`, {
+        method: "POST",
+        body: {
+            issuanceKey: JSON.parse(issuanceKey.value),
+            issuerDid: issuanceDid.value,
+            vc: JSON.parse(credentials[0].data),
+            mapping: JSON.parse(credentials[0].mapping)
+        }
+    })
+
+    oidcLink.value = data.value
+    // alert(data.value)
+
+    issuing.value = false
+}
+
+async function issueBatch() {
+    await issueSingle()
+}
+
 function editCredential(id: number) {
     editing.value = credentials.find((value) => value.id == id) ?? null;
+}
+
+function removeCredential(id: number) {
+    const rmIdx = credentials.findIndex((value) => value.id == id);
+    credentials.splice(rmIdx, 1);
 }
 
 type EditableCredential = {

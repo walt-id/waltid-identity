@@ -1,8 +1,11 @@
 <template>
-    <CredentialTemplateList :actions="x"></CredentialTemplateList>
+    <div>
+
+        <CredentialTemplateList :actions="x"></CredentialTemplateList>
+    </div>
 </template>
 
-<script setup lang="ts">
+<script lang="ts" setup>
 // import { EnvelopeIcon, PhoneIcon } from '@heroicons/vue/20/solid'
 
 const x = [
@@ -10,17 +13,17 @@ const x = [
         name: "Issue",
         icon: "heroicons:check-badge",
         action: (template: string) => {
-            alert("ISSUE")
+            alert("ISSUE");
         }
     },
     {
         name: "Verify",
         icon: "heroicons:clipboard-document-list",
         action: (template: string) => {
-            alert("Verify")
+            alert("Verify");
         }
-    },
-]
+    }
+];
 
 </script>
 
