@@ -179,6 +179,6 @@ data class CredentialFilterObject(
     val sorDescending: Boolean,
 ) {
     companion object {
-        val default = CredentialFilterObject(emptyList(), false, "", false)
+        val default = CredentialFilterObject(null, false, "", false)
     }
 }
