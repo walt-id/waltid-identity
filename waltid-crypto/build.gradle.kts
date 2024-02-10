@@ -54,15 +54,11 @@ kotlin {
     }
 
     sourceSets {
-        val androidMain by getting {
-            dependencies {
-                
-            }
-        }
         val androidUnitTest by getting {
             dependencies {
-                implementation(kotlin("test-junit"))
-                implementation("junit:junit:4.13.2")
+                implementation(kotlin("test"))
+                implementation("org.junit.jupiter:junit-jupiter-api:5.10.1")
+                implementation("org.junit.jupiter:junit-jupiter-params:5.10.1")
             }
         }
         val commonMain by getting {
@@ -168,12 +164,12 @@ kotlin {
 }
 
 android {
+    namespace = "id.walt.crypto"
     compileSdk = 34
     sourceSets["main"].manifest.srcFile("src/androidMain/AndroidManifest.xml")
     defaultConfig {
         minSdk = 28
     }
-    namespace = "id.walt.waltid_crypto"
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
