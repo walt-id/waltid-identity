@@ -80,39 +80,3 @@ object AndroidLocalKeyGenerator : LocalKeyCreator {
         TODO("Not yet implemented")
     }
 }
-
-
-object KeyPairGenerator {
-
-    fun generateKeyPair(keyType: KeyType) {
-        val keyPairGenerator = KeyPairGenerator.getInstance(KeyProperties.KEY_ALGORITHM_RSA)
-
-        val keySpec = when (keyType) {
-            KeyType.Ed25519 -> null // No equivalent algorithm in Android KeyStore for Ed25519
-            KeyType.secp256k1 -> null // No equivalent algorithm in Android KeyStore for secp256k1
-            KeyType.secp256r1 -> KeyGenParameterSpec.Builder(
-                "secp256r1",
-                KeyProperties.PURPOSE_SIGN or KeyProperties.PURPOSE_VERIFY
-            )
-                .setAlgorithmParameterSpec(ECGenParameterSpec("secp256r1"))
-                .setDigests(KeyProperties.DIGEST_SHA256, KeyProperties.DIGEST_SHA512)
-                .build()
-
-            KeyType.RSA -> KeyGenParameterSpec.Builder(
-                "RSA",
-                KeyProperties.PURPOSE_SIGN or KeyProperties.PURPOSE_VERIFY
-            )
-                .setKeySize(2048) // or any desired key size
-                .setDigests(KeyProperties.DIGEST_SHA256, KeyProperties.DIGEST_SHA512)
-                .build()
-        }
-
-        if (keySpec != null) {
-            keyPairGenerator.initialize(keySpec)
-            keyPairGenerator.generateKeyPair()
-        } else {
-            // Handle unsupported key types
-            println("Key type $keyType is not supported in Android KeyStore.")
-        }
-    }
-}
