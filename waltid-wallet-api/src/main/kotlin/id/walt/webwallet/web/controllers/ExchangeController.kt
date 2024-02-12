@@ -1,6 +1,7 @@
 package id.walt.webwallet.web.controllers
 
 import id.walt.oid4vc.data.dif.PresentationDefinition
+import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.db.models.WalletOperationHistory
 import id.walt.webwallet.service.SSIKit2WalletService
 import io.github.smiley4.ktorswaggerui.dsl.post
@@ -29,8 +30,8 @@ fun Application.exchange() = walletRoute {
             }
             response {
                 HttpStatusCode.OK to {
-                    body<List<String>> {
-                        description = "List of credential-id"
+                    body<List<WalletCredential>> {
+                        description = "List of credentials"
                     }
                 }
             }

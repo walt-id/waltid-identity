@@ -504,7 +504,7 @@ class SSIKit2WalletService(
 
     override suspend fun useOfferRequest(
         offer: String, did: String, requireUserInput: Boolean, silent: Boolean
-    ): List<String> {
+    ): List<WalletCredential> {
 
         val credentialWallet = getCredentialWallet(did)
 
@@ -553,7 +553,7 @@ class SSIKit2WalletService(
             wallet = walletId,
             credentials = addableCredentials.toTypedArray()
         )
-        return addableCredentials.map { it.id }
+        return addableCredentials
     }
 
     /* DIDs */
