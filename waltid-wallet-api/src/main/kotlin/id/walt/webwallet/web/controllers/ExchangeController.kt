@@ -9,6 +9,7 @@ import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
+import io.ktor.server.util.*
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 
@@ -36,7 +37,7 @@ fun Application.exchange() = walletRoute {
 
             val did = call.request.queryParameters["did"] ?: wallet.listDids().firstOrNull()?.did
             ?: throw IllegalArgumentException("No DID to use supplied")
-            val silent = call.request.queryParameters["silent"].toBoolean()
+            val silent = call.request.queryParameters.getOrFail("silent").toBoolean()
 
             val offer = call.receiveText()
 
