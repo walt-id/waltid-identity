@@ -20,9 +20,16 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
+import love.forte.plugin.suspendtrans.annotation.JsPromise
+import love.forte.plugin.suspendtrans.annotation.JvmAsync
+import love.forte.plugin.suspendtrans.annotation.JvmBlocking
+import kotlin.js.ExperimentalJsExport
+import kotlin.js.JsExport
 import kotlin.random.Random
 
 // Works with the Hashicorp Transit Secret Engine
+@ExperimentalJsExport
+@JsExport
 @Suppress("TRANSIENT_IS_REDUNDANT")
 @Serializable
 @SerialName("tse")
@@ -55,6 +62,10 @@ class TSEKey(
             _keyType = value
         }
 
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     override suspend fun init() {
         if (_keyType == null) _keyType = coroutineScope {  retrievedKeyType.await() }
     }
@@ -86,18 +97,42 @@ class TSEKey(
     override val hasPrivateKey: Boolean
         get() = TODO("Not yet implemented")
 
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     override suspend fun getKeyId(): String = id
 
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     override suspend fun getThumbprint(): String {
         TODO("Not yet implemented")
     }
 
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     override suspend fun exportJWK(): String = throw IllegalArgumentException("The private key should not be exposed.")
 
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     override suspend fun exportJWKObject(): JsonObject = throw IllegalArgumentException("The private key should not be exposed.")
 
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     override suspend fun exportPEM(): String = throw IllegalArgumentException("The private key should not be exposed.")
 
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     override suspend fun signRaw(plaintext: ByteArray): Any {
         val signatureBase64 = http.post("$server/sign/${id}") {
             header("X-Vault-Token", accessKey) // TODO
@@ -109,6 +144,10 @@ class TSEKey(
         return signatureBase64
     }
 
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     override suspend fun signJws(plaintext: ByteArray, headers: Map<String, String>): String {
         val header = Json.encodeToString(mutableMapOf(
             "typ" to "JWT",
@@ -125,6 +164,10 @@ class TSEKey(
         return "$signable.$signatureBase64Url"
     }
 
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     override suspend fun verifyRaw(signed: ByteArray, detachedPlaintext: ByteArray?): Result<ByteArray> {
         val localPublicKey = when (keyType) {
             KeyType.Ed25519 -> LocalKey.importRawPublicKey(
@@ -154,6 +197,10 @@ class TSEKey(
         else Result.failure(IllegalArgumentException("Signature failed"))
     }
 
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     override suspend fun verifyJws(signedJws: String): Result<JsonObject> {
         val parts = signedJws.split(".")
         check(parts.size == 3) { "Invalid JWT part count: ${parts.size} instead of 3" }
@@ -176,6 +223,10 @@ class TSEKey(
         }
     }
 
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     suspend fun getEncodedPublicKey(): String = // TODO add to base Key
         lazyOf(
             http.get("$server/keys/$id") {
@@ -185,6 +236,10 @@ class TSEKey(
                 ?: throwTSEError("No keys/1/public_key in data response")
         ).value
 
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     override suspend fun getPublicKey(): Key {
         println("Getting public key: $keyType")
 
@@ -195,6 +250,10 @@ class TSEKey(
         )
     }
 
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     override suspend fun getPublicKeyRepresentation(): ByteArray = getBackingPublicKey()
 
     /*
@@ -208,6 +267,10 @@ class TSEKey(
 
     override fun toString(): String = "[TSE ${keyType.name} key @ $server]"
 
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     suspend fun delete() {
         http.post("$server/keys/$id/config") {
             header("X-Vault-Token", accessKey)
@@ -236,6 +299,10 @@ class TSEKey(
             else -> throw IllegalArgumentException("Not supported: $type")
         }
 
+        @JvmBlocking
+        @JvmAsync
+        @JsPromise
+        @JsExport.Ignore
         suspend fun HttpResponse.tseJsonDataBody(): JsonObject {
             val baseMsg = { "TSE server (URL: ${this.request.url}) returned invalid response: " }
 
@@ -247,6 +314,10 @@ class TSEKey(
             }["data"]?.jsonObject ?: throw IllegalArgumentException(baseMsg.invoke() + "no data in response: ${this.bodyAsText()}")
         }
 
+        @JvmBlocking
+        @JvmAsync
+        @JsPromise
+        @JsExport.Ignore
         override suspend fun generate(type: KeyType, metadata: TSEKeyMetadata): TSEKey {
             val keyData = http.post("${metadata.server}/keys/k${metadata.id ?: Random.nextInt()}") {
                 header("X-Vault-Token", metadata.accessKey)
