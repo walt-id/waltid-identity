@@ -77,4 +77,5 @@ fun Application.module() {
     categories()
     reports()
     settings()
+    reasons()
 }
