@@ -2,23 +2,58 @@
     <PageOverlay :isOpen="editing != null" :name="`Editor: ${editing?.name}`" @close="editing = null">
         <p class="font-semibold">Credential data</p>
         <ClientOnly>
-            <MonacoEditor :model-value="editing?.data" class="h-60" lang="json" />
+            <LazyMonacoEditor v-if="editing != null" v-model="editing!!.data" class="h-60" lang="json" />
         </ClientOnly>
 
         <p class="font-semibold">Credential mapping</p>
         <ClientOnly>
-            <MonacoEditor :model-value="editing?.mapping" class="h-60" lang="json" />
+            <LazyMonacoEditor v-if="editing != null" v-model="editing!!.data" class="h-60" lang="json" />
         </ClientOnly>
     </PageOverlay>
 
-    <OidcResultDialog v-if="oidcLink" :link="oidcLink" text="Claim your credentials" @close="oidcLink = null"/>
+    <OidcResultDialog v-if="oidcLink" :link="oidcLink" text="Claim your credentials" @close="oidcLink = null" />
+
+
+    <PageOverlay :is-open="showRequest" name="HTTP Request Viewer" @close="showRequest = false">
+        <div>
+            <p>
+                HTTP: <span class="font-semibold">{{ currentIssuanceRequest.method }}</span> <code><span>{{ currentIssuanceRequest.url
+                }}</span></code>
+            </p>
+            <p>
+                Body:
+                <ClientOnly>
+                    <highlightjs :code="`${JSON.stringify(currentIssuanceRequest.body, null, 4)}`" class="" language="json" />
+                </ClientOnly>
+            </p>
+        </div>
+
+        <hr />
+
+        <p class="font-semibold">As curl request:</p>
+
+        <p>
+            <code class="">
+                {{
+                    fetchToCurl({
+                        url: currentIssuanceRequest.url,
+                        method: currentIssuanceRequest.method,
+                        body: currentIssuanceRequest.body,
+                        headers: {
+                            "content-type": "application/json"
+                        }
+                    })
+                }}
+            </code>
+        </p>
+    </PageOverlay>
 
     <PageOverlay :is-open="openSettings" name="Settings" @close="openSettings = false">
         <div>
             <label class="block text-sm font-semibold leading-6 text-gray-900" for="comment">Issuance key</label>
             <div class="mt-1">
                 <ClientOnly>
-                    <MonacoEditor :model-value="issuanceKey" class="h-40" lang="json" />
+                    <LazyMonacoEditor v-if="openSettings" :model-value="issuanceKey" class="h-40" lang="json" />
                 </ClientOnly>
             </div>
         </div>
@@ -122,26 +157,32 @@
 
             <button v-if="issuing"
                     class="rounded-md inline-flex items-center bg-green-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-green-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
-                    type="button"
-                    @click="issueBatch"
                     disabled
-            >
-                <Spinner class="p-1 mr-1"/>Issuing...
-            </button>
-            <button v-else-if="credentials.length >= 2"
-                    class="rounded-md bg-green-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-green-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
                     type="button"
                     @click="issueBatch"
             >
-                Issue {{ credentials.length }} credentials <span class="text-xs">(<span class="underline">Batch Issuance</span>)</span>
+                <Spinner class="p-1 mr-1" />
+                Issuing...
             </button>
-            <button v-else-if="credentials.length == 1"
+            <div v-else-if="credentials.length >= 1" class="flex gap-2">
+                <button
+                    class="rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 flex items-center gap-0.5"
+                    @click="showRequest = true"
+                >
+                    <Icon class="h-4 w-8" name="logos:curl" />
+                    Show request
+                </button>
+                <button
                     class="rounded-md bg-green-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-green-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
                     type="button"
-                    @click="issueSingle"
-            >
-                Issue single credentials
-            </button>
+                    @click="issueBatch"
+                >
+                    <span v-if="credentials.length >= 2">Issue {{ credentials.length }} credentials <span class="text-xs">(<span
+                        class="underline"
+                    >Batch Issuance</span>)</span></span>
+                    <span v-else>Issue single credentials</span>
+                </button>
+            </div>
             <span v-else>
                 <button
                     class="flex items-center gap-1 rounded-md bg-gray-500 px-3 py-2 text-sm font-semibold text-gray-100 shadow-sm hover:bg-green-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
@@ -155,16 +196,15 @@
         </div>
 
 
-
         <div v-if="issuanceError" class="rounded-md bg-red-50 p-4 my-2">
             <div class="flex">
                 <div class="flex-shrink-0">
-                    <Icon name="heroicons:x-circle" class="h-5 w-5 text-red-400" aria-hidden="true" />
+                    <Icon aria-hidden="true" class="h-5 w-5 text-red-400" name="heroicons:x-circle" />
                 </div>
                 <div class="ml-3">
                     <h3 class="text-sm font-medium text-red-800">There was an error with this issuance:</h3>
                     <div class="mt-2 text-sm text-red-700">
-                        <ul role="list" class="list-disc space-y-1 pl-5">
+                        <ul class="list-disc space-y-1 pl-5" role="list">
                             <li>Error: {{ issuanceError.name }} {{ issuanceError.statusCode }}:</li>
                             <li>Message: {{ issuanceError.message }}</li>
                             <li v-if="issuanceError.response">Response: {{ issuanceError.response }}</li>
@@ -187,8 +227,8 @@
 <script lang="ts" setup>
 import { Menu, MenuButton, MenuItem, MenuItems } from "@headlessui/vue";
 import { FetchError } from "ofetch";
+import fetchToCurl from "fetch-to-curl";
 import type { Ref } from "vue";
-
 
 const config = useRuntimeConfig();
 
@@ -201,11 +241,13 @@ const issuanceKey = ref(JSON.stringify({
 }, null, 4));
 const issuanceDid = ref("did:key:z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp");
 
-const oidcLink: Ref<string | null> = ref(null)
+const showRequest = ref(false);
 
-const issuanceError: Ref<FetchError<any> | null> = ref(null)
+const oidcLink: Ref<string | null> = ref(null);
 
-const issuing = ref(false)
+const issuanceError: Ref<FetchError<any> | null> = ref(null);
+
+const issuing = ref(false);
 
 type IssuanceRequest = {
     url: string,
@@ -213,11 +255,8 @@ type IssuanceRequest = {
     body: object
 }
 
-
-async function issueSingle() {
-    issuing.value = true
-
-    const req: IssuanceRequest = {
+const currentIssuanceRequest: Ref<IssuanceRequest> = computed(() => {
+    return {
         url: `${config.public.issuer}/openid4vc/jwt/issue`,
         method: "POST",
         body: {
@@ -226,22 +265,28 @@ async function issueSingle() {
             vc: JSON.parse(credentials[0].data),
             mapping: JSON.parse(credentials[0].mapping)
         }
-    }
+    };
+});
 
-    const {data, pending, error, refresh} = await useFetch<string>(req.url, {
+async function issueSingle() {
+    issuing.value = true;
+
+    const req: IssuanceRequest = currentIssuanceRequest.value;
+
+    const { data, pending, error, refresh } = await useFetch<string>(req.url, {
         method: "POST",
         body: req.body
-    })
-    issuanceError.value = error.value
+    });
+    issuanceError.value = error.value;
 
-    oidcLink.value = data.value
+    oidcLink.value = data.value;
     // alert(data.value)
 
-    issuing.value = false
+    issuing.value = false;
 }
 
 async function issueBatch() {
-    await issueSingle()
+    await issueSingle();
 }
 
 function editCredential(id: number) {
@@ -270,7 +315,6 @@ const actions = [
 
             const { data: credentialData } = await useFetch<string>(`${config.public.credentialRepository}/api/vc/${template}`);
             const { data: mappingData } = await useFetch<string>(`${config.public.credentialRepository}/api/mapping/${template}`);
-            await refreshNuxtData();
 
             credentials.push(
                 {
