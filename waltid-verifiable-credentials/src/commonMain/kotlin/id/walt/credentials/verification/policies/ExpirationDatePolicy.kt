@@ -2,12 +2,13 @@ package id.walt.credentials.verification.policies
 
 import id.walt.credentials.verification.CredentialWrapperValidatorPolicy
 import id.walt.credentials.verification.ExpirationDatePolicyException
+import id.walt.credentials.verification.VerificationPolicy.VerificationPolicyArgumentType.NONE
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.serialization.json.*
 
 class ExpirationDatePolicy : CredentialWrapperValidatorPolicy(
-    "expired", "Verifies that the credentials expiration date (`exp` for JWTs) has not been exceeded."
+    "expired", "Verifies that the credentials expiration date (`exp` for JWTs) has not been exceeded.", listOf(NONE)
 ) {
     override suspend fun verify(data: JsonElement, args: Any?, context: Map<String, Any>): Result<Any> {
         var successfulKey = ""

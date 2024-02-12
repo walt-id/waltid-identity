@@ -2,6 +2,7 @@ package id.walt.credentials.verification.policies
 
 import id.walt.credentials.verification.CredentialWrapperValidatorPolicy
 import id.walt.credentials.verification.NotBeforePolicyException
+import id.walt.credentials.verification.VerificationPolicy.VerificationPolicyArgumentType.NONE
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.serialization.json.*
@@ -9,7 +10,8 @@ import kotlin.time.Duration.Companion.minutes
 
 class NotBeforeDatePolicy : CredentialWrapperValidatorPolicy(
     "not-before",
-    "Verifies that the credentials not-before date (for JWT: `nbf`, if unavailable: `iat` - 1 min) is correctly exceeded."
+    "Verifies that the credentials not-before date (for JWT: `nbf`, if unavailable: `iat` - 1 min) is correctly exceeded.",
+    listOf(NONE)
 ) {
     override suspend fun verify(data: JsonElement, args: Any?, context: Map<String, Any>): Result<Any> {
         var successfulKey = ""

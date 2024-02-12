@@ -3,11 +3,14 @@ package id.walt.credentials.verification.policies
 import id.walt.credentials.schemes.JwsSignatureScheme.JwsOption
 import id.walt.credentials.verification.CredentialWrapperValidatorPolicy
 import id.walt.credentials.verification.NotAllowedIssuerException
+import id.walt.credentials.verification.VerificationPolicy.VerificationPolicyArgumentType.DID
+import id.walt.credentials.verification.VerificationPolicy.VerificationPolicyArgumentType.DID_ARRAY
 import kotlinx.serialization.json.*
 
 class AllowedIssuerPolicy : CredentialWrapperValidatorPolicy(
     "allowed-issuer",
-    "Checks that the issuer of the credential is present in the supplied list."
+    "Checks that the issuer of the credential is present in the supplied list.",
+    listOf(DID, DID_ARRAY)
 ) {
     override suspend fun verify(data: JsonElement, args: Any?, context: Map<String, Any>): Result<Any> {
         val allowedIssuers = when (args) {

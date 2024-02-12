@@ -1,6 +1,7 @@
 package id.walt.credentials.verification.policies
 
 import id.walt.credentials.verification.CredentialWrapperValidatorPolicy
+import id.walt.credentials.verification.VerificationPolicy.VerificationPolicyArgumentType.URL
 import id.walt.credentials.verification.WebhookPolicyException
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -14,7 +15,8 @@ import kotlinx.serialization.json.JsonPrimitive
 
 class WebhookPolicy : CredentialWrapperValidatorPolicy(
     "webhook",
-    "Sends the credential data to an webhook URL as HTTP POST, and returns the verified status based on the webhooks set status code (success = 200 - 299)."
+    "Sends the credential data to an webhook URL as HTTP POST, and returns the verified status based on the webhooks set status code (success = 200 - 299).",
+    listOf(URL)
 ) {
 
     val http = HttpClient {

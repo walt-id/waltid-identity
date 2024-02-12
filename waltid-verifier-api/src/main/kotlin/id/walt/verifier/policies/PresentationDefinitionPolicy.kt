@@ -2,13 +2,15 @@ package id.walt.verifier.policies
 
 import id.walt.credentials.verification.CredentialWrapperValidatorPolicy
 import id.walt.credentials.verification.PresentationDefinitionException
+import id.walt.credentials.verification.VerificationPolicy.VerificationPolicyArgumentType.*
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import kotlinx.serialization.json.*
 
 class PresentationDefinitionPolicy : CredentialWrapperValidatorPolicy(
     "presentation-definition",
-    "Verifies that with an Verifiable Presentation at minimum the list of credentials `request_credentials` has been presented."
+    "Verifies that with an Verifiable Presentation at minimum the list of credentials `request_credentials` has been presented.",
+    listOf(NONE)
 ) {
 
     override suspend fun verify(data: JsonElement, args: Any?, context: Map<String, Any>): Result<Any> {

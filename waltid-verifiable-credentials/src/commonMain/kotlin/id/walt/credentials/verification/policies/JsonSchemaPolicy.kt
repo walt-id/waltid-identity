@@ -2,6 +2,7 @@ package id.walt.credentials.verification.policies
 
 import id.walt.credentials.verification.CredentialDataValidatorPolicy
 import id.walt.credentials.verification.JsonSchemaVerificationException
+import id.walt.credentials.verification.VerificationPolicy.VerificationPolicyArgumentType.JSON
 import io.github.optimumcode.json.schema.JsonSchema
 import io.github.optimumcode.json.schema.ValidationError
 import kotlinx.serialization.Serializable
@@ -10,7 +11,8 @@ import kotlinx.serialization.json.JsonObject
 
 class JsonSchemaPolicy : CredentialDataValidatorPolicy(
     "schema",
-    "Verifies a credentials data against a JSON Schema (Draft 7 - see https://json-schema.org/specification-links#draft-7)."
+    "Verifies a credentials data against a JSON Schema (Draft 7 - see https://json-schema.org/specification-links#draft-7).",
+    listOf(JSON)
 ) {
     @Serializable
     data class SerializableValidationError(

@@ -2,11 +2,13 @@ package id.walt.credentials.verification.policies.vp
 
 import id.walt.credentials.verification.CredentialWrapperValidatorPolicy
 import id.walt.credentials.verification.MaximumCredentialsException
+import id.walt.credentials.verification.VerificationPolicy.VerificationPolicyArgumentType.NUMBER
 import kotlinx.serialization.json.*
 
 class MaximumCredentialsPolicy : CredentialWrapperValidatorPolicy(
     name = "maximum-credentials",
-    description = "Verifies that a maximum number of credentials in the Verifiable Presentation is not exceeded"
+    description = "Verifies that a maximum number of credentials in the Verifiable Presentation is not exceeded",
+    argumentTypes = listOf(NUMBER)
 ) {
     override suspend fun verify(data: JsonElement, args: Any?, context: Map<String, Any>): Result<Any> {
         val n = (args as JsonPrimitive).int

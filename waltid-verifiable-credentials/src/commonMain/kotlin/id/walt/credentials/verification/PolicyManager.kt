@@ -4,6 +4,7 @@ import id.walt.credentials.verification.policies.*
 import id.walt.credentials.verification.policies.vp.HolderBindingPolicy
 import id.walt.credentials.verification.policies.vp.MaximumCredentialsPolicy
 import id.walt.credentials.verification.policies.vp.MinimumCredentialsPolicy
+import kotlinx.serialization.Serializable
 
 object PolicyManager {
     private val mappedPolicies = HashMap<String, VerificationPolicy>()
@@ -20,7 +21,20 @@ object PolicyManager {
             "webhook"
      */
 
-    fun listPolicyDescriptions() = mappedPolicies.mapValues { it.value.description }
+    @Serializable
+    data class PolicyInformation(
+        val description: String? = null,
+        val policyType: String? = null,
+        val argumentType: List<VerificationPolicy.VerificationPolicyArgumentType>? = null,
+    )
+
+    fun listPolicyDescriptions() = mappedPolicies.mapValues {
+        PolicyInformation(
+            description = it.value.description,
+            policyType = it.value.policyType,
+            argumentType = it.value.argumentTypes
+        )
+    }
 
     fun registerPolicies(vararg policies: VerificationPolicy) {
         policies.forEach { policy ->
