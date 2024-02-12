@@ -45,4 +45,7 @@ type VerifyCredential = {
 
 const credentials: VerifyCredential[] = reactive([]);
 
+useHead({
+    title: "Verification | walt.id Portal"
+})
 </script>

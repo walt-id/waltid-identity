@@ -1,10 +1,12 @@
 <template>
-    <NuxtLayout>
-        <NuxtPage />
-    </NuxtLayout>
+    <Html lang="en">
+        <NuxtLayout>
+            <NuxtPage />
+        </NuxtLayout>
+    </Html>
 </template>
 
-<script setup lang="ts">
-import '@unocss/reset/tailwind-compat.css'
-import 'uno.css'
+<script lang="ts" setup>
+import "@unocss/reset/tailwind-compat.css";
+import "uno.css";
 </script>

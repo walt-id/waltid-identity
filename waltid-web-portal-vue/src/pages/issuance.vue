@@ -296,4 +296,7 @@ const statuses = {
 
 const credentials: EditableCredential[] = reactive([]);
 
+useHead({
+    title: "Issuance | walt.id Portal"
+});
 </script>
