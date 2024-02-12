@@ -78,8 +78,6 @@ import org.jetbrains.exposed.sql.transactions.transaction
 import org.slf4j.LoggerFactory
 import java.net.URLDecoder
 import kotlin.time.Duration.Companion.seconds
-
-
 class SSIKit2WalletService(
     tenant: String,
     accountId: UUID,
@@ -131,13 +129,15 @@ class SSIKit2WalletService(
         CredentialsService.get(walletId, credentialId)
             ?: throw IllegalArgumentException("WalletCredential not found for credentialId: $credentialId")
 
-    override suspend fun attachCategory(credentialId: String, category: String): Boolean =
-        categoryService.get(walletId, category)?.let {// validation should be part of schema
-            CredentialsService.Category.add(walletId, credentialId, it.name) == 1
-        } ?: throw IllegalArgumentException("Category not found for wallet: $category")
+    override suspend fun attachCategory(credentialId: String, categories: List<String>): Boolean =
+        categoryService.list(walletId).filter { categories.contains(it.name) }.map { it.name }.let {
+            CredentialsService.Category.add(
+                wallet = walletId, credentialId = credentialId, category = it.toTypedArray()
+            ) == it.size
+        }
 
-    override suspend fun detachCategory(credentialId: String, category: String): Boolean =
-        CredentialsService.Category.delete(walletId, credentialId, category) == 1
+    override suspend fun detachCategory(credentialId: String, categories: List<String>): Boolean =
+        CredentialsService.Category.delete(walletId, credentialId, *categories.toTypedArray()) > 0
 
     override suspend fun acceptCredential(parameter: CredentialRequestParameter): Boolean =
         CredentialsService.get(walletId, parameter.credentialId)?.takeIf { it.deletedOn == null }?.let {
@@ -948,3 +948,5 @@ class SSIKit2WalletService(
     } ?: EventDataNotAvailable
 
 }
+
+

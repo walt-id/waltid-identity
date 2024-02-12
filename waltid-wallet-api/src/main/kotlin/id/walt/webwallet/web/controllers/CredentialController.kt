@@ -1,11 +1,9 @@
 package id.walt.webwallet.web.controllers
 
-import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.service.credentials.CredentialFilterObject
 import id.walt.webwallet.web.parameter.CredentialRequestParameter
 import id.walt.webwallet.web.parameter.NoteRequestParameter
-import id.walt.webwallet.web.parameter.RequestParameter
 import io.github.smiley4.ktorswaggerui.dsl.*
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -176,11 +174,11 @@ fun Application.credentials() = walletRoute {
                     context.respond(HttpStatusCode.BadRequest, it.localizedMessage)
                 }
             }
-            route("category/{category}", {
+            route("category", {
                 request {
-                    pathParameter<String>("category") {
-                        description = "the category name"
-                        example = "my-category"
+                    body<List<String>> {
+                        description = "The list of category names"
+                        required = true
                     }
                 }
             }) {
@@ -193,8 +191,8 @@ fun Application.credentials() = walletRoute {
                     }
                 }) {
                     val credentialId = call.parameters.getOrFail("credentialId")
-                    val category = call.parameters.getOrFail("category")
-                    runCatching { getWalletService().attachCategory(credentialId, category) }.onSuccess {
+                    val categories = call.receive<List<String>>()
+                    runCatching { getWalletService().attachCategory(credentialId, categories) }.onSuccess {
                         if (it) context.respond(HttpStatusCode.Created) else context.respond(HttpStatusCode.BadRequest)
                     }.onFailure { context.respond(HttpStatusCode.BadRequest, it.localizedMessage) }
                 }
@@ -207,8 +205,8 @@ fun Application.credentials() = walletRoute {
                     }
                 }) {
                     val credentialId = call.parameters.getOrFail("credentialId")
-                    val category = call.parameters.getOrFail("category")
-                    runCatching { getWalletService().detachCategory(credentialId, category) }.onSuccess {
+                    val categories = call.receive<List<String>>()
+                    runCatching { getWalletService().detachCategory(credentialId, categories) }.onSuccess {
                         if (it) context.respond(HttpStatusCode.Accepted) else context.respond(HttpStatusCode.BadRequest)
                     }.onFailure { context.respond(HttpStatusCode.BadRequest, it.localizedMessage) }
                 }
