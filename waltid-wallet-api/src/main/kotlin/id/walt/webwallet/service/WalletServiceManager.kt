@@ -11,8 +11,8 @@ import id.walt.webwallet.service.account.AccountsService
 import id.walt.webwallet.service.category.CategoryServiceImpl
 import id.walt.webwallet.service.nft.NftKitNftService
 import id.walt.webwallet.service.nft.NftService
-import id.walt.webwallet.service.trust.EntraIssuerTrustValidationService
-import id.walt.webwallet.service.trust.EntraVerifierTrustValidationService
+import id.walt.webwallet.service.trust.DefaultIssuerTrustValidationService
+import id.walt.webwallet.service.trust.DefaultVerifierTrustValidationService
 import id.walt.webwallet.trustusecase.TrustValidationUseCaseImpl
 import io.ktor.client.*
 import kotlinx.datetime.Clock
@@ -21,7 +21,6 @@ import kotlinx.uuid.UUID
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.select
-import org.slf4j.LoggerFactory
 import java.util.concurrent.ConcurrentHashMap
 
 object WalletServiceManager {
@@ -31,8 +30,8 @@ object WalletServiceManager {
     private val http = HttpClient()
     private val entraIssuerTrustConfig = ConfigManager.getConfig<TrustConfig>().entra?.issuer
     private val entraTrustValidationUseCase = TrustValidationUseCaseImpl(
-        issuerTrustValidationService = EntraIssuerTrustValidationService(http, entraIssuerTrustConfig),
-        verifierTrustValidationService = EntraVerifierTrustValidationService(http),
+        issuerTrustValidationService = DefaultIssuerTrustValidationService(http, entraIssuerTrustConfig),
+        verifierTrustValidationService = DefaultVerifierTrustValidationService(http),
         didSeeker = EntraDidSeeker(),
         credentialTypeSeeker = EntraCredentialTypeSeeker(),
     )
