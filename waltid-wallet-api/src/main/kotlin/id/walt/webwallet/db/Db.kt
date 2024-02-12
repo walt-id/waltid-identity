@@ -77,7 +77,8 @@ object Db {
         WalletCategory,
         WalletCredentialCategoryMap,
 
-        OidcLogins
+        OidcLogins,
+        WalletSettings,
     ).toTypedArray()
 
     fun recreateDatabase() {

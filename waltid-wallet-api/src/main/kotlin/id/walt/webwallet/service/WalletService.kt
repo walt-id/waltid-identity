@@ -1,7 +1,10 @@
 package id.walt.webwallet.service
 
 import id.walt.oid4vc.data.dif.PresentationDefinition
-import id.walt.webwallet.db.models.*
+import id.walt.webwallet.db.models.WalletCategoryData
+import id.walt.webwallet.db.models.WalletCredential
+import id.walt.webwallet.db.models.WalletDid
+import id.walt.webwallet.db.models.WalletOperationHistory
 import id.walt.webwallet.service.credentials.CredentialFilterObject
 import id.walt.webwallet.service.dto.LinkedWalletDataTransferObject
 import id.walt.webwallet.service.dto.WalletDataTransferObject
@@ -9,6 +12,7 @@ import id.walt.webwallet.service.events.EventLogFilter
 import id.walt.webwallet.service.events.EventLogFilterResult
 import id.walt.webwallet.service.issuers.IssuerDataTransferObject
 import id.walt.webwallet.service.report.ReportRequestParameter
+import id.walt.webwallet.service.settings.WalletSetting
 import id.walt.webwallet.web.controllers.PresentationRequestParameter
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -65,6 +69,8 @@ abstract class WalletService(val tenant: String, val accountId: UUID, val wallet
     // Issuers TODO: move each such component to use-case
     abstract suspend fun listIssuers(): List<IssuerDataTransferObject>
     abstract suspend fun getIssuer(name: String): IssuerDataTransferObject
+    abstract fun authorizeIssuer(issuer: String): Boolean
+    abstract fun addIssuer(issuer: IssuerDataTransferObject): Boolean
     abstract fun getCredentialsByIds(credentialIds: List<String>): List<WalletCredential>
 
     // Categories

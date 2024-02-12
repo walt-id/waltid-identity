@@ -24,7 +24,7 @@ fun Application.settings() = walletRoute {
             }
         }) {
             runCatching { getWalletService().getSettings() }.onSuccess {
-                context.respond(HttpStatusCode.Created)
+                context.respond(HttpStatusCode.OK, it)
             }.onFailure {
                 context.respond(HttpStatusCode.BadRequest, it.localizedMessage)
             }

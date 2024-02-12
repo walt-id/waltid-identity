@@ -11,6 +11,7 @@ import id.walt.webwallet.service.account.AccountsService
 import id.walt.webwallet.service.category.CategoryServiceImpl
 import id.walt.webwallet.service.nft.NftKitNftService
 import id.walt.webwallet.service.nft.NftService
+import id.walt.webwallet.service.settings.SettingsService
 import id.walt.webwallet.service.trust.DefaultIssuerTrustValidationService
 import id.walt.webwallet.service.trust.DefaultVerifierTrustValidationService
 import id.walt.webwallet.trustusecase.TrustValidationUseCaseImpl
@@ -27,6 +28,7 @@ object WalletServiceManager {
 
     private val walletServices = ConcurrentHashMap<Pair<UUID, UUID>, WalletService>()
     private val categoryService = CategoryServiceImpl
+    private val settingsService = SettingsService
     private val http = HttpClient()
     private val entraIssuerTrustConfig = ConfigManager.getConfig<TrustConfig>().entra?.issuer
     private val entraTrustValidationUseCase = TrustValidationUseCaseImpl(
@@ -44,7 +46,8 @@ object WalletServiceManager {
                 accountId = account,
                 walletId = wallet,
                 categoryService = categoryService,
-                trustUseCase = entraTrustValidationUseCase
+                trustUseCase = entraTrustValidationUseCase,
+                settingsService = settingsService
             )
         }
 

@@ -12,6 +12,7 @@ import id.walt.webwallet.service.events.EventLogFilter
 import id.walt.webwallet.service.events.EventLogFilterResult
 import id.walt.webwallet.service.issuers.IssuerDataTransferObject
 import id.walt.webwallet.service.report.ReportRequestParameter
+import id.walt.webwallet.service.settings.WalletSetting
 import id.walt.webwallet.utils.JsonUtils.toJsonPrimitive
 import id.walt.webwallet.web.controllers.PresentationRequestParameter
 import io.ktor.client.*
@@ -402,6 +403,9 @@ class WalletKitWalletService(tenant: String, accountId: UUID, walletId: UUID) : 
 
     override fun getCredentialsByIds(credentialIds: List<String>): List<WalletCredential> =
         throw NotImplementedError("")
+
+    override fun authorizeIssuer(issuer: String): Boolean = throw NotImplementedError("")
+    override fun addIssuer(issuer: IssuerDataTransferObject): Boolean = throw NotImplementedError("")
 
     override suspend fun listCategories(): List<WalletCategoryData> = throw NotImplementedError("")
 

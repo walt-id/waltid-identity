@@ -48,9 +48,9 @@ import id.walt.webwallet.service.report.ReportRequestParameter
 import id.walt.webwallet.service.report.ReportService
 import id.walt.webwallet.service.settings.SettingsService
 import id.walt.webwallet.service.settings.WalletSetting
-import id.walt.webwallet.web.controllers.PresentationRequestParameter
 import id.walt.webwallet.trustusecase.TrustStatus
 import id.walt.webwallet.trustusecase.TrustValidationUseCase
+import id.walt.webwallet.web.controllers.PresentationRequestParameter
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.engine.cio.*
@@ -756,6 +756,16 @@ class SSIKit2WalletService(
     override fun getCredentialsByIds(credentialIds: List<String>): List<WalletCredential> {
         // todo: select by SQL
         return listCredentials(CredentialFilterObject.default).filter { it.id in credentialIds }
+    }
+
+    override fun authorizeIssuer(issuer: String): Boolean = IssuersService.authorize(walletId, issuer) > 0
+    override fun addIssuer(issuer: IssuerDataTransferObject): Boolean = IssuersService.add(
+        name = issuer.name,
+        description = issuer.description,
+        uiEndpoint = issuer.uiEndpoint,
+        configurationEndpoint = issuer.configurationEndpoint
+    ).let {
+        IssuersService.addToWallet(walletId, issuer.name, issuer.authorized) > 0
     }
 
     override suspend fun listCategories(): List<WalletCategoryData> = categoryService.list(walletId)
