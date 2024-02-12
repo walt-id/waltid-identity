@@ -19,9 +19,16 @@
                             class="relative transform overflow-hidden rounded-lg bg-white px-4 pb-4 pt-5 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:p-6"
                         >
                             <div>
-                                <div class="mx-auto flex h-96 w-24 items-center justify-center rounded-full bg-green-100">
-                                    <qrcode-vue :value="link" level="H" size="380" style="height: 380px" />
+                                <div class="mx-auto flex h-96 w-24 items-center justify-center rounded-full">
+                                    <NuxtErrorBoundary>
+                                        <qrcode-vue :size="380" :value="link" level="L" style="height: 380px" />
+                                        <template #error="{ error }">
+                                            <p v-if="error.value?.message.includes('Data too long')">This QR code is too big to be displayed. <span class="text-xs">Length is: {{ link.length }}</span></p>
+                                            <p v-else>{{ error }}</p>
+                                        </template>
+                                    </NuxtErrorBoundary>
                                 </div>
+                                DEBUG: Length is: {{ link.length }}
                                 <div class="mt-3 text-center sm:mt-5">
                                     <DialogTitle as="h3" class="text-base font-semibold leading-6 text-gray-900">Claim your credentials
                                     </DialogTitle>
