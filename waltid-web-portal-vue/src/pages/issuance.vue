@@ -159,7 +159,6 @@
                     class="rounded-md inline-flex items-center bg-green-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-green-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
                     disabled
                     type="button"
-                    @click="issueBatch"
             >
                 <Spinner class="p-1 mr-1" />
                 Issuing...
@@ -175,7 +174,7 @@
                 <button
                     class="rounded-md bg-green-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-green-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
                     type="button"
-                    @click="issueBatch"
+                    @click="sendIssueRequest"
                 >
                     <span v-if="credentials.length >= 2">Issue {{ credentials.length }} credentials <span class="text-xs">(<span
                         class="underline"
@@ -205,9 +204,11 @@
                     <h3 class="text-sm font-medium text-red-800">There was an error with this issuance:</h3>
                     <div class="mt-2 text-sm text-red-700">
                         <ul class="list-disc space-y-1 pl-5" role="list">
-                            <li>Error: {{ issuanceError.name }} {{ issuanceError.statusCode }}:</li>
+                            <li>{{ issuanceError.name }}: {{ issuanceError.statusCode }} {{ issuanceError.statusMessage }}</li>
                             <li>Message: {{ issuanceError.message }}</li>
                             <li v-if="issuanceError.response">Response: {{ issuanceError.response }}</li>
+
+                            <li v-if="issuanceError.data">{{ issuanceError.data?.startsWith('{') ? JSON.parse(issuanceError.data)?.message ?? JSON.parse(issuanceError.data) : issuanceError.data }}</li>
                         </ul>
                     </div>
                 </div>
@@ -256,37 +257,43 @@ type IssuanceRequest = {
 }
 
 const currentIssuanceRequest: Ref<IssuanceRequest> = computed(() => {
-    return {
-        url: `${config.public.issuer}/openid4vc/jwt/issue`,
-        method: "POST",
-        body: {
+    const batch = credentials.length > 1;
+
+    let url: string = `${config.public.issuer}/openid4vc/jwt/` + (batch ? "issueBatch" : "issue");
+
+    const credentialRequestBodies = credentials.map((credential) => ({
             issuanceKey: JSON.parse(issuanceKey.value),
             issuerDid: issuanceDid.value,
-            vc: JSON.parse(credentials[0].data),
-            mapping: JSON.parse(credentials[0].mapping)
-        }
+            vc: JSON.parse(credential.data),
+            mapping: JSON.parse(credential.mapping)
+        })
+    );
+
+    return {
+        url: url,
+        method: "POST",
+        body: batch ? credentialRequestBodies : credentialRequestBodies[0]
     };
 });
 
-async function issueSingle() {
+async function sendIssueRequest() {
     issuing.value = true;
 
     const req: IssuanceRequest = currentIssuanceRequest.value;
 
     const { data, pending, error, refresh } = await useFetch<string>(req.url, {
         method: "POST",
-        body: req.body
+        body: req.body,
+        headers: {
+            "content-type": "application/json"
+        }
     });
+
     issuanceError.value = error.value;
 
     oidcLink.value = data.value;
-    // alert(data.value)
 
     issuing.value = false;
-}
-
-async function issueBatch() {
-    await issueSingle();
 }
 
 function editCredential(id: number) {
