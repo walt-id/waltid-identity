@@ -15,6 +15,7 @@ import id.walt.webwallet.service.report.ReportRequestParameter
 import id.walt.webwallet.service.settings.WalletSetting
 import id.walt.webwallet.utils.JsonUtils.toJsonPrimitive
 import id.walt.webwallet.web.controllers.PresentationRequestParameter
+import id.walt.webwallet.web.parameter.CredentialRequestParameter
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.engine.cio.*
@@ -170,6 +171,9 @@ class WalletKitWalletService(tenant: String, accountId: UUID, walletId: UUID) : 
     override suspend fun attachCategory(credentialId: String, category: String): Boolean = throw NotImplementedError("")
 
     override suspend fun detachCategory(credentialId: String, category: String): Boolean = throw NotImplementedError("")
+    override suspend fun acceptCredential(parameter: CredentialRequestParameter): Boolean = throw NotImplementedError("")
+
+    override suspend fun rejectCredential(parameter: CredentialRequestParameter): Boolean = throw NotImplementedError("")
 
     override fun matchCredentialsByPresentationDefinition(presentationDefinition: PresentationDefinition): List<WalletCredential> =
         throw NotImplementedError("")
@@ -275,10 +279,11 @@ class WalletKitWalletService(tenant: String, accountId: UUID, walletId: UUID) : 
         return request
     }
 
-    override suspend fun useOfferRequest(offer: String, did: String, silent: Boolean) {
+    override suspend fun useOfferRequest(
+        offer: String, did: String, requireUserInput: Boolean, silent: Boolean
+    ): List<WalletCredential> {
         val sessionId = authenticatedJsonPost(
-            "/api/wallet/issuance/startIssuerInitiatedIssuance",
-            mapOf("oidcUri" to offer)
+            "/api/wallet/issuance/startIssuerInitiatedIssuance", mapOf("oidcUri" to offer)
         ).bodyAsText()
 
         authenticatedJsonGet("/api/wallet/issuance/continueIssuerInitiatedIssuance") {
@@ -289,6 +294,7 @@ class WalletKitWalletService(tenant: String, accountId: UUID, walletId: UUID) : 
                 }
             }
         }
+        throw NotImplementedError("")
     }
 
     /* DIDs */
