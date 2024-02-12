@@ -1,7 +1,12 @@
 package id.walt.crypto.utils
 
 import kotlinx.serialization.json.*
+import kotlin.js.ExperimentalJsExport
+import kotlin.js.JsExport
+import kotlin.js.JsName
 
+@ExperimentalJsExport
+@JsExport
 object JsonUtils {
 
     fun Any?.toJsonElement(): JsonElement =
@@ -25,10 +30,12 @@ object JsonUtils {
             else -> throw IllegalArgumentException("Unknown type: ${this::class.simpleName}, was: $this")
         }
 
+    @JsName("listToJsonElement")
     fun List<*>.toJsonElement(): JsonElement {
         return JsonArray(map { it.toJsonElement() })
     }
 
+    @JsName("mapToJsonObject")
     fun Map<*, *>.toJsonElement(): JsonElement {
         val map: MutableMap<String, JsonElement> = mutableMapOf()
         this.forEach { (key, value) ->
