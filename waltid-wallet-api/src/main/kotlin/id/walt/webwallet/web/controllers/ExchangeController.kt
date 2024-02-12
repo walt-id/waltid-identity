@@ -22,6 +22,7 @@ fun Application.exchange() = walletRoute {
             request {
                 queryParameter<String>("did") { description = "The DID to issue the credential(s) to" }
                 queryParameter<Boolean>("silent") { description = "Whether to claim in background" }
+                queryParameter<Boolean>("requireUserInput") { description = "Whether to claim as pending acceptance" }
                 body<String> {
                     description = "The offer request to use"
                 }
@@ -37,6 +38,7 @@ fun Application.exchange() = walletRoute {
             val did = call.request.queryParameters["did"] ?: wallet.listDids().firstOrNull()?.did
             ?: throw IllegalArgumentException("No DID to use supplied")
             val silent = call.request.queryParameters["silent"].toBoolean()
+            val requireUserInput = call.request.queryParameters["requireUserInput"].toBoolean()
 
             val offer = call.receiveText()
 

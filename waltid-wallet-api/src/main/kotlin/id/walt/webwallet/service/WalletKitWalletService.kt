@@ -275,7 +275,7 @@ class WalletKitWalletService(tenant: String, accountId: UUID, walletId: UUID) : 
         return request
     }
 
-    override suspend fun useOfferRequest(offer: String, did: String, silent: Boolean) {
+    override suspend fun useOfferRequest(offer: String, did: String, requireUserInput: Boolean, silent: Boolean) {
         val sessionId = authenticatedJsonPost(
             "/api/wallet/issuance/startIssuerInitiatedIssuance",
             mapOf("oidcUri" to offer)

@@ -493,7 +493,7 @@ class SSIKit2WalletService(
         return listOf(CredentialResponse.Companion.success(CredentialFormat.jwt_vc_json, vc))
     }
 
-    override suspend fun useOfferRequest(offer: String, did: String, silent: Boolean) {
+    override suspend fun useOfferRequest(offer: String, did: String, requireUserInput: Boolean, silent: Boolean) {
 
         val credentialWallet = getCredentialWallet(did)
 
@@ -526,7 +526,7 @@ class SSIKit2WalletService(
         val manifest =
             isEntra.takeIf { it }?.let { EntraManifestExtractor().extract(offer) }//?:DefaultManifestExtractor
         val addableCredentials: List<WalletCredential> = credentialResponses.map {
-            getCredentialData(it, manifest, silent).also {
+            getCredentialData(it, manifest, requireUserInput || silent).also {
                 logEvent(
                     action = EventType.Credential.Accept,
                     originator = "", //parsedOfferReq.credentialOffer!!.credentialIssuer,
@@ -819,12 +819,7 @@ class SSIKit2WalletService(
     //TODO: move to related entity
     private fun createCredentialEventData(credential: WalletCredential, type: String?) = CredentialEventData(
         ecosystem = EventDataNotAvailable,
-        issuerId = credential.parsedDocument?.jsonObject?.get("issuer")?.let {
-            if (it is JsonObject)
-                it.jsonObject["id"]?.jsonPrimitive?.content
-            else
-                it.jsonPrimitive.content
-        } ?: EventDataNotAvailable,
+        issuerId = parseIssuerDid(credential.parsedDocument),
         subjectId = credential.parsedDocument?.jsonObject?.get("credentialSubject")?.jsonObject?.get(
             "id"
         )?.jsonPrimitive?.content ?: EventDataNotAvailable,
@@ -851,14 +846,14 @@ class SSIKit2WalletService(
     }
 
     private fun getCredentialData(
-        credentialResp: CredentialResponse, manifest: JsonObject?, silent: Boolean
+        credentialResp: CredentialResponse, manifest: JsonObject?, pending: Boolean
     ) = let {
         val credential = credentialResp.credential!!.jsonPrimitive.content
         val credentialJwt = credential.decodeJws(withSignature = true)
         val typ = credentialJwt.header["typ"]?.jsonPrimitive?.content?.lowercase()
         when (typ) {
-            "jwt" -> parseJwtCredentialResponse(credentialJwt, credential, manifest, silent)
-            "vc+sd-jwt" -> parseSdJwtCredentialResponse(credentialJwt, credential, manifest, silent)
+            "jwt" -> parseJwtCredentialResponse(credentialJwt, credential, manifest, pending)
+            "vc+sd-jwt" -> parseSdJwtCredentialResponse(credentialJwt, credential, manifest, pending)
             null -> throw IllegalArgumentException("WalletCredential JWT does not have \"typ\"")
             else -> throw IllegalArgumentException("Invalid credential \"typ\": $typ")
         }.let {
@@ -868,7 +863,7 @@ class SSIKit2WalletService(
 
     //TODO: move to related entity
     private fun parseJwtCredentialResponse(
-        credentialJwt: JwsUtils.JwsParts, document: String, manifest: JsonObject?, silent: Boolean
+        credentialJwt: JwsUtils.JwsParts, document: String, manifest: JsonObject?, pending: Boolean,
     ) = let {
         val credentialId =
             credentialJwt.payload["vc"]!!.jsonObject["id"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
@@ -885,13 +880,13 @@ class SSIKit2WalletService(
             manifest = manifest.toString(),
 //                delete = false,
             deletedOn = null,
-            pending = silent,
+            pending = pending,
         )
     }
 
     //TODO: move to related entity
     private fun parseSdJwtCredentialResponse(
-        credentialJwt: JwsUtils.JwsParts, document: String, manifest: JsonObject?, silent: Boolean
+        credentialJwt: JwsUtils.JwsParts, document: String, manifest: JsonObject?, pending: Boolean
     ) = let {
         val credentialId =
             credentialJwt.payload["id"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() } ?: randomUUID()
@@ -914,7 +909,7 @@ class SSIKit2WalletService(
             manifest = manifest?.toString(),
 //                delete = false,
             deletedOn = null,
-            pending = silent,
+            pending = pending,
         )
     }
 
@@ -927,5 +922,10 @@ class SSIKit2WalletService(
         val credential: WalletCredential,
         val type: String?,
     )
+
+    private fun parseIssuerDid(credential: JsonObject?) = credential?.jsonObject?.get("issuer")?.let {
+        if (it is JsonObject) it.jsonObject["id"]?.jsonPrimitive?.content
+        else it.jsonPrimitive.content
+    } ?: EventDataNotAvailable
 
 }

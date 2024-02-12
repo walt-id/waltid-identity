@@ -62,24 +62,6 @@ data class WalletCredential(
                 .getOrNull()
     }
 
-    /*
-    val parsedDocument: JsonObject?
-        get() =
-            runCatching {
-                when {
-                    document.startsWith("{") -> Json.parseToJsonElement(document).jsonObject
-                    document.startsWith("ey") -> document.decodeJws().payload
-                        .run { jsonObject["vc"]?.jsonObject ?: jsonObject }
-
-                    else -> throw IllegalArgumentException("Unknown credential format")
-                }.toMutableMap().also {
-                    it.putIfAbsent("id", JsonPrimitive(id))
-                }.let {
-                    JsonObject(it)
-                }
-            }.onFailure { it.printStackTrace() }
-                .getOrNull()*/
-
 
     constructor(result: ResultRow) : this(
         wallet = result[WalletCredentials.wallet].value,
