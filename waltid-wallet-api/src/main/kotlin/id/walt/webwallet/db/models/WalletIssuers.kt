@@ -1,6 +1,5 @@
-package id.walt.webwallet.db.models.todo
+package id.walt.webwallet.db.models
 
-import id.walt.webwallet.db.models.Wallets
 import kotlinx.uuid.exposed.KotlinxUUIDTable
 
 object WalletIssuers : KotlinxUUIDTable("wallet_issuers") {
@@ -8,6 +7,7 @@ object WalletIssuers : KotlinxUUIDTable("wallet_issuers") {
 //    val accountId = kotlinxUUID("accountId").autoGenerate()
     val wallet = reference("wallet", Wallets)
     val issuer = reference("issuer", Issuers)
+    val authorized = bool("authorized").default(false)//authorized to push credentials silently
 
     init {
 //        foreignKey(wallet, target = Accounts.primaryKey)

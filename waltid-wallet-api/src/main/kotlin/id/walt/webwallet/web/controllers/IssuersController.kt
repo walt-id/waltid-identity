@@ -7,10 +7,13 @@ import id.walt.webwallet.service.issuers.IssuersService
 import id.walt.webwallet.web.controllers.getWalletService
 import id.walt.webwallet.web.controllers.walletRoute
 import io.github.smiley4.ktorswaggerui.dsl.get
+import io.github.smiley4.ktorswaggerui.dsl.post
 import io.github.smiley4.ktorswaggerui.dsl.route
 import io.ktor.http.*
 import io.ktor.server.application.*
+import io.ktor.server.request.*
 import io.ktor.server.response.*
+import io.ktor.server.util.*
 
 fun Application.issuers() = walletRoute {
     route("issuers", {
@@ -26,6 +29,27 @@ fun Application.issuers() = walletRoute {
             }
         }) {
             context.respond(getWalletService().listIssuers())
+        }
+        post("add", {
+            summary = "Add issuer to wallet"
+            request {
+                body<IssuerDataTransferObject> {
+                    description = "Issuer data"
+                    required = true
+                }
+            }
+            response {
+                HttpStatusCode.Created to { description = "Issuer added successfully" }
+                HttpStatusCode.BadRequest to { description = "Failed to add issuer to wallet" }
+            }
+        }) {
+            runCatching {
+                getWalletService().addIssuer(call.receive<IssuerDataTransferObject>())
+            }.onSuccess {
+                context.respond(HttpStatusCode.Created)
+            }.onFailure {
+                context.respond(HttpStatusCode.BadRequest, it.localizedMessage)
+            }
         }
         route("{issuer}", {
             request {
@@ -50,13 +74,26 @@ fun Application.issuers() = walletRoute {
                 }
             }) {
                 runCatching {
-                    getWalletService().getIssuer(
-                        call.parameters["issuer"] ?: throw IllegalArgumentException("No issuer name provided.")
-                    )
+                    getWalletService().getIssuer(call.parameters.getOrFail("issuer"))
                 }.onSuccess {
                     context.respond(it)
                 }.onFailure {
                     context.respondText(it.localizedMessage, ContentType.Text.Plain, HttpStatusCode.NotFound)
+                }
+            }
+            post("authorize",{
+                summary = "Authorize issuer to automatically add credentials to the wallet in future"
+                response {
+                    HttpStatusCode.Accepted to { description = "Authorization succeed" }
+                    HttpStatusCode.BadRequest to { description = "Authorization failed" }
+                }
+            }){
+                runCatching {
+                    getWalletService().authorizeIssuer(call.parameters.getOrFail("issuer"))
+                }.onSuccess {
+                    context.respond(HttpStatusCode.Accepted)
+                }.onFailure {
+                    context.respond(HttpStatusCode.BadRequest, it.localizedMessage)
                 }
             }
         }

@@ -25,6 +25,7 @@ data class Event(
     val wallet: UUID? = null,
     val credentialId: String? = null,
     val data: JsonObject,
+    val note: String? = null,
 ) {
     constructor(
         action: EventType.Action,
@@ -33,7 +34,8 @@ data class Event(
         account: UUID,
         wallet: UUID?,
         data: EventData,
-        credentialId: String? = null
+        credentialId: String? = null,
+        note: String? = null,
     ) : this(
         event = action.type,
         action = action.toString(),
@@ -43,6 +45,7 @@ data class Event(
         wallet = wallet,
         data = Json.encodeToJsonElement(data).jsonObject,
         credentialId = credentialId,
+        note = note,
     )
 
     constructor(row: ResultRow) : this(
@@ -55,5 +58,6 @@ data class Event(
         wallet = row[Events.wallet],
         data = Json.parseToJsonElement(row[Events.data]).jsonObject,
         credentialId = row[Events.credentialId],
+        note = row[Events.note]
     )
 }
