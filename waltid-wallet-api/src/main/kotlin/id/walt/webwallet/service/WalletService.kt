@@ -1,10 +1,7 @@
 package id.walt.webwallet.service
 
 import id.walt.oid4vc.data.dif.PresentationDefinition
-import id.walt.webwallet.db.models.WalletCategoryData
-import id.walt.webwallet.db.models.WalletCredential
-import id.walt.webwallet.db.models.WalletDid
-import id.walt.webwallet.db.models.WalletOperationHistory
+import id.walt.webwallet.db.models.*
 import id.walt.webwallet.service.credentials.CredentialFilterObject
 import id.walt.webwallet.service.dto.LinkedWalletDataTransferObject
 import id.walt.webwallet.service.dto.WalletDataTransferObject
@@ -77,6 +74,10 @@ abstract class WalletService(val tenant: String, val accountId: UUID, val wallet
 
     // Reports
     abstract suspend fun getFrequentCredentials(parameter: ReportRequestParameter): List<WalletCredential>
+
+    // Settings
+    abstract suspend fun getSettings(): WalletSetting
+    abstract suspend fun setSettings(settings: WalletSetting): Boolean
 
 
     // TODO: Push

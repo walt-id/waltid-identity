@@ -3,13 +3,13 @@ package id.walt.webwallet.service.account
 import id.walt.webwallet.config.ConfigManager
 import id.walt.webwallet.config.LoginMethodsConfig
 import id.walt.webwallet.db.models.*
-import id.walt.webwallet.db.models.WalletIssuers
-import id.walt.webwallet.db.models.Issuers
 import id.walt.webwallet.service.WalletServiceManager
 import id.walt.webwallet.service.events.AccountEventData
 import id.walt.webwallet.service.events.Event
 import id.walt.webwallet.service.events.EventService
 import id.walt.webwallet.service.events.EventType
+import id.walt.webwallet.service.settings.SettingsService
+import id.walt.webwallet.service.settings.WalletSetting
 import id.walt.webwallet.web.controllers.generateToken
 import id.walt.webwallet.web.model.AccountRequest
 import id.walt.webwallet.web.model.AddressAccountRequest
@@ -51,6 +51,7 @@ object AccountsService {
                         it[wallet] = walletId
                     }
                 }
+                SettingsService.set(walletId, WalletSetting.default)
             }
         }
 

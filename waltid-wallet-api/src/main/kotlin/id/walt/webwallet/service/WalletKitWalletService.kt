@@ -411,5 +411,9 @@ class WalletKitWalletService(tenant: String, accountId: UUID, walletId: UUID) : 
 
     override suspend fun getFrequentCredentials(parameter: ReportRequestParameter): List<WalletCredential> =
         throw NotImplementedError("")
+
+    override suspend fun getSettings(): WalletSetting = throw NotImplementedError("")
+
+    override suspend fun setSettings(settings: WalletSetting): Boolean = throw NotImplementedError("")
 }
 

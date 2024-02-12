@@ -25,7 +25,7 @@ data class Event(
     val wallet: UUID? = null,
     val credentialId: String? = null,
     val data: JsonObject,
-    val note: String?,
+    val note: String? = null,
 ) {
     constructor(
         action: EventType.Action,
@@ -35,7 +35,7 @@ data class Event(
         wallet: UUID?,
         data: EventData,
         credentialId: String? = null,
-        note: String?,
+        note: String? = null,
     ) : this(
         event = action.type,
         action = action.toString(),

@@ -46,6 +46,8 @@ import id.walt.webwallet.service.keys.KeysService
 import id.walt.webwallet.service.oidc4vc.TestCredentialWallet
 import id.walt.webwallet.service.report.ReportRequestParameter
 import id.walt.webwallet.service.report.ReportService
+import id.walt.webwallet.service.settings.SettingsService
+import id.walt.webwallet.service.settings.WalletSetting
 import id.walt.webwallet.web.controllers.PresentationRequestParameter
 import id.walt.webwallet.trustusecase.TrustStatus
 import id.walt.webwallet.trustusecase.TrustValidationUseCase
@@ -81,7 +83,8 @@ class SSIKit2WalletService(
     accountId: UUID,
     walletId: UUID,
     private val categoryService: CategoryService,
-    private val trustUseCase: TrustValidationUseCase
+    private val trustUseCase: TrustValidationUseCase,
+    private val settingsService: SettingsService,
 ) : WalletService(tenant, accountId, walletId) {
     private val logger = LoggerFactory.getLogger(this::class.java)
 
@@ -762,6 +765,11 @@ class SSIKit2WalletService(
     override suspend fun deleteCategory(name: String): Boolean = categoryService.delete(walletId, name) == 1
     override suspend fun getFrequentCredentials(parameter: ReportRequestParameter): List<WalletCredential> =
         ReportService.Credentials.frequent(parameter)
+
+    override suspend fun getSettings(): WalletSetting =
+        settingsService.get(walletId) ?: error("Settings not found for wallet: $walletId")
+
+    override suspend fun setSettings(settings: WalletSetting): Boolean = settingsService.set(walletId, settings) > 0
 
     private fun getDidOptions(method: String, args: Map<String, JsonPrimitive>) = when (method.lowercase()) {
         "key" -> DidKeyCreateOptions(
