@@ -61,7 +61,9 @@ const props = defineProps({
     }
 });
 
-const { data: credentialTemplates, pending, error, refresh } = await useFetch<Array<String>>("https://credentials.walt.id/api/list");
+const config = useRuntimeConfig()
+
+const { data: credentialTemplates, pending, error, refresh } = useFetch<Array<string>>(`${config.public.credentialRepository}/api/list`);
 const filter = ref("");
 
 const filteredCredentialTemplates = computed(() => {

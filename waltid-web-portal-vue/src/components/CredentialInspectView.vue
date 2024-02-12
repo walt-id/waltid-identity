@@ -43,6 +43,8 @@ const props = defineProps({
     }
 });
 
+const config = useRuntimeConfig()
+
 const loading = ref(false)
 const credentialData: Ref<_AsyncData<any, FetchError | null> | null> = ref(null);
 const credentialMapping: Ref<_AsyncData<any, FetchError | null> | null> = ref(null);
@@ -51,8 +53,8 @@ async function getCredentialData() {
     loading.value = true
     const templateId = props.template;
 
-    credentialData.value = await useFetch<string>(`https://credentials.walt.id/api/vc/${templateId}`);
-    credentialMapping.value = await useFetch<string>(`https://credentials.walt.id/api/mapping/${templateId}`);
+    credentialData.value = await useFetch<string>(`${config.public.credentialRepository}/api/vc/${templateId}`);
+    credentialMapping.value = await useFetch<string>(`${config.public.credentialRepository}/api/mapping/${templateId}`);
 
     loading.value = false
 }
