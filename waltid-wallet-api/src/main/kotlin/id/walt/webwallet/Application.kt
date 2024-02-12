@@ -1,7 +1,5 @@
 package id.walt.webwallet
 
-import id.walt.webwallet.web.controllers.auth
-import id.walt.webwallet.web.controllers.configureSecurity
 import id.walt.web.controllers.issuers
 import id.walt.webwallet.config.ConfigManager
 import id.walt.webwallet.config.WebConfig
@@ -65,17 +63,18 @@ fun Application.module() {
     notifications()
 
     // Wallet routes
-    credentials()
-    dids()
+    accounts()
     keys()
+    dids()
+    credentials()
     exchange()
     history()
     web3accounts()
-    accounts()
     nfts()
     issuers()
     eventLogs()
     manifest()
     categories()
     reports()
+    settings()
 }
