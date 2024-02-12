@@ -51,6 +51,7 @@ import id.walt.webwallet.service.settings.WalletSetting
 import id.walt.webwallet.trustusecase.TrustStatus
 import id.walt.webwallet.trustusecase.TrustValidationUseCase
 import id.walt.webwallet.web.controllers.PresentationRequestParameter
+import id.walt.webwallet.web.parameter.CredentialRequestParameter
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.engine.cio.*
@@ -137,13 +138,13 @@ class SSIKit2WalletService(
     override suspend fun detachCategory(credentialId: String, category: String): Boolean =
         CredentialsService.Category.delete(walletId, credentialId, category) == 1
 
-    override suspend fun acceptCredential(credentialId: String): Boolean =
-        CredentialsService.get(walletId, credentialId)?.takeIf { it.deletedOn == null }?.let {
-            CredentialsService.setPending(walletId, credentialId, false) > 0
-        } ?: error("Credential not found: $credentialId")
+    override suspend fun acceptCredential(parameter: CredentialRequestParameter): Boolean =
+        CredentialsService.get(walletId, parameter.credentialId)?.takeIf { it.deletedOn == null }?.let {
+            CredentialsService.setPending(walletId, parameter.credentialId, false) > 0
+        } ?: error("Credential not found: ${parameter.credentialId}")
 
-    override suspend fun rejectCredential(credentialId: String): Boolean =
-        CredentialsService.delete(walletId, credentialId, true)
+    override suspend fun rejectCredential(parameter: CredentialRequestParameter): Boolean =
+        CredentialsService.delete(walletId, parameter.credentialId, true)
 
     override fun matchCredentialsByPresentationDefinition(presentationDefinition: PresentationDefinition): List<WalletCredential> {
         val credentialList = listCredentials(CredentialFilterObject.default)
@@ -262,7 +263,7 @@ class SSIKit2WalletService(
         val credentialWallet = getCredentialWallet(parameter.did)
 
         val authReq = AuthorizationRequest.fromHttpParametersAuto(parseQueryString(Url(parameter.request).encodedQuery).toMap())
-        println("Auth req: $authReq")
+        logger.debug("Auth req: {}", authReq)
 
         logger.debug("USING PRESENTATION REQUEST, SELECTED CREDENTIALS: {}", parameter.selectedCredentials)
 

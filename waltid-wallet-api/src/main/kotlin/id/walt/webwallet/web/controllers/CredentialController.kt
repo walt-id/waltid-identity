@@ -1,10 +1,15 @@
 package id.walt.webwallet.web.controllers
 
+import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.service.credentials.CredentialFilterObject
+import id.walt.webwallet.web.parameter.CredentialRequestParameter
+import id.walt.webwallet.web.parameter.NoteRequestParameter
+import id.walt.webwallet.web.parameter.RequestParameter
 import io.github.smiley4.ktorswaggerui.dsl.*
 import io.ktor.http.*
 import io.ktor.server.application.*
+import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.util.*
 import kotlinx.serialization.json.JsonObject
@@ -132,12 +137,12 @@ fun Application.credentials() = walletRoute {
             post("accept", {
                 summary = "Accept credential"
                 response {
-                    HttpStatusCode.Accepted to { description = "" }
-                    HttpStatusCode.BadRequest to { description = "" }
+                    HttpStatusCode.Accepted to { description = "Credential accepted successfully" }
+                    HttpStatusCode.BadRequest to { description = "Credential acceptance failed" }
                 }
             }){
                 val credentialId = call.parameters.getOrFail("credentialId")
-                runCatching { getWalletService().acceptCredential(credentialId) }.onSuccess {
+                runCatching { getWalletService().acceptCredential(CredentialRequestParameter(credentialId)) }.onSuccess {
                     if (it) context.respond(HttpStatusCode.Accepted) else context.respond(HttpStatusCode.BadRequest)
                 }.onFailure {
                     context.respond(HttpStatusCode.BadRequest, it.localizedMessage)
@@ -145,13 +150,27 @@ fun Application.credentials() = walletRoute {
             }
             post("reject", {
                 summary = "Reject credential"
-                response {
-                    HttpStatusCode.Accepted to { description = "" }
-                    HttpStatusCode.BadRequest to { description = "" }
+                request {
+                    body<NoteRequestParameter> {
+                        description = "Request data"
+                        required = false
+                        example("Note", NoteRequestParameter("note"))
+                    }
                 }
-            }){
+                response {
+                    HttpStatusCode.Accepted to { description = "Credential rejected successfully" }
+                    HttpStatusCode.BadRequest to { description = "Credential rejection failed" }
+                }
+            }) {
                 val credentialId = call.parameters.getOrFail("credentialId")
-                runCatching { getWalletService().rejectCredential(credentialId) }.onSuccess {
+                val requestParameter = call.receiveNullable<NoteRequestParameter>()
+                runCatching {
+                    getWalletService().rejectCredential(
+                        CredentialRequestParameter(
+                            credentialId = credentialId, parameter = requestParameter
+                        )
+                    )
+                }.onSuccess {
                     if (it) context.respond(HttpStatusCode.Accepted) else context.respond(HttpStatusCode.BadRequest)
                 }.onFailure {
                     context.respond(HttpStatusCode.BadRequest, it.localizedMessage)
