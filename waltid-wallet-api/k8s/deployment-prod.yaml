@@ -160,6 +160,10 @@ spec:
               mountPath: "/waltid-wallet-api/config/push.conf"
               subPath: "push.conf"
               readOnly: true
+            - name: wallet-trust-config
+              mountPath: "/waltid-wallet-api/config/trust.conf"
+              subPath: "trust.conf"
+              readOnly: true
             - name: wallet-nft-config
               mountPath: "/waltid-wallet-api/walt.yaml"
               subPath: "walt.yaml"
@@ -194,6 +198,9 @@ spec:
         - name: wallet-push-config
           secret:
             secretName: wallet-push-config-secret
+        - name: wallet-trust-config
+          configMap:
+            name: wallet-trust-config
         - name: wallet-nft-config
           secret:
             secretName: wallet-nft-config-secret

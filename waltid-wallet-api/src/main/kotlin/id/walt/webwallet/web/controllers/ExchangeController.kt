@@ -21,6 +21,7 @@ fun Application.exchange() = walletRoute {
 
             request {
                 queryParameter<String>("did") { description = "The DID to issue the credential(s) to" }
+                queryParameter<Boolean>("silent") { description = "Whether to claim in background" }
                 body<String> {
                     description = "The offer request to use"
                 }
@@ -33,24 +34,25 @@ fun Application.exchange() = walletRoute {
         }) {
             val wallet = getWalletService()
 
-            val did = call.request.queryParameters["did"]
-                ?: wallet.listDids().firstOrNull()?.did
-                ?: throw IllegalArgumentException("No DID to use supplied")
+            val did = call.request.queryParameters["did"] ?: wallet.listDids().firstOrNull()?.did
+            ?: throw IllegalArgumentException("No DID to use supplied")
+            val silent = call.request.queryParameters["silent"].toBoolean()
 
             val offer = call.receiveText()
 
-
-            wallet.useOfferRequest(offer, did)
-            wallet.addOperationHistory(
-                WalletOperationHistory.new(
-                    tenant = wallet.tenant,
-                    wallet = wallet,
-                    "useOfferRequest",
-                    mapOf("did" to did, "offer" to offer)
+            runCatching {
+                wallet.useOfferRequest(offer, did, silent)
+                wallet.addOperationHistory(
+                    WalletOperationHistory.new(
+                        tenant = wallet.tenant,
+                        wallet = wallet,
+                        "useOfferRequest",
+                        mapOf("did" to did, "offer" to offer)
+                    )
                 )
-            )
-
-            context.respond(HttpStatusCode.OK)
+            }.onSuccess {
+                context.respond(HttpStatusCode.OK)
+            }.onFailure { context.respond(HttpStatusCode.BadRequest, it.localizedMessage) }
         }
 
         post("matchCredentialsForPresentationDefinition", {
