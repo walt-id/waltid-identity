@@ -38,7 +38,7 @@ abstract class WalletService(val tenant: String, val accountId: UUID, val wallet
     ): Result<String?>
 
     abstract suspend fun resolvePresentationRequest(request: String): String
-    abstract suspend fun useOfferRequest(offer: String, did: String)
+    abstract suspend fun useOfferRequest(offer: String, did: String, silent: Boolean)
 
     // DIDs
     abstract suspend fun listDids(): List<WalletDid>

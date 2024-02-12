@@ -100,6 +100,7 @@ object CredentialsService {
             this[WalletCredentials.addedOn] = Clock.System.now().toJavaInstant()
             this[WalletCredentials.manifest] = credential.manifest
 //            this[WalletCredentials.delete] = credential.delete
+            this[WalletCredentials.pending] = credential.pending
         }.map { it[WalletCredentials.id] }
     }
 
