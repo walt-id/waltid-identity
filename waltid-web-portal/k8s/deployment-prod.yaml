@@ -1,3 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wallet-portal-config
+data:
+  .env: |
+    NEXT_PUBLIC_VC_REPO: https://credentials.walt.id
+    NEXT_PUBLIC_ISSUER: https://issuer.portal.walt.id
+    NEXT_PUBLIC_VERIFIER: https://verifier.portal.walt.id
+    NEXT_PUBLIC_WALLET: https://wallet.walt.id
+---
+
 ---
 kind: Deployment
 apiVersion: apps/v1
@@ -30,6 +42,15 @@ spec:
           ports:
             - containerPort: 3000
               name: http-portal
+          volumeMounts:
+            - mountPath: /app/.env
+              subPath: ".env"
+              name: wallet-portal-config
+              readOnly: true
+      volumes:
+        - name: wallet-portal-config
+          configMap:
+            name: wallet-portal-config
 ---
 kind: Service
 apiVersion: v1
