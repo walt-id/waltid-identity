@@ -7,6 +7,9 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonObject
+import kotlin.js.ExperimentalJsExport
+import kotlin.js.JsExport
+import kotlin.js.JsName
 
 /*
  * if JWK has `use`="sig", no `keyAgreement` is included
@@ -18,6 +21,8 @@ import kotlinx.serialization.json.jsonObject
  * update & deactivate not supported
  */
 
+@ExperimentalJsExport
+@JsExport
 @Serializable
 data class DidJwkDocument(
     @SerialName("@context")
@@ -45,6 +50,7 @@ data class DidJwkDocument(
 
     fun toMap() = Json.encodeToJsonElement(this).jsonObject.toMap()
 
+    @JsName("secondaryConstructor")
     constructor(did: String, didJwk: JsonObject) : this(
         context = DEFAULT_CONTEXT,
         id = did,
