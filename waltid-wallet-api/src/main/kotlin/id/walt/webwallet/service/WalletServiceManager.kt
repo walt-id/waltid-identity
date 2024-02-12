@@ -21,6 +21,7 @@ import kotlinx.uuid.UUID
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.select
+import org.slf4j.LoggerFactory
 import java.util.concurrent.ConcurrentHashMap
 
 object WalletServiceManager {

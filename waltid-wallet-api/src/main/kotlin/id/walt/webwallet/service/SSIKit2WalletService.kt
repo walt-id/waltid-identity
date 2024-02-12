@@ -70,6 +70,7 @@ import kotlinx.uuid.UUID
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.select
 import org.jetbrains.exposed.sql.transactions.transaction
+import org.slf4j.LoggerFactory
 import java.net.URLDecoder
 import kotlin.time.Duration.Companion.seconds
 
@@ -81,6 +82,8 @@ class SSIKit2WalletService(
     private val categoryService: CategoryService,
     private val trustUseCase: TrustValidationUseCase
 ) : WalletService(tenant, accountId, walletId) {
+    private val logger = LoggerFactory.getLogger(this::class.java)
+
     companion object {
         init {
             runBlocking {
@@ -133,7 +136,7 @@ class SSIKit2WalletService(
     override fun matchCredentialsByPresentationDefinition(presentationDefinition: PresentationDefinition): List<WalletCredential> {
         val credentialList = listCredentials(CredentialFilterObject.default)
 
-        println("WalletCredential list is: ${credentialList.map { it.parsedDocument?.get("type")!!.jsonArray }}")
+        logger.debug("WalletCredential list is: {}", credentialList.map { it.parsedDocument?.get("type")!!.jsonArray })
 
         data class TypeFilter(val path: String, val type: String? = null, val pattern: String)
 
@@ -153,7 +156,7 @@ class SSIKit2WalletService(
             )
         }
 
-        println("Using filters: $filters")
+        logger.debug("Using filters: {}", filters)
 
         val matchedCredentials = when {
             filters.isNotEmpty() -> credentialList.filter { credential ->
@@ -176,7 +179,7 @@ class SSIKit2WalletService(
         }
 
 
-        println("Matched credentials: $matchedCredentials")
+        logger.debug("Matched credentials: {}", matchedCredentials)
 
         return matchedCredentials.ifEmpty { credentialList }
     }
@@ -252,9 +255,9 @@ class SSIKit2WalletService(
         val credentialWallet = getCredentialWallet(did)
 
         val authReq = AuthorizationRequest.fromHttpParametersAuto(parseQueryString(Url(request).encodedQuery).toMap())
-        println("Auth req: $authReq")
+        logger.debug("Auth req: {}", authReq)
 
-        println("USING PRESENTATION REQUEST, SELECTED CREDENTIALS: $selectedCredentialIds")
+        logger.debug("USING PRESENTATION REQUEST, SELECTED CREDENTIALS: {}", selectedCredentialIds)
 
         SessionAttributes.HACK_outsideMappedSelectedCredentialsPerSession[authReq.state + authReq.presentationDefinition] =
             selectedCredentialIds
@@ -265,9 +268,9 @@ class SSIKit2WalletService(
 
         val presentationSession =
             credentialWallet.initializeAuthorization(authReq, 60.seconds, selectedCredentialIds.toSet())
-        println("Initialized authorization (VPPresentationSession): $presentationSession")
+        logger.debug("Initialized authorization (VPPresentationSession): {}", presentationSession)
 
-        println("Resolved presentation definition: ${presentationSession.authorizationRequest!!.presentationDefinition!!.toJSONString()}")
+        logger.debug("Resolved presentation definition: ${presentationSession.authorizationRequest!!.presentationDefinition!!.toJSONString()}")
 
         val tokenResponse = credentialWallet.processImplicitFlowAuthorization(presentationSession.authorizationRequest)
         val resp = ktorClient.submitForm(
@@ -288,7 +291,7 @@ class SSIKit2WalletService(
                 @Suppress("HttpUrlsUsage")
                 it.startsWith("http://") || it.startsWith("https://")
             }
-        println("HTTP Response: $resp, body: $httpResponseBody")
+        logger.debug("HTTP Response: {}, body: {}", resp, httpResponseBody)
         selectedCredentialIds.forEach {
             CredentialsService.get(walletId, it)?.run {
                 logEvent(
@@ -311,7 +314,7 @@ class SSIKit2WalletService(
                     )
                 )
             } else {
-                println("Response body: $httpResponseBody")
+                logger.debug("Response body: $httpResponseBody")
                 Result.failure(
                     PresentationError(
                         message = if (httpResponseBody != null) "Presentation failed:\n $httpResponseBody" else "Presentation failed",
@@ -360,24 +363,24 @@ class SSIKit2WalletService(
         credentialOfferRequest: CredentialOfferRequest,
         credentialWallet: TestCredentialWallet
     ): List<CredentialResponse> {
-        println("// get issuer metadata")
+        logger.debug("// get issuer metadata")
         val providerMetadataUri =
             credentialWallet.getCIProviderMetadataUrl(credentialOfferRequest.credentialOffer!!.credentialIssuer)
-        println("Getting provider metadata from: $providerMetadataUri")
+        logger.debug("Getting provider metadata from: $providerMetadataUri")
         val providerMetadataResult = ktorClient.get(providerMetadataUri)
-        println("Provider metadata returned: " + providerMetadataResult.bodyAsText())
+        logger.debug("Provider metadata returned: " + providerMetadataResult.bodyAsText())
 
         val providerMetadata = providerMetadataResult.body<JsonObject>().let { OpenIDProviderMetadata.fromJSON(it) }
-        println("providerMetadata: $providerMetadata")
+        logger.debug("providerMetadata: {}", providerMetadata)
 
-        println("// resolve offered credentials")
+        logger.debug("// resolve offered credentials")
         val offeredCredentials = credentialOfferRequest.credentialOffer!!.resolveOfferedCredentials(providerMetadata)
-        println("offeredCredentials: $offeredCredentials")
+        logger.debug("offeredCredentials: {}", offeredCredentials)
 
         //val offeredCredential = offeredCredentials.first()
-        //println("offeredCredentials[0]: $offeredCredential")
+        //logger.debug("offeredCredentials[0]: $offeredCredential")
 
-        println("// fetch access token using pre-authorized code (skipping authorization step)")
+        logger.debug("// fetch access token using pre-authorized code (skipping authorization step)")
         val tokenReq = TokenRequest(
             grantType = GrantType.pre_authorized_code,
             clientId = testCIClientConfig.clientID,
@@ -385,24 +388,24 @@ class SSIKit2WalletService(
             preAuthorizedCode = credentialOfferRequest.credentialOffer!!.grants[GrantType.pre_authorized_code.value]!!.preAuthorizedCode,
             userPin = null
         )
-        println("tokenReq: $tokenReq")
+        logger.debug("tokenReq: {}", tokenReq)
 
         val tokenResp = ktorClient.submitForm(
             providerMetadata.tokenEndpoint!!, formParameters = parametersOf(tokenReq.toHttpParameters())
         ).let {
-            println("tokenResp raw: $it")
+            logger.debug("tokenResp raw: {}", it)
             it.body<JsonObject>().let { TokenResponse.fromJSON(it) }
         }
 
-        println("tokenResp: $tokenResp")
+        logger.debug("tokenResp: {}", tokenResp)
 
-        println(">>> Token response = success: ${tokenResp.isSuccess}")
+        logger.debug(">>> Token response = success: ${tokenResp.isSuccess}")
 
-        println("// receive credential")
+        logger.debug("// receive credential")
         val nonce = tokenResp.cNonce
 
 
-        println("Using issuer URL: ${credentialOfferRequest.credentialOfferUri ?: credentialOfferRequest.credentialOffer!!.credentialIssuer}")
+        logger.debug("Using issuer URL: ${credentialOfferRequest.credentialOfferUri ?: credentialOfferRequest.credentialOffer!!.credentialIssuer}")
         val credReqs = offeredCredentials.map { offeredCredential ->
             CredentialRequest.forOfferedCredential(
                 offeredCredential = offeredCredential,
@@ -414,7 +417,7 @@ class SSIKit2WalletService(
                 )
             )
         }
-        println("credReqs: $credReqs")
+        logger.debug("credReqs: {}", credReqs)
 
 
         return when {
@@ -426,7 +429,7 @@ class SSIKit2WalletService(
                     bearerAuth(tokenResp.accessToken!!)
                     setBody(batchCredentialRequest.toJSON())
                 }.body<JsonObject>().let { BatchCredentialResponse.fromJSON(it) }
-                println("credentialResponses: $credentialResponses")
+                logger.debug("credentialResponses: {}", credentialResponses)
 
                 credentialResponses.credentialResponses
                     ?: throw IllegalArgumentException("No credential responses returned")
@@ -440,7 +443,7 @@ class SSIKit2WalletService(
                     bearerAuth(tokenResp.accessToken!!)
                     setBody(credReq.toJSON())
                 }.body<JsonObject>().let { CredentialResponse.fromJSON(it) }
-                println("credentialResponse: $credentialResponse")
+                logger.debug("credentialResponse: {}", credentialResponse)
 
                 listOf(credentialResponse)
             }
@@ -481,8 +484,8 @@ class SSIKit2WalletService(
             setBody(responseToken)
         }
         val responseBody = resp.bodyAsText()
-        println("Resp: $resp")
-        println(responseBody)
+        logger.debug("Resp: {}", resp)
+        logger.debug(responseBody)
         val vc =
             runCatching { Json.parseToJsonElement(responseBody).jsonObject["vc"]!!.jsonPrimitive.content }.getOrElse {
                 throw IllegalArgumentException("Could not get Verifiable Credential from response: $responseBody")
@@ -494,9 +497,9 @@ class SSIKit2WalletService(
 
         val credentialWallet = getCredentialWallet(did)
 
-        println("// -------- WALLET ----------")
-        println("// as WALLET: receive credential offer, either being called via deeplink or by scanning QR code")
-        println("// parse credential URI")
+        logger.debug("// -------- WALLET ----------")
+        logger.debug("// as WALLET: receive credential offer, either being called via deeplink or by scanning QR code")
+        logger.debug("// parse credential URI")
         val reqParams = Url(offer).parameters.toMap()
 
         // entra or openid4vc credential offer
@@ -514,7 +517,7 @@ class SSIKit2WalletService(
         }
 
         // === original ===
-        println("// parse and verify credential(s)")
+        logger.debug("// parse and verify credential(s)")
         if (credentialResponses.all { it.credential == null }) {
             throw IllegalStateException("No credential was returned from credentialEndpoint: $credentialResponses")
         }
@@ -527,10 +530,10 @@ class SSIKit2WalletService(
                 logEvent(
                     action = EventType.Credential.Accept,
                     originator = "", //parsedOfferReq.credentialOffer!!.credentialIssuer,
-                    data = createCredentialEventData(credential = it.second, type = it.first),
-                    credentialId = it.second.id,
+                    data = createCredentialEventData(credential = it.credential, type = it.type),
+                    credentialId = it.credential.id,
                 )
-            }.second//TODO: don't use pair
+            }.credential
         }.filter {
             !silent || validateTrustedIssuer(it, isEntra) == TrustStatus.Trusted
         }
@@ -837,7 +840,7 @@ class SSIKit2WalletService(
             null -> throw IllegalArgumentException("WalletCredential JWT does not have \"typ\"")
             else -> throw IllegalArgumentException("Invalid credential \"typ\": $typ")
         }.let {
-            typ to it
+            CredentialDataResult(credential = it, type = typ)
         }
     }
 
@@ -849,7 +852,7 @@ class SSIKit2WalletService(
             credentialJwt.payload["vc"]!!.jsonObject["id"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
                 ?: randomUUID()
 
-        println("Got JWT credential: $credentialJwt")
+        logger.debug("Got JWT credential: {}", credentialJwt)
 
         WalletCredential(
             wallet = walletId,
@@ -871,10 +874,10 @@ class SSIKit2WalletService(
         val credentialId =
             credentialJwt.payload["id"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() } ?: randomUUID()
 
-        println("Got SD-JWT credential: $credentialJwt")
+        logger.debug("Got SD-JWT credential: $credentialJwt")
 
         val disclosures = credentialJwt.signature.split("~").drop(1)
-        println("Disclosures (${disclosures.size}): $disclosures")
+        logger.debug("Disclosures (${disclosures.size}): $disclosures")
 
         val disclosuresString = disclosures.joinToString("~")
 
@@ -897,5 +900,10 @@ class SSIKit2WalletService(
         isEntra.takeIf { it }?.let {
             trustUseCase.status(credential, true)
         }?: throw IllegalArgumentException("Silent claim for this credential type not supported.")//TrustStatus.NotFound
+
+    private data class CredentialDataResult(
+        val credential: WalletCredential,
+        val type: String?,
+    )
 
 }
