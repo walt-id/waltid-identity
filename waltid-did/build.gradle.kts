@@ -1,8 +1,14 @@
+import love.forte.plugin.suspendtrans.ClassInfo
+import love.forte.plugin.suspendtrans.SuspendTransformConfiguration
+import love.forte.plugin.suspendtrans.TargetPlatform
+import love.forte.plugin.suspendtrans.gradle.SuspendTransformGradleExtension
+
 plugins {
     kotlin("multiplatform")
     kotlin("plugin.serialization")
     id("maven-publish")
     id("com.github.ben-manes.versions")
+    id("love.forte.plugin.suspend-transform") version "0.6.0"
 }
 
 group = "id.walt.did"
@@ -15,6 +21,19 @@ repositories {
 java {
     sourceCompatibility = JavaVersion.VERSION_15
     targetCompatibility = JavaVersion.VERSION_15
+}
+
+suspendTransform {
+    enabled = true
+    includeRuntime = true
+    /*jvm {
+
+    }
+    js {
+
+    }*/
+    useJvmDefault()
+    useJsDefault()
 }
 
 
@@ -141,4 +160,14 @@ kotlin {
             languageSettings.enableLanguageFeature("InlineClasses")
         }
     }
+}
+
+extensions.getByType<SuspendTransformGradleExtension>().apply {
+    transformers[TargetPlatform.JS] = mutableListOf(
+        SuspendTransformConfiguration.jsPromiseTransformer.copy(
+            copyAnnotationExcludes = listOf(
+                ClassInfo("kotlin.js", "JsExport.Ignore")
+            )
+        )
+    )
 }

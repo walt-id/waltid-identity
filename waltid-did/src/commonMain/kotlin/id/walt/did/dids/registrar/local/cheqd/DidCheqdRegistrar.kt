@@ -32,7 +32,14 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.encodeToJsonElement
+import love.forte.plugin.suspendtrans.annotation.JsPromise
+import love.forte.plugin.suspendtrans.annotation.JvmAsync
+import love.forte.plugin.suspendtrans.annotation.JvmBlocking
+import kotlin.js.ExperimentalJsExport
+import kotlin.js.JsExport
 
+@ExperimentalJsExport
+@JsExport
 class DidCheqdRegistrar : LocalRegistrarMethod("cheqd") {
 
     private val log = KotlinLogging.logger { }
@@ -63,9 +70,17 @@ class DidCheqdRegistrar : LocalRegistrarMethod("cheqd") {
         }
     }
 
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     override suspend fun register(options: DidCreateOptions): DidResult =
         registerByKey(LocalKey.generate(KeyType.Ed25519), options)
 
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     override suspend fun registerByKey(key: Key, options: DidCreateOptions): DidResult =
         createDid(key, options.get<String>("network") ?: "testnet").let {
             DidResult(it.id, id.walt.did.dids.document.DidDocument(DidCheqdDocument(it, key.exportJWKObject()).toMap()))

@@ -2,6 +2,8 @@ package id.walt.did.utils
 
 import kotlin.js.js
 
+@ExperimentalJsExport
+@JsExport
 actual object EncodingUtils {
     actual fun urlEncode(path: String): String = js("encodeURIComponent")(path)
 

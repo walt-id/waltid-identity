@@ -10,14 +10,29 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import love.forte.plugin.suspendtrans.annotation.JsPromise
+import love.forte.plugin.suspendtrans.annotation.JvmAsync
+import love.forte.plugin.suspendtrans.annotation.JvmBlocking
+import kotlin.js.ExperimentalJsExport
+import kotlin.js.JsExport
 
+@ExperimentalJsExport
+@JsExport
 class DidCheqdResolver : LocalResolverMethod("cheqd") {
     private val httpClient = HttpClient() //TODO: inject
 
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     override suspend fun resolve(did: String): Result<DidDocument> = runCatching {
         resolveDid(did)
     }
 
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     override suspend fun resolveToKey(did: String): Result<Key> {
         TODO("Not yet implemented")
         // response verificationMethod contains only publicKeyMultibase
