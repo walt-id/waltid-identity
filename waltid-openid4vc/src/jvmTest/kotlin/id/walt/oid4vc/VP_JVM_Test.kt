@@ -50,9 +50,9 @@ class VP_JVM_Test : AnnotationSpec() {
 
     @BeforeAll
     fun init() {
-        runBlocking { DidService.init() }
+        runBlocking { DidService.minimalInit() }
         DidService.resolverMethods.keys shouldContain "jwk"
-        DidService.registrarMethods.keys shouldContain "ion"
+        DidService.registrarMethods.keys shouldContain "web"
         testWallet = TestCredentialWallet(CredentialWalletConfig(WALLET_BASE_URL))
         testWallet.start()
 
