@@ -1,5 +1,6 @@
 pluginManagement {
     repositories {
+        google()
         mavenCentral()
         gradlePluginPortal()
     }
@@ -30,6 +31,9 @@ include(
     "waltid-cli",
 
     // Reporting
-    "waltid-reporting"
+    "waltid-reporting",
+
+    // Samples
+    "waltid-android"
 )
 
