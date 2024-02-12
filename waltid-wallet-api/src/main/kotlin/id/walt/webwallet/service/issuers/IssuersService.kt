@@ -1,7 +1,7 @@
 package id.walt.webwallet.service.issuers
 
-import id.walt.webwallet.db.models.todo.WalletIssuers
-import id.walt.webwallet.db.models.todo.Issuers
+import id.walt.webwallet.db.models.WalletIssuers
+import id.walt.webwallet.db.models.Issuers
 import io.ktor.client.*
 import io.ktor.client.engine.cio.*
 import io.ktor.client.plugins.contentnegotiation.*

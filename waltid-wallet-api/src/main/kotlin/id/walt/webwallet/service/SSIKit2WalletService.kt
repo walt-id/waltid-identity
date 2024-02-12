@@ -46,6 +46,7 @@ import id.walt.webwallet.service.keys.KeysService
 import id.walt.webwallet.service.oidc4vc.TestCredentialWallet
 import id.walt.webwallet.service.report.ReportRequestParameter
 import id.walt.webwallet.service.report.ReportService
+import id.walt.webwallet.web.controllers.PresentationRequestParameter
 import id.walt.webwallet.trustusecase.TrustStatus
 import id.walt.webwallet.trustusecase.TrustValidationUseCase
 import io.ktor.client.*
@@ -246,28 +247,23 @@ class SSIKit2WalletService(
     /**
      * @return redirect uri
      */
-    override suspend fun usePresentationRequest(
-        request: String,
-        did: String,
-        selectedCredentialIds: List<String>,
-        disclosures: Map<String, List<String>>?
-    ): Result<String?> {
-        val credentialWallet = getCredentialWallet(did)
+    override suspend fun usePresentationRequest(parameter: PresentationRequestParameter): Result<String?> {
+        val credentialWallet = getCredentialWallet(parameter.did)
 
-        val authReq = AuthorizationRequest.fromHttpParametersAuto(parseQueryString(Url(request).encodedQuery).toMap())
-        logger.debug("Auth req: {}", authReq)
+        val authReq = AuthorizationRequest.fromHttpParametersAuto(parseQueryString(Url(parameter.request).encodedQuery).toMap())
+        println("Auth req: $authReq")
 
-        logger.debug("USING PRESENTATION REQUEST, SELECTED CREDENTIALS: {}", selectedCredentialIds)
+        logger.debug("USING PRESENTATION REQUEST, SELECTED CREDENTIALS: {}", parameter.selectedCredentials)
 
         SessionAttributes.HACK_outsideMappedSelectedCredentialsPerSession[authReq.state + authReq.presentationDefinition] =
-            selectedCredentialIds
-        if (disclosures != null) {
+            parameter.selectedCredentials
+        if (parameter.disclosures != null) {
             SessionAttributes.HACK_outsideMappedSelectedDisclosuresPerSession[authReq.state + authReq.presentationDefinition] =
-                disclosures
+                parameter.disclosures
         }
 
         val presentationSession =
-            credentialWallet.initializeAuthorization(authReq, 60.seconds, selectedCredentialIds.toSet())
+            credentialWallet.initializeAuthorization(authReq, 60.seconds, parameter.selectedCredentials.toSet())
         logger.debug("Initialized authorization (VPPresentationSession): {}", presentationSession)
 
         logger.debug("Resolved presentation definition: ${presentationSession.authorizationRequest!!.presentationDefinition!!.toJSONString()}")
@@ -292,13 +288,14 @@ class SSIKit2WalletService(
                 it.startsWith("http://") || it.startsWith("https://")
             }
         logger.debug("HTTP Response: {}, body: {}", resp, httpResponseBody)
-        selectedCredentialIds.forEach {
+        parameter.selectedCredentials.forEach {
             CredentialsService.get(walletId, it)?.run {
                 logEvent(
                     action = EventType.Credential.Present,
                     originator = presentationSession.presentationDefinition?.name ?: EventDataNotAvailable,
                     data = createCredentialEventData(this, null),
-                    credentialId = this.id
+                    credentialId = this.id,
+                    note = parameter.note,
                 )
             }
         }
@@ -781,7 +778,13 @@ class SSIKit2WalletService(
         else -> throw IllegalArgumentException("Did method not supported: $method")
     }
 
-    private fun logEvent(action: EventType.Action, originator: String, data: EventData, credentialId: String? = null) =
+    private fun logEvent(
+        action: EventType.Action,
+        originator: String,
+        data: EventData,
+        credentialId: String? = null,
+        note: String? = null
+    ) =
         EventService.add(
             Event(
                 action = action,
@@ -791,6 +794,7 @@ class SSIKit2WalletService(
                 wallet = walletId,
                 data = data,
                 credentialId = credentialId,
+                note = note,
             )
         )
 

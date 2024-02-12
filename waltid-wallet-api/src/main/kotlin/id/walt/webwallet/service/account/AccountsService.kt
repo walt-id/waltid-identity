@@ -3,8 +3,8 @@ package id.walt.webwallet.service.account
 import id.walt.webwallet.config.ConfigManager
 import id.walt.webwallet.config.LoginMethodsConfig
 import id.walt.webwallet.db.models.*
-import id.walt.webwallet.db.models.todo.WalletIssuers
-import id.walt.webwallet.db.models.todo.Issuers
+import id.walt.webwallet.db.models.WalletIssuers
+import id.walt.webwallet.db.models.Issuers
 import id.walt.webwallet.service.WalletServiceManager
 import id.walt.webwallet.service.events.AccountEventData
 import id.walt.webwallet.service.events.Event

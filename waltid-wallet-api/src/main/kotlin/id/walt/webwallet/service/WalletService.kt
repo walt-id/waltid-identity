@@ -12,6 +12,7 @@ import id.walt.webwallet.service.events.EventLogFilter
 import id.walt.webwallet.service.events.EventLogFilterResult
 import id.walt.webwallet.service.issuers.IssuerDataTransferObject
 import id.walt.webwallet.service.report.ReportRequestParameter
+import id.walt.webwallet.web.controllers.PresentationRequestParameter
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.uuid.UUID
@@ -30,12 +31,7 @@ abstract class WalletService(val tenant: String, val accountId: UUID, val wallet
     abstract fun matchCredentialsByPresentationDefinition(presentationDefinition: PresentationDefinition): List<WalletCredential>
 
     // SIOP
-    abstract suspend fun usePresentationRequest(
-        request: String,
-        did: String,
-        selectedCredentialIds: List<String>,
-        disclosures: Map<String, List<String>>?
-    ): Result<String?>
+    abstract suspend fun usePresentationRequest(parameter: PresentationRequestParameter): Result<String?>
 
     abstract suspend fun resolvePresentationRequest(request: String): String
     abstract suspend fun useOfferRequest(offer: String, did: String, silent: Boolean)

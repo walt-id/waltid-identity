@@ -13,6 +13,7 @@ import id.walt.webwallet.service.events.EventLogFilterResult
 import id.walt.webwallet.service.issuers.IssuerDataTransferObject
 import id.walt.webwallet.service.report.ReportRequestParameter
 import id.walt.webwallet.utils.JsonUtils.toJsonPrimitive
+import id.walt.webwallet.web.controllers.PresentationRequestParameter
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.engine.cio.*
@@ -223,27 +224,22 @@ class WalletKitWalletService(tenant: String, accountId: UUID, walletId: UUID) : 
         val state: String?
     )
 
-    override suspend fun usePresentationRequest(
-        request: String,
-        did: String,
-        selectedCredentialIds: List<String>,
-        disclosures: Map<String, List<String>>?
-    ): Result<String?> {
-        val decoded = URLDecoder.decode(request, Charset.defaultCharset())
+    override suspend fun usePresentationRequest(parameter: PresentationRequestParameter): Result<String?> {
+        val decoded = URLDecoder.decode(parameter.request, Charset.defaultCharset())
         val queryParams = getQueryParams(decoded)
         val redirectUri = queryParams["redirect_uri"]?.first()
             ?: throw IllegalArgumentException("Could not get redirect_uri from request!")
 
         val sessionId = authenticatedJsonPost(
             "/api/wallet/presentation/startPresentation",
-            mapOf("oidcUri" to request)
+            mapOf("oidcUri" to parameter.request)
         ).bodyAsText()
 
         val presentableCredentials = authenticatedJsonGet("/api/wallet/presentation/continue") {
             url {
                 parameters.apply {
                     append("sessionId", sessionId)
-                    append("did", did)
+                    append("did", parameter.did)
                 }
             }
         }.body<JsonObject>()["presentableCredentials"]!!.jsonArray

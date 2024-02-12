@@ -113,7 +113,15 @@ fun Application.exchange() = walletRoute {
             val disclosures = req.disclosures
 
 
-            val result = wallet.usePresentationRequest(request, did, selectedCredentialIds, disclosures) // TODO add disclosures here
+            val result = wallet.usePresentationRequest(
+                PresentationRequestParameter(
+                    did = did,
+                    request = request,
+                    selectedCredentials = selectedCredentialIds,
+                    disclosures = disclosures,
+                    note = req.note,
+                )
+            ) // TODO add disclosures here
 
             if (result.isSuccess) {
                 wallet.addOperationHistory(
@@ -190,4 +198,13 @@ data class UsePresentationRequest(
 
     val selectedCredentials: List<String>, // todo: automatically choose matching
     val disclosures: Map<String, List<String>>? = null,
+    val note: String? = null,
+)
+
+data class PresentationRequestParameter(
+    val did: String,
+    val request: String,
+    val selectedCredentials: List<String>,
+    val disclosures: Map<String, List<String>>? = null,
+    val note: String? = null
 )
