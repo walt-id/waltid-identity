@@ -181,6 +181,9 @@ spec:
         - name: wallet-web-config
           configMap:
             name: wallet-web-config
+        - name: wallet-oidc-config
+          configMap:
+            name: wallet-oidc-config
         - name: wallet-marketplace-config
           configMap:
             name: wallet-marketplace-config
