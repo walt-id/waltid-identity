@@ -2,7 +2,11 @@ package id.walt.crypto.utils
 
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
+import kotlin.js.ExperimentalJsExport
+import kotlin.js.JsExport
 
+@ExperimentalJsExport
+@JsExport
 @OptIn(ExperimentalEncodingApi::class)
 object Base64Utils {
 

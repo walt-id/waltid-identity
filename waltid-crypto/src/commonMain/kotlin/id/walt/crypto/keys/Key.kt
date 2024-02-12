@@ -4,7 +4,14 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonClassDiscriminator
 import kotlinx.serialization.json.JsonObject
+import love.forte.plugin.suspendtrans.annotation.JsPromise
+import love.forte.plugin.suspendtrans.annotation.JvmAsync
+import love.forte.plugin.suspendtrans.annotation.JvmBlocking
+import kotlin.js.ExperimentalJsExport
+import kotlin.js.JsExport
 
+@ExperimentalJsExport
+@JsExport
 @OptIn(ExperimentalSerializationApi::class)
 @Serializable
 @JsonClassDiscriminator("type")
@@ -15,7 +22,15 @@ abstract class Key {
 
     abstract val hasPrivateKey: Boolean
 
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     abstract suspend fun getKeyId(): String
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     abstract suspend fun getThumbprint(): String
 
 
@@ -23,13 +38,25 @@ abstract class Key {
      * export this key as a JWK if possible (check documentation if this algorithm / key type is supported by the JWK spec)
      * @return JWK
      */
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     abstract suspend fun exportJWK(): String
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     abstract suspend fun exportJWKObject(): JsonObject
 
     /**
      * export this key as a PEM if supported
      * @return encoded PEM
      */
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     abstract suspend fun exportPEM(): String
 
     /**
@@ -38,6 +65,10 @@ abstract class Key {
      * @param plaintext data to be signed
      * @return raw signature
      */
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     abstract suspend fun signRaw(plaintext: ByteArray): Any
 
     /**
@@ -46,6 +77,10 @@ abstract class Key {
      * @param plaintext data to be signed
      * @return JWS
      */
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     abstract suspend fun signJws(plaintext: ByteArray, headers: Map<String, String> = emptyMap()): String
 
     /**
@@ -53,8 +88,16 @@ abstract class Key {
      * @param signed signed
      * @return Result wrapping the plaintext; Result failure when the signature fails
      */
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     abstract suspend fun verifyRaw(signed: ByteArray, detachedPlaintext: ByteArray? = null): Result<ByteArray>
 
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     abstract suspend fun verifyJws(signedJws: String): Result<JsonObject>
 
     /*/**
@@ -73,10 +116,26 @@ abstract class Key {
     abstract suspend fun decrypt(encrypted: ByteArray): Result<ByteArray>
      */
 
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     abstract suspend fun getPublicKey(): Key
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     abstract suspend fun getPublicKeyRepresentation(): ByteArray
 
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     override fun toString() = "[walt.id CoreCrypto ${if (hasPrivateKey) "private" else "public"} $keyType key]"
 
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     open suspend fun init() {}
 }
