@@ -14,6 +14,7 @@ import id.walt.webwallet.service.issuers.IssuerDataTransferObject
 import id.walt.webwallet.service.report.ReportRequestParameter
 import id.walt.webwallet.service.settings.WalletSetting
 import id.walt.webwallet.web.controllers.PresentationRequestParameter
+import id.walt.webwallet.web.parameter.CredentialRequestParameter
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.uuid.UUID
@@ -28,6 +29,8 @@ abstract class WalletService(val tenant: String, val accountId: UUID, val wallet
     abstract suspend fun getCredential(credentialId: String): WalletCredential
     abstract suspend fun attachCategory(credentialId: String, category: String): Boolean
     abstract suspend fun detachCategory(credentialId: String, category: String): Boolean
+    abstract suspend fun acceptCredential(parameter: CredentialRequestParameter): Boolean
+    abstract suspend fun rejectCredential(parameter: CredentialRequestParameter): Boolean
 
     abstract fun matchCredentialsByPresentationDefinition(presentationDefinition: PresentationDefinition): List<WalletCredential>
 
@@ -35,7 +38,9 @@ abstract class WalletService(val tenant: String, val accountId: UUID, val wallet
     abstract suspend fun usePresentationRequest(parameter: PresentationRequestParameter): Result<String?>
 
     abstract suspend fun resolvePresentationRequest(request: String): String
-    abstract suspend fun useOfferRequest(offer: String, did: String, silent: Boolean)
+    abstract suspend fun useOfferRequest(
+        offer: String, did: String, requireUserInput: Boolean, silent: Boolean
+    ): List<WalletCredential>
 
     // DIDs
     abstract suspend fun listDids(): List<WalletDid>

@@ -1,6 +1,7 @@
 package id.walt.webwallet.web.controllers
 
 import id.walt.oid4vc.data.dif.PresentationDefinition
+import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.db.models.WalletOperationHistory
 import id.walt.webwallet.service.SSIKit2WalletService
 import io.github.smiley4.ktorswaggerui.dsl.post
@@ -22,13 +23,16 @@ fun Application.exchange() = walletRoute {
             request {
                 queryParameter<String>("did") { description = "The DID to issue the credential(s) to" }
                 queryParameter<Boolean>("silent") { description = "Whether to claim in background" }
+                queryParameter<Boolean>("requireUserInput") { description = "Whether to claim as pending acceptance" }
                 body<String> {
                     description = "The offer request to use"
                 }
             }
             response {
                 HttpStatusCode.OK to {
-                    description = "Successfully claimed credentials"
+                    body<List<WalletCredential>> {
+                        description = "List of credentials"
+                    }
                 }
             }
         }) {
@@ -37,21 +41,24 @@ fun Application.exchange() = walletRoute {
             val did = call.request.queryParameters["did"] ?: wallet.listDids().firstOrNull()?.did
             ?: throw IllegalArgumentException("No DID to use supplied")
             val silent = call.request.queryParameters["silent"].toBoolean()
+            val requireUserInput = call.request.queryParameters["requireUserInput"].toBoolean()
 
             val offer = call.receiveText()
 
             runCatching {
-                wallet.useOfferRequest(offer, did, silent)
-                wallet.addOperationHistory(
-                    WalletOperationHistory.new(
-                        tenant = wallet.tenant,
-                        wallet = wallet,
-                        "useOfferRequest",
-                        mapOf("did" to did, "offer" to offer)
-                    )
-                )
+                wallet.useOfferRequest(offer = offer, did = did, requireUserInput = requireUserInput, silent = silent)
+                    .also {
+                        wallet.addOperationHistory(
+                            WalletOperationHistory.new(
+                                tenant = wallet.tenant,
+                                wallet = wallet,
+                                "useOfferRequest",
+                                mapOf("did" to did, "offer" to offer)
+                            )
+                        )
+                    }
             }.onSuccess {
-                context.respond(HttpStatusCode.OK)
+                context.respond(HttpStatusCode.OK, it)
             }.onFailure { context.respond(HttpStatusCode.BadRequest, it.localizedMessage) }
         }
 
