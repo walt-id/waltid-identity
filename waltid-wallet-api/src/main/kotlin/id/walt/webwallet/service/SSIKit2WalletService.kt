@@ -388,7 +388,7 @@ class SSIKit2WalletService(
             preAuthorizedCode = credentialOfferRequest.credentialOffer!!.grants[GrantType.pre_authorized_code.value]!!.preAuthorizedCode,
             userPin = null
         )
-        logger.debug("tokenReq: {}", tokenReq)
+//        logger.debug("tokenReq: {}", tokenReq)
 
         val tokenResp = ktorClient.submitForm(
             providerMetadata.tokenEndpoint!!, formParameters = parametersOf(tokenReq.toHttpParameters())
@@ -397,7 +397,7 @@ class SSIKit2WalletService(
             it.body<JsonObject>().let { TokenResponse.fromJSON(it) }
         }
 
-        logger.debug("tokenResp: {}", tokenResp)
+//        logger.debug("tokenResp: {}", tokenResp)
 
         logger.debug(">>> Token response = success: ${tokenResp.isSuccess}")
 
