@@ -4,10 +4,15 @@ import KeyLike
 import id.walt.crypto.utils.JwsUtils.jwsAlg
 import id.walt.crypto.utils.PromiseUtils.await
 import jose
+import love.forte.plugin.suspendtrans.annotation.JsPromise
 import kotlin.js.json
 
+@ExperimentalJsExport
+@JsExport
 object JsLocalKeyCreator : LocalKeyCreator {
 
+    @JsPromise
+    @JsExport.Ignore
     override suspend fun generate(type: KeyType, metadata: LocalKeyMetadata): LocalKey {
         val alg = type.jwsAlg()
 
@@ -17,10 +22,14 @@ object JsLocalKeyCreator : LocalKeyCreator {
         return LocalKey(key).apply { init() }
     }
 
+    @JsPromise
+    @JsExport.Ignore
     override suspend fun importRawPublicKey(type: KeyType, rawPublicKey: ByteArray, metadata: LocalKeyMetadata): Key {
         TODO("Not yet implemented")
     }
 
+    @JsPromise
+    @JsExport.Ignore
     override suspend fun importJWK(jwk: String): Result<LocalKey> =
         runCatching { LocalKey(await(jose.importJWK(JSON.parse(jwk))), JSON.parse(jwk)).apply { init() } }
 
@@ -28,6 +37,8 @@ object JsLocalKeyCreator : LocalKeyCreator {
     /**
      * Only supported on Node right now (algorithms are not passed to WebCrypto)
      */
+    @JsPromise
+    @JsExport.Ignore
     override suspend fun importPEM(pem: String): Result<LocalKey> =
         runCatching {
             val lines = pem.lines()

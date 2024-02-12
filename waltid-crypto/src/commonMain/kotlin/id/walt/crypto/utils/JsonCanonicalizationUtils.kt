@@ -4,7 +4,14 @@ import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import kotlinx.serialization.json.JsonObject
+import love.forte.plugin.suspendtrans.annotation.JsPromise
+import love.forte.plugin.suspendtrans.annotation.JvmAsync
+import love.forte.plugin.suspendtrans.annotation.JvmBlocking
+import kotlin.js.ExperimentalJsExport
+import kotlin.js.JsExport
 
+@ExperimentalJsExport
+@JsExport
 object JsonCanonicalizationUtils {
 
     /**
@@ -12,6 +19,10 @@ object JsonCanonicalizationUtils {
      * @param - the key
      * @return - the JSON string representing the public key having only the required members
      */
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     suspend fun convertToRequiredMembersJsonString(key: Key): String = key.exportJWKObject().let {
         when (key.keyType) {
             KeyType.Ed25519 -> okpPublicKeyRequiredMembers(it)
