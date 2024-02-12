@@ -120,7 +120,15 @@
                 Settings
             </button>
 
-            <button v-if="credentials.length >= 2"
+            <button v-if="issuing"
+                    class="rounded-md inline-flex items-center bg-green-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-green-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                    type="button"
+                    @click="issueBatch"
+                    disabled
+            >
+                <Spinner class="p-1 mr-1"/>Issuing...
+            </button>
+            <button v-else-if="credentials.length >= 2"
                     class="rounded-md bg-green-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-green-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
                     type="button"
                     @click="issueBatch"
@@ -146,6 +154,26 @@
             </span>
         </div>
 
+
+
+        <div v-if="issuanceError" class="rounded-md bg-red-50 p-4 my-2">
+            <div class="flex">
+                <div class="flex-shrink-0">
+                    <Icon name="heroicons:x-circle" class="h-5 w-5 text-red-400" aria-hidden="true" />
+                </div>
+                <div class="ml-3">
+                    <h3 class="text-sm font-medium text-red-800">There was an error with this issuance:</h3>
+                    <div class="mt-2 text-sm text-red-700">
+                        <ul role="list" class="list-disc space-y-1 pl-5">
+                            <li>Error: {{ issuanceError.name }} {{ issuanceError.statusCode }}:</li>
+                            <li>Message: {{ issuanceError.message }}</li>
+                            <li v-if="issuanceError.response">Response: {{ issuanceError.response }}</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div class="mt-2 flex-shrink">
             <div class="font-semibold text-lg">
                 <Icon class="h-5 w-5" name="carbon:prompt-template" />
@@ -158,6 +186,8 @@
 
 <script lang="ts" setup>
 import { Menu, MenuButton, MenuItem, MenuItems } from "@headlessui/vue";
+import { FetchError } from "ofetch";
+import type { Ref } from "vue";
 
 
 const config = useRuntimeConfig();
@@ -173,10 +203,22 @@ const issuanceDid = ref("did:key:z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNyw
 
 const oidcLink: Ref<string | null> = ref(null)
 
+const issuanceError: Ref<FetchError<any> | null> = ref(null)
+
 const issuing = ref(false)
+
+type IssuanceRequest = {
+    url: string,
+    method: string,
+    body: object
+}
+
+
 async function issueSingle() {
     issuing.value = true
-    const {data, pending, error, refresh} = await useFetch<string>(`${config.public.issuer}/openid4vc/jwt/issue`, {
+
+    const req: IssuanceRequest = {
+        url: `${config.public.issuer}/openid4vc/jwt/issue`,
         method: "POST",
         body: {
             issuanceKey: JSON.parse(issuanceKey.value),
@@ -184,7 +226,13 @@ async function issueSingle() {
             vc: JSON.parse(credentials[0].data),
             mapping: JSON.parse(credentials[0].mapping)
         }
+    }
+
+    const {data, pending, error, refresh} = await useFetch<string>(req.url, {
+        method: "POST",
+        body: req.body
     })
+    issuanceError.value = error.value
 
     oidcLink.value = data.value
     // alert(data.value)
@@ -217,7 +265,7 @@ type EditableCredential = {
 const actions = [
     {
         name: "Issue",
-        icon: "heroicons:check-badge",
+        icon: "carbon:certificate-check",
         action: async (template: string) => {
 
             const { data: credentialData } = await useFetch<string>(`${config.public.credentialRepository}/api/vc/${template}`);
