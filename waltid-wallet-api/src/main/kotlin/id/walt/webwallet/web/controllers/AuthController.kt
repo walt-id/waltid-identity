@@ -1,6 +1,5 @@
 package id.walt.webwallet.web.controllers
 
-import com.auth0.jwk.JwkProviderBuilder
 import id.walt.webwallet.config.ConfigManager
 import id.walt.webwallet.config.OidcConfiguration
 import id.walt.webwallet.config.WebConfig
@@ -38,8 +37,6 @@ import kotlinx.uuid.UUID
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.select
 import org.jetbrains.exposed.sql.transactions.transaction
-import java.net.URL
-import java.util.concurrent.TimeUnit
 import kotlin.collections.set
 import kotlin.time.Duration.Companion.days
 
@@ -97,10 +94,8 @@ fun Application.configureSecurity() {
             providerLookup = {
                 OAuthServerSettings.OAuth2ServerSettings(
                     name = oidcConfig.providerName,
-                    authorizeUrl =
-                    oidcConfig.authorizeUrl,
-                    accessTokenUrl =
-                    oidcConfig.accessTokenUrl,
+                    authorizeUrl = oidcConfig.authorizeUrl,
+                    accessTokenUrl = oidcConfig.accessTokenUrl,
                     clientId = oidcConfig.clientId,
                     clientSecret = oidcConfig.clientSecret,
                     accessTokenRequiresBasicAuth = false,
