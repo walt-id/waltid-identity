@@ -1,7 +1,9 @@
 package id.walt.webwallet.service.trust
 
-class EntraVerifierTrustValidationService : TrustValidationService {
-    override fun validate(did: String): Boolean? {
+import io.ktor.client.*
+
+class EntraVerifierTrustValidationService(private val http: HttpClient) : TrustValidationService {
+    override suspend fun validate(did: String, type: String): Boolean {
         TODO("Not yet implemented")
     }
 }
