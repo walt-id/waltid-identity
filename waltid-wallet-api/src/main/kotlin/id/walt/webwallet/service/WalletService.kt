@@ -12,6 +12,9 @@ import id.walt.webwallet.service.events.EventLogFilter
 import id.walt.webwallet.service.events.EventLogFilterResult
 import id.walt.webwallet.service.issuers.IssuerDataTransferObject
 import id.walt.webwallet.service.report.ReportRequestParameter
+import id.walt.webwallet.service.settings.WalletSetting
+import id.walt.webwallet.web.controllers.PresentationRequestParameter
+import id.walt.webwallet.web.parameter.CredentialRequestParameter
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.uuid.UUID
@@ -26,19 +29,18 @@ abstract class WalletService(val tenant: String, val accountId: UUID, val wallet
     abstract suspend fun getCredential(credentialId: String): WalletCredential
     abstract suspend fun attachCategory(credentialId: String, category: String): Boolean
     abstract suspend fun detachCategory(credentialId: String, category: String): Boolean
+    abstract suspend fun acceptCredential(parameter: CredentialRequestParameter): Boolean
+    abstract suspend fun rejectCredential(parameter: CredentialRequestParameter): Boolean
 
     abstract fun matchCredentialsByPresentationDefinition(presentationDefinition: PresentationDefinition): List<WalletCredential>
 
     // SIOP
-    abstract suspend fun usePresentationRequest(
-        request: String,
-        did: String,
-        selectedCredentialIds: List<String>,
-        disclosures: Map<String, List<String>>?
-    ): Result<String?>
+    abstract suspend fun usePresentationRequest(parameter: PresentationRequestParameter): Result<String?>
 
     abstract suspend fun resolvePresentationRequest(request: String): String
-    abstract suspend fun useOfferRequest(offer: String, did: String)
+    abstract suspend fun useOfferRequest(
+        offer: String, did: String, requireUserInput: Boolean, silent: Boolean
+    ): List<WalletCredential>
 
     // DIDs
     abstract suspend fun listDids(): List<WalletDid>
@@ -72,6 +74,8 @@ abstract class WalletService(val tenant: String, val accountId: UUID, val wallet
     // Issuers TODO: move each such component to use-case
     abstract suspend fun listIssuers(): List<IssuerDataTransferObject>
     abstract suspend fun getIssuer(name: String): IssuerDataTransferObject
+    abstract fun authorizeIssuer(issuer: String): Boolean
+    abstract fun addIssuer(issuer: IssuerDataTransferObject): Boolean
     abstract fun getCredentialsByIds(credentialIds: List<String>): List<WalletCredential>
 
     // Categories
@@ -81,6 +85,10 @@ abstract class WalletService(val tenant: String, val accountId: UUID, val wallet
 
     // Reports
     abstract suspend fun getFrequentCredentials(parameter: ReportRequestParameter): List<WalletCredential>
+
+    // Settings
+    abstract suspend fun getSettings(): WalletSetting
+    abstract suspend fun setSettings(settings: WalletSetting): Boolean
 
 
     // TODO: Push

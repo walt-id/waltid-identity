@@ -1,6 +1,7 @@
 package id.walt.webwallet.web.controllers
 
 import id.walt.oid4vc.data.dif.PresentationDefinition
+import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.db.models.WalletOperationHistory
 import id.walt.webwallet.service.SSIKit2WalletService
 import io.github.smiley4.ktorswaggerui.dsl.post
@@ -21,36 +22,44 @@ fun Application.exchange() = walletRoute {
 
             request {
                 queryParameter<String>("did") { description = "The DID to issue the credential(s) to" }
+                queryParameter<Boolean>("silent") { description = "Whether to claim in background" }
+                queryParameter<Boolean>("requireUserInput") { description = "Whether to claim as pending acceptance" }
                 body<String> {
                     description = "The offer request to use"
                 }
             }
             response {
                 HttpStatusCode.OK to {
-                    description = "Successfully claimed credentials"
+                    body<List<WalletCredential>> {
+                        description = "List of credentials"
+                    }
                 }
             }
         }) {
             val wallet = getWalletService()
 
-            val did = call.request.queryParameters["did"]
-                ?: wallet.listDids().firstOrNull()?.did
-                ?: throw IllegalArgumentException("No DID to use supplied")
+            val did = call.request.queryParameters["did"] ?: wallet.listDids().firstOrNull()?.did
+            ?: throw IllegalArgumentException("No DID to use supplied")
+            val silent = call.request.queryParameters["silent"].toBoolean()
+            val requireUserInput = call.request.queryParameters["requireUserInput"].toBoolean()
 
             val offer = call.receiveText()
 
-
-            wallet.useOfferRequest(offer, did)
-            wallet.addOperationHistory(
-                WalletOperationHistory.new(
-                    tenant = wallet.tenant,
-                    wallet = wallet,
-                    "useOfferRequest",
-                    mapOf("did" to did, "offer" to offer)
-                )
-            )
-
-            context.respond(HttpStatusCode.OK)
+            runCatching {
+                wallet.useOfferRequest(offer = offer, did = did, requireUserInput = requireUserInput, silent = silent)
+                    .also {
+                        wallet.addOperationHistory(
+                            WalletOperationHistory.new(
+                                tenant = wallet.tenant,
+                                wallet = wallet,
+                                "useOfferRequest",
+                                mapOf("did" to did, "offer" to offer)
+                            )
+                        )
+                    }
+            }.onSuccess {
+                context.respond(HttpStatusCode.OK, it)
+            }.onFailure { context.respond(HttpStatusCode.BadRequest, it.localizedMessage) }
         }
 
         post("matchCredentialsForPresentationDefinition", {
@@ -111,7 +120,15 @@ fun Application.exchange() = walletRoute {
             val disclosures = req.disclosures
 
 
-            val result = wallet.usePresentationRequest(request, did, selectedCredentialIds, disclosures) // TODO add disclosures here
+            val result = wallet.usePresentationRequest(
+                PresentationRequestParameter(
+                    did = did,
+                    request = request,
+                    selectedCredentials = selectedCredentialIds,
+                    disclosures = disclosures,
+                    note = req.note,
+                )
+            ) // TODO add disclosures here
 
             if (result.isSuccess) {
                 wallet.addOperationHistory(
@@ -188,4 +205,13 @@ data class UsePresentationRequest(
 
     val selectedCredentials: List<String>, // todo: automatically choose matching
     val disclosures: Map<String, List<String>>? = null,
+    val note: String? = null,
+)
+
+data class PresentationRequestParameter(
+    val did: String,
+    val request: String,
+    val selectedCredentials: List<String>,
+    val disclosures: Map<String, List<String>>? = null,
+    val note: String? = null
 )

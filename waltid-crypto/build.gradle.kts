@@ -1,8 +1,14 @@
+import love.forte.plugin.suspendtrans.ClassInfo
+import love.forte.plugin.suspendtrans.SuspendTransformConfiguration
+import love.forte.plugin.suspendtrans.TargetPlatform
+import love.forte.plugin.suspendtrans.gradle.SuspendTransformGradleExtension
+
 plugins {
     kotlin("multiplatform")
     kotlin("plugin.serialization")
     id("maven-publish")
     id("com.github.ben-manes.versions")
+    id("love.forte.plugin.suspend-transform") version "0.6.0"
 }
 
 group = "id.walt.crypto"
@@ -10,6 +16,19 @@ group = "id.walt.crypto"
 repositories {
     mavenCentral()
     maven("https://jitpack.io")
+}
+
+suspendTransform {
+    enabled = true
+    includeRuntime = true
+    /*jvm {
+
+    }
+    js {
+
+    }*/
+    useJvmDefault()
+    useJsDefault()
 }
 
 java {
@@ -45,7 +64,7 @@ kotlin {
             }
         }
         generateTypeScriptDefinitions()
-        //binaries.library()
+        binaries.library()
     }
 
     sourceSets {
@@ -149,4 +168,14 @@ kotlin {
             languageSettings.enableLanguageFeature("InlineClasses")
         }
     }
+}
+
+extensions.getByType<SuspendTransformGradleExtension>().apply {
+    transformers[TargetPlatform.JS] = mutableListOf(
+        SuspendTransformConfiguration.jsPromiseTransformer.copy(
+            copyAnnotationExcludes = listOf(
+                ClassInfo("kotlin.js", "JsExport.Ignore")
+            )
+        )
+    )
 }

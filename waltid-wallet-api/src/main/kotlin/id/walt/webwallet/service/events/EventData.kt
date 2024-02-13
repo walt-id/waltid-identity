@@ -37,4 +37,5 @@ data class CredentialEventData(
     val credentialProofType: String,
     val policies: List<String>,
     val protocol: String,
+    val credentialId: String,
 ) : EventData()

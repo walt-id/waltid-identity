@@ -11,7 +11,7 @@ import kotlin.test.*
 val keysToTest = listOf(KeyType.Ed25519, KeyType.secp256r1, KeyType.secp256k1, KeyType.RSA)
 
 private suspend fun init(didMethodsToTest: List<String>) {
-    DidService.init()
+    DidService.minimalInit()
 
     println("Resolvers -> ${DidService.resolverMethods.keys}")
     println("Registrars -> ${DidService.registrarMethods.keys}")

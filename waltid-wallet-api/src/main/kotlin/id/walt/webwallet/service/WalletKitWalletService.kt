@@ -12,7 +12,10 @@ import id.walt.webwallet.service.events.EventLogFilter
 import id.walt.webwallet.service.events.EventLogFilterResult
 import id.walt.webwallet.service.issuers.IssuerDataTransferObject
 import id.walt.webwallet.service.report.ReportRequestParameter
+import id.walt.webwallet.service.settings.WalletSetting
 import id.walt.webwallet.utils.JsonUtils.toJsonPrimitive
+import id.walt.webwallet.web.controllers.PresentationRequestParameter
+import id.walt.webwallet.web.parameter.CredentialRequestParameter
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.engine.cio.*
@@ -168,6 +171,9 @@ class WalletKitWalletService(tenant: String, accountId: UUID, walletId: UUID) : 
     override suspend fun attachCategory(credentialId: String, category: String): Boolean = throw NotImplementedError("")
 
     override suspend fun detachCategory(credentialId: String, category: String): Boolean = throw NotImplementedError("")
+    override suspend fun acceptCredential(parameter: CredentialRequestParameter): Boolean = throw NotImplementedError("")
+
+    override suspend fun rejectCredential(parameter: CredentialRequestParameter): Boolean = throw NotImplementedError("")
 
     override fun matchCredentialsByPresentationDefinition(presentationDefinition: PresentationDefinition): List<WalletCredential> =
         throw NotImplementedError("")
@@ -223,27 +229,22 @@ class WalletKitWalletService(tenant: String, accountId: UUID, walletId: UUID) : 
         val state: String?
     )
 
-    override suspend fun usePresentationRequest(
-        request: String,
-        did: String,
-        selectedCredentialIds: List<String>,
-        disclosures: Map<String, List<String>>?
-    ): Result<String?> {
-        val decoded = URLDecoder.decode(request, Charset.defaultCharset())
+    override suspend fun usePresentationRequest(parameter: PresentationRequestParameter): Result<String?> {
+        val decoded = URLDecoder.decode(parameter.request, Charset.defaultCharset())
         val queryParams = getQueryParams(decoded)
         val redirectUri = queryParams["redirect_uri"]?.first()
             ?: throw IllegalArgumentException("Could not get redirect_uri from request!")
 
         val sessionId = authenticatedJsonPost(
             "/api/wallet/presentation/startPresentation",
-            mapOf("oidcUri" to request)
+            mapOf("oidcUri" to parameter.request)
         ).bodyAsText()
 
         val presentableCredentials = authenticatedJsonGet("/api/wallet/presentation/continue") {
             url {
                 parameters.apply {
                     append("sessionId", sessionId)
-                    append("did", did)
+                    append("did", parameter.did)
                 }
             }
         }.body<JsonObject>()["presentableCredentials"]!!.jsonArray
@@ -278,10 +279,11 @@ class WalletKitWalletService(tenant: String, accountId: UUID, walletId: UUID) : 
         return request
     }
 
-    override suspend fun useOfferRequest(offer: String, did: String) {
+    override suspend fun useOfferRequest(
+        offer: String, did: String, requireUserInput: Boolean, silent: Boolean
+    ): List<WalletCredential> {
         val sessionId = authenticatedJsonPost(
-            "/api/wallet/issuance/startIssuerInitiatedIssuance",
-            mapOf("oidcUri" to offer)
+            "/api/wallet/issuance/startIssuerInitiatedIssuance", mapOf("oidcUri" to offer)
         ).bodyAsText()
 
         authenticatedJsonGet("/api/wallet/issuance/continueIssuerInitiatedIssuance") {
@@ -292,6 +294,7 @@ class WalletKitWalletService(tenant: String, accountId: UUID, walletId: UUID) : 
                 }
             }
         }
+        throw NotImplementedError("")
     }
 
     /* DIDs */
@@ -407,6 +410,9 @@ class WalletKitWalletService(tenant: String, accountId: UUID, walletId: UUID) : 
     override fun getCredentialsByIds(credentialIds: List<String>): List<WalletCredential> =
         throw NotImplementedError("")
 
+    override fun authorizeIssuer(issuer: String): Boolean = throw NotImplementedError("")
+    override fun addIssuer(issuer: IssuerDataTransferObject): Boolean = throw NotImplementedError("")
+
     override suspend fun listCategories(): List<WalletCategoryData> = throw NotImplementedError("")
 
     override suspend fun addCategory(name: String): Boolean = throw NotImplementedError("")
@@ -415,5 +421,9 @@ class WalletKitWalletService(tenant: String, accountId: UUID, walletId: UUID) : 
 
     override suspend fun getFrequentCredentials(parameter: ReportRequestParameter): List<WalletCredential> =
         throw NotImplementedError("")
+
+    override suspend fun getSettings(): WalletSetting = throw NotImplementedError("")
+
+    override suspend fun setSettings(settings: WalletSetting): Boolean = throw NotImplementedError("")
 }
 
