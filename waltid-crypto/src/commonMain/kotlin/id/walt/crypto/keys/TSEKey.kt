@@ -351,14 +351,14 @@ class TSEKey(
 }
 
 /*suspend fun main() {
-    val tseKey = TSEKey.generate(KeyType.Ed25519, TSEKeyMetadata("http://127.0.0.1:8200/v1/transit", "dev-only-token"))
+    val tseKey = TSEKey.generate(KeyType.Ed25519, TSEKeyMetadata("http://0.0.0.0:8200/v1/transit", "hvs.1eeHn0cyrzOyjeohJalj0gCW"))
     val plaintext = "This is a plaintext 123".encodeToByteArray()
 
     val signed = tseKey.signRaw(plaintext) as String
 
     val verified = tseKey.verifyRaw(signed.decodeBase64Bytes(), plaintext)
 
-    println("TSEKey: $tseKey")
+    println("TSEKey: ${tseKey.getEncodedPublicKey()}")
     println("Plaintext: ${plaintext.decodeToString()}")
     println("Signed: $signed")
     println("Verified signature success: ${verified.isSuccess}")

@@ -1,9 +1,6 @@
 package id.walt.webwallet.service
 
-import id.walt.crypto.keys.Key
-import id.walt.crypto.keys.KeySerialization
-import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.LocalKey
+import id.walt.crypto.keys.*
 import id.walt.crypto.utils.JwsUtils
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.did.dids.DidService
@@ -646,7 +643,19 @@ class SSIKit2WalletService(
     }
 
     override suspend fun generateKey(type: String): String =
-        LocalKey.generate(KeyType.valueOf(type)).let { createdKey ->
+//        LocalKey.generate(KeyType.valueOf(type)).let { createdKey ->
+//            logEvent(
+//                EventType.Key.Create, "wallet", KeyEventData(
+//                    id = createdKey.getKeyId(),
+//                    algorithm = createdKey.keyType.name,
+//                    keyManagementService = "local",
+//                )
+//            )
+//            KeysService.add(walletId, createdKey.getKeyId(), KeySerialization.serializeKey(createdKey))
+//            createdKey.getKeyId()
+//        }
+
+        TSEKey.generate(KeyType.valueOf(type) , TSEKeyMetadata("http://0.0.0.0:8200/v1/transit", "hvs.1eeHn0cyrzOyjeohJalj0gCW")).let { createdKey ->
             logEvent(
                 EventType.Key.Create, "wallet", KeyEventData(
                     id = createdKey.getKeyId(),
@@ -655,7 +664,7 @@ class SSIKit2WalletService(
                 )
             )
             KeysService.add(walletId, createdKey.getKeyId(), KeySerialization.serializeKey(createdKey))
-            createdKey.getKeyId()
+            createdKey.getEncodedPublicKey()
         }
 
     override suspend fun importKey(jwkOrPem: String): String {
