@@ -11,16 +11,16 @@ docker compose up
 ## Services Exposed
 port mapping below
 
-- Wallet API: `7001`
-- Issuer API: `7002`
-- Verifier API: `7003`
+- Wallet API: [http://localhost:7001](http://localhost:7001)
+- Issuer API: [http://localhost:7002](http://localhost:7002)
+- Verifier API: [http://localhost:7003](http://localhost:7003)
 
 ## Apps
 port mapping below
 
-- Web Wallet: `7101`
-- Web Portal: `7102`
-- Credential Repo: `7103`
+- Web Wallet: [http://localhost:7101](http://localhost:7101)
+- Web Portal: [http://localhost:7102](http://localhost:7102)
+- Credential Repo: [http://localhost:7103](http://localhost:7103)
 
 
 ## Configurations
