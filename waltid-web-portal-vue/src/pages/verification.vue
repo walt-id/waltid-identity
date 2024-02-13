@@ -184,10 +184,10 @@
                                         <MenuItem v-slot="{ active }">
                                             <button
                                                 class="px-3 py-1 text-sm leading-6 text-gray-900 flex items-center gap-1 bg-white w-full hover:bg-gray-50"
-                                                @click="removeCredential(policy.id)"
+                                                @click="removeVpPolicy(policy.id)"
                                             >
                                                 <Icon name="carbon:trash-can" />
-                                                Delete<span class="sr-only">, {{ policy.name }}</span></button>
+                                                Delete<span class="sr-only">, {{ policy.name }}</span> {{ policy.id }} </button>
                                         </MenuItem>
                                     </MenuItems>
                                 </transition>
@@ -408,7 +408,7 @@ availablePolicies.value.map((entry) => ({
     argTypes: entry.argumentType
 })).forEach((entry) => {
     vpPolicies.push(entry)
-    globalVcPolicies.push(entry)
+    // globalVcPolicies.push(entry)
 })
 
 type VerifyCredential = {
@@ -423,7 +423,9 @@ const credentials: VerifyCredential[] = reactive([]);
 
 const generatedRequest: ComputedRef<IssuanceRequest> = computed(() => {
 
-    const reqRequestCredentials = credentials
+    const reqRequestCredentials = credentials.map((entry) => {
+        return entry.policies ? {credential: entry.name, policies: entry.policies} : entry.name
+    })
     const reqVpPolicies = vpPolicies.map((entry) => {
         return entry.args == null ? entry.name : { policy: entry.name, args: entry.args }
     })
@@ -449,6 +451,14 @@ const generatedRequest: ComputedRef<IssuanceRequest> = computed(() => {
 function removeCredential(id: number) {
     const rmIdx = credentials.findIndex((value) => value.id == id);
     credentials.splice(rmIdx, 1);
+}
+function removeVpPolicy(id: number) {
+    const rmIdx = vpPolicies.findIndex((value) => value.id == id);
+    vpPolicies.splice(rmIdx, 1);
+}
+function removeGlobalVcPolicy(id: number) {
+    const rmIdx = globalVcPolicies.findIndex((value) => value.id == id);
+    globalVcPolicies.splice(rmIdx, 1);
 }
 
 
