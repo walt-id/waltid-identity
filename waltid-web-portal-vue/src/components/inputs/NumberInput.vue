@@ -15,7 +15,8 @@ const model: ModelRef<number | undefined> = defineModel();
 const props = defineProps({
     min: {
         type: Number,
-        required: false
+        required: false,
+        default: 0
     },
     max: {
         type: Number,

@@ -1,7 +1,9 @@
 <template>
     <main>
 
-        <PageOverlay :is-open="addingPresentationPolicies" name="Add Verifiable Presentation policies"
+        <PageOverlay :is-open="addingPresentationPolicies"
+                     description="Below you can choose from a list of default policies you can apply to the Verifiable Presentation object. Some of the policies require you to configure arguments."
+                     name="Add Verifiable Presentation policies"
                      @close="addingPresentationPolicies = false"
         >
             <SelectablePolicyListView
@@ -10,7 +12,10 @@
             />
         </PageOverlay>
 
-        <PageOverlay :is-open="addingCredentialPolicies" name="Add Verifiable Credential policies" @close="addingCredentialPolicies = false"
+        <PageOverlay :is-open="addingCredentialPolicies"
+                     description="Below you can choose from a list of default policies you can apply to each of the Verifiable Credentials within a presented Verifiable Presentation object. Some of the policies require you to configure arguments."
+                     name="Add Verifiable Credential policies"
+                     @close="addingCredentialPolicies = false"
         >
             <SelectablePolicyListView
                 :policies="availablePolicies"
@@ -32,19 +37,36 @@
             </div>
         </PageOverlay>
 
+        <PageOverlay
+            :description="`Below you can choose from a list of default policies that you can apply specifically to all presented Verifiable Credentials of type ${addingSpecificCredentialPolicies?.name ?? 'None'}.`"
+            :is-open="addingSpecificCredentialPolicies != null"
+            :name="`Add specific credential verification policies: ${addingSpecificCredentialPolicies?.name ?? 'None'}`"
+            @close="addingSpecificCredentialPolicies = null"
+        >
+            <SelectablePolicyListView
+                :policies="availablePolicies"
+                @added-policy="(policy: VerificationPolicyInformation) => {
+                    if (addingSpecificCredentialPolicies.policies == null) {
+                        addingSpecificCredentialPolicies.policies = []
+                    }
+                    addingSpecificCredentialPolicies.policies.push(policy)
+                }"
+            />
+        </PageOverlay>
 
-        <PageOverlay name="Policy arguments" :is-open="editingPolicy != null" @close="editingPolicy = null">
+
+        <PageOverlay :is-open="editingPolicy != null" name="Policy arguments" @close="editingPolicy = null">
             <div v-if="editingPolicy?.argumentType[0] == 'JSON'" class="h-12">
-                <LazyInputsJsonInput v-model="editingPolicy.args" v-if="editingPolicy?.argumentType[0] == 'JSON'"></LazyInputsJsonInput>
+                <LazyInputsJsonInput v-if="editingPolicy?.argumentType[0] == 'JSON'" v-model="editingPolicy.args"></LazyInputsJsonInput>
             </div>
             <div v-else-if="editingPolicy?.argumentType[0] == 'URL'">
-                <UrlInput v-model="editingPolicy!!.args"/>
+                <UrlInput v-model="editingPolicy!!.args" />
             </div>
             <div v-else-if="editingPolicy?.argumentType[0] == 'NUMBER'">
-                <NumberInput v-model="editingPolicy!!.args"/>
+                <NumberInput v-model="editingPolicy!!.args" />
             </div>
             <div v-else-if="editingPolicy?.argumentType[0] == 'DID'">
-                <DidInput v-model="editingPolicy!!.args"/>
+                <DidInput v-model="editingPolicy!!.args" />
             </div>
             <div v-else-if="editingPolicy?.argumentType[0] == 'DID_ARRAY'">
                 <DidArrayInput v-model="editingPolicy!!.args" />
@@ -54,7 +76,7 @@
             </div>
         </PageOverlay>
 
-        <HttpRequestOverlay :is-open="showRequest" :request="generatedRequest" @close="showRequest = false"/>
+        <HttpRequestOverlay :is-open="showRequest" :request="generatedRequest" @close="showRequest = false" />
 
 
         <div class="grid grid-cols-2 gap-10">
@@ -72,30 +94,34 @@
                             <div class="flex items-start gap-x-3">
                                 <p class="text-sm font-semibold leading-6 text-gray-900">{{ credential.name }}</p>
 
-                                <p v-if="credentials.policies"
+                                <p v-if="credential.policies"
                                    class="rounded-md whitespace-nowrap mt-0.5 px-1.5 py-0.5 text-xs font-medium ring-1 ring-inset text-green-600"
                                 >
-                                    {{ credential.policies.map((policy) => policy.name).join(", ") }}
+                                    Special policies applied
                                 </p>
 
                                 <p v-else class="rounded-md whitespace-nowrap mt-0.5 px-1.5 py-0.5 text-xs font-medium ring-1 ring-inset">
-                                    No special policies</p>
+                                    No special policies
+                                </p>
                             </div>
-                            <!--                    <div class="mt-1 flex items-center gap-x-2 text-xs leading-5 text-gray-500">
-                            &lt;!&ndash;                        <p class="whitespace-nowrap">
-                                                        Due on
-                                                        <time :datetime="credential.dueDateTime">{{ credential.dueDate }}</time>
-                                                    </p>
-                                                    <svg class="h-0.5 w-0.5 fill-current" viewBox="0 0 2 2">
-                                                        <circle cx="1" cy="1" r="1" />
-                                                    </svg>
-                                                    <p class="truncate">Created by {{ credential.createdBy }}</p>&ndash;&gt;
-                                                </div>-->
+                            <div v-if="credential.policies" class="mt-1 flex items-center gap-x-2 text-xs leading-5 text-gray-500">
+                                <ul>
+                                    <li v-for="specificPolicy of credential.policies" class="list-disc ml-3">
+                                        <div>
+                                            {{ specificPolicy.name }}
+                                            <button>Edit arguments</button>
+                                        </div>
+                                    </li>
+                                </ul>
+                                <!--                                <p class="truncate">
+                                                                    {{ credential.policies.map((policy) => policy.name).join(", ") }}
+                                                                </p>-->
+                            </div>
                         </div>
                         <div class="flex flex-none items-center gap-x-2">
                             <button
                                 class="flex items-center gap-1 rounded-md bg-white px-2.5 py-1.5 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
-                                @click="editCredential(credential.id)"
+                                @click="addingSpecificCredentialPolicies = credential"
                             >Edit credential specific policies
                             </button>
                             <Menu as="div" class="relative flex-none">
@@ -359,9 +385,11 @@ const addingCredentials = ref(false);
 const addingPresentationPolicies = ref(false);
 const addingCredentialPolicies = ref(false);
 
+const addingSpecificCredentialPolicies = ref(null);
+
 const showRequest = ref(false);
 
-const editingPolicy: Ref<any> = ref(null)
+const editingPolicy: Ref<any> = ref(null);
 
 const actions = [
     {
@@ -414,7 +442,15 @@ const credentials: VerifyCredential[] = reactive([]);
 const generatedRequest: ComputedRef<HttpRequestType> = computed(() => {
 
     const reqRequestCredentials = credentials.map((entry) => {
-        return entry.policies ? { credential: entry.name, policies: entry.policies } : entry.name;
+        return !entry.policies ? entry.name : {
+            credential: entry.name,
+            policies: entry.policies?.map((specificPolicy) => {
+                return !specificPolicy.args ? specificPolicy.name : {
+                    policy: specificPolicy.name,
+                    args: specificPolicy.args
+                };
+            })
+        };
     });
     const reqVpPolicies = vpPolicies.map((entry) => {
         return entry.args == null ? entry.name : { policy: entry.name, args: entry.args };
