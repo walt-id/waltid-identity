@@ -16,7 +16,7 @@
 
     <OidcResultDialog v-if="oidcLink" :link="oidcLink" text="Claim your credentials" @close="oidcLink = null" />
 
-    <HttpRequestOverlay :is-open="showRequest" :request="currentIssuanceRequest" @close="showRequest = false"/>
+    <HttpRequestOverlay :is-open="showRequest" :request="currentIssuanceRequest" @close="showRequest = false" />
 
     <PageOverlay :is-open="openSettings" description="Below you can edit various settings used during the issuance process." name="Settings"
                  @close="openSettings = false"
@@ -181,29 +181,7 @@
             </span>
         </div>
 
-
-        <div v-if="issuanceError" class="rounded-md bg-red-50 p-4 my-2">
-            <div class="flex">
-                <div class="flex-shrink-0">
-                    <Icon aria-hidden="true" class="h-5 w-5 text-red-400" name="heroicons:x-circle" />
-                </div>
-                <div class="ml-3">
-                    <h3 class="text-sm font-medium text-red-800">There was an error with this issuance:</h3>
-                    <div class="mt-2 text-sm text-red-700">
-                        <ul class="list-disc space-y-1 pl-5" role="list">
-                            <li>{{ issuanceError.name }}: {{ issuanceError.statusCode }} {{ issuanceError.statusMessage }}</li>
-                            <li>Message: {{ issuanceError.message }}</li>
-                            <li v-if="issuanceError.response">Response: {{ issuanceError.response }}</li>
-
-                            <li v-if="issuanceError.data">
-                                {{ issuanceError.data?.startsWith("{") ? JSON.parse(issuanceError.data)?.message ?? JSON.parse(issuanceError.data) : issuanceError.data
-                                }}
-                            </li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
-        </div>
+        <ErrorDisplay :error="issuanceError" title="There was an error with this issuance:" />
 
         <div class="mt-2 flex-shrink">
             <div class="font-semibold text-lg">
@@ -232,7 +210,7 @@ const issuanceKey = ref(JSON.stringify({
 }, null, 4));
 const issuanceDid = ref("did:key:z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp");
 
-const sdJwtConfig = ref("")
+const sdJwtConfig = ref("");
 
 const showRequest = ref(false);
 
@@ -257,10 +235,10 @@ const currentIssuanceRequest: Ref<HttpRequestType> = computed(() => {
 
     if (!batch && sdJwtConfig.value.length > 0) {
         try {
-            credentialRequestBodies[0].selectiveDisclosure = JSON.parse(sdJwtConfig.value)
-            url = `${config.public.issuer}/openid4vc/sdjwt/issue`
+            credentialRequestBodies[0].selectiveDisclosure = JSON.parse(sdJwtConfig.value);
+            url = `${config.public.issuer}/openid4vc/sdjwt/issue`;
         } catch (e) {
-            console.log(e)
+            console.log(e);
         }
     }
 
@@ -294,6 +272,7 @@ async function sendIssueRequest() {
 
 function editCredential(id: number) {
     editing.value = credentials.find((value) => value.id == id) ?? null;
+    editing.value!!.edited = true;
 }
 
 function removeCredential(id: number) {
@@ -310,25 +289,52 @@ type EditableCredential = {
     status: string
 }
 
+function addCredential(template: string, credentialData: string, mappingData: string) {
+    credentials.push(
+        {
+            id: ++idx,
+            name: template,
+            data: JSON.stringify(credentialData, null, 4),
+            mapping: JSON.stringify(mappingData, null, 4),
+            edited: false,
+            status: "Template"
+        }
+    );
+}
+
+async function getCredentialData(template: string): Promise<{ credentialData: string, mappingData: string }> {
+    const { data: credentialData, error: dataError } = await useFetch<string>(`${config.public.credentialRepository}/api/vc/${template}`);
+    const {
+        data: mappingData,
+        error: mappingError
+    } = await useFetch<string>(`${config.public.credentialRepository}/api/mapping/${template}`);
+
+    const data: string = credentialData.value!!;
+    const mapping: string = mappingData.value!!;
+
+    if (dataError) {
+        issuanceError.value = dataError.value;
+    } else if (mappingError) {
+        issuanceError.value = mappingError.value;
+    }
+
+    // if (!data.startsWith("{") || !mapping.startsWith("{")) {
+    //     throw Error(`Could not get valid credential template! data err = ${dataError.value}, mapping err = ${mappingError.value}`);
+    // }
+    return { credentialData: data, mappingData: mapping };
+}
+
+async function addCredentialWithTemplate(template: string): boolean {
+    const { credentialData, mappingData } = await getCredentialData(template);
+    addCredential(template, credentialData, mappingData);
+}
+
 const actions = [
     {
         name: "Issue",
         icon: "carbon:certificate-check",
         action: async (template: string) => {
-
-            const { data: credentialData } = await useFetch<string>(`${config.public.credentialRepository}/api/vc/${template}`);
-            const { data: mappingData } = await useFetch<string>(`${config.public.credentialRepository}/api/mapping/${template}`);
-
-            credentials.push(
-                {
-                    id: ++idx,
-                    name: template,
-                    data: JSON.stringify(credentialData.value!!, null, 4),
-                    mapping: JSON.stringify(mappingData.value!!, null, 4),
-                    edited: false,
-                    status: "Template"
-                }
-            );
+            addCredentialWithTemplate(template);
         }
     }
 ];
@@ -342,6 +348,12 @@ const statuses = {
 };
 
 const credentials: EditableCredential[] = reactive([]);
+
+const query = useRoute().query;
+
+if (query.credential) {
+    addCredentialWithTemplate(query.credential);
+}
 
 useHead({
     title: "Issuance | walt.id Portal"

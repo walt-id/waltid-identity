@@ -1,32 +1,41 @@
 <template>
     <div>
 
-        <CredentialTemplateList :actions="x"></CredentialTemplateList>
+        <CredentialTemplateList :actions="actions"></CredentialTemplateList>
     </div>
 </template>
 
 <script lang="ts" setup>
 // import { EnvelopeIcon, PhoneIcon } from '@heroicons/vue/20/solid'
 
-const x = [
+const actions = [
     {
         name: "Issue",
         icon: "heroicons:check-badge",
         action: (template: string) => {
-            alert("ISSUE");
+            navigateTo({
+                path: "/issuance",
+                query: {
+                    credential: template
+                }
+            })
         }
     },
     {
         name: "Verify",
         icon: "heroicons:clipboard-document-list",
         action: (template: string) => {
-            alert("Verify");
+            navigateTo({
+                path: "/verification",
+                query: {
+                    credential: template
+                }
+            })
         }
     }
 ];
 
+useHead({
+    title: "walt.id Portal"
+})
 </script>
-
-<style>
-
-</style>

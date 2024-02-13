@@ -55,7 +55,11 @@
         </PageOverlay>
 
 
-        <PageOverlay :is-open="editingPolicy != null" name="Policy arguments" @close="editingPolicy = null">
+        <PageOverlay
+            :is-open="editingPolicy != null"
+            :name="`Policy arguments for ${editingPolicy?.name ?? 'None'}`"
+            @close="editingPolicy = null"
+        >
             <div v-if="editingPolicy?.argumentType[0] == 'JSON'" class="h-12">
                 <LazyInputsJsonInput v-if="editingPolicy?.argumentType[0] == 'JSON'" v-model="editingPolicy.args"></LazyInputsJsonInput>
             </div>
@@ -78,6 +82,69 @@
 
         <HttpRequestOverlay :is-open="showRequest" :request="generatedRequest" @close="showRequest = false" />
 
+        <OidcResultDialog v-if="oidcLink" :link="oidcLink" text="Claim your credentials" @close="oidcLink = null" />
+
+        <PageOverlay :is-open="showExplainer" description="Below you will find a description of how this request will execute."
+                     name="Verification flow" @close="showExplainer = false"
+        >
+            <div class="p-2 shadow border">
+                <p class="font-semibold">This request will ask the holder to share the following credentials:</p>
+                <ul class="list-inside list-decimal">
+                    <li v-for="credential of credentials">{{ credential.name }}</li>
+                </ul>
+                <p class="text-gray-500 mt-1">Keep in mind that the holder might not share all or any of the credential types you
+                    request.</p>
+                <p class="text-gray-500">The policy <span class="underline">presentation-definition</span> can verify that at minimum all
+                    the requested credential types were shared by the holder.</p>
+            </div>
+
+            <div class="p-2 shadow mt-3 border">
+                <p class="font-semibold">
+                    Then, the following policies will be checked for on <span class="underline">Verifiable Presentation</span>:
+                </p>
+                <ul class="list-inside list-decimal">
+                    <li v-for="policy of vpPolicies">{{ policy.name }}</li>
+                </ul>
+
+                <p class="text-gray-500 mt-1">
+                    These policies are applied on the Verifiable Presentation, even if the presentation the holder shared is not containing
+                    any Verifiable Credentials.
+                </p>
+            </div>
+
+            <div class="p-2 shadow mt-3 border">
+                <p class="font-semibold">
+                    Then, a number of policies will be checked on the <span class="underline">Verifiable Credentials</span> within the
+                    Verifiable Presentation:
+                </p>
+                <ul class="list-inside list-decimal">
+                    <li v-for="credential of credentials">
+                        <span class="font-semibold">{{ credential.name }}</span>
+                        <div class="ml-4">
+                            <div>
+                                <p class="underline">Global policies:</p>
+                                <ul class="list-inside list-decimal">
+                                    <li v-for="policy of globalVcPolicies">{{ policy.name }}</li>
+                                </ul>
+                            </div>
+
+                            <div v-if="credential.policies">
+                                <p class="underline mt-2">Additionally, specific policies for type <span class="font-semibold"
+                                >{{ credential.name }}</span>:</p>
+                                <ul class="list-inside list-decimal">
+                                    <li v-for="policy of credential.policies">{{ policy.name }}</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </li>
+                </ul>
+
+                <p class="text-gray-500 mt-1">
+                    These policies are applied on the Verifiable Credentials within a Verifiable Presentation.
+                    Global policies are applied globally to all Verifiable Credentials within a Verifiable Presentation, while specific policies are only applied to a specific credential type.
+                </p>
+            </div>
+        </PageOverlay>
 
         <div class="grid grid-cols-2 gap-10">
             <div class="border p-3">
@@ -107,9 +174,28 @@
                             <div v-if="credential.policies" class="mt-1 flex items-center gap-x-2 text-xs leading-5 text-gray-500">
                                 <ul>
                                     <li v-for="specificPolicy of credential.policies" class="list-disc ml-3">
-                                        <div>
-                                            {{ specificPolicy.name }}
-                                            <button>Edit arguments</button>
+                                        <div class="flex items-center gap-x-2">
+                                            {{ specificPolicy.name }} <span v-if="!(specificPolicy.argumentType.length == 1 && specificPolicy.argumentType[0] == 'NONE')">({{ specificPolicy.argumentType.join(", ") }})</span>
+                                            <span v-if="specificPolicy.args"
+                                                  class="rounded-md whitespace-nowrap mt-0.5 px-1.5 py-0.5 text-xs font-medium ring-1 ring-inset text-green-600"
+                                            >
+                                                Arguments supplied
+                                            </span>
+                                            <span v-else-if="!specificPolicy.args && hasArguments(specificPolicy.argumentType)"
+                                                  class="rounded-md whitespace-nowrap mt-0.5 px-1.5 py-0.5 text-xs font-medium ring-1 ring-inset text-yellow-600"
+                                            >
+                                                Missing arguments
+                                            </span>
+                                            <span v-else
+                                                  class="rounded-md whitespace-nowrap mt-0.5 px-1.5 py-0.5 text-xs font-medium ring-1 ring-inset"
+                                            >
+                                                No arguments
+                                            </span>
+
+                                            <button class="px-1.5"
+                                                    @click="editingPolicy = specificPolicy"
+                                            >Edit arguments
+                                            </button>
                                         </div>
                                     </li>
                                 </ul>
@@ -197,15 +283,14 @@
                                 >
                                     Arguments supplied
                                 </p>
-
                                 <p v-else-if="!policy.args && hasArguments(policy.argumentType)"
                                    class="rounded-md whitespace-nowrap mt-0.5 px-1.5 py-0.5 text-xs font-medium ring-1 ring-inset text-yellow-600"
                                 >
                                     Missing arguments
                                 </p>
-
                                 <p v-else class="rounded-md whitespace-nowrap mt-0.5 px-1.5 py-0.5 text-xs font-medium ring-1 ring-inset">
-                                    No arguments</p>
+                                    No arguments
+                                </p>
                             </div>
                             <div v-if="policy.args" class="mt-1 flex items-center gap-x-2 text-xs leading-5 text-gray-500">
                                 <p class="truncate">Arguments: {{ policy.args }}</p>
@@ -241,6 +326,7 @@
                     @click="addingPresentationPolicies = true"
                 >Add additional presentation policy
                 </button>
+
             </div>
 
 
@@ -314,6 +400,7 @@
                     <button
                         class="rounded-md bg-indigo-600 px-2.5 py-1.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
                         type="button"
+                        @click="sendRequest"
                     >
                         Send verification request
                     </button>
@@ -329,40 +416,20 @@
                     <button
                         class="rounded-md bg-white px-2.5 py-1.5 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
                         type="button"
+                        @click="showExplainer = true"
                     >
-                        View verification flow
+                        View verification flow explainer
                     </button>
                 </div>
                 <div v-else class="text-gray-500 cursor-not-allowed">
                     Add a credential type to continue with sending this request.
                 </div>
 
-                Request is: {{ generatedRequest.body }}
+                <ErrorDisplay :error="verifierError" title="There was an error with this issuance:" />
+
+                <p v-if="credentials.length >= 1 || vpPolicies.length >= 1 || globalVcPolicies.length >= 1" class="text-xs mt-4 text-gray-500">Request is: <code>{{ generatedRequest.body }}</code></p>
             </div>
         </div>
-
-
-        <!--        Fetched: {{ availablePolicies }}-->
-
-
-        <!--            <div>
-            <ul class="list-disc">
-                            <li v-for="(name, idx) of Object.keys(data)" :key="name">
-                                <TestVerificationComponent :name="name" :information="data[name] as VerificationPolicyInformation"/>
-                            </li>
-                        </ul>
-                        <button @click="refreshNuxtData">Update</button>
-        </div>-->
-
-        <!--        <hr class="mt-3 mb-3"/>
-
-                <div class="mt-2 flex-shrink">
-                    <div class="font-semibold text-lg">
-                        <Icon class="h-5 w-5" name="carbon:prompt-template" />
-                        Choose a template:
-                    </div>
-                    <CredentialTemplateList :actions="actions" class="overflow-y-scroll" />
-                </div>-->
     </main>
 </template>
 
@@ -376,6 +443,7 @@ import NumberInput from "~/components/inputs/NumberInput.vue";
 import DidInput from "~/components/inputs/DidInput.vue";
 import UrlInput from "~/components/inputs/UrlInput.vue";
 import DidArrayInput from "~/components/inputs/DidArrayInput.vue";
+import { FetchError } from "ofetch";
 
 const config = useRuntimeConfig();
 
@@ -388,6 +456,9 @@ const addingCredentialPolicies = ref(false);
 const addingSpecificCredentialPolicies = ref(null);
 
 const showRequest = ref(false);
+const showExplainer = ref(false);
+
+const oidcLink: Ref<string | null> = ref(null);
 
 const editingPolicy: Ref<any> = ref(null);
 
@@ -473,6 +544,26 @@ const generatedRequest: ComputedRef<HttpRequestType> = computed(() => {
     };
 });
 
+const verifierError: Ref<FetchError<any> | null> = ref(null);
+const verifying = ref(false);
+
+async function sendRequest() {
+    verifying.value = true;
+
+    const req: HttpRequestType = generatedRequest.value;
+
+    const { data, pending, error, refresh } = await useFetch<string>(req.url, {
+        method: "POST",
+        body: req.body,
+        headers: req.headers
+    });
+
+    verifierError.value = error.value;
+
+    oidcLink.value = data.value;
+
+    verifying.value = false;
+}
 
 function removeCredential(id: number) {
     const rmIdx = credentials.findIndex((value) => value.id == id);
