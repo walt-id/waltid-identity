@@ -242,7 +242,7 @@ class TestCredentialWallet(
                 get("/authorize") {
                     val authReq = AuthorizationRequest.fromHttpParameters(call.parameters.toMap())
                     try {
-                        if (authReq.responseType != ResponseType.vp_token.name) {
+                        if (!authReq.responseType.contains(ResponseType.VpToken)) {
                             throw AuthorizationError(
                                 authReq,
                                 AuthorizationErrorCode.unsupported_response_type,
@@ -250,7 +250,7 @@ class TestCredentialWallet(
                             )
                         }
                         val tokenResponse = processImplicitFlowAuthorization(authReq)
-                        val redirectLocation = if (authReq.responseMode == ResponseMode.direct_post) {
+                        val redirectLocation = if (authReq.responseMode == ResponseMode.DirectPost) {
                             ktorClient.submitForm(
                                 authReq.responseUri ?: throw AuthorizationError(
                                     authReq,
@@ -266,7 +266,7 @@ class TestCredentialWallet(
                                     AuthorizationErrorCode.invalid_request,
                                     "No redirect uri found on authorization request"
                                 ),
-                                authReq.responseMode ?: ResponseMode.fragment
+                                authReq.responseMode ?: ResponseMode.Fragment
                             )
                         }
                         if (!redirectLocation.isNullOrEmpty()) {

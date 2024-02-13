@@ -162,9 +162,9 @@ class CITestProvider : OpenIDCredentialIssuer(
                 get("/authorize") {
                     val authReq = AuthorizationRequest.fromHttpParameters(call.parameters.toMap())
                     try {
-                        val authResp = if (authReq.responseType == ResponseType.code.name) {
+                        val authResp = if (authReq.responseType.contains(ResponseType.Code)) {
                             processCodeFlowAuthorization(authReq)
-                        } else if (authReq.responseType.contains(ResponseType.token.name)) {
+                        } else if (authReq.responseType.contains(ResponseType.Token)) {
                             processImplicitFlowAuthorization(authReq)
                         } else {
                             throw AuthorizationError(
@@ -185,7 +185,7 @@ class CITestProvider : OpenIDCredentialIssuer(
                         call.response.apply {
                             status(HttpStatusCode.Found)
                             val defaultResponseMode =
-                                if (authReq.responseType == ResponseType.code.name) ResponseMode.query else ResponseMode.fragment
+                                if (authReq.responseType.contains(ResponseType.Code)) ResponseMode.Query else ResponseMode.Fragment
                             header(
                                 HttpHeaders.Location,
                                 authResp.toRedirectUri(redirectUri, authReq.responseMode ?: defaultResponseMode)

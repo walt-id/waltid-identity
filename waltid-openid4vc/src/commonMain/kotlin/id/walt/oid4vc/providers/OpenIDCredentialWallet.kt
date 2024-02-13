@@ -82,8 +82,8 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
     protected abstract fun isPresentationDefinitionSupported(presentationDefinition: PresentationDefinition): Boolean
 
     override fun validateAuthorizationRequest(authorizationRequest: AuthorizationRequest): Boolean {
-        return ((authorizationRequest.responseType.contains(ResponseType.vp_token.name) ||
-                    authorizationRequest.responseType.contains(ResponseType.id_token.name)) &&
+        return ((authorizationRequest.responseType.contains(ResponseType.VpToken) ||
+                    authorizationRequest.responseType.contains(ResponseType.IdToken)) &&
             authorizationRequest.presentationDefinition != null &&
             isPresentationDefinitionSupported(authorizationRequest.presentationDefinition)
             )
@@ -151,7 +151,7 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
         )
         val result = generatePresentationForVPToken(session, tokenRequest)
         val holderDid = getDidFor(session)
-        val idToken = if(session.authorizationRequest?.responseType?.contains("id_token") == true) {
+        val idToken = if(session.authorizationRequest?.responseType?.contains(ResponseType.IdToken) == true) {
             signToken(TokenTarget.TOKEN, buildJsonObject {
                 put("iss", "https://self-issued.me/v2/openid-vc")
                 put("sub", holderDid)
@@ -254,7 +254,7 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
         val codeChallenge = codeVerifier?.let { Base64.UrlSafe.encode(sha256(it.toByteArray(Charsets.UTF_8))).trimEnd('=') }
 
         val authReq = AuthorizationRequest(
-            responseType = ResponseType.getResponseTypeString(ResponseType.code),
+            responseType = setOf(ResponseType.Code),
             clientId = client.clientID,
             redirectUri = config.redirectUri,
             scope = setOf("openid"),
@@ -285,7 +285,7 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
 
                 println("// 2. call authorize endpoint with request uri, receive HTTP redirect (302 Found) with Location header")
                 AuthorizationRequest(
-                    responseType = ResponseType.code.name,
+                    responseType = setOf(ResponseType.Code),
                     clientId = client.clientID,
                     requestUri = pushedAuthResp.requestUri
                 )
@@ -305,9 +305,9 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
         var location = Url(authResp.headers[HttpHeaders.Location]!!)
         println("location: $location")
         location =
-            if (location.parameters.contains("response_type") && location.parameters["response_type"] == ResponseType.id_token.name) {
+            if (location.parameters.contains("response_type") && location.parameters["response_type"] == ResponseType.IdToken.name) {
                 executeIdTokenAuthorization(location, holderDid, client)
-            } else if (location.parameters.contains("response_type") && location.parameters["response_type"] == ResponseType.vp_token.name) {
+            } else if (location.parameters.contains("response_type") && location.parameters["response_type"] == ResponseType.VpToken.name) {
                 executeVpTokenAuthorization(location, holderDid, client)
             } else location
 
@@ -444,7 +444,7 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
             authorizationRequest.customParameters["request"]?.let { AuthorizationJSONRequest.fromJSON(SDJwt.parse(it.first()).fullPayload) }
                 ?: authorizationRequest
         }
-        if (authReq.responseMode != ResponseMode.direct_post || authReq.responseType != ResponseType.id_token.name || authReq.redirectUri.isNullOrEmpty())
+        if (authReq.responseMode != ResponseMode.DirectPost || !authReq.responseType.contains(ResponseType.IdToken) || authReq.redirectUri.isNullOrEmpty())
             throw AuthorizationError(
                 authReq,
                 AuthorizationErrorCode.server_error,
