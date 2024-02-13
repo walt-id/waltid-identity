@@ -30,12 +30,39 @@ class LocalKeyTest {
         val rsaPublicKey = rsaKeyPair.getPublicKey()
 
         assertTrue { rsaPublicKey.toString().contains("RSA") }
-        assertFalse { rsaPublicKey.hasPrivateKey}
+        assertFalse { rsaPublicKey.hasPrivateKey }
 
         val eccKeyPair = AndroidLocalKeyGenerator.generate(KeyType.secp256r1)
         val eccPublicKey = eccKeyPair.getPublicKey()
 
         assertTrue { eccPublicKey.toString().contains("secp256r1") }
-        assertFalse { eccPublicKey.hasPrivateKey}
+        assertFalse { eccPublicKey.hasPrivateKey }
+    }
+
+    @Test
+    fun return_same_instance_when_calling_retrieving_public_key_when_instance_does_not_have_a_keypair() = runTest {
+        val rsaKeyPair = AndroidLocalKeyGenerator.generate(KeyType.RSA)
+        val rsaPublicKey = rsaKeyPair.getPublicKey()
+
+        assertTrue { rsaPublicKey.toString().contains("RSA") }
+        assertFalse { rsaPublicKey.hasPrivateKey }
+
+        val identicalRSAPublicKey = rsaPublicKey.getPublicKey()
+
+        assertTrue { identicalRSAPublicKey.toString().contains("RSA") }
+        assertTrue { identicalRSAPublicKey == rsaPublicKey }
+        assertFalse { identicalRSAPublicKey.hasPrivateKey }
+
+        val eccKeyPair = AndroidLocalKeyGenerator.generate(KeyType.secp256r1)
+        val eccPublicKey = eccKeyPair.getPublicKey()
+
+        assertTrue { eccPublicKey.toString().contains("secp256r1") }
+        assertFalse { eccPublicKey.hasPrivateKey }
+
+        val identicalEccPublicKey = eccPublicKey.getPublicKey()
+
+        assertTrue { identicalEccPublicKey.toString().contains("secp256r1") }
+        assertTrue { identicalEccPublicKey == eccPublicKey }
+        assertFalse { identicalEccPublicKey.hasPrivateKey }
     }
 }
