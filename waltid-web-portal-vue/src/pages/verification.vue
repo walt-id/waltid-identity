@@ -33,6 +33,28 @@
         </PageOverlay>
 
 
+        <PageOverlay name="Policy arguments" :is-open="editingPolicy != null" @close="editingPolicy = null">
+            <div v-if="editingPolicy?.argumentType[0] == 'JSON'" class="h-12">
+                <LazyInputsJsonInput v-model="editingPolicy.args" v-if="editingPolicy?.argumentType[0] == 'JSON'"></LazyInputsJsonInput>
+            </div>
+            <div v-else-if="editingPolicy?.argumentType[0] == 'URL'">
+                <UrlInput v-model="editingPolicy!!.args"/>
+            </div>
+            <div v-else-if="editingPolicy?.argumentType[0] == 'NUMBER'">
+                <NumberInput v-model="editingPolicy!!.args"/>
+            </div>
+            <div v-else-if="editingPolicy?.argumentType[0] == 'DID'">
+                <DidInput v-model="editingPolicy!!.args"/>
+            </div>
+            <div v-else-if="editingPolicy?.argumentType[0] == 'DID_ARRAY'">
+                <DidArrayInput v-model="editingPolicy!!.args" />
+            </div>
+            <div v-else>
+                Unknown: {{ editingPolicy?.argumentTypes[0] }}
+            </div>
+        </PageOverlay>
+
+
         <div class="grid grid-cols-2 gap-10">
             <div class="border p-3">
                 <p class="text-lg">Request credentials</p>
@@ -120,8 +142,10 @@
                     </li>
                 </ul>
 
-                <button class="w-full mt-2 rounded-md bg-indigo-50 px-3 py-2 text-sm font-semibold text-indigo-600 shadow-sm hover:bg-indigo-100" type="button"
-                        @click="addingCredentials = true"
+                <button
+                    class="w-full mt-2 rounded-md bg-indigo-50 px-3 py-2 text-sm font-semibold text-indigo-600 shadow-sm hover:bg-indigo-100"
+                    type="button"
+                    @click="addingCredentials = true"
                 >Request additional credential type
                 </button>
             </div>
@@ -142,56 +166,38 @@
                                 <p v-if="policy.args"
                                    class="rounded-md whitespace-nowrap mt-0.5 px-1.5 py-0.5 text-xs font-medium ring-1 ring-inset text-green-600"
                                 >
-                                    {{ policy.args }}
+                                    Arguments supplied
+                                </p>
+
+                                <p v-else-if="!policy.args && hasArguments(policy.argumentType)"
+                                   class="rounded-md whitespace-nowrap mt-0.5 px-1.5 py-0.5 text-xs font-medium ring-1 ring-inset text-yellow-600"
+                                >
+                                    Missing arguments
                                 </p>
 
                                 <p v-else class="rounded-md whitespace-nowrap mt-0.5 px-1.5 py-0.5 text-xs font-medium ring-1 ring-inset">
                                     No arguments</p>
                             </div>
-                            <!--                    <div class="mt-1 flex items-center gap-x-2 text-xs leading-5 text-gray-500">
-                            &lt;!&ndash;                        <p class="whitespace-nowrap">
-                                                        Due on
-                                                        <time :datetime="credential.dueDateTime">{{ credential.dueDate }}</time>
-                                                    </p>
-                                                    <svg class="h-0.5 w-0.5 fill-current" viewBox="0 0 2 2">
-                                                        <circle cx="1" cy="1" r="1" />
-                                                    </svg>
-                                                    <p class="truncate">Created by {{ credential.createdBy }}</p>&ndash;&gt;
-                                                </div>-->
+                            <div v-if="policy.args" class="mt-1 flex items-center gap-x-2 text-xs leading-5 text-gray-500">
+                                <p class="truncate">Arguments: {{ policy.args }}</p>
+                            </div>
                         </div>
                         <div class="flex flex-none items-center gap-x-2">
                             <button
+                                v-if="hasArguments(policy.argumentType)"
                                 class="flex items-center gap-1 rounded-md bg-white px-2.5 py-1.5 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
-                                @click="editCredential(policy.id)"
+                                @click="editingPolicy = policy"
                             >Edit policy arguments
                             </button>
-                            <Menu as="div" class="relative flex-none">
-                                <MenuButton
-                                    class="flex items-center gap-1 rounded-md bg-white px-2 py-1.5 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
-                                >
-                                    <span class="sr-only">Open options</span>
-                                    <Icon aria-hidden="true" class="h-5 w-5" name="material-symbols:event-list-outline-rounded" />
-                                </MenuButton>
-                                <transition enter-active-class="transition ease-out duration-100"
-                                            enter-from-class="transform opacity-0 scale-95"
-                                            enter-to-class="transform opacity-100 scale-100"
-                                            leave-active-class="transition ease-in duration-75"
-                                            leave-from-class="transform opacity-100 scale-100" leave-to-class="transform opacity-0 scale-95"
-                                >
-                                    <MenuItems
-                                        class="absolute right-0 z-10 mt-2 w-48 origin-top-right rounded-md bg-white py-2 shadow-lg ring-1 ring-gray-900/5 focus:outline-none"
-                                    >
-                                        <MenuItem v-slot="{ active }">
-                                            <button
-                                                class="px-3 py-1 text-sm leading-6 text-gray-900 flex items-center gap-1 bg-white w-full hover:bg-gray-50"
-                                                @click="removeVpPolicy(policy.id)"
-                                            >
-                                                <Icon name="carbon:trash-can" />
-                                                Delete<span class="sr-only">, {{ policy.name }}</span> {{ policy.id }} </button>
-                                        </MenuItem>
-                                    </MenuItems>
-                                </transition>
-                            </Menu>
+
+
+                            <button
+                                class="flex items-center gap-1 rounded-md bg-white px-2.5 py-1.5 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
+                                @click="removeVpPolicy(policy.id)"
+                            >
+                                <Icon name="carbon:trash-can" />
+                                Delete
+                            </button>
                         </div>
                     </li>
                     <li v-if="vpPolicies.length == 0" class="flex items-center gap-1 gap-x-5 py-3">
@@ -200,12 +206,13 @@
                     </li>
                 </ul>
 
-                <button class="w-full mt-2 rounded-md bg-indigo-50 px-3 py-2 text-sm font-semibold text-indigo-600 shadow-sm hover:bg-indigo-100" type="button"
-                        @click="addingPresentationPolicies = true"
+                <button
+                    class="w-full mt-2 rounded-md bg-indigo-50 px-3 py-2 text-sm font-semibold text-indigo-600 shadow-sm hover:bg-indigo-100"
+                    type="button"
+                    @click="addingPresentationPolicies = true"
                 >Add additional presentation policy
                 </button>
             </div>
-
 
 
             <div class="border p-3">
@@ -291,15 +298,16 @@
                     </li>
                 </ul>
 
-                <button class="w-full mt-2 rounded-md bg-indigo-50 px-3 py-2 text-sm font-semibold text-indigo-600 shadow-sm hover:bg-indigo-100" type="button"
-                        @click="addingCredentialPolicies = true"
+                <button
+                    class="w-full mt-2 rounded-md bg-indigo-50 px-3 py-2 text-sm font-semibold text-indigo-600 shadow-sm hover:bg-indigo-100"
+                    type="button"
+                    @click="addingCredentialPolicies = true"
                 >Add additional global credential policy
                 </button>
             </div>
 
 
-
-            <div class="border p-3">
+            <div class="border p-3 pt-4 shadow-2xl">
                 <div v-if="credentials.length >= 1" class="flex gap-3">
                     <button
                         class="rounded-md bg-indigo-600 px-2.5 py-1.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
@@ -326,7 +334,7 @@
                     Add a credential type to continue with sending this request.
                 </div>
 
-                Request is: {{ generatedRequest }}
+                Request is: {{ generatedRequest.body }}
             </div>
         </div>
 
@@ -359,8 +367,12 @@
 
 import type { VerificationPolicyInformation } from "~/composables/verification";
 import { Menu, MenuButton, MenuItem, MenuItems } from "@headlessui/vue";
-import type { ComputedRef } from "vue";
+import type { ComputedRef, Ref } from "vue";
 import type { IssuanceRequest } from "~/composables/network-request";
+import NumberInput from "~/components/inputs/NumberInput.vue";
+import DidInput from "~/components/inputs/DidInput.vue";
+import UrlInput from "~/components/inputs/UrlInput.vue";
+import DidArrayInput from "~/components/inputs/DidArrayInput.vue";
 
 const config = useRuntimeConfig();
 
@@ -369,6 +381,8 @@ const { data, pending, error, refresh } = await useFetch<Object>(`${config.publi
 const addingCredentials = ref(false);
 const addingPresentationPolicies = ref(false);
 const addingCredentialPolicies = ref(false);
+
+const editingPolicy: Ref<any> = ref(null)
 
 const actions = [
     {
@@ -398,10 +412,7 @@ const availablePolicies = computed(() => {
 const vpPolicies: any[] = reactive<any[]>([]);
 const globalVcPolicies: any[] = reactive<any[]>([]);
 
-let tempIdx1 = 0
-let tempIdx2 = 0
-
-availablePolicies.value.map((entry) => ({
+/*availablePolicies.value.map((entry) => ({
     id: ++tempIdx1,
     name: entry.name,
     args: entry.argumentType && entry.argumentType.length > 0 && entry.argumentType[0] != "NONE" ? "xy" : null,
@@ -409,7 +420,7 @@ availablePolicies.value.map((entry) => ({
 })).forEach((entry) => {
     vpPolicies.push(entry)
     // globalVcPolicies.push(entry)
-})
+})*/
 
 type VerifyCredential = {
     id: number,
@@ -424,14 +435,14 @@ const credentials: VerifyCredential[] = reactive([]);
 const generatedRequest: ComputedRef<IssuanceRequest> = computed(() => {
 
     const reqRequestCredentials = credentials.map((entry) => {
-        return entry.policies ? {credential: entry.name, policies: entry.policies} : entry.name
-    })
+        return entry.policies ? { credential: entry.name, policies: entry.policies } : entry.name;
+    });
     const reqVpPolicies = vpPolicies.map((entry) => {
-        return entry.args == null ? entry.name : { policy: entry.name, args: entry.args }
-    })
+        return entry.args == null ? entry.name : { policy: entry.name, args: entry.args };
+    });
     const reqVcPolicies = globalVcPolicies.map((entry) => {
-        return entry.args == null ? entry.name : { policy: entry.name, args: entry.args }
-    })
+        return entry.args == null ? entry.name : { policy: entry.name, args: entry.args };
+    });
 
     return {
         url: `${config.public.verifier}/openid4vc/verify`,
@@ -441,21 +452,21 @@ const generatedRequest: ComputedRef<IssuanceRequest> = computed(() => {
             vc_policies: reqVcPolicies,
             request_credentials: reqRequestCredentials
         },
-        headers: {
-
-        }
-    }
-})
+        headers: {}
+    };
+});
 
 
 function removeCredential(id: number) {
     const rmIdx = credentials.findIndex((value) => value.id == id);
     credentials.splice(rmIdx, 1);
 }
+
 function removeVpPolicy(id: number) {
     const rmIdx = vpPolicies.findIndex((value) => value.id == id);
     vpPolicies.splice(rmIdx, 1);
 }
+
 function removeGlobalVcPolicy(id: number) {
     const rmIdx = globalVcPolicies.findIndex((value) => value.id == id);
     globalVcPolicies.splice(rmIdx, 1);
