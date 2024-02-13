@@ -15,6 +15,7 @@ import id.walt.webwallet.service.report.ReportRequestParameter
 import id.walt.webwallet.service.settings.WalletSetting
 import id.walt.webwallet.web.controllers.PresentationRequestParameter
 import id.walt.webwallet.web.parameter.CredentialRequestParameter
+import id.walt.webwallet.web.model.KMSData
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.uuid.UUID
@@ -51,7 +52,7 @@ abstract class WalletService(val tenant: String, val accountId: UUID, val wallet
 
     // Keys
     abstract suspend fun listKeys(): List<SingleKeyResponse>
-    abstract suspend fun generateKey(type: String): String
+    abstract suspend fun generateKey(type: String, config:KMSData?= null): String
     abstract suspend fun exportKey(alias: String, format: String, private: Boolean): String
     abstract suspend fun loadKey(alias: String): JsonObject
     abstract suspend fun importKey(jwkOrPem: String): String

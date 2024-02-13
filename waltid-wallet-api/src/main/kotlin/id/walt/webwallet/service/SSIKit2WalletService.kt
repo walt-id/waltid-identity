@@ -48,6 +48,7 @@ import id.walt.webwallet.service.settings.WalletSetting
 import id.walt.webwallet.trustusecase.TrustStatus
 import id.walt.webwallet.trustusecase.TrustValidationUseCase
 import id.walt.webwallet.web.controllers.PresentationRequestParameter
+import id.walt.webwallet.web.model.KMSData
 import id.walt.webwallet.web.parameter.CredentialRequestParameter
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -642,32 +643,34 @@ class SSIKit2WalletService(
         )
     }
 
-    override suspend fun generateKey(type: String): String =
-//        LocalKey.generate(KeyType.valueOf(type)).let { createdKey ->
-//            logEvent(
-//                EventType.Key.Create, "wallet", KeyEventData(
-//                    id = createdKey.getKeyId(),
-//                    algorithm = createdKey.keyType.name,
-//                    keyManagementService = "local",
-//                )
-//            )
-//            println(createdKey)
-//            KeysService.add(walletId, createdKey.getKeyId(), KeySerialization.serializeKey(createdKey))
-//            createdKey.getKeyId()
-//        }
-
-        TSEKey.generate(KeyType.valueOf(type) , TSEKeyMetadata("http://0.0.0.0:8200/v1/transit", "dev-only-token")).let { createdKey ->
+    override suspend fun generateKey(type: String, config:KMSData?): String {
+        if (config?.type == "tse") {
+            return TSEKey.generate(KeyType.valueOf(type) , TSEKeyMetadata("http://0.0.0.0:8200/v1/transit", "dev-only-token")).let { createdKey ->
+                val keyId = createdKey.getKeyId()
+                logEvent(
+                    EventType.Key.Create, "wallet", KeyEventData(
+                        id = keyId,
+                        algorithm = createdKey.keyType.name,
+                        keyManagementService = "tse",
+                    )
+                )
+                KeysService.add(walletId, keyId, KeySerialization.serializeKey(createdKey))
+                keyId
+            }
+        }
+        return LocalKey.generate(KeyType.valueOf(type)).let { createdKey ->
             val keyId = createdKey.getKeyId()
             logEvent(
                 EventType.Key.Create, "wallet", KeyEventData(
                     id = keyId,
                     algorithm = createdKey.keyType.name,
-                    keyManagementService = "tse",
+                    keyManagementService = "local",
                 )
             )
             KeysService.add(walletId, keyId, KeySerialization.serializeKey(createdKey))
             keyId
         }
+    }
 
     override suspend fun importKey(jwkOrPem: String): String {
         val type = when {
