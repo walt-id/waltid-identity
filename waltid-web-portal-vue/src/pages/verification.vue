@@ -54,6 +54,8 @@
             </div>
         </PageOverlay>
 
+        <HttpRequestOverlay :is-open="showRequest" :request="generatedRequest" @close="showRequest = false"/>
+
 
         <div class="grid grid-cols-2 gap-10">
             <div class="border p-3">
@@ -154,6 +156,7 @@
             <div class="border p-3">
                 <p class="text-lg">Verifiable Presentation Policies</p>
                 <p class="text-gray-600">These policies are applied to the Verifiable Presentation (VP).</p>
+
                 <ul v-auto-animate="{ duration: 200 }"
                     class="pt-2 pb-6 basis-1/3 divide-y divide-gray-100 shadow px-3 my-1 overflow-y-scroll"
                     role="list"
@@ -218,81 +221,54 @@
             <div class="border p-3">
                 <p class="text-lg">Global Verifiable Credential Policies</p>
                 <p class="text-gray-600">These policies are applied each Verifiable Credential (VC) within the Verifiable Presentation.</p>
+
                 <ul v-auto-animate="{ duration: 200 }"
                     class="pt-2 pb-6 basis-1/3 divide-y divide-gray-100 shadow px-3 my-1 overflow-y-scroll"
                     role="list"
                 >
-                    <li v-for="credential in credentials" :key="credential.id" class="flex items-center justify-between gap-x-5 py-3">
+                    <li v-for="policy of globalVcPolicies" :key="policy.id" class="flex items-center justify-between gap-x-5 py-3">
                         <div class="min-w-0">
                             <div class="flex items-start gap-x-3">
-                                <p class="text-sm font-semibold leading-6 text-gray-900">{{ credential.name }}</p>
+                                <p class="text-sm font-semibold leading-6 text-gray-900">{{ policy.name }}</p>
 
-                                <p v-if="credentials.policies"
+                                <p v-if="policy.args"
                                    class="rounded-md whitespace-nowrap mt-0.5 px-1.5 py-0.5 text-xs font-medium ring-1 ring-inset text-green-600"
                                 >
-                                    {{ credential.policies.map((policy) => policy.name).join(", ") }}</p>
+                                    Arguments supplied
+                                </p>
 
-                                <p class="rounded-md whitespace-nowrap mt-0.5 px-1.5 py-0.5 text-xs font-medium ring-1 ring-inset">
-                                    No special policies</p>
+                                <p v-else-if="!policy.args && hasArguments(policy.argumentType)"
+                                   class="rounded-md whitespace-nowrap mt-0.5 px-1.5 py-0.5 text-xs font-medium ring-1 ring-inset text-yellow-600"
+                                >
+                                    Missing arguments
+                                </p>
+
+                                <p v-else class="rounded-md whitespace-nowrap mt-0.5 px-1.5 py-0.5 text-xs font-medium ring-1 ring-inset">
+                                    No arguments</p>
                             </div>
-                            <!--                    <div class="mt-1 flex items-center gap-x-2 text-xs leading-5 text-gray-500">
-                            &lt;!&ndash;                        <p class="whitespace-nowrap">
-                                                        Due on
-                                                        <time :datetime="credential.dueDateTime">{{ credential.dueDate }}</time>
-                                                    </p>
-                                                    <svg class="h-0.5 w-0.5 fill-current" viewBox="0 0 2 2">
-                                                        <circle cx="1" cy="1" r="1" />
-                                                    </svg>
-                                                    <p class="truncate">Created by {{ credential.createdBy }}</p>&ndash;&gt;
-                                                </div>-->
+                            <div v-if="policy.args" class="mt-1 flex items-center gap-x-2 text-xs leading-5 text-gray-500">
+                                <p class="truncate">Arguments: {{ policy.args }}</p>
+                            </div>
                         </div>
                         <div class="flex flex-none items-center gap-x-2">
                             <button
+                                v-if="hasArguments(policy.argumentType)"
                                 class="flex items-center gap-1 rounded-md bg-white px-2.5 py-1.5 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
-                                @click="editCredential(credential.id)"
-                            >Edit credential specific policies
+                                @click="editingPolicy = policy"
+                            >Edit policy arguments
                             </button>
-                            <Menu as="div" class="relative flex-none">
-                                <MenuButton
-                                    class="flex items-center gap-1 rounded-md bg-white px-2 py-1.5 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
-                                >
-                                    <span class="sr-only">Open options</span>
-                                    <Icon aria-hidden="true" class="h-5 w-5" name="material-symbols:event-list-outline-rounded" />
-                                </MenuButton>
-                                <transition enter-active-class="transition ease-out duration-100"
-                                            enter-from-class="transform opacity-0 scale-95"
-                                            enter-to-class="transform opacity-100 scale-100"
-                                            leave-active-class="transition ease-in duration-75"
-                                            leave-from-class="transform opacity-100 scale-100" leave-to-class="transform opacity-0 scale-95"
-                                >
-                                    <MenuItems
-                                        class="absolute right-0 z-10 mt-2 w-48 origin-top-right rounded-md bg-white py-2 shadow-lg ring-1 ring-gray-900/5 focus:outline-none"
-                                    >
-                                        <MenuItem v-slot="{ active }">
-                                            <NuxtLink
-                                                :class="[active ? 'bg-gray-50' : '', 'px-3 py-1 text-sm leading-6 text-gray-900 flex items-center gap-1']"
-                                                :external="true"
-                                                :to="`${config.public.credentialRepository}/credentials/${credential.name.toLowerCase()}`"
-                                                href="#"
-                                                target="_blank"
-                                            >
-                                                <Icon name="carbon:repo-source-code" />
-                                                View in repository<span class="sr-only">, {{ credential.name }}</span></NuxtLink>
-                                        </MenuItem>
-                                        <MenuItem v-slot="{ active }">
-                                            <button
-                                                class="px-3 py-1 text-sm leading-6 text-gray-900 flex items-center gap-1 bg-white w-full hover:bg-gray-50"
-                                                @click="removeCredential(credential.id)"
-                                            >
-                                                <Icon name="carbon:trash-can" />
-                                                Delete<span class="sr-only">, {{ credential.name }}</span></button>
-                                        </MenuItem>
-                                    </MenuItems>
-                                </transition>
-                            </Menu>
+
+
+                            <button
+                                class="flex items-center gap-1 rounded-md bg-white px-2.5 py-1.5 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
+                                @click="removeGlobalVcPolicy(policy.id)"
+                            >
+                                <Icon name="carbon:trash-can" />
+                                Delete
+                            </button>
                         </div>
                     </li>
-                    <li v-if="credentials.length == 0" class="flex items-center gap-1 gap-x-5 py-3">
+                    <li v-if="globalVcPolicies.length == 0" class="flex items-center gap-1 gap-x-5 py-3">
                         <Icon name="radix-icons:value-none" />
                         No credential types to verify selected yet.
                     </li>
@@ -319,6 +295,7 @@
                     <button
                         class="rounded-md bg-white px-2.5 py-1.5 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
                         type="button"
+                        @click="showRequest = true"
                     >
                         View HTTP request
                     </button>
@@ -368,7 +345,7 @@
 import type { VerificationPolicyInformation } from "~/composables/verification";
 import { Menu, MenuButton, MenuItem, MenuItems } from "@headlessui/vue";
 import type { ComputedRef, Ref } from "vue";
-import type { IssuanceRequest } from "~/composables/network-request";
+import type { HttpRequestType } from "~/composables/network-request";
 import NumberInput from "~/components/inputs/NumberInput.vue";
 import DidInput from "~/components/inputs/DidInput.vue";
 import UrlInput from "~/components/inputs/UrlInput.vue";
@@ -381,6 +358,8 @@ const { data, pending, error, refresh } = await useFetch<Object>(`${config.publi
 const addingCredentials = ref(false);
 const addingPresentationPolicies = ref(false);
 const addingCredentialPolicies = ref(false);
+
+const showRequest = ref(false);
 
 const editingPolicy: Ref<any> = ref(null)
 
@@ -432,7 +411,7 @@ type VerifyCredential = {
 
 const credentials: VerifyCredential[] = reactive([]);
 
-const generatedRequest: ComputedRef<IssuanceRequest> = computed(() => {
+const generatedRequest: ComputedRef<HttpRequestType> = computed(() => {
 
     const reqRequestCredentials = credentials.map((entry) => {
         return entry.policies ? { credential: entry.name, policies: entry.policies } : entry.name;
@@ -452,7 +431,9 @@ const generatedRequest: ComputedRef<IssuanceRequest> = computed(() => {
             vc_policies: reqVcPolicies,
             request_credentials: reqRequestCredentials
         },
-        headers: {}
+        headers: {
+            "content-type": "application/json"
+        }
     };
 });
 

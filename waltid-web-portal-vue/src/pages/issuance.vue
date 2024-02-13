@@ -16,33 +16,7 @@
 
     <OidcResultDialog v-if="oidcLink" :link="oidcLink" text="Claim your credentials" @close="oidcLink = null" />
 
-
-    <PageOverlay :is-open="showRequest" description="Below you can find the HTTP request generated with the options you applied."
-                 name="HTTP Request Viewer" @close="showRequest = false"
-    >
-        <div>
-            <p>
-                HTTP: <span class="font-semibold">{{ currentIssuanceRequest.method }}</span> <code><span>{{ currentIssuanceRequest.url
-                }}</span></code>
-            </p>
-            <p>
-                Body:
-                <ClientOnly>
-                    <highlightjs :code="`${JSON.stringify(currentIssuanceRequest.body, null, 4)}`" class="" language="json" />
-                </ClientOnly>
-            </p>
-        </div>
-
-        <hr />
-
-        <p class="font-semibold">As curl request:</p>
-
-        <p>
-            <code class="">
-                {{ fetchToCurl(currentIssuanceRequest) }}
-            </code>
-        </p>
-    </PageOverlay>
+    <HttpRequestOverlay :is-open="showRequest" :request="currentIssuanceRequest" @close="showRequest = false"/>
 
     <PageOverlay :is-open="openSettings" description="Below you can edit various settings used during the issuance process." name="Settings"
                  @close="openSettings = false"
@@ -230,11 +204,10 @@
 </template>
 
 <script lang="ts" setup>
+import type { HttpRequestType } from "~/composables/network-request";
 import { Menu, MenuButton, MenuItem, MenuItems } from "@headlessui/vue";
 import { FetchError } from "ofetch";
-import fetchToCurl from "fetch-to-curl";
 import type { Ref } from "vue";
-import type { IssuanceRequest } from "~/composables/network-request";
 
 const config = useRuntimeConfig();
 
@@ -255,7 +228,7 @@ const issuanceError: Ref<FetchError<any> | null> = ref(null);
 
 const issuing = ref(false);
 
-const currentIssuanceRequest: Ref<IssuanceRequest> = computed(() => {
+const currentIssuanceRequest: Ref<HttpRequestType> = computed(() => {
     const batch = credentials.length > 1;
 
     let url: string = `${config.public.issuer}/openid4vc/jwt/` + (batch ? "issueBatch" : "issue");
@@ -281,7 +254,7 @@ const currentIssuanceRequest: Ref<IssuanceRequest> = computed(() => {
 async function sendIssueRequest() {
     issuing.value = true;
 
-    const req: IssuanceRequest = currentIssuanceRequest.value;
+    const req: HttpRequestType = currentIssuanceRequest.value;
 
     const { data, pending, error, refresh } = await useFetch<string>(req.url, {
         method: "POST",

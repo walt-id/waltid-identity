@@ -68,7 +68,7 @@ const addedPolicyNames: string[] = reactive([])
 
 function addPolicy(policy: VerificationPolicyInformation) {
     addedPolicyNames.push(policy.name)
-    emit("added-policy", policy)
+    emit("added-policy", JSON.parse(JSON.stringify(policy))) // it's 2024 and there's still no better way than JSON.parse(JSON.stringify(
 }
 
 const policyTypeColors = {
