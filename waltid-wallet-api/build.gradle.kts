@@ -5,14 +5,14 @@ plugins {
     kotlin("jvm") version kotlinVersion
     id("io.ktor.plugin") version "2.3.7"
     id("org.jetbrains.kotlin.plugin.serialization") version kotlinVersion
-
+    
     id("com.github.ben-manes.versions") version "0.49.0"
 }
 
 group = "id.walt"
 application {
     mainClass.set("id.walt.webwallet.ApplicationKt")
-
+    
     val isDevelopment: Boolean = project.ext.has("development")
     applicationDefaultJvmArgs = listOf("-Dio.ktor.development=$isDevelopment")
 }
@@ -47,9 +47,9 @@ dependencies {
         exclude("com.sksamuel.hoplite", "hoplite-yaml")
         exclude("com.sksamuel.hoplite", "hoplite-hikaricp")
     }
-
+    
     /* -- KTOR -- */
-
+    
     val ktorVersion = "2.3.7"
     // Ktor server
     implementation("io.ktor:ktor-server-core-jvm:$ktorVersion")
@@ -68,11 +68,11 @@ dependencies {
     implementation("io.ktor:ktor-server-content-negotiation-jvm:$ktorVersion")
     implementation("io.ktor:ktor-server-cio-jvm:$ktorVersion")
     implementation("io.ktor:ktor-server-method-override:$ktorVersion")
-
+    
     // Ktor server external libs
     implementation("io.github.smiley4:ktor-swagger-ui:2.7.4")
     //implementation("io.github.microutils:kotlin-logging-jvm:2.1.23")
-
+    
     // Ktor client
     implementation("io.ktor:ktor-client-core-jvm:$ktorVersion")
     implementation("io.ktor:ktor-client-serialization-jvm:$ktorVersion")
@@ -81,44 +81,44 @@ dependencies {
     implementation("io.ktor:ktor-client-cio-jvm:$ktorVersion")
     implementation("io.ktor:ktor-client-logging-jvm:$ktorVersion")
     implementation("io.ktor:ktor-client-cio-jvm:$ktorVersion")
-
+    
     /* -- Kotlin -- */
-
+    
     // Kotlinx.serialization
     implementation("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
-
+    
     // Date
     implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.5.0")
-
+    
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
-
+    
     // UUID
     implementation("app.softwork:kotlinx-uuid-core:0.0.22")
     implementation("app.softwork:kotlinx-uuid-exposed:0.0.22")
-
+    
     /* -- Security -- */
     // Bouncy Castle
     implementation("org.bouncycastle:bcprov-jdk18on:1.76")
-
+    
     // Argon2
     implementation("de.mkammerer:argon2-jvm:2.11")
-
-
+    
+    
     // waltid-did
     implementation("id.walt.did:waltid-did:1.1.1")//id.walt.crypto provided by id.walt.did:waltid-did
-
+    
     // OIDC
     implementation(project(":waltid-openid4vc"))
     implementation(project(":waltid-sdjwt"))
     implementation("com.nimbusds:nimbus-jose-jwt:9.37.1")
     implementation("io.ktor:ktor-client-java:$ktorVersion")
-
+    
     /* -- Misc --*/
-
+    
     // Cache
     implementation("io.github.reactivecircus.cache4k:cache4k:0.12.0")
-
+    
     // DB
     implementation("org.jetbrains.exposed:exposed-core:0.45.0")
     implementation("org.jetbrains.exposed:exposed-jdbc:0.45.0")
@@ -129,27 +129,30 @@ dependencies {
     implementation("org.postgresql:postgresql:42.7.1")
     // migration
     //implementation("org.flywaydb:flyway-core:9.22.2")
-
+    
     // Web push
     implementation("nl.martijndwars:web-push:5.1.1") // todo: replace with https://github.com/interaso/webpush
-
+    
     // Config
     implementation("com.sksamuel.hoplite:hoplite-core:2.8.0.RC3")
     implementation("com.sksamuel.hoplite:hoplite-hocon:2.8.0.RC3")
     implementation("com.sksamuel.hoplite:hoplite-yaml:2.8.0.RC3")
     implementation("com.sksamuel.hoplite:hoplite-hikaricp:2.8.0.RC3")
     implementation("com.zaxxer:HikariCP:5.0.1")
-
+    
     // Logging
     implementation("io.github.oshai:kotlin-logging-jvm:5.1.1")
     implementation("org.slf4j:slf4j-simple:2.0.9")
     implementation("org.slf4j:jul-to-slf4j:2.0.9")
-
+    
     // Test
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit:1.9.22")
-
+    testImplementation(kotlin("test"))
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
+    testImplementation("io.ktor:ktor-server-tests-jvm:$ktorVersion")
+    
     /*testImplementation("io.kotest:kotest-runner-junit5:5.5.5")
     testImplementation("io.kotest:kotest-assertions-core:5.5.5")
     testImplementation("io.kotest.extensions:kotest-assertions-ktor:2.0.0")*/
-    testImplementation("io.ktor:ktor-server-tests-jvm:$ktorVersion")
+
 }

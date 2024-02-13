@@ -11,14 +11,14 @@ object Versions {
 plugins {
     kotlin("jvm") // Versions.KOTLIN_VERSION
     id("org.jetbrains.kotlin.plugin.serialization")  // Versions.KOTLIN_VERSION
-
+    
     //id("io.ktor.plugin") version "2.3.7" // Versions.KTOR_VERSION
     id("io.ktor.plugin") version "2.3.7" // Versions.KTOR_VERSION
     id("org.owasp.dependencycheck") version "8.4.3"
     id("com.github.jk1.dependency-license-report") version "2.5"
     application
     `maven-publish`
-
+    
     id("com.github.ben-manes.versions") //version "0.48.0"
 }
 
@@ -37,9 +37,9 @@ repositories {
 
 
 dependencies {
-
+    
     /* -- KTOR -- */
-
+    
     // Ktor server
     implementation("io.ktor:ktor-server-core-jvm:${Versions.KTOR_VERSION}")
     implementation("io.ktor:ktor-server-auth-jvm:${Versions.KTOR_VERSION}")
@@ -56,10 +56,10 @@ dependencies {
     implementation("io.ktor:ktor-server-call-id-jvm:${Versions.KTOR_VERSION}")
     implementation("io.ktor:ktor-server-content-negotiation-jvm:${Versions.KTOR_VERSION}")
     implementation("io.ktor:ktor-server-cio-jvm:${Versions.KTOR_VERSION}")
-
+    
     // Ktor server external libs
     implementation("io.github.smiley4:ktor-swagger-ui:2.7.1")
-
+    
     // Ktor client
     implementation("io.ktor:ktor-client-core-jvm:${Versions.KTOR_VERSION}")
     implementation("io.ktor:ktor-client-serialization-jvm:${Versions.KTOR_VERSION}")
@@ -67,65 +67,70 @@ dependencies {
     implementation("io.ktor:ktor-client-json-jvm:${Versions.KTOR_VERSION}")
     implementation("io.ktor:ktor-client-cio-jvm:${Versions.KTOR_VERSION}")
     implementation("io.ktor:ktor-client-logging-jvm:${Versions.KTOR_VERSION}")
-
-
+    
+    
     /* -- Kotlin -- */
-
+    
     // Kotlinx.serialization
     implementation("io.ktor:ktor-serialization-kotlinx-json-jvm:${Versions.KTOR_VERSION}")
-
+    
     // Date
     implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.4.1")
-
+    
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:${Versions.COROUTINES_VERSION}")
-
+    
     /* -- Misc --*/
-
+    
     // Config
     implementation("com.sksamuel.hoplite:hoplite-core:${Versions.HOPLITE_VERSION}")
     implementation("com.sksamuel.hoplite:hoplite-hocon:${Versions.HOPLITE_VERSION}")
-
+    
     // Logging
     implementation("io.github.oshai:kotlin-logging-jvm:5.1.0")
     implementation("org.slf4j:slf4j-simple:2.0.9")
     implementation("org.slf4j:jul-to-slf4j:2.0.9")
-
+    
     // Test
+    testImplementation("org.jetbrains.kotlin:kotlin-test-junit:1.9.22")
     testImplementation(kotlin("test"))
-    //testImplementation("org.jetbrains.kotlin:kotlin-test-junit:${Versions.KOTLIN_VERSION}")
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:${Versions.COROUTINES_VERSION}")
-    //testImplementation("io.ktor:ktor-server-tests-jvm:${Versions.KTOR_VERSION}")
-
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
+    testImplementation("io.ktor:ktor-server-tests-jvm:${Versions.KTOR_VERSION}")
+    
+    
+    /*testImplementation("io.kotest:kotest-runner-junit5:5.5.5")
+    testImplementation("io.kotest:kotest-assertions-core:5.5.5")
+    testImplementation("io.kotest.extensions:kotest-assertions-ktor:2.0.0")*/
+    
     // CLI
     //implementation("com.github.ajalt.clikt:clikt:4.2.0")
-
+    
     // OIDC
     api(project(":waltid-openid4vc"))
-
+    
     // SSIKit
     //implementation("id.walt:waltid-ssikit:1.2309171812.0")
     //implementation("id.walt:waltid-sd-jwt:1.2306191408.0")
     //implementation("id.walt.servicematrix:WaltID-ServiceMatrix:1.1.3")
-
+    
     // SSI Kit 2
     api(project(":waltid-crypto"))
     api(project(":waltid-did"))
-
+    
     api(project(":waltid-verifiable-credentials"))
     api(project(":waltid-sdjwt"))
-
+    
     // TODO: REMOVE:
     implementation("com.nimbusds:nimbus-jose-jwt:9.37.1")
-
+    
     //api(project(":waltid-mdocs"))
     //implementation("id.walt:waltid-ssikit2:1.0.8a-SNAPSHOT")
     // implementation id.walt:core-crypto -> provided by id.walt:waltid-ssikit2
 }
 
 tasks.withType<Test> {
-    useJUnitPlatform()
-
+//    useJUnitPlatform()
+    
     // Use the following condition to optionally run the integration tests:
     // > gradle build -PrunIntegrationTests
     if (!project.hasProperty("runIntegrationTests")) {
@@ -172,19 +177,19 @@ publishing {
             from(components["java"])
         }
     }
-
+    
     repositories {
         maven {
             url = uri("https://maven.walt.id/repository/waltid/")
             val envUsername = System.getenv("MAVEN_USERNAME")
             val envPassword = System.getenv("MAVEN_PASSWORD")
-
+            
             val usernameFile = File("secret_maven_username.txt")
             val passwordFile = File("secret_maven_password.txt")
-
+            
             val secretMavenUsername = envUsername ?: usernameFile.let { if (it.isFile) it.readLines().first() else "" }
             val secretMavenPassword = envPassword ?: passwordFile.let { if (it.isFile) it.readLines().first() else "" }
-
+            
             credentials {
                 username = secretMavenUsername
                 password = secretMavenPassword
