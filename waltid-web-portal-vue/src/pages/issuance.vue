@@ -25,7 +25,7 @@
             <label class="block text-sm font-semibold leading-6 text-gray-900" for="comment">Issuance key</label>
             <div class="mt-1">
                 <ClientOnly>
-                    <LazyMonacoEditor v-if="openSettings" :model-value="issuanceKey" class="h-40" lang="json" />
+                    <LazyMonacoEditor v-if="openSettings" v-model="issuanceKey" class="h-40" lang="json" />
                 </ClientOnly>
             </div>
         </div>
@@ -36,6 +36,15 @@
                 <input v-model="issuanceDid"
                        class="px-2 block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
                 >
+            </div>
+        </div>
+
+        <div>
+            <label class="block text-sm font-semibold leading-6 text-gray-900" for="comment">SD-JWT Configuration</label>
+            <div class="mt-1">
+                <ClientOnly>
+                    <LazyMonacoEditor v-if="openSettings" v-model="sdJwtConfig" class="h-40" lang="json" />
+                </ClientOnly>
             </div>
         </div>
     </PageOverlay>
@@ -151,7 +160,10 @@
                     type="button"
                     @click="sendIssueRequest"
                 >
-                    <span v-if="credentials.length >= 2">Issue {{ credentials.length }} credentials <span class="text-xs">(<span
+                    <span v-if="credentials.length >= 1 && sdJwtConfig && sdJwtConfig.length > 0">
+                        SD-JWT Issuance
+                    </span>
+                    <span v-else-if="credentials.length >= 2">Issue {{ credentials.length }} credentials <span class="text-xs">(<span
                         class="underline"
                     >Batch Issuance</span>)</span></span>
                     <span v-else>Issue single credentials</span>
@@ -220,6 +232,8 @@ const issuanceKey = ref(JSON.stringify({
 }, null, 4));
 const issuanceDid = ref("did:key:z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp");
 
+const sdJwtConfig = ref("")
+
 const showRequest = ref(false);
 
 const oidcLink: Ref<string | null> = ref(null);
@@ -240,6 +254,15 @@ const currentIssuanceRequest: Ref<HttpRequestType> = computed(() => {
             mapping: JSON.parse(credential.mapping)
         })
     );
+
+    if (!batch && sdJwtConfig.value.length > 0) {
+        try {
+            credentialRequestBodies[0].selectiveDisclosure = JSON.parse(sdJwtConfig.value)
+            url = `${config.public.issuer}/openid4vc/sdjwt/issue`
+        } catch (e) {
+            console.log(e)
+        }
+    }
 
     return {
         url: url,
