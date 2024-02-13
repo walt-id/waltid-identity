@@ -103,16 +103,24 @@ actual class LocalKey actual constructor(jwk: String?) : Key() {
     }
 
     actual override suspend fun getPublicKey(): LocalKey {
-        val keyPair = keyStore.getEntry(internalKeyId, null) as? KeyStore.PrivateKeyEntry
-        checkNotNull(keyPair) { "This LocalKey instance does not have a KeyPair!" }
+        return if (hasPrivateKey) {
+            val keyPair = keyStore.getEntry(internalKeyId, null) as? KeyStore.PrivateKeyEntry
+            checkNotNull(keyPair) { "This LocalKey instance does not have a KeyPair!" }
 
-        val id = "$PUBLIC_KEY_ALIAS_PREFIX${UUID.randomUUID()}"
-        keyStore.setCertificateEntry(id, keyPair.certificate)
-        return LocalKey(KeyAlias(id), keyType)
+            val id = "$PUBLIC_KEY_ALIAS_PREFIX${UUID.randomUUID()}"
+            keyStore.setCertificateEntry(id, keyPair.certificate)
+            LocalKey(KeyAlias(id), keyType)
+        } else this
     }
 
     actual override suspend fun getPublicKeyRepresentation(): ByteArray {
-        TODO("Not yet implemented")
+        return if (hasPrivateKey) {
+            val keyPair = keyStore.getEntry(internalKeyId, null) as? KeyStore.PrivateKeyEntry
+            checkNotNull(keyPair) { "This LocalKey instance does not have a KeyPair!" }
+            keyPair.certificate.publicKey.encoded
+        } else {
+            keyStore.getCertificate(internalKeyId).publicKey.encoded
+        }
     }
 
     private fun getSignature(): Signature = when (keyType) {
