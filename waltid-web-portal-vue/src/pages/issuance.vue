@@ -10,7 +10,7 @@
 
         <p class="font-semibold">Credential mapping</p>
         <ClientOnly>
-            <LazyMonacoEditor v-if="editing != null" v-model="editing!!.data" class="h-60" lang="json" />
+            <LazyMonacoEditor v-if="editing != null" v-model="editing!!.mapping" class="h-60" lang="json" />
         </ClientOnly>
     </PageOverlay>
 
