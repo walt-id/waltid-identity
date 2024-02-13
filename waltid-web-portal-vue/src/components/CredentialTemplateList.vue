@@ -2,12 +2,19 @@
 
     <div>
         <div class="relative flex items-center mt-1">
-            <div class="absolute left-0 pl-1.5"><Icon name="heroicons:magnifying-glass" class="h-4 w-4"/></div>
-            <input placeholder="Search template..." id="search" v-model="filter" class="pl-6 block w-full rounded-md border-0 px-2 py-1.5 pr-14 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6" name="search"
-                   type="text" accesskey="k"
+
+            <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                <Icon aria-hidden="true" class="h-5 w-5 text-gray-400" name="heroicons:magnifying-glass" />
+            </div>
+            <input id="search" v-model="filter" accesskey="k"
+                   class="block w-full rounded-md border-0 py-1.5 pl-10 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                   name="search"
+                   placeholder="Search template..." type="text"
             />
             <div class="absolute inset-y-0 right-0 flex py-1.5 pr-1.5">
-                <button v-if="filter.length >= 1" @click="filter = ''" class="bg-white mr-2 border p-1 flex items-center rounded"><Icon name="fluent:clear-formatting-24-regular"/></button>
+                <button v-if="filter.length >= 1" class="bg-white mr-2 border p-1 flex items-center rounded" @click="filter = ''">
+                    <Icon name="fluent:clear-formatting-24-regular" />
+                </button>
                 <kbd class="inline-flex items-center rounded border border-gray-200 px-1 font-sans text-xs text-gray-400">⌘K</kbd>
             </div>
         </div>
@@ -45,7 +52,10 @@
             </div>
         </li>
     </ul>
-    <PageOverlay :isOpen="inspecting != null" :name="`Inspector: ${inspecting}`" @close="inspecting = null">
+    <PageOverlay :isOpen="inspecting != null" :name="`Inspector: ${inspecting ?? 'None'}`"
+                 description="Below you can find a sample credential and a corresponding data mapping for your selected credential type."
+                 @close="inspecting = null"
+    >
         <CredentialInspectView :template="inspecting" />
     </PageOverlay>
 </template>
@@ -61,7 +71,7 @@ const props = defineProps({
     }
 });
 
-const config = useRuntimeConfig()
+const config = useRuntimeConfig();
 
 const { data: credentialTemplates, pending, error, refresh } = useFetch<Array<string>>(`${config.public.credentialRepository}/api/list`);
 const filter = ref("");
