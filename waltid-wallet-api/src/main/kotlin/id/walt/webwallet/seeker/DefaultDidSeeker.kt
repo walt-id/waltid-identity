@@ -6,7 +6,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
-class EntraDidSeeker : Seeker<String> {
+class DefaultDidSeeker : Seeker<String> {
     override fun get(credential: WalletCredential): String = credential.manifest?.let {
         Json.decodeFromString<JsonObject>(it)
     }?.let {
