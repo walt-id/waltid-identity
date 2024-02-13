@@ -1,11 +1,7 @@
-
 import id.walt.webwallet.config.ConfigManager
 import id.walt.webwallet.configurePlugins
 import id.walt.webwallet.db.Db
-import id.walt.webwallet.web.controllers.accounts
-import id.walt.webwallet.web.controllers.auth
-import id.walt.webwallet.web.controllers.credentials
-import id.walt.webwallet.web.controllers.dids
+import id.walt.webwallet.web.controllers.*
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.plugins.contentnegotiation.*
@@ -16,6 +12,7 @@ import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.testing.*
 import kotlinx.serialization.json.*
 import org.bouncycastle.jce.provider.BouncyCastleProvider
+import org.junit.BeforeClass
 import org.junit.FixMethodOrder
 import org.junit.runners.MethodSorters
 import java.lang.reflect.Method
@@ -29,7 +26,9 @@ class WalletApiTest {
   private val didMethodsToTest = listOf("key", "jwk", "web", "cheqd")
   
   companion object {
-    val init by lazy {
+    @JvmStatic
+    @BeforeClass
+    fun initDb() {
       Security.addProvider(BouncyCastleProvider())
       runCatching { Db.dataDirectoryPath.createDirectories() }
       
@@ -101,8 +100,8 @@ class WalletApiTest {
       auth()
       accounts()
     }
-    
-    init
+
+//    initDb()
     
     println("\nUSE CASE -> REGISTRATION\n")
     
@@ -164,7 +163,7 @@ class WalletApiTest {
       accounts()
       credentials()
     }
-    init
+//    init
     
     // login with preset user
     val token = login(client)
@@ -236,7 +235,7 @@ class WalletApiTest {
       accounts()
       dids()
     }
-    init
+//    init
     
     // login with preset user
     val token = login(client)
@@ -253,7 +252,7 @@ class WalletApiTest {
       bearerAuth(token)
     }.let { response ->
       assertEquals(HttpStatusCode.OK, response.status)
-      response.body<JsonArray>()[0].jsonObject["did"]?.jsonPrimitive?.content ?: error("No credentials found")
+      response.body<JsonArray>()[0].jsonObject["did"]?.jsonPrimitive?.content ?: error("No dids found")
     }
     assertNotNull(walletId)
     assertTrue(did.startsWith("did:key:z6Mk"))
@@ -294,5 +293,62 @@ class WalletApiTest {
     }.let { response ->
       assertEquals(HttpStatusCode.Accepted, response.status)
     }
+  }
+  
+  @Test
+  fun testKeys() = testApplication {
+    val client = createClient {
+      install(ContentNegotiation) {
+        json()
+      }
+    }
+    application {
+      configurePlugins()
+      auth()
+      accounts()
+      keys()
+    }
+    // login with preset user
+    val token = login(client)
+    
+    println("TestKeys: Login Successful.")
+    
+    // get the wallet for that user
+    val wallets = getWalletFor(client, token)
+    val walletId = wallets.jsonObject["id"]?.jsonPrimitive?.content
+    assertNotNull(walletId)
+    
+    println("Use Case -> List Keys")
+    val keys = client.get("/wallet-api/wallet/$walletId/keys") {
+      contentType(ContentType.Application.Json)
+      bearerAuth(token)
+    }.let { response ->
+      assertEquals(HttpStatusCode.OK, response.status)
+      val rsaKeys = response.body<JsonArray>().filter { item -> item.jsonObject["algorithm"]?.jsonPrimitive?.content == "RSA" }
+      assertEquals(0, rsaKeys.size) // ensure no RSA keys in the list of keys for this wallet
+      response.body<JsonArray>()[0].jsonObject
+    }
+    val algorithm = keys["algorithm"]?.jsonPrimitive?.content
+    assertEquals("Ed25519", algorithm)
+    
+    
+    println("Use Case -> Generate new key of type RSA")
+    client.post("/wallet-api/wallet/$walletId/keys/generate?type=RSA") {
+      contentType(ContentType.Application.Json)
+      bearerAuth(token)
+    }.let { response ->
+      assertEquals(HttpStatusCode.OK, response.status)
+    }
+    
+    // list keys again to ensure the RSA key is there
+    client.get("/wallet-api/wallet/$walletId/keys") {
+      contentType(ContentType.Application.Json)
+      bearerAuth(token)
+    }.let { response ->
+      assertEquals(HttpStatusCode.OK, response.status)
+      val rsaKeys = response.body<JsonArray>().filter { item -> item.jsonObject["algorithm"]?.jsonPrimitive?.content == "RSA" }
+      assertEquals(1, rsaKeys.size) // ensure now 1 RSA key in the list of keys for this wallet
+    }
+    
   }
 }
