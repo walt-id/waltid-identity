@@ -38,7 +38,6 @@ repositories {
 
 
 dependencies {
-
     /* -- KTOR -- */
 
     // Ktor server
@@ -94,9 +93,14 @@ dependencies {
 
     // Test
     testImplementation(kotlin("test"))
-    //testImplementation("org.jetbrains.kotlin:kotlin-test-junit:${Versions.KOTLIN_VERSION}")
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:${Versions.COROUTINES_VERSION}")
-    //testImplementation("io.ktor:ktor-server-tests-jvm:${Versions.KTOR_VERSION}")
+    testImplementation("org.jetbrains.kotlin:kotlin-test-junit:1.9.22")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.0")
+    testImplementation("io.ktor:ktor-server-tests-jvm:${Versions.KTOR_VERSION}")
+
+
+    /*testImplementation("io.kotest:kotest-runner-junit5:5.5.5")
+    testImplementation("io.kotest:kotest-assertions-core:5.5.5")
+    testImplementation("io.kotest.extensions:kotest-assertions-ktor:2.0.0")*/
 
     // CLI
     //implementation("com.github.ajalt.clikt:clikt:4.2.0")
@@ -125,7 +129,7 @@ dependencies {
 }
 
 tasks.withType<Test> {
-    useJUnitPlatform()
+//    useJUnitPlatform()
 
     // Use the following condition to optionally run the integration tests:
     // > gradle build -PrunIntegrationTests
@@ -198,8 +202,6 @@ publishing {
     renderers = arrayOf<ReportRenderer>(InventoryHtmlReportRenderer("xyzkit-licenses-report.html", "XYZ Kit"))
     filters = arrayOf<DependencyFilter>(LicenseBundleNormalizer())
 }*/
-
-
 
 tasks.withType<DependencyUpdatesTask> {
     rejectVersionIf {

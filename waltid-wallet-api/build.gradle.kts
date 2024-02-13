@@ -147,13 +147,15 @@ dependencies {
 
     // Test
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit:1.9.22")
+    testImplementation(kotlin("test"))
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
+    testImplementation("io.ktor:ktor-server-tests-jvm:$ktorVersion")
 
     /*testImplementation("io.kotest:kotest-runner-junit5:5.5.5")
     testImplementation("io.kotest:kotest-assertions-core:5.5.5")
     testImplementation("io.kotest.extensions:kotest-assertions-ktor:2.0.0")*/
-    testImplementation("io.ktor:ktor-server-tests-jvm:$ktorVersion")
-}
 
+}
 
 
 tasks.withType<DependencyUpdatesTask> {
