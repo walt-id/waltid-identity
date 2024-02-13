@@ -5,8 +5,8 @@ import id.walt.webwallet.config.TrustConfig
 import id.walt.webwallet.db.models.AccountWalletMappings
 import id.walt.webwallet.db.models.AccountWalletPermissions
 import id.walt.webwallet.db.models.Wallets
-import id.walt.webwallet.seeker.EntraCredentialTypeSeeker
-import id.walt.webwallet.seeker.EntraDidSeeker
+import id.walt.webwallet.seeker.DefaultCredentialTypeSeeker
+import id.walt.webwallet.seeker.DefaultDidSeeker
 import id.walt.webwallet.service.account.AccountsService
 import id.walt.webwallet.service.category.CategoryServiceImpl
 import id.walt.webwallet.service.nft.NftKitNftService
@@ -33,8 +33,8 @@ object WalletServiceManager {
     private val entraTrustValidationUseCase = TrustValidationUseCaseImpl(
         issuerTrustValidationService = DefaultIssuerTrustValidationService(http, entraIssuerTrustConfig),
         verifierTrustValidationService = DefaultVerifierTrustValidationService(http),
-        didSeeker = EntraDidSeeker(),
-        credentialTypeSeeker = EntraCredentialTypeSeeker(),
+        didSeeker = DefaultDidSeeker(),
+        credentialTypeSeeker = DefaultCredentialTypeSeeker(),
     )
 
     fun getWalletService(tenant: String, account: UUID, wallet: UUID): WalletService =

@@ -5,7 +5,7 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
-class EntraCredentialTypeSeeker : Seeker<String> {
+class DefaultCredentialTypeSeeker : Seeker<String> {
     override fun get(credential: WalletCredential): String =
         credential.parsedDocument?.jsonObject?.get("type")?.jsonArray?.last()?.jsonPrimitive?.content ?: "n/a"
 }
