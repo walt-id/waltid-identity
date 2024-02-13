@@ -597,7 +597,7 @@ class SSIKit2WalletService(
 
     /* Keys */
 
-    private fun getKey(keyId: String) = KeysService.get(walletId, keyId)?.let {
+    private suspend fun getKey(keyId: String) = KeysService.get(walletId, keyId)?.let {
         KeySerialization.deserializeKey(it.document)
             .getOrElse { throw IllegalArgumentException("Could not deserialize resolved key: ${it.message}", it) }
     } ?: throw IllegalArgumentException("Key not found: $keyId")
@@ -657,15 +657,16 @@ class SSIKit2WalletService(
 //        }
 
         TSEKey.generate(KeyType.valueOf(type) , TSEKeyMetadata("http://0.0.0.0:8200/v1/transit", "dev-only-token")).let { createdKey ->
+            val keyId = createdKey.getKeyId()
             logEvent(
                 EventType.Key.Create, "wallet", KeyEventData(
-                    id = createdKey.getKeyId(),
+                    id = keyId,
                     algorithm = createdKey.keyType.name,
                     keyManagementService = "tse",
                 )
             )
-            KeysService.add(walletId, createdKey.getKeyId(), KeySerialization.serializeKey(createdKey))
-            createdKey.getKeyId()
+            KeysService.add(walletId, keyId, KeySerialization.serializeKey(createdKey))
+            keyId
         }
 
     override suspend fun importKey(jwkOrPem: String): String {
