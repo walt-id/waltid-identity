@@ -1,6 +1,6 @@
 <template>
     <button
-        class="relative -mr-px inline-flex w-0 flex-1 items-center justify-center gap-x-1  border border-transparent py-4 text-sm font-semibold text-gray-900"
+        class="relative -mr-px inline-flex w-0 flex-1 items-center justify-center gap-x-1 border border-transparent py-4 text-sm font-semibold text-gray-900"
         @click="handleClick"
     >
         <Spinner v-if="loading" class="h-5 w-5" />
