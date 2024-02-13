@@ -54,6 +54,12 @@ kotlin {
     }
 
     sourceSets {
+        val androidMain by getting {
+            dependencies {
+                // Multibase
+                implementation("com.github.multiformats:java-multibase:v1.1.1")
+            }
+        }
         val androidInstrumentedTest by getting {
             dependencies {
                 implementation(kotlin("test"))
