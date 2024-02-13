@@ -1,3 +1,4 @@
+import io.ktor.util.*
 import java.io.File
 
 object TestUtils {
@@ -9,4 +10,5 @@ object TestUtils {
         this::class.java.classLoader.getResource(relativePath)!!.path.let { File(it).readText() }
     fun loadResourceBytes(relativePath: String): ByteArray =
         this::class.java.classLoader.getResource(relativePath)!!.path.let { File(it).readBytes() }
+    fun loadResourceBase64(relativePath: String): ByteArray = loadResource(relativePath).decodeBase64Bytes()
 }

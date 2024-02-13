@@ -101,7 +101,8 @@ class TSEKey(
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    override suspend fun getKeyId(): String = id
+//    override suspend fun getKeyId(): String = id
+    override suspend fun getKeyId(): String = getPublicKey().getKeyId()
 
     @JvmBlocking
     @JvmAsync
