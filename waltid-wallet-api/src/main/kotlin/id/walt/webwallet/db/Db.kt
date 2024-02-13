@@ -3,8 +3,6 @@ package id.walt.webwallet.db
 import id.walt.webwallet.config.ConfigManager
 import id.walt.webwallet.config.DatasourceConfiguration
 import id.walt.webwallet.db.models.*
-import id.walt.webwallet.db.models.todo.WalletIssuers
-import id.walt.webwallet.db.models.todo.Issuers
 import id.walt.webwallet.service.account.AccountsService
 import id.walt.webwallet.service.issuers.IssuersService
 import id.walt.webwallet.web.model.EmailAccountRequest
@@ -79,7 +77,8 @@ object Db {
         WalletCategory,
         WalletCredentialCategoryMap,
 
-        OidcLogins
+        OidcLogins,
+        WalletSettings,
     ).toTypedArray()
 
     fun recreateDatabase() {

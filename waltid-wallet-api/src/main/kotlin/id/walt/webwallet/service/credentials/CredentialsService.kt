@@ -9,6 +9,7 @@ import kotlinx.datetime.toJavaInstant
 import kotlinx.uuid.UUID
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.statements.UpdateStatement
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.time.Instant
 
@@ -51,7 +52,7 @@ object CredentialsService {
                 } ?: categorizedQuery(wallet, filter.showDeleted, it)
             } ?: allQuery(wallet, filter.showDeleted)
         }.orderBy(
-            column = lookupSortBy(filter.sortBy),
+            column = lookupColumn(filter.sortBy),
             order = if (filter.sorDescending) SortOrder.DESC else SortOrder.ASC
         ).map { WalletCredential(it) }
     }
@@ -87,6 +88,9 @@ object CredentialsService {
         updateDelete(wallet, credentialId, false)
     }
 
+    fun setPending(wallet: UUID, credentialId: String, pending: Boolean = true) =
+        updatePending(wallet, credentialId, pending)
+
     /*fun update(account: UUID, did: DidUpdateDataObject): Boolean {
         TO-DO
     }*/
@@ -100,6 +104,7 @@ object CredentialsService {
             this[WalletCredentials.addedOn] = Clock.System.now().toJavaInstant()
             this[WalletCredentials.manifest] = credential.manifest
 //            this[WalletCredentials.delete] = credential.delete
+            this[WalletCredentials.pending] = credential.pending
         }.map { it[WalletCredentials.id] }
     }
 
@@ -110,11 +115,22 @@ object CredentialsService {
         }
 
     private fun updateDelete(wallet: UUID, credentialId: String, value: Boolean): Int = transaction {
-        WalletCredentials.update({ WalletCredentials.wallet eq wallet and (WalletCredentials.id eq credentialId) }) {
+        updateColumn(wallet, credentialId){
 //            it[this.delete] = value
-            it[this.deletedOn] = value.takeIf { it }?.let { Instant.now() }
+            it[WalletCredentials.deletedOn] = value.takeIf { it }?.let { Instant.now() }
         }
     }
+
+    private fun updatePending(wallet: UUID, credentialId: String, value: Boolean): Int = transaction {
+        updateColumn(wallet, credentialId){
+            it[WalletCredentials.pending] = value
+        }
+    }
+
+    private fun updateColumn(wallet: UUID, credentialId: String, update: (statement: UpdateStatement) -> Unit): Int =
+        WalletCredentials.update({ WalletCredentials.wallet eq wallet and (WalletCredentials.id eq credentialId) }) {
+            update(it)
+        }
 
     private fun deleteCredential(wallet: UUID, credentialId: String) =
         transaction { WalletCredentials.deleteWhere { (WalletCredentials.wallet eq wallet) and (id eq credentialId) } }
@@ -149,7 +165,8 @@ object CredentialsService {
     private fun deletedCondition(deleted: Boolean) =
         deleted.takeIf { it }?.let { deletedItemsCondition } ?: notDeletedItemsCondition
 
-    private fun lookupSortBy(property: String) = WalletCredentials.addedOn
+    //TODO
+    private fun lookupColumn(name: String) = WalletCredentials.addedOn
 
     object Manifest {
         fun get(wallet: UUID, credentialId: String): String? = CredentialsService.get(wallet, credentialId)?.manifest

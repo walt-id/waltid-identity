@@ -67,6 +67,31 @@ data:
   web.conf: |
     webHost = "0.0.0.0"
     webPort = 4545
+    publicBaseUrl = "https://wallet.walt.id"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wallet-oidc-config
+data:
+  oidc.conf: |
+    enableOidcLogin = true
+    providerName = keycloak
+    oidcRealm = "https://keycloak.walt-test.cloud/realms/waltid-keycloak-ktor"
+    oidcJwks = "${oidcRealm}/protocol/openid-connect/certs"
+    authorizeUrl = "${oidcRealm}/protocol/openid-connect/auth"
+    accessTokenUrl = "${oidcRealm}/protocol/openid-connect/token"
+    logoutUrl = "${oidcRealm}/protocol/openid-connect/logout"
+    clientId = "wallet_backend_prod"
+    clientSecret = "hhzmJsLdJgtbFGKR0GUvUWDMS7SmFoSm"
+    jwksCache = {
+        cacheSize = 10
+        cacheExpirationHours = 24
+        rateLimit: {
+            bucketSize: 10
+            refillRateMinutes: 1
+        }
+    }
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -159,6 +184,10 @@ spec:
               mountPath: "/waltid-wallet-api/config/push.conf"
               subPath: "push.conf"
               readOnly: true
+            - name: wallet-trust-config
+              mountPath: "/waltid-wallet-api/config/trust.conf"
+              subPath: "trust.conf"
+              readOnly: true
             - name: wallet-nft-config
               mountPath: "/waltid-wallet-api/walt.yaml"
               subPath: "walt.yaml"
@@ -193,6 +222,9 @@ spec:
         - name: wallet-push-config
           secret:
             secretName: wallet-push-config-secret
+        - name: wallet-trust-config
+          configMap:
+            name: wallet-trust-config
         - name: wallet-nft-config
           secret:
             secretName: wallet-nft-config-secret

@@ -1,11 +1,11 @@
-package id.walt.webwallet.db.models.todo
+package id.walt.webwallet.db.models
 
 import kotlinx.uuid.UUID
 import kotlinx.uuid.exposed.KotlinxUUIDTable
 import org.jetbrains.exposed.sql.ResultRow
 
 object Issuers : KotlinxUUIDTable("issuers") {
-    val name = varchar("name", 128).uniqueIndex()
+    val name = varchar("name", 512).uniqueIndex()
     val description = text("description").nullable().default("no description")
     val uiEndpoint = varchar("ui", 128)
     val configurationEndpoint = varchar("configuration", 256)

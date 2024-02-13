@@ -3,13 +3,14 @@ package id.walt.webwallet.service.account
 import id.walt.webwallet.config.ConfigManager
 import id.walt.webwallet.config.LoginMethodsConfig
 import id.walt.webwallet.db.models.*
-import id.walt.webwallet.db.models.todo.WalletIssuers
-import id.walt.webwallet.db.models.todo.Issuers
 import id.walt.webwallet.service.WalletServiceManager
 import id.walt.webwallet.service.events.AccountEventData
 import id.walt.webwallet.service.events.Event
 import id.walt.webwallet.service.events.EventService
 import id.walt.webwallet.service.events.EventType
+import id.walt.webwallet.service.issuers.IssuersService
+import id.walt.webwallet.service.settings.SettingsService
+import id.walt.webwallet.service.settings.WalletSetting
 import id.walt.webwallet.web.controllers.generateToken
 import id.walt.webwallet.web.model.AccountRequest
 import id.walt.webwallet.web.model.AddressAccountRequest
@@ -19,9 +20,7 @@ import kotlinx.datetime.toKotlinInstant
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.uuid.UUID
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.and
-import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.select
 import org.jetbrains.exposed.sql.transactions.transaction
 
@@ -42,16 +41,8 @@ object AccountsService {
         val createdInitialWalletId = transaction {
             WalletServiceManager.createWallet(tenant, registeredUserId)
         }.also { walletId ->
-            transaction {
-                queryDefaultIssuer("walt.id")?.let { defaultIssuer ->
-                    WalletIssuers.insert {
-//                    it[WalletIssuers.tenant] = tenant
-//                    it[accountId] = registeredUserId
-                        it[issuer] = defaultIssuer
-                        it[wallet] = walletId
-                    }
-                }
-            }
+            IssuersService.addToWallet(walletId, "walt.id")
+            SettingsService.set(walletId, WalletSetting.default)
         }
 
         val walletService = WalletServiceManager.getWalletService(tenant, registeredUserId, createdInitialWalletId)
@@ -72,11 +63,6 @@ object AccountsService {
     }.onFailure {
         throw IllegalStateException("Could not register user: ${it.message}", it)
     }
-
-    private fun queryDefaultIssuer(name: String) =
-        Issuers.select(Issuers.name eq name).singleOrNull()?.let {
-            it[Issuers.id]
-        }?.value
 
     suspend fun authenticate(tenant: String, request: AccountRequest): Result<AuthenticationResult> = runCatching {
         when (request) {
