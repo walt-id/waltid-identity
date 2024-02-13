@@ -15,6 +15,7 @@ import id.walt.webwallet.service.report.ReportRequestParameter
 import id.walt.webwallet.service.settings.WalletSetting
 import id.walt.webwallet.utils.JsonUtils.toJsonPrimitive
 import id.walt.webwallet.web.controllers.PresentationRequestParameter
+import id.walt.webwallet.web.model.KMSData
 import id.walt.webwallet.web.parameter.CredentialRequestParameter
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -348,7 +349,7 @@ class WalletKitWalletService(tenant: String, accountId: UUID, walletId: UUID) : 
     override suspend fun listKeys() = authenticatedJsonGet("/api/wallet/keys/list")
         .body<JsonObject>()["list"]!!.jsonArray.map { Json.decodeFromJsonElement<SingleKeyResponse>(it) }
 
-    override suspend fun generateKey(type: String) =
+    override suspend fun generateKey(type: String, config:KMSData?) =
         authenticatedJsonPost("/api/wallet/keys/generate", type).body<String>()
 
 

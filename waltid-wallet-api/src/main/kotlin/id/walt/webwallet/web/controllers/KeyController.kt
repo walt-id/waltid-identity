@@ -1,6 +1,8 @@
 package id.walt.webwallet.web.controllers
 
 import id.walt.crypto.keys.KeyType
+import id.walt.web.controllers.getWalletService
+import id.walt.webwallet.web.model.KMS
 import io.github.smiley4.ktorswaggerui.dsl.delete
 import io.github.smiley4.ktorswaggerui.dsl.get
 import io.github.smiley4.ktorswaggerui.dsl.post
@@ -12,6 +14,8 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
 import org.jetbrains.exposed.sql.transactions.transaction
 
 fun Application.keys() = walletRoute {
@@ -36,12 +40,29 @@ fun Application.keys() = walletRoute {
                 queryParameter<String>("type") {
                     description = "Key type to use. Choose from: ${KeyType.entries.joinToString()}"
                 }
+                body<KMS> {
+                    description = "Key configuration (JSON)"
+                    example("Example", buildJsonObject {
+                        put("kms", buildJsonObject {
+                            put("type", JsonPrimitive("tse"))
+                            put("config", buildJsonObject {
+                                put("server", JsonPrimitive("http://0.0.0.0:8200/v1/transit"))
+                                put("accessKey", JsonPrimitive("dev-only-token"))
+                            })
+                        })
+                    }.toString())
+                }
             }
         }) {
             val type = call.request.queryParameters["type"]
                 ?: KeyType.Ed25519.toString()
+            val configuration = try {
+                call.receive<KMS>()
+            } catch (e: Exception) {
+                null
+            }
 
-            val keyId = getWalletService().generateKey(type)
+            val keyId = getWalletService().generateKey(type, configuration?.kms)
             context.respond(keyId)
         }
 
