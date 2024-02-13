@@ -205,7 +205,7 @@
                     </li>
                     <li v-if="vpPolicies.length == 0" class="flex items-center gap-1 gap-x-5 py-3">
                         <Icon name="radix-icons:value-none" />
-                        No credential types to verify selected yet.
+                        No Verifiable Presentation policies applied yet.
                     </li>
                 </ul>
 
@@ -270,7 +270,7 @@
                     </li>
                     <li v-if="globalVcPolicies.length == 0" class="flex items-center gap-1 gap-x-5 py-3">
                         <Icon name="radix-icons:value-none" />
-                        No credential types to verify selected yet.
+                        No global Verifiable Credential policies applied yet.
                     </li>
                 </ul>
 
