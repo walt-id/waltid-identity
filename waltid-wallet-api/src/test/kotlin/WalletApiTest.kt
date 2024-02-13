@@ -15,7 +15,6 @@ import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.junit.BeforeClass
 import org.junit.FixMethodOrder
 import org.junit.runners.MethodSorters
-import java.lang.reflect.Method
 import java.security.Security
 import kotlin.io.path.createDirectories
 import kotlin.test.*
@@ -26,6 +25,7 @@ class WalletApiTest {
   private val didMethodsToTest = listOf("key", "jwk", "web", "cheqd")
   
   companion object {
+    
     @JvmStatic
     @BeforeClass
     fun initDb() {
@@ -36,7 +36,25 @@ class WalletApiTest {
       ConfigManager.loadConfigs(args)
       
       Db.start()
+      
+      setUpServer()
     }
+    
+    private fun setUpServer() = testApplication {
+      println("Server Starting...")
+      val client = createClient {
+        install(ContentNegotiation) {
+          json()
+        }
+      }
+      application {
+        configurePlugins()
+        auth()
+        accounts()
+      }
+    }
+  
+
   }
   
   private val alphabet = ('a'..'z')
@@ -86,6 +104,11 @@ class WalletApiTest {
       defaultDid = did
     }
     return defaultDid
+  }
+  
+  @Test
+  fun test() {
+    println("ok")
   }
   
   @Test
