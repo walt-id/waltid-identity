@@ -7,7 +7,8 @@ export default defineNuxtConfig({
         "nuxt-icon",
         "nuxt-monaco-editor",
         "nuxt-headlessui",
-        "@formkit/auto-animate/nuxt"
+        "@formkit/auto-animate/nuxt",
+        '@vueuse/nuxt'
     ],
     runtimeConfig: {
         public: {
