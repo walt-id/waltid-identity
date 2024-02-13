@@ -247,7 +247,7 @@ class CI_JVM_Test : AnnotationSpec() {
 
         // 1. send pushed authorization request with authorization details, containing info of credentials to be issued, receive session id
         val authReq = AuthorizationRequest(
-            responseType = ResponseType.getResponseTypeString(ResponseType.code),
+            responseType = setOf(ResponseType.Code),
             clientId = testCIClientConfig.clientID,
             redirectUri = credentialWallet.config.redirectUri,
             authorizationDetails = listOf(
@@ -281,7 +281,7 @@ class CI_JVM_Test : AnnotationSpec() {
 
         println("// 1. send pushed authorization request with authorization details, containing info of credentials to be issued, receive session id")
         val pushedAuthReq = AuthorizationRequest(
-            responseType = ResponseType.getResponseTypeString(ResponseType.code),
+            responseType = setOf(ResponseType.Code),
             clientId = testCIClientConfig.clientID,
             redirectUri = credentialWallet.config.redirectUri,
             authorizationDetails = listOf(
@@ -310,7 +310,7 @@ class CI_JVM_Test : AnnotationSpec() {
         println("// 2. call authorize endpoint with request uri, receive HTTP redirect (302 Found) with Location header")
         providerMetadata.authorizationEndpoint shouldNotBe null
         val authReq = AuthorizationRequest(
-            responseType = ResponseType.code.name,
+            responseType = setOf(ResponseType.Code),
             clientId = testCIClientConfig.clientID,
             requestUri = pushedAuthResp.requestUri
         )
@@ -326,7 +326,7 @@ class CI_JVM_Test : AnnotationSpec() {
         val location = Url(authResp.headers[HttpHeaders.Location]!!)
         println("location: $location")
         location.toString() shouldStartWith credentialWallet.config.redirectUri!!
-        location.parameters.names() shouldContain ResponseType.code.name
+        location.parameters.names() shouldContain ResponseType.Code.name
 
         println("// 3. Parse code response parameter from authorization redirect URI")
         providerMetadata.tokenEndpoint shouldNotBe null
@@ -507,7 +507,7 @@ class CI_JVM_Test : AnnotationSpec() {
         println("// go through full authorization code flow to receive offered credential")
         println("// auth request (short-cut, without pushed authorization request)")
         val authReq = AuthorizationRequest(
-            ResponseType.code.name, testCIClientConfig.clientID,
+            setOf(ResponseType.Code), testCIClientConfig.clientID,
             redirectUri = credentialWallet.config.redirectUri,
             issuerState = parsedOfferReq.credentialOffer!!.grants[GrantType.authorization_code.value]!!.issuerState
         )
@@ -522,14 +522,14 @@ class CI_JVM_Test : AnnotationSpec() {
 
         authResp.status shouldBe HttpStatusCode.Found
         val location = Url(authResp.headers[HttpHeaders.Location]!!)
-        location.parameters.names() shouldContain ResponseType.code.name
+        location.parameters.names() shouldContain ResponseType.Code.name
 
         println("// token req")
         val tokenReq =
             TokenRequest(
                 GrantType.authorization_code,
                 testCIClientConfig.clientID,
-                code = location.parameters[ResponseType.code.name]!!
+                code = location.parameters[ResponseType.Code.name]!!
             )
         println("tokenReq: $tokenReq")
 
@@ -705,8 +705,8 @@ class CI_JVM_Test : AnnotationSpec() {
 
         println("// 1. send pushed authorization request with authorization details, containing info of credentials to be issued, receive session id")
         val implicitAuthReq = AuthorizationRequest(
-            responseType = ResponseType.getResponseTypeString(ResponseType.token),
-            responseMode = ResponseMode.fragment,
+            responseType = setOf(ResponseType.Token),
+            responseMode = ResponseMode.Fragment,
             clientId = testCIClientConfig.clientID,
             redirectUri = credentialWallet.config.redirectUri,
             authorizationDetails = listOf(

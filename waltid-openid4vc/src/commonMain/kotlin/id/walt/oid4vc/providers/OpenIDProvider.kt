@@ -88,7 +88,7 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
 
     abstract fun initializeAuthorization(authorizationRequest: AuthorizationRequest, expiresIn: Duration): S
     open fun processCodeFlowAuthorization(authorizationRequest: AuthorizationRequest): AuthorizationCodeResponse {
-        if (authorizationRequest.responseType != ResponseType.code.name)
+        if (!authorizationRequest.responseType.contains(ResponseType.Code))
             throw AuthorizationError(
                 authorizationRequest,
                 AuthorizationErrorCode.invalid_request,
@@ -101,7 +101,7 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
 
     open fun processImplicitFlowAuthorization(authorizationRequest: AuthorizationRequest): TokenResponse {
         println("> processImplicitFlowAuthorization for $authorizationRequest")
-        if (!authorizationRequest.responseType.contains(ResponseType.token.name))
+        if (!authorizationRequest.responseType.contains(ResponseType.Token))
             throw AuthorizationError(
                 authorizationRequest,
                 AuthorizationErrorCode.invalid_request,

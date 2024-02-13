@@ -66,7 +66,7 @@ class wallettest : AnnotationSpec() {
         // ^^^ UPDATE ABOVE URL WITH OFFER_URI ^^^
 
         AuthorizationRequest(
-            responseType = "",
+            responseType = setOf(),
             clientId = "",
             responseMode = null,
             redirectUri = null,
