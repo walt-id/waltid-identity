@@ -9,7 +9,7 @@ import kotlinx.datetime.Instant
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
-class DefaultIssuerTrustValidationService(
+class DefaultTrustValidationService(
     private val http: HttpClient,
     trustItem: TrustConfig.TrustEntry.TrustItem?,
 ) : TrustValidationService {
@@ -19,17 +19,14 @@ class DefaultIssuerTrustValidationService(
         ignoreUnknownKeys = true
     }
 
-    override suspend fun validate(did: String, type: String): Boolean = runCatching {
+    override suspend fun validate(did: String, type: String): Boolean =
         http.get(String.format("$baseUrl/$trustedRecordPath", did, type)).bodyAsText().let {
             tryParseResponse<SuccessResponse>(it)?.run {
                 validate(this)
             } ?: tryParseResponse<FailResponse>(it)?.let { error(it.detail) } ?: error(it)
         }
-    }.fold(onSuccess = { it }, onFailure = { throw it })
 
-    private inline fun <reified T> tryParseResponse(response: String): T? = runCatching {
-        json.decodeFromString<T>(response)
-    }.fold(onSuccess = { it }, onFailure = { null })
+    private inline fun <reified T> tryParseResponse(response: String): T? = json.decodeFromString<T>(response)
 
     private fun validate(record: SuccessResponse): Boolean {
         val from = Instant.parse(record.validFromDT)
