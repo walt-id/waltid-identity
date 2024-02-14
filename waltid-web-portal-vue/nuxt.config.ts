@@ -12,6 +12,7 @@ export default defineNuxtConfig({
     ],
     runtimeConfig: {
         public: {
+            verificationCallback: "",
             credentialRepository: "", // overwritten with NUXT_PUBLIC_CREDENTIAL_REPOSITORY
             issuer: "", // overwritten with NUXT_PUBLIC_ISSUER
             verifier: "", // overwritten with NUXT_PUBLIC_VERIFIER
