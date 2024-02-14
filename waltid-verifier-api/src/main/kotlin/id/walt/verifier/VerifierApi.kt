@@ -92,8 +92,8 @@ fun Application.verfierApi() {
                         required = false
                     }
                     headerParameter<ResponseMode>("responseMode") {
-                        description = "Response mode, for vp_token response, defaults to ${ResponseMode.direct_post}"
-                        example = ResponseMode.direct_post.name
+                        description = "Response mode, for vp_token response, defaults to ${ResponseMode.DirectPost}"
+                        example = ResponseMode.DirectPost.name
                         required = false
                     }
                     headerParameter<String>("successRedirectUri") {
@@ -124,7 +124,7 @@ fun Application.verfierApi() {
             }) {
                 val authorizeBaseUrl = context.request.header("authorizeBaseUrl") ?: defaultAuthorizeBaseUrl
                 val responseMode =
-                    context.request.header("responseMode")?.let { ResponseMode.valueOf(it) } ?: ResponseMode.direct_post
+                    context.request.header("responseMode")?.let { ResponseMode.valueOf(it) } ?: ResponseMode.DirectPost
                 val successRedirectUri = context.request.header("successRedirectUri")
                 val errorRedirectUri = context.request.header("errorRedirectUri")
 
