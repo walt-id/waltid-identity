@@ -122,10 +122,7 @@ async function generateKey() {
 
     response.value = await $fetch(`/wallet-api/wallet/${currentWallet.value}/keys/generate`, {
         method: "POST",
-        params: {
-            type: data.value.type,
-        },
-        body: Object.keys(data.value.kms.config).length ? { "kms": data.value.kms } : null,
+        body: data.value,
     });
     loading.value = false;
 }
