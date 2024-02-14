@@ -510,6 +510,8 @@ type VerifyCredential = {
 
 const credentials: VerifyCredential[] = reactive([]);
 
+const defaultVerificationCallback = config.public.verificationCallback
+
 const generatedRequest: ComputedRef<HttpRequestType> = computed(() => {
 
     const reqRequestCredentials = credentials.map((entry) => {
@@ -534,6 +536,8 @@ const generatedRequest: ComputedRef<HttpRequestType> = computed(() => {
         url: `${config.public.verifier}/openid4vc/verify`,
         method: "POST",
         body: {
+            successRedirectUri: defaultVerificationCallback,
+            errorRedirectUri: defaultVerificationCallback,
             vp_policies: reqVpPolicies,
             vc_policies: reqVcPolicies,
             request_credentials: reqRequestCredentials
