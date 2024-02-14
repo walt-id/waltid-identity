@@ -74,6 +74,7 @@ import org.jetbrains.exposed.sql.select
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.slf4j.LoggerFactory
 import java.net.URLDecoder
+import kotlin.js.ExperimentalJsExport
 import kotlin.time.Duration.Companion.seconds
 
 
@@ -643,37 +644,28 @@ class SSIKit2WalletService(
         )
     }
 
-    override suspend fun generateKey(type: String, config: KMS.Data?): String {
-        if (config?.type == "tse") {
-            return TSEKey.generate(KeyType.valueOf(type) , TSEKeyMetadata(
-                config.config.jsonObject["server"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("No server in config"),
-                config.config.jsonObject["accessKey"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("No accessKey in config"),
-            )).let { createdKey ->
-                val keyId = createdKey.getKeyId()
-                logEvent(
-                    EventType.Key.Create, "wallet", KeyEventData(
-                        id = keyId,
-                        algorithm = createdKey.keyType.name,
-                        keyManagementService = "tse",
-                    )
-                )
-                KeysService.add(walletId, keyId, KeySerialization.serializeKey(createdKey))
-                keyId
-            }
-        }
-        return LocalKey.generate(KeyType.valueOf(type)).let { createdKey ->
-            val keyId = createdKey.getKeyId()
-            logEvent(
-                EventType.Key.Create, "wallet", KeyEventData(
-                    id = keyId,
-                    algorithm = createdKey.keyType.name,
-                    keyManagementService = "local",
+    @OptIn(ExperimentalJsExport::class)
+    override suspend fun generateKey(type: String, config: KMS.Data?): String = let {
+        config?.type?.takeIf { it == "tse" }?.let {
+            TSEKey.generate(
+                KeyType.valueOf(type), TSEKeyMetadata(
+                    config.config.jsonObject["server"]?.jsonPrimitive?.content
+                        ?: throw IllegalArgumentException("No server in config"),
+                    config.config.jsonObject["accessKey"]?.jsonPrimitive?.content
+                        ?: throw IllegalArgumentException("No accessKey in config"),
                 )
             )
-            KeysService.add(walletId, keyId, KeySerialization.serializeKey(createdKey))
-            keyId
-        }
-    }
+        } ?: LocalKey.generate(KeyType.valueOf(type))
+    }.also {
+        KeysService.add(walletId, it.getKeyId(), KeySerialization.serializeKey(it))
+        logEvent(
+            EventType.Key.Create, "wallet", KeyEventData(
+                id = it.getKeyId(),
+                algorithm = type,
+                keyManagementService = config?.type ?: "local",
+            )
+        )
+    }.getKeyId()
 
     override suspend fun importKey(jwkOrPem: String): String {
         val type = when {

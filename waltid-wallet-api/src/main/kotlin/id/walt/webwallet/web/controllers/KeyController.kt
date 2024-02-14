@@ -52,8 +52,13 @@ fun Application.keys() = walletRoute {
             val kms = call.receiveNullable<KMS>()
             val keyType = kms?.keyType ?: KeyType.Ed25519.toString()
 
-            val keyId = getWalletService().generateKey(keyType, kms?.data)
-            context.respond(keyId)
+            runCatching {
+                getWalletService().generateKey(keyType, kms?.data)
+            }.onSuccess {
+                context.respond(it)
+            }.onFailure {
+                context.respond(HttpStatusCode.BadRequest, it.localizedMessage)
+            }
         }
 
 
