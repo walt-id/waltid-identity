@@ -19,6 +19,7 @@ import java.security.Security
 import kotlin.io.path.createDirectories
 import kotlinx.coroutines.test.runTest
 import kotlin.test.*
+import kotlin.time.Duration.Companion.seconds
 
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
 class WalletApiTest {
@@ -26,7 +27,7 @@ class WalletApiTest {
   private val didMethodsToTest = listOf("key", "jwk", "web", "cheqd")
   
   companion object {
-    var ktorClient: HttpClient? = null
+    lateinit var client: HttpClient
     @JvmStatic
     @BeforeClass
     fun initDb() {
@@ -43,18 +44,22 @@ class WalletApiTest {
       setUpServer()
     }
     
-    private fun setUpServer() = testApplication {
-      println("Server Starting...")
-     
-      ktorClient = createClient {
+    private fun setUpServer() {
+      println("Server starting...")
+      val testApp = TestApplication {
+        application {
+          configurePlugins()
+          auth()
+          accounts()
+          credentials()
+          dids()
+          keys()
+        }
+      }
+      client = testApp.createClient {
         install(ContentNegotiation) {
           json()
         }
-      }
-      application {
-        configurePlugins()
-        auth()
-        accounts()
       }
     }
   }
@@ -62,7 +67,7 @@ class WalletApiTest {
   private val alphabet = ('a'..'z')
   private fun randomString(length: Int) = (1..length).map { alphabet.random() }.toTypedArray().contentToString()
   
-  private suspend fun login(client: HttpClient): String = run {
+  private suspend fun login(): String = run {
     return client.post("/wallet-api/auth/login") {
       contentType(ContentType.Application.Json)
       setBody(
@@ -79,7 +84,7 @@ class WalletApiTest {
     }
   }
   
-  private suspend fun getWalletFor(client: HttpClient, token: String): JsonElement {
+  private suspend fun getWalletFor(token: String): JsonElement {
     return client.get("/wallet-api/wallet/accounts/wallets") {
       contentType(ContentType.Application.Json)
       bearerAuth(token)
@@ -89,7 +94,7 @@ class WalletApiTest {
     }
   }
   
-  private suspend fun createDids(client: HttpClient, token: String, walletId: String): String {
+  private suspend fun createDids(token: String, walletId: String): String {
     var defaultDid: String = ""
     didMethodsToTest.forEach {
       println("\nUse Case -> Create a did:$it\n")
@@ -110,19 +115,13 @@ class WalletApiTest {
   
   
   @Test
-  fun myTest() = runTest {
-    println("ok!")
-  }
-  
-  
-  @Test
   fun testAuthentication() = runTest {
     println("\nUSE CASE -> REGISTRATION\n")
     
     val email = randomString(8) + "@example.org"
     val password = randomString(16)
     
-    ktorClient?.post("/wallet-api/auth/create") {
+    client.post("/wallet-api/auth/create") {
       contentType(ContentType.Application.Json)
       setBody(
         mapOf(
@@ -136,56 +135,44 @@ class WalletApiTest {
       assertEquals(HttpStatusCode.Created, response?.status)
     }
     
-//    println("\nUSE CASE -> LOGIN\n")
-//
-//    val token = ktorClient?.let { login(it) }
-//
-//    println("Login Successful.")
-//
-//    println("> Response JSON body token: $token")
-//
-//    println("\nUSE CASE -> USER-INFO\n")
-//    client.get("/wallet-api/auth/user-info") {
-//      contentType(ContentType.Application.Json)
-//      bearerAuth(token)
-//    }.let { response ->
-//      assertEquals(HttpStatusCode.OK, response.status)
-//    }
-//
-//    println("\nUSE CASE -> SESSION\n")
-//    client.get("/wallet-api/auth/session") {
-//      contentType(ContentType.Application.Json)
-//      bearerAuth(token)
-//    }.let { response ->
-//      assertEquals(HttpStatusCode.OK, response.status)
-//    }
-//
-//    println("\nUSE CASE -> LIST WALLETS FOR ACCOUNT\n")
-//    getWalletFor(client, token)
+    println("\nUSE CASE -> LOGIN\n")
+
+    val token = login()
+
+    println("Login Successful.")
+
+    println("> Response JSON body token: $token")
+
+    println("\nUSE CASE -> USER-INFO\n")
+    client.get("/wallet-api/auth/user-info") {
+      contentType(ContentType.Application.Json)
+      bearerAuth(token)
+    }.let { response ->
+      assertEquals(HttpStatusCode.OK, response.status)
+    }
+
+    println("\nUSE CASE -> SESSION\n")
+    client.get("/wallet-api/auth/session") {
+      contentType(ContentType.Application.Json)
+      bearerAuth(token)
+    }.let { response ->
+      assertEquals(HttpStatusCode.OK, response.status)
+    }
+
+    println("\nUSE CASE -> LIST WALLETS FOR ACCOUNT\n")
+    getWalletFor(token)
   }
   
   @Test
-  fun testCredentials() = testApplication {
-    val client = createClient {
-      install(ContentNegotiation) {
-        json()
-      }
-    }
-    application {
-      configurePlugins()
-      auth()
-      accounts()
-      credentials()
-    }
-//    init
+  fun testCredentials() = runTest {
     
     // login with preset user
-    val token = login(client)
+    val token = login()
     
     println("Login Successful.")
     
     // get the wallet for that user
-    val wallets = getWalletFor(client, token)
+    val wallets = getWalletFor(token)
     val walletId = wallets.jsonObject["id"]?.jsonPrimitive?.content
     
     
@@ -237,27 +224,15 @@ class WalletApiTest {
   
   
   @Test
-  fun testDids() = testApplication {
-    val client = createClient {
-      install(ContentNegotiation) {
-        json()
-      }
-    }
-    application {
-      configurePlugins()
-      auth()
-      accounts()
-      dids()
-    }
-//    init
+  fun testDids() = runTest(timeout = 15.seconds){
     
     // login with preset user
-    val token = login(client)
+    val token = login()
     
     println("TestDids: Login Successful.")
     
     // get the wallet for that user
-    val wallets = getWalletFor(client, token)
+    val wallets = getWalletFor(token)
     val walletId = wallets.jsonObject["id"]?.jsonPrimitive?.content
     
     println("Use Case -> List DIDs")
@@ -298,7 +273,7 @@ class WalletApiTest {
       println("Invalid authentication: DID not found!")
     }
     
-    val defaultDid = createDids(client, token, walletId)
+    val defaultDid = createDids(token, walletId)
     
     println("\nUse Case -> Set default did to $defaultDid\n")
     client.post("/wallet-api/wallet/$walletId/dids/default?did=$defaultDid") {
@@ -310,25 +285,14 @@ class WalletApiTest {
   }
   
   @Test
-  fun testKeys() = testApplication {
-    val client = createClient {
-      install(ContentNegotiation) {
-        json()
-      }
-    }
-    application {
-      configurePlugins()
-      auth()
-      accounts()
-      keys()
-    }
+  fun testKeys() = runTest {
     // login with preset user
-    val token = login(client)
+    val token = login()
     
     println("TestKeys: Login Successful.")
     
     // get the wallet for that user
-    val wallets = getWalletFor(client, token)
+    val wallets = getWalletFor(token)
     val walletId = wallets.jsonObject["id"]?.jsonPrimitive?.content
     assertNotNull(walletId)
     
