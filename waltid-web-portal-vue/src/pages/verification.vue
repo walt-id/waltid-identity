@@ -82,7 +82,7 @@
 
         <HttpRequestOverlay :is-open="showRequest" :request="generatedRequest" @close="showRequest = false" />
 
-        <OidcResultDialog v-if="oidcLink" :link="oidcLink" text="Claim your credentials" @close="oidcLink = null" />
+        <OidcResultDialog v-if="oidcLink" :link="oidcLink" type="verification" text="Present your credential" @close="oidcLink = null" />
 
         <PageOverlay :is-open="showExplainer" description="Below you will find a description of how this request will execute."
                      name="Verification flow" @close="showExplainer = false"

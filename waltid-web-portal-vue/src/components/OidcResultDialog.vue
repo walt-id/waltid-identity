@@ -23,7 +23,8 @@
                                     <NuxtErrorBoundary>
                                         <qrcode-vue :size="380" :value="link" level="L" style="height: 380px" />
                                         <template #error="{ error }">
-                                            <p v-if="error.value?.message.includes('Data too long')">This QR code is too big to be displayed. <span class="text-xs">Length is: {{ link.length }}</span></p>
+                                            <p v-if="error.value?.message.includes('Data too long')">This QR code is too big to be
+                                                displayed. <span class="text-xs">Length is: {{ link.length }}</span></p>
                                             <p v-else>{{ error }}</p>
                                         </template>
                                     </NuxtErrorBoundary>
@@ -40,18 +41,34 @@
 
                                 <div class="mt-3">
                                     <NuxtLink :to="webWalletLink"
-                                              class="inline-flex w-full justify-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                                              class="flex items-center gap-2 w-full justify-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
                                               type="button"
-                                    >Open in Web Wallet
+                                    >
+                                        <Icon class="h-5 w-5" name="heroicons:wallet" />
+                                        Open in Web Wallet
                                     </NuxtLink>
                                 </div>
+
+                                <div class="mt-1.5">
+                                    <button
+                                        class="flex items-center gap-2 w-full justify-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                                        type="button"
+                                        @click="copy(link)"
+                                    >
+                                        <Icon v-if="copied" class="h-5 w-5" name="heroicons:clipboard-document-check" />
+                                        <Icon v-else class="h-5 w-5" name="heroicons:clipboard-document" />
+                                        Copy to clipboard
+                                    </button>
+                                </div>
                             </div>
-                            <div class="mt-5">
+                            <div class="mt-4">
                                 <button
-                                    class="inline-flex w-full justify-center rounded-md bg-gray-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                                    class="flex items-center gap-2 w-full justify-center rounded-md bg-gray-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
                                     type="button"
                                     @click="closeDialog"
-                                >Return to issuance
+                                >
+                                    <Icon class="h-5 w-5" name="heroicons:arrow-uturn-down" />
+                                    Return to issuance
                                 </button>
                             </div>
                         </DialogPanel>
@@ -68,8 +85,14 @@ import QrcodeVue from "qrcode.vue";
 
 const config = useRuntimeConfig();
 
+const { copy, copied } = useClipboard();
+
 const props = defineProps({
     link: {
+        type: String,
+        required: true
+    },
+    type: {
         type: String,
         required: true
     },
@@ -77,8 +100,11 @@ const props = defineProps({
         type: String
     }
 });
+
+const webWalletPrefix = props.type == "issuance" ? config.public.webWalletIssuancePrefix : config.public.webWalletVerificationPrefix;
+
 const webWalletLink = computed(() => {
-    return config.public.webWalletPrefix + props.link?.substring(props.link?.indexOf("/?") + 1);
+    return webWalletPrefix + "?" + props.link?.substring(props.link?.indexOf("?") + 1);
 });
 
 const emit = defineEmits(["close"]);

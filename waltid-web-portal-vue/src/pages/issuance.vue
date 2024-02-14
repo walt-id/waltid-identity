@@ -14,7 +14,7 @@
         </ClientOnly>
     </PageOverlay>
 
-    <OidcResultDialog v-if="oidcLink" :link="oidcLink" text="Claim your credentials" @close="oidcLink = null" />
+    <OidcResultDialog v-if="oidcLink" :link="oidcLink" type="issuance" text="Claim your credential" @close="oidcLink = null" />
 
     <HttpRequestOverlay :is-open="showRequest" :request="currentIssuanceRequest" @close="showRequest = false" />
 
