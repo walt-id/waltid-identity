@@ -13,17 +13,17 @@
                 <!--                    impedit perferendis suscipit eaque, iste dolor cupiditate blanditiis ratione.</p>-->
             </div>
             <dl class="col-span-2 grid grid-cols-1 gap-x-8 gap-y-10 text-base leading-7 text-gray-600 sm:grid-cols-2 lg:gap-y-16">
-                <div v-for="res in credential.policies" :key="res.policy" class="relative pl-9 bg-gray-50 border rounded-md">
+                <div v-for="res in credential.policies" :key="res.policy" class="relative pl-9 bg-gray-50 border rounded-md pb-3">
                     <dt class="font-semibold text-gray-900 pt-1">
-                        <Icon v-if="res.is_success" aria-hidden="true" class="absolute left-2 top-2 h-5 w-5 text-indigo-500"
+                        <Icon v-if="res.is_success" aria-hidden="true" class="absolute left-2 top-2 h-5 w-5 text-green-500"
                               name="heroicons:check"
                         />
-                        <Icon v-else aria-hidden="true" class="absolute left-2 top-2 h-5 w-5 text-indigo-500" name="heroicons:x-mark" />
+                        <Icon v-else aria-hidden="true" class="absolute left-2 top-2 h-5 w-5 text-red-500" name="heroicons:x-mark" />
                         {{ res.policy }}
                     </dt>
                     <dd class="mt-2">{{ res.description }}</dd>
                     <code class="text-sm text-gray-600">
-                        <pre class="overflow-x-auto">{{ res.result }}</pre>
+                        <pre class="overflow-x-auto">{{ res.result ?? res.error }}</pre>
                     </code>
                 </div>
                 <div v-if="credential.policies.length == 0">(No policies)</div>
