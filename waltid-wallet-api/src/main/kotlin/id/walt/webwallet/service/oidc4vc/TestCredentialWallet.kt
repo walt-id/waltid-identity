@@ -186,21 +186,7 @@ class TestCredentialWallet(
                 id = presentationId,
                 definitionId = presentationId,
                 descriptorMap = matchedCredentials.map { it.document }.mapIndexed { index, vcJwsStr ->
-                    val vcJws = vcJwsStr.base64UrlToBase64().decodeJws()
-                    val type =
-                        vcJws.payload["vc"]?.jsonObject?.get("type")?.jsonArray?.last()?.jsonPrimitive?.contentOrNull
-                            ?: "VerifiableCredential"
-
-                    DescriptorMapping(
-                        id = session.presentationDefinition?.inputDescriptors?.get(index)?.id,
-                        format = VCFormat.jwt_vp,  // jwt_vp_json
-                        path = "$",
-                        pathNested = DescriptorMapping(
-                            id = session.presentationDefinition?.inputDescriptors?.get(index)?.id,
-                            format = VCFormat.jwt_vc_json,
-                            path = "$.verifiableCredential[$index]",
-                        )
-                    )
+                    buildDescriptorMapping(session, index, vcJwsStr)
                 }
             )
         )
@@ -290,4 +276,26 @@ class TestCredentialWallet(
             putSession(it.id, it)
         }
     }
+
+    private fun buildDescriptorMapping(session: VPresentationSession, index: Int, vcJwsStr: String) = let {
+        val vcJws = vcJwsStr.base64UrlToBase64().decodeJws()
+        val type = vcJws.payload["vc"]?.jsonObject?.get("type")?.jsonArray?.last()?.jsonPrimitive?.contentOrNull
+            ?: "VerifiableCredential"
+
+        DescriptorMapping(
+            id = getDescriptorId(type, session.presentationDefinition),//session.presentationDefinition?.inputDescriptors?.get(index)?.id,
+            format = VCFormat.jwt_vp,  // jwt_vp_json
+            path = "$",
+            pathNested = DescriptorMapping(
+                id = getDescriptorId(type, session.presentationDefinition),//session.presentationDefinition?.inputDescriptors?.get(index)?.id,
+                format = VCFormat.jwt_vc_json,
+                path = "$.verifiableCredential[$index]",
+            )
+        )
+    }
+
+    private fun getDescriptorId(type: String, presentationDefinition: PresentationDefinition?) =
+        presentationDefinition?.inputDescriptors?.find {
+            (it.name ?: it.id) == type
+        }?.id
 }
