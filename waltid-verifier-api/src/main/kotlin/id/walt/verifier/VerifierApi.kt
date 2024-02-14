@@ -97,12 +97,12 @@ fun Application.verfierApi() {
                         required = false
                     }
                     headerParameter<String>("successRedirectUri") {
-                        description = "Redirect URI to return when all policies passed. \"\$id\" will be replaced with the session id."
+                        description = "Redirect URI to return when all policies passed. \"%id\" will be replaced with the session id."
                         example = ""
                         required = false
                     }
                     headerParameter<String>("errorRedirectUri") {
-                        description = "Redirect URI to return when a policy failed. \"\$id\" will be replaced with the session id."
+                        description = "Redirect URI to return when a policy failed. \"%id\" will be replaced with the session id."
                         example = ""
                         required = false
                     }
@@ -125,11 +125,13 @@ fun Application.verfierApi() {
                 val authorizeBaseUrl = context.request.header("authorizeBaseUrl") ?: defaultAuthorizeBaseUrl
                 val responseMode =
                     context.request.header("responseMode")?.let { ResponseMode.valueOf(it) } ?: ResponseMode.direct_post
-                val successRedirectUri = context.request.header("successRedirectUri")
-                val errorRedirectUri = context.request.header("errorRedirectUri")
-
 
                 val body = context.receive<JsonObject>()
+
+                val successRedirectUri = context.request.header("successRedirectUri") ?: body["successRedirectUri"]?.jsonPrimitive?.content
+                val errorRedirectUri = context.request.header("errorRedirectUri") ?: body["errorRedirectUri"]?.jsonPrimitive?.content
+
+
 
                 /*val presentationDefinition = (body["presentation_definition"]
                     ?: throw IllegalArgumentException("No `presentation_definition` supplied!"))
@@ -223,11 +225,12 @@ fun Application.verfierApi() {
                 if (maybePresentationSessionResult.getOrNull() != null) {
                     val presentationSession = maybePresentationSessionResult.getOrThrow()
                     if (presentationSession.verificationResult == true) {
-                        val redirectUri = sessionVerificationInfo.successRedirectUri?.replace("\$id", session.id) ?: ""
+                        val redirectUri = sessionVerificationInfo.successRedirectUri?.replace("%id", session.id) ?: ""
+                        println("Redirecting to: $redirectUri")
                         call.respond(HttpStatusCode.OK, redirectUri)
                     } else {
                         val policyResults = OIDCVerifierService.policyResults[session.id]
-                        val redirectUri = sessionVerificationInfo.errorRedirectUri?.replace("\$id", session.id)
+                        val redirectUri = sessionVerificationInfo.errorRedirectUri?.replace("%id", session.id)
 
                         if (redirectUri != null) {
                             call.respond(HttpStatusCode.BadRequest, redirectUri)
@@ -273,11 +276,9 @@ fun Application.verfierApi() {
                 //?: throw IllegalStateException("No policy results found for id")
 
                 call.respond(
-                    Json { prettyPrint = true }.encodeToString(
-                        PresentationSessionInfo.fromPresentationSession(
-                            session,
-                            policyResults?.toJson()
-                        )
+                    PresentationSessionInfo.fromPresentationSession(
+                        session,
+                        policyResults?.toJson()
                     )
                 )
             }
