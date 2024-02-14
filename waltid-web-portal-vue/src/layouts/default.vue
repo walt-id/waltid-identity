@@ -36,7 +36,7 @@
                                 class="relative flex rounded-full bg-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
                             >
                                 <span class="absolute -inset-1.5" />
-                                <span class="font-semibold">Credential Demo Portal</span>
+                                <span class="font-semibold">Playground</span>
                             </div>
                         </div>
                     </div>
