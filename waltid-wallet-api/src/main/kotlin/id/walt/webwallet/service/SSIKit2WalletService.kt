@@ -48,7 +48,7 @@ import id.walt.webwallet.service.settings.WalletSetting
 import id.walt.webwallet.trustusecase.TrustStatus
 import id.walt.webwallet.trustusecase.TrustValidationUseCase
 import id.walt.webwallet.web.controllers.PresentationRequestParameter
-import id.walt.webwallet.web.model.KMSData
+import id.walt.webwallet.web.model.KMS
 import id.walt.webwallet.web.parameter.CredentialRequestParameter
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -643,7 +643,7 @@ class SSIKit2WalletService(
         )
     }
 
-    override suspend fun generateKey(type: String, config:KMSData?): String {
+    override suspend fun generateKey(type: String, config: KMS.Data?): String {
         if (config?.type == "tse") {
             return TSEKey.generate(KeyType.valueOf(type) , TSEKeyMetadata(
                 config.config.jsonObject["server"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("No server in config"),
