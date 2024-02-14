@@ -17,16 +17,16 @@
     "@vueuse/nuxt": "^10.7.2",
     "fetch-to-curl": "^0.6.0",
     "highlight.js": "^11.9.0",
-    "nuxt": "^3.10.1",
+    "nuxt": "^3.10.2",
     "nuxt-icon": "^0.6.8",
     "qrcode.vue": "^3.4.1",
-    "vue": "^3.4.15",
+    "vue": "^3.4.19",
     "vue-highlight.js": "^3.1.0",
     "vue-router": "^4.2.5"
   },
   "devDependencies": {
     "@unocss/nuxt": "^0.58.5",
-    "monaco-editor": "^0.45.0",
+    "monaco-editor": "^0.46.0",
     "nuxt-headlessui": "^1.1.5",
     "nuxt-monaco-editor": "^1.2.7"
   }
