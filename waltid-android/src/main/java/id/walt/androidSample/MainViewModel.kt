@@ -3,6 +3,7 @@ package id.walt.androidSample
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.LocalKey
 import id.walt.crypto.keys.LocalKeyMetadata
+import id.walt.did.dids.DidService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
@@ -21,6 +22,8 @@ interface MainViewModel {
 
     val publicKey: StateFlow<LocalKey?>
 
+    val did: StateFlow<String?>
+
     val events: Flow<Event>
 
     fun onSignRaw(plainText: String, keyType: KeyType)
@@ -34,6 +37,8 @@ interface MainViewModel {
     fun onBiometricsUnavailable()
 
     fun onBiometricsAuthFailure()
+
+    fun onGenerateDid()
 
     fun onClearInput()
 
@@ -50,6 +55,7 @@ interface MainViewModel {
         override val plainText = MutableStateFlow("placeholder text")
         override val signature = MutableStateFlow<ByteArray?>(null)
         override val publicKey = MutableStateFlow<LocalKey?>(null)
+        override val did = MutableStateFlow<String>("")
         override val events = emptyFlow<Event>()
 
         override fun onSignRaw(plainText: String, keyType: KeyType) = Unit
@@ -62,6 +68,7 @@ interface MainViewModel {
         override fun onRetrievePublicKey() = Unit
         override fun onBiometricsUnavailable() = Unit
         override fun onBiometricsAuthFailure() = Unit
+        override fun onGenerateDid() = Unit
 
     }
 
@@ -72,6 +79,7 @@ interface MainViewModel {
         override val plainText = MutableStateFlow("")
         override val signature = MutableStateFlow<ByteArray?>(null)
         override val publicKey = MutableStateFlow<LocalKey?>(null)
+        override val did = MutableStateFlow<String?>(null)
 
         private val eventsChannel = Channel<Event>()
         override val events = eventsChannel.receiveAsFlow()
@@ -124,10 +132,20 @@ interface MainViewModel {
             }
         }
 
+        override fun onGenerateDid() {
+            viewModelScope.launch {
+                DidService.minimalInit()
+                val localKey = LocalKey.generate(KeyType.RSA, LocalKeyMetadata())
+                val didKey = DidService.registerByKey("key", localKey)
+                did.value = didKey.did
+            }
+        }
+
         override fun onClearInput() {
             plainText.value = ""
             signature.value = null
             publicKey.value = null
+            did.value = null
         }
 
     }
