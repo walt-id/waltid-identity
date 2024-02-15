@@ -55,7 +55,7 @@ object CredentialsService {
         }.orderBy(
             column = lookupColumn(filter.sortBy),
             order = if (filter.sorDescending) SortOrder.DESC else SortOrder.ASC
-        ).map { WalletCredential(it) }
+        ).distinctBy { it[WalletCredentials.id] }.map { WalletCredential(it) }
     }
 
     /**
@@ -104,7 +104,6 @@ object CredentialsService {
             this[WalletCredentials.disclosures] = credential.disclosures
             this[WalletCredentials.addedOn] = Clock.System.now().toJavaInstant()
             this[WalletCredentials.manifest] = credential.manifest
-//            this[WalletCredentials.delete] = credential.delete
             this[WalletCredentials.pending] = credential.pending
         }.map { it[WalletCredentials.id] }
     }
@@ -143,13 +142,12 @@ object CredentialsService {
             additionalConstraint = {
                 WalletCredentials.wallet eq wallet and (WalletCredentialCategoryMap.wallet eq wallet) and deletedCondition(
                     deleted
-                )
+                ) and (WalletCredentials.pending eq false)
             }).innerJoin(otherTable = WalletCategory,
             onColumn = { WalletCredentialCategoryMap.category },
             otherColumn = { WalletCategory.name },
             additionalConstraint = {
                 WalletCategory.wallet eq wallet and (WalletCredentialCategoryMap.wallet eq wallet) and (WalletCategory.name inList (categories))
-                //(WalletCredentials.delete eq filter.showDeleted)
             }).selectAll()
 
     private fun uncategorizedQuery(wallet: UUID, deleted: Boolean) = WalletCredentials.select {
@@ -157,11 +155,11 @@ object CredentialsService {
             WalletCredentialCategoryMap.credential
         ).select {
             WalletCredentialCategoryMap.wallet eq wallet
-        })) and deletedCondition(deleted)
+        })) and deletedCondition(deleted) and (WalletCredentials.pending eq false)
     }
 
     private fun allQuery(wallet: UUID, deleted: Boolean) =
-        WalletCredentials.select { WalletCredentials.wallet eq wallet and deletedCondition(deleted) }
+        WalletCredentials.select { WalletCredentials.wallet eq wallet and deletedCondition(deleted) and (WalletCredentials.pending eq false) }
 
     private fun deletedCondition(deleted: Boolean) =
         deleted.takeIf { it }?.let { deletedItemsCondition } ?: notDeletedItemsCondition
