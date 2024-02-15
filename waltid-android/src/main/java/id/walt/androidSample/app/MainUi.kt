@@ -1,4 +1,4 @@
-package id.walt.androidSample
+package id.walt.androidSample.app
 
 import android.annotation.SuppressLint
 import android.content.ClipData
@@ -54,11 +54,17 @@ import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.repeatOnLifecycle
-import id.walt.androidSample.MainViewModel.Event.BiometricAuthenticationFailure
-import id.walt.androidSample.MainViewModel.Event.BiometricsUnavailable
-import id.walt.androidSample.MainViewModel.Event.SignatureInvalid
-import id.walt.androidSample.MainViewModel.Event.SignatureVerified
+import id.walt.androidSample.ui.KeyTypeOptions
+import id.walt.androidSample.R
+import id.walt.androidSample.app.MainViewModel.Event.BiometricAuthenticationFailure
+import id.walt.androidSample.app.MainViewModel.Event.BiometricsUnavailable
+import id.walt.androidSample.app.MainViewModel.Event.SignatureInvalid
+import id.walt.androidSample.app.MainViewModel.Event.SignatureVerified
+import id.walt.androidSample.models.CopiedText
 import id.walt.androidSample.theme.WaltIdAndroidSampleTheme
+import id.walt.androidSample.ui.BasicText
+import id.walt.androidSample.utils.ObserveAsEvents
+import id.walt.androidSample.utils.collectImmediatelyAsState
 import id.walt.crypto.keys.KeyType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -70,8 +76,8 @@ import kotlinx.coroutines.withContext
 fun MainUi(viewModel: MainViewModel) {
 
     val plainText by viewModel.plainText.collectImmediatelyAsState()
-    val signature by viewModel.signature.collectImmediatelyAsState()
-    val publicKey by viewModel.publicKey.collectImmediatelyAsState()
+    val signature by viewModel.signature.collectAsState()
+    val publicKey by viewModel.publicKey.collectAsState()
     val did by viewModel.did.collectAsState()
 
     val context = LocalContext.current
@@ -215,54 +221,26 @@ fun MainUi(viewModel: MainViewModel) {
             Text(text = stringResource(R.string.label_generate_did))
         }
 
+        val _did = did
+        if (!_did.isNullOrBlank()) {
+            BasicText(
+                text = _did,
+                textToCopy = CopiedText("Cryptographic DID", _did)
+            )
+        }
+
         if (publicKey != null) {
-            Text(
+            BasicText(
                 text = "PublicKey: $publicKey",
-                color = MaterialTheme.colorScheme.primary,
-                fontSize = 14.sp,
-                modifier = Modifier
-                    .padding(20.dp)
-                    .horizontalScroll(rememberScrollState()),
+                textToCopy = CopiedText("Cryptographic PublicKey", publicKey.toString())
             )
         }
 
         if (signature != null) {
-            Text(
-                text = stringResource(R.string.signature, Base64.encodeToString(signature, Base64.DEFAULT)),
-                color = MaterialTheme.colorScheme.primary,
-                fontSize = 14.sp,
-                modifier = Modifier
-                    .padding(20.dp)
-                    .horizontalScroll(rememberScrollState())
-                    .clickable {
-                        (context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager)?.apply {
-                            val clip = ClipData.newPlainText("Cryptographic Signature", Base64.encodeToString(signature, Base64.DEFAULT))
-                            setPrimaryClip(clip)
-                            Toast
-                                .makeText(context, context.getString(R.string.copied_signature_to_clipboard), Toast.LENGTH_SHORT)
-                                .show()
-                        }
-                    },
-            )
-        }
-
-        val _did = did
-        if (!_did.isNullOrBlank()) {
-            Text(
-                text = _did,
-                color = MaterialTheme.colorScheme.primary,
-                fontSize = 14.sp,
-                modifier = Modifier
-                    .padding(20.dp)
-                    .clickable {
-                        (context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager)?.apply {
-                            val clip = ClipData.newPlainText("Cryptographic DID", _did)
-                            setPrimaryClip(clip)
-                            Toast
-                                .makeText(context, context.getString(R.string.copied_did_to_clipboard), Toast.LENGTH_SHORT)
-                                .show()
-                        }
-                    }
+            val signatureEncoded = Base64.encodeToString(signature, Base64.DEFAULT)
+            BasicText(
+                text = stringResource(R.string.signature, signatureEncoded),
+                textToCopy = CopiedText("Cryptographic Signature", signatureEncoded)
             )
         }
     }
@@ -276,22 +254,6 @@ private fun Preview_MainUi() {
             modifier = Modifier.fillMaxSize()
         ) {
             MainUi(MainViewModel.Fake())
-        }
-    }
-}
-
-@SuppressLint("StateFlowValueCalledInComposition")
-@Composable
-private fun <T> StateFlow<T>.collectImmediatelyAsState(): State<T> = collectAsState(value, Dispatchers.Main.immediate)
-
-@Composable
-private fun <T> ObserveAsEvents(flow: Flow<T>, onEvent: (T) -> Unit) {
-    val lifecycleOwner = LocalLifecycleOwner.current
-    LaunchedEffect(flow, lifecycleOwner.lifecycle) {
-        lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-            withContext(Dispatchers.Main.immediate) {
-                flow.collect(onEvent)
-            }
         }
     }
 }

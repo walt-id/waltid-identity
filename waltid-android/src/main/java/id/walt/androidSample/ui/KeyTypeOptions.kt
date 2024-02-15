@@ -1,4 +1,4 @@
-package id.walt.androidSample
+package id.walt.androidSample.ui
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row

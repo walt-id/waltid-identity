@@ -18,8 +18,7 @@
     <string name="signature">Signature: %s</string>
     <string name="did">DID: %s</string>
 
-    <string name="copied_signature_to_clipboard">Copied signature to clipboard!</string>
-    <string name="copied_did_to_clipboard">Copied DID to clipboard!</string>
+    <string name="copied_to_clipboard">Copied to clipboard!</string>
 
     <string name="signed_with_key">Signed plain text with key: %s</string>
 </resources>
