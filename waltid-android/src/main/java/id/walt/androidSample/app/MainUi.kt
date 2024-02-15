@@ -1,9 +1,5 @@
 package id.walt.androidSample.app
 
-import android.annotation.SuppressLint
-import android.content.ClipData
-import android.content.ClipboardManager
-import android.content.Context
 import android.util.Base64
 import android.widget.Toast
 import androidx.biometric.BiometricManager
@@ -12,7 +8,6 @@ import androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_WEAK
 import androidx.biometric.BiometricPrompt
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -27,13 +22,11 @@ import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -43,17 +36,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.repeatOnLifecycle
 import id.walt.androidSample.ui.KeyTypeOptions
 import id.walt.androidSample.R
 import id.walt.androidSample.app.MainViewModel.Event.BiometricAuthenticationFailure
@@ -66,43 +54,29 @@ import id.walt.androidSample.ui.BasicText
 import id.walt.androidSample.utils.ObserveAsEvents
 import id.walt.androidSample.utils.collectImmediatelyAsState
 import id.walt.crypto.keys.KeyType
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.withContext
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalComposeUiApi::class)
 @Composable
 fun MainUi(viewModel: MainViewModel) {
 
-    val plainText by viewModel.plainText.collectImmediatelyAsState()
-    val signature by viewModel.signature.collectAsState()
-    val publicKey by viewModel.publicKey.collectAsState()
-    val did by viewModel.did.collectAsState()
+    val ctx = LocalContext.current
 
-    val context = LocalContext.current
-    val systemKeyboard = LocalSoftwareKeyboardController.current
-
-    val biometricManager = remember { BiometricManager.from(context) }
+    val biometricManager = remember { BiometricManager.from(ctx) }
     val isBiometricsAvailable = biometricManager.canAuthenticate(BIOMETRIC_STRONG or BIOMETRIC_WEAK) == BiometricManager.BIOMETRIC_SUCCESS
-
-    val keyTypeOptions = listOf(KeyType.RSA, KeyType.secp256r1)
-    var selectedKeyType: KeyType by remember { mutableStateOf(keyTypeOptions[0]) }
 
     ObserveAsEvents(viewModel.events) { event ->
         when (event) {
-            SignatureInvalid -> Toast.makeText(context, context.getString(R.string.signature_verification_failed), Toast.LENGTH_SHORT).show()
-            SignatureVerified -> Toast.makeText(context, context.getString(R.string.signature_verified), Toast.LENGTH_SHORT).show()
-            BiometricsUnavailable -> Toast.makeText(context, context.getString(R.string.biometric_unavailable), Toast.LENGTH_SHORT).show()
+            SignatureInvalid -> Toast.makeText(ctx, ctx.getString(R.string.signature_verification_failed), Toast.LENGTH_SHORT).show()
+            SignatureVerified -> Toast.makeText(ctx, ctx.getString(R.string.signature_verified), Toast.LENGTH_SHORT).show()
+            BiometricsUnavailable -> Toast.makeText(ctx, ctx.getString(R.string.biometric_unavailable), Toast.LENGTH_SHORT).show()
             BiometricAuthenticationFailure -> Toast.makeText(
-                context,
-                context.getString(R.string.biometric_authentication_failure),
+                ctx,
+                ctx.getString(R.string.biometric_authentication_failure),
                 Toast.LENGTH_SHORT
             ).show()
 
             is MainViewModel.Event.SignedWithKey -> Toast.makeText(
-                context,
-                context.getString(R.string.signed_with_key, event.key.name),
+                ctx,
+                ctx.getString(R.string.signed_with_key, event.key.name),
                 Toast.LENGTH_SHORT
             ).show()
         }
@@ -112,28 +86,28 @@ fun MainUi(viewModel: MainViewModel) {
         if (!isBiometricsAvailable) viewModel.onBiometricsUnavailable()
     }
 
-    val executor = remember { ContextCompat.getMainExecutor(context) }
-    val biometricPrompt = BiometricPrompt(
-        context as FragmentActivity,
-        executor,
-        object : BiometricPrompt.AuthenticationCallback() {
-            override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
-                super.onAuthenticationSucceeded(result)
-                viewModel.onSignRaw(plainText, selectedKeyType)
-            }
+    MainUiContent(viewModel, isBiometricsAvailable)
+}
 
-            override fun onAuthenticationFailed() {
-                super.onAuthenticationFailed()
-                viewModel.onBiometricsAuthFailure()
-            }
-        }
-    )
-    val promptInfo = BiometricPrompt.PromptInfo.Builder()
-        .setAllowedAuthenticators(BIOMETRIC_STRONG or BIOMETRIC_WEAK)
-        .setTitle(stringResource(R.string.title_biometric_authentication))
-        .setSubtitle(stringResource(R.string.subtitle_biometric_authentication))
-        .setNegativeButtonText(stringResource(R.string.cancel))
-        .build()
+
+@OptIn(ExperimentalComposeUiApi::class, ExperimentalMaterial3Api::class)
+@Composable
+private fun MainUiContent(
+    viewModel: MainViewModel,
+    isBiometricsAvailable: Boolean,
+) {
+
+    val plainText by viewModel.plainText.collectImmediatelyAsState()
+    val signature by viewModel.signature.collectAsState()
+    val publicKey by viewModel.publicKey.collectAsState()
+    val did by viewModel.did.collectAsState()
+
+    val context = LocalContext.current
+    val systemKeyboard = LocalSoftwareKeyboardController.current
+
+    val keyTypeOptions = listOf(KeyType.RSA, KeyType.secp256r1)
+    var selectedKeyType: KeyType by remember { mutableStateOf(keyTypeOptions[0]) }
+
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -172,7 +146,11 @@ fun MainUi(viewModel: MainViewModel) {
             keyboardActions = KeyboardActions(
                 onDone = {
                     systemKeyboard?.hide()
-                    biometricPrompt.authenticate(promptInfo)
+                    authenticateWithBiometric(
+                        context = context as FragmentActivity,
+                        onAuthenticated = { viewModel.onSignRaw(plainText, selectedKeyType) },
+                        onFailure = { viewModel.onBiometricsAuthFailure() }
+                    )
                 },
             ),
             modifier = Modifier
@@ -184,7 +162,11 @@ fun MainUi(viewModel: MainViewModel) {
         Button(
             onClick = {
                 systemKeyboard?.hide()
-                biometricPrompt.authenticate(promptInfo)
+                authenticateWithBiometric(
+                    context = context as FragmentActivity,
+                    onAuthenticated = { viewModel.onSignRaw(plainText, selectedKeyType) },
+                    onFailure = { viewModel.onBiometricsAuthFailure() }
+                )
             },
             enabled = plainText.isNotBlank() && isBiometricsAvailable,
         ) {
@@ -246,14 +228,48 @@ fun MainUi(viewModel: MainViewModel) {
     }
 }
 
+private fun authenticateWithBiometric(
+    context: FragmentActivity,
+    onAuthenticated: () -> Unit,
+    onFailure: () -> Unit,
+) {
+    val executor = context.mainExecutor
+    val biometricPrompt = BiometricPrompt(
+        context,
+        executor,
+        object : BiometricPrompt.AuthenticationCallback() {
+            override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                super.onAuthenticationSucceeded(result)
+                onAuthenticated()
+            }
+
+            override fun onAuthenticationFailed() {
+                super.onAuthenticationFailed()
+                onFailure()
+            }
+        }
+    )
+    val promptInfo = BiometricPrompt.PromptInfo.Builder()
+        .setAllowedAuthenticators(BIOMETRIC_STRONG or BIOMETRIC_WEAK)
+        .setTitle(context.getString(R.string.title_biometric_authentication))
+        .setSubtitle(context.getString(R.string.subtitle_biometric_authentication))
+        .setNegativeButtonText(context.getString(R.string.cancel))
+        .build()
+
+    biometricPrompt.authenticate(promptInfo)
+}
+
 @Preview
 @Composable
-private fun Preview_MainUi() {
+private fun Preview_MainUiContent() {
     WaltIdAndroidSampleTheme {
         Surface(
             modifier = Modifier.fillMaxSize()
         ) {
-            MainUi(MainViewModel.Fake())
+            MainUiContent(
+                MainViewModel.Fake(),
+                isBiometricsAvailable = true
+            )
         }
     }
 }
