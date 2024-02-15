@@ -135,9 +135,10 @@ interface MainViewModel {
         override fun onGenerateDid() {
             viewModelScope.launch {
                 DidService.minimalInit()
-                val localKey = LocalKey.generate(KeyType.RSA, LocalKeyMetadata())
-                val didKey = DidService.registerByKey("key", localKey)
-                did.value = didKey.did
+                localKey?.let {
+                    val didKey = DidService.registerByKey("key", it)
+                    did.value = didKey.did
+                }
             }
         }
 
