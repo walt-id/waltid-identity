@@ -2,11 +2,16 @@ package id.walt.crypto.keys
 
 import android.util.Base64
 import id.walt.crypto.keys.AndroidLocalKeyGenerator.PUBLIC_KEY_ALIAS_PREFIX
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import org.json.JSONObject
+import java.security.KeyFactory
 import java.security.KeyStore
 import java.security.PrivateKey
 import java.security.Signature
 import java.security.cert.Certificate
+import java.security.spec.ECPublicKeySpec
+import java.security.spec.RSAPublicKeySpec
 import java.util.UUID
 
 actual class LocalKey actual constructor(jwk: String?) : Key() {
@@ -40,11 +45,38 @@ actual class LocalKey actual constructor(jwk: String?) : Key() {
     }
 
     actual override suspend fun exportJWK(): String {
-        TODO("Not yet implemented")
+        val publicKey = keyStore.getCertificate(internalKeyId)?.publicKey
+        checkNotNull(publicKey) { "This LocalKey instance does not have a public key associated with it. This should not happen." }
+        val keyFactory = KeyFactory.getInstance(internalKeyType.name)
+
+        return when (internalKeyType) {
+            KeyType.RSA -> {
+                val keySpec = keyFactory.getKeySpec(publicKey, RSAPublicKeySpec::class.java)
+                JSONObject().run {
+                    put("kty", internalKeyType.name)
+                    put("n", Base64.encodeToString(keySpec.modulus.toByteArray(), Base64.NO_WRAP))
+                    put("e", Base64.encodeToString(keySpec.publicExponent.toByteArray(), Base64.NO_WRAP))
+                    toString()
+                }
+            }
+            KeyType.secp256r1 -> {
+                val keySpec = keyFactory.getKeySpec(publicKey, ECPublicKeySpec::class.java)
+                JSONObject().run {
+                    put("kty", "EC")
+                    put("crv", "P-256")
+                    put("x", Base64.encodeToString(keySpec.w.affineX.toByteArray(), Base64.NO_WRAP))
+                    put("y", Base64.encodeToString(keySpec.w.affineY.toByteArray(), Base64.NO_WRAP))
+                    toString()
+                }
+            }
+            KeyType.Ed25519 -> throw IllegalArgumentException("Ed25519 is not supported in Android KeyStore")
+            KeyType.secp256k1 -> throw IllegalArgumentException("secp256k1 is not supported in Android KeyStore")
+        }
     }
 
     actual override suspend fun exportJWKObject(): JsonObject {
-        TODO("Not yet implemented")
+        val jwkString = exportJWK()
+        return Json.parseToJsonElement(jwkString) as JsonObject
     }
 
     actual override suspend fun exportPEM(): String {
