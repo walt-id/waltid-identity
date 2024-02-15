@@ -15,13 +15,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -32,7 +29,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -76,6 +72,7 @@ fun MainUi(viewModel: MainViewModel) {
     val plainText by viewModel.plainText.collectImmediatelyAsState()
     val signature by viewModel.signature.collectImmediatelyAsState()
     val publicKey by viewModel.publicKey.collectImmediatelyAsState()
+    val did by viewModel.did.collectAsState()
 
     val context = LocalContext.current
     val systemKeyboard = LocalSoftwareKeyboardController.current
@@ -208,6 +205,16 @@ fun MainUi(viewModel: MainViewModel) {
             Text(text = stringResource(R.string.label_get_public_key))
         }
 
+        Button(
+            onClick = {
+                systemKeyboard?.hide()
+                viewModel.onGenerateDid()
+            },
+            enabled = signature != null,
+        ) {
+            Text(text = stringResource(R.string.label_generate_did))
+        }
+
         if (publicKey != null) {
             Text(
                 text = "PublicKey: $publicKey",
@@ -232,10 +239,30 @@ fun MainUi(viewModel: MainViewModel) {
                             val clip = ClipData.newPlainText("Cryptographic Signature", Base64.encodeToString(signature, Base64.DEFAULT))
                             setPrimaryClip(clip)
                             Toast
-                                .makeText(context, context.getString(R.string.copied_to_clipboard), Toast.LENGTH_SHORT)
+                                .makeText(context, context.getString(R.string.copied_signature_to_clipboard), Toast.LENGTH_SHORT)
                                 .show()
                         }
                     },
+            )
+        }
+
+        val _did = did
+        if (!_did.isNullOrBlank()) {
+            Text(
+                text = _did,
+                color = MaterialTheme.colorScheme.primary,
+                fontSize = 14.sp,
+                modifier = Modifier
+                    .padding(20.dp)
+                    .clickable {
+                        (context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager)?.apply {
+                            val clip = ClipData.newPlainText("Cryptographic DID", _did)
+                            setPrimaryClip(clip)
+                            Toast
+                                .makeText(context, context.getString(R.string.copied_did_to_clipboard), Toast.LENGTH_SHORT)
+                                .show()
+                        }
+                    }
             )
         }
     }
