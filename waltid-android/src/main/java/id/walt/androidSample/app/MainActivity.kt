@@ -1,4 +1,4 @@
-package id.walt.androidSample
+package id.walt.androidSample.app
 
 import android.os.Bundle
 import androidx.activity.compose.setContent

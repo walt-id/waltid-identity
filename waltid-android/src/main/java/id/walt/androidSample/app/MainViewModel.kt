@@ -1,4 +1,4 @@
-package id.walt.androidSample
+package id.walt.androidSample.app
 
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.LocalKey
