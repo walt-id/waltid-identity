@@ -49,10 +49,7 @@ android {
 
 dependencies {
     api(project(":waltid-crypto"))
-//    implementation(":wal")
-//    implementation("id.walt.credentials:waltid-verifiable-credentials:1.0.1")
-//    implementation("id.walt:waltid-openid4vc:1.0.1")
-//    implementation("id.walt:waltid-sdjwt:1.0.1")
+    api(project(":waltid-did"))
 
     implementation("androidx.biometric:biometric:1.2.0-alpha05")
     implementation("androidx.biometric:biometric-ktx:1.2.0-alpha05")
