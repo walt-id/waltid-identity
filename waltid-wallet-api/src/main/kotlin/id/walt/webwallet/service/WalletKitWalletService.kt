@@ -1,6 +1,8 @@
 package id.walt.webwallet.service
 
+import id.walt.oid4vc.data.CredentialOffer
 import id.walt.oid4vc.data.dif.PresentationDefinition
+import id.walt.oid4vc.requests.CredentialOfferRequest
 import id.walt.webwallet.config.ConfigManager
 import id.walt.webwallet.config.RemoteWalletConfig
 import id.walt.webwallet.db.models.*
@@ -294,6 +296,10 @@ class WalletKitWalletService(tenant: String, accountId: UUID, walletId: UUID) : 
                 }
             }
         }
+        throw NotImplementedError("")
+    }
+
+    override suspend fun resolveCredentialOffer(offerRequest: CredentialOfferRequest): CredentialOffer {
         throw NotImplementedError("")
     }
 

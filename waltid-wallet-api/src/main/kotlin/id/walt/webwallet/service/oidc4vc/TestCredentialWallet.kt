@@ -22,6 +22,7 @@ import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.engine.cio.*
 import io.ktor.client.request.*
+import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.util.*
@@ -112,7 +113,13 @@ class TestCredentialWallet(
     }
 
     override fun httpGet(url: Url, headers: Headers?): SimpleHttpResponse {
-        TODO("Not yet implemented")
+        return runBlocking {
+            ktorClient.get(url) {
+                headers {
+                    headers?.forEach { s, strings -> headersOf(s, strings) }
+                }
+            }.let { SimpleHttpResponse(it.status, it.headers, it.bodyAsText()) }
+        }
     }
 
     override fun httpPostObject(url: Url, jsonObject: JsonObject, headers: Headers?): SimpleHttpResponse {
