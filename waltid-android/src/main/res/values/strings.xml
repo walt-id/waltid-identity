@@ -14,9 +14,12 @@
     <string name="label_sign">Sign Plain Text</string>
     <string name="label_verify_signature">Verify Signature</string>
     <string name="label_get_public_key">Retrieve Public Key</string>
+    <string name="label_generate_did">Generate DID</string>
     <string name="signature">Signature: %s</string>
+    <string name="did">DID: %s</string>
 
-    <string name="copied_to_clipboard">Copied signature to clipboard!</string>
+    <string name="copied_signature_to_clipboard">Copied signature to clipboard!</string>
+    <string name="copied_did_to_clipboard">Copied DID to clipboard!</string>
 
     <string name="signed_with_key">Signed plain text with key: %s</string>
 </resources>
