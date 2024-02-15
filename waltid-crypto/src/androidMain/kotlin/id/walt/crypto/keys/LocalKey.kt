@@ -47,10 +47,10 @@ actual class LocalKey actual constructor(jwk: String?) : Key() {
     actual override suspend fun exportJWK(): String {
         val publicKey = keyStore.getCertificate(internalKeyId)?.publicKey
         checkNotNull(publicKey) { "This LocalKey instance does not have a public key associated with it. This should not happen." }
-        val keyFactory = KeyFactory.getInstance(internalKeyType.name)
 
         return when (internalKeyType) {
             KeyType.RSA -> {
+                val keyFactory = KeyFactory.getInstance(internalKeyType.name)
                 val keySpec = keyFactory.getKeySpec(publicKey, RSAPublicKeySpec::class.java)
                 JSONObject().run {
                     put("kty", internalKeyType.name)
@@ -60,6 +60,7 @@ actual class LocalKey actual constructor(jwk: String?) : Key() {
                 }
             }
             KeyType.secp256r1 -> {
+                val keyFactory = KeyFactory.getInstance("EC")
                 val keySpec = keyFactory.getKeySpec(publicKey, ECPublicKeySpec::class.java)
                 JSONObject().run {
                     put("kty", "EC")
