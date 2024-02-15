@@ -82,7 +82,7 @@
 
         <HttpRequestOverlay :is-open="showRequest" :request="generatedRequest" @close="showRequest = false" />
 
-        <OidcResultDialog v-if="oidcLink" :link="oidcLink" type="verification" text="Present your credential" @close="oidcLink = null" />
+        <OidcResultDialog v-if="oidcLink" :link="oidcLink" text="Present your credential" type="verification" @close="oidcLink = null" />
 
         <PageOverlay :is-open="showExplainer" description="Below you will find a description of how this request will execute."
                      name="Verification flow" @close="showExplainer = false"
@@ -141,7 +141,8 @@
 
                 <p class="text-gray-500 mt-1">
                     These policies are applied on the Verifiable Credentials within a Verifiable Presentation.
-                    Global policies are applied globally to all Verifiable Credentials within a Verifiable Presentation, while specific policies are only applied to a specific credential type.
+                    Global policies are applied globally to all Verifiable Credentials within a Verifiable Presentation, while specific
+                    policies are only applied to a specific credential type.
                 </p>
             </div>
         </PageOverlay>
@@ -175,7 +176,9 @@
                                 <ul>
                                     <li v-for="specificPolicy of credential.policies" class="list-disc ml-3">
                                         <div class="flex items-center gap-x-2">
-                                            {{ specificPolicy.name }} <span v-if="!(specificPolicy.argumentType.length == 1 && specificPolicy.argumentType[0] == 'NONE')">({{ specificPolicy.argumentType.join(", ") }})</span>
+                                            {{ specificPolicy.name }} <span
+                                            v-if="!(specificPolicy.argumentType.length == 1 && specificPolicy.argumentType[0] == 'NONE')"
+                                        >({{ specificPolicy.argumentType.join(", ") }})</span>
                                             <span v-if="specificPolicy.args"
                                                   class="rounded-md whitespace-nowrap mt-0.5 px-1.5 py-0.5 text-xs font-medium ring-1 ring-inset text-green-600"
                                             >
@@ -427,7 +430,9 @@
 
                 <ErrorDisplay :error="verifierError" title="There was an error with this issuance:" />
 
-                <p v-if="credentials.length >= 1 || vpPolicies.length >= 1 || globalVcPolicies.length >= 1" class="text-xs mt-4 text-gray-500">Request is: <code>{{ generatedRequest.body }}</code></p>
+                <p v-if="credentials.length >= 1 || vpPolicies.length >= 1 || globalVcPolicies.length >= 1"
+                   class="text-xs mt-4 text-gray-500"
+                >Request is: <code>{{ generatedRequest.body }}</code></p>
             </div>
         </div>
     </main>
@@ -510,7 +515,7 @@ type VerifyCredential = {
 
 const credentials: VerifyCredential[] = reactive([]);
 
-const defaultVerificationCallback = config.public.verificationCallback
+const defaultVerificationCallback = config.public.verificationCallback;
 
 const generatedRequest: ComputedRef<HttpRequestType> = computed(() => {
 
@@ -584,6 +589,16 @@ function removeGlobalVcPolicy(id: number) {
     globalVcPolicies.splice(rmIdx, 1);
 }
 
+
+const query = useRoute().query;
+
+if (query.credential) {
+    credentials.push({
+        id: ++idx,
+        name: query.credential,
+        policies: null
+    });
+}
 
 useHead({
     title: "Verification | walt.id Portal"
