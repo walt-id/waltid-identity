@@ -112,7 +112,14 @@ actual class LocalKey actual constructor(
     @JsExport.Ignore
     actual override suspend fun signRaw(plaintext: ByteArray): ByteArray {
         check(hasPrivateKey) { "No private key is attached to this key!" }
-        return crypto.sign("SHA256", plaintext, exportPEM())
+        return crypto.sign(
+            when (keyType) {
+                KeyType.Ed25519 -> null
+                else -> "sha256"
+            },
+            plaintext,
+            exportPEM()
+        )
     }
 
     /**
@@ -139,7 +146,15 @@ actual class LocalKey actual constructor(
     @JsExport.Ignore
     actual override suspend fun verifyRaw(signed: ByteArray, detachedPlaintext: ByteArray?): Result<ByteArray> {
         return runCatching {
-            val verified = crypto.verify("SHA256", detachedPlaintext ?: signed, getPublicKey().exportPEM(), signed)
+            val verified = crypto.verify(
+                when (keyType) {
+                    KeyType.Ed25519 -> null
+                    else -> "sha256"
+                },
+                detachedPlaintext ?: signed,
+                getPublicKey().exportPEM(),
+                signed
+            )
             if (verified) {
                 "true".toByteArray()
             } else {
@@ -180,8 +195,7 @@ actual class LocalKey actual constructor(
     @JsPromise
     @JsExport.Ignore
     actual override suspend fun getPublicKeyRepresentation(): ByteArray {
-
-        TODO("Not yet implemented")
+        return getPublicKey().exportPEM().toByteArray()
     }
 
     override val keyType: KeyType
