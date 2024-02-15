@@ -7,7 +7,7 @@ import multibase
 @JsExport
 actual object MultiBaseUtils {
     actual fun convertRawKeyToMultiBase58Btc(key: ByteArray, code: UInt): String {
-        return multibase.encode("base58btc", key).toString()
+        return multibase.encode("base58btc", key).decodeToString()
     }
 
     actual fun convertMultiBase58BtcToRawKey(mb: String): ByteArray {
