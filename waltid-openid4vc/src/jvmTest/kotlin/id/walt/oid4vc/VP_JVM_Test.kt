@@ -27,6 +27,8 @@ import io.ktor.serialization.kotlinx.json.*
 import io.ktor.util.*
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
+import kotlinx.uuid.UUID
+import kotlinx.uuid.generateUUID
 import kotlin.time.Duration.Companion.minutes
 
 class VP_JVM_Test : AnnotationSpec() {
@@ -114,7 +116,7 @@ class VP_JVM_Test : AnnotationSpec() {
             redirectOrResponseUri = "http://blank",
             nonce = null,
             state = null,
-            accessTokenScopes = setOf(),
+            scopes = setOf(),
             clientId = "test-verifier",
             clientIdScheme = ClientIdScheme.PreRegistered,
             clientMetadataParameter = ClientMetadataParameter.fromClientMetadata(
@@ -136,6 +138,37 @@ class VP_JVM_Test : AnnotationSpec() {
         // vpToken is NOT a string, but JSON ELEMENT
         // this will break without .content(): (if JsonPrimitive and not JsonArray!)
         JwtSignaturePolicy().verify(tokenResponse.vpToken!!.jsonPrimitive.content, null, mapOf()).isSuccess shouldBe true
+    }
+
+    @Test
+    suspend fun testOID4VPFlow() {
+        //------- VERIFIER ---------
+        val presentationReq = OpenID4VP.createPresentationRequest(
+            PresentationDefinitionParameter.fromPresentationDefinition(
+                PresentationDefinition(
+                    inputDescriptors = listOf(
+                        InputDescriptor(
+                            format = mapOf(VCFormat.jwt_vc_json to VCFormatDefinition(setOf("EdDSA"))),
+                            constraints = InputDescriptorConstraints(
+                                fields = listOf(
+                                    InputDescriptorField(listOf("$.type"), filter = buildJsonObject {
+                                        put("type", "string")
+                                        put("const", "VerifiableId")
+                                    })
+                                )
+                            )
+                        )
+                    )
+                )
+            ), ResponseMode.DirectPost, setOf(ResponseType.VpToken), "http://blank", UUID.generateUUID().toString(),
+            "test", setOf(), "test-verifier", ClientIdScheme.PreRegistered, ClientMetadataParameter.fromClientMetadata(
+                OpenIDClientMetadata(listOf(testWallet.baseUrl))
+            )
+        )
+        // get authorization URL to be rendered as QR code, or called on wallet authorization endpoint, for same-device flow
+        val authUrl = OpenID4VP.getAuthorizationUrl(presentationReq)
+
+        //
     }
 
     //@Test
