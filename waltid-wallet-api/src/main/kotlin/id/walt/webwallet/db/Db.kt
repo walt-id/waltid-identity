@@ -33,7 +33,7 @@ object Db {
 
     val dataDirectoryPath = Path("data")
 
-    private fun connect() {
+    fun connect() {
         datasourceConfig = ConfigManager.getConfig<DatasourceConfiguration>()
         val hikariDataSourceConfig = datasourceConfig.hikariDataSource
 
