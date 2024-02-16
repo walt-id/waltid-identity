@@ -12,7 +12,8 @@ jobs:
       - name: Calculate release version
         run: |
           BRANCH=$(echo ${{ github.ref }} | sed 's/refs\/heads\///')
-          echo "release_version=1.0.$(date +'%g%m%d%H%M')-${{ BRANCH }}" >> $GITHUB_ENV
+          echo "BRANCH=${BRANCH}" >> $GITHUB_ENV
+          echo "release_version=1.0.$(date +'%g%m%d%H%M')-${BRANCH}" >> $GITHUB_ENV
       - name: Set version
         run: |
           sed -i "s/1.0.0-SNAPSHOT/${{ env.release_version }}/g" build.gradle.kts
