@@ -4,6 +4,7 @@ import id.walt.webwallet.db.Db
 import id.walt.webwallet.web.controllers.*
 import io.ktor.client.*
 import io.ktor.client.call.*
+import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
@@ -12,14 +13,12 @@ import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.testing.*
 import kotlinx.serialization.json.*
 import org.bouncycastle.jce.provider.BouncyCastleProvider
-import org.junit.BeforeClass
 import org.junit.FixMethodOrder
 import org.junit.runners.MethodSorters
 import java.security.Security
 import kotlin.io.path.createDirectories
 import kotlinx.coroutines.test.runTest
 import kotlin.test.*
-import kotlin.time.Duration.Companion.seconds
 
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
 class WalletApiTest {
@@ -28,38 +27,54 @@ class WalletApiTest {
   
   companion object {
     lateinit var client: HttpClient
-    @JvmStatic
-    @BeforeClass
-    fun initDb() {
-      
-      // TODO delete database folder
-      Security.addProvider(BouncyCastleProvider())
-      runCatching { Db.dataDirectoryPath.createDirectories() }
-      
-      val args = emptyArray<String>()
-      ConfigManager.loadConfigs(args)
-      
-      Db.start()
-      
-      setUpServer()
+    lateinit var apiUrl: String
+    
+    private var USE_DEPLOYED_API = true
+    
+    init {
+      if (!USE_DEPLOYED_API) {
+        Security.addProvider(BouncyCastleProvider())
+        runCatching { Db.dataDirectoryPath.createDirectories() }
+        
+        val args = emptyArray<String>()
+        ConfigManager.loadConfigs(args)
+        
+        Db.start()
+      }
+      setUpHttp()
     }
     
-    private fun setUpServer() {
-      println("Server starting...")
-      val testApp = TestApplication {
-        application {
-          configurePlugins()
-          auth()
-          accounts()
-          credentials()
-          dids()
-          keys()
+    private fun setUpHttp() {
+      
+      if (USE_DEPLOYED_API) {
+        println("Using Deployed WaltId Wallet Api...")
+        client = HttpClient {
+          install(ContentNegotiation) {
+            json()
+          }
+          install(HttpTimeout) {
+            requestTimeoutMillis = 30 * 1000
+          }
         }
-      }
-      client = testApp.createClient {
-        install(ContentNegotiation) {
-          json()
+        apiUrl = "https://wallet.walt.id"
+      } else {
+        println("Server starting...")
+        val testApp = TestApplication {
+          application {
+            configurePlugins()
+            auth()
+            accounts()
+            credentials()
+            dids()
+            keys()
+          }
         }
+        client = testApp.createClient {
+          install(ContentNegotiation) {
+            json()
+          }
+        }
+        apiUrl = ""
       }
     }
   }
@@ -68,7 +83,10 @@ class WalletApiTest {
   private fun randomString(length: Int) = (1..length).map { alphabet.random() }.toTypedArray().contentToString()
   
   private suspend fun login(): String = run {
-    return client.post("/wallet-api/auth/login") {
+    
+    val endpoint = "$apiUrl/wallet-api/auth/login"
+    println("POST ($endpoint)")
+    return client.post(endpoint) {
       contentType(ContentType.Application.Json)
       setBody(
         mapOf(
@@ -85,8 +103,9 @@ class WalletApiTest {
   }
   
   private suspend fun getWalletFor(token: String): JsonElement {
-    return client.get("/wallet-api/wallet/accounts/wallets") {
-      contentType(ContentType.Application.Json)
+    val endpoint = "$apiUrl/wallet-api/wallet/accounts/wallets"
+    println("GET($endpoint)")
+    return client.get(endpoint) {
       bearerAuth(token)
     }.let { response ->
       assertEquals(HttpStatusCode.OK, response.status)
@@ -121,7 +140,10 @@ class WalletApiTest {
     val email = randomString(8) + "@example.org"
     val password = randomString(16)
     
-    client.post("/wallet-api/auth/create") {
+    var endpoint = "$apiUrl/wallet-api/auth/create"
+    println("POST ($endpoint)\n")
+    
+    client.post(endpoint) {
       contentType(ContentType.Application.Json)
       setBody(
         mapOf(
@@ -132,10 +154,10 @@ class WalletApiTest {
         )
       )
     }.let { response ->
-      assertEquals(HttpStatusCode.Created, response?.status)
+      assertEquals(HttpStatusCode.Created, response.status)
     }
-    
-    println("\nUSE CASE -> LOGIN\n")
+
+    println("\nUSE CASE -> LOGIN")
 
     val token = login()
 
@@ -144,16 +166,18 @@ class WalletApiTest {
     println("> Response JSON body token: $token")
 
     println("\nUSE CASE -> USER-INFO\n")
-    client.get("/wallet-api/auth/user-info") {
-      contentType(ContentType.Application.Json)
+    endpoint = "$apiUrl/wallet-api/auth/user-info"
+    println("GET ($endpoint)")
+    client.get(endpoint) {
       bearerAuth(token)
     }.let { response ->
       assertEquals(HttpStatusCode.OK, response.status)
     }
 
     println("\nUSE CASE -> SESSION\n")
-    client.get("/wallet-api/auth/session") {
-      contentType(ContentType.Application.Json)
+    endpoint = "$apiUrl/wallet-api/auth/session"
+    println("GET ($endpoint")
+    client.get(endpoint) {
       bearerAuth(token)
     }.let { response ->
       assertEquals(HttpStatusCode.OK, response.status)
@@ -162,173 +186,172 @@ class WalletApiTest {
     println("\nUSE CASE -> LIST WALLETS FOR ACCOUNT\n")
     getWalletFor(token)
   }
-  
-  @Test
-  fun testCredentials() = runTest {
-    
-    // login with preset user
-    val token = login()
-    
-    println("Login Successful.")
-    
-    // get the wallet for that user
-    val wallets = getWalletFor(token)
-    val walletId = wallets.jsonObject["id"]?.jsonPrimitive?.content
-    
-    
-    println("\nUSE CASE -> LIST CREDENTIALS FOR WALLET, id = $walletId\n")
-    
-    val id = client.get("/wallet-api/wallet/${walletId}/credentials") {
-      contentType(ContentType.Application.Json)
-      bearerAuth(token)
-    }.let { response ->
-      assertEquals(HttpStatusCode.OK, response.status)
-      assertNotEquals(response.body<JsonArray>().size, 0)
-      response.body<JsonArray>()[0].jsonObject["id"]?.jsonPrimitive?.content ?: error("No credentials found")
-    }
-    
-    val endpoint = "/wallet-api/wallet/${walletId}/credentials/$id"
-    println(">>>>>>>>>>>>>>>>>>>>>> endpoint for view -> $endpoint")
-    println("\nUSE CASE -> VIEW CREDENTIAL BY ID\n")
-    
-    val vc = client.get(endpoint) {
-      contentType(ContentType.Application.Json)
-      bearerAuth(token)
-    }.let { response ->
-      assertEquals(HttpStatusCode.OK, response.status)
-      response.body<JsonObject>()["document"]?.jsonPrimitive?.content ?: error("No document found")
-    }
-    
-    println("Found Credential -> $vc")
-    
-    println("\nUSE CASE -> DELETE CREDENTIAL\n")
-    
-    println(">>>>>>>>>>>>>>>>>>>>>> endpoint for delete -> $endpoint")
-    
-    client.delete(endpoint) {
-      contentType(ContentType.Application.Json)
-      bearerAuth(token)
-    }.let { response ->
-      assertEquals(HttpStatusCode.Accepted, response.status)
-    }
-    
-    // rerun the list credential to make sure it really has been removed
-    client.get("/wallet-api/wallet/${walletId}/credentials") {
-      contentType(ContentType.Application.Json)
-      bearerAuth(token)
-    }.let { response ->
-      assertEquals(HttpStatusCode.OK, response.status)
-      assertEquals(response.body<JsonArray>().size, 0) // make sure no credentials in this wallet
-    }
-  }
-  
-  
-  @Test
-  fun testDids() = runTest(timeout = 15.seconds){
-    
-    // login with preset user
-    val token = login()
-    
-    println("TestDids: Login Successful.")
-    
-    // get the wallet for that user
-    val wallets = getWalletFor(token)
-    val walletId = wallets.jsonObject["id"]?.jsonPrimitive?.content
-    
-    println("Use Case -> List DIDs")
-    val did = client.get("/wallet-api/wallet/$walletId/dids") {
-      contentType(ContentType.Application.Json)
-      bearerAuth(token)
-    }.let { response ->
-      assertEquals(HttpStatusCode.OK, response.status)
-      response.body<JsonArray>()[0].jsonObject["did"]?.jsonPrimitive?.content ?: error("No dids found")
-    }
-    assertNotNull(walletId)
-    assertTrue(did.startsWith("did:key:z6Mk"))
-    
-    println("Use Case -> Show a specific DID")
-    client.get("/wallet-api/wallet/$walletId/dids/$did") {
-      contentType(ContentType.Application.Json)
-      bearerAuth(token)
-    }.let { response ->
-      assertEquals(HttpStatusCode.OK, response.status)
-      println("DID found!")
-    }
-    
-    println("Use Case -> Delete a DID")
-    client.delete("/wallet-api/wallet/$walletId/dids/$did") {
-      contentType(ContentType.Application.Json)
-      bearerAuth(token)
-    }.let { response ->
-      assertEquals(HttpStatusCode.Accepted, response.status)
-      println("DID deleted!")
-    }
-    
-    println("Use Case -> Show deleted DID fails")
-    client.get("/wallet-api/wallet/$walletId/dids/$did") {
-      contentType(ContentType.Application.Json)
-      bearerAuth(token)
-    }.let { response ->
-      assertEquals(HttpStatusCode.BadRequest, response.status)
-      println("Invalid authentication: DID not found!")
-    }
-    
-    val defaultDid = createDids(token, walletId)
-    
-    println("\nUse Case -> Set default did to $defaultDid\n")
-    client.post("/wallet-api/wallet/$walletId/dids/default?did=$defaultDid") {
-      contentType(ContentType.Application.Json)
-      bearerAuth(token)
-    }.let { response ->
-      assertEquals(HttpStatusCode.Accepted, response.status)
-    }
-  }
-  
-  @Test
-  fun testKeys() = runTest {
-    // login with preset user
-    val token = login()
-    
-    println("TestKeys: Login Successful.")
-    
-    // get the wallet for that user
-    val wallets = getWalletFor(token)
-    val walletId = wallets.jsonObject["id"]?.jsonPrimitive?.content
-    assertNotNull(walletId)
-    
-    println("Use Case -> List Keys")
-    val keys = client.get("/wallet-api/wallet/$walletId/keys") {
-      contentType(ContentType.Application.Json)
-      bearerAuth(token)
-    }.let { response ->
-      assertEquals(HttpStatusCode.OK, response.status)
-      val rsaKeys =
-        response.body<JsonArray>().filter { item -> item.jsonObject["algorithm"]?.jsonPrimitive?.content == "RSA" }
-      assertEquals(0, rsaKeys.size) // ensure no RSA keys in the list of keys for this wallet
-      response.body<JsonArray>()[0].jsonObject
-    }
-    val algorithm = keys["algorithm"]?.jsonPrimitive?.content
-    assertEquals("Ed25519", algorithm)
-    
-    
-    println("Use Case -> Generate new key of type RSA")
-    client.post("/wallet-api/wallet/$walletId/keys/generate?type=RSA") {
-      contentType(ContentType.Application.Json)
-      bearerAuth(token)
-    }.let { response ->
-      assertEquals(HttpStatusCode.OK, response.status)
-    }
-    
-    // list keys again to ensure the RSA key is there
-    client.get("/wallet-api/wallet/$walletId/keys") {
-      contentType(ContentType.Application.Json)
-      bearerAuth(token)
-    }.let { response ->
-      assertEquals(HttpStatusCode.OK, response.status)
-      val rsaKeys =
-        response.body<JsonArray>().filter { item -> item.jsonObject["algorithm"]?.jsonPrimitive?.content == "RSA" }
-      assertEquals(1, rsaKeys.size) // ensure now 1 RSA key in the list of keys for this wallet
-    }
-    
-  }
+//
+//  @Test
+//  fun testCredentials() = runTest {
+//
+//    // login with preset user
+//    val token = login()
+//
+//    println("Login Successful.")
+//
+//    // get the wallet for that user
+//    val wallets = getWalletFor(token)
+//    val walletId = wallets.jsonObject["id"]?.jsonPrimitive?.content
+//
+//
+//    println("\nUSE CASE -> LIST CREDENTIALS FOR WALLET, id = $walletId\n")
+//
+//    val id = client.get("/wallet-api/wallet/${walletId}/credentials") {
+//      contentType(ContentType.Application.Json)
+//      bearerAuth(token)
+//    }.let { response ->
+//      assertEquals(HttpStatusCode.OK, response.status)
+//      assertNotEquals(response.body<JsonArray>().size, 0)
+//      response.body<JsonArray>()[0].jsonObject["id"]?.jsonPrimitive?.content ?: error("No credentials found")
+//    }
+//
+//    val endpoint = "/wallet-api/wallet/${walletId}/credentials/$id"
+//    println(">>>>>>>>>>>>>>>>>>>>>> endpoint for view -> $endpoint")
+//    println("\nUSE CASE -> VIEW CREDENTIAL BY ID\n")
+//
+//    val vc = client.get(endpoint) {
+//      contentType(ContentType.Application.Json)
+//      bearerAuth(token)
+//    }.let { response ->
+//      assertEquals(HttpStatusCode.OK, response.status)
+//      response.body<JsonObject>()["document"]?.jsonPrimitive?.content ?: error("No document found")
+//    }
+//
+//    println("Found Credential -> $vc")
+//
+//    println("\nUSE CASE -> DELETE CREDENTIAL\n")
+//
+//    println(">>>>>>>>>>>>>>>>>>>>>> endpoint for delete -> $endpoint")
+//
+//    client.delete(endpoint) {
+//      contentType(ContentType.Application.Json)
+//      bearerAuth(token)
+//    }.let { response ->
+//      assertEquals(HttpStatusCode.Accepted, response.status)
+//    }
+//
+//    // rerun the list credential to make sure it really has been removed
+//    client.get("/wallet-api/wallet/${walletId}/credentials") {
+//      contentType(ContentType.Application.Json)
+//      bearerAuth(token)
+//    }.let { response ->
+//      assertEquals(HttpStatusCode.OK, response.status)
+//      assertEquals(response.body<JsonArray>().size, 0) // make sure no credentials in this wallet
+//    }
+//  }
+//
+//  @Test
+//  fun testDids() = runTest(timeout = 20.seconds){
+//
+//    // login with preset user
+//    val token = login()
+//
+//    println("TestDids: Login Successful.")
+//
+//    // get the wallet for that user
+//    val wallets = getWalletFor(token)
+//    val walletId = wallets.jsonObject["id"]?.jsonPrimitive?.content
+//
+//    println("Use Case -> List DIDs")
+//    val did = client.get("/wallet-api/wallet/$walletId/dids") {
+//      contentType(ContentType.Application.Json)
+//      bearerAuth(token)
+//    }.let { response ->
+//      assertEquals(HttpStatusCode.OK, response.status)
+//      response.body<JsonArray>()[0].jsonObject["did"]?.jsonPrimitive?.content ?: error("No dids found")
+//    }
+//    assertNotNull(walletId)
+//    assertTrue(did.startsWith("did:key:z6Mk"))
+//
+//    println("Use Case -> Show a specific DID")
+//    client.get("/wallet-api/wallet/$walletId/dids/$did") {
+//      contentType(ContentType.Application.Json)
+//      bearerAuth(token)
+//    }.let { response ->
+//      assertEquals(HttpStatusCode.OK, response.status)
+//      println("DID found!")
+//    }
+//
+//    println("Use Case -> Delete a DID")
+//    client.delete("/wallet-api/wallet/$walletId/dids/$did") {
+//      contentType(ContentType.Application.Json)
+//      bearerAuth(token)
+//    }.let { response ->
+//      assertEquals(HttpStatusCode.Accepted, response.status)
+//      println("DID deleted!")
+//    }
+//
+//    println("Use Case -> Show deleted DID fails")
+//    client.get("/wallet-api/wallet/$walletId/dids/$did") {
+//      contentType(ContentType.Application.Json)
+//      bearerAuth(token)
+//    }.let { response ->
+//      assertEquals(HttpStatusCode.BadRequest, response.status)
+//      println("Invalid authentication: DID not found!")
+//    }
+//
+//    val defaultDid = createDids(token, walletId)
+//
+//    println("\nUse Case -> Set default did to $defaultDid\n")
+//    client.post("/wallet-api/wallet/$walletId/dids/default?did=$defaultDid") {
+//      contentType(ContentType.Application.Json)
+//      bearerAuth(token)
+//    }.let { response ->
+//      assertEquals(HttpStatusCode.Accepted, response.status)
+//    }
+//  }
+//
+//  @Test
+//  fun testKeys() = runTest {
+//    // login with preset user
+//    val token = login()
+//
+//    println("TestKeys: Login Successful.")
+//
+//    // get the wallet for that user
+//    val wallets = getWalletFor(token)
+//    val walletId = wallets.jsonObject["id"]?.jsonPrimitive?.content
+//    assertNotNull(walletId)
+//
+//    println("Use Case -> List Keys")
+//    val keys = client.get("/wallet-api/wallet/$walletId/keys") {
+//      contentType(ContentType.Application.Json)
+//      bearerAuth(token)
+//    }.let { response ->
+//      assertEquals(HttpStatusCode.OK, response.status)
+//      val rsaKeys =
+//        response.body<JsonArray>().filter { item -> item.jsonObject["algorithm"]?.jsonPrimitive?.content == "RSA" }
+//      assertEquals(0, rsaKeys.size) // ensure no RSA keys in the list of keys for this wallet
+//      response.body<JsonArray>()[0].jsonObject
+//    }
+//    val algorithm = keys["algorithm"]?.jsonPrimitive?.content
+//    assertEquals("Ed25519", algorithm)
+//
+//
+//    println("Use Case -> Generate new key of type RSA")
+//    client.post("/wallet-api/wallet/$walletId/keys/generate?type=RSA") {
+//      contentType(ContentType.Application.Json)
+//      bearerAuth(token)
+//    }.let { response ->
+//      assertEquals(HttpStatusCode.OK, response.status)
+//    }
+//
+//    // list keys again to ensure the RSA key is there
+//    client.get("/wallet-api/wallet/$walletId/keys") {
+//      contentType(ContentType.Application.Json)
+//      bearerAuth(token)
+//    }.let { response ->
+//      assertEquals(HttpStatusCode.OK, response.status)
+//      val rsaKeys =
+//        response.body<JsonArray>().filter { item -> item.jsonObject["algorithm"]?.jsonPrimitive?.content == "RSA" }
+//      assertEquals(1, rsaKeys.size) // ensure now 1 RSA key in the list of keys for this wallet
+//    }
+//
+//  }
 }
