@@ -12,7 +12,8 @@ jobs:
       - name: Calculate release version
         run: |
           BRANCH=$(echo ${{ github.ref }} | sed 's/refs\/heads\///')
-          echo "release_version=1.0.$(date +'%g%m%d%H%M')-${{ BRANCH }}" >> $GITHUB_ENV
+          echo "BRANCH=${BRANCH}" >> $GITHUB_ENV
+          echo "release_version=1.0.$(date +'%g%m%d%H%M')-${BRANCH}" >> $GITHUB_ENV
       - name: Set version
         run: |
           sed -i "s/1.0.0-SNAPSHOT/${{ env.release_version }}/g" build.gradle.kts
@@ -50,31 +51,31 @@ jobs:
         with:
           push: true
           file: waltid-issuer-api/Dockerfile
-          tags: waltid/issuer-api:latest, waltid/issuer-api:${{ env.release_version }}
+          tags: waltid/issuer-api:dev, waltid/issuer-api:${{ env.release_version }}
       - name: Build and push Docker images (verifier)
         uses: docker/build-push-action@v4.0.0
         with:
           push: true
           file: waltid-verifier-api/Dockerfile
-          tags: waltid/verifier-api:latest, waltid/verifier-api:${{ env.release_version }}
+          tags: waltid/verifier-api:dev, waltid/verifier-api:${{ env.release_version }}
       - name: Build and push Docker images (wallet-api)
         uses: docker/build-push-action@v4.0.0
         with:
           push: true
           file: waltid-wallet-api/Dockerfile
-          tags: waltid/wallet-api:latest, waltid/wallet-api:${{ env.release_version }}
+          tags: waltid/wallet-api:dev, waltid/wallet-api:${{ env.release_version }}
       - name: Build and push Docker images (waltid-web-wallet)
         uses: docker/build-push-action@v4.0.0
         with:
           push: true
           file: waltid-web-wallet/Dockerfile
-          tags: waltid/waltid-web-wallet:latest, waltid/waltid-web-wallet:${{ env.release_version }}
+          tags: waltid/waltid-web-wallet:dev, waltid/waltid-web-wallet:${{ env.release_version }}
       - name: Build and push Docker images (wallet-portal)
         uses: docker/build-push-action@v4
         with:
           push: true
           file: waltid-web-portal/Dockerfile
-          tags: waltid/portal:latest, waltid/portal:${{ env.release_version }}
+          tags: waltid/portal:dev, waltid/portal:${{ env.release_version }}
 
       - name: Prepare CD - issuer
         run: sed "s/_DEFAULT_DEPLOYMENT_/$GITHUB_SHA/g" waltid-issuer-api/k8s/deployment-dev.yaml > waltid-issuer-api/k8s/deployment_mod.yaml
