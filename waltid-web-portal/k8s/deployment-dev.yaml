@@ -18,6 +18,7 @@ spec:
       containers:
         - name: web-portal
           image: waltid/portal:dev
+          imagePullPolicy: Always
           env:
             - name: NEXT_PUBLIC_VC_REPO
               value: "https://vc-repo.walt-test.cloud"
