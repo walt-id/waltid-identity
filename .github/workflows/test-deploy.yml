@@ -94,7 +94,7 @@ jobs:
         env:
           KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
         with:
-          args: apply -n portals -f waltid-issuer-api/k8s/deployment_mod.yaml
+          args: apply -n dev -f waltid-issuer-api/k8s/deployment_mod.yaml
       - name: Prepare CD - verifier
         run: sed "s/_DEFAULT_DEPLOYMENT_/$GITHUB_SHA/g" waltid-verifier-api/k8s/deployment-dev.yaml > waltid-verifier-api/k8s/deployment_mod.yaml
       - name: Continuous deployment - verifier
@@ -102,7 +102,7 @@ jobs:
         env:
           KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
         with:
-          args: apply -n portals -f waltid-verifier-api/k8s/deployment_mod.yaml
+          args: apply -n dev -f waltid-verifier-api/k8s/deployment_mod.yaml
       - name: Prepare CD - wallet.walt.id
         run: sed "s/_DEFAULT_DEPLOYMENT_/$GITHUB_SHA/g" waltid-wallet-api/k8s/deployment-dev.yaml > waltid-wallet-api/k8s/deployment_mod.yaml
       - name: Continuous deployment - wallet.walt.id
@@ -110,7 +110,7 @@ jobs:
         env:
           KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
         with:
-          args: apply -n default -f waltid-wallet-api/k8s/deployment_mod.yaml
+          args: apply -n dev -f waltid-wallet-api/k8s/deployment_mod.yaml
       - name: Prepare CD - portal.walt.id
         run: sed "s/_DEFAULT_DEPLOYMENT_/$GITHUB_SHA/g" waltid-web-portal/k8s/deployment-dev.yaml > waltid-web-portal/k8s/deployment_mod.yaml
       - name: Continuous deployment - portal.walt.id
@@ -118,4 +118,4 @@ jobs:
         env:
           KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
         with:
-          args: apply -n portals -f waltid-web-portal/k8s/deployment_mod.yaml
+          args: apply -n dev -f waltid-web-portal/k8s/deployment_mod.yaml
