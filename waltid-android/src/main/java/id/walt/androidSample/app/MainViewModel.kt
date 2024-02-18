@@ -24,9 +24,13 @@ interface MainViewModel {
 
     val did: StateFlow<String?>
 
+    val jws: StateFlow<String?>
+
     val events: Flow<Event>
 
     fun onSignRaw(plainText: String, keyType: KeyType)
+
+    fun onSignJWS(plainText: String, keyType: KeyType)
 
     fun onVerifyPlainText(signature: ByteArray, plainText: ByteArray?)
 
@@ -56,6 +60,7 @@ interface MainViewModel {
         override val signature = MutableStateFlow<ByteArray?>(null)
         override val publicKey = MutableStateFlow<LocalKey?>(null)
         override val did = MutableStateFlow<String>("")
+        override val jws = MutableStateFlow<String?>(null)
         override val events = emptyFlow<Event>()
 
         override fun onSignRaw(plainText: String, keyType: KeyType) = Unit
@@ -69,6 +74,7 @@ interface MainViewModel {
         override fun onBiometricsUnavailable() = Unit
         override fun onBiometricsAuthFailure() = Unit
         override fun onGenerateDid() = Unit
+        override fun onSignJWS(plainText: String, keyType: KeyType) = Unit
 
     }
 
@@ -80,6 +86,7 @@ interface MainViewModel {
         override val signature = MutableStateFlow<ByteArray?>(null)
         override val publicKey = MutableStateFlow<LocalKey?>(null)
         override val did = MutableStateFlow<String?>(null)
+        override val jws = MutableStateFlow<String?>(null)
 
         private val eventsChannel = Channel<Event>()
         override val events = eventsChannel.receiveAsFlow()
@@ -93,6 +100,18 @@ interface MainViewModel {
                     val signedContent = this.signRaw(plainText.toByteArray())
                     signature.value = signedContent
                     eventsChannel.send(Event.SignedWithKey(keyType))
+                }
+            }
+        }
+
+        override fun onSignJWS(plainText: String, keyType: KeyType) {
+            viewModelScope.launch {
+                LocalKey.generate(keyType, LocalKeyMetadata()).run {
+                    localKey = this
+                    signJws(plainText.toByteArray(), mapOf("kid" to this.getKeyId())).also {
+                        jws.value = it
+                        eventsChannel.send(Event.SignedWithKey(keyType))
+                    }
                 }
             }
         }

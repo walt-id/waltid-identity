@@ -12,10 +12,12 @@
 
     <string name="label_enter_plaintext">Enter plain text to sign</string>
     <string name="label_sign">Sign Plain Text</string>
+    <string name="label_sign_jws">Sign as JWS</string>
     <string name="label_verify_signature">Verify Signature</string>
     <string name="label_get_public_key">Retrieve Public Key</string>
     <string name="label_generate_did">Generate DID</string>
     <string name="signature">Signature: %s</string>
+    <string name="jws">JWS: %s</string>
     <string name="did">DID: %s</string>
 
     <string name="copied_to_clipboard">Copied to clipboard!</string>

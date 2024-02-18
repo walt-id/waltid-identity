@@ -101,6 +101,7 @@ private fun MainUiContent(
     val signature by viewModel.signature.collectAsState()
     val publicKey by viewModel.publicKey.collectAsState()
     val did by viewModel.did.collectAsState()
+    val jws by viewModel.jws.collectAsState()
 
     val context = LocalContext.current
     val systemKeyboard = LocalSoftwareKeyboardController.current
@@ -164,6 +165,20 @@ private fun MainUiContent(
                 systemKeyboard?.hide()
                 authenticateWithBiometric(
                     context = context as FragmentActivity,
+                    onAuthenticated = { viewModel.onSignJWS(plainText, selectedKeyType) },
+                    onFailure = { viewModel.onBiometricsAuthFailure() }
+                )
+            },
+            enabled = plainText.isNotBlank() && isBiometricsAvailable && selectedKeyType == KeyType.RSA,
+        ) {
+            Text(text = stringResource(R.string.label_sign_jws))
+        }
+
+        Button(
+            onClick = {
+                systemKeyboard?.hide()
+                authenticateWithBiometric(
+                    context = context as FragmentActivity,
                     onAuthenticated = { viewModel.onSignRaw(plainText, selectedKeyType) },
                     onFailure = { viewModel.onBiometricsAuthFailure() }
                 )
@@ -215,6 +230,13 @@ private fun MainUiContent(
             BasicText(
                 text = "PublicKey: $publicKey",
                 textToCopy = CopiedText("Cryptographic PublicKey", publicKey.toString())
+            )
+        }
+
+        if (jws != null) {
+            BasicText(
+                text = stringResource(R.string.jws, jws.toString()),
+                textToCopy = CopiedText("JWS", jws.toString())
             )
         }
 
