@@ -39,6 +39,7 @@ spec:
       containers:
         - name: issuer
           image: waltid/issuer-api:dev
+          imagePullPolicy: Always
           volumeMounts:
             - name: issuer-web-config
               mountPath: "/waltid-issuer-api/config/"
