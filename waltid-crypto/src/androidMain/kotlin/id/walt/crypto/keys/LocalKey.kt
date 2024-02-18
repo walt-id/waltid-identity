@@ -1,6 +1,11 @@
 package id.walt.crypto.keys
 
 import android.util.Base64
+import com.nimbusds.jose.JWSAlgorithm
+import com.nimbusds.jose.JWSHeader
+import com.nimbusds.jose.JWSObject
+import com.nimbusds.jose.Payload
+import com.nimbusds.jose.crypto.RSASSASigner
 import id.walt.crypto.keys.AndroidLocalKeyGenerator.PUBLIC_KEY_ALIAS_PREFIX
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -59,6 +64,7 @@ actual class LocalKey actual constructor(jwk: String?) : Key() {
                     toString()
                 }
             }
+
             KeyType.secp256r1 -> {
                 val keyFactory = KeyFactory.getInstance("EC")
                 val keySpec = keyFactory.getKeySpec(publicKey, ECPublicKeySpec::class.java)
@@ -70,6 +76,7 @@ actual class LocalKey actual constructor(jwk: String?) : Key() {
                     toString()
                 }
             }
+
             KeyType.Ed25519 -> throw IllegalArgumentException("Ed25519 is not supported in Android KeyStore")
             KeyType.secp256k1 -> throw IllegalArgumentException("secp256k1 is not supported in Android KeyStore")
         }
@@ -102,7 +109,32 @@ actual class LocalKey actual constructor(jwk: String?) : Key() {
     }
 
     actual override suspend fun signJws(plaintext: ByteArray, headers: Map<String, String>): String {
-        TODO("Not yet implemented")
+        check(hasPrivateKey) { "No private key is attached to this key!" }
+
+        val privateKey: PrivateKey = keyStore.getKey(internalKeyId, null) as PrivateKey
+
+        val jwsAlgorithm = when (internalKeyType) {
+            KeyType.Ed25519 -> JWSAlgorithm.EdDSA
+            KeyType.secp256k1 -> JWSAlgorithm.ES256K
+            KeyType.secp256r1 -> JWSAlgorithm.ES256
+            KeyType.RSA -> JWSAlgorithm.RS256
+        }
+
+        val signer = when (keyType) {
+            KeyType.RSA -> RSASSASigner(privateKey)
+            KeyType.secp256r1 -> throw IllegalArgumentException("key type not supported")
+            KeyType.Ed25519 -> throw IllegalArgumentException("key type not supported")
+            KeyType.secp256k1 -> throw IllegalArgumentException("key type not supported")
+        }
+
+        val jwsObject = JWSObject(
+            JWSHeader.Builder(jwsAlgorithm).customParams(headers).build(),
+            Payload(plaintext)
+        )
+
+        jwsObject.sign(signer)
+
+        return jwsObject.serialize()
     }
 
     actual override suspend fun verifyRaw(signed: ByteArray, detachedPlaintext: ByteArray?): Result<ByteArray> {
