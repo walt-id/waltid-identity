@@ -126,6 +126,7 @@ spec:
       containers:
         - name: wallet-api
           image: waltid/wallet-api:dev
+          imagePullPolicy: Always
           volumeMounts:
             - name: wallet-db-config
               mountPath: "/waltid-wallet-api/config/db.conf"
@@ -232,6 +233,7 @@ spec:
       containers:
         - name: waltid-web-wallet
           image: waltid/waltid-web-wallet:dev
+          imagePullPolicy: Always
           env:
             - name: NUXT_PUBLIC_ISSUER_CALLBACK_URL
               value: "https://wallet.walt-test.cloud"
