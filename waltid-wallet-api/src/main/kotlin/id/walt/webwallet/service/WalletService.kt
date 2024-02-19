@@ -1,6 +1,8 @@
 package id.walt.webwallet.service
 
+import id.walt.oid4vc.data.CredentialOffer
 import id.walt.oid4vc.data.dif.PresentationDefinition
+import id.walt.oid4vc.requests.CredentialOfferRequest
 import id.walt.webwallet.db.models.WalletCategoryData
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.db.models.WalletDid
@@ -41,6 +43,7 @@ abstract class WalletService(val tenant: String, val accountId: UUID, val wallet
     abstract suspend fun useOfferRequest(
         offer: String, did: String, requireUserInput: Boolean, silent: Boolean
     ): List<WalletCredential>
+    abstract suspend fun resolveCredentialOffer(offerRequest: CredentialOfferRequest): CredentialOffer
 
     // DIDs
     abstract suspend fun listDids(): List<WalletDid>

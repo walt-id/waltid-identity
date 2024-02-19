@@ -18,11 +18,6 @@ repositories {
             includeGroup("com.github.multiformats")
         }
     }
-    maven("https://maven.walt.id/repository/waltid-ssi-kit/") {
-        content {
-            includeGroup("id.walt")
-        }
-    }
     maven("https://repo.danubetech.com/repository/maven-public/")
     maven("https://maven.walt.id/repository/waltid/") {
         content {
