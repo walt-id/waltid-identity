@@ -111,6 +111,10 @@ dependencies {
     // OIDC
     implementation(project(":waltid-openid4vc"))
     implementation(project(":waltid-sdjwt"))
+
+    testImplementation(project(":waltid-issuer-api"))
+    testImplementation(project(":waltid-verifier-api"))
+
     implementation("com.nimbusds:nimbus-jose-jwt:9.37.3")
     implementation("io.ktor:ktor-client-java:$ktorVersion")
 

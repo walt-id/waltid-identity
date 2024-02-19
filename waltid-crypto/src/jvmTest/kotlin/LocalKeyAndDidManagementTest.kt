@@ -4,6 +4,7 @@ import id.walt.crypto.keys.LocalKey
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
+import kotlin.js.ExperimentalJsExport
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -11,6 +12,7 @@ import kotlin.test.assertTrue
 
 class LocalKeyAndDidManagementTest {
 
+    @OptIn(ExperimentalJsExport::class)
     private val keyTypeMap = mapOf(
         KeyType.Ed25519 to "OKP",
         KeyType.secp256k1 to "EC",
@@ -18,12 +20,14 @@ class LocalKeyAndDidManagementTest {
         KeyType.RSA to "RSA"
     )
 
+    @OptIn(ExperimentalJsExport::class)
     private fun getKeyTypeMap(kt: KeyType): String? {
         return keyTypeMap[kt]
     }
 
     private val testObj = JsonObject(mapOf("value1" to JsonPrimitive("123456789")))
 
+    @OptIn(ExperimentalJsExport::class)
     @Test
     fun localKeyGenerationTest() = runTest {
         KeyType.entries.forEach {
@@ -63,6 +67,7 @@ class LocalKeyAndDidManagementTest {
         }
     }
 
+    @OptIn(ExperimentalJsExport::class)
     private suspend fun signJws(serializedKey: String) {
         val testObjJson = Json.encodeToString(testObj)
 
@@ -78,6 +83,7 @@ class LocalKeyAndDidManagementTest {
         assertEquals(testObj, verificationResult.getOrThrow())
     }
 
+    @OptIn(ExperimentalJsExport::class)
     private suspend fun signRaw(serializedKey: String) {
         val testObjJson = Json.encodeToString(testObj)
 
@@ -88,6 +94,7 @@ class LocalKeyAndDidManagementTest {
         assertNotNull(signature)
     }
 
+    @OptIn(ExperimentalJsExport::class)
     private suspend fun exportJwk(serializedKey: String) {
         val decoded = Json.decodeFromString<JsonObject>(serializedKey)
         val jwk = decoded["jwk"]!!.jsonPrimitive.content
@@ -98,6 +105,7 @@ class LocalKeyAndDidManagementTest {
         assertEquals(jwk, export)
     }
 
+    @OptIn(ExperimentalJsExport::class)
     private suspend fun exportJson(serializedKey: String) {
         val decoded = Json.decodeFromString<JsonObject>(serializedKey)
         val jwk = decoded["jwk"]!!.jsonPrimitive.content
