@@ -166,6 +166,7 @@ interface MainViewModel {
             signature.value = null
             publicKey.value = null
             did.value = null
+            jws.value = null
         }
 
     }

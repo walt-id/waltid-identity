@@ -58,9 +58,6 @@ kotlin {
             dependencies {
                 // Multibase
                 implementation("com.github.multiformats:java-multibase:v1.1.1")
-
-                // JOSE
-                implementation("com.nimbusds:nimbus-jose-jwt:9.37.3")
             }
         }
         val androidInstrumentedTest by getting {
