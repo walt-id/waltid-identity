@@ -169,7 +169,7 @@ private fun MainUiContent(
                     onFailure = { viewModel.onBiometricsAuthFailure() }
                 )
             },
-            enabled = plainText.isNotBlank() && isBiometricsAvailable && selectedKeyType == KeyType.RSA,
+            enabled = plainText.isNotBlank() && isBiometricsAvailable,
         ) {
             Text(text = stringResource(R.string.label_sign_jws))
         }

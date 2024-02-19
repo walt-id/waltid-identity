@@ -1,11 +1,6 @@
 package id.walt.crypto.keys
 
 import android.util.Base64
-import com.nimbusds.jose.JWSAlgorithm
-import com.nimbusds.jose.JWSHeader
-import com.nimbusds.jose.JWSObject
-import com.nimbusds.jose.Payload
-import com.nimbusds.jose.crypto.RSASSASigner
 import id.walt.crypto.keys.AndroidLocalKeyGenerator.PUBLIC_KEY_ALIAS_PREFIX
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -113,28 +108,19 @@ actual class LocalKey actual constructor(jwk: String?) : Key() {
 
         val privateKey: PrivateKey = keyStore.getKey(internalKeyId, null) as PrivateKey
 
-        val jwsAlgorithm = when (internalKeyType) {
-            KeyType.Ed25519 -> JWSAlgorithm.EdDSA
-            KeyType.secp256k1 -> JWSAlgorithm.ES256K
-            KeyType.secp256r1 -> JWSAlgorithm.ES256
-            KeyType.RSA -> JWSAlgorithm.RS256
+        val signature: ByteArray = getSignature().run {
+            initSign(privateKey)
+            update(plaintext)
+            sign()
         }
 
-        val signer = when (keyType) {
-            KeyType.RSA -> RSASSASigner(privateKey)
-            KeyType.secp256r1 -> throw IllegalArgumentException("key type not supported")
-            KeyType.Ed25519 -> throw IllegalArgumentException("key type not supported")
-            KeyType.secp256k1 -> throw IllegalArgumentException("key type not supported")
-        }
+        val encodedSignature = Base64.encodeToString(signature, Base64.NO_WRAP)
 
-        val jwsObject = JWSObject(
-            JWSHeader.Builder(jwsAlgorithm).customParams(headers).build(),
-            Payload(plaintext)
-        )
+        // Construct the JWS in the format: base64UrlEncode(headers) + '.' + base64UrlEncode(payload) + '.' + base64UrlEncode(signature)
+        val encodedHeaders = Base64.encodeToString(headers.toString().toByteArray(), Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING)
+        val encodedPayload = Base64.encodeToString(plaintext, Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING)
 
-        jwsObject.sign(signer)
-
-        return jwsObject.serialize()
+        return "$encodedHeaders.$encodedPayload.$encodedSignature"
     }
 
     actual override suspend fun verifyRaw(signed: ByteArray, detachedPlaintext: ByteArray?): Result<ByteArray> {
