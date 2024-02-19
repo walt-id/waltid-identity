@@ -108,9 +108,15 @@ dependencies {
     // waltid-did
     implementation("id.walt.did:waltid-did:1.1.1")//id.walt.crypto provided by id.walt.did:waltid-did
     
+    // waltid-issuer
+    
     // OIDC
     implementation(project(":waltid-openid4vc"))
     implementation(project(":waltid-sdjwt"))
+    implementation(project(":waltid-issuer-api"))
+    
+    testImplementation(project(":waltid-issuer-api"))
+    
     implementation("com.nimbusds:nimbus-jose-jwt:9.37.1")
     implementation("io.ktor:ktor-client-java:$ktorVersion")
     

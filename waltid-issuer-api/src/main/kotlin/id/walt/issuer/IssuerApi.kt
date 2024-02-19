@@ -21,10 +21,13 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlin.js.ExperimentalJsExport
 import kotlin.time.Duration.Companion.minutes
 
 
 suspend fun createCredentialOfferUri(issuanceRequest: BaseIssuanceRequest): String {
+    println("KEY = ${issuanceRequest.issuanceKey}")
+    println("type of key = ${issuanceRequest.issuanceKey::class.qualifiedName}")
     val key = KeySerialization.deserializeKey(issuanceRequest.issuanceKey)
         .onFailure { throw IllegalArgumentException("Invalid key was supplied, error occurred is: $it") }
         .getOrThrow()
