@@ -25,15 +25,9 @@ import kotlinx.serialization.json.JsonObject
 import kotlin.time.Duration.Companion.minutes
 
 
-suspend fun createCredentialOfferUri(issuanceRequest: BaseIssuanceRequest): String {
-    val key = KeySerialization.deserializeKey(issuanceRequest.issuanceKey)
-        .onFailure { throw IllegalArgumentException("Invalid key was supplied, error occurred is: $it") }
-        .getOrThrow()
-    val issuerDid =
-        issuanceRequest.issuerDid ?: DidService.registerByKey("key", key).did
-
+suspend fun createCredentialOfferUri(issuanceRequests: List<BaseIssuanceRequest>): String {
     val credentialOfferBuilder =
-        OidcIssuance.issuanceRequestsToCredentialOfferBuilder(issuanceRequest)
+        OidcIssuance.issuanceRequestsToCredentialOfferBuilder(issuanceRequests)
 
     val issuanceSession = OidcApi.initializeCredentialOffer(
         credentialOfferBuilder = credentialOfferBuilder,
@@ -42,7 +36,13 @@ suspend fun createCredentialOfferUri(issuanceRequest: BaseIssuanceRequest): Stri
     )
     OidcApi.setIssuanceDataForIssuanceId(
         issuanceSession.id,
-        listOf(CIProvider.IssuanceSessionData(key, issuerDid, issuanceRequest))
+        issuanceRequests.map {
+            CIProvider.IssuanceSessionData(
+                KeySerialization.deserializeKey(it.issuanceKey)
+                    .onFailure { throw IllegalArgumentException("Invalid key was supplied, error occurred is: $it") }
+                    .getOrThrow(), it.issuerDid, it
+            )
+        }
     )  // TODO: Hack as this is non stateless because of oidc4vc lib API
 
     println("issuanceSession: $issuanceSession")
@@ -199,7 +199,7 @@ fun Application.issuerApi() {
                         }
                     }) {
                         val jwtIssuanceRequest = context.receive<JwtIssuanceRequest>()
-                        val offerUri = createCredentialOfferUri(jwtIssuanceRequest)
+                        val offerUri = createCredentialOfferUri(listOf(jwtIssuanceRequest))
 
                         context.respond(
                             HttpStatusCode.OK,
@@ -235,37 +235,7 @@ fun Application.issuerApi() {
 
 
                         val issuanceRequests = context.receive<List<JwtIssuanceRequest>>()
-
-                        val credentialOfferBuilder =
-                            OidcIssuance.issuanceRequestsToCredentialOfferBuilder(issuanceRequests)
-
-                        val issuanceSession = OidcApi.initializeCredentialOffer(
-                            credentialOfferBuilder = credentialOfferBuilder,
-                            expiresIn = 5.minutes,
-                            allowPreAuthorized = true,
-                            //preAuthUserPin = "1234"
-                        )
-
-
-                        OidcApi.setIssuanceDataForIssuanceId(
-                            issuanceSession.id,
-                            issuanceRequests.map {
-                                CIProvider.IssuanceSessionData(
-                                    KeySerialization.deserializeKey(it.issuanceKey).getOrThrow(), it.issuerDid, it
-                                )
-                            }
-                        )  // TODO: Hack as this is non stateless because of oidc4vc lib API
-                        println("issuanceSession: $issuanceSession")
-
-                        val offerRequest = CredentialOfferRequest(issuanceSession.credentialOffer!!)
-                        println("offerRequest: $offerRequest")
-
-                        val offerUri = OidcApi.getCredentialOfferRequestUrl(
-                            offerRequest = offerRequest,
-                            walletCredentialOfferEndpoint = CROSS_DEVICE_CREDENTIAL_OFFER_URL + OidcApi.baseUrl.removePrefix(
-                                "https://"
-                            ).removePrefix("http://") + "/"
-                        )
+                        val offerUri = createCredentialOfferUri(issuanceRequests)
                         println("Offer URI: $offerUri")
 
                         context.respond(
@@ -303,7 +273,7 @@ fun Application.issuerApi() {
                     }) {
                         val sdJwtIssuanceRequest = context.receive<SdJwtIssuanceRequest>()
 
-                        val offerUri = createCredentialOfferUri(sdJwtIssuanceRequest)
+                        val offerUri = createCredentialOfferUri(listOf(sdJwtIssuanceRequest))
 
                         context.respond(
                             HttpStatusCode.OK,
