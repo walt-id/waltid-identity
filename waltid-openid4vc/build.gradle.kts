@@ -106,6 +106,7 @@ kotlin {
         val jvmMain by getting {
             dependencies {
                 implementation("io.ktor:ktor-client-java:$ktor_version")
+                implementation("org.sqids:sqids:0.1.0")
             }
         }
         val jvmTest by getting {

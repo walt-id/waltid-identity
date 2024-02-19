@@ -4,3 +4,5 @@ expect fun randomUUID(): String
 expect fun sha256(data: ByteArray): ByteArray
 
 expect suspend fun httpGet(url: String): String
+
+expect fun randomSessionId(): String
