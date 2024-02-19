@@ -5,7 +5,14 @@ This package is a docker compose configuration that starts all the services and 
 ## Executing The Package
 
 ```bash
-docker compose up
+docker-compose pull
+docker-compose up
+```
+
+Note: If you are facing issues with the containers, try running the following command to remove the existing containers and then run the above command again.
+
+```bash
+docker-compose down
 ```
 
 ## Services Exposed
