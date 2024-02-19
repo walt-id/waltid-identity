@@ -1,6 +1,5 @@
 package id.walt.androidSample.app
 
-import android.util.Base64
 import android.widget.Toast
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG
@@ -79,6 +78,9 @@ fun MainUi(viewModel: MainViewModel) {
                 ctx.getString(R.string.signed_with_key, event.key.name),
                 Toast.LENGTH_SHORT
             ).show()
+
+            MainViewModel.Event.CredentialSignFailure -> Toast.makeText(ctx, ctx.getString(R.string.credential_sign_failure), Toast.LENGTH_SHORT).show()
+            MainViewModel.Event.GeneralSuccess -> Toast.makeText(ctx, ctx.getString(R.string.success), Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -98,10 +100,8 @@ private fun MainUiContent(
 ) {
 
     val plainText by viewModel.plainText.collectImmediatelyAsState()
+    val textToDisplay by viewModel.displayText.collectAsState()
     val signature by viewModel.signature.collectAsState()
-    val publicKey by viewModel.publicKey.collectAsState()
-    val did by viewModel.did.collectAsState()
-    val jws by viewModel.jws.collectAsState()
 
     val context = LocalContext.current
     val systemKeyboard = LocalSoftwareKeyboardController.current
@@ -218,33 +218,25 @@ private fun MainUiContent(
             Text(text = stringResource(R.string.label_generate_did))
         }
 
-        val _did = did
-        if (!_did.isNullOrBlank()) {
-            BasicText(
-                text = _did,
-                textToCopy = CopiedText("Cryptographic DID", _did)
-            )
+        Button(
+            onClick = {
+                systemKeyboard?.hide()
+                authenticateWithBiometric(
+                    context = context as FragmentActivity,
+                    onAuthenticated = { viewModel.onSignCredential() },
+                    onFailure = { viewModel.onBiometricsAuthFailure() }
+                )
+            },
+            enabled = signature != null,
+        ) {
+            Text(text = stringResource(R.string.label_sign_credential))
         }
 
-        if (publicKey != null) {
+        val displayText = textToDisplay
+        if (displayText != null) {
             BasicText(
-                text = "PublicKey: $publicKey",
-                textToCopy = CopiedText("Cryptographic PublicKey", publicKey.toString())
-            )
-        }
-
-        if (jws != null) {
-            BasicText(
-                text = stringResource(R.string.jws, jws.toString()),
-                textToCopy = CopiedText("JWS", jws.toString())
-            )
-        }
-
-        if (signature != null) {
-            val signatureEncoded = Base64.encodeToString(signature, Base64.DEFAULT)
-            BasicText(
-                text = stringResource(R.string.signature, signatureEncoded),
-                textToCopy = CopiedText("Cryptographic Signature", signatureEncoded)
+                text = displayText,
+                textToCopy = CopiedText("WaltId copied text", displayText)
             )
         }
     }

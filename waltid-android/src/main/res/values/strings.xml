@@ -6,6 +6,9 @@
     <string name="biometric_unavailable">Please enroll fingerprint to continue</string>
     <string name="biometric_authentication_failure">Authentication failed</string>
 
+    <string name="credential_sign_failure">Key instance not found</string>
+    <string name="success">Success!</string>
+
     <string name="title_biometric_authentication">Biometric Authentication</string>
     <string name="subtitle_biometric_authentication">Verify your identity to sign signature</string>
     <string name="cancel">Cancel</string>
@@ -16,6 +19,7 @@
     <string name="label_verify_signature">Verify Signature</string>
     <string name="label_get_public_key">Retrieve Public Key</string>
     <string name="label_generate_did">Generate DID</string>
+    <string name="label_sign_credential">Sign a Credential</string>
     <string name="signature">Signature: %s</string>
     <string name="jws">JWS: %s</string>
     <string name="did">DID: %s</string>

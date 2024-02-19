@@ -1,5 +1,8 @@
 package id.walt.androidSample.app
 
+import android.util.Base64
+import id.walt.credentials.CredentialBuilder
+import id.walt.credentials.CredentialBuilderType
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.LocalKey
 import id.walt.crypto.keys.LocalKeyMetadata
@@ -17,14 +20,8 @@ import kotlinx.coroutines.launch
 interface MainViewModel {
 
     val plainText: StateFlow<String>
-
+    val displayText: StateFlow<String?>
     val signature: StateFlow<ByteArray?>
-
-    val publicKey: StateFlow<LocalKey?>
-
-    val did: StateFlow<String?>
-
-    val jws: StateFlow<String?>
 
     val events: Flow<Event>
 
@@ -44,23 +41,25 @@ interface MainViewModel {
 
     fun onGenerateDid()
 
+    fun onSignCredential()
+
     fun onClearInput()
 
     sealed interface Event {
         data object SignatureVerified : Event
         data object SignatureInvalid : Event
         data object BiometricsUnavailable : Event
+        data object CredentialSignFailure : Event
         data object BiometricAuthenticationFailure : Event
         data class SignedWithKey(val key: KeyType) : Event
+        data object GeneralSuccess : Event
     }
 
     class Fake : MainViewModel {
 
-        override val plainText = MutableStateFlow("placeholder text")
+        override val plainText = MutableStateFlow("")
+        override val displayText = MutableStateFlow<String?>(null)
         override val signature = MutableStateFlow<ByteArray?>(null)
-        override val publicKey = MutableStateFlow<LocalKey?>(null)
-        override val did = MutableStateFlow<String>("")
-        override val jws = MutableStateFlow<String?>(null)
         override val events = emptyFlow<Event>()
 
         override fun onSignRaw(plainText: String, keyType: KeyType) = Unit
@@ -74,6 +73,7 @@ interface MainViewModel {
         override fun onBiometricsUnavailable() = Unit
         override fun onBiometricsAuthFailure() = Unit
         override fun onGenerateDid() = Unit
+        override fun onSignCredential() = Unit
         override fun onSignJWS(plainText: String, keyType: KeyType) = Unit
 
     }
@@ -83,21 +83,22 @@ interface MainViewModel {
         private val viewModelScope = CoroutineScope(Dispatchers.Main.immediate)
 
         override val plainText = MutableStateFlow("")
+        override val displayText = MutableStateFlow<String?>(null)
         override val signature = MutableStateFlow<ByteArray?>(null)
-        override val publicKey = MutableStateFlow<LocalKey?>(null)
-        override val did = MutableStateFlow<String?>(null)
-        override val jws = MutableStateFlow<String?>(null)
 
         private val eventsChannel = Channel<Event>()
         override val events = eventsChannel.receiveAsFlow()
 
         private var localKey: LocalKey? = null
 
+        private var did: String? = null
+
         override fun onSignRaw(plainText: String, keyType: KeyType) {
             viewModelScope.launch {
                 LocalKey.generate(keyType, LocalKeyMetadata()).run {
                     localKey = this
                     val signedContent = this.signRaw(plainText.toByteArray())
+                    displayText.value = Base64.encodeToString(signedContent, Base64.DEFAULT)
                     signature.value = signedContent
                     eventsChannel.send(Event.SignedWithKey(keyType))
                 }
@@ -109,7 +110,7 @@ interface MainViewModel {
                 LocalKey.generate(keyType, LocalKeyMetadata()).run {
                     localKey = this
                     signJws(plainText.toByteArray(), mapOf("kid" to this.getKeyId())).also {
-                        jws.value = it
+                        displayText.value = it
                         eventsChannel.send(Event.SignedWithKey(keyType))
                     }
                 }
@@ -131,7 +132,8 @@ interface MainViewModel {
 
         override fun onRetrievePublicKey() {
             viewModelScope.launch {
-                publicKey.value = localKey?.getPublicKey()
+                displayText.value = localKey?.getPublicKey().toString()
+                eventsChannel.send(Event.GeneralSuccess)
             }
         }
 
@@ -156,17 +158,36 @@ interface MainViewModel {
                 DidService.minimalInit()
                 localKey?.let {
                     val didKey = DidService.registerByKey("key", it)
-                    did.value = didKey.did
+                    displayText.value = didKey.did
+                    did = didKey.did
+                    eventsChannel.send(Event.GeneralSuccess)
+                }
+            }
+        }
+
+        override fun onSignCredential() {
+            viewModelScope.launch {
+                val credential = CredentialBuilder(CredentialBuilderType.W3CV11CredentialBuilder).buildW3C()
+
+                val key = localKey
+                val d = did
+                if (key != null && d != null) {
+                    val mySubjectDid = "did:key:xyz"
+
+                    val signed: String = credential.signJws(key, d, mySubjectDid)
+
+                    displayText.value = signed
+                    eventsChannel.send(Event.GeneralSuccess)
+                } else {
+                    eventsChannel.send(Event.CredentialSignFailure)
                 }
             }
         }
 
         override fun onClearInput() {
+            displayText.value = null
             plainText.value = ""
             signature.value = null
-            publicKey.value = null
-            did.value = null
-            jws.value = null
         }
 
     }
