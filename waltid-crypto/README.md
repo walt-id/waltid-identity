@@ -478,7 +478,7 @@ vault server -dev -dev-root-token-id="dev-only-token"
 #### Docker
 
 ```shell
-docker run -p 8200:8200 --cap-add=IPC_LOCK -e VAULT_DEV_ROOT_TOKEN_ID=myroot -e VAULT_DEV_LISTEN_ADDRESS=0.0.0.0:8200 hashicorp/vault
+docker run -p 8200:8200 --cap-add=IPC_LOCK -e VAULT_DEV_ROOT_TOKEN_ID=dev-only-token -e VAULT_DEV_LISTEN_ADDRESS=0.0.0.0:8200 hashicorp/vault
 ```
 
 ### Enable a Transit Secrets Engine instance

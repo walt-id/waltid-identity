@@ -22,6 +22,7 @@ import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.engine.cio.*
 import io.ktor.client.request.*
+import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.util.*
@@ -112,7 +113,13 @@ class TestCredentialWallet(
     }
 
     override fun httpGet(url: Url, headers: Headers?): SimpleHttpResponse {
-        TODO("Not yet implemented")
+        return runBlocking {
+            ktorClient.get(url) {
+                headers {
+                    headers?.forEach { s, strings -> headersOf(s, strings) }
+                }
+            }.let { SimpleHttpResponse(it.status, it.headers, it.bodyAsText()) }
+        }
     }
 
     override fun httpPostObject(url: Url, jsonObject: JsonObject, headers: Headers?): SimpleHttpResponse {
@@ -186,21 +193,7 @@ class TestCredentialWallet(
                 id = presentationId,
                 definitionId = presentationId,
                 descriptorMap = matchedCredentials.map { it.document }.mapIndexed { index, vcJwsStr ->
-                    val vcJws = vcJwsStr.base64UrlToBase64().decodeJws()
-                    val type =
-                        vcJws.payload["vc"]?.jsonObject?.get("type")?.jsonArray?.last()?.jsonPrimitive?.contentOrNull
-                            ?: "VerifiableCredential"
-
-                    DescriptorMapping(
-                        id = session.presentationDefinition?.inputDescriptors?.get(index)?.id,
-                        format = VCFormat.jwt_vp,  // jwt_vp_json
-                        path = "$",
-                        pathNested = DescriptorMapping(
-                            id = session.presentationDefinition?.inputDescriptors?.get(index)?.id,
-                            format = VCFormat.jwt_vc_json,
-                            path = "$.verifiableCredential[$index]",
-                        )
-                    )
+                    buildDescriptorMapping(session, index, vcJwsStr)
                 }
             )
         )
@@ -290,4 +283,26 @@ class TestCredentialWallet(
             putSession(it.id, it)
         }
     }
+
+    private fun buildDescriptorMapping(session: VPresentationSession, index: Int, vcJwsStr: String) = let {
+        val vcJws = vcJwsStr.base64UrlToBase64().decodeJws()
+        val type = vcJws.payload["vc"]?.jsonObject?.get("type")?.jsonArray?.last()?.jsonPrimitive?.contentOrNull
+            ?: "VerifiableCredential"
+
+        DescriptorMapping(
+            id = getDescriptorId(type, session.presentationDefinition),//session.presentationDefinition?.inputDescriptors?.get(index)?.id,
+            format = VCFormat.jwt_vp,  // jwt_vp_json
+            path = "$",
+            pathNested = DescriptorMapping(
+                id = getDescriptorId(type, session.presentationDefinition),//session.presentationDefinition?.inputDescriptors?.get(index)?.id,
+                format = VCFormat.jwt_vc_json,
+                path = "$.verifiableCredential[$index]",
+            )
+        )
+    }
+
+    private fun getDescriptorId(type: String, presentationDefinition: PresentationDefinition?) =
+        presentationDefinition?.inputDescriptors?.find {
+            (it.name ?: it.id) == type
+        }?.id
 }
