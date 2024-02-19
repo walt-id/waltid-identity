@@ -1,9 +1,13 @@
 package id.walt.webwallet.db.models
 
 import id.walt.crypto.utils.JwsUtils.decodeJws
+import id.walt.webwallet.manifest.provider.ManifestProvider
 import kotlinx.datetime.Instant
 import kotlinx.datetime.toKotlinInstant
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -22,7 +26,8 @@ object WalletCredentials : Table("credentials") {
 
     val addedOn = timestamp("added_on")
     val manifest = text("manifest").nullable()
-//    val delete = bool("delete").default(false)
+
+    //    val delete = bool("delete").default(false)
     val deletedOn = timestamp("deleted_on").nullable().default(null)
     val pending = bool("pending").default(false)
 
@@ -36,12 +41,14 @@ data class WalletCredential(
     val document: String,
     val disclosures: String?,
     val addedOn: Instant,
+    @Transient
     val manifest: String? = null,
-//    @Transient val delete: Boolean = false,
     val deletedOn: Instant?,
     val pending: Boolean = false,
 
-    val parsedDocument: JsonObject? = parseDocument(document, id)
+    val parsedDocument: JsonObject? = parseDocument(document, id),
+    @SerialName("manifest")
+    val parsedManifest: JsonObject? = tryParseManifest(manifest),
 ) {
 
     companion object {
@@ -60,6 +67,14 @@ data class WalletCredential(
                 }
             }.onFailure { it.printStackTrace() }
                 .getOrNull()
+
+        private fun tryParseManifest(manifest: String?) = runCatching {
+            manifest?.let { ManifestProvider.json.decodeFromString<JsonObject>(it) }
+        }.fold(onSuccess = {
+            it
+        }, onFailure = {
+            null
+        })
     }
 
 
@@ -70,7 +85,6 @@ data class WalletCredential(
         disclosures = result[WalletCredentials.disclosures],
         addedOn = result[WalletCredentials.addedOn].toKotlinInstant(),
         manifest = result[WalletCredentials.manifest],
-//        delete = result[WalletCredentials.delete],
         deletedOn = result[WalletCredentials.deletedOn]?.toKotlinInstant(),
         pending = result[WalletCredentials.pending],
     )

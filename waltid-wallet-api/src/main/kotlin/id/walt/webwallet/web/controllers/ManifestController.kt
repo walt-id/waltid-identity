@@ -11,6 +11,7 @@ import io.github.smiley4.ktorswaggerui.dsl.route
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.response.*
+import io.ktor.server.util.*
 import kotlinx.serialization.json.JsonObject
 
 fun Application.manifest() = walletRoute {
@@ -153,17 +154,13 @@ internal suspend fun callManifest(parameters: Parameters, method: suspend (Param
     }
 }
 
-internal fun getManifest(parameters: Parameters): JsonObject {
-    val walletId = parameters["walletId"] ?: throw IllegalArgumentException("Missing wallet id.")
-    val credentialId = parameters["credentialId"] ?: throw IllegalArgumentException("Missing credential id.")
-    return ManifestProvider.json.decodeFromString(
-        CredentialsService.Manifest.get(
-            kotlinx.uuid.UUID(walletId), credentialId
-        ) ?: ""
-    )
+internal fun getManifest(parameters: Parameters): JsonObject? {
+    val walletId = parameters.getOrFail("walletId")
+    val credentialId = parameters.getOrFail("credentialId")
+    return CredentialsService.get(kotlinx.uuid.UUID(walletId), credentialId)?.parsedManifest
 }
 
 internal suspend fun extractManifest(parameters: Parameters): JsonObject? {
-    val offer = parameters["offer"] ?: throw IllegalArgumentException("Missing offer request uri.")
+    val offer = parameters.getOrFail("offer")
     return ManifestExtractor.new(offer)?.extract(offer)
 }

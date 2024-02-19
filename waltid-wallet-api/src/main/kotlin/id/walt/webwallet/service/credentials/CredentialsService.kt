@@ -167,10 +167,6 @@ object CredentialsService {
     //TODO
     private fun lookupColumn(name: String) = WalletCredentials.addedOn
 
-    object Manifest {
-        fun get(wallet: UUID, credentialId: String): String? = CredentialsService.get(wallet, credentialId)?.manifest
-    }
-
     object Category {
         fun add(wallet: UUID, credentialId: String, vararg category: String): Int = transaction {
             WalletCredentialCategoryMap.batchUpsert(
