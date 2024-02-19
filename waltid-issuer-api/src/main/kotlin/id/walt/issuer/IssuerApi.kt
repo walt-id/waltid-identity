@@ -16,6 +16,7 @@ import io.github.smiley4.ktorswaggerui.dsl.post
 import io.github.smiley4.ktorswaggerui.dsl.route
 import io.ktor.http.*
 import io.ktor.server.application.*
+import io.ktor.server.plugins.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
@@ -46,7 +47,7 @@ suspend fun createCredentialOfferUri(issuanceRequest: BaseIssuanceRequest): Stri
 
     println("issuanceSession: $issuanceSession")
 
-    val offerRequest = CredentialOfferRequest(issuanceSession.credentialOffer!!)
+    val offerRequest = CredentialOfferRequest(null, "${OidcApi.baseUrl}/openid4vc/credentialOffer?id=${issuanceSession.id}")
     println("offerRequest: $offerRequest")
 
     val offerUri = OidcApi.getCredentialOfferRequestUrl(
@@ -329,6 +330,17 @@ fun Application.issuerApi() {
                     }) {
                         context.respond(HttpStatusCode.OK, "mdoc issued")
                     }
+                }
+                get("credentialOffer", {
+                    summary = "Gets a credential offer based on the session id"
+                    request {
+                        queryParameter<String>("id") { required = true }
+                    }
+                }) {
+                    val sessionId = call.parameters.get("id") ?: throw BadRequestException("Missing parameter \"id\"")
+                    val issuanceSession = OidcApi.getSession(sessionId) ?: throw NotFoundException("No active issuance session found by the given id")
+                    val credentialOffer = issuanceSession.credentialOffer ?: throw BadRequestException("Session has no credential offer set")
+                    context.respond(credentialOffer.toJSON())
                 }
             }
         }
