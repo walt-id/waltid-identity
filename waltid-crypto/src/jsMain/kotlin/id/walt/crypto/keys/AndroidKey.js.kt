@@ -67,7 +67,7 @@ actual class AndroidKey : Key() {
         TODO("Not yet implemented")
     }
 
-    actual override suspend fun getPublicKey(): LocalKey {
+    actual override suspend fun getPublicKey(): AndroidKey {
         TODO("Not yet implemented")
     }
 
@@ -81,27 +81,11 @@ actual class AndroidKey : Key() {
     actual override val hasPrivateKey: Boolean
         get() = TODO("Not yet implemented")
 
-    actual companion object : LocalKeyCreator {
+    actual companion object : AndroidKeyCreator {
         actual override suspend fun generate(
             type: KeyType,
             metadata: LocalKeyMetadata
-        ): LocalKey {
-            TODO("Not yet implemented")
-        }
-
-        actual override suspend fun importRawPublicKey(
-            type: KeyType,
-            rawPublicKey: ByteArray,
-            metadata: LocalKeyMetadata
-        ): Key {
-            TODO("Not yet implemented")
-        }
-
-        actual override suspend fun importJWK(jwk: String): Result<LocalKey> {
-            TODO("Not yet implemented")
-        }
-
-        actual override suspend fun importPEM(pem: String): Result<LocalKey> {
+        ): AndroidKey {
             TODO("Not yet implemented")
         }
 
