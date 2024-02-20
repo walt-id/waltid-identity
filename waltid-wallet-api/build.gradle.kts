@@ -120,7 +120,7 @@ dependencies {
     implementation("io.github.reactivecircus.cache4k:cache4k:0.12.0")
 
     // Webauthn
-    // implementation("com.yubico:webauthn-server-core:2.5.0")
+     implementation("com.webauthn4j:webauthn4j-core:0.22.1.RELEASE")
 
     // DB
     implementation("org.jetbrains.exposed:exposed-core:0.45.0")
