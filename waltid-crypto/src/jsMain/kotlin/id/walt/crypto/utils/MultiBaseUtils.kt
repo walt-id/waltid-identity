@@ -8,7 +8,11 @@ import org.khronos.webgl.Uint8Array
 @JsExport
 actual object MultiBaseUtils {
     actual fun convertRawKeyToMultiBase58Btc(key: ByteArray, code: UInt): String {
-        return multibase.encode("base58btc", key).decodeToString()
+        val codeVarInt = MultiCodecUtils.UVarInt(code)
+        val multicodecAndRawKey = ByteArray(key.size + codeVarInt.length)
+        codeVarInt.bytes.copyInto(multicodecAndRawKey)
+        key.copyInto(multicodecAndRawKey, codeVarInt.length)
+        return multibase.encode("base58btc", multicodecAndRawKey).decodeToString()
     }
 
     actual fun convertMultiBase58BtcToRawKey(mb: String): ByteArray {
