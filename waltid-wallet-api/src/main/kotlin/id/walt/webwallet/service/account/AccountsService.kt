@@ -12,10 +12,7 @@ import id.walt.webwallet.service.issuers.IssuersService
 import id.walt.webwallet.service.settings.SettingsService
 import id.walt.webwallet.service.settings.WalletSetting
 import id.walt.webwallet.web.controllers.generateToken
-import id.walt.webwallet.web.model.AccountRequest
-import id.walt.webwallet.web.model.AddressAccountRequest
-import id.walt.webwallet.web.model.EmailAccountRequest
-import id.walt.webwallet.web.model.OidcAccountRequest
+import id.walt.webwallet.web.model.*
 import kotlinx.datetime.toKotlinInstant
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonPrimitive
@@ -35,6 +32,7 @@ object AccountsService {
         is EmailAccountRequest -> EmailAccountStrategy.register(tenant, request)
         is AddressAccountRequest -> Web3WalletAccountStrategy.register(tenant, request)
         is OidcAccountRequest -> OidcAccountStrategy.register(tenant, request)
+        is OidcUniqueSubjectRequest -> OidcUniqueSubjectStrategy.register(tenant, request)
     }.onSuccess { registrationResult ->
         val registeredUserId = registrationResult.id
 
@@ -69,6 +67,7 @@ object AccountsService {
             is EmailAccountRequest -> EmailAccountStrategy.authenticate(tenant, request)
             is AddressAccountRequest -> Web3WalletAccountStrategy.authenticate(tenant, request)
             is OidcAccountRequest -> OidcAccountStrategy.authenticate(tenant, request)
+            is OidcUniqueSubjectRequest -> OidcUniqueSubjectStrategy.authenticate(tenant, request)
         }
     }.fold(onSuccess = {
         EventService.add(
