@@ -168,7 +168,20 @@ class VP_JVM_Test : AnnotationSpec() {
         // get authorization URL to be rendered as QR code, or called on wallet authorization endpoint, for same-device flow
         val authUrl = OpenID4VP.getAuthorizationUrl(presentationReq)
 
-        //
+        // ----------- WALLET -------------------
+
+        // TODO: parse authorization/presentation request
+        // TODO: Determine flow details
+        // TODO: optional (code flow): code response (verifier <-- wallet), token endpoint (verifier -> wallet)
+        // TODO: Generate token response
+        // TODO: Optional: respond to token request (code-flow, verifier <-- wallet), respond to authorization request (implicit flow, verifier <-- wallet)
+        // TODO: Optional: post token response to response_uri of verifier (cross-device flow, verifier <-- wallet)
+
+        // ------------ VERIFIER ---------------------
+
+        // TODO: Parse token response
+        // TODO: validate token response
+        // TODO: validation response
     }
 
     //@Test
