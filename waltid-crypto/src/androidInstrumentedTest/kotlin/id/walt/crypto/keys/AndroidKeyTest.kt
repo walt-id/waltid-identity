@@ -8,7 +8,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 @RunWith(AndroidJUnit4::class)
-class LocalKeyTest {
+class AndroidKeyTest {
 
     @Test
     fun generate_key_pair_using_RSA_algorithm() = runTest {
