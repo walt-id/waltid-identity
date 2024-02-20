@@ -51,7 +51,7 @@ val key = LocalKey.generate(KeyType.Ed25519)
 val options = DidKeyCreateOptions(
     useJwkJcsPub = true
 )
-val didResult = DidService.register(
+val didResult = DidService.registerByKey(
     method = "key",
     key = key,
     options = options
