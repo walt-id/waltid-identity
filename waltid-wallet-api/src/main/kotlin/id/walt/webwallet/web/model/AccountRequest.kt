@@ -23,6 +23,9 @@ data class AddressAccountRequest(override val name: String? = null, val address:
 @SerialName("oidc")
 data class OidcAccountRequest(override val name: String? = null, val token: String) : AccountRequest()
 
+@Serializable
+@SerialName("oidc-unique-subject")
+data class OidcUniqueSubjectRequest(override val name: String? = null, val token: String) : AccountRequest()
 
 val module = SerializersModule {
     polymorphic(AccountRequest::class) {
