@@ -3,6 +3,8 @@ plugins {
     kotlin("plugin.serialization")
     id("maven-publish")
     id("com.github.ben-manes.versions")
+    // Apply the application plugin to add support for building a CLI application in Java.
+    application
 }
 
 group = "id.walt.cli"
@@ -41,6 +43,9 @@ kotlin {
                 api(project(":waltid-sdjwt"))
                 api(project(":waltid-openid4vc"))
 
+                // kotlinx-io
+                implementation("org.jetbrains.kotlinx:kotlinx-io-core:0.3.1")
+
                 // CLI
                 implementation("com.varabyte.kotter:kotter-jvm:1.1.1")
                 implementation("com.github.ajalt.mordant:mordant:2.2.0")
@@ -63,12 +68,18 @@ kotlin {
             dependencies {
                 // Logging
                 implementation("org.slf4j:slf4j-simple:2.0.9")
+
+                // JOSE
+                implementation("com.nimbusds:nimbus-jose-jwt:9.37.3")
+
+                // BouncyCastle for PEM import
+                implementation("org.bouncycastle:bcpkix-jdk18on:1.77")
             }
         }
         val jvmTest by getting {
             dependencies {
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0")
-                implementation("org.junit.jupiter:junit-jupiter-params:5.9.0")
+                implementation("com.wolpl.clikt-testkit:clikt-testkit:2.0.0")
             }
         }
         /*publishing {
@@ -100,4 +111,16 @@ kotlin {
             languageSettings.enableLanguageFeature("InlineClasses")
         }
     }
+}
+
+application {
+    // Define the main class for the application.
+    // Works with:
+    //     ../gradlew run --args="--help"
+    mainClass = "id.walt.cli.MainKt"
+
+}
+
+tasks.test {
+    useJUnitPlatform()
 }
