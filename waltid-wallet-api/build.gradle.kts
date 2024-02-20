@@ -119,6 +119,9 @@ dependencies {
     // Cache
     implementation("io.github.reactivecircus.cache4k:cache4k:0.13.0")
 
+    // Webauthn
+    // implementation("com.yubico:webauthn-server-core:2.5.0")
+
     // DB
     implementation("org.jetbrains.exposed:exposed-core:0.47.0")
     implementation("org.jetbrains.exposed:exposed-jdbc:0.47.0")
@@ -131,7 +134,8 @@ dependencies {
     //implementation("org.flywaydb:flyway-core:9.22.2")
 
     // Web push
-    implementation("nl.martijndwars:web-push:5.1.1") // todo: replace with https://github.com/interaso/webpush
+    // implementation("dev.blanke.webpush:webpush:6.1.1") // alternative
+    implementation("com.interaso:webpush:1.1.1")
 
     // Config
     implementation("com.sksamuel.hoplite:hoplite-core:2.8.0.RC3")
