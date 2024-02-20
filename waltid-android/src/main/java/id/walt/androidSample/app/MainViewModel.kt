@@ -3,8 +3,8 @@ package id.walt.androidSample.app
 import android.util.Base64
 import id.walt.credentials.CredentialBuilder
 import id.walt.credentials.CredentialBuilderType
+import id.walt.crypto.keys.AndroidKey
 import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.LocalKey
 import id.walt.crypto.keys.LocalKeyMetadata
 import id.walt.did.dids.DidService
 import kotlinx.coroutines.CoroutineScope
@@ -89,14 +89,14 @@ interface MainViewModel {
         private val eventsChannel = Channel<Event>()
         override val events = eventsChannel.receiveAsFlow()
 
-        private var localKey: LocalKey? = null
+        private var androidKey: AndroidKey? = null
 
         private var did: String? = null
 
         override fun onSignRaw(plainText: String, keyType: KeyType) {
             viewModelScope.launch {
-                LocalKey.generate(keyType, LocalKeyMetadata()).run {
-                    localKey = this
+                AndroidKey.generate(keyType, LocalKeyMetadata()).run {
+                    androidKey = this
                     val signedContent = this.signRaw(plainText.toByteArray())
                     displayText.value = Base64.encodeToString(signedContent, Base64.DEFAULT)
                     signature.value = signedContent
@@ -107,8 +107,8 @@ interface MainViewModel {
 
         override fun onSignJWS(plainText: String, keyType: KeyType) {
             viewModelScope.launch {
-                LocalKey.generate(keyType, LocalKeyMetadata()).run {
-                    localKey = this
+                AndroidKey.generate(keyType, LocalKeyMetadata()).run {
+                    androidKey = this
                     signJws(plainText.toByteArray(), mapOf("kid" to this.getKeyId())).also {
                         displayText.value = it
                         eventsChannel.send(Event.SignedWithKey(keyType))
@@ -119,7 +119,7 @@ interface MainViewModel {
 
         override fun onVerifyPlainText(signature: ByteArray, plainText: ByteArray?) {
             viewModelScope.launch {
-                localKey?.let {
+                androidKey?.let {
                     val result = it.verifyRaw(signature, plainText)
                     if (result.isSuccess) {
                         eventsChannel.send(Event.SignatureVerified)
@@ -132,7 +132,7 @@ interface MainViewModel {
 
         override fun onRetrievePublicKey() {
             viewModelScope.launch {
-                displayText.value = localKey?.getPublicKey().toString()
+                displayText.value = androidKey?.getPublicKey().toString()
                 eventsChannel.send(Event.GeneralSuccess)
             }
         }
@@ -156,7 +156,7 @@ interface MainViewModel {
         override fun onGenerateDid() {
             viewModelScope.launch {
                 DidService.minimalInit()
-                localKey?.let {
+                androidKey?.let {
                     val didKey = DidService.registerByKey("key", it)
                     displayText.value = didKey.did
                     did = didKey.did
@@ -169,7 +169,7 @@ interface MainViewModel {
             viewModelScope.launch {
                 val credential = CredentialBuilder(CredentialBuilderType.W3CV11CredentialBuilder).buildW3C()
 
-                val key = localKey
+                val key = androidKey
                 val d = did
                 if (key != null && d != null) {
                     val mySubjectDid = "did:key:xyz"

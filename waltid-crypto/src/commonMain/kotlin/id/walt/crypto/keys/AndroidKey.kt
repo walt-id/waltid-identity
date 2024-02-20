@@ -45,21 +45,15 @@ expect class AndroidKey : Key {
     override suspend fun decrypt(encrypted: ByteArray): Result<ByteArray>
      */
 
-    override suspend fun getPublicKey(): LocalKey
+    override suspend fun getPublicKey(): AndroidKey
     override suspend fun getPublicKeyRepresentation(): ByteArray
 
 
     override val hasPrivateKey: Boolean
 
 
-    companion object : LocalKeyCreator {
-
-        override suspend fun generate(type: KeyType, metadata: LocalKeyMetadata): LocalKey
-        override suspend fun importRawPublicKey(type: KeyType, rawPublicKey: ByteArray, metadata: LocalKeyMetadata): Key
-
-        override suspend fun importJWK(jwk: String): Result<LocalKey>
-
-        override suspend fun importPEM(pem: String): Result<LocalKey>
+    companion object : AndroidKeyCreator {
+        override suspend fun generate(type: KeyType, metadata: LocalKeyMetadata): AndroidKey
     }
 
 }

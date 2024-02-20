@@ -8,14 +8,14 @@ import java.security.spec.ECGenParameterSpec
 import java.util.UUID
 import javax.security.auth.x500.X500Principal
 
-object AndroidLocalKeyGenerator : LocalKeyCreator {
+object AndroidKeyGenerator : AndroidKeyCreator {
 
     private const val KEY_PAIR_ALIAS_PREFIX = "local_key_pair_"
     const val PUBLIC_KEY_ALIAS_PREFIX = "local_public_key_"
     const val ANDROID_KEYSTORE = "AndroidKeyStore"
 
     // Create an instance using key type
-    override suspend fun generate(type: KeyType, metadata: LocalKeyMetadata): LocalKey {
+    override suspend fun generate(type: KeyType, metadata: LocalKeyMetadata): AndroidKey {
         val uniqueId = UUID.randomUUID().toString()
         val alias = "$KEY_PAIR_ALIAS_PREFIX$uniqueId"
         KeyPairGenerator.getInstance(getAlgorithmFor(type), ANDROID_KEYSTORE).apply {
@@ -53,7 +53,7 @@ object AndroidLocalKeyGenerator : LocalKeyCreator {
             )
         }.generateKeyPair()
 
-        return LocalKey(KeyAlias(alias), type)
+        return AndroidKey(KeyAlias(alias), type)
     }
 
     private fun getAlgorithmFor(keyType: KeyType): String {
@@ -63,20 +63,5 @@ object AndroidLocalKeyGenerator : LocalKeyCreator {
             KeyType.secp256k1 -> throw IllegalArgumentException("secp256k1 is not supported in Android KeyStore")
             KeyType.secp256r1 -> KeyProperties.KEY_ALGORITHM_EC
         }
-    }
-
-    // create an instance using keytype AND a public key
-    override suspend fun importRawPublicKey(type: KeyType, rawPublicKey: ByteArray, metadata: LocalKeyMetadata): Key {
-        TODO("Not yet implemented")
-    }
-
-    // create an instance using JWK string
-    override suspend fun importJWK(jwk: String): Result<LocalKey> {
-        TODO("Not yet implemented")
-    }
-
-    // create an instance using PEM string
-    override suspend fun importPEM(pem: String): Result<LocalKey> {
-        TODO("Not yet implemented")
     }
 }
