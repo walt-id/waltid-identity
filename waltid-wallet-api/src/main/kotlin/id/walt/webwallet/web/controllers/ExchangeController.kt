@@ -1,7 +1,10 @@
 package id.walt.webwallet.web.controllers
 
+import id.walt.oid4vc.data.CredentialOffer
 import id.walt.oid4vc.data.dif.PresentationDefinition
+import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.requests.CredentialOfferRequest
+import id.walt.oid4vc.requests.EntraIssuanceRequest
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.db.models.WalletOperationHistory
 import id.walt.webwallet.service.SSIKit2WalletService
@@ -207,7 +210,13 @@ fun Application.exchange() = walletRoute {
             val wallet = getWalletService()
             val request = call.receiveText()
             val reqParams = Url(request).parameters.toMap()
-            val parsedOffer = wallet.resolveCredentialOffer(CredentialOfferRequest.fromHttpParameters(reqParams))
+            val parsedOffer = if(EntraIssuanceRequest.isEntraIssuanceRequestUri(request)) {
+                CredentialOffer.fromEntraIssuanceRequest(EntraIssuanceRequest.fromAuthorizationRequest(
+                    AuthorizationRequest.fromHttpParametersAuto(reqParams))
+                )
+            } else {
+                wallet.resolveCredentialOffer(CredentialOfferRequest.fromHttpParameters(reqParams))
+            }
             context.respond(parsedOffer)
         }
     }

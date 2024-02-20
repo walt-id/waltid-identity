@@ -1,5 +1,6 @@
 package id.walt.oid4vc.data
 
+import id.walt.oid4vc.requests.EntraIssuanceRequest
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
@@ -53,6 +54,13 @@ data class CredentialOffer private constructor(
     companion object : JsonDataObjectFactory<CredentialOffer>() {
         override fun fromJSON(jsonObject: JsonObject) =
             Json.decodeFromJsonElement(CredentialOfferSerializer, jsonObject)
+
+        fun fromEntraIssuanceRequest(entraIssuanceRequest: EntraIssuanceRequest): CredentialOffer {
+            return CredentialOffer(
+                entraIssuanceRequest.manifest["input"]?.jsonObject?.get("credentialIssuer")?.jsonPrimitive?.content ?: "Unknown",
+                listOf(), mapOf()
+            )
+        }
     }
 }
 
