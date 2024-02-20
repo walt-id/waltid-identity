@@ -2,6 +2,7 @@ package id.walt.crypto.utils
 
 import io.ktor.utils.io.core.*
 import multibase
+import org.khronos.webgl.Uint8Array
 
 @ExperimentalJsExport
 @JsExport
@@ -17,6 +18,6 @@ actual object MultiBaseUtils {
     }
 
     actual fun decodeMultiBase58Btc(mb: String): ByteArray {
-        return multibase.decode(mb.toByteArray())
+        return multibase.decode(Uint8Array(mb.toByteArray().toTypedArray()))
     }
 }
