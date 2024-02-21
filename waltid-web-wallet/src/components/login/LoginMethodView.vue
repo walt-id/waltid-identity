@@ -1,5 +1,5 @@
 <template>
-    <div class="flex flex-col h-full bg-white bg-opacity-95 p-6
+    <div class="flex flex-col h-full bg-opacity-95 p-6
             focus-within:(shadow-2xl shadow-blue-500)
             hover:(ring-2 ring-inset ring-blue-500)"
     >
