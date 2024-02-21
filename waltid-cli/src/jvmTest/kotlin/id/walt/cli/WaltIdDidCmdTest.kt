@@ -5,14 +5,17 @@ import com.github.ajalt.clikt.testing.test
 import id.walt.cli.commands.DidCmd
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
+import kotlin.test.assertContains
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class WaltIdDidCmdTest {
 
+    val command = DidCmd()
+
     @Test
     fun `should print help message when called with no arguments`() = runTest {
-        val command = DidCmd()
+        // val command = DidCmd()
         val result = assertFailsWith<PrintHelpMessage> {
             command.parse(emptyList())
         }
@@ -26,10 +29,20 @@ class WaltIdDidCmdTest {
 
     @Test
     fun `should print help message when called with --help argument`() {
-        val command = DidCmd()
-
         assertFailsWith<PrintHelpMessage> {
             command.parse(listOf("--help"))
         }
+    }
+
+    @Test
+    fun `should have subcommand 'create'`() {
+        val result = command.test()
+        assertContains(result.stdout, "create")
+    }
+
+    @Test
+    fun `should have subcommand 'resolve'`() {
+        val result = command.test()
+        assertContains(result.stdout, "resolve")
     }
 }
