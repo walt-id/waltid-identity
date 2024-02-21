@@ -9,6 +9,7 @@ import kotlinx.datetime.toJavaInstant
 import kotlinx.uuid.UUID
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.inList
 import org.jetbrains.exposed.sql.statements.UpdateStatement
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.time.Instant
@@ -173,17 +174,22 @@ object CredentialsService {
     }
 
     object Category {
-        fun add(wallet: UUID, credentialId: String, category: String): Int = transaction {
-            WalletCredentialCategoryMap.insert {
-                it[WalletCredentialCategoryMap.wallet] = wallet
-                it[WalletCredentialCategoryMap.credential] = credentialId
-                it[WalletCredentialCategoryMap.category] = category
-            }
-        }.insertedCount
+        fun add(wallet: UUID, credentialId: String, vararg category: String): Int = transaction {
+            WalletCredentialCategoryMap.batchUpsert(
+                category.toList(),
+                WalletCredentialCategoryMap.wallet,
+                WalletCredentialCategoryMap.credential,
+                WalletCredentialCategoryMap.category
+            ) {
+                this[WalletCredentialCategoryMap.wallet] = wallet
+                this[WalletCredentialCategoryMap.credential] = credentialId
+                this[WalletCredentialCategoryMap.category] = it
+            }.count()
+        }
 
-        fun delete(wallet: UUID, credentialId: String, category: String): Int = transaction {
+        fun delete(wallet: UUID, credentialId: String, vararg category: String): Int = transaction {
             WalletCredentialCategoryMap.deleteWhere {
-                WalletCredentialCategoryMap.wallet eq wallet and (WalletCredentialCategoryMap.credential eq credentialId) and (WalletCredentialCategoryMap.category eq category)
+                WalletCredentialCategoryMap.wallet eq wallet and (WalletCredentialCategoryMap.credential eq credentialId) and (WalletCredentialCategoryMap.category inList (category.toList()))
             }
         }
     }
