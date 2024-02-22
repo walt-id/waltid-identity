@@ -182,6 +182,26 @@ class VP_JVM_Test : AnnotationSpec() {
         // TODO: Parse token response
         // TODO: validate token response
         // TODO: validation response
+
+    }
+
+    @Test
+    suspend fun testVpTokenParamSerializationAndDeserialization() {
+        val presObj = Json.parseToJsonElement("{\"test\": \"bla\"}").jsonObject
+        val presStr1 = "eyJ.eyJpc3M.ft_Eq4"
+        val presStr2 = "eyJ.eyJpc3M.ft_Eq5"
+        val presParams = listOf(VpTokenParameter(presStr1), VpTokenParameter(presObj), VpTokenParameter(setOf(presStr1), listOf(presObj)),
+            VpTokenParameter(setOf(presStr1, presStr2)), VpTokenParameter(listOf(presObj, presObj)))
+        presParams.forEach { param ->
+            val tokenResponse = TokenResponse.success(param, null, null, null)
+            val url =  tokenResponse.toRedirectUri("http://blank", ResponseMode.Query)
+            println(url)
+            val parsedResponse = TokenResponse.fromHttpParameters(Url(url).parameters.toMap())
+            parsedResponse.vpToken shouldNotBe null
+            val parsedVpTokenParam = VpTokenParameter.fromJsonElement(parsedResponse.vpToken!!)
+            parsedVpTokenParam.vpTokenStrings shouldContainExactly param.vpTokenStrings
+            parsedVpTokenParam.vpTokenObjects shouldContainExactly param.vpTokenObjects
+        }
     }
 
     //@Test

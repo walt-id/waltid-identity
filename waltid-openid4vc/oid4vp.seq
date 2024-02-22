@@ -5,15 +5,19 @@ participant "waltid-openid4vc" as WID
 participant "User wallet" as UW
 SP-#red>WID: Generate presentation request (authorization request)
 activate WID #red
-WID--#red>SP: presentation request object
+WID--#red>SP: Presentation request object
+deactivate WID
+SP-#red>WID: Generate authorization URL for presentation req.
+activate WID #red
+WID--#red>SP: Authorization URL
 deactivate WID
 alt Cross-device
-SP->SP: Display presentation request URI as QR code
+SP->SP: Display presentation authorization URL as QR code
 UW->UW: scan QR code
 else Same-device
-SP->UW: Call presentation request URI on wallet
+SP->UW: Call authorization URL on wallet
 end
-UW-#red>WID: Parse presentation request
+UW-#red>WID: Parse presentation request from authoriztion req.
 activate WID #red
 WID--#red>UW: Presentation request object
 deactivate WID
@@ -25,6 +29,10 @@ alt Code flow
 UW-->SP: Authorization code
 SP->UW: Call token endpoint using authorization code
 end
+UW-#red>WID: Extract presentation definition (by value or ref.)
+activate WID #red
+WID--#red>UW: Presentation definition with required credentials
+deactivate WID
 UW->UW: Generate and sign verifiable presentation with required credentials
 UW-#red>WID: Create token response with previously created VP
 activate WID #red
