@@ -114,7 +114,7 @@ kotlin {
                 implementation("com.nimbusds:nimbus-jose-jwt:9.37.3")
 
                 // Multibase
-                implementation("com.github.multiformats:java-multibase:v1.1.1")
+//                implementation("com.github.multiformats:java-multibase:v1.1.1")
             }
         }
         val jvmTest by getting {
