@@ -86,12 +86,17 @@ class WalletApiTeste2eLocal : WalletApiTeste2eBase() {
   }
   
   @Test
+  fun testDid() = runTest {
+    testDidEndpoints()
+  }
+  
+  @Test
   fun testIssuance() = runTest {
     testCredentialIssuance()
   }
   @Test
   fun testKey() = runTest {
-    testKeys()
+    testKeyEndpoints()
   }
   
   
