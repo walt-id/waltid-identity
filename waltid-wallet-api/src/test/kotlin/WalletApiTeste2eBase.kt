@@ -1,4 +1,3 @@
-import id.walt.crypto.utils.JsonUtils.toJsonElement
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
@@ -7,13 +6,13 @@ import io.ktor.http.*
 import kotlinx.serialization.json.*
 import kotlin.test.*
 
+
 abstract class WalletApiTeste2eBase {
   
   private val didMethodsToTest = listOf("key", "jwk", "web", "cheqd")
   private val alphabet = ('a'..'z')
   private lateinit var token: String
   private lateinit var walletId: String
-  
   
   private fun randomString(length: Int) = (1..length).map { alphabet.random() }.toTypedArray().contentToString()
   
@@ -22,11 +21,12 @@ abstract class WalletApiTeste2eBase {
   
   abstract var walletClient: HttpClient
   abstract var issuerClient: HttpClient
-  abstract var apiUrl: String
+  abstract var walletUrl: String
+  abstract var issuerUrl: String
   
   protected suspend fun testCreateUser(user: User) = run {
     println("\nUse Case -> Register User $user\n")
-    val endpoint = "$apiUrl/wallet-api/auth/create"
+    val endpoint = "$walletUrl/wallet-api/auth/create"
     println("POST ($endpoint)\n")
     
     walletClient.post(endpoint) {
@@ -46,20 +46,23 @@ abstract class WalletApiTeste2eBase {
   
   private suspend fun testIssueJwtCredential() = run {
     println("\nUse Case -> Issue JWT Credential")
-    val endpoint = "$apiUrl/openid4vc/jwt/issue"
+    val endpoint = "$issuerUrl/openid4vc/jwt/issue"
     println("POST ($endpoint)")
-    println("Credential for Issuance = ${Credential().testCredential}")
-    issuerClient.post(endpoint) {
+    println("Credential for Issuance = ${Credential.testCredential}")
+    issuerClient.post("$issuerUrl/openid4vc/jwt/issue") {
       contentType(ContentType.Application.Json)
-      setBody(Credential().testCredential)
+      setBody(Credential.testCredential)
     }.let { response ->
       assertEquals(HttpStatusCode.OK, response.status)
+      val responseString = response.body<String>()
+      assertTrue(responseString.startsWith("openid-credential-offer:"))
+      println("********************* response = ${response.body<String>()}")
     }
   }
   
   private suspend fun testExampleKey() = run {
     println("\nUse Case -> Create Example Key")
-    val endpoint = "$apiUrl/example-key"
+    val endpoint = "$walletUrl/example-key"
     println("GET ($endpoint)")
     issuerClient.get(endpoint) {
       contentType(ContentType.Application.Json)
@@ -69,7 +72,7 @@ abstract class WalletApiTeste2eBase {
   }
   private suspend fun testLogin(user: User) = run {
     println("\nUse Case -> Login with user $user")
-    val endpoint = "$apiUrl/wallet-api/auth/login"
+    val endpoint = "$walletUrl/wallet-api/auth/login"
     println("POST ($endpoint)")
     token = walletClient.post(endpoint) {
       contentType(ContentType.Application.Json)
@@ -91,7 +94,7 @@ abstract class WalletApiTeste2eBase {
   
   private suspend fun testListWallets(): JsonElement {
     println("\nUse Case -> List Wallets for Account\n")
-    val endpoint = "$apiUrl/wallet-api/wallet/accounts/wallets"
+    val endpoint = "$walletUrl/wallet-api/wallet/accounts/wallets"
     println("GET($endpoint)")
     return walletClient.get(endpoint) {
       bearerAuth(token)
@@ -122,7 +125,7 @@ abstract class WalletApiTeste2eBase {
   
   private suspend fun testUserInfo() = run {
     println("\nUse Case -> User Info\n")
-    val endpoint = "$apiUrl/wallet-api/auth/user-info"
+    val endpoint = "$walletUrl/wallet-api/auth/user-info"
     println("GET ($endpoint)")
     walletClient.get(endpoint) {
       bearerAuth(token)
@@ -133,7 +136,7 @@ abstract class WalletApiTeste2eBase {
   
   private suspend fun testUserSession() = run {
     println("\nUse Case -> Session\n")
-    val endpoint = "$apiUrl/wallet-api/auth/session"
+    val endpoint = "$walletUrl/wallet-api/auth/session"
     println("GET ($endpoint")
     walletClient.get(endpoint) {
       bearerAuth(token)
@@ -148,7 +151,7 @@ abstract class WalletApiTeste2eBase {
     
     println("\nUse -> List credentials for wallet, id = $walletId\n")
     
-    val endpoint = "$apiUrl/wallet-api/wallet/${walletId}/credentials"
+    val endpoint = "$walletUrl/wallet-api/wallet/${walletId}/credentials"
     
     println("GET $endpoint")
     walletClient.get(endpoint) {

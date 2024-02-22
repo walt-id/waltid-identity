@@ -21,6 +21,7 @@ plugins {
     `maven-publish`
 
     id("com.github.ben-manes.versions") //version "0.48.0"
+    id("love.forte.plugin.suspend-transform") version "0.6.0"
 }
 
 group = "id.walt"
@@ -38,6 +39,7 @@ repositories {
 
 
 dependencies {
+
     /* -- KTOR -- */
 
     // Ktor server
@@ -67,6 +69,7 @@ dependencies {
     implementation("io.ktor:ktor-client-json-jvm:${Versions.KTOR_VERSION}")
     implementation("io.ktor:ktor-client-cio-jvm:${Versions.KTOR_VERSION}")
     implementation("io.ktor:ktor-client-logging-jvm:${Versions.KTOR_VERSION}")
+
 
     /* -- Kotlin -- */
 
@@ -196,6 +199,7 @@ publishing {
     renderers = arrayOf<ReportRenderer>(InventoryHtmlReportRenderer("xyzkit-licenses-report.html", "XYZ Kit"))
     filters = arrayOf<DependencyFilter>(LicenseBundleNormalizer())
 }*/
+
 
 
 tasks.withType<DependencyUpdatesTask> {
