@@ -4,9 +4,10 @@ import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.subcommands
 
 class KeyCmd : CliktCommand(
-    name="key",
-    help="Key management features",
-    printHelpOnEmptyArgs = true) {
+    name = "key",
+    help = "Key management features",
+    printHelpOnEmptyArgs = true
+) {
 
     init {
         subcommands(KeyGenerateCmd(), KeyConvertCmd())
@@ -14,4 +15,5 @@ class KeyCmd : CliktCommand(
 
     override fun run(): Unit {}
 }
+
 fun main(args: Array<String>) = KeyCmd().main(args)
