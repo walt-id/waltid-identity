@@ -12,8 +12,8 @@ import kotlinx.coroutines.runBlocking
 import kotlin.io.path.Path
 
 class KeyGenerateCmd : CliktCommand(
-    name="generate",
-    help="Generates a new cryptographic key.",
+    name = "generate",
+    help = "Generates a new cryptographic key.",
     // printHelpOnEmptyArgs = true
 ) {
 
@@ -38,7 +38,7 @@ class KeyGenerateCmd : CliktCommand(
         echo("Generating key of type " + keyType.name)
         runBlocking {
 
-            var key : LocalKey? = null
+            var key: LocalKey? = null
 
             key = LocalKey.generate(keyType)
 
