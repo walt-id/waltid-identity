@@ -9,6 +9,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlin.test.*
+import kotlin.time.Duration.Companion.seconds
 
 class WalletApiTeste2eDeployed : WalletApiTeste2eBase() {
   
@@ -75,8 +76,26 @@ class WalletApiTeste2eDeployed : WalletApiTeste2eBase() {
   }
   
   @Test
-  fun testDid() = runTest {
-    testDidEndpoints()
+  fun testListDids() = runTest {
+    testDidsList()
+  }
+  
+  @Test
+  fun testDeleteDids() = runTest(timeout = 60.seconds) {
+    testDidsDelete()
+  }
+  
+  @Test
+  fun testCreateDids() = runTest(timeout = 60.seconds) {
+    testDidsDelete()
+    testDidsCreate()
+  }
+  
+  @Test
+  fun testDidDefault() = runTest(timeout = 60.seconds){
+    testDidsDelete()
+    testDidsCreate()
+    testDefaultDid()
   }
   
   @Test

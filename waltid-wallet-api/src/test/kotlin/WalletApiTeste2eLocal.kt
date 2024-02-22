@@ -14,6 +14,10 @@ import kotlin.test.Test
 import kotlinx.serialization.json.*
 import kotlin.test.*
 import id.walt.issuer.utils.IssuerApiTeste2e
+import kotlinx.coroutines.withTimeout
+import org.junit.rules.Timeout
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 
 class WalletApiTeste2eLocal : WalletApiTeste2eBase() {
@@ -86,8 +90,26 @@ class WalletApiTeste2eLocal : WalletApiTeste2eBase() {
   }
   
   @Test
-  fun testDid() = runTest {
-    testDidEndpoints()
+  fun testListDids() = runTest {
+    testDidsList()
+  }
+  
+  @Test
+  fun testDeleteDids() = runTest {
+    testDidsDelete()
+  }
+  
+  @Test
+  fun testCreateDids() = runTest {
+    testDidsDelete()
+    testDidsCreate()
+  }
+  
+  @Test
+  fun testDidDefault() = runTest {
+    testDidsDelete()
+    testDidsCreate()
+    testDefaultDid()
   }
   
   @Test
