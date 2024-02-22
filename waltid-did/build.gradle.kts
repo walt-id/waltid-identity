@@ -129,6 +129,7 @@ kotlin {
             dependencies {
                 implementation(npm("canonicalize", "2.0.0"))
                 implementation(npm("uuid", "9.0.1"))
+                implementation(npm("bs58", "5.0.0"))
             }
         }
         publishing {
