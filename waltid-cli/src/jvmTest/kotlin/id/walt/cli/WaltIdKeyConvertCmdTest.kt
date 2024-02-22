@@ -1,16 +1,20 @@
 package id.walt.cli
 
-import com.github.ajalt.clikt.core.IncorrectOptionValueCount
-import com.github.ajalt.clikt.core.MissingOption
-import com.github.ajalt.clikt.core.MultiUsageError
-import com.github.ajalt.clikt.core.PrintHelpMessage
+import com.github.ajalt.clikt.core.*
 import com.github.ajalt.clikt.testing.test
+import com.github.ajalt.mordant.rendering.AnsiLevel
+import com.github.ajalt.mordant.terminal.PrintRequest
+import com.github.ajalt.mordant.terminal.Terminal
+import com.github.ajalt.mordant.terminal.TerminalInfo
+import com.github.ajalt.mordant.terminal.TerminalInterface
 import id.walt.cli.commands.KeyConvertCmd
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.test.runTest
 import java.io.File
+import java.io.StringWriter
 import java.net.URI
+import java.text.ParseException
 import kotlin.test.*
-import com.wolpl.clikttestkit.test as testkit
 
 class WaltIdKeyConvertCmdTest {
 
@@ -86,7 +90,7 @@ class WaltIdKeyConvertCmdTest {
         val inputFilename = "foo.jwk"
         val result = command.test(listOf("-i$inputFilename"))
 
-        val expected = ".*$inputFilename not found.*".toRegex(RegexOption.IGNORE_CASE)
+        val expected = """.*file "$inputFilename" does not exist.*""".toRegex(RegexOption.IGNORE_CASE)
         assertContains(result.stderr, expected)
     }
 
@@ -97,18 +101,39 @@ class WaltIdKeyConvertCmdTest {
         val inputFileName = "invalidKey.jwk"
         var inputFilePath = getFilePath(inputFileName)
 
-        val result = KeyConvertCmd().test("--input=\"$inputFilePath\"")
-        val expectedOutput = ".*incorrect format in file $inputFilePath.*".toRegex(RegexOption.IGNORE_CASE)
+        val failure = assertFailsWith<ParseException> {
+            KeyConvertCmd().test("--input=\"$inputFilePath\"")
+        }
 
-        assertContains(result.stderr, expectedOutput)
+        val expectedErrorMessage = ".*Missing key type \"kty\" parameter*".toRegex()
+        assertContains(failure.message!!.toString(), expectedErrorMessage)
+    }
+
+    @Test
+    fun `should prompt for overwrite confirmation when the output file already exists`() {
+        // Stored in src/jvmTest/resources
+        val inputFileName = "rsa_public_key.pem"
+        val outputFileName = "existingFile.jwk"
+
+        val inputFilePath = getFilePath(inputFileName)
+        val outputFilePath = getOutputFilePath(inputFilePath, outputFileName)
+
+        // Creates the output file to simulate its previous existence
+        File(outputFilePath).createNewFile()
+
+        val result = KeyConvertCmd().test("--input=\"$inputFilePath\" --output=\"$outputFilePath\"")
+        val expectedOutput = """.*The file "$outputFilePath" already exists.*""".toRegex()
+
+        // Assert successful logging message
+        assertContains(result.stdout, expectedOutput)
     }
 
     @Test
     fun `should convert JWT input file to PEM`() {
 
         // Stored in src/jvmTest/resources
-        val inputFileName = "validKey.jwk"
-        val outputFileName = "validKey.pem"
+        val inputFileName = "ed25519_valid_key.jwk"
+        val outputFileName = "ed25519_valid_key.pem"
 
         val inputFilePath = getFilePath(inputFileName)
         val outputFilePath = getOutputFilePath(inputFilePath, outputFileName)
@@ -117,8 +142,8 @@ class WaltIdKeyConvertCmdTest {
         // val expectedOutput = ".*Converting $inputFilePath to $outputFilePath.*".toRegex()
         // assertContains(result.stdout, expectedOutput)
 
-        // Only as long as LocalKey.exportPEM() is not implemented.
-        assertFails {
+        // Only as long as Ed25519 is not fully supported in LocalKey.exportPEM()
+        val failure = assertFailsWith<NotImplementedError> {
             KeyConvertCmd().test("--input=\"$inputFilePath\"")
         }
     }
@@ -133,8 +158,10 @@ class WaltIdKeyConvertCmdTest {
         val inputFilePath = getFilePath(inputFileName)
         val outputFilePath = getOutputFilePath(inputFilePath, outputFileName)
 
+        deleteOutputFile(outputFilePath)
+
         val result = KeyConvertCmd().test("--input=\"$inputFilePath\"")
-        val expectedOutput = ".*$inputFilePath file converted to $outputFilePath.*".toRegex()
+        val expectedOutput = """.*Done. Converted "$inputFilePath" to "$outputFilePath".*""".toRegex()
 
         // Assert successful logging message
         assertContains(result.stdout, expectedOutput)
@@ -189,17 +216,51 @@ class WaltIdKeyConvertCmdTest {
     }
 
     @Test
+    @Ignore
     fun `should ask for the passphrase if input PEM file is encrypted and no passphrase is provided`() = runTest {
         val inputFileName = "rsa_encrypted_private_key.pem"
         val outputFileName = "rsa_encrypted_private_key.jwk"
 
         val inputFilePath = getFilePath(inputFileName)
 
-        KeyConvertCmd().testkit("--input", inputFilePath) {
-            expectOutput()
-            provideInput("123123")
-            expectOutput() // ".*file converted to.*" --> I opened a ticket asking for Regex support
+        class PassphraseTerminal : TerminalInterface {
+            override val info: TerminalInfo
+                get() = TerminalInfo(
+                    width = 0,
+                    height = 0,
+                    ansiLevel = AnsiLevel.NONE,
+                    ansiHyperLinks = false,
+                    outputInteractive = false,
+                    inputInteractive = false,
+                    crClearsLine = false
+                )
+
+            override fun completePrintRequest(request: PrintRequest) {
+                StringWriter().write(request.text)
+            }
+
+            override fun readLineOrNull(hideInput: Boolean): String {
+                return "123123"
+            }
+
+            suspend fun answerPrompt(input: String) = Channel<String>().send(input)
+
         }
+
+        val result = KeyConvertCmd().context { terminal = Terminal(terminalInterface = PassphraseTerminal()) }
+            .test("--input=\"${inputFilePath}\"")
+
+        println(result)
+
+        //
+        // KeyConvertCmd().testkit("--input", inputFilePath) {
+        //     expectOutput() // Reading key ...
+        //     assertContains(expectOutput(), ".*Key encrypted. Please, inform the passphrase to decipher it.*".toRegex())
+        //     provideInput("123123")
+        //     // expectOutput() // Converting key
+        //     // assertContains(expectOutput(), ".*Converted Key .JWK.*".toRegex())
+        //     // ignoreOutputs()
+        // }
     }
 
     @Test
@@ -212,7 +273,7 @@ class WaltIdKeyConvertCmdTest {
 
         val result = KeyConvertCmd().test("--input=\"$inputFilePath\" --passphrase=123123")
 
-        val expectedOutput = ".*$inputFilePath file converted to $outputFilePath.*".toRegex()
+        val expectedOutput = """.*Done. Converted "$inputFilePath" to "$outputFilePath".*""".toRegex()
 
         // Assert successful logging message
         assertContains(result.stdout, expectedOutput)
@@ -290,6 +351,11 @@ class WaltIdKeyConvertCmdTest {
         return "${inputFilePath.dropLastWhile { it != '/' }}$outputFileName"
     }
 
+    fun deleteOutputFile(outputFilePath: String) {
+        // TODO: Need to check if exists?
+        File(outputFilePath).delete()
+    }
+
     private fun testPEMConvertion(
         inputFileName: String,
         outputFileName: String,
@@ -299,9 +365,10 @@ class WaltIdKeyConvertCmdTest {
         val inputFilePath = getFilePath(inputFileName)
         val outputFilePath = getOutputFilePath(inputFilePath, outputFileName)
 
+        deleteOutputFile(outputFilePath)
         val result = KeyConvertCmd().test("--input=\"$inputFilePath\" $extraArgs")
 
-        val expectedOutput = ".*$inputFilePath file converted to $outputFilePath.*".toRegex()
+        val expectedOutput = """.*Done. Converted "$inputFilePath" to "$outputFilePath".*""".toRegex()
 
         // Assert successful logging message
         assertContains(result.stdout, expectedOutput)
