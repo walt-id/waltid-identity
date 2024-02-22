@@ -64,7 +64,6 @@ kotlin {
     if (hostOs in listOf("Windows", "Linux") && hostArch == "aarch64") {
         println("Native compilation is not yet supported for aarch64 on Windows / Linux.")
     } else {
-        println("Running with $hostOs under $hostArch")
         val isMingwX64 = hostOs.startsWith("Windows")
         val nativeTarget = when {
             hostOs == "Mac OS X" -> macosX64("native")
@@ -82,6 +81,7 @@ kotlin {
 
             else -> listOf()
         }.forEach {
+            println("Native compilation for target: ${it.name}")
             val platform = when (it.name) {
                 "iosArm64" -> "iphoneos"
                 else -> "iphonesimulator"
