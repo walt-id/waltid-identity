@@ -8,6 +8,10 @@ import com.github.ajalt.clikt.parameters.options.help
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.required
 import com.github.ajalt.clikt.parameters.types.file
+import com.github.ajalt.mordant.markdown.Markdown
+import com.github.ajalt.mordant.rendering.TextColors
+import com.github.ajalt.mordant.rendering.TextStyles
+import com.github.ajalt.mordant.terminal.YesNoPrompt
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.LocalKey
 import kotlinx.coroutines.runBlocking
@@ -24,6 +28,7 @@ import java.io.FileReader
 import java.security.PrivateKey
 import java.security.Security
 import java.util.Base64
+import kotlin.io.path.absolutePathString
 import kotlin.io.path.useLines
 import kotlin.js.ExperimentalJsExport
 
@@ -61,13 +66,36 @@ class KeyConvertCmd : CliktCommand(
 
     override fun run() {
         // Read the source key from the input file
+        echo(TextStyles.dim("Reading key \"${input.absolutePath}\"..."))
         val inputKey = runBlocking { getKey(input) }
 
+        echo(TextStyles.dim("Converting key \"${input.absolutePath}\"..."))
         val outputContent = convertKey(inputKey, targetKeyType)
+
+        echo(TextColors.green("Converted Key (${targetKeyType}):"))
+        terminal.println(
+            Markdown(
+                """
+                |```${if (targetKeyType == KeyFileFormat.JWK) "json" else ""}
+                |$outputContent
+                |```
+            """.trimMargin()
+            )
+        )
+
+        if (output.exists()
+            && YesNoPrompt(
+                "The file \"${output.absolutePath}\" already exists, do you want to overwrite it?",
+                terminal
+            ).ask() == false
+        ) {
+            echo("Will not overwrite output file.")
+            return
+        }
 
         output.writeText(outputContent)
 
-        echo("Converted \"${input.path}\" to \"${output.path}\".")
+        echo("${TextColors.brightGreen("Done.")} Converted \"${input.absolutePath}\" to \"${output.absolutePath}\".")
     }
 
     private operator fun Regex.contains(text: CharSequence?): Boolean = this.matches(text ?: "")
