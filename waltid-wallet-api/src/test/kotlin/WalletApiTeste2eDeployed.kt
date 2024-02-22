@@ -15,14 +15,10 @@ class WalletApiTeste2eDeployed : WalletApiTeste2eBase() {
   companion object {
     var deployedWalletUrl: String = "https://wallet.walt.id"
     var deployedIssuerUrl: String = "https://issuer.portal.walt.id"
-    lateinit var deployedClient: HttpClient
-    lateinit var deployedIssuerClient: HttpClient
+    var deployedClient: HttpClient
+    var deployedIssuerClient: HttpClient
     
     init {
-      setUpHttp()
-    }
-    
-    private fun setUpHttp() {
       println("Using client for Deployed WaltId Wallet and Issuer Api...")
       deployedClient = HttpClient {
         install(ContentNegotiation) {
@@ -79,13 +75,18 @@ class WalletApiTeste2eDeployed : WalletApiTeste2eBase() {
   }
   
   @Test
+  fun testDid() = runTest {
+    testDidEndpoints()
+  }
+  
+  @Test
   fun testIssuance() = runTest {
     testCredentialIssuance()
   }
   
   @Test
   fun testKey() = runTest {
-    testKeys()
+    testKeyEndpoints()
   }
   
   override var walletClient: HttpClient
