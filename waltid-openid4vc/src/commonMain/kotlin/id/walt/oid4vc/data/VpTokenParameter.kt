@@ -14,6 +14,7 @@ data class VpTokenParameter constructor(
   fun toJsonElement(): JsonElement {
     return when {
       vpTokenStrings.size == 1 && vpTokenObjects.isEmpty() -> JsonUnquotedLiteral(vpTokenStrings.first())
+      vpTokenObjects.size == 1 && vpTokenStrings.isEmpty() -> vpTokenObjects.first()
       else -> JsonArray(vpTokenStrings.map { JsonPrimitive(it) }.plus(vpTokenObjects))
       }
   }
