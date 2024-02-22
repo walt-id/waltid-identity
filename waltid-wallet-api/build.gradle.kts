@@ -5,7 +5,6 @@ plugins {
     kotlin("jvm") version kotlinVersion
     id("io.ktor.plugin") version "2.3.7"
     id("org.jetbrains.kotlin.plugin.serialization") version kotlinVersion
-    
     id("com.github.ben-manes.versions") version "0.49.0"
 }
 
@@ -24,17 +23,11 @@ repositories {
     maven("https://jitpack.io")
     maven("https://maven.walt.id/repository/waltid/")
     maven("https://maven.walt.id/repository/waltid-ssi-kit/")
-    //maven("https://repo.danubetech.com/repository/maven-public/")
 }
 
 tasks.withType<KotlinCompile> {
     kotlinOptions.jvmTarget = "17"
 }
-
-/*java {
-    sourceCompatibility = JavaVersion.VERSION_15
-    targetCompatibility = JavaVersion.VERSION_15
-}*/
 
 kotlin {
     jvmToolchain(17)
@@ -106,8 +99,7 @@ dependencies {
     
     
     // waltid-did
-    implementation("id.walt.did:waltid-did:1.1.1")//id.walt.crypto provided by id.walt.did:waltid-did
-    
+    implementation(project(":waltid-did"))
     // waltid-issuer
     
     // OIDC
@@ -133,8 +125,6 @@ dependencies {
     implementation("org.jetbrains.exposed:exposed-json:0.45.0")
     implementation("org.xerial:sqlite-jdbc:3.44.1.0")
     implementation("org.postgresql:postgresql:42.7.1")
-    // migration
-    //implementation("org.flywaydb:flyway-core:9.22.2")
     
     // Web push
     implementation("nl.martijndwars:web-push:5.1.1") // todo: replace with https://github.com/interaso/webpush
@@ -156,9 +146,4 @@ dependencies {
     testImplementation(kotlin("test"))
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
     testImplementation("io.ktor:ktor-server-tests-jvm:$ktorVersion")
-    
-    /*testImplementation("io.kotest:kotest-runner-junit5:5.5.5")
-    testImplementation("io.kotest:kotest-assertions-core:5.5.5")
-    testImplementation("io.kotest.extensions:kotest-assertions-ktor:2.0.0")*/
-
 }

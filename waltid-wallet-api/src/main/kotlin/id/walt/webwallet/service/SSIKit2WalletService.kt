@@ -600,7 +600,7 @@ class SSIKit2WalletService(
 
     /* Keys */
 
-    private fun getKey(keyId: String) = KeysService.get(walletId, keyId)?.let {
+    private suspend fun getKey(keyId: String) = KeysService.get(walletId, keyId)?.let {
         KeySerialization.deserializeKey(it.document)
             .getOrElse { throw IllegalArgumentException("Could not deserialize resolved key: ${it.message}", it) }
     } ?: throw IllegalArgumentException("Key not found: $keyId")

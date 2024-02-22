@@ -1,4 +1,3 @@
-import WalletApiTeste2eDeployed.Companion.localClient
 import id.walt.webwallet.config.ConfigManager
 import id.walt.webwallet.configurePlugins
 import id.walt.webwallet.db.Db
@@ -28,19 +27,20 @@ class WalletApiTeste2eLocal : WalletApiTeste2eBase() {
       Security.addProvider(BouncyCastleProvider())
       runCatching { Db.dataDirectoryPath.createDirectories() }
       
-      val args = emptyArray<String>()
-      ConfigManager.loadConfigs(args)
+      ConfigManager.loadConfigs(emptyArray())
       
       Db.start()
       
       // creates two test applications, for wallet and issuer
-      setUpHttpClient()
+      setUpWalletAPITestApplication()
      
       localIssuerClient = issuer.getHttpClient()
       println("Init finished")
     }
     
-    private fun setUpHttpClient() {
+    private fun setUpWalletAPITestApplication() {
+      println("Wallet API : Test Application starting...")
+      
       val testApp = TestApplication {
         application {
           configurePlugins()
@@ -60,8 +60,16 @@ class WalletApiTeste2eLocal : WalletApiTeste2eBase() {
   }
   
   @Test
-  fun myTest() = runTest {
-    println("ok, issuerClient = $issuerClient")
+  fun testLogin() = runTest {
+    // test creation of a randomly generated user account
+    super.testCreateUser(
+      User(
+        "tester",
+        email,
+        password,
+        "email"
+      )
+    )
   }
   
   @Test
@@ -97,9 +105,11 @@ class WalletApiTeste2eLocal : WalletApiTeste2eBase() {
     set(value) {
       localIssuerClient = value
     }
-  override var apiUrl: String
+  override var walletUrl: String
     get() = localUrl
     set(value) {
       localUrl = value
     }
+  
+  override var issuerUrl: String = walletUrl
 }

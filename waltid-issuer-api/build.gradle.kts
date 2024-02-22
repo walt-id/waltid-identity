@@ -20,6 +20,7 @@ plugins {
     `maven-publish`
     
     id("com.github.ben-manes.versions") //version "0.48.0"
+    id("love.forte.plugin.suspend-transform") version "0.6.0"
 }
 
 group = "id.walt"
@@ -91,16 +92,6 @@ dependencies {
     implementation("org.slf4j:slf4j-simple:2.0.9")
     implementation("org.slf4j:jul-to-slf4j:2.0.9")
     
-    // Test
-    testImplementation("org.jetbrains.kotlin:kotlin-test-junit:1.9.22")
-    testImplementation(kotlin("test"))
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
-    testImplementation("io.ktor:ktor-server-tests-jvm:${Versions.KTOR_VERSION}")
-    
-    implementation(kotlin("test"))
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
-    implementation("io.ktor:ktor-server-tests-jvm:${Versions.KTOR_VERSION}")
-    
     
     /*testImplementation("io.kotest:kotest-runner-junit5:5.5.5")
     testImplementation("io.kotest:kotest-assertions-core:5.5.5")
@@ -118,7 +109,7 @@ dependencies {
     //implementation("id.walt.servicematrix:WaltID-ServiceMatrix:1.1.3")
     
     // SSI Kit 2
-    api(project(":waltid-crypto"))
+
     api(project(":waltid-did"))
     
     api(project(":waltid-verifiable-credentials"))
@@ -130,6 +121,15 @@ dependencies {
     //api(project(":waltid-mdocs"))
     //implementation("id.walt:waltid-ssikit2:1.0.8a-SNAPSHOT")
     // implementation id.walt:core-crypto -> provided by id.walt:waltid-ssikit2
+    
+    // Test
+    implementation(kotlin("test"))
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
+    implementation("io.ktor:ktor-server-tests-jvm:${Versions.KTOR_VERSION}")
+    testImplementation("org.jetbrains.kotlin:kotlin-test-junit:1.9.22")
+    testImplementation(kotlin("test"))
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
+    testImplementation("io.ktor:ktor-server-tests-jvm:${Versions.KTOR_VERSION}")
 }
 
 tasks.withType<Test> {
