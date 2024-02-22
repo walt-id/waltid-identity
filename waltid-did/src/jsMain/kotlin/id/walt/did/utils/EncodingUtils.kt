@@ -1,5 +1,8 @@
 package id.walt.did.utils
 
+import bs58
+import id.walt.crypto.utils.ArrayUtils.toByteArray
+import org.khronos.webgl.Uint8Array
 import kotlin.js.js
 
 @ExperimentalJsExport
@@ -13,16 +16,15 @@ actual object EncodingUtils {
 
     actual fun base64Decode(data: String): ByteArray = js("atob")(data)
     actual fun base58Encode(byteArray: ByteArray): String {
-        TODO("Not yet implemented")
+        return bs58.encode(Uint8Array(byteArray.toTypedArray()))
     }
 
     actual fun base58Decode(base58String: String): ByteArray {
-        TODO("Not yet implemented")
+        return bs58.decode(base58String).toByteArray()
     }
 
-    actual fun fromHexString(hexString: String): ByteArray {
-        TODO("Not yet implemented")
-    }
+    actual fun fromHexString(hexString: String): ByteArray =
+        hexString.replace(" ", "").chunked(2).map { it.toInt(16).toByte() }.toByteArray()
 
     actual fun toHexString(byteArray: ByteArray): String {
         TODO("Not yet implemented")
