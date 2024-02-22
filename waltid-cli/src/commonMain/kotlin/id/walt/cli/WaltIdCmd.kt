@@ -5,7 +5,7 @@ import com.github.ajalt.clikt.core.subcommands
 import id.walt.cli.commands.KeyCmd
 
 class WaltIdCmd : CliktCommand(
-    name="waltid",
+    name = "waltid",
     help = """WaltId CLI
 
         The WaltId CLI is a command line tool that allows you to onboard and 
@@ -36,7 +36,8 @@ class WaltIdCmd : CliktCommand(
         ---------------
         ../gradlew run --args="key convert --input=./myRSAKey.pem"
         """,
-    printHelpOnEmptyArgs = true) {
+    printHelpOnEmptyArgs = true
+) {
 
     init {
         subcommands(KeyCmd())

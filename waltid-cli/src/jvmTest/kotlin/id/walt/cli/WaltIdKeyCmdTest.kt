@@ -21,7 +21,7 @@ class WaltIdKeyCmdTest {
         result.message?.let { assertTrue(it.contains("Key management")) }
 
         val result2 = command.test()
-        assertTrue(result2.stdout.contains("Key management features", ignoreCase=true ))
+        assertTrue(result2.stdout.contains("Key management features", ignoreCase = true))
     }
 
     @Test
