@@ -28,7 +28,7 @@ import kotlin.time.Duration.Companion.minutes
 suspend fun createCredentialOfferUri(issuanceRequests: List<BaseIssuanceRequest>): String {
     val credentialOfferBuilder =
         OidcIssuance.issuanceRequestsToCredentialOfferBuilder(issuanceRequests)
-
+    
     val issuanceSession = OidcApi.initializeCredentialOffer(
         credentialOfferBuilder = credentialOfferBuilder,
         expiresIn = 5.minutes,
@@ -44,12 +44,12 @@ suspend fun createCredentialOfferUri(issuanceRequests: List<BaseIssuanceRequest>
             )
         }
     )  // TODO: Hack as this is non stateless because of oidc4vc lib API
-
+    
     println("issuanceSession: $issuanceSession")
-
+    
     val offerRequest = CredentialOfferRequest(null, "${OidcApi.baseUrl}/openid4vc/credentialOffer?id=${issuanceSession.id}")
     println("offerRequest: $offerRequest")
-
+    
     val offerUri = OidcApi.getCredentialOfferRequestUrl(
         offerRequest,
         CROSS_DEVICE_CREDENTIAL_OFFER_URL + OidcApi.baseUrl.removePrefix("https://")
@@ -76,7 +76,7 @@ fun Application.issuerApi() {
                 KeyType.Ed25519,
                 TSEKeyMetadata(call.parameters["tse-server"]!!, call.parameters["tse-token"]!!)
             )
-
+            
             context.respondText(ContentType.Application.Json) {
                 KeySerialization.serializeKey(key)
             }
@@ -87,25 +87,25 @@ fun Application.issuerApi() {
             val key = KeySerialization.deserializeKey(context.request.header("key")!!).getOrThrow()
             context.respond(DidService.registerByKey("key", key).did)
         }
-
+        
         route("", {
             tags = listOf("Credential Issuance")
         }) {
-
+            
             route("raw") {
                 route("jwt") {
                     post("sign", {
                         summary = "Signs credential without using an credential exchange mechanism."
                         description =
                             "This endpoint issues (signs) an Verifiable Credential, but does not utilize an credential exchange " +
-                                    "mechanism flow like OIDC or DIDComm to adapt and send the signed credential to an user. This means, that the " +
-                                    "caller will have to utilize such an credential exchange mechanism themselves."
-
+                                "mechanism flow like OIDC or DIDComm to adapt and send the signed credential to an user. This means, that the " +
+                                "caller will have to utilize such an credential exchange mechanism themselves."
+                        
                         request {
                             headerParameter<String>("walt-key") {
                                 description =
                                     "Supply a core-crypto key representation to use to issue the credential, " +
-                                            "e.g. a local key (internal JWK) or a TSE key."
+                                        "e.g. a local key (internal JWK) or a TSE key."
                                 example = mapOf(
                                     "type" to "local", "jwk" to "{ ... }"
                                 )
@@ -113,7 +113,7 @@ fun Application.issuerApi() {
                             }
                             headerParameter<String>("walt-issuerDid") {
                                 description = "Optionally, supply a DID to use in the proof. If no DID is passed, " +
-                                        "a did:key of the supplied key will be used."
+                                    "a did:key of the supplied key will be used."
                                 example = "did:ebsi:..."
                                 required = false
                             }
@@ -122,7 +122,7 @@ fun Application.issuerApi() {
                                 example = "did:key:..."
                                 required = true
                             }
-
+                            
                             body<JsonObject> {
                                 description =
                                     "Pass the unsigned credential that you intend to sign as the body of the request."
@@ -131,7 +131,7 @@ fun Application.issuerApi() {
                                 required = true
                             }
                         }
-
+                        
                         response {
                             "200" to {
                                 description = "Signed Credential (with the *proof* attribute added)"
@@ -148,34 +148,34 @@ fun Application.issuerApi() {
                             context.request.header("walt-key") ?: throw IllegalArgumentException("No key was passed.")
                         val subjectDid = context.request.header("walt-subjectDid")
                             ?: throw IllegalArgumentException("No subjectDid was passed.")
-
+                        
                         val key = KeySerialization.deserializeKey(keyJson).getOrThrow()
-
+                        
                         val issuerDid =
                             context.request.header("walt-issuerDid") ?: DidService.registerByKey("key", key).did
-
+                        
                         val body = context.receive<Map<String, JsonElement>>()
-
+                        
                         val vc = W3CVC(body)
-
+                        
                         // Sign VC
                         val jws = vc.signJws(
                             issuerKey = key,
                             issuerDid = issuerDid,
                             subjectDid = subjectDid
                         )
-
+                        
                         context.respond(HttpStatusCode.OK, jws)
                     }
                 }
             }
-
+            
             route("openid4vc") {
                 route("jwt") {
                     post("issue", {
                         summary = "Signs credential with JWT and starts an OIDC credential exchange flow."
                         description = "This endpoint issues a W3C Verifiable Credential, and returns an issuance URL "
-
+                        
                         request {
                             body<JwtIssuanceRequest> {
                                 description =
@@ -185,7 +185,7 @@ fun Application.issuerApi() {
                                 required = true
                             }
                         }
-
+                        
                         response {
                             "200" to {
                                 description = "Credential signed (with the *proof* attribute added)"
@@ -200,7 +200,7 @@ fun Application.issuerApi() {
                     }) {
                         val jwtIssuanceRequest = context.receive<JwtIssuanceRequest>()
                         val offerUri = createCredentialOfferUri(listOf(jwtIssuanceRequest))
-
+                        
                         context.respond(
                             HttpStatusCode.OK,
                             offerUri
@@ -210,7 +210,7 @@ fun Application.issuerApi() {
                         summary = "Signs a list of credentials and starts an OIDC credential exchange flow."
                         description =
                             "This endpoint issues a list W3C Verifiable Credentials, and returns an issuance URL "
-
+                        
                         request {
                             body<List<JwtIssuanceRequest>> {
                                 description =
@@ -219,7 +219,7 @@ fun Application.issuerApi() {
                                 required = true
                             }
                         }
-
+                        
                         response {
                             "200" to {
                                 description = "Credential signed (with the *proof* attribute added)"
@@ -232,12 +232,12 @@ fun Application.issuerApi() {
                             }
                         }
                     }) {
-
-
+                        
+                        
                         val issuanceRequests = context.receive<List<JwtIssuanceRequest>>()
                         val offerUri = createCredentialOfferUri(issuanceRequests)
                         println("Offer URI: $offerUri")
-
+                        
                         context.respond(
                             HttpStatusCode.OK,
                             offerUri
@@ -248,7 +248,7 @@ fun Application.issuerApi() {
                     post("issue", {
                         summary = "Signs credential and starts an OIDC credential exchange flow."
                         description = "This endpoint issues a W3C Verifiable Credential, and returns an issuance URL "
-
+                        
                         request {
                             body<SdJwtIssuanceRequest> {
                                 description =
@@ -258,7 +258,7 @@ fun Application.issuerApi() {
                                 required = true
                             }
                         }
-
+                        
                         response {
                             "200" to {
                                 description = "Credential signed (with the *proof* attribute added)"
@@ -272,9 +272,9 @@ fun Application.issuerApi() {
                         }
                     }) {
                         val sdJwtIssuanceRequest = context.receive<SdJwtIssuanceRequest>()
-
+                        
                         val offerUri = createCredentialOfferUri(listOf(sdJwtIssuanceRequest))
-
+                        
                         context.respond(
                             HttpStatusCode.OK,
                             offerUri
@@ -285,12 +285,12 @@ fun Application.issuerApi() {
                     post("issue", {
                         summary = "Signs a credential based on the IEC/ISO18013-5 mdoc/mDL format."
                         description = "This endpoint issues a mdoc and returns an issuance URL "
-
+                        
                         request {
                             headerParameter<String>("walt-key") {
                                 description =
                                     "Supply a core-crypto key representation to use to issue the credential, " +
-                                            "e.g. a local key (internal JWK) or a TSE key."
+                                        "e.g. a local key (internal JWK) or a TSE key."
                                 example = mapOf(
                                     "type" to "local", "jwk" to "{ ... }"
                                 )
