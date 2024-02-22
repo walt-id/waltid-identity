@@ -8,6 +8,7 @@ expect class LocalKey(jwk: String?) : Key {
     override suspend fun getThumbprint(): String
 
     override suspend fun exportJWK(): String
+
     override suspend fun exportJWKObject(): JsonObject
 
     override suspend fun exportPEM(): String
