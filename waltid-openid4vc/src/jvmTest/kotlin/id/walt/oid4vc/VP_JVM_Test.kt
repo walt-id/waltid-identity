@@ -12,8 +12,11 @@ import io.kotest.common.runBlocking
 import io.kotest.core.spec.style.AnnotationSpec
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldContainExactly
+import io.kotest.matchers.should
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.shouldNot
 import io.kotest.matchers.shouldNotBe
+import io.kotest.matchers.types.beInstanceOf
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.engine.java.*
@@ -194,6 +197,22 @@ class VP_JVM_Test : AnnotationSpec() {
             VpTokenParameter(setOf(presStr1, presStr2)), VpTokenParameter(listOf(presObj, presObj)))
         presParams.forEach { param ->
             val tokenResponse = TokenResponse.success(param, null, null, null)
+
+            if(param.vpTokenObjects.plus(param.vpTokenStrings).size == 1) {
+                tokenResponse.vpToken shouldNot beInstanceOf<JsonArray>()
+                if(param.vpTokenObjects.size == 1) tokenResponse.vpToken should beInstanceOf<JsonObject>()
+                else {
+                    tokenResponse.vpToken should beInstanceOf<JsonPrimitive>()
+                    tokenResponse.vpToken!!.jsonPrimitive.isString shouldBe false // should be an unquoted string if vp_token is a single string
+                }
+            } else {
+                tokenResponse.vpToken should beInstanceOf<JsonArray>()
+                tokenResponse.vpToken!!.jsonArray.forEach {
+                    if(it is JsonPrimitive)
+                        it.isString shouldBe true // string elements in the array must be quoted strings
+                }
+            }
+
             val url =  tokenResponse.toRedirectUri("http://blank", ResponseMode.Query)
             println(url)
             val parsedResponse = TokenResponse.fromHttpParameters(Url(url).parameters.toMap())
