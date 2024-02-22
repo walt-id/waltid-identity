@@ -13,7 +13,7 @@ class KeyCmd : CliktCommand(
         subcommands(KeyGenerateCmd(), KeyConvertCmd())
     }
 
-    override fun run(): Unit {}
+    override fun run() = Unit
 }
 
 fun main(args: Array<String>) = KeyCmd().main(args)

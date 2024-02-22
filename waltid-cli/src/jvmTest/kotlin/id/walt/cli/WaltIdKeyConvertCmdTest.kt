@@ -278,8 +278,7 @@ class WaltIdKeyConvertCmdTest {
 
     @Test
     @Ignore
-    fun `should convert encrypted secp256r1 pub & pvt key PEM file to a valid JWK`() {
-    }
+    fun `should convert encrypted secp256r1 pub & pvt key PEM file to a valid JWK`() = Unit
 
     fun getFilePath(filename: String): String {
         // The returned URL has white spaces replaced by %20.
