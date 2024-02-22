@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalJsExport::class)
+
 package id.walt.crypto.keys
 
 import com.nimbusds.jose.*
@@ -18,12 +20,18 @@ import org.bouncycastle.asn1.edec.EdECObjectIdentifiers
 import org.bouncycastle.asn1.pkcs.PrivateKeyInfo
 import org.bouncycastle.asn1.x509.AlgorithmIdentifier
 import org.bouncycastle.jce.provider.BouncyCastleProvider
+import org.bouncycastle.util.io.pem.PemObject
+import org.bouncycastle.util.io.pem.PemWriter
+import java.io.ByteArrayOutputStream
 import java.security.*
 import java.security.spec.PKCS8EncodedKeySpec
 import java.util.*
+import kotlin.js.ExperimentalJsExport
 
 private val bouncyCastleProvider = BouncyCastleProvider()
 
+
+@Suppress("EXPECT_ACTUAL_CLASSIFIERS_ARE_IN_BETA_WARNING")
 @Serializable
 @SerialName("local")
 actual class LocalKey actual constructor(
@@ -57,11 +65,30 @@ actual class LocalKey actual constructor(
     }
 
     actual override suspend fun exportJWK(): String = _internalJwk.toJSONString()
+
     actual override suspend fun exportJWKObject(): JsonObject =
         JsonObject(_internalJwk.toJSONObject().mapValues { JsonPrimitive(it.value as String) })
 
     actual override suspend fun exportPEM(): String {
-        TODO("Not yet implemented")
+        val internalKeyRepresentation = when (keyType) {
+            KeyType.secp256r1, KeyType.secp256k1 -> _internalJwk.toECKey().let {
+                if (hasPrivateKey) Pair("EC PRIVATE KEY", it.toECPrivateKey()) else Pair("EC PUBLIC KEY", it.toECPublicKey())
+            }
+
+            KeyType.Ed25519 -> throw NotImplementedError("Encoded export is not supported for Ed25519 keys. You can use JWK export instead.")
+
+            KeyType.RSA -> _internalJwk.toRSAKey().let { if (hasPrivateKey) Pair("RSA PRIVATE KEY", it.toRSAPrivateKey()) else Pair("RSA PUBLIC KEY", it.toRSAPublicKey()) }
+        }
+
+        val pemObject = PemObject(internalKeyRepresentation.first, internalKeyRepresentation.second.encoded)
+
+        val x = ByteArrayOutputStream().apply {
+            PemWriter(writer()).use {
+                it.writeObject(pemObject)
+            }
+        }.toByteArray().toString(Charsets.UTF_8)
+
+        return x
     }
 
     private val _internalSigner: JWSSigner by lazy {
@@ -219,7 +246,11 @@ actual class LocalKey actual constructor(
         return kf.generatePrivate(pkcs8KeySpec)
     }
 
+    @OptIn(ExperimentalJsExport::class)
     actual companion object : LocalKeyCreator {
+
+        val prettyJson = Json { prettyPrint = true }
+
         actual override suspend fun generate(type: KeyType, metadata: LocalKeyMetadata): LocalKey =
             JvmLocalKeyCreator.generate(type, metadata)
 

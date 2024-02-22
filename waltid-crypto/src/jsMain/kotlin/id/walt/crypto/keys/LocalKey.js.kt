@@ -39,6 +39,7 @@ actual class LocalKey actual constructor(
             _internalJwk = JSON.parse(jwk!!)
         }
     }
+
     @JsPromise
     @JsExport.Ignore
     override suspend fun init() {
@@ -88,8 +89,11 @@ actual class LocalKey actual constructor(
 
     @JsPromise
     @JsExport.Ignore
-    actual override suspend fun exportJWK(): String =
-        JSON.stringify(_internalJwk)
+    actual override suspend fun exportJWK(): String = JSON.stringify(_internalJwk)
+
+    @JsPromise
+    @JsExport.Ignore
+    override suspend fun exportJWKPretty(): String = JSON.stringify(_internalJwk, null, 4)
 
     @JsPromise
     @JsExport.Ignore
@@ -234,6 +238,7 @@ actual class LocalKey actual constructor(
         @JsPromise
         @JsExport.Ignore
         actual override suspend fun importJWK(jwk: String): Result<LocalKey> = JsLocalKeyCreator.importJWK(jwk)
+
         @JsPromise
         @JsExport.Ignore
         actual override suspend fun importPEM(pem: String): Result<LocalKey> = JsLocalKeyCreator.importPEM(pem)
