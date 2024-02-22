@@ -6,9 +6,9 @@ import id.walt.cli.commands.KeyCmd
 
 class WaltIdCmd : CliktCommand(
     name = "waltid",
-    help = """WaltId CLI
+    help = """walt.id CLI
 
-        The WaltId CLI is a command line tool that allows you to onboard and 
+        The walt.id CLI is a command line tool that allows you to onboard and 
         use a SSI (Self-Sovereign-Identity) ecosystem. You can manage 
         cryptographic keys, generate and register W3C Decentralized 
         Identifiers (DIDs) as well as create, issue & verify W3C Verifiable 
@@ -18,23 +18,22 @@ class WaltIdCmd : CliktCommand(
 
         Print usage instructions
         -------------------------
-        ../gradlew run --args="-h"  
-        ../gradlew run --args="--help" 
-        ../gradlew run --args="key -h" 
-        ../gradlew run --args="key generate -h" 
-        ../gradlew run --args="key convert -h" 
+        waltid-cli -h
+        waltid-cli --help
+        waltid-cli key -h
+        waltid-cli key generate -h
+        waltid-cli key convert -h
         
         Key generation
         ---------------
-        ../gradlew run --args="key generate"
-        ../gradlew run --args="key generate"
-        ../gradlew run --args="key generate -tsecp256k1"
-        ../gradlew run --args="key generate --keyType=RSA"
-        ../gradlew run --args="key generate --keyType=RSA -o=myRSAKey.json"
+        waltid-cli key generate
+        waltid-cli key generate -t secp256k1
+        waltid-cli key generate --keyType=RSA
+        waltid-cli key generate --keyType=RSA -o myRsaKey.json
         
-        Key convertion
+        Key conversion
         ---------------
-        ../gradlew run --args="key convert --input=./myRSAKey.pem"
+        waltid-cli key convert --input=myRsaKey.pem
         """,
     printHelpOnEmptyArgs = true
 ) {
@@ -43,5 +42,5 @@ class WaltIdCmd : CliktCommand(
         subcommands(KeyCmd())
     }
 
-    override fun run() {}
+    override fun run() = Unit
 }
