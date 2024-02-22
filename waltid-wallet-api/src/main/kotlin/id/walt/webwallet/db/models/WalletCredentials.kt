@@ -4,7 +4,6 @@ import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.webwallet.manifest.provider.ManifestProvider
 import kotlinx.datetime.Instant
 import kotlinx.datetime.toKotlinInstant
-import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
@@ -27,7 +26,6 @@ object WalletCredentials : Table("credentials") {
     val addedOn = timestamp("added_on")
     val manifest = text("manifest").nullable()
 
-    //    val delete = bool("delete").default(false)
     val deletedOn = timestamp("deleted_on").nullable().default(null)
     val pending = bool("pending").default(false)
 

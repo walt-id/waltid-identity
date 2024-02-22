@@ -21,7 +21,7 @@ fun Application.manifest() = walletRoute {
         route("{credentialId}") {
             get({
                 summary =
-                    "Get credential manifest, if available, otherwise empty object"//<--TODO: decide empty response type
+                    "Get credential manifest, if available, otherwise null"
                 request {
                     pathParameter<String>("credentialId") {
                         required = true
@@ -74,8 +74,6 @@ fun Application.manifest() = walletRoute {
                     null -> context.respond(HttpStatusCode.NoContent)
                     else -> context.respond(ManifestProvider.new(manifest).display())
                 }
-
-
             }
             get("issuer", {
                 summary =

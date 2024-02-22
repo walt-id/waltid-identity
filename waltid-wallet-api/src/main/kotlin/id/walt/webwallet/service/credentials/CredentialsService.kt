@@ -53,7 +53,7 @@ object CredentialsService {
                 } ?: categorizedQuery(wallet, filter.showDeleted, it)
             } ?: allQuery(wallet, filter.showDeleted)
         }.orderBy(
-            column = lookupColumn(filter.sortBy),
+            column = WalletCredentials.addedOn,
             order = if (filter.sorDescending) SortOrder.DESC else SortOrder.ASC
         ).distinctBy { it[WalletCredentials.id] }.map { WalletCredential(it) }
     }
@@ -115,14 +115,13 @@ object CredentialsService {
         }
 
     private fun updateDelete(wallet: UUID, credentialId: String, value: Boolean): Int = transaction {
-        updateColumn(wallet, credentialId){
-//            it[this.delete] = value
+        updateColumn(wallet, credentialId) {
             it[WalletCredentials.deletedOn] = value.takeIf { it }?.let { Instant.now() }
         }
     }
 
     private fun updatePending(wallet: UUID, credentialId: String, value: Boolean): Int = transaction {
-        updateColumn(wallet, credentialId){
+        updateColumn(wallet, credentialId) {
             it[WalletCredentials.pending] = value
         }
     }
@@ -163,9 +162,6 @@ object CredentialsService {
 
     private fun deletedCondition(deleted: Boolean) =
         deleted.takeIf { it }?.let { deletedItemsCondition } ?: notDeletedItemsCondition
-
-    //TODO
-    private fun lookupColumn(name: String) = WalletCredentials.addedOn
 
     object Category {
         fun add(wallet: UUID, credentialId: String, vararg category: String): Int = transaction {
