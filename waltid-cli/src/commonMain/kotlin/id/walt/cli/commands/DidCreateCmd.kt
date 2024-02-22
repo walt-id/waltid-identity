@@ -4,10 +4,9 @@ import com.github.ajalt.clikt.core.CliktCommand
 
 class DidCreateCmd : CliktCommand(
     name = "create",
-    help = "Create a brand new Decentralized Identity",
-    printHelpOnEmptyArgs = true
+    help = "Create a brand new Decentralized Identity"
 ) {
     override fun run() {
-
+        echo("DID created")
     }
 }
