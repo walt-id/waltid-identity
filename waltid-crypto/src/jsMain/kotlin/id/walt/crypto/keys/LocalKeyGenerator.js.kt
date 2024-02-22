@@ -26,7 +26,8 @@ object JsLocalKeyCreator : LocalKeyCreator {
     @JsPromise
     @JsExport.Ignore
     override suspend fun importRawPublicKey(type: KeyType, rawPublicKey: ByteArray, metadata: LocalKeyMetadata): Key {
-        TODO("Not yet implemented")
+        val key: KeyLike = await(jose.importSPKI(rawPublicKey.decodeToString(), type.jwsAlg()))
+        return LocalKey(key).apply { init() }
     }
 
     @JsPromise
