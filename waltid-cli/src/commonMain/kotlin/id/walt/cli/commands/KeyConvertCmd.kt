@@ -27,8 +27,7 @@ import java.io.File
 import java.io.FileReader
 import java.security.PrivateKey
 import java.security.Security
-import java.util.Base64
-import kotlin.io.path.absolutePathString
+import java.util.*
 import kotlin.io.path.useLines
 import kotlin.js.ExperimentalJsExport
 
@@ -105,8 +104,8 @@ class KeyConvertCmd : CliktCommand(
             // other PEM content types: https://github.com/openssl/openssl/blob/master/include/openssl/pem.h
             in Regex("""^\{.*""") -> KeyFileFormat.JWK
             in Regex("""^-+BEGIN .*PUBLIC KEY-+""") -> KeyFileFormat.PEM
-            in Regex("""^-+BEGIN .*PRIVATE KEY-+""") -> KeyFileFormat.PEM
             in Regex("""^-+BEGIN .*ENCRYPTED PRIVATE KEY-+""") -> KeyFileFormat.ENCRYPTED_PEM
+            in Regex("""^-+BEGIN .*PRIVATE KEY-+""") -> KeyFileFormat.PEM
             else -> throw InvalidFileFormat(input.path, "Unknown file format (expected ${KeyFileFormat.getNames()}).")
         }
     }
@@ -120,7 +119,8 @@ class KeyConvertCmd : CliktCommand(
                 KeyFileFormat.PEM -> LocalKey.importPEM(inputContent).getOrThrow()
                 KeyFileFormat.ENCRYPTED_PEM -> LocalKey.importPEM(decrypt(input).getOrThrow()).getOrThrow()
             }
-        }.getOrElse { throw IllegalArgumentException("Could not process key file at ${input.absolutePath}.", it) }
+        }.getOrThrow()
+        // getOrElse { throw IllegalArgumentException("Could not process key file at ${input.absolutePath}.", it) }
     }
 
     /**

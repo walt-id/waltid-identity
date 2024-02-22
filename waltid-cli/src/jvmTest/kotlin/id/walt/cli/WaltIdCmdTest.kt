@@ -4,8 +4,8 @@ import com.github.ajalt.clikt.core.PrintHelpMessage
 import com.github.ajalt.clikt.testing.test
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
+import kotlin.test.assertContains
 import kotlin.test.assertFailsWith
-import kotlin.test.assertTrue
 
 class WaltIdCmdTest {
 
@@ -16,7 +16,7 @@ class WaltIdCmdTest {
             command.parse(emptyList())
         }
         val result = command.test()
-        assertTrue(result.stdout.contains("The WaltId CLI is a command line tool"))
+        assertContains(result.stdout, "The walt.id CLI is a command line tool")
     }
 
     @Test
