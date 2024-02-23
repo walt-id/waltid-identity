@@ -1,6 +1,9 @@
 package id.walt.webwallet.web.controllers
 
+import id.walt.webwallet.service.credentials.CredentialFilterObject
+import id.walt.webwallet.service.credentials.CredentialsService
 import id.walt.webwallet.service.push.PushManager
+import io.github.smiley4.ktorswaggerui.dsl.get
 import io.github.smiley4.ktorswaggerui.dsl.post
 import io.github.smiley4.ktorswaggerui.dsl.route
 import io.ktor.http.*
@@ -9,6 +12,7 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import java.net.URI
@@ -37,10 +41,30 @@ object NotificationController {
     }
 
     fun Application.notifications() {
-        routing {
+        walletRoute {
             route("/api/notifications", {
                 tags = listOf("NotificationController")
             }) {
+                get("pending", {
+                    summary = "Get pending credentials"
+                    response {
+                        HttpStatusCode.OK to {
+                            description = "Array of (verifiable credentials) JSON documents"
+                            body<List<JsonObject>>()
+                        }
+                    }
+                }) {
+                    val pending = CredentialsService.list(
+                        getWalletId(), CredentialFilterObject(
+                            categories = null,
+                            showDeleted = false,
+                            showPending = true,
+                            sortBy = "addedOn",
+                            sorDescending = false
+                        )
+                    )
+                    context.respond(pending)
+                }
                 post("send", {
                     summary = "Experimental: Push notification system"
                     // TODO

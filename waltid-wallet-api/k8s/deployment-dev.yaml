@@ -107,7 +107,7 @@ data:
       "Not relevant to me",
       "Unsure about accuracy",
       "Need more details",
-  ]
+    ]
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
