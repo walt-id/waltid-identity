@@ -75,7 +75,7 @@ actual class LocalKey actual constructor(
                 if (hasPrivateKey) Pair("EC PRIVATE KEY", it.toECPrivateKey()) else Pair("EC PUBLIC KEY", it.toECPublicKey())
             }
 
-            KeyType.Ed25519 -> throw NotImplementedError("Encoded export is not supported for Ed25519 keys. You can use JWK export instead.")
+            KeyType.Ed25519 -> throw NotImplementedError("Ed25519 keys cannot be exported as PEM yet.")
 
             KeyType.RSA -> _internalJwk.toRSAKey().let { if (hasPrivateKey) Pair("RSA PRIVATE KEY", it.toRSAPrivateKey()) else Pair("RSA PUBLIC KEY", it.toRSAPublicKey()) }
         }
