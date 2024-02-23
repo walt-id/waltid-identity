@@ -28,6 +28,11 @@ fun Application.credentials() = walletRoute {
                     example = false
                     required = false
                 }
+                queryParameter<Boolean>("showPending") {
+                    description = "include the pending credentials in the query result"
+                    example = false
+                    required = false
+                }
                 queryParameter<String>("sortBy") {
                     description = "The property to sort by"
                     example = "addedOn"
@@ -48,6 +53,7 @@ fun Application.credentials() = walletRoute {
         }) {
             val categories = call.request.queryParameters.getAll("category")
             val showDeleted = call.request.queryParameters["showDeleted"].toBoolean()
+            val showPending = call.request.queryParameters["showPending"].toBoolean()
             val sortBy = call.request.queryParameters["sortBy"] ?: "addedOn"
             val descending = call.request.queryParameters["descending"].toBoolean()
             context.respond(
@@ -55,6 +61,7 @@ fun Application.credentials() = walletRoute {
                     CredentialFilterObject(
                         categories = categories,
                         showDeleted = showDeleted,
+                        showPending = showPending,
                         sortBy = sortBy,
                         sorDescending = descending
                     )
