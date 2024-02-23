@@ -57,7 +57,7 @@ class DidCheqdRegistrar : LocalRegistrarMethod("cheqd") {
     }
 
     //TODO: inject
-    private val client = HttpClient() {
+    private val client = HttpClient {
         install(ContentNegotiation) {
             json(json)
         }
@@ -131,7 +131,7 @@ class DidCheqdRegistrar : LocalRegistrarMethod("cheqd") {
                     jobId = jobId, secret = Secret(signingResponse = signatures.map {
                         SigningResponse(
                             signature = it.base64toBase64Url(),
-                            verificationMethodId = verificationMethodId,
+                            kid = verificationMethodId,
                         )
                     })
                 )
@@ -140,7 +140,8 @@ class DidCheqdRegistrar : LocalRegistrarMethod("cheqd") {
     }
 
     private suspend fun signPayload(key: Key, job: JobActionResponse): List<String> = let {
-        val state = (job.didState as? ActionDidState) ?: throw IllegalArgumentException("Unexpected did state")
+        val state = (job.didState as? ActionDidState) ?: error("Unexpected did state")
+        if (!state.action.equals("signPayload", true)) error("Unexpected state action: ${state.action}")
         val payloads = state.signingRequest.map {
             id.walt.did.utils.EncodingUtils.base64Decode(it.serializedPayload)
         }

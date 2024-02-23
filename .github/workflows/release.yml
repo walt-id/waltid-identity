@@ -12,6 +12,11 @@ jobs:
     name: "Release"
     runs-on: ubuntu-latest
     steps:
+      - name: Free Disk Space (Ubuntu)
+        uses: jlumbroso/free-disk-space@v1.3.1
+        with:
+          tool-cache: false
+          docker-images: false
       - uses: actions/checkout@v3
       - name: Set version
         run: |

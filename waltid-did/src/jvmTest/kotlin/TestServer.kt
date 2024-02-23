@@ -9,18 +9,25 @@ import io.ktor.server.routing.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import java.io.File
+import java.net.URI
 import javax.security.auth.x500.X500Principal
 
 object TestServer {
     private val keyStoreFile = File(this.javaClass.classLoader.getResource("")!!.path.plus("keystore.jks"))
     private val ed25519DocumentResponse =
-        this.javaClass.classLoader.getResource("did-web/ed25519.json")!!.path.let { File(it).readText() }
+        URI(
+            this.javaClass.classLoader.getResource("did-web/ed25519.json")!!.toString()
+        ).path.let { File(it).readText() }
     private val secp256k1DocumentResponse =
-        this.javaClass.classLoader.getResource("did-web/secp256k1.json")!!.path.let { File(it).readText() }
+        URI(
+            this.javaClass.classLoader.getResource("did-web/secp256k1.json")!!.toString()
+        ).path.let { File(it).readText() }
     private val secp256r1DocumentResponse =
-        this.javaClass.classLoader.getResource("did-web/secp256r1.json")!!.path.let { File(it).readText() }
+        URI(
+            this.javaClass.classLoader.getResource("did-web/secp256r1.json")!!.toString()
+        ).path.let { File(it).readText() }
     private val rsaDocumentResponse =
-        this.javaClass.classLoader.getResource("did-web/rsa.json")!!.path.let { File(it).readText() }
+        URI(this.javaClass.classLoader.getResource("did-web/rsa.json")!!.toString()).path.let { File(it).readText() }
     private val keyStore = buildKeyStore {
         certificate("test") {
             password = "test123"

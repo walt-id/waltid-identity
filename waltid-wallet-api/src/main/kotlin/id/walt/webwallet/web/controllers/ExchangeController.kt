@@ -1,6 +1,7 @@
 package id.walt.webwallet.web.controllers
 
 import id.walt.oid4vc.data.dif.PresentationDefinition
+import id.walt.oid4vc.requests.CredentialOfferRequest
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.db.models.WalletOperationHistory
 import id.walt.webwallet.service.SSIKit2WalletService
@@ -10,6 +11,7 @@ import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
+import io.ktor.util.*
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 
@@ -194,6 +196,19 @@ fun Application.exchange() = walletRoute {
             val request = call.receiveText()
             val parsedRequest = wallet.resolvePresentationRequest(request)
             context.respond(parsedRequest)
+        }
+        post("resolveCredentialOffer", {
+            summary = "Return resolved / parsed credential offer"
+
+            request {
+                body<String> { description = "Credential offer request to resolve/parse" }
+            }
+        }) {
+            val wallet = getWalletService()
+            val request = call.receiveText()
+            val reqParams = Url(request).parameters.toMap()
+            val parsedOffer = wallet.resolveCredentialOffer(CredentialOfferRequest.fromHttpParameters(reqParams))
+            context.respond(parsedOffer)
         }
     }
 }

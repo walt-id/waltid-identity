@@ -94,7 +94,7 @@ class IssuerApiTest {
         val issueRequest = JwtIssuanceRequest(jsonKeyObj, TEST_ISSUER_DID, w3cVc, jsonMappingObj)
 
         ConfigManager.loadConfigs(emptyArray())
-        val offerUri = createCredentialOfferUri(issueRequest)
+        val offerUri = createCredentialOfferUri(listOf(issueRequest))
 
         assertEquals(true, offerUri.contains("//localhost:7002/?credential_offer"))
     }
@@ -111,7 +111,7 @@ class IssuerApiTest {
         val issueRequest = SdJwtIssuanceRequest(jsonKeyObj, TEST_ISSUER_DID, w3cVc, jsonMappingObj, selectiveDisclosureMap)
 
         ConfigManager.loadConfigs(emptyArray())
-        val offerUri = createCredentialOfferUri(issueRequest)
+        val offerUri = createCredentialOfferUri(listOf(issueRequest))
 
         assertEquals(true, offerUri.contains("//localhost:7002/?credential_offer"))
     }
