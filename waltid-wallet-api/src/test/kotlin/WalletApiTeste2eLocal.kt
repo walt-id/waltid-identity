@@ -21,122 +21,121 @@ import kotlin.time.Duration.Companion.seconds
 
 
 class WalletApiTeste2eLocal : WalletApiTeste2eBase() {
-  
-  companion object {
-    var localUrl: String = ""
-    private var issuer = IssuerApiTeste2e()
-    var localIssuerClient: HttpClient
-    lateinit var localWalletClient: HttpClient
-    init {
-      Security.addProvider(BouncyCastleProvider())
-      runCatching { Db.dataDirectoryPath.createDirectories() }
-      
-      ConfigManager.loadConfigs(emptyArray())
-      
-      Db.start()
-      
-      // creates two test applications, for wallet and issuer
-      setUpWalletAPITestApplication()
-     
-      localIssuerClient = issuer.getHttpClient()
-      println("Init finished")
+    companion object {
+        var localUrl: String = ""
+        private var issuer = IssuerApiTeste2e()
+        var localIssuerClient: HttpClient
+        lateinit var localWalletClient: HttpClient
+        
+        init {
+            Security.addProvider(BouncyCastleProvider())
+            runCatching { Db.dataDirectoryPath.createDirectories() }
+            
+            ConfigManager.loadConfigs(emptyArray())
+            
+            Db.start()
+            
+            // creates two test applications, for wallet and issuer
+            setUpWalletAPITestApplication()
+            
+            localIssuerClient = issuer.getHttpClient()
+            println("Init finished")
+        }
+        
+        private fun setUpWalletAPITestApplication() {
+            println("Wallet API : Test Application starting...")
+            
+            val testApp = TestApplication {
+                application {
+                    configurePlugins()
+                    auth()
+                    accounts()
+                    credentials()
+                    dids()
+                    keys()
+                }
+            }
+            localWalletClient = testApp.createClient {
+                install(ContentNegotiation) {
+                    json()
+                }
+            }
+        }
     }
     
-    private fun setUpWalletAPITestApplication() {
-      println("Wallet API : Test Application starting...")
-      
-      val testApp = TestApplication {
-        application {
-          configurePlugins()
-          auth()
-          accounts()
-          credentials()
-          dids()
-          keys()
+    @Test
+    fun testLogin() = runTest {
+        // test creation of a randomly generated user account
+        super.testCreateUser(
+            User(
+                "tester",
+                email,
+                password,
+                "email"
+            )
+        )
+    }
+    
+    @Test
+    fun testAuthentication() = runTest {
+        testCreateUser(User("tester", email, password, "email"))
+        testAuthenticationEndpoints(User("tester", "user@email.com", "password", "email"))
+    }
+    
+    @Test
+    fun testCredentials() = runTest {
+        testCredentialEndpoints()
+    }
+    
+    @Test
+    fun testListDids() = runTest {
+        testDidsList()
+    }
+    
+    @Test
+    fun testDeleteDids() = runTest {
+        testDidsDelete()
+    }
+    
+    @Test
+    fun testCreateDids() = runTest {
+        testDidsDelete()
+        testDidsCreate()
+    }
+    
+    @Test
+    fun testDidDefault() = runTest {
+        testDidsDelete()
+        testDidsCreate()
+        testDefaultDid()
+    }
+    
+    @Test
+    fun testIssuance() = runTest {
+        testCredentialIssuance()
+    }
+    
+    @Test
+    fun testKey() = runTest {
+        testKeyEndpoints()
+    }
+    
+    
+    override var walletClient: HttpClient
+        get() = localWalletClient
+        set(value) {
+            walletClient = value
         }
-      }
-      localWalletClient = testApp.createClient {
-        install(ContentNegotiation) {
-          json()
+    override var issuerClient: HttpClient
+        get() = localIssuerClient
+        set(value) {
+            localIssuerClient = value
         }
-      }
-    }
-  }
-  
-  @Test
-  fun testLogin() = runTest {
-    // test creation of a randomly generated user account
-    super.testCreateUser(
-      User(
-        "tester",
-        email,
-        password,
-        "email"
-      )
-    )
-  }
-  
-  @Test
-  fun testAuthentication() = runTest {
-    testCreateUser(User("tester", email, password, "email"))
-    testAuthenticationEndpoints(User("tester", "user@email.com", "password", "email"))
-  }
-  
-  @Test
-  fun testCredentials() = runTest {
-    val response:JsonArray = testCredentialEndpoints(User("tester", "user@email.com", "password", "email"))
-    assertNotEquals(response.size, 0)
-    response[0].jsonObject["id"]?.jsonPrimitive?.content ?: error("No credentials found")
-  }
-  
-  @Test
-  fun testListDids() = runTest {
-    testDidsList()
-  }
-  
-  @Test
-  fun testDeleteDids() = runTest {
-    testDidsDelete()
-  }
-  
-  @Test
-  fun testCreateDids() = runTest {
-    testDidsDelete()
-    testDidsCreate()
-  }
-  
-  @Test
-  fun testDidDefault() = runTest {
-    testDidsDelete()
-    testDidsCreate()
-    testDefaultDid()
-  }
-  
-  @Test
-  fun testIssuance() = runTest {
-    testCredentialIssuance()
-  }
-  @Test
-  fun testKey() = runTest {
-    testKeyEndpoints()
-  }
-  
-  
-  override var walletClient: HttpClient
-    get() = localWalletClient
-    set(value) {
-      walletClient = value
-    }
-  override var issuerClient: HttpClient
-    get() = localIssuerClient
-    set(value) {
-      localIssuerClient = value
-    }
-  override var walletUrl: String
-    get() = localUrl
-    set(value) {
-      localUrl = value
-    }
-  
-  override var issuerUrl: String = walletUrl
+    override var walletUrl: String
+        get() = localUrl
+        set(value) {
+            localUrl = value
+        }
+    
+    override var issuerUrl: String = walletUrl
 }
