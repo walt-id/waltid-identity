@@ -1,6 +1,7 @@
 package id.walt.crypto.keys
 
 import id.walt.crypto.keys.TSEKey.Companion.tseJsonDataBody
+import id.walt.crypto.utils.Base64Utils.base64UrlDecode
 import id.walt.crypto.utils.Base64Utils.base64toBase64Url
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto.utils.JwsUtils.jwsAlg
@@ -25,13 +26,14 @@ import kotlinx.coroutines.*
 import kotlinx.serialization.Transient
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
+import kotlin.js.ExperimentalJsExport
+import kotlin.js.JsExport
 
 class OCIKey(
     val OCIConfig: OCIKeyConfig,
     private var _publicKey: ByteArray? = null,
     private var _keyType: KeyType? = null,
-    // override val keyType: KeyType,
-    // override val hasPrivateKey: Boolean,
+
 
 ) : Key() {
 
@@ -178,8 +180,26 @@ class OCIKey(
       return if (response) Result.success(signed) else Result.failure(Exception("Signature is not valid"))
   }
 
+
+  @OptIn(ExperimentalJsExport::class)
   override suspend fun verifyJws(signedJws: String): Result<JsonObject> {
-    TODO("Not yet implemented")
+      val parts = signedJws.split(".")
+      check(parts.size == 3) { "Invalid JWT part count: ${parts.size} instead of 3" }
+      val header = parts[0]
+      val headers: Map<String, JsonElement> = Json.decodeFromString(header.base64UrlDecode().decodeToString())
+      headers["alg"]?.let {
+          val algValue = it.jsonPrimitive.content
+          check(algValue == keyType.jwsAlg()) { "Invalid key algorithm for JWS: JWS has $algValue, key is ${keyType.jwsAlg()}!" }
+      }
+
+      val payload = parts[1]
+      val signature = parts[2].base64UrlDecode()
+
+      val signable = "$header.$payload".encodeToByteArray()
+      return verifyRaw(signature, signable).map {
+           val verifiedPayload = it.decodeToString().substringAfter(".").base64UrlDecode().decodeToString()
+              Json.parseToJsonElement(verifiedPayload).jsonObject
+      }
   }
 
   override suspend fun getPublicKey(): Key {
@@ -302,7 +322,7 @@ class OCIKey(
             else -> throw IllegalArgumentException("Unsupported HTTP method: $method")
           }
 
-      val privateKeycon = ""
+      val privateKeycon = "PRIVATE_KEY_HERE"
       val privateKeyPEM =
           privateKeycon
               .replace("-----BEGIN PRIVATE KEY-----", "")
@@ -355,89 +375,8 @@ class OCIKey(
       return response.body<Array<JsonObject>>()
     }
 
-    @OptIn(ExperimentalEncodingApi::class, InternalAPI::class)
-    suspend fun signRawText(
-        OCIDKeyID: String,
-        keyId: String,
-        message: String,
-        host: String
-    ): JsonObject {
-      val encodedMessage = Base64.encode(message.encodeToByteArray())
 
-      val requestBody =
-          JsonObject(
-                  mapOf(
-                      "keyId" to JsonPrimitive(OCIDKeyID),
-                      "message" to JsonPrimitive(encodedMessage),
-                      "signingAlgorithm" to JsonPrimitive("SHA_384_RSA_PKCS_PSS"),
-                  ))
-              .toString()
-      val signature = signingRequest("POST", "/20180608/sign", host, requestBody)
 
-      val response =
-          http.post("https://$host/20180608/sign") {
-            header(
-                "Authorization",
-                """Signature version="1",headers="date (request-target) host content-length content-type x-content-sha256",keyId="$keyId",algorithm="rsa-sha256",signature="$signature"""")
-            header("Date", GMTDate().toHttpDate())
-            header("Host", host)
-            header("Content-Length", requestBody.length.toString())
-            header("Accept", "application/json")
-            header("Connection", "keep-alive")
-            header("Content-Type", "application/json")
-            header("x-content-sha256", calculateSHA256(requestBody))
-            body = requestBody
-          }
-      return response.body<JsonObject>()
-    }
-
-    //        suspend fun signJws(plaintext: ByteArray, headers: Map<String, String>): String {
-    //            val header = Json.encodeToString(mutableMapOf(
-    //                "typ" to "JWT",
-    //                "alg" to keyType.jwsAlg(),
-    //            ).apply { putAll(headers) }).encodeToByteArray().encodeToBase64Url()
-    //
-    //            val payload = plaintext.encodeToBase64Url()
-    //            return ""
-    //        }
-
-    @OptIn(InternalAPI::class, ExperimentalEncodingApi::class)
-    suspend fun verifyRawtext(
-        OCIDKeyID: String,
-        keyId: String,
-        message: String,
-        signature: String,
-        host: String
-    ): Boolean {
-      val encodedMessage = Base64.encode(message.encodeToByteArray())
-
-      val requestBody =
-          JsonObject(
-                  mapOf(
-                      "keyId" to JsonPrimitive(OCIDKeyID),
-                      "message" to JsonPrimitive(encodedMessage),
-                      "signature" to JsonPrimitive(signature),
-                      "signingAlgorithm" to JsonPrimitive("SHA_384_RSA_PKCS_PSS"),
-                  ))
-              .toString()
-      val signature = signingRequest("POST", "/20180608/verify", host, requestBody)
-
-      val response =
-          http.post("https://$host/20180608/verify") {
-            header(
-                "Authorization",
-                """Signature version="1",headers="date (request-target) host content-length content-type x-content-sha256",keyId="$keyId",algorithm="rsa-sha256",signature="$signature"""")
-            header("Date", GMTDate().toHttpDate())
-            header("Host", host)
-            header("Content-Length", requestBody.length.toString())
-            header("Accept", "application/json")
-            header("Connection", "keep-alive")
-            header("Content-Type", "application/json")
-            header("x-content-sha256", calculateSHA256(requestBody))
-            body = requestBody
-          }
-      return response.body<JsonObject>()["isSignatureValid"]?.jsonPrimitive?.boolean ?: false
-    }
 
     suspend fun getPublicKey(
         OCIDKeyID: String,
@@ -474,39 +413,23 @@ class OCIKey(
   }
 }
 
-suspend fun main() {
-
-  val Config =
-      OCIKeyConfig(
-          "ocid1.tenancy.oc1..aaaaaaaaiijfupfvsqwqwgupzdy5yclfzcccmie4ktp2wlgslftv5j7xpk6q",
-          "ocid1.user.oc1..aaaaaaaaxjkkfjqxdqk7ldfjrxjmacmbi7sci73rbfiwpioehikavpbtqx5q",
-          "bb:d4:4b:0c:c8:3a:49:15:7f:87:55:d5:2b:7e:dd:bc",
-          "ens3g6m3aabyo-management.kms.eu-frankfurt-1.oraclecloud.com",
-          "ocid1.tenancy.oc1..aaaaaaaaiijfupfvsqwqwgupzdy5yclfzcccmie4ktp2wlgslftv5j7xpk6q/ocid1.user.oc1..aaaaaaaaxjkkfjqxdqk7ldfjrxjmacmbi7sci73rbfiwpioehikavpbtqx5q/bb:d4:4b:0c:c8:3a:49:15:7f:87:55:d5:2b:7e:dd:bc",
-          "ocid1.key.oc1.eu-frankfurt-1.ens3g6m3aabyo.abtheljssgbbeedlwujnvfyqxfjrfhtfdnlwioevpvjoqj6675n7twqzzixq",
-          "ens3g6m3aabyo-crypto.kms.eu-frankfurt-1.oraclecloud.com",
-      )
-
-//  val message = "Hello World!"
-//  val signData = OCIKey(Config).signRaw(message.encodeToByteArray()) as String
-//  println("Signed Data: $signData")
-//    val verification = OCIKey(Config).verifyRaw(
-//        signData.decodeBase64Bytes(),
-//        message.encodeToByteArray()
-//    )
-//    println("Verification: $verification")
-
-    val key = OCIKey.generateKey(KeyType.RSA, Config)
-    println("the key is: $key.")
-
-    println("the key type is: ${key.keyType}")
-    println("the key id is: ${key.getKeyId()}")
-    println("key public : ${key.retrievedPublicKey.await().decodeToString()}" )
-
-  //    val keys = OCIKey.getKeys(Config.keyId, Config.managementEndpoint)
-  //    println(keys.forEach { println(it) })
-  //
-  //
+//suspend fun main() {
+//
+//  val Config =
+//      OCIKeyConfig(
+//          "ocid1.tenancy.oc1..aaaaaaaaiijfupfvsqwqwgupzdy5yclfzcccmie4ktp2wlgslftv5j7xpk6q",
+//          "ocid1.user.oc1..aaaaaaaaxjkkfjqxdqk7ldfjrxjmacmbi7sci73rbfiwpioehikavpbtqx5q",
+//          "bb:d4:4b:0c:c8:3a:49:15:7f:87:55:d5:2b:7e:dd:bc",
+//          "ens3g6m3aabyo-management.kms.eu-frankfurt-1.oraclecloud.com",
+//          "ocid1.tenancy.oc1..aaaaaaaaiijfupfvsqwqwgupzdy5yclfzcccmie4ktp2wlgslftv5j7xpk6q/ocid1.user.oc1..aaaaaaaaxjkkfjqxdqk7ldfjrxjmacmbi7sci73rbfiwpioehikavpbtqx5q/bb:d4:4b:0c:c8:3a:49:15:7f:87:55:d5:2b:7e:dd:bc",
+//          "ocid1.key.oc1.eu-frankfurt-1.ens3g6m3aabyo.abtheljssgbbeedlwujnvfyqxfjrfhtfdnlwioevpvjoqj6675n7twqzzixq",
+//          "ens3g6m3aabyo-crypto.kms.eu-frankfurt-1.oraclecloud.com",
+//      )
+//
+//
+//
+//      val key = OCIKey.generateKey(KeyType.RSA, Config)
+//
 //      val message = JsonObject(
 //          mapOf(
 //              "sub" to JsonPrimitive("16bb17e0-e733-4622-9384-122bc2fc6290"),
@@ -514,19 +437,15 @@ suspend fun main() {
 //              "aud" to JsonPrimitive("TOKEN"),
 //          )
 //      )
+//    key.signRaw(message.toString().encodeToByteArray())
+//          val signedData = key.signRaw(message.toString().encodeToByteArray()) as String
+//          println("Signed Data: $signedData")
+//          val verification = key.verifyRaw(
+//              signedData.decodeBase64Bytes(),
+//              message.toString().encodeToByteArray()
+//          )
+//          println("Verification: ${verification.isSuccess}")
 //
-//      val signedData = OCIKey(Config).signRaw(message.toString().encodeToByteArray()) as String
-//      println("Signed Data: $signedData")
-//      val verification = OCIKey(Config).verifyRaw(
-//          signedData.decodeBase64Bytes(),
-//          message.toString().encodeToByteArray()
-//      )
-//      println("Verification: $verification")
-  //
-//      val publicKey = OCIKey.getPublicKey(Config.OCIDKeyID ,Config.keyId,
-//   Config.managementEndpoint,
-//   "ocid1.keyversion.oc1.eu-frankfurt-1.ens3g6m3aabyo.bdavmw3iunaaa.abtheljsneg3zrfvkhcijrmm6k7iwrjrsyy63sjuabdjlsxosmfbpwzxkwiq")
-//      println("Public Key: $publicKey.")
-}
+//}
 
 
