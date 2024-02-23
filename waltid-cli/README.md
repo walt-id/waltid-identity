@@ -8,21 +8,24 @@ Manage keys, DIDs, issue Verifiable Credentials, and verify them using the WaltI
 
 * `git clone https://github.com/walt-id/waltid-identity.git`
 * `cd waltid-identity/waltid-cli`
-* Run one of the following commands
+* `../gradlew clean build`
+* `alias waltid="./waltid-cli.sh"`  # _This is a temporary hack while we finish the distribution strategy._
 
-| Command                                                                                          | What it does                                                                          |
-|:-------------------------------------------------------------------------------------------------|:--------------------------------------------------------------------------------------| 
-| `../gradlew run --args="-h"`                                                                     | Print usage message                                                                   |
-| `../gradlew run --args="--help"`                                                                 | Print WaltId CLI usage message                                                        |
-| `../gradlew run --args="key -h"`                                                                 | Print WaltId CLI key command usage message                                            |
-| `../gradlew run --args="key generate -h"`                                                        | Print WaltId CLI key generate command usage message                                   |
-| `../gradlew run --args="key convert -h"`                                                         | Print WaltId CLI key generate command usage message                                   |
-| `../gradlew run --args="key generate"`                                                           | Generates a cryptographic key of type Ed25519                                         |
-| `../gradlew run --args="key generate -tsecp256k1"`                                               | Generates a cryptographic key of type secp256k1                                       |
-| `../gradlew run --args="key generate --keyType=RSA"`                                             | Generates a cryptographic key of type RSA                                             |
-| `../gradlew run --args="key generate --keyType=RSA -o=myRSAKey.json"`                            | Generates a cryptographic key of type RSA and save it in a file called  myRSAKey.json |
-| `../gradlew run --args="key convert --input=./myRSAKey.pem"`                                     | Convert ./myRSAKey.pem file to ./myRSAKey.jwk                                         |
-| `../gradlew run --args="key convert --input=./myRSAKey.pem --output=./myRSAKeyInJWTFormat.json"` | Convert ./myRSAKey.pem file to ./myRSAKeyInJWTFormat.json                             |
+Now, you can run:
+
+| Command                                                                         | What it does                                                                          |
+|:--------------------------------------------------------------------------------|:--------------------------------------------------------------------------------------| 
+| `waltid -h`                                                                     | Print usage message                                                                   |
+| `waltid --help`                                                                 | Print WaltId CLI usage message                                                        |
+| `waltid key -h`                                                                 | Print WaltId CLI key command usage message                                            |
+| `waltid key generate -h`                                                        | Print WaltId CLI key generate command usage message                                   |
+| `waltid key convert -h`                                                         | Print WaltId CLI key generate command usage message                                   |
+| `waltid key generate`                                                           | Generates a cryptographic key of type Ed25519                                         |
+| `waltid key generate -tsecp256k1`                                               | Generates a cryptographic key of type secp256k1                                       |
+| `waltid key generate --keyType=RSA`                                             | Generates a cryptographic key of type RSA                                             |
+| `waltid key generate --keyType=RSA -o=myRSAKey.json`                            | Generates a cryptographic key of type RSA and save it in a file called  myRSAKey.json |
+| `waltid key convert --input=./myRSAKey.pem`                                     | Convert ./myRSAKey.pem file to ./myRSAKey.jwk                                         |
+| `waltid key convert --input=./myRSAKey.pem --output=./myRSAKeyInJWTFormat.json` | Convert ./myRSAKey.pem file to ./myRSAKeyInJWTFormat.json                             |
 
 ## In production
 
@@ -58,6 +61,20 @@ drwxr-xr-x@  4 waltian  wheel   128B Feb 20 18:41 bin
 drwxr-xr-x@ 72 waltian  wheel   2.3K Feb 20 18:41 lib
 ```
 
+The `bin` folder has the CLI execution script compatible with common operating systems.
+
+Set execution rights to the script
+
+`$ chmod a+x /tmp/waltid-cli-1.0.0-SNAPSHOT/bin/waltid`
+
+Add the `/tmp/waltid-cli-1.0.0-SNAPSHOT/bin` to the PATH.
+
+`$ export PATH="/tmp/waltid-cli-1.0.0-SNAPSHOT/bin:$PATH"`
+
+Execute the walt.id CLI
+
+`$ waltid`
+
 # Supported commands
 
 | Command | Subommand | Description                                    | Ready to use |
@@ -82,35 +99,34 @@ Usage: waltid [<options>] <command> [<args>]...
 
   WaltId CLI
 
-  ╭────────────────────────────────────────────────────────────────────────╮
-  │    The WaltId CLI is a command line tool that allows you to onboard and│
-  │    use a SSI (Self-Sovereign-Identity) ecosystem. You can manage       │
-  │    cryptographic keys, generate and register W3C Decentralized         │
-  │    Identifiers (DIDs) as well as create, issue & verify W3C Verifiable │
-  │    credentials (VCs).                                                  │
-  │                                                                        │
-  │    Example commands are:                                               │
-  │                                                                        │
-  │    Print usage instructions                                            │
-  │    -------------------------                                           │
-  │    ../gradlew run --args="-h"                                          │
-  │    ../gradlew run --args="--help"                                      │
-  │    ../gradlew run --args="key -h"                                      │
-  │    ../gradlew run --args="key generate -h"                             │
-  │    ../gradlew run --args="key convert -h"                              │
-  │                                                                        │
-  │    Key generation                                                      │
-  │    ---------------                                                     │
-  │    ../gradlew run --args="key generate"                                │
-  │    ../gradlew run --args="key generate"                                │
-  │    ../gradlew run --args="key generate -tsecp256k1"                    │
-  │    ../gradlew run --args="key generate --keyType=RSA"                  │
-  │    ../gradlew run --args="key generate --keyType=RSA -o=myRSAKey.json" │
-  │                                                                        │
-  │    Key convertion                                                      │
-  │    ---------------                                                     │
-  │    ../gradlew run --args="key convert --input=./myRSAKey.pem"          │
-  ╰────────────────────────────────────────────────────────────────────────╯
+  ╭─────────────────────────────────────────────────────────────────────────╮
+  │    The walt.id CLI is a command line tool that allows you to onboard and│
+  │    use a SSI (Self-Sovereign-Identity) ecosystem. You can manage        │
+  │    cryptographic keys, generate and register W3C Decentralized          │
+  │    Identifiers (DIDs) as well as create, issue & verify W3C Verifiable  │
+  │    credentials (VCs).                                                   │
+  │                                                                         │
+  │    Example commands are:                                                │
+  │                                                                         │
+  │    Print usage instructions                                             │
+  │    -------------------------                                            │
+  │    waltid -h                                                            │
+  │    waltid --help                                                        │
+  │    waltid key -h                                                        │
+  │    waltid key generate -h                                               │
+  │    waltid key convert -h                                                │
+  │                                                                         │
+  │    Key generation                                                       │
+  │    ---------------                                                      │
+  │    waltid key generate                                                  │
+  │    waltid key generate -t secp256k1                                     │
+  │    waltid key generate --keyType=RSA                                    │
+  │    waltid key generate --keyType=RSA -o myRsaKey.json                   │
+  │                                                                         │
+  │    Key conversion                                                       │
+  │    ---------------                                                      │
+  │    waltid key convert --input=myRsaKey.pem                              │
+  ╰─────────────────────────────────────────────────────────────────────────╯
 
 Options:
   -h, --help  Show this message and exit
@@ -144,7 +160,7 @@ Usage: waltid key generate [<options>]
 Options:
   -t, --keyType=(Ed25519|secp256k1|secp256r1|RSA)
                        Key type to use. Possible values are: [Ed25519 |
-                       secp256k1 | secp256r1 | RSA}]. Default value is Ed25519
+                       secp256k1 | secp256r1 | RSA]. Default value is Ed25519
   -o, --output=<path>  File path to save the generated key. Default value is
                        <keyId>.json
   -h, --help           Show this message and exit
@@ -195,7 +211,7 @@ This project is still a work in progress. As such, not all features are already 
 * PEM Content
   * RSA Private Key ✅
   * RSA Public Key ✅
-  * RSA Encrypted Private Key
+  * RSA Encrypted Private Key ✅
   * Ed25519 ❌
   * secp256k1 ❌
   * secp256r1 ❌
