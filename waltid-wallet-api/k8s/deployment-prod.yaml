@@ -98,6 +98,19 @@ data:
     ]
 ---
 apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wallet-rejection-reason-config
+data:
+  rejectionreason.conf: |
+    reasons = [
+      "Unknown sender",
+      "Not relevant to me",
+      "Unsure about accuracy",
+      "Need more details",
+]
+---
+apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: wallet-data-volume-claim
@@ -156,6 +169,10 @@ spec:
               mountPath: "/waltid-wallet-api/config/chainexplorer.conf"
               subPath: "chainexplorer.conf"
               readOnly: true
+            - name: wallet-rejection-reason-config
+              mountPath: "/waltid-wallet-api/config/rejectionreason.conf"
+              subPath: "rejectionreason.conf"
+              readOnly: true
             - name: wallet-push-config
               mountPath: "/waltid-wallet-api/config/push.conf"
               subPath: "push.conf"
@@ -195,6 +212,9 @@ spec:
         - name: wallet-chainexplorer-config
           configMap:
             name: wallet-chainexplorer-config
+        - name: wallet-rejection-reason-config
+          configMap:
+            name: wallet-rejection-reason-config
         - name: wallet-push-config
           secret:
             secretName: wallet-push-config-secret
