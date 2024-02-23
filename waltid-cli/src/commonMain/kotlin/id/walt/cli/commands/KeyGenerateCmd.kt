@@ -31,7 +31,7 @@ class KeyGenerateCmd : CliktCommand(
 
     private val keyType by option("-t", "--keyType")
         .enum<KeyType>()
-        .help("Key type to use. Possible values are: [${acceptedKeyTypes}}]. Default value is " + KeyType.Ed25519.name)
+        .help("Key type to use. Possible values are: [${acceptedKeyTypes}]. Default value is " + KeyType.Ed25519.name)
         .default(KeyType.Ed25519)
 
     private val optOutputFilePath by option("-o", "--output")
