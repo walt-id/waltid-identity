@@ -18,22 +18,22 @@ class WaltIdCmd : CliktCommand(
 
         Print usage instructions
         -------------------------
-        waltid-cli -h
-        waltid-cli --help
-        waltid-cli key -h
-        waltid-cli key generate -h
-        waltid-cli key convert -h
+        waltid -h
+        waltid --help
+        waltid key -h
+        waltid key generate -h
+        waltid key convert -h
         
         Key generation
         ---------------
-        waltid-cli key generate
-        waltid-cli key generate -t secp256k1
-        waltid-cli key generate --keyType=RSA
-        waltid-cli key generate --keyType=RSA -o myRsaKey.json
+        waltid key generate
+        waltid key generate -t secp256k1
+        waltid key generate --keyType=RSA
+        waltid key generate --keyType=RSA -o myRsaKey.json
         
         Key conversion
         ---------------
-        waltid-cli key convert --input=myRsaKey.pem
+        waltid key convert --input=myRsaKey.pem
         """,
     printHelpOnEmptyArgs = true
 ) {
