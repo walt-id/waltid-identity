@@ -1,8 +1,6 @@
 package id.walt.cli.commands
 
-import com.github.ajalt.clikt.core.CliktCommand
-import com.github.ajalt.clikt.core.InvalidFileFormat
-import com.github.ajalt.clikt.core.terminal
+import com.github.ajalt.clikt.core.*
 import com.github.ajalt.clikt.parameters.options.defaultLazy
 import com.github.ajalt.clikt.parameters.options.help
 import com.github.ajalt.clikt.parameters.options.option
@@ -69,7 +67,7 @@ class KeyConvertCmd : CliktCommand(
         val inputKey = runBlocking { getKey(input) }
 
         echo(TextStyles.dim("Converting key \"${input.absolutePath}\"..."))
-        val outputContent = convertKey(inputKey, targetKeyType)
+        val outputContent = runBlocking { convertKey(inputKey, targetKeyType) }
 
         echo(TextColors.green("Converted Key (${targetKeyType}):"))
         terminal.println(
@@ -101,9 +99,12 @@ class KeyConvertCmd : CliktCommand(
     private fun getKeyType(input: File): KeyFileFormat = input.toPath().useLines { lines ->
         when (lines.firstOrNull()) {
             null -> throw InvalidFileFormat(input.path, "No lines in file.")
+
             // other PEM content types: https://github.com/openssl/openssl/blob/master/include/openssl/pem.h
             in Regex("""^\{.*""") -> KeyFileFormat.JWK
             in Regex("""^-+BEGIN .*PUBLIC KEY-+""") -> KeyFileFormat.PEM
+            in Regex("""^-+BEGIN .*OPENSSH PRIVATE KEY-+""") -> KeyFileFormat.PEM
+            in Regex("""^-+BEGIN .*EC PARAMETERS-+""") -> KeyFileFormat.PEM
             in Regex("""^-+BEGIN .*ENCRYPTED PRIVATE KEY-+""") -> KeyFileFormat.ENCRYPTED_PEM
             in Regex("""^-+BEGIN .*PRIVATE KEY-+""") -> KeyFileFormat.PEM
             else -> throw InvalidFileFormat(input.path, "Unknown file format (expected ${KeyFileFormat.getNames()}).")
@@ -112,15 +113,18 @@ class KeyConvertCmd : CliktCommand(
 
     private suspend fun getKey(input: File, keyType: KeyFileFormat = getKeyType(input)): LocalKey {
         val inputContent = input.readText()
+        try {
+            return runCatching {
+                when (keyType) {
+                    KeyFileFormat.JWK -> LocalKey.importJWK(inputContent).getOrThrow()
+                    KeyFileFormat.PEM -> LocalKey.importPEM(inputContent).getOrThrow()
+                    KeyFileFormat.ENCRYPTED_PEM -> LocalKey.importPEM(decrypt(input).getOrThrow()).getOrThrow()
+                }
+            }.getOrThrow()
+        } catch (e: Throwable) {
+            throw e.message!!.let { InvalidFileFormat(input.absolutePath, it) }
+        }
 
-        return runCatching {
-            when (keyType) {
-                KeyFileFormat.JWK -> LocalKey.importJWK(inputContent).getOrThrow()
-                KeyFileFormat.PEM -> LocalKey.importPEM(inputContent).getOrThrow()
-                KeyFileFormat.ENCRYPTED_PEM -> LocalKey.importPEM(decrypt(input).getOrThrow()).getOrThrow()
-            }
-        }.getOrThrow()
-        // getOrElse { throw IllegalArgumentException("Could not process key file at ${input.absolutePath}.", it) }
     }
 
     /**
@@ -134,10 +138,16 @@ class KeyConvertCmd : CliktCommand(
     /**
     Convert provided source key to specified target key type
      */
-    private fun convertKey(inputKey: Key, targetKeyType: KeyFileFormat): String = when (targetKeyType) {
-        KeyFileFormat.JWK -> runBlocking { inputKey.exportJWK() }
-        KeyFileFormat.PEM -> runBlocking { inputKey.exportPEM() }
-        KeyFileFormat.ENCRYPTED_PEM -> runBlocking { inputKey.exportPEM() }
+    private suspend fun convertKey(inputKey: Key, targetKeyType: KeyFileFormat): String {
+        try {
+            return when (targetKeyType) {
+                KeyFileFormat.JWK -> inputKey.exportJWK()
+                KeyFileFormat.PEM -> inputKey.exportPEM()
+                KeyFileFormat.ENCRYPTED_PEM -> inputKey.exportPEM()
+            }
+        } catch (e: Throwable) {
+            throw CliktError("Oops. Something went wrong when converting the key: ${e.message}")
+        }
     }
 
     private fun decrypt(input: File): Result<String> {
@@ -151,7 +161,7 @@ class KeyConvertCmd : CliktCommand(
             if (passphrase == null) {
                 decipherKey = terminal.prompt("Key encrypted. Please, inform the passphrase to decipher it")!!
                 if (decipherKey == null) { // TODO: Can happen?
-                    return Result.failure(IllegalArgumentException("Passphrase is required for encrypted PEM file."))
+                    return Result.failure(BadParameterValue(passphrase!!))
                 }
             } else {
                 decipherKey = passphrase as String
