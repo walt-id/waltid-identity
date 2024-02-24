@@ -30,7 +30,7 @@ class WaltIdKeyGenerateCmdTest {
     }
 
     fun deleteGeneratedFile(output: String) {
-        val generatedFilePath = Regex(".*Key saved at file (.*)").findAll(output).toList()[0].groupValues[1]
+        val generatedFilePath = Regex(".*Key saved at file \"(.*?)\"").findAll(output).toList()[0].groupValues[1]
         File(generatedFilePath).delete()
     }
 
