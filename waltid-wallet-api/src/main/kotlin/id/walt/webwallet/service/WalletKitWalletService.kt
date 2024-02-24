@@ -1,6 +1,8 @@
 package id.walt.webwallet.service
 
+import id.walt.oid4vc.data.CredentialOffer
 import id.walt.oid4vc.data.dif.PresentationDefinition
+import id.walt.oid4vc.requests.CredentialOfferRequest
 import id.walt.webwallet.config.ConfigManager
 import id.walt.webwallet.config.RemoteWalletConfig
 import id.walt.webwallet.db.models.*
@@ -169,9 +171,9 @@ class WalletKitWalletService(tenant: String, accountId: UUID, walletId: UUID) : 
             )
         }
 
-    override suspend fun attachCategory(credentialId: String, category: String): Boolean = throw NotImplementedError("")
+    override suspend fun attachCategory(credentialId: String, categories: List<String>): Boolean = throw NotImplementedError("")
 
-    override suspend fun detachCategory(credentialId: String, category: String): Boolean = throw NotImplementedError("")
+    override suspend fun detachCategory(credentialId: String, categories: List<String>): Boolean = throw NotImplementedError("")
     override suspend fun acceptCredential(parameter: CredentialRequestParameter): Boolean = throw NotImplementedError("")
 
     override suspend fun rejectCredential(parameter: CredentialRequestParameter): Boolean = throw NotImplementedError("")
@@ -295,6 +297,10 @@ class WalletKitWalletService(tenant: String, accountId: UUID, walletId: UUID) : 
                 }
             }
         }
+        throw NotImplementedError("")
+    }
+
+    override suspend fun resolveCredentialOffer(offerRequest: CredentialOfferRequest): CredentialOffer {
         throw NotImplementedError("")
     }
 

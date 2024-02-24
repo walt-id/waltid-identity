@@ -18,11 +18,6 @@ repositories {
             includeGroup("com.github.multiformats")
         }
     }
-    maven("https://maven.walt.id/repository/waltid-ssi-kit/") {
-        content {
-            includeGroup("id.walt")
-        }
-    }
     maven("https://repo.danubetech.com/repository/maven-public/")
     maven("https://maven.walt.id/repository/waltid/") {
         content {
@@ -111,6 +106,7 @@ kotlin {
         val jvmMain by getting {
             dependencies {
                 implementation("io.ktor:ktor-client-java:$ktor_version")
+                implementation("org.sqids:sqids:0.1.0")
             }
         }
         val jvmTest by getting {
