@@ -1,6 +1,8 @@
 package id.walt.webwallet.service
 
+import id.walt.oid4vc.data.CredentialOffer
 import id.walt.oid4vc.data.dif.PresentationDefinition
+import id.walt.oid4vc.requests.CredentialOfferRequest
 import id.walt.webwallet.db.models.WalletCategoryData
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.db.models.WalletDid
@@ -28,10 +30,10 @@ abstract class WalletService(val tenant: String, val accountId: UUID, val wallet
     abstract suspend fun deleteCredential(id: String, permanent: Boolean): Boolean
     abstract suspend fun restoreCredential(id: String): WalletCredential
     abstract suspend fun getCredential(credentialId: String): WalletCredential
-    abstract suspend fun attachCategory(credentialId: String, category: String): Boolean
-    abstract suspend fun detachCategory(credentialId: String, category: String): Boolean
     abstract suspend fun acceptCredential(parameter: CredentialRequestParameter): Boolean
     abstract suspend fun rejectCredential(parameter: CredentialRequestParameter): Boolean
+    abstract suspend fun attachCategory(credentialId: String, categories: List<String>): Boolean
+    abstract suspend fun detachCategory(credentialId: String, categories: List<String>): Boolean
 
     abstract fun matchCredentialsByPresentationDefinition(presentationDefinition: PresentationDefinition): List<WalletCredential>
 
@@ -42,6 +44,7 @@ abstract class WalletService(val tenant: String, val accountId: UUID, val wallet
     abstract suspend fun useOfferRequest(
         offer: String, did: String, requireUserInput: Boolean, silent: Boolean
     ): List<WalletCredential>
+    abstract suspend fun resolveCredentialOffer(offerRequest: CredentialOfferRequest): CredentialOffer
 
     // DIDs
     abstract suspend fun listDids(): List<WalletDid>

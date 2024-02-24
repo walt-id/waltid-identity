@@ -173,31 +173,39 @@ watch(dids, async (newDids) => {
     selectedDid.value = newDid;
 });
 
+async function resolveCredentialOffer(request) {
+    try {
+        console.log("RESOLVING credential offer request", request);
+        const response = await $fetch(`/wallet-api/wallet/${currentWallet.value}/exchange/resolveCredentialOffer`, {
+            method: "POST",
+            body: request
+        });
+        console.log(response);
+        return response;
+    } catch (e) {
+        failed.value = true;
+        throw e;
+    }
+}
+
 const query = useRoute().query;
 
 const request = decodeRequest(query.request);
 console.log("Issuance -> Using request: ", request);
 
 const immediateAccept = ref(false);
-console.log("Making issuanceUrl...");
-const issuanceUrl = new URL(request);
-console.log("issuanceUrl: ", issuanceUrl);
 
-const credentialOffer = issuanceUrl.searchParams.get("credential_offer");
-console.log("credentialOffer: ", credentialOffer);
-
+const credentialOffer = await resolveCredentialOffer(decodeRequest(query.request));
 if (credentialOffer == null) {
     throw createError({
         statusCode: 400,
         statusMessage: "Invalid issuance request: No credential_offer",
     });
 }
-
-const issuanceParamsJson = JSON.parse(credentialOffer);
-console.log("issuanceParamsJson: ", issuanceParamsJson);
+console.log("credentialOffer: ", credentialOffer);
 
 console.log("Issuer host...");
-const issuer = issuanceParamsJson["credential_issuer"];
+const issuer = credentialOffer["credential_issuer"];
 
 let issuerHost: String;
 try {
@@ -207,7 +215,7 @@ try {
 }
 
 console.log("Issuer host:", issuerHost);
-const credentialList = issuanceParamsJson["credentials"];
+const credentialList = credentialOffer["credentials"];
 
 let credentialTypes: String[] = [];
 

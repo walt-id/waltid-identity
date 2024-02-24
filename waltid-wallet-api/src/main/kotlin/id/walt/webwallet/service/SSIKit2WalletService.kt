@@ -12,6 +12,7 @@ import id.walt.did.dids.registrar.dids.DidWebCreateOptions
 import id.walt.did.dids.resolver.LocalResolver
 import id.walt.did.utils.EnumUtils.enumValueIgnoreCase
 import id.walt.oid4vc.data.CredentialFormat
+import id.walt.oid4vc.data.CredentialOffer
 import id.walt.oid4vc.data.GrantType
 import id.walt.oid4vc.data.OpenIDProviderMetadata
 import id.walt.oid4vc.data.dif.PresentationDefinition
@@ -76,8 +77,6 @@ import org.slf4j.LoggerFactory
 import java.net.URLDecoder
 import kotlin.js.ExperimentalJsExport
 import kotlin.time.Duration.Companion.seconds
-
-
 class SSIKit2WalletService(
     tenant: String,
     accountId: UUID,
@@ -129,13 +128,15 @@ class SSIKit2WalletService(
         CredentialsService.get(walletId, credentialId)
             ?: throw IllegalArgumentException("WalletCredential not found for credentialId: $credentialId")
 
-    override suspend fun attachCategory(credentialId: String, category: String): Boolean =
-        categoryService.get(walletId, category)?.let {// validation should be part of schema
-            CredentialsService.Category.add(walletId, credentialId, it.name) == 1
-        } ?: throw IllegalArgumentException("Category not found for wallet: $category")
+    override suspend fun attachCategory(credentialId: String, categories: List<String>): Boolean =
+        categoryService.list(walletId).filter { categories.contains(it.name) }.map { it.name }.let {
+            CredentialsService.Category.add(
+                wallet = walletId, credentialId = credentialId, category = it.toTypedArray()
+            ) == it.size
+        }
 
-    override suspend fun detachCategory(credentialId: String, category: String): Boolean =
-        CredentialsService.Category.delete(walletId, credentialId, category) == 1
+    override suspend fun detachCategory(credentialId: String, categories: List<String>): Boolean =
+        CredentialsService.Category.delete(walletId, credentialId, *categories.toTypedArray()) > 0
 
     override suspend fun acceptCredential(parameter: CredentialRequestParameter): Boolean =
         CredentialsService.get(walletId, parameter.credentialId)?.takeIf { it.deletedOn == null }?.let {
@@ -367,13 +368,13 @@ class SSIKit2WalletService(
         followRedirects = false
     }
 
-    private suspend fun processCredentialOfferRequest(
-        credentialOfferRequest: CredentialOfferRequest,
+    private suspend fun processCredentialOffer(
+        credentialOffer: CredentialOffer,
         credentialWallet: TestCredentialWallet
     ): List<CredentialResponse> {
         logger.debug("// get issuer metadata")
         val providerMetadataUri =
-            credentialWallet.getCIProviderMetadataUrl(credentialOfferRequest.credentialOffer!!.credentialIssuer)
+            credentialWallet.getCIProviderMetadataUrl(credentialOffer.credentialIssuer)
         logger.debug("Getting provider metadata from: $providerMetadataUri")
         val providerMetadataResult = ktorClient.get(providerMetadataUri)
         logger.debug("Provider metadata returned: " + providerMetadataResult.bodyAsText())
@@ -382,7 +383,7 @@ class SSIKit2WalletService(
         logger.debug("providerMetadata: {}", providerMetadata)
 
         logger.debug("// resolve offered credentials")
-        val offeredCredentials = credentialOfferRequest.credentialOffer!!.resolveOfferedCredentials(providerMetadata)
+        val offeredCredentials = credentialOffer.resolveOfferedCredentials(providerMetadata)
         logger.debug("offeredCredentials: {}", offeredCredentials)
 
         //val offeredCredential = offeredCredentials.first()
@@ -393,7 +394,7 @@ class SSIKit2WalletService(
             grantType = GrantType.pre_authorized_code,
             clientId = testCIClientConfig.clientID,
             redirectUri = credentialWallet.config.redirectUri,
-            preAuthorizedCode = credentialOfferRequest.credentialOffer!!.grants[GrantType.pre_authorized_code.value]!!.preAuthorizedCode,
+            preAuthorizedCode = credentialOffer.grants[GrantType.pre_authorized_code.value]!!.preAuthorizedCode,
             userPin = null
         )
 //        logger.debug("tokenReq: {}", tokenReq)
@@ -413,14 +414,13 @@ class SSIKit2WalletService(
         val nonce = tokenResp.cNonce
 
 
-        logger.debug("Using issuer URL: ${credentialOfferRequest.credentialOfferUri ?: credentialOfferRequest.credentialOffer!!.credentialIssuer}")
+        logger.debug("Using issuer URL: ${credentialOffer.credentialIssuer}")
         val credReqs = offeredCredentials.map { offeredCredential ->
             CredentialRequest.forOfferedCredential(
                 offeredCredential = offeredCredential,
                 proof = credentialWallet.generateDidProof(
                     did = credentialWallet.did,
-                    issuerUrl =  /*ciTestProvider.baseUrl*/ credentialOfferRequest.credentialOfferUri
-                        ?: credentialOfferRequest.credentialOffer!!.credentialIssuer,
+                    issuerUrl = credentialOffer.credentialIssuer,
                     nonce = nonce
                 )
             )
@@ -523,7 +523,10 @@ class SSIKit2WalletService(
                 ), credentialWallet
             )
         } else {
-            processCredentialOfferRequest(CredentialOfferRequest.fromHttpParameters(reqParams), credentialWallet)
+            processCredentialOffer(
+                credentialWallet.resolveCredentialOffer(CredentialOfferRequest.fromHttpParameters(reqParams)),
+                credentialWallet
+            )
         }
 
         // === original ===
@@ -553,6 +556,10 @@ class SSIKit2WalletService(
             credentials = addableCredentials.toTypedArray()
         )
         return addableCredentials
+    }
+
+    override suspend fun resolveCredentialOffer(offerRequest: CredentialOfferRequest): CredentialOffer {
+        return getAnyCredentialWallet().resolveCredentialOffer(offerRequest)
     }
 
     /* DIDs */
@@ -950,3 +957,5 @@ class SSIKit2WalletService(
     } ?: EventDataNotAvailable
 
 }
+
+
