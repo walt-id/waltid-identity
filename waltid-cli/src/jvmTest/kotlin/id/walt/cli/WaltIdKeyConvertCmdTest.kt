@@ -74,8 +74,10 @@ class WaltIdKeyConvertCmdTest {
     @Test
     fun `should NOT fail if --output is not provided`() {
 
-        val inputFileName = "rsa_public_key.pem"
-        val outputFileName = "rsa_public_key.jwk"
+        // openssl genrsa -out src/jvmTest/resources/rsa_by_openssl_pvt_key.pem 3072
+        // openssl rsa -in src/jvmTest/resources/rsa_by_openssl_pvt_key.pem -pubout -out src/jvmTest/resources/rsa_by_openssl_pub_key.pem
+        val inputFileName = "rsa_by_openssl_pvt_key.pem"
+        val outputFileName = "rsa_by_openssl_pvt_key.jwk"
 
         val inputFilePath = getFilePath(inputFileName)
         val outputFilePath = getOutputFilePath(inputFilePath, outputFileName)
@@ -117,7 +119,7 @@ class WaltIdKeyConvertCmdTest {
     @Test
     fun `should prompt for overwrite confirmation when the output file already exists`() {
         // Stored in src/jvmTest/resources
-        val inputFileName = "rsa_public_key.pem"
+        val inputFileName = "rsa_by_openssl_pub_key.pem"
         val outputFileName = "existingFile.jwk"
 
         val inputFilePath = getFilePath(inputFileName)
@@ -137,8 +139,8 @@ class WaltIdKeyConvertCmdTest {
     fun `should convert JWT input file to PEM`() {
 
         // Stored in src/jvmTest/resources
-        val inputFileName = "ed25519_valid_key.jwk"
-        val outputFileName = "ed25519_valid_key.pem"
+        val inputFileName = "ed25519_by_waltid_pvt_key.jwk"
+        val outputFileName = "ed25519_by_waltid_pvt_key.pem"
 
         val inputFilePath = getFilePath(inputFileName)
         val outputFilePath = getOutputFilePath(inputFilePath, outputFileName)
@@ -157,8 +159,8 @@ class WaltIdKeyConvertCmdTest {
     fun `should convert a PEM file to JWK`() {
 
         // Stored in src/jvmTest/resources
-        val inputFileName = "rsa_public_key.pem"
-        val outputFileName = "rsa_public_key.jwk"
+        val inputFileName = "rsa_by_openssl_pub_key.pem"
+        val outputFileName = "rsa_by_openssl_pub_key.jwk"
 
         val inputFilePath = getFilePath(inputFileName)
         val outputFilePath = getOutputFilePath(inputFilePath, outputFileName)
@@ -178,8 +180,8 @@ class WaltIdKeyConvertCmdTest {
     fun `should convert RSA public key PEM file to a valid JWK`() {
 
         // Stored in src/jvmTest/resources
-        val inputFileName = "rsa_public_key.pem"
-        val outputFileName = "rsa_public_key.jwk"
+        val inputFileName = "rsa_by_openssl_pub_key.pem"
+        val outputFileName = "rsa_by_openssl_pub_key.jwk"
 
         // Assert output file content
         val expectedJWKFragments = listOf(
@@ -202,8 +204,8 @@ class WaltIdKeyConvertCmdTest {
     fun `should convert RSA private key PEM file to a valid JWK`() {
 
         // Stored in src/jvmTest/resources
-        val inputFileName = "rsa_private_key.pem"
-        val outputFileName = "rsa_private_key.jwk"
+        val inputFileName = "rsa_by_openssl_pvt_key.pem"
+        val outputFileName = "rsa_by_openssl_pvt_key.jwk"
 
         // Assert output file content
         val expectedJWKFragments = listOf(
