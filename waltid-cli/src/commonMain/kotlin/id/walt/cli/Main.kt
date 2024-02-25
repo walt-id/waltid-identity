@@ -42,7 +42,7 @@ fun printErrorAndExit(cmd: CliktCommand, e: CliktError) {
     println("\n")
     cmd.terminal.println(
         Panel(
-            content = Text(TextColors.brightRed(e.toString()), whitespace = Whitespace.NORMAL),
+            content = Text(TextColors.brightRed(e.toString()), whitespace = Whitespace.NORMAL, width = 70),
             title = Text(TextColors.red("ERROR"))
         )
     )
