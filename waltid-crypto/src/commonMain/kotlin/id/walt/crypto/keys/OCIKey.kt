@@ -145,42 +145,46 @@ class OCIKey(
         return "$signable.$signatureBase64Url"
     }
 
-    override suspend fun verifyRaw(
-        signed: ByteArray,
-        detachedPlaintext: ByteArray?
-    ): Result<ByteArray> {
-        check(detachedPlaintext != null) { "An detached plaintext is needed." }
+  override suspend fun verifyRaw(
+      signed: ByteArray,
+      detachedPlaintext: ByteArray?
+  ): Result<ByteArray> {
+    check(detachedPlaintext != null) { "An detached plaintext is needed." }
 
-        val requestBody =
-            JsonObject(
+    val requestBody =
+        JsonObject(
                 mapOf(
                     "keyId" to JsonPrimitive(OCIConfig.OCIDKeyID),
                     "message" to JsonPrimitive(detachedPlaintext.encodeBase64()),
                     "signature" to JsonPrimitive(signed.encodeBase64()),
                     "signingAlgorithm" to JsonPrimitive("SHA_384_RSA_PKCS_PSS"),
-                )
-            )
-                .toString()
-        val signature = signingRequest("POST", "/20180608/verify", OCIConfig.cryptoEndpoint, requestBody)
+                ))
+            .toString()
+    val signature =
+        signingRequest("POST", "/20180608/verify", OCIConfig.cryptoEndpoint, requestBody)
 
-        val response =
-            http.post("https://${OCIConfig.cryptoEndpoint}/20180608/verify") {
-                header(
-                    "Authorization",
-                    """Signature version="1",headers="date (request-target) host content-length content-type x-content-sha256",keyId="${OCIConfig.keyId}",algorithm="rsa-sha256",signature="$signature""""
-                )
-                header("Date", GMTDate().toHttpDate())
-                header("Host", host)
-                header("Content-Length", requestBody.length.toString())
-                header("Accept", "application/json")
-                header("Connection", "keep-alive")
-                header("Content-Type", "application/json")
-                header("x-content-sha256", calculateSHA256(requestBody))
-                setBody(requestBody)
-            }.ociJsonDataBody().jsonObject["isSignatureValid"]?.jsonPrimitive?.boolean
-                ?: false
-        return if (response) Result.success(signed) else Result.failure(Exception("Signature is not valid"))
-    }
+    val response =
+        http
+            .post("https://${OCIConfig.cryptoEndpoint}/20180608/verify") {
+              header(
+                  "Authorization",
+                  """Signature version="1",headers="date (request-target) host content-length content-type x-content-sha256",keyId="${OCIConfig.keyId}",algorithm="rsa-sha256",signature="$signature"""")
+              header("Date", GMTDate().toHttpDate())
+              header("Host", host)
+              header("Content-Length", requestBody.length.toString())
+              header("Accept", "application/json")
+              header("Connection", "keep-alive")
+              header("Content-Type", "application/json")
+              header("x-content-sha256", calculateSHA256(requestBody))
+              setBody(requestBody)
+            }
+            .ociJsonDataBody()
+            .jsonObject["isSignatureValid"]
+            ?.jsonPrimitive
+            ?.boolean ?: false
+    return if (response) Result.success(detachedPlaintext)
+    else Result.failure(Exception("Signature is not valid"))
+  }
 
     @OptIn(ExperimentalJsExport::class)
     override suspend fun verifyJws(signedJws: String): Result<JsonObject> {
