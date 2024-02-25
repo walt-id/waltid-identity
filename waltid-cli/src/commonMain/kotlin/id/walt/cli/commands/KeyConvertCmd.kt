@@ -126,7 +126,7 @@ class KeyConvertCmd : CliktCommand(
             }.getOrThrow()
         } catch (e: Throwable) {
             var mainMsg = "Invalid file format."
-            var complementaryMsg = "User --verbose tag to get more details."
+            var complementaryMsg = "Use the --verbose flag to get more details."
 
             if (this.commonOptions.verbose) {
                 complementaryMsg = e.localizedMessage ?: "No more details to show."
@@ -155,7 +155,14 @@ class KeyConvertCmd : CliktCommand(
                 KeyFileFormat.ENCRYPTED_PEM -> inputKey.exportPEM()
             }
         } catch (e: Throwable) {
-            throw CliktError("Oops. Something went wrong when converting the key: ${e.message}")
+            val mainMsg = "Oops. Something went wrong when converting the key."
+            var complementaryMsg = "Use the --verbose flag to get more details."
+
+            if (this.commonOptions.verbose) {
+                complementaryMsg = e.localizedMessage ?: "No more details to show."
+            }
+
+            throw UsageError("$mainMsg $complementaryMsg")
         }
     }
 
