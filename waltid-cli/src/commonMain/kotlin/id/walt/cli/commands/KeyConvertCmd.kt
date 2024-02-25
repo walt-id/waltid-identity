@@ -1,6 +1,7 @@
 package id.walt.cli.commands
 
 import com.github.ajalt.clikt.core.*
+import com.github.ajalt.clikt.parameters.groups.provideDelegate
 import com.github.ajalt.clikt.parameters.options.defaultLazy
 import com.github.ajalt.clikt.parameters.options.help
 import com.github.ajalt.clikt.parameters.options.option
@@ -60,6 +61,8 @@ class KeyConvertCmd : CliktCommand(
 
     private val passphrase by option("-p", "--passphrase").help("Passphrase to open an encrypted PEM")
     // .prompt(text = "Please, inform the PEM passphrase", hideInput = true)
+
+    private val commonOptions by CommonOptions()
 
     override fun run() {
         // Read the source key from the input file
@@ -122,7 +125,13 @@ class KeyConvertCmd : CliktCommand(
                 }
             }.getOrThrow()
         } catch (e: Throwable) {
-            throw e.message!!.let { InvalidFileFormat(input.absolutePath, it) }
+            var mainMsg = "Invalid file format."
+            var complementaryMsg = "User --verbose tag to get more details."
+
+            if (this.commonOptions.verbose) {
+                complementaryMsg = e.localizedMessage ?: "No more details to show."
+            }
+            throw InvalidFileFormat(input.absolutePath, "$mainMsg $complementaryMsg")
         }
 
     }

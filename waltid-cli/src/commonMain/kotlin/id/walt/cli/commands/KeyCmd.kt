@@ -2,6 +2,7 @@ package id.walt.cli.commands
 
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.subcommands
+import com.github.ajalt.clikt.parameters.groups.provideDelegate
 
 class KeyCmd : CliktCommand(
     name = "key",
@@ -12,6 +13,8 @@ class KeyCmd : CliktCommand(
     init {
         subcommands(KeyGenerateCmd(), KeyConvertCmd())
     }
+
+    private val commonOptions by CommonOptions()
 
     override fun run() = Unit
 }
