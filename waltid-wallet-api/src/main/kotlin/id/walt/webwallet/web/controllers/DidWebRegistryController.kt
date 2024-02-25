@@ -1,17 +1,17 @@
 package id.walt.webwallet.web.controllers
 
 import id.walt.webwallet.service.DidWebRegistryService
+import id.walt.webwallet.web.WebBaseRoutes.webWalletRoute
 import io.github.smiley4.ktorswaggerui.dsl.get
 import io.github.smiley4.ktorswaggerui.dsl.route
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.response.*
-import io.ktor.server.routing.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonObject
 
-fun Application.didRegistry() = routing {
-    route("did-registry", {
+fun Application.didRegistry() = webWalletRoute {
+    route("registry", {
         tags = listOf("DID Web Registry")
     }) {
         get({
