@@ -108,11 +108,12 @@ class WaltIdKeyConvertCmdTest {
         val inputFileName = "invalidKey.jwk"
         var inputFilePath = getFilePath(inputFileName)
 
-        // val failure = assertFailsWith<ParseException> {
-        val result = KeyConvertCmd().test("--input=\"$inputFilePath\"")
-        // }
+        var result = KeyConvertCmd().test("--input=\"$inputFilePath\" --verbose")
+        var expectedErrorMessage = ".*Invalid file format*".toRegex()
+        assertContains(result.stderr, expectedErrorMessage)
 
-        val expectedErrorMessage = ".*Missing key type \"kty\" parameter*".toRegex()
+        result = KeyConvertCmd().test("--input=\"$inputFilePath\" --verbose")
+        expectedErrorMessage = ".*Missing key type \"kty\" parameter*".toRegex()
         assertContains(result.stderr, expectedErrorMessage)
     }
 
@@ -320,25 +321,30 @@ class WaltIdKeyConvertCmdTest {
     // @ValueSource(strings = {"ed25519_pub_key.pem", "ed25519_pvt_key.pem"})  --> JUnit dependency :-(
     fun `should fail when trying to convert Ed25519 PEM file`() {
 
-        fun testEd25519(inputFileName: String, expectedErrorMessage: String) {
+        fun testEd25519(inputFileName: String, expectedErrorMessage: String, verbose: Boolean = false) {
 
             val inputFilePath = getFilePath(inputFileName)
+            var args = "--input=\"$inputFilePath\""
 
-            // val failure = assertFailsWith<JOSEException> {
-            val result = KeyConvertCmd().test("--input=\"$inputFilePath\"")
-            // }
+            if (verbose) {
+                args = "$args --verbose"
+            }
 
+            val result = KeyConvertCmd().test(args)
             assertContains(result.stderr, expectedErrorMessage)
         }
 
         // ssh-keygen -t ed25519  -f ed25519_pvt_key_by_openssh.pem
-        testEd25519("ed25519_by_openssh_pvt_key.pem", "unrecognised object: OPENSSH PRIVATE KEY")
+        testEd25519("ed25519_by_openssh_pvt_key.pem", "Invalid file format", false)
+        testEd25519("ed25519_by_openssh_pvt_key.pem", "unrecognised object: OPENSSH PRIVATE KEY", true)
 
         // openssl genpkey -algorithm ed25519 -out ed25519_pvt_key_by_openssl.pem
-        testEd25519("ed25519_by_openssl_pvt_key.pem", "Missing PEM-encoded public key to construct JWK")
+        testEd25519("ed25519_by_openssl_pvt_key.pem", "Invalid file format", false)
+        testEd25519("ed25519_by_openssl_pvt_key.pem", "Missing PEM-encoded public key to construct JWK", true)
 
         // openssl pkey -pubout -in src/jvmTest/resources/ed25519_pvt_key_by_openssl.pem -out src/jvmTest/resources/ed25519_pub_key_by_openssl.pem
-        testEd25519("ed25519_by_openssl_pub_key.pem", "Unsupported algorithm of PEM-encoded key: EdDSA")
+        testEd25519("ed25519_by_openssl_pub_key.pem", "Invalid file format", false)
+        testEd25519("ed25519_by_openssl_pub_key.pem", "Unsupported algorithm of PEM-encoded key: EdDSA", true)
     }
 
     @Test
@@ -389,10 +395,19 @@ class WaltIdKeyConvertCmdTest {
     @Test
     fun `should fail when trying to convert secp256k1 PEM file only with private key inside`() {
 
-        fun testSecp256k1PrivateKeyFailure(inputFileName: String, expectedErrorMessage: String) {
+        fun testSecp256k1PrivateKeyFailure(
+            inputFileName: String,
+            verbose: Boolean = false,
+            expectedErrorMessage: String
+        ) {
             val inputFilePath = getFilePath(inputFileName)
 
-            val result = KeyConvertCmd().test("--input=\"$inputFilePath\"")
+            var args = "--input=\"$inputFilePath\""
+            if (verbose) {
+                args = "$args --verbose"
+            }
+
+            val result = KeyConvertCmd().test(args)
 
             assertContains(result.stderr, expectedErrorMessage)
         }
@@ -401,16 +416,30 @@ class WaltIdKeyConvertCmdTest {
         // ./waltid-cli.sh key convert  --input=src/jvmTest/resources/secp256k1_by_waltid_pvt_key.jwk
         testSecp256k1PrivateKeyFailure(
             "secp256k1_by_waltid_pvt_key.pem",
+            false,
+            "incorrect format in file"
+        )
+
+        testSecp256k1PrivateKeyFailure(
+            "secp256k1_by_waltid_pvt_key.pem",
+            true,
             """the return value of "org.bouncycastle.openssl.PEMKeyPair.getPublicKeyInfo()" is null"""
         )
+
 
         // openssl storeutl -keys src/jvmTest/resources/secp256k1_by_openssl_pub_pvt_key.pem > src/jvmTest/resources/secp256k1_by_openssl_pvt_key.pem
         testSecp256k1PrivateKeyFailure(
             "secp256k1_by_openssl_pvt_key.pem",
+            false,
+            "Invalid file format"
+        )
+
+        testSecp256k1PrivateKeyFailure(
+            "secp256k1_by_openssl_pvt_key.pem",
+            true,
             "Missing PEM-encoded public key to construct JWK"
         )
     }
-
 
     @Test
     @Ignore
