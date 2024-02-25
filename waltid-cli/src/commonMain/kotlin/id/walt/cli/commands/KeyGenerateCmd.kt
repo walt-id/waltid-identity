@@ -2,6 +2,7 @@ package id.walt.cli.commands
 
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.terminal
+import com.github.ajalt.clikt.parameters.groups.provideDelegate
 import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.help
 import com.github.ajalt.clikt.parameters.options.option
@@ -37,6 +38,8 @@ class KeyGenerateCmd : CliktCommand(
     private val optOutputFilePath by option("-o", "--output")
         .path()
         .help("File path to save the generated key. Default value is <keyId>.json")
+
+    private val commonOptions by CommonOptions()
 
     override fun run() {
         echo(TextStyles.dim("Generating key of type ${keyType.name}..."))
