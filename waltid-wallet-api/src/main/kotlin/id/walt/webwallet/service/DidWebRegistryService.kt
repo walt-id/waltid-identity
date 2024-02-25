@@ -8,12 +8,19 @@ import kotlinx.serialization.json.jsonObject
 import org.jetbrains.exposed.sql.select
 import org.jetbrains.exposed.sql.transactions.transaction
 
+/**
+ * DID Web Registry hosts Decentralized Identifiers according to https://w3c-ccg.github.io/did-method-web/
+ * Registered DIDs have to follow the pattern: did:web:{domain}:wallet-api:registry:{id} which will host the
+ * DID documents at https://w3c-ccg.github.io/user/alice/did.json
+ */
 object DidWebRegistryService {
+
+    val DID_WEB_BASE_PATH = "wallet-api:registry"
 
     fun listRegisteredDids(): List<String> {
         return transaction {
             WalletDids.select {
-                WalletDids.did like "did:web:%"
+                WalletDids.did like "%:${DID_WEB_BASE_PATH}:%"
             }.map { WalletDid(it).did }
         }
     }
@@ -22,7 +29,7 @@ object DidWebRegistryService {
         return transaction {
             Json.parseToJsonElement(
                 WalletDids.select {
-                    WalletDids.did like "%:$id"
+                    WalletDids.did like "%:${DID_WEB_BASE_PATH}:$id"
                 }.single().let {
                     WalletDid(it).document
                 }).jsonObject
