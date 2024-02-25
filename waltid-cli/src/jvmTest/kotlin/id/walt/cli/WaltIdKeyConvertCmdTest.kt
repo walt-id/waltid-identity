@@ -147,11 +147,11 @@ class WaltIdKeyConvertCmdTest {
         val outputFilePath = getOutputFilePath(inputFilePath, outputFileName)
 
         // Only as long as Ed25519 is not fully supported in LocalKey.exportPEM()
-        // val failure = assertFailsWith<NotImplementedError> {
-        val result = KeyConvertCmd().test("--input=\"$inputFilePath\"")
-        // }
+        val result1 = KeyConvertCmd().test("--input=\"$inputFilePath\"")
+        assertContains(result1.stderr, "Something went wrong when converting the key")
 
-        assertContains(result.stderr, "Ed25519 keys cannot be exported as PEM yet")
+        val result2 = KeyConvertCmd().test("--input=\"$inputFilePath\" --verbose")
+        assertContains(result2.stderr, "Ed25519 keys cannot be exported as PEM yet")
 
         deleteOutputFile(outputFilePath)
     }
@@ -198,7 +198,7 @@ class WaltIdKeyConvertCmdTest {
             // "\"dq\":\".*\"",       // Secobnd factor CRT expoent
         )
 
-        testPEMConvertion(inputFileName, outputFileName, expectedJWKFragments)
+        testSuccessfulConvertion(inputFileName, outputFileName, expectedJWKFragments)
     }
 
     @Test
@@ -222,7 +222,7 @@ class WaltIdKeyConvertCmdTest {
             """"dq":".*"""",       // Second factor CRT exponent
         )
 
-        testPEMConvertion(inputFileName, outputFileName, expectedJWKFragments)
+        testSuccessfulConvertion(inputFileName, outputFileName, expectedJWKFragments)
     }
 
     @Test
@@ -275,8 +275,10 @@ class WaltIdKeyConvertCmdTest {
 
     @Test
     fun `should NOT ask for the passphrase if input PEM file is encrypted and --passphrase is provided`() {
-        val inputFileName = "rsa_encrypted_private_key.pem"
-        val outputFileName = "rsa_encrypted_private_key.jwk"
+
+        // openssl genrsa -aes256 -passout pass:123123 -out rsa_by_openssl_encrypted_pvt_key.pem 2048
+        val inputFileName = "rsa_by_openssl_encrypted_pvt_key.pem"
+        val outputFileName = "rsa_by_openssl_encrypted_pvt_key.jwk"
 
         val inputFilePath = getFilePath(inputFileName)
         val outputFilePath = getOutputFilePath(inputFilePath, outputFileName)
@@ -292,11 +294,32 @@ class WaltIdKeyConvertCmdTest {
     }
 
     @Test
+    fun `should convert RSA PEM public key extracted from an encrypted private key`() {
+
+        // openssl rsa -in rsa_by_openssl_encrypted_pvt_key.pem -passin pass:123123 -pubout -out rsa_by_openssl_encrypted_pub_key.pem
+        val inputFileName = "rsa_by_openssl_encrypted_pub_key.pem"
+        val outputFileName = "rsa_by_openssl_encrypted_pub_key.jwk"
+
+        val inputFilePath = getFilePath(inputFileName)
+        val outputFilePath = getOutputFilePath(inputFilePath, outputFileName)
+
+        val result = KeyConvertCmd().test("--input=\"$inputFilePath\"")
+
+        val expectedOutput = """.*Done. Converted "$inputFilePath" to "$outputFilePath".*""".toRegex()
+
+        // Assert successful logging message
+        assertContains(result.stdout, expectedOutput)
+
+        deleteOutputFile(outputFilePath)
+
+    }
+
+    @Test
     fun `should convert encrypted RSA private key PEM file to a valid JWK`() {
 
         // Stored in src/jvmTest/resources
-        val inputFileName = "rsa_encrypted_private_key.pem"
-        val outputFileName = "rsa_encrypted_private_key.jwk"
+        val inputFileName = "rsa_by_openssl_encrypted_pvt_key.pem"
+        val outputFileName = "rsa_by_openssl_encrypted_pvt_key.jwk"
 
         // Assert output file content
         val expectedJWKFragments = listOf(
@@ -314,37 +337,24 @@ class WaltIdKeyConvertCmdTest {
 
         val extraArgs = "--passphrase=123123"
 
-        testPEMConvertion(inputFileName, outputFileName, expectedJWKFragments, extraArgs)
+        testSuccessfulConvertion(inputFileName, outputFileName, expectedJWKFragments, extraArgs)
     }
 
     @Test
     // @ValueSource(strings = {"ed25519_pub_key.pem", "ed25519_pvt_key.pem"})  --> JUnit dependency :-(
     fun `should fail when trying to convert Ed25519 PEM file`() {
 
-        fun testEd25519(inputFileName: String, expectedErrorMessage: String, verbose: Boolean = false) {
-
-            val inputFilePath = getFilePath(inputFileName)
-            var args = "--input=\"$inputFilePath\""
-
-            if (verbose) {
-                args = "$args --verbose"
-            }
-
-            val result = KeyConvertCmd().test(args)
-            assertContains(result.stderr, expectedErrorMessage)
-        }
-
         // ssh-keygen -t ed25519  -f ed25519_pvt_key_by_openssh.pem
-        testEd25519("ed25519_by_openssh_pvt_key.pem", "Invalid file format", false)
-        testEd25519("ed25519_by_openssh_pvt_key.pem", "unrecognised object: OPENSSH PRIVATE KEY", true)
+        testFailingConversion("ed25519_by_openssh_pvt_key.pem", "Invalid file format", false)
+        testFailingConversion("ed25519_by_openssh_pvt_key.pem", "unrecognised object: OPENSSH PRIVATE KEY", true)
 
         // openssl genpkey -algorithm ed25519 -out ed25519_pvt_key_by_openssl.pem
-        testEd25519("ed25519_by_openssl_pvt_key.pem", "Invalid file format", false)
-        testEd25519("ed25519_by_openssl_pvt_key.pem", "Missing PEM-encoded public key to construct JWK", true)
+        testFailingConversion("ed25519_by_openssl_pvt_key.pem", "Invalid file format", false)
+        testFailingConversion("ed25519_by_openssl_pvt_key.pem", "Missing PEM-encoded public key to construct JWK", true)
 
         // openssl pkey -pubout -in src/jvmTest/resources/ed25519_pvt_key_by_openssl.pem -out src/jvmTest/resources/ed25519_pub_key_by_openssl.pem
-        testEd25519("ed25519_by_openssl_pub_key.pem", "Invalid file format", false)
-        testEd25519("ed25519_by_openssl_pub_key.pem", "Unsupported algorithm of PEM-encoded key: EdDSA", true)
+        testFailingConversion("ed25519_by_openssl_pub_key.pem", "Invalid file format", false)
+        testFailingConversion("ed25519_by_openssl_pub_key.pem", "Unsupported algorithm of PEM-encoded key: EdDSA", true)
     }
 
     @Test
@@ -356,7 +366,7 @@ class WaltIdKeyConvertCmdTest {
     fun `should convert Ed25519 OpenSSH PEM file`() = Unit
 
     @Test
-    fun `should convert secp256k1 PEM file with public and private key inside`() {
+    fun `should convert secp256k1 PEM file with public and private key inside to JWK`() {
 
         // openssl ecparam -genkey -name secp256k1 -out src/jvmTest/resources/secp256k1_by_openssl_pub_pvt_key.pem
         val inputFileName = "secp256k1_by_openssl_pub_pvt_key.pem"
@@ -365,13 +375,12 @@ class WaltIdKeyConvertCmdTest {
         // Assert output file content
         val expectedJWKFragments = listOf(
             """"kty":"EC"""",
-            """"d":".*?"""",
             """"crv":"secp256k1"""",
             """"x":".*"""",
             """"y":".*""""
         )
 
-        testPEMConvertion(inputFileName, outputFileName, expectedJWKFragments, "")
+        testSuccessfulConvertion(inputFileName, outputFileName, expectedJWKFragments, "")
     }
 
     @Test
@@ -389,55 +398,37 @@ class WaltIdKeyConvertCmdTest {
             """"y":".*""""
         )
 
-        testPEMConvertion(inputFileName, outputFileName, expectedJWKFragments, "")
+        testSuccessfulConvertion(inputFileName, outputFileName, expectedJWKFragments, "")
     }
 
     @Test
     fun `should fail when trying to convert secp256k1 PEM file only with private key inside`() {
 
-        fun testSecp256k1PrivateKeyFailure(
-            inputFileName: String,
-            verbose: Boolean = false,
-            expectedErrorMessage: String
-        ) {
-            val inputFilePath = getFilePath(inputFileName)
-
-            var args = "--input=\"$inputFilePath\""
-            if (verbose) {
-                args = "$args --verbose"
-            }
-
-            val result = KeyConvertCmd().test(args)
-
-            assertContains(result.stderr, expectedErrorMessage)
-        }
-
         // ./waltid-cli.sh key generate -tsecp256k1 --output=src/jvmTest/resources/secp256k1_by_waltid_pvt_key.jwk
         // ./waltid-cli.sh key convert  --input=src/jvmTest/resources/secp256k1_by_waltid_pvt_key.jwk
-        testSecp256k1PrivateKeyFailure(
+        testFailingConversion(
             "secp256k1_by_waltid_pvt_key.pem",
+            "incorrect format in file",
             false,
-            "incorrect format in file"
         )
 
-        testSecp256k1PrivateKeyFailure(
+        testFailingConversion(
             "secp256k1_by_waltid_pvt_key.pem",
+            """the return value of "org.bouncycastle.openssl.PEMKeyPair.getPublicKeyInfo()" is null""",
             true,
-            """the return value of "org.bouncycastle.openssl.PEMKeyPair.getPublicKeyInfo()" is null"""
         )
-
 
         // openssl storeutl -keys src/jvmTest/resources/secp256k1_by_openssl_pub_pvt_key.pem > src/jvmTest/resources/secp256k1_by_openssl_pvt_key.pem
-        testSecp256k1PrivateKeyFailure(
+        testFailingConversion(
             "secp256k1_by_openssl_pvt_key.pem",
+            "Invalid file format",
             false,
-            "Invalid file format"
         )
 
-        testSecp256k1PrivateKeyFailure(
+        testFailingConversion(
             "secp256k1_by_openssl_pvt_key.pem",
+            "Missing PEM-encoded public key to construct JWK",
             true,
-            "Missing PEM-encoded public key to construct JWK"
         )
     }
 
@@ -496,7 +487,7 @@ class WaltIdKeyConvertCmdTest {
         File(outputFilePath).delete()
     }
 
-    private fun testPEMConvertion(
+    private fun testSuccessfulConvertion(
         inputFileName: String, outputFileName: String, expectedFragments: List<String>, extraArgs: String = ""
     ) {
         val inputFilePath = getFilePath(inputFileName)
@@ -519,4 +510,18 @@ class WaltIdKeyConvertCmdTest {
 
         deleteOutputFile(outputFilePath)
     }
+
+    fun testFailingConversion(inputFileName: String, expectedErrorMessage: String, verbose: Boolean = false) {
+
+        val inputFilePath = getFilePath(inputFileName)
+        var args = "--input=\"$inputFilePath\""
+
+        if (verbose) {
+            args = "$args --verbose"
+        }
+
+        val result = KeyConvertCmd().test(args)
+        assertContains(result.stderr, expectedErrorMessage)
+    }
+
 }
