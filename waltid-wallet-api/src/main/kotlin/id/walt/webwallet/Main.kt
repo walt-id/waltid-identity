@@ -39,9 +39,6 @@ fun main(args: Array<String>) {
     log.info { "Starting web server (binding to ${webConfig.webHost}, listening on port ${webConfig.webPort})..." }
     embeddedServer(CIO, port = webConfig.webPort, host = webConfig.webHost, module = Application::module)
         .start(wait = true)
-    /*log.info { "Starting web server (binding to 0.0.0.0, listening on port 4545)..." }
-    embeddedServer(CIO, port = 4545, host = "0.0.0.0", module = Application::module)
-        .start(wait = true)*/
 }
 
 fun Application.configurePlugins() {

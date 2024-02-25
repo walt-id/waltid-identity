@@ -11,7 +11,7 @@ plugins {
 
 group = "id.walt"
 application {
-    mainClass.set("id.walt.webwallet.ApplicationKt")
+    mainClass.set("id.walt.webwallet.MainKt")
 
     val isDevelopment: Boolean = project.ext.has("development")
     applicationDefaultJvmArgs = listOf("-Dio.ktor.development=$isDevelopment")
@@ -24,7 +24,6 @@ repositories {
     maven("https://jitpack.io")
     maven("https://maven.walt.id/repository/waltid/")
     maven("https://maven.walt.id/repository/waltid-ssi-kit/")
-    //maven("https://repo.danubetech.com/repository/maven-public/")
 }
 
 tasks.withType<KotlinCompile> {
