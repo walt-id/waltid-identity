@@ -79,6 +79,7 @@ object Db {
 
         OidcLogins,
         WalletSettings,
+        Profiles,
     ).toTypedArray()
 
     fun recreateDatabase() {

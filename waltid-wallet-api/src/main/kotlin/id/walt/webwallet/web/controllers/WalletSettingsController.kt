@@ -2,7 +2,7 @@ package id.walt.webwallet.web.controllers
 
 import id.walt.webwallet.service.settings.WalletSetting
 import io.github.smiley4.ktorswaggerui.dsl.get
-import io.github.smiley4.ktorswaggerui.dsl.post
+import io.github.smiley4.ktorswaggerui.dsl.put
 import io.github.smiley4.ktorswaggerui.dsl.route
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -29,8 +29,7 @@ fun Application.settings() = walletRoute {
                 context.respond(HttpStatusCode.BadRequest, it.localizedMessage)
             }
         }
-        //put
-        post({
+        put({
             summary = "Update wallet settings"
             request {
                 body<WalletSetting> { description = "Wallet setting object" }

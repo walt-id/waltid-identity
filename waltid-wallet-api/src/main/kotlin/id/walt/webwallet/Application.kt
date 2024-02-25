@@ -78,4 +78,5 @@ fun Application.module() {
     reports()
     settings()
     reasons()
+    profiles()
 }
