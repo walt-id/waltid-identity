@@ -37,8 +37,12 @@ fun main(args: Array<String>) {
 
     val webConfig = ConfigManager.getConfig<WebConfig>()
     log.info { "Starting web server (binding to ${webConfig.webHost}, listening on port ${webConfig.webPort})..." }
-    embeddedServer(CIO, port = webConfig.webPort, host = webConfig.webHost, module = Application::module)
-        .start(wait = true)
+    embeddedServer(
+        CIO,
+        port = webConfig.webPort,
+        host = webConfig.webHost,
+        module = Application::module
+    ).start(wait = true)
 }
 
 fun Application.configurePlugins() {
@@ -75,4 +79,7 @@ fun Application.module() {
     reports()
     settings()
     reasons()
+
+    // DID Web Registry
+    didRegistry()
 }
