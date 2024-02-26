@@ -3,23 +3,20 @@ package id.walt.webwallet.service.category
 import id.walt.webwallet.db.models.WalletCategory
 import id.walt.webwallet.db.models.WalletCategoryData
 import kotlinx.uuid.UUID
+import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
-import org.jetbrains.exposed.sql.and
-import org.jetbrains.exposed.sql.deleteWhere
-import org.jetbrains.exposed.sql.insert
-import org.jetbrains.exposed.sql.select
 import org.jetbrains.exposed.sql.transactions.transaction
 
 object CategoryServiceImpl : CategoryService {
 
     override fun list(wallet: UUID): List<WalletCategoryData> = transaction {
-        WalletCategory.select { WalletCategory.wallet eq wallet }.map {
+        WalletCategory.selectAll().where { WalletCategory.wallet eq wallet }.map {
             WalletCategoryData(it)
         }
     }
 
     override fun get(wallet: UUID, name: String): WalletCategoryData? = transaction {
-        WalletCategory.select { WalletCategory.wallet eq wallet and (WalletCategory.name eq name) }.singleOrNull()
+        WalletCategory.selectAll().where { WalletCategory.wallet eq wallet and (WalletCategory.name eq name) }.singleOrNull()
             ?.let { WalletCategoryData(it) }
     }
 

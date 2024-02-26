@@ -41,6 +41,7 @@ import id.walt.webwallet.service.events.*
 import id.walt.webwallet.service.issuers.IssuerDataTransferObject
 import id.walt.webwallet.service.issuers.IssuersService
 import id.walt.webwallet.service.keys.KeysService
+import id.walt.webwallet.service.keys.SingleKeyResponse
 import id.walt.webwallet.service.oidc4vc.TestCredentialWallet
 import id.walt.webwallet.service.report.ReportRequestParameter
 import id.walt.webwallet.service.report.ReportService
@@ -70,13 +71,14 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import kotlinx.uuid.UUID
-import org.jetbrains.exposed.sql.insert
-import org.jetbrains.exposed.sql.select
+import org.jetbrains.exposed.sql.*
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.slf4j.LoggerFactory
 import java.net.URLDecoder
 import kotlin.js.ExperimentalJsExport
 import kotlin.time.Duration.Companion.seconds
+
 class SSIKit2WalletService(
     tenant: String,
     accountId: UUID,
@@ -90,7 +92,6 @@ class SSIKit2WalletService(
     companion object {
         init {
             runBlocking {
-                //WaltidServices.init()
                 DidService.apply {
                     registerResolver(LocalResolver())
                     updateResolversForMethods()
@@ -162,11 +163,9 @@ class SSIKit2WalletService(
                         ?: throw IllegalArgumentException("No filter pattern in presentation definition constraint")
 
                     TypeFilter(path, filterType, filterPattern)
-                }?.plus(
-                inputDescriptor.schema?.map { schema ->
+                }?.plus(inputDescriptor.schema?.map { schema ->
                     TypeFilter("type", "string", schema.uri)
-                } ?: listOf()
-            )
+                } ?: listOf())
         }
 
         logger.debug("Using filters: {}", filters)
@@ -201,8 +200,7 @@ class SSIKit2WalletService(
         val params: MutableMap<String, MutableList<String>> = HashMap()
         val urlParts = url.split("\\?".toRegex()).dropLastWhile { it.isEmpty() }.toTypedArray()
 
-        if (urlParts.size <= 1)
-            return params
+        if (urlParts.size <= 1) return params
 
         val query = urlParts[1]
         for (param in query.split("&".toRegex()).dropLastWhile { it.isEmpty() }.toTypedArray()) {
@@ -236,10 +234,7 @@ class SSIKit2WalletService(
 
     @Serializable
     data class SIOPv2Response(
-        val vp_token: String,
-        val presentation_submission: String,
-        val id_token: String?,
-        val state: String?
+        val vp_token: String, val presentation_submission: String, val id_token: String?, val state: String?
     )
 
     private val ktorClient = HttpClient(CIO) {
@@ -251,8 +246,7 @@ class SSIKit2WalletService(
 
 
     data class PresentationError(
-        override val message: String,
-        val redirectUri: String?
+        override val message: String, val redirectUri: String?
     ) : IllegalArgumentException(message)
 
 
@@ -262,7 +256,8 @@ class SSIKit2WalletService(
     override suspend fun usePresentationRequest(parameter: PresentationRequestParameter): Result<String?> {
         val credentialWallet = getCredentialWallet(parameter.did)
 
-        val authReq = AuthorizationRequest.fromHttpParametersAuto(parseQueryString(Url(parameter.request).encodedQuery).toMap())
+        val authReq =
+            AuthorizationRequest.fromHttpParametersAuto(parseQueryString(Url(parameter.request).encodedQuery).toMap())
         logger.debug("Auth req: {}", authReq)
 
         logger.debug("USING PRESENTATION REQUEST, SELECTED CREDENTIALS: {}", parameter.selectedCredentials)
@@ -281,24 +276,20 @@ class SSIKit2WalletService(
         logger.debug("Resolved presentation definition: ${presentationSession.authorizationRequest!!.presentationDefinition!!.toJSONString()}")
 
         val tokenResponse = credentialWallet.processImplicitFlowAuthorization(presentationSession.authorizationRequest)
-        val resp = ktorClient.submitForm(
-            presentationSession.authorizationRequest.responseUri ?: presentationSession.authorizationRequest.redirectUri
-            ?: throw AuthorizationError(
+        val resp = ktorClient.submitForm(presentationSession.authorizationRequest.responseUri
+            ?: presentationSession.authorizationRequest.redirectUri ?: throw AuthorizationError(
                 presentationSession.authorizationRequest,
                 AuthorizationErrorCode.invalid_request,
                 "No response_uri or redirect_uri found on authorization request"
-            ),
-            parameters {
-                tokenResponse.toHttpParameters().forEach { entry ->
-                    entry.value.forEach { append(entry.key, it) }
-                }
-            })
-        val httpResponseBody = runCatching { resp.bodyAsText() }.getOrNull()
-        val isResponseRedirectUrl =
-            httpResponseBody != null && httpResponseBody.take(10).lowercase().let {
-                @Suppress("HttpUrlsUsage")
-                it.startsWith("http://") || it.startsWith("https://")
+            ), parameters {
+            tokenResponse.toHttpParameters().forEach { entry ->
+                entry.value.forEach { append(entry.key, it) }
             }
+        })
+        val httpResponseBody = runCatching { resp.bodyAsText() }.getOrNull()
+        val isResponseRedirectUrl = httpResponseBody != null && httpResponseBody.take(10).lowercase().let {
+            @Suppress("HttpUrlsUsage") it.startsWith("http://") || it.startsWith("https://")
+        }
         logger.debug("HTTP Response: {}, body: {}", resp, httpResponseBody)
         parameter.selectedCredentials.forEach {
             CredentialsService.get(walletId, it)?.run {
@@ -318,8 +309,7 @@ class SSIKit2WalletService(
             if (isResponseRedirectUrl) {
                 Result.failure(
                     PresentationError(
-                        message = "Presentation failed - redirecting to error page",
-                        redirectUri = httpResponseBody
+                        message = "Presentation failed - redirecting to error page", redirectUri = httpResponseBody
                     )
                 )
             } else {
@@ -346,9 +336,7 @@ class SSIKit2WalletService(
 
     private fun getCredentialWallet(did: String) = credentialWallets.getOrPut(did) {
         TestCredentialWallet(
-            CredentialWalletConfig("http://blank"),
-            this,
-            did
+            CredentialWalletConfig("http://blank"), this, did
         )
     }
 
@@ -369,12 +357,10 @@ class SSIKit2WalletService(
     }
 
     private suspend fun processCredentialOffer(
-        credentialOffer: CredentialOffer,
-        credentialWallet: TestCredentialWallet
+        credentialOffer: CredentialOffer, credentialWallet: TestCredentialWallet
     ): List<CredentialResponse> {
         logger.debug("// get issuer metadata")
-        val providerMetadataUri =
-            credentialWallet.getCIProviderMetadataUrl(credentialOffer.credentialIssuer)
+        val providerMetadataUri = credentialWallet.getCIProviderMetadataUrl(credentialOffer.credentialIssuer)
         logger.debug("Getting provider metadata from: $providerMetadataUri")
         val providerMetadataResult = ktorClient.get(providerMetadataUri)
         logger.debug("Provider metadata returned: " + providerMetadataResult.bodyAsText())
@@ -417,11 +403,8 @@ class SSIKit2WalletService(
         logger.debug("Using issuer URL: ${credentialOffer.credentialIssuer}")
         val credReqs = offeredCredentials.map { offeredCredential ->
             CredentialRequest.forOfferedCredential(
-                offeredCredential = offeredCredential,
-                proof = credentialWallet.generateDidProof(
-                    did = credentialWallet.did,
-                    issuerUrl = credentialOffer.credentialIssuer,
-                    nonce = nonce
+                offeredCredential = offeredCredential, proof = credentialWallet.generateDidProof(
+                    did = credentialWallet.did, issuerUrl = credentialOffer.credentialIssuer, nonce = nonce
                 )
             )
         }
@@ -461,19 +444,14 @@ class SSIKit2WalletService(
     }
 
     private suspend fun processMSEntraIssuanceRequest(
-        entraIssuanceRequest: EntraIssuanceRequest,
-        credentialWallet: TestCredentialWallet,
-        pin: String? = null
+        entraIssuanceRequest: EntraIssuanceRequest, credentialWallet: TestCredentialWallet, pin: String? = null
     ): List<CredentialResponse> {
         // *) Load key:
         val walletKey = getKeyByDid(credentialWallet.did)
 
         // *) Create response JWT token, signed by key for holder DID
         val responseObject = entraIssuanceRequest.getResponseObject(
-            walletKey.getThumbprint(),
-            credentialWallet.did,
-            walletKey.getPublicKey().exportJWK(),
-            pin
+            walletKey.getThumbprint(), credentialWallet.did, walletKey.getPublicKey().exportJWK(), pin
         )
         val responseToken = credentialWallet.signToken(TokenTarget.TOKEN, responseObject, keyId = credentialWallet.did)
 //        val jwtCryptoProvider = runBlocking {
@@ -552,8 +530,7 @@ class SSIKit2WalletService(
         }
 
         CredentialsService.add(
-            wallet = walletId,
-            credentials = addableCredentials.toTypedArray()
+            wallet = walletId, credentials = addableCredentials.toTypedArray()
         )
         return addableCredentials
     }
@@ -572,7 +549,7 @@ class SSIKit2WalletService(
         DidsService.add(
             wallet = walletId,
             did = result.did,
-            document = Json.encodeToString(result.didDocument),
+            document = result.didDocument.toString(),
             alias = args["alias"]?.content,
             keyId = keyId
         )
@@ -726,7 +703,7 @@ class SSIKit2WalletService(
 //fun infoAboutOfferRequest
 
     override fun getHistory(limit: Int, offset: Long): List<WalletOperationHistory> =
-        WalletOperationHistories.select { WalletOperationHistories.wallet eq walletId }
+        WalletOperationHistories.selectAll().where { WalletOperationHistories.wallet eq walletId }
             .orderBy(WalletOperationHistories.timestamp).limit(10).map { row ->
                 WalletOperationHistory(row)
             }
@@ -810,10 +787,8 @@ class SSIKit2WalletService(
     override suspend fun setSettings(settings: WalletSetting): Boolean = settingsService.set(walletId, settings) > 0
 
     private fun getDidOptions(method: String, args: Map<String, JsonPrimitive>) = when (method.lowercase()) {
-        "key" -> DidKeyCreateOptions(
-            args["key"]?.let { enumValueIgnoreCase<KeyType>(it.content) } ?: KeyType.Ed25519,
-            args["useJwkJcsPub"]?.let { it.content.toBoolean() } ?: false
-        )
+        "key" -> DidKeyCreateOptions(args["key"]?.let { enumValueIgnoreCase<KeyType>(it.content) } ?: KeyType.Ed25519,
+            args["useJwkJcsPub"]?.let { it.content.toBoolean() } ?: false)
 
         "jwk" -> DidJwkCreateOptions()
         "web" -> DidWebCreateOptions(domain = args["domain"]?.content ?: "", path = args["path"]?.content ?: "")
@@ -830,19 +805,18 @@ class SSIKit2WalletService(
         data: EventData,
         credentialId: String? = null,
         note: String? = null
-    ) =
-        EventService.add(
-            Event(
-                action = action,
-                tenant = tenant,
-                originator = originator,
-                account = accountId,
-                wallet = walletId,
-                data = data,
-                credentialId = credentialId,
-                note = note,
-            )
+    ) = EventService.add(
+        Event(
+            action = action,
+            tenant = tenant,
+            originator = originator,
+            account = accountId,
+            wallet = walletId,
+            data = data,
+            credentialId = credentialId,
+            note = note,
         )
+    )
 
     //TODO: move to related entity
     private fun createCredentialEventData(credential: WalletCredential, type: String?) = CredentialEventData(
@@ -944,7 +918,8 @@ class SSIKit2WalletService(
     private suspend fun validateTrustedIssuer(credential: WalletCredential, isEntra: Boolean) =
         isEntra.takeIf { it }?.let {
             trustUseCase.status(credential, true)
-        }?: throw IllegalArgumentException("Silent claim for this credential type not supported.")//TrustStatus.NotFound
+        }
+            ?: throw IllegalArgumentException("Silent claim for this credential type not supported.")//TrustStatus.NotFound
 
     private data class CredentialDataResult(
         val credential: WalletCredential,

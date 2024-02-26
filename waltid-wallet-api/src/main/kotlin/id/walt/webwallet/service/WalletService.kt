@@ -13,6 +13,7 @@ import id.walt.webwallet.service.dto.WalletDataTransferObject
 import id.walt.webwallet.service.events.EventLogFilter
 import id.walt.webwallet.service.events.EventLogFilterResult
 import id.walt.webwallet.service.issuers.IssuerDataTransferObject
+import id.walt.webwallet.service.keys.SingleKeyResponse
 import id.walt.webwallet.service.report.ReportRequestParameter
 import id.walt.webwallet.service.settings.WalletSetting
 import id.walt.webwallet.web.controllers.PresentationRequestParameter

@@ -3,7 +3,7 @@ package id.walt.sdjwt
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 
-@ExperimentalJsExport
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 class SDPayloadBuilder(
     val fullPayload: dynamic

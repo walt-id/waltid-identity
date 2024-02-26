@@ -28,7 +28,7 @@ import kotlin.js.JsExport
 import kotlin.random.Random
 
 // Works with the Hashicorp Transit Secret Engine
-@ExperimentalJsExport
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 @Suppress("TRANSIENT_IS_REDUNDANT")
 @Serializable
