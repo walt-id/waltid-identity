@@ -9,23 +9,37 @@ Manage keys, DIDs, issue Verifiable Credentials, and verify them using the WaltI
 * `git clone https://github.com/walt-id/waltid-identity.git`
 * `cd waltid-identity/waltid-cli`
 * `../gradlew clean build`
-* `alias waltid="./waltid-cli.sh"`  # _This is a temporary hack while we finish the distribution strategy._
+* `alias waltid="./waltid-cli-development.sh"`
 
 Now, you can run:
 
-| Command                                                                         | What it does                                                                          |
-|:--------------------------------------------------------------------------------|:--------------------------------------------------------------------------------------| 
-| `waltid -h`                                                                     | Print usage message                                                                   |
-| `waltid --help`                                                                 | Print WaltId CLI usage message                                                        |
-| `waltid key -h`                                                                 | Print WaltId CLI key command usage message                                            |
-| `waltid key generate -h`                                                        | Print WaltId CLI key generate command usage message                                   |
-| `waltid key convert -h`                                                         | Print WaltId CLI key generate command usage message                                   |
-| `waltid key generate`                                                           | Generates a cryptographic key of type Ed25519                                         |
-| `waltid key generate -tsecp256k1`                                               | Generates a cryptographic key of type secp256k1                                       |
-| `waltid key generate --keyType=RSA`                                             | Generates a cryptographic key of type RSA                                             |
-| `waltid key generate --keyType=RSA -o=myRSAKey.json`                            | Generates a cryptographic key of type RSA and save it in a file called  myRSAKey.json |
-| `waltid key convert --input=./myRSAKey.pem`                                     | Convert ./myRSAKey.pem file to ./myRSAKey.jwk                                         |
-| `waltid key convert --input=./myRSAKey.pem --output=./myRSAKeyInJWTFormat.json` | Convert ./myRSAKey.pem file to ./myRSAKeyInJWTFormat.json                             |
+| Command                                                                             | What it does                                                                                                            |
+|:------------------------------------------------------------------------------------|:------------------------------------------------------------------------------------------------------------------------| 
+| `waltid -h`                                                                         | Print usage message                                                                                                     |
+| `waltid --help`                                                                     | Print WaltId CLI usage message                                                                                          |
+| `waltid key -h`                                                                     | Print WaltId CLI key command usage message                                                                              |
+| `waltid key generate -h`                                                            | Print WaltId CLI key generate command usage message                                                                     |
+| `waltid key convert -h`                                                             | Print WaltId CLI key generate command usage message                                                                     |
+| `waltid key generate`                                                               | Generates a cryptographic key of type Ed25519                                                                           |
+| `waltid key generate -tsecp256k1`                                                   | Generates a cryptographic key of type secp256k1                                                                         |
+| `waltid key generate --keyType=RSA`                                                 | Generates a cryptographic key of type RSA                                                                               |
+| `waltid key generate --keyType=RSA -omyRSAKey.json`                                 | Generates a cryptographic key of type RSA and save it in a file called myRSAKey.json                                    |
+| `waltid key generate --keyType=Ed25519 -o myEd25519Key.json`                        | Generates a cryptographic key of type Ed25519 and save it in a file called myEd25519.json                               |
+| `waltid key generate --keyType=secp256k1 -o mySecp256k1Key.json`                    | Generates a cryptographic key of type Secp256k1 and save it in a file called mySecp256k1.json                           |
+| `waltid key generate --keyType=secp256r1 -o mySecp256r1Key.json`                    | Generates a cruyptographic key of type Secp256r1 and save it in a file called mySecp256r1.json                          |
+| `waltid key convert -i myRSAKey.json`                                               | Convert the given JWK file with an RSA key to the PEM format. The converted file will be called myRSA.pem               |
+| `waltid key convert -i myEd25519Key.json`                                           | ⚠️ Not yet implemented. We don't export Ed25519 keys in PEM format yet.                                                 |                                                                                       |                                                                                |                                                                                       |
+| `waltid key convert -i mySecp256k1Key.json`                                         | Convert the given JWK with a Secp256k1 key file to the PEM format. The converted file will be called mySecp256k1Key.pem |
+| `waltid key convert -i mySecp256r1Key.json`                                         | Convert the given JWK with a Secp256r1 key file to the PEM format. The converted file will be called mySecp256r1Key.pem |
+| `waltid key convert --input=./myRSAKey.pem`                                         | 🚨 ERROR!! malformed sequence in RSA private key                                                                        |
+| `waltid key convert --input=./myEd25519Key.pem`                                     | ⚠️ Not yet implemented.                                                                                                 |
+| `waltid key convert --input=./mySecp256k1Key.pem`                                   | 🚨 ERROR!! ? ⚠️ Not yet implemented.                                                                                    |                                                                                       |
+| `waltid key convert --input=./mySecp256r1Key.pem`                                   | 🚨 ERROR!! ? ⚠️ Not yet implemented.                                                                                    |
+| `waltid key convert --input=./myRSAKey.pem --output=./myRSAKeyInJWKFormat.json`     | 🚨 ERROR!! Convert ./myRSAKey.pem file to ./myRSAKeyInJWTFormat.json                                                    |
+| `waltid key convert --verbose -i secp256k1_by_openssl_pvt_key.pem`                  | 🚨 ERROR!!                                                                                                              |                                                                                                                         |
+| `waltid key convert --verbose -i secp256k1_by_openssl_pub_key.pem`                  | 🚨 ERROR!!                                                                                                              |                                                                                                                         |
+| `openssl ecparam -genkey -name secp256k1 -out secp256k1_by_openssl_pub_pvt_key.pem` | Uses OpenSSL to generate a pair of keys in a PEM file.                                                                  |                                                                                                                         |
+| `waltid key convert --verbose -i secp256k1_by_openssl_pub_pvt_key.pem`              | Converts the Secp256k1 key in the given PEM file to the JWK format.                                                     |
 
 ## In production
 
