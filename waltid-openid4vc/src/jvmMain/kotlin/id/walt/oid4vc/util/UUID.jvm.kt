@@ -1,10 +1,10 @@
 package id.walt.oid4vc.util
 
 import io.ktor.client.*
-import io.ktor.client.call.*
 import io.ktor.client.engine.java.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
+import org.sqids.Sqids
 import java.security.MessageDigest
 import java.util.*
 
@@ -18,4 +18,12 @@ private val ktorClient = HttpClient(Java) {
 }
 actual suspend fun httpGet(url: String): String {
     return ktorClient.get(url).bodyAsText()
+}
+
+actual fun randomSessionId(): String {
+    return Sqids.builder().build().encode(
+        listOf(
+            (Math.random() * Long.MAX_VALUE).toLong()
+        )
+    )
 }
