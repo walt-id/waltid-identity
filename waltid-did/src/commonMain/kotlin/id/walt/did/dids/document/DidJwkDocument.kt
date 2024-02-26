@@ -1,9 +1,9 @@
 package id.walt.did.dids.document
 
 
+import id.walt.did.utils.JsonUtils.didDocumentJson
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonObject
@@ -43,7 +43,7 @@ data class DidJwkDocument(
         val publicKeyJwk: JsonObject // json-web-key
     )
 
-    fun toMap() = Json.encodeToJsonElement(this).jsonObject.toMap()
+    fun toMap() = didDocumentJson.encodeToJsonElement(this).jsonObject.toMap()
 
     constructor(did: String, didJwk: JsonObject) : this(
         context = DEFAULT_CONTEXT,

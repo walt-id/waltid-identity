@@ -1,9 +1,9 @@
 package id.walt.did.dids.document
 
 import id.walt.did.dids.registrar.local.cheqd.models.job.didstates.finished.DidDocument
+import id.walt.did.utils.JsonUtils
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonObject
@@ -33,7 +33,7 @@ data class DidCheqdDocument(
         val publicKeyJwk: JsonObject // json-web-key
     )
 
-    fun toMap() = Json.encodeToJsonElement(this).jsonObject.toMap()
+    fun toMap() = JsonUtils.didDocumentJson.encodeToJsonElement(this).jsonObject.toMap()
 
     constructor(didDoc: DidDocument, jwk: JsonObject? = null) : this(
         context = DEFAULT_CONTEXT,
