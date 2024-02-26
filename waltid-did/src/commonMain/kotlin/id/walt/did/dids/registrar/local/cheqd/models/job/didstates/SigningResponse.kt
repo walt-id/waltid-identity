@@ -5,5 +5,6 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class SigningResponse(
     val signature: String,
-    val verificationMethodId: String
+    val verificationMethodId: String? = null,
+    val kid: String? = null,
 )

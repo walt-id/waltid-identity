@@ -186,7 +186,7 @@ export default defineNuxtConfig({
             brotli: false
         },
         devProxy: {
-            "/wallet-api/": "http://localhost:7000/wallet-api"
+            "/wallet-api/": "http://localhost:7001/wallet-api"
         }
     },
     ssr: false,
