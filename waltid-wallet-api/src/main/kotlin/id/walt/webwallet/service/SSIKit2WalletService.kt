@@ -628,8 +628,8 @@ class SSIKit2WalletService(
             }
         }.fold(onSuccess = {
             when (format.lowercase()) {
-                "jwk" -> it.exportJWK()
-                "pem" -> it.exportPEM()
+                "jwk" -> if (private) it.exportJWK() else it.getPublicKey().exportJWK()
+                "pem" -> if (private) it.exportPEM() else it.getPublicKey().exportPEM()
                 else -> throw IllegalArgumentException("Unknown format: $format")
             }
         }, onFailure = {
