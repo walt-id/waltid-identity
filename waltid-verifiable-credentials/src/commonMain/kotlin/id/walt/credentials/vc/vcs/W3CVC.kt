@@ -25,7 +25,7 @@ import love.forte.plugin.suspendtrans.annotation.JvmBlocking
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 
-@ExperimentalJsExport
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 class W3CVCSerializer : KSerializer<W3CVC> {
     override val descriptor: SerialDescriptor = JsonObject.serializer().descriptor
@@ -33,7 +33,7 @@ class W3CVCSerializer : KSerializer<W3CVC> {
     override fun serialize(encoder: Encoder, value: W3CVC) = encoder.encodeSerializableValue(JsonObject.serializer(), value.toJsonObject())
 }
 
-@ExperimentalJsExport
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 @Serializable(with = W3CVCSerializer::class)
 data class W3CVC(

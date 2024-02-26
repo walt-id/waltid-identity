@@ -12,7 +12,7 @@ import kotlin.collections.set
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 
-@ExperimentalJsExport
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 object W3CDataMergeUtils {
 

@@ -35,8 +35,8 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.uuid.SecureRandom
 import kotlinx.uuid.UUID
-import org.jetbrains.exposed.sql.and
-import org.jetbrains.exposed.sql.select
+import org.jetbrains.exposed.sql.*
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.net.URL
 import java.util.concurrent.TimeUnit
@@ -367,7 +367,8 @@ fun PipelineContext<Unit, ApplicationCall>.ensurePermissionsForWallet(required: 
     val walletId = getWalletId()
 
     val permissions = transaction {
-        (AccountWalletMappings.select { (AccountWalletMappings.tenant eq "") and (AccountWalletMappings.accountId eq userId) and (AccountWalletMappings.wallet eq walletId) } // FIX ME -> TENANT HERE
+        (AccountWalletMappings.selectAll()
+            .where { (AccountWalletMappings.tenant eq "") and (AccountWalletMappings.accountId eq userId) and (AccountWalletMappings.wallet eq walletId) } // FIX ME -> TENANT HERE
             .firstOrNull()
             ?: throw ForbiddenException("This account does not have access to the specified wallet.")
                 )[AccountWalletMappings.permissions]
