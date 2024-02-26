@@ -1,6 +1,6 @@
 package id.walt.webwallet.web.controllers
 
-import id.walt.webwallet.service.DidWebRegistryService
+import id.walt.webwallet.service.dids.DidWebRegistryService
 import id.walt.webwallet.web.WebBaseRoutes.webWalletRoute
 import io.github.smiley4.ktorswaggerui.dsl.get
 import io.github.smiley4.ktorswaggerui.dsl.route

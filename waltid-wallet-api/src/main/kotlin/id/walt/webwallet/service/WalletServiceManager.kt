@@ -19,9 +19,8 @@ import io.ktor.client.*
 import kotlinx.datetime.Clock
 import kotlinx.datetime.toJavaInstant
 import kotlinx.uuid.UUID
-import org.jetbrains.exposed.sql.and
-import org.jetbrains.exposed.sql.insert
-import org.jetbrains.exposed.sql.select
+import org.jetbrains.exposed.sql.*
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import java.util.concurrent.ConcurrentHashMap
 
 object WalletServiceManager {
@@ -95,9 +94,9 @@ object WalletServiceManager {
     )
     fun listWallets(tenant: String, account: UUID): List<UUID> =
         AccountWalletMappings.innerJoin(Wallets)
-            .select { (AccountWalletMappings.tenant eq tenant) and (AccountWalletMappings.accountId eq account) }.map {
-            it[Wallets.id].value
-        }
+            .selectAll().where { (AccountWalletMappings.tenant eq tenant) and (AccountWalletMappings.accountId eq account) }.map {
+                it[Wallets.id].value
+            }
 
     fun getNftService(): NftService = NftKitNftService()
 }
