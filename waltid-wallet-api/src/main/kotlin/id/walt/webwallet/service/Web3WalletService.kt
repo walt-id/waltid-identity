@@ -70,7 +70,7 @@ object Web3WalletService {
          * === 2 different accounts exist, which the user should have access to (merged) when logging in with web3-address
          */
         transaction {
-            Web3Wallets.select { (Web3Wallets.tenant eq tenant) and (Web3Wallets.accountId eq accountId) }.map {
+            Web3Wallets.selectAll().where { (Web3Wallets.tenant eq tenant) and (Web3Wallets.accountId eq accountId) }.map {
                 LinkedWalletDataTransferObject(
                     it[Web3Wallets.id],
                     it[Web3Wallets.address],

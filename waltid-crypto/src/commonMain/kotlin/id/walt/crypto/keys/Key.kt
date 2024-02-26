@@ -10,9 +10,8 @@ import love.forte.plugin.suspendtrans.annotation.JvmBlocking
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 
-@ExperimentalJsExport
 @JsExport
-@OptIn(ExperimentalSerializationApi::class)
+@OptIn(ExperimentalSerializationApi::class, ExperimentalJsExport::class)
 @Serializable
 @JsonClassDiscriminator("type")
 abstract class Key {
