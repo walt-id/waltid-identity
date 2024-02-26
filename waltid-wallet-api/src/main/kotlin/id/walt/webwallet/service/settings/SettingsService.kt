@@ -3,9 +3,9 @@ package id.walt.webwallet.service.settings
 import id.walt.webwallet.db.models.WalletSettings
 import kotlinx.serialization.Serializable
 import kotlinx.uuid.UUID
-import org.jetbrains.exposed.sql.select
+import org.jetbrains.exposed.sql.*
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.transactions.transaction
-import org.jetbrains.exposed.sql.upsert
 
 object SettingsService {
 
@@ -19,7 +19,7 @@ object SettingsService {
         upsertQuery(wallet, setting)
     }.insertedCount
 
-    private fun getQuery(wallet: UUID) = WalletSettings.select { WalletSettings.wallet eq wallet }
+    private fun getQuery(wallet: UUID) = WalletSettings.selectAll().where { WalletSettings.wallet eq wallet }
 
     private fun upsertQuery(wallet: UUID, setting: WalletSetting) = WalletSettings.upsert(
         WalletSettings.wallet

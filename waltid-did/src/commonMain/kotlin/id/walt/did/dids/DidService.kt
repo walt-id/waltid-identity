@@ -13,6 +13,7 @@ import id.walt.did.dids.resolver.LocalResolver
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.json.JsonObject
 
+@Suppress("OPT_IN_USAGE")
 object DidService {
     private val log = KotlinLogging.logger {}
 

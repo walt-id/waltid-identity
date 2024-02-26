@@ -15,7 +15,7 @@ import kotlin.js.JsExport
  * W3C V2.0
  * https://www.w3.org/TR/vc-data-model-2.0/
  */
-@ExperimentalJsExport
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 @Serializable
 data class W3CV11DataModel(

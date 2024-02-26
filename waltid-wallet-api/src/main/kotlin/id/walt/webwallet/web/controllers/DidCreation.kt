@@ -45,7 +45,7 @@ object DidCreation {
                     description = "Domain to use to host did:web document at"
                 }
                 queryParameter<String>("path") {
-                    description = "Path to host the did:web document at"
+                    description = "Path to host the did:web document at. Starting with a: \"/\""
                 }
             }
         }) {
