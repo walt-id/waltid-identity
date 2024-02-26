@@ -1,8 +1,9 @@
+import com.github.benmanes.gradle.versions.updates.DependencyUpdatesTask
+
 plugins {
-    val kotlinVersion = "1.9.22"
-    kotlin("multiplatform") version kotlinVersion
-    kotlin("plugin.serialization") version kotlinVersion
-    id("dev.petuska.npm.publish") version "3.4.1"
+    kotlin("multiplatform")
+    kotlin("plugin.serialization")
+    id("dev.petuska.npm.publish") version "3.4.2"
     `maven-publish`
 }
 
@@ -41,17 +42,15 @@ kotlin {
         isMingwX64 -> mingwX64("native")
         else -> throw GradleException("Host OS is not supported in Kotlin/Native.")
     }*/
-    val kryptoVersion = "4.0.1"
-
 
     sourceSets {
         val commonMain by getting {
             dependencies {
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.5.1")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
                 //implementation("org.jetbrains.kotlinx:kotlinx-serialization-cbor:1.5.1")
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.1")
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.4.0")
-                implementation("com.soywiz.korlibs.krypto:krypto:$kryptoVersion")
+                implementation("com.soywiz.korlibs.krypto:krypto:4.0.10")
             }
         }
         val commonTest by getting {
@@ -126,5 +125,12 @@ npmPublish {
                 authToken.set(secretNpmToken)
             }
         }
+    }
+}
+
+
+tasks.withType<DependencyUpdatesTask> {
+    rejectVersionIf {
+        listOf("-beta", "-alpha", "-rc").any { it in candidate.version.lowercase() } || candidate.version.takeLast(4).contains("RC")
     }
 }

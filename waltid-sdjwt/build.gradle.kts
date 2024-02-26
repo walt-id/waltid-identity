@@ -1,11 +1,12 @@
+import com.github.benmanes.gradle.versions.updates.DependencyUpdatesTask
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 
 plugins {
     kotlin("multiplatform")
 
-    id("org.jetbrains.kotlin.plugin.serialization")
+    kotlin("plugin.serialization")
 
-    id("dev.petuska.npm.publish") version "3.4.1"
+    id("dev.petuska.npm.publish") version "3.4.2"
     `maven-publish`
     id("com.github.ben-manes.versions")
 }
@@ -106,38 +107,35 @@ kotlin {
         }
     }
 
-    val kryptoVersion = "4.0.10"
-
-
     sourceSets {
         val commonMain by getting {
             dependencies {
-                implementation("dev.whyoleg.cryptography:cryptography-random:0.2.0")
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0")
-                implementation("com.soywiz.korlibs.krypto:krypto:$kryptoVersion")
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
+                implementation("dev.whyoleg.cryptography:cryptography-random:0.3.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
+                implementation("com.soywiz.korlibs.krypto:krypto:4.0.10")
             }
         }
         val commonTest by getting {
             dependencies {
                 implementation(kotlin("test"))
-                implementation("io.kotest:kotest-assertions-core:5.7.2")
+                implementation("io.kotest:kotest-assertions-core:5.8.0")
 
-                implementation("io.kotest:kotest-assertions-json:5.7.2")
+                implementation("io.kotest:kotest-assertions-json:5.8.0")
             }
         }
         val jvmMain by getting {
             dependencies {
-                implementation("com.nimbusds:nimbus-jose-jwt:9.37.1")
+                implementation("com.nimbusds:nimbus-jose-jwt:9.37.3")
             }
         }
         val jvmTest by getting {
             dependencies {
 //              implementation("io.mockk:mockk:1.13.2")
 
-                implementation("io.kotest:kotest-runner-junit5:5.7.2")
-                implementation("io.kotest:kotest-assertions-core:5.7.2")
-                implementation("io.kotest:kotest-assertions-json:5.7.2")
+                implementation("io.kotest:kotest-runner-junit5:5.8.0")
+                implementation("io.kotest:kotest-assertions-core:5.8.0")
+                implementation("io.kotest:kotest-assertions-json:5.8.0")
             }
         }
         val jsMain by getting {
@@ -214,5 +212,13 @@ npmPublish {
                 authToken.set(secretNpmToken)
             }
         }
+    }
+}
+
+
+
+tasks.withType<DependencyUpdatesTask> {
+    rejectVersionIf {
+        listOf("-beta", "-alpha", "-rc").any { it in candidate.version.lowercase() } || candidate.version.takeLast(4).contains("RC")
     }
 }
