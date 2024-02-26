@@ -53,6 +53,13 @@ abstract class WalletApiTeste2eBase {
         println("\nUse Case -> Use Offer Request")
         val endpoint = "$walletUrl/wallet-api/wallet/$walletId/exchange/useOfferRequest"
         println("POST ($endpoint)")
+        walletClient.post(endpoint) {
+            contentType(ContentType.Application.Json)
+            setBody(offerUri)
+            bearerAuth(token)
+        }.let { response ->
+            assertEquals(HttpStatusCode.OK, response.status)
+        }
     }
     
     private suspend fun testIssueJwtCredential(): String = run {
@@ -277,6 +284,7 @@ abstract class WalletApiTeste2eBase {
         getTokenFor(user)
         getWallets()
         val offerUri = testIssueJwtCredential()
+        println("offerUri = $offerUri")
         testUseOfferRequest(offerUri)
     }
     

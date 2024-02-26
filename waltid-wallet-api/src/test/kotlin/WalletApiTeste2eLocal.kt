@@ -1,3 +1,4 @@
+import id.walt.did.dids.resolver.local.DidWebResolver
 import id.walt.webwallet.config.ConfigManager
 import id.walt.webwallet.configurePlugins
 import id.walt.webwallet.db.Db
@@ -11,20 +12,25 @@ import org.bouncycastle.jce.provider.BouncyCastleProvider
 import java.security.Security
 import kotlin.io.path.createDirectories
 import kotlin.test.Test
-import kotlinx.serialization.json.*
-import kotlin.test.*
 import id.walt.issuer.utils.IssuerApiTeste2e
-import kotlinx.coroutines.withTimeout
-import org.junit.rules.Timeout
-import kotlin.time.Duration
+import io.ktor.client.engine.cio.*
 import kotlin.time.Duration.Companion.seconds
 
 
 class WalletApiTeste2eLocal : WalletApiTeste2eBase() {
     companion object {
-        var localUrl: String = ""
-        private var issuer = IssuerApiTeste2e()
-        var localIssuerClient: HttpClient
+        var localWalletUrl: String = ""
+        var localIssuerUrl: String = "http://localhost:7002"
+        
+        //        private var issuer = IssuerApiTeste2e()
+//        var localIssuerClient: HttpClient
+        
+        var nonTestAppIssuerClient = HttpClient(CIO) {
+            install(ContentNegotiation) {
+                json()
+            }
+            followRedirects = false
+        }
         lateinit var localWalletClient: HttpClient
         
         init {
@@ -37,8 +43,9 @@ class WalletApiTeste2eLocal : WalletApiTeste2eBase() {
             
             // creates two test applications, for wallet and issuer
             setUpWalletAPITestApplication()
-            
-            localIssuerClient = issuer.getHttpClient()
+
+//            localIssuerClient = issuer.getHttpClient()
+//            localIssuerClient = EndToEndTestController.getClient()
             println("Init finished")
         }
         
@@ -51,6 +58,7 @@ class WalletApiTeste2eLocal : WalletApiTeste2eBase() {
                     auth()
                     accounts()
                     credentials()
+                    exchange()
                     dids()
                     keys()
                 }
@@ -111,7 +119,7 @@ class WalletApiTeste2eLocal : WalletApiTeste2eBase() {
     }
     
     @Test
-    fun testIssuance() = runTest {
+    fun testIssuance() = runTest(timeout = 600.seconds) {
         testCredentialIssuance()
     }
     
@@ -126,16 +134,26 @@ class WalletApiTeste2eLocal : WalletApiTeste2eBase() {
         set(value) {
             walletClient = value
         }
+    
+    //    override var issuerClient: HttpClient
+//        get() = localIssuerClient
+//        set(value) {
+//            localIssuerClient = value
+//        }
     override var issuerClient: HttpClient
-        get() = localIssuerClient
+        get() = nonTestAppIssuerClient
         set(value) {
-            localIssuerClient = value
+            issuerClient = value
         }
     override var walletUrl: String
-        get() = localUrl
+        get() = localWalletUrl
         set(value) {
-            localUrl = value
+            localWalletUrl = value
         }
     
-    override var issuerUrl: String = walletUrl
+    override var issuerUrl: String
+        get() = localIssuerUrl
+        set(value) {
+            localIssuerUrl = value
+        }
 }
