@@ -1,5 +1,5 @@
 package id.walt.credentials.utils
-@ExperimentalJsExport
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 actual object EncodingUtils {
     actual fun urlEncode(path: String): String = js("encodeURIComponent")(path)

@@ -9,9 +9,8 @@ import kotlinx.datetime.Clock
 import kotlinx.datetime.toJavaInstant
 import kotlinx.uuid.UUID
 import kotlinx.uuid.generateUUID
-import org.jetbrains.exposed.sql.and
-import org.jetbrains.exposed.sql.insert
-import org.jetbrains.exposed.sql.select
+import org.jetbrains.exposed.sql.*
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.transactions.transaction
 
 object EmailAccountStrategy : AccountStrategy<EmailAccountRequest>("email") {
@@ -48,7 +47,7 @@ object EmailAccountStrategy : AccountStrategy<EmailAccountRequest>("email") {
         }
 
         val (matchedAccount, pwHash) = transaction {
-            val matchedAccount = Accounts.select { (Accounts.tenant eq tenant) and (Accounts.email eq email) }.first()
+            val matchedAccount = Accounts.selectAll().where { (Accounts.tenant eq tenant) and (Accounts.email eq email) }.first()
 
             val pwHash = matchedAccount[Accounts.password]
                 ?: throw UnauthorizedException("User \"${req.username}\" does not have password authentication enabled.")

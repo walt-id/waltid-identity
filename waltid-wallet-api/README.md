@@ -14,7 +14,7 @@
 </div>
 
 Watch the [Intro Video](https://www.youtube.com/watch?v=ILaSAxjoHbw&t=1s) to learn about features and see a demo. 
-The [documentation](https://docs.oss.walt.id/wallet/api/getting-started) examplains how to create and manage identity wallets.
+The [documentation](https://docs.oss.walt.id/wallet/api/getting-started) explains how to create and manage identity wallets.
 
 ## What it provides
 
@@ -22,21 +22,34 @@ The Wallet-API is designed to provide a broad range of API endpoints that let yo
 
 ## How to use it
 
+***Docker compose***
+
 From the root folder, you can run the wallet-api, including the necessary configuration as well as other relevant services and apps like the wallet frontend by the following command:
 
 ```bash
 cd docker-compose && docker compose up
 ```
 
-- Visit the web wallet hosted under [localhost:3000](http://localhost:3000).
-- Visit the wallet-api hosted under [localhost:4545](http://localhost:4545).
+***Running the wallet API as single container***
+
+```bash
+docker run \
+-p 7001:7001 \
+-itv $(pwd)/waltid-wallet-api/config:/waltid-wallet-api/config \
+-itv $(pwd)/waltid-wallet-api/data:/waltid-wallet-api/data \
+-t waltid/wallet-api
+```
+
+
+- Visit the web wallet hosted under [localhost:7101](http://localhost:7101).
+- Visit the wallet-api hosted under [localhost:7001](http://localhost:7001).
+
+***Build the container***
 
 Update the wallet-api container by running the following commands from the root folder: 
 ```bash
 docker build -t waltid/wallet-api -f waltid-wallet-api/Dockerfile .
 ```
-
-Note the wallet-api is used by the waltid-web-wallet to provide all the functionality.
 
 ### Switching to Posgress
 
@@ -46,7 +59,7 @@ Note the wallet-api is used by the waltid-web-wallet to provide all the function
 ```bash
 docker run --name postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_USER=postgres -p 5432:5432 -d postgres
 ```
-3. In your IDE run _src/main/kotlin/id/walt/webwallet/Application.kt_ 
+3. In your IDE run _src/main/kotlin/id/walt/webwallet/Main.kt_ 
 
 
 ## Join the community
