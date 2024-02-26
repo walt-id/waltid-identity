@@ -170,9 +170,9 @@ class WalletKitWalletService(tenant: String, accountId: UUID, walletId: UUID) : 
             )
         }
 
-    override suspend fun attachCategory(credentialId: String, category: String): Boolean = throw NotImplementedError("")
+    override suspend fun attachCategory(credentialId: String, categories: List<String>): Boolean = throw NotImplementedError("")
 
-    override suspend fun detachCategory(credentialId: String, category: String): Boolean = throw NotImplementedError("")
+    override suspend fun detachCategory(credentialId: String, categories: List<String>): Boolean = throw NotImplementedError("")
     override suspend fun acceptCredential(parameter: CredentialRequestParameter): Boolean = throw NotImplementedError("")
 
     override suspend fun rejectCredential(parameter: CredentialRequestParameter): Boolean = throw NotImplementedError("")
