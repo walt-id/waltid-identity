@@ -24,6 +24,7 @@ import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.js.ExperimentalJsExport
 import kotlinx.coroutines.*
+import kotlinx.datetime.*
 import kotlinx.serialization.Transient
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
@@ -403,33 +404,42 @@ class OCIKey(
       return response.body<JsonObject>()["publicKey"].toString()
     }
 
-    suspend fun deleteKey(OCIDKeyID: String, keyId: String, host: String): JsonObject {
+    suspend fun deleteKey(
+        OCIDKeyID: String,
+        keyId: String,
+        host: String
+    ): Pair<HttpResponse, JsonObject> {
+      val localDateTime = Clock.System.now()
+      // add 7 days to the current date
+      val timeOfDeletion = localDateTime.plus(7, DateTimeUnit.DAY, TimeZone.currentSystemDefault())
+
       val requestBody =
           JsonObject(
                   mapOf(
-                      "timeOfDeletion" to JsonPrimitive(GMTDate().toHttpDate()),
+                      "timeOfDeletion" to JsonPrimitive(timeOfDeletion.toString()),
                   ))
               .toString()
       val signature =
           signingRequest(
-              "DELETE", "/20180608/keys/$OCIDKeyID/actions/scheduleDeletion", host, requestBody)
+              "POST", "/20180608/keys/$OCIDKeyID/actions/scheduleDeletion", host, requestBody)
 
       val response =
-          http
-              .post("https://$host/20180608/keys/$OCIDKeyID/actions/scheduleDeletion") {
-                header(
-                    "Authorization",
-                    """Signature version="1",headers="host (request-target) date",keyId="$keyId",algorithm="rsa-sha256",signature="$signature"""")
-                header("Date", GMTDate().toHttpDate())
-                header("Host", host)
-                header("Accept", "application/json")
-                header("Connection", "keep-alive")
-                header("Content-Type", "application/json")
-                setBody(requestBody)
-              }
-              .ociJsonDataBody()
+          http.post("https://$host/20180608/keys/$OCIDKeyID/actions/scheduleDeletion") {
+            header(
+                "Authorization",
+                """Signature version="1",headers="date (request-target) host content-length content-type x-content-sha256",keyId="$keyId",algorithm="rsa-sha256",signature="$signature"""")
 
-      return response
+            header("Date", GMTDate().toHttpDate())
+            header("Host", host)
+            header("Content-Length", requestBody.length.toString())
+            header("Accept", "application/json")
+            header("Connection", "keep-alive")
+            header("Content-Type", "application/json")
+            header("x-content-sha256", calculateSHA256(requestBody))
+            setBody(requestBody)
+          }
+
+      return response to response.body<JsonObject>()
     }
 
     val http = HttpClient {
