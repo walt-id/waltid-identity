@@ -4,7 +4,7 @@ import id.walt.credentials.verification.models.PolicyRequest
 import id.walt.credentials.verification.models.PolicyRequest.Companion.parsePolicyRequests
 import kotlinx.serialization.json.*
 
-@ExperimentalJsExport
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 object PresentationVerificationUtils {
     fun generatePolicyRequest(jsonString: String): List<PolicyRequest> {

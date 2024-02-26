@@ -23,7 +23,7 @@ enum class KeyType {
     RSA // RSA
 }
 
-@ExperimentalJsExport
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 enum class KeyCategory {
     RSA,

@@ -16,7 +16,7 @@ import kotlin.js.JsExport
  * @param key Field key
  * @param value Field value
  */
-@ExperimentalJsExport
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 data class SDisclosure internal constructor(
     val disclosure: String,
