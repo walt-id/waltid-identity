@@ -44,6 +44,7 @@ import id.walt.webwallet.service.events.*
 import id.walt.webwallet.service.issuers.IssuerDataTransferObject
 import id.walt.webwallet.service.issuers.IssuersService
 import id.walt.webwallet.service.keys.KeysService
+import id.walt.webwallet.service.keys.SingleKeyResponse
 import id.walt.webwallet.service.oidc4vc.TestCredentialWallet
 import id.walt.webwallet.service.report.ReportRequestParameter
 import id.walt.webwallet.service.report.ReportService
@@ -72,8 +73,8 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import kotlinx.uuid.UUID
-import org.jetbrains.exposed.sql.insert
-import org.jetbrains.exposed.sql.select
+import org.jetbrains.exposed.sql.*
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.slf4j.LoggerFactory
 import java.net.URLDecoder
@@ -693,7 +694,7 @@ class SSIKit2WalletService(
 //fun infoAboutOfferRequest
 
     override fun getHistory(limit: Int, offset: Long): List<WalletOperationHistory> =
-        WalletOperationHistories.select { WalletOperationHistories.wallet eq walletId }
+        WalletOperationHistories.selectAll().where { WalletOperationHistories.wallet eq walletId }
             .orderBy(WalletOperationHistories.timestamp).limit(10).map { row ->
                 WalletOperationHistory(row)
             }

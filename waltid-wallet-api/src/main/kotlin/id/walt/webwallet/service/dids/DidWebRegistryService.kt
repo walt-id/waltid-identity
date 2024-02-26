@@ -1,11 +1,16 @@
-package id.walt.webwallet.service
+package id.walt.webwallet.service.dids
 
 import id.walt.webwallet.db.models.WalletDid
 import id.walt.webwallet.db.models.WalletDids
+import id.walt.webwallet.service.dids.DidWebRegistryService.DID_WEB_BASE_PATH
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
+import org.jetbrains.exposed.sql.Op
+import org.jetbrains.exposed.sql.SqlExpressionBuilder
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.like
 import org.jetbrains.exposed.sql.select
+import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 
 /**
@@ -19,18 +24,14 @@ object DidWebRegistryService {
 
     fun listRegisteredDids(): List<String> {
         return transaction {
-            WalletDids.select {
-                WalletDids.did like "%:${DID_WEB_BASE_PATH}:%"
-            }.map { WalletDid(it).did }
+            WalletDids.selectAll().where { WalletDids.did like "%:$DID_WEB_BASE_PATH:%" }.map { WalletDid(it).did }
         }
     }
 
     fun loadRegisteredDid(id: String): JsonObject {
         return transaction {
             Json.parseToJsonElement(
-                WalletDids.select {
-                    WalletDids.did like "%:${DID_WEB_BASE_PATH}:$id"
-                }.single().let {
+                WalletDids.selectAll().where { WalletDids.did like "%:$DID_WEB_BASE_PATH:$id" }.single().let {
                     WalletDid(it).document
                 }).jsonObject
         }
