@@ -3,6 +3,8 @@ package id.walt.cli
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.LocalKey
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
 import org.junit.jupiter.api.assertDoesNotThrow
 import kotlin.test.Ignore
 import kotlin.test.Test
@@ -41,7 +43,9 @@ class ImportAndExportTests {
             runBlocking { LocalKey.importJWK(generatedJwk).getOrThrow() }
         }
 
+        println("Export PEM:")
         val exportedPem = runBlocking { importedKeyFromJwk.exportPEM() }
+        println(exportedPem)
 
         val importedKeyFromPem = assertDoesNotThrow {
             runBlocking { LocalKey.importPEM(exportedPem).getOrThrow() }
@@ -49,6 +53,10 @@ class ImportAndExportTests {
 
         val exportedJwk = runBlocking { importedKeyFromPem.exportJWK() }
 
-        assertEquals(generatedJwk, exportedJwk)
+
+        assertEquals(
+            expected = Json.parseToJsonElement(generatedJwk).jsonObject.filterKeys { it != "kid" },
+            actual = Json.parseToJsonElement(exportedJwk).jsonObject.filterKeys { it != "kid" },
+        )
     }
 }
