@@ -5,6 +5,7 @@ import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.did.dids.DidService
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.data.dif.*
+import id.walt.oid4vc.interfaces.PresentationResult
 import id.walt.oid4vc.providers.CredentialWalletConfig
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.responses.TokenResponse
@@ -164,7 +165,7 @@ class VP_JVM_Test : AnnotationSpec() {
                         )
                     )
                 )
-            ), ResponseMode.DirectPost, setOf(ResponseType.VpToken), "http://blank", UUID.generateUUID().toString(),
+            ), ResponseMode.Query, setOf(ResponseType.VpToken), "http://blank", UUID.generateUUID().toString(),
             "test", setOf(), "test-verifier", ClientIdScheme.PreRegistered, ClientMetadataParameter.fromClientMetadata(
                 OpenIDClientMetadata(listOf(testWallet.baseUrl))
             )
@@ -174,16 +175,32 @@ class VP_JVM_Test : AnnotationSpec() {
 
         // ----------- WALLET -------------------
 
-        // TODO: parse authorization/presentation request
+        // parse authorization/presentation request
+        val parsedPresentationRequest = AuthorizationRequest.fromHttpParametersAuto(Url(authUrl).parameters.toMap())
+        parsedPresentationRequest.presentationDefinition?.toJSON() shouldBe presentationReq.presentationDefinition?.toJSON()
         // TODO: Determine flow details
         // TODO: optional (code flow): code response (verifier <-- wallet), token endpoint (verifier -> wallet)
-        // TODO: Generate token response
+        // Generate token response
+        val testVP = "eyJhbGciOiJFUzI1NksiLCJ0eXAiOiJKV1QiLCJraWQiOiJkaWQ6d2ViOmVudHJhLndhbHQuaWQ6aG9sZGVyIzQ4ZDhhMzQyNjNjZjQ5MmFhN2ZmNjFiNjE4M2U4YmNmIn0.eyJzdWIiOiJkaWQ6d2ViOmVudHJhLndhbHQuaWQ6aG9sZGVyIiwibmJmIjoxNzA4OTUzOTI0LCJpYXQiOjE3MDg5NTM5ODQsImp0aSI6IjEiLCJpc3MiOiJkaWQ6d2ViOmVudHJhLndhbHQuaWQ6aG9sZGVyIiwibm9uY2UiOiIiLCJhdWQiOiJ0ZXN0LXZlcmlmaWVyIiwidnAiOnsiQGNvbnRleHQiOlsiaHR0cHM6Ly93d3cudzMub3JnLzIwMTgvY3JlZGVudGlhbHMvdjEiXSwidHlwZSI6WyJWZXJpZmlhYmxlUHJlc2VudGF0aW9uIl0sImlkIjoiMSIsImhvbGRlciI6ImRpZDp3ZWI6ZW50cmEud2FsdC5pZDpob2xkZXIiLCJ2ZXJpZmlhYmxlQ3JlZGVudGlhbCI6W119fQ.hgGTCeYGGE9qhlSqeBQmY7WnAts6aBSH378-z5WtNDAB8LaQwXKeoOLAURoE5utacYhX-hDZJwBpGg9Zf1ZkgA"
+        val tokenResponse = OpenID4VP.generatePresentationResponse(
+            PresentationResult(
+                listOf(JsonPrimitive(testVP)),
+                PresentationSubmission("presentation_1", "definition_1", listOf(
+                    DescriptorMapping("Test descriptor", VCFormat.jwt_vc_json, DescriptorMapping.vpPath(1, 0))
+                ))
+            )
+        )
         // TODO: Optional: respond to token request (code-flow, verifier <-- wallet), respond to authorization request (implicit flow, verifier <-- wallet)
-        // TODO: Optional: post token response to response_uri of verifier (cross-device flow, verifier <-- wallet)
+        // Optional: post token response to response_uri of verifier (cross-device flow, verifier <-- wallet)
+        val responseUri = tokenResponse.toRedirectUri(presentationReq.redirectUri!!, ResponseMode.Query)
 
         // ------------ VERIFIER ---------------------
 
-        // TODO: Parse token response
+        // Parse token response
+        val parsedTokenResponse = OpenID4VP.parsePresentationResponseFromUrl(responseUri)
+        parsedTokenResponse.vpToken?.jsonPrimitive?.content shouldBe testVP
+        parsedTokenResponse.presentationSubmission?.descriptorMap?.size shouldBe 1
+
         // TODO: validate token response
         // TODO: validation response
 
