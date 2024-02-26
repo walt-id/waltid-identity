@@ -5,9 +5,8 @@ import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 
-@OptIn(ExperimentalJsExport::class)
+@OptIn(ExperimentalJsExport::class, ExperimentalEncodingApi::class)
 @JsExport
-@OptIn(ExperimentalEncodingApi::class)
 object Base64Utils {
 
     fun String.base64toBase64Url() = this.replace("+", "-").replace("/", "_").dropLastWhile { it == '=' }
