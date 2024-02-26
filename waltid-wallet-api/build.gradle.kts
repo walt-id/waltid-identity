@@ -105,8 +105,9 @@ dependencies {
     implementation("de.mkammerer:argon2-jvm:2.11")
 
 
-    // waltid-did
-    implementation(project(":waltid-did")) //id.walt.crypto provided by id.walt.did:waltid-did
+    // waltid
+    implementation(project(":waltid-did"))
+    implementation(project(":waltid-crypto"))
 
     // OIDC
     implementation(project(":waltid-openid4vc"))
@@ -150,9 +151,9 @@ dependencies {
     implementation("org.slf4j:jul-to-slf4j:2.0.12")
 
     // Test
-    testImplementation("org.jetbrains.kotlin:kotlin-test-junit:1.9.22")
     testImplementation(kotlin("test"))
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
+    testImplementation("org.jetbrains.kotlin:kotlin-test-junit:1.9.22")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.0")
     testImplementation("io.ktor:ktor-server-tests-jvm:$ktorVersion")
 
     /*testImplementation("io.kotest:kotest-runner-junit5:5.5.5")

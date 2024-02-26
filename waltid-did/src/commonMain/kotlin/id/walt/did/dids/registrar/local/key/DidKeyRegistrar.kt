@@ -14,6 +14,7 @@ import id.walt.did.dids.registrar.dids.DidCreateOptions
 import id.walt.did.dids.registrar.local.LocalRegistrarMethod
 import id.walt.did.utils.JsonCanonicalization
 import kotlinx.serialization.json.JsonObject
+import kotlin.js.ExperimentalJsExport
 
 class DidKeyRegistrar : LocalRegistrarMethod("key") {
 

@@ -26,9 +26,7 @@ fun main(args: Array<String>) {
 
     log.debug { "Running in path: ${Path(".").absolutePathString()}" }
 
-    log.info { "Setting up..." }
-    Security.addProvider(BouncyCastleProvider())
-    runCatching { Db.dataDirectoryPath.createDirectories() }
+    webWalletSetup()
 
     log.info { "Reading configurations..." }
     ConfigManager.loadConfigs(args)
@@ -41,11 +39,17 @@ fun main(args: Array<String>) {
         CIO,
         port = webConfig.webPort,
         host = webConfig.webHost,
-        module = Application::module
+        module = Application::webWalletModule
     ).start(wait = true)
 }
 
-fun Application.configurePlugins() {
+fun webWalletSetup() {
+    log.info { "Setting up..." }
+    Security.addProvider(BouncyCastleProvider())
+    runCatching { Db.dataDirectoryPath.createDirectories() }
+}
+
+private fun Application.configurePlugins() {
     configureSecurity()
     configureHTTP()
     configureMonitoring()
@@ -57,8 +61,11 @@ fun Application.configurePlugins() {
 }
 
 
-fun Application.module() {
-    configurePlugins()
+fun Application.webWalletModule(withPlugins: Boolean = true) {
+    if (withPlugins) {
+        configurePlugins()
+    }
+
     auth()
     push()
     notifications()

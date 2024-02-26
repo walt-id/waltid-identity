@@ -14,6 +14,11 @@ object ConfigManager {
 
     val registeredConfigurations = ArrayList<Pair<String, KClass<out BaseConfig>>>()
     val loadedConfigurations = HashMap<String, BaseConfig>()
+    private val preloadedConfigurations = HashMap<String, BaseConfig>()
+
+    fun preloadConfig(id: String, config: BaseConfig) {
+        preloadedConfigurations[id] = config
+    }
 
     @OptIn(ExperimentalHoplite::class)
     private fun loadConfig(config: Pair<String, KClass<out BaseConfig>>, args: Array<String>) {
@@ -21,6 +26,12 @@ object ConfigManager {
         log.debug { "Loading configuration: \"$id\"..." }
 
         val type = config.second
+
+        preloadedConfigurations[id]?.let {
+            loadedConfigurations[id] = it
+            log.info { "Overwrote issuer configuration with preload: $id" }
+            return
+        }
 
         runCatching {
             ConfigLoaderBuilder.default()

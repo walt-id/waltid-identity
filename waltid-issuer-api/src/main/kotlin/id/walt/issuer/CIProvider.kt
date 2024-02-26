@@ -44,7 +44,8 @@ import kotlin.time.Duration.Companion.minutes
 open class CIProvider : OpenIDCredentialIssuer(
     baseUrl = let {
         ConfigManager.getConfig<OIDCIssuerServiceConfig>().baseUrl
-    }, config = CredentialIssuerConfig(credentialsSupported = listOf(
+    },
+    config = CredentialIssuerConfig(credentialsSupported = listOf(
 //        "VerifiableCredential" to listOf("VerifiableCredential"),
         "BankId" to listOf("VerifiableCredential", "BankId"),
         "KycChecksCredential" to listOf("VerifiableCredential", "VerifiableAttestation", "KycChecksCredential"),
