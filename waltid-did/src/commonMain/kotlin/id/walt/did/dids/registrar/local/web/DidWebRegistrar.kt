@@ -10,9 +10,7 @@ import id.walt.did.dids.registrar.dids.DidCreateOptions
 import id.walt.did.dids.registrar.local.LocalRegistrarMethod
 import id.walt.did.utils.EncodingUtils.urlEncode
 import id.walt.did.utils.ExtensionMethods.ensurePrefix
-import kotlin.js.ExperimentalJsExport
 
-@OptIn(ExperimentalJsExport::class)
 class DidWebRegistrar : LocalRegistrarMethod("web") {
     override suspend fun register(options: DidCreateOptions): DidResult = options.get<KeyType>("keyType")?.let {
         registerByKey(LocalKey.generate(it), options)

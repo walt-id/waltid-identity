@@ -15,7 +15,7 @@ object DidsService {
             .singleOrNull()?.let { WalletDid(it) }
     }
 
-    fun list(wallet: UUID): List<WalletDid> = WalletDids.select { WalletDids.wallet eq wallet }.map { WalletDid(it) }
+    fun list(wallet: UUID): List<WalletDid> = WalletDids.selectAll().where { WalletDids.wallet eq wallet }.map { WalletDid(it) }
 
     fun add(wallet: UUID, did: String, document: String, keyId: String, alias: String? = null) = transaction {
         val now = Clock.System.now()
