@@ -1,15 +1,18 @@
 package id.walt.did.dids.document
 
-import id.walt.did.utils.JsonUtils
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonObject
 
+@OptIn(ExperimentalSerializationApi::class)
 @Serializable
 data class DidKeyDocument(
-    @SerialName("@context") val context: List<String> = DEFAULT_CONTEXT,
+    @EncodeDefault @SerialName("@context")  val context: List<String> = DEFAULT_CONTEXT,
     val id: String, // did:key:
 
     val verificationMethod: List<VerificationMethod>?,
@@ -32,7 +35,7 @@ data class DidKeyDocument(
         val publicKeyJwk: JsonObject // json-web-key
     )
 
-    fun toMap() = JsonUtils.didDocumentJson.encodeToJsonElement(this).jsonObject.toMap()
+    fun toMap() = Json.encodeToJsonElement(this).jsonObject.toMap()
 
     constructor(did: String, identifier: String, didKey: JsonObject) : this(
         context = DEFAULT_CONTEXT,

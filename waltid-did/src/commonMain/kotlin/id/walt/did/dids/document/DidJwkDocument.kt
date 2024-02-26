@@ -1,9 +1,11 @@
 package id.walt.did.dids.document
 
 
-import id.walt.did.utils.JsonUtils.didDocumentJson
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonObject
@@ -18,9 +20,10 @@ import kotlinx.serialization.json.jsonObject
  * update & deactivate not supported
  */
 
+@OptIn(ExperimentalSerializationApi::class)
 @Serializable
 data class DidJwkDocument(
-    @SerialName("@context")
+    @EncodeDefault @SerialName("@context")
     val context: List<String> = DEFAULT_CONTEXT,
     val id: String, // did:jwk:${base64url-value}
 
@@ -43,7 +46,7 @@ data class DidJwkDocument(
         val publicKeyJwk: JsonObject // json-web-key
     )
 
-    fun toMap() = didDocumentJson.encodeToJsonElement(this).jsonObject.toMap()
+    fun toMap() = Json.encodeToJsonElement(this).jsonObject.toMap()
 
     constructor(did: String, didJwk: JsonObject) : this(
         context = DEFAULT_CONTEXT,

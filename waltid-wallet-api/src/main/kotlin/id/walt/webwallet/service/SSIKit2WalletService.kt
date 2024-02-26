@@ -549,7 +549,7 @@ class SSIKit2WalletService(
         DidsService.add(
             wallet = walletId,
             did = result.did,
-            document = Json.encodeToString(result.didDocument),
+            document = result.didDocument.toString(),
             alias = args["alias"]?.content,
             keyId = keyId
         )
