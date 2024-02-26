@@ -45,8 +45,13 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
      */
     abstract fun getDidFor(session: S): String
 
-    fun httpGetAsJson(url: Url): JsonElement? = httpGet(url).body?.let { Json.decodeFromString<JsonElement>(it) }
-
+    
+    fun httpGetAsJson(url: Url): JsonElement? {
+        val r = httpGet(url)
+        println("*************** ERROR r.body = ${r.body}")
+       
+        return r.body?.let { Json.decodeFromString<JsonElement>(it) }
+    }
     open fun generateDidProof(
         did: String,
         issuerUrl: String,
@@ -185,7 +190,14 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
     // ==========================================================
     // ===============  issuance flow ===========================
     open fun resolveCredentialOffer(credentialOfferRequest: CredentialOfferRequest): CredentialOffer {
+        println(".......................offer = ${credentialOfferRequest.credentialOffer}")
+        
+        
+        println(">>>>>>>>>>>> credentialOfferRequest.credentialOffer = ${credentialOfferRequest.credentialOffer}")
+        println(">>>>>>>>>>>>> credentialOfferRequest.credentialOfferUri = ${credentialOfferRequest.credentialOfferUri}")
         return credentialOfferRequest.credentialOffer ?: credentialOfferRequest.credentialOfferUri?.let { uri ->
+            println("Uri = $uri")
+            println("Url(uri) = ${Url(uri)}")
             httpGetAsJson(Url(uri))?.jsonObject?.let { CredentialOffer.fromJSON(it) }
         } ?: throw CredentialOfferError(
             credentialOfferRequest,

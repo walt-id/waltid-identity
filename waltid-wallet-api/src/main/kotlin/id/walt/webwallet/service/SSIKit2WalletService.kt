@@ -513,6 +513,7 @@ class SSIKit2WalletService(
         logger.debug("// parse credential URI")
         val reqParams = Url(offer).parameters.toMap()
 
+        println("*********** reqParams = $reqParams")
         // entra or openid4vc credential offer
         val isEntra = EntraIssuanceRequest.isEntraIssuanceRequestUri(offer)
         val credentialResponses = if (isEntra) {

@@ -47,6 +47,7 @@ fun Application.exchange() = walletRoute {
 
             val offer = call.receiveText()
 
+            println("++++++++++++++ offer uri = $offer")
             runCatching {
                 wallet.useOfferRequest(offer = offer, did = did, requireUserInput = requireUserInput, silent = silent)
                     .also {
