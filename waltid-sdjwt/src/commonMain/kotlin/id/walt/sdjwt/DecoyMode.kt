@@ -15,7 +15,7 @@ import kotlin.js.JsExport
  * @property FIXED: Fixed number of decoy digests to be added
  * @property RANDOM: Random number of decoy digests to be added
  */
-@ExperimentalJsExport
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 @Serializable
 enum class DecoyMode {

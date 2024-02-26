@@ -14,7 +14,7 @@ import id.walt.did.utils.ExtensionMethods.ensurePrefix
 class DidWebRegistrar : LocalRegistrarMethod("web") {
     override suspend fun register(options: DidCreateOptions): DidResult = options.get<KeyType>("keyType")?.let {
         registerByKey(LocalKey.generate(it), options)
-    } ?: throw IllegalArgumentException("KeyType option not found.")
+    } ?: throw IllegalArgumentException("keyType option not found.")
 
     override suspend fun registerByKey(key: Key, options: DidCreateOptions): DidResult =
         options.get<String>("domain")?.takeIf {
