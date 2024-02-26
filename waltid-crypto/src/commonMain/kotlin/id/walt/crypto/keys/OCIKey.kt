@@ -403,6 +403,35 @@ class OCIKey(
       return response.body<JsonObject>()["publicKey"].toString()
     }
 
+    suspend fun deleteKey(OCIDKeyID: String, keyId: String, host: String): JsonObject {
+      val requestBody =
+          JsonObject(
+                  mapOf(
+                      "timeOfDeletion" to JsonPrimitive(GMTDate().toHttpDate()),
+                  ))
+              .toString()
+      val signature =
+          signingRequest(
+              "DELETE", "/20180608/keys/$OCIDKeyID/actions/scheduleDeletion", host, requestBody)
+
+      val response =
+          http
+              .post("https://$host/20180608/keys/$OCIDKeyID/actions/scheduleDeletion") {
+                header(
+                    "Authorization",
+                    """Signature version="1",headers="host (request-target) date",keyId="$keyId",algorithm="rsa-sha256",signature="$signature"""")
+                header("Date", GMTDate().toHttpDate())
+                header("Host", host)
+                header("Accept", "application/json")
+                header("Connection", "keep-alive")
+                header("Content-Type", "application/json")
+                setBody(requestBody)
+              }
+              .ociJsonDataBody()
+
+      return response
+    }
+
     val http = HttpClient {
       install(ContentNegotiation) { json() }
       defaultRequest { header(HttpHeaders.ContentType, ContentType.Application.Json) }
