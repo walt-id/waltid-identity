@@ -120,10 +120,9 @@ dependencies {
     implementation("io.github.reactivecircus.cache4k:cache4k:0.13.0")
 
     // Webauthn
-     implementation("com.webauthn4j:webauthn4j-core:0.22.1.RELEASE")
-
-    // Webauthn
-     implementation("com.webauthn4j:webauthn4j-core:0.22.1.RELEASE")
+     implementation("com.webauthn4j:webauthn4j-core:0.22.1.RELEASE") {
+         exclude("ch.qos.logback")
+     }
 
     // DB
     implementation("org.jetbrains.exposed:exposed-core:0.47.0")
