@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalJsExport::class)
-
 package id.walt.crypto.keys
 
 import com.nimbusds.jose.*
@@ -70,25 +68,39 @@ actual class LocalKey actual constructor(
         JsonObject(_internalJwk.toJSONObject().mapValues { JsonPrimitive(it.value as String) })
 
     actual override suspend fun exportPEM(): String {
-        val internalKeyRepresentation = when (keyType) {
+        val pemObjects = ArrayList<PemObject>()
+
+        when (keyType) {
             KeyType.secp256r1, KeyType.secp256k1 -> _internalJwk.toECKey().let {
-                if (hasPrivateKey) Pair("EC PRIVATE KEY", it.toECPrivateKey()) else Pair("EC PUBLIC KEY", it.toECPublicKey())
+                if (hasPrivateKey) {
+                    pemObjects.add(PemObject("PRIVATE KEY", it.toECPrivateKey().encoded))
+                    pemObjects.add(PemObject("PUBLIC KEY", getPublicKey()._internalJwk.toECKey().toECPublicKey().encoded))
+                } else {
+                    pemObjects.add(PemObject("PUBLIC KEY", it.toECPublicKey().encoded))
+                }
             }
 
             KeyType.Ed25519 -> throw NotImplementedError("Ed25519 keys cannot be exported as PEM yet.")
 
-            KeyType.RSA -> _internalJwk.toRSAKey().let { if (hasPrivateKey) Pair("RSA PRIVATE KEY", it.toRSAPrivateKey()) else Pair("RSA PUBLIC KEY", it.toRSAPublicKey()) }
+            KeyType.RSA -> _internalJwk.toRSAKey().let {
+                if (hasPrivateKey) {
+                    pemObjects.add(PemObject("RSA PRIVATE KEY", it.toRSAPrivateKey().encoded))
+                    pemObjects.add(PemObject("RSA PUBLIC KEY", getPublicKey()._internalJwk.toRSAKey().toRSAPublicKey().encoded))
+                } else {
+                    pemObjects.add(PemObject("RSA PUBLIC KEY", it.toRSAPublicKey().encoded))
+                }
+            }
         }
 
-        val pemObject = PemObject(internalKeyRepresentation.first, internalKeyRepresentation.second.encoded)
-
-        val x = ByteArrayOutputStream().apply {
+        val pem = ByteArrayOutputStream().apply {
             PemWriter(writer()).use {
-                it.writeObject(pemObject)
+                pemObjects.forEach { pemObject ->
+                    it.writeObject(pemObject)
+                }
             }
         }.toByteArray().toString(Charsets.UTF_8)
 
-        return x
+        return pem
     }
 
     private val _internalSigner: JWSSigner by lazy {
@@ -246,7 +258,6 @@ actual class LocalKey actual constructor(
         return kf.generatePrivate(pkcs8KeySpec)
     }
 
-    @OptIn(ExperimentalJsExport::class)
     actual companion object : LocalKeyCreator {
 
         val prettyJson = Json { prettyPrint = true }
