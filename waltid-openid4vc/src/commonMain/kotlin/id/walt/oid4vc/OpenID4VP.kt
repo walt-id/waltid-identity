@@ -2,12 +2,17 @@ package id.walt.oid4vc
 
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.data.dif.PresentationDefinition
+import id.walt.oid4vc.data.dif.PresentationSubmission
 import id.walt.oid4vc.errors.AuthorizationError
+import id.walt.oid4vc.interfaces.PresentationResult
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.responses.AuthorizationErrorCode
+import id.walt.oid4vc.responses.TokenResponse
 import id.walt.oid4vc.util.httpGet
 import io.ktor.http.*
 import io.ktor.util.*
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonPrimitive
 
 object OpenID4VP {
 
@@ -95,6 +100,46 @@ object OpenID4VP {
     scopeMapping?.let { authorizationRequest.scope.firstNotNullOfOrNull(it) } ?:
     throw AuthorizationError(authorizationRequest, AuthorizationErrorCode.invalid_request, "No presentation definition found on given presentation request")
 
+  /**
+   * Generates a presentation token response, for the given presentation result
+   * @param presentationResult The presentation result containing the presentation and presentation submission
+   * @param state Optional state parameter from the presentation request
+   * @param code Optional code parameter
+   * @param idToken  Optional id_token parameter, for combination with SIOPv2
+   * @param iss Optional issuer parameter from RFC9207
+   * @return The token response
+   */
+  fun generatePresentationResponse(presentationResult: PresentationResult,
+                                   state: String? = null,
+                                   code: String? = null,
+                                   idToken: String? = null,
+                                   iss: String? = null): TokenResponse {
+    return if (presentationResult.presentations.size == 1) {
+      TokenResponse.success(
+        VpTokenParameter.fromJsonElement(presentationResult.presentations.first()),
+        presentationResult.presentationSubmission,
+        state = state,
+        idToken = idToken
+      )
+    } else {
+      TokenResponse.success(
+        VpTokenParameter.fromJsonElement(JsonArray(presentationResult.presentations)),
+        presentationResult.presentationSubmission,
+        state = state,
+        idToken = idToken
+      )
+    }.copy(customParameters = buildMap {
+      code?.let { put("code", JsonPrimitive(it)) }
+      iss?.let { put("iss", JsonPrimitive(it)) }
+    })
+  }
 
-
+  /**
+   * Parse token response URI (redirect_url) and generate token response object.
+   * @param url Response or redirect url
+   * @return Token response object
+   */
+  fun parsePresentationResponseFromUrl(url: String): TokenResponse = TokenResponse.fromHttpParameters(
+    Url(url).parameters.toMap()
+  )
 }
