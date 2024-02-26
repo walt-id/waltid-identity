@@ -1,3 +1,5 @@
+import com.github.benmanes.gradle.versions.updates.DependencyUpdatesTask
+
 plugins {
     kotlin("multiplatform")
     kotlin("plugin.serialization")
@@ -42,33 +44,33 @@ kotlin {
                 api(project(":waltid-openid4vc"))
 
                 // CLI
-                implementation("com.varabyte.kotter:kotter-jvm:1.1.1")
-                implementation("com.github.ajalt.mordant:mordant:2.2.0")
-                implementation("com.github.ajalt.clikt:clikt:4.2.1")
+                implementation("com.varabyte.kotter:kotter-jvm:1.1.2")
+                implementation("com.github.ajalt.mordant:mordant:2.3.0")
+                implementation("com.github.ajalt.clikt:clikt:4.2.2")
 
                 // Coroutines
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
 
                 // Logging
-                implementation("io.github.oshai:kotlin-logging:5.1.0")
+                implementation("io.github.oshai:kotlin-logging:6.0.3")
             }
         }
         val commonTest by getting {
             dependencies {
                 implementation(kotlin("test"))
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.0")
             }
         }
         val jvmMain by getting {
             dependencies {
                 // Logging
-                implementation("org.slf4j:slf4j-simple:2.0.9")
+                implementation("org.slf4j:slf4j-simple:2.0.12")
             }
         }
         val jvmTest by getting {
             dependencies {
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0")
-                implementation("org.junit.jupiter:junit-jupiter-params:5.9.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
+                implementation("org.junit.jupiter:junit-jupiter-params:5.10.2")
             }
         }
         /*publishing {
@@ -99,5 +101,12 @@ kotlin {
         all {
             languageSettings.enableLanguageFeature("InlineClasses")
         }
+    }
+}
+
+
+tasks.withType<DependencyUpdatesTask> {
+    rejectVersionIf {
+        listOf("-beta", "-alpha", "-rc").any { it in candidate.version.lowercase() } || candidate.version.takeLast(4).contains("RC")
     }
 }

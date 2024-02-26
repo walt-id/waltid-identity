@@ -1,4 +1,4 @@
-package id.walt.webwallet.service
+package id.walt.webwallet.service.credentials
 
 import kotlinx.serialization.json.JsonObject
 

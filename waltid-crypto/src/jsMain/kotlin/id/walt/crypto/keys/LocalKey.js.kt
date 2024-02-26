@@ -16,7 +16,7 @@ import love.forte.plugin.suspendtrans.annotation.JsPromise
 import org.khronos.webgl.Uint8Array
 import kotlin.js.json
 
-@ExperimentalJsExport
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 @Serializable
 @SerialName("local")

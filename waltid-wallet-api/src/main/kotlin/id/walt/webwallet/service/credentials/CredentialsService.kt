@@ -4,12 +4,15 @@ import id.walt.webwallet.db.models.WalletCategory
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.db.models.WalletCredentialCategoryMap
 import id.walt.webwallet.db.models.WalletCredentials
+import id.walt.webwallet.service.credentials.CredentialsService.deletedCondition
+import id.walt.webwallet.service.credentials.CredentialsService.notDeletedItemsCondition
 import kotlinx.datetime.Clock
 import kotlinx.datetime.toJavaInstant
 import kotlinx.uuid.UUID
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.inList
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.notInSubQuery
 import org.jetbrains.exposed.sql.statements.UpdateStatement
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.time.Instant
@@ -108,7 +111,7 @@ object CredentialsService {
     }
 
     private fun getCredentialsQuery(wallet: UUID, includeDeleted: Boolean, vararg credentialId: String) =
-        WalletCredentials.select {
+        WalletCredentials.selectAll().where {
             (WalletCredentials.wallet eq wallet) and (WalletCredentials.id inList credentialId.toList() and (notDeletedItemsCondition or (includeDeleted.takeIf { it }
                 ?.let { Op.TRUE } ?: Op.FALSE)))
         }
@@ -148,16 +151,16 @@ object CredentialsService {
                 WalletCategory.wallet eq wallet and (WalletCredentialCategoryMap.wallet eq wallet) and (WalletCategory.name inList (categories))
             }).selectAll()
 
-    private fun uncategorizedQuery(wallet: UUID, deleted: Boolean, pending: Boolean) = WalletCredentials.select {
+    private fun uncategorizedQuery(wallet: UUID, deleted: Boolean, pending: Boolean) = WalletCredentials.selectAll().where {
         WalletCredentials.wallet eq wallet and (WalletCredentials.id notInSubQuery (WalletCredentialCategoryMap.slice(
             WalletCredentialCategoryMap.credential
-        ).select {
-            WalletCredentialCategoryMap.wallet eq wallet
-        })) and deletedCondition(deleted) and (WalletCredentials.pending eq pending)
+        ).selectAll()
+            .where { WalletCredentialCategoryMap.wallet eq wallet })) and deletedCondition(deleted) and (WalletCredentials.pending eq pending)
     }
 
     private fun allQuery(wallet: UUID, deleted: Boolean, pending: Boolean) =
-        WalletCredentials.select { WalletCredentials.wallet eq wallet and deletedCondition(deleted) and (WalletCredentials.pending eq pending) }
+        WalletCredentials.selectAll()
+            .where { WalletCredentials.wallet eq wallet and deletedCondition(deleted) and (WalletCredentials.pending eq pending) }
 
     private fun deletedCondition(deleted: Boolean) =
         deleted.takeIf { it }?.let { deletedItemsCondition } ?: notDeletedItemsCondition

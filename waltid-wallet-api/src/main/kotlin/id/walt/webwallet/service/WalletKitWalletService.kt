@@ -13,6 +13,7 @@ import id.walt.webwallet.service.dto.WalletDataTransferObject
 import id.walt.webwallet.service.events.EventLogFilter
 import id.walt.webwallet.service.events.EventLogFilterResult
 import id.walt.webwallet.service.issuers.IssuerDataTransferObject
+import id.walt.webwallet.service.keys.SingleKeyResponse
 import id.walt.webwallet.service.report.ReportRequestParameter
 import id.walt.webwallet.service.settings.WalletSetting
 import id.walt.webwallet.utils.JsonUtils.toJsonPrimitive
@@ -37,9 +38,8 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import kotlinx.uuid.UUID
-import org.jetbrains.exposed.sql.and
-import org.jetbrains.exposed.sql.insert
-import org.jetbrains.exposed.sql.select
+import org.jetbrains.exposed.sql.*
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.net.URLDecoder
 import java.nio.charset.Charset
@@ -70,7 +70,7 @@ class WalletKitWalletService(tenant: String, accountId: UUID, walletId: UUID) : 
 
     private val userEmail: String by lazy {
         transaction {
-            Accounts.select { Accounts.id eq this@WalletKitWalletService.walletId }
+            Accounts.selectAll().where { Accounts.id eq this@WalletKitWalletService.walletId }
                 .single()[Accounts.email]
         } ?: throw IllegalArgumentException("No such account: ${this.walletId}")
     }
@@ -377,7 +377,7 @@ class WalletKitWalletService(tenant: String, accountId: UUID, walletId: UUID) : 
 
     override fun getHistory(limit: Int, offset: Long): List<WalletOperationHistory> = transaction {
         WalletOperationHistories
-            .select { (WalletOperationHistories.tenant eq tenant) and (WalletOperationHistories.accountId eq walletId) }
+            .selectAll().where { (WalletOperationHistories.tenant eq tenant) and (WalletOperationHistories.accountId eq walletId) }
             .orderBy(WalletOperationHistories.timestamp)
             .limit(10)
             .map { WalletOperationHistory(it) }
