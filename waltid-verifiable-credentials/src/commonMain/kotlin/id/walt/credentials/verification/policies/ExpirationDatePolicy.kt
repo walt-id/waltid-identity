@@ -11,7 +11,7 @@ import love.forte.plugin.suspendtrans.annotation.JvmBlocking
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 
-@ExperimentalJsExport
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 class ExpirationDatePolicy : CredentialWrapperValidatorPolicy(
     "expired", "Verifies that the credentials expiration date (`exp` for JWTs) has not been exceeded."

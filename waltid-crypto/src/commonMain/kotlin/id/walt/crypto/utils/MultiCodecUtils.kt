@@ -13,7 +13,7 @@ import kotlin.js.JsName
 // 0xe7 secp256k1-pub
 // 0xeb51 jwk_jcs-pub
 
-@ExperimentalJsExport
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 object MultiCodecUtils {
     const val JwkJcsPubMultiCodecKeyCode = 0xeb51u
