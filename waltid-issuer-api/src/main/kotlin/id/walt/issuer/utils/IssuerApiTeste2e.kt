@@ -18,7 +18,7 @@ class IssuerApiTeste2e {
     private lateinit var localClient: HttpClient
     init {
 //      startLocalIssuer()
-//      startTestApplicationIssuer()
+      startTestApplicationIssuer()
     }
     
     private fun startLocalIssuer() {

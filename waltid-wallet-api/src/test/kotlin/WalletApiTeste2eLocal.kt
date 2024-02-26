@@ -19,11 +19,9 @@ import kotlin.time.Duration.Companion.seconds
 
 class WalletApiTeste2eLocal : WalletApiTeste2eBase() {
     companion object {
-        var localWalletUrl: String = ""
-        var localIssuerUrl: String = "http://localhost:7002"
-        
-        //        private var issuer = IssuerApiTeste2e()
-//        var localIssuerClient: HttpClient
+        var localUrl: String = ""
+//        private var issuer = IssuerApiTeste2e()
+        var localIssuerClient: HttpClient
         
         var nonTestAppIssuerClient = HttpClient(CIO) {
             install(ContentNegotiation) {
@@ -43,9 +41,9 @@ class WalletApiTeste2eLocal : WalletApiTeste2eBase() {
             
             // creates two test applications, for wallet and issuer
             setUpWalletAPITestApplication()
-
+            
 //            localIssuerClient = issuer.getHttpClient()
-//            localIssuerClient = EndToEndTestController.getClient()
+            localIssuerClient = EndToEndTestController.getClient()
             println("Init finished")
         }
         
@@ -134,26 +132,16 @@ class WalletApiTeste2eLocal : WalletApiTeste2eBase() {
         set(value) {
             walletClient = value
         }
-    
-    //    override var issuerClient: HttpClient
-//        get() = localIssuerClient
-//        set(value) {
-//            localIssuerClient = value
-//        }
     override var issuerClient: HttpClient
-        get() = nonTestAppIssuerClient
+        get() = localIssuerClient
         set(value) {
-            issuerClient = value
+            localIssuerClient = value
         }
     override var walletUrl: String
-        get() = localWalletUrl
+        get() = localUrl
         set(value) {
-            localWalletUrl = value
+            localUrl = value
         }
     
-    override var issuerUrl: String
-        get() = localIssuerUrl
-        set(value) {
-            localIssuerUrl = value
-        }
+    override var issuerUrl: String = walletUrl
 }
