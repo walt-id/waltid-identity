@@ -122,6 +122,9 @@ dependencies {
     // Webauthn
      implementation("com.webauthn4j:webauthn4j-core:0.22.1.RELEASE")
 
+    // Webauthn
+     implementation("com.webauthn4j:webauthn4j-core:0.22.1.RELEASE")
+
     // DB
     implementation("org.jetbrains.exposed:exposed-core:0.47.0")
     implementation("org.jetbrains.exposed:exposed-jdbc:0.47.0")
