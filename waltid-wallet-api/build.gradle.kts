@@ -106,7 +106,8 @@ dependencies {
 
 
     // waltid-did
-    implementation(project(":waltid-did"))//id.walt.crypto provided by id.walt.did:waltid-did
+    implementation(project(":waltid-crypto"))
+    implementation(project(":waltid-did"))
 
     // OIDC
     implementation(project(":waltid-openid4vc"))
