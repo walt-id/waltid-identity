@@ -2,9 +2,10 @@ package id.walt.sdjwt
 
 import dev.whyoleg.cryptography.random.CryptographyRandom
 import korlibs.crypto.SecureRandom
-import korlibs.crypto.encoding.Base64
 import korlibs.crypto.sha256
 import kotlinx.serialization.json.*
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 
@@ -117,6 +118,7 @@ data class SDPayload internal constructor(
         disclosePayloadRecursively(undisclosedPayload, it)
     }.isEmpty()
 
+    @OptIn(ExperimentalEncodingApi::class)
     @JsExport.Ignore // see SDPayloadBuilder for JS support
     companion object {
 
@@ -127,16 +129,16 @@ data class SDPayload internal constructor(
 
         private fun generateSalt(): String {
             val randomness = CryptographyRandom.nextBytes(16)
-            return Base64.encode(randomness, url = true)
+            return Base64.UrlSafe.encode(randomness)
         }
 
         private fun generateDisclosure(key: String, value: JsonElement): SDisclosure {
             val salt = generateSalt()
-            return Base64.encode(buildJsonArray {
+            return Base64.UrlSafe.encode(buildJsonArray {
                 add(salt)
                 add(key)
                 add(value)
-            }.toString().encodeToByteArray(), url = true).let { disclosure ->
+            }.toString().encodeToByteArray()).let { disclosure ->
                 SDisclosure(disclosure, salt, key, value)
             }
         }
@@ -271,7 +273,7 @@ data class SDPayload internal constructor(
          */
         fun parse(jwtBody: String, disclosures: Set<String>): SDPayload {
             return SDPayload(
-                Json.parseToJsonElement(Base64.decode(jwtBody, url = true).decodeToString()).jsonObject,
+                Json.parseToJsonElement(Base64.UrlSafe.decode(jwtBody).decodeToString()).jsonObject,
                 disclosures.associate { Pair(digest(it), SDisclosure.parse(it)) })
         }
     }

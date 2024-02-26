@@ -1,7 +1,8 @@
 package id.walt.sdjwt
 
-import korlibs.crypto.encoding.Base64
 import kotlinx.serialization.json.*
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 import kotlin.js.JsName
@@ -149,13 +150,14 @@ open class SDJwt internal constructor(
         /**
          * Parse SD-JWT from a token string
          */
+        @OptIn(ExperimentalEncodingApi::class)
         fun parse(sdJwt: String): SDJwt {
             val matchResult = Regex(SD_JWT_PATTERN).matchEntire(sdJwt) ?: throw IllegalArgumentException("Invalid SD-JWT format: $sdJwt")
             val matchedGroups = matchResult.groups as MatchNamedGroupCollection
             val disclosures = matchedGroups["disclosures"]?.value?.trim(SEPARATOR)?.split(SEPARATOR)?.toSet() ?: setOf()
             return SDJwt(
                 matchedGroups["sdjwt"]!!.value,
-                Json.parseToJsonElement(Base64.decode(matchedGroups["header"]!!.value, true).decodeToString()).jsonObject,
+                Json.parseToJsonElement(Base64.UrlSafe.decode(matchedGroups["header"]!!.value).decodeToString()).jsonObject,
                 SDPayload.parse(
                     matchedGroups["body"]!!.value,
                     disclosures
