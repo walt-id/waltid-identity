@@ -72,6 +72,9 @@ kotlin {
                 // Crypto
                 api(project(":waltid-crypto"))
 
+                // Encodings
+                implementation("net.thauvin.erik.urlencoder:urlencoder-lib:1.4.0")
+
                 // Logging
                 implementation("io.github.oshai:kotlin-logging:6.0.3")
 
@@ -95,7 +98,7 @@ kotlin {
                 implementation("io.github.erdtman:java-json-canonicalization:1.1")
 
                 // Multiformat
-                implementation("com.github.multiformats:java-multibase:v1.1.1")
+//                implementation("com.github.multiformats:java-multibase:v1.1.1")
             }
         }
         val jvmTest by getting {

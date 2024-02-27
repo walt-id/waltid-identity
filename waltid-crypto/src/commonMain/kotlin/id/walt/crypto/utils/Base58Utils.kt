@@ -14,7 +14,7 @@ private val alphabetIndices by lazy {
  *
  * @return the base58-encoded string
  */
-internal fun ByteArray.encodeToBase58String(): String {
+fun ByteArray.encodeToBase58String(): String {
 
     val input = copyOf(size) // since we modify it in-place
     if (input.isEmpty()) {
@@ -53,7 +53,7 @@ internal fun ByteArray.encodeToBase58String(): String {
  * @throws NumberFormatException if the string is not a valid base58 string
  */
 @Throws(NumberFormatException::class)
-internal fun String.decodeBase58(): ByteArray {
+fun String.decodeBase58(): ByteArray {
     if (isEmpty()) {
         return ByteArray(0)
     }
