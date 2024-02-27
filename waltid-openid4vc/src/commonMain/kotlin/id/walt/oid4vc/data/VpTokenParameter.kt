@@ -1,6 +1,5 @@
 package id.walt.oid4vc.data
 
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 
 data class VpTokenParameter constructor(
