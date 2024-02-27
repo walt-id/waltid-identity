@@ -62,7 +62,7 @@ kotlin {
                 }
             }
         }
-        nodejs() {
+        nodejs {
             generateTypeScriptDefinitions()
         }
         binaries.library()
@@ -117,7 +117,7 @@ kotlin {
                 implementation("io.kotest:kotest-assertions-json:5.8.0")
                 implementation("com.google.crypto.tink:tink:1.12.0") // for JOSE using Ed25519
                 // Multibase
-                implementation("com.github.multiformats:java-multibase:v1.1.1")
+                // implementation("com.github.multiformats:java-multibase:v1.1.1")
                 // TODO: current version implementation("id.walt:waltid-ssikit:1.2311131043.0")
                 //implementation("id.walt:waltid-ssikit:1.JWTTYP") {
                 //    exclude("waltid-sd-jwt-jvm")
