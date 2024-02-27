@@ -20,7 +20,6 @@ import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.types.beInstanceOf
 import io.ktor.client.*
 import io.ktor.client.call.*
-import io.ktor.client.engine.java.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.plugins.logging.*
 import io.ktor.client.request.*
@@ -40,7 +39,7 @@ class VP_JVM_Test : AnnotationSpec() {
     private lateinit var testWallet: TestCredentialWallet
     private lateinit var testVerifier: VPTestVerifier
 
-    val http = HttpClient(Java) {
+    val http = HttpClient() {
         install(ContentNegotiation) {
             json()
         }
@@ -100,21 +99,23 @@ class VP_JVM_Test : AnnotationSpec() {
     @Test
     suspend fun testVPAuthorization() {
         val authReq = OpenID4VP.createPresentationRequest(
-            PresentationDefinitionParameter.fromPresentationDefinition(PresentationDefinition(
-                inputDescriptors = listOf(
-                    InputDescriptor(
-                        format = mapOf(VCFormat.jwt_vc_json to VCFormatDefinition(setOf("EdDSA"))),
-                        constraints = InputDescriptorConstraints(
-                            fields = listOf(
-                                InputDescriptorField(listOf("$.type"), filter = buildJsonObject {
-                                    put("type", "string")
-                                    put("const", "VerifiableId")
-                                })
+            PresentationDefinitionParameter.fromPresentationDefinition(
+                PresentationDefinition(
+                    inputDescriptors = listOf(
+                        InputDescriptor(
+                            format = mapOf(VCFormat.jwt_vc_json to VCFormatDefinition(setOf("EdDSA"))),
+                            constraints = InputDescriptorConstraints(
+                                fields = listOf(
+                                    InputDescriptorField(listOf("$.type"), filter = buildJsonObject {
+                                        put("type", "string")
+                                        put("const", "VerifiableId")
+                                    })
+                                )
                             )
                         )
                     )
                 )
-            )),
+            ),
             responseMode = ResponseMode.Query,
             responseTypes = setOf(ResponseType.VpToken),
             redirectOrResponseUri = "http://blank",
@@ -134,7 +135,7 @@ class VP_JVM_Test : AnnotationSpec() {
         }
         println("Auth resp: $authReq")
         authResp.status shouldBe HttpStatusCode.Found
-        authResp.headers.names() shouldContain HttpHeaders.Location.lowercase()
+        authResp.headers.names() shouldContain HttpHeaders.Location
         val redirectUrl = Url(authResp.headers[HttpHeaders.Location]!!)
         val tokenResponse = TokenResponse.fromHttpParameters(redirectUrl.parameters.toMap())
         tokenResponse.vpToken shouldNotBe null
@@ -180,13 +181,16 @@ class VP_JVM_Test : AnnotationSpec() {
         // TODO: Determine flow details
         // TODO: optional (code flow): code response (verifier <-- wallet), token endpoint (verifier -> wallet)
         // Generate token response
-        val testVP = "eyJhbGciOiJFUzI1NksiLCJ0eXAiOiJKV1QiLCJraWQiOiJkaWQ6d2ViOmVudHJhLndhbHQuaWQ6aG9sZGVyIzQ4ZDhhMzQyNjNjZjQ5MmFhN2ZmNjFiNjE4M2U4YmNmIn0.eyJzdWIiOiJkaWQ6d2ViOmVudHJhLndhbHQuaWQ6aG9sZGVyIiwibmJmIjoxNzA4OTUzOTI0LCJpYXQiOjE3MDg5NTM5ODQsImp0aSI6IjEiLCJpc3MiOiJkaWQ6d2ViOmVudHJhLndhbHQuaWQ6aG9sZGVyIiwibm9uY2UiOiIiLCJhdWQiOiJ0ZXN0LXZlcmlmaWVyIiwidnAiOnsiQGNvbnRleHQiOlsiaHR0cHM6Ly93d3cudzMub3JnLzIwMTgvY3JlZGVudGlhbHMvdjEiXSwidHlwZSI6WyJWZXJpZmlhYmxlUHJlc2VudGF0aW9uIl0sImlkIjoiMSIsImhvbGRlciI6ImRpZDp3ZWI6ZW50cmEud2FsdC5pZDpob2xkZXIiLCJ2ZXJpZmlhYmxlQ3JlZGVudGlhbCI6W119fQ.hgGTCeYGGE9qhlSqeBQmY7WnAts6aBSH378-z5WtNDAB8LaQwXKeoOLAURoE5utacYhX-hDZJwBpGg9Zf1ZkgA"
+        val testVP =
+            "eyJhbGciOiJFUzI1NksiLCJ0eXAiOiJKV1QiLCJraWQiOiJkaWQ6d2ViOmVudHJhLndhbHQuaWQ6aG9sZGVyIzQ4ZDhhMzQyNjNjZjQ5MmFhN2ZmNjFiNjE4M2U4YmNmIn0.eyJzdWIiOiJkaWQ6d2ViOmVudHJhLndhbHQuaWQ6aG9sZGVyIiwibmJmIjoxNzA4OTUzOTI0LCJpYXQiOjE3MDg5NTM5ODQsImp0aSI6IjEiLCJpc3MiOiJkaWQ6d2ViOmVudHJhLndhbHQuaWQ6aG9sZGVyIiwibm9uY2UiOiIiLCJhdWQiOiJ0ZXN0LXZlcmlmaWVyIiwidnAiOnsiQGNvbnRleHQiOlsiaHR0cHM6Ly93d3cudzMub3JnLzIwMTgvY3JlZGVudGlhbHMvdjEiXSwidHlwZSI6WyJWZXJpZmlhYmxlUHJlc2VudGF0aW9uIl0sImlkIjoiMSIsImhvbGRlciI6ImRpZDp3ZWI6ZW50cmEud2FsdC5pZDpob2xkZXIiLCJ2ZXJpZmlhYmxlQ3JlZGVudGlhbCI6W119fQ.hgGTCeYGGE9qhlSqeBQmY7WnAts6aBSH378-z5WtNDAB8LaQwXKeoOLAURoE5utacYhX-hDZJwBpGg9Zf1ZkgA"
         val tokenResponse = OpenID4VP.generatePresentationResponse(
             PresentationResult(
                 listOf(JsonPrimitive(testVP)),
-                PresentationSubmission("presentation_1", "definition_1", listOf(
-                    DescriptorMapping("Test descriptor", VCFormat.jwt_vc_json, DescriptorMapping.vpPath(1, 0))
-                ))
+                PresentationSubmission(
+                    "presentation_1", "definition_1", listOf(
+                        DescriptorMapping("Test descriptor", VCFormat.jwt_vc_json, DescriptorMapping.vpPath(1, 0))
+                    )
+                )
             )
         )
         // TODO: Optional: respond to token request (code-flow, verifier <-- wallet), respond to authorization request (implicit flow, verifier <-- wallet)
@@ -210,14 +214,16 @@ class VP_JVM_Test : AnnotationSpec() {
         val presObj = Json.parseToJsonElement("{\"test\": \"bla\"}").jsonObject
         val presStr1 = "eyJ.eyJpc3M.ft_Eq4"
         val presStr2 = "eyJ.eyJpc3M.ft_Eq5"
-        val presParams = listOf(VpTokenParameter(presStr1), VpTokenParameter(presObj), VpTokenParameter(setOf(presStr1), listOf(presObj)),
-            VpTokenParameter(setOf(presStr1, presStr2)), VpTokenParameter(listOf(presObj, presObj)))
+        val presParams = listOf(
+            VpTokenParameter(presStr1), VpTokenParameter(presObj), VpTokenParameter(setOf(presStr1), listOf(presObj)),
+            VpTokenParameter(setOf(presStr1, presStr2)), VpTokenParameter(listOf(presObj, presObj))
+        )
         presParams.forEach { param ->
             val tokenResponse = TokenResponse.success(param, null, null, null)
 
-            if(param.vpTokenObjects.plus(param.vpTokenStrings).size == 1) {
+            if (param.vpTokenObjects.plus(param.vpTokenStrings).size == 1) {
                 tokenResponse.vpToken shouldNot beInstanceOf<JsonArray>()
-                if(param.vpTokenObjects.size == 1) tokenResponse.vpToken should beInstanceOf<JsonObject>()
+                if (param.vpTokenObjects.size == 1) tokenResponse.vpToken should beInstanceOf<JsonObject>()
                 else {
                     tokenResponse.vpToken should beInstanceOf<JsonPrimitive>()
                     tokenResponse.vpToken!!.jsonPrimitive.isString shouldBe false // should be an unquoted string if vp_token is a single string
@@ -225,13 +231,13 @@ class VP_JVM_Test : AnnotationSpec() {
             } else {
                 tokenResponse.vpToken should beInstanceOf<JsonArray>()
                 tokenResponse.vpToken!!.jsonArray.forEach {
-                    if(it is JsonPrimitive)
+                    if (it is JsonPrimitive)
                         it.isString shouldBe true // string elements in the array must be quoted strings
                     else it should beInstanceOf<JsonObject>()
                 }
             }
 
-            val url =  tokenResponse.toRedirectUri("http://blank", ResponseMode.Query)
+            val url = tokenResponse.toRedirectUri("http://blank", ResponseMode.Query)
             println(url)
             val parsedResponse = TokenResponse.fromHttpParameters(Url(url).parameters.toMap())
             parsedResponse.vpToken shouldNotBe null
@@ -711,8 +717,6 @@ class VP_JVM_Test : AnnotationSpec() {
         //testVerifier.start(wait = true)
 
 
-
-
         val authReq = AuthorizationRequest.fromHttpParametersAuto(parseQueryString(Url(reqUri!!).encodedQuery).toMap())
         authReq.clientId shouldBe "did:web:entra.walt.id"
 
@@ -749,27 +753,27 @@ class VP_JVM_Test : AnnotationSpec() {
     suspend fun testCreateEntraPresentationRequest(): String? {
         val accessToken = entraAuthorize()
         val createPresentationRequestBody = "{\n" +
-            "    \"authority\": \"did:web:entra.walt.id\",\n" +
-            "    \"callback\": {\n" +
-            "        \"headers\": {\n" +
-            "            \"api-key\": \"1234\"\n" +
-            "        },\n" +
-            "        \"state\": \"1234\",\n" +
-            "        \"url\": \"https://httpstat.us/200\"\n" +
-            "    },\n" +
-            "    \"registration\": {\n" +
-            "        \"clientName\": \"verifiable-credentials-app\"\n" +
-            "    },\n" +
-            "    \"requestedCredentials\": [\n" +
-            "        {\n" +
-            "            \"acceptedIssuers\": [\n" +
-            "                \"did:web:entra.walt.id\"\n" +
-            "            ],\n" +
-            "            \"purpose\": \"TEST\",\n" +
-            "            \"type\": \"MyID\"\n" +
-            "        }\n" +
-            "    ]\n" +
-            "}"
+                "    \"authority\": \"did:web:entra.walt.id\",\n" +
+                "    \"callback\": {\n" +
+                "        \"headers\": {\n" +
+                "            \"api-key\": \"1234\"\n" +
+                "        },\n" +
+                "        \"state\": \"1234\",\n" +
+                "        \"url\": \"https://httpstat.us/200\"\n" +
+                "    },\n" +
+                "    \"registration\": {\n" +
+                "        \"clientName\": \"verifiable-credentials-app\"\n" +
+                "    },\n" +
+                "    \"requestedCredentials\": [\n" +
+                "        {\n" +
+                "            \"acceptedIssuers\": [\n" +
+                "                \"did:web:entra.walt.id\"\n" +
+                "            ],\n" +
+                "            \"purpose\": \"TEST\",\n" +
+                "            \"type\": \"MyID\"\n" +
+                "        }\n" +
+                "    ]\n" +
+                "}"
         val response = http.post("https://verifiedid.did.msidentity.com/v1.0/verifiableCredentials/createPresentationRequest") {
             header(HttpHeaders.Authorization, accessToken)
             contentType(ContentType.Application.Json)

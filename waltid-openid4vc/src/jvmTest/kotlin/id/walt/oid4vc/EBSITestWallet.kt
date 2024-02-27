@@ -29,7 +29,6 @@ import id.walt.sdjwt.SDPayload
 import id.walt.sdjwt.SimpleJWTCryptoProvider
 import io.kotest.common.runBlocking
 import io.ktor.client.*
-import io.ktor.client.engine.java.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.plugins.logging.*
 import io.ktor.client.request.*
@@ -53,7 +52,7 @@ class EBSITestWallet(
     config: CredentialWalletConfig
 ) : OpenIDCredentialWallet<SIOPSession>(EBSI_WALLET_BASE_URL, config) {
     private val sessionCache = mutableMapOf<String, SIOPSession>()
-    private val ktorClient = HttpClient(Java) {
+    private val ktorClient = HttpClient() {
         install(ContentNegotiation) {
             json()
         }
@@ -69,7 +68,8 @@ class EBSITestWallet(
 
     override fun resolveDID(did: String): String {
         val didObj = runBlocking { DidService.resolve(did) }.getOrThrow()
-        return (didObj["authentication"] ?: didObj["assertionMethod"] ?: didObj["verificationMethod"])?.jsonArray?.firstOrNull()?.jsonObject?.get("id")?.jsonPrimitive?.content ?: did
+        return (didObj["authentication"] ?: didObj["assertionMethod"]
+        ?: didObj["verificationMethod"])?.jsonArray?.firstOrNull()?.jsonObject?.get("id")?.jsonPrimitive?.content ?: did
     }
 
     override fun getDidFor(session: SIOPSession): String {
@@ -94,8 +94,13 @@ class EBSITestWallet(
     override fun removeSession(id: String): SIOPSession? = sessionCache.remove(id)
 
     val jwtCryptoProvider = runBlocking {
-        SimpleJWTCryptoProvider(JWSAlgorithm.ES256, ECDSASigner(ECKey.parse(EBSI_WALLET_TEST_KEY_JWK)), ECDSAVerifier(ECKey.parse(
-            EBSI_WALLET_TEST_KEY_JWK)))
+        SimpleJWTCryptoProvider(
+            JWSAlgorithm.ES256, ECDSASigner(ECKey.parse(EBSI_WALLET_TEST_KEY_JWK)), ECDSAVerifier(
+                ECKey.parse(
+                    EBSI_WALLET_TEST_KEY_JWK
+                )
+            )
+        )
     }
 
     override fun signToken(target: TokenTarget, payload: JsonObject, header: JsonObject?, keyId: String?) =
