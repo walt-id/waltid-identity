@@ -6,6 +6,7 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.uuid.UUID
 import org.jetbrains.exposed.sql.*
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.transactions.transaction
 
 object EventService {
@@ -17,7 +18,7 @@ object EventService {
         sortOrder: String,
         sortBy: String,
         dataFilter: Map<String, String>
-    ) = Events.select { Events.account eq accountId or (Events.wallet eq walletId) }
+    ) = Events.selectAll().where { Events.account eq accountId or (Events.wallet eq walletId) }
         .orderBy(getColumn(sortBy) ?: Events.timestamp,
             sortOrder.takeIf { it.uppercase() == "ASC" }?.let { SortOrder.ASC } ?: SortOrder.DESC)
         .limit(n = limit, offset = offset).addWhereClause(dataFilter).map {
@@ -25,7 +26,7 @@ object EventService {
         }
 
     fun count(walletId: UUID, dataFilter: Map<String, String>): Long =
-        Events.select { Events.wallet eq walletId }.addWhereClause(dataFilter).count()
+        Events.selectAll().where { Events.wallet eq walletId }.addWhereClause(dataFilter).count()
 
 
     fun add(event: Event): Unit = transaction {

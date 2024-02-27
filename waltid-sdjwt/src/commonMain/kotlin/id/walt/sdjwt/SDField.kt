@@ -11,7 +11,7 @@ import kotlin.js.JsExport
  * @param children    Not null, if field is an object. Contains SDMap for the properties of the object
  * @see SDMap
  */
-@ExperimentalJsExport
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 @Serializable
 data class SDField(
