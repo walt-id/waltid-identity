@@ -7,7 +7,7 @@ import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.interfaces.ISessionCache
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.responses.TokenResponse
-import id.walt.oid4vc.util.randomSessionId
+import id.walt.oid4vc.util.ShortIdUtils
 import kotlinx.datetime.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
@@ -37,7 +37,7 @@ abstract class OpenIDCredentialVerifier(val config: CredentialVerifierConfig) :
         expiresIn: Duration = 60.seconds
     ): PresentationSession {
         val session = PresentationSession(
-            id = randomSessionId(),
+            id = ShortIdUtils.randomSessionId(),
             authorizationRequest = null,
             expirationTimestamp = Clock.System.now().plus(expiresIn),
             presentationDefinition = presentationDefinition
