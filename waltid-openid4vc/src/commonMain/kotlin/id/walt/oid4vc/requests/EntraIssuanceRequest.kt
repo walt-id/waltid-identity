@@ -1,8 +1,10 @@
 package id.walt.oid4vc.requests
 
-import id.walt.oid4vc.util.httpGet
+import id.walt.oid4vc.util.http
 import id.walt.oid4vc.util.randomUUID
 import id.walt.sdjwt.SDJwt
+import io.ktor.client.call.*
+import io.ktor.client.request.*
 import io.ktor.utils.io.core.*
 import kotlinx.datetime.Clock
 import kotlinx.serialization.json.*
@@ -56,9 +58,12 @@ data class EntraIssuanceRequest(
         suspend fun fromAuthorizationRequest(authorizationRequest: AuthorizationRequest): EntraIssuanceRequest {
             val manifestUrl =
                 authorizationRequest.claims!!["vp_token"]!!.jsonObject["presentation_definition"]!!.jsonObject["input_descriptors"]!!.jsonArray.first().jsonObject["issuance"]!!.jsonArray.first().jsonObject["manifest"]!!.jsonPrimitive.content
-            val manifest = Json.parseToJsonElement(httpGet(manifestUrl)).jsonObject["token"]!!.jsonPrimitive.content.let {
+
+
+            val manifest = http.get(manifestUrl).body<JsonObject>()["token"]!!.jsonPrimitive.content.let {
                 SDJwt.parse(it).fullPayload
             }
+
             return EntraIssuanceRequest(authorizationRequest, manifest, manifestUrl)
         }
 

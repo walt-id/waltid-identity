@@ -2,8 +2,9 @@ package id.walt.oid4vc.requests
 
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.data.dif.PresentationDefinition
-import id.walt.oid4vc.util.httpGet
 import id.walt.sdjwt.SDJwt
+import io.ktor.client.request.*
+import io.ktor.client.statement.*
 import kotlinx.serialization.json.*
 
 interface IAuthorizationRequest {
@@ -118,7 +119,7 @@ data class AuthorizationRequest(
 
         suspend fun fromRequestObjectByReference(requestUri: String): AuthorizationRequest {
             println("Request object by reference: $requestUri")
-            return fromRequestObject(httpGet(requestUri))
+            return fromRequestObject(id.walt.oid4vc.util.http.get(requestUri).bodyAsText())
         }
 
         fun fromRequestObject(request: String): AuthorizationRequest {

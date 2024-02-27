@@ -7,7 +7,9 @@ import id.walt.oid4vc.interfaces.PresentationResult
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.responses.AuthorizationErrorCode
 import id.walt.oid4vc.responses.TokenResponse
-import id.walt.oid4vc.util.httpGet
+import id.walt.oid4vc.util.http
+import io.ktor.client.request.*
+import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.util.*
 import kotlinx.serialization.json.JsonArray
@@ -97,7 +99,7 @@ object OpenID4VP {
         scopeMapping: ((String) -> PresentationDefinition?)? = null
     ): PresentationDefinition =
         authorizationRequest.presentationDefinition ?: authorizationRequest.presentationDefinitionUri?.let { uri ->
-            httpGet(uri).let { PresentationDefinition.fromJSONString(it) }
+            http.get(uri).bodyAsText().let { PresentationDefinition.fromJSONString(it) }
         } ?: scopeMapping?.let { authorizationRequest.scope.firstNotNullOfOrNull(it) } ?: throw AuthorizationError(
             authorizationRequest,
             AuthorizationErrorCode.invalid_request,
