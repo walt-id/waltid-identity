@@ -463,6 +463,28 @@ class CI_JVM_Test : AnnotationSpec() {
     }
 
     @Test
+    suspend fun testCredentialIssuanceIsolatedFunctions() {
+        println("// -------- CREDENTIAL ISSUER ----------")
+
+        val credOffer = CredentialOffer.Builder(ciTestProvider.baseUrl).addOfferedCredential("VerifiableId").build()
+        val issueReqUrl = OpenID4VCI.getCredentialOfferRequestUrl(credOffer)
+
+        // Show credential offer request as QR code
+        println(issueReqUrl)
+
+        println("// -------- WALLET ----------")
+        val parsedCredOffer = OpenID4VCI.parseAndResolveCredentialOfferRequestUrl(issueReqUrl)
+        parsedCredOffer.toJSONString() shouldBe credOffer.toJSONString()
+
+        val providerMetadata = OpenID4VCI.resolveCIProviderMetadata(parsedCredOffer)
+        providerMetadata.credentialIssuer shouldBe parsedCredOffer.credentialIssuer
+
+        println("// resolve offered credentials")
+        val offeredCredentials = OpenID4VCI.resolveOfferedCredentials(parsedCredOffer, providerMetadata)
+        println("offeredCredentials: $offeredCredentials")
+    }
+
+    @Test
     suspend fun testCredentialOfferFullAuth() {
         println("// -------- CREDENTIAL ISSUER ----------")
         println("// as CI provider, initialize credential offer for user")
@@ -495,7 +517,7 @@ class CI_JVM_Test : AnnotationSpec() {
         providerMetadata.credentialsSupported shouldNotBe null
 
         println("// resolve offered credentials")
-        val offeredCredentials = parsedOfferReq.credentialOffer!!.resolveOfferedCredentials(providerMetadata)
+        val offeredCredentials = OpenID4VCI.resolveOfferedCredentials(parsedOfferReq.credentialOffer!!, providerMetadata)
         println("offeredCredentials: $offeredCredentials")
 
         offeredCredentials.size shouldBe 1
@@ -617,7 +639,7 @@ class CI_JVM_Test : AnnotationSpec() {
         providerMetadata.credentialsSupported shouldNotBe null
 
         println("// resolve offered credentials")
-        val offeredCredentials = parsedOfferReq.credentialOffer!!.resolveOfferedCredentials(providerMetadata)
+        val offeredCredentials = OpenID4VCI.resolveOfferedCredentials(parsedOfferReq.credentialOffer!!, providerMetadata)
         println("offeredCredentials: $offeredCredentials")
         offeredCredentials.size shouldBe 1
         offeredCredentials.first().format shouldBe CredentialFormat.jwt_vc_json
@@ -794,7 +816,7 @@ class CI_JVM_Test : AnnotationSpec() {
         println("providerMetadata: $providerMetadata")
         providerMetadata.authorizationEndpoint shouldNotBe null
         println("// resolve offered credentials")
-        val offeredCredentials = credOfferReq.credentialOffer!!.resolveOfferedCredentials(providerMetadata)
+        val offeredCredentials = OpenID4VCI.resolveOfferedCredentials(credOfferReq.credentialOffer!!, providerMetadata)
         println("offeredCredentials: $offeredCredentials")
 
         providerMetadata.grantTypesSupported shouldContain GrantType.pre_authorized_code
@@ -849,7 +871,7 @@ class CI_JVM_Test : AnnotationSpec() {
         println("providerMetadata: $providerMetadata")
         providerMetadata.authorizationEndpoint shouldNotBe null
         println("// resolve offered credentials")
-        val offeredCredentials = credOfferReq.credentialOffer!!.resolveOfferedCredentials(providerMetadata)
+        val offeredCredentials = OpenID4VCI.resolveOfferedCredentials(credOfferReq.credentialOffer!!, providerMetadata)
         println("offeredCredentials: $offeredCredentials")
 
         providerMetadata.grantTypesSupported shouldContain GrantType.pre_authorized_code
@@ -906,7 +928,7 @@ class CI_JVM_Test : AnnotationSpec() {
         providerMetadata.tokenEndpoint shouldNotBe null
         providerMetadata.credentialEndpoint shouldNotBe null
         println("// resolve offered credentials")
-        val offeredCredentials = credOfferReq.credentialOffer!!.resolveOfferedCredentials(providerMetadata)
+        val offeredCredentials = OpenID4VCI.resolveOfferedCredentials(credOfferReq.credentialOffer!!, providerMetadata)
         println("offeredCredentials: $offeredCredentials")
 
         // make token request
@@ -992,7 +1014,7 @@ class CI_JVM_Test : AnnotationSpec() {
         providerMetadata.credentialsSupported shouldNotBe null
 
         println("// resolve offered credentials")
-        val offeredCredentials = credentialOffer.resolveOfferedCredentials(providerMetadata)
+        val offeredCredentials = OpenID4VCI.resolveOfferedCredentials(credentialOffer, providerMetadata)
         println("offeredCredentials: $offeredCredentials")
         offeredCredentials.size shouldBe 1
         offeredCredentials.first().format shouldBe CredentialFormat.jwt_vc_json

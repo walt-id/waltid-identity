@@ -13,20 +13,6 @@ data class CredentialOffer private constructor(
 ) : JsonDataObject() {
     override fun toJSON() = Json.encodeToJsonElement(CredentialOfferSerializer, this).jsonObject
 
-    fun resolveOfferedCredentials(providerMetadata: OpenIDProviderMetadata): List<OfferedCredential> {
-        val supportedCredentials =
-            providerMetadata.credentialsSupported?.filter { !it.id.isNullOrEmpty() }?.associateBy { it.id!! } ?: mapOf()
-        return credentials.mapNotNull { c ->
-            if (c is JsonObject) {
-                OfferedCredential.fromJSON(c)
-            } else if (c is JsonPrimitive && c.isString) {
-                supportedCredentials[c.content]?.let {
-                    OfferedCredential.fromProviderMetadata(it)
-                }
-            } else null
-        }
-    }
-
     class Builder(private val credentialIssuer: String) {
         private val credentials = mutableListOf<JsonElement>()
         private val grants = mutableMapOf<String, GrantDetails>()
