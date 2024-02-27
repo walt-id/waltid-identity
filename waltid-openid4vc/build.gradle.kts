@@ -71,13 +71,28 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
+                // Coroutines
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
-                implementation("io.ktor:ktor-http:$ktor_version")
-                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.5.0")
+
+                // HTTP
+                implementation("io.ktor:ktor-client-core:$ktor_version")
+                implementation("io.ktor:ktor-client-content-negotiation:$ktor_version")
+                implementation("io.ktor:ktor-serialization-kotlinx-json:$ktor_version")
+
+                // JSON
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
+
+                // walt.id
                 implementation(project(":waltid-sdjwt"))
+
+                // -- Multiplatform --
+                // Multiplatform / UUID
                 implementation("app.softwork:kotlinx-uuid-core:0.0.22")
 
+                // Multiplatform / Date & time
+                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.5.0")
+
+                // Multiplatform / Hashes
                 implementation(project.dependencies.platform("org.kotlincrypto.hash:bom:0.4.0"))
                 implementation("org.kotlincrypto.hash:sha2")
             }
@@ -97,7 +112,7 @@ kotlin {
         }
         val jvmMain by getting {
             dependencies {
-                implementation("io.ktor:ktor-client-java:$ktor_version")
+                implementation("io.ktor:ktor-client-cio:$ktor_version")
             }
         }
         val jvmTest by getting {
@@ -146,6 +161,7 @@ kotlin {
         val jsMain by getting {
             dependencies {
                 implementation(npm("jose", "~4.14.4"))
+                implementation("io.ktor:ktor-client-js:$ktor_version")
             }
         }
         val jsTest by getting {
@@ -153,6 +169,7 @@ kotlin {
         }
 //        val nativeMain by getting
 //        val nativeTest by getting
+        // Add for native: implementation("io.ktor:ktor-client-cio:$ktor_version")
     }
 
     publishing {
