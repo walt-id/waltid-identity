@@ -1,5 +1,6 @@
 package id.walt.oid4vc.data
 
+import JWK
 import id.walt.oid4vc.*
 import id.walt.oid4vc.definitions.*
 import kotlinx.serialization.EncodeDefault

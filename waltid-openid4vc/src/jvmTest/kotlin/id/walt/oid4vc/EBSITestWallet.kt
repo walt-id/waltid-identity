@@ -39,7 +39,7 @@ import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.datetime.Instant
 import kotlinx.serialization.json.*
-import java.util.*
+import java.util.UUID
 import kotlin.js.ExperimentalJsExport
 
 const val EBSI_WALLET_PORT = 8011

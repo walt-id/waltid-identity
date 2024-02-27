@@ -11,7 +11,6 @@ import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.responses.TokenResponse
 import io.kotest.common.runBlocking
 import io.kotest.core.spec.style.AnnotationSpec
-import io.kotest.matchers.collections.beIn
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.should

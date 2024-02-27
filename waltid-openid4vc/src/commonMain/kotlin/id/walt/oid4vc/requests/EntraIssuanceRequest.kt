@@ -1,14 +1,12 @@
 package id.walt.oid4vc.requests
 
-import id.walt.oid4vc.data.HTTPDataObject
 import id.walt.oid4vc.util.httpGet
+import id.walt.oid4vc.util.randomUUID
 import id.walt.oid4vc.util.sha256
 import id.walt.sdjwt.SDJwt
 import io.ktor.utils.io.core.*
 import kotlinx.datetime.Clock
 import kotlinx.serialization.json.*
-import kotlinx.uuid.UUID
-import kotlinx.uuid.generateUUID
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 
@@ -40,7 +38,7 @@ data class EntraIssuanceRequest(
         put("iat", it)
         put("exp", it + 3600)
       }
-      put("jti", UUID.generateUUID().toString())
+      put("jti", randomUUID())
       put("attestations", buildJsonObject {
         // * Get id_token_hint, if any, to add to response, or else generate id_token/input claims according to alternative attestation mode
         // Attestation modes: https://learn.microsoft.com/en-us/entra/verified-id/rules-and-display-definitions-model

@@ -3,20 +3,12 @@ package id.walt.oid4vc
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.crypto.ECDSASigner
 import com.nimbusds.jose.crypto.ECDSAVerifier
-import com.nimbusds.jose.crypto.Ed25519Signer
-import com.nimbusds.jose.crypto.Ed25519Verifier
 import com.nimbusds.jose.crypto.bc.BouncyCastleProviderSingleton
 import com.nimbusds.jose.jwk.ECKey
-import com.nimbusds.jose.jwk.OctetKeyPair
 import id.walt.credentials.PresentationBuilder
-import id.walt.credentials.vc.vcs.W3CVC
-import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.LocalKey
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.did.dids.DidService
-import id.walt.did.dids.registrar.dids.DidCreateOptions
-import id.walt.did.dids.registrar.dids.DidJwkCreateOptions
-import id.walt.did.dids.registrar.local.jwk.DidJwkRegistrar
 import id.walt.oid4vc.data.OpenIDProviderMetadata
 import id.walt.oid4vc.data.ResponseMode
 import id.walt.oid4vc.data.ResponseType
@@ -37,7 +29,10 @@ import id.walt.oid4vc.requests.TokenRequest
 import id.walt.oid4vc.responses.AuthorizationDirectPostResponse
 import id.walt.oid4vc.responses.AuthorizationErrorCode
 import id.walt.oid4vc.responses.TokenErrorCode
-import id.walt.sdjwt.*
+import id.walt.sdjwt.SDJwt
+import id.walt.sdjwt.SDMap
+import id.walt.sdjwt.SDPayload
+import id.walt.sdjwt.SimpleJWTCryptoProvider
 import io.kotest.common.runBlocking
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -56,7 +51,6 @@ import io.ktor.server.routing.*
 import io.ktor.util.*
 import kotlinx.datetime.Instant
 import kotlinx.serialization.json.*
-import java.io.File
 import kotlin.js.ExperimentalJsExport
 
 const val WALLET_PORT = 8001
