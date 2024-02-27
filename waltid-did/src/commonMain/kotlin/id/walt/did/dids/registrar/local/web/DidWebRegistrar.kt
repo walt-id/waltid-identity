@@ -8,8 +8,8 @@ import id.walt.did.dids.document.DidWebDocument
 import id.walt.did.dids.registrar.DidResult
 import id.walt.did.dids.registrar.dids.DidCreateOptions
 import id.walt.did.dids.registrar.local.LocalRegistrarMethod
-import id.walt.did.utils.EncodingUtils.urlEncode
 import id.walt.did.utils.ExtensionMethods.ensurePrefix
+import net.thauvin.erik.urlencoder.UrlEncoderUtil
 
 class DidWebRegistrar : LocalRegistrarMethod("web") {
     override suspend fun register(options: DidCreateOptions): DidResult = options.get<KeyType>("keyType")?.let {
@@ -20,9 +20,9 @@ class DidWebRegistrar : LocalRegistrarMethod("web") {
         options.get<String>("domain")?.takeIf {
             it.isNotEmpty()
         }?.let {
-            val domain = urlEncode(it)
+            val domain = UrlEncoderUtil.encode(it)
             val path = options.get<String>("path")?.takeIf { it.isNotEmpty() }?.let {
-                it.ensurePrefix("/").split("/").joinToString(":") { part -> urlEncode(part) }
+                it.ensurePrefix("/").split("/").joinToString(":") { part -> UrlEncoderUtil.encode(part) }
             } ?: ""
             DidResult(
                 "did:web:$domain$path", DidDocument(
