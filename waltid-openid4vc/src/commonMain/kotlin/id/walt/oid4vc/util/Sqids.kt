@@ -669,7 +669,7 @@ class Sqids(
             return ""
         }
 
-        require(numbers.all { it >= 0 }) { "Encoding supports numbers between 0 and ${Long.MAX_VALUE}" }
+        require(numbers.all { it >= 0 }) { "Encoding supports numbers between 0 and ${Long.MAX_VALUE}, you supplied: $numbers" }
         return encodeNumbers(numbers)
     }
 

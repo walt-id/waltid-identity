@@ -38,7 +38,6 @@ import io.kotest.matchers.types.instanceOf
 import io.kotest.matchers.types.shouldBeInstanceOf
 import io.ktor.client.*
 import io.ktor.client.call.*
-import io.ktor.client.engine.java.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.plugins.logging.*
 import io.ktor.client.request.*
@@ -99,7 +98,7 @@ class CI_JVM_Test : AnnotationSpec() {
         )
     )
 
-    val ktorClient = HttpClient(Java) {
+    val ktorClient = HttpClient() {
         install(ContentNegotiation) {
             json()
         }
@@ -322,11 +321,11 @@ class CI_JVM_Test : AnnotationSpec() {
         }
         println("authResp: $authResp")
         authResp.status shouldBe HttpStatusCode.Found
-        authResp.headers.names() shouldContain HttpHeaders.Location.lowercase()
+        authResp.headers.names() shouldContain HttpHeaders.Location
         val location = Url(authResp.headers[HttpHeaders.Location]!!)
         println("location: $location")
         location.toString() shouldStartWith credentialWallet.config.redirectUri!!
-        location.parameters.names() shouldContain ResponseType.Code.name
+        location.parameters.names() shouldContain ResponseType.Code.name.lowercase()
 
         println("// 3. Parse code response parameter from authorization redirect URI")
         providerMetadata.tokenEndpoint shouldNotBe null
@@ -544,7 +543,7 @@ class CI_JVM_Test : AnnotationSpec() {
 
         authResp.status shouldBe HttpStatusCode.Found
         val location = Url(authResp.headers[HttpHeaders.Location]!!)
-        location.parameters.names() shouldContain ResponseType.Code.name
+        location.parameters.names() shouldContain ResponseType.Code.name.lowercase()
 
         println("// token req")
         val tokenReq =
@@ -755,7 +754,7 @@ class CI_JVM_Test : AnnotationSpec() {
         println("authResp: $authResp")
 
         authResp.status shouldBe HttpStatusCode.Found
-        authResp.headers.names() shouldContain HttpHeaders.Location.lowercase()
+        authResp.headers.names() shouldContain HttpHeaders.Location
 
         val location = Url(authResp.headers[HttpHeaders.Location]!!)
         println("location: $location")
@@ -1093,7 +1092,7 @@ class CI_JVM_Test : AnnotationSpec() {
     }
 
 
-    val http = HttpClient(Java) {
+    val http = HttpClient() {
         install(ContentNegotiation) {
             json()
         }
