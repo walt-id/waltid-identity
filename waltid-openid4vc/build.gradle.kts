@@ -77,6 +77,9 @@ kotlin {
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.5.0")
                 implementation(project(":waltid-sdjwt"))
                 implementation("app.softwork:kotlinx-uuid-core:0.0.22")
+
+                implementation(project.dependencies.platform("org.kotlincrypto.hash:bom:0.4.0"))
+                implementation("org.kotlincrypto.hash:sha2")
             }
         }
         val commonTest by getting {
@@ -111,8 +114,6 @@ kotlin {
                 implementation("org.bouncycastle:bcprov-jdk18on:1.77") // for secp256k1 (which was removed with Java 17)
                 implementation("org.bouncycastle:bcpkix-jdk18on:1.77") // PEM import
                 implementation("io.github.oshai:kotlin-logging-jvm:6.0.3")
-
-                implementation("app.softwork:kotlinx-uuid-core:0.0.22")
 
                 implementation("io.ktor:ktor-server-core-jvm:$ktor_version")
                 implementation("io.ktor:ktor-server-netty-jvm:$ktor_version")

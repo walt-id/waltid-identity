@@ -6,8 +6,6 @@ import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import java.security.MessageDigest
 
-actual fun sha256(data: ByteArray): ByteArray = MessageDigest.getInstance("SHA-256").digest(data)
-
 private val ktorClient = HttpClient(Java) {
 }
 actual suspend fun httpGet(url: String): String {
