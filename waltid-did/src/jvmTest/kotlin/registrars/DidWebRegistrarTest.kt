@@ -7,9 +7,9 @@ import id.walt.did.dids.DidUtils
 import id.walt.did.dids.registrar.dids.DidCreateOptions
 import id.walt.did.dids.registrar.dids.DidWebCreateOptions
 import id.walt.did.dids.registrar.local.web.DidWebRegistrar
-import id.walt.did.utils.EncodingUtils
 import id.walt.did.utils.ExtensionMethods.ensurePrefix
 import kotlinx.coroutines.runBlocking
+import net.thauvin.erik.urlencoder.UrlEncoderUtil
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.Arguments
 import org.junit.jupiter.params.provider.Arguments.arguments
@@ -91,7 +91,7 @@ class DidWebRegistrarTest : DidRegistrarTestBase(DidWebRegistrar()) {
             // assert [did identifier] and [domain + path] are identical
             assert(
                 //TODO: avoid computations in result comparison
-                EncodingUtils.urlDecode(DidUtils.identifierFromDid(did)!!) == domain.plus(
+                UrlEncoderUtil.decode(DidUtils.identifierFromDid(did)!!) == domain.plus(
                     path.takeIf { !it.isNullOrEmpty() }?.ensurePrefix("/")?.replace("/", ":") ?: ""
                 )
             )
