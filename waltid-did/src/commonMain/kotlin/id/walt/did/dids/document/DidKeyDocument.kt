@@ -40,7 +40,7 @@ data class DidKeyDocument(
     constructor(did: String, identifier: String, didKey: JsonObject) : this(
         context = DEFAULT_CONTEXT,
         id = did,
-        verificationMethod = listOf(VerificationMethod(did, "JsonWebKey2020", did, didKey)),
+        verificationMethod = listOf(VerificationMethod("$did#$identifier", "JsonWebKey2020", did, didKey)),
 
         assertionMethod = listOf("$did#$identifier"),
         authentication = listOf("$did#$identifier"),
