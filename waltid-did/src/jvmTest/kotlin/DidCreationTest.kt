@@ -1,9 +1,12 @@
+import id.walt.did.dids.registrar.dids.DidKeyCreateOptions
 import id.walt.did.dids.registrar.dids.DidWebCreateOptions
+import id.walt.did.dids.registrar.local.key.DidKeyRegistrar
 import id.walt.did.dids.registrar.local.web.DidWebRegistrar
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.*
 
 class DidCreationTest {
@@ -50,4 +53,19 @@ class DidCreationTest {
         assertTrue { didDoc2["@context"]!!.jsonArray.isNotEmpty() }
     }
 
+    @Test
+    fun checkReferencedDidMethods() = runTest {
+        val resultWeb = registrar
+            .register(DidWebCreateOptions("localhost", "/abc/xyz"))
+        val resultKey = DidKeyRegistrar().register(DidKeyCreateOptions())
+
+        arrayOf(resultKey, resultWeb).forEach { result ->
+            val didDoc1 = result.didDocument.toString()
+            println("DID doc: $didDoc1")
+            val id =
+                result.didDocument["verificationMethod"]?.jsonArray?.get(0)?.jsonObject?.get("id")?.jsonPrimitive?.content
+            val refId = result.didDocument["assertionMethod"]?.jsonArray?.get(0)?.jsonPrimitive?.content
+            assertEquals(id, refId)
+        }
+    }
 }
