@@ -120,7 +120,7 @@ class wallettest : AnnotationSpec() {
         providerMetadata.credentialsSupported shouldNotBe null
 
         println("// resolve offered credentials")
-        val offeredCredentials = parsedOfferReq.credentialOffer!!.resolveOfferedCredentials(providerMetadata)
+        val offeredCredentials = OpenID4VCI.resolveOfferedCredentials(parsedOfferReq.credentialOffer!!, providerMetadata)
         println("offeredCredentials: $offeredCredentials")
         offeredCredentials.size shouldBe 1
         offeredCredentials.first().format shouldBe CredentialFormat.jwt_vc_json

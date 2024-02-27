@@ -1,5 +1,6 @@
 package id.walt.oid4vc.providers
 
+import id.walt.oid4vc.OpenID4VCI
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.definitions.JWTClaims
@@ -218,7 +219,7 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
         val authorizationServerMetadata = issuerMetadata.authorizationServer?.let { authServer ->
             httpGetAsJson(Url(getCommonProviderMetadataUrl(authServer)))?.jsonObject?.let { OpenIDProviderMetadata.fromJSON(it) }
         } ?: issuerMetadata
-        val offeredCredentials = credentialOffer.resolveOfferedCredentials(issuerMetadata)
+        val offeredCredentials = OpenID4VCI.resolveOfferedCredentials(credentialOffer, issuerMetadata)
 
         return executeAuthorizedIssuanceCodeFlow(
             authorizationServerMetadata, issuerMetadata, credentialOffer, GrantType.pre_authorized_code,
@@ -249,7 +250,7 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
         val authorizationServerMetadata = issuerMetadata.authorizationServer?.let { authServer ->
             httpGetAsJson(Url(getCommonProviderMetadataUrl(authServer)))?.jsonObject?.let { OpenIDProviderMetadata.fromJSON(it) }
         } ?: issuerMetadata
-        val offeredCredentials = credentialOffer.resolveOfferedCredentials(issuerMetadata)
+        val offeredCredentials = OpenID4VCI.resolveOfferedCredentials(credentialOffer, issuerMetadata)
         val codeVerifier = if (client.useCodeChallenge) randomUUID() else null
         val codeChallenge = codeVerifier?.let { Base64.UrlSafe.encode(sha256(it.toByteArray(Charsets.UTF_8))).trimEnd('=') }
 

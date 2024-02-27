@@ -14,6 +14,7 @@ import id.walt.did.dids.registrar.dids.DidKeyCreateOptions
 import id.walt.did.dids.registrar.dids.DidWebCreateOptions
 import id.walt.did.dids.resolver.LocalResolver
 import id.walt.did.utils.EnumUtils.enumValueIgnoreCase
+import id.walt.oid4vc.OpenID4VCI
 import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.data.CredentialOffer
 import id.walt.oid4vc.data.GrantType
@@ -370,7 +371,7 @@ class SSIKit2WalletService(
         logger.debug("providerMetadata: {}", providerMetadata)
 
         logger.debug("// resolve offered credentials")
-        val offeredCredentials = credentialOffer.resolveOfferedCredentials(providerMetadata)
+        val offeredCredentials = OpenID4VCI.resolveOfferedCredentials(credentialOffer, providerMetadata)
         logger.debug("offeredCredentials: {}", offeredCredentials)
 
         //val offeredCredential = offeredCredentials.first()

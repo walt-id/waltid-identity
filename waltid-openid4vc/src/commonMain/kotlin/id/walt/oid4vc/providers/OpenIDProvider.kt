@@ -39,7 +39,7 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
         grantTypesSupported = setOf(GrantType.authorization_code, GrantType.pre_authorized_code),
         requestUriParameterSupported = true,
         subjectTypesSupported = setOf(SubjectType.public),
-        credentialIssuer = "$baseUrl/.well-known/openid-credential-issuer"
+        credentialIssuer = "$baseUrl"
     )
 
     fun getCommonProviderMetadataUrl(): String {
