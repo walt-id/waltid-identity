@@ -14,19 +14,9 @@ group = "id.walt"
 
 repositories {
     mavenCentral()
-    /*maven("https://jitpack.io") {
-        content {
-            includeGroup("com.github.multiformats")
-        }
-    }*/
-    maven("https://repo.danubetech.com/repository/maven-public/")
     maven("https://maven.walt.id/repository/waltid/") {
         content {
             includeGroup("id.walt")
-            includeGroup("id.walt.servicematrix")
-            //includeGroup("info.weboftrust")
-            includeGroup("decentralized-identity")
-            //includeGroup("com.danubetech")
         }
     }
     mavenLocal()
@@ -105,7 +95,6 @@ kotlin {
         val jvmMain by getting {
             dependencies {
                 implementation("io.ktor:ktor-client-java:$ktor_version")
-                implementation("org.sqids:sqids:0.1.0")
             }
         }
         val jvmTest by getting {
@@ -117,11 +106,13 @@ kotlin {
                 implementation("io.kotest:kotest-assertions-json:5.8.0")
                 implementation("com.google.crypto.tink:tink:1.12.0") // for JOSE using Ed25519
                 // Multibase
-//                implementation("com.github.multiformats:java-multibase:v1.1.1")
+                // implementation("com.github.multiformats:java-multibase:v1.1.1")
 
                 implementation("org.bouncycastle:bcprov-jdk18on:1.77") // for secp256k1 (which was removed with Java 17)
                 implementation("org.bouncycastle:bcpkix-jdk18on:1.77") // PEM import
                 implementation("io.github.oshai:kotlin-logging-jvm:6.0.3")
+
+                implementation("app.softwork:kotlinx-uuid-core:0.0.22")
 
                 implementation("io.ktor:ktor-server-core-jvm:$ktor_version")
                 implementation("io.ktor:ktor-server-netty-jvm:$ktor_version")

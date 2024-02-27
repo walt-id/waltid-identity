@@ -12,6 +12,3 @@ actual suspend fun httpGet(url: String): String {
   TODO("Not yet implemented")
 }
 
-actual fun randomSessionId(): String {
-  TODO("Not yet implemented")
-}

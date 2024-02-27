@@ -4,9 +4,8 @@ import io.ktor.client.*
 import io.ktor.client.engine.java.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
-import org.sqids.Sqids
 import java.security.MessageDigest
-import java.util.*
+import java.util.UUID
 
 actual fun randomUUID(): String {
     return UUID.randomUUID().toString()
@@ -20,10 +19,3 @@ actual suspend fun httpGet(url: String): String {
     return ktorClient.get(url).bodyAsText()
 }
 
-actual fun randomSessionId(): String {
-    return Sqids.builder().build().encode(
-        listOf(
-            (Math.random() * Long.MAX_VALUE).toLong()
-        )
-    )
-}
