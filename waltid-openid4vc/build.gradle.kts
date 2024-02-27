@@ -14,11 +14,11 @@ group = "id.walt"
 
 repositories {
     mavenCentral()
-    maven("https://jitpack.io") {
+    /*maven("https://jitpack.io") {
         content {
             includeGroup("com.github.multiformats")
         }
-    }
+    }*/
     maven("https://repo.danubetech.com/repository/maven-public/")
     maven("https://maven.walt.id/repository/waltid/") {
         content {
