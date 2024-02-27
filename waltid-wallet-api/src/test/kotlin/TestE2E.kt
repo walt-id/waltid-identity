@@ -5,6 +5,7 @@ import id.walt.webwallet.db.Db
 import id.walt.webwallet.db.models.AccountWalletListing
 import id.walt.webwallet.db.models.WalletDid
 import id.walt.webwallet.service.account.AuthenticationResult
+import id.walt.webwallet.utils.WalletHttpClients
 import id.walt.webwallet.web.model.AccountRequest
 import id.walt.webwallet.web.model.EmailAccountRequest
 import id.walt.webwallet.web.model.LoginRequestJson
@@ -15,6 +16,7 @@ import io.ktor.client.call.*
 import io.ktor.client.engine.cio.*
 import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.*
+import io.ktor.client.plugins.logging.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
@@ -32,10 +34,15 @@ import id.walt.webwallet.config.WebConfig as WalletWebConfig
 
 class TestE2E {
 
-    fun ApplicationTestBuilder.newClient(token: String? = null) = createClient {
+    private fun ApplicationTestBuilder.newClient(token: String? = null) = createClient {
         install(ContentNegotiation) {
             json()
         }
+        install(Logging) {
+            logger = Logger.SIMPLE
+            level = LogLevel.ALL
+        }
+        followRedirects = false
         defaultRequest {
             contentType(ContentType.Application.Json)
             if (token != null) {
@@ -65,6 +72,10 @@ class TestE2E {
         println("Running in ${Path(".").absolutePathString()}")
 
         var client = newClient()
+
+        WalletHttpClients.defaultMethod = {
+            newClient()
+        }
 
         println("Setup web wallet...")
         setupTestWebWallet()

@@ -1,3 +1,4 @@
+/*
 package id.walt.issuer.utils
 import id.walt.credentials.issuance.Issuer
 import id.walt.issuer.OidcApi.oidcApi
@@ -13,14 +14,14 @@ import io.ktor.server.testing.*
 import kotlinx.coroutines.runBlocking
 
 class IssuerApiTeste2e {
-  
+
   companion object {
     private lateinit var localClient: HttpClient
     init {
 //      startLocalIssuer()
       startTestApplicationIssuer()
     }
-    
+
     private fun startLocalIssuer() {
       runBlocking {
         main(emptyArray()) // call issuer main function to start issuer api
@@ -45,8 +46,9 @@ class IssuerApiTeste2e {
       }
     }
   }
-  
+
   fun getHttpClient(): HttpClient {
     return localClient
   }
 }
+*/
