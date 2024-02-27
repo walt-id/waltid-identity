@@ -132,7 +132,7 @@ kotlin {
                 implementation(npm("jose", "4.14.4"))
 
                 // Multibase
-                implementation(npm("multiformats", "12.1.2"))
+                // implementation(npm("multiformats", "12.1.2"))
             }
         }
         val jsTest by getting {

@@ -14,11 +14,11 @@ group = "id.walt"
 
 repositories {
     mavenCentral()
-    maven("https://jitpack.io") {
+    /*maven("https://jitpack.io") {
         content {
             includeGroup("com.github.multiformats")
         }
-    }
+    }*/
     maven("https://repo.danubetech.com/repository/maven-public/")
     maven("https://maven.walt.id/repository/waltid/") {
         content {
@@ -117,12 +117,8 @@ kotlin {
                 implementation("io.kotest:kotest-assertions-json:5.8.0")
                 implementation("com.google.crypto.tink:tink:1.12.0") // for JOSE using Ed25519
                 // Multibase
-                implementation("com.github.multiformats:java-multibase:v1.1.1")
-                // TODO: current version implementation("id.walt:waltid-ssikit:1.2311131043.0")
-                //implementation("id.walt:waltid-ssikit:1.JWTTYP") {
-                //    exclude("waltid-sd-jwt-jvm")
-                //    exclude(module = "waltid-sd-jwt-jvm")
-                //}
+//                implementation("com.github.multiformats:java-multibase:v1.1.1")
+
                 implementation("org.bouncycastle:bcprov-jdk18on:1.77") // for secp256k1 (which was removed with Java 17)
                 implementation("org.bouncycastle:bcpkix-jdk18on:1.77") // PEM import
                 implementation("io.github.oshai:kotlin-logging-jvm:6.0.3")
