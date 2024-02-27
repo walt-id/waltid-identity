@@ -6,7 +6,7 @@ import kotlinx.serialization.json.*
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 
-@ExperimentalJsExport
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 data class PolicyResult(val request: PolicyRequest, val result: Result<Any?>) {
 

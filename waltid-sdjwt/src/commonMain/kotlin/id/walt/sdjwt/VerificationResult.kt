@@ -3,14 +3,14 @@ package id.walt.sdjwt
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 
-@ExperimentalJsExport
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 data class JwtVerificationResult(
     val verified: Boolean,
     val message: String? = null
 )
 
-@ExperimentalJsExport
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 data class VerificationResult<T : SDJwt>(
     val sdJwt: T,
