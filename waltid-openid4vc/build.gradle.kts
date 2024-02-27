@@ -106,8 +106,6 @@ kotlin {
                 implementation("io.kotest:kotest-assertions-core:5.8.0")
 
                 implementation("io.kotest:kotest-assertions-json:5.8.0")
-
-                implementation("io.github.microutils:kotlin-logging:1.12.5")
             }
         }
         val jvmMain by getting {
@@ -123,12 +121,9 @@ kotlin {
                 implementation("io.kotest:kotest-assertions-core:5.8.0")
                 implementation("io.kotest:kotest-assertions-json:5.8.0")
                 implementation("com.google.crypto.tink:tink:1.12.0") // for JOSE using Ed25519
-                // Multibase
-                // implementation("com.github.multiformats:java-multibase:v1.1.1")
 
                 implementation("org.bouncycastle:bcprov-jdk18on:1.77") // for secp256k1 (which was removed with Java 17)
                 implementation("org.bouncycastle:bcpkix-jdk18on:1.77") // PEM import
-                implementation("io.github.oshai:kotlin-logging-jvm:6.0.3")
 
                 implementation("io.ktor:ktor-server-core-jvm:$ktor_version")
                 implementation("io.ktor:ktor-server-netty-jvm:$ktor_version")
@@ -137,25 +132,10 @@ kotlin {
                 implementation("io.ktor:ktor-server-content-negotiation:$ktor_version")
                 implementation("io.ktor:ktor-client-core:$ktor_version")
                 implementation("io.ktor:ktor-client-cio:$ktor_version")
-                implementation("io.ktor:ktor-client-java:$ktor_version")
                 implementation("io.ktor:ktor-client-auth:$ktor_version")
-                implementation("io.ktor:ktor-client-okhttp:$ktor_version")
                 implementation("io.ktor:ktor-client-content-negotiation:$ktor_version")
                 implementation("io.ktor:ktor-serialization-kotlinx-json:$ktor_version")
                 implementation("io.ktor:ktor-client-logging-jvm:$ktor_version")
-                implementation("com.sksamuel.hoplite:hoplite-core:2.7.5")
-                implementation("com.sksamuel.hoplite:hoplite-yaml:2.7.5")
-                implementation("com.sksamuel.hoplite:hoplite-hikaricp:2.7.5")
-                implementation("org.yaml:snakeyaml:2.2")
-                implementation("org.xerial:sqlite-jdbc:3.44.1.0")
-
-                // Config
-                implementation("com.sksamuel.hoplite:hoplite-core:${HOPLITE_VERSION}")
-                implementation("com.sksamuel.hoplite:hoplite-hocon:${HOPLITE_VERSION}")
-                // https://mvnrepository.com/artifact/org.jetbrains.kotlinx/kotlinx-coroutines-slf4j
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-slf4j:1.8.0")
-                // https://mvnrepository.com/artifact/org.jetbrains.kotlin/kotlin-stdlib
-                implementation("org.jetbrains.kotlin:kotlin-stdlib:1.9.20")
             }
         }
         val jsMain by getting {
