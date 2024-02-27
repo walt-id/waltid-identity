@@ -25,7 +25,31 @@ data:
             fullColumnNames = false
         }
     }
-    recreateDatabaseOnStart = false
+    recreateDatabaseOnStart = true
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wallet-oidc-config
+data:
+  oidc.conf: |
+    enableOidcLogin = true
+    providerName = keycloak
+    oidcRealm = "https://keycloak.walt-test.cloud/realms/waltid-keycloak-ktor"
+    oidcJwks = "${oidcRealm}/protocol/openid-connect/certs"
+    authorizeUrl = "${oidcRealm}/protocol/openid-connect/auth"
+    accessTokenUrl = "${oidcRealm}/protocol/openid-connect/token"
+    logoutUrl = "${oidcRealm}/protocol/openid-connect/logout"
+    clientId = "waltid_backend"
+    clientSecret = "SiJXBB6U6CmPR8kXmhYDOZ8KdcGR46w8"
+    jwksCache = {
+        cacheSize = 10
+        cacheExpirationHours = 24
+        rateLimit: {
+            bucketSize: 10
+            refillRateMinutes: 1
+        }
+    }
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -98,6 +122,19 @@ data:
     ]
 ---
 apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wallet-rejection-reason-config
+data:
+  rejectionreason.conf: |
+    reasons = [
+      "Unknown sender",
+      "Not relevant to me",
+      "Unsure about accuracy",
+      "Need more details",
+    ]
+---
+apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: wallet-data-volume-claim
@@ -156,6 +193,10 @@ spec:
               mountPath: "/waltid-wallet-api/config/chainexplorer.conf"
               subPath: "chainexplorer.conf"
               readOnly: true
+            - name: wallet-rejection-reason-config
+              mountPath: "/waltid-wallet-api/config/rejectionreason.conf"
+              subPath: "rejectionreason.conf"
+              readOnly: true
             - name: wallet-push-config
               mountPath: "/waltid-wallet-api/config/push.conf"
               subPath: "push.conf"
@@ -195,6 +236,9 @@ spec:
         - name: wallet-chainexplorer-config
           configMap:
             name: wallet-chainexplorer-config
+        - name: wallet-rejection-reason-config
+          configMap:
+            name: wallet-rejection-reason-config
         - name: wallet-push-config
           secret:
             secretName: wallet-push-config-secret

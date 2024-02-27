@@ -17,7 +17,7 @@ import love.forte.plugin.suspendtrans.annotation.JvmBlocking
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 import kotlin.time.measureTime
-@ExperimentalJsExport
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 object Verifier {
 

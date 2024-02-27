@@ -5,7 +5,7 @@ import kotlinx.serialization.Transient
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 
-@ExperimentalJsExport
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 @Serializable
 abstract class VerificationPolicy(

@@ -18,7 +18,7 @@ import kotlin.js.JsExport
 import kotlin.js.JsName
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
-@ExperimentalJsExport
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 enum class CredentialBuilderType {
     /** W3C Verifiable Credential version 1.1 */
@@ -29,7 +29,7 @@ enum class CredentialBuilderType {
 
     MdocsCredentialBuilder // TODO
 }
-@ExperimentalJsExport
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 class CredentialBuilder(
     val builderType: CredentialBuilderType = W3CV2CredentialBuilder

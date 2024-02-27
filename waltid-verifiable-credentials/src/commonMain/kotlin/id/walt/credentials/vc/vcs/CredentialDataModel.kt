@@ -6,7 +6,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 
-@ExperimentalJsExport
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 sealed interface CredentialDataModel {
     fun encodeToJsonObject(): JsonObject

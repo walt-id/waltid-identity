@@ -8,7 +8,7 @@ import kotlin.js.JsExport
  * ECC vs ECDSA vs EdDSA vs ECDH
  */
 
-@ExperimentalJsExport
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 @Serializable
 enum class KeyType {
@@ -23,7 +23,7 @@ enum class KeyType {
     RSA // RSA
 }
 
-@ExperimentalJsExport
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 enum class KeyCategory {
     RSA,

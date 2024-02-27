@@ -3,7 +3,7 @@ package id.walt.crypto.utils
 import org.khronos.webgl.Uint8Array
 import org.khronos.webgl.get
 
-@ExperimentalJsExport
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 object ArrayUtils {
 
