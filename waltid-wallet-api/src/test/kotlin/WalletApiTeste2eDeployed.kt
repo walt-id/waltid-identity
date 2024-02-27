@@ -5,6 +5,7 @@ import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.*
 import io.ktor.serialization.kotlinx.json.*
+import io.ktor.server.testing.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -13,11 +14,13 @@ import kotlin.time.Duration.Companion.seconds
 
 class WalletApiTeste2eDeployed : WalletApiTeste2eBase() {
     
+    fun ApplicationTestBuilder.newClient(token: String?): HttpClient {
+        TODO("Not yet implemented")
+    }
     companion object {
         var deployedWalletUrl: String = "https://wallet.walt.id"
         var deployedIssuerUrl: String = "https://issuer.portal.walt.id"
         var deployedClient: HttpClient
-        var deployedIssuerClient: HttpClient
         
         init {
             println("Using client for Deployed WaltId Wallet and Issuer Api...")
@@ -29,24 +32,24 @@ class WalletApiTeste2eDeployed : WalletApiTeste2eBase() {
                     requestTimeoutMillis = 30 * 1000
                 }
             }
-            deployedIssuerClient = HttpClient {
-                install(ContentNegotiation) {
-                    json()
-                }
-                defaultRequest {
-                    header(HttpHeaders.ContentType, ContentType.Application.Json)
-                }
-                install(HttpTimeout) {
-                    requestTimeoutMillis = 30 * 1000
-                }
-            }
+//            deployedIssuerClient = HttpClient {
+//                install(ContentNegotiation) {
+//                    json()
+//                }
+//                defaultRequest {
+//                    header(HttpHeaders.ContentType, ContentType.Application.Json)
+//                }
+//                install(HttpTimeout) {
+//                    requestTimeoutMillis = 30 * 1000
+//                }
+//            }
         }
     }
     
     @Test
     fun testLogin() = runTest {
         // test creation of a randomly generated user account
-        super.testCreateUser(
+        login(
             User(
                 "tester",
                 email,
@@ -115,12 +118,6 @@ class WalletApiTeste2eDeployed : WalletApiTeste2eBase() {
             deployedClient = value
         }
     
-    override var issuerClient: HttpClient
-        get() = deployedIssuerClient
-        set(value) {
-            deployedIssuerClient = value
-        }
-    
     override var walletUrl: String
         get() = deployedWalletUrl
         set(value) {
@@ -132,4 +129,5 @@ class WalletApiTeste2eDeployed : WalletApiTeste2eBase() {
         set(value) {
             deployedIssuerUrl = value
         }
+    
 }
