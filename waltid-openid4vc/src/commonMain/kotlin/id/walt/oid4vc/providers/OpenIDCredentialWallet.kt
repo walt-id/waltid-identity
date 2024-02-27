@@ -11,7 +11,6 @@ import id.walt.oid4vc.interfaces.IVPTokenProvider
 import id.walt.oid4vc.requests.*
 import id.walt.oid4vc.responses.*
 import id.walt.oid4vc.util.randomUUID
-import id.walt.oid4vc.util.sha256
 import id.walt.sdjwt.SDJwt
 import io.ktor.http.*
 import io.ktor.utils.io.charsets.*
@@ -20,6 +19,7 @@ import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.*
+import org.kotlincrypto.hash.sha2.SHA256
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.time.Duration
@@ -84,10 +84,10 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
 
     override fun validateAuthorizationRequest(authorizationRequest: AuthorizationRequest): Boolean {
         return ((authorizationRequest.responseType.contains(ResponseType.VpToken) ||
-                    authorizationRequest.responseType.contains(ResponseType.IdToken)) &&
-            authorizationRequest.presentationDefinition != null &&
-            isPresentationDefinitionSupported(authorizationRequest.presentationDefinition)
-            )
+                authorizationRequest.responseType.contains(ResponseType.IdToken)) &&
+                authorizationRequest.presentationDefinition != null &&
+                isPresentationDefinitionSupported(authorizationRequest.presentationDefinition)
+                )
     }
 
     protected open fun resolveVPAuthorizationParameters(authorizationRequest: AuthorizationRequest): AuthorizationRequest {
@@ -152,7 +152,7 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
         )
         val result = generatePresentationForVPToken(session, tokenRequest)
         val holderDid = getDidFor(session)
-        val idToken = if(session.authorizationRequest?.responseType?.contains(ResponseType.IdToken) == true) {
+        val idToken = if (session.authorizationRequest?.responseType?.contains(ResponseType.IdToken) == true) {
             signToken(TokenTarget.TOKEN, buildJsonObject {
                 put("iss", "https://self-issued.me/v2/openid-vc")
                 put("sub", holderDid)
@@ -162,21 +162,21 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
                 put("state", session.id)
                 put("nonce", session.nonce)
                 put("_vp_token", buildJsonObject {
-                    put("presentation_submission",  result.presentationSubmission.toJSON())
+                    put("presentation_submission", result.presentationSubmission.toJSON())
                 })
             }, keyId = resolveDID(holderDid))
         } else null
         return if (result.presentations.size == 1) {
             TokenResponse.success(
                 result.presentations.first().let { VpTokenParameter.fromJsonElement(it) },
-                if(idToken == null) result.presentationSubmission else null,
+                if (idToken == null) result.presentationSubmission else null,
                 idToken = idToken,
                 state = session.authorizationRequest?.state
             )
         } else {
             TokenResponse.success(
                 JsonArray(result.presentations).let { VpTokenParameter.fromJsonElement(it) },
-                if(idToken == null) result.presentationSubmission else null,
+                if (idToken == null) result.presentationSubmission else null,
                 idToken = idToken,
                 state = session.authorizationRequest?.state
             )
@@ -252,7 +252,9 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
         } ?: issuerMetadata
         val offeredCredentials = OpenID4VCI.resolveOfferedCredentials(credentialOffer, issuerMetadata)
         val codeVerifier = if (client.useCodeChallenge) randomUUID() else null
-        val codeChallenge = codeVerifier?.let { Base64.UrlSafe.encode(sha256(it.toByteArray(Charsets.UTF_8))).trimEnd('=') }
+
+        val codeChallenge =
+            codeVerifier?.let { Base64.UrlSafe.encode(SHA256().digest(it.toByteArray(Charsets.UTF_8))).trimEnd('=') }
 
         val authReq = AuthorizationRequest(
             responseType = setOf(ResponseType.Code),
