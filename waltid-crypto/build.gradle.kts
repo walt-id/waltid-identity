@@ -1,3 +1,4 @@
+import com.github.benmanes.gradle.versions.updates.DependencyUpdatesTask
 import love.forte.plugin.suspendtrans.ClassInfo
 import love.forte.plugin.suspendtrans.SuspendTransformConfiguration
 import love.forte.plugin.suspendtrans.TargetPlatform
@@ -71,28 +72,28 @@ kotlin {
         val commonMain by getting {
             dependencies {
                 // JSON
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.2")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
 
                 // Ktor client
-                implementation("io.ktor:ktor-client-core:2.3.7")
-                implementation("io.ktor:ktor-client-serialization:2.3.7")
-                implementation("io.ktor:ktor-client-content-negotiation:2.3.7")
-                implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.7")
-                implementation("io.ktor:ktor-client-json:2.3.7")
-                implementation("io.ktor:ktor-client-logging:2.3.7")
+                implementation("io.ktor:ktor-client-core:2.3.8")
+                implementation("io.ktor:ktor-client-serialization:2.3.8")
+                implementation("io.ktor:ktor-client-content-negotiation:2.3.8")
+                implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.8")
+                implementation("io.ktor:ktor-client-json:2.3.8")
+                implementation("io.ktor:ktor-client-logging:2.3.8")
 
                 // Coroutines
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
 
                 // Logging
-                implementation("io.github.oshai:kotlin-logging:5.1.1")
+                implementation("io.github.oshai:kotlin-logging:6.0.3")
             }
         }
         val commonTest by getting {
             dependencies {
                 implementation(kotlin("test-common"))
                 implementation(kotlin("test-annotations-common"))
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.0")
             }
         }
         val jvmMain by getting {
@@ -104,25 +105,25 @@ kotlin {
                 implementation("org.bouncycastle:bcpkix-jdk18on:1.77") // PEM import
 
                 // Ktor client
-                implementation("io.ktor:ktor-client-cio:2.3.7")
+                implementation("io.ktor:ktor-client-cio:2.3.8")
 
                 // Logging
-                implementation("org.slf4j:slf4j-simple:2.0.9")
+                implementation("org.slf4j:slf4j-simple:2.0.12")
 
                 // JOSE
                 implementation("com.nimbusds:nimbus-jose-jwt:9.37.3")
 
                 // Multibase
-                implementation("com.github.multiformats:java-multibase:v1.1.1")
+//                implementation("com.github.multiformats:java-multibase:v1.1.1")
             }
         }
         val jvmTest by getting {
             dependencies {
                 implementation(kotlin("test"))
 
-                implementation("org.junit.jupiter:junit-jupiter-api:5.10.1")
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.2")
-                implementation("org.junit.jupiter:junit-jupiter-params:5.10.1")
+                implementation("org.junit.jupiter:junit-jupiter-api:5.10.2")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
+                implementation("org.junit.jupiter:junit-jupiter-params:5.10.2")
             }
         }
         val jsMain by getting {
@@ -131,7 +132,7 @@ kotlin {
                 implementation(npm("jose", "4.14.4"))
 
                 // Multibase
-                implementation(npm("multiformats", "12.1.2"))
+                // implementation(npm("multiformats", "12.1.2"))
             }
         }
         val jsTest by getting {
@@ -178,4 +179,11 @@ extensions.getByType<SuspendTransformGradleExtension>().apply {
             )
         )
     )
+}
+
+
+tasks.withType<DependencyUpdatesTask> {
+    rejectVersionIf {
+        listOf("-beta", "-alpha", "-rc").any { it in candidate.version.lowercase() } || candidate.version.takeLast(4).contains("RC")
+    }
 }

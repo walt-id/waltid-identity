@@ -7,7 +7,7 @@ import id.walt.credentials.verification.policies.vp.MinimumCredentialsPolicy
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 
-@ExperimentalJsExport
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 object PolicyManager {
     private val mappedPolicies = HashMap<String, VerificationPolicy>()

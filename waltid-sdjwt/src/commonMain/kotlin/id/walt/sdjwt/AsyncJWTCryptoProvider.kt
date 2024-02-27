@@ -11,7 +11,7 @@ import kotlin.js.JsExport
  * **Note for JavaScript**: Implement _JSAsyncJWTCryptoProvider_ instead.
  * @see SimpleJWTCryptoProvider
  */
-@ExperimentalJsExport
+@OptIn(ExperimentalJsExport::class)
 @JsExport.Ignore
 interface AsyncJWTCryptoProvider {
     /**
