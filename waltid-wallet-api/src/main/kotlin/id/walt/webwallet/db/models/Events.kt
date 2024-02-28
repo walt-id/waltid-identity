@@ -14,6 +14,7 @@ object Events : IntIdTable("events") {
     val event = varchar("event", 48)
     val action = varchar("action", 48)
     val data = text("data")
+    val note = text("note").nullable()
 
     init {
         foreignKey(tenant, account, target = Accounts.primaryKey)

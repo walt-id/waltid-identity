@@ -1,6 +1,8 @@
 package id.walt.did.dids.document
 
 
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -23,9 +25,10 @@ import kotlin.js.JsName
 
 @ExperimentalJsExport
 @JsExport
+@OptIn(ExperimentalSerializationApi::class)
 @Serializable
 data class DidJwkDocument(
-    @SerialName("@context")
+    @EncodeDefault @SerialName("@context")
     val context: List<String> = DEFAULT_CONTEXT,
     val id: String, // did:jwk:${base64url-value}
 

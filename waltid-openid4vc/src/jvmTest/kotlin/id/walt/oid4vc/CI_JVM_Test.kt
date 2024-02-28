@@ -117,8 +117,8 @@ class CI_JVM_Test : AnnotationSpec() {
     @BeforeAll
     fun init() {
         runBlocking {
-            DidService.init()
-            DidService.registrarMethods.keys shouldContain "ion"
+            DidService.minimalInit()
+            DidService.registrarMethods.keys shouldContain "web"
         }
         ciTestProvider = CITestProvider()
         credentialWallet = TestCredentialWallet(CredentialWalletConfig("http://blank"))

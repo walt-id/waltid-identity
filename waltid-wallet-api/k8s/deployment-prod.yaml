@@ -25,7 +25,31 @@ data:
             fullColumnNames = false
         }
     }
-    recreateDatabaseOnStart = false
+    recreateDatabaseOnStart = true
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wallet-oidc-config
+data:
+  oidc.conf: |
+    enableOidcLogin = true
+    providerName = keycloak
+    oidcRealm = "https://keycloak.walt-test.cloud/realms/waltid-keycloak-ktor"
+    oidcJwks = "${oidcRealm}/protocol/openid-connect/certs"
+    authorizeUrl = "${oidcRealm}/protocol/openid-connect/auth"
+    accessTokenUrl = "${oidcRealm}/protocol/openid-connect/token"
+    logoutUrl = "${oidcRealm}/protocol/openid-connect/logout"
+    clientId = "waltid_backend"
+    clientSecret = "SiJXBB6U6CmPR8kXmhYDOZ8KdcGR46w8"
+    jwksCache = {
+        cacheSize = 10
+        cacheExpirationHours = 24
+        rateLimit: {
+            bucketSize: 10
+            refillRateMinutes: 1
+        }
+    }
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -43,6 +67,31 @@ data:
   web.conf: |
     webHost = "0.0.0.0"
     webPort = 4545
+    publicBaseUrl = "https://wallet.walt.id"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wallet-oidc-config
+data:
+  oidc.conf: |
+    enableOidcLogin = true
+    providerName = keycloak
+    oidcRealm = "https://keycloak.walt-test.cloud/realms/waltid-keycloak-ktor"
+    oidcJwks = "${oidcRealm}/protocol/openid-connect/certs"
+    authorizeUrl = "${oidcRealm}/protocol/openid-connect/auth"
+    accessTokenUrl = "${oidcRealm}/protocol/openid-connect/token"
+    logoutUrl = "${oidcRealm}/protocol/openid-connect/logout"
+    clientId = "wallet_backend_prod"
+    clientSecret = "hhzmJsLdJgtbFGKR0GUvUWDMS7SmFoSm"
+    jwksCache = {
+        cacheSize = 10
+        cacheExpirationHours = 24
+        rateLimit: {
+            bucketSize: 10
+            refillRateMinutes: 1
+        }
+    }
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -70,6 +119,19 @@ data:
       {chain = "mumbai", url = "https://mumbai.polygonscan.com/address/%s"},
       {chain = "tezos", url = "https://tzkt.io/%s/operations"},
       {chain = "ghostnet", url = "https://ghostnet.tzkt.io/%s/operations"},
+    ]
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wallet-rejection-reason-config
+data:
+  rejectionreason.conf: |
+    reasons = [
+      "Unknown sender",
+      "Not relevant to me",
+      "Unsure about accuracy",
+      "Need more details",
     ]
 ---
 apiVersion: v1
@@ -119,6 +181,10 @@ spec:
               mountPath: "/waltid-wallet-api/config/web.conf"
               subPath: "web.conf"
               readOnly: true
+            - name: wallet-oidc-config
+              mountPath: "/waltid-wallet-api/config/oidc.conf"
+              subPath: "oidc.conf"
+              readOnly: true
             - name: wallet-marketplace-config
               mountPath: "/waltid-wallet-api/config/marketplace.conf"
               subPath: "marketplace.conf"
@@ -127,9 +193,17 @@ spec:
               mountPath: "/waltid-wallet-api/config/chainexplorer.conf"
               subPath: "chainexplorer.conf"
               readOnly: true
+            - name: wallet-rejection-reason-config
+              mountPath: "/waltid-wallet-api/config/rejectionreason.conf"
+              subPath: "rejectionreason.conf"
+              readOnly: true
             - name: wallet-push-config
               mountPath: "/waltid-wallet-api/config/push.conf"
               subPath: "push.conf"
+              readOnly: true
+            - name: wallet-trust-config
+              mountPath: "/waltid-wallet-api/config/trust.conf"
+              subPath: "trust.conf"
               readOnly: true
             - name: wallet-nft-config
               mountPath: "/waltid-wallet-api/walt.yaml"
@@ -153,15 +227,24 @@ spec:
         - name: wallet-web-config
           configMap:
             name: wallet-web-config
+        - name: wallet-oidc-config
+          configMap:
+            name: wallet-oidc-config
         - name: wallet-marketplace-config
           configMap:
             name: wallet-marketplace-config
         - name: wallet-chainexplorer-config
           configMap:
             name: wallet-chainexplorer-config
+        - name: wallet-rejection-reason-config
+          configMap:
+            name: wallet-rejection-reason-config
         - name: wallet-push-config
           secret:
             secretName: wallet-push-config-secret
+        - name: wallet-trust-config
+          configMap:
+            name: wallet-trust-config
         - name: wallet-nft-config
           secret:
             secretName: wallet-nft-config-secret

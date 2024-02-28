@@ -12,6 +12,34 @@
 
 </div>
 
+## Installation
+Add the did library as a dependency to your Kotlin or Java project, which includes the crypto lib.
+
+### walt.id Repository
+
+Add the Maven repository which hosts the walt.id libraries to your build.gradle file.
+
+```kotlin
+repositories {
+    maven { url = uri("https://maven.walt.id/repository/waltid/") }
+} 
+```
+
+### Library Dependency
+
+Adding the did library as dependency. Specify the version that coincides with the latest or required
+snapshot for your project. [Latest releases](https://github.com/walt-id/waltid-identity/releases).
+
+```kotlin
+dependencies {
+  implementation("id.walt.did:waltid-did:<version>")
+}
+```
+
+Replace `version` with the version of the walt.id did library you want to use.
+Note: As the did lib is part of the mono-repo walt.id identity, you need to use the version of
+walt.id identity.
+
 ## What it provides
 
 _**walt.id did**_ library provides functionality for registering and resolving
@@ -51,7 +79,7 @@ val key = LocalKey.generate(KeyType.Ed25519)
 val options = DidKeyCreateOptions(
     useJwkJcsPub = true
 )
-val didResult = DidService.register(
+val didResult = DidService.registerByKey(
     method = "key",
     key = key,
     options = options

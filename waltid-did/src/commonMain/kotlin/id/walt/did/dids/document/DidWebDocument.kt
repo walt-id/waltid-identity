@@ -1,5 +1,7 @@
 package id.walt.did.dids.document
 
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -12,9 +14,10 @@ import kotlin.js.JsName
 
 @ExperimentalJsExport
 @JsExport
+@OptIn(ExperimentalSerializationApi::class)
 @Serializable
 data class DidWebDocument(
-    @SerialName("@context") val context: List<String> = DEFAULT_CONTEXT,
+    @EncodeDefault @SerialName("@context")  val context: List<String> = DEFAULT_CONTEXT,
     val id: String, // did:web:
 
     val verificationMethod: List<VerificationMethod>?,
@@ -43,7 +46,7 @@ data class DidWebDocument(
     constructor(did: String, keyId: String, didKey: JsonObject) : this(
         context = DEFAULT_CONTEXT,
         id = did,
-        verificationMethod = listOf(VerificationMethod(did, "JsonWebKey2020", did, didKey)),
+        verificationMethod = listOf(VerificationMethod("$did#$keyId", "JsonWebKey2020", did, didKey)),
 
         assertionMethod = listOf("$did#$keyId"),
         authentication = listOf("$did#$keyId"),

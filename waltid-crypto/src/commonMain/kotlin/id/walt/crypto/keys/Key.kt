@@ -1,7 +1,10 @@
 package id.walt.crypto.keys
 
+import id.walt.crypto.utils.JsonUtils.prettyJson
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonClassDiscriminator
 import kotlinx.serialization.json.JsonObject
 import love.forte.plugin.suspendtrans.annotation.JsPromise
@@ -10,9 +13,8 @@ import love.forte.plugin.suspendtrans.annotation.JvmBlocking
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 
-@ExperimentalJsExport
 @JsExport
-@OptIn(ExperimentalSerializationApi::class)
+@OptIn(ExperimentalSerializationApi::class, ExperimentalJsExport::class)
 @Serializable
 @JsonClassDiscriminator("type")
 abstract class Key {
@@ -43,6 +45,13 @@ abstract class Key {
     @JsPromise
     @JsExport.Ignore
     abstract suspend fun exportJWK(): String
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
+    open suspend fun exportJWKPretty(): String = prettyJson.encodeToString(Json.parseToJsonElement(exportJWK()))
+
+
     @JvmBlocking
     @JvmAsync
     @JsPromise
