@@ -1,4 +1,4 @@
-package id.walt.webwallet.trustusecase
+package id.walt.webwallet.usecase.trust
 
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.seeker.Seeker

@@ -13,7 +13,7 @@ import id.walt.webwallet.service.nft.NftKitNftService
 import id.walt.webwallet.service.nft.NftService
 import id.walt.webwallet.service.settings.SettingsService
 import id.walt.webwallet.service.trust.DefaultTrustValidationService
-import id.walt.webwallet.trustusecase.TrustValidationUseCaseImpl
+import id.walt.webwallet.usecase.trust.TrustValidationUseCaseImpl
 import io.ktor.client.*
 import kotlinx.datetime.Clock
 import kotlinx.datetime.toJavaInstant

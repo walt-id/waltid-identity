@@ -34,6 +34,7 @@ abstract class WalletService(val tenant: String, val accountId: UUID, val wallet
     abstract suspend fun rejectCredential(parameter: CredentialRequestParameter): Boolean
     abstract suspend fun attachCategory(credentialId: String, categories: List<String>): Boolean
     abstract suspend fun detachCategory(credentialId: String, categories: List<String>): Boolean
+    abstract fun getCredentialsByIds(credentialIds: List<String>): List<WalletCredential>
 
     abstract fun matchCredentialsByPresentationDefinition(presentationDefinition: PresentationDefinition): List<WalletCredential>
 
@@ -75,12 +76,7 @@ abstract class WalletService(val tenant: String, val accountId: UUID, val wallet
     abstract suspend fun connectWallet(walletId: UUID): Boolean
     abstract suspend fun disconnectWallet(wallet: UUID): Boolean
 
-    // Issuers TODO: move each such component to use-case
-    abstract suspend fun listIssuers(): List<IssuerDataTransferObject>
-    abstract suspend fun getIssuer(name: String): IssuerDataTransferObject
-    abstract fun authorizeIssuer(issuer: String): Boolean
-    abstract fun addIssuer(issuer: IssuerDataTransferObject): Boolean
-    abstract fun getCredentialsByIds(credentialIds: List<String>): List<WalletCredential>
+    // TODO: move each such component to use-case
 
     // Categories
     abstract suspend fun listCategories(): List<WalletCategoryData>

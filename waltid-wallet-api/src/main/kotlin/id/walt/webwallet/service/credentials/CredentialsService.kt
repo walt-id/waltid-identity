@@ -128,6 +128,7 @@ object CredentialsService {
         }
     }
 
+    //TODO: copied from IssuersService
     private fun updateColumn(wallet: UUID, credentialId: String, update: (statement: UpdateStatement) -> Unit): Int =
         WalletCredentials.update({ WalletCredentials.wallet eq wallet and (WalletCredentials.id eq credentialId) }) {
             update(it)
