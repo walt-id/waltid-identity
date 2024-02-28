@@ -527,7 +527,9 @@ class SSIKit2WalletService(
                 )
             }.credential
         }.filter {
-            !silent || validateTrustedIssuer(it, isEntra) == TrustStatus.Trusted
+            !silent || (validateTrustedIssuer(it, isEntra) == TrustStatus.Trusted && IssuersService.get(
+                walletId, parseIssuerDid(it.parsedDocument)
+            )?.authorized ?: false)
         }
 
         CredentialsService.add(
@@ -908,9 +910,8 @@ class SSIKit2WalletService(
 
     private suspend fun validateTrustedIssuer(credential: WalletCredential, isEntra: Boolean) =
         isEntra.takeIf { it }?.let {
-            trustUseCase.status(credential, true)
-        }
-            ?: throw IllegalArgumentException("Silent claim for this credential type not supported.")//TrustStatus.NotFound
+             trustUseCase.status(credential, true)
+        } ?: throw IllegalArgumentException("Silent claim for this credential type not supported.")
 
     private data class CredentialDataResult(
         val credential: WalletCredential,
