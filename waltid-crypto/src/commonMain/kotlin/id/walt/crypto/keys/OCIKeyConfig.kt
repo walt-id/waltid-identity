@@ -1,5 +1,12 @@
 package id.walt.crypto.keys
 
+import kotlin.js.ExperimentalJsExport
+import kotlin.js.JsExport
+import kotlinx.serialization.Serializable
+
+@Serializable
+@OptIn(ExperimentalJsExport::class)
+@JsExport
 data class OCIKeyConfig(
     val tenancyOcid: String,
     val userOcid: String,

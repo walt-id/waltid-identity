@@ -15,22 +15,35 @@ import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.util.*
 import io.ktor.util.date.*
+import io.ktor.utils.io.charsets.*
 import io.ktor.utils.io.core.*
 import java.security.KeyFactory
-import java.security.MessageDigest
 import java.security.Signature
 import java.security.spec.PKCS8EncodedKeySpec
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.js.ExperimentalJsExport
+import kotlin.js.JsExport
 import kotlinx.coroutines.*
 import kotlinx.datetime.*
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
+import love.forte.plugin.suspendtrans.annotation.JsPromise
+import love.forte.plugin.suspendtrans.annotation.JvmAsync
+import love.forte.plugin.suspendtrans.annotation.JvmBlocking
+import org.kotlincrypto.hash.sha2.SHA256
 
+@OptIn(ExperimentalJsExport::class)
+@JsExport
+@Suppress("TRANSIENT_IS_REDUNDANT")
+@Serializable
+@SerialName("oci")
 class OCIKey(
     val OCIConfig: OCIKeyConfig,
+    val id: String,
     private var _publicKey: ByteArray? = null,
     private var _keyType: KeyType? = null,
 ) : Key() {
@@ -69,33 +82,57 @@ class OCIKey(
     return keyType
   }
 
-  override suspend fun getKeyId(): String = OCIConfig.OCIDKeyID
+  @JvmBlocking
+  @JvmAsync
+  @JsPromise
+  @JsExport.Ignore
+  override suspend fun getKeyId(): String = getPublicKey().getKeyId()
 
+  @JvmBlocking
+  @JvmAsync
+  @JsPromise
+  @JsExport.Ignore
   override suspend fun getThumbprint(): String {
     TODO("Not yet implemented")
   }
 
+  @JvmBlocking
+  @JvmAsync
+  @JsPromise
+  @JsExport.Ignore
   override suspend fun exportJWK(): String {
     TODO("Not yet implemented")
   }
 
+  @JvmBlocking
+  @JvmAsync
+  @JsPromise
+  @JsExport.Ignore
   override suspend fun exportJWKObject(): JsonObject {
     TODO("Not yet implemented")
   }
 
+  @JvmBlocking
+  @JvmAsync
+  @JsPromise
+  @JsExport.Ignore
   override suspend fun exportPEM(): String {
     TODO("Not yet implemented")
   }
 
+  @JvmBlocking
+  @JvmAsync
+  @JsPromise
+  @JsExport.Ignore
   override suspend fun signRaw(plaintext: ByteArray): Any {
     val encodedMessage = plaintext.encodeBase64()
 
     val requestBody =
         JsonObject(
                 mapOf(
-                    "keyId" to JsonPrimitive(OCIConfig.OCIDKeyID),
+                    "keyId" to JsonPrimitive(id),
                     "message" to JsonPrimitive(encodedMessage),
-                    "signingAlgorithm" to JsonPrimitive("SHA_384_RSA_PKCS_PSS"),
+                    "signingAlgorithm" to JsonPrimitive("ECDSA_SHA_256"),
                 ))
             .toString()
     val signature = signingRequest("POST", "/20180608/sign", OCIConfig.cryptoEndpoint, requestBody)
@@ -122,6 +159,10 @@ class OCIKey(
     return response
   }
 
+  @JvmBlocking
+  @JvmAsync
+  @JsPromise
+  @JsExport.Ignore
   override suspend fun signJws(plaintext: ByteArray, headers: Map<String, String>): String {
     val header =
         Json.encodeToString(
@@ -143,6 +184,10 @@ class OCIKey(
     return "$signable.$signatureBase64Url"
   }
 
+  @JvmBlocking
+  @JvmAsync
+  @JsPromise
+  @JsExport.Ignore
   override suspend fun verifyRaw(
       signed: ByteArray,
       detachedPlaintext: ByteArray?
@@ -155,7 +200,7 @@ class OCIKey(
                     "keyId" to JsonPrimitive(OCIConfig.OCIDKeyID),
                     "message" to JsonPrimitive(detachedPlaintext.encodeBase64()),
                     "signature" to JsonPrimitive(signed.encodeBase64()),
-                    "signingAlgorithm" to JsonPrimitive("SHA_384_RSA_PKCS_PSS"),
+                    "signingAlgorithm" to JsonPrimitive("ECDSA_SHA_256"),
                 ))
             .toString()
     val signature =
@@ -184,7 +229,10 @@ class OCIKey(
     else Result.failure(Exception("Signature is not valid"))
   }
 
-  @OptIn(ExperimentalJsExport::class, ExperimentalEncodingApi::class)
+  @JvmBlocking
+  @JvmAsync
+  @JsPromise
+  @JsExport.Ignore
   override suspend fun verifyJws(signedJws: String): Result<JsonObject> {
     val parts = signedJws.split(".")
     check(parts.size == 3) { "Invalid JWT part count: ${parts.size} instead of 3" }
@@ -209,6 +257,10 @@ class OCIKey(
     }
   }
 
+  @JvmBlocking
+  @JvmAsync
+  @JsPromise
+  @JsExport.Ignore
   override suspend fun getPublicKey(): Key {
     println("Getting public key: $keyType")
 
@@ -219,6 +271,10 @@ class OCIKey(
     )
   }
 
+  @JvmBlocking
+  @JvmAsync
+  @JsPromise
+  @JsExport.Ignore
   override suspend fun getPublicKeyRepresentation(): ByteArray {
     TODO("Not yet implemented")
   }
@@ -227,24 +283,35 @@ class OCIKey(
 
     private fun keyTypeToOciKeyMapping(type: KeyType) =
         when (type) {
-          KeyType.Ed25519 -> throw IllegalArgumentException("Not supported: $type")
-          KeyType.secp256r1 -> "ECDSA"
+          KeyType.Ed25519 -> "ECDSA"
+          KeyType.secp256r1 -> throw IllegalArgumentException("Not supported: $type")
           KeyType.RSA -> "RSA"
           KeyType.secp256k1 -> throw IllegalArgumentException("Not supported: $type")
         }
 
     private fun ociKeyToKeyTypeMapping(type: String) =
         when (type) {
-          "ed25519" -> throw IllegalArgumentException("Not supported: $type")
-          "ECDSA" -> KeyType.secp256r1
+          "ed25519" -> KeyType.Ed25519
+          "ECDSA" -> KeyType.Ed25519
           "RSA" -> KeyType.RSA
           else -> throw IllegalArgumentException("Not supported: $type")
         }
 
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     suspend fun generateKey(type: KeyType, config: OCIKeyConfig): OCIKey {
       val keyType = keyTypeToOciKeyMapping(type)
       val keyId = config.keyId
       val host = config.managementEndpoint
+      val length =
+          when (type) {
+            KeyType.Ed25519 -> 32
+            KeyType.secp256r1 -> throw IllegalArgumentException("Not supported: $type")
+            KeyType.RSA -> 256
+            KeyType.secp256k1 -> throw IllegalArgumentException("Not supported: $type")
+          }
       val requestBody =
           JsonObject(
                   mapOf(
@@ -254,7 +321,11 @@ class OCIKey(
                           JsonObject(
                               mapOf(
                                   "algorithm" to JsonPrimitive(keyType),
-                                  "length" to JsonPrimitive(256),
+                                  "length" to JsonPrimitive(length),
+                                  when (type) {
+                                    KeyType.Ed25519 -> "curveId" to JsonPrimitive("NIST_P256")
+                                    else -> "curveId" to JsonPrimitive(null)
+                                  },
                               )),
                       "protectionMode" to JsonPrimitive("SOFTWARE"),
                   ))
@@ -284,9 +355,14 @@ class OCIKey(
       val OCIDkeyId = keyData["id"]?.jsonPrimitive?.content ?: ""
 
       val publicKey = getOCIPublicKey(OCIDkeyId, config.keyId, host, keyVersion)
-      return OCIKey(config, publicKey.decodeBase64Bytes(), ociKeyToKeyTypeMapping(keyType))
+      return OCIKey(
+          config, OCIDkeyId, publicKey.decodeBase64Bytes(), ociKeyToKeyTypeMapping(keyType))
     }
 
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     suspend fun HttpResponse.ociJsonDataBody(): JsonObject {
       val baseMsg = { "OCI server (URL: ${this.request.url}) returned invalid response: " }
 
@@ -303,8 +379,12 @@ class OCIKey(
           }
     }
 
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     @OptIn(ExperimentalEncodingApi::class)
-    fun signingRequest(
+    suspend fun signingRequest(
         method: String,
         restApi: String,
         host: String,
@@ -345,17 +425,28 @@ class OCIKey(
       signature.initSign(privateKey)
       signature.update(signingString.toByteArray())
 
+      //        val hashed = SHA256().digest(signingString.encodeToByteArray())
+      //        val key = LocalKey.importPEM(private_Key).getOrThrow()
+      //        println(key.exportPEM())
+      //        val signed = key.signRaw(hashed)
+      //        println("signed: ${Base64.encode(signed)}")
+      //        println("signature old :${Base64.encode(signature.sign())}")
+
       return Base64.encode(signature.sign())
     }
 
     @OptIn(ExperimentalEncodingApi::class)
     fun calculateSHA256(data: String?): String {
       if (data == null) return ""
-      val digest = MessageDigest.getInstance("SHA-256")
-      val hash = digest.digest(data.toByteArray(io.ktor.utils.io.charsets.Charsets.UTF_8))
+      val digest = SHA256()
+      val hash = digest.digest(data.encodeToByteArray())
       return Base64.encode(hash)
     }
 
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     suspend fun getKeys(keyId: String, host: String, tenancyOcid: String): Array<JsonObject> {
       val signature =
           signingRequest(
@@ -366,11 +457,10 @@ class OCIKey(
 
       val response =
           http.get(
-              "https://$host/20180608/keys?compartmentId=ocid1.tenancy.oc1..aaaaaaaaiijfupfvsqwqwgupzdy5yclfzcccmie4ktp2wlgslftv5j7xpk6q&sortBy=TIMECREATED&sortOrder=DESC") {
+              "https://$host/20180608/keys?compartmentId=$tenancyOcid&sortBy=TIMECREATED&sortOrder=DESC") {
                 header(
                     "Authorization",
-                    """Signature version="1",headers="host (request-target)
-     date",keyId="$keyId",algorithm="rsa-sha256",signature="$signature"""")
+                    """Signature version="1",headers="host (request-target) date",keyId="$keyId",algorithm="rsa-sha256",signature="$signature"""")
                 header("Date", GMTDate().toHttpDate())
                 header("Host", host)
                 header("Accept", "application/json")
@@ -380,6 +470,10 @@ class OCIKey(
       return response.body<Array<JsonObject>>()
     }
 
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     suspend fun getOCIPublicKey(
         OCIDKeyID: String,
         keyId: String,
@@ -404,6 +498,10 @@ class OCIKey(
       return response.body<JsonObject>()["publicKey"].toString()
     }
 
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     suspend fun deleteKey(
         OCIDKeyID: String,
         keyId: String,
