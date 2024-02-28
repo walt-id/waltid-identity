@@ -11,20 +11,23 @@ import kotlinx.serialization.json.Json
 
 class DefaultTrustValidationService(
     private val http: HttpClient,
-    trustItem: TrustConfig.TrustEntry.TrustItem?,
+    trustRecord: TrustConfig.TrustRecord?,
 ) : TrustValidationService {
-    private val baseUrl = trustItem?.baseUrl ?: ""
-    private val trustedRecordPath = trustItem?.trustRecordPath ?: ""
+    private val baseUrl = trustRecord?.baseUrl ?: ""
+    private val trustedRecordPath = trustRecord?.trustRecordPath ?: ""
     private val json = Json {
         ignoreUnknownKeys = true
     }
 
-    override suspend fun validate(did: String, type: String): Boolean =
-        http.get(String.format("$baseUrl/$trustedRecordPath", did, type)).bodyAsText().let {
+    override suspend fun validate(did: String, type: String, egfUri: String): Boolean = runCatching {
+        http.get(String.format("$baseUrl/$trustedRecordPath", did, type, egfUri)).bodyAsText().let {
             tryParseResponse<SuccessResponse>(it)?.run {
                 validate(this)
             } ?: tryParseResponse<FailResponse>(it)?.let { error(it.detail) } ?: error(it)
         }
+    }.fold(onSuccess = {
+        it
+    }, onFailure = { false })
 
     private inline fun <reified T> tryParseResponse(response: String): T? = json.decodeFromString<T>(response)
 
