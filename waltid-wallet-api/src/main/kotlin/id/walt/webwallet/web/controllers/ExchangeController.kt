@@ -4,10 +4,17 @@ import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.requests.CredentialOfferRequest
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.db.models.WalletOperationHistory
+import id.walt.webwallet.seeker.DefaultCredentialTypeSeeker
+import id.walt.webwallet.seeker.DefaultDidSeeker
 import id.walt.webwallet.service.SSIKit2WalletService
+import id.walt.webwallet.service.WalletServiceManager
 import id.walt.webwallet.service.dids.DidsService
+import id.walt.webwallet.service.exchange.IssuanceService
+import id.walt.webwallet.service.issuers.IssuersService
+import id.walt.webwallet.usecase.issuer.IssuerUseCaseImpl
 import io.github.smiley4.ktorswaggerui.dsl.post
 import io.github.smiley4.ktorswaggerui.dsl.route
+import io.ktor.client.*
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
@@ -15,6 +22,7 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.util.*
 import io.ktor.util.*
+import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 
@@ -51,7 +59,7 @@ fun Application.exchange() = walletRoute {
             val offer = call.receiveText()
 
             runCatching {
-                wallet.useOfferRequest(offer = offer, did = did, requireUserInput = requireUserInput, silent = silent)
+                wallet.useOfferRequest(offer = offer, did = did, requireUserInput = requireUserInput)
                     .also {
                         wallet.addOperationHistory(
                             WalletOperationHistory.new(
@@ -231,7 +239,38 @@ fun Application.silentExchange() = routing {
         }) {
             val did = call.parameters.getOrFail("did")
             val offer = call.receiveText()
-            val wallets = DidsService.getWalletsForDid(did)
+            val issuerUseCase = IssuerUseCaseImpl(
+                service = IssuersService, http = HttpClient()
+            )
+            IssuanceService.useOfferRequest(
+                offer = offer,
+                credentialWallet = SSIKit2WalletService.getCredentialWallet(did),
+                clientId = SSIKit2WalletService.testCIClientConfig.clientID
+            ).forEach {
+                val manifest = WalletCredential.tryParseManifest(it.manifest) ?: JsonObject(emptyMap())
+                val credential = WalletCredential.parseDocument(it.document, it.id) ?: JsonObject(emptyMap())
+                if (WalletServiceManager.issuerTrustValidationService.validate(
+                        did = DefaultDidSeeker().get(manifest),
+                        type = DefaultCredentialTypeSeeker().get(credential),
+                        egfUri = "todo"
+                    )
+                ) {
+                    DidsService.getWalletsForDid(did).forEach { wallet ->
+                        WalletCredential(
+                            wallet = wallet,
+                            id = it.id,
+                            document = it.document,
+                            disclosures = it.disclosures,
+                            addedOn = Clock.System.now(),
+                            manifest = it.manifest,
+                            deletedOn = null,
+                            pending = issuerUseCase.get(
+                                wallet = wallet, name = WalletCredential.parseIssuerDid(credential, manifest) ?: ""
+                            ).getOrNull()?.authorized ?: true,
+                        )
+                    }
+                }
+            }
         }
     }
 }

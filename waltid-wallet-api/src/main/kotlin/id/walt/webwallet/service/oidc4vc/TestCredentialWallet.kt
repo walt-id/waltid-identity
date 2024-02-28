@@ -12,12 +12,14 @@ import id.walt.oid4vc.data.dif.PresentationSubmission
 import id.walt.oid4vc.data.dif.VCFormat
 import id.walt.oid4vc.interfaces.PresentationResult
 import id.walt.oid4vc.interfaces.SimpleHttpResponse
-import id.walt.oid4vc.providers.*
+import id.walt.oid4vc.providers.CredentialWalletConfig
+import id.walt.oid4vc.providers.OpenIDCredentialWallet
+import id.walt.oid4vc.providers.TokenTarget
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.requests.TokenRequest
-import id.walt.webwallet.service.SSIKit2WalletService
 import id.walt.webwallet.service.SessionAttributes.HACK_outsideMappedSelectedCredentialsPerSession
 import id.walt.webwallet.service.SessionAttributes.HACK_outsideMappedSelectedDisclosuresPerSession
+import id.walt.webwallet.service.credentials.CredentialsService
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.engine.cio.*
@@ -43,7 +45,6 @@ const val WALLET_BASE_URL = "http://localhost:$WALLET_PORT"
 
 class TestCredentialWallet(
     config: CredentialWalletConfig,
-    val walletService: SSIKit2WalletService,
     val did: String
 ) : OpenIDCredentialWallet<VPresentationSession>(WALLET_BASE_URL, config) {
 
@@ -76,7 +77,8 @@ class TestCredentialWallet(
 
         keyId ?: throw IllegalArgumentException("No keyId provided for signToken ${debugStateMsg()}")
 
-        val key = runBlocking { walletService.getKeyByDid(keyId) }
+//        val key = runBlocking { walletService.getKeyByDid(keyId) }
+        val key = runBlocking { DidService.resolveToKey(keyId).getOrThrow() }
         println("KEY FOR SIGNING: $key")
 
         return runBlocking {
@@ -139,7 +141,8 @@ class TestCredentialWallet(
             HACK_outsideMappedSelectedDisclosuresPerSession[session.authorizationRequest.state + session.authorizationRequest.presentationDefinition]
 
         println("Selected credentials: $selectedCredentials")
-        val matchedCredentials = walletService.getCredentialsByIds(selectedCredentials)
+//        val matchedCredentials = walletService.getCredentialsByIds(selectedCredentials)
+        val matchedCredentials = CredentialsService.get(selectedCredentials)
         println("Matched credentials: $matchedCredentials")
 
         println("Using disclosures: $selectedDisclosures")
@@ -174,7 +177,8 @@ class TestCredentialWallet(
             ).toJsonElement()
         )
 
-        val key = runBlocking { walletService.getKeyByDid(this@TestCredentialWallet.did) }
+//        val key = runBlocking { walletService.getKeyByDid(this@TestCredentialWallet.did) }
+        val key = runBlocking { DidService.resolveToKey(did).getOrThrow() }
         val signed = runBlocking {
             val authKeyId = resolveDidAuthentication(this@TestCredentialWallet.did)
 

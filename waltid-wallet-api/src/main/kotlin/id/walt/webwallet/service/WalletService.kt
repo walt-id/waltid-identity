@@ -43,7 +43,7 @@ abstract class WalletService(val tenant: String, val accountId: UUID, val wallet
 
     abstract suspend fun resolvePresentationRequest(request: String): String
     abstract suspend fun useOfferRequest(
-        offer: String, did: String, requireUserInput: Boolean, silent: Boolean
+        offer: String, did: String, requireUserInput: Boolean
     ): List<WalletCredential>
     abstract suspend fun resolveCredentialOffer(offerRequest: CredentialOfferRequest): CredentialOffer
 
