@@ -34,7 +34,6 @@ suspendTransform {
     js {
 
     }*/
-    useJvmDefault()
     useJsDefault()
 }
 
