@@ -10,7 +10,14 @@ import io.ktor.client.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.json.JsonObject
+import love.forte.plugin.suspendtrans.annotation.JsPromise
+import love.forte.plugin.suspendtrans.annotation.JvmAsync
+import love.forte.plugin.suspendtrans.annotation.JvmBlocking
+import kotlin.js.ExperimentalJsExport
+import kotlin.js.JsExport
 
+@ExperimentalJsExport
+@JsExport
 class LocalResolver : DidResolver {
     override val name = "walt.id local resolver"
     private val http = HttpClient() {
@@ -29,6 +36,10 @@ class LocalResolver : DidResolver {
         resolvers.remove(method)
     }
 
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     override suspend fun getSupportedMethods(): Result<Set<String>> = Result.success(resolvers.keys)
 
     private fun getResolverForDid(did: String): LocalResolverMethod {
@@ -36,9 +47,17 @@ class LocalResolver : DidResolver {
         return resolvers[method] ?: throw IllegalArgumentException("No resolver for method: $did")
     }
 
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     override suspend fun resolve(did: String): Result<JsonObject> =
         getResolverForDid(did).resolve(did).map { it.toJsonObject() }
 
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     override suspend fun resolveToKey(did: String): Result<Key> =
         getResolverForDid(did).resolveToKey(did)
 }

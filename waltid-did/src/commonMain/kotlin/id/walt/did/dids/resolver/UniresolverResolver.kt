@@ -13,7 +13,14 @@ import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import love.forte.plugin.suspendtrans.annotation.JsPromise
+import love.forte.plugin.suspendtrans.annotation.JvmAsync
+import love.forte.plugin.suspendtrans.annotation.JvmBlocking
+import kotlin.js.ExperimentalJsExport
+import kotlin.js.JsExport
 
+@ExperimentalJsExport
+@JsExport
 class UniresolverResolver : DidResolver {
     @Suppress("MemberVisibilityCanBePrivate")
     //var resolverUrl = "http://localhost:8080/1.0"
@@ -22,6 +29,10 @@ class UniresolverResolver : DidResolver {
 
     override val name = "uniresolver @ $resolverUrl"
 
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     override suspend fun getSupportedMethods() = runCatching { lazyOf(getMethods()).value }
 
     private val http = HttpClient {
@@ -33,9 +44,17 @@ class UniresolverResolver : DidResolver {
         }
     }
 
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     override suspend fun resolve(did: String): Result<JsonObject> =
         runCatching { http.get("$resolverUrl/identifiers/$did").body() }
 
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     override suspend fun resolveToKey(did: String): Result<Key> = resolve(did).fold(
         onSuccess = {
             VerificationMaterial.get(it)?.let {
