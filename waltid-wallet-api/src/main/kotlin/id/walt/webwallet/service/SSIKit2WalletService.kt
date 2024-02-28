@@ -41,8 +41,6 @@ import id.walt.webwallet.service.dids.DidsService
 import id.walt.webwallet.service.dto.LinkedWalletDataTransferObject
 import id.walt.webwallet.service.dto.WalletDataTransferObject
 import id.walt.webwallet.service.events.*
-import id.walt.webwallet.service.issuers.IssuerDataTransferObject
-import id.walt.webwallet.service.issuers.IssuersService
 import id.walt.webwallet.service.keys.KeysService
 import id.walt.webwallet.service.keys.SingleKeyResponse
 import id.walt.webwallet.service.oidc4vc.TestCredentialWallet
@@ -50,8 +48,8 @@ import id.walt.webwallet.service.report.ReportRequestParameter
 import id.walt.webwallet.service.report.ReportService
 import id.walt.webwallet.service.settings.SettingsService
 import id.walt.webwallet.service.settings.WalletSetting
-import id.walt.webwallet.trustusecase.TrustStatus
-import id.walt.webwallet.trustusecase.TrustValidationUseCase
+import id.walt.webwallet.usecase.trust.TrustStatus
+import id.walt.webwallet.usecase.trust.TrustValidationUseCase
 import id.walt.webwallet.web.controllers.PresentationRequestParameter
 import id.walt.webwallet.web.parameter.CredentialRequestParameter
 import io.ktor.client.*
@@ -527,9 +525,9 @@ class SSIKit2WalletService(
                 )
             }.credential
         }.filter {
-            !silent || (validateTrustedIssuer(it, isEntra) == TrustStatus.Trusted && IssuersService.get(
-                walletId, parseIssuerDid(it.parsedDocument)
-            )?.authorized ?: false)
+            !silent || (validateTrustedIssuer(it, isEntra) == TrustStatus.Trusted
+//                    && IssuersService.get(walletId, parseIssuerDid(it.parsedDocument))?.authorized ?: false
+                    )
         }
 
         CredentialsService.add(
@@ -746,24 +744,9 @@ class SSIKit2WalletService(
 
     override suspend fun disconnectWallet(wallet: UUID) = Web3WalletService.disconnect(tenant, walletId, wallet)
 
-    override suspend fun listIssuers(): List<IssuerDataTransferObject> = IssuersService.list(walletId)
-
-    override suspend fun getIssuer(name: String): IssuerDataTransferObject =
-        IssuersService.get(walletId, name) ?: throw IllegalArgumentException("Issuer: $name not found for: $walletId")
-
     override fun getCredentialsByIds(credentialIds: List<String>): List<WalletCredential> {
         // todo: select by SQL
         return listCredentials(CredentialFilterObject.default).filter { it.id in credentialIds }
-    }
-
-    override fun authorizeIssuer(issuer: String): Boolean = IssuersService.authorize(walletId, issuer) > 0
-    override fun addIssuer(issuer: IssuerDataTransferObject): Boolean = IssuersService.add(
-        name = issuer.name,
-        description = issuer.description,
-        uiEndpoint = issuer.uiEndpoint,
-        configurationEndpoint = issuer.configurationEndpoint
-    ).let {
-        IssuersService.addToWallet(walletId, issuer.name, issuer.authorized) > 0
     }
 
     override suspend fun listCategories(): List<WalletCategoryData> = categoryService.list(walletId)
@@ -910,7 +893,7 @@ class SSIKit2WalletService(
 
     private suspend fun validateTrustedIssuer(credential: WalletCredential, isEntra: Boolean) =
         isEntra.takeIf { it }?.let {
-             trustUseCase.status(credential, true)
+             trustUseCase.status(credential)
         } ?: throw IllegalArgumentException("Silent claim for this credential type not supported.")
 
     private data class CredentialDataResult(
