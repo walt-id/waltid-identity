@@ -13,7 +13,6 @@ import id.walt.webwallet.service.nft.NftKitNftService
 import id.walt.webwallet.service.nft.NftService
 import id.walt.webwallet.service.settings.SettingsService
 import id.walt.webwallet.service.trust.DefaultTrustValidationService
-import id.walt.webwallet.usecase.trust.TrustValidationUseCaseImpl
 import io.ktor.client.*
 import kotlinx.datetime.Clock
 import kotlinx.datetime.toJavaInstant
@@ -28,17 +27,9 @@ object WalletServiceManager {
     private val categoryService = CategoryServiceImpl
     private val settingsService = SettingsService
     private val http = HttpClient()
-    private val trustConfig = ConfigManager.getConfig<TrustConfig>().entra
-    private val issuerTrustConfig = trustConfig?.issuer
-    private val verifierTrustConfig = trustConfig?.verifier
-    private val issuerTrustValidationService = DefaultTrustValidationService(http, issuerTrustConfig)
-    private val verifierTrustValidationService = DefaultTrustValidationService(http, verifierTrustConfig)
-
-    private val entraTrustValidationUseCase = TrustValidationUseCaseImpl(
-        trustValidationService = DefaultTrustValidationService(http, issuerTrustConfig),
-        didSeeker = DefaultDidSeeker(),
-        credentialTypeSeeker = DefaultCredentialTypeSeeker(),
-    )
+    private val trustConfig = ConfigManager.getConfig<TrustConfig>()
+    val issuerTrustValidationService = DefaultTrustValidationService(http, trustConfig.issuersRecord)
+    val verifierTrustValidationService = DefaultTrustValidationService(http, trustConfig.verifiersRecord)
 
     fun getWalletService(tenant: String, account: UUID, wallet: UUID): WalletService =
         walletServices.getOrPut(Pair(account, wallet)) {
@@ -48,8 +39,10 @@ object WalletServiceManager {
                 accountId = account,
                 walletId = wallet,
                 categoryService = categoryService,
-                trustUseCase = entraTrustValidationUseCase,
-                settingsService = settingsService
+                settingsService = settingsService,
+                trustService = issuerTrustValidationService,
+                didSeeker = DefaultDidSeeker(),
+                credentialTypeSeeker = DefaultCredentialTypeSeeker(),
             )
         }
 

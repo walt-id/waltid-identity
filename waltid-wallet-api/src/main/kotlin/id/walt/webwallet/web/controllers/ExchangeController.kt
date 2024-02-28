@@ -5,12 +5,15 @@ import id.walt.oid4vc.requests.CredentialOfferRequest
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.db.models.WalletOperationHistory
 import id.walt.webwallet.service.SSIKit2WalletService
+import id.walt.webwallet.service.dids.DidsService
 import io.github.smiley4.ktorswaggerui.dsl.post
 import io.github.smiley4.ktorswaggerui.dsl.route
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
+import io.ktor.server.routing.*
+import io.ktor.server.util.*
 import io.ktor.util.*
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
@@ -209,6 +212,26 @@ fun Application.exchange() = walletRoute {
             val reqParams = Url(request).parameters.toMap()
             val parsedOffer = wallet.resolveCredentialOffer(CredentialOfferRequest.fromHttpParameters(reqParams))
             context.respond(parsedOffer)
+        }
+    }
+}
+
+fun Application.silentExchange() = routing {
+    route("api", {
+        tags = listOf("WalletCredential Exchange")
+    }) {
+        post("useOfferRequest/{did}", {
+            summary = "Silently claim credentials"
+            request {
+                pathParameter<String>("did") { description = "The DID to issue the credential(s) to" }
+                body<String> {
+                    description = "The offer request to use"
+                }
+            }
+        }) {
+            val did = call.parameters.getOrFail("did")
+            val offer = call.receiveText()
+            val wallets = DidsService.getWalletsForDid(did)
         }
     }
 }

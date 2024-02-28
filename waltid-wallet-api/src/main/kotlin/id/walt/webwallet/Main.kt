@@ -79,6 +79,7 @@ fun Application.module() {
     reports()
     settings()
     reasons()
+    trustRegistry()
 
     // DID Web Registry
     didRegistry()

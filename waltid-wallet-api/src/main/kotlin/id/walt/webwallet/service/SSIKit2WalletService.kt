@@ -34,6 +34,7 @@ import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.db.models.WalletOperationHistories
 import id.walt.webwallet.db.models.WalletOperationHistory
 import id.walt.webwallet.manifest.extractor.EntraManifestExtractor
+import id.walt.webwallet.seeker.Seeker
 import id.walt.webwallet.service.category.CategoryService
 import id.walt.webwallet.service.credentials.CredentialFilterObject
 import id.walt.webwallet.service.credentials.CredentialsService
@@ -48,8 +49,7 @@ import id.walt.webwallet.service.report.ReportRequestParameter
 import id.walt.webwallet.service.report.ReportService
 import id.walt.webwallet.service.settings.SettingsService
 import id.walt.webwallet.service.settings.WalletSetting
-import id.walt.webwallet.usecase.trust.TrustStatus
-import id.walt.webwallet.usecase.trust.TrustValidationUseCase
+import id.walt.webwallet.service.trust.TrustValidationService
 import id.walt.webwallet.web.controllers.PresentationRequestParameter
 import id.walt.webwallet.web.parameter.CredentialRequestParameter
 import io.ktor.client.*
@@ -83,8 +83,10 @@ class SSIKit2WalletService(
     accountId: UUID,
     walletId: UUID,
     private val categoryService: CategoryService,
-    private val trustUseCase: TrustValidationUseCase,
     private val settingsService: SettingsService,
+    private val trustService: TrustValidationService,
+    private val didSeeker: Seeker<String>,
+    private val credentialTypeSeeker: Seeker<String>,
 ) : WalletService(tenant, accountId, walletId) {
     private val logger = LoggerFactory.getLogger(this::class.java)
 
@@ -518,15 +520,15 @@ class SSIKit2WalletService(
         val addableCredentials: List<WalletCredential> = credentialResponses.map {
             getCredentialData(it, manifest, requireUserInput || silent).also {
                 logEvent(
-                    action = EventType.Credential.Accept,
+                    action = EventType.Credential.Receive,
                     originator = "", //parsedOfferReq.credentialOffer!!.credentialIssuer,
                     data = createCredentialEventData(credential = it.credential, type = it.type),
                     credentialId = it.credential.id,
                 )
             }.credential
         }.filter {
-            !silent || (validateTrustedIssuer(it, isEntra) == TrustStatus.Trusted
-//                    && IssuersService.get(walletId, parseIssuerDid(it.parsedDocument))?.authorized ?: false
+            !silent || (validateTrustedIssuer(it, isEntra)
+                    //&& IssuersService.get(walletId, parseIssuerDid(it.parsedDocument))?.authorized ?: false
                     )
         }
 
@@ -893,7 +895,7 @@ class SSIKit2WalletService(
 
     private suspend fun validateTrustedIssuer(credential: WalletCredential, isEntra: Boolean) =
         isEntra.takeIf { it }?.let {
-             trustUseCase.status(credential)
+            trustService.validate(didSeeker.get(credential), credentialTypeSeeker.get(credential), "todo")
         } ?: throw IllegalArgumentException("Silent claim for this credential type not supported.")
 
     private data class CredentialDataResult(
