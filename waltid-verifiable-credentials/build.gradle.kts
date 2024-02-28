@@ -29,7 +29,6 @@ suspendTransform {
     js {
 
     }*/
-    useJvmDefault()
     useJsDefault()
 }
 
