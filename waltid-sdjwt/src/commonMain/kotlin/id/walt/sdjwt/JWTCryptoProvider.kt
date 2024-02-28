@@ -10,7 +10,7 @@ import kotlin.js.JsExport
  * Default implementations exist for some platforms.
  * @see SimpleJWTCryptoProvider
  */
-@ExperimentalJsExport
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 interface JWTCryptoProvider {
     /**

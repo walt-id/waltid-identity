@@ -4,12 +4,15 @@ import id.walt.webwallet.db.models.WalletCategory
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.db.models.WalletCredentialCategoryMap
 import id.walt.webwallet.db.models.WalletCredentials
+import id.walt.webwallet.service.credentials.CredentialsService.deletedCondition
+import id.walt.webwallet.service.credentials.CredentialsService.notDeletedItemsCondition
 import kotlinx.datetime.Clock
 import kotlinx.datetime.toJavaInstant
 import kotlinx.uuid.UUID
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.inList
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.notInSubQuery
 import org.jetbrains.exposed.sql.statements.UpdateStatement
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.time.Instant
@@ -28,7 +31,7 @@ object CredentialsService {
         transaction { getCredentialsQuery(wallet, true, credentialId).singleOrNull()?.let { WalletCredential(it) } }
 
     /**
-     * Returns a list of credentials identifier by the [credentialIdList]
+     * Returns a list of credentials identified by the [credentialIdList]
      * @param wallet wallet id
      * @param credentialIdList the list of credential ids
      * @return list of [WalletCredential] that could match the specified [credentialIdList]
@@ -49,12 +52,11 @@ object CredentialsService {
         let {
             filter.categories?.let {
                 it.takeIf { it.isEmpty() }?.let {
-                    uncategorizedQuery(wallet, filter.showDeleted)
-                } ?: categorizedQuery(wallet, filter.showDeleted, it)
-            } ?: allQuery(wallet, filter.showDeleted)
+                    uncategorizedQuery(wallet, filter.showDeleted, filter.showPending)
+                } ?: categorizedQuery(wallet, filter.showDeleted, filter.showPending, it)
+            } ?: allQuery(wallet, filter.showDeleted, filter.showPending)
         }.orderBy(
-            column = WalletCredentials.addedOn,
-            order = if (filter.sorDescending) SortOrder.DESC else SortOrder.ASC
+            column = WalletCredentials.addedOn, order = if (filter.sorDescending) SortOrder.DESC else SortOrder.ASC
         ).distinctBy { it[WalletCredentials.id] }.map { WalletCredential(it) }
     }
 
@@ -109,7 +111,7 @@ object CredentialsService {
     }
 
     private fun getCredentialsQuery(wallet: UUID, includeDeleted: Boolean, vararg credentialId: String) =
-        WalletCredentials.select {
+        WalletCredentials.selectAll().where {
             (WalletCredentials.wallet eq wallet) and (WalletCredentials.id inList credentialId.toList() and (notDeletedItemsCondition or (includeDeleted.takeIf { it }
                 ?.let { Op.TRUE } ?: Op.FALSE)))
         }
@@ -134,14 +136,14 @@ object CredentialsService {
     private fun deleteCredential(wallet: UUID, credentialId: String) =
         transaction { WalletCredentials.deleteWhere { (WalletCredentials.wallet eq wallet) and (id eq credentialId) } }
 
-    private fun categorizedQuery(wallet: UUID, deleted: Boolean, categories: List<String>) =
+    private fun categorizedQuery(wallet: UUID, deleted: Boolean, pending: Boolean, categories: List<String>) =
         WalletCredentials.innerJoin(otherTable = WalletCredentialCategoryMap,
             onColumn = { WalletCredentials.id },
             otherColumn = { WalletCredentialCategoryMap.credential },
             additionalConstraint = {
                 WalletCredentials.wallet eq wallet and (WalletCredentialCategoryMap.wallet eq wallet) and deletedCondition(
                     deleted
-                ) and (WalletCredentials.pending eq false)
+                ) and (WalletCredentials.pending eq pending)
             }).innerJoin(otherTable = WalletCategory,
             onColumn = { WalletCredentialCategoryMap.category },
             otherColumn = { WalletCategory.name },
@@ -149,16 +151,16 @@ object CredentialsService {
                 WalletCategory.wallet eq wallet and (WalletCredentialCategoryMap.wallet eq wallet) and (WalletCategory.name inList (categories))
             }).selectAll()
 
-    private fun uncategorizedQuery(wallet: UUID, deleted: Boolean) = WalletCredentials.select {
+    private fun uncategorizedQuery(wallet: UUID, deleted: Boolean, pending: Boolean) = WalletCredentials.selectAll().where {
         WalletCredentials.wallet eq wallet and (WalletCredentials.id notInSubQuery (WalletCredentialCategoryMap.slice(
             WalletCredentialCategoryMap.credential
-        ).select {
-            WalletCredentialCategoryMap.wallet eq wallet
-        })) and deletedCondition(deleted) and (WalletCredentials.pending eq false)
+        ).selectAll()
+            .where { WalletCredentialCategoryMap.wallet eq wallet })) and deletedCondition(deleted) and (WalletCredentials.pending eq pending)
     }
 
-    private fun allQuery(wallet: UUID, deleted: Boolean) =
-        WalletCredentials.select { WalletCredentials.wallet eq wallet and deletedCondition(deleted) and (WalletCredentials.pending eq false) }
+    private fun allQuery(wallet: UUID, deleted: Boolean, pending: Boolean) =
+        WalletCredentials.selectAll()
+            .where { WalletCredentials.wallet eq wallet and deletedCondition(deleted) and (WalletCredentials.pending eq pending) }
 
     private fun deletedCondition(deleted: Boolean) =
         deleted.takeIf { it }?.let { deletedItemsCondition } ?: notDeletedItemsCondition
@@ -188,10 +190,11 @@ object CredentialsService {
 data class CredentialFilterObject(
     val categories: List<String>?,
     val showDeleted: Boolean,
+    val showPending: Boolean,
     val sortBy: String,
     val sorDescending: Boolean,
 ) {
     companion object {
-        val default = CredentialFilterObject(null, false, "", false)
+        val default = CredentialFilterObject(null, false, false, "", false)
     }
 }

@@ -20,8 +20,8 @@ import kotlinx.datetime.toKotlinInstant
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.uuid.UUID
-import org.jetbrains.exposed.sql.and
-import org.jetbrains.exposed.sql.select
+import org.jetbrains.exposed.sql.*
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.transactions.transaction
 
 object AccountsService {
@@ -95,7 +95,7 @@ object AccountsService {
         AccountWalletListing(account, wallets =
         transaction {
             AccountWalletMappings.innerJoin(Wallets)
-                .select { (AccountWalletMappings.tenant eq tenant) and (AccountWalletMappings.accountId eq account) }
+                .selectAll().where { (AccountWalletMappings.tenant eq tenant) and (AccountWalletMappings.accountId eq account) }
                 .map {
                     AccountWalletListing.WalletListing(
                         id = it[AccountWalletMappings.wallet].value,
@@ -110,18 +110,19 @@ object AccountsService {
 
 
     fun hasAccountEmail(tenant: String, email: String) =
-        transaction { Accounts.select { (Accounts.tenant eq tenant) and (Accounts.email eq email) }.count() > 0 }
+        transaction { Accounts.selectAll().where { (Accounts.tenant eq tenant) and (Accounts.email eq email) }.count() > 0 }
 
     fun hasAccountWeb3WalletAddress(address: String) = transaction {
         Accounts.innerJoin(Web3Wallets)
-            .select { Web3Wallets.address eq address }
+            .selectAll().where { Web3Wallets.address eq address }
             .count() > 0
     }
 
 
     fun hasAccountOidcId(oidcId: String): Boolean = transaction {
         Accounts.crossJoin(OidcLogins) // TODO crossJoin
-            .select { (Accounts.tenant eq OidcLogins.tenant) and (Accounts.id eq OidcLogins.accountId) and (OidcLogins.oidcId eq oidcId) }
+            .selectAll()
+            .where { (Accounts.tenant eq OidcLogins.tenant) and (Accounts.id eq OidcLogins.accountId) and (OidcLogins.oidcId eq oidcId) }
             .count() > 0
     }
 
@@ -129,19 +130,20 @@ object AccountsService {
     fun getAccountByWeb3WalletAddress(address: String) =
         transaction {
             Accounts.innerJoin(Web3Wallets)
-                .select { Web3Wallets.address eq address }
+                .selectAll().where { Web3Wallets.address eq address }
                 .map { Account(it) }
         }
 
     fun getAccountByOidcId(oidcId: String) =
         transaction {
             Accounts.crossJoin(OidcLogins) // TODO crossJoin
-                .select { (Accounts.tenant eq OidcLogins.tenant) and (Accounts.id eq OidcLogins.accountId) and (OidcLogins.oidcId eq oidcId) }
+                .selectAll()
+                .where { (Accounts.tenant eq OidcLogins.tenant) and (Accounts.id eq OidcLogins.accountId) and (OidcLogins.oidcId eq oidcId) }
                 .map { Account(it) }
                 .firstOrNull()
         }
 
-    fun getNameFor(account: UUID) = Accounts.select { Accounts.id eq account }.single()[Accounts.email]
+    fun getNameFor(account: UUID) = Accounts.selectAll().where { Accounts.id eq account }.single()[Accounts.email]
 
 }
 

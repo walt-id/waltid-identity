@@ -1,8 +1,12 @@
+import com.github.benmanes.gradle.versions.updates.DependencyUpdatesTask
+
 plugins {
     kotlin("multiplatform")
     kotlin("plugin.serialization")
     id("maven-publish")
     id("com.github.ben-manes.versions")
+    // Apply the application plugin to add support for building a CLI application in Java.
+    application
 }
 
 group = "id.walt.cli"
@@ -41,34 +45,43 @@ kotlin {
                 api(project(":waltid-sdjwt"))
                 api(project(":waltid-openid4vc"))
 
+                // kotlinx-io
+                implementation("org.jetbrains.kotlinx:kotlinx-io-core:0.3.1")
+
                 // CLI
-                implementation("com.varabyte.kotter:kotter-jvm:1.1.1")
-                implementation("com.github.ajalt.mordant:mordant:2.2.0")
-                implementation("com.github.ajalt.clikt:clikt:4.2.1")
+                implementation("com.varabyte.kotter:kotter-jvm:1.1.2")
+                implementation("com.github.ajalt.mordant:mordant:2.3.0")
+                implementation("com.github.ajalt.clikt:clikt:4.2.2")
 
                 // Coroutines
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
 
                 // Logging
-                implementation("io.github.oshai:kotlin-logging:5.1.0")
+                implementation("io.github.oshai:kotlin-logging:6.0.3")
             }
         }
         val commonTest by getting {
             dependencies {
                 implementation(kotlin("test"))
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.0")
             }
         }
         val jvmMain by getting {
             dependencies {
                 // Logging
-                implementation("org.slf4j:slf4j-simple:2.0.9")
+                implementation("org.slf4j:slf4j-simple:2.0.12")
+
+                // JOSE
+                implementation("com.nimbusds:nimbus-jose-jwt:9.37.3")
+
+                // BouncyCastle for PEM import
+                implementation("org.bouncycastle:bcpkix-lts8on:2.73.4")
             }
         }
         val jvmTest by getting {
             dependencies {
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0")
-                implementation("org.junit.jupiter:junit-jupiter-params:5.9.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
+                implementation("com.wolpl.clikt-testkit:clikt-testkit:2.0.0")
             }
         }
         /*publishing {
@@ -100,4 +113,23 @@ kotlin {
             languageSettings.enableLanguageFeature("InlineClasses")
         }
     }
+}
+
+
+tasks.withType<DependencyUpdatesTask> {
+    rejectVersionIf {
+        listOf("-beta", "-alpha", "-rc").any { it in candidate.version.lowercase() } || candidate.version.takeLast(4).contains("RC")
+    }
+}
+
+application {
+    // Define the main class for the application.
+    // Works with:
+    //     ../gradlew run --args="--help"
+    mainClass = "id.walt.cli.MainKt"
+
+}
+
+tasks.test {
+    useJUnitPlatform()
 }

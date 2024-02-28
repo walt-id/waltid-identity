@@ -25,7 +25,31 @@ data:
             fullColumnNames = false
         }
     }
-    recreateDatabaseOnStart = false
+    recreateDatabaseOnStart = true
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wallet-oidc-config
+data:
+  oidc.conf: |
+    enableOidcLogin = true
+    providerName = keycloak
+    oidcRealm = "https://keycloak.walt-test.cloud/realms/waltid-keycloak-ktor"
+    oidcJwks = "${oidcRealm}/protocol/openid-connect/certs"
+    authorizeUrl = "${oidcRealm}/protocol/openid-connect/auth"
+    accessTokenUrl = "${oidcRealm}/protocol/openid-connect/token"
+    logoutUrl = "${oidcRealm}/protocol/openid-connect/logout"
+    clientId = "waltid_backend"
+    clientSecret = "SiJXBB6U6CmPR8kXmhYDOZ8KdcGR46w8"
+    jwksCache = {
+        cacheSize = 10
+        cacheExpirationHours = 24
+        rateLimit: {
+            bucketSize: 10
+            refillRateMinutes: 1
+        }
+    }
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -108,7 +132,7 @@ data:
       "Not relevant to me",
       "Unsure about accuracy",
       "Need more details",
-]
+    ]
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
