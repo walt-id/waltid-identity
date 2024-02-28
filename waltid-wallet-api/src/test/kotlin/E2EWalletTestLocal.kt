@@ -30,7 +30,7 @@ class E2EWalletTestLocal : WalletApiTeste2eBase() {
     
     private lateinit var localWalletClient: HttpClient
     private var localWalletUrl: String = ""
-    private var localIssuerUrl: String = "http://localhost:7002"
+    private var localIssuerUrl: String = ""
     
     private fun ApplicationTestBuilder.newClient(token: String? = null) = createClient {
         install(ContentNegotiation) {
@@ -101,7 +101,7 @@ class E2EWalletTestLocal : WalletApiTeste2eBase() {
         localWalletClient = newClient(token)
 
         // list all wallets for this user
-        getWallets()
+        listAllWalletsForUser()
     }
     
     @Test
@@ -112,7 +112,7 @@ class E2EWalletTestLocal : WalletApiTeste2eBase() {
         localWalletClient = newClient(token)
         
         // list all wallets for this user
-        getWallets()
+        listAllWalletsForUser()
         
         testKeys()
         
@@ -128,7 +128,7 @@ class E2EWalletTestLocal : WalletApiTeste2eBase() {
             localWalletClient = newClient(token)
             
             // list all wallets for this user
-            getWallets()
+            listAllWalletsForUser()
             
             // create a did, one of each of the main types we support
             createDids()
@@ -146,7 +146,7 @@ class E2EWalletTestLocal : WalletApiTeste2eBase() {
         localWalletClient = newClient(token)
         
         // list all wallets for this user
-        getWallets()
+        listAllWalletsForUser()
         val response: JsonArray = listCredentials()
         assertNotEquals(response.size, 0)
         val id = response[0].jsonObject["id"]?.jsonPrimitive?.content ?: error("No credentials found")
@@ -163,12 +163,13 @@ class E2EWalletTestLocal : WalletApiTeste2eBase() {
         localWalletClient = newClient(token)
         
         // list all wallets for this user
-        getWallets()
+        listAllWalletsForUser()
         
         // list al Dids for this user and set default for credential issuance
         val availableDids = listAllDids()
         
         val issuanceUri = issueJwtCredential()
+        println(">>>>>>>>>>>> Issuance Offer uri = $issuanceUri")
         
         // Request credential and store in wallet
         requestCredential(issuanceUri, availableDids.first().did)

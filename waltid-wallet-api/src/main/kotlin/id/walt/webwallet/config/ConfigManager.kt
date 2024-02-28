@@ -90,7 +90,7 @@ object ConfigManager {
         registerConfig(ConfigData("trust", TrustConfig::class))
         registerConfig(ConfigData("rejectionreason", RejectionReasonConfig::class))
     }
-    
+
     fun loadConfigs(args: Array<String>) {
         log.debug { "Loading configurations..." }
 
