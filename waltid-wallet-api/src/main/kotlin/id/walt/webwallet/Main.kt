@@ -80,6 +80,7 @@ fun Application.module() {
     settings()
     reasons()
     trustRegistry()
+    silentExchange()
 
     // DID Web Registry
     didRegistry()
