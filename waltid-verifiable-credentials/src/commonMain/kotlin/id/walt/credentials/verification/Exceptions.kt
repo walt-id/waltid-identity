@@ -9,17 +9,17 @@ import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 import kotlin.time.Duration
 
-@ExperimentalJsExport
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 @Serializable
 sealed class SerializableRuntimeException(override val message: String? = null) : RuntimeException(message)
-@ExperimentalJsExport
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 @Serializable
 @SerialName("JsonSchemaVerificationException")
 data class JsonSchemaVerificationException(val validationErrors: List<JsonSchemaPolicy.SerializableValidationError>) :
     SerializableRuntimeException()
-@ExperimentalJsExport
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 @Serializable
 @SerialName("NotBeforePolicyException")
@@ -37,7 +37,7 @@ data class NotBeforePolicyException(
     val policyAvailable: Boolean = true
 ) :
     SerializableRuntimeException()
-@ExperimentalJsExport
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 @Serializable
 @SerialName("ExpirationDatePolicyException")
@@ -55,7 +55,7 @@ data class ExpirationDatePolicyException(
     val policyAvailable: Boolean = true
 ) :
     SerializableRuntimeException()
-@ExperimentalJsExport
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 @Serializable
 @SerialName("WebhookPolicyException")
@@ -63,14 +63,14 @@ data class WebhookPolicyException(
     val response: JsonObject
 ) :
     SerializableRuntimeException()
-@ExperimentalJsExport
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 @Serializable
 @SerialName("PresentationDefinitionException")
 class PresentationDefinitionException(
     val missingCredentialTypes: List<String>
 ) : SerializableRuntimeException()
-@ExperimentalJsExport
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 @Serializable
 @SerialName("MinimumCredentialsException")
@@ -78,7 +78,7 @@ class MinimumCredentialsException(
     val total: Int,
     val missing: Int
 ) : SerializableRuntimeException()
-@ExperimentalJsExport
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 @Serializable
 @SerialName("MaximumCredentialsException")
@@ -86,7 +86,7 @@ class MaximumCredentialsException(
     val total: Int,
     val exceeded: Int
 ) : SerializableRuntimeException()
-@ExperimentalJsExport
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 @Serializable
 @SerialName("HolderBindingException")
@@ -94,7 +94,7 @@ class HolderBindingException(
     val presenterDid: String,
     val credentialDids: List<String>
 ) : SerializableRuntimeException()
-@ExperimentalJsExport
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 @Serializable
 @SerialName("NotAllowedIssuerException")

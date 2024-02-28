@@ -9,7 +9,7 @@ import platform.Foundation.NSData
 import platform.Foundation.create
 import kotlin.js.ExperimentalJsExport
 
-@ExperimentalJsExport
+@OptIn(ExperimentalJsExport::class)
 @OptIn(ExperimentalForeignApi::class)
 class HMACJWTCryptoProvider(private val algorithm: String, private val key: ByteArray) :
     JWTCryptoProvider {

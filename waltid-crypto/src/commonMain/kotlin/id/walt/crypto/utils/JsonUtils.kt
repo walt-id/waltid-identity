@@ -5,9 +5,11 @@ import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 import kotlin.js.JsName
 
-@ExperimentalJsExport
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 object JsonUtils {
+
+    val prettyJson by lazy { Json { prettyPrint = true } }
 
     fun Any?.toJsonElement(): JsonElement =
         when (this) {

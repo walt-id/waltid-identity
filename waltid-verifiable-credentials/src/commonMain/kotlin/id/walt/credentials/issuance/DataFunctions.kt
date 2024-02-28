@@ -14,7 +14,7 @@ import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 import kotlin.time.Duration
 
-@ExperimentalJsExport
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 val dataFunctions = mapOf<String, suspend (call: W3CDataMergeUtils.FunctionCall) -> JsonElement>(
     "subjectDid" to { it.fromContext() },
