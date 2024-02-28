@@ -19,20 +19,12 @@ import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.plugins.logging.*
 import io.ktor.client.request.*
-import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.testing.*
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.encodeToString
-import java.util.concurrent.TimeUnit
 import kotlin.io.path.Path
 import kotlin.io.path.absolutePathString
 import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 import id.walt.issuer.base.config.ConfigManager as IssuerConfigManager
 import id.walt.webwallet.config.ConfigManager as WalletConfigManager
 import id.walt.webwallet.config.WebConfig as WalletWebConfig
@@ -43,119 +35,82 @@ class TestE2E: WalletApiTeste2eBase() {
         lateinit var localWalletClient: HttpClient
         var localWalletUrl: String = ""
         var localIssuerUrl: String = "http://localhost:7002"
-        
-        init {
-            initKtorTestApplication()
-            println("Init finished")
+            }
+    private fun ApplicationTestBuilder.newClient(token: String? = null) = createClient {
+        install(ContentNegotiation) {
+            json()
         }
-        
-        private fun initKtorTestApplication() = testApplication {
-            println("Running in ${Path(".").absolutePathString()}")
-            
-            localWalletClient = newClient()
-            
-            WalletHttpClients.defaultMethod = {
-                newClient()
-            }
-            
-            println("Setup web wallet...")
-            setupTestWebWallet()
-            
-            println("Setup issuer...")
-            setupTestIssuer()
-            
-            println("Starting application...")
-            application {
-                webWalletModule()
-                issuerModule(withPlugins = false)
-                verifierModule(withPlugins = false)
-            }
-            
-            println("Running login...")
-            val authResult = localWalletClient.post("/wallet-api/auth/login") {
-                setBody(LoginRequestJson.encodeToString(EmailAccountRequest(email = "user@email.com", password = "password") as AccountRequest))
-            }.body<AuthenticationResult>()
-            println("Login result: $authResult\n")
-            
-            localWalletClient = newClient(authResult.token)
-          
+        install(Logging) {
+            logger = Logger.SIMPLE
+            level = LogLevel.ALL
         }
-        private fun ApplicationTestBuilder.newClient(token: String? = null) = createClient {
-            install(ContentNegotiation) {
-                json()
+        followRedirects = false
+        defaultRequest {
+            contentType(ContentType.Application.Json)
+            if (token != null) {
+                header("Authorization", "Bearer $token")
             }
-            install(Logging) {
-                logger = Logger.SIMPLE
-                level = LogLevel.ALL
-            }
-            followRedirects = false
-            defaultRequest {
-                contentType(ContentType.Application.Json)
-                if (token != null) {
-                    header("Authorization", "Bearer $token")
-                }
-            }
-        }
-        private fun setupTestWebWallet() {
-            WalletConfigManager.preloadConfig("web", WalletWebConfig())
-            
-            webWalletSetup()
-            WalletConfigManager.loadConfigs(emptyArray())
-            
-            Db.start()
-        }
-        
-        private fun setupTestIssuer() {
-            IssuerConfigManager.preloadConfig("issuer-service", OIDCIssuerServiceConfig("http://localhost"))
-            
-            IssuerConfigManager.loadConfigs(emptyArray())
         }
     }
-  
     
-   
+    
+    private fun setupTestWebWallet() {
+        WalletConfigManager.preloadConfig("web", WalletWebConfig())
+        
+        webWalletSetup()
+        WalletConfigManager.loadConfigs(emptyArray())
+        
+        Db.start()
+    }
+    
+    private fun setupTestIssuer() {
+        IssuerConfigManager.preloadConfig("issuer-service", OIDCIssuerServiceConfig("http://localhost"))
+        
+        IssuerConfigManager.loadConfigs(emptyArray())
+    }
+    
+    private fun ApplicationTestBuilder.runApplication() = run {
+        println("Running in ${Path(".").absolutePathString()}")
+        localWalletClient = newClient()
+        
+        WalletHttpClients.defaultMethod = {
+            newClient()
+        }
+        
+        println("Setup web wallet...")
+        setupTestWebWallet()
+        
+        println("Setup issuer...")
+        setupTestIssuer()
+        
+        println("Starting application...")
+        application {
+            webWalletModule()
+            issuerModule(withPlugins = false)
+            verifierModule(withPlugins = false)
+        }
+    }
     
     @Test
-    fun x() = runTest {
-        println("Running wallet listing...")
-        val walletListing = localWalletClient.get("/wallet-api/wallet/accounts/wallets")
-            .body<AccountWalletListing>()
-        println("Wallet listing: $walletListing\n")
+    fun x() = testApplication {
+        runApplication()
+        login()
+        getTokenFor()
         
-        val availableWallets = walletListing.wallets
-        assertTrue { availableWallets.isNotEmpty() }
-        val walletId = availableWallets.first().id
+        localWalletClient = newClient(token)
         
-        println("Running DID listing...")
-        val availableDids = localWalletClient.get("/wallet-api/wallet/$walletId/dids")
-            .body<List<WalletDid>>()
-        println("DID listing: $availableDids\n")
+        // list all wallets for this user
+        getWallets()
+        
+        // list al Dids for this user and set default for credential issuance
+        val availableDids = listAllDids()
+        
+        val issuanceUri = issueJwtCredential()
 
-        assertTrue { availableDids.isNotEmpty() }
-        val did = availableDids.first().did
-
-        // Issuer
-        println("Calling issuer...")
-        val issuanceUrl = localWalletClient.post("/openid4vc/jwt/issue") {
-            //language=JSON
-            setBody(
-               testCredential
-            )
-        }.bodyAsText()
-
-//
-        println("Issuance URL: $issuanceUrl\n")
-
-        // Wallet
-        println("Claiming credential...")
-        val result = localWalletClient.post("/wallet-api/wallet/$walletId/exchange/useOfferRequest") {
-            parameter("did", did)
-
-            contentType(ContentType.Text.Plain)
-            setBody(issuanceUrl)
-        }
-        println("Claim result: $result")
-        assertEquals(HttpStatusCode.OK, result.status)
+        // Request credential and store in wallet
+        requestCredential(issuanceUri, availableDids.first().did)
+        
+        // TODO list credentials in wallet e2e test to verify the credential is there
     }
     override var walletClient: HttpClient
         get() = localWalletClient

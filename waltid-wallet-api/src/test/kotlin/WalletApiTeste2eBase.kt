@@ -1,3 +1,6 @@
+import Credential.Companion.testCredential
+import id.walt.webwallet.db.models.AccountWalletListing
+import id.walt.webwallet.db.models.WalletDid
 import id.walt.webwallet.service.account.AuthenticationResult
 import id.walt.webwallet.web.model.AccountRequest
 import id.walt.webwallet.web.model.EmailAccountRequest
@@ -10,6 +13,7 @@ import io.ktor.http.*
 import io.ktor.server.testing.*
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
+import kotlinx.uuid.UUID
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
@@ -24,7 +28,8 @@ abstract class WalletApiTeste2eBase {
     
     private val alphabet = ('a'..'z')
     protected lateinit var token: String
-    private lateinit var walletId: String
+    protected lateinit var walletId: UUID
+    protected lateinit var firstDid: String
     
     private fun randomString(length: Int) = (1..length).map { alphabet.random() }.toTypedArray().contentToString()
     
@@ -59,31 +64,31 @@ abstract class WalletApiTeste2eBase {
         }
     }
     
-    private suspend fun testUseOfferRequest(offerUri: String) {
+    protected suspend fun requestCredential(issuanceUri: String, did:String) {
         println("\nUse Case -> Use Offer Request")
-        val endpoint = "$walletUrl/wallet-api/wallet/$walletId/exchange/useOfferRequest"
-        println("POST ($endpoint)")
-        walletClient.post(endpoint) {
-            contentType(ContentType.Application.Json)
-            setBody(offerUri)
-            bearerAuth(token)
-        }.let { response ->
-            assertEquals(HttpStatusCode.OK, response.status)
+        val result = walletClient.post("/wallet-api/wallet/$walletId/exchange/useOfferRequest") {
+            parameter("did", did)
+            
+            contentType(ContentType.Text.Plain)
+            setBody(issuanceUri)
         }
+        println("Claim result: $result")
+        assertEquals(HttpStatusCode.OK, result.status)
     }
     
-    private suspend fun testIssueJwtCredential(): String = run {
-        println("\nUse Case -> Issue JWT Credential")
-        val endpoint = "$issuerUrl/openid4vc/jwt/issue"
-        println("POST ($endpoint)")
-        println("Credential for Issuance = ${Credential.testCredential}")
-        return walletClient.post("$issuerUrl/openid4vc/jwt/issue") {
-            contentType(ContentType.Application.Json)
-            setBody(Credential.testCredential)
-        }.let { response ->
-            assertEquals(HttpStatusCode.OK, response.status)
-            response.body<String>()
-        }
+    protected suspend fun issueJwtCredential(): String = run {
+        // Issuer
+        println("Calling issuer...")
+        val issuanceUri = walletClient.post("$walletUrl/openid4vc/jwt/issue") {
+            //language=JSON
+            setBody(
+                testCredential
+            )
+        }.bodyAsText()
+
+//
+        println("Issuance (Offer) URI: $issuanceUri\n")
+        return issuanceUri
     }
     
     private suspend fun testExampleKey() = run {
@@ -134,17 +139,18 @@ abstract class WalletApiTeste2eBase {
         println("> Response JSON body token: $token")
     }
     
-    private suspend fun getWallets() {
+    protected suspend fun getWallets() {
         println("\nUse Case -> List Wallets for Account\n")
         val endpoint = "$walletUrl/wallet-api/wallet/accounts/wallets"
         println("GET($endpoint)")
-        walletClient.get(endpoint) {
-            bearerAuth(token)
-        }.let { response ->
-            assertEquals(HttpStatusCode.OK, response.status)
-            val wallets = response.body<JsonObject>()["wallets"]?.jsonArray?.elementAt(0) ?: error("No wallets found")
-            walletId = wallets.jsonObject["id"]?.jsonPrimitive?.content.toString()
-        }
+        
+        val walletListing = walletClient.get("/wallet-api/wallet/accounts/wallets")
+            .body<AccountWalletListing>()
+        println("Wallet listing: $walletListing\n")
+        
+        val availableWallets = walletListing.wallets
+        assertTrue { availableWallets.isNotEmpty() }
+        walletId = availableWallets.first().id
     }
     
     private suspend fun createDid(didType: String): String {
@@ -232,27 +238,22 @@ abstract class WalletApiTeste2eBase {
         }
     }
     
-    private suspend fun listAllDids(): List<String> {
-        val endpoint = "$walletUrl/wallet-api/wallet/$walletId/dids"
-        println("GET $endpoint")
-        val list = arrayListOf<String>()
+    protected suspend fun listAllDids(): List<WalletDid> {
+        println("Running DID listing...")
+        val availableDids = walletClient.get("$walletUrl/wallet-api/wallet/$walletId/dids")
+            .body<List<WalletDid>>()
+        println("DID listing: $availableDids\n")
         
-        walletClient.get(endpoint) {
-            bearerAuth(token)
-        }.let { response ->
-            assertEquals(HttpStatusCode.OK, response.status)
-            response.body<JsonArray>().forEach() {
-                it.jsonObject["did"]?.jsonPrimitive?.content?.let { it1 -> list.add(it1) }
-            }
-        }
-        return list
+        assertTrue { availableDids.isNotEmpty() }
+        firstDid = availableDids.first().did
+        return availableDids
     }
     
-    private suspend fun deleteAllDids(dids: List<String>) {
+    private suspend fun deleteAllDids(dids: List<WalletDid>) {
         println("\nUse Case -> Delete DIDs\n")
         
         dids.forEach {
-            val endpoint = "$walletUrl/wallet-api/wallet/$walletId/dids/$it"
+            val endpoint = "$walletUrl/wallet-api/wallet/$walletId/dids/${it.did}"
             println("DELETE $endpoint")
             walletClient.delete(endpoint) {
                 bearerAuth(token)
@@ -308,9 +309,9 @@ abstract class WalletApiTeste2eBase {
     suspend fun testCredentialIssuance(user: User = defaultTestUser) {
         getTokenFor(user)
         getWallets()
-        val offerUri = testIssueJwtCredential()
+        val offerUri = issueJwtCredential()
         println("offerUri = $offerUri")
-        testUseOfferRequest(offerUri)
+        requestCredential(offerUri, firstDid)
     }
     
     suspend fun testDidsList(user: User = defaultTestUser) = run {
