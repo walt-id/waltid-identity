@@ -42,7 +42,7 @@ class OCIKeyTest {
           "Xx/EZNg4kJzoLhq5D/Oi0AIHszpPiIVE6Rpx51UPIyG1Cu6vdmldZhRrgrtQPwP0\n" +
           "zQIDAQAB\n" +
           "-----END PUBLIC KEY-----\n"
-  val key = OCIKey(Config, null, KeyType.RSA)
+  val key = OCIKey(Config, null.toString(), _keyType = KeyType.RSA)
 
   @Test
   fun testOCI() = runTest {
