@@ -4,8 +4,6 @@ import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.LocalKey
-import id.walt.crypto.utils.JwsUtils
-import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.did.dids.DidService
 import id.walt.did.dids.registrar.LocalRegistrar
 import id.walt.did.dids.registrar.dids.DidCheqdCreateOptions
@@ -14,26 +12,18 @@ import id.walt.did.dids.registrar.dids.DidKeyCreateOptions
 import id.walt.did.dids.registrar.dids.DidWebCreateOptions
 import id.walt.did.dids.resolver.LocalResolver
 import id.walt.did.utils.EnumUtils.enumValueIgnoreCase
-import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.data.CredentialOffer
-import id.walt.oid4vc.data.GrantType
-import id.walt.oid4vc.data.OpenIDProviderMetadata
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.errors.AuthorizationError
 import id.walt.oid4vc.providers.CredentialWalletConfig
 import id.walt.oid4vc.providers.OpenIDClientConfig
-import id.walt.oid4vc.providers.TokenTarget
-import id.walt.oid4vc.requests.*
+import id.walt.oid4vc.requests.AuthorizationRequest
+import id.walt.oid4vc.requests.CredentialOfferRequest
 import id.walt.oid4vc.responses.AuthorizationErrorCode
-import id.walt.oid4vc.responses.BatchCredentialResponse
-import id.walt.oid4vc.responses.CredentialResponse
-import id.walt.oid4vc.responses.TokenResponse
-import id.walt.oid4vc.util.randomUUID
 import id.walt.webwallet.db.models.WalletCategoryData
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.db.models.WalletOperationHistories
 import id.walt.webwallet.db.models.WalletOperationHistory
-import id.walt.webwallet.manifest.extractor.EntraManifestExtractor
 import id.walt.webwallet.seeker.Seeker
 import id.walt.webwallet.service.category.CategoryService
 import id.walt.webwallet.service.credentials.CredentialFilterObject
@@ -42,6 +32,7 @@ import id.walt.webwallet.service.dids.DidsService
 import id.walt.webwallet.service.dto.LinkedWalletDataTransferObject
 import id.walt.webwallet.service.dto.WalletDataTransferObject
 import id.walt.webwallet.service.events.*
+import id.walt.webwallet.service.exchange.IssuanceService
 import id.walt.webwallet.service.keys.KeysService
 import id.walt.webwallet.service.keys.SingleKeyResponse
 import id.walt.webwallet.service.oidc4vc.TestCredentialWallet
@@ -53,12 +44,10 @@ import id.walt.webwallet.service.trust.TrustValidationService
 import id.walt.webwallet.web.controllers.PresentationRequestParameter
 import id.walt.webwallet.web.parameter.CredentialRequestParameter
 import io.ktor.client.*
-import io.ktor.client.call.*
 import io.ktor.client.engine.cio.*
 import io.ktor.client.engine.java.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.plugins.logging.*
-import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
@@ -76,6 +65,32 @@ import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.slf4j.LoggerFactory
 import java.net.URLDecoder
+import kotlin.collections.ArrayList
+import kotlin.collections.HashMap
+import kotlin.collections.List
+import kotlin.collections.Map
+import kotlin.collections.MutableList
+import kotlin.collections.MutableMap
+import kotlin.collections.all
+import kotlin.collections.any
+import kotlin.collections.dropLastWhile
+import kotlin.collections.emptyList
+import kotlin.collections.emptyMap
+import kotlin.collections.filter
+import kotlin.collections.first
+import kotlin.collections.firstOrNull
+import kotlin.collections.forEach
+import kotlin.collections.getOrPut
+import kotlin.collections.ifEmpty
+import kotlin.collections.isNotEmpty
+import kotlin.collections.last
+import kotlin.collections.listOf
+import kotlin.collections.map
+import kotlin.collections.mapNotNull
+import kotlin.collections.plus
+import kotlin.collections.set
+import kotlin.collections.toSet
+import kotlin.collections.toTypedArray
 import kotlin.time.Duration.Companion.seconds
 
 class SSIKit2WalletService(
@@ -357,180 +372,23 @@ class SSIKit2WalletService(
         followRedirects = false
     }
 
-    private suspend fun processCredentialOffer(
-        credentialOffer: CredentialOffer, credentialWallet: TestCredentialWallet
-    ): List<CredentialResponse> {
-        logger.debug("// get issuer metadata")
-        val providerMetadataUri = credentialWallet.getCIProviderMetadataUrl(credentialOffer.credentialIssuer)
-        logger.debug("Getting provider metadata from: $providerMetadataUri")
-        val providerMetadataResult = ktorClient.get(providerMetadataUri)
-        logger.debug("Provider metadata returned: " + providerMetadataResult.bodyAsText())
-
-        val providerMetadata = providerMetadataResult.body<JsonObject>().let { OpenIDProviderMetadata.fromJSON(it) }
-        logger.debug("providerMetadata: {}", providerMetadata)
-
-        logger.debug("// resolve offered credentials")
-        val offeredCredentials = credentialOffer.resolveOfferedCredentials(providerMetadata)
-        logger.debug("offeredCredentials: {}", offeredCredentials)
-
-        //val offeredCredential = offeredCredentials.first()
-        //logger.debug("offeredCredentials[0]: $offeredCredential")
-
-        logger.debug("// fetch access token using pre-authorized code (skipping authorization step)")
-        val tokenReq = TokenRequest(
-            grantType = GrantType.pre_authorized_code,
-            clientId = testCIClientConfig.clientID,
-            redirectUri = credentialWallet.config.redirectUri,
-            preAuthorizedCode = credentialOffer.grants[GrantType.pre_authorized_code.value]!!.preAuthorizedCode,
-            userPin = null
-        )
-//        logger.debug("tokenReq: {}", tokenReq)
-
-        val tokenResp = ktorClient.submitForm(
-            providerMetadata.tokenEndpoint!!, formParameters = parametersOf(tokenReq.toHttpParameters())
-        ).let {
-            logger.debug("tokenResp raw: {}", it)
-            it.body<JsonObject>().let { TokenResponse.fromJSON(it) }
-        }
-
-//        logger.debug("tokenResp: {}", tokenResp)
-
-        logger.debug(">>> Token response = success: ${tokenResp.isSuccess}")
-
-        logger.debug("// receive credential")
-        val nonce = tokenResp.cNonce
-
-
-        logger.debug("Using issuer URL: ${credentialOffer.credentialIssuer}")
-        val credReqs = offeredCredentials.map { offeredCredential ->
-            CredentialRequest.forOfferedCredential(
-                offeredCredential = offeredCredential, proof = credentialWallet.generateDidProof(
-                    did = credentialWallet.did, issuerUrl = credentialOffer.credentialIssuer, nonce = nonce
-                )
-            )
-        }
-        logger.debug("credReqs: {}", credReqs)
-
-
-        return when {
-            credReqs.size >= 2 -> {
-                val batchCredentialRequest = BatchCredentialRequest(credReqs)
-
-                val credentialResponses = ktorClient.post(providerMetadata.batchCredentialEndpoint!!) {
-                    contentType(ContentType.Application.Json)
-                    bearerAuth(tokenResp.accessToken!!)
-                    setBody(batchCredentialRequest.toJSON())
-                }.body<JsonObject>().let { BatchCredentialResponse.fromJSON(it) }
-                logger.debug("credentialResponses: {}", credentialResponses)
-
-                credentialResponses.credentialResponses
-                    ?: throw IllegalArgumentException("No credential responses returned")
-            }
-
-            credReqs.size == 1 -> {
-                val credReq = credReqs.first()
-
-                val credentialResponse = ktorClient.post(providerMetadata.credentialEndpoint!!) {
-                    contentType(ContentType.Application.Json)
-                    bearerAuth(tokenResp.accessToken!!)
-                    setBody(credReq.toJSON())
-                }.body<JsonObject>().let { CredentialResponse.fromJSON(it) }
-                logger.debug("credentialResponse: {}", credentialResponse)
-
-                listOf(credentialResponse)
-            }
-
-            else -> throw IllegalStateException("No credentials offered")
-        }
-    }
-
-    private suspend fun processMSEntraIssuanceRequest(
-        entraIssuanceRequest: EntraIssuanceRequest, credentialWallet: TestCredentialWallet, pin: String? = null
-    ): List<CredentialResponse> {
-        // *) Load key:
-        val walletKey = getKeyByDid(credentialWallet.did)
-
-        // *) Create response JWT token, signed by key for holder DID
-        val responseObject = entraIssuanceRequest.getResponseObject(
-            walletKey.getThumbprint(), credentialWallet.did, walletKey.getPublicKey().exportJWK(), pin
-        )
-        val responseToken = credentialWallet.signToken(TokenTarget.TOKEN, responseObject, keyId = credentialWallet.did)
-//        val jwtCryptoProvider = runBlocking {
-//            val key = ECKey.parse(TEST_WALLET_KEY)
-//            SimpleJWTCryptoProvider(JWSAlgorithm.ES256K, ECDSASigner(key).apply {
-//                jcaContext.provider = BouncyCastleProviderSingleton.getInstance()
-//            }, ECDSAVerifier(key.toPublicJWK()).apply {
-//                jcaContext.provider = BouncyCastleProviderSingleton.getInstance()
-//            })
-//        }
-//        val responseToken = SDJwt.sign(responseTokenPayload, jwtCryptoProvider, TEST_WALLET_DID + "#${testWalletKey.getKeyId()}").toString()
-
-        // *) POST response JWT token to return address found in manifest
-        val resp = http.post(entraIssuanceRequest.issuerReturnAddress) {
-            contentType(ContentType.Text.Plain)
-            setBody(responseToken)
-        }
-        val responseBody = resp.bodyAsText()
-        logger.debug("Resp: {}", resp)
-        logger.debug(responseBody)
-        val vc =
-            runCatching { Json.parseToJsonElement(responseBody).jsonObject["vc"]!!.jsonPrimitive.content }.getOrElse {
-                throw IllegalArgumentException("Could not get Verifiable Credential from response: $responseBody")
-            }
-        return listOf(CredentialResponse.Companion.success(CredentialFormat.jwt_vc_json, vc))
-    }
-
     override suspend fun useOfferRequest(
         offer: String, did: String, requireUserInput: Boolean, silent: Boolean
     ): List<WalletCredential> {
-
-        val credentialWallet = getCredentialWallet(did)
-
-        logger.debug("// -------- WALLET ----------")
-        logger.debug("// as WALLET: receive credential offer, either being called via deeplink or by scanning QR code")
-        logger.debug("// parse credential URI")
-        val reqParams = Url(offer).parameters.toMap()
-
-        // entra or openid4vc credential offer
-        val isEntra = EntraIssuanceRequest.isEntraIssuanceRequestUri(offer)
-        val credentialResponses = if (isEntra) {
-            processMSEntraIssuanceRequest(
-                EntraIssuanceRequest.fromAuthorizationRequest(
-                    AuthorizationRequest.fromHttpParametersAuto(
-                        reqParams
+        val addableCredentials =
+            IssuanceService.useOfferRequest(offer, did, requireUserInput, getCredentialWallet(did), testCIClientConfig.clientID)
+                .map {
+                    WalletCredential(
+                        wallet = walletId,
+                        id = it.id,
+                        document = it.document,
+                        disclosures = it.disclosures,
+                        addedOn = Clock.System.now(),
+                        manifest = it.manifest,
+                        deletedOn = null,
+                        pending = requireUserInput,
                     )
-                ), credentialWallet
-            )
-        } else {
-            processCredentialOffer(
-                credentialWallet.resolveCredentialOffer(CredentialOfferRequest.fromHttpParameters(reqParams)),
-                credentialWallet
-            )
-        }
-
-        // === original ===
-        logger.debug("// parse and verify credential(s)")
-        if (credentialResponses.all { it.credential == null }) {
-            throw IllegalStateException("No credential was returned from credentialEndpoint: $credentialResponses")
-        }
-
-        // ??multiple credentials manifests
-        val manifest =
-            isEntra.takeIf { it }?.let { EntraManifestExtractor().extract(offer) }//?:DefaultManifestExtractor
-        val addableCredentials: List<WalletCredential> = credentialResponses.map {
-            getCredentialData(it, manifest, requireUserInput || silent).also {
-                logEvent(
-                    action = EventType.Credential.Receive,
-                    originator = "", //parsedOfferReq.credentialOffer!!.credentialIssuer,
-                    data = createCredentialEventData(credential = it.credential, type = it.type),
-                    credentialId = it.credential.id,
-                )
-            }.credential
-        }.filter {
-            !silent || (validateTrustedIssuer(it, isEntra)
-                    //&& IssuersService.get(walletId, parseIssuerDid(it.parsedDocument))?.authorized ?: false
-                    )
-        }
+                }
 
         CredentialsService.add(
             wallet = walletId, credentials = addableCredentials.toTypedArray()
@@ -825,83 +683,10 @@ class SSIKit2WalletService(
         itemIndex.takeIf { it < count }?.toString()
     }
 
-    private fun getCredentialData(
-        credentialResp: CredentialResponse, manifest: JsonObject?, pending: Boolean
-    ) = let {
-        val credential = credentialResp.credential!!.jsonPrimitive.content
-        val credentialJwt = credential.decodeJws(withSignature = true)
-        val typ = credentialJwt.header["typ"]?.jsonPrimitive?.content?.lowercase()
-        when (typ) {
-            "jwt" -> parseJwtCredentialResponse(credentialJwt, credential, manifest, pending)
-            "vc+sd-jwt" -> parseSdJwtCredentialResponse(credentialJwt, credential, manifest, pending)
-            null -> throw IllegalArgumentException("WalletCredential JWT does not have \"typ\"")
-            else -> throw IllegalArgumentException("Invalid credential \"typ\": $typ")
-        }.let {
-            CredentialDataResult(credential = it, type = typ)
-        }
-    }
-
-    //TODO: move to related entity
-    private fun parseJwtCredentialResponse(
-        credentialJwt: JwsUtils.JwsParts, document: String, manifest: JsonObject?, pending: Boolean,
-    ) = let {
-        val credentialId =
-            credentialJwt.payload["vc"]!!.jsonObject["id"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
-                ?: randomUUID()
-
-        logger.debug("Got JWT credential: {}", credentialJwt)
-
-        WalletCredential(
-            wallet = walletId,
-            id = credentialId,
-            document = document,
-            disclosures = null,
-            addedOn = Clock.System.now(),
-            manifest = manifest.toString(),
-//                delete = false,
-            deletedOn = null,
-            pending = pending,
-        )
-    }
-
-    //TODO: move to related entity
-    private fun parseSdJwtCredentialResponse(
-        credentialJwt: JwsUtils.JwsParts, document: String, manifest: JsonObject?, pending: Boolean
-    ) = let {
-        val credentialId =
-            credentialJwt.payload["id"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() } ?: randomUUID()
-
-        logger.debug("Got SD-JWT credential: $credentialJwt")
-
-        val disclosures = credentialJwt.signature.split("~").drop(1)
-        logger.debug("Disclosures (${disclosures.size}): $disclosures")
-
-        val disclosuresString = disclosures.joinToString("~")
-
-        val credentialWithoutDisclosures = document.substringBefore("~")
-
-        WalletCredential(
-            wallet = walletId,
-            id = credentialId,
-            document = credentialWithoutDisclosures,
-            disclosures = disclosuresString,
-            addedOn = Clock.System.now(),
-            manifest = manifest?.toString(),
-//                delete = false,
-            deletedOn = null,
-            pending = pending,
-        )
-    }
-
     private suspend fun validateTrustedIssuer(credential: WalletCredential, isEntra: Boolean) =
         isEntra.takeIf { it }?.let {
             trustService.validate(didSeeker.get(credential), credentialTypeSeeker.get(credential), "todo")
         } ?: throw IllegalArgumentException("Silent claim for this credential type not supported.")
-
-    private data class CredentialDataResult(
-        val credential: WalletCredential,
-        val type: String?,
-    )
 
     private fun parseIssuerDid(credential: JsonObject?) = credential?.jsonObject?.get("issuer")?.let {
         if (it is JsonObject) it.jsonObject["id"]?.jsonPrimitive?.content
