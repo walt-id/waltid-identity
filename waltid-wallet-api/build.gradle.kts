@@ -105,9 +105,9 @@ dependencies {
     implementation("de.mkammerer:argon2-jvm:2.11")
 
 
-    // waltid
-    implementation(project(":waltid-did"))
+    // waltid-did
     implementation(project(":waltid-crypto"))
+    implementation(project(":waltid-did"))
 
     // OIDC
     implementation(project(":waltid-openid4vc"))
