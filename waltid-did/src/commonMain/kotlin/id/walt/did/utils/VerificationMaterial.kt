@@ -2,7 +2,11 @@ package id.walt.did.utils
 
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import kotlinx.serialization.json.*
+import kotlin.js.ExperimentalJsExport
+import kotlin.js.JsExport
 
+@ExperimentalJsExport
+@JsExport
 object VerificationMaterial {
     private val verificationMethods = arrayOf(
         "verificationMethod",

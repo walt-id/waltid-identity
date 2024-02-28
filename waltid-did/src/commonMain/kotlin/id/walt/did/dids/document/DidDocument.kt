@@ -4,7 +4,12 @@ import id.walt.crypto.utils.JsonUtils.printAsJson
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlin.js.ExperimentalJsExport
+import kotlin.js.JsExport
+import kotlin.js.JsName
 
+@ExperimentalJsExport
+@JsExport
 @Serializable
 class DidDocument(
     private val content: Map<String, JsonElement>
@@ -16,6 +21,7 @@ class DidDocument(
     /**
      * From JsonObject
      */
+    @JsName("secondaryConstructor")
     constructor(jsonObject: JsonObject) : this(jsonObject.toMap())
 
     /**

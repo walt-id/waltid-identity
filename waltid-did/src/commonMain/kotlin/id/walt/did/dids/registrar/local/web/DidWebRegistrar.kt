@@ -9,13 +9,28 @@ import id.walt.did.dids.registrar.DidResult
 import id.walt.did.dids.registrar.dids.DidCreateOptions
 import id.walt.did.dids.registrar.local.LocalRegistrarMethod
 import id.walt.did.utils.ExtensionMethods.ensurePrefix
+import love.forte.plugin.suspendtrans.annotation.JsPromise
+import love.forte.plugin.suspendtrans.annotation.JvmAsync
+import love.forte.plugin.suspendtrans.annotation.JvmBlocking
+import kotlin.js.ExperimentalJsExport
+import kotlin.js.JsExport
 import net.thauvin.erik.urlencoder.UrlEncoderUtil
 
+@ExperimentalJsExport
+@JsExport
 class DidWebRegistrar : LocalRegistrarMethod("web") {
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     override suspend fun register(options: DidCreateOptions): DidResult = options.get<KeyType>("keyType")?.let {
         registerByKey(LocalKey.generate(it), options)
     } ?: throw IllegalArgumentException("keyType option not found.")
 
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     override suspend fun registerByKey(key: Key, options: DidCreateOptions): DidResult =
         options.get<String>("domain")?.takeIf {
             it.isNotEmpty()
