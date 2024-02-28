@@ -1,20 +1,11 @@
-import Credential.Companion.testCredential
 import id.walt.issuer.base.config.OIDCIssuerServiceConfig
 import id.walt.issuer.issuerModule
 import id.walt.verifier.verifierModule
 import id.walt.webwallet.db.Db
-import id.walt.webwallet.db.models.AccountWalletListing
-import id.walt.webwallet.db.models.WalletDid
-import id.walt.webwallet.service.account.AuthenticationResult
 import id.walt.webwallet.utils.WalletHttpClients
-import id.walt.webwallet.web.model.AccountRequest
-import id.walt.webwallet.web.model.EmailAccountRequest
-import id.walt.webwallet.web.model.LoginRequestJson
 import id.walt.webwallet.webWalletModule
 import id.walt.webwallet.webWalletSetup
 import io.ktor.client.*
-import io.ktor.client.call.*
-import io.ktor.client.engine.cio.*
 import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.plugins.logging.*
@@ -92,7 +83,7 @@ class TestE2E: WalletApiTeste2eBase() {
     }
     
     @Test
-    fun x() = testApplication {
+    fun e2eTestIssuance() = testApplication {
         runApplication()
         login()
         getTokenFor()
@@ -104,14 +95,12 @@ class TestE2E: WalletApiTeste2eBase() {
         
         // list al Dids for this user and set default for credential issuance
         val availableDids = listAllDids()
-        
         val issuanceUri = issueJwtCredential()
-
+        
         // Request credential and store in wallet
         requestCredential(issuanceUri, availableDids.first().did)
-        
-        // TODO list credentials in wallet e2e test to verify the credential is there
     }
+    
     override var walletClient: HttpClient
         get() = localWalletClient
         set(value) {
