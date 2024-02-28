@@ -132,7 +132,11 @@ class OCIKey(
                 mapOf(
                     "keyId" to JsonPrimitive(id),
                     "message" to JsonPrimitive(encodedMessage),
-                    "signingAlgorithm" to JsonPrimitive("ECDSA_SHA_256"),
+                    when (keyType) {
+                      KeyType.secp256r1 -> "signingAlgorithm" to JsonPrimitive("ECDSA_SHA_256")
+                      KeyType.RSA -> "signingAlgorithm" to JsonPrimitive("SHA_256_RSA_PKCS_PSS")
+                      else -> "signingAlgorithm" to JsonPrimitive(null)
+                    },
                 ))
             .toString()
     val signature = signingRequest("POST", "/20180608/sign", OCIConfig.cryptoEndpoint, requestBody)
@@ -197,10 +201,14 @@ class OCIKey(
     val requestBody =
         JsonObject(
                 mapOf(
-                    "keyId" to JsonPrimitive(OCIConfig.OCIDKeyID),
+                    "keyId" to JsonPrimitive(id),
                     "message" to JsonPrimitive(detachedPlaintext.encodeBase64()),
                     "signature" to JsonPrimitive(signed.encodeBase64()),
-                    "signingAlgorithm" to JsonPrimitive("ECDSA_SHA_256"),
+                    when (keyType) {
+                      KeyType.secp256r1 -> "signingAlgorithm" to JsonPrimitive("ECDSA_SHA_256")
+                      KeyType.RSA -> "signingAlgorithm" to JsonPrimitive("SHA_256_RSA_PKCS_PSS")
+                      else -> "signingAlgorithm" to JsonPrimitive(null)
+                    },
                 ))
             .toString()
     val signature =
@@ -283,16 +291,15 @@ class OCIKey(
 
     private fun keyTypeToOciKeyMapping(type: KeyType) =
         when (type) {
-          KeyType.Ed25519 -> "ECDSA"
-          KeyType.secp256r1 -> throw IllegalArgumentException("Not supported: $type")
+          KeyType.secp256r1 -> "ECDSA"
           KeyType.RSA -> "RSA"
           KeyType.secp256k1 -> throw IllegalArgumentException("Not supported: $type")
+          KeyType.Ed25519 -> throw IllegalArgumentException("Not supported: $type")
         }
 
     private fun ociKeyToKeyTypeMapping(type: String) =
         when (type) {
-          "ed25519" -> KeyType.Ed25519
-          "ECDSA" -> KeyType.Ed25519
+          "ECDSA" -> KeyType.secp256r1
           "RSA" -> KeyType.RSA
           else -> throw IllegalArgumentException("Not supported: $type")
         }
@@ -307,8 +314,8 @@ class OCIKey(
       val host = config.managementEndpoint
       val length =
           when (type) {
-            KeyType.Ed25519 -> 32
-            KeyType.secp256r1 -> throw IllegalArgumentException("Not supported: $type")
+            KeyType.Ed25519 -> throw IllegalArgumentException("Not supported: $type")
+            KeyType.secp256r1 -> 32
             KeyType.RSA -> 256
             KeyType.secp256k1 -> throw IllegalArgumentException("Not supported: $type")
           }
@@ -323,7 +330,7 @@ class OCIKey(
                                   "algorithm" to JsonPrimitive(keyType),
                                   "length" to JsonPrimitive(length),
                                   when (type) {
-                                    KeyType.Ed25519 -> "curveId" to JsonPrimitive("NIST_P256")
+                                    KeyType.secp256r1 -> "curveId" to JsonPrimitive("NIST_P256")
                                     else -> "curveId" to JsonPrimitive(null)
                                   },
                               )),
