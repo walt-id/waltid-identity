@@ -1,6 +1,7 @@
 package id.walt.webwallet.service.oidc4vc
 
 import id.walt.crypto.keys.Key
+import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.utils.Base64Utils.base64UrlToBase64
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.crypto.utils.JwsUtils.decodeJws
@@ -20,6 +21,7 @@ import id.walt.oid4vc.requests.TokenRequest
 import id.walt.webwallet.service.SessionAttributes.HACK_outsideMappedSelectedCredentialsPerSession
 import id.walt.webwallet.service.SessionAttributes.HACK_outsideMappedSelectedDisclosuresPerSession
 import id.walt.webwallet.service.credentials.CredentialsService
+import id.walt.webwallet.service.keys.KeysService
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.engine.cio.*
@@ -78,7 +80,10 @@ class TestCredentialWallet(
         keyId ?: throw IllegalArgumentException("No keyId provided for signToken ${debugStateMsg()}")
 
 //        val key = runBlocking { walletService.getKeyByDid(keyId) }
-        val key = runBlocking { DidService.resolveToKey(keyId).getOrThrow() }
+        val key = runBlocking {
+            DidService.resolveToKey(keyId).getOrThrow().let { KeysService.get(it.getKeyId()) }
+                ?.let { KeySerialization.deserializeKey(it.document).getOrThrow() }
+        } ?: error("Failed to retrieve the key")
         println("KEY FOR SIGNING: $key")
 
         return runBlocking {
@@ -178,7 +183,10 @@ class TestCredentialWallet(
         )
 
 //        val key = runBlocking { walletService.getKeyByDid(this@TestCredentialWallet.did) }
-        val key = runBlocking { DidService.resolveToKey(did).getOrThrow() }
+        val key = runBlocking {
+            DidService.resolveToKey(did).getOrThrow().let { KeysService.get(it.getKeyId()) }
+                ?.let { KeySerialization.deserializeKey(it.document).getOrThrow() }
+        } ?: error("Failed to retrieve the key")
         val signed = runBlocking {
             val authKeyId = resolveDidAuthentication(this@TestCredentialWallet.did)
 
