@@ -24,7 +24,6 @@ import java.io.ByteArrayOutputStream
 import java.security.*
 import java.security.spec.PKCS8EncodedKeySpec
 import java.util.*
-import kotlin.js.ExperimentalJsExport
 
 private val bouncyCastleProvider = BouncyCastleProvider()
 
@@ -167,7 +166,17 @@ actual class LocalKey actual constructor(
     }
 
     actual override suspend fun verifyRaw(signed: ByteArray, detachedPlaintext: ByteArray?): Result<ByteArray> {
-        TODO("Not yet implemented")
+        check(detachedPlaintext != null) { "Detached plaintext is required." }
+
+        val signature = getSignature()
+        signature.initVerify(getInternalPublicKey())
+        signature.update(detachedPlaintext)
+
+        return if (signature.verify(signed)) {
+            Result.success(detachedPlaintext!!)
+        } else {
+            Result.failure(IllegalArgumentException("Signature verification failed!"))
+        }
     }
 
     /**
@@ -233,6 +242,12 @@ actual class LocalKey actual constructor(
         KeyType.secp256r1, KeyType.secp256k1 -> _internalJwk.toECKey().toPrivateKey()
         KeyType.Ed25519 -> decodeEd25519RawPrivKey(_internalJwk.toOctetKeyPair().d.toString(), getKeyFactory())
         KeyType.RSA -> _internalJwk.toRSAKey().toPrivateKey()
+    }
+    private fun getInternalPublicKey() = when (keyType) {
+        KeyType.secp256r1, KeyType.secp256k1 -> _internalJwk.toECKey().toECPublicKey()
+//        KeyType.Ed25519 -> decodeEd25519RawPrivKey(_internalJwk.toOctetKeyPair().d.toString(), getKeyFactory())
+        KeyType.RSA -> _internalJwk.toRSAKey().toRSAPublicKey()
+        else -> TODO("Not yet supported: $keyType")
     }
 
     private fun getSignature(): Signature = when (keyType) {
