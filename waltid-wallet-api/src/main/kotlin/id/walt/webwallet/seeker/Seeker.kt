@@ -1,7 +1,8 @@
 package id.walt.webwallet.seeker
 
-import id.walt.webwallet.db.models.WalletCredential
+import kotlinx.serialization.json.JsonObject
+
 
 interface Seeker<T> {
-    fun get(credential: WalletCredential): T
+    fun get(data: JsonObject): T
 }

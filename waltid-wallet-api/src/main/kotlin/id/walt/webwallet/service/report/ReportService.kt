@@ -17,7 +17,7 @@ interface ReportService<T> {
         override fun frequent(parameter: ReportRequestParameter): List<WalletCredential> =
             (parameter as? CredentialReportRequestParameter)?.let { param ->
                 frequent(param.walletId, EventType.Credential.Present, param.limit).let {
-                    CredentialsService.get(param.walletId, it.filterNotNull())
+                    CredentialsService.get(it.filterNotNull())
                 }
             } ?: emptyList()
 

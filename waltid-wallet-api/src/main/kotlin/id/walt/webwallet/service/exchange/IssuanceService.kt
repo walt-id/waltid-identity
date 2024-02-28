@@ -13,7 +13,6 @@ import id.walt.oid4vc.responses.BatchCredentialResponse
 import id.walt.oid4vc.responses.CredentialResponse
 import id.walt.oid4vc.responses.TokenResponse
 import id.walt.oid4vc.util.randomUUID
-import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.manifest.extractor.EntraManifestExtractor
 import id.walt.webwallet.service.oidc4vc.TestCredentialWallet
 import io.ktor.client.*
@@ -26,7 +25,6 @@ import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.util.*
-import kotlinx.datetime.Clock
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
@@ -43,7 +41,7 @@ object  IssuanceService {
     private val logger = LoggerFactory.getLogger(this::class.java)
 
     suspend fun useOfferRequest(
-        offer: String, did: String, pending: Boolean, credentialWallet: TestCredentialWallet, clientId: String,
+        offer: String, credentialWallet: TestCredentialWallet, clientId: String,
     ) = let {
         logger.debug("// -------- WALLET ----------")
         logger.debug("// as WALLET: receive credential offer, either being called via deeplink or by scanning QR code")
@@ -77,7 +75,7 @@ object  IssuanceService {
         val manifest =
             isEntra.takeIf { it }?.let { EntraManifestExtractor().extract(offer) }
         credentialResponses.map {
-            getCredentialData(it, manifest, pending)
+            getCredentialData(it, manifest)
         }
     }
 
@@ -208,14 +206,14 @@ object  IssuanceService {
     }
 
     private fun getCredentialData(
-        credentialResp: CredentialResponse, manifest: JsonObject?, pending: Boolean
+        credentialResp: CredentialResponse, manifest: JsonObject?,
     ) = let {
         val credential = credentialResp.credential!!.jsonPrimitive.content
         val credentialJwt = credential.decodeJws(withSignature = true)
         val typ = credentialJwt.header["typ"]?.jsonPrimitive?.content?.lowercase()
         when (typ) {
-            "jwt" -> parseJwtCredentialResponse(credentialJwt, credential, manifest, pending)
-            "vc+sd-jwt" -> parseSdJwtCredentialResponse(credentialJwt, credential, manifest, pending)
+            "jwt" -> parseJwtCredentialResponse(credentialJwt, credential, manifest)
+            "vc+sd-jwt" -> parseSdJwtCredentialResponse(credentialJwt, credential, manifest)
             null -> throw IllegalArgumentException("WalletCredential JWT does not have \"typ\"")
             else -> throw IllegalArgumentException("Invalid credential \"typ\": $typ")
         }.let {
@@ -225,7 +223,7 @@ object  IssuanceService {
 
     //TODO: move to related entity
     private fun parseJwtCredentialResponse(
-        credentialJwt: JwsUtils.JwsParts, document: String, manifest: JsonObject?, pending: Boolean,
+        credentialJwt: JwsUtils.JwsParts, document: String, manifest: JsonObject?,
     ) = let {
         val credentialId =
             credentialJwt.payload["vc"]!!.jsonObject["id"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
@@ -243,7 +241,7 @@ object  IssuanceService {
 
     //TODO: move to related entity
     private fun parseSdJwtCredentialResponse(
-        credentialJwt: JwsUtils.JwsParts, document: String, manifest: JsonObject?, pending: Boolean
+        credentialJwt: JwsUtils.JwsParts, document: String, manifest: JsonObject?,
     ) = let {
         val credentialId =
             credentialJwt.payload["id"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() } ?: randomUUID()

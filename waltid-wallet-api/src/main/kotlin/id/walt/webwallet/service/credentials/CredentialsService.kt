@@ -32,12 +32,13 @@ object CredentialsService {
 
     /**
      * Returns a list of credentials identified by the [credentialIdList]
-     * @param wallet wallet id
      * @param credentialIdList the list of credential ids
      * @return list of [WalletCredential] that could match the specified [credentialIdList]
      */
-    fun get(wallet: UUID, credentialIdList: List<String>): List<WalletCredential> = transaction {
-        getCredentialsQuery(wallet, true, *credentialIdList.toTypedArray()).map {
+    fun get(credentialIdList: List<String>): List<WalletCredential> = transaction {
+        WalletCredentials.select {
+            (WalletCredentials.id inList credentialIdList)
+        }.map {
             WalletCredential(it)
         }
     }

@@ -5,14 +5,13 @@ import id.walt.webwallet.config.TrustConfig
 import id.walt.webwallet.db.models.AccountWalletMappings
 import id.walt.webwallet.db.models.AccountWalletPermissions
 import id.walt.webwallet.db.models.Wallets
-import id.walt.webwallet.seeker.DefaultCredentialTypeSeeker
-import id.walt.webwallet.seeker.DefaultDidSeeker
 import id.walt.webwallet.service.account.AccountsService
 import id.walt.webwallet.service.category.CategoryServiceImpl
 import id.walt.webwallet.service.nft.NftKitNftService
 import id.walt.webwallet.service.nft.NftService
 import id.walt.webwallet.service.settings.SettingsService
 import id.walt.webwallet.service.trust.DefaultTrustValidationService
+import id.walt.webwallet.usecase.event.EventUseCase
 import io.ktor.client.*
 import kotlinx.datetime.Clock
 import kotlinx.datetime.toJavaInstant
@@ -30,6 +29,7 @@ object WalletServiceManager {
     private val trustConfig = ConfigManager.getConfig<TrustConfig>()
     val issuerTrustValidationService = DefaultTrustValidationService(http, trustConfig.issuersRecord)
     val verifierTrustValidationService = DefaultTrustValidationService(http, trustConfig.verifiersRecord)
+    val eventUseCase = EventUseCase()
 
     fun getWalletService(tenant: String, account: UUID, wallet: UUID): WalletService =
         walletServices.getOrPut(Pair(account, wallet)) {
@@ -40,9 +40,7 @@ object WalletServiceManager {
                 walletId = wallet,
                 categoryService = categoryService,
                 settingsService = settingsService,
-                trustService = issuerTrustValidationService,
-                didSeeker = DefaultDidSeeker(),
-                credentialTypeSeeker = DefaultCredentialTypeSeeker(),
+                eventUseCase = eventUseCase,
             )
         }
 
