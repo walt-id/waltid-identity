@@ -9,6 +9,8 @@ import kotlin.js.JsName
 @JsExport
 object JsonUtils {
 
+    val prettyJson by lazy { Json { prettyPrint = true } }
+
     fun Any?.toJsonElement(): JsonElement =
         when (this) {
             is JsonElement -> this

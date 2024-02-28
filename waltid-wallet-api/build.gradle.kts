@@ -99,7 +99,7 @@ dependencies {
 
     /* -- Security -- */
     // Bouncy Castle
-    implementation("org.bouncycastle:bcprov-jdk18on:1.77")
+    implementation("org.bouncycastle:bcprov-lts8on:2.73.4")
 
     // Argon2
     implementation("de.mkammerer:argon2-jvm:2.11")
