@@ -36,6 +36,35 @@ Verifiable Credentials library relies on the following walt.id libraries:
 - [waltid-crypto library](https://github.com/walt-id/waltid-identity/tree/main/waltid-crypto)
   for key related operations
 
+
+## Installation
+Add the verifiable credentials library as a dependency to your Kotlin or Java project, which includes the crypto and did lib.
+
+### walt.id Repository
+
+Add the Maven repository which hosts the walt.id libraries to your build.gradle file.
+
+```kotlin
+repositories {
+    maven { url = uri("https://maven.walt.id/repository/waltid/") }
+} 
+```
+
+### Library Dependency
+
+Adding the verifiable credentials library as dependency. Specify the version that coincides with the latest or required
+snapshot for your project. [Latest releases](https://github.com/walt-id/waltid-identity/releases).
+
+```kotlin
+dependencies {
+    implementation("id.walt.credentials:waltid-verifiable-credentials:<version>")
+}
+```
+
+Replace `version` with the version of the walt.id verifiable credential library you want to use.
+Note: As the verifiable credentials lib is part of the mono-repo walt.id identity, you need to use the version of
+walt.id identity.
+
 ## How to use it
 
 #### Build credential

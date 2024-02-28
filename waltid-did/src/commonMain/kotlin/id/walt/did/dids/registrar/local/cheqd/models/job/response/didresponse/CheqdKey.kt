@@ -9,5 +9,6 @@ import kotlin.js.JsExport
 @Serializable
 data class CheqdKey(
     val publicKeyHex: String,
-    val verificationMethodId: String
+    val verificationMethodId: String? = null,
+    val keyId: String? = null,
 )

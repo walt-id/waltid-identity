@@ -32,6 +32,8 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.encodeToJsonElement
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 import love.forte.plugin.suspendtrans.annotation.JsPromise
 import love.forte.plugin.suspendtrans.annotation.JvmAsync
 import love.forte.plugin.suspendtrans.annotation.JvmBlocking
@@ -64,7 +66,7 @@ class DidCheqdRegistrar : LocalRegistrarMethod("cheqd") {
     }
 
     //TODO: inject
-    private val client = HttpClient() {
+    private val client = HttpClient {
         install(ContentNegotiation) {
             json(json)
         }
@@ -146,7 +148,7 @@ class DidCheqdRegistrar : LocalRegistrarMethod("cheqd") {
                     jobId = jobId, secret = Secret(signingResponse = signatures.map {
                         SigningResponse(
                             signature = it.base64toBase64Url(),
-                            verificationMethodId = verificationMethodId,
+                            kid = verificationMethodId,
                         )
                     })
                 )
@@ -154,15 +156,17 @@ class DidCheqdRegistrar : LocalRegistrarMethod("cheqd") {
         }.body<JobActionResponse>()
     }
 
+    @OptIn(ExperimentalEncodingApi::class)
     private suspend fun signPayload(key: Key, job: JobActionResponse): List<String> = let {
-        val state = (job.didState as? ActionDidState) ?: throw IllegalArgumentException("Unexpected did state")
+        val state = (job.didState as? ActionDidState) ?: error("Unexpected did state")
+        if (!state.action.equals("signPayload", true)) error("Unexpected state action: ${state.action}")
         val payloads = state.signingRequest.map {
-            id.walt.did.utils.EncodingUtils.base64Decode(it.serializedPayload)
+            Base64.decode(it.serializedPayload)
         }
         // TODO: sign with key having alias from verification method
 
         payloads.map {
-            id.walt.did.utils.EncodingUtils.base64Encode(key.signRaw(it) as ByteArray)
+            Base64.encode(key.signRaw(it) as ByteArray)
         }
     }
 }

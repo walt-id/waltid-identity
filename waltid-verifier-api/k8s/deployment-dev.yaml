@@ -41,6 +41,7 @@ spec:
       containers:
         - name: verifier
           image: waltid/verifier-api:dev
+          imagePullPolicy: Always
           volumeMounts:
             - name: verifier-web-config
               mountPath: "/waltid-verifier-api/config/"

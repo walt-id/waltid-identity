@@ -6,7 +6,7 @@ import love.forte.plugin.suspendtrans.annotation.JvmBlocking
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 
-@ExperimentalJsExport
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 abstract class JwtVerificationPolicy(override val name: String, override val description: String? = null) :
     VerificationPolicy(name, description) {
