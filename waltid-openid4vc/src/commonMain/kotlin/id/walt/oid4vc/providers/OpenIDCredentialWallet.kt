@@ -48,7 +48,6 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
     
     fun httpGetAsJson(url: Url): JsonElement? {
         val r = httpGet(url)
-        println("*************** ERROR r.body = ${r.body}")
        
         return r.body?.let { Json.decodeFromString<JsonElement>(it) }
     }

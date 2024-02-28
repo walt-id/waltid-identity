@@ -13,20 +13,25 @@ import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.testing.*
+import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.io.path.Path
 import kotlin.io.path.absolutePathString
 import kotlin.test.Test
+import kotlin.test.assertNotEquals
+import kotlin.time.Duration.Companion.seconds
 import id.walt.issuer.base.config.ConfigManager as IssuerConfigManager
 import id.walt.webwallet.config.ConfigManager as WalletConfigManager
 import id.walt.webwallet.config.WebConfig as WalletWebConfig
 
-class TestE2E: WalletApiTeste2eBase() {
+class E2EWalletTestLocal : WalletApiTeste2eBase() {
     
-    companion object {
-        lateinit var localWalletClient: HttpClient
-        var localWalletUrl: String = ""
-        var localIssuerUrl: String = "http://localhost:7002"
-            }
+    private lateinit var localWalletClient: HttpClient
+    private var localWalletUrl: String = ""
+    private var localIssuerUrl: String = "http://localhost:7002"
+    
     private fun ApplicationTestBuilder.newClient(token: String? = null) = createClient {
         install(ContentNegotiation) {
             json()
@@ -43,7 +48,6 @@ class TestE2E: WalletApiTeste2eBase() {
             }
         }
     }
-    
     
     private fun setupTestWebWallet() {
         WalletConfigManager.preloadConfig("web", WalletWebConfig())
@@ -67,8 +71,6 @@ class TestE2E: WalletApiTeste2eBase() {
         WalletHttpClients.defaultMethod = {
             newClient()
         }
-        
-        println("Setup web wallet...")
         setupTestWebWallet()
         
         println("Setup issuer...")
@@ -80,6 +82,76 @@ class TestE2E: WalletApiTeste2eBase() {
             issuerModule(withPlugins = false)
             verifierModule(withPlugins = false)
         }
+    }
+    
+    @Test
+    fun e2eTestRegisterNewUser() = testApplication {
+        runApplication()
+        testCreateUser(User(name="tester", email="tester@email.com", password="password", accountType="email"))
+    }
+    
+    @Test
+    fun e2eTestAuthentication() = testApplication {
+        runApplication()
+      
+        login()
+        getTokenFor()
+        testUserInfo()
+        testUserSession()
+        localWalletClient = newClient(token)
+
+        // list all wallets for this user
+        getWallets()
+    }
+    
+    @Test
+    fun e2eTestKeys() = testApplication {
+        runApplication()
+        login()
+        getTokenFor()
+        localWalletClient = newClient(token)
+        
+        // list all wallets for this user
+        getWallets()
+        
+        testKeys()
+        
+        testExampleKey()
+    }
+    
+    @Test
+    fun e2eTestDids() = testApplication {
+        runTest(timeout = 60.seconds) {
+            runApplication()
+            login()
+            getTokenFor()
+            localWalletClient = newClient(token)
+            
+            // list all wallets for this user
+            getWallets()
+            
+            // create a did, one of each of the main types we support
+            createDids()
+            val availableDids = listAllDids()
+            deleteAllDids(availableDids)
+        }
+    }
+    
+    @Test
+    fun e2eTestWalletCredentials() = testApplication {
+        runApplication()
+        login()
+        getTokenFor()
+        
+        localWalletClient = newClient(token)
+        
+        // list all wallets for this user
+        getWallets()
+        val response: JsonArray = listCredentials()
+        assertNotEquals(response.size, 0)
+        val id = response[0].jsonObject["id"]?.jsonPrimitive?.content ?: error("No credentials found")
+        viewCredential(id)
+        deleteCredential(id)
     }
     
     @Test
@@ -95,6 +167,7 @@ class TestE2E: WalletApiTeste2eBase() {
         
         // list al Dids for this user and set default for credential issuance
         val availableDids = listAllDids()
+        
         val issuanceUri = issueJwtCredential()
         
         // Request credential and store in wallet
