@@ -692,10 +692,10 @@ class SSIKit2WalletService(
           "ocid1.tenancy.oc1..aaaaaaaaiijfupfvsqwqwgupzdy5yclfzcccmie4ktp2wlgslftv5j7xpk6q",
           "ocid1.user.oc1..aaaaaaaaxjkkfjqxdqk7ldfjrxjmacmbi7sci73rbfiwpioehikavpbtqx5q",
           "bb:d4:4b:0c:c8:3a:49:15:7f:87:55:d5:2b:7e:dd:bc",
-          "ens56msmaacam-management.kms.eu-frankfurt-1.oraclecloud.com",
+          "ens56xmjaagd2-management.kms.eu-frankfurt-1.oraclecloud.com",
           "ocid1.tenancy.oc1..aaaaaaaaiijfupfvsqwqwgupzdy5yclfzcccmie4ktp2wlgslftv5j7xpk6q/ocid1.user.oc1..aaaaaaaaxjkkfjqxdqk7ldfjrxjmacmbi7sci73rbfiwpioehikavpbtqx5q/bb:d4:4b:0c:c8:3a:49:15:7f:87:55:d5:2b:7e:dd:bc",
           "ocid1.key.oc1.eu-frankfurt-1.ens56msmaacam.abtheljs4nlgys6vwnyo37rojq63kowj4cif6dn7poq7joh3cd5qxvosa75q",
-          "ens56msmaacam-crypto.kms.eu-frankfurt-1.oraclecloud.com",
+          "ens56xmjaagd2-crypto.kms.eu-frankfurt-1.oraclecloud.com",
       )
 
   override suspend fun generateKey(type: String): String =
