@@ -184,7 +184,7 @@ actual class LocalKey actual constructor(
      * @param signed signed
      * @return Result wrapping the plaintext; Result failure when the signature fails
      */
-    actual override suspend fun verifyJws(signedJws: String): Result<JsonObject> = runCatching {
+    actual override suspend fun verifyJws(signedJws: String): Result<JsonElement> = runCatching {
         val jwsObject = JWSObject.parse(signedJws)
 
         check(jwsObject.verify(_internalVerifier)) { "Signature check failed." }
