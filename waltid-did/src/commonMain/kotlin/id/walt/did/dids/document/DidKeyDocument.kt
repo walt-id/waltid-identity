@@ -8,7 +8,12 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonObject
+import kotlin.js.ExperimentalJsExport
+import kotlin.js.JsExport
+import kotlin.js.JsName
 
+@ExperimentalJsExport
+@JsExport
 @OptIn(ExperimentalSerializationApi::class)
 @Serializable
 data class DidKeyDocument(
@@ -37,6 +42,7 @@ data class DidKeyDocument(
 
     fun toMap() = Json.encodeToJsonElement(this).jsonObject.toMap()
 
+    @JsName("secondaryConstructor")
     constructor(did: String, identifier: String, didKey: JsonObject) : this(
         context = DEFAULT_CONTEXT,
         id = did,

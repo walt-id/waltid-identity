@@ -6,11 +6,18 @@ import id.walt.did.utils.EnumUtils.enumValueIgnoreCase
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlin.js.ExperimentalJsExport
+import kotlin.js.JsExport
+import kotlin.js.JsName
 
+@ExperimentalJsExport
+@JsExport
 open class DidCreateOptions(val method: String, val options: JsonElement) {
 
+    @JsName("secondaryConstructor")
     constructor(method: String, options: Map<String, Any?>) : this(method, options.toJsonElement())
 
+    @JsExport.Ignore
     inline operator fun <reified T> get(name: String): T? =
         options.jsonObject["options"]?.jsonObject?.get(name)?.jsonPrimitive?.content?.let {
             when (T::class) {
@@ -25,6 +32,8 @@ open class DidCreateOptions(val method: String, val options: JsonElement) {
         }
 }
 
+@ExperimentalJsExport
+@JsExport
 internal fun options(options: Map<String, Any>, secret: Map<String, Any> = emptyMap()) = mapOf(
     "options" to options,
     "didDocument" to mapOf(
@@ -35,4 +44,6 @@ internal fun options(options: Map<String, Any>, secret: Map<String, Any> = empty
     "secret" to secret
 )
 
+@ExperimentalJsExport
+@JsExport
 internal fun options(vararg inlineOptions: Pair<String, Any>) = options(mapOf(*inlineOptions))
