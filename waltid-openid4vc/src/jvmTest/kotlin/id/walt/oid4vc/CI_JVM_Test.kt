@@ -464,8 +464,11 @@ class CI_JVM_Test : AnnotationSpec() {
     @Test
     suspend fun testCredentialIssuanceIsolatedFunctions() {
         println("// -------- CREDENTIAL ISSUER ----------")
-
-        val credOffer = CredentialOffer.Builder(ciTestProvider.baseUrl).addOfferedCredential("VerifiableId").build()
+        // init credential offer for full authorization code flow
+        val credOffer = CredentialOffer.Builder(ciTestProvider.baseUrl)
+            .addOfferedCredential("VerifiableId")
+            .addAuthorizationCodeGrant("test-state")
+            .build()
         val issueReqUrl = OpenID4VCI.getCredentialOfferRequestUrl(credOffer)
 
         // Show credential offer request as QR code
@@ -481,6 +484,79 @@ class CI_JVM_Test : AnnotationSpec() {
         println("// resolve offered credentials")
         val offeredCredentials = OpenID4VCI.resolveOfferedCredentials(parsedCredOffer, providerMetadata)
         println("offeredCredentials: $offeredCredentials")
+        offeredCredentials.size shouldBe 1
+        offeredCredentials.first().format shouldBe CredentialFormat.jwt_vc_json
+        offeredCredentials.first().types?.last() shouldBe "VerifiableId"
+        val offeredCredential = offeredCredentials.first()
+        println("offeredCredentials[0]: $offeredCredential")
+
+        println("// go through full authorization code flow to receive offered credential")
+        println("// auth request (short-cut, without pushed authorization request)")
+        val authReq = AuthorizationRequest(
+            setOf(ResponseType.Code), testCIClientConfig.clientID,
+            redirectUri = credentialWallet.config.redirectUri,
+            issuerState = parsedCredOffer.grants[GrantType.authorization_code.value]!!.issuerState
+        )
+        println("authReq: $authReq")
+
+        println("// -------- CREDENTIAL ISSUER ----------")
+
+        // create issuance session and generate authorization code
+        val authCodeResponse: AuthorizationCodeResponse = AuthorizationCodeResponse.success("test-code")
+        val redirectUri = authCodeResponse.toRedirectUri(authReq.redirectUri ?: TODO(), authReq.responseMode ?: ResponseMode.Query)
+        Url(redirectUri).let {
+            it.parameters.names() shouldContain ResponseType.Code.name.lowercase()
+            it.parameters.get(ResponseType.Code.name.lowercase()) shouldBe authCodeResponse.code
+        }
+
+        println("// -------- WALLET ----------")
+        println("// token req")
+        val tokenReq =
+            TokenRequest(
+                GrantType.authorization_code,
+                testCIClientConfig.clientID,
+                code = authCodeResponse.code!!
+            )
+        println("tokenReq: $tokenReq")
+
+        println("// -------- CREDENTIAL ISSUER ----------")
+
+        // TODO: Validate authorization code
+        // TODO: generate token response
+        val tokenResponse: TokenResponse = TODO("Implement in OpenID4VCI") // processTokenRequest(tokenReq)
+
+        println("// -------- WALLET ----------")
+        tokenResponse.isSuccess shouldBe true
+        tokenResponse.accessToken shouldNotBe null
+        tokenResponse.cNonce shouldNotBe null
+
+        println("// receive credential")
+        ciTestProvider.deferIssuance = false
+        var nonce = tokenResponse.cNonce!!
+
+        val credReq = CredentialRequest.forOfferedCredential(
+            offeredCredential,
+            credentialWallet.generateDidProof(credentialWallet.TEST_DID, ciTestProvider.baseUrl, nonce)
+        )
+        println("credReq: $credReq")
+
+        println("// -------- CREDENTIAL ISSUER ----------")
+        val credentialResponse: CredentialResponse = TODO("Implement in OpenID4VCI") // generateCredentialResponse(credReq, accessToken)
+
+        println("// -------- WALLET ----------")
+        credentialResponse.isSuccess shouldBe true
+        credentialResponse.isDeferred shouldBe false
+        credentialResponse.format!! shouldBe CredentialFormat.jwt_vc_json
+        credentialResponse.credential.shouldBeInstanceOf<JsonPrimitive>()
+
+        println("// parse and verify credential")
+        val credential = credentialResponse.credential!!.jsonPrimitive.content
+        println(">>> Issued credential: $credential")
+        verifyIssuerAndSubjectId(
+            SDJwt.parse(credential).fullPayload.get("vc")?.jsonObject!!,
+            ciTestProvider.CI_ISSUER_DID, credentialWallet.TEST_DID
+        )
+        JwtSignaturePolicy().verify(credential, null, mapOf()).isSuccess shouldBe true
     }
 
     @Test
