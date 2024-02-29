@@ -23,9 +23,8 @@ import kotlin.js.JsName
  * update & deactivate not supported
  */
 
-@ExperimentalJsExport
+@OptIn(ExperimentalJsExport::class, ExperimentalSerializationApi::class)
 @JsExport
-@OptIn(ExperimentalSerializationApi::class)
 @Serializable
 data class DidJwkDocument(
     @EncodeDefault @SerialName("@context")
