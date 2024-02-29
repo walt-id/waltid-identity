@@ -1,7 +1,7 @@
 package id.walt.crypto.keys
 
+import id.walt.crypto.utils.Base64Utils.base64Decode
 import id.walt.crypto.utils.Base64Utils.base64UrlDecode
-import id.walt.crypto.utils.Base64Utils.base64toBase64Url
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto.utils.JwsUtils.jwsAlg
 import id.walt.crypto.utils.sha256WithRsa
@@ -123,7 +123,7 @@ class OCIKey(
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    override suspend fun signRaw(plaintext: ByteArray): Any {
+    override suspend fun signRaw(plaintext: ByteArray): ByteArray {
         val encodedMessage = plaintext.encodeBase64()
 
         val requestBody =
@@ -157,24 +157,42 @@ class OCIKey(
                 .ociJsonDataBody()
                 .jsonObject["signature"]
                 ?.jsonPrimitive
-                ?.content ?: ""
-        return response
+                ?.content?.base64Decode()
+        return response ?: error("No signature returned from OCI.")
     }
 
+    @OptIn(ExperimentalEncodingApi::class)
     @JvmBlocking
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
     override suspend fun signJws(plaintext: ByteArray, headers: Map<String, String>): String {
-        val header =
-            Json.encodeToString(
-                mutableMapOf(
-                    "typ" to "JWT",
-                    "alg" to keyType.jwsAlg(),
-                )
-                    .apply { putAll(headers) })
-                .encodeToByteArray()
-                .encodeToBase64Url()
+
+        fun base64UrlEncode(input: ByteArray): String = Base64.UrlSafe.encode(input).replace("=", "")
+
+        // Step 1: Create a JSON object containing the header and payload
+        val encodedHeader = base64UrlEncode(Json.encodeToString(mutableMapOf(
+            "typ" to "JWT",
+            "alg" to keyType.jwsAlg(),
+        ).apply { putAll(headers) }).encodeToByteArray())
+        val encodedPayload = base64UrlEncode(plaintext)
+
+        // Step 3: Concatenate the encoded header and payload with a period (.)
+        val unsignedToken = "$encodedHeader.$encodedPayload"
+
+        // Step 4: Generate a signature for the concatenated string
+
+        println("SIGNING: \"${unsignedToken}\".encodeToByteArray()")
+        val encodedSignature = (signRaw(unsignedToken.encodeToByteArray())).encodeToBase64Url()
+        println("Signature (base64URL): $encodedSignature")
+
+        // Step 6: Concatenate the encoded header, payload, and signature with periods (.)
+        return "$unsignedToken.$encodedSignature"
+
+       /* val header = Json.encodeToString(mutableMapOf(
+            "typ" to "JWT",
+            "alg" to keyType.jwsAlg(),
+        ).apply { putAll(headers) }).encodeToByteArray().encodeToBase64Url()
 
         val payload = plaintext.encodeToBase64Url()
 
@@ -183,7 +201,7 @@ class OCIKey(
         val signatureBase64 = signRaw(signable.encodeToByteArray()) as String
         val signatureBase64Url = signatureBase64.base64toBase64Url()
 
-        return "$signable.$signatureBase64Url"
+        return "$signable.$signatureBase64Url"*/
     }
 
     @JvmBlocking
@@ -400,7 +418,7 @@ class OCIKey(
             val baseMsg = { "OCI server (URL: ${this.request.url}) returned invalid response: " }
 
             if (!status.isSuccess())
-                throw RuntimeException(baseMsg.invoke() + "non-success status: $status")
+                throw IllegalStateException(baseMsg.invoke() + "non-success status: $status - ${this.bodyAsText()}")
 
             return runCatching { this.body<JsonObject>() }
                 .getOrElse {
@@ -446,7 +464,9 @@ class OCIKey(
 
             /* -- PRIVATE KEY HERE (as PEM) -- */
             val privateOciApiKey =
-                signingKey ?: TODO("Make this configurable. In the meanwhile, you can add the OCI signing key to the config parameters.")
+                signingKey ?: """
+                
+            """.trimIndent()
 
             //        val hashed = SHA256().digest(signingString.encodeToByteArray())
             //        val key = LocalKey.importPEM(private_Key).getOrThrow()
