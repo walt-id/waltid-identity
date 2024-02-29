@@ -3,7 +3,11 @@ package id.walt.did.dids.registrar.local.cheqd.models.job.didstates.action
 import id.walt.did.dids.registrar.local.cheqd.models.job.didstates.DidState
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlin.js.ExperimentalJsExport
+import kotlin.js.JsExport
 
+@ExperimentalJsExport
+@JsExport
 @Serializable
 @SerialName("action")
 data class ActionDidState(
