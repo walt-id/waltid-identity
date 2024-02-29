@@ -16,7 +16,7 @@ import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 import net.thauvin.erik.urlencoder.UrlEncoderUtil
 
-@ExperimentalJsExport
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 class DidWebRegistrar : LocalRegistrarMethod("web") {
     @JvmBlocking

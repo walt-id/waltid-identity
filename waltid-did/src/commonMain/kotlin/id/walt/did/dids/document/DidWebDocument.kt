@@ -12,9 +12,8 @@ import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 import kotlin.js.JsName
 
-@ExperimentalJsExport
+@OptIn(ExperimentalJsExport::class, ExperimentalSerializationApi::class)
 @JsExport
-@OptIn(ExperimentalSerializationApi::class)
 @Serializable
 data class DidWebDocument(
     @EncodeDefault @SerialName("@context")  val context: List<String> = DEFAULT_CONTEXT,

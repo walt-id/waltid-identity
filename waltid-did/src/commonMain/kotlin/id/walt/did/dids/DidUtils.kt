@@ -3,7 +3,7 @@ package id.walt.did.dids
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 
-@ExperimentalJsExport
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 object DidUtils {
     private const val PATTERN = "^did:([a-z]+):(.+)"
