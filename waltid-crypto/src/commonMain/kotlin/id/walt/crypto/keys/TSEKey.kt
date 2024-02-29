@@ -201,7 +201,7 @@ class TSEKey(
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    override suspend fun verifyJws(signedJws: String): Result<JsonObject> {
+    override suspend fun verifyJws(signedJws: String): Result<JsonElement> {
         val parts = signedJws.split(".")
         check(parts.size == 3) { "Invalid JWT part count: ${parts.size} instead of 3" }
 
