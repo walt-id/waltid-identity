@@ -7,7 +7,14 @@ import id.walt.did.dids.registrar.local.cheqd.DidCheqdRegistrar
 import id.walt.did.dids.registrar.local.jwk.DidJwkRegistrar
 import id.walt.did.dids.registrar.local.key.DidKeyRegistrar
 import id.walt.did.dids.registrar.local.web.DidWebRegistrar
+import love.forte.plugin.suspendtrans.annotation.JsPromise
+import love.forte.plugin.suspendtrans.annotation.JvmAsync
+import love.forte.plugin.suspendtrans.annotation.JvmBlocking
+import kotlin.js.ExperimentalJsExport
+import kotlin.js.JsExport
 
+@ExperimentalJsExport
+@JsExport
 class LocalRegistrar : DidRegistrar {
     override val name = "walt.id local registrar"
 
@@ -18,23 +25,43 @@ class LocalRegistrar : DidRegistrar {
         DidCheqdRegistrar(),
     ).associateBy { it.method }
 
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     override suspend fun getSupportedMethods() = Result.success(setOf("key", "jwk", "web", "cheqd" /*"ebsi",*/))
     //override suspend fun getSupportedMethods() = Result.success(registrarMethods.values.toSet())
 
     private fun getRegistrarForMethod(method: String) =
         registrarMethods[method] ?: throw IllegalArgumentException("No local registrar for method: $method")
 
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     override suspend fun create(options: DidCreateOptions): DidResult =
         getRegistrarForMethod(options.method).register(options)
 
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     override suspend fun createByKey(key: Key, options: DidCreateOptions): DidResult =
         getRegistrarForMethod(options.method).registerByKey(key, options)
 
 
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     override suspend fun update() {
         TODO("Not yet implemented")
     }
 
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     override suspend fun delete() {
         TODO("Not yet implemented")
     }

@@ -12,7 +12,14 @@ import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.jsonPrimitive
+import love.forte.plugin.suspendtrans.annotation.JsPromise
+import love.forte.plugin.suspendtrans.annotation.JvmAsync
+import love.forte.plugin.suspendtrans.annotation.JvmBlocking
+import kotlin.js.ExperimentalJsExport
+import kotlin.js.JsExport
 
+@ExperimentalJsExport
+@JsExport
 class UniregistrarRegistrar : DidRegistrar {
 
     @Suppress("MemberVisibilityCanBePrivate")
@@ -35,6 +42,10 @@ class UniregistrarRegistrar : DidRegistrar {
         }
     }
 
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     override suspend fun getSupportedMethods() = runCatching { lazyOf(getMethods()).value }
 
     private suspend fun getMethods(): Set<String> =
@@ -43,20 +54,36 @@ class UniregistrarRegistrar : DidRegistrar {
             .map { it.jsonPrimitive.content }
             .toSet()
 
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     override suspend fun create(options: DidCreateOptions): DidResult {
         return DidResult("TODO" /* TODO */, http.post("$registrarUrl/create?method=${options.method}") {
             setBody(options.options)
         }.body())
     }
 
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     override suspend fun createByKey(key: Key, options: DidCreateOptions): DidResult {
         TODO("Not yet implemented")
     }
 
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     override suspend fun update() {
         TODO("Not yet implemented")
     }
 
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     override suspend fun delete() {
         TODO("Not yet implemented")
     }

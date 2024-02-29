@@ -1,5 +1,10 @@
 package id.walt.did.dids
 
+import kotlin.js.ExperimentalJsExport
+import kotlin.js.JsExport
+
+@ExperimentalJsExport
+@JsExport
 object DidUtils {
     private const val PATTERN = "^did:([a-z]+):(.+)"
     fun methodFromDid(did: String) = did.removePrefix("did:").substringBefore(":")

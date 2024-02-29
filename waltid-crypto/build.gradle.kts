@@ -28,7 +28,6 @@ suspendTransform {
     js {
 
     }*/
-    useJvmDefault()
     useJsDefault()
 }
 
@@ -101,8 +100,8 @@ kotlin {
                 //implementation("dev.whyoleg.cryptography:cryptography-jdk:0.1.0")
                 implementation("com.google.crypto.tink:tink:1.12.0") // for JOSE using Ed25519
 
-                implementation("org.bouncycastle:bcprov-jdk18on:1.77") // for secp256k1 (which was removed with Java 17)
-                implementation("org.bouncycastle:bcpkix-jdk18on:1.77") // PEM import
+                implementation("org.bouncycastle:bcprov-lts8on:2.73.4") // for secp256k1 (which was removed with Java 17)
+                implementation("org.bouncycastle:bcpkix-lts8on:2.73.4") // PEM import
 
                 // Ktor client
                 implementation("io.ktor:ktor-client-cio:2.3.8")
