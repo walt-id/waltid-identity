@@ -6,7 +6,9 @@ import com.nimbusds.jose.crypto.bc.BouncyCastleProviderSingleton
 import com.nimbusds.jose.jwk.*
 import com.nimbusds.jose.jwk.KeyType.*
 import com.nimbusds.jose.util.Base64URL
+import id.walt.crypto.utils.Base64Utils.base64Decode
 import id.walt.crypto.utils.Base64Utils.base64UrlDecode
+import id.walt.crypto.utils.JsonUtils.toJsonElement
 import io.ktor.util.*
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -186,26 +188,34 @@ actual class LocalKey actual constructor(
      * @return Result wrapping the plaintext; Result failure when the signature fails
      */
     actual override suspend fun verifyJws(signedJws: String): Result<JsonElement> {
-        /*val jwsObject = JWSObject.parse(signedJws)
+        if (keyType == KeyType.Ed25519) {
+            return runCatching {
 
-        check(jwsObject.verify(_internalVerifier)) { "Signature check failed." }
+                val jwsObject = JWSObject.parse(signedJws)
 
-        val objectElements = jwsObject.payload.toJSONObject()
-            .mapValues { it.value.toJsonElement() }
-        JsonObject(objectElements)*/
-        println("Verifying JWS: $signedJws")
+                check(jwsObject.verify(_internalVerifier)) { "Signature check failed." }
 
-        val (header, payload, signature) = signedJws.split(".")
+                val objectElements = jwsObject.payload.toJSONObject()
+                    .mapValues { it.value.toJsonElement() }
 
-        println()
+                JsonObject(objectElements)
+            }
+        } else {
+            println("Verifying JWS: $signedJws")
 
-        println("VERIFYING: \"$header.$payload\".encodeToByteArray()")
-        println("with Signature: $signature")
-        val x = verifyRaw(signature.base64UrlDecode(), "$header.$payload".encodeToByteArray())
+            val (header, payload, signature) = signedJws.split(".")
 
-        return if (x.isSuccess)
-            Result.success(JsonPrimitive("ok")) else Result.failure(IllegalArgumentException("signature verification failed"))
+            println()
 
+            println("VERIFYING: \"$header.$payload\".encodeToByteArray()")
+            println("with Signature: $signature")
+            val x = verifyRaw(signature.base64UrlDecode(), "$header.$payload".encodeToByteArray())
+
+            return if (x.isSuccess)
+                Result.success(Json.parseToJsonElement(payload.base64Decode().decodeToString()))
+            else
+                Result.failure(IllegalArgumentException("signature verification failed"))
+        }
     }
 
     /**
@@ -257,6 +267,7 @@ actual class LocalKey actual constructor(
         KeyType.Ed25519 -> decodeEd25519RawPrivKey(_internalJwk.toOctetKeyPair().d.toString(), getKeyFactory())
         KeyType.RSA -> _internalJwk.toRSAKey().toPrivateKey()
     }
+
     private fun getInternalPublicKey() = when (keyType) {
         KeyType.secp256r1, KeyType.secp256k1 -> _internalJwk.toECKey().toECPublicKey()
 //        KeyType.Ed25519 -> decodeEd25519RawPrivKey(_internalJwk.toOctetKeyPair().d.toString(), getKeyFactory())
