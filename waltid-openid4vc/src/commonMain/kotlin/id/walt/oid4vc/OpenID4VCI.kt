@@ -58,8 +58,18 @@ object OpenID4VCI {
     }
 
     fun getCIProviderMetadataUrl(credOffer: CredentialOffer): String {
-        return URLBuilder(credOffer.credentialIssuer).apply {
+        return getCIProviderMetadataUrl(credOffer.credentialIssuer)
+    }
+
+    fun getCIProviderMetadataUrl(baseUrl: String): String {
+        return URLBuilder(baseUrl).apply {
             appendPathSegments(".well-known", "openid-credential-issuer")
+        }.buildString()
+    }
+
+    fun getCommonProviderMetadataUrl(baseUrl: String): String {
+        return URLBuilder(baseUrl).apply {
+            appendPathSegments(".well-known", "openid-configuration")
         }.buildString()
     }
 
