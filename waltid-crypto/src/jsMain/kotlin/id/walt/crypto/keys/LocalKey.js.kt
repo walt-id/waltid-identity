@@ -2,9 +2,11 @@ package id.walt.crypto.keys
 
 import JWK
 import KeyLike
+import crypto
 import id.walt.crypto.utils.ArrayUtils.toByteArray
 import id.walt.crypto.utils.JwsUtils.jwsAlg
 import id.walt.crypto.utils.PromiseUtils.await
+import io.ktor.utils.io.core.*
 import jose
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -114,7 +116,15 @@ actual class LocalKey actual constructor(
     @JsPromise
     @JsExport.Ignore
     actual override suspend fun signRaw(plaintext: ByteArray): ByteArray {
-        TODO("Not yet implemented")
+        check(hasPrivateKey) { "No private key is attached to this key!" }
+        return crypto.sign(
+            when (keyType) {
+                KeyType.Ed25519 -> null
+                else -> "sha256"
+            },
+            plaintext,
+            exportPEM()
+        )
     }
 
     /**
@@ -140,7 +150,22 @@ actual class LocalKey actual constructor(
     @JsPromise
     @JsExport.Ignore
     actual override suspend fun verifyRaw(signed: ByteArray, detachedPlaintext: ByteArray?): Result<ByteArray> {
-        TODO("Not yet implemented")
+        return runCatching {
+            val verified = crypto.verify(
+                when (keyType) {
+                    KeyType.Ed25519 -> null
+                    else -> "sha256"
+                },
+                detachedPlaintext ?: signed,
+                getPublicKey().exportPEM(),
+                signed
+            )
+            if (verified) {
+                "true".toByteArray()
+            } else {
+                throw IllegalArgumentException("Signature verification failed")
+            }
+        }
     }
 
     /**
@@ -175,8 +200,7 @@ actual class LocalKey actual constructor(
     @JsPromise
     @JsExport.Ignore
     actual override suspend fun getPublicKeyRepresentation(): ByteArray {
-
-        TODO("Not yet implemented")
+        return getPublicKey().exportPEM().toByteArray()
     }
 
     override val keyType: KeyType

@@ -12,8 +12,15 @@ import id.walt.did.dids.resolver.DidResolverRegistrations
 import id.walt.did.dids.resolver.LocalResolver
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.json.JsonObject
+import love.forte.plugin.suspendtrans.annotation.JsPromise
+import love.forte.plugin.suspendtrans.annotation.JvmAsync
+import love.forte.plugin.suspendtrans.annotation.JvmBlocking
+import kotlin.js.ExperimentalJsExport
+import kotlin.js.JsExport
 
 @Suppress("OPT_IN_USAGE")
+@ExperimentalJsExport
+@JsExport
 object DidService {
     private val log = KotlinLogging.logger {}
 
@@ -47,6 +54,10 @@ object DidService {
             }
     }
 
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     suspend fun init() {
         registerAllResolvers(DidResolverRegistrations.didResolvers)
         registerAllRegistrars(DidRegistrarRegistrations.didRegistrars)
@@ -58,6 +69,10 @@ object DidService {
         log.debug { "INIT -> REGISTRARS: $registrarMethods" }
     }
 
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     suspend fun minimalInit() {
         registerAllResolvers(setOf(LocalResolver()))
         registerAllRegistrars(setOf(LocalRegistrar()))
@@ -70,6 +85,10 @@ object DidService {
 
     fun registerResolverForMethod(method: String, resolver: DidResolver) = resolverMethods.put(method, resolver)
     fun registerRegistrarForMethod(method: String, registrar: DidRegistrar) = registrarMethods.put(method, registrar)
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     suspend fun updateResolversForMethods() {
         didResolvers.forEach { resolver ->
             val methods = resolver.getSupportedMethods()
@@ -83,6 +102,10 @@ object DidService {
         }
     }
 
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     suspend fun updateRegistrarsForMethods() {
         didRegistrars.forEach { registrar ->
             val methods = registrar.getSupportedMethods()
@@ -107,18 +130,34 @@ object DidService {
     }
 
     /* - Did methods - */
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     suspend fun resolve(did: String): Result<JsonObject> =
         getResolverForDid(did).resolve(did)
 
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     suspend fun resolveToKey(did: String): Result<Key> =
         getResolverForDid(did).resolveToKey(did)
 
     private fun getRegistrarForMethod(method: String): DidRegistrar =
         registrarMethods[method] ?: throw IllegalArgumentException("No registrar for did method: $method")
 
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     suspend fun register(options: DidCreateOptions) =
         getRegistrarForMethod(options.method).create(options)
 
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     suspend fun registerByKey(
         method: String, key: Key, options: DidCreateOptions = DidCreateOptions(method, emptyMap())
     ): DidResult = getRegistrarForMethod(method).createByKey(key, options)

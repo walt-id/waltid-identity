@@ -10,12 +10,27 @@ import id.walt.did.dids.registrar.DidResult
 import id.walt.did.dids.registrar.dids.DidCreateOptions
 import id.walt.did.dids.registrar.local.LocalRegistrarMethod
 import io.ktor.utils.io.core.*
+import love.forte.plugin.suspendtrans.annotation.JsPromise
+import love.forte.plugin.suspendtrans.annotation.JvmAsync
+import love.forte.plugin.suspendtrans.annotation.JvmBlocking
+import kotlin.js.ExperimentalJsExport
+import kotlin.js.JsExport
 
+@ExperimentalJsExport
+@JsExport
 class DidJwkRegistrar : LocalRegistrarMethod("jwk") {
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     override suspend fun register(options: DidCreateOptions) = options.get<KeyType>("keyType")?.let {
         registerByKey(LocalKey.generate(it), options)
     } ?: throw IllegalArgumentException("KeyType option not found.")
 
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     override suspend fun registerByKey(key: Key, options: DidCreateOptions): DidResult {
         val did = "did:jwk:${key.getPublicKey().exportJWK().toByteArray().encodeToBase64Url()}"
 
