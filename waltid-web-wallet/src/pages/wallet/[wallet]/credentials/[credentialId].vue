@@ -403,7 +403,7 @@ type WalletCredential = {
 const { data: credential, pending, refresh, error } = await useLazyFetch<WalletCredential>(`/wallet-api/wallet/${currentWallet.value}/credentials/${encodeURIComponent(credentialId)}`);
 refreshNuxtData();
 
-const manifest = computed(() => (credential.value?.manifest && credential.value?.manifest != "{}" ? JSON.parse(credential.value?.manifest) : null));
+const manifest = computed(() => (credential.value?.manifest && credential.value?.manifest != "{}" ? (typeof credential.value?.manifest === 'string' ? JSON.parse(credential.value?.manifest) : credential.value?.manifest) : null));
 const manifestClaims = computed(() => manifest.value?.display?.claims);
 
 const issuerName = ref(null);
