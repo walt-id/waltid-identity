@@ -463,6 +463,7 @@ class CI_JVM_Test : AnnotationSpec() {
 
     @Test
     suspend fun testCredentialIssuanceIsolatedFunctions() {
+        // TODO: consider re-implementing CITestProvider, making use of new lib functions
         println("// -------- CREDENTIAL ISSUER ----------")
         // init credential offer for full authorization code flow
         val credOffer = CredentialOffer.Builder(ciTestProvider.baseUrl)
