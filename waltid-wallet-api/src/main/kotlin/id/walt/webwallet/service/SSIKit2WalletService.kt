@@ -721,15 +721,14 @@ class SSIKit2WalletService(
             )
         }
 
-    val config =
-        OCIKeyConfig(
+    val config = OCIKeyConfig(
             "ocid1.tenancy.oc1..aaaaaaaaiijfupfvsqwqwgupzdy5yclfzcccmie4ktp2wlgslftv5j7xpk6q",
             "ocid1.user.oc1..aaaaaaaaxjkkfjqxdqk7ldfjrxjmacmbi7sci73rbfiwpioehikavpbtqx5q",
             "bb:d4:4b:0c:c8:3a:49:15:7f:87:55:d5:2b:7e:dd:bc",
-            "ens57gy2aafk2-management.kms.eu-frankfurt-1.oraclecloud.com",
+            "ens6bc6aaafs6-management.kms.eu-frankfurt-1.oraclecloud.com",
             "ocid1.tenancy.oc1..aaaaaaaaiijfupfvsqwqwgupzdy5yclfzcccmie4ktp2wlgslftv5j7xpk6q/ocid1.user.oc1..aaaaaaaaxjkkfjqxdqk7ldfjrxjmacmbi7sci73rbfiwpioehikavpbtqx5q/bb:d4:4b:0c:c8:3a:49:15:7f:87:55:d5:2b:7e:dd:bc",
             "ocid1.key.oc1.eu-frankfurt-1.ens56xmjaagd2.abtheljr5rrn53m2jspslexxyyhjnb4ckcr7irpj4m6ufaafcgj6oeqm3dta",
-            "ens57gy2aafk2-crypto.kms.eu-frankfurt-1.oraclecloud.com",
+            "ens6bc6aaafs6-crypto.kms.eu-frankfurt-1.oraclecloud.com/",
 
             signingKeyPem = """
             -----BEGIN PRIVATE KEY-----
