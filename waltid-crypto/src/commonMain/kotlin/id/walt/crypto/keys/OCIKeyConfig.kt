@@ -14,5 +14,7 @@ data class OCIKeyConfig(
     val managementEndpoint: String,
     val keyId: String,
     val OCIDKeyID: String,
-    val cryptoEndpoint: String
+    val cryptoEndpoint: String,
+
+    val signingKeyPem: String? = null
 )

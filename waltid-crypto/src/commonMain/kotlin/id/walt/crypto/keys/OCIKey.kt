@@ -16,7 +16,6 @@ import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.util.*
 import io.ktor.util.date.*
-import kotlinx.coroutines.*
 import kotlinx.datetime.Clock
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.TimeZone
@@ -51,20 +50,6 @@ class OCIKey(
     private var _keyType: KeyType? = null,
 ) : Key() {
 
-    @OptIn(DelicateCoroutinesApi::class)
-    private inline fun <T> lazySuspended(
-        crossinline block: suspend CoroutineScope.() -> T
-    ): Deferred<T> =
-        GlobalScope.async(Dispatchers.Unconfined, start = CoroutineStart.LAZY) { block.invoke(this) }
-
-    /*@Transient
-    val retrievedKeyType = lazySuspended { retrieveKeyType() }*/
-
-    @Transient
-    val retrievedPublicKey = lazySuspended {
-        _publicKey?.let { LocalKey.importJWK(it).getOrThrow() } ?: retrievePublicKey()
-    }
-
     @Transient
     override var keyType: KeyType
         get() = _keyType!!
@@ -79,27 +64,14 @@ class OCIKey(
      * returns public key as PEM
      */
     private suspend fun retrievePublicKey(): Key {
-        val keyData = getKeys(config.keyId, config.managementEndpoint, config.tenancyOcid)
-        println(
-            "KEY DATA: ${
-                keyData.map {
-                    it["id"]?.jsonPrimitive?.content
-                }
-            }"
-        )
+        val keyData = getKeys(config.keyId, config.managementEndpoint, config.tenancyOcid, config.signingKeyPem)
         val key =
             keyData.firstOrNull { it["id"]?.jsonPrimitive?.content == id }
                 ?: throw IllegalArgumentException("Key with id $id not found")
-        println("the key is: $key")
-        val keyVersion = getKeyVersion(id, config.keyId, config.managementEndpoint)
-        val OCIDkeyId = key["id"]?.jsonPrimitive?.content ?: ""
+        val keyVersion = getKeyVersion(id, config.keyId, config.managementEndpoint, config.signingKeyPem)
+        val keyId = key["id"]?.jsonPrimitive?.content ?: ""
 
-        return getOCIPublicKey(OCIDkeyId, config.keyId, config.managementEndpoint, keyVersion)
-    }
-
-    private suspend fun retrieveKeyType(): KeyType {
-        val keyType = ociKeyToKeyTypeMapping("RSA")
-        return keyType
+        return getOCIPublicKey(keyId, config.keyId, config.managementEndpoint, keyVersion, config.signingKeyPem)
     }
 
     @JvmBlocking
@@ -143,7 +115,7 @@ class OCIKey(
         when (keyType) {
             KeyType.secp256r1 -> "ECDSA_SHA_256"
             KeyType.RSA -> "SHA_256_RSA_PKCS_PSS"
-            else -> null
+            else -> throw NotImplementedError("Keytype not yet implemented: $keyType")
         }
     }
 
@@ -164,7 +136,7 @@ class OCIKey(
             )
                 .toString()
 
-        val signature = signingRequest("POST", "/20180608/sign", config.cryptoEndpoint, requestBody)
+        val signature = signingRequest("POST", "/20180608/sign", config.cryptoEndpoint, requestBody, config.signingKeyPem)
 
         val response =
             http
@@ -236,7 +208,7 @@ class OCIKey(
                 .toString()
 
         val signature =
-            signingRequest("POST", "/20180608/verify", config.cryptoEndpoint, requestBody)
+            signingRequest("POST", "/20180608/verify", config.cryptoEndpoint, requestBody, config.signingKeyPem)
 
         val response =
             http
@@ -290,11 +262,23 @@ class OCIKey(
         }
     }
 
+
+    @Transient
+    private var backedKey: Key? = null
+
     @JvmBlocking
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    override suspend fun getPublicKey(): Key = retrievedPublicKey.await()
+    override suspend fun getPublicKey(): Key {
+        if (backedKey == null && _publicKey != null) {
+            backedKey = _publicKey?.let { LocalKey.importJWK(it).getOrThrow() }
+        } else if (backedKey == null) {
+            backedKey = retrievePublicKey()
+        }
+
+        return backedKey!!
+    }
 
     @JvmBlocking
     @JvmAsync
@@ -357,8 +341,7 @@ class OCIKey(
                 )
                     .toString()
 
-            println("the body request is: $requestBody")
-            val signature = signingRequest("POST", "/20180608/keys", host, requestBody)
+            val signature = signingRequest("POST", "/20180608/keys", host, requestBody, config.signingKeyPem)
             val keyData =
                 http
                     .post("https://$host/20180608/keys") {
@@ -381,7 +364,7 @@ class OCIKey(
             val keyVersion = keyData["currentKeyVersion"]?.jsonPrimitive?.content ?: ""
             val OCIDkeyId = keyData["id"]?.jsonPrimitive?.content ?: ""
 
-            val publicKey = getOCIPublicKey(OCIDkeyId, config.keyId, host, keyVersion)
+            val publicKey = getOCIPublicKey(OCIDkeyId, config.keyId, host, keyVersion, config.signingKeyPem)
             return OCIKey(
                 config, OCIDkeyId, publicKey.exportJWK(), ociKeyToKeyTypeMapping(keyType)
             )
@@ -391,11 +374,11 @@ class OCIKey(
         @JvmAsync
         @JsPromise
         @JsExport.Ignore
-        suspend fun getKeyVersion(OCIDKEYID: String, keyId: String, host: String): String {
-            val signature = signingRequest("GET", "/20180608/keys/$OCIDKEYID", host, null)
+        suspend fun getKeyVersion(ocidKeyId: String, keyId: String, host: String, signingKey: String?): String {
+            val signature = signingRequest("GET", "/20180608/keys/$ocidKeyId", host, null, signingKey)
 
             val response =
-                http.get("https://$host/20180608/keys/$OCIDKEYID") {
+                http.get("https://$host/20180608/keys/$ocidKeyId") {
                     header(
                         "Authorization",
                         """Signature version="1",headers="host (request-target) date",keyId="$keyId",algorithm="rsa-sha256",signature="$signature""""
@@ -440,7 +423,9 @@ class OCIKey(
             method: String,
             restApi: String,
             host: String,
-            requestBody: String?
+            requestBody: String?,
+
+            signingKey: String? //= null
         ): String {
             val date = GMTDate().toHttpDate()
             val requestTarget = "(request-target): ${method.lowercase()} $restApi"
@@ -461,7 +446,8 @@ class OCIKey(
                 }
 
             /* -- PRIVATE KEY HERE (as PEM) -- */
-            val privateOciApiKey = TODO("Make this configurable")
+            val privateOciApiKey =
+                signingKey ?: TODO("Make this configurable. In the meanwhile, you can add the OCI signing key to the config parameters.")
 
             //        val hashed = SHA256().digest(signingString.encodeToByteArray())
             //        val key = LocalKey.importPEM(private_Key).getOrThrow()
@@ -485,13 +471,14 @@ class OCIKey(
         @JvmAsync
         @JsPromise
         @JsExport.Ignore
-        suspend fun getKeys(keyId: String, host: String, tenancyOcid: String): Array<JsonObject> {
+        suspend fun getKeys(keyId: String, host: String, tenancyOcid: String, signingKey: String?): Array<JsonObject> {
             val signature =
                 signingRequest(
                     "GET",
                     "/20180608/keys?compartmentId=$tenancyOcid&sortBy=TIMECREATED&sortOrder=DESC",
                     host,
-                    null
+                    null,
+                    signingKey
                 )
 
             val response =
@@ -519,11 +506,12 @@ class OCIKey(
             OCIDKeyID: String,
             keyId: String,
             host: String,
-            keyVersion: String
+            keyVersion: String,
+            signingKeyPem: String?
         ): Key {
 
             val signature =
-                signingRequest("GET", "/20180608/keys/$OCIDKeyID/keyVersions/$keyVersion", host, null)
+                signingRequest("GET", "/20180608/keys/$OCIDKeyID/keyVersions/$keyVersion", host, null, signingKeyPem)
 
             val response =
                 http.get("https://$host/20180608/keys/$OCIDKeyID/keyVersions/$keyVersion") {
@@ -550,7 +538,8 @@ class OCIKey(
         suspend fun deleteKey(
             OCIDKeyID: String,
             keyId: String,
-            host: String
+            host: String,
+            signingKeyPem: String
         ): Pair<HttpResponse, JsonObject> {
             val localDateTime = Clock.System.now()
             // add 7 days to the current date
@@ -565,7 +554,7 @@ class OCIKey(
                     .toString()
             val signature =
                 signingRequest(
-                    "POST", "/20180608/keys/$OCIDKeyID/actions/scheduleDeletion", host, requestBody
+                    "POST", "/20180608/keys/$OCIDKeyID/actions/scheduleDeletion", host, requestBody, signingKeyPem
                 )
 
             val response =
