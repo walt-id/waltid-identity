@@ -178,8 +178,6 @@ class TSEKey(
             KeyType.secp256k1 -> throw IllegalArgumentException("Type not supported for TSE: $keyType")
         }
 
-        println(localPublicKey)
-
         check(detachedPlaintext != null) { "An detached plaintext is needed." }
 
         val valid = http.post("$server/verify/${id}") {
@@ -241,8 +239,6 @@ class TSEKey(
     @JsPromise
     @JsExport.Ignore
     override suspend fun getPublicKey(): Key {
-        println("Getting public key: $keyType")
-
         return LocalKey.importRawPublicKey(
             type = keyType,
             rawPublicKey = getBackingPublicKey(),

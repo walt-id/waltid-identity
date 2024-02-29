@@ -397,7 +397,6 @@ class OCIKey(
         @JsPromise
         @JsExport.Ignore
         suspend fun HttpResponse.ociJsonDataBody(): JsonObject {
-            println("OCI RESPONSE: ${bodyAsText()}")
             val baseMsg = { "OCI server (URL: ${this.request.url}) returned invalid response: " }
 
             if (!status.isSuccess())
