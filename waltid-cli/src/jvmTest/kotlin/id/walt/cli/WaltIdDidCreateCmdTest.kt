@@ -30,7 +30,7 @@ class WaltIdDidCreateCmdTest {
     }
 
     @Test
-    fun `should create a did-key when called with no argument`() {
+    fun `should create a key of type did when called with no argument`() {
         val result = command.test(emptyList<String>())
 
         assertContains(result.stdout, "DID created")
@@ -45,7 +45,7 @@ class WaltIdDidCreateCmdTest {
 
     @Test
     @Ignore
-    fun `should have --type option`() {
+    fun `should have --method option`() {
     }
 
     @Test
@@ -55,36 +55,53 @@ class WaltIdDidCreateCmdTest {
 
     @Test
     @Ignore
+    fun `should have --useJwkJcsPub option???? When?`() {
+
+    }
+
+    // --method
+
+    @Test
+    @Ignore
+    fun `should not accept --method value other than key, jwk, web, ebsi, cheqd or iota`() {
+    }
+
+    @Test
+    @Ignore
+    fun `should accept --method=key DID method`() {
+    }
+
+    @Test
+    @Ignore
+    fun `should accept --method=jwk DID method`() {
+    }
+
+    @Test
+    @Ignore
+    fun `should accept --method=web DID method`() {
+    }
+
+    @Test
+    @Ignore
+    fun `should accept --method=ebsi DID method`() {
+    }
+
+    @Test
+    @Ignore
+    fun `should accept --method=cheqd DID method`() {
+    }
+
+    @Test
+    @Ignore
+    fun `should accept --method=iota DID method`() {
+    }
+
+    @Test
+    @Ignore
     fun `should generate a new key if one is not provided via the --key option`() {
     }
 
-    @Test
-    @Ignore
-    fun `should have --domain option if --type=web`() {
-    }
-
-    @Test
-    @Ignore
-    fun `should have --path option if --type=web`() {
-    }
-
-    @Test
-    @Ignore
-    fun `should have --version option if --type=ebsi`() {
-    }
-
-    @Test
-    @Ignore
-    fun `should have --bearerToken option if --type=ebsi`() {
-    }
-
-    @Test
-    @Ignore
-    fun `should have --network option if --type=cheqd`() {
-    }
-
-    // @Test
-    // fun `should have --xx option if --type=iota`() {}
+    // --key
 
     @Test
     @Ignore
@@ -93,31 +110,108 @@ class WaltIdDidCreateCmdTest {
 
     @Test
     @Ignore
-    fun `should create a valid did-jwk when called with --xxx=jwk`() {
+    fun `should fail if the key file specified in the --key option is in a not supported format`() {
+    }
 
+    // KEY
+
+    // JWK
+
+    @Test
+    @Ignore
+    fun `should create a valid did-jwk when called with --method=jwk`() {
+
+    }
+
+    // WEB
+
+    @Test
+    @Ignore
+    fun `should have --domain option if --method=web`() {
     }
 
     @Test
     @Ignore
-    fun `should create a valid did-web when called with --xxx=web`() {
-
+    fun `should have --path option if --method=web`() {
     }
 
     @Test
     @Ignore
-    fun `should create a valid did-ebsi when called with --xxx=ebsi`() {
+    fun `should create a valid did-web when called with --method=web`() {
 
+    }
+
+    // EBSI
+
+    @Test
+    @Ignore
+    fun `should have --version option if --method=ebsi`() {
     }
 
     @Test
     @Ignore
-    fun `should create a valid did-cheqd when called with --xxx=cheqd`() {
-
+    fun `should have --bearerToken option if --method=ebsi`() {
     }
 
     @Test
     @Ignore
-    fun `should create a valid did-iota when called with --xxx=iota`() {
+    fun `should accept --version=1 if --method=ebsi`() {
+    }
+
+    @Test
+    @Ignore
+    fun `should accept --version=2 if --method=ebsi`() {
+    }
+
+    @Test
+    @Ignore
+    fun `should not accept --version value other than 1 or 2 if --method=ebsi`() {
+    }
+
+    @Test
+    @Ignore
+    fun `should create a valid did-ebsi when called with --method=ebsi`() {
 
     }
+
+    // CHEQD
+
+    @Test
+    @Ignore
+    fun `should have --network option if --method=cheqd`() {
+    }
+
+    @Test
+    @Ignore
+    fun `should accept --network=mainnet option if --method=cheqd`() {
+    }
+
+    @Test
+    @Ignore
+    fun `should accept --network-testnet option if --method=cheqd`() {
+    }
+
+    @Test
+    @Ignore
+    fun `should not accept --network with value other than 'mainnet' and 'testnet' if --method=cheqd`() {
+    }
+
+    @Test
+    @Ignore
+    fun `should create a valid did-cheqd when called with --method=cheqd`() {
+
+    }
+
+    // IOTA
+
+    @Test
+    @Ignore
+    fun `should create a valid did-iota when called with --method=iota`() {
+
+    }
+
+    // @Test
+    // fun `should have --xx option if --method=iota`() {}
+
+
 }
