@@ -14,14 +14,28 @@ import id.walt.did.dids.registrar.dids.DidCreateOptions
 import id.walt.did.dids.registrar.local.LocalRegistrarMethod
 import id.walt.did.utils.JsonCanonicalization
 import kotlinx.serialization.json.JsonObject
+import love.forte.plugin.suspendtrans.annotation.JsPromise
+import love.forte.plugin.suspendtrans.annotation.JvmAsync
+import love.forte.plugin.suspendtrans.annotation.JvmBlocking
 import kotlin.js.ExperimentalJsExport
+import kotlin.js.JsExport
 
+@ExperimentalJsExport
+@JsExport
 class DidKeyRegistrar : LocalRegistrarMethod("key") {
-
+    
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     override suspend fun register(options: DidCreateOptions): DidResult = options.get<KeyType>("keyType")?.let {
         registerByKey(LocalKey.generate(it), options)
     } ?: throw IllegalArgumentException("KeyType option not found.")
-
+    
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     override suspend fun registerByKey(key: Key, options: DidCreateOptions): DidResult = options.let {
         if (key.keyType !in setOf(
                 KeyType.Ed25519,
@@ -35,7 +49,7 @@ class DidKeyRegistrar : LocalRegistrarMethod("key") {
         val identifier = convertRawKeyToMultiBase58Btc(identifierComponents.pubKeyBytes, identifierComponents.multiCodecKeyCode)
         createDid(identifier, pubKey.exportJWKObject())
     }
-
+    
     private suspend fun getIdentifierComponents(key: Key, options: DidCreateOptions): IdentifierComponents =
         options.get<Boolean>("useJwkJcsPub")?.takeIf { it }?.let {
             IdentifierComponents(
@@ -44,7 +58,7 @@ class DidKeyRegistrar : LocalRegistrarMethod("key") {
                 )
             )
         } ?: IdentifierComponents(getMultiCodecKeyCode(key.keyType), key.getPublicKeyRepresentation())
-
+    
     private fun createDid(identifier: String, publicKeyJwk: JsonObject) = "did:key:$identifier".let {
         DidResult(it, DidDocument(DidKeyDocument(did = it, identifier = identifier, didKey = publicKeyJwk).toMap()))
     }
