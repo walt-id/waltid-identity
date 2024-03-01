@@ -20,6 +20,7 @@
     <string name="label_get_public_key">Retrieve Public Key</string>
     <string name="label_generate_did">Generate DID</string>
     <string name="label_sign_credential">Sign a Credential</string>
+    <string name="label_create_and_sign_sdjwt">Create and sign an SD-JWT</string>
     <string name="signature">Signature: %s</string>
     <string name="jws">JWS: %s</string>
     <string name="did">DID: %s</string>
