@@ -20,23 +20,29 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import java.io.File
+import java.nio.file.Files
+import java.nio.file.Paths
 import kotlin.io.path.Path
 import kotlin.io.path.absolutePathString
 import kotlin.test.Test
 import kotlin.test.assertNotEquals
+import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
 import id.walt.issuer.base.config.ConfigManager as IssuerConfigManager
 import id.walt.webwallet.config.ConfigManager as WalletConfigManager
 import id.walt.webwallet.config.WebConfig as WalletWebConfig
 
 class E2EWalletTestLocal : E2EWalletTestBase() {
-    
+
     private lateinit var localWalletClient: HttpClient
     private var localWalletUrl: String = ""
     private var localIssuerUrl: String = ""
 
     companion object {
         init {
+            Files.createDirectories(Paths.get("./data"));
+            assertTrue(File("./data").exists())
             val config = DatasourceConfiguration(
                 hikariDataSource = HikariDataSource(HikariConfig().apply {
                     jdbcUrl = "jdbc:sqlite:data/wallet.db"
@@ -48,11 +54,11 @@ class E2EWalletTestLocal : E2EWalletTestBase() {
                 }),
                 recreateDatabaseOnStart = true
             )
-            
+
             WalletConfigManager.preloadConfig(
                 "db.sqlite", config
             )
-            
+
             WalletConfigManager.preloadConfig(
                 "web", WalletWebConfig()
             )
@@ -60,7 +66,7 @@ class E2EWalletTestLocal : E2EWalletTestBase() {
             WalletConfigManager.loadConfigs(emptyArray())
         }
     }
-   
+
     private fun ApplicationTestBuilder.newClient(token: String? = null) = createClient {
         install(ContentNegotiation) {
             json()
@@ -77,19 +83,19 @@ class E2EWalletTestLocal : E2EWalletTestBase() {
             }
         }
     }
-    
+
     private fun ApplicationTestBuilder.runApplication() = run {
         println("Running in ${Path(".").absolutePathString()}")
         localWalletClient = newClient()
-        
+
         WalletHttpClients.defaultMethod = {
             newClient()
         }
         setupTestWebWallet()
-        
+
         println("Setup issuer...")
         setupTestIssuer()
-        
+
         println("Starting application...")
         application {
             webWalletModule()
@@ -97,55 +103,60 @@ class E2EWalletTestLocal : E2EWalletTestBase() {
             verifierModule(withPlugins = false)
         }
     }
-    
+
     private fun setupTestWebWallet() {
         // TODO moving this into init{} causes error 400 status code in issuance test
         Db.start()
     }
-    
+
     private fun setupTestIssuer() {
         IssuerConfigManager.preloadConfig("issuer-service", OIDCIssuerServiceConfig("http://localhost"))
-        
+
         IssuerConfigManager.loadConfigs(emptyArray())
     }
-    
-   
-    
+
+
+    @Test
+    fun createDataDirectory() = runTest {
+        Files.createDirectories(Paths.get("/data"));
+        assertTrue(File("/data").exists())
+    }
+
     @Test
     fun e2eTestRegisterNewUser() = testApplication {
         runApplication()
         testCreateUser(User(name = "tester", email = "tester@email.com", password = "password", accountType = "email"))
     }
-    
+
     @Test
     fun e2eTestAuthentication() = testApplication {
         runApplication()
-        
+
         login()
         getTokenFor()
         testUserInfo()
         testUserSession()
         localWalletClient = newClient(token)
-        
+
         // list all wallets for this user
         listAllWalletsForUser()
     }
-    
+
     @Test
     fun e2eTestKeys() = testApplication {
         runApplication()
         login()
         getTokenFor()
         localWalletClient = newClient(token)
-        
+
         // list all wallets for this user
         listAllWalletsForUser()
-        
+
         testKeys()
-        
+
         testExampleKey()
     }
-    
+
     @Test
     fun e2eTestDids() = testApplication {
         runTest(timeout = 60.seconds) {
@@ -153,10 +164,10 @@ class E2EWalletTestLocal : E2EWalletTestBase() {
             login()
             getTokenFor()
             localWalletClient = newClient(token)
-            
+
             // list all wallets for this user
             listAllWalletsForUser()
-            
+
             // create a did, one of each of the main types we support
             createDids()
             testDefaultDid()
@@ -164,15 +175,15 @@ class E2EWalletTestLocal : E2EWalletTestBase() {
             deleteAllDids(availableDids)
         }
     }
-    
+
     @Test
     fun e2eTestWalletCredentials() = testApplication {
         runApplication()
         login()
         getTokenFor()
-        
+
         localWalletClient = newClient(token)
-        
+
         // list all wallets for this user
         listAllWalletsForUser()
         val response: JsonArray = listCredentials()
@@ -181,40 +192,40 @@ class E2EWalletTestLocal : E2EWalletTestBase() {
         viewCredential(id)
         deleteCredential(id)
     }
-    
+
     @Test
     fun e2eTestIssuance() = testApplication {
         runApplication()
         login()
         getTokenFor()
-        
+
         localWalletClient = newClient(token)
-        
+
         // list all wallets for this user
         listAllWalletsForUser()
-        
+
         // list all Dids for this user and set default for credential issuance
         val availableDids = listAllDids()
-        
+
         val issuanceUri = issueJwtCredential()
         println("Issuance Offer uri = $issuanceUri")
-        
+
         // Request credential and store in wallet
         requestCredential(issuanceUri, availableDids.first().did)
     }
-    
+
     override var walletClient: HttpClient
         get() = localWalletClient
         set(value) {
             localWalletClient = value
         }
-    
+
     override var walletUrl: String
         get() = localWalletUrl
         set(value) {
             localWalletUrl = value
         }
-    
+
     override var issuerUrl: String
         get() = localIssuerUrl
         set(value) {
