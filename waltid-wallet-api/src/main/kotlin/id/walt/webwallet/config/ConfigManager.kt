@@ -64,7 +64,7 @@ object ConfigManager {
 
 
     private fun registerConfig(data: ConfigData) {
-//        if (registeredConfigurations.any { it.id == data.id }) throw IllegalArgumentException("A configuration with the name \"${data.id}\" already exists!")
+        if (registeredConfigurations.any { it.id == data.id }) throw IllegalArgumentException("A configuration with the name \"${data.id}\" already exists!")
 
         registeredConfigurations.add(data)
     }

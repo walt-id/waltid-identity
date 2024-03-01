@@ -1,6 +1,9 @@
+import com.zaxxer.hikari.HikariConfig
+import com.zaxxer.hikari.HikariDataSource
 import id.walt.issuer.base.config.OIDCIssuerServiceConfig
 import id.walt.issuer.issuerModule
 import id.walt.verifier.verifierModule
+import id.walt.webwallet.config.DatasourceConfiguration
 import id.walt.webwallet.db.Db
 import id.walt.webwallet.utils.WalletHttpClients
 import id.walt.webwallet.webWalletModule
@@ -26,12 +29,38 @@ import id.walt.issuer.base.config.ConfigManager as IssuerConfigManager
 import id.walt.webwallet.config.ConfigManager as WalletConfigManager
 import id.walt.webwallet.config.WebConfig as WalletWebConfig
 
-class E2EWalletTestLocal : WalletApiTeste2eBase() {
+class E2EWalletTestLocal : E2EWalletTestBase() {
     
     private lateinit var localWalletClient: HttpClient
     private var localWalletUrl: String = ""
     private var localIssuerUrl: String = ""
-    
+
+    companion object {
+        init {
+            val config = DatasourceConfiguration(
+                hikariDataSource = HikariDataSource(HikariConfig().apply {
+                    jdbcUrl = "jdbc:sqlite:data/wallet.db"
+                    driverClassName = "org.sqlite.JDBC"
+                    username = ""
+                    password = ""
+                    transactionIsolation = "TRANSACTION_SERIALIZABLE"
+                    isAutoCommit = true
+                }),
+                recreateDatabaseOnStart = true
+            )
+            
+            WalletConfigManager.preloadConfig(
+                "db.sqlite", config
+            )
+            
+            WalletConfigManager.preloadConfig(
+                "web", WalletWebConfig()
+            )
+            webWalletSetup()
+            WalletConfigManager.loadConfigs(emptyArray())
+        }
+    }
+   
     private fun ApplicationTestBuilder.newClient(token: String? = null) = createClient {
         install(ContentNegotiation) {
             json()
@@ -47,21 +76,6 @@ class E2EWalletTestLocal : WalletApiTeste2eBase() {
                 header("Authorization", "Bearer $token")
             }
         }
-    }
-    
-    private fun setupTestWebWallet() {
-        WalletConfigManager.preloadConfig("web", WalletWebConfig())
-        
-        webWalletSetup()
-        WalletConfigManager.loadConfigs(emptyArray())
-        
-        Db.start()
-    }
-    
-    private fun setupTestIssuer() {
-        IssuerConfigManager.preloadConfig("issuer-service", OIDCIssuerServiceConfig("http://localhost"))
-        
-        IssuerConfigManager.loadConfigs(emptyArray())
     }
     
     private fun ApplicationTestBuilder.runApplication() = run {
@@ -84,22 +98,35 @@ class E2EWalletTestLocal : WalletApiTeste2eBase() {
         }
     }
     
+    private fun setupTestWebWallet() {
+        // TODO moving this into init{} causes error 400 status code in issuance test
+        Db.start()
+    }
+    
+    private fun setupTestIssuer() {
+        IssuerConfigManager.preloadConfig("issuer-service", OIDCIssuerServiceConfig("http://localhost"))
+        
+        IssuerConfigManager.loadConfigs(emptyArray())
+    }
+    
+   
+    
     @Test
     fun e2eTestRegisterNewUser() = testApplication {
         runApplication()
-        testCreateUser(User(name="tester", email="tester@email.com", password="password", accountType="email"))
+        testCreateUser(User(name = "tester", email = "tester@email.com", password = "password", accountType = "email"))
     }
     
     @Test
     fun e2eTestAuthentication() = testApplication {
         runApplication()
-      
+        
         login()
         getTokenFor()
         testUserInfo()
         testUserSession()
         localWalletClient = newClient(token)
-
+        
         // list all wallets for this user
         listAllWalletsForUser()
     }
@@ -132,6 +159,7 @@ class E2EWalletTestLocal : WalletApiTeste2eBase() {
             
             // create a did, one of each of the main types we support
             createDids()
+            testDefaultDid()
             val availableDids = listAllDids()
             deleteAllDids(availableDids)
         }
@@ -165,11 +193,11 @@ class E2EWalletTestLocal : WalletApiTeste2eBase() {
         // list all wallets for this user
         listAllWalletsForUser()
         
-        // list al Dids for this user and set default for credential issuance
+        // list all Dids for this user and set default for credential issuance
         val availableDids = listAllDids()
         
         val issuanceUri = issueJwtCredential()
-        println(">>>>>>>>>>>> Issuance Offer uri = $issuanceUri")
+        println("Issuance Offer uri = $issuanceUri")
         
         // Request credential and store in wallet
         requestCredential(issuanceUri, availableDids.first().did)
@@ -178,7 +206,7 @@ class E2EWalletTestLocal : WalletApiTeste2eBase() {
     override var walletClient: HttpClient
         get() = localWalletClient
         set(value) {
-            walletClient = value
+            localWalletClient = value
         }
     
     override var walletUrl: String

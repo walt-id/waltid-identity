@@ -17,17 +17,17 @@ import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
-abstract class WalletApiTeste2eBase {
-    private val didMethodsToTest = listOf("key", "jwk", "web") //22/02/24 cheqd resolver broken awaiting fix
+abstract class E2EWalletTestBase {
+    private val didMethodsToTest = listOf("key", "jwk", "web")
     
     private val defaultTestUser = User("tester", "user@email.com", "password", "email")
     
     private val alphabet = ('a'..'z')
     protected lateinit var token: String
     protected lateinit var walletId: UUID
-    protected lateinit var firstDid: String
+    private lateinit var firstDid: String
     
-    private fun randomString(length: Int) = (1..length).map { alphabet.random() }.toTypedArray().contentToString()
+    private fun randomString(length: Int) = (1..length).map { alphabet.random() }.toTypedArray().joinToString("")
     
     protected val email = randomString(8) + "@example.org"
     protected val password = randomString(16)
@@ -43,6 +43,7 @@ abstract class WalletApiTeste2eBase {
         println("POST ($endpoint)\n")
         
         walletClient.post(endpoint) {
+            contentType(ContentType.Application.Json)
             setBody(
                 mapOf(
                     "name" to user.name,
@@ -60,7 +61,6 @@ abstract class WalletApiTeste2eBase {
         println("\nUse Case -> Use Offer Request")
         val result = walletClient.post("$walletUrl/wallet-api/wallet/$walletId/exchange/useOfferRequest") {
             parameter("did", did)
-            
             contentType(ContentType.Text.Plain)
             setBody(issuanceUri)
         }
@@ -76,6 +76,7 @@ abstract class WalletApiTeste2eBase {
         println("Calling issuer...")
         val issuanceUri = walletClient.post(endpoint) {
             //language=JSON
+            contentType(ContentType.Application.Json)
             setBody(
                 testCredential
             )
@@ -190,9 +191,7 @@ abstract class WalletApiTeste2eBase {
         val endpoint = "$walletUrl/wallet-api/wallet/$walletId/credentials/$credentialId"
         println("DELETE ($endpoint")
         
-        walletClient.delete(endpoint).let { response ->
-            assertEquals(HttpStatusCode.Accepted, response.status)
-        }
+        assertEquals(HttpStatusCode.Accepted, walletClient.delete(endpoint).status)
     }
     
     protected suspend fun viewCredential(credentialId: String) {
@@ -263,76 +262,22 @@ abstract class WalletApiTeste2eBase {
         println("\nUse Case -> Generate new key of type RSA\n")
         endpoint = "$walletUrl/wallet-api/wallet/$walletId/keys/generate?type=RSA"
         println("POST $endpoint")
-        walletClient.post(endpoint).let { response ->
-            assertEquals(HttpStatusCode.OK, response.status)
-        }
+        assertEquals(HttpStatusCode.OK, walletClient.post(endpoint).status)
     }
     
-    suspend fun testAuthenticationEndpoints(user: User) {
-        getTokenFor(user)
-        testUserInfo()
-        testUserSession()
-        listAllWalletsForUser()
-    }
-    
-    suspend fun testCredentialIssuance(user: User = defaultTestUser) {
-        getTokenFor(user)
-        listAllWalletsForUser()
-        val offerUri = issueJwtCredential()
-        println("offerUri = $offerUri")
-        requestCredential(offerUri, firstDid)
-    }
-    
-    suspend fun testDidsList(user: User = defaultTestUser) = run {
-        getTokenFor(user)
-        listAllWalletsForUser()
-        println("\nUse Case -> List DIDs\n")
-        println("Number of Dids found: ${listAllDids().size}")
-    }
-    
-    suspend fun testDefaultDid(user: User = defaultTestUser) {
-        getTokenFor(user)
-        listAllWalletsForUser()
+    suspend fun testDefaultDid() {
         println("\nUse Case -> Delete DIDs\n")
-        
         listAllDids().let { dids ->
             assertNotEquals(0, dids.size)
             val defaultDid = dids[0]
-            println("\nUse Case -> Set default did to $defaultDid\n")
-            val endpoint = "$walletUrl/wallet-api/wallet/$walletId/dids/default?did=$defaultDid"
+            println("\nUse Case -> Set default did to ${defaultDid.did}\n")
+            val endpoint = "$walletUrl/wallet-api/wallet/$walletId/dids/default?did=${defaultDid.did}"
             println("POST $endpoint")
             walletClient.post(endpoint) {
-                bearerAuth(token)
+                contentType(ContentType.Application.Json)
             }.let { response ->
                 assertEquals(HttpStatusCode.Accepted, response.status)
             }
         }
     }
-    
-    suspend fun testDidsDelete(user: User = defaultTestUser) = run {
-        getTokenFor(user)
-        listAllWalletsForUser()
-        println("\nUse Case -> Delete DIDs\n")
-        listAllDids().let { dids ->
-            println("Number of Dids found: ${dids.size}")
-            dids.forEach {
-                println(" DID: $it")
-            }
-            deleteAllDids(dids)
-        }
-    }
-    
-    suspend fun testDidsCreate(user: User = defaultTestUser) = run {
-        getTokenFor(user)
-        listAllWalletsForUser()
-        println("\nUse Case -> Create DIDs\n")
-        createDids()
-    }
-    
-    suspend fun testKeyEndpoints(user: User = defaultTestUser) {
-        getTokenFor(user)
-        listAllWalletsForUser()
-        testKeys()
-    }
-    
 }

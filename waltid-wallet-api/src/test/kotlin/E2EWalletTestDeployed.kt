@@ -3,19 +3,17 @@ import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.plugins.logging.*
 import io.ktor.client.request.*
-import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
-import io.ktor.server.testing.*
 import kotlinx.coroutines.test.runTest
 import kotlin.test.*
 import kotlin.time.Duration.Companion.seconds
 
-class E2EWalletTestDeployed : WalletApiTeste2eBase() {
+class E2EWalletTestDeployed : E2EWalletTestBase() {
     private lateinit var deployedClient: HttpClient
     private var deployedWalletUrl: String = "https://wallet.walt.id"
     private var deployedIssuerUrl: String = "https://issuer.portal.walt.id"
     
-    private fun newClient(contentType: Boolean = false, token: String? = null) = HttpClient {
+    private fun newClient(token: String? = null) = HttpClient {
         install(ContentNegotiation) {
             json()
         }
@@ -25,9 +23,6 @@ class E2EWalletTestDeployed : WalletApiTeste2eBase() {
         }
         followRedirects = false
         defaultRequest {
-            if (contentType) {
-                contentType(ContentType.Application.Json)
-            }
             if (token != null) {
                 header("Authorization", "Bearer $token")
             }
@@ -36,16 +31,14 @@ class E2EWalletTestDeployed : WalletApiTeste2eBase() {
     
     @Test
     fun e2eTestRegisterNewUser() = runTest {
-        deployedClient = newClient(true)
-        println("*********email = $email")
-        
+        deployedClient = newClient()
         testCreateUser(User(name="tester", email=email, password=password, accountType="email"))
     }
     
     @Test
     fun e2eTestLogin() = runTest {
         // test creation of a randomly generated user account
-        deployedClient = newClient(true)
+        deployedClient = newClient()
         
         testCreateUser(User(name = "tester", email = email, password = password, accountType = "email"))
         login(
@@ -67,7 +60,7 @@ class E2EWalletTestDeployed : WalletApiTeste2eBase() {
         getTokenFor()
         testUserInfo()
         testUserSession()
-        deployedClient = newClient(false, token)
+        deployedClient = newClient(token)
         listAllWalletsForUser()
         
         println("WalletId (Deployed Wallet API) = $walletId")
@@ -78,7 +71,7 @@ class E2EWalletTestDeployed : WalletApiTeste2eBase() {
         deployedClient = newClient()
         login()
         getTokenFor()
-        deployedClient = newClient(false, token)
+        deployedClient = newClient(token)
         
         listAllWalletsForUser()
         
@@ -88,11 +81,11 @@ class E2EWalletTestDeployed : WalletApiTeste2eBase() {
     }
     
     @Test
-    fun e2eTestDids() = runTest(timeout = 60.seconds) {
+    fun e2eTestDids() = runTest(timeout = 120.seconds) {
         deployedClient = newClient()
         login()
         getTokenFor()
-        deployedClient = newClient(false, token)
+        deployedClient = newClient(token)
         
         listAllWalletsForUser()
         
@@ -102,6 +95,7 @@ class E2EWalletTestDeployed : WalletApiTeste2eBase() {
         
         // create a did, one of each of the main types we support
         createDids()
+        testDefaultDid()
         availableDids = listAllDids()
         deleteAllDids(availableDids)
     }
@@ -112,7 +106,7 @@ class E2EWalletTestDeployed : WalletApiTeste2eBase() {
         login()
         getTokenFor()
         
-        deployedClient = newClient(false, token)
+        deployedClient = newClient(token)
         
         // list all wallets for this user
         listAllWalletsForUser()
@@ -122,7 +116,7 @@ class E2EWalletTestDeployed : WalletApiTeste2eBase() {
         createDid("key")
         val availableDids = listAllDids()
         
-        deployedClient = newClient(true, token)
+        deployedClient = newClient(token)
         
         val issuanceUri = issueJwtCredential()
         println("Issuance Offer uri = $issuanceUri")
@@ -147,5 +141,4 @@ class E2EWalletTestDeployed : WalletApiTeste2eBase() {
         set(value) {
             deployedIssuerUrl = value
         }
-    
 }
