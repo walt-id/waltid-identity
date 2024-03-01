@@ -112,6 +112,10 @@ dependencies {
     // OIDC
     implementation(project(":waltid-openid4vc"))
     implementation(project(":waltid-sdjwt"))
+    
+    testImplementation(project(":waltid-issuer-api"))
+    testImplementation(project(":waltid-verifier-api"))
+    
     implementation("com.nimbusds:nimbus-jose-jwt:9.37.3")
     implementation("io.ktor:ktor-client-java:$ktorVersion")
 
@@ -148,10 +152,8 @@ dependencies {
 
     // Test
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit:1.9.22")
-
-    /*testImplementation("io.kotest:kotest-runner-junit5:5.5.5")
-    testImplementation("io.kotest:kotest-assertions-core:5.5.5")
-    testImplementation("io.kotest.extensions:kotest-assertions-ktor:2.0.0")*/
+    testImplementation(kotlin("test"))
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.0")
     testImplementation("io.ktor:ktor-server-tests-jvm:$ktorVersion")
 }
 
