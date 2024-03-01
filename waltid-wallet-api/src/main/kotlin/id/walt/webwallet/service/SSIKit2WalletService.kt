@@ -52,19 +52,14 @@ import id.walt.webwallet.service.settings.SettingsService
 import id.walt.webwallet.service.settings.WalletSetting
 import id.walt.webwallet.trustusecase.TrustStatus
 import id.walt.webwallet.trustusecase.TrustValidationUseCase
+import id.walt.webwallet.utils.WalletHttpClients.getHttpClient
 import id.walt.webwallet.web.controllers.PresentationRequestParameter
 import id.walt.webwallet.web.parameter.CredentialRequestParameter
-import io.ktor.client.*
 import io.ktor.client.call.*
-import io.ktor.client.engine.cio.*
-import io.ktor.client.engine.java.*
-import io.ktor.client.plugins.contentnegotiation.*
-import io.ktor.client.plugins.logging.*
 import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
-import io.ktor.serialization.kotlinx.json.*
 import io.ktor.util.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Clock
@@ -73,8 +68,8 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import kotlinx.uuid.UUID
-import org.jetbrains.exposed.sql.*
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.insert
+import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.slf4j.LoggerFactory
 import java.net.URLDecoder
@@ -238,14 +233,6 @@ class SSIKit2WalletService(
         val vp_token: String, val presentation_submission: String, val id_token: String?, val state: String?
     )
 
-    private val ktorClient = HttpClient(CIO) {
-        install(ContentNegotiation) {
-            json()
-        }
-        followRedirects = false
-    }
-
-
     data class PresentationError(
         override val message: String, val redirectUri: String?
     ) : IllegalArgumentException(message)
@@ -277,7 +264,7 @@ class SSIKit2WalletService(
         logger.debug("Resolved presentation definition: ${presentationSession.authorizationRequest!!.presentationDefinition!!.toJSONString()}")
 
         val tokenResponse = credentialWallet.processImplicitFlowAuthorization(presentationSession.authorizationRequest)
-        val resp = ktorClient.submitForm(presentationSession.authorizationRequest.responseUri
+        val resp = this.http.submitForm(presentationSession.authorizationRequest.responseUri
             ?: presentationSession.authorizationRequest.redirectUri ?: throw AuthorizationError(
                 presentationSession.authorizationRequest,
                 AuthorizationErrorCode.invalid_request,
@@ -346,16 +333,7 @@ class SSIKit2WalletService(
 
     private val testCIClientConfig = OpenIDClientConfig("test-client", null, redirectUri = "http://blank")
 
-    val http = HttpClient(Java) {
-        install(ContentNegotiation) {
-            json()
-        }
-        install(Logging) {
-            logger = Logger.SIMPLE
-            level = LogLevel.ALL
-        }
-        followRedirects = false
-    }
+    val http = getHttpClient()
 
     private suspend fun processCredentialOffer(
         credentialOffer: CredentialOffer, credentialWallet: TestCredentialWallet
@@ -363,7 +341,7 @@ class SSIKit2WalletService(
         logger.debug("// get issuer metadata")
         val providerMetadataUri = credentialWallet.getCIProviderMetadataUrl(credentialOffer.credentialIssuer)
         logger.debug("Getting provider metadata from: $providerMetadataUri")
-        val providerMetadataResult = ktorClient.get(providerMetadataUri)
+        val providerMetadataResult = this.http.get(providerMetadataUri)
         logger.debug("Provider metadata returned: " + providerMetadataResult.bodyAsText())
 
         val providerMetadata = providerMetadataResult.body<JsonObject>().let { OpenIDProviderMetadata.fromJSON(it) }
@@ -386,7 +364,7 @@ class SSIKit2WalletService(
         )
 //        logger.debug("tokenReq: {}", tokenReq)
 
-        val tokenResp = ktorClient.submitForm(
+        val tokenResp = this.http.submitForm(
             providerMetadata.tokenEndpoint!!, formParameters = parametersOf(tokenReq.toHttpParameters())
         ).let {
             logger.debug("tokenResp raw: {}", it)
@@ -416,7 +394,7 @@ class SSIKit2WalletService(
             credReqs.size >= 2 -> {
                 val batchCredentialRequest = BatchCredentialRequest(credReqs)
 
-                val credentialResponses = ktorClient.post(providerMetadata.batchCredentialEndpoint!!) {
+                val credentialResponses = this.http.post(providerMetadata.batchCredentialEndpoint!!) {
                     contentType(ContentType.Application.Json)
                     bearerAuth(tokenResp.accessToken!!)
                     setBody(batchCredentialRequest.toJSON())
@@ -430,7 +408,7 @@ class SSIKit2WalletService(
             credReqs.size == 1 -> {
                 val credReq = credReqs.first()
 
-                val credentialResponse = ktorClient.post(providerMetadata.credentialEndpoint!!) {
+                val credentialResponse = this.http.post(providerMetadata.credentialEndpoint!!) {
                     contentType(ContentType.Application.Json)
                     bearerAuth(tokenResp.accessToken!!)
                     setBody(credReq.toJSON())
@@ -466,7 +444,7 @@ class SSIKit2WalletService(
 //        val responseToken = SDJwt.sign(responseTokenPayload, jwtCryptoProvider, TEST_WALLET_DID + "#${testWalletKey.getKeyId()}").toString()
 
         // *) POST response JWT token to return address found in manifest
-        val resp = http.post(entraIssuanceRequest.issuerReturnAddress) {
+        val resp = this.http.post(entraIssuanceRequest.issuerReturnAddress) {
             contentType(ContentType.Text.Plain)
             setBody(responseToken)
         }
@@ -491,6 +469,7 @@ class SSIKit2WalletService(
         logger.debug("// parse credential URI")
         val reqParams = Url(offer).parameters.toMap()
 
+        println("*********** reqParams = $reqParams")
         // entra or openid4vc credential offer
         val isEntra = EntraIssuanceRequest.isEntraIssuanceRequestUri(offer)
         val credentialResponses = if (isEntra) {
@@ -923,5 +902,3 @@ class SSIKit2WalletService(
     } ?: EventDataNotAvailable
 
 }
-
-
