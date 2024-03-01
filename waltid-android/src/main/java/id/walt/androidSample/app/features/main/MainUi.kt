@@ -1,4 +1,4 @@
-package id.walt.androidSample.app
+package id.walt.androidSample.app.features.main
 
 import android.widget.Toast
 import androidx.biometric.BiometricManager
@@ -41,21 +41,21 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.fragment.app.FragmentActivity
-import id.walt.androidSample.ui.KeyTypeOptions
+import androidx.navigation.NavHostController
 import id.walt.androidSample.R
-import id.walt.androidSample.app.MainViewModel.Event.BiometricAuthenticationFailure
-import id.walt.androidSample.app.MainViewModel.Event.BiometricsUnavailable
-import id.walt.androidSample.app.MainViewModel.Event.SignatureInvalid
-import id.walt.androidSample.app.MainViewModel.Event.SignatureVerified
-import id.walt.androidSample.models.CopiedText
+import id.walt.androidSample.app.features.main.MainViewModel.Event.*
+import id.walt.androidSample.app.navigation.NavigationItem
 import id.walt.androidSample.theme.WaltIdAndroidSampleTheme
-import id.walt.androidSample.ui.BasicText
+import id.walt.androidSample.ui.KeyTypeOptions
 import id.walt.androidSample.utils.ObserveAsEvents
 import id.walt.androidSample.utils.collectImmediatelyAsState
 import id.walt.crypto.keys.KeyType
 
 @Composable
-fun MainUi(viewModel: MainViewModel) {
+fun MainUi(
+    viewModel: MainViewModel,
+    navHostController: NavHostController,
+) {
 
     val ctx = LocalContext.current
 
@@ -73,14 +73,17 @@ fun MainUi(viewModel: MainViewModel) {
                 Toast.LENGTH_SHORT
             ).show()
 
-            is MainViewModel.Event.SignedWithKey -> Toast.makeText(
+            is SignedWithKey -> Toast.makeText(
                 ctx,
                 ctx.getString(R.string.signed_with_key, event.key.name),
                 Toast.LENGTH_SHORT
             ).show()
 
-            MainViewModel.Event.CredentialSignFailure -> Toast.makeText(ctx, ctx.getString(R.string.credential_sign_failure), Toast.LENGTH_SHORT).show()
-            MainViewModel.Event.GeneralSuccess -> Toast.makeText(ctx, ctx.getString(R.string.success), Toast.LENGTH_SHORT).show()
+            CredentialSignFailure -> Toast.makeText(ctx, ctx.getString(R.string.credential_sign_failure), Toast.LENGTH_SHORT).show()
+            GeneralSuccess -> Toast.makeText(ctx, ctx.getString(R.string.success), Toast.LENGTH_SHORT).show()
+            is NavigateToResult -> {
+                navHostController.navigate(NavigationItem.Result.route)
+            }
         }
     }
 
@@ -100,7 +103,6 @@ private fun MainUiContent(
 ) {
 
     val plainText by viewModel.plainText.collectImmediatelyAsState()
-    val textToDisplay by viewModel.displayText.collectAsState()
     val signature by viewModel.signature.collectAsState()
 
     val context = LocalContext.current
@@ -232,12 +234,17 @@ private fun MainUiContent(
             Text(text = stringResource(R.string.label_sign_credential))
         }
 
-        val displayText = textToDisplay
-        if (displayText != null) {
-            BasicText(
-                text = displayText,
-                textToCopy = CopiedText("WaltId copied text", displayText)
-            )
+        Button(
+            onClick = {
+                systemKeyboard?.hide()
+                authenticateWithBiometric(
+                    context = context as FragmentActivity,
+                    onAuthenticated = { viewModel.onCreateAndSignSDJWT() },
+                    onFailure = { viewModel.onBiometricsAuthFailure() }
+                )
+            }
+        ) {
+            Text(text = stringResource(R.string.label_create_and_sign_sdjwt))
         }
     }
 }
@@ -282,7 +289,7 @@ private fun Preview_MainUiContent() {
         ) {
             MainUiContent(
                 MainViewModel.Fake(),
-                isBiometricsAvailable = true
+                isBiometricsAvailable = true,
             )
         }
     }

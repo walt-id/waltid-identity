@@ -1,12 +1,20 @@
-package id.walt.androidSample.app
+package id.walt.androidSample.app.features.main
 
 import android.util.Base64
+import android.util.Log
+import com.nimbusds.jose.JWSAlgorithm
+import com.nimbusds.jose.crypto.MACSigner
+import com.nimbusds.jose.crypto.MACVerifier
+import com.nimbusds.jwt.JWTClaimsSet
 import id.walt.credentials.CredentialBuilder
 import id.walt.credentials.CredentialBuilderType
 import id.walt.crypto.keys.AndroidKey
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.LocalKeyMetadata
 import id.walt.did.dids.DidService
+import id.walt.sdjwt.SDJwt
+import id.walt.sdjwt.SDPayload
+import id.walt.sdjwt.SimpleJWTCryptoProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
@@ -16,6 +24,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
+import java.io.UnsupportedEncodingException
+import kotlin.js.ExperimentalJsExport
+
 
 interface MainViewModel {
 
@@ -43,6 +54,8 @@ interface MainViewModel {
 
     fun onSignCredential()
 
+    fun onCreateAndSignSDJWT()
+
     fun onClearInput()
 
     sealed interface Event {
@@ -53,6 +66,7 @@ interface MainViewModel {
         data object BiometricAuthenticationFailure : Event
         data class SignedWithKey(val key: KeyType) : Event
         data object GeneralSuccess : Event
+        data object NavigateToResult : Event
     }
 
     class Fake : MainViewModel {
@@ -75,6 +89,7 @@ interface MainViewModel {
         override fun onGenerateDid() = Unit
         override fun onSignCredential() = Unit
         override fun onSignJWS(plainText: String, keyType: KeyType) = Unit
+        override fun onCreateAndSignSDJWT() = Unit
 
     }
 
@@ -100,7 +115,7 @@ interface MainViewModel {
                     val signedContent = this.signRaw(plainText.toByteArray())
                     displayText.value = Base64.encodeToString(signedContent, Base64.DEFAULT)
                     signature.value = signedContent
-                    eventsChannel.send(Event.SignedWithKey(keyType))
+                    eventsChannel.send(Event.NavigateToResult)
                 }
             }
         }
@@ -111,7 +126,7 @@ interface MainViewModel {
                     androidKey = this
                     signJws(plainText.toByteArray(), mapOf("kid" to this.getKeyId())).also {
                         displayText.value = it
-                        eventsChannel.send(Event.SignedWithKey(keyType))
+                        eventsChannel.send(Event.NavigateToResult)
                     }
                 }
             }
@@ -133,7 +148,7 @@ interface MainViewModel {
         override fun onRetrievePublicKey() {
             viewModelScope.launch {
                 displayText.value = androidKey?.getPublicKey().toString()
-                eventsChannel.send(Event.GeneralSuccess)
+                eventsChannel.send(Event.NavigateToResult)
             }
         }
 
@@ -160,8 +175,59 @@ interface MainViewModel {
                     val didKey = DidService.registerByKey("key", it)
                     displayText.value = didKey.did
                     did = didKey.did
-                    eventsChannel.send(Event.GeneralSuccess)
+                    eventsChannel.send(Event.NavigateToResult)
                 }
+            }
+        }
+
+        @OptIn(ExperimentalJsExport::class)
+        override fun onCreateAndSignSDJWT() {
+            viewModelScope.launch {
+                // Shared secret for HMAC crypto algorithm
+                val sharedSecret = "ef23f749-7238-481a-815c-f0c2157dfa8e"
+
+                // Create SimpleJWTCryptoProvider with MACSigner and MACVerifier
+                val cryptoProvider = SimpleJWTCryptoProvider(JWSAlgorithm.HS256, MACSigner(sharedSecret), MACVerifier(sharedSecret))
+
+                // Create original JWT claims set, using nimbusds claims set builder
+                val originalClaimsSet = JWTClaimsSet.Builder()
+                    .subject("123")
+                    .audience("456")
+                    .claim("name", "Jane")
+                    .claim("email", "janedoe@gmail.com")
+                    .claim("family_name", "Doe")
+                    .claim("admin", true)
+                    .build()
+
+                // Create undisclosed claims set, by removing e.g. subject property from original claims set
+                val undisclosedClaimsSet = JWTClaimsSet.Builder(originalClaimsSet)
+                    .subject(null)
+                    .claim("admin", null)
+                    .claim("family_name", null)
+                    .build()
+
+                // Create SD payload by comparing original claims set with undisclosed claims set
+                val sdPayload = SDPayload.createSDPayload(originalClaimsSet, undisclosedClaimsSet)
+
+                // Create and sign SD-JWT using the generated SD payload and the previously configured crypto provider
+                val sdJwt = SDJwt.sign(sdPayload, cryptoProvider)
+
+                fun getJson(strEncoded: String): String {
+                    val decodedBytes = Base64.decode(strEncoded, Base64.URL_SAFE)
+                    return String(decodedBytes, charset("UTF-8"))
+                }
+
+                val decoded = try {
+                    val split = sdJwt.toString().split("\\.".toRegex()).dropLastWhile { it.isEmpty() }.toTypedArray()
+                    val header = getJson(split[0])
+                    val body = getJson(split[1])
+                    "HEADER --> $header\n\nBODY --> $body\n"
+                } catch (e: UnsupportedEncodingException) {
+                    null
+                }
+
+                displayText.value = "$sdJwt \n\n $decoded"
+                eventsChannel.send(Event.NavigateToResult)
             }
         }
 
@@ -177,7 +243,7 @@ interface MainViewModel {
                     val signed: String = credential.signJws(key, d, mySubjectDid)
 
                     displayText.value = signed
-                    eventsChannel.send(Event.GeneralSuccess)
+                    eventsChannel.send(Event.NavigateToResult)
                 } else {
                     eventsChannel.send(Event.CredentialSignFailure)
                 }
