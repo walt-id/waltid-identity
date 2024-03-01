@@ -7,14 +7,12 @@ import kotlinx.serialization.Serializable
 @Serializable
 @OptIn(ExperimentalJsExport::class)
 @JsExport
-data class OCIKeyConfig(
+data class OCIKeyMetadata(
     val tenancyOcid: String,
     val userOcid: String,
     val fingerprint: String,
     val managementEndpoint: String,
     val keyId: String,
-    val OCIDKeyID: String,
     val cryptoEndpoint: String,
-
     val signingKeyPem: String? = null
 )
