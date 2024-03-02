@@ -40,12 +40,14 @@ class WaltIdDidCreateCmdTest {
     fun `should create a valid did-key when called with no argument`() {
         val result = command.test(emptyList<String>())
 
-        assertContains(result.stdout, "did:key")
+        assertContains(result.stdout, "did:key:z[a-km-zA-HJ-NP-Z1-9]+".toRegex())
     }
 
     @Test
-    @Ignore
     fun `should have --method option`() {
+        val result = command.test(listOf("--help"))
+
+        assertContains(result.stdout, "--method")
     }
 
     @Test
