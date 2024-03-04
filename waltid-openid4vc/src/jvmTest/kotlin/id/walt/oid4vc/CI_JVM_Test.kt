@@ -523,7 +523,7 @@ class CI_JVM_Test : AnnotationSpec() {
         println("// -------- CREDENTIAL ISSUER ----------")
 
         // TODO: Validate authorization code
-        // TODO: generate token response
+        // TODO: generate access token
         val tokenResponse: TokenResponse = TODO("Implement in OpenID4VCI") // processTokenRequest(tokenReq)
 
         println("// -------- WALLET ----------")

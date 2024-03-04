@@ -45,9 +45,11 @@ data class TokenResponse private constructor(
         override fun fromJSON(jsonObject: JsonObject) = Json.decodeFromJsonElement(TokenResponseSerializer, jsonObject)
         fun success(
             accessToken: String, tokenType: String, expiresIn: Long? = null, refreshToken: String? = null,
-            scope: String? = null, cNonce: String? = null, cNonceExpiresIn: Long? = null,
-            authorizationPending: Boolean? = null, interval: Long? = null, state: String?
-        ) = TokenResponse(accessToken, tokenType, expiresIn, refreshToken, scope = scope, state = state)
+            scope: String? = null, cNonce: String? = null, cNonceExpiresIn: Duration? = null,
+            authorizationPending: Boolean? = null, interval: Long? = null, state: String? = null
+        ) = TokenResponse(accessToken, tokenType, expiresIn, refreshToken, scope = scope,
+            cNonce = cNonce, cNonceExpiresIn = cNonceExpiresIn, authorizationPending = authorizationPending,
+            interval = interval, state = state)
 
         /**
          * Utility method to construct a success response for a verifiable presentation request
