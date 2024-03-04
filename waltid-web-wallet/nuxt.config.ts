@@ -4,8 +4,8 @@ export default defineNuxtConfig({
     srcDir: "src",
     modules: [
         "@vueuse/nuxt",
-        "@nuxtjs/tailwindcss",
-        "@unocss/nuxt",
+        // "@nuxtjs/tailwindcss",
+        ["@unocss/nuxt", { autoImport: false }],
         "@nuxtjs/i18n",
         "@nuxtjs/color-mode",
         //'@huntersofbook/naive-ui-nuxt',
@@ -158,9 +158,9 @@ export default defineNuxtConfig({
         storageKey: "color-mode"
     },
 
-    tailwindcss: {
+    /*tailwindcss: {
         configPath: "./tailwind.config.js"
-    },
+    },*/
 
     vite: {
         logLevel: "info"
