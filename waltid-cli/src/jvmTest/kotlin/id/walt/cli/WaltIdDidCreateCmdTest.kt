@@ -51,8 +51,10 @@ class WaltIdDidCreateCmdTest {
     }
 
     @Test
-    @Ignore
     fun `should have --key option`() {
+        val result = command.test(listOf("--help"))
+
+        assertContains(result.stdout, "--key")
     }
 
     @Test
