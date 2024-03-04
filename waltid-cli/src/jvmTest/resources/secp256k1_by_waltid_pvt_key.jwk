@@ -1,0 +1,8 @@
+{
+    "kty": "EC",
+    "d": "mRKHNNlqkRxLtTBd4zSDtuPjV36NY7Kg6yusAIQlH_g",
+    "crv": "secp256k1",
+    "kid": "xxWVWbA0sgAAyeq3YyrA_-DQYbKtzmZJKeDn_qRwZYE",
+    "x": "9uDtgwPgXmV3QdQYNwdurDMptuW9nicx3vpqRzo69Zc",
+    "y": "nZRz7ZyUxIMslHlyouR0IdZ1Z2Sl5-_Q_2xYA_XupIA"
+}
