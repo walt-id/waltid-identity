@@ -45,6 +45,7 @@ abstract class WalletService(val tenant: String, val accountId: UUID, val wallet
     abstract suspend fun useOfferRequest(
         offer: String, did: String, requireUserInput: Boolean, silent: Boolean
     ): List<WalletCredential>
+
     abstract suspend fun resolveCredentialOffer(offerRequest: CredentialOfferRequest): CredentialOffer
 
     // DIDs
@@ -56,7 +57,7 @@ abstract class WalletService(val tenant: String, val accountId: UUID, val wallet
 
     // Keys
     abstract suspend fun listKeys(): List<SingleKeyResponse>
-    abstract suspend fun generateKey(type: String, config: KMS.Data?= null): String
+    abstract suspend fun generateKey(type: String, config: KMS.Data? = null): String
     abstract suspend fun exportKey(alias: String, format: String, private: Boolean): String
     abstract suspend fun loadKey(alias: String): JsonObject
     abstract suspend fun importKey(jwkOrPem: String): String
