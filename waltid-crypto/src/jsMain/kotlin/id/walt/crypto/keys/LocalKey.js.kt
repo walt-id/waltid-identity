@@ -2,9 +2,11 @@ package id.walt.crypto.keys
 
 import JWK
 import KeyLike
+import crypto
 import id.walt.crypto.utils.ArrayUtils.toByteArray
 import id.walt.crypto.utils.JwsUtils.jwsAlg
 import id.walt.crypto.utils.PromiseUtils.await
+import io.ktor.utils.io.core.*
 import jose
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -39,6 +41,7 @@ actual class LocalKey actual constructor(
             _internalJwk = JSON.parse(jwk!!)
         }
     }
+
     @JsPromise
     @JsExport.Ignore
     override suspend fun init() {
@@ -88,8 +91,11 @@ actual class LocalKey actual constructor(
 
     @JsPromise
     @JsExport.Ignore
-    actual override suspend fun exportJWK(): String =
-        JSON.stringify(_internalJwk)
+    actual override suspend fun exportJWK(): String = JSON.stringify(_internalJwk)
+
+    @JsPromise
+    @JsExport.Ignore
+    override suspend fun exportJWKPretty(): String = JSON.stringify(_internalJwk, null, 4)
 
     @JsPromise
     @JsExport.Ignore
@@ -109,7 +115,15 @@ actual class LocalKey actual constructor(
     @JsPromise
     @JsExport.Ignore
     actual override suspend fun signRaw(plaintext: ByteArray): ByteArray {
-        TODO("Not yet implemented")
+        check(hasPrivateKey) { "No private key is attached to this key!" }
+        return crypto.sign(
+            when (keyType) {
+                KeyType.Ed25519 -> null
+                else -> "sha256"
+            },
+            plaintext,
+            exportPEM()
+        )
     }
 
     /**
@@ -135,7 +149,22 @@ actual class LocalKey actual constructor(
     @JsPromise
     @JsExport.Ignore
     actual override suspend fun verifyRaw(signed: ByteArray, detachedPlaintext: ByteArray?): Result<ByteArray> {
-        TODO("Not yet implemented")
+        return runCatching {
+            val verified = crypto.verify(
+                when (keyType) {
+                    KeyType.Ed25519 -> null
+                    else -> "sha256"
+                },
+                detachedPlaintext ?: signed,
+                getPublicKey().exportPEM(),
+                signed
+            )
+            if (verified) {
+                "true".toByteArray()
+            } else {
+                throw IllegalArgumentException("Signature verification failed")
+            }
+        }
     }
 
     /**
@@ -170,8 +199,7 @@ actual class LocalKey actual constructor(
     @JsPromise
     @JsExport.Ignore
     actual override suspend fun getPublicKeyRepresentation(): ByteArray {
-
-        TODO("Not yet implemented")
+        return getPublicKey().exportPEM().toByteArray()
     }
 
     override val keyType: KeyType
@@ -234,6 +262,7 @@ actual class LocalKey actual constructor(
         @JsPromise
         @JsExport.Ignore
         actual override suspend fun importJWK(jwk: String): Result<LocalKey> = JsLocalKeyCreator.importJWK(jwk)
+
         @JsPromise
         @JsExport.Ignore
         actual override suspend fun importPEM(pem: String): Result<LocalKey> = JsLocalKeyCreator.importPEM(pem)

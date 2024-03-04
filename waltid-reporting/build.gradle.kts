@@ -118,11 +118,3 @@ kotlin {
         }
     }
 }
-
-
-
-tasks.withType<DependencyUpdatesTask> {
-    rejectVersionIf {
-        listOf("-beta", "-alpha", "-rc").any { it in candidate.version.lowercase() } || candidate.version.takeLast(4).contains("RC")
-    }
-}

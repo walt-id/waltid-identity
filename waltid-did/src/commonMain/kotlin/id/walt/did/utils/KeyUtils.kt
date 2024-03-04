@@ -6,8 +6,19 @@ import id.walt.crypto.keys.LocalKey
 import id.walt.crypto.keys.LocalKeyMetadata
 import id.walt.crypto.utils.MultiBaseUtils
 import id.walt.crypto.utils.MultiCodecUtils
+import love.forte.plugin.suspendtrans.annotation.JsPromise
+import love.forte.plugin.suspendtrans.annotation.JvmAsync
+import love.forte.plugin.suspendtrans.annotation.JvmBlocking
+import kotlin.js.ExperimentalJsExport
+import kotlin.js.JsExport
 
+@ExperimentalJsExport
+@JsExport
 object KeyUtils {
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     suspend fun fromPublicKeyMultiBase(identifier: String): Result<Key> {
         val publicKeyRaw = MultiBaseUtils.convertMultiBase58BtcToRawKey(identifier)
         //TODO: externalize import call
