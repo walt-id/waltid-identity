@@ -4,6 +4,7 @@ import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.subcommands
 import com.github.ajalt.clikt.parameters.groups.provideDelegate
 import id.walt.cli.commands.CommonOptions
+import id.walt.cli.commands.DidCmd
 import id.walt.cli.commands.KeyCmd
 
 class WaltIdCmd : CliktCommand(
@@ -40,7 +41,7 @@ class WaltIdCmd : CliktCommand(
     printHelpOnEmptyArgs = true
 ) {
     init {
-        subcommands(KeyCmd())
+        subcommands(KeyCmd(), DidCmd())
     }
 
     private val commonOptions by CommonOptions()
