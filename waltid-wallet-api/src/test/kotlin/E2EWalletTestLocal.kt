@@ -41,8 +41,6 @@ class E2EWalletTestLocal : E2EWalletTestBase() {
 
     companion object {
         init {
-            Files.createDirectories(Paths.get("./data"));
-            assertTrue(File("./data").exists())
             val config = DatasourceConfiguration(
                 hikariDataSource = HikariDataSource(HikariConfig().apply {
                     jdbcUrl = "jdbc:sqlite:data/wallet.db"
@@ -113,13 +111,6 @@ class E2EWalletTestLocal : E2EWalletTestBase() {
         IssuerConfigManager.preloadConfig("issuer-service", OIDCIssuerServiceConfig("http://localhost"))
 
         IssuerConfigManager.loadConfigs(emptyArray())
-    }
-
-
-    @Test
-    fun createDataDirectory() = runTest {
-        Files.createDirectories(Paths.get("/data"));
-        assertTrue(File("/data").exists())
     }
 
     @Test
