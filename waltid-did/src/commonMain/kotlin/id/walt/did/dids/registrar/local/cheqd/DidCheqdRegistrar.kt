@@ -32,7 +32,16 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.encodeToJsonElement
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
+import love.forte.plugin.suspendtrans.annotation.JsPromise
+import love.forte.plugin.suspendtrans.annotation.JvmAsync
+import love.forte.plugin.suspendtrans.annotation.JvmBlocking
+import kotlin.js.ExperimentalJsExport
+import kotlin.js.JsExport
 
+@ExperimentalJsExport
+@JsExport
 class DidCheqdRegistrar : LocalRegistrarMethod("cheqd") {
 
     private val log = KotlinLogging.logger { }
@@ -63,9 +72,17 @@ class DidCheqdRegistrar : LocalRegistrarMethod("cheqd") {
         }
     }
 
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     override suspend fun register(options: DidCreateOptions): DidResult =
         registerByKey(LocalKey.generate(KeyType.Ed25519), options)
 
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     override suspend fun registerByKey(key: Key, options: DidCreateOptions): DidResult =
         createDid(key, options.get<String>("network") ?: "testnet").let {
             DidResult(it.id, id.walt.did.dids.document.DidDocument(DidCheqdDocument(it, key.exportJWKObject()).toMap()))
@@ -139,16 +156,17 @@ class DidCheqdRegistrar : LocalRegistrarMethod("cheqd") {
         }.body<JobActionResponse>()
     }
 
+    @OptIn(ExperimentalEncodingApi::class)
     private suspend fun signPayload(key: Key, job: JobActionResponse): List<String> = let {
         val state = (job.didState as? ActionDidState) ?: error("Unexpected did state")
         if (!state.action.equals("signPayload", true)) error("Unexpected state action: ${state.action}")
         val payloads = state.signingRequest.map {
-            id.walt.did.utils.EncodingUtils.base64Decode(it.serializedPayload)
+            Base64.decode(it.serializedPayload)
         }
         // TODO: sign with key having alias from verification method
 
         payloads.map {
-            id.walt.did.utils.EncodingUtils.base64Encode(key.signRaw(it) as ByteArray)
+            Base64.encode(key.signRaw(it) as ByteArray)
         }
     }
 }

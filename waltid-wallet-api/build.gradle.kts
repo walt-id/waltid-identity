@@ -99,14 +99,15 @@ dependencies {
 
     /* -- Security -- */
     // Bouncy Castle
-    implementation("org.bouncycastle:bcprov-jdk18on:1.77")
+    implementation("org.bouncycastle:bcprov-lts8on:2.73.4")
 
     // Argon2
     implementation("de.mkammerer:argon2-jvm:2.11")
 
 
     // waltid-did
-    implementation(project(":waltid-did"))//id.walt.crypto provided by id.walt.did:waltid-did
+    implementation(project(":waltid-crypto"))
+    implementation(project(":waltid-did"))
 
     // OIDC
     implementation(project(":waltid-openid4vc"))
@@ -158,12 +159,4 @@ dependencies {
     testImplementation("io.kotest:kotest-assertions-core:5.5.5")
     testImplementation("io.kotest.extensions:kotest-assertions-ktor:2.0.0")*/
     testImplementation("io.ktor:ktor-server-tests-jvm:$ktorVersion")
-}
-
-
-
-tasks.withType<DependencyUpdatesTask> {
-    rejectVersionIf {
-        listOf("-beta", "-alpha", "-rc").any { it in candidate.version.lowercase() } || candidate.version.takeLast(4).contains("RC")
-    }
 }

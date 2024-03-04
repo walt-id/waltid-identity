@@ -28,7 +28,6 @@ suspendTransform {
     js {
 
     }*/
-    useJvmDefault()
     useJsDefault()
 }
 
@@ -101,8 +100,8 @@ kotlin {
                 //implementation("dev.whyoleg.cryptography:cryptography-jdk:0.1.0")
                 implementation("com.google.crypto.tink:tink:1.12.0") // for JOSE using Ed25519
 
-                implementation("org.bouncycastle:bcprov-jdk18on:1.77") // for secp256k1 (which was removed with Java 17)
-                implementation("org.bouncycastle:bcpkix-jdk18on:1.77") // PEM import
+                implementation("org.bouncycastle:bcprov-lts8on:2.73.4") // for secp256k1 (which was removed with Java 17)
+                implementation("org.bouncycastle:bcpkix-lts8on:2.73.4") // PEM import
 
                 // Ktor client
                 implementation("io.ktor:ktor-client-cio:2.3.8")
@@ -114,7 +113,7 @@ kotlin {
                 implementation("com.nimbusds:nimbus-jose-jwt:9.37.3")
 
                 // Multibase
-                implementation("com.github.multiformats:java-multibase:v1.1.1")
+//                implementation("com.github.multiformats:java-multibase:v1.1.1")
             }
         }
         val jvmTest by getting {
@@ -132,7 +131,7 @@ kotlin {
                 implementation(npm("jose", "4.14.4"))
 
                 // Multibase
-                implementation(npm("multiformats", "12.1.2"))
+                // implementation(npm("multiformats", "12.1.2"))
             }
         }
         val jsTest by getting {
@@ -179,11 +178,4 @@ extensions.getByType<SuspendTransformGradleExtension>().apply {
             )
         )
     )
-}
-
-
-tasks.withType<DependencyUpdatesTask> {
-    rejectVersionIf {
-        listOf("-beta", "-alpha", "-rc").any { it in candidate.version.lowercase() } || candidate.version.takeLast(4).contains("RC")
-    }
 }

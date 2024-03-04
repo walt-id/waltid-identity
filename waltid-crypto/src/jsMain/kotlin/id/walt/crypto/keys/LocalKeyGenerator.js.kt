@@ -1,5 +1,6 @@
 package id.walt.crypto.keys
 
+import JWK
 import KeyLike
 import id.walt.crypto.utils.JwsUtils.jwsAlg
 import id.walt.crypto.utils.PromiseUtils.await
@@ -25,13 +26,20 @@ object JsLocalKeyCreator : LocalKeyCreator {
     @JsPromise
     @JsExport.Ignore
     override suspend fun importRawPublicKey(type: KeyType, rawPublicKey: ByteArray, metadata: LocalKeyMetadata): Key {
-        TODO("Not yet implemented")
+        val key: KeyLike = await(jose.importSPKI(rawPublicKey.decodeToString(), type.jwsAlg()))
+        return LocalKey(key).apply { init() }
     }
 
     @JsPromise
     @JsExport.Ignore
     override suspend fun importJWK(jwk: String): Result<LocalKey> =
-        runCatching { LocalKey(await(jose.importJWK(JSON.parse(jwk))), JSON.parse(jwk)).apply { init() } }
+        runCatching {
+            var jsonJWK = JSON.parse<JWK>(jwk)
+            while (jsonJWK::class == String::class) {
+               jsonJWK = JSON.parse(jsonJWK as String)
+            }
+            LocalKey(await(jose.importJWK(jsonJWK)), jsonJWK).apply { init() }
+        }
 
 
     /**

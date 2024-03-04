@@ -5,6 +5,7 @@ COPY gradle/ /work/gradle
 COPY settings.gradle.kts build.gradle.kts gradle.properties gradlew /work/
 COPY waltid-openid4vc/build.gradle.kts /work/waltid-openid4vc/
 COPY waltid-sdjwt/build.gradle.kts /work/waltid-sdjwt/
+COPY waltid-crypto/build.gradle.kts /work/waltid-crypto/
 COPY waltid-did/build.gradle.kts /work/waltid-did/
 
 WORKDIR /work/waltid-wallet-api/
@@ -13,6 +14,7 @@ RUN gradle build || return 0
 
 COPY waltid-openid4vc/. /work/waltid-openid4vc
 COPY waltid-sdjwt/. /work/waltid-sdjwt
+COPY waltid-crypto/. /work/waltid-crypto
 COPY waltid-did/. /work/waltid-did
 
 COPY waltid-wallet-api/src/ /work/waltid-wallet-api/src

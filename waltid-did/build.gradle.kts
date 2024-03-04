@@ -1,10 +1,16 @@
 import com.github.benmanes.gradle.versions.updates.DependencyUpdatesTask
 
+import love.forte.plugin.suspendtrans.ClassInfo
+import love.forte.plugin.suspendtrans.SuspendTransformConfiguration
+import love.forte.plugin.suspendtrans.TargetPlatform
+import love.forte.plugin.suspendtrans.gradle.SuspendTransformGradleExtension
+
 plugins {
     kotlin("multiplatform")
     kotlin("plugin.serialization")
     id("maven-publish")
     id("com.github.ben-manes.versions")
+    id("love.forte.plugin.suspend-transform") version "0.6.0"
 }
 
 group = "id.walt.did"
@@ -17,6 +23,18 @@ repositories {
 java {
     sourceCompatibility = JavaVersion.VERSION_15
     targetCompatibility = JavaVersion.VERSION_15
+}
+
+suspendTransform {
+    enabled = true
+    includeRuntime = true
+    /*jvm {
+
+    }
+    js {
+
+    }*/
+    useJsDefault()
 }
 
 
@@ -72,6 +90,9 @@ kotlin {
                 // Crypto
                 api(project(":waltid-crypto"))
 
+                // Encodings
+                implementation("net.thauvin.erik.urlencoder:urlencoder-lib:1.4.0")
+
                 // Logging
                 implementation("io.github.oshai:kotlin-logging:6.0.3")
 
@@ -95,7 +116,7 @@ kotlin {
                 implementation("io.github.erdtman:java-json-canonicalization:1.1")
 
                 // Multiformat
-                implementation("com.github.multiformats:java-multibase:v1.1.1")
+//                implementation("com.github.multiformats:java-multibase:v1.1.1")
             }
         }
         val jvmTest by getting {
@@ -145,10 +166,12 @@ kotlin {
     }
 }
 
-
-
-tasks.withType<DependencyUpdatesTask> {
-    rejectVersionIf {
-        listOf("-beta", "-alpha", "-rc").any { it in candidate.version.lowercase() } || candidate.version.takeLast(4).contains("RC")
-    }
+extensions.getByType<SuspendTransformGradleExtension>().apply {
+    transformers[TargetPlatform.JS] = mutableListOf(
+        SuspendTransformConfiguration.jsPromiseTransformer.copy(
+            copyAnnotationExcludes = listOf(
+                ClassInfo("kotlin.js", "JsExport.Ignore")
+            )
+        )
+    )
 }
