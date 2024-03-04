@@ -63,7 +63,6 @@ class WaltIdDidCreateCmdTest {
     // --method
 
     @Test
-
     fun `should not accept --method value other than key, jwk, web, ebsi, cheqd or iota`() {
         // Could be a parametrized test :-/
         val acceptedMethods = listOf("key", "jwk", "web", "ebsi", "cheqd", "iota")
@@ -111,8 +110,22 @@ class WaltIdDidCreateCmdTest {
     }
 
     @Test
-    @Ignore
     fun `should generate a new key if one is not provided via the --key option`() {
+        val result = command.test("--method=key")
+
+        val keyFormat = listOf(
+            """"kty": "OKP"""",
+            """"d": ".*?"""",
+            """"crv": "Ed25519"""",
+            """"kid": ".*?"""",
+            """"x": ".*?""""
+        )
+
+        assertContains(result.stdout, "Key not provided. Let's generate a new one...")
+        assertContains(result.stdout, "Key generated:")
+        keyFormat.forEach {
+            assertContains(result.stdout, it.toRegex())
+        }
     }
 
 // --key
