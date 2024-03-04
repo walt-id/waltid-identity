@@ -3,10 +3,8 @@ package id.walt.cli
 import com.github.ajalt.clikt.core.PrintHelpMessage
 import com.github.ajalt.clikt.testing.test
 import id.walt.cli.commands.DidCreateCmd
-import kotlin.test.Ignore
-import kotlin.test.Test
-import kotlin.test.assertContains
-import kotlin.test.assertFailsWith
+import org.junit.jupiter.api.assertDoesNotThrow
+import kotlin.test.*
 
 class WaltIdDidCreateCmdTest {
 
@@ -60,14 +58,26 @@ class WaltIdDidCreateCmdTest {
     @Test
     @Ignore
     fun `should have --useJwkJcsPub option???? When?`() {
-
     }
 
     // --method
 
     @Test
-    @Ignore
+
     fun `should not accept --method value other than key, jwk, web, ebsi, cheqd or iota`() {
+        // Could be a parametrized test :-/
+        val acceptedMethods = listOf("key", "jwk", "web", "ebsi", "cheqd", "iota")
+        for (m in acceptedMethods) {
+            assertDoesNotThrow {
+                command.parse(listOf("--method=${m}"))
+            }
+        }
+
+        val failure1 = assertFails { command.parse(listOf("--method=foo")) }
+        assertContains(failure1.toString(), "BadParameterValue: invalid choice")
+
+        val failure2 = assertFails { command.parse(listOf("--method=bar")) }
+        assertContains(failure2.toString(), "BadParameterValue: invalid choice")
     }
 
     @Test
@@ -105,7 +115,7 @@ class WaltIdDidCreateCmdTest {
     fun `should generate a new key if one is not provided via the --key option`() {
     }
 
-    // --key
+// --key
 
     @Test
     @Ignore
@@ -117,9 +127,9 @@ class WaltIdDidCreateCmdTest {
     fun `should fail if the key file specified in the --key option is in a not supported format`() {
     }
 
-    // KEY
+// KEY
 
-    // JWK
+// JWK
 
     @Test
     @Ignore
@@ -127,7 +137,7 @@ class WaltIdDidCreateCmdTest {
 
     }
 
-    // WEB
+// WEB
 
     @Test
     @Ignore
@@ -145,7 +155,7 @@ class WaltIdDidCreateCmdTest {
 
     }
 
-    // EBSI
+// EBSI
 
     @Test
     @Ignore
@@ -178,7 +188,7 @@ class WaltIdDidCreateCmdTest {
 
     }
 
-    // CHEQD
+// CHEQD
 
     @Test
     @Ignore
@@ -206,7 +216,7 @@ class WaltIdDidCreateCmdTest {
 
     }
 
-    // IOTA
+// IOTA
 
     @Test
     @Ignore
@@ -214,8 +224,8 @@ class WaltIdDidCreateCmdTest {
 
     }
 
-    // @Test
-    // fun `should have --xx option if --method=iota`() {}
+// @Test
+// fun `should have --xx option if --method=iota`() {}
 
 
 }
