@@ -8,5 +8,5 @@ data class DatabaseConfiguration(
 
 data class DatasourceConfiguration(
     val hikariDataSource: HikariDataSource,
-    val recreateDatabaseOnStart: Boolean = false
+    var recreateDatabaseOnStart: Boolean = false
 ) : WalletConfig
