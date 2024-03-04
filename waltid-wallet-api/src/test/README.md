@@ -35,8 +35,8 @@ the basic test logic for all tests. There are then two subclasses:
   * Wallet API: `https://wallet.walt.id`
   * Issuer API: `https://issuer.portal.walt.id`
 
-To run the suite of tests within that class, you can either click on the green button (above) or run
-from within *intellij*
+To run the suite of tests within that class, you can either click on the green button (above) from within _intellij IDE_, 
+or run from the command line using _gradle_. See _Running the Tests_ below.
 
 The following Architecture diagram summarises how the switchable nature of the framework
 is implemented.
@@ -75,18 +75,40 @@ The `e2eTestWalletCredentials` test suite contains a number of component steps a
     <br></br>
 
   * `getTokenFor()`
+    For authorisation purposes on many of the endpoint calls we need the token for
+    this user. This function calls login which returns the user token.
      <br></br>
   * `localWalletClient = newClient(token)`
+    In local class, calls `newClient()` within the ApplicationTestBuilder ktor class to
+    set up a ktor test client.
+    In the deployed case, creates a standard http client which can call the deployed servers based on 
+    port number.
     <br></br>
   *  `listAllWalletsForUser()`   
-     <br></br>
+    Each user can have a number of wallets attached to the account. We need to retrieve one to use
+    as the correct wallet into which we perform various actions related to DIDs, Keys, credentials etc.
+       <br></br>
   * `val availableDids = listAllDids()`
+    Lists all the Dids associated with this user wallet.
     <br></br>
   * `val issuanceUri = issueJwtCredential()`
+    Issues a jtw credential offer Uri for this wallet. The Uri can then be used to request 
+    credential issuance from the Issuer API
+    
     <br></br>
   * `requestCredential(issuanceUri, availableDids.first().did)`
-    <br></br> 
-        
-        
-        
+    Once the Uri has been issued (see above), it -and an avaiable Did for this user - can be used to request credential
+    issuance from the Issuer API. The endpoint called is:
+    <br></br>
+`    /wallet-api/wallet/<walletId>/exchange/useOfferRequest
+`    
+<br></br> 
+  
+## Running the Tests
+
+From the /waltid-identity root folder, the wallet-api tests described here can be be run by using 
+the following command:
+
+`./gradlew :waltid-wallet-api:build
+`        
 
