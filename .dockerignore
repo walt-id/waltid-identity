@@ -1,4 +1,6 @@
 */build
+*/.nuxt
+*/node_modules
 .gradle
 .idea
 .run
