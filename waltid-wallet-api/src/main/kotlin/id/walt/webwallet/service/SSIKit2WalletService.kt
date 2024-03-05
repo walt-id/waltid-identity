@@ -124,11 +124,9 @@ class SSIKit2WalletService(
             ?: throw IllegalArgumentException("WalletCredential not found for credentialId: $credentialId")
 
     override suspend fun attachCategory(credentialId: String, categories: List<String>): Boolean =
-        categoryService.list(walletId).filter { categories.contains(it.name) }.map { it.name }.let {
-            CredentialsService.Category.add(
-                wallet = walletId, credentialId = credentialId, category = it.toTypedArray()
-            ) == it.size
-        }
+        CredentialsService.Category.add(
+            wallet = walletId, credentialId = credentialId, category = categories.toTypedArray()
+        ) == categories.size
 
     override suspend fun detachCategory(credentialId: String, categories: List<String>): Boolean =
         CredentialsService.Category.delete(walletId, credentialId, *categories.toTypedArray()) > 0
