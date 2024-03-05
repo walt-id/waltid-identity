@@ -37,8 +37,9 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import kotlinx.uuid.UUID
-import org.jetbrains.exposed.sql.*
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.sql.insert
+import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.net.URLDecoder
 import java.nio.charset.Charset
@@ -173,6 +174,8 @@ class WalletKitWalletService(tenant: String, accountId: UUID, walletId: UUID) : 
     override suspend fun attachCategory(credentialId: String, categories: List<String>): Boolean = throw NotImplementedError("")
 
     override suspend fun detachCategory(credentialId: String, categories: List<String>): Boolean = throw NotImplementedError("")
+    override suspend fun renameCategory(oldName: String, newName: String): Boolean = throw NotImplementedError("")
+
     override suspend fun acceptCredential(parameter: CredentialRequestParameter): Boolean = throw NotImplementedError("")
 
     override suspend fun rejectCredential(parameter: CredentialRequestParameter): Boolean = throw NotImplementedError("")
