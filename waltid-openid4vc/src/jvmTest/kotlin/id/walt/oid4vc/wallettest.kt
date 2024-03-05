@@ -132,7 +132,7 @@ class wallettest : AnnotationSpec() {
             clientId = testCIClientConfig.clientID,
             redirectUri = credentialWallet.config.redirectUri,
             preAuthorizedCode = parsedOfferReq.credentialOffer!!.grants[GrantType.pre_authorized_code.value]!!.preAuthorizedCode,
-            userPin = null
+            txCode = null
         )
         println("tokenReq: $tokenReq")
 

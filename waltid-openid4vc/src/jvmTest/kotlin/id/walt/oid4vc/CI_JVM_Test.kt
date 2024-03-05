@@ -14,9 +14,11 @@ import id.walt.did.dids.registrar.dids.DidJwkCreateOptions
 import id.walt.did.dids.registrar.dids.DidKeyCreateOptions
 import id.walt.did.dids.registrar.dids.DidWebCreateOptions
 import id.walt.oid4vc.data.*
+import id.walt.oid4vc.definitions.JWTClaims
 import id.walt.oid4vc.definitions.OPENID_CREDENTIAL_AUTHORIZATION_TYPE
 import id.walt.oid4vc.providers.CredentialWalletConfig
 import id.walt.oid4vc.providers.OpenIDClientConfig
+import id.walt.oid4vc.providers.TokenTarget
 import id.walt.oid4vc.requests.*
 import id.walt.oid4vc.responses.*
 import id.walt.sdjwt.SDJwt
@@ -524,7 +526,14 @@ class CI_JVM_Test : AnnotationSpec() {
 
         // TODO: Validate authorization code
         // TODO: generate access token
-        val tokenResponse: TokenResponse = TODO("Implement in OpenID4VCI") // processTokenRequest(tokenReq)
+        val accessToken = ciTestProvider.signToken(TokenTarget.ACCESS, buildJsonObject {
+            put(JWTClaims.Payload.subject, "test-issuance-session")
+            put(JWTClaims.Payload.issuer, ciTestProvider.baseUrl)
+            put(JWTClaims.Payload.audience, TokenTarget.ACCESS.name)
+            put(JWTClaims.Payload.jwtID, "token-id")
+        })
+        val cNonce = "pop-nonce"
+        val tokenResponse: TokenResponse = TokenResponse.success(accessToken, "bearer", cNonce = cNonce)
 
         println("// -------- WALLET ----------")
         tokenResponse.isSuccess shouldBe true
@@ -679,13 +688,13 @@ class CI_JVM_Test : AnnotationSpec() {
         println("// as CI provider, initialize credential offer for user, this time providing full offered credential object, and allowing pre-authorized code flow with user pin")
         val issuanceSession = ciTestProvider.initializeCredentialOffer(
             CredentialOffer.Builder(ciTestProvider.baseUrl)
-                .addOfferedCredential(OfferedCredential.fromProviderMetadata(ciTestProvider.metadata.credentialsSupported!!.first())),
+                .addOfferedCredential(ciTestProvider.metadata.credentialsSupported!!.first().id!!),
             5.minutes, allowPreAuthorized = true, preAuthUserPin = "1234"
         )
         println("issuanceSession: $issuanceSession")
 
         issuanceSession.credentialOffer shouldNotBe null
-        issuanceSession.credentialOffer!!.credentials.first() shouldBe instanceOf<JsonObject>()
+        issuanceSession.credentialOffer!!.credentialConfigurationIds.first() shouldBe ciTestProvider.metadata.credentialsSupported!!.first().id!!
 
         val offerRequest = CredentialOfferRequest(issuanceSession.credentialOffer!!)
         println("offerRequest: $offerRequest")
@@ -704,7 +713,7 @@ class CI_JVM_Test : AnnotationSpec() {
         parsedOfferReq.credentialOffer!!.credentialIssuer shouldNotBe null
         parsedOfferReq.credentialOffer!!.grants.keys shouldContain GrantType.pre_authorized_code.value
         parsedOfferReq.credentialOffer!!.grants[GrantType.pre_authorized_code.value]?.preAuthorizedCode shouldNotBe null
-        parsedOfferReq.credentialOffer!!.grants[GrantType.pre_authorized_code.value]?.userPinRequired shouldBe true
+        parsedOfferReq.credentialOffer!!.grants[GrantType.pre_authorized_code.value]?.txCode shouldNotBe null
 
         println("// get issuer metadata")
         val providerMetadataUri =
@@ -730,7 +739,7 @@ class CI_JVM_Test : AnnotationSpec() {
             //clientId = testCIClientConfig.clientID,
             redirectUri = credentialWallet.config.redirectUri,
             preAuthorizedCode = parsedOfferReq.credentialOffer!!.grants[GrantType.pre_authorized_code.value]!!.preAuthorizedCode,
-            userPin = null
+            txCode = null
         )
         println("tokenReq: $tokenReq")
 
@@ -748,7 +757,7 @@ class CI_JVM_Test : AnnotationSpec() {
             clientId = testCIClientConfig.clientID,
             redirectUri = credentialWallet.config.redirectUri,
             preAuthorizedCode = parsedOfferReq.credentialOffer!!.grants[GrantType.pre_authorized_code.value]!!.preAuthorizedCode,
-            userPin = issuanceSession.preAuthUserPin
+            txCode = issuanceSession.preAuthUserPin
         )
         println("tokenReq: $tokenReq")
 
@@ -904,7 +913,7 @@ class CI_JVM_Test : AnnotationSpec() {
             //clientId = testCIClientConfig.clientID,
             redirectUri = credentialWallet.config.redirectUri,
             preAuthorizedCode = credOfferReq.credentialOffer!!.grants[GrantType.pre_authorized_code.value]!!.preAuthorizedCode,
-            userPin = null
+            txCode = null
         )
         println("tokenReq: $tokenReq")
         var tokenResp = ktorClient.submitForm(
@@ -959,7 +968,7 @@ class CI_JVM_Test : AnnotationSpec() {
             clientId = testCIClientConfig.clientID,
             redirectUri = credentialWallet.config.redirectUri,
             preAuthorizedCode = credOfferReq.credentialOffer!!.grants[GrantType.pre_authorized_code.value]!!.preAuthorizedCode,
-            userPin = null
+            txCode = null
         )
         println("tokenReq: ${tokenReq.toHttpQueryString()}")
         var tokenResp = ktorClient.submitForm(
@@ -1013,7 +1022,7 @@ class CI_JVM_Test : AnnotationSpec() {
             clientId = testCIClientConfig.clientID,
             redirectUri = credentialWallet.config.redirectUri,
             preAuthorizedCode = credOfferReq.credentialOffer!!.grants[GrantType.pre_authorized_code.value]!!.preAuthorizedCode,
-            userPin = null
+            txCode = null
         )
         println("tokenReq: ${tokenReq.toHttpQueryString()}")
         var tokenResp = ktorClient.submitForm(
@@ -1052,13 +1061,13 @@ class CI_JVM_Test : AnnotationSpec() {
         println("// as CI provider, initialize credential offer for user, this time providing full offered credential object, and allowing pre-authorized code flow with user pin")
         val issuanceSession = ciTestProvider.initializeCredentialOffer(
             CredentialOffer.Builder(ciTestProvider.baseUrl)
-                .addOfferedCredential(OfferedCredential.fromProviderMetadata(ciTestProvider.metadata.credentialsSupported!!.first())),
+                .addOfferedCredential(ciTestProvider.metadata.credentialsSupported!!.first().id!!),
             5.minutes, allowPreAuthorized = true, preAuthUserPin = "1234"
         )
         println("issuanceSession: $issuanceSession")
 
         issuanceSession.credentialOffer shouldNotBe null
-        issuanceSession.credentialOffer!!.credentials.first() shouldBe instanceOf<JsonObject>()
+        issuanceSession.credentialOffer!!.credentialConfigurationIds.first() shouldBe ciTestProvider.metadata.credentialsSupported!!.first().id!!
 
         val offerRequest = ciTestProvider.getCredentialOfferRequest(issuanceSession, byReference = true)
         println("offerRequest: $offerRequest")
@@ -1079,7 +1088,7 @@ class CI_JVM_Test : AnnotationSpec() {
         credentialOffer.credentialIssuer shouldNotBe null
         credentialOffer.grants.keys shouldContain GrantType.pre_authorized_code.value
         credentialOffer.grants[GrantType.pre_authorized_code.value]?.preAuthorizedCode shouldNotBe null
-        credentialOffer.grants[GrantType.pre_authorized_code.value]?.userPinRequired shouldBe true
+        credentialOffer.grants[GrantType.pre_authorized_code.value]?.txCode shouldNotBe null
 
         println("// get issuer metadata")
         val providerMetadataUri =
@@ -1105,7 +1114,7 @@ class CI_JVM_Test : AnnotationSpec() {
             //clientId = testCIClientConfig.clientID,
             redirectUri = credentialWallet.config.redirectUri,
             preAuthorizedCode = credentialOffer.grants[GrantType.pre_authorized_code.value]!!.preAuthorizedCode,
-            userPin = null
+            txCode = null
         )
         println("tokenReq: $tokenReq")
 
@@ -1123,7 +1132,7 @@ class CI_JVM_Test : AnnotationSpec() {
             clientId = testCIClientConfig.clientID,
             redirectUri = credentialWallet.config.redirectUri,
             preAuthorizedCode = credentialOffer.grants[GrantType.pre_authorized_code.value]!!.preAuthorizedCode,
-            userPin = issuanceSession.preAuthUserPin
+            txCode = issuanceSession.preAuthUserPin
         )
         println("tokenReq: $tokenReq")
 

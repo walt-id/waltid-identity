@@ -383,7 +383,7 @@ class SSIKit2WalletService(
             clientId = testCIClientConfig.clientID,
             redirectUri = credentialWallet.config.redirectUri,
             preAuthorizedCode = credentialOffer.grants[GrantType.pre_authorized_code.value]!!.preAuthorizedCode,
-            userPin = null
+            txCode = null
         )
 //        logger.debug("tokenReq: {}", tokenReq)
 
