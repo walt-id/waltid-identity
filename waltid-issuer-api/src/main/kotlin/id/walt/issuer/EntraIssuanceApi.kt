@@ -18,7 +18,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
-private val http = HttpClient() {
+private val http = HttpClient {
     install(ContentNegotiation) {
         json()
     }

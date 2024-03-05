@@ -28,11 +28,11 @@ import kotlin.js.JsExport
 import kotlin.random.Random
 
 // Works with the Hashicorp Transit Secret Engine
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 @Suppress("TRANSIENT_IS_REDUNDANT")
 @Serializable
 @SerialName("tse")
+@OptIn(ExperimentalJsExport::class)
 class TSEKey(
     val server: String, private val accessKey: String, private val namespace: String? = null, val id: String,
     //private var publicKey: ByteArray? = null,

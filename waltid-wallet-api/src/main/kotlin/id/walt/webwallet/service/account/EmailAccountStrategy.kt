@@ -1,16 +1,17 @@
 package id.walt.webwallet.service.account
 
 import de.mkammerer.argon2.Argon2Factory
-import id.walt.webwallet.web.controllers.ByteLoginRequest
 import id.walt.webwallet.db.models.Accounts
 import id.walt.webwallet.web.UnauthorizedException
+import id.walt.webwallet.web.controllers.ByteLoginRequest
 import id.walt.webwallet.web.model.EmailAccountRequest
 import kotlinx.datetime.Clock
 import kotlinx.datetime.toJavaInstant
 import kotlinx.uuid.UUID
 import kotlinx.uuid.generateUUID
-import org.jetbrains.exposed.sql.*
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.sql.insert
+import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 
 object EmailAccountStrategy : AccountStrategy<EmailAccountRequest>("email") {

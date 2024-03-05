@@ -10,7 +10,9 @@ import id.walt.crypto.utils.JsonUtils.toJsonElement
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
-import kotlinx.serialization.json.*
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import org.bouncycastle.asn1.ASN1BitString
 import org.bouncycastle.asn1.ASN1Sequence
 import org.bouncycastle.asn1.DEROctetString
@@ -23,8 +25,6 @@ import org.bouncycastle.util.io.pem.PemWriter
 import java.io.ByteArrayOutputStream
 import java.security.*
 import java.security.spec.PKCS8EncodedKeySpec
-import java.util.*
-import kotlin.js.ExperimentalJsExport
 
 private val bouncyCastleProvider = BouncyCastleProvider()
 
@@ -172,7 +172,7 @@ actual class LocalKey actual constructor(
 
     /**
      * Verifies JWS: Verifies a signed message using this public key
-     * @param signed signed
+     * @param signedJws signed
      * @return Result wrapping the plaintext; Result failure when the signature fails
      */
     actual override suspend fun verifyJws(signedJws: String): Result<JsonObject> = runCatching {
@@ -184,12 +184,6 @@ actual class LocalKey actual constructor(
             .mapValues { it.value.toJsonElement() }
         JsonObject(objectElements)
     }
-
-    /**
-     * Verifies JWS: Verifies a signed message using this public key
-     * @param signed signed
-     * @return Result wrapping the plaintext; Result failure when the signature fails
-     */
 
     actual override suspend fun getPublicKey(): LocalKey = LocalKey(_internalJwk.toPublicJWK())
 

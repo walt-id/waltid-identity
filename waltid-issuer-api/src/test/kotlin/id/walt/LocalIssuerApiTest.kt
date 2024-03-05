@@ -1,13 +1,14 @@
 package id.walt
 
 import id.walt.credentials.vc.vcs.W3CVC
-import id.walt.issuer.*
+import id.walt.issuer.JwtIssuanceRequest
+import id.walt.issuer.SdJwtIssuanceRequest
 import id.walt.issuer.base.config.ConfigManager
+import id.walt.issuer.createCredentialOfferUri
 import id.walt.sdjwt.SDMapBuilder
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
-import kotlin.js.ExperimentalJsExport
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -99,7 +100,7 @@ class IssuerApiTest {
         assertEquals(true, offerUri.contains("//localhost:7002/?credential_offer"))
     }
 
-    @OptIn(ExperimentalJsExport::class)
+
     @Test
     fun testSdJwt() = runTest {
         val jsonKeyObj = Json.decodeFromString<JsonObject>(TEST_KEY)

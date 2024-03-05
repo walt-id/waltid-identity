@@ -1,7 +1,6 @@
 package id.walt.mdoc
 
 import cbor.Cbor
-import id.walt.mdoc.cose.AsyncCOSECryptoProvider
 import id.walt.mdoc.cose.COSESign1
 import id.walt.mdoc.cose.COSESign1Serializer
 import korlibs.crypto.encoding.Hex
@@ -12,7 +11,7 @@ import kotlin.js.Promise
 
 @JsModule("cose-js")
 @JsNonModule
-external abstract class CoseJs {
+abstract external class CoseJs {
   object sign {
     fun create(headers: dynamic, payload: dynamic, signers: dynamic): Promise<ByteArray>
   }
@@ -34,10 +33,7 @@ data class COSECryptoProviderKeyInfo(
 )
 
 class SimpleAsyncCOSECryptoProvider(keys: List<COSECryptoProviderKeyInfo>): JSAsyncCOSECryptoProvider {
-  private val keyMap: Map<String, COSECryptoProviderKeyInfo>
-  init {
-    keyMap = keys.associateBy { it.keyID }
-  }
+  private val keyMap: Map<String, COSECryptoProviderKeyInfo> = keys.associateBy { it.keyID }
   override suspend fun sign1(payload: ByteArray, keyID: String?): COSESign1 {
     val keyInfo = keyMap[keyID] ?: throw Exception("No key ID given, or key with given ID not found")
     val headers: dynamic = object {}
@@ -50,7 +46,7 @@ class SimpleAsyncCOSECryptoProvider(keys: List<COSECryptoProviderKeyInfo>): JSAs
     val signer:dynamic = object {}//mapOf("key" to keyInfo.key)
     signer["key"] = keyInfo.key
     val buf = CoseJs.sign.create(headers, payload, signer).await()
-    console.log("Signed message: " + Hex.encode(buf));
+    console.log("Signed message: " + Hex.encode(buf))
     return Cbor.decodeFromByteArray(COSESign1Serializer, buf)
   }
 

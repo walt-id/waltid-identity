@@ -8,7 +8,6 @@ import jose
 import love.forte.plugin.suspendtrans.annotation.JsPromise
 import kotlin.js.json
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 object JsLocalKeyCreator : LocalKeyCreator {
 

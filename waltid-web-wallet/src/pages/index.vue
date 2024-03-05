@@ -25,19 +25,22 @@
                             </div>
                         </div>
                         <div class="flex flex-none items-center gap-x-4">
-                            <button @click="setWallet(wallet.id)" class="rounded-md bg-white px-2.5 py-1.5 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
-                            >View wallet</button>
+                            <button
+                                @click="setWallet(wallet.id)"
+                                class="rounded-md bg-white px-2.5 py-1.5 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
+                            >
+                                View wallet
+                            </button>
                         </div>
                     </li>
                 </ul>
-                <LoadingIndicator v-else/>
+                <LoadingIndicator v-else />
             </div>
         </CenterMain>
     </div>
 </template>
 
 <script setup>
-import { PlusIcon } from "@heroicons/vue/24/outline";
 import WalletPageHeader from "~/components/WalletPageHeader.vue";
 import LoadingIndicator from "~/components/loading/LoadingIndicator.vue";
 import CenterMain from "~/components/CenterMain.vue";
@@ -45,12 +48,11 @@ import { listWallets } from "~/composables/accountWallet";
 
 const config = useRuntimeConfig();
 
-
 useHead({
     title: "Wallet selection - walt.id",
 });
 
-const wallets = await listWallets()
+const wallets = await listWallets();
 
 if (process.client) {
     //const worker = new Worker()
@@ -161,8 +163,8 @@ if (process.client) {
         console.log("Send subscription to server...");
 
         // Get public key and user auth from the subscription object
-        var key = subscription.getKey ? subscription.getKey("p256dh") : "";
-        var auth = subscription.getKey ? subscription.getKey("auth") : "";
+        const key = subscription.getKey ? subscription.getKey("p256dh") : "";
+        const auth = subscription.getKey ? subscription.getKey("auth") : "";
 
         return fetch("/wallet-api/push/subscription", {
             method: "POST",
@@ -183,8 +185,7 @@ if (process.client) {
 definePageMeta({
     title: "Select your wallet - walt.id",
     layout: "default-reduced-nav",
-})
-
+});
 </script>
 
 <style scoped>

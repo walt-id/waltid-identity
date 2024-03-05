@@ -3,7 +3,7 @@ package id.walt.did.dids.resolver
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 
-@ExperimentalJsExport
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 object DidResolverRegistrations {
 

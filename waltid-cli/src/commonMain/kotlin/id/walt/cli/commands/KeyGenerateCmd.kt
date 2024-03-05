@@ -19,9 +19,7 @@ import kotlin.io.path.Path
 import kotlin.io.path.absolutePathString
 import kotlin.io.path.exists
 import kotlin.io.path.writeText
-import kotlin.js.ExperimentalJsExport
 
-@OptIn(ExperimentalJsExport::class)
 class KeyGenerateCmd : CliktCommand(
     name = "generate",
     help = "Generates a new cryptographic key.",

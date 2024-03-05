@@ -106,7 +106,7 @@ class WaltIdKeyConvertCmdTest {
 
         // Stored in src/jvmTest/resources
         val inputFileName = "invalidKey.jwk"
-        var inputFilePath = getFilePath(inputFileName)
+        val inputFilePath = getFilePath(inputFileName)
 
         var result = KeyConvertCmd().test("--input=\"$inputFilePath\" --verbose")
         var expectedErrorMessage = ".*Invalid file format*".toRegex()
