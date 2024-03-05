@@ -3,14 +3,14 @@ package id.walt.webwallet.db.models
 import kotlinx.uuid.exposed.KotlinxUUIDTable
 
 object WalletIssuers : KotlinxUUIDTable("wallet_issuers") {
-//    val tenant = varchar("tenant", 128).default("")
-//    val accountId = kotlinxUUID("accountId").autoGenerate()
     val wallet = reference("wallet", Wallets)
-    val issuer = reference("issuer", Issuers)
+    val name = varchar("name", 512)
+    val description = text("description").nullable().default("no description")
+    val uiEndpoint = varchar("ui", 128)
+    val configurationEndpoint = varchar("configuration", 256)
     val authorized = bool("authorized").default(false)//authorized to push credentials silently
 
     init {
-//        foreignKey(wallet, target = Accounts.primaryKey)
-        uniqueIndex(wallet, issuer)
+        uniqueIndex(wallet, name)
     }
 }

@@ -239,6 +239,9 @@ spec:
         - name: wallet-rejection-reason-config
           configMap:
             name: wallet-rejection-reason-config
+        - name: wallet-trust-config
+          configMap:
+            name: wallet-trust-config
         - name: wallet-push-config
           secret:
             secretName: wallet-push-config-secret

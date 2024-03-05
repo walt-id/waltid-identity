@@ -39,7 +39,14 @@ object AccountsService {
         val createdInitialWalletId = transaction {
             WalletServiceManager.createWallet(tenant, registeredUserId)
         }.also { walletId ->
-            IssuersService.addToWallet(walletId, "walt.id")
+            //TODO: inject
+            IssuersService.add(
+                wallet = walletId,
+                name = "walt.id",
+                description = "walt.id issuer portal",
+                uiEndpoint = "https://portal.walt.id/credentials?ids=",
+                configurationEndpoint = "https://issuer.portal.walt.id/.well-known/openid-credential-issuer"
+            )
             SettingsService.set(walletId, WalletSetting.default)
         }
 
