@@ -105,14 +105,14 @@ dependencies {
     implementation("de.mkammerer:argon2-jvm:2.11")
 
 
-    // waltid-did
-    implementation(project(":waltid-crypto"))
-    implementation(project(":waltid-did"))
-
     // OIDC
     implementation(project(":waltid-openid4vc"))
     implementation(project(":waltid-sdjwt"))
+
+    implementation(project(":waltid-crypto"))
+    implementation(project(":waltid-did"))
     implementation("com.nimbusds:nimbus-jose-jwt:9.37.3")
+
     implementation("io.ktor:ktor-client-java:$ktorVersion")
 
     /* -- Misc --*/

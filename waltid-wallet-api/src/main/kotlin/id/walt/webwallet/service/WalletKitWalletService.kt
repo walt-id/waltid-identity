@@ -18,6 +18,7 @@ import id.walt.webwallet.service.report.ReportRequestParameter
 import id.walt.webwallet.service.settings.WalletSetting
 import id.walt.webwallet.utils.JsonUtils.toJsonPrimitive
 import id.walt.webwallet.web.controllers.PresentationRequestParameter
+import id.walt.webwallet.web.model.KMS
 import id.walt.webwallet.web.parameter.CredentialRequestParameter
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -37,8 +38,9 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import kotlinx.uuid.UUID
-import org.jetbrains.exposed.sql.*
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.sql.insert
+import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.net.URLDecoder
 import java.nio.charset.Charset
@@ -354,7 +356,7 @@ class WalletKitWalletService(tenant: String, accountId: UUID, walletId: UUID) : 
     override suspend fun listKeys() = authenticatedJsonGet("/api/wallet/keys/list")
         .body<JsonObject>()["list"]!!.jsonArray.map { Json.decodeFromJsonElement<SingleKeyResponse>(it) }
 
-    override suspend fun generateKey(type: String) =
+    override suspend fun generateKey(type: String, config: KMS.Data?) =
         authenticatedJsonPost("/api/wallet/keys/generate", type).body<String>()
 
 

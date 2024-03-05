@@ -1,6 +1,7 @@
 package id.walt.webwallet.web.controllers
 
 import id.walt.crypto.keys.KeyType
+import id.walt.webwallet.web.model.KMS
 import io.github.smiley4.ktorswaggerui.dsl.delete
 import io.github.smiley4.ktorswaggerui.dsl.get
 import io.github.smiley4.ktorswaggerui.dsl.post
@@ -9,9 +10,10 @@ import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
-import io.ktor.server.routing.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
 import org.jetbrains.exposed.sql.transactions.transaction
 
 fun Application.keys() = walletRoute {
@@ -33,16 +35,30 @@ fun Application.keys() = walletRoute {
         post("generate", {
             summary = "Generate new key"
             request {
-                queryParameter<String>("type") {
-                    description = "Key type to use. Choose from: ${KeyType.entries.joinToString()}"
+                body<KMS> {
+                    description = "Key configuration (JSON)"
+                    example("Example", buildJsonObject {
+                        put("kms", buildJsonObject {
+                            put("type", JsonPrimitive("tse"))
+                            put("config", buildJsonObject {
+                                put("server", JsonPrimitive("http://0.0.0.0:8200/v1/transit"))
+                                put("accessKey", JsonPrimitive("dev-only-token"))
+                            })
+                        })
+                    }.toString())
                 }
             }
         }) {
-            val type = call.request.queryParameters["type"]
-                ?: KeyType.Ed25519.toString()
+            val kms = call.receiveNullable<KMS>()
+            val keyType = kms?.keyType ?: KeyType.Ed25519.toString()
 
-            val keyId = getWalletService().generateKey(type)
-            context.respond(keyId)
+            runCatching {
+                getWalletService().generateKey(keyType, kms?.data)
+            }.onSuccess {
+                context.respond(it)
+            }.onFailure {
+                context.respond(HttpStatusCode.BadRequest, it.localizedMessage)
+            }
         }
 
 
