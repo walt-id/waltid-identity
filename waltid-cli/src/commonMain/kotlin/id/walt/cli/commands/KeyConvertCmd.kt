@@ -26,9 +26,8 @@ import java.io.File
 import java.io.FileReader
 import java.security.PrivateKey
 import java.security.Security
-import java.util.*
+import java.util.Base64
 import kotlin.io.path.useLines
-import kotlin.js.ExperimentalJsExport
 
 
 enum class KeyFileFormat {
@@ -39,7 +38,6 @@ enum class KeyFileFormat {
     }
 }
 
-@OptIn(ExperimentalJsExport::class)
 class KeyConvertCmd : CliktCommand(
     name = "convert", help = "Convert key files between PEM and JWK formats.", printHelpOnEmptyArgs = true
 ) {
@@ -117,15 +115,15 @@ class KeyConvertCmd : CliktCommand(
     private suspend fun getKey(input: File, keyType: KeyFileFormat = getKeyType(input)): LocalKey {
         val inputContent = input.readText()
         try {
-            return runCatching {
+            return run {
                 when (keyType) {
                     KeyFileFormat.JWK -> LocalKey.importJWK(inputContent).getOrThrow()
                     KeyFileFormat.PEM -> LocalKey.importPEM(inputContent).getOrThrow()
                     KeyFileFormat.ENCRYPTED_PEM -> LocalKey.importPEM(decrypt(input).getOrThrow()).getOrThrow()
                 }
-            }.getOrThrow()
+            }
         } catch (e: Throwable) {
-            var mainMsg = "Invalid file format."
+            val mainMsg = "Invalid file format."
             var complementaryMsg = "Use the --verbose flag to get more details."
 
             if (this.commonOptions.verbose) {

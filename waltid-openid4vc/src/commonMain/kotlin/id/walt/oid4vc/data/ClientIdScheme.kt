@@ -6,7 +6,7 @@ enum class ClientIdScheme(val value: String) {
 
     companion object {
         fun fromValue(value: String): ClientIdScheme? {
-            return ClientIdScheme.values().find { it.value == value }
+            return entries.find { it.value == value }
         }
     }
 }

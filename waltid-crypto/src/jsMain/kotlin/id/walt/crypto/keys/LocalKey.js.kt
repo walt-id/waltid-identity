@@ -18,7 +18,6 @@ import love.forte.plugin.suspendtrans.annotation.JsPromise
 import org.khronos.webgl.Uint8Array
 import kotlin.js.json
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 @Serializable
 @SerialName("local")
@@ -169,7 +168,7 @@ actual class LocalKey actual constructor(
 
     /**
      * Verifies JWS: Verifies a signed message using this public key
-     * @param signed signed
+     * @param signedJws signed
      * @return Result wrapping the plaintext; Result failure when the signature fails
      */
     @JsPromise

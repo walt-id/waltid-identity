@@ -87,6 +87,7 @@
 <script lang="ts" setup>
 import CenterMain from "~/components/CenterMain.vue";
 import { CheckIcon, ArrowUturnLeftIcon, KeyIcon } from "@heroicons/vue/24/outline"
+import InlineLoadingCircle from "~/components/loading/InlineLoadingCircle.vue";
 
 const loading = ref(false);
 const response = ref("");

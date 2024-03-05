@@ -18,7 +18,7 @@ The [documentation](https://docs.oss.walt.id/wallet/api/getting-started) explain
 
 ## What it provides
 
-The Wallet-API is designed to provide a broad range of API endpoints that let you offer identity wallets to users capable of handling different keys, DIDs, and credential types and facilitate the receipt and presentation of credentials from various issuers and verifiers using the OIDC4VC protocol standard. Alongside digital identity capabilities, it also supports the integration of web3 wallets. This feature enables your users to view their tokens from different blockchain ecosystems like Ethereum, Polygon, and more.
+The Wallet API is designed to provide a broad range of API endpoints that let you offer identity wallets to users capable of handling different keys, DIDs, and credential types and facilitate the receipt and presentation of credentials from various issuers and verifiers using the OIDC4VC protocol standard. Alongside digital identity capabilities, it also supports the integration of web3 wallets. This feature enables your users to view their tokens from different blockchain ecosystems like Ethereum, Polygon, and more.
 
 ## How to use it
 
@@ -56,9 +56,9 @@ docker build -t waltid/wallet-api -f waltid-wallet-api/Dockerfile .
 1. update config/db.config
    - set database = "db.postgres"
 2. start postgres
-```bash
-docker run --name postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_USER=postgres -p 5432:5432 -d postgres
-```
+   ```bash
+   docker run --name postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_USER=postgres -p 5432:5432 -d postgres
+   ```
 3. In your IDE run _src/main/kotlin/id/walt/webwallet/Main.kt_ 
 
 

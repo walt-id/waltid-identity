@@ -3,9 +3,9 @@ package id.walt.webwallet.service.settings
 import id.walt.webwallet.db.models.WalletSettings
 import kotlinx.serialization.Serializable
 import kotlinx.uuid.UUID
-import org.jetbrains.exposed.sql.*
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.sql.upsert
 
 object SettingsService {
 
@@ -25,7 +25,7 @@ object SettingsService {
         WalletSettings.wallet
     ) {
         it[WalletSettings.wallet] = wallet
-        it[WalletSettings.showNoteOnPresentation] = setting.showNoteOnPresentation
+        it[showNoteOnPresentation] = setting.showNoteOnPresentation
     }
 }
 

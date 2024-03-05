@@ -5,8 +5,9 @@ import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.service.credentials.CredentialsService
 import id.walt.webwallet.service.events.EventType
 import kotlinx.uuid.UUID
-import org.jetbrains.exposed.sql.*
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.SortOrder
+import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.sql.count
 import org.jetbrains.exposed.sql.transactions.transaction
 
 interface ReportService<T> {
@@ -22,8 +23,8 @@ interface ReportService<T> {
             } ?: emptyList()
 
         private fun frequent(walletId: UUID, action: EventType.Action, limit: Int) = transaction {
-            Events.slice(Events.credentialId)
-                .selectAll().where { Events.wallet eq walletId and (Events.event eq action.type) and (Events.action eq action.toString()) }
+            Events.select(Events.credentialId)
+                .where { Events.wallet eq walletId and (Events.event eq action.type) and (Events.action eq action.toString()) }
                 .groupBy(Events.credentialId)
                 .having { Events.credentialId neq null }
                 .orderBy(Events.credentialId.count(), SortOrder.DESC)

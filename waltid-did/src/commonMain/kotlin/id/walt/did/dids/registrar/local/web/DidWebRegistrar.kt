@@ -12,11 +12,11 @@ import id.walt.did.utils.ExtensionMethods.ensurePrefix
 import love.forte.plugin.suspendtrans.annotation.JsPromise
 import love.forte.plugin.suspendtrans.annotation.JvmAsync
 import love.forte.plugin.suspendtrans.annotation.JvmBlocking
+import net.thauvin.erik.urlencoder.UrlEncoderUtil
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
-import net.thauvin.erik.urlencoder.UrlEncoderUtil
 
-@ExperimentalJsExport
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 class DidWebRegistrar : LocalRegistrarMethod("web") {
     @JvmBlocking

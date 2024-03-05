@@ -4,7 +4,6 @@ package id.walt.credentials.vc.vcs
 import id.walt.credentials.vc.vcs.CredentialDataModel.Companion.w3cJson
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonObject

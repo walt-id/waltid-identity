@@ -30,7 +30,7 @@ object IssuersService {
         Issuers.innerJoin(
             WalletIssuers,
             onColumn = { Issuers.id },
-            otherColumn = { WalletIssuers.issuer },
+            otherColumn = { issuer },
             additionalConstraint = {
                 WalletIssuers.wallet eq wallet
             }).selectAll().map {
@@ -61,7 +61,7 @@ object IssuersService {
     }?.insertedCount ?: 0
 
     private fun queryIssuer(name: String) =
-        Issuers.select(Issuers.name eq name).singleOrNull()?.let {
+        Issuers.selectAll().where(Issuers.name eq name).singleOrNull()?.let {
             it[Issuers.id]
         }?.value
 

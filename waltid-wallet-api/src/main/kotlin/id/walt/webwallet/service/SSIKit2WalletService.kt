@@ -52,6 +52,7 @@ import id.walt.webwallet.trustusecase.TrustValidationUseCase
 import id.walt.webwallet.web.controllers.PresentationRequestParameter
 import id.walt.webwallet.web.model.KMS
 import id.walt.webwallet.web.parameter.CredentialRequestParameter
+import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.engine.cio.*
@@ -74,9 +75,7 @@ import kotlinx.uuid.UUID
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
-import org.slf4j.LoggerFactory
 import java.net.URLDecoder
-import kotlin.js.ExperimentalJsExport
 import kotlin.time.Duration.Companion.seconds
 
 class SSIKit2WalletService(
@@ -87,7 +86,7 @@ class SSIKit2WalletService(
     private val trustUseCase: TrustValidationUseCase,
     private val settingsService: SettingsService,
 ) : WalletService(tenant, accountId, walletId) {
-    private val logger = LoggerFactory.getLogger(this::class.java)
+    private val logger = KotlinLogging.logger {  }
 
     companion object {
         init {
@@ -723,7 +722,7 @@ class SSIKit2WalletService(
             )
         }
 
-    @OptIn(ExperimentalJsExport::class)
+
     override suspend fun generateKey(type: String, config: KMS.Data?): String =
         let {
             config

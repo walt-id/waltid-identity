@@ -18,8 +18,7 @@ import love.forte.plugin.suspendtrans.annotation.JvmBlocking
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 
-@Suppress("OPT_IN_USAGE")
-@ExperimentalJsExport
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 object DidService {
     private val log = KotlinLogging.logger {}

@@ -53,7 +53,7 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
     override fun preparePresentationDefinitionUri(
         presentationDefinition: PresentationDefinition,
         sessionID: String
-    ): String? {
+    ): String {
         val baseUrl = ConfigManager.getConfig<OIDCVerifierServiceConfig>().baseUrl
         return "$baseUrl/openid4vc/pd/$sessionID"
     }

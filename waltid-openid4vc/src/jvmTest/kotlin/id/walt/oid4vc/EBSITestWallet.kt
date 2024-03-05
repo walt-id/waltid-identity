@@ -39,8 +39,7 @@ import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.datetime.Instant
 import kotlinx.serialization.json.*
-import java.util.*
-import kotlin.js.ExperimentalJsExport
+import java.util.UUID
 
 const val EBSI_WALLET_PORT = 8011
 const val EBSI_WALLET_BASE_URL = "http://localhost:${EBSI_WALLET_PORT}"
@@ -101,7 +100,7 @@ class EBSITestWallet(
     override fun signToken(target: TokenTarget, payload: JsonObject, header: JsonObject?, keyId: String?) =
         SDJwt.sign(SDPayload.createSDPayload(payload, SDMap.Companion.fromJSON("{}")), jwtCryptoProvider, keyId).jwt
 
-    @OptIn(ExperimentalJsExport::class)
+
     override fun verifyTokenSignature(target: TokenTarget, token: String) =
         SDJwt.verifyAndParse(token, jwtCryptoProvider).signatureVerified
 
