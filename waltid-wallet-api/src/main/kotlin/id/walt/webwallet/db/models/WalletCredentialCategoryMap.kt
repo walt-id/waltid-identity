@@ -8,13 +8,12 @@ object WalletCredentialCategoryMap : Table("credential_category") {
     val wallet = kotlinxUUID("wallet")
     //TODO: what if the [id] column in credentials table gets updated?
     val credential = varchar("credential", 256)
-    //TODO: what if the [name] column in category table gets updated?
-    val category = varchar("category", 128)
+    val category = reference("category", WalletCategory)
 
     override val primaryKey = PrimaryKey(wallet, credential, category)
 
     init {
         foreignKey(wallet, credential, target = WalletCredentials.primaryKey)
-        foreignKey(wallet, category, target = WalletCategory.primaryKey)
+//        uniqueIndex(wallet, credential, category)
     }
 }

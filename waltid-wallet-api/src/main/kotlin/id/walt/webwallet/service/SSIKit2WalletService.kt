@@ -133,6 +133,9 @@ class SSIKit2WalletService(
     override suspend fun detachCategory(credentialId: String, categories: List<String>): Boolean =
         CredentialsService.Category.delete(walletId, credentialId, *categories.toTypedArray()) > 0
 
+    override suspend fun renameCategory(oldName: String, newName: String): Boolean =
+        categoryService.rename(walletId, oldName, newName) > 0
+
     override suspend fun acceptCredential(parameter: CredentialRequestParameter): Boolean =
         CredentialsService.get(walletId, parameter.credentialId)?.takeIf { it.deletedOn == null }?.let {
             CredentialsService.setPending(walletId, parameter.credentialId, false) > 0
