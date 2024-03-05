@@ -3,6 +3,7 @@ package id.walt.cli
 import com.github.ajalt.clikt.core.PrintHelpMessage
 import com.github.ajalt.clikt.testing.test
 import id.walt.cli.commands.DidCreateCmd
+import kotlinx.io.files.FileNotFoundException
 import org.junit.jupiter.api.assertDoesNotThrow
 import kotlin.test.*
 
@@ -128,19 +129,19 @@ class WaltIdDidCreateCmdTest {
         }
     }
 
-// --key
+// KEY
 
     @Test
-    @Ignore
     fun `should fail if the key file specified in the --key option does not exist`() {
+        assertFailsWith<FileNotFoundException> {
+            command.parse(listOf("--key=./foo.bar"))
+        }
     }
 
     @Test
     @Ignore
     fun `should fail if the key file specified in the --key option is in a not supported format`() {
     }
-
-// KEY
 
 // JWK
 
