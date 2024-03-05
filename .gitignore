@@ -47,7 +47,7 @@ secret*
 **/*.db
 /kotlin-js-store/
 .idea/misc.xml
-**/bun.lockb
+#**/bun.lockb
 
 **/.nuxt
 **/.output
