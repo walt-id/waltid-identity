@@ -59,7 +59,6 @@ import CenterMain from "~/components/CenterMain.vue";
 import { PlusIcon } from "@heroicons/vue/20/solid";
 import Web3WalletIcon from "~/components/Web3WalletIcon.vue";
 import AddWalletModal from "~/components/modals/AddWalletModal.vue";
-import ConnectWalletModal from "~/components/modals/ConnectWalletModal.vue";
 import useModalStore from "~/stores/useModalStore";
 import { useUserStore } from "~/stores/user";
 import { storeToRefs } from "pinia";
