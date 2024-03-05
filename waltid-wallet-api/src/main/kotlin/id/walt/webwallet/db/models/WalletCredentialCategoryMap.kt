@@ -14,6 +14,6 @@ object WalletCredentialCategoryMap : Table("credential_category") {
 
     init {
         foreignKey(wallet, credential, target = WalletCredentials.primaryKey)
-//        uniqueIndex(wallet, credential, category)
+        uniqueIndex(wallet, credential, category)
     }
 }
