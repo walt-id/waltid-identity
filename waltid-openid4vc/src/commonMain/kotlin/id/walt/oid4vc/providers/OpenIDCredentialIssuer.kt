@@ -103,7 +103,7 @@ abstract class OpenIDCredentialIssuer(
         if (allowPreAuthorized)
             credentialOfferBuilder.addPreAuthorizedCodeGrant(
                 generateToken(sessionId, TokenTarget.TOKEN),
-                !preAuthUserPin.isNullOrEmpty()
+                preAuthUserPin?.let { TxCode(TxInputMode.numeric, description = "User PIN") }
             )
         return IssuanceSession(
             id = sessionId,
@@ -126,7 +126,7 @@ abstract class OpenIDCredentialIssuer(
 
     override fun generateTokenResponse(session: IssuanceSession, tokenRequest: TokenRequest): TokenResponse {
         if (tokenRequest.grantType == GrantType.pre_authorized_code && !session.preAuthUserPin.isNullOrEmpty() &&
-            session.preAuthUserPin != tokenRequest.userPin
+            session.preAuthUserPin != tokenRequest.txCode
         ) {
             throw TokenError(
                 tokenRequest,
