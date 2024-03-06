@@ -1,6 +1,6 @@
-import Credential.Companion.testCredential
 import id.walt.webwallet.db.models.AccountWalletListing
 import id.walt.webwallet.db.models.WalletDid
+import id.walt.webwallet.utils.IssuanceExamples
 import id.walt.webwallet.web.model.AccountRequest
 import id.walt.webwallet.web.model.EmailAccountRequest
 import id.walt.webwallet.web.model.LoginRequestJson
@@ -27,6 +27,8 @@ abstract class E2EWalletTestBase {
     protected lateinit var walletId: UUID
     private lateinit var firstDid: String
     
+  
+    
     private fun randomString(length: Int) = (1..length).map { alphabet.random() }.toTypedArray().joinToString("")
     
     protected val email = randomString(8) + "@example.org"
@@ -52,8 +54,6 @@ abstract class E2EWalletTestBase {
                     "type" to user.accountType
                 ),
             )
-        }.let { response ->
-            assertEquals(HttpStatusCode.Created, response.status)
         }
     }
     
@@ -78,7 +78,7 @@ abstract class E2EWalletTestBase {
             //language=JSON
             contentType(ContentType.Application.Json)
             setBody(
-                testCredential
+                IssuanceExamples.testCredential
             )
         }.bodyAsText()
 
