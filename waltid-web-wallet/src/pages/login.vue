@@ -288,12 +288,18 @@ async function login() {
       client_secret: "**********",
       password: userData.password,
     }),
+  }).catch((err) => {
+    console.log("Could not sign in", err);
+    error.value = {
+      isError: true,
+      message: "Please check that you have entered your correct email address and password!", //(await response.text())
+    };
+    isLoggingIn.value = false;
+
   });
 
-  console.log(res.access_token);
 
-
-    // try {
+  // try {
   await signIn({
     username: emailInput,
     password: passwordInput,
