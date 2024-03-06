@@ -5,16 +5,13 @@ import id.walt.webwallet.config.TrustConfig
 import id.walt.webwallet.db.models.AccountWalletMappings
 import id.walt.webwallet.db.models.AccountWalletPermissions
 import id.walt.webwallet.db.models.Wallets
-import id.walt.webwallet.seeker.EntraCredentialTypeSeeker
-import id.walt.webwallet.seeker.EntraDidSeeker
 import id.walt.webwallet.service.account.AccountsService
 import id.walt.webwallet.service.category.CategoryServiceImpl
 import id.walt.webwallet.service.nft.NftKitNftService
 import id.walt.webwallet.service.nft.NftService
 import id.walt.webwallet.service.settings.SettingsService
-import id.walt.webwallet.service.trust.DefaultIssuerTrustValidationService
-import id.walt.webwallet.service.trust.DefaultVerifierTrustValidationService
-import id.walt.webwallet.trustusecase.TrustValidationUseCaseImpl
+import id.walt.webwallet.service.trust.DefaultTrustValidationService
+import id.walt.webwallet.usecase.event.EventUseCase
 import io.ktor.client.*
 import kotlinx.datetime.Clock
 import kotlinx.datetime.toJavaInstant
@@ -29,13 +26,10 @@ object WalletServiceManager {
     private val categoryService = CategoryServiceImpl
     private val settingsService = SettingsService
     private val http = HttpClient()
-    private val entraIssuerTrustConfig = ConfigManager.getConfig<TrustConfig>().entra?.issuer
-    private val entraTrustValidationUseCase = TrustValidationUseCaseImpl(
-        issuerTrustValidationService = DefaultIssuerTrustValidationService(http, entraIssuerTrustConfig),
-        verifierTrustValidationService = DefaultVerifierTrustValidationService(http),
-        didSeeker = EntraDidSeeker(),
-        credentialTypeSeeker = EntraCredentialTypeSeeker(),
-    )
+    private val trustConfig = ConfigManager.getConfig<TrustConfig>()
+    val issuerTrustValidationService = DefaultTrustValidationService(http, trustConfig.issuersRecord)
+    val verifierTrustValidationService = DefaultTrustValidationService(http, trustConfig.verifiersRecord)
+    val eventUseCase = EventUseCase()
 
     fun getWalletService(tenant: String, account: UUID, wallet: UUID): WalletService =
         walletServices.getOrPut(Pair(account, wallet)) {
@@ -45,8 +39,8 @@ object WalletServiceManager {
                 accountId = account,
                 walletId = wallet,
                 categoryService = categoryService,
-                trustUseCase = entraTrustValidationUseCase,
-                settingsService = settingsService
+                settingsService = settingsService,
+                eventUseCase = eventUseCase,
             )
         }
 

@@ -6,7 +6,7 @@
       <script value="dev" />
     </scripts>
     <node-interpreter value="project" />
-    <package-manager value="/usr/local/bin/bun" />
+    <package-manager value="/usr/bin/bun" />
     <envs />
     <method v="2" />
   </configuration>

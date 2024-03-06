@@ -34,6 +34,14 @@ fun Application.configureOpenApi() {
             type = AuthType.HTTP
         }
 
+        securityScheme("auth-bearer-alternative") {
+            name = "Bearer token authentication (alternative header)"
+            description = "Set alternative header \"waltid-authorization: Bearer %token-here%\" to authenticate."
+            scheme = AuthScheme.BEARER
+            type = AuthType.HTTP
+            location = AuthKeyLocation.HEADER
+        }
+
         defaultUnauthorizedResponse {
             description = "Invalid authentication"
         }
