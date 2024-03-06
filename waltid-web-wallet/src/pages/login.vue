@@ -276,6 +276,23 @@ async function login() {
         password: passwordInput,
     };
 
+  const res = await $fetch("http://0.0.0.0:8080/realms/waltid-keycloak-ktor/protocol/openid-connect/token", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: new URLSearchParams({
+      grant_type: "password",
+      client_id: "waltid_backend_localhost",
+      username: userData.email,
+      client_secret: "**********",
+      password: userData.password,
+    }),
+  });
+
+  console.log(res.access_token);
+
+
     // try {
   await signIn({
     username: emailInput,
