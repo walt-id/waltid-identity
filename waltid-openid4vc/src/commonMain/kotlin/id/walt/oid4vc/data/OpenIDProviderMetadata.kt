@@ -106,16 +106,24 @@ data class OpenIDProviderMetadata @OptIn(ExperimentalSerializationApi::class) co
     // OID4VCI properties
     @SerialName("credential_issuer") val credentialIssuer: String? = null,
     @SerialName("credential_endpoint") val credentialEndpoint: String? = null,
-    @SerialName("credentials_supported") @Serializable(CredentialSupportedListSerializer::class) val credentialsSupported: List<CredentialSupported>? = null,
+    @SerialName("credential_configurations_supported") @Serializable(CredentialSupportedListSerializer::class) val credentialConfigurationsSupported: List<CredentialSupported>? = null,
     @SerialName("batch_credential_endpoint") val batchCredentialEndpoint: String? = null,
     @SerialName("deferred_credential_endpoint") val deferredCredentialEndpoint: String? = null,
-    @SerialName("authorization_server") val authorizationServer: String? = null,
+    @SerialName("authorization_servers") val authorizationServers: Set<String>? = null,
     @SerialName("display") @Serializable(DisplayPropertiesListSerializer::class) val display: List<DisplayProperties>? = null,
     @SerialName("presentation_definition_uri_supported") val presentationDefinitionUriSupported: Boolean? = null,
     //@SerialName("vp_formats_supported") @Serializable(SupportedVPFormatMapSerializer::class) val vpFormatsSupported: Map<CredentialFormat, SupportedVPFormat>? = null,
     @SerialName("client_id_schemes_supported") val clientIdSchemesSupported: List<String>? = null,
     override val customParameters: Map<String, JsonElement> = mapOf()
 ) : JsonDataObject() {
+
+    @SerialName("authorization_server")
+    val authorizationServer: String?
+        get() = authorizationServers?.firstOrNull()
+
+    @SerialName("credentials_supported") @Serializable(CredentialSupportedListSerializer::class)
+    val credentialsSupported
+        get() = credentialConfigurationsSupported
     override fun toJSON(): JsonObject = Json.encodeToJsonElement(OpenIDProviderMetadataSerializer, this).jsonObject
 
     companion object : JsonDataObjectFactory<OpenIDProviderMetadata>() {
