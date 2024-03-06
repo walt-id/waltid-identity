@@ -13,12 +13,28 @@ import com.github.ajalt.mordant.rendering.TextStyles
 import id.walt.cli.util.DidMethod
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.LocalKey
+import id.walt.did.dids.DidService
+import id.walt.did.dids.registrar.LocalRegistrar
+import id.walt.did.dids.resolver.LocalResolver
 import kotlinx.coroutines.runBlocking
 
 class DidCreateCmd : CliktCommand(
     name = "create",
     help = "Create a brand new Decentralized Identity"
 ) {
+
+    companion object {
+        init {
+            runBlocking {
+                DidService.apply {
+                    registerResolver(LocalResolver())
+                    updateResolversForMethods()
+                    registerRegistrar(LocalRegistrar())
+                    updateRegistrarsForMethods()
+                }
+            }
+        }
+    }
 
     private val method by option("-m", "--method")
         .help("The DID method to be used.")
@@ -31,12 +47,10 @@ class DidCreateCmd : CliktCommand(
         .file()
     // .enum<DidMethod>(ignoreCase = true)
 
-    private val key by lazy {
-        runBlocking { getKey() }
-    }
-
     override fun run() {
         runBlocking {
+            val key = getKey()
+
             echo(TextStyles.dim("DID subject ${key.keyType} key thumbprint: ${key.getThumbprint()}"))
             // terminal.println(
             //     Markdown(
@@ -47,7 +61,19 @@ class DidCreateCmd : CliktCommand(
             // """.trimMargin()
             //     )
             // )
-            echo("DID created: did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK")
+            // walletService.createDid("key", mapOf("alias" to JsonPrimitive("Onboarding")))
+
+            val result = DidService.registerByKey(method.name.lowercase(), key) //, options)
+            echo(TextColors.green("DID created:"))
+            terminal.println(
+                Markdown(
+                    """
+                |```json
+                |${result.did}
+                |```
+            """.trimMargin()
+                )
+            )
         }
     }
 
