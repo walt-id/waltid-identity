@@ -20,6 +20,6 @@ object WalletHttpClients {
         }
     }
 
-    fun getHttpClient(): HttpClient = defaultMethod.invoke()
+    fun getHttpClient(): HttpClient = defaultMethod()
 
 }

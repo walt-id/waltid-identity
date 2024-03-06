@@ -92,7 +92,7 @@ The `e2eTestWalletCredentials` test suite contains a number of component steps a
     Lists all the Dids associated with this user wallet.
     <br></br>
   * `val issuanceUri = issueJwtCredential()`
-    Issues a jtw credential offer Uri for this wallet. The Uri can then be used to request 
+    Issues a jwt credential offer Uri for this wallet. The Uri can then be used to request 
     credential issuance from the Issuer API
     
     <br></br>

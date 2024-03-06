@@ -5,12 +5,11 @@ import id.walt.webwallet.config.DatasourceConfiguration
 import id.walt.webwallet.db.models.*
 import id.walt.webwallet.service.account.AccountsService
 import id.walt.webwallet.service.credentials.CredentialsService
-import id.walt.webwallet.service.issuers.IssuersService
+import id.walt.webwallet.utils.IssuanceExamples
 import id.walt.webwallet.web.model.EmailAccountRequest
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.uuid.UUID
 import kotlinx.uuid.generateUUID
-import kotlinx.uuid.randomUUID
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Clock
 import org.jetbrains.exposed.sql.Database
@@ -70,10 +69,9 @@ object Db {
     ).toTypedArray()
     
     
-    fun recreateDatabase() {
+    private fun recreateDatabase() {
         transaction {
             addLogger(StdOutSqlLogger)
-            
             
             SchemaUtils.drop(*(tables.reversedArray()))
             SchemaUtils.create(*tables)
@@ -84,15 +82,7 @@ object Db {
                 val accountResult = AccountsService.register(request = EmailAccountRequest("Max Mustermann", "user@email.com", "password"))
                 val accountId = accountResult.getOrNull()?.id!!
                 val walletResult = AccountsService.getAccountWalletMappings("", accountId)
-                val walletId = walletResult.wallets.get(0).id
-                
-                IssuersService.add(
-                    wallet = walletId,
-                    name = "walt.id",
-                    description = "walt.id issuer portal",
-                    uiEndpoint = "https://portal.walt.id/credentials?ids=",
-                    configurationEndpoint = "https://issuer.portal.walt.id/.well-known/openid-credential-issuer"
-                )
+                val walletId = walletResult.wallets[0].id
                 
                 CredentialsService.add(
                     wallet = walletId,

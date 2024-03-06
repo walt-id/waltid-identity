@@ -194,7 +194,7 @@ class E2EWalletTestLocal : E2EWalletTestBase() {
 
         localWalletClient = newClient(token)
 
-        // list all wallets for this user - set wallet id
+        // list all wallets for this user
         listAllWalletsForUser()
 
         // list all Dids for this user and set default for credential issuance
