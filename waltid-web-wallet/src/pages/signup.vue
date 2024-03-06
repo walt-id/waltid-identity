@@ -15,7 +15,7 @@
                                 <label class="block text-sm font-medium leading-6 text-gray-900" for="email">
                                     <span class="flex flex-row items-center">
                                         <IdentificationIcon class="h-5 mr-1" />
-                                        Name
+                                        Username
                                     </span></label
                                 >
                                 <div class="mt-2">
