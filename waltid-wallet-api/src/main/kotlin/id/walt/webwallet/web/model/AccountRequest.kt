@@ -36,9 +36,10 @@ data class OidcAccountRequest(override val name: String? = null, val token: Stri
 @SerialName("keycloak")
 data class KeycloakAccountRequest(
     override val name: String? = null,
-    val email: String,
+    val email: String? = null,
     val username: String,
-    val password: String
+    val password: String,
+    val token: String
 ) : AccountRequest()
 
 val module = SerializersModule {
