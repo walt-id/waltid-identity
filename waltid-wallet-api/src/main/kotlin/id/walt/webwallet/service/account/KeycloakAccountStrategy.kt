@@ -48,24 +48,25 @@ object KeycloakAccountStrategy : AccountStrategy<KeycloakAccountRequest>("keyclo
             level = LogLevel.ALL
           }
         }
-    val params =
-        mapOf(
-            "client_id" to "waltid_backend_localhost",
-            "client_secret" to "**********",
-            "grant_type" to "client_credentials")
+    //    val params =
+    //        mapOf(
+    //            "client_id" to "waltid_backend_localhost",
+    //            "client_secret" to "**********",
+    //            "grant_type" to "client_credentials")
+    //
+    //    val body = params.map { (k, v) -> "$k=$v" }.joinToString("&")
+    //
+    //    val response =
+    //
+    // http.post("http://0.0.0.0:8080/realms/waltid-keycloak-ktor/protocol/openid-connect/token") {
+    //          headers { append("Content-Type", "application/x-www-form-urlencoded") }
+    //          setBody(body)
+    //        }
+    //
+    //    val jsonBody = Json.parseToJsonElement(response.body())
+    //    val access_token = jsonBody.jsonObject["access_token"]!!.jsonPrimitive.content
 
-    val body = params.map { (k, v) -> "$k=$v" }.joinToString("&")
-
-    val response =
-        http.post("http://0.0.0.0:8080/realms/waltid-keycloak-ktor/protocol/openid-connect/token") {
-          headers { append("Content-Type", "application/x-www-form-urlencoded") }
-          setBody(body)
-        }
-
-    val jsonBody = Json.parseToJsonElement(response.body())
-    val access_token = jsonBody.jsonObject["access_token"]!!.jsonPrimitive.content
-
-    println(access_token)
+    //  println(access_token)
     val user =
         mapOf(
                 "username" to request.username,
@@ -80,7 +81,7 @@ object KeycloakAccountStrategy : AccountStrategy<KeycloakAccountRequest>("keyclo
           contentType(ContentType.Application.Json)
           headers {
             append("Content-Type", "application/json")
-            append("Authorization", "Bearer $access_token")
+            append("Authorization", "Bearer ${request.token}")
           }
           setBody(user)
         }

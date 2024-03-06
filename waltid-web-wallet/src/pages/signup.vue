@@ -171,11 +171,23 @@ async function register() {
 
 async function submit() {
     isProgress.value = true;
+  const res = await $fetch("http://0.0.0.0:8080/realms/waltid-keycloak-ktor/protocol/openid-connect/token", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: new URLSearchParams({
+      grant_type: "client_credentials",
+      client_id: "waltid_backend_localhost",
+      client_secret: "**********",
+    }),
+  })
 
     const user = {
       username: nameInput,
         email: emailInput,
         password: passwordInput,
+      token: res.access_token,
       type: "keycloak",
     };
 
