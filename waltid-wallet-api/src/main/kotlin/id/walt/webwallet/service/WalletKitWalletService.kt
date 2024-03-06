@@ -282,7 +282,7 @@ class WalletKitWalletService(tenant: String, accountId: UUID, walletId: UUID) : 
     }
 
     override suspend fun useOfferRequest(
-        offer: String, did: String, requireUserInput: Boolean, silent: Boolean
+        offer: String, did: String, requireUserInput: Boolean
     ): List<WalletCredential> {
         val sessionId = authenticatedJsonPost(
             "/api/wallet/issuance/startIssuerInitiatedIssuance", mapOf("oidcUri" to offer)
@@ -409,15 +409,8 @@ class WalletKitWalletService(tenant: String, accountId: UUID, walletId: UUID) : 
 
     override suspend fun disconnectWallet(wallet: UUID) = Web3WalletService.disconnect(tenant, walletId, wallet)
 
-    override suspend fun listIssuers(): List<IssuerDataTransferObject> = throw NotImplementedError("")
-
-    override suspend fun getIssuer(name: String): IssuerDataTransferObject = throw NotImplementedError("")
-
     override fun getCredentialsByIds(credentialIds: List<String>): List<WalletCredential> =
         throw NotImplementedError("")
-
-    override fun authorizeIssuer(issuer: String): Boolean = throw NotImplementedError("")
-    override fun addIssuer(issuer: IssuerDataTransferObject): Boolean = throw NotImplementedError("")
 
     override suspend fun listCategories(): List<WalletCategoryData> = throw NotImplementedError("")
 
