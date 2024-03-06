@@ -291,7 +291,7 @@ spec:
             - name: NUXT_PUBLIC_ISSUER_CALLBACK_URL
               value: "https://wallet.walt.id"
           ports:
-            - containerPort: 3000
+            - containerPort: 7101
               name: http-api
 ---
 kind: Service
