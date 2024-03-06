@@ -4,8 +4,6 @@ import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.LocalKey
-import id.walt.crypto.utils.JwsUtils
-import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.did.dids.DidService
 import id.walt.did.dids.registrar.LocalRegistrar
 import id.walt.did.dids.registrar.dids.DidCheqdCreateOptions
@@ -29,12 +27,10 @@ import id.walt.oid4vc.responses.AuthorizationErrorCode
 import id.walt.oid4vc.responses.BatchCredentialResponse
 import id.walt.oid4vc.responses.CredentialResponse
 import id.walt.oid4vc.responses.TokenResponse
-import id.walt.oid4vc.util.randomUUID
 import id.walt.webwallet.db.models.WalletCategoryData
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.db.models.WalletOperationHistories
 import id.walt.webwallet.db.models.WalletOperationHistory
-import id.walt.webwallet.manifest.extractor.EntraManifestExtractor
 import id.walt.webwallet.service.category.CategoryService
 import id.walt.webwallet.service.credentials.CredentialFilterObject
 import id.walt.webwallet.service.credentials.CredentialsService
@@ -42,8 +38,7 @@ import id.walt.webwallet.service.dids.DidsService
 import id.walt.webwallet.service.dto.LinkedWalletDataTransferObject
 import id.walt.webwallet.service.dto.WalletDataTransferObject
 import id.walt.webwallet.service.events.*
-import id.walt.webwallet.service.issuers.IssuerDataTransferObject
-import id.walt.webwallet.service.issuers.IssuersService
+import id.walt.webwallet.service.exchange.IssuanceService
 import id.walt.webwallet.service.keys.KeysService
 import id.walt.webwallet.service.keys.SingleKeyResponse
 import id.walt.webwallet.service.oidc4vc.TestCredentialWallet
@@ -51,8 +46,7 @@ import id.walt.webwallet.service.report.ReportRequestParameter
 import id.walt.webwallet.service.report.ReportService
 import id.walt.webwallet.service.settings.SettingsService
 import id.walt.webwallet.service.settings.WalletSetting
-import id.walt.webwallet.trustusecase.TrustStatus
-import id.walt.webwallet.trustusecase.TrustValidationUseCase
+import id.walt.webwallet.usecase.event.EventUseCase
 import id.walt.webwallet.web.controllers.PresentationRequestParameter
 import id.walt.webwallet.web.parameter.CredentialRequestParameter
 import io.ktor.client.*
@@ -64,6 +58,7 @@ import io.ktor.client.plugins.logging.*
 import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
+import io.ktor.client.utils.EmptyContent.contentType
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.util.*
@@ -74,11 +69,12 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import kotlinx.uuid.UUID
-import org.jetbrains.exposed.sql.*
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.insert
+import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.slf4j.LoggerFactory
 import java.net.URLDecoder
+import kotlin.collections.set
 import kotlin.time.Duration.Companion.seconds
 
 class SSIKit2WalletService(
@@ -86,8 +82,8 @@ class SSIKit2WalletService(
     accountId: UUID,
     walletId: UUID,
     private val categoryService: CategoryService,
-    private val trustUseCase: TrustValidationUseCase,
     private val settingsService: SettingsService,
+    private val eventUseCase: EventUseCase,
 ) : WalletService(tenant, accountId, walletId) {
     private val logger = LoggerFactory.getLogger(this::class.java)
 
@@ -102,6 +98,13 @@ class SSIKit2WalletService(
                 }
             }
         }
+        val testCIClientConfig = OpenIDClientConfig("test-client", null, redirectUri = "http://blank")
+        private val credentialWallets = HashMap<String, TestCredentialWallet>()
+        fun getCredentialWallet(did: String) = credentialWallets.getOrPut(did) {
+            TestCredentialWallet(
+                CredentialWalletConfig("http://blank"), did
+            )
+        }
     }
 
     override fun listCredentials(filter: CredentialFilterObject): List<WalletCredential> =
@@ -114,10 +117,13 @@ class SSIKit2WalletService(
 
     override suspend fun deleteCredential(id: String, permanent: Boolean) = let {
         CredentialsService.get(walletId, id)?.run {
-            logEvent(
+            eventUseCase.log(
                 action = EventType.Credential.Delete,
                 originator = "wallet",
-                data = createCredentialEventData(this, null),
+                tenant = tenant,
+                accountId = accountId,
+                walletId = walletId,
+                data = eventUseCase.credentialEventData(this, null),
                 credentialId = this.id
             )
         }
@@ -295,10 +301,13 @@ class SSIKit2WalletService(
         logger.debug("HTTP Response: {}, body: {}", resp, httpResponseBody)
         parameter.selectedCredentials.forEach {
             CredentialsService.get(walletId, it)?.run {
-                logEvent(
+                eventUseCase.log(
                     action = EventType.Credential.Present,
                     originator = presentationSession.presentationDefinition?.name ?: EventDataNotAvailable,
-                    data = createCredentialEventData(this, null),
+                    tenant = tenant,
+                    accountId = accountId,
+                    walletId = walletId,
+                    data = eventUseCase.credentialEventData(this, null),
                     credentialId = this.id,
                     note = parameter.note,
                 )
@@ -333,19 +342,8 @@ class SSIKit2WalletService(
             .plus(credentialWallet.parsePresentationRequest(request).toHttpQueryString())
     }
 
-
-    private val credentialWallets = HashMap<String, TestCredentialWallet>()
-
-    private fun getCredentialWallet(did: String) = credentialWallets.getOrPut(did) {
-        TestCredentialWallet(
-            CredentialWalletConfig("http://blank"), this, did
-        )
-    }
-
     private fun getAnyCredentialWallet() =
         credentialWallets.values.firstOrNull() ?: getCredentialWallet("did:test:test")
-
-    private val testCIClientConfig = OpenIDClientConfig("test-client", null, redirectUri = "http://blank")
 
     val http = HttpClient(Java) {
         install(ContentNegotiation) {
@@ -482,55 +480,31 @@ class SSIKit2WalletService(
     }
 
     override suspend fun useOfferRequest(
-        offer: String, did: String, requireUserInput: Boolean, silent: Boolean
+        offer: String, did: String, requireUserInput: Boolean
     ): List<WalletCredential> {
-
-        val credentialWallet = getCredentialWallet(did)
-
-        logger.debug("// -------- WALLET ----------")
-        logger.debug("// as WALLET: receive credential offer, either being called via deeplink or by scanning QR code")
-        logger.debug("// parse credential URI")
-        val reqParams = Url(offer).parameters.toMap()
-
-        // entra or openid4vc credential offer
-        val isEntra = EntraIssuanceRequest.isEntraIssuanceRequestUri(offer)
-        val credentialResponses = if (isEntra) {
-            processMSEntraIssuanceRequest(
-                EntraIssuanceRequest.fromAuthorizationRequest(
-                    AuthorizationRequest.fromHttpParametersAuto(
-                        reqParams
+        val addableCredentials =
+            IssuanceService.useOfferRequest(offer, getCredentialWallet(did), testCIClientConfig.clientID).map {
+                WalletCredential(
+                    wallet = walletId,
+                    id = it.id,
+                    document = it.document,
+                    disclosures = it.disclosures,
+                    addedOn = Clock.System.now(),
+                    manifest = it.manifest,
+                    deletedOn = null,
+                    pending = requireUserInput,
+                ).also { credential ->
+                    eventUseCase.log(
+                        action = EventType.Credential.Receive,
+                        originator = "", //parsedOfferReq.credentialOffer!!.credentialIssuer,
+                        tenant = tenant,
+                        accountId = accountId,
+                        walletId = walletId,
+                        data = eventUseCase.credentialEventData(credential = credential, type = it.type),
+                        credentialId = credential.id,
                     )
-                ), credentialWallet
-            )
-        } else {
-            processCredentialOffer(
-                credentialWallet.resolveCredentialOffer(CredentialOfferRequest.fromHttpParameters(reqParams)),
-                credentialWallet
-            )
-        }
-
-        // === original ===
-        logger.debug("// parse and verify credential(s)")
-        if (credentialResponses.all { it.credential == null }) {
-            throw IllegalStateException("No credential was returned from credentialEndpoint: $credentialResponses")
-        }
-
-        // ??multiple credentials manifests
-        val manifest =
-            isEntra.takeIf { it }?.let { EntraManifestExtractor().extract(offer) }//?:DefaultManifestExtractor
-        val addableCredentials: List<WalletCredential> = credentialResponses.map {
-            getCredentialData(it, manifest, requireUserInput || silent).also {
-                logEvent(
-                    action = EventType.Credential.Accept,
-                    originator = "", //parsedOfferReq.credentialOffer!!.credentialIssuer,
-                    data = createCredentialEventData(credential = it.credential, type = it.type),
-                    credentialId = it.credential.id,
-                )
-            }.credential
-        }.filter {
-            !silent || validateTrustedIssuer(it, isEntra) == TrustStatus.Trusted
-        }
-
+                }
+            }
         CredentialsService.add(
             wallet = walletId, credentials = addableCredentials.toTypedArray()
         )
@@ -555,10 +529,13 @@ class SSIKit2WalletService(
             alias = args["alias"]?.content,
             keyId = keyId
         )
-        logEvent(
-            EventType.Did.Create, "wallet", DidEventData(
-                did = result.did, document = result.didDocument.toString()
-            )
+        eventUseCase.log(
+            action = EventType.Did.Create,
+            originator = "wallet",
+            tenant = tenant,
+            accountId = accountId,
+            walletId = walletId,
+            data = eventUseCase.didEventData(result.did, result.didDocument)
         )
         return result.did
     }
@@ -572,10 +549,15 @@ class SSIKit2WalletService(
 
     override suspend fun deleteDid(did: String): Boolean {
         DidsService.get(walletId, did).also {
-            logEvent(
-                EventType.Did.Delete, "wallet", DidEventData(
+            eventUseCase.log(
+                action = EventType.Did.Delete,
+                originator = "wallet",
+                tenant = tenant,
+                accountId = accountId,
+                walletId = walletId,
+                data = eventUseCase.didEventData(
                     did = it?.did ?: did, document = it?.document ?: EventDataNotAvailable
-                )
+                ),
             )
         }
         return DidsService.delete(walletId, did)
@@ -599,10 +581,13 @@ class SSIKit2WalletService(
     override suspend fun exportKey(alias: String, format: String, private: Boolean): String = let {
         runCatching {
             getKey(alias).also {
-                logEvent(
-                    EventType.Key.Export, "wallet", KeyEventData(
-                        id = it.getKeyId(), algorithm = it.keyType.name, keyManagementService = EventDataNotAvailable
-                    )
+                eventUseCase.log(
+                    action = EventType.Key.Export,
+                    originator = "wallet",
+                    tenant = tenant,
+                    accountId = accountId,
+                    walletId = walletId,
+                    data = eventUseCase.keyEventData(it, EventDataNotAvailable)
                 )
             }
         }.fold(onSuccess = {
@@ -632,12 +617,13 @@ class SSIKit2WalletService(
 
     override suspend fun generateKey(type: String): String =
         LocalKey.generate(KeyType.valueOf(type)).let { createdKey ->
-            logEvent(
-                EventType.Key.Create, "wallet", KeyEventData(
-                    id = createdKey.getKeyId(),
-                    algorithm = createdKey.keyType.name,
-                    keyManagementService = "local",
-                )
+            eventUseCase.log(
+                action = EventType.Key.Create,
+                originator = "wallet",
+                tenant = tenant,
+                accountId = accountId,
+                walletId = walletId,
+                data = eventUseCase.keyEventData(createdKey, "local")
             )
             KeysService.add(walletId, createdKey.getKeyId(), KeySerialization.serializeKey(createdKey))
             createdKey.getKeyId()
@@ -661,10 +647,13 @@ class SSIKit2WalletService(
 
         val key = keyResult.getOrThrow()
         val keyId = key.getKeyId()
-        logEvent(
-            EventType.Key.Import, "wallet", KeyEventData(
-                id = keyId, algorithm = key.keyType.name, keyManagementService = EventDataNotAvailable
-            )
+        eventUseCase.log(
+            action = EventType.Key.Import,
+            originator = "wallet",
+            tenant = tenant,
+            accountId = accountId,
+            walletId = walletId,
+            data = eventUseCase.keyEventData(key, EventDataNotAvailable)
         )
         KeysService.add(walletId, keyId, KeySerialization.serializeKey(key))
         return keyId
@@ -672,27 +661,24 @@ class SSIKit2WalletService(
 
     override suspend fun deleteKey(alias: String): Boolean = runCatching {
         KeysService.get(walletId, alias)?.let { Json.parseToJsonElement(it.document) }?.run {
-            logEvent(
-                EventType.Key.Delete, "wallet", KeyEventData(
+            eventUseCase.log(
+                action = EventType.Key.Delete,
+                originator = "wallet",
+                tenant = tenant,
+                accountId = accountId,
+                walletId = walletId,
+                data = eventUseCase.keyEventData(
                     id = this.jsonObject["jwk"]?.jsonObject?.get("kid")?.jsonPrimitive?.content
                         ?: EventDataNotAvailable,
                     algorithm = this.jsonObject["jwk"]?.jsonObject?.get("kty")?.jsonPrimitive?.content
                         ?: EventDataNotAvailable,
-                    keyManagementService = EventDataNotAvailable
+                    kmsType = EventDataNotAvailable
                 )
             )
         }
     }.let {
         KeysService.delete(walletId, alias)
     }
-
-    fun addToHistory() {
-        // data from
-        // https://wallet.walt-test.cloud/api/wallet/issuance/info?sessionId=SESSION_ID
-        // after taking up issuance offer
-    }
-// TODO
-//fun infoAboutOfferRequest
 
     override fun getHistory(limit: Int, offset: Long): List<WalletOperationHistory> =
         WalletOperationHistories.selectAll().where { WalletOperationHistories.wallet eq walletId }
@@ -745,24 +731,9 @@ class SSIKit2WalletService(
 
     override suspend fun disconnectWallet(wallet: UUID) = Web3WalletService.disconnect(tenant, walletId, wallet)
 
-    override suspend fun listIssuers(): List<IssuerDataTransferObject> = IssuersService.list(walletId)
-
-    override suspend fun getIssuer(name: String): IssuerDataTransferObject =
-        IssuersService.get(walletId, name) ?: throw IllegalArgumentException("Issuer: $name not found for: $walletId")
-
     override fun getCredentialsByIds(credentialIds: List<String>): List<WalletCredential> {
         // todo: select by SQL
         return listCredentials(CredentialFilterObject.default).filter { it.id in credentialIds }
-    }
-
-    override fun authorizeIssuer(issuer: String): Boolean = IssuersService.authorize(walletId, issuer) > 0
-    override fun addIssuer(issuer: IssuerDataTransferObject): Boolean = IssuersService.add(
-        name = issuer.name,
-        description = issuer.description,
-        uiEndpoint = issuer.uiEndpoint,
-        configurationEndpoint = issuer.configurationEndpoint
-    ).let {
-        IssuersService.addToWallet(walletId, issuer.name, issuer.authorized) > 0
     }
 
     override suspend fun listCategories(): List<WalletCategoryData> = categoryService.list(walletId)
@@ -791,43 +762,6 @@ class SSIKit2WalletService(
         else -> throw IllegalArgumentException("Did method not supported: $method")
     }
 
-    private fun logEvent(
-        action: EventType.Action,
-        originator: String,
-        data: EventData,
-        credentialId: String? = null,
-        note: String? = null
-    ) = EventService.add(
-        Event(
-            action = action,
-            tenant = tenant,
-            originator = originator,
-            account = accountId,
-            wallet = walletId,
-            data = data,
-            credentialId = credentialId,
-            note = note,
-        )
-    )
-
-    //TODO: move to related entity
-    private fun createCredentialEventData(credential: WalletCredential, type: String?) = CredentialEventData(
-        ecosystem = EventDataNotAvailable,
-        issuerId = parseIssuerDid(credential.parsedDocument),
-        subjectId = credential.parsedDocument?.jsonObject?.get("credentialSubject")?.jsonObject?.get(
-            "id"
-        )?.jsonPrimitive?.content ?: EventDataNotAvailable,
-        issuerKeyId = EventDataNotAvailable,
-        issuerKeyType = EventDataNotAvailable,
-        subjectKeyType = EventDataNotAvailable,
-        credentialType = type ?: EventDataNotAvailable,
-        credentialFormat = "W3C",
-        credentialProofType = EventDataNotAvailable,
-        policies = emptyList(),
-        protocol = "oid4vp",
-        credentialId = credential.id,
-    )
-
     //TODO: move to related entity
     private fun computeCurrentStartingAfter(afterItemIndex: Long): String? = let {
         afterItemIndex.takeIf { it >= 0 }?.toString()
@@ -838,91 +772,6 @@ class SSIKit2WalletService(
         val itemIndex = afterItemIndex + pageSize
         itemIndex.takeIf { it < count }?.toString()
     }
-
-    private fun getCredentialData(
-        credentialResp: CredentialResponse, manifest: JsonObject?, pending: Boolean
-    ) = let {
-        val credential = credentialResp.credential!!.jsonPrimitive.content
-        val credentialJwt = credential.decodeJws(withSignature = true)
-        val typ = credentialJwt.header["typ"]?.jsonPrimitive?.content?.lowercase()
-        when (typ) {
-            "jwt" -> parseJwtCredentialResponse(credentialJwt, credential, manifest, pending)
-            "vc+sd-jwt" -> parseSdJwtCredentialResponse(credentialJwt, credential, manifest, pending)
-            null -> throw IllegalArgumentException("WalletCredential JWT does not have \"typ\"")
-            else -> throw IllegalArgumentException("Invalid credential \"typ\": $typ")
-        }.let {
-            CredentialDataResult(credential = it, type = typ)
-        }
-    }
-
-    //TODO: move to related entity
-    private fun parseJwtCredentialResponse(
-        credentialJwt: JwsUtils.JwsParts, document: String, manifest: JsonObject?, pending: Boolean,
-    ) = let {
-        val credentialId =
-            credentialJwt.payload["vc"]!!.jsonObject["id"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
-                ?: randomUUID()
-
-        logger.debug("Got JWT credential: {}", credentialJwt)
-
-        WalletCredential(
-            wallet = walletId,
-            id = credentialId,
-            document = document,
-            disclosures = null,
-            addedOn = Clock.System.now(),
-            manifest = manifest.toString(),
-//                delete = false,
-            deletedOn = null,
-            pending = pending,
-        )
-    }
-
-    //TODO: move to related entity
-    private fun parseSdJwtCredentialResponse(
-        credentialJwt: JwsUtils.JwsParts, document: String, manifest: JsonObject?, pending: Boolean
-    ) = let {
-        val credentialId =
-            credentialJwt.payload["id"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() } ?: randomUUID()
-
-        logger.debug("Got SD-JWT credential: $credentialJwt")
-
-        val disclosures = credentialJwt.signature.split("~").drop(1)
-        logger.debug("Disclosures (${disclosures.size}): $disclosures")
-
-        val disclosuresString = disclosures.joinToString("~")
-
-        val credentialWithoutDisclosures = document.substringBefore("~")
-
-        WalletCredential(
-            wallet = walletId,
-            id = credentialId,
-            document = credentialWithoutDisclosures,
-            disclosures = disclosuresString,
-            addedOn = Clock.System.now(),
-            manifest = manifest?.toString(),
-//                delete = false,
-            deletedOn = null,
-            pending = pending,
-        )
-    }
-
-    private suspend fun validateTrustedIssuer(credential: WalletCredential, isEntra: Boolean) =
-        isEntra.takeIf { it }?.let {
-            trustUseCase.status(credential, true)
-        }
-            ?: throw IllegalArgumentException("Silent claim for this credential type not supported.")//TrustStatus.NotFound
-
-    private data class CredentialDataResult(
-        val credential: WalletCredential,
-        val type: String?,
-    )
-
-    private fun parseIssuerDid(credential: JsonObject?) = credential?.jsonObject?.get("issuer")?.let {
-        if (it is JsonObject) it.jsonObject["id"]?.jsonPrimitive?.content
-        else it.jsonPrimitive.content
-    } ?: EventDataNotAvailable
-
 }
 
 
