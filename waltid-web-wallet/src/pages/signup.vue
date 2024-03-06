@@ -173,15 +173,18 @@ async function submit() {
     isProgress.value = true;
 
     const user = {
-        name: nameInput,
+      username: nameInput,
         email: emailInput,
         password: passwordInput,
-        type: "email",
+      type: "keycloak",
     };
-    await $fetch("/wallet-api/auth/create", {
+
+
+  await $fetch("/wallet-api/auth/keycloak/create", {
         method: "POST",
         body: user,
-    })
+
+  })
         .then((response) => {
             isProgress.value = false;
 
