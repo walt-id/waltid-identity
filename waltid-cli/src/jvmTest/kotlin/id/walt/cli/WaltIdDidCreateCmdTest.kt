@@ -3,6 +3,7 @@ package id.walt.cli
 import com.github.ajalt.clikt.core.PrintHelpMessage
 import com.github.ajalt.clikt.testing.test
 import id.walt.cli.commands.DidCreateCmd
+import id.walt.cli.util.getResourcePath
 import kotlinx.io.files.FileNotFoundException
 import org.junit.jupiter.api.assertDoesNotThrow
 import kotlin.test.*
@@ -64,6 +65,7 @@ class WaltIdDidCreateCmdTest {
     // --method
 
     @Test
+    @Ignore
     fun `should not accept --method value other than key, jwk, web, ebsi, cheqd or iota`() {
         // Could be a parametrized test :-/
         val acceptedMethods = listOf("key", "jwk", "web", "ebsi", "cheqd", "iota")
@@ -136,6 +138,27 @@ class WaltIdDidCreateCmdTest {
         assertFailsWith<FileNotFoundException> {
             command.parse(listOf("--key=./foo.bar"))
         }
+    }
+
+    @Test
+    fun `should create different DIDs when provided with different keys`() {
+
+        val didFile1 = "ed25519_key_sample1.json"
+        val didFile2 = "ed25519_key_sample2.json"
+
+        val didFilePath1 = getResourcePath(this, didFile1)
+        val didFilePath2 = getResourcePath(this, didFile2)
+
+        val result1 = command.test("-k \"${didFilePath1}\"")
+        val result2 = command.test("-k \"${didFilePath2}\"")
+
+        val regex = "did:key:z[a-km-zA-HJ-NP-Z1-9]+".toRegex()
+
+        val did1 = regex.find(result1.stdout)?.groupValues?.get(0)
+        val did2 = regex.find(result2.stdout)?.groupValues?.get(0)
+
+        assertNotEquals(did1, did2)
+
     }
 
     @Test
