@@ -11,31 +11,15 @@ import com.github.ajalt.mordant.markdown.Markdown
 import com.github.ajalt.mordant.rendering.TextColors
 import com.github.ajalt.mordant.rendering.TextStyles
 import id.walt.cli.util.DidMethod
+import id.walt.cli.util.DidUtil
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.LocalKey
-import id.walt.did.dids.DidService
-import id.walt.did.dids.registrar.LocalRegistrar
-import id.walt.did.dids.resolver.LocalResolver
 import kotlinx.coroutines.runBlocking
 
 class DidCreateCmd : CliktCommand(
     name = "create",
     help = "Create a brand new Decentralized Identity"
 ) {
-
-    companion object {
-        init {
-            runBlocking {
-                DidService.apply {
-                    registerResolver(LocalResolver())
-                    updateResolversForMethods()
-                    registerRegistrar(LocalRegistrar())
-                    updateRegistrarsForMethods()
-                }
-            }
-        }
-    }
-
     private val method by option("-m", "--method")
         .help("The DID method to be used.")
         .enum<DidMethod>(ignoreCase = true)
@@ -63,7 +47,7 @@ class DidCreateCmd : CliktCommand(
             // )
             // walletService.createDid("key", mapOf("alias" to JsonPrimitive("Onboarding")))
 
-            val result = DidService.registerByKey(method.name.lowercase(), key) //, options)
+            val result = DidUtil.createDid(method, key)
             echo(TextColors.green("DID created:"))
             terminal.println(
                 Markdown(
