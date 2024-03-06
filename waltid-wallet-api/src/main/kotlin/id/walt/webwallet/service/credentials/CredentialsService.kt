@@ -32,12 +32,13 @@ object CredentialsService {
 
     /**
      * Returns a list of credentials identified by the [credentialIdList]
-     * @param wallet wallet id
      * @param credentialIdList the list of credential ids
      * @return list of [WalletCredential] that could match the specified [credentialIdList]
      */
-    fun get(wallet: UUID, credentialIdList: List<String>): List<WalletCredential> = transaction {
-        getCredentialsQuery(wallet, true, *credentialIdList.toTypedArray()).map {
+    fun get(credentialIdList: List<String>): List<WalletCredential> = transaction {
+        WalletCredentials.select {
+            (WalletCredentials.id inList credentialIdList)
+        }.map {
             WalletCredential(it)
         }
     }
@@ -128,6 +129,7 @@ object CredentialsService {
         }
     }
 
+    //TODO: copied from IssuersService
     private fun updateColumn(wallet: UUID, credentialId: String, update: (statement: UpdateStatement) -> Unit): Int =
         WalletCredentials.update({ WalletCredentials.wallet eq wallet and (WalletCredentials.id eq credentialId) }) {
             update(it)

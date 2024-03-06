@@ -194,10 +194,3 @@ publishing {
 //    renderers = arrayOf<ReportRenderer>(InventoryHtmlReportRenderer("waltid-verifier-licenses-report.html", "walt.id verifier"))
 //    filters = arrayOf<DependencyFilter>(LicenseBundleNormalizer())
 //}
-
-
-tasks.withType<DependencyUpdatesTask> {
-    rejectVersionIf {
-        listOf("-beta", "-alpha", "-rc").any { it in candidate.version.lowercase() } || candidate.version.takeLast(4).contains("RC")
-    }
-}

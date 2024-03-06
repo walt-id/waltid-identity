@@ -51,7 +51,6 @@ object Db {
 
     // Make sure the creation order is correct (references / foreignKeys have to exist)
     val tables = listOf(
-        Issuers,
         Accounts,
         Wallets,
         WalletOperationHistories,
@@ -60,7 +59,6 @@ object Db {
         WalletCredentials,
         AccountWalletMappings,
 
-        //AccountWeb3WalletMappings,
         Web3Wallets,
         WalletIssuers,
         Events,
@@ -81,7 +79,7 @@ object Db {
             SchemaUtils.create(*tables)
             
             runBlocking {
-                
+
                 AccountsService.register(request = EmailAccountRequest("Max Mustermann", "string@string.string", "string"))
                 val accountResult = AccountsService.register(request = EmailAccountRequest("Max Mustermann", "user@email.com", "password"))
                 val accountId = accountResult.getOrNull()?.id!!
@@ -89,6 +87,7 @@ object Db {
                 val walletId = walletResult.wallets.get(0).id
                 
                 IssuersService.add(
+                    wallet = walletId,
                     name = "walt.id",
                     description = "walt.id issuer portal",
                     uiEndpoint = "https://portal.walt.id/credentials?ids=",
@@ -107,7 +106,6 @@ object Db {
                         deletedOn = null,
                     )
                 )
-                
             }
         }
     }

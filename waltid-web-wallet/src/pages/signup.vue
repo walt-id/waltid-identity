@@ -237,7 +237,6 @@ useHead({
     25%,
     100% {
         transform: scale(2);
-        //opacity: 0;
         filter: blur(1rem);
     }
 }

@@ -20,10 +20,11 @@
 </template>
 
 <script lang="ts" setup>
+import "@unocss/reset/tailwind-compat.css";
+import "uno.css";
 import { InitApp } from "~/utils/initApp";
-import ModalBase from "~/components/modals/ModalBase.vue";
-import { $fetch } from "ofetch";
 import { useTenant } from "~/composables/tenants";
+import ModalBase from "~/components/modals/ModalBase.vue";
 
 InitApp();
 const locale = useState<string>("locale.i18n");

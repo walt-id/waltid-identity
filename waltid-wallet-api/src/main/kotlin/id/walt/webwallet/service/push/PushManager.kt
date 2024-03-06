@@ -1,19 +1,21 @@
 package id.walt.webwallet.service.push
 
+import com.interaso.webpush.VapidKeys
+import com.interaso.webpush.WebPushService
 import id.walt.webwallet.config.ConfigManager
 import id.walt.webwallet.config.PushConfig
+import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import nl.martijndwars.webpush.Notification
-import nl.martijndwars.webpush.PushAsyncService
 
 object PushManager {
 
-    val pushConfig by lazy { ConfigManager.getConfig<PushConfig>() }
+    private val log = KotlinLogging.logger { }
 
-    val pushService = PushAsyncService(
-        pushConfig.pushPublicKey, pushConfig.pushPrivateKey.value, "mailto:dev@walt.id"
-    )
+    private val pushConfig by lazy { ConfigManager.getConfig<PushConfig>() }
+
+    // subject: "mailto:dev@walt.id"
+    private val pushService = WebPushService(pushConfig.pushSubject, VapidKeys.create(pushConfig.pushPublicKey, pushConfig.pushPrivateKey.value))
 
     val subscriptions = ArrayList<Subscription>()
 
@@ -31,7 +33,9 @@ object PushManager {
         val payload = Json.encodeToString(data).toByteArray()
 
         subscriptions.forEach { subscription ->
-            val notification = Notification(
+            val res = pushService.send(payload, subscription.endpoint, subscription.userPublicKey().encoded, subscription.authAsBytes())
+            log.debug { "Push result for ${subscription.endpoint} (${subscription.userPublicKey().encoded}): $res" }
+            /*val notification = Notification(
                 subscription.endpoint,
                 subscription.userPublicKey(),
                 subscription.authAsBytes(),
@@ -40,7 +44,9 @@ object PushManager {
 
             val pushResponse = pushService.send(notification)
                 .get()
+
             println("Push send response: $pushResponse")
+            */
         }
     }
 
