@@ -31,9 +31,6 @@ interface ReportService<T> {
         private fun frequent(walletId: UUID, action: EventType.Action, limit: Int) = transaction {
             Events.select(Events.data)
                 .where { Events.wallet eq walletId and (Events.event eq action.type) and (Events.action eq action.toString()) }
-//                .groupBy(Events.credentialId)
-//                .having { Events.credentialId neq null }
-//                .orderBy(Events.credentialId.count(), SortOrder.DESC)
                 .limit(limit).map {
                     it[Events.data]
                 }
