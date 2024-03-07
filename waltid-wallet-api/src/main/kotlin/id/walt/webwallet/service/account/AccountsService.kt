@@ -5,24 +5,25 @@ import id.walt.webwallet.config.LoginMethodsConfig
 import id.walt.webwallet.db.models.*
 import id.walt.webwallet.service.WalletServiceManager
 import id.walt.webwallet.service.events.AccountEventData
-import id.walt.webwallet.service.events.Event
 import id.walt.webwallet.service.events.EventService
 import id.walt.webwallet.service.events.EventType
 import id.walt.webwallet.service.issuers.IssuersService
 import id.walt.webwallet.service.settings.SettingsService
 import id.walt.webwallet.service.settings.WalletSetting
+import id.walt.webwallet.usecase.event.EventUseCase
 import id.walt.webwallet.web.controllers.generateToken
 import id.walt.webwallet.web.model.*
 import kotlinx.datetime.toKotlinInstant
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.uuid.UUID
-import org.jetbrains.exposed.sql.*
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 
 object AccountsService {
 
+    private val eventUseCase = EventUseCase(EventService())
     fun registerAuthenticationMethods() {
         val loginMethods = ConfigManager.getConfig<LoginMethodsConfig>().enabledLoginMethods
 
@@ -51,15 +52,13 @@ object AccountsService {
         }
 
         val walletService = WalletServiceManager.getWalletService(tenant, registeredUserId, createdInitialWalletId)
-        EventService.add(
-            Event(
-                action = EventType.Account.Create,
-                tenant = tenant,
-                originator = "wallet",
-                account = registeredUserId,
-                wallet = createdInitialWalletId,
-                data = AccountEventData(accountId = request.name)
-            )
+        eventUseCase.log(
+            action = EventType.Account.Create,
+            originator = "wallet",
+            tenant = tenant,
+            accountId = registeredUserId,
+            walletId = createdInitialWalletId,
+            data = AccountEventData(accountId = request.name)
         )
 
         // Add default data:
@@ -77,15 +76,13 @@ object AccountsService {
             is OidcUniqueSubjectRequest -> OidcUniqueSubjectStrategy.authenticate(tenant, request)
         }
     }.fold(onSuccess = {
-        EventService.add(
-            Event(
-                action = EventType.Account.Login,
-                tenant = tenant,
-                originator = "wallet",
-                account = it.id,
-                wallet = null,
-                data = AccountEventData(accountId = it.username)
-            )
+        eventUseCase.log(
+            action = EventType.Account.Login,
+            tenant = tenant,
+            originator = "wallet",
+            accountId = it.id,
+            walletId = UUID.NIL,
+            data = AccountEventData(accountId = it.username)
         )
         Result.success(
             AuthenticationResult(

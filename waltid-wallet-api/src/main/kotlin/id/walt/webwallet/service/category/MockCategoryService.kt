@@ -12,6 +12,7 @@ object MockCategoryService : CategoryService {
     override fun add(wallet: UUID, name: String) = 1
 
     override fun delete(wallet: UUID, name: String) = 1
+    override fun rename(wallet: UUID, oldName: String, newName: String): Int = 1
 
     private val charPool: CharArray = (('a'..'z') + ('A'..'Z') + ('0'..'9')).toCharArray()
     private val listOfCategories = (1..10).map { WalletCategoryData(name = generate(Random.nextInt(4, 17))) }

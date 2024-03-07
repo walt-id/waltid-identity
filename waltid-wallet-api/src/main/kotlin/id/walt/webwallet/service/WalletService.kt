@@ -12,7 +12,6 @@ import id.walt.webwallet.service.dto.LinkedWalletDataTransferObject
 import id.walt.webwallet.service.dto.WalletDataTransferObject
 import id.walt.webwallet.service.events.EventLogFilter
 import id.walt.webwallet.service.events.EventLogFilterResult
-import id.walt.webwallet.service.issuers.IssuerDataTransferObject
 import id.walt.webwallet.service.keys.SingleKeyResponse
 import id.walt.webwallet.service.report.ReportRequestParameter
 import id.walt.webwallet.service.settings.WalletSetting
@@ -34,6 +33,7 @@ abstract class WalletService(val tenant: String, val accountId: UUID, val wallet
     abstract suspend fun rejectCredential(parameter: CredentialRequestParameter): Boolean
     abstract suspend fun attachCategory(credentialId: String, categories: List<String>): Boolean
     abstract suspend fun detachCategory(credentialId: String, categories: List<String>): Boolean
+    abstract suspend fun renameCategory(oldName: String, newName: String): Boolean
     abstract fun getCredentialsByIds(credentialIds: List<String>): List<WalletCredential>
 
     abstract fun matchCredentialsByPresentationDefinition(presentationDefinition: PresentationDefinition): List<WalletCredential>
