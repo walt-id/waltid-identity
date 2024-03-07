@@ -56,9 +56,10 @@ class CI_JVM_Test : AnnotationSpec() {
 
     var testMetadata = OpenIDProviderMetadata(
         authorizationEndpoint = "https://localhost/oidc",
-        credentialsSupported = listOf(
+        credentialConfigurationsSupported = listOf(
             CredentialSupported(
-                CredentialFormat.jwt_vc_json, "jwt_vc_json_fmt", setOf("did"), setOf("ES256K"),
+                "UniversityDegreeCredential_jwt_vc_json",
+                CredentialFormat.jwt_vc_json, setOf("did"), setOf("ES256K"),
                 listOf(
                     DisplayProperties(
                         "University Credential",
@@ -89,7 +90,8 @@ class CI_JVM_Test : AnnotationSpec() {
                 )
             ),
             CredentialSupported(
-                CredentialFormat.ldp_vc, "ldp_vc_1", setOf("did"), setOf("ES256K"),
+                "VerifiableId_ldp_vc",
+                CredentialFormat.ldp_vc, setOf("did"), setOf("ES256K"),
                 listOf(DisplayProperties("Verifiable ID")),
                 types = listOf("VerifiableCredential", "VerifiableId"),
                 context = listOf(
@@ -97,7 +99,7 @@ class CI_JVM_Test : AnnotationSpec() {
                     JsonObject(mapOf("@version" to JsonPrimitive(1.1)))
                 )
             )
-        )
+        ).associateBy { it.id }
     )
 
     val ktorClient = HttpClient() {
@@ -689,7 +691,7 @@ class CI_JVM_Test : AnnotationSpec() {
         val issuanceSession = ciTestProvider.initializeCredentialOffer(
             CredentialOffer.Builder(ciTestProvider.baseUrl)
                 .addOfferedCredential(ciTestProvider.metadata.credentialsSupported!!.first().id!!),
-            5.minutes, allowPreAuthorized = true, preAuthUserPin = "1234"
+            5.minutes, allowPreAuthorized = true, txCode = TxCode(TxInputMode.numeric), txCodeValue = "1234"
         )
         println("issuanceSession: $issuanceSession")
 
@@ -757,7 +759,7 @@ class CI_JVM_Test : AnnotationSpec() {
             clientId = testCIClientConfig.clientID,
             redirectUri = credentialWallet.config.redirectUri,
             preAuthorizedCode = parsedOfferReq.credentialOffer!!.grants[GrantType.pre_authorized_code.value]!!.preAuthorizedCode,
-            txCode = issuanceSession.preAuthUserPin
+            txCode = issuanceSession.txCodeValue
         )
         println("tokenReq: $tokenReq")
 
@@ -1062,7 +1064,7 @@ class CI_JVM_Test : AnnotationSpec() {
         val issuanceSession = ciTestProvider.initializeCredentialOffer(
             CredentialOffer.Builder(ciTestProvider.baseUrl)
                 .addOfferedCredential(ciTestProvider.metadata.credentialsSupported!!.first().id!!),
-            5.minutes, allowPreAuthorized = true, preAuthUserPin = "1234"
+            5.minutes, allowPreAuthorized = true, TxCode(TxInputMode.numeric), txCodeValue = "1234"
         )
         println("issuanceSession: $issuanceSession")
 
@@ -1132,7 +1134,7 @@ class CI_JVM_Test : AnnotationSpec() {
             clientId = testCIClientConfig.clientID,
             redirectUri = credentialWallet.config.redirectUri,
             preAuthorizedCode = credentialOffer.grants[GrantType.pre_authorized_code.value]!!.preAuthorizedCode,
-            txCode = issuanceSession.preAuthUserPin
+            txCode = issuanceSession.txCodeValue
         )
         println("tokenReq: $tokenReq")
 
