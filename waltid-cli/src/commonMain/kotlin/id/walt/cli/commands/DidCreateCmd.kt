@@ -1,6 +1,7 @@
 package id.walt.cli.commands
 
 import com.github.ajalt.clikt.core.CliktCommand
+import com.github.ajalt.clikt.core.InvalidFileFormat
 import com.github.ajalt.clikt.core.terminal
 import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.help
@@ -15,6 +16,7 @@ import id.walt.cli.util.DidUtil
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.LocalKey
 import kotlinx.coroutines.runBlocking
+import java.text.ParseException
 
 class DidCreateCmd : CliktCommand(
     name = "create",
@@ -29,25 +31,25 @@ class DidCreateCmd : CliktCommand(
     private val keyFile by option("-k", "--key")
         .help("The Subject's key to be used. If none is provided, a new one will be generated.")
         .file()
-    // .enum<DidMethod>(ignoreCase = true)
 
     override fun run() {
         runBlocking {
             val key = getKey()
 
-            echo(TextStyles.dim("DID subject ${key.keyType} key thumbprint: ${key.getThumbprint()}"))
-            // terminal.println(
-            //     Markdown(
-            //         """
-            //     |```json
-            //     |${key.getThumbprint()}
-            //     |```
-            // """.trimMargin()
-            //     )
-            // )
-            // walletService.createDid("key", mapOf("alias" to JsonPrimitive("Onboarding")))
+            val jwk = runBlocking { key.exportJWKPretty() }
+            echo(TextColors.green("DID Subject key to be used:"))
+            terminal.println(
+                Markdown(
+                    """
+                |```json
+                |$jwk
+                |```
+            """.trimMargin()
+                )
+            )
 
             val result = DidUtil.createDid(method, key)
+
             echo(TextColors.green("DID created:"))
             terminal.println(
                 Markdown(
@@ -63,7 +65,12 @@ class DidCreateCmd : CliktCommand(
 
     private suspend fun getKey(): LocalKey {
         if (keyFile != null) {
-            return LocalKey.importJWK(keyFile!!.readText()).getOrThrow()
+            try {
+                return LocalKey.importJWK(keyFile!!.readText()).getOrThrow()
+            } catch (e: ParseException) {
+                // } catch (e : Exception) {
+                throw InvalidFileFormat(keyFile!!.path, e.let { e.message!! })
+            }
         } else {
             return generateDefaultKey()
         }
@@ -72,23 +79,8 @@ class DidCreateCmd : CliktCommand(
     private suspend fun generateDefaultKey(): LocalKey {
         echo(TextStyles.dim("Key not provided. Let's generate a new one..."))
         val key = runBlocking { LocalKey.generate(KeyType.Ed25519) }
-        echo(TextStyles.dim("Key thumbprint is: ${key.getThumbprint()}"))
-
-        val jwk = runBlocking { key.exportJWKPretty() }
-        echo(TextColors.green("Generated Key (JWK):"))
-        terminal.println(
-            Markdown(
-                """
-                |```json
-                |$jwk
-                |```
-            """.trimMargin()
-            )
-        )
+        echo(TextStyles.dim("Key generated with thumbprint ${key.getThumbprint()}"))
 
         return key
-        // return KeyUtils.generateKey(KeyType.Ed25519)
-
-
     }
 }
