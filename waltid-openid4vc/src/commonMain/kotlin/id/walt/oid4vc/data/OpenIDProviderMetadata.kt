@@ -106,7 +106,7 @@ data class OpenIDProviderMetadata @OptIn(ExperimentalSerializationApi::class) co
     // OID4VCI properties
     @SerialName("credential_issuer") val credentialIssuer: String? = null,
     @SerialName("credential_endpoint") val credentialEndpoint: String? = null,
-    @SerialName("credential_configurations_supported") @Serializable(CredentialSupportedListSerializer::class) val credentialConfigurationsSupported: Map<String, CredentialSupported>? = null,
+    @SerialName("credential_configurations_supported") @Serializable(CredentialSupportedMapSerializer::class) val credentialConfigurationsSupported: Map<String, CredentialSupported>? = null,
     @SerialName("batch_credential_endpoint") val batchCredentialEndpoint: String? = null,
     @SerialName("deferred_credential_endpoint") val deferredCredentialEndpoint: String? = null,
     @SerialName("authorization_servers") val authorizationServers: Set<String>? = null,
