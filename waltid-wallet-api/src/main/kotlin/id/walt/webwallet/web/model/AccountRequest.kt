@@ -39,7 +39,7 @@ data class KeycloakAccountRequest(
     val email: String? = null,
     val username: String,
     val password: String,
-    val token: String
+    val token: String? = null
 ) : AccountRequest()
 
 val module = SerializersModule {
