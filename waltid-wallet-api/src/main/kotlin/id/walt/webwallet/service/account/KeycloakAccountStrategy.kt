@@ -5,6 +5,8 @@ import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
 import com.auth0.jwt.interfaces.DecodedJWT
 import id.walt.crypto.utils.JsonUtils.toJsonObject
+import id.walt.webwallet.config.ConfigManager
+import id.walt.webwallet.config.OidcConfiguration
 import id.walt.webwallet.db.models.Accounts
 import id.walt.webwallet.db.models.OidcLogins
 import id.walt.webwallet.service.OidcLoginService
@@ -33,21 +35,24 @@ import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.transactions.transaction
 
 object KeycloakAccountStrategy : AccountStrategy<KeycloakAccountRequest>("keycloak") {
+  val http =
+      HttpClient() {
+        install(ContentNegotiation) { json() }
+        defaultRequest { header(HttpHeaders.ContentType, ContentType.Application.Json) }
+
+        install(Logging) {
+          logger = Logger.DEFAULT
+          level = LogLevel.ALL
+        }
+      }
+
+  val config = ConfigManager.getConfig<OidcConfiguration>()
 
   override suspend fun register(
       tenant: String,
       request: KeycloakAccountRequest
   ): Result<RegistrationResult> {
-    val http =
-        HttpClient() {
-          install(ContentNegotiation) { json() }
-          defaultRequest { header(HttpHeaders.ContentType, ContentType.Application.Json) }
 
-          install(Logging) {
-            logger = Logger.DEFAULT
-            level = LogLevel.ALL
-          }
-        }
     //    val params =
     //        mapOf(
     //            "client_id" to "waltid_backend_localhost",
@@ -76,39 +81,22 @@ object KeycloakAccountStrategy : AccountStrategy<KeycloakAccountRequest>("keyclo
             .toJsonObject()
 
     println(user)
-    http
-        .post("http://0.0.0.0:8080/admin/realms/waltid-keycloak-ktor/users") {
-          contentType(ContentType.Application.Json)
-          headers {
-            append("Content-Type", "application/json")
-            append("Authorization", "Bearer ${request.token}")
-          }
-          setBody(user)
-        }
-        .headers
-        .toMap()
-        .forEach { (k, v) -> println("$k -> $v") }
+    val res =
+        http
+            .post(config.oidcUserApi) {
+              contentType(ContentType.Application.Json)
+              headers {
+                append("Content-Type", "application/json")
+                append("Authorization", "Bearer ${request.token}")
+              }
+              setBody(user)
+            }
+            .headers
 
-    val request_params =
-        mapOf(
-                "client_id" to "waltid_backend_localhost",
-                "client_secret" to "**********",
-                "grant_type" to "password",
-                "username" to request.username,
-                "password" to request.password,
-            )
-            .map { (k, v) -> "$k=$v" }
-            .joinToString("&")
+    val account_id = res["Location"]!!.split("/").last()
 
-    val response_sub =
-        http.post("http://0.0.0.0:8080/realms/waltid-keycloak-ktor/protocol/openid-connect/token") {
-          headers { append("Content-Type", "application/x-www-form-urlencoded") }
-          setBody(request_params)
-        }
-
-    val resBody = Json.parseToJsonElement(response_sub.body())
-    val sub_access_token = resBody.jsonObject["access_token"]!!.jsonPrimitive.content
-    val jwt = verifiedToken(sub_access_token)
+    println("ACCOUNT ID: $account_id")
+    println("REQUEST: $request")
 
     val createdAccountId = transaction {
       val accountId =
@@ -123,7 +111,7 @@ object KeycloakAccountStrategy : AccountStrategy<KeycloakAccountRequest>("keyclo
       OidcLogins.insert {
         it[OidcLogins.tenant] = tenant
         it[OidcLogins.accountId] = accountId
-        it[oidcId] = jwt.subject
+        it[oidcId] = account_id
       }
 
       accountId
@@ -159,9 +147,11 @@ object KeycloakAccountStrategy : AccountStrategy<KeycloakAccountRequest>("keyclo
       tenant: String,
       request: KeycloakAccountRequest
   ): AuthenticatedUser {
-    println("OIDC LOGIN REQUEST: ${request}")
+    println("KEYCLOAK LOGIN REQUEST : ${request}")
 
-    val jwt = verifiedToken(request.token)
+    val token = getUserToken(request)
+
+    val jwt = verifiedToken(token)
 
     val registeredUserId =
         if (AccountsService.hasAccountOidcId(jwt.subject)) {
