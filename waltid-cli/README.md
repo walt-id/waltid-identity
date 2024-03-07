@@ -37,6 +37,10 @@ Now, you can run:
 | `waltid key convert --input=./mySecp256r1Key.pem --output=./convertedSecp256r1.jwk` | Converts the given PEM with a Sec256r1 key to the JWK format. The converted file will be called convertedSecp256r1.jwk  |
 | `openssl ecparam -genkey -name secp256k1 -out secp256k1_by_openssl_pub_pvt_key.pem` | Uses OpenSSL to generate a pair of keys in a PEM file.                                                                  |                                                                                                                         |
 | `waltid key convert --verbose -i secp256k1_by_openssl_pub_pvt_key.pem`              | Converts the Secp256k1 key in the given PEM file to the JWK format.                                                     |
+| `waltid did -h`                                                                     | Print WaltID CLI DID command usage message                                                                              |
+| `waltid did create -h`                                                              | Print WaltID CLI DID create command usage message                                                                       |
+| `waltid did create`                                                                 | Creates a new did:key                                                                                                   |
+| `waltid did create --key=myRSAKey.json`                                             | Creates a new did:key with the key provided in the spoecified file                                                      | 
 
 ## In production
 
@@ -126,6 +130,8 @@ Usage: waltid [<options>] <command> [<args>]...
   │    waltid key -h                                                        │
   │    waltid key generate -h                                               │
   │    waltid key convert -h                                                │
+  │    waltid did -h                                                        │
+  │    waltid did create -h                                                 │
   │                                                                         │
   │    Key generation                                                       │
   │    ---------------                                                      │
@@ -137,6 +143,11 @@ Usage: waltid [<options>] <command> [<args>]...
   │    Key conversion                                                       │
   │    ---------------                                                      │
   │    waltid key convert --input=myRsaKey.pem                              │
+  │                                                                         │
+  │    DID creation                                                         │
+  │    -------------                                                        │
+  │    waltid did create                                                    │
+  │    waltid did create -k myKey.json                                      │
   ╰─────────────────────────────────────────────────────────────────────────╯
 
 Options:
@@ -194,6 +205,34 @@ Options:
   -h, --help               Show this message and exit
 ```
 
+## `waltid did` command
+
+```bash
+Usage: waltid did [<options>] <command> [<args>]...
+
+  DID management features
+
+Options:
+  -h, --help  Show this message and exit
+
+Commands:
+  create   Create a brand new Decentralized Identity
+  resolve  Resolve the decentralized identity passed as an argument, i.e. it retrieves the sovereign identity document addressed by the given DID.
+```
+
+## `waltid did create` command
+
+```bash
+Usage: waltid did create [<options>]
+
+  Create a brand new Decentralized Identity
+
+Options:
+  -m, --method=(KEY|JWK|WEB|EBSI|CHEQD|IOTA)  The DID method to be used.
+  -k, --key=<path>                            The Subject's key to be used. If none is provided, a new one will be generated.
+  -h, --help                                  Show this message and exit
+```
+
 # Compatibility
 
 This project is still a work in progress. As such, not all features are already implemented.
@@ -209,21 +248,37 @@ This project is still a work in progress. As such, not all features are already 
   * RSA ✅
 * Export formats
   * JWK ✅
-  * PEM ❌
+  * PEM
+    * RSA ✅
+    * ❌
 
-### `key convert
+### key convert
 
 * Input formats
-  * PEM ✅
-  * JWK ✅
-* Output formats
-  * PEM ❌
-  * JWK ✅
+  * JWK
+    * RSA ✅
+    * ed25519 ❌
+    * secp256k1 ✅
+    * secp256r1 ✅
+  * PEM
+    * RSA ❌
+    * ed25519 ❌
+    * secp256k1 ✅
+    * secp256r1 ✅
 * PEM Content
   * RSA Private Key ✅
   * RSA Public Key ✅
   * RSA Encrypted Private Key ✅
   * Ed25519 ❌
-  * secp256k1 ❌
-  * secp256r1 ❌
+  * secp256k1 Public + Private Key ✅
+  * secp256r1 ✅
 
+### DID create
+
+* Supported DID methods
+  * KEY ✅
+  * JWK ❌
+  * WEB ❌
+  * EBSI ❌
+  * CHEQD ❌
+  * IOTA ❌
