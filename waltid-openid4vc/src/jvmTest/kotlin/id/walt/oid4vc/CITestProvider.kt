@@ -49,19 +49,19 @@ const val CI_PROVIDER_BASE_URL = "http://localhost:$CI_PROVIDER_PORT"
 class CITestProvider : OpenIDCredentialIssuer(
     baseUrl = CI_PROVIDER_BASE_URL,
     config = CredentialIssuerConfig(
-        credentialsSupported = listOf(
+        credentialConfigurationsSupported = listOf(
             CredentialSupported(
-                CredentialFormat.jwt_vc_json, "VerifiableId",
+                "VerifiableId", CredentialFormat.jwt_vc_json,
                 cryptographicBindingMethodsSupported = setOf("did"), cryptographicSuitesSupported = setOf("ES256K"),
                 types = listOf("VerifiableCredential", "VerifiableId"),
                 customParameters = mapOf("foo" to JsonPrimitive("bar"))
             ),
             CredentialSupported(
-                CredentialFormat.jwt_vc_json, "VerifiableDiploma",
+                "VerifiableDiploma", CredentialFormat.jwt_vc_json,
                 cryptographicBindingMethodsSupported = setOf("did"), cryptographicSuitesSupported = setOf("ES256K"),
                 types = listOf("VerifiableCredential", "VerifiableAttestation", "VerifiableDiploma")
             )
-        )
+        ).associateBy { it.id }
     )
 ) {
 
