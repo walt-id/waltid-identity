@@ -17,7 +17,7 @@ private val log = KotlinLogging.logger { }
 
 suspend fun main(args: Array<String>) {
     log.debug { "verfier CLI starting ..." }
-
+    
     log.debug { "Init walt services..." }
     //WaltidServices.init()
     DidService.apply {
@@ -25,16 +25,16 @@ suspend fun main(args: Array<String>) {
         updateResolversForMethods()
     }
     PolicyManager.registerPolicies(PresentationDefinitionPolicy())
-
+    
     //ServiceMatrix("service-matrix.properties")
-
+    
     log.info { "Reading configurations..." }
     ConfigManager.loadConfigs(args)
-
+    
     val webConfig = ConfigManager.getConfig<WebConfig>()
-
+    
     log.info { "Starting web server (binding to ${webConfig.webHost}, listening on port ${webConfig.webPort})..." }
-    embeddedServer(CIO, port = webConfig.webPort, host = webConfig.webHost, module = Application::module)
+    embeddedServer(CIO, port = webConfig.webPort, host = webConfig.webHost, module = Application::verifierModule)
         .start(wait = true)
 }
 
@@ -47,8 +47,10 @@ fun Application.configurePlugins() {
     configureOpenApi()
 }
 
-fun Application.module() {
-    configurePlugins()
+fun Application.verifierModule(withPlugins: Boolean = true) {
+    if (withPlugins) {
+        configurePlugins()
+    }
     verfierApi()
     entraVerifierApi()
 }
