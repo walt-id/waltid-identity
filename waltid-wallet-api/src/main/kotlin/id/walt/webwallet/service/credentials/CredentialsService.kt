@@ -14,7 +14,9 @@ import org.jetbrains.exposed.sql.statements.UpdateStatement
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.time.Instant
 
-object CredentialsService {
+class CredentialsService {
+    val categoryService = CategoryService()
+
     private val notDeletedItemsCondition = Op.build { WalletCredentials.deletedOn eq null }
     private val deletedItemsCondition = Op.build { WalletCredentials.deletedOn neq null }
 
@@ -92,10 +94,6 @@ object CredentialsService {
     fun setPending(wallet: UUID, credentialId: String, pending: Boolean = true) =
         updatePending(wallet, credentialId, pending)
 
-    /*fun update(account: UUID, did: DidUpdateDataObject): Boolean {
-        TO-DO
-    }*/
-
     private fun addAll(wallet: UUID, credentials: List<WalletCredential>): List<String> = transaction {
         WalletCredentials.batchInsert(credentials) { credential: WalletCredential ->
             this[WalletCredentials.wallet] = wallet
@@ -164,7 +162,7 @@ object CredentialsService {
     private fun deletedCondition(deleted: Boolean) =
         deleted.takeIf { it }?.let { deletedItemsCondition } ?: notDeletedItemsCondition
 
-    object Category {
+    class CategoryService {
         fun add(wallet: UUID, credentialId: String, vararg category: String): Int = transaction {
             WalletCredentialCategoryMap.batchUpsert(
                 getCategoryIds(wallet, category.toList()),
