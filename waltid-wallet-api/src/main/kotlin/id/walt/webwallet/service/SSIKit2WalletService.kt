@@ -43,6 +43,7 @@ import id.walt.webwallet.usecase.event.EventUseCase
 import id.walt.webwallet.utils.WalletHttpClients.getHttpClient
 import id.walt.webwallet.web.controllers.PresentationRequestParameter
 import id.walt.webwallet.web.parameter.CredentialRequestParameter
+import io.ktor.client.*
 import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
@@ -58,7 +59,6 @@ import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.slf4j.LoggerFactory
-import java.net.URLDecoder
 import kotlin.collections.set
 import kotlin.time.Duration.Companion.seconds
 
@@ -69,6 +69,7 @@ class SSIKit2WalletService(
     private val categoryService: CategoryService,
     private val settingsService: SettingsService,
     private val eventUseCase: EventUseCase,
+    private val http: HttpClient
 ) : WalletService(tenant, accountId, walletId) {
     private val logger = LoggerFactory.getLogger(this::class.java)
 
@@ -188,32 +189,8 @@ class SSIKit2WalletService(
 
         return matchedCredentials.ifEmpty { credentialList }
     }
-
-    private fun getQueryParams(url: String): Map<String, MutableList<String>> {
-        val params: MutableMap<String, MutableList<String>> = HashMap()
-        val urlParts = url.split("\\?".toRegex()).dropLastWhile { it.isEmpty() }.toTypedArray()
-
-        if (urlParts.size <= 1) return params
-
-        val query = urlParts[1]
-        for (param in query.split("&".toRegex()).dropLastWhile { it.isEmpty() }.toTypedArray()) {
-            val pair = param.split("=".toRegex()).dropLastWhile { it.isEmpty() }.toTypedArray()
-            val key = URLDecoder.decode(pair[0], "UTF-8")
-            var value = ""
-            if (pair.size > 1) {
-                value = URLDecoder.decode(pair[1], "UTF-8")
-            }
-            var values = params[key]
-            if (values == null) {
-                values = ArrayList()
-                params[key] = values
-            }
-            values.add(value)
-        }
-        return params
-    }
-
-
+    
+    
     /* SIOP */
     @Serializable
     data class PresentationResponse(
@@ -321,9 +298,7 @@ class SSIKit2WalletService(
 
     private fun getAnyCredentialWallet() =
         credentialWallets.values.firstOrNull() ?: getCredentialWallet("did:test:test")
-
-    val http=getHttpClient()
-
+    
         override suspend fun useOfferRequest(
         offer: String, did: String, requireUserInput: Boolean
     ): List<WalletCredential> {
