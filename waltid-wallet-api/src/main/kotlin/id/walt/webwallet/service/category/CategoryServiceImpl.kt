@@ -30,4 +30,10 @@ object CategoryServiceImpl : CategoryService {
     override fun delete(wallet: UUID, name: String) = transaction {
         WalletCategory.deleteWhere { WalletCategory.wallet eq wallet and (WalletCategory.name eq name) }
     }
+
+    override fun rename(wallet: UUID, oldName: String, newName: String): Int = transaction {
+        WalletCategory.update({ WalletCategory.wallet eq wallet and (WalletCategory.name eq oldName) }) {
+            it[this.name] = newName
+        }
+    }
 }

@@ -246,6 +246,7 @@ fun Application.silentExchange() = routing {
             val issuerUseCase = IssuerUseCaseImpl(
                 service = IssuersService, http = HttpClient()
             )
+            val credentialService = CredentialsService()
             // claim offer
             val credentials = IssuanceService.useOfferRequest(
                 offer = offer,
@@ -292,7 +293,7 @@ fun Application.silentExchange() = routing {
             val result = credentials.groupBy {
                 it.wallet
             }.flatMap {
-                CredentialsService.add(
+                credentialService.add(
                     wallet = it.key, credentials = it.value.toTypedArray()
                 )
             }

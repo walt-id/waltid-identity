@@ -8,7 +8,9 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.uuid.UUID
 
-class EventUseCase {
+class EventUseCase(
+    private val eventService: EventService
+) {
 
     fun log(
         action: EventType.Action,
@@ -19,7 +21,7 @@ class EventUseCase {
         data: EventData,
         credentialId: String? = null,
         note: String? = null
-    ) = EventService.add(
+    ) = eventService.add(
         Event(
             action = action,
             tenant = tenant,
@@ -30,6 +32,18 @@ class EventUseCase {
             credentialId = credentialId,
             note = note,
         )
+    )
+
+    fun count(walletId: UUID, dataFilter: Map<String, String>) = eventService.count(walletId, dataFilter)
+
+    fun get(parameter: EventFilterParameter) = eventService.get(
+        accountId = parameter.accountId,
+        walletId = parameter.walletId,
+        limit = parameter.logFilter.limit,
+        offset = parameter.offset,
+        sortOrder = parameter.logFilter.sortOrder ?: "asc",
+        sortBy = parameter.logFilter.sortBy ?: "",
+        dataFilter = parameter.logFilter.data
     )
 
     fun credentialEventData(credential: WalletCredential, type: String?) = CredentialEventData(
@@ -62,5 +76,12 @@ class EventUseCase {
 
     fun keyEventData(id: String, algorithm: String, kmsType: String) = KeyEventData(
         id = id, algorithm = algorithm, keyManagementService = kmsType
+    )
+
+    data class EventFilterParameter(
+        val accountId: UUID,
+        val walletId: UUID,
+        val offset: Long,
+        val logFilter: EventLogFilter,
     )
 }

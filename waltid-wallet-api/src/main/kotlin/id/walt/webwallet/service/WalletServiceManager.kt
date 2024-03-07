@@ -7,6 +7,7 @@ import id.walt.webwallet.db.models.AccountWalletPermissions
 import id.walt.webwallet.db.models.Wallets
 import id.walt.webwallet.service.account.AccountsService
 import id.walt.webwallet.service.category.CategoryServiceImpl
+import id.walt.webwallet.service.events.EventService
 import id.walt.webwallet.service.nft.NftKitNftService
 import id.walt.webwallet.service.nft.NftService
 import id.walt.webwallet.service.settings.SettingsService
@@ -28,7 +29,7 @@ object WalletServiceManager {
     private val trustConfig = ConfigManager.getConfig<TrustConfig>()
     val issuerTrustValidationService = DefaultTrustValidationService(httpClient, trustConfig.issuersRecord)
     val verifierTrustValidationService = DefaultTrustValidationService(httpClient, trustConfig.verifiersRecord)
-    val eventUseCase = EventUseCase()
+    val eventUseCase = EventUseCase(EventService())
 
     fun getWalletService(tenant: String, account: UUID, wallet: UUID): WalletService =
         walletServices.getOrPut(Pair(account, wallet)) {

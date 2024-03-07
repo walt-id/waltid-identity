@@ -54,7 +54,8 @@ object NotificationController {
                         }
                     }
                 }) {
-                    val pending = CredentialsService.list(
+                    val credentialsService = CredentialsService()
+                    val pending = credentialsService.list(
                         getWalletId(), CredentialFilterObject(
                             categories = null,
                             showDeleted = false,
