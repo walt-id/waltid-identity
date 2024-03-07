@@ -171,4 +171,42 @@ object KeycloakAccountStrategy : AccountStrategy<KeycloakAccountRequest>("keyclo
         }
     return AuthenticatedUser(registeredUserId, jwt.subject)
   }
+
+  suspend fun getAccessToken(): String {
+    return getToken("client_credentials")
+  }
+
+  private suspend fun getUserToken(request: KeycloakAccountRequest): String {
+    return getToken("password", request.username, request.password)
+  }
+
+  suspend fun getToken(
+      grantType: String,
+      username: String? = null,
+      password: String? = null
+  ): String {
+    val requestParams =
+        mutableMapOf(
+            "client_id" to config.clientId,
+            "client_secret" to config.clientSecret,
+            "grant_type" to grantType)
+
+    if (grantType == "password") {
+      require(username != null && password != null) {
+        "Username and password are required for password grant type"
+      }
+      requestParams["username"] = username
+      requestParams["password"] = password
+    }
+
+    val requestBody = requestParams.map { (k, v) -> "$k=$v" }.joinToString("&")
+    val res =
+        http.post(config.accessTokenUrl) {
+          headers { append("Content-Type", "application/x-www-form-urlencoded") }
+          setBody(requestBody)
+        }
+
+    val resBody = Json.parseToJsonElement(res.body())
+    return resBody.jsonObject["access_token"]!!.jsonPrimitive.content
+  }
 }
