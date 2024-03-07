@@ -1,40 +1,42 @@
 package id.walt.webwallet.service.report
 
-import id.walt.webwallet.db.models.Events
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.service.credentials.CredentialsService
-import id.walt.webwallet.service.events.CredentialEventData
+import id.walt.webwallet.service.events.EventService
 import id.walt.webwallet.service.events.EventType
-import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.uuid.UUID
-import org.jetbrains.exposed.sql.and
-import org.jetbrains.exposed.sql.transactions.transaction
 
 interface ReportService<T> {
     fun frequent(parameter: ReportRequestParameter): List<T>
 
-    object Credentials : ReportService<WalletCredential> {
+    class Credentials(private val credentialService: CredentialsService, private val eventService: EventService) :
+        ReportService<WalletCredential> {
 
-        private val json = Json { ignoreUnknownKeys = true }
         override fun frequent(parameter: ReportRequestParameter): List<WalletCredential> =
             (parameter as? CredentialReportRequestParameter)?.let { param ->
-                frequent(param.walletId, EventType.Credential.Present, param.limit).map {
-                    json.decodeFromString<CredentialEventData>(it).credentialId
+                frequent(param.walletId, EventType.Credential.Present, param.limit).mapNotNull {
+                    it.jsonObject["credentialId"]?.jsonPrimitive?.content
                 }.groupBy { it }.let { group ->
                     val sorted = group.keys.sortedByDescending {
                         group[it]?.count()
                     }
-                    CredentialsService.get(sorted)
+                    credentialService.get(sorted)
                 }
             } ?: emptyList()
 
-        private fun frequent(walletId: UUID, action: EventType.Action, limit: Int) = transaction {
-            Events.select(Events.data)
-                .where { Events.wallet eq walletId and (Events.event eq action.type) and (Events.action eq action.toString()) }
-                .limit(limit).map {
-                    it[Events.data]
-                }
-        }
+        private fun frequent(walletId: UUID, action: EventType.Action, limit: Int) = eventService.get(
+            accountId = UUID.NIL,
+            walletId = walletId,
+            limit = limit,
+            offset = 0,
+            sortOrder = "ASC",
+            sortBy = "",
+            dataFilter = mapOf(
+                "event" to action.type, "action" to action.toString()
+            )
+        ).map { it.data }
     }
 }
 
@@ -44,6 +46,5 @@ abstract class ReportRequestParameter(
 )
 
 data class CredentialReportRequestParameter(
-    override val walletId: UUID,
-    override val limit: Int
+    override val walletId: UUID, override val limit: Int
 ) : ReportRequestParameter(walletId, limit)

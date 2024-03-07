@@ -8,10 +8,10 @@ import id.walt.webwallet.service.credentials.CredentialsService
 import id.walt.webwallet.utils.IssuanceExamples
 import id.walt.webwallet.web.model.EmailAccountRequest
 import io.github.oshai.kotlinlogging.KotlinLogging
-import kotlinx.uuid.UUID
-import kotlinx.uuid.generateUUID
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Clock
+import kotlinx.uuid.UUID
+import kotlinx.uuid.generateUUID
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SchemaUtils
 import org.jetbrains.exposed.sql.StdOutSqlLogger
@@ -84,7 +84,7 @@ object Db {
                 val walletResult = AccountsService.getAccountWalletMappings("", accountId)
                 val walletId = walletResult.wallets[0].id
                 
-                CredentialsService.add(
+                CredentialsService().add(
                     wallet = walletId,
                     WalletCredential(
                         wallet = walletId,
@@ -110,7 +110,7 @@ object Db {
             recreateDatabase()
         } else {
             transaction {
-                SchemaUtils.drop(WalletCredentialCategoryMap, WalletCategory, WalletCredentials, WalletIssuers)// migration
+                SchemaUtils.drop(WalletCredentialCategoryMap, WalletCategory, WalletIssuers)// migration
                 SchemaUtils.createMissingTablesAndColumns(*tables)
             }
         }

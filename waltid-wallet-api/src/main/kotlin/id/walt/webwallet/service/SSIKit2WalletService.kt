@@ -72,6 +72,9 @@ class SSIKit2WalletService(
     private val http: HttpClient
 ) : WalletService(tenant, accountId, walletId) {
     private val logger = LoggerFactory.getLogger(this::class.java)
+    private val credentialService = CredentialsService()
+    private val eventService = EventService()
+    private val credentialReportsService = ReportService.Credentials(credentialService, eventService)
 
     companion object {
         init {
@@ -94,15 +97,15 @@ class SSIKit2WalletService(
     }
 
     override fun listCredentials(filter: CredentialFilterObject): List<WalletCredential> =
-        CredentialsService.list(walletId, filter)
+        credentialService.list(walletId, filter)
 
     override suspend fun listRawCredentials(): List<String> =
-        CredentialsService.list(walletId, CredentialFilterObject.default).map {
+        credentialService.list(walletId, CredentialFilterObject.default).map {
             it.document
         }
 
     override suspend fun deleteCredential(id: String, permanent: Boolean) = let {
-        CredentialsService.get(walletId, id)?.run {
+        credentialService.get(walletId, id)?.run {
             eventUseCase.log(
                 action = EventType.Credential.Delete,
                 originator = "wallet",
@@ -113,34 +116,34 @@ class SSIKit2WalletService(
                 credentialId = this.id
             )
         }
-        CredentialsService.delete(walletId, id, permanent)
+        credentialService.delete(walletId, id, permanent)
     }
 
     override suspend fun restoreCredential(id: String): WalletCredential =
-        CredentialsService.restore(walletId, id) ?: error("Credential not found: $id")
+        credentialService.restore(walletId, id) ?: error("Credential not found: $id")
 
     override suspend fun getCredential(credentialId: String): WalletCredential =
-        CredentialsService.get(walletId, credentialId)
+        credentialService.get(walletId, credentialId)
             ?: throw IllegalArgumentException("WalletCredential not found for credentialId: $credentialId")
 
     override suspend fun attachCategory(credentialId: String, categories: List<String>): Boolean =
-        CredentialsService.Category.add(
+        credentialService.categoryService.add(
             wallet = walletId, credentialId = credentialId, category = categories.toTypedArray()
         ) == categories.size
 
     override suspend fun detachCategory(credentialId: String, categories: List<String>): Boolean =
-        CredentialsService.Category.delete(walletId, credentialId, *categories.toTypedArray()) > 0
+        credentialService.categoryService.delete(walletId, credentialId, *categories.toTypedArray()) > 0
 
     override suspend fun renameCategory(oldName: String, newName: String): Boolean =
         categoryService.rename(walletId, oldName, newName) > 0
 
     override suspend fun acceptCredential(parameter: CredentialRequestParameter): Boolean =
-        CredentialsService.get(walletId, parameter.credentialId)?.takeIf { it.deletedOn == null }?.let {
-            CredentialsService.setPending(walletId, parameter.credentialId, false) > 0
+        credentialService.get(walletId, parameter.credentialId)?.takeIf { it.deletedOn == null }?.let {
+            credentialService.setPending(walletId, parameter.credentialId, false) > 0
         } ?: error("Credential not found: ${parameter.credentialId}")
 
     override suspend fun rejectCredential(parameter: CredentialRequestParameter): Boolean =
-        CredentialsService.delete(walletId, parameter.credentialId, true)
+        credentialService.delete(walletId, parameter.credentialId, true)
 
     override fun matchCredentialsByPresentationDefinition(presentationDefinition: PresentationDefinition): List<WalletCredential> {
         val credentialList = listCredentials(CredentialFilterObject.default)
@@ -255,7 +258,7 @@ class SSIKit2WalletService(
         }
         logger.debug("HTTP Response: {}, body: {}", resp, httpResponseBody)
         parameter.selectedCredentials.forEach {
-            CredentialsService.get(walletId, it)?.run {
+            credentialService.get(walletId, it)?.run {
                 eventUseCase.log(
                     action = EventType.Credential.Present,
                     originator = presentationSession.presentationDefinition?.name ?: EventDataNotAvailable,
@@ -326,7 +329,7 @@ class SSIKit2WalletService(
                     )
                 }
             }
-        CredentialsService.add(
+        credentialService.add(
             wallet = walletId, credentials = addableCredentials.toTypedArray()
         )
         return addableCredentials
@@ -523,10 +526,15 @@ class SSIKit2WalletService(
     override fun filterEventLog(filter: EventLogFilter): EventLogFilterResult = runCatching {
         val startingAfterItemIndex = filter.startingAfter?.toLongOrNull()?.takeIf { it >= 0 } ?: -1L
         val pageSize = filter.limit
-        val count = EventService.count(walletId, filter.data)
+        val count = eventUseCase.count(walletId, filter.data)
         val offset = startingAfterItemIndex + 1
-        val events = EventService.get(
-            accountId, walletId, filter.limit, offset, filter.sortOrder ?: "asc", filter.sortBy ?: "", filter.data
+        val events = eventUseCase.get(
+            EventUseCase.EventFilterParameter(
+                accountId = accountId,
+                walletId = walletId,
+                offset = offset,
+                logFilter = filter,
+            )
         )
         EventLogFilterDataResult(
             items = events,
@@ -563,7 +571,7 @@ class SSIKit2WalletService(
 
     override suspend fun deleteCategory(name: String): Boolean = categoryService.delete(walletId, name) == 1
     override suspend fun getFrequentCredentials(parameter: ReportRequestParameter): List<WalletCredential> =
-        ReportService.Credentials.frequent(parameter)
+        credentialReportsService.frequent(parameter)
 
     override suspend fun getSettings(): WalletSetting =
         settingsService.get(walletId) ?: error("Settings not found for wallet: $walletId")
