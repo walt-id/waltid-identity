@@ -30,30 +30,6 @@ data:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: wallet-oidc-config
-data:
-  oidc.conf: |
-    enableOidcLogin = true
-    providerName = keycloak
-    oidcRealm = "https://keycloak.walt-test.cloud/realms/waltid-keycloak-ktor"
-    oidcJwks = "${oidcRealm}/protocol/openid-connect/certs"
-    authorizeUrl = "${oidcRealm}/protocol/openid-connect/auth"
-    accessTokenUrl = "${oidcRealm}/protocol/openid-connect/token"
-    logoutUrl = "${oidcRealm}/protocol/openid-connect/logout"
-    clientId = "waltid_backend"
-    clientSecret = "SiJXBB6U6CmPR8kXmhYDOZ8KdcGR46w8"
-    jwksCache = {
-        cacheSize = 10
-        cacheExpirationHours = 24
-        rateLimit: {
-            bucketSize: 10
-            refillRateMinutes: 1
-        }
-    }
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
   name: wallet-wallet-config
 data:
   wallet.conf: |
@@ -133,6 +109,21 @@ data:
       "Unsure about accuracy",
       "Need more details",
     ]
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wallet-trust-config
+data:
+  trust.conf: |
+    issuersRecord: {
+        baseUrl = "<url>"
+        trustRecordPath = "<path>"
+    }
+    verifiersRecord: {
+         baseUrl = "<url>"
+         trustRecordPath = "<path>"
+    }
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -245,9 +236,6 @@ spec:
         - name: wallet-push-config
           secret:
             secretName: wallet-push-config-secret
-        - name: wallet-trust-config
-          configMap:
-            name: wallet-trust-config
         - name: wallet-nft-config
           secret:
             secretName: wallet-nft-config-secret
@@ -291,7 +279,7 @@ spec:
             - name: NUXT_PUBLIC_ISSUER_CALLBACK_URL
               value: "https://wallet.walt.id"
           ports:
-            - containerPort: 3000
+            - containerPort: 7101
               name: http-api
 ---
 kind: Service
