@@ -189,6 +189,11 @@ fun Application.auth() {
 
         call.respond(oidcSession.token)
       }
+      get("keycloak-token", { description = "Returns Keycloak access token" }) {
+        val access_token = KeycloakAccountStrategy.getAccessToken()
+
+        call.respond(access_token)
+      }
 
       post(
           "login",
@@ -218,6 +223,14 @@ fun Application.auth() {
                     buildJsonObject {
                           put("type", JsonPrimitive("oidc"))
                           put("token", JsonPrimitive("oidc token"))
+                        }
+                        .toString())
+                example(
+                    "Keycloak username + password",
+                    buildJsonObject {
+                          put("type", JsonPrimitive("keycloak"))
+                          put("username", JsonPrimitive("Max_Mustermann"))
+                          put("password", JsonPrimitive("password"))
                         }
                         .toString())
               }
