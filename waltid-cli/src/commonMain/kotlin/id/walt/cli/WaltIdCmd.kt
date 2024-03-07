@@ -26,6 +26,8 @@ class WaltIdCmd : CliktCommand(
         waltid key -h
         waltid key generate -h
         waltid key convert -h
+        waltid did -h
+        waltid did create -h
         
         Key generation
         ---------------
@@ -37,6 +39,11 @@ class WaltIdCmd : CliktCommand(
         Key conversion
         ---------------
         waltid key convert --input=myRsaKey.pem
+        
+        DID creation
+        -------------
+        waltid did create 
+        waltid did create -k myKey.json
         """,
     printHelpOnEmptyArgs = true
 ) {
