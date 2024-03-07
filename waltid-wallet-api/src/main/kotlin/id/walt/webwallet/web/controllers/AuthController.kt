@@ -8,6 +8,7 @@ import id.walt.webwallet.db.models.AccountWalletPermissions
 import id.walt.webwallet.service.OidcLoginService
 import id.walt.webwallet.service.WalletServiceManager
 import id.walt.webwallet.service.account.AccountsService
+import id.walt.webwallet.service.account.KeycloakAccountStrategy
 import id.walt.webwallet.utils.RandomUtils
 import id.walt.webwallet.web.ForbiddenException
 import id.walt.webwallet.web.InsufficientPermissionsException
@@ -304,12 +305,13 @@ fun Application.auth() {
             request {
               body<KeycloakAccountRequest> {
                 example(
-                    "E-mail + password",
+                    "Username + password",
                     buildJsonObject {
-                          put("name", JsonPrimitive("Max Mustermann"))
+                          put("username", JsonPrimitive("Max_Mustermann"))
                           put("email", JsonPrimitive("user@email.com"))
                           put("password", JsonPrimitive("password"))
-                          put("type", JsonPrimitive("email"))
+                          put("token", JsonPrimitive("eyJhb..."))
+                          put("type", JsonPrimitive("keycloak"))
                         }
                         .toString())
                 example(
