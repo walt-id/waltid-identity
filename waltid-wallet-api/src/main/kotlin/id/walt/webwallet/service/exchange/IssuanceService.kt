@@ -15,15 +15,12 @@ import id.walt.oid4vc.responses.TokenResponse
 import id.walt.oid4vc.util.randomUUID
 import id.walt.webwallet.manifest.extractor.EntraManifestExtractor
 import id.walt.webwallet.service.oidc4vc.TestCredentialWallet
-import io.ktor.client.*
+import id.walt.webwallet.utils.WalletHttpClients
 import io.ktor.client.call.*
-import io.ktor.client.engine.cio.*
-import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
-import io.ktor.serialization.kotlinx.json.*
 import io.ktor.util.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -32,12 +29,8 @@ import kotlinx.serialization.json.jsonPrimitive
 import org.slf4j.LoggerFactory
 
 object  IssuanceService {
-    private val http = HttpClient(CIO) {
-        install(ContentNegotiation) {
-            json()
-        }
-        followRedirects = false
-    }
+
+    private val http = WalletHttpClients.getHttpClient()
     private val logger = LoggerFactory.getLogger(this::class.java)
 
     suspend fun useOfferRequest(

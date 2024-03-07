@@ -20,15 +20,13 @@ import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.requests.TokenRequest
 import id.walt.webwallet.service.SessionAttributes.HACK_outsideMappedSelectedCredentialsPerSession
 import id.walt.webwallet.service.SessionAttributes.HACK_outsideMappedSelectedDisclosuresPerSession
+import id.walt.webwallet.utils.WalletHttpClients.getHttpClient
 import id.walt.webwallet.service.credentials.CredentialsService
 import id.walt.webwallet.service.keys.KeysService
-import io.ktor.client.*
 import io.ktor.client.call.*
-import io.ktor.client.engine.cio.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
-import io.ktor.serialization.kotlinx.json.*
 import io.ktor.util.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Clock
@@ -52,11 +50,7 @@ class TestCredentialWallet(
 
     private val sessionCache = mutableMapOf<String, VPresentationSession>() // TODO not stateless because of oidc4vc library
 
-    private val ktorClient = HttpClient(CIO) {
-        install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) {
-            json()
-        }
-    }
+    private val ktorClient = getHttpClient()
 
     suspend fun resolveDidAuthentication(did: String): String {
         return DidService.resolve(did).getOrElse {

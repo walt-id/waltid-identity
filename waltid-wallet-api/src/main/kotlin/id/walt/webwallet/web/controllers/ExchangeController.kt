@@ -74,7 +74,9 @@ fun Application.exchange() = walletRoute {
                     }
             }.onSuccess {
                 context.respond(HttpStatusCode.OK, it)
-            }.onFailure { context.respond(HttpStatusCode.BadRequest, it.localizedMessage) }
+            }.onFailure {  error ->
+                println("wallet exception: $error")
+                context.respond(HttpStatusCode.BadRequest, error.localizedMessage) }
         }
 
         post("matchCredentialsForPresentationDefinition", {
