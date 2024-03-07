@@ -1,5 +1,6 @@
 package id.walt.cli
 
+import com.github.ajalt.clikt.core.InvalidFileFormat
 import com.github.ajalt.clikt.core.PrintHelpMessage
 import com.github.ajalt.clikt.testing.test
 import id.walt.cli.commands.DidCreateCmd
@@ -162,9 +163,29 @@ class WaltIdDidCreateCmdTest {
     }
 
     @Test
-    @Ignore
-    fun `should fail if the key file specified in the --key option is in a not supported format`() {
+    fun `should fail if a PEM key file is provided`() {
+        val keyFile1 = "secp256k1_key_sample1.pem"
+        val keyFilePath1 = getResourcePath(this, keyFile1)
+
+        val failure = assertFailsWith<InvalidFileFormat> {
+            command.parse(listOf("-k${keyFilePath1}"))
+        }
+
+        assertContains(failure.localizedMessage, "Invalid JSON")
     }
+
+    @Test
+    fun `should fail if the the provided --key is in a not supported format`() {
+        val didFile1 = "invalidKey.jwk"
+        val didFilePath1 = getResourcePath(this, didFile1)
+
+        val failure = assertFailsWith<InvalidFileFormat> {
+            command.parse(listOf("-k${didFilePath1}"))
+        }
+
+        assertContains(failure.localizedMessage, "Missing key type")
+    }
+
 
 // JWK
 
