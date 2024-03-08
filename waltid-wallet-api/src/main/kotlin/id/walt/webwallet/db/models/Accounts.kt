@@ -11,7 +11,7 @@ import org.jetbrains.exposed.sql.javatime.timestamp
 
 object Accounts : Table("accounts") {
     val tenant = varchar("tenant", 128).default("")
-    val id = kotlinxUUID("id")
+    val id = kotlinxUUID("id").uniqueIndex()
 
     val name = varchar("name", 128).nullable()
 
