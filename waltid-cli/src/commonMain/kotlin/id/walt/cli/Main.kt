@@ -6,37 +6,64 @@ import com.github.ajalt.mordant.rendering.TextColors
 import com.github.ajalt.mordant.rendering.Whitespace
 import com.github.ajalt.mordant.widgets.Panel
 import com.github.ajalt.mordant.widgets.Text
-import kotlin.system.exitProcess
+
+fun t(args: Array<String>) {
+    println("T() Function: $args.toString()")
+}
 
 fun main(args: Array<String>) {
     val cmd = WaltIdCmd()
     try {
         cmd.parse(args)
     } catch (e: PrintHelpMessage) {
-        cmd.echoFormattedHelp(e)
-        exitProcess(e.statusCode)
+        handlePrintHelpMessage(cmd, e)
     } catch (e: InvalidFileFormat) {
-        printError(cmd, e)
-        printUsage(cmd, e)
-        exitProcess(e.statusCode)
+        handleInvalidFileFormat(cmd, e)
     } catch (e: MultiUsageError) {
-        var msgs = "Invalid command. Please, review the usage instructions bellow and try again."
-        // for (error in e.errors) {
-        //     if (msgs.length == 0) {
-        //         // msgs = error.formatMessage(error.context!!.localization, parameterFormatter(error.context!!))
-        //         msgs = "${error.localizedMessage} - ${error.message} "
-        //     } else {
-        //         msgs = """${msgs} ${error.toString() ?: ""}"""
-        //     }
-        // }
-        printError(cmd, e, msgs)
-        printUsage(cmd, e)
-
+        handleMultiUsageError(cmd, e)
+    } catch (e: NoSuchOption) {
+        handleNoSuchOption(cmd, e)
     } catch (e: CliktError) {
-        printError(cmd, e)
-        printUsage(cmd, e)
-        exitProcess(e.statusCode)
+        handleCliktError(cmd, e)
     }
+    // finally {
+    //     exitProcess(e.statusCode)
+    // }
+}
+
+fun handleCliktError(cmd: WaltIdCmd, e: CliktError) {
+    printError(cmd, e)
+    printUsage(cmd, e)
+}
+
+fun handleNoSuchOption(cmd: WaltIdCmd, e: NoSuchOption) {
+    printError(cmd, e)
+    printUsage(cmd, e)
+}
+
+fun handleMultiUsageError(cmd: WaltIdCmd, e: MultiUsageError) {
+    var msgs = "Invalid command. Please, review the usage instructions bellow and try again."
+    // for (error in e.errors) {
+    //     if (msgs.length == 0) {
+    //         // msgs = error.formatMessage(error.context!!.localization, parameterFormatter(error.context!!))
+    //         msgs = "${error.localizedMessage} - ${error.message} "
+    //     } else {
+    //         msgs = """${msgs} ${error.toString() ?: ""}"""
+    //     }
+    // }
+    printError(cmd, e, msgs)
+    printUsage(cmd, e)
+
+
+}
+
+fun handleInvalidFileFormat(cmd: WaltIdCmd, e: InvalidFileFormat) {
+    printError(cmd, e)
+    printUsage(cmd, e)
+}
+
+fun handlePrintHelpMessage(cmd: WaltIdCmd, e: PrintHelpMessage) {
+    cmd.echoFormattedHelp(e)
 }
 
 fun printError(cmd: CliktCommand, e: CliktError? = null, msg: String? = null) {
@@ -44,7 +71,11 @@ fun printError(cmd: CliktCommand, e: CliktError? = null, msg: String? = null) {
     val msgToPrint = msg ?: e?.let { it.localizedMessage }
     cmd.terminal.println(
         Panel(
-            content = Text(TextColors.brightRed(msgToPrint!!), whitespace = Whitespace.NORMAL, width = 70),
+            content = Text(
+                TextColors.brightRed(msgToPrint ?: e.toString()),
+                whitespace = Whitespace.NORMAL,
+                width = 70
+            ),
             title = Text(TextColors.red("ERROR"))
         )
     )
