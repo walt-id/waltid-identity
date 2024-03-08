@@ -40,17 +40,13 @@ import id.walt.webwallet.service.report.ReportService
 import id.walt.webwallet.service.settings.SettingsService
 import id.walt.webwallet.service.settings.WalletSetting
 import id.walt.webwallet.usecase.event.EventUseCase
+import id.walt.webwallet.utils.WalletHttpClients.getHttpClient
 import id.walt.webwallet.web.controllers.PresentationRequestParameter
 import id.walt.webwallet.web.parameter.CredentialRequestParameter
 import io.ktor.client.*
-import io.ktor.client.engine.cio.*
-import io.ktor.client.engine.java.*
-import io.ktor.client.plugins.contentnegotiation.*
-import io.ktor.client.plugins.logging.*
 import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
-import io.ktor.serialization.kotlinx.json.*
 import io.ktor.util.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Clock
@@ -63,7 +59,6 @@ import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.slf4j.LoggerFactory
-import java.net.URLDecoder
 import kotlin.collections.set
 import kotlin.time.Duration.Companion.seconds
 
@@ -74,8 +69,12 @@ class SSIKit2WalletService(
     private val categoryService: CategoryService,
     private val settingsService: SettingsService,
     private val eventUseCase: EventUseCase,
+    private val http: HttpClient
 ) : WalletService(tenant, accountId, walletId) {
     private val logger = LoggerFactory.getLogger(this::class.java)
+    private val credentialService = CredentialsService()
+    private val eventService = EventService()
+    private val credentialReportsService = ReportService.Credentials(credentialService, eventService)
 
     companion object {
         init {
@@ -98,15 +97,15 @@ class SSIKit2WalletService(
     }
 
     override fun listCredentials(filter: CredentialFilterObject): List<WalletCredential> =
-        CredentialsService.list(walletId, filter)
+        credentialService.list(walletId, filter)
 
     override suspend fun listRawCredentials(): List<String> =
-        CredentialsService.list(walletId, CredentialFilterObject.default).map {
+        credentialService.list(walletId, CredentialFilterObject.default).map {
             it.document
         }
 
     override suspend fun deleteCredential(id: String, permanent: Boolean) = let {
-        CredentialsService.get(walletId, id)?.run {
+        credentialService.get(walletId, id)?.run {
             eventUseCase.log(
                 action = EventType.Credential.Delete,
                 originator = "wallet",
@@ -117,33 +116,34 @@ class SSIKit2WalletService(
                 credentialId = this.id
             )
         }
-        CredentialsService.delete(walletId, id, permanent)
+        credentialService.delete(walletId, id, permanent)
     }
 
     override suspend fun restoreCredential(id: String): WalletCredential =
-        CredentialsService.restore(walletId, id) ?: error("Credential not found: $id")
+        credentialService.restore(walletId, id) ?: error("Credential not found: $id")
 
     override suspend fun getCredential(credentialId: String): WalletCredential =
-        CredentialsService.get(walletId, credentialId)
+        credentialService.get(walletId, credentialId)
             ?: throw IllegalArgumentException("WalletCredential not found for credentialId: $credentialId")
 
     override suspend fun attachCategory(credentialId: String, categories: List<String>): Boolean =
-        categoryService.list(walletId).filter { categories.contains(it.name) }.map { it.name }.let {
-            CredentialsService.Category.add(
-                wallet = walletId, credentialId = credentialId, category = it.toTypedArray()
-            ) == it.size
-        }
+        credentialService.categoryService.add(
+            wallet = walletId, credentialId = credentialId, category = categories.toTypedArray()
+        ) == categories.size
 
     override suspend fun detachCategory(credentialId: String, categories: List<String>): Boolean =
-        CredentialsService.Category.delete(walletId, credentialId, *categories.toTypedArray()) > 0
+        credentialService.categoryService.delete(walletId, credentialId, *categories.toTypedArray()) > 0
+
+    override suspend fun renameCategory(oldName: String, newName: String): Boolean =
+        categoryService.rename(walletId, oldName, newName) > 0
 
     override suspend fun acceptCredential(parameter: CredentialRequestParameter): Boolean =
-        CredentialsService.get(walletId, parameter.credentialId)?.takeIf { it.deletedOn == null }?.let {
-            CredentialsService.setPending(walletId, parameter.credentialId, false) > 0
+        credentialService.get(walletId, parameter.credentialId)?.takeIf { it.deletedOn == null }?.let {
+            credentialService.setPending(walletId, parameter.credentialId, false) > 0
         } ?: error("Credential not found: ${parameter.credentialId}")
 
     override suspend fun rejectCredential(parameter: CredentialRequestParameter): Boolean =
-        CredentialsService.delete(walletId, parameter.credentialId, true)
+        credentialService.delete(walletId, parameter.credentialId, true)
 
     override fun matchCredentialsByPresentationDefinition(presentationDefinition: PresentationDefinition): List<WalletCredential> {
         val credentialList = listCredentials(CredentialFilterObject.default)
@@ -193,32 +193,8 @@ class SSIKit2WalletService(
 
         return matchedCredentials.ifEmpty { credentialList }
     }
-
-    private fun getQueryParams(url: String): Map<String, MutableList<String>> {
-        val params: MutableMap<String, MutableList<String>> = HashMap()
-        val urlParts = url.split("\\?".toRegex()).dropLastWhile { it.isEmpty() }.toTypedArray()
-
-        if (urlParts.size <= 1) return params
-
-        val query = urlParts[1]
-        for (param in query.split("&".toRegex()).dropLastWhile { it.isEmpty() }.toTypedArray()) {
-            val pair = param.split("=".toRegex()).dropLastWhile { it.isEmpty() }.toTypedArray()
-            val key = URLDecoder.decode(pair[0], "UTF-8")
-            var value = ""
-            if (pair.size > 1) {
-                value = URLDecoder.decode(pair[1], "UTF-8")
-            }
-            var values = params[key]
-            if (values == null) {
-                values = ArrayList()
-                params[key] = values
-            }
-            values.add(value)
-        }
-        return params
-    }
-
-
+    
+    
     /* SIOP */
     @Serializable
     data class PresentationResponse(
@@ -234,14 +210,6 @@ class SSIKit2WalletService(
     data class SIOPv2Response(
         val vp_token: String, val presentation_submission: String, val id_token: String?, val state: String?
     )
-
-    private val ktorClient = HttpClient(CIO) {
-        install(ContentNegotiation) {
-            json()
-        }
-        followRedirects = false
-    }
-
 
     data class PresentationError(
         override val message: String, val redirectUri: String?
@@ -274,7 +242,7 @@ class SSIKit2WalletService(
         logger.debug("Resolved presentation definition: ${presentationSession.authorizationRequest!!.presentationDefinition!!.toJSONString()}")
 
         val tokenResponse = credentialWallet.processImplicitFlowAuthorization(presentationSession.authorizationRequest)
-        val resp = ktorClient.submitForm(presentationSession.authorizationRequest.responseUri
+        val resp = this.http.submitForm(presentationSession.authorizationRequest.responseUri
             ?: presentationSession.authorizationRequest.redirectUri ?: throw AuthorizationError(
                 presentationSession.authorizationRequest,
                 AuthorizationErrorCode.invalid_request,
@@ -290,7 +258,7 @@ class SSIKit2WalletService(
         }
         logger.debug("HTTP Response: {}, body: {}", resp, httpResponseBody)
         parameter.selectedCredentials.forEach {
-            CredentialsService.get(walletId, it)?.run {
+            credentialService.get(walletId, it)?.run {
                 eventUseCase.log(
                     action = EventType.Credential.Present,
                     originator = presentationSession.presentationDefinition?.name ?: EventDataNotAvailable,
@@ -334,19 +302,8 @@ class SSIKit2WalletService(
 
     private fun getAnyCredentialWallet() =
         credentialWallets.values.firstOrNull() ?: getCredentialWallet("did:test:test")
-
-    val http = HttpClient(Java) {
-        install(ContentNegotiation) {
-            json()
-        }
-        install(Logging) {
-            logger = Logger.SIMPLE
-            level = LogLevel.ALL
-        }
-        followRedirects = false
-    }
-
-    override suspend fun useOfferRequest(
+    
+        override suspend fun useOfferRequest(
         offer: String, did: String, requireUserInput: Boolean
     ): List<WalletCredential> {
         val addableCredentials =
@@ -372,7 +329,7 @@ class SSIKit2WalletService(
                     )
                 }
             }
-        CredentialsService.add(
+        credentialService.add(
             wallet = walletId, credentials = addableCredentials.toTypedArray()
         )
         return addableCredentials
@@ -569,10 +526,15 @@ class SSIKit2WalletService(
     override fun filterEventLog(filter: EventLogFilter): EventLogFilterResult = runCatching {
         val startingAfterItemIndex = filter.startingAfter?.toLongOrNull()?.takeIf { it >= 0 } ?: -1L
         val pageSize = filter.limit
-        val count = EventService.count(walletId, filter.data)
+        val count = eventUseCase.count(walletId, filter.data)
         val offset = startingAfterItemIndex + 1
-        val events = EventService.get(
-            accountId, walletId, filter.limit, offset, filter.sortOrder ?: "asc", filter.sortBy ?: "", filter.data
+        val events = eventUseCase.get(
+            EventUseCase.EventFilterParameter(
+                accountId = accountId,
+                walletId = walletId,
+                offset = offset,
+                logFilter = filter,
+            )
         )
         EventLogFilterDataResult(
             items = events,
@@ -609,7 +571,7 @@ class SSIKit2WalletService(
 
     override suspend fun deleteCategory(name: String): Boolean = categoryService.delete(walletId, name) == 1
     override suspend fun getFrequentCredentials(parameter: ReportRequestParameter): List<WalletCredential> =
-        ReportService.Credentials.frequent(parameter)
+        credentialReportsService.frequent(parameter)
 
     override suspend fun getSettings(): WalletSetting =
         settingsService.get(walletId) ?: error("Settings not found for wallet: $walletId")
@@ -640,5 +602,4 @@ class SSIKit2WalletService(
         itemIndex.takeIf { it < count }?.toString()
     }
 }
-
 

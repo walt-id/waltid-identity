@@ -6,8 +6,10 @@ import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 class DefaultTrustValidationService(
     private val http: HttpClient,
@@ -21,9 +23,11 @@ class DefaultTrustValidationService(
 
     override suspend fun validate(did: String, type: String, egfUri: String): Boolean = runCatching {
         http.get(String.format("$baseUrl/$trustedRecordPath", did, type, egfUri)).bodyAsText().let {
-            tryParseResponse<SuccessResponse>(it)?.run {
+            tryParseResponse<JsonObject>(it)?.run {
                 validate(this)
-            } ?: tryParseResponse<FailResponse>(it)?.let { error(it.detail) } ?: error(it)
+            } ?: tryParseResponse<JsonObject>(it)?.let {
+                error(it.jsonObject["detail"]?.jsonPrimitive?.content ?: "")
+            } ?: error(it)
         }
     }.fold(onSuccess = {
         it
@@ -31,32 +35,11 @@ class DefaultTrustValidationService(
 
     private inline fun <reified T> tryParseResponse(response: String): T? = json.decodeFromString<T>(response)
 
-    private fun validate(record: SuccessResponse): Boolean {
-        val from = Instant.parse(record.validFromDT)
-        val until = Instant.parse(record.validUntilDT)
+    private fun validate(record: JsonObject): Boolean {
+        val from = record.jsonObject["validFromDT"]?.jsonPrimitive?.content?.let { Instant.parse(it) }?: Instant.DISTANT_FUTURE
+        val until = record.jsonObject["validUntilDT"]?.jsonPrimitive?.content?.let { Instant.parse(it) }?:Instant.DISTANT_PAST
+        val status = record.jsonObject["status"]?.jsonPrimitive?.content
         val now = Clock.System.now()
-        return now > from && now < until && record.status == "current"
+        return now in from..until && "current" == status
     }
-
-    @Serializable
-    data class SuccessResponse(
-        val identifier: String,
-        val entityType: String,
-        val credentialType: String,
-        val governanceFrameworkURI: String,
-        val DIDDocument: String,
-        val status: String,
-        val statusDetail: String,
-        val validFromDT: String,
-        val validUntilDT: String,
-    )
-
-    @Serializable
-    data class FailResponse(
-        val type: String,
-        val title: String,
-        val status: String,
-        val detail: String,
-        val instance: String,
-    )
 }
