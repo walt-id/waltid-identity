@@ -285,7 +285,7 @@ abstract class E2EWalletTestBase {
             }
         }
     }
-    // Verifier Endpoint Tests
+    // Verifier Tests
     protected suspend fun testPolicyList(): JsonObject = run {
         println("\nUse Case -> List Verification Policies\n")
         val endpoint = "$verifierUrl/openid4vc/policy-list"
