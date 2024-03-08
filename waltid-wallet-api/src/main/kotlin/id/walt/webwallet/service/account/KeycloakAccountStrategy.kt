@@ -17,11 +17,8 @@ import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.plugins.logging.*
 import io.ktor.client.request.*
-import io.ktor.client.request.headers
-import io.ktor.client.statement.*
 import io.ktor.http.*
-import io.ktor.serialization.kotlinx.json.json
-import io.ktor.util.*
+import io.ktor.serialization.kotlinx.json.*
 import java.security.interfaces.ECPublicKey
 import java.security.interfaces.RSAPublicKey
 import kotlinx.datetime.Clock
@@ -53,25 +50,6 @@ object KeycloakAccountStrategy : AccountStrategy<KeycloakAccountRequest>("keyclo
       request: KeycloakAccountRequest
   ): Result<RegistrationResult> {
 
-    //    val params =
-    //        mapOf(
-    //            "client_id" to "waltid_backend_localhost",
-    //            "client_secret" to "**********",
-    //            "grant_type" to "client_credentials")
-    //
-    //    val body = params.map { (k, v) -> "$k=$v" }.joinToString("&")
-    //
-    //    val response =
-    //
-    // http.post("http://0.0.0.0:8080/realms/waltid-keycloak-ktor/protocol/openid-connect/token") {
-    //          headers { append("Content-Type", "application/x-www-form-urlencoded") }
-    //          setBody(body)
-    //        }
-    //
-    //    val jsonBody = Json.parseToJsonElement(response.body())
-    //    val access_token = jsonBody.jsonObject["access_token"]!!.jsonPrimitive.content
-
-    //  println(access_token)
     val user =
         mapOf(
                 "username" to request.username,
@@ -80,7 +58,6 @@ object KeycloakAccountStrategy : AccountStrategy<KeycloakAccountRequest>("keyclo
                 "credentials" to listOf(mapOf("type" to "password", "value" to request.password)))
             .toJsonObject()
 
-    println(user)
     val res =
         http
             .post(config.oidcUserApi) {
@@ -94,9 +71,6 @@ object KeycloakAccountStrategy : AccountStrategy<KeycloakAccountRequest>("keyclo
             .headers
 
     val account_id = res["Location"]!!.split("/").last()
-
-    println("ACCOUNT ID: $account_id")
-    println("REQUEST: $request")
 
     val createdAccountId = transaction {
       val accountId =
@@ -147,7 +121,7 @@ object KeycloakAccountStrategy : AccountStrategy<KeycloakAccountRequest>("keyclo
       tenant: String,
       request: KeycloakAccountRequest
   ): AuthenticatedUser {
-    println("KEYCLOAK LOGIN REQUEST : ${request}")
+    println("KEYCLOAK LOGIN REQUEST : $request")
 
     val token = getUserToken(request)
 
