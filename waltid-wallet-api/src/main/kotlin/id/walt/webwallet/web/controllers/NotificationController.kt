@@ -45,6 +45,48 @@ object NotificationController {
             route("/api/notifications", {
                 tags = listOf("NotificationController")
             }) {
+                get({
+                    summary = "Get notifications"
+                    response {
+                        HttpStatusCode.OK to {
+                            description = "Array of notification objects"
+                            body<List<JsonObject>>()
+                        }
+                    }
+                }) {
+                    context.respond(useCase.findAll(getWalletId()))
+                }
+                delete({
+                    summary = "Delete all wallet notifications"
+                    response {
+                        HttpStatusCode.Accepted to { description = "Notifications deleted" }
+                        HttpStatusCode.BadRequest to { description = "Notifications could not be deleted" }
+                    }
+                }) {
+                    context.respond(if (useCase.deleteAll(getWalletId()) > 0) HttpStatusCode.Accepted else HttpStatusCode.BadRequest)
+                }
+                put("status", {
+                    summary = "Set notification read status"
+                    request {
+                        body<List<String>> {
+                            description = "The list of notification ids"
+                            required = true
+                        }
+                    }
+                    response {
+                        HttpStatusCode.Accepted to { description = "Notification status updated" }
+                        HttpStatusCode.BadRequest to { description = "Notification status could not be updated" }
+                    }
+                }) {
+                    val ids = call.receive<List<String>>()
+                    val status = call.parameters.getOrFail("status").toBoolean()
+                    context.respond(
+                        if (useCase.setStatus(
+                                *ids.map { UUID(it) }.toTypedArray(), isRead = status
+                            ) > 0
+                        ) HttpStatusCode.Accepted else HttpStatusCode.BadRequest
+                    )
+                }
                 route("id"){
                     get({
                         summary = "Get notification by id"
@@ -72,48 +114,6 @@ object NotificationController {
                         val id = call.parameters.getOrFail("id")
                         context.respond(if (useCase.deleteById(UUID(id)) > 0) HttpStatusCode.Accepted else HttpStatusCode.BadRequest)
                     }
-                }
-                get({
-                    summary = "Get notifications"
-                    response {
-                        HttpStatusCode.OK to {
-                            description = "Array of notification objects"
-                            body<List<JsonObject>>()
-                        }
-                    }
-                }) {
-                    context.respond(useCase.findAll(getWalletId()))
-                }
-                put("status", {
-                    summary = "Set notification read status"
-                    request {
-                        body<List<String>> {
-                            description = "The list of notification ids"
-                            required = true
-                        }
-                    }
-                    response {
-                        HttpStatusCode.Accepted to { description = "Notification status updated" }
-                        HttpStatusCode.BadRequest to { description = "Notification status could not be updated" }
-                    }
-                }) {
-                    val ids = call.receive<List<String>>()
-                    val status = call.parameters.getOrFail("status").toBoolean()
-                    context.respond(
-                        if (useCase.setStatus(
-                                *ids.map { UUID(it) }.toTypedArray(), isRead = status
-                            ) > 0
-                        ) HttpStatusCode.Accepted else HttpStatusCode.BadRequest
-                    )
-                }
-                delete("all", {
-                    summary = "Delete all wallet notifications"
-                    response {
-                        HttpStatusCode.Accepted to { description = "Notifications deleted" }
-                        HttpStatusCode.BadRequest to { description = "Notifications could not be deleted" }
-                    }
-                }) {
-                    context.respond(if (useCase.deleteAll(getWalletId()) > 0) HttpStatusCode.Accepted else HttpStatusCode.BadRequest)
                 }
 
                 post("send", {
