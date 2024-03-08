@@ -51,6 +51,7 @@ class TestCredentialWallet(
     private val sessionCache = mutableMapOf<String, VPresentationSession>() // TODO not stateless because of oidc4vc library
 
     private val ktorClient = getHttpClient()
+    private val credentialsService = CredentialsService()
 
     suspend fun resolveDidAuthentication(did: String): String {
         return DidService.resolve(did).getOrElse {
@@ -141,7 +142,7 @@ class TestCredentialWallet(
 
         println("Selected credentials: $selectedCredentials")
 //        val matchedCredentials = walletService.getCredentialsByIds(selectedCredentials)
-        val matchedCredentials = CredentialsService.get(selectedCredentials)
+        val matchedCredentials = credentialsService.get(selectedCredentials)
         println("Matched credentials: $matchedCredentials")
 
         println("Using disclosures: $selectedDisclosures")
