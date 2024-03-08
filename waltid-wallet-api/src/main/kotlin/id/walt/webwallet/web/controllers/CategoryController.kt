@@ -45,7 +45,7 @@ fun Application.categories() = walletRoute {
             delete({
                 summary = "Delete category"
                 response {
-                    HttpStatusCode.Accepted to { description = "Category delete" }
+                    HttpStatusCode.Accepted to { description = "Category deleted" }
                     HttpStatusCode.BadRequest to { description = "Category could not be deleted" }
                 }
             }) {
