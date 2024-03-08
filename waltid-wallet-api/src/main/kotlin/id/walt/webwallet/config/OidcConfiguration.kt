@@ -11,7 +11,7 @@ data class OidcConfiguration(
     val logoutUrl: String,
     val clientId: String,
     val clientSecret: String,
-    val oidcUserApi: String,
+    val keycloakUserApi: String
 ) : WalletConfig {
   data class OidcJwksCacheConfiguration(
       val cacheSize: Int,
