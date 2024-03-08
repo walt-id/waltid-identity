@@ -18,22 +18,28 @@
 - [Intro Video](https://youtu.be/HW9CNFmRFlI) - Learn about features and see a demo.
 
 
-### Running The Project
+### Running the project using Docker
 
 From the root-folder you can run the wallet-api including the necessary configuration as well as other relevant services and apps like the wallet frontend by the following command:
 ```bash
 cd docker-compose && docker compose up
 ```
 
-- Visit the web wallet hosted under [localhost:3000](http://localhost:3000).
-- Visit the wallet-api hosted under [localhost:4545](http://localhost:4545).
+- Visit the web wallet hosted under [localhost:7101](http://localhost:7101).
+- Visit the wallet-api hosted under [localhost:7001](http://localhost:7001).
 
 Update the containers by running the following commands from the root folder: 
 ```bash
 docker build -f waltid-web-wallet/Dockerfile -t waltid/waltid-web-wallet .
 ```
-
 Note that this is project only the frontend of the web-wallet. The corresponding backend is in the /waltid-wallet-api folder.
+
+### Running the project using Bun for development
+
+```bash
+bun install
+bun --watch run dev
+```
 
 ## What is the Web-Wallet?
 

@@ -121,7 +121,6 @@ object KeycloakAccountStrategy : AccountStrategy<KeycloakAccountRequest>("keyclo
       tenant: String,
       request: KeycloakAccountRequest
   ): AuthenticatedUser {
-    println("KEYCLOAK LOGIN REQUEST : $request")
 
     val token = getUserToken(request)
 
@@ -133,7 +132,7 @@ object KeycloakAccountStrategy : AccountStrategy<KeycloakAccountRequest>("keyclo
         } else {
           AccountsService.register(tenant, request).getOrThrow().id
         }
-    return AuthenticatedUser(registeredUserId, jwt.subject)
+    return AuthenticatedUser(registeredUserId, request.username)
   }
 
   suspend fun getAccessToken(): String {

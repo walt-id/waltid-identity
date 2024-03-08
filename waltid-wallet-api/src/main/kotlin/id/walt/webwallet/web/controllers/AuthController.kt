@@ -330,7 +330,7 @@ fun Application.auth() {
 
       // create keycloak User
       post(
-          "keycloak/create",
+          "keycloak-create",
           {
             summary = "Register with [email + password] or [wallet address + ecosystem] On Keycloak"
             request {
@@ -400,7 +400,7 @@ fun Application.auth() {
               call.sessions.clear<LoginTokenSession>()
 
               call.respond(HttpStatusCode.OK)
-              // call.respondRedirect("http://localhost:8080/realms/waltid-keycloak-ktor/protocol/openid-connect/logout?post_logout_redirect_uri=http://localhost:3000&client_id=waltid_backend")
+
             } else {
               call.respond(HttpStatusCode.OK)
             }
