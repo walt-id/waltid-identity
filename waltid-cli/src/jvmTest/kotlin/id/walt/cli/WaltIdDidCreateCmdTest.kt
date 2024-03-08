@@ -13,16 +13,6 @@ class WaltIdDidCreateCmdTest {
 
     val command = DidCreateCmd()
 
-    // @Test
-    // fun `should print help message when called with no arguments`() = runTest {
-    //     assertFailsWith<PrintHelpMessage> {
-    //         command.parse(emptyList())
-    //     }
-    //
-    //     val result = command.test()
-    //     assertContains(result.stdout, "Creates a new Decentralized Identity")
-    // }
-
     @Test
     fun `should print help message when called with --help argument`() {
         assertFailsWith<PrintHelpMessage> {
@@ -126,7 +116,7 @@ class WaltIdDidCreateCmdTest {
         )
 
         assertContains(result.stdout, "Key not provided. Let's generate a new one...")
-        assertContains(result.stdout, "Key generated:")
+        assertContains(result.stdout, "Key generated with thumbprint")
         keyFormat.forEach {
             assertContains(result.stdout, it.toRegex())
         }
