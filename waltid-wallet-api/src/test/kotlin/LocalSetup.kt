@@ -84,19 +84,6 @@ class LocalSetup {
     }
     
     fun initTestApplication() = testApplication {
-        runApplication()
-        this@LocalSetup.client = newClient()
-    }
-    
-    fun initClient(token: String) = testApplication {
-        newClient(token)
-    }
-    
-    fun getClient(): HttpClient {
-        return this@LocalSetup.client
-    }
-    
-    private fun ApplicationTestBuilder.runApplication() = run {
         println("Running in ${Path(".").absolutePathString()}")
         this@LocalSetup.client = newClient()
         
@@ -116,7 +103,18 @@ class LocalSetup {
             webWalletModule()
             issuerModule(withPlugins = false)
             verifierModule(withPlugins = false)
-        }
+        }    }
+    
+    fun initClient(token: String) = testApplication {
+        newClient(token)
+    }
+    
+    fun getClient(): HttpClient {
+        return this@LocalSetup.client
+    }
+    
+    private fun ApplicationTestBuilder.runApplication() = run {
+    
     }
     
     private fun setupTestWebWallet() {

@@ -3,6 +3,8 @@ import com.zaxxer.hikari.HikariDataSource
 import id.walt.issuer.base.config.OIDCIssuerServiceConfig
 import id.walt.issuer.issuerModule
 import id.walt.verifier.base.config.OIDCVerifierServiceConfig
+import PresentationDefinition.Companion.minimalPresentationDefinition
+import PresentationDefinition.Companion.vpPoliciesDefinition
 import id.walt.verifier.verifierModule
 import id.walt.webwallet.config.DatasourceConfiguration
 import id.walt.webwallet.db.Db
@@ -35,8 +37,8 @@ import id.walt.verifier.base.config.ConfigManager as VerifierConfigManager
 import kotlin.test.assertNotNull
 
 open class E2EWalletTestLocal : E2EWalletTestBase() {
-
-    lateinit var localWalletClient: HttpClient
+    
+    private lateinit var localWalletClient: HttpClient
     private var localWalletUrl: String = ""
     private var localIssuerUrl: String = ""
     private var localVerifierUrl: String = ""
@@ -56,11 +58,11 @@ open class E2EWalletTestLocal : E2EWalletTestBase() {
                 }),
                 recreateDatabaseOnStart = true
             )
-
+            
             WalletConfigManager.preloadConfig(
                 "db.sqlite", config
             )
-
+            
             WalletConfigManager.preloadConfig(
                 "web", WalletWebConfig()
             )
@@ -68,7 +70,7 @@ open class E2EWalletTestLocal : E2EWalletTestBase() {
             WalletConfigManager.loadConfigs(emptyArray())
         }
     }
-
+    
     fun ApplicationTestBuilder.newClient(token: String? = null) = createClient {
         install(ContentNegotiation) {
             json()
@@ -85,16 +87,16 @@ open class E2EWalletTestLocal : E2EWalletTestBase() {
             }
         }
     }
-
+    
     fun ApplicationTestBuilder.runApplication() = run {
         println("Running in ${Path(".").absolutePathString()}")
         localWalletClient = newClient()
-
+        
         WalletHttpClients.defaultMethod = {
             newClient()
         }
         setupTestWebWallet()
-
+        
         println("Setup issuer...")
         setupTestIssuer()
         
@@ -108,72 +110,68 @@ open class E2EWalletTestLocal : E2EWalletTestBase() {
             verifierModule(withPlugins = false)
         }
     }
-
+    
     private fun setupTestWebWallet() {
         // TODO moving this into init{} causes error 400 status code in issuance test
         Db.start()
     }
-
+    
     private fun setupTestIssuer() {
         IssuerConfigManager.preloadConfig("issuer-service", OIDCIssuerServiceConfig("http://localhost"))
-
+        
         IssuerConfigManager.loadConfigs(emptyArray())
     }
     
-    private fun setupTestVerifier() {
+    open fun setupTestVerifier() {
         VerifierConfigManager.preloadConfig("verifier-service", OIDCVerifierServiceConfig("http://localhost"))
         
         VerifierConfigManager.loadConfigs(emptyArray())
     }
-
+    
     @Test
     fun e2eTestRegisterNewUser() = testApplication {
         runApplication()
         testCreateUser(User(name = "tester", email = "tester@email.com", password = "password", accountType = "email"))
     }
-
+    
     @Test
     fun e2eTestAuthentication() = testApplication {
         runApplication()
-
-        login()
         getUserToken()
         testUserInfo()
         testUserSession()
         localWalletClient = newClient(token)
-
+        
         // list all wallets for this user
         listAllWallets()
     }
-
+    
     @Test
     fun e2eTestKeys() = testApplication {
         runApplication()
-        login()
         getUserToken()
         localWalletClient = newClient(token)
-
+        
         // list all wallets for this user
         listAllWallets()
-
+        
         testKeys()
         
         testCreateRSAKey()
-
+        
         testExampleKey()
     }
-
+    
     @Test
     fun e2eTestDids() = testApplication {
         runTest(timeout = 60.seconds) {
             runApplication()
-            login()
             getUserToken()
             localWalletClient = newClient(token)
-
+            
             // list all wallets for this user
             listAllWallets()
-
+            
             // create a did, one of each of the main types we support
             createDids()
             testDefaultDid()
@@ -181,15 +179,14 @@ open class E2EWalletTestLocal : E2EWalletTestBase() {
             deleteAllDids(availableDids)
         }
     }
-
+    
     @Test
     fun e2eTestWalletCredentials() = testApplication {
         runApplication()
-        login()
         getUserToken()
-
+        
         localWalletClient = newClient(token)
-
+        
         // list all wallets for this user
         listAllWallets()
         val response: JsonArray = listCredentials()
@@ -198,24 +195,23 @@ open class E2EWalletTestLocal : E2EWalletTestBase() {
         viewCredential(id)
         deleteCredential(id)
     }
-
+    
     @Test
     fun e2eTestIssuance() = testApplication {
         runApplication()
-        login()
         getUserToken()
-
+        
         localWalletClient = newClient(token)
-
+        
         // list all wallets for this user
         listAllWallets()
-
+        
         // list all Dids for this user and set default for credential issuance
         val availableDids = listAllDids()
-
+        
         val issuanceUri = issueJwtCredential()
         println("Issuance Offer uri = $issuanceUri")
-
+        
         // Request credential and store in wallet
         val vc: JsonObject = requestCredential(issuanceUri, availableDids.first().did)
         println("issued vc = $vc")
@@ -227,19 +223,58 @@ open class E2EWalletTestLocal : E2EWalletTestBase() {
         // demonstrate that the newly issued credential is in the user wallet
         viewCredential(id)
     }
-
+    
+    // Verifier Tests
+    @Test
+    fun e2eTestPolicyList() = testApplication {
+        runApplication()
+        val list: JsonObject = testPolicyList()
+        
+        assertNotEquals(0, list.size)
+        list.keys.forEach {
+            println("$it -> ${list[it]?.jsonPrimitive?.content}")
+        }
+    }
+    
+    @Test
+    fun e2eTestVerify() = testApplication {
+        runApplication()
+        var url = testVerifyCredential(minimalPresentationDefinition)
+        assertTrue(url.startsWith("openid4vp://authorize?response_type=vp_token"))
+        println("verify Url = $url")
+        
+        url = testVerifyCredential(vpPoliciesDefinition)
+        assertTrue(url.startsWith("openid4vp://authorize?response_type=vp_token"))
+        println("verify Url = $url")
+    }
+    
+    @Test
+    fun e2eTestPresentationRequest() = testApplication {
+        runApplication()
+        getUserToken()
+        localWalletClient = newClient(token)
+        
+        listAllWallets() // sets the walletId
+        val url = testVerifyCredential(minimalPresentationDefinition)
+        assertTrue(url.startsWith("openid4vp://authorize?response_type=vp_token"))
+        println("verify Url = $url")
+        
+        val parsedRequest = testResolvePresentationRequest(url)
+        println("Parsed Request = $parsedRequest")
+    }
+    
     override var walletClient: HttpClient
         get() = localWalletClient
         set(value) {
             localWalletClient = value
         }
-
+    
     override var walletUrl: String
         get() = localWalletUrl
         set(value) {
             localWalletUrl = value
         }
-
+    
     override var issuerUrl: String
         get() = localIssuerUrl
         set(value) {
