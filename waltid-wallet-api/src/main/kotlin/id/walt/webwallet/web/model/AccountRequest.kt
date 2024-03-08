@@ -41,6 +41,14 @@ data class KeycloakAccountRequest(
     val password: String,
     val token: String? = null
 ) : AccountRequest()
+
+@Serializable
+@SerialName("keycloak")
+data class KeycloakLogoutRequest(
+    val userId: String? = null,
+    val token: String? = null
+)
+
 @Serializable
 @SerialName("oidc-unique-subject")
 data class OidcUniqueSubjectRequest(override val name: String? = null, val token: String) : AccountRequest()
