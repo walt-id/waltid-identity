@@ -12,6 +12,8 @@ class E2EWalletTestDeployed : E2EWalletTestBase() {
     private lateinit var deployedClient: HttpClient
     private var deployedWalletUrl: String = "https://wallet.walt.id"
     private var deployedIssuerUrl: String = "https://issuer.portal.walt.id"
+    private var deployedVerifierUrl: String = "https://verifier.portal.walt.id"
+    
     
     private fun newClient(token: String? = null) = HttpClient {
         install(ContentNegotiation) {
@@ -142,5 +144,11 @@ class E2EWalletTestDeployed : E2EWalletTestBase() {
         get() = deployedIssuerUrl
         set(value) {
             deployedIssuerUrl = value
+        }
+    
+    override var verifierUrl: String
+        get() = deployedVerifierUrl
+        set(value) {
+            deployedVerifierUrl = value
         }
 }

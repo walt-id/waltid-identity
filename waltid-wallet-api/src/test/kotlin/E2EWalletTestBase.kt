@@ -38,6 +38,7 @@ abstract class E2EWalletTestBase {
     
     abstract var walletUrl: String
     abstract var issuerUrl: String
+    abstract var verifierUrl: String
     
     protected suspend fun testCreateUser(user: User) {
         println("\nUse Case -> Register User $user\n")
@@ -283,5 +284,48 @@ abstract class E2EWalletTestBase {
                 assertEquals(HttpStatusCode.Accepted, response.status)
             }
         }
+    }
+    // Verifier Endpoint Tests
+    protected suspend fun testPolicyList(): JsonObject = run {
+        println("\nUse Case -> List Verification Policies\n")
+        val endpoint = "$verifierUrl/openid4vc/policy-list"
+        println("GET $endpoint")
+        return walletClient.get(endpoint).let { response ->
+            assertEquals(HttpStatusCode.OK, response.status)
+            response.body<JsonObject>()
+        }
+    }
+    
+    protected suspend fun testVerifyCredential(presentationDefinition: String): String = run {
+        val endpoint = "$verifierUrl/openid4vc/verify"
+        println("POST ($endpoint)\n")
+        
+        println("Calling verifier...")
+        val verifyUri = walletClient.post(endpoint) {
+            //language=JSON
+            contentType(ContentType.Application.Json)
+            setBody(
+                presentationDefinition
+            )
+        }.bodyAsText()
+        return verifyUri
+    }
+    
+    protected suspend fun testResolvePresentationRequest(url: String): String = run {
+        val endpoint = "$walletUrl/wallet-api/wallet/$walletId/exchange/resolvePresentationRequest"
+        
+        println("POST ($endpoint)\n")
+        
+        val presentationRequest = walletClient.post(endpoint) {
+            //language=JSON
+            contentType(ContentType.Application.Json)
+            setBody(
+                url
+            )
+        }.let { response ->
+            assertEquals(HttpStatusCode.OK, response.status)
+            response.bodyAsText()
+        }
+        return presentationRequest
     }
 }

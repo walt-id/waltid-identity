@@ -2,6 +2,7 @@ import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
 import id.walt.issuer.base.config.OIDCIssuerServiceConfig
 import id.walt.issuer.issuerModule
+import id.walt.verifier.base.config.OIDCVerifierServiceConfig
 import id.walt.verifier.verifierModule
 import id.walt.webwallet.config.DatasourceConfiguration
 import id.walt.webwallet.db.Db
@@ -30,14 +31,16 @@ import kotlin.time.Duration.Companion.seconds
 import id.walt.issuer.base.config.ConfigManager as IssuerConfigManager
 import id.walt.webwallet.config.ConfigManager as WalletConfigManager
 import id.walt.webwallet.config.WebConfig as WalletWebConfig
+import id.walt.verifier.base.config.ConfigManager as VerifierConfigManager
 import kotlin.test.assertNotNull
 
-class E2EWalletTestLocal : E2EWalletTestBase() {
+open class E2EWalletTestLocal : E2EWalletTestBase() {
 
-    private lateinit var localWalletClient: HttpClient
+    lateinit var localWalletClient: HttpClient
     private var localWalletUrl: String = ""
     private var localIssuerUrl: String = ""
-
+    private var localVerifierUrl: String = ""
+    
     companion object {
         init {
             Files.createDirectories(Paths.get("./data"))
@@ -66,7 +69,7 @@ class E2EWalletTestLocal : E2EWalletTestBase() {
         }
     }
 
-    private fun ApplicationTestBuilder.newClient(token: String? = null) = createClient {
+    fun ApplicationTestBuilder.newClient(token: String? = null) = createClient {
         install(ContentNegotiation) {
             json()
         }
@@ -83,7 +86,7 @@ class E2EWalletTestLocal : E2EWalletTestBase() {
         }
     }
 
-    private fun ApplicationTestBuilder.runApplication() = run {
+    fun ApplicationTestBuilder.runApplication() = run {
         println("Running in ${Path(".").absolutePathString()}")
         localWalletClient = newClient()
 
@@ -94,7 +97,10 @@ class E2EWalletTestLocal : E2EWalletTestBase() {
 
         println("Setup issuer...")
         setupTestIssuer()
-
+        
+        println("Setup issuer...")
+        setupTestVerifier()
+        
         println("Starting application...")
         application {
             webWalletModule()
@@ -112,6 +118,12 @@ class E2EWalletTestLocal : E2EWalletTestBase() {
         IssuerConfigManager.preloadConfig("issuer-service", OIDCIssuerServiceConfig("http://localhost"))
 
         IssuerConfigManager.loadConfigs(emptyArray())
+    }
+    
+    private fun setupTestVerifier() {
+        VerifierConfigManager.preloadConfig("verifier-service", OIDCVerifierServiceConfig("http://localhost"))
+        
+        VerifierConfigManager.loadConfigs(emptyArray())
     }
 
     @Test
@@ -232,5 +244,11 @@ class E2EWalletTestLocal : E2EWalletTestBase() {
         get() = localIssuerUrl
         set(value) {
             localIssuerUrl = value
+        }
+    
+    override var verifierUrl: String
+        get() = localVerifierUrl
+        set(value) {
+            localVerifierUrl = value
         }
 }
