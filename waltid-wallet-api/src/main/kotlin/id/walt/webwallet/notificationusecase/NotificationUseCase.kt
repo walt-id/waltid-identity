@@ -2,6 +2,7 @@ package id.walt.webwallet.notificationusecase
 
 import id.walt.webwallet.db.models.Notification
 import id.walt.webwallet.service.notifications.NotificationService
+import kotlinx.datetime.Instant
 import kotlinx.uuid.UUID
 
 class NotificationUseCase(
@@ -24,10 +25,26 @@ class NotificationUseCase(
         )
     }.size
 
-    fun findAll(wallet: UUID) = service.list(wallet)
+    fun findAll(wallet: UUID, parameter: NotificationFilterParameter) = service.list(
+        wallet = wallet,
+        type = parameter.type,
+        addedOn = parameter.addedOn?.let { Instant.parse(it) },
+        isRead = parameter.isRead,
+        sortAscending = parseSortOrder(parameter.sort)
+    )
+
     fun findById(id: UUID) = service.get(id)
     fun deleteById(id: UUID) = service.delete(id)
     fun deleteAll(wallet: UUID) = service.list(wallet).mapNotNull { it.id }.let {
         service.delete(*it.toTypedArray())
     }
+
+    private fun parseSortOrder(sort: String) = sort.lowercase().takeIf { it == "asc" }?.let { true } ?: false
 }
+
+data class NotificationFilterParameter(
+    val type: String?,
+    val isRead: Boolean?,
+    val sort: String = "desc",
+    val addedOn: String? = null,
+)

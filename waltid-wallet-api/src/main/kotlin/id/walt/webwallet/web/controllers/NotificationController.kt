@@ -1,5 +1,6 @@
 package id.walt.webwallet.web.controllers
 
+import id.walt.webwallet.notificationusecase.NotificationFilterParameter
 import id.walt.webwallet.notificationusecase.NotificationUseCase
 import id.walt.webwallet.service.notifications.NotificationService
 import id.walt.webwallet.service.push.PushManager
@@ -47,6 +48,24 @@ object NotificationController {
             }) {
                 get({
                     summary = "Get notifications"
+                    request {
+                        queryParameter<String>("type") {
+                            description = "Filter by notification type"
+                            example = "Receive"
+                        }
+                        queryParameter<String>("addedOn") {
+                            description = "Filter by date the notification was created"
+                            example = "2024-03-06T12:48:50.723Z"
+                        }
+                        queryParameter<Boolean>("isRead") {
+                            description = "Filter by 'isRead' status"
+                            example = false
+                        }
+                        queryParameter<String>("sort") {
+                            description = "Sort by date added: ASC or DESC"
+                            example = "ASC"
+                        }
+                    }
                     response {
                         HttpStatusCode.OK to {
                             description = "Array of notification objects"
@@ -54,7 +73,16 @@ object NotificationController {
                         }
                     }
                 }) {
-                    context.respond(useCase.findAll(getWalletId()))
+                    context.respond(
+                        useCase.findAll(
+                            getWalletId(), NotificationFilterParameter(
+                                type = call.request.queryParameters["type"],
+                                isRead = call.request.queryParameters["isRead"]?.toBooleanStrictOrNull(),
+                                addedOn = call.request.queryParameters["addedOn"],
+                                sort = call.request.queryParameters["sort"] ?: "desc",
+                            )
+                        )
+                    )
                 }
                 delete({
                     summary = "Delete all wallet notifications"

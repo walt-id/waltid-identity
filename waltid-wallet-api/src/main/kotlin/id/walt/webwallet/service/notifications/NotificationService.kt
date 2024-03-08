@@ -2,20 +2,31 @@ package id.walt.webwallet.service.notifications
 
 import id.walt.webwallet.db.models.Notification
 import id.walt.webwallet.db.models.WalletNotifications
+import kotlinx.datetime.Instant
 import kotlinx.datetime.toJavaInstant
 import kotlinx.uuid.UUID
+import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.inList
-import org.jetbrains.exposed.sql.batchUpsert
-import org.jetbrains.exposed.sql.deleteWhere
-import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
+import java.time.temporal.ChronoUnit
 
 object NotificationService {
-    fun list(wallet: UUID): List<Notification> = transaction {
-        WalletNotifications.selectAll().where {
-            WalletNotifications.wallet eq wallet
-        }.map {
-            Notification(it)
+    fun list(
+        wallet: UUID,
+        type: String? = null,
+        addedOn: Instant? = null,
+        isRead: Boolean? = null,
+        sortAscending: Boolean? = null
+    ): List<Notification> = transaction {
+        filterAll(wallet, type, isRead, sortAscending).mapNotNull { result ->
+            if (addedOn != null) {
+                addedOn.takeIf {
+                    result[WalletNotifications.addedOn].truncatedTo(ChronoUnit.DAYS) == it.toJavaInstant()
+                        .truncatedTo(ChronoUnit.DAYS)
+                }?.let {
+                    Notification(result)
+                }
+            } else Notification(result)
         }
     }
 
@@ -36,6 +47,17 @@ object NotificationService {
     fun update(vararg notification: Notification): Int = transaction {
         upsert(*notification)
     }
+
+    private fun filterAll(
+        wallet: UUID, type: String?, isRead: Boolean?, ascending: Boolean?
+    ) = WalletNotifications.selectAll().where {
+        WalletNotifications.wallet eq wallet
+    }.andWhere {
+        isRead?.let { WalletNotifications.isRead eq it } ?: Op.TRUE
+    }.andWhere {
+        type?.let { WalletNotifications.type eq it } ?: Op.TRUE
+    }.orderBy(column = WalletNotifications.addedOn,
+        order = ascending?.takeIf { it }?.let { SortOrder.ASC } ?: SortOrder.DESC)
 
     private fun upsert(vararg notifications: Notification): Int = WalletNotifications.batchUpsert(
         notifications.toList(),
