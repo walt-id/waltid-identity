@@ -54,14 +54,14 @@ class E2EWalletTestDeployed : E2EWalletTestBase() {
     @Test
     fun e2eTestAuthentication() = runTest {
         deployedClient = newClient()
-//        testCreateUser(User(name="tester", email="tester@email.com", password="password", accountType="email"))
+        testCreateUser(User(name="tester", email="tester@email.com", password="password", accountType="email"))
         
         login(User(name = "tester", email = "tester@email.com", password = "password", accountType = "email"))
-        getTokenFor()
+        getUserToken()
         testUserInfo()
         testUserSession()
         deployedClient = newClient(token)
-        listAllWalletsForUser()
+        listAllWallets()
         
         println("WalletId (Deployed Wallet API) = $walletId")
     }
@@ -70,12 +70,14 @@ class E2EWalletTestDeployed : E2EWalletTestBase() {
     fun e2eTestKeys() = runTest {
         deployedClient = newClient()
         login()
-        getTokenFor()
+        getUserToken()
         deployedClient = newClient(token)
         
-        listAllWalletsForUser()
+        listAllWallets()
         
         testKeys()
+        
+        testCreateRSAKey()
         
         testExampleKey()
     }
@@ -84,10 +86,10 @@ class E2EWalletTestDeployed : E2EWalletTestBase() {
     fun e2eTestDids() = runTest(timeout = 120.seconds) {
         deployedClient = newClient()
         login()
-        getTokenFor()
+        getUserToken()
         deployedClient = newClient(token)
         
-        listAllWalletsForUser()
+        listAllWallets()
         
         // delete dids first to avoid duplicates when we create new ones
         var availableDids = listAllDids()
@@ -104,12 +106,12 @@ class E2EWalletTestDeployed : E2EWalletTestBase() {
     fun e2eTestIssuance() = runTest {
         deployedClient = newClient()
         login()
-        getTokenFor()
+        getUserToken()
         
         deployedClient = newClient(token)
         
         // list all wallets for this user
-        listAllWalletsForUser()
+        listAllWallets()
         
         // create a did for issuance and
         // list all Dids for this user and set default for credential issuance

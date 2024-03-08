@@ -17,9 +17,7 @@ import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.testing.*
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.*
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.Paths
@@ -32,6 +30,7 @@ import kotlin.time.Duration.Companion.seconds
 import id.walt.issuer.base.config.ConfigManager as IssuerConfigManager
 import id.walt.webwallet.config.ConfigManager as WalletConfigManager
 import id.walt.webwallet.config.WebConfig as WalletWebConfig
+import kotlin.test.assertNotNull
 
 class E2EWalletTestLocal : E2EWalletTestBase() {
 
@@ -126,26 +125,28 @@ class E2EWalletTestLocal : E2EWalletTestBase() {
         runApplication()
 
         login()
-        getTokenFor()
+        getUserToken()
         testUserInfo()
         testUserSession()
         localWalletClient = newClient(token)
 
         // list all wallets for this user
-        listAllWalletsForUser()
+        listAllWallets()
     }
 
     @Test
     fun e2eTestKeys() = testApplication {
         runApplication()
         login()
-        getTokenFor()
+        getUserToken()
         localWalletClient = newClient(token)
 
         // list all wallets for this user
-        listAllWalletsForUser()
+        listAllWallets()
 
         testKeys()
+        
+        testCreateRSAKey()
 
         testExampleKey()
     }
@@ -155,11 +156,11 @@ class E2EWalletTestLocal : E2EWalletTestBase() {
         runTest(timeout = 60.seconds) {
             runApplication()
             login()
-            getTokenFor()
+            getUserToken()
             localWalletClient = newClient(token)
 
             // list all wallets for this user
-            listAllWalletsForUser()
+            listAllWallets()
 
             // create a did, one of each of the main types we support
             createDids()
@@ -173,12 +174,12 @@ class E2EWalletTestLocal : E2EWalletTestBase() {
     fun e2eTestWalletCredentials() = testApplication {
         runApplication()
         login()
-        getTokenFor()
+        getUserToken()
 
         localWalletClient = newClient(token)
 
         // list all wallets for this user
-        listAllWalletsForUser()
+        listAllWallets()
         val response: JsonArray = listCredentials()
         assertNotEquals(response.size, 0)
         val id = response[0].jsonObject["id"]?.jsonPrimitive?.content ?: error("No credentials found")
@@ -190,12 +191,12 @@ class E2EWalletTestLocal : E2EWalletTestBase() {
     fun e2eTestIssuance() = testApplication {
         runApplication()
         login()
-        getTokenFor()
+        getUserToken()
 
         localWalletClient = newClient(token)
 
         // list all wallets for this user
-        listAllWalletsForUser()
+        listAllWallets()
 
         // list all Dids for this user and set default for credential issuance
         val availableDids = listAllDids()
@@ -204,7 +205,15 @@ class E2EWalletTestLocal : E2EWalletTestBase() {
         println("Issuance Offer uri = $issuanceUri")
 
         // Request credential and store in wallet
-        requestCredential(issuanceUri, availableDids.first().did)
+        val vc: JsonObject = requestCredential(issuanceUri, availableDids.first().did)
+        println("issued vc = $vc")
+        
+        val id = vc["id"]?.jsonPrimitive?.content
+        println("credential id = $id")
+        assertNotNull(id)
+        
+        // demonstrate that the newly issued credential is in the user wallet
+        viewCredential(id)
     }
 
     override var walletClient: HttpClient

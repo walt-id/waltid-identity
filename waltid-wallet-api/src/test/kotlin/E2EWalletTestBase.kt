@@ -57,15 +57,16 @@ abstract class E2EWalletTestBase {
         }
     }
     
-    protected suspend fun requestCredential(issuanceUri: String, did: String) {
+    protected suspend fun requestCredential(issuanceUri: String, did: String): JsonObject {
         println("\nUse Case -> Use Offer Request")
-        val result = walletClient.post("$walletUrl/wallet-api/wallet/$walletId/exchange/useOfferRequest") {
+        return walletClient.post("$walletUrl/wallet-api/wallet/$walletId/exchange/useOfferRequest") {
             parameter("did", did)
             contentType(ContentType.Text.Plain)
             setBody(issuanceUri)
+        }.let { response ->
+            assertEquals(HttpStatusCode.OK, response.status)
+            response.body<JsonArray>()[0].jsonObject
         }
-        println("Claim result: $result")
-        assertEquals(HttpStatusCode.OK, result.status)
     }
     
     protected suspend fun issueJwtCredential(): String = run {
@@ -109,7 +110,7 @@ abstract class E2EWalletTestBase {
         }
     }
     
-    protected suspend fun getTokenFor(user: User = defaultTestUser) = run {
+    protected suspend fun getUserToken(user: User = defaultTestUser) = run {
         println("\nUse Case -> Login with user $user")
         val endpoint = "$walletUrl/wallet-api/auth/login"
         println("POST ($endpoint)")
@@ -131,7 +132,7 @@ abstract class E2EWalletTestBase {
         println("> Response JSON body token: $token")
     }
     
-    protected suspend fun listAllWalletsForUser() {
+    protected suspend fun listAllWallets() {
         println("\nUse Case -> List Wallets for Account\n")
         val endpoint = "$walletUrl/wallet-api/wallet/accounts/wallets"
         println("GET($endpoint)")
@@ -201,7 +202,7 @@ abstract class E2EWalletTestBase {
         
         walletClient.get(endpoint).let { response ->
             assertEquals(HttpStatusCode.OK, response.status)
-            val vc = response.body<JsonObject>()["document"]?.jsonPrimitive?.content ?: error("No document found")
+            val vc = response.body<JsonObject>()["parsedDocument"]
             println("Found Credential -> $vc")
         }
     }
@@ -247,6 +248,14 @@ abstract class E2EWalletTestBase {
         }
     }
     
+    
+    protected suspend fun testCreateRSAKey() {
+        println("\nUse Case -> Generate new key of type RSA\n")
+        val endpoint = "$walletUrl/wallet-api/wallet/$walletId/keys/generate?type=RSA"
+        println("POST $endpoint")
+        assertEquals(HttpStatusCode.OK, walletClient.post(endpoint).status)
+    }
+    
     protected suspend fun testKeys() {
         println("\nUse Case -> List Keys\n")
         var endpoint = "$walletUrl/wallet-api/wallet/$walletId/keys"
@@ -258,11 +267,6 @@ abstract class E2EWalletTestBase {
         }
         val algorithm = keys["algorithm"]?.jsonPrimitive?.content
         assertEquals("Ed25519", algorithm)
-        
-        println("\nUse Case -> Generate new key of type RSA\n")
-        endpoint = "$walletUrl/wallet-api/wallet/$walletId/keys/generate?type=RSA"
-        println("POST $endpoint")
-        assertEquals(HttpStatusCode.OK, walletClient.post(endpoint).status)
     }
     
     suspend fun testDefaultDid() {
