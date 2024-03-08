@@ -44,14 +44,12 @@ data class KeycloakAccountRequest(
 
 @Serializable
 @SerialName("keycloak")
-data class KeycloakLogoutRequest(
-    val userId: String? = null,
-    val token: String? = null
-)
+data class KeycloakLogoutRequest(val keycloakUserId: String? = null, val token: String? = null)
 
 @Serializable
 @SerialName("oidc-unique-subject")
-data class OidcUniqueSubjectRequest(override val name: String? = null, val token: String) : AccountRequest()
+data class OidcUniqueSubjectRequest(override val name: String? = null, val token: String) :
+    AccountRequest()
 
 val module = SerializersModule {
   polymorphic(AccountRequest::class) {
