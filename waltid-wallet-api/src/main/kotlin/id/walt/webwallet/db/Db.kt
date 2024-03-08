@@ -66,6 +66,7 @@ object Db {
 
         OidcLogins,
         WalletSettings,
+        WalletNotifications,
     ).toTypedArray()
     
     
