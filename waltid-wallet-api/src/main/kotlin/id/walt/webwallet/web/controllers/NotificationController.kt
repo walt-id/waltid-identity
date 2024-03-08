@@ -1,20 +1,19 @@
 package id.walt.webwallet.web.controllers
 
-import id.walt.webwallet.service.credentials.CredentialFilterObject
-import id.walt.webwallet.service.credentials.CredentialsService
+import id.walt.webwallet.notificationusecase.NotificationUseCase
+import id.walt.webwallet.service.notifications.NotificationService
 import id.walt.webwallet.service.push.PushManager
-import io.github.smiley4.ktorswaggerui.dsl.get
-import io.github.smiley4.ktorswaggerui.dsl.post
-import io.github.smiley4.ktorswaggerui.dsl.route
+import io.github.smiley4.ktorswaggerui.dsl.*
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
-import io.ktor.server.routing.*
+import io.ktor.server.util.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.uuid.UUID
 import java.net.URI
 import java.net.URL
 import java.net.URLDecoder
@@ -42,30 +41,81 @@ object NotificationController {
 
     fun Application.notifications() {
         walletRoute {
+            val useCase = NotificationUseCase(NotificationService)
             route("/api/notifications", {
                 tags = listOf("NotificationController")
             }) {
-                get("pending", {
-                    summary = "Get pending credentials"
+                route("id"){
+                    get({
+                        summary = "Get notification by id"
+                        response {
+                            HttpStatusCode.OK to {
+                                description = "Notification object"
+                                body<JsonObject>()
+                            }
+                        }
+                    }) {
+                        val id = call.parameters.getOrFail("id")
+                        context.respond(useCase.findById(UUID(id)).onSuccess {
+                            it
+                        }.onFailure {
+                            it.localizedMessage
+                        })
+                    }
+                    delete({
+                        summary = "Delete notification by id"
+                        response {
+                            HttpStatusCode.Accepted to { description = "Notification deleted" }
+                            HttpStatusCode.BadRequest to { description = "Notification could not be deleted" }
+                        }
+                    }) {
+                        val id = call.parameters.getOrFail("id")
+                        context.respond(if (useCase.deleteById(UUID(id)) > 0) HttpStatusCode.Accepted else HttpStatusCode.BadRequest)
+                    }
+                }
+                get({
+                    summary = "Get notifications"
                     response {
                         HttpStatusCode.OK to {
-                            description = "Array of (verifiable credentials) JSON documents"
+                            description = "Array of notification objects"
                             body<List<JsonObject>>()
                         }
                     }
                 }) {
-                    val credentialsService = CredentialsService()
-                    val pending = credentialsService.list(
-                        getWalletId(), CredentialFilterObject(
-                            categories = null,
-                            showDeleted = false,
-                            showPending = true,
-                            sortBy = "addedOn",
-                            sorDescending = false
-                        )
-                    )
-                    context.respond(pending)
+                    context.respond(useCase.findAll(getWalletId()))
                 }
+                put("status", {
+                    summary = "Set notification read status"
+                    request {
+                        body<List<String>> {
+                            description = "The list of notification ids"
+                            required = true
+                        }
+                    }
+                    response {
+                        HttpStatusCode.Accepted to { description = "Notification status updated" }
+                        HttpStatusCode.BadRequest to { description = "Notification status could not be updated" }
+                    }
+                }) {
+                    val ids = call.receive<List<String>>()
+                    val status = call.parameters.getOrFail("status").toBoolean()
+                    context.respond(
+                        if (useCase.setStatus(
+                                *ids.map { UUID(it) }.toTypedArray(), isRead = status
+                            ) > 0
+                        ) HttpStatusCode.Accepted else HttpStatusCode.BadRequest
+                    )
+                }
+                delete("all", {
+                    summary = "Delete all wallet notifications"
+                    response {
+                        HttpStatusCode.Accepted to { description = "Notifications deleted" }
+                        HttpStatusCode.BadRequest to { description = "Notifications could not be deleted" }
+                    }
+                }) {
+                    context.respond(if (useCase.deleteAll(getWalletId()) > 0) HttpStatusCode.Accepted else HttpStatusCode.BadRequest)
+                }
+
                 post("send", {
                     summary = "Experimental: Push notification system"
                     // TODO
