@@ -41,11 +41,9 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.uuid.SecureRandom
 import kotlinx.uuid.UUID
-import org.jetbrains.exposed.sql.*
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
-import kotlin.collections.set
-import kotlin.time.Duration.Companion.days
 
 private val log = KotlinLogging.logger {}
 
@@ -144,43 +142,43 @@ fun Application.configureSecurity() {
       }
     }
 
-//    session<LoginTokenSession>("auth-session") {
-//      validate { session ->
-//        if (securityUserTokenMapping.contains(session.token)) {
-//          UserIdPrincipal(securityUserTokenMapping[session.token].toString())
-//        } else {
-//          sessions.clear("login")
-//          null
-//        }
-//      }
-        bearer("auth-bearer-alternative") {
-            authHeader { call ->
-                call.request.header("waltid-authorization")?.let {
-                    try {
-                        parseAuthorizationHeader(it)
-                    } catch (cause: ParseException) {
-                        throw BadRequestException("Invalid auth header", cause)
-                    }
-                }
-            }
-            authenticate { tokenCredential ->
-                if (securityUserTokenMapping.contains(tokenCredential.token)) {
-                    UserIdPrincipal(securityUserTokenMapping[tokenCredential.token].toString())
-                } else {
-                    null
-                }
-            }
+    //    session<LoginTokenSession>("auth-session") {
+    //      validate { session ->
+    //        if (securityUserTokenMapping.contains(session.token)) {
+    //          UserIdPrincipal(securityUserTokenMapping[session.token].toString())
+    //        } else {
+    //          sessions.clear("login")
+    //          null
+    //        }
+    //      }
+    bearer("auth-bearer-alternative") {
+      authHeader { call ->
+        call.request.header("waltid-authorization")?.let {
+          try {
+            parseAuthorizationHeader(it)
+          } catch (cause: ParseException) {
+            throw BadRequestException("Invalid auth header", cause)
+          }
         }
+      }
+      authenticate { tokenCredential ->
+        if (securityUserTokenMapping.contains(tokenCredential.token)) {
+          UserIdPrincipal(securityUserTokenMapping[tokenCredential.token].toString())
+        } else {
+          null
+        }
+      }
+    }
 
-        session<LoginTokenSession>("auth-session") {
-            validate { session ->
-                if (securityUserTokenMapping.contains(session.token)) {
-                    UserIdPrincipal(securityUserTokenMapping[session.token].toString())
-                } else {
-                    sessions.clear("login")
-                    null
-                }
-            }
+    session<LoginTokenSession>("auth-session") {
+      validate { session ->
+        if (securityUserTokenMapping.contains(session.token)) {
+          UserIdPrincipal(securityUserTokenMapping[session.token].toString())
+        } else {
+          sessions.clear("login")
+          null
+        }
+      }
 
       challenge {
         call.respond(
@@ -371,17 +369,13 @@ fun Application.auth() {
                 .onFailure { call.respond(HttpStatusCode.BadRequest, it.localizedMessage) }
           }
 
-            authenticate("auth-session", "auth-bearer", "auth-bearer-alternative") {
-                get("user-info", {
-                    summary = "Return user ID if logged in"
-                }) {
-                    call.respond(getUserId().name)
-                }
-                get("session", {
-                    summary = "Return session ID if logged in"
-                }) {
-                    //val token = getUserId().name
-                    val token = getUsersSessionToken() ?: throw UnauthorizedException("Invalid session")
+      authenticate("auth-session", "auth-bearer", "auth-bearer-alternative") {
+        get("user-info", { summary = "Return user ID if logged in" }) {
+          call.respond(getUserId().name)
+        }
+        get("session", { summary = "Return session ID if logged in" }) {
+          // val token = getUserId().name
+          val token = getUsersSessionToken() ?: throw UnauthorizedException("Invalid session")
 
           if (securityUserTokenMapping.contains(token))
               call.respond(mapOf("token" to mapOf("accessToken" to token)))
