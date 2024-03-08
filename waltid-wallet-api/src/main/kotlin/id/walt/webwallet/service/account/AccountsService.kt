@@ -8,8 +8,6 @@ import id.walt.webwallet.service.events.AccountEventData
 import id.walt.webwallet.service.events.EventService
 import id.walt.webwallet.service.events.EventType
 import id.walt.webwallet.service.issuers.IssuersService
-import id.walt.webwallet.service.settings.SettingsService
-import id.walt.webwallet.service.settings.WalletSetting
 import id.walt.webwallet.usecase.event.EventUseCase
 import id.walt.webwallet.web.controllers.generateToken
 import id.walt.webwallet.web.model.*
@@ -48,7 +46,6 @@ object AccountsService {
                 uiEndpoint = "https://portal.walt.id/credentials?ids=",
                 configurationEndpoint = "https://issuer.portal.walt.id/.well-known/openid-credential-issuer"
             )
-            SettingsService.set(walletId, WalletSetting.default)
         }
 
         val walletService = WalletServiceManager.getWalletService(tenant, registeredUserId, createdInitialWalletId)
