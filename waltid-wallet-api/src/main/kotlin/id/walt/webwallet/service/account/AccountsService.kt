@@ -27,22 +27,29 @@ object AccountsService {
     val loginMethods = ConfigManager.getConfig<LoginMethodsConfig>().enabledLoginMethods
   }
 
-  suspend fun register(tenant: String = "", request: AccountRequest): Result<RegistrationResult> =
-      when (request) {
-            is EmailAccountRequest -> EmailAccountStrategy.register(tenant, request)
-            is AddressAccountRequest -> Web3WalletAccountStrategy.register(tenant, request)
-            is OidcAccountRequest -> OidcAccountStrategy.register(tenant, request)
-            is KeycloakAccountRequest -> KeycloakAccountStrategy.register(tenant, request)
-          }
-          .onSuccess { registrationResult ->
-            val registeredUserId = registrationResult.id
+    suspend fun register(tenant: String = "", request: AccountRequest): Result<RegistrationResult> = when (request) {
+        is EmailAccountRequest -> EmailAccountStrategy.register(tenant, request)
+        is AddressAccountRequest -> Web3WalletAccountStrategy.register(tenant, request)
+        is OidcAccountRequest -> OidcAccountStrategy.register(tenant, request)
+        is KeycloakAccountRequest -> KeycloakAccountStrategy.register(tenant, request)
+        is OidcUniqueSubjectRequest -> OidcUniqueSubjectStrategy.register(tenant, request)
 
-            val createdInitialWalletId =
-                transaction { WalletServiceManager.createWallet(tenant, registeredUserId) }
-                    .also { walletId ->
-                      IssuersService.addToWallet(walletId, "walt.id")
-                      SettingsService.set(walletId, WalletSetting.default)
-                    }
+    }.onSuccess { registrationResult ->
+        val registeredUserId = registrationResult.id
+
+        val createdInitialWalletId = transaction {
+            WalletServiceManager.createWallet(tenant, registeredUserId)
+        }.also { walletId ->
+            //TODO: inject
+            IssuersService.add(
+                wallet = walletId,
+                name = "walt.id",
+                description = "walt.id issuer portal",
+                uiEndpoint = "https://portal.walt.id/credentials?ids=",
+                configurationEndpoint = "https://issuer.portal.walt.id/.well-known/openid-credential-issuer"
+            )
+            SettingsService.set(walletId, WalletSetting.default)
+        }
 
             val walletService =
                 WalletServiceManager.getWalletService(
@@ -70,6 +77,8 @@ object AccountsService {
               is AddressAccountRequest -> Web3WalletAccountStrategy.authenticate(tenant, request)
               is OidcAccountRequest -> OidcAccountStrategy.authenticate(tenant, request)
               is KeycloakAccountRequest -> KeycloakAccountStrategy.authenticate(tenant, request)
+              is OidcUniqueSubjectRequest -> OidcUniqueSubjectStrategy.authenticate(tenant, request)
+
             }
           }
           .fold(

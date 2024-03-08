@@ -61,7 +61,6 @@ object Db {
 
     // Make sure the creation order is correct (references / foreignKeys have to exist)
     val tables = listOf(
-        Issuers,
         Accounts,
         Wallets,
         WalletOperationHistories,
@@ -90,12 +89,6 @@ object Db {
             SchemaUtils.create(*tables)
 
             runBlocking {
-                IssuersService.add(
-                    name = "walt.id",
-                    description = "walt.id issuer portal",
-                    uiEndpoint = "https://portal.walt.id/credentials?ids=",
-                    configurationEndpoint = "https://issuer.portal.walt.id/.well-known/openid-credential-issuer"
-                )
                 AccountsService.register(request = EmailAccountRequest("Max Mustermann", "string@string.string", "string"))
                 AccountsService.register(request = EmailAccountRequest("Max Mustermann", "user@email.com", "password"))
             }
