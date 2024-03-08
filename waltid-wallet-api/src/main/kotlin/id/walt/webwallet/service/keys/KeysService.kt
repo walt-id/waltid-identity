@@ -15,11 +15,11 @@ import org.jetbrains.exposed.sql.transactions.transaction
 object KeysService {
     fun get(wallet: UUID, keyId: String): WalletKey? = transaction {
         WalletKeys.selectAll().where { (WalletKeys.wallet eq wallet) and (WalletKeys.keyId eq keyId) }
-            .singleOrNull()?.let { WalletKey(it) }
+            .firstOrNull()?.let { WalletKey(it) }
     }
 
     fun get(keyId: String): WalletKey? = transaction {
-        WalletKeys.selectAll().where { WalletKeys.keyId eq keyId }.singleOrNull()?.let { WalletKey(it) }
+        WalletKeys.selectAll().where { WalletKeys.keyId eq keyId }.firstOrNull()?.let { WalletKey(it) }
     }
 
     fun list(wallet: UUID): List<WalletKey> = WalletKeys.selectAll().where { WalletKeys.wallet eq wallet }.map { WalletKey(it) }
