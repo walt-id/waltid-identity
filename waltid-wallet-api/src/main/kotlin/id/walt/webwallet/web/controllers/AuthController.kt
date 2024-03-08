@@ -24,9 +24,12 @@ import io.github.smiley4.ktorswaggerui.dsl.post
 import io.github.smiley4.ktorswaggerui.dsl.route
 import io.ktor.client.*
 import io.ktor.http.*
+import io.ktor.http.auth.*
+import io.ktor.http.parsing.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
 import io.ktor.server.auth.jwt.*
+import io.ktor.server.plugins.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.sessions.*
@@ -41,6 +44,8 @@ import kotlinx.uuid.UUID
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.transactions.transaction
+import kotlin.collections.set
+import kotlin.time.Duration.Companion.days
 
 private val log = KotlinLogging.logger {}
 
@@ -139,15 +144,43 @@ fun Application.configureSecurity() {
       }
     }
 
-    session<LoginTokenSession>("auth-session") {
-      validate { session ->
-        if (securityUserTokenMapping.contains(session.token)) {
-          UserIdPrincipal(securityUserTokenMapping[session.token].toString())
-        } else {
-          sessions.clear("login")
-          null
+//    session<LoginTokenSession>("auth-session") {
+//      validate { session ->
+//        if (securityUserTokenMapping.contains(session.token)) {
+//          UserIdPrincipal(securityUserTokenMapping[session.token].toString())
+//        } else {
+//          sessions.clear("login")
+//          null
+//        }
+//      }
+        bearer("auth-bearer-alternative") {
+            authHeader { call ->
+                call.request.header("waltid-authorization")?.let {
+                    try {
+                        parseAuthorizationHeader(it)
+                    } catch (cause: ParseException) {
+                        throw BadRequestException("Invalid auth header", cause)
+                    }
+                }
+            }
+            authenticate { tokenCredential ->
+                if (securityUserTokenMapping.contains(tokenCredential.token)) {
+                    UserIdPrincipal(securityUserTokenMapping[tokenCredential.token].toString())
+                } else {
+                    null
+                }
+            }
         }
-      }
+
+        session<LoginTokenSession>("auth-session") {
+            validate { session ->
+                if (securityUserTokenMapping.contains(session.token)) {
+                    UserIdPrincipal(securityUserTokenMapping[session.token].toString())
+                } else {
+                    sessions.clear("login")
+                    null
+                }
+            }
 
       challenge {
         call.respond(
@@ -338,13 +371,17 @@ fun Application.auth() {
                 .onFailure { call.respond(HttpStatusCode.BadRequest, it.localizedMessage) }
           }
 
-      authenticate("auth-session", "auth-bearer") {
-        get("user-info", { summary = "Return user ID if logged in" }) {
-          call.respond(getUserId().name)
-        }
-        get("session", { summary = "Return session ID if logged in" }) {
-          // val token = getUserId().name
-          val token = getUsersSessionToken() ?: throw UnauthorizedException("Invalid session")
+            authenticate("auth-session", "auth-bearer", "auth-bearer-alternative") {
+                get("user-info", {
+                    summary = "Return user ID if logged in"
+                }) {
+                    call.respond(getUserId().name)
+                }
+                get("session", {
+                    summary = "Return session ID if logged in"
+                }) {
+                    //val token = getUserId().name
+                    val token = getUsersSessionToken() ?: throw UnauthorizedException("Invalid session")
 
           if (securityUserTokenMapping.contains(token))
               call.respond(mapOf("token" to mapOf("accessToken" to token)))
@@ -387,6 +424,7 @@ fun Application.auth() {
 fun PipelineContext<Unit, ApplicationCall>.getUserId() =
     call.principal<UserIdPrincipal>("auth-session")
         ?: call.principal<UserIdPrincipal>("auth-bearer")
+        ?: call.principal<UserIdPrincipal>("auth-bearer-alternative")
         ?: call.principal<UserIdPrincipal>() // bearer is registered with no name for some reason
         ?: throw UnauthorizedException("Could not find user authorization within request.")
 
