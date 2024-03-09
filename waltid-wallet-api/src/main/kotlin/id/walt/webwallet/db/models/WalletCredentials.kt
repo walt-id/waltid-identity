@@ -9,13 +9,13 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 import kotlinx.serialization.json.*
 import kotlinx.uuid.UUID
-import org.jetbrains.exposed.dao.id.IntIdTable
 import org.jetbrains.exposed.sql.ResultRow
+import org.jetbrains.exposed.sql.Table
 import org.jetbrains.exposed.sql.javatime.timestamp
 
-object WalletCredentials : IntIdTable("credentials") {
+object WalletCredentials : Table("credentials") {
     val wallet = reference("wallet", Wallets)
-    val credentialId = varchar("credential_id", 256)
+    val id = varchar("id", 256)
 
     val document = text("document")
     val disclosures = text("disclosures").nullable()
@@ -25,16 +25,13 @@ object WalletCredentials : IntIdTable("credentials") {
 
     val deletedOn = timestamp("deleted_on").nullable().default(null)
     val pending = bool("pending").default(false)
-    
-    init {
-        uniqueIndex(credentialId, wallet)
-    }
+
+    override val primaryKey = PrimaryKey(wallet, id)
 }
 
 @Serializable
 data class WalletCredential(
     val wallet: UUID,
-    val recordId: Int? = null,
     val id: String,
     val document: String,
     val disclosures: String?,
@@ -84,8 +81,7 @@ data class WalletCredential(
 
     constructor(result: ResultRow) : this(
         wallet = result[WalletCredentials.wallet].value,
-        recordId = result[WalletCredentials.id].value,
-        id = result[WalletCredentials.credentialId],
+        id = result[WalletCredentials.id],
         document = result[WalletCredentials.document],
         disclosures = result[WalletCredentials.disclosures],
         addedOn = result[WalletCredentials.addedOn].toKotlinInstant(),
