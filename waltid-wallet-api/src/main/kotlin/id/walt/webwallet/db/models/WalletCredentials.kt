@@ -15,7 +15,7 @@ import org.jetbrains.exposed.sql.javatime.timestamp
 
 object WalletCredentials : Table("credentials") {
     val wallet = reference("wallet", Wallets)
-    val id = varchar("id", 256).uniqueIndex()
+    val credentialId = varchar("credential_id", 256).uniqueIndex()
 
     val document = text("document")
     val disclosures = text("disclosures").nullable()
@@ -26,7 +26,7 @@ object WalletCredentials : Table("credentials") {
     val deletedOn = timestamp("deleted_on").nullable().default(null)
     val pending = bool("pending").default(false)
 
-    override val primaryKey = PrimaryKey(wallet, id)
+    override val primaryKey = PrimaryKey(wallet, credentialId)
 }
 
 @Serializable
@@ -81,7 +81,7 @@ data class WalletCredential(
 
     constructor(result: ResultRow) : this(
         wallet = result[WalletCredentials.wallet].value,
-        id = result[WalletCredentials.id],
+        id = result[WalletCredentials.credentialId],
         document = result[WalletCredentials.document],
         disclosures = result[WalletCredentials.disclosures],
         addedOn = result[WalletCredentials.addedOn].toKotlinInstant(),
