@@ -47,7 +47,8 @@ suspend fun createCredentialOfferUri(issuanceRequests: List<BaseIssuanceRequest>
 
     println("issuanceSession: $issuanceSession")
 
-    val offerRequest = CredentialOfferRequest(null, "${OidcApi.baseUrl}/openid4vc/credentialOffer?id=${issuanceSession.id}")
+    val offerRequest =
+        CredentialOfferRequest(null, "${OidcApi.baseUrl}/openid4vc/credentialOffer?id=${issuanceSession.id}")
     println("offerRequest: $offerRequest")
 
     val offerUri = OidcApi.getCredentialOfferRequestUrl(
@@ -58,6 +59,7 @@ suspend fun createCredentialOfferUri(issuanceRequests: List<BaseIssuanceRequest>
     println("Offer URI: $offerUri")
     return offerUri
 }
+
 fun Application.issuerApi() {
     routing {
         get("/example-key") {
@@ -308,8 +310,10 @@ fun Application.issuerApi() {
                     }
                 }) {
                     val sessionId = call.parameters.get("id") ?: throw BadRequestException("Missing parameter \"id\"")
-                    val issuanceSession = OidcApi.getSession(sessionId) ?: throw NotFoundException("No active issuance session found by the given id")
-                    val credentialOffer = issuanceSession.credentialOffer ?: throw BadRequestException("Session has no credential offer set")
+                    val issuanceSession = OidcApi.getSession(sessionId)
+                        ?: throw NotFoundException("No active issuance session found by the given id")
+                    val credentialOffer = issuanceSession.credentialOffer
+                        ?: throw BadRequestException("Session has no credential offer set")
                     context.respond(credentialOffer.toJSON())
                 }
             }
