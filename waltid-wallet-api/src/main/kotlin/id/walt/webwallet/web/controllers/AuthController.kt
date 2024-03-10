@@ -291,16 +291,9 @@ fun Application.auth() {
                 summary = "Logout (delete session)"
                 response { HttpStatusCode.OK to { description = "Logged out." } }
             }) {
-                removeKtorSession()
+                clearUserSession()
 
-                val oidcSession = call.sessions.get<OidcTokenSession>()
-                if (oidcSession != null) {
-                    call.sessions.clear<LoginTokenSession>()
-
-                    call.respond(HttpStatusCode.OK)
-                } else {
-                    call.respond(HttpStatusCode.OK)
-                }
+                call.respond(HttpStatusCode.OK)
             }
 
             get("logout-oidc", { description = "Logout via OIDC provider" }) {
@@ -351,7 +344,9 @@ fun Application.auth() {
                 AccountsService.register("", req).onSuccess {
                     call.response.status(HttpStatusCode.Created)
                     call.respond("Registration succeeded ")
-                }.onFailure { call.respond(HttpStatusCode.BadRequest, it.localizedMessage) }
+                }.onFailure {
+                    call.respond(HttpStatusCode.BadRequest, it.localizedMessage)
+                }
             }
 
             // Login a Keycloak user
@@ -406,10 +401,11 @@ fun Application.auth() {
                         }.toString())
                     }
                 }
-                logger.debug { "Keycloak logut" }
                 response { HttpStatusCode.OK to { description = "Keycloak HTTP status code." } }
             }) {
-                removeKtorSession()
+                clearUserSession()
+
+                logger.debug { "Clearing Keycloak user session" }
 
                 val req = Json.decodeFromString<KeycloakLogoutRequest>(call.receive())
 
@@ -419,12 +415,21 @@ fun Application.auth() {
     }
 }
 
-private fun PipelineContext<Unit, ApplicationCall>.removeKtorSession() {
-    val token = getUsersSessionToken()
+private fun PipelineContext<Unit, ApplicationCall>.clearUserSession() {
+    getUsersSessionToken()?.let {
+        logger.debug { "Clearing user token session" }
+        securityUserTokenMapping.remove(it)
+    }
 
-    securityUserTokenMapping.remove(token)
+    call.sessions.get<LoginTokenSession>()?.let {
+        logger.debug { "Clearing login token session" }
+        call.sessions.clear<LoginTokenSession>()
+    }
 
-    call.sessions.clear<LoginTokenSession>()
+    call.sessions.get<OidcTokenSession>()?.let {
+        logger.debug { "Clearing OIDC token token session" }
+        call.sessions.clear<OidcTokenSession>()
+    }
 }
 
 fun PipelineContext<Unit, ApplicationCall>.getUserId() =
