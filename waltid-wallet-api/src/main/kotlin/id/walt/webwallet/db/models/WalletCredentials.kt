@@ -15,7 +15,7 @@ import org.jetbrains.exposed.sql.javatime.timestamp
 
 object WalletCredentials : Table("credentials") {
     val wallet = reference("wallet", Wallets)
-    val id = varchar("id", 256).uniqueIndex()
+    val id = varchar("id", 256)
 
     val document = text("document")
     val disclosures = text("disclosures").nullable()
