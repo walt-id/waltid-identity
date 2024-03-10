@@ -131,8 +131,7 @@ object IssuanceExamples {
         "issuanceDate" to "2020-03-10T04:24:12.164Z",
         "credentialSubject" to mapOf(
             "id" to "did:example:ebfeb1f712ebc6f1c276e12ec21", "degree" to mapOf(
-                "type" to "BachelorDegree",
-                "name" to "Bachelor of Science and Arts"
+                "type" to "BachelorDegree", "name" to "Bachelor of Science and Arts"
             )
         ),
     )
@@ -325,6 +324,55 @@ object IssuanceExamples {
           "selectiveDisclosure": {
             "fields": {"name": {"sd": true}}
           }
+        }
+    """.trimIndent()
+
+    val issuerOnboardingRequestDefaultExample = """
+        {
+          "issuerKeyConfig": {
+            "type": "local",
+            "algorithm": "Ed25519"
+          },
+          "issuerDidConfig": {
+            "method" : "jwk"
+          }
+        }
+    """.trimIndent()
+
+    val issuerOnboardingRequestTseExample = """
+        {
+          "issuerKeyConfig": {
+            "type": "tse",
+            "tseServer": "https://vault.com",
+            "tseAccessToken": "12345",
+            "algorithm": "RSA"
+          },
+          "issuerDidConfig": {
+            "method" : "key"
+          }
+        }
+    """.trimIndent()
+
+    val issuerOnboardingResponseDefaultExample = """
+        {
+          "issuanceKey": {
+            "type": "local",
+            "keyId": "Vzx7l5fh56F3Pf9aR3DECU5BwfrY6ZJe05aiWYWzan8"
+            "publicKey": "{\"kty\":\"OKP\",\"d\":\"mDhpwaH6JYSrD2Bq7Cs-pzmsjlLj4EOhxyI-9DM1mFI\",\"crv\":\"Ed25519\",\"kid\":\"Vzx7l5fh56F3Pf9aR3DECU5BwfrY6ZJe05aiWYWzan8\",\"x\":\"T3T4-u1Xz3vAV2JwPNxWfs4pik_JLiArz_WTCvrCFUM\"}"
+          },
+          "issuerDid": "did:key:z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp"
+        }
+    """.trimIndent()
+
+    // TODO: set TSE RSA demo key
+    val issuerOnboardingResponseTseExample = """
+        {
+          "issuanceKey": {
+            "type": "tse",
+            "keyId": "Vzx7l5fh56F3Pf9aR3DECU5BwfrY6ZJe05aiWYWzan8"
+            "publicKey": "{\"kty\":\"OKP\",\"d\":\"mDhpwaH6JYSrD2Bq7Cs-pzmsjlLj4EOhxyI-9DM1mFI\",\"crv\":\"Ed25519\",\"kid\":\"Vzx7l5fh56F3Pf9aR3DECU5BwfrY6ZJe05aiWYWzan8\",\"x\":\"T3T4-u1Xz3vAV2JwPNxWfs4pik_JLiArz_WTCvrCFUM\"}"
+          },
+          "issuerDid": "did:key:z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp"
         }
     """.trimIndent()
 }
