@@ -135,8 +135,11 @@ dependencies {
     implementation("org.jetbrains.exposed:exposed-dao:0.47.0")
     implementation("org.jetbrains.exposed:exposed-java-time:0.47.0")
     implementation("org.jetbrains.exposed:exposed-json:0.47.0")
+    // drivers
     implementation("org.xerial:sqlite-jdbc:3.44.1.0")
     implementation("org.postgresql:postgresql:42.7.2")
+    implementation("mysql:mysql-connector-java:8.0.33")
+    implementation("com.microsoft.sqlserver:mssql-jdbc:9.4.1.jre8")
     // migration
     //implementation("org.flywaydb:flyway-core:9.22.2")
 
