@@ -40,7 +40,6 @@ import id.walt.webwallet.service.report.ReportService
 import id.walt.webwallet.service.settings.SettingsService
 import id.walt.webwallet.service.settings.WalletSetting
 import id.walt.webwallet.usecase.event.EventUseCase
-import id.walt.webwallet.utils.WalletHttpClients.getHttpClient
 import id.walt.webwallet.web.controllers.PresentationRequestParameter
 import id.walt.webwallet.web.parameter.CredentialRequestParameter
 import io.ktor.client.*
@@ -573,10 +572,9 @@ class SSIKit2WalletService(
     override suspend fun getFrequentCredentials(parameter: ReportRequestParameter): List<WalletCredential> =
         credentialReportsService.frequent(parameter)
 
-    override suspend fun getSettings(): WalletSetting =
-        settingsService.get(walletId) ?: error("Settings not found for wallet: $walletId")
+    override suspend fun getSettings(): WalletSetting = settingsService.get(walletId)
 
-    override suspend fun setSettings(settings: WalletSetting): Boolean = settingsService.set(walletId, settings) > 0
+    override suspend fun setSettings(settings: JsonObject): Boolean = settingsService.set(walletId, settings) > 0
 
     private fun getDidOptions(method: String, args: Map<String, JsonPrimitive>) = when (method.lowercase()) {
         "key" -> DidKeyCreateOptions(args["key"]?.let { enumValueIgnoreCase<KeyType>(it.content) } ?: KeyType.Ed25519,
