@@ -15,11 +15,9 @@ sealed class BaseIssuanceRequest {
 
 @Serializable
 data class JwtIssuanceRequest(
-    override val issuanceKey: JsonObject,
-    override val issuerDid: String,
+    override val issuanceKey: JsonObject, override val issuerDid: String,
 
-    override val vc: W3CVC,
-    override val mapping: JsonObject? = null
+    override val vc: W3CVC, override val mapping: JsonObject? = null
 ) : BaseIssuanceRequest()
 
 @Serializable
@@ -31,3 +29,14 @@ data class SdJwtIssuanceRequest(
     override val mapping: JsonObject? = null,
     val selectiveDisclosure: SDMap? = null,
 ) : BaseIssuanceRequest()
+
+@Serializable
+data class IssuerOnboardingRequest(
+    val issuerKeyConfig: JsonObject,
+    val issuerDidConfig: JsonObject
+)
+
+@Serializable
+data class IssuerOnboardingResponse(
+    val issuanceKey: String, val issuerDid: String
+)
