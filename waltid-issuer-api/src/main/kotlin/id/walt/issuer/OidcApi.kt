@@ -81,7 +81,11 @@ object OidcApi : CIProvider() {
                     } else if (authReq.responseType.contains(ResponseType.token.name)) {
                         processImplicitFlowAuthorization(authReq)
                     } else {
-                        throw AuthorizationError(authReq, AuthorizationErrorCode.unsupported_response_type, "Response type not supported")
+                        throw AuthorizationError(
+                            authReq,
+                            AuthorizationErrorCode.unsupported_response_type,
+                            "Response type not supported"
+                        )
                     }
                     val redirectUri = if (authReq.isReferenceToPAR) {
                         getPushedAuthorizationSession(authReq).authorizationRequest?.redirectUri
@@ -96,14 +100,21 @@ object OidcApi : CIProvider() {
                         status(HttpStatusCode.Found)
                         val defaultResponseMode =
                             if (authReq.responseType == ResponseType.code.name) ResponseMode.query else ResponseMode.fragment
-                        header(HttpHeaders.Location, authResp.toRedirectUri(redirectUri, authReq.responseMode ?: defaultResponseMode))
+                        header(
+                            HttpHeaders.Location,
+                            authResp.toRedirectUri(redirectUri, authReq.responseMode ?: defaultResponseMode)
+                        )
                     }
                 } catch (authExc: AuthorizationError) {
                     logger.error(authExc) { "Authorization error: " }
                     call.response.apply {
                         status(HttpStatusCode.Found)
                         header(HttpHeaders.Location, URLBuilder(authExc.authorizationRequest.redirectUri!!).apply {
-                            parameters.appendAll(parametersOf(authExc.toAuthorizationErrorResponse().toHttpParameters()))
+                            parameters.appendAll(
+                                parametersOf(
+                                    authExc.toAuthorizationErrorResponse().toHttpParameters()
+                                )
+                            )
                         }.buildString())
                     }
                 }
@@ -123,12 +134,18 @@ object OidcApi : CIProvider() {
                     val sessionId = Json.parseToJsonElement(
                         Base64.decode(
                             (tokenResp.accessToken
-                                ?: throw IllegalArgumentException("No access token was responded with tokenResp?")).split(".")[1]
+                                ?: throw IllegalArgumentException("No access token was responded with tokenResp?")).split(
+                                "."
+                            )[1]
                         ).decodeToString()
                     ).jsonObject["sub"]?.jsonPrimitive?.contentOrNull
                         ?: throw IllegalArgumentException("Could not get session ID from token response!")
-                    val nonceToken = tokenResp.cNonce ?: throw IllegalArgumentException("No nonce token was responded with the tokenResp?")
-                    OidcApi.mapSessionIdToToken(sessionId, nonceToken)  // TODO: Hack as this is non stateless because of oidc4vc lib API
+                    val nonceToken = tokenResp.cNonce
+                        ?: throw IllegalArgumentException("No nonce token was responded with the tokenResp?")
+                    OidcApi.mapSessionIdToToken(
+                        sessionId,
+                        nonceToken
+                    )  // TODO: Hack as this is non stateless because of oidc4vc lib API
 
                     call.respond(tokenResp.toJSON())
                 } catch (exc: TokenError) {
@@ -152,7 +169,11 @@ object OidcApi : CIProvider() {
             }
             post("/credential_deferred") {
                 val accessToken = call.request.header(HttpHeaders.Authorization)?.substringAfter(" ")
-                if (accessToken.isNullOrEmpty() || !verifyTokenSignature(TokenTarget.DEFERRED_CREDENTIAL, accessToken)) {
+                if (accessToken.isNullOrEmpty() || !verifyTokenSignature(
+                        TokenTarget.DEFERRED_CREDENTIAL,
+                        accessToken
+                    )
+                ) {
                     call.respond(HttpStatusCode.Unauthorized)
                 } else {
                     try {
