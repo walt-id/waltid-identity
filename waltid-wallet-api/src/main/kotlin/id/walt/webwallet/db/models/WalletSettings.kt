@@ -4,7 +4,7 @@ import org.jetbrains.exposed.sql.Table
 
 object WalletSettings : Table("wallet_settings") {
     val wallet = reference("wallet", Wallets)
-    val showNoteOnPresentation = bool("note").default(true)
+    val settings = text("settings").nullable()
 
     override val primaryKey: PrimaryKey = PrimaryKey(wallet)
 }
