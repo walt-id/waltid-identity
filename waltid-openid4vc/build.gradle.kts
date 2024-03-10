@@ -124,7 +124,7 @@ kotlin {
                 //    exclude(module = "waltid-sd-jwt-jvm")
                 //}
                 implementation("org.bouncycastle:bcprov-lts8on:2.73.4") // for secp256k1 (which was removed with Java 17)
-                implementation("org.bouncycastle:bcpkix-lts8on:2.73.4") // PEM import
+                implementation("org.bouncycastle:bcpkix-lts8on:2.73.5") // PEM import
                 implementation("io.github.oshai:kotlin-logging-jvm:6.0.3")
 
                 implementation("io.ktor:ktor-server-core-jvm:$ktor_version")
