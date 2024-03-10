@@ -367,8 +367,8 @@ fun Application.auth() {
 
                 response {
                     HttpStatusCode.OK to { description = "Login successful" }
-                    HttpStatusCode.Unauthorized to { description = "Login failed" }
-                    HttpStatusCode.BadRequest to { description = "Login failed" }
+                    HttpStatusCode.Unauthorized to { description = "Unauthorized" }
+                    HttpStatusCode.BadRequest to { description = "Bad request" }
                 }
             }) {
                 val reqBody = LoginRequestJson.decodeFromString<AccountRequest>(call.receive())
@@ -409,7 +409,7 @@ fun Application.auth() {
 
                 val req = Json.decodeFromString<KeycloakLogoutRequest>(call.receive())
 
-                call.respond(KeycloakAccountStrategy.logout(req))
+                call.respond("Keycloak responded with: ${KeycloakAccountStrategy.logout(req)}")
             }
         }
     }
