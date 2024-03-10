@@ -1,6 +1,5 @@
 package id.walt.webwallet
 
-import id.walt.webwallet.web.controllers.issuers
 import id.walt.webwallet.config.ConfigManager
 import id.walt.webwallet.config.WebConfig
 import id.walt.webwallet.db.Db
@@ -88,6 +87,7 @@ fun Application.webWalletModule(withPlugins: Boolean = true) {
     reasons()
     trustRegistry()
     silentExchange()
+
     // DID Web Registry
     didRegistry()
 }

@@ -20,7 +20,7 @@ fun Application.accounts() {
                     response { HttpStatusCode.OK to { body<AccountWalletListing>() } }
                 }) {
                     val user = getUserUUID()
-                    context.respond(AccountsService.getAccountWalletMappings("", user)) // FIX ME -> TENANT HERE
+                    context.respond(AccountsService.getAccountWalletMappings("", user)) // FIXME -> TENANT HERE
                 }
             }
         }

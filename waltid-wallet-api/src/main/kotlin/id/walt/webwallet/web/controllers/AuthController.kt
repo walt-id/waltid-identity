@@ -8,14 +8,13 @@ import id.walt.webwallet.db.models.AccountWalletPermissions
 import id.walt.webwallet.service.OidcLoginService
 import id.walt.webwallet.service.WalletServiceManager
 import id.walt.webwallet.service.account.AccountsService
+import id.walt.webwallet.service.account.KeycloakAccountStrategy
 import id.walt.webwallet.utils.RandomUtils
 import id.walt.webwallet.web.ForbiddenException
 import id.walt.webwallet.web.InsufficientPermissionsException
 import id.walt.webwallet.web.UnauthorizedException
 import id.walt.webwallet.web.WebBaseRoutes.webWalletRoute
-import id.walt.webwallet.web.model.AccountRequest
-import id.walt.webwallet.web.model.EmailAccountRequest
-import id.walt.webwallet.web.model.LoginRequestJson
+import id.walt.webwallet.web.model.*
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.github.smiley4.ktorswaggerui.dsl.get
 import io.github.smiley4.ktorswaggerui.dsl.post
@@ -32,22 +31,26 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.sessions.*
 import io.ktor.util.pipeline.*
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.uuid.SecureRandom
 import kotlinx.uuid.UUID
-import org.jetbrains.exposed.sql.*
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 import kotlin.collections.set
 import kotlin.time.Duration.Companion.days
 
-private val log = KotlinLogging.logger { }
+private val logger = KotlinLogging.logger {}
+
 
 @Suppress("ArrayInDataClass")
 data class ByteLoginRequest(val username: String, val password: ByteArray) {
-    constructor(loginRequest: EmailAccountRequest) : this(loginRequest.email, loginRequest.password.toByteArray())
+    constructor(
+        loginRequest: EmailAccountRequest
+    ) : this(loginRequest.email, loginRequest.password.toByteArray())
 
     override fun toString() = "[LOGIN REQUEST FOR: $username]"
 }
@@ -55,6 +58,7 @@ data class ByteLoginRequest(val username: String, val password: ByteArray) {
 fun generateToken() = RandomUtils.randomBase64UrlString(256)
 
 data class LoginTokenSession(val token: String) : Principal
+
 data class OidcTokenSession(val token: String) : Principal
 
 object AuthKeys {
@@ -70,9 +74,9 @@ fun Application.configureSecurity() {
     val oidcConfig = ConfigManager.getConfig<OidcConfiguration>()
     install(Sessions) {
         cookie<LoginTokenSession>("login") {
-            //cookie.encoding = CookieEncoding.BASE64_ENCODING
+            // cookie.encoding = CookieEncoding.BASE64_ENCODING
 
-            //cookie.httpOnly = true
+            // cookie.httpOnly = true
             cookie.httpOnly = false // FIXME
             // TODO cookie.secure = true
             cookie.maxAge = 1.days
@@ -80,9 +84,9 @@ fun Application.configureSecurity() {
             transform(SessionTransportTransformerEncrypt(AuthKeys.encryptionKey, AuthKeys.signKey))
         }
         cookie<OidcTokenSession>("oidc-login") {
-            //cookie.encoding = CookieEncoding.BASE64_ENCODING
+            // cookie.encoding = CookieEncoding.BASE64_ENCODING
 
-            //cookie.httpOnly = true
+            // cookie.httpOnly = true
             cookie.httpOnly = false // FIXME
             // TODO cookie.secure = true
             cookie.maxAge = 1.days
@@ -97,10 +101,8 @@ fun Application.configureSecurity() {
             providerLookup = {
                 OAuthServerSettings.OAuth2ServerSettings(
                     name = oidcConfig.providerName,
-                    authorizeUrl =
-                    oidcConfig.authorizeUrl,
-                    accessTokenUrl =
-                    oidcConfig.accessTokenUrl,
+                    authorizeUrl = oidcConfig.authorizeUrl,
+                    accessTokenUrl = oidcConfig.accessTokenUrl,
                     clientId = oidcConfig.clientId,
                     clientSecret = oidcConfig.clientSecret,
                     accessTokenRequiresBasicAuth = false,
@@ -113,20 +115,10 @@ fun Application.configureSecurity() {
 
         jwt("auth-oauth-jwt") {
             realm = OidcLoginService.oidcRealm
-            //verifier(jwkProvider, oidcRealm)
+            // verifier(jwkProvider, oidcRealm)
             verifier(OidcLoginService.jwkProvider)
 
-            validate { credential ->
-
-
-                JWTPrincipal(credential.payload)
-
-                /*if (jwtCredential.payload.issuer != null) {
-                    JWTPrincipal(jwtCredential.payload)
-                } else {
-                    null
-                }*/
-            }
+            validate { credential -> JWTPrincipal(credential.payload) }
             challenge { defaultScheme, realm ->
                 call.respond(HttpStatusCode.Unauthorized, "Token is not valid or has expired")
             }
@@ -173,43 +165,28 @@ fun Application.configureSecurity() {
 
             challenge {
                 call.respond(
-                    HttpStatusCode.Unauthorized, JsonObject(
-                        mapOf(
-                            "message" to JsonPrimitive("Login Required")
-                        )
-                    )
+                    HttpStatusCode.Unauthorized, JsonObject(mapOf("message" to JsonPrimitive("Login Required")))
                 )
             }
         }
     }
 }
 
-
 val securityUserTokenMapping = HashMap<String, UUID>() // Token -> UUID
-
 
 fun Application.auth() {
     webWalletRoute {
-        route("auth", {
-            tags = listOf("Authentication")
-        }) {
-
+        route("auth", { tags = listOf("Authentication") }) {
             authenticate("auth-oauth") {
                 get("oidc-login", {
                     description = "Redirect to OIDC provider for login"
                     response { HttpStatusCode.Found }
                 }) {
-
-
                     call.respondRedirect("oidc-session")
-
                 }
 
                 authenticate("auth-oauth-jwt") {
-                    get("oidc-session", {
-                        description = "Configure OIDC session"
-                    }) {
-
+                    get("oidc-session", { description = "Configure OIDC session" }) {
                         val principal: OAuthAccessTokenResponse.OAuth2 = call.principal() ?: error("No OAuth principal")
 
                         call.sessions.set(OidcTokenSession(principal.accessToken))
@@ -219,15 +196,11 @@ fun Application.auth() {
                 }
             }
 
-            get("oidc-token", {
-                description = "Returns OIDC token"
-            }) {
-
+            get("oidc-token", { description = "Returns OIDC token" }) {
                 val oidcSession = call.sessions.get<OidcTokenSession>() ?: error("No OIDC session")
 
                 call.respond(oidcSession.token)
             }
-
 
             post("login", {
                 summary = "Login with [email + password] or [wallet address + ecosystem] or [oidc session]"
@@ -255,9 +228,8 @@ fun Application.auth() {
                     HttpStatusCode.BadRequest to { description = "Login failed" }
                 }
             }) {
-
                 val reqBody = LoginRequestJson.decodeFromString<AccountRequest>(call.receive())
-                AccountsService.authenticate("", reqBody).onSuccess { // FIX ME -> TENANT HERE
+                AccountsService.authenticate("", reqBody).onSuccess { // FIXME -> TENANT HERE
                     securityUserTokenMapping[it.token] = it.id
                     call.sessions.set(LoginTokenSession(it.token))
                     call.response.status(HttpStatusCode.OK)
@@ -265,7 +237,7 @@ fun Application.auth() {
                         mapOf(
                             "token" to it.token,
                             "id" to it.id.toString(),
-                            "username" to it.username
+                            "username" to it.username // TODO: change id to wallet-id (also in the frontend)
                         )
                     )
                 }.onFailure {
@@ -292,34 +264,25 @@ fun Application.auth() {
                     }
                 }
                 response {
-                    HttpStatusCode.Created to { description = "Register successful" }
-                    HttpStatusCode.BadRequest to { description = "Register failed" }
+                    HttpStatusCode.Created to { description = "Registration succeeded " }
+                    HttpStatusCode.BadRequest to { description = "Registration failed" }
                 }
             }) {
                 val req = LoginRequestJson.decodeFromString<AccountRequest>(call.receive())
                 AccountsService.register("", req).onSuccess {
-
                     call.response.status(HttpStatusCode.Created)
-                    call.respond("Registration succeed.")
-                }.onFailure {
-                    call.respond(HttpStatusCode.BadRequest, it.localizedMessage)
-                }
+                    call.respond("Registration succeeded ")
+                }.onFailure { call.respond(HttpStatusCode.BadRequest, it.localizedMessage) }
             }
 
             authenticate("auth-session", "auth-bearer", "auth-bearer-alternative") {
-                get("user-info", {
-                    summary = "Return user ID if logged in"
-                }) {
+                get("user-info", { summary = "Return user ID if logged in" }) {
                     call.respond(getUserId().name)
                 }
-                get("session", {
-                    summary = "Return session ID if logged in"
-                }) {
-                    //val token = getUserId().name
+                get("session", { summary = "Return session ID if logged in" }) {
                     val token = getUsersSessionToken() ?: throw UnauthorizedException("Invalid session")
 
-                    if (securityUserTokenMapping.contains(token))
-                        call.respond(mapOf("token" to mapOf("accessToken" to token)))
+                    if (securityUserTokenMapping.contains(token)) call.respond(mapOf("token" to mapOf("accessToken" to token)))
                     else throw UnauthorizedException("Invalid (outdated?) session!")
                 }
             }
@@ -328,78 +291,188 @@ fun Application.auth() {
                 summary = "Logout (delete session)"
                 response { HttpStatusCode.OK to { description = "Logged out." } }
             }) {
-                val token = getUsersSessionToken()
+                clearUserSession()
 
-                securityUserTokenMapping.remove(token)
-
-                call.sessions.clear<LoginTokenSession>()
-
-                val oidcSession = call.sessions.get<OidcTokenSession>()
-                if (oidcSession != null) {
-                    call.sessions.clear<LoginTokenSession>()
-
-                    call.respond(HttpStatusCode.OK)
-                    //call.respondRedirect("http://localhost:8080/realms/waltid-keycloak-ktor/protocol/openid-connect/logout?post_logout_redirect_uri=http://localhost:3000&client_id=waltid_backend")
-                } else {
-                    call.respond(HttpStatusCode.OK)
-                }
+                call.respond(HttpStatusCode.OK)
             }
-            get("logout-oidc", {
-                description = "Logout via OIDC provider"
-            }) {
+
+            get("logout-oidc", { description = "Logout via OIDC provider" }) {
                 val oidcConfig = ConfigManager.getConfig<OidcConfiguration>()
                 val webConfig = ConfigManager.getConfig<WebConfig>()
-                call.respondRedirect("${oidcConfig.logoutUrl}?post_logout_redirect_uri=${webConfig.publicBaseUrl}&client_id=${oidcConfig.clientId}")
+                call.respondRedirect(
+                    "${oidcConfig.logoutUrl}?post_logout_redirect_uri=${webConfig.publicBaseUrl}&client_id=${oidcConfig.clientId}"
+                )
+            }
+        }
+        route("auth/keycloak", { tags = listOf("Keycloak Authentication") }) {
+
+            // Generates Keycloak access token
+            get("token", {
+                summary = "Returns Keycloak access token"
+                description =
+                    "Returns a access token to be used for all further operations towards Keycloak. Required Keycloak configuration in oidc.conf."
+            }) {
+                logger.debug { "Fetching Keycloak access token" }
+                val access_token = KeycloakAccountStrategy.getAccessToken()
+                call.respond(access_token)
+            }
+
+            // Create Keycloak User
+            post("create", {
+                summary = "Keycloak registration with [username + email + password]"
+                description = "Creates a user in the configured Keycloak instance."
+                request {
+                    body<KeycloakAccountRequest> {
+                        example("username + email + password", buildJsonObject {
+                            put("username", JsonPrimitive("Max_Mustermann"))
+                            put("email", JsonPrimitive("user@email.com"))
+                            put("password", JsonPrimitive("password"))
+                            put("token", JsonPrimitive("eyJhb..."))
+                            put("type", JsonPrimitive("keycloak"))
+                        }.toString())
+                    }
+                }
+                response {
+                    HttpStatusCode.Created to { description = "Registration succeeded " }
+                    HttpStatusCode.BadRequest to { description = "Registration failed" }
+                }
+            }) {
+                val req = LoginRequestJson.decodeFromString<AccountRequest>(call.receive())
+
+                logger.debug { "Creating Keycloak user" }
+
+                AccountsService.register("", req).onSuccess {
+                    call.response.status(HttpStatusCode.Created)
+                    call.respond("Registration succeeded ")
+                }.onFailure {
+                    call.respond(HttpStatusCode.BadRequest, it.localizedMessage)
+                }
+            }
+
+            // Login a Keycloak user
+            post("login", {
+                summary = "Keycloak login with [username + password]"
+                description = "Login of a user managed by Keycloak."
+                request {
+                    body<KeycloakAccountRequest> {
+                        example("Keycloak username + password", buildJsonObject {
+                            put("type", JsonPrimitive("keycloak"))
+                            put("username", JsonPrimitive("Max_Mustermann"))
+                            put("password", JsonPrimitive("password"))
+                        }.toString())
+                    }
+                }
+
+                logger.debug { "Login via Keycloak" }
+
+                response {
+                    HttpStatusCode.OK to { description = "Login successful" }
+                    HttpStatusCode.Unauthorized to { description = "Unauthorized" }
+                    HttpStatusCode.BadRequest to { description = "Bad request" }
+                }
+            }) {
+                val reqBody = LoginRequestJson.decodeFromString<AccountRequest>(call.receive())
+                AccountsService.authenticate("", reqBody).onSuccess { // FIXME -> TENANT HERE
+                    securityUserTokenMapping[it.token] = it.id
+                    call.sessions.set(LoginTokenSession(it.token))
+                    call.response.status(HttpStatusCode.OK)
+                    call.respond(
+                        mapOf(
+                            "token" to it.token,
+                            "id" to it.id.toString(),  // TODO: change id to wallet-id (also in the frontend)
+                            "keycloakUserId" to it.username
+                        )
+                    )
+                }.onFailure {
+                    it.printStackTrace()
+                    call.respond(HttpStatusCode.BadRequest, it.localizedMessage)
+                }
+            }
+
+            // Terminate Keycloak session
+            post("logout", {
+                summary = "Logout via Keycloak provider."
+                description = "Terminates Keycloak and wallet session by the user identified by the Keycloak user ID."
+                request {
+                    body<KeycloakLogoutRequest> {
+                        example("keycloakUserId + token", buildJsonObject {
+                            put("keycloakUserId", JsonPrimitive("3d09 ..."))
+                            put("token", JsonPrimitive("eyJhb ..."))
+                        }.toString())
+                    }
+                }
+                response { HttpStatusCode.OK to { description = "Keycloak HTTP status code." } }
+            }) {
+                clearUserSession()
+
+                logger.debug { "Clearing Keycloak user session" }
+
+                val req = Json.decodeFromString<KeycloakLogoutRequest>(call.receive())
+
+                call.respond("Keycloak responded with: ${KeycloakAccountStrategy.logout(req)}")
             }
         }
     }
 }
 
+private fun PipelineContext<Unit, ApplicationCall>.clearUserSession() {
+    getUsersSessionToken()?.let {
+        logger.debug { "Clearing user token session" }
+        securityUserTokenMapping.remove(it)
+    }
+
+    call.sessions.get<LoginTokenSession>()?.let {
+        logger.debug { "Clearing login token session" }
+        call.sessions.clear<LoginTokenSession>()
+    }
+
+    call.sessions.get<OidcTokenSession>()?.let {
+        logger.debug { "Clearing OIDC token token session" }
+        call.sessions.clear<OidcTokenSession>()
+    }
+}
+
 fun PipelineContext<Unit, ApplicationCall>.getUserId() =
-    call.principal<UserIdPrincipal>("auth-session")
-        ?: call.principal<UserIdPrincipal>("auth-bearer")
-        ?: call.principal<UserIdPrincipal>("auth-bearer-alternative")
-        ?: call.principal<UserIdPrincipal>() // bearer is registered with no name for some reason
-        ?: throw UnauthorizedException("Could not find user authorization within request.")
+    call.principal<UserIdPrincipal>("auth-session") ?: call.principal<UserIdPrincipal>("auth-bearer")
+    ?: call.principal<UserIdPrincipal>("auth-bearer-alternative")
+    ?: call.principal<UserIdPrincipal>() // bearer is registered with no name for some reason
+    ?: throw UnauthorizedException("Could not find user authorization within request.")
 
 fun PipelineContext<Unit, ApplicationCall>.getUserUUID() =
     runCatching { UUID(getUserId().name) }.getOrElse { throw IllegalArgumentException("Invalid user id: $it") }
 
-fun PipelineContext<Unit, ApplicationCall>.getWalletId() =
-    runCatching {
-        UUID(call.parameters["wallet"] ?: throw IllegalArgumentException("No wallet ID provided"))
-    }.getOrElse { throw IllegalArgumentException("Invalid wallet ID provided: ${it.message}") }
+fun PipelineContext<Unit, ApplicationCall>.getWalletId() = runCatching {
+    UUID(call.parameters["wallet"] ?: throw IllegalArgumentException("No wallet ID provided"))
+}.getOrElse { throw IllegalArgumentException("Invalid wallet ID provided: ${it.message}") }
 
 fun PipelineContext<Unit, ApplicationCall>.getWalletService(walletId: UUID) =
-    WalletServiceManager.getWalletService("", getUserUUID(), walletId) // FIX ME -> TENANT HERE
+    WalletServiceManager.getWalletService("", getUserUUID(), walletId) // FIXME -> TENANT HERE
 
 fun PipelineContext<Unit, ApplicationCall>.getWalletService() =
-    WalletServiceManager.getWalletService("", getUserUUID(), getWalletId()) // FIX ME -> TENANT HERE
+    WalletServiceManager.getWalletService("", getUserUUID(), getWalletId()) // FIXME -> TENANT HERE
 
 fun PipelineContext<Unit, ApplicationCall>.getUsersSessionToken(): String? =
-    call.sessions.get(LoginTokenSession::class)?.token
-        ?: call.request.authorization()?.removePrefix("Bearer ")
+    call.sessions.get(LoginTokenSession::class)?.token ?: call.request.authorization()?.removePrefix("Bearer ")
 
 fun getNftService() = WalletServiceManager.getNftService()
 
-fun PipelineContext<Unit, ApplicationCall>.ensurePermissionsForWallet(required: AccountWalletPermissions): Boolean {
+fun PipelineContext<Unit, ApplicationCall>.ensurePermissionsForWallet(
+    required: AccountWalletPermissions
+): Boolean {
     val userId = getUserUUID()
     val walletId = getWalletId()
 
     val permissions = transaction {
-        (AccountWalletMappings.selectAll()
-            .where { (AccountWalletMappings.tenant eq "") and (AccountWalletMappings.accountId eq userId) and (AccountWalletMappings.wallet eq walletId) } // FIX ME -> TENANT HERE
+        (AccountWalletMappings.selectAll().where {
+            (AccountWalletMappings.tenant eq "") and (AccountWalletMappings.accountId eq userId) and (AccountWalletMappings.wallet eq walletId)
+        } // FIXME -> TENANT HERE
             .firstOrNull()
-            ?: throw ForbiddenException("This account does not have access to the specified wallet.")
-                )[AccountWalletMappings.permissions]
+            ?: throw ForbiddenException("This account does not have access to the specified wallet."))[AccountWalletMappings.permissions]
     }
 
     if (permissions.power >= required.power) {
         return true
     } else {
-        throw InsufficientPermissionsException(
-            minimumRequired = required,
-            current = permissions
-        )
+        throw InsufficientPermissionsException(minimumRequired = required, current = permissions)
     }
 }
