@@ -13,7 +13,7 @@ plugins {
     kotlin("plugin.serialization")  // Versions.KOTLIN_VERSION
 
     //id("io.ktor.plugin") version "2.3.8" // Versions.KTOR_VERSION
-    id("io.ktor.plugin") version "2.3.8" // Versions.KTOR_VERSION
+    id("io.ktor.plugin") version "2.3.9" // Versions.KTOR_VERSION
     id("org.owasp.dependencycheck") version "9.0.9"
     id("com.github.jk1.dependency-license-report") version "2.5"
     application
