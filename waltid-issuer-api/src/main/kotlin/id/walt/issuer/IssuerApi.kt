@@ -100,10 +100,13 @@ fun Application.issuerApi() {
                 // Generate key
 
                 val keyType =
-                    getParamOrThrow(req.issuerKeyConfig["type"], "Mandatory issuerKeyConfig param 'type' not provided")
+                    getParamOrThrow(
+                        req.issuanceKeyConfig["type"],
+                        "Mandatory issuanceKeyConfig param 'type' not provided"
+                    )
                 val keyAlgorithm = getParamOrThrow(
-                    req.issuerKeyConfig["algorithm"],
-                    "Mandatory issuerKeyConfig param 'algorithm' not provided"
+                    req.issuanceKeyConfig["algorithm"],
+                    "Mandatory issuanceKeyConfig param 'algorithm' not provided"
                 ).let { KeyType.valueOf(it) }
 
                 val key = when (keyType) {
@@ -112,12 +115,12 @@ fun Application.issuerApi() {
                         keyAlgorithm,
                         TSEKeyMetadata(
                             getParamOrThrow(
-                                req.issuerKeyConfig["tseServer"],
-                                "Mandatory issuerKeyConfig param 'tseServer' not provided"
+                                req.issuanceKeyConfig["tseServer"],
+                                "Mandatory issuanceKeyConfig param 'tseServer' not provided"
                             ),
                             getParamOrThrow(
-                                req.issuerKeyConfig["tseAccessToken"],
-                                "Mandatory issuerKeyConfig param 'tseAccessToken' not provided"
+                                req.issuanceKeyConfig["tseAccessToken"],
+                                "Mandatory issuanceKeyConfig param 'tseAccessToken' not provided"
                             )
                         )
                     )
