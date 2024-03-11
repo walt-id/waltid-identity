@@ -88,7 +88,7 @@ abstract class WalletService(val tenant: String, val accountId: UUID, val wallet
 
     // Settings
     abstract suspend fun getSettings(): WalletSetting
-    abstract suspend fun setSettings(settings: WalletSetting): Boolean
+    abstract suspend fun setSettings(settings: JsonObject): Boolean
 
 
     // TODO: Push

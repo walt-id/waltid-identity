@@ -413,6 +413,6 @@ class WalletKitWalletService(tenant: String, accountId: UUID, walletId: UUID) :
 
     override suspend fun getSettings(): WalletSetting = throw NotImplementedError("")
 
-    override suspend fun setSettings(settings: WalletSetting): Boolean = throw NotImplementedError("")
+    override suspend fun setSettings(settings: JsonObject): Boolean = throw NotImplementedError("")
 }
 

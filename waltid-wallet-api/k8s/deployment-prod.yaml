@@ -58,15 +58,16 @@ data:
     authorizeUrl = "${oidcRealm}/protocol/openid-connect/auth"
     accessTokenUrl = "${oidcRealm}/protocol/openid-connect/token"
     logoutUrl = "${oidcRealm}/protocol/openid-connect/logout"
-    clientId = "wallet_backend_prod"
-    clientSecret = "hhzmJsLdJgtbFGKR0GUvUWDMS7SmFoSm"
+    clientId = "waltid_backend"
+    clientSecret = "SiJXBB6U6CmPR8kXmhYDOZ8KdcGR46w8"
+    keycloakUserApi = "https://keycloak.walt-test.cloud/admin/realms/waltid-keycloak-ktor/users"
     jwksCache = {
-        cacheSize = 10
-        cacheExpirationHours = 24
-        rateLimit: {
-            bucketSize: 10
-            refillRateMinutes: 1
-        }
+      cacheSize = 10
+      cacheExpirationHours = 24
+      rateLimit: {
+        bucketSize: 10
+        refillRateMinutes: 1
+      }
     }
 ---
 apiVersion: v1
@@ -124,6 +125,19 @@ data:
          baseUrl = "<url>"
          trustRecordPath = "<path>"
     }
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wallet-logins-config
+data:
+  logins.conf: |
+    enabledLoginMethods: [
+        "email",
+        "web3",
+        "oidc",
+        "passkeys"
+    ]
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -196,6 +210,10 @@ spec:
               mountPath: "/waltid-wallet-api/config/trust.conf"
               subPath: "trust.conf"
               readOnly: true
+            - name: wallet-logins-config
+              mountPath: "/waltid-wallet-api/config/logins.conf"
+              subPath: "logins.conf"
+              readOnly: true
             - name: wallet-nft-config
               mountPath: "/waltid-wallet-api/walt.yaml"
               subPath: "walt.yaml"
@@ -233,6 +251,9 @@ spec:
         - name: wallet-trust-config
           configMap:
             name: wallet-trust-config
+        - name: wallet-logins-config
+          configMap:
+            name: wallet-logins-config
         - name: wallet-push-config
           secret:
             secretName: wallet-push-config-secret

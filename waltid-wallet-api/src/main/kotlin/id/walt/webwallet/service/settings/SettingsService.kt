@@ -2,38 +2,44 @@ package id.walt.webwallet.service.settings
 
 import id.walt.webwallet.db.models.WalletSettings
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 import kotlinx.uuid.UUID
-import org.jetbrains.exposed.sql.*
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.sql.upsert
 
 object SettingsService {
+    private val json = Json { ignoreUnknownKeys = true }
 
     fun get(wallet: UUID) = transaction {
-        getQuery(wallet).singleOrNull()?.let {
-            WalletSetting(showNoteOnPresentation = it[WalletSettings.showNoteOnPresentation])
-        }
+        tryParseSettings(getQuery(wallet).singleOrNull()?.get(WalletSettings.settings))
     }
 
-    fun set(wallet: UUID, setting: WalletSetting) = transaction {
+    fun set(wallet: UUID, setting: JsonObject) = transaction {
         upsertQuery(wallet, setting)
     }.insertedCount
 
     private fun getQuery(wallet: UUID) = WalletSettings.selectAll().where { WalletSettings.wallet eq wallet }
 
-    private fun upsertQuery(wallet: UUID, setting: WalletSetting) = WalletSettings.upsert(
+    private fun upsertQuery(wallet: UUID, setting: JsonObject) = WalletSettings.upsert(
         WalletSettings.wallet
     ) {
         it[WalletSettings.wallet] = wallet
-        it[WalletSettings.showNoteOnPresentation] = setting.showNoteOnPresentation
+        it[WalletSettings.settings] = json.encodeToString(setting)
     }
+
+    private fun tryParseSettings(settings: String?) =
+        runCatching { json.decodeFromString<JsonObject>(settings ?: "") }.fold(onSuccess = { WalletSetting(it) },
+            onFailure = { WalletSetting.default })
 }
 
 @Serializable
 data class WalletSetting(
-    val showNoteOnPresentation: Boolean
+    val settings: JsonObject,
 ) {
     companion object {
-        val default = WalletSetting(false)
+        val default = WalletSetting(JsonObject(emptyMap()))
     }
 }
