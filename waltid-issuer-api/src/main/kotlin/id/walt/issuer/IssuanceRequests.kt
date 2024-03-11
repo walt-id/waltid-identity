@@ -32,7 +32,7 @@ data class SdJwtIssuanceRequest(
 
 @Serializable
 data class IssuerOnboardingRequest(
-    val issuerKeyConfig: JsonObject,
+    val issuanceKeyConfig: JsonObject,
     val issuerDidConfig: JsonObject
 )
 
