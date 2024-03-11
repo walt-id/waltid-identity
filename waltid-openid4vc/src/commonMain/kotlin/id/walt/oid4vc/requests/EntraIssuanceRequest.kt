@@ -1,8 +1,8 @@
 package id.walt.oid4vc.requests
 
+import id.walt.oid4vc.util.JwtUtils
 import id.walt.oid4vc.util.http
 import id.walt.oid4vc.util.randomUUID
-import id.walt.sdjwt.SDJwt
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.utils.io.core.*
@@ -61,7 +61,7 @@ data class EntraIssuanceRequest(
 
 
             val manifest = http.get(manifestUrl).body<JsonObject>()["token"]!!.jsonPrimitive.content.let {
-                SDJwt.parse(it).fullPayload
+                JwtUtils.parseJWTPayload(it)
             }
 
             return EntraIssuanceRequest(authorizationRequest, manifest, manifestUrl)

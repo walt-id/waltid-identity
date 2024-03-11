@@ -83,7 +83,7 @@ class CITestProvider : OpenIDCredentialIssuer(
         runBlocking { CI_TOKEN_KEY.signJws(payload.toString().toByteArray()) }
 
     fun getKeyFor(token: String): Key {
-        return runBlocking { DidService.resolveToKey((JWTParser.parse(token).header as JWSHeader).keyID) }.getOrThrow()
+        return runBlocking { DidService.resolveToKey((JWTParser.parse(token).header as JWSHeader).keyID.substringBefore("#")) }.getOrThrow()
     }
     override fun verifyTokenSignature(target: TokenTarget, token: String) =
         runBlocking { (if(target == TokenTarget.PROOF_OF_POSSESSION) getKeyFor(token) else CI_TOKEN_KEY).verifyJws(token).isSuccess }

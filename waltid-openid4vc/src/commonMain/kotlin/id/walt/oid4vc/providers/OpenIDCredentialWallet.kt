@@ -10,8 +10,8 @@ import id.walt.oid4vc.interfaces.ITokenProvider
 import id.walt.oid4vc.interfaces.IVPTokenProvider
 import id.walt.oid4vc.requests.*
 import id.walt.oid4vc.responses.*
+import id.walt.oid4vc.util.JwtUtils
 import id.walt.oid4vc.util.randomUUID
-import id.walt.sdjwt.SDJwt
 import io.ktor.http.*
 import io.ktor.utils.io.charsets.*
 import io.ktor.utils.io.core.*
@@ -54,18 +54,9 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
         nonce: String?,
         client: OpenIDClientConfig? = null
     ): ProofOfPossession {
-        val keyId = resolveDID(did)
-        return ProofOfPossession(
-            jwt = signToken(TokenTarget.PROOF_OF_POSSESSION, buildJsonObject {
-                client?.let { put(JWTClaims.Payload.issuer, it.clientID) }
-                put(JWTClaims.Payload.audience, issuerUrl)
-                put(JWTClaims.Payload.issuedAtTime, Clock.System.now().epochSeconds)
-                nonce?.let { put(JWTClaims.Payload.nonce, it) }
-            }, header = buildJsonObject {
-                put(JWTClaims.Header.keyID, keyId)
-                put(JWTClaims.Header.type, "openid4vci-proof+jwt")
-            }, keyId = keyId)
-        )
+        throw NotImplementedError("This object/method is obsolete and will be removed or replaced")
+        //val keyId = resolveDID(did)
+        //return ProofOfPossession.createJwtProof(this, issuerUrl, client?.clientID, nonce, keyId)
     }
 
     open fun getCIProviderMetadataUrl(baseUrl: String): String {
@@ -444,7 +435,7 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
 
     protected open fun executeIdTokenAuthorization(idTokenRequestUri: Url, holderDid: String, client: OpenIDClientConfig): Url {
         var authReq = AuthorizationRequest.fromHttpQueryString(idTokenRequestUri.encodedQuery).let { authorizationRequest ->
-            authorizationRequest.customParameters["request"]?.let { AuthorizationJSONRequest.fromJSON(SDJwt.parse(it.first()).fullPayload) }
+            authorizationRequest.customParameters["request"]?.let { AuthorizationJSONRequest.fromJSON(JwtUtils.parseJWTPayload(it.first())) }
                 ?: authorizationRequest
         }
         if (authReq.responseMode != ResponseMode.DirectPost || !authReq.responseType.contains(ResponseType.IdToken) || authReq.redirectUri.isNullOrEmpty())
