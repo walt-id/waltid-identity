@@ -31,7 +31,7 @@ jobs:
 
       - name: Get changed files in the frontend
         id: frontend-changed-files
-        uses: tj-actions/changed-files@v41
+        uses: tj-actions/changed-files@v42
         with:
           files: |
             waltid-web-portal/**
