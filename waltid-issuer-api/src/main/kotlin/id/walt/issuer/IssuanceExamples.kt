@@ -332,7 +332,7 @@ object IssuanceExamples {
         {
           "issuanceKeyConfig": {
             "type": "local",
-            "algorithm": "Ed25519"
+            "algorithm": "secp256r1"
           },
           "issuerDidConfig": {
             "method" : "jwk"
@@ -345,9 +345,9 @@ object IssuanceExamples {
         {
           "issuanceKeyConfig": {
             "type": "tse",
-            "tseServer": "https://your-hashicrop-vault-instance.com",
-            "tseAccessToken": "12345",
-            "algorithm": "RSA"
+            "tseServer": "http://127.0.0.1:8200/v1/transit",
+            "tseAccessToken": "dev-only-token",
+            "algorithm": "Ed25519"
           },
           "issuerDidConfig": {
             "method" : "key"
@@ -358,25 +358,16 @@ object IssuanceExamples {
     //language=JSON
     val issuerOnboardingResponseDefaultExample = """
         {
-          "issuanceKey": {
-            "type": "local",
-            "keyId": "Vzx7l5fh56F3Pf9aR3DECU5BwfrY6ZJe05aiWYWzan8",
-            "publicKey": "{\"kty\":\"OKP\",\"d\":\"mDhpwaH6JYSrD2Bq7Cs-pzmsjlLj4EOhxyI-9DM1mFI\",\"crv\":\"Ed25519\",\"kid\":\"Vzx7l5fh56F3Pf9aR3DECU5BwfrY6ZJe05aiWYWzan8\",\"x\":\"T3T4-u1Xz3vAV2JwPNxWfs4pik_JLiArz_WTCvrCFUM\"}"
-          },
-          "issuerDid": "did:key:z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp"
+          "issuanceKey": "{\"type\":\"local\",\"jwk\":\"{\\\"kty\\\":\\\"EC\\\",\\\"d\\\":\\\"nBuOdeBDAiiiVtnfJGqoh6OLpICXfenS0xVcxsaTD7g\\\",\\\"crv\\\":\\\"P-256\\\",\\\"kid\\\":\\\"vagXR7ehhLlJ2iQaaD0sR1BdvkPyx_Zy2e_qCvsD-0w\\\",\\\"x\\\":\\\"L461HF6vdrLW38h87eFxAti0hGiPYz0F0hi2poze9TM\\\",\\\"y\\\":\\\"d6MpdM3xoyDbx8FNkBtFzKXgPGgG6sLji0Ne9wGfwqQ\\\"}\"}",
+          "issuerDid": "did:jwk:eyJrdHkiOiJFQyIsImNydiI6IlAtMjU2Iiwia2lkIjoidmFnWFI3ZWhoTGxKMmlRYWFEMHNSMUJkdmtQeXhfWnkyZV9xQ3ZzRC0wdyIsIngiOiJMNDYxSEY2dmRyTFczOGg4N2VGeEF0aTBoR2lQWXowRjBoaTJwb3plOVRNIiwieSI6ImQ2TXBkTTN4b3lEYng4Rk5rQnRGektYZ1BHZ0c2c0xqaTBOZTl3R2Z3cVEifQ"
         }
     """.trimIndent()
 
-    // TODO: set TSE RSA demo key
     //language=JSON
     val issuerOnboardingResponseTseExample = """
         {
-          "issuanceKey": {
-            "type": "tse",
-            "keyId": "Vzx7l5fh56F3Pf9aR3DECU5BwfrY6ZJe05aiWYWzan8",
-            "publicKey": "{\"kty\":\"OKP\",\"d\":\"mDhpwaH6JYSrD2Bq7Cs-pzmsjlLj4EOhxyI-9DM1mFI\",\"crv\":\"Ed25519\",\"kid\":\"Vzx7l5fh56F3Pf9aR3DECU5BwfrY6ZJe05aiWYWzan8\",\"x\":\"T3T4-u1Xz3vAV2JwPNxWfs4pik_JLiArz_WTCvrCFUM\"}"
-          },
-          "issuerDid": "did:key:z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp"
+          "issuanceKey": "{\"type\":\"tse\",\"server\":\"http://127.0.0.1:8200/v1/transit\",\"accessKey\":\"dev-only-token\",\"id\":\"k-615009916\",\"_publicKey\":[-20,2,-66,11,25,16,-119,113,-94,-22,-88,-98,-62,29,98,120,115,40,71,63,93,-57,107,33,127,91,-88,44,66,-73,-41,82],\"_keyType\":\"Ed25519\"}",
+          "issuerDid": "did:key:z6MkvLYgq2DVZ68arPvGwDHHoVGHEc3CkGKmdhgEvUSpRwEy"
         }
     """.trimIndent()
 }

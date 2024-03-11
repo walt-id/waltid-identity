@@ -82,11 +82,11 @@ fun Application.issuerApi() {
                         description = "Issuer onboarding response"
                         body<IssuerOnboardingResponse> {
                             example(
-                                "Local ed25519 key + did:jwk",
+                                "Local secp256r1 key + did:jwk",
                                 issuerOnboardingResponseDefaultExample,
                             )
                             example(
-                                "Remote RSA key + did:key",
+                                "Remote Ed25519 key + did:key",
                                 issuerOnboardingResponseTseExample,
                             )
                         }
