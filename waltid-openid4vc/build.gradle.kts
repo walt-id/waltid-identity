@@ -83,7 +83,7 @@ kotlin {
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
 
                 // walt.id
-                implementation(project(":waltid-sdjwt"))
+                implementation(project(":waltid-crypto"))
 
                 // -- Multiplatform --
                 // Multiplatform / UUID

@@ -21,6 +21,7 @@ import id.walt.oid4vc.providers.OpenIDClientConfig
 import id.walt.oid4vc.providers.TokenTarget
 import id.walt.oid4vc.requests.*
 import id.walt.oid4vc.responses.*
+import id.walt.oid4vc.util.JwtUtils
 import id.walt.sdjwt.SDJwt
 import id.walt.sdjwt.SDMap
 import id.walt.sdjwt.SDPayload
@@ -466,7 +467,7 @@ class CI_JVM_Test : AnnotationSpec() {
     }
 
     @Test
-    suspend fun testCredentialIssuanceIsolatedFunctions() {
+    fun testCredentialIssuanceIsolatedFunctions() {
         // TODO: consider re-implementing CITestProvider, making use of new lib functions
         println("// -------- CREDENTIAL ISSUER ----------")
         // init credential offer for full authorization code flow
@@ -480,10 +481,10 @@ class CI_JVM_Test : AnnotationSpec() {
         println(issueReqUrl)
 
         println("// -------- WALLET ----------")
-        val parsedCredOffer = OpenID4VCI.parseAndResolveCredentialOfferRequestUrl(issueReqUrl)
+        val parsedCredOffer = runBlocking { OpenID4VCI.parseAndResolveCredentialOfferRequestUrl(issueReqUrl) }
         parsedCredOffer.toJSONString() shouldBe credOffer.toJSONString()
 
-        val providerMetadata = OpenID4VCI.resolveCIProviderMetadata(parsedCredOffer)
+        val providerMetadata = runBlocking { OpenID4VCI.resolveCIProviderMetadata(parsedCredOffer) }
         providerMetadata.credentialIssuer shouldBe parsedCredOffer.credentialIssuer
 
         println("// resolve offered credentials")
@@ -545,15 +546,32 @@ class CI_JVM_Test : AnnotationSpec() {
         println("// receive credential")
         ciTestProvider.deferIssuance = false
         var nonce = tokenResponse.cNonce!!
+        val holderDid = TEST_WALLET_DID_WEB1
+        val holderKey = runBlocking { LocalKey.importJWK(TEST_WALLET_KEY1) }.getOrThrow()
+        val holderKeyId = runBlocking { holderKey.getKeyId() }
+        val proofKeyId = "$holderDid#$holderKeyId"
+        val proofOfPossession = runBlocking {
+            ProofOfPossession.createJwtProof(holderKey, ciTestProvider.baseUrl, null, nonce, proofKeyId)
+        }
 
-        val credReq = CredentialRequest.forOfferedCredential(
-            offeredCredential,
-            credentialWallet.generateDidProof(credentialWallet.TEST_DID, ciTestProvider.baseUrl, nonce)
-        )
+        val credReq = CredentialRequest.forOfferedCredential(offeredCredential, proofOfPossession)
         println("credReq: $credReq")
 
         println("// -------- CREDENTIAL ISSUER ----------")
-        val credentialResponse: CredentialResponse = TODO("Implement in OpenID4VCI") // generateCredentialResponse(credReq, accessToken)
+        val parsedHolderKeyId = credReq.proof?.jwt?.let { JwtUtils.parseJWTHeader(it) }?.get("kid")?.jsonPrimitive?.content
+        parsedHolderKeyId shouldNotBe null
+        parsedHolderKeyId shouldStartWith "did:"
+        val parsedHolderDid = parsedHolderKeyId!!.substringBefore("#")
+        val resolvedKeyForHolderDid = runBlocking { DidService.resolveToKey(parsedHolderDid) }.getOrThrow()
+
+        val validPoP = runBlocking {
+            credReq.proof?.validateJwtProof(resolvedKeyForHolderDid, ciTestProvider.baseUrl,null, nonce, parsedHolderKeyId)
+        }
+        validPoP shouldBe true
+
+        val generatedCredential = ciTestProvider.generateCredential(credReq).credential
+        generatedCredential shouldNotBe null
+        val credentialResponse: CredentialResponse = CredentialResponse.success(credReq.format, generatedCredential!!)
 
         println("// -------- WALLET ----------")
         credentialResponse.isSuccess shouldBe true
@@ -568,7 +586,7 @@ class CI_JVM_Test : AnnotationSpec() {
             SDJwt.parse(credential).fullPayload.get("vc")?.jsonObject!!,
             ciTestProvider.CI_ISSUER_DID, credentialWallet.TEST_DID
         )
-        JwtSignaturePolicy().verify(credential, null, mapOf()).isSuccess shouldBe true
+        runBlocking{ JwtSignaturePolicy().verify(credential, null, mapOf()) }.isSuccess shouldBe true
     }
 
     @Test

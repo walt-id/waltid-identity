@@ -2,7 +2,7 @@ package id.walt.oid4vc.requests
 
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.data.dif.PresentationDefinition
-import id.walt.sdjwt.SDJwt
+import id.walt.oid4vc.util.JwtUtils
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import kotlinx.serialization.json.*
@@ -124,7 +124,7 @@ data class AuthorizationRequest(
 
         fun fromRequestObject(request: String): AuthorizationRequest {
             return fromHttpParameters(
-                SDJwt.parse(request).fullPayload.mapValues { e ->
+                JwtUtils.parseJWTPayload(request).mapValues { e ->
                     when (e.value) {
                         is JsonArray -> e.value.jsonArray.map { it.toString() }.toList()
                         is JsonPrimitive -> listOf(e.value.jsonPrimitive.content)
