@@ -15,7 +15,7 @@ jobs:
         with:
           tool-cache: false
           docker-images: false
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Calculate release version
         run: |
           echo "release_version=1.0.$(date +'%g%m%d%H%M')-SNAPSHOT" >> $GITHUB_ENV
