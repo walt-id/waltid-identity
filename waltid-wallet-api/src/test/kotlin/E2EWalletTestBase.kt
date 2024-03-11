@@ -311,6 +311,15 @@ abstract class E2EWalletTestBase {
         return verifyUri
     }
     
+    protected suspend fun testSession(id: String) = run {
+        println("\nUse Case -> Test Verification Session\n")
+        val endpoint = "$verifierUrl/openid4vc/session/$id"
+        println("GET $endpoint")
+        walletClient.get(endpoint).let { response ->
+            assertEquals(HttpStatusCode.OK, response.status)
+        }
+    }
+    
     protected suspend fun testResolvePresentationRequest(url: String): String = run {
         val endpoint = "$walletUrl/wallet-api/wallet/$walletId/exchange/resolvePresentationRequest"
         

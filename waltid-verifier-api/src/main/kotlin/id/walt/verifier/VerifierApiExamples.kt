@@ -1,8 +1,8 @@
 package id.walt.verifier
 
 object VerifierApiExamples {
-
-
+    
+    
     // Minimal call, default policies will be used, PresentationDefinition is generated based on credentials requested in `request_credentials`:
     //language=json
     val minimal = """
@@ -12,7 +12,7 @@ object VerifierApiExamples {
   ]
 }
 """.trimIndent()
-
+    
     //Call with policies for the VerifiablePresentation, default policies for VCs, generated PresentationDefinition:
     //language=json
     val vpPolicies = """
@@ -27,7 +27,7 @@ object VerifierApiExamples {
   ]
 }
 """.trimIndent()
-
+    
     //Call with policies for the VerifiablePresentation, defined policies for all VCs, generated PresentationDefinition:
     //language=json
     val vpGlobalVcPolicies =
@@ -39,7 +39,6 @@ object VerifierApiExamples {
   ],
   "vc_policies": [
     "signature",
-    "revoked",
     "expired",
     "not-before"
   ],
@@ -49,7 +48,7 @@ object VerifierApiExamples {
   ]
 }
 """.trimIndent()
-
+    
     // Call with policies for the VerifiablePresentation, defined policies for all VCs, generated PresentationDefinition,
     // and special policies for each credential type:
     //language=json
@@ -61,7 +60,6 @@ object VerifierApiExamples {
   ],
   "vc_policies": [
     "signature",
-    "revoked",
     "expired",
     "not-before"
   ],
@@ -89,7 +87,7 @@ object VerifierApiExamples {
   ]
 }
 """.trimIndent()
-
+    
     // Call with policies for the VerifiablePresentation, defined policies for all VCs, and special policies for each credential type,
     // the PresentationDefinition is not generated but manually defined:
     //language=json
@@ -102,7 +100,6 @@ object VerifierApiExamples {
   ],
   "vc_policies": [
     "signature",
-    "revoked",
     "expired",
     "not-before"
   ],
@@ -160,7 +157,7 @@ object VerifierApiExamples {
   }
 }
 """.trimIndent()
-
+    
     //language=JSON
     val presentationDefinitionPolicy =
         """

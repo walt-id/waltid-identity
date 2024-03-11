@@ -58,7 +58,7 @@ class wallettest : AnnotationSpec() {
         //ciTestProvider.start()
     }
 
-    //@Test   /* Uncomment me */
+    @Test   /* Uncomment me */
     suspend fun testPreauth() {
         // vvv UPDATE BELOW URL WITH OFFER_URI vvv
         val offerUri =

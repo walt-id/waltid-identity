@@ -1,10 +1,16 @@
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
+import id.walt.credentials.verification.policies.JwtSignaturePolicy
 import id.walt.issuer.base.config.OIDCIssuerServiceConfig
 import id.walt.issuer.issuerModule
+import id.walt.oid4vc.data.*
 import id.walt.verifier.base.config.OIDCVerifierServiceConfig
-import PresentationDefinition.Companion.minimalPresentationDefinition
-import PresentationDefinition.Companion.vpPoliciesDefinition
+import id.walt.verifier.VerifierApiExamples.maxExample
+import id.walt.verifier.VerifierApiExamples.minimal
+import id.walt.verifier.VerifierApiExamples.presentationDefinitionPolicy
+import id.walt.verifier.VerifierApiExamples.vcVpIndividualPolicies
+import id.walt.verifier.VerifierApiExamples.vpGlobalVcPolicies
+import id.walt.verifier.VerifierApiExamples.vpPolicies
 import id.walt.verifier.verifierModule
 import id.walt.webwallet.config.DatasourceConfiguration
 import id.walt.webwallet.db.Db
@@ -216,6 +222,10 @@ open class E2EWalletTestLocal : E2EWalletTestBase() {
         val vc: JsonObject = requestCredential(issuanceUri, availableDids.first().did)
         println("issued vc = $vc")
         
+        val credential = vc["parsedDocument"].toString()
+        assertNotNull(credential)
+        assertTrue(JwtSignaturePolicy().verify(credential, null, mapOf()).isSuccess)
+        
         val id = vc["id"]?.jsonPrimitive?.content
         println("credential id = $id")
         assertNotNull(id)
@@ -239,13 +249,42 @@ open class E2EWalletTestLocal : E2EWalletTestBase() {
     @Test
     fun e2eTestVerify() = testApplication {
         runApplication()
-        var url = testVerifyCredential(minimalPresentationDefinition)
+        var url = testVerifyCredential(minimal)
         assertTrue(url.startsWith("openid4vp://authorize?response_type=vp_token"))
-        println("verify Url = $url")
+        println("minimal presentation definition: verify Url = $url")
+
+        url = testVerifyCredential(vpPolicies)
+        assertTrue(url.startsWith("openid4vp://authorize?response_type=vp_token"))
+        println("vp policy definition :verify Url = $url")
+
+        url = testVerifyCredential(vpGlobalVcPolicies)
+        assertTrue(url.startsWith("openid4vp://authorize?response_type=vp_token"))
+        println("vp policy definition with global Vcs:verify Url = $url")
+
+        url = testVerifyCredential(vcVpIndividualPolicies)
+        assertTrue(url.startsWith("openid4vp://authorize?response_type=vp_token"))
+        println("vp policy definition with specific Vc credential policies:verify Url = $url")
+
+        url = testVerifyCredential(maxExample)
+        assertTrue(url.startsWith("openid4vp://authorize?response_type=vp_token"))
+        println("vp policy definition explicit presentation definition:verify Url = $url")
+    }
+    
+    @Test
+    fun e2eTestPresentationSession() = testApplication {
+        runApplication()
+        val url = testVerifyCredential(minimal)
+        val startStr = "state="
+        val endStr = "&presentation"
+        assertTrue(url.startsWith("openid4vp://authorize?response_type=vp_token"))
+       
+        val start = url.indexOf(startStr) + startStr.length
+        val end = url.indexOf(endStr)
         
-        url = testVerifyCredential(vpPoliciesDefinition)
-        assertTrue(url.startsWith("openid4vp://authorize?response_type=vp_token"))
-        println("verify Url = $url")
+        // extract 'state' from URL
+        val state = url.substring(start, end)
+        println("session id (state) = $state")
+        testSession(state)
     }
     
     @Test
@@ -255,13 +294,64 @@ open class E2EWalletTestLocal : E2EWalletTestBase() {
         localWalletClient = newClient(token)
         
         listAllWallets() // sets the walletId
-        val url = testVerifyCredential(minimalPresentationDefinition)
+        val url = testVerifyCredential(minimal)
         assertTrue(url.startsWith("openid4vp://authorize?response_type=vp_token"))
         println("verify Url = $url")
         
         val parsedRequest = testResolvePresentationRequest(url)
         println("Parsed Request = $parsedRequest")
     }
+    
+    @Test
+    fun e2eTestMatchCredentialsForPresentationDefinition() = testApplication {
+//        var testMetadata = OpenIDProviderMetadata(
+//            authorizationEndpoint = "https://localhost/oidc",
+//            credentialsSupported = listOf(
+//                CredentialSupported(
+//                    CredentialFormat.jwt_vc_json, "jwt_vc_json_fmt", setOf("did"), setOf("ES256K"),
+//                    listOf(
+//                        DisplayProperties(
+//                            "University Credential",
+//                            "en-US",
+//                            LogoProperties(
+//                                "https://exampleuniversity.com/public/logo.png",
+//                                "a square logo of a university"
+//                            ),
+//                            backgroundColor = "#12107c", textColor = "#FFFFFF"
+//                        )
+//                    ),
+//                    types = listOf("VerifiableCredential", "UniversityDegreeCredential"),
+//                    credentialSubject = mapOf(
+//                        "name" to ClaimDescriptor(
+//                            mandatory = false,
+//                            display = listOf(DisplayProperties("Full Name")),
+//                            customParameters = mapOf(
+//                                "firstName" to ClaimDescriptor(
+//                                    valueType = "string",
+//                                    display = listOf(DisplayProperties("First Name"))
+//                                ).toJSON(),
+//                                "lastName" to ClaimDescriptor(
+//                                    valueType = "string",
+//                                    display = listOf(DisplayProperties("Last Name"))
+//                                ).toJSON()
+//                            )
+//                        )
+//                    )
+//                ),
+//                CredentialSupported(
+//                    CredentialFormat.ldp_vc, "ldp_vc_1", setOf("did"), setOf("ES256K"),
+//                    listOf(DisplayProperties("Verifiable ID")),
+//                    types = listOf("VerifiableCredential", "VerifiableId"),
+//                    context = listOf(
+//                        JsonPrimitive("https://www.w3.org/2018/credentials/v1"),
+//                        JsonObject(mapOf("@version" to JsonPrimitive(1.1)))
+//                    )
+//                )
+//            )
+//        )
+    }
+    
+    
     
     override var walletClient: HttpClient
         get() = localWalletClient
