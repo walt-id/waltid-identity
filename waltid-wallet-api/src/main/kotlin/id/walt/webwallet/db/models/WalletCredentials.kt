@@ -2,7 +2,6 @@ package id.walt.webwallet.db.models
 
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.webwallet.manifest.provider.ManifestProvider
-import id.walt.webwallet.service.events.EventDataNotAvailable
 import kotlinx.datetime.Instant
 import kotlinx.datetime.toKotlinInstant
 import kotlinx.serialization.SerialName

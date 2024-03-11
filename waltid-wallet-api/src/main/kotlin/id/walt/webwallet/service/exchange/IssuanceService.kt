@@ -16,15 +16,12 @@ import id.walt.oid4vc.responses.TokenResponse
 import id.walt.oid4vc.util.randomUUID
 import id.walt.webwallet.manifest.extractor.EntraManifestExtractor
 import id.walt.webwallet.service.oidc4vc.TestCredentialWallet
-import io.ktor.client.*
+import id.walt.webwallet.utils.WalletHttpClients
 import io.ktor.client.call.*
-import io.ktor.client.engine.cio.*
-import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
-import io.ktor.serialization.kotlinx.json.*
 import io.ktor.util.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -33,12 +30,8 @@ import kotlinx.serialization.json.jsonPrimitive
 import org.slf4j.LoggerFactory
 
 object  IssuanceService {
-    private val http = HttpClient(CIO) {
-        install(ContentNegotiation) {
-            json()
-        }
-        followRedirects = false
-    }
+
+    private val http = WalletHttpClients.getHttpClient()
     private val logger = LoggerFactory.getLogger(this::class.java)
 
     suspend fun useOfferRequest(
@@ -211,20 +204,17 @@ object  IssuanceService {
     ) = let {
         val credential = credentialResp.credential!!.jsonPrimitive.content
         val credentialJwt = credential.decodeJws(withSignature = true)
-        val typ = credentialJwt.header["typ"]?.jsonPrimitive?.content?.lowercase()
-        when (typ) {
-            "jwt" -> parseJwtCredentialResponse(credentialJwt, credential, manifest)
-            "vc+sd-jwt" -> parseSdJwtCredentialResponse(credentialJwt, credential, manifest)
+        when (val typ = credentialJwt.header["typ"]?.jsonPrimitive?.content?.lowercase()) {
+            "jwt" -> parseJwtCredentialResponse(credentialJwt, credential, manifest, typ)
+            "vc+sd-jwt" -> parseSdJwtCredentialResponse(credentialJwt, credential, manifest, typ)
             null -> throw IllegalArgumentException("WalletCredential JWT does not have \"typ\"")
             else -> throw IllegalArgumentException("Invalid credential \"typ\": $typ")
-        }.let {
-            CredentialDataResult(id = it.id, document = it.document, manifest = it.manifest, type = typ)
         }
     }
 
     //TODO: move to related entity
     private fun parseJwtCredentialResponse(
-        credentialJwt: JwsUtils.JwsParts, document: String, manifest: JsonObject?,
+        credentialJwt: JwsUtils.JwsParts, document: String, manifest: JsonObject?, type: String
     ) = let {
         val credentialId =
             credentialJwt.payload["vc"]!!.jsonObject["id"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
@@ -236,13 +226,13 @@ object  IssuanceService {
             id = credentialId,
             document = document,
             manifest = manifest?.toString(),
-            type = null,
+            type = type,
         )
     }
 
     //TODO: move to related entity
     private fun parseSdJwtCredentialResponse(
-        credentialJwt: JwsUtils.JwsParts, document: String, manifest: JsonObject?,
+        credentialJwt: JwsUtils.JwsParts, document: String, manifest: JsonObject?, type: String
     ) = let {
         val credentialId =
             credentialJwt.payload["id"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() } ?: randomUUID()
@@ -261,7 +251,7 @@ object  IssuanceService {
             document = credentialWithoutDisclosures,
             disclosures = disclosuresString,
             manifest = manifest?.toString(),
-            type = null,
+            type = type,
         )
     }
 
