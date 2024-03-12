@@ -134,13 +134,21 @@ object KeycloakAccountStrategy : AccountStrategy<KeycloakAccountRequest>("keyclo
   ): AuthenticatedUser {
 
     val token =
-        if (request.password == null) {
-          getTokenExchange(request)
-        } else {
-          getUserToken(request)
-        }
+        when {
+          request.username != null && request.password != null -> {
 
-    // val token = getUserToken(request)
+            getUserToken(request)
+          }
+          request.token != null && request.password == null && request.username != null -> {
+
+            getTokenExchange(request)
+          }
+          request.token != null && request.password == null && request.username == null -> {
+
+            request.token
+          }
+          else -> throw RuntimeException("Invalid request")
+        }
 
     val jwt = verifiedToken(token)
 

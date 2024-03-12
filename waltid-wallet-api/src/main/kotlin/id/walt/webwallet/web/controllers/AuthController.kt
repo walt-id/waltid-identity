@@ -407,6 +407,14 @@ fun Application.auth() {
                           put("token", JsonPrimitive("eyJhb..."))
                         }
                         .toString())
+
+                example(
+                    "Keycloak user Access Token ",
+                    buildJsonObject {
+                          put("type", JsonPrimitive("keycloak"))
+                          put("token", JsonPrimitive("eyJhb..."))
+                        }
+                        .toString())
               }
             }
 
@@ -427,10 +435,8 @@ fun Application.auth() {
                   call.respond(
                       mapOf(
                           "token" to it.token,
-                          "id" to
-                              it.id
-                                  .toString(), // TODO: change id to wallet-id (also in the
-                                               // frontend)
+                          "id" to it.id.toString(), // TODO: change id to wallet-id (also in the
+                          // frontend)
                           "keycloakUserId" to it.username))
                 }
                 .onFailure {
