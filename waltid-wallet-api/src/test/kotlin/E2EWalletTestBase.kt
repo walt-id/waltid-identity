@@ -110,13 +110,6 @@ abstract class E2EWalletTestBase {
 
     }
 
-    /*    protected suspend fun testExampleKey() = run {
-            println("\nUse Case -> Create Example Key")
-            val endpoint = "$walletUrl/example-key"
-            println("GET ($endpoint)")
-            assertEquals(HttpStatusCode.OK, walletClient.get(endpoint).status)
-        }*/
-
     protected suspend fun login(user: User = defaultTestUser) = run {
         println("Running login...")
         walletClient.post("$walletUrl/wallet-api/auth/login") {
