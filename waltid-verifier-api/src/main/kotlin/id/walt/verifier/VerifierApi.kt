@@ -106,6 +106,21 @@ fun Application.verfierApi() {
                         example = ""
                         required = false
                     }
+                    headerParameter<String>("statusCallbackUri") {
+                        description = "Callback to push state changes of the presentation process to"
+                        example = ""
+                        required = false
+                    }
+                    headerParameter<String>("statusCallbackApiKey") {
+                        description = ""
+                        example = ""
+                        required = false
+                    }
+                    headerParameter<String>("stateId") {
+                        description = ""
+                        example = ""
+                        required = false
+                    }
                     body<JsonObject> {
                         description =
                             "Presentation definition, describing the presentation requirement for this verification session. ID of the presentation definition is automatically assigned randomly."
@@ -127,6 +142,9 @@ fun Application.verfierApi() {
                     context.request.header("responseMode")?.let { ResponseMode.valueOf(it) } ?: ResponseMode.direct_post
                 val successRedirectUri = context.request.header("successRedirectUri")
                 val errorRedirectUri = context.request.header("errorRedirectUri")
+                val statusCallbackUri = context.request.header("statusCallbackUri")
+                val statusCallbackApiKey = context.request.header("statusCallbackApiKey")
+                val stateId = context.request.header("stateId")
 
 
                 val body = context.receive<JsonObject>()
