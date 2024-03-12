@@ -1,9 +1,6 @@
 package id.walt.oid4vc.data
 
 import id.walt.crypto.keys.Key
-import id.walt.oid4vc.definitions.JWTClaims
-import id.walt.oid4vc.interfaces.ITokenProvider
-import id.walt.oid4vc.providers.TokenTarget
 import id.walt.oid4vc.util.JwtUtils
 import io.ktor.utils.io.core.*
 import kotlinx.datetime.Clock
@@ -15,7 +12,7 @@ import kotlinx.serialization.json.*
 
 @Serializable
 data class ProofOfPossession @OptIn(ExperimentalSerializationApi::class) private constructor(
-    @EncodeDefault @SerialName("proof_type") val proofType: ProofType = ProofType.jwt,
+    @EncodeDefault @SerialName("proof_type") val proofType: ProofType,
     val jwt: String?,
     val cwt: String?,
     val ldp_vp: JsonObject?,
@@ -38,31 +35,42 @@ data class ProofOfPossession @OptIn(ExperimentalSerializationApi::class) private
             }
     }
 
+    abstract class ProofBuilder() {
+        abstract suspend fun build(key: Key): ProofOfPossession
+    }
+
+    class JWTProofBuilder(private val issuerUrl: String, private val clientId: String?,
+                          private val nonce: String?, private val keyId: String?,
+                          private val keyJwk: JsonObject? = null, private val x5c: JsonArray? = null,
+                          private val trustChain: JsonArray? = null): ProofBuilder() {
+        val headers = buildJsonObject {
+            put("typ", JWT_HEADER_TYPE)
+            keyId?.let { put("kid", it) }
+            keyJwk?.let { put("jwk", it) }
+            x5c?.let { put("x5c", it) }
+            trustChain?.let { put("trust_chain", it) }
+        }
+        val payload = buildJsonObject {
+            clientId?.let { put("iss", it) }
+            put("aud", issuerUrl)
+            put("iat", Clock.System.now().epochSeconds)
+            nonce?.let { put("nonce", nonce) }
+        }
+
+        override suspend fun build(key: Key): ProofOfPossession {
+            return ProofOfPossession(ProofType.jwt, key.signJws(payload.toString().toByteArray(), headers.mapValues { it.toString() }), null, null)
+        }
+
+        fun build(signedJwt: String): ProofOfPossession {
+            return ProofOfPossession(ProofType.jwt, signedJwt, null, null)
+        }
+
+    }
+
     companion object : JsonDataObjectFactory<ProofOfPossession>() {
         const val JWT_HEADER_TYPE = "openid4vci-proof+jwt"
         override fun fromJSON(jsonObject: JsonObject) =
             Json.decodeFromJsonElement(ProofOfPossessionSerializer, jsonObject)
-
-        suspend fun createJwtProof(key: Key,
-                                   issuerUrl: String, clientId: String?, nonce: String?, keyId: String?,
-                                   keyJwk: JsonObject? = null, x5c: JsonArray? = null,
-                                   trustChain: JsonArray? = null): ProofOfPossession {
-            return ProofOfPossession(
-                ProofType.jwt, key.signJws(
-                    plaintext = buildJsonObject {
-                        clientId?.let { put("iss", it) }
-                        put("aud", issuerUrl)
-                        put("iat", Clock.System.now().epochSeconds)
-                        nonce?.let { put("nonce", nonce) }
-                    }.toString().toByteArray(),
-                    headers = buildMap {
-                        put("typ", JWT_HEADER_TYPE)
-                        keyId?.let { put("kid", it) }
-                        keyJwk?.let { put("jwk", it.toString()) }
-                        x5c?.let { put("x5c", it.toString()) }
-                        trustChain?.let { put("trust_chain", it.toString()) }
-                    }), null, null)
-        }
     }
 }
 
