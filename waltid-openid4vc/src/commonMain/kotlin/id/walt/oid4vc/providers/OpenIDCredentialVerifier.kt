@@ -34,10 +34,11 @@ abstract class OpenIDCredentialVerifier(val config: CredentialVerifierConfig) :
         presentationDefinition: PresentationDefinition,
         responseMode: ResponseMode = ResponseMode.fragment,
         scope: Set<String> = setOf(),
-        expiresIn: Duration = 60.seconds
+        expiresIn: Duration = 60.seconds,
+        sessionId: String? = null,
     ): PresentationSession {
         val session = PresentationSession(
-            id = randomSessionId(),
+            id = sessionId ?: randomSessionId(),//TODO: is it safe, we don't control the uniqueness?
             authorizationRequest = null,
             expirationTimestamp = Clock.System.now().plus(expiresIn),
             presentationDefinition = presentationDefinition

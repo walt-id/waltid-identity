@@ -34,6 +34,13 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
         val specificPolicies: Map<String, List<PolicyRequest>>,
         val successRedirectUri: String?,
         val errorRedirectUri: String?,
+        val statusCallback: StatusCallback? = null,
+    )
+
+    data class StatusCallback(
+        val statusCallbackUri: String,
+        val statusCallbackApiKey: String? = null,
+//        val stateId: String? = null,
     )
 
     val sessionVerificationInfos = HashMap<String, SessionVerificationInformation>()
