@@ -304,51 +304,7 @@ open class E2EWalletTestLocal : E2EWalletTestBase() {
     
     @Test
     fun e2eTestMatchCredentialsForPresentationDefinition() = testApplication {
-//        var testMetadata = OpenIDProviderMetadata(
-//            authorizationEndpoint = "https://localhost/oidc",
-//            credentialsSupported = listOf(
-//                CredentialSupported(
-//                    CredentialFormat.jwt_vc_json, "jwt_vc_json_fmt", setOf("did"), setOf("ES256K"),
-//                    listOf(
-//                        DisplayProperties(
-//                            "University Credential",
-//                            "en-US",
-//                            LogoProperties(
-//                                "https://exampleuniversity.com/public/logo.png",
-//                                "a square logo of a university"
-//                            ),
-//                            backgroundColor = "#12107c", textColor = "#FFFFFF"
-//                        )
-//                    ),
-//                    types = listOf("VerifiableCredential", "UniversityDegreeCredential"),
-//                    credentialSubject = mapOf(
-//                        "name" to ClaimDescriptor(
-//                            mandatory = false,
-//                            display = listOf(DisplayProperties("Full Name")),
-//                            customParameters = mapOf(
-//                                "firstName" to ClaimDescriptor(
-//                                    valueType = "string",
-//                                    display = listOf(DisplayProperties("First Name"))
-//                                ).toJSON(),
-//                                "lastName" to ClaimDescriptor(
-//                                    valueType = "string",
-//                                    display = listOf(DisplayProperties("Last Name"))
-//                                ).toJSON()
-//                            )
-//                        )
-//                    )
-//                ),
-//                CredentialSupported(
-//                    CredentialFormat.ldp_vc, "ldp_vc_1", setOf("did"), setOf("ES256K"),
-//                    listOf(DisplayProperties("Verifiable ID")),
-//                    types = listOf("VerifiableCredential", "VerifiableId"),
-//                    context = listOf(
-//                        JsonPrimitive("https://www.w3.org/2018/credentials/v1"),
-//                        JsonObject(mapOf("@version" to JsonPrimitive(1.1)))
-//                    )
-//                )
-//            )
-//        )
+        testPresentationDefinition()
     }
     
     

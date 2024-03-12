@@ -1,3 +1,7 @@
+import id.walt.oid4vc.data.dif.DisclosureLimitation
+import id.walt.oid4vc.data.dif.PresentationDefinition
+import PresentationDefinitionFixtures.*
+import PresentationDefinitionFixtures.Companion.presentationDefinitionExample1
 import id.walt.webwallet.db.models.AccountWalletListing
 import id.walt.webwallet.db.models.WalletDid
 import id.walt.webwallet.utils.IssuanceExamples
@@ -56,6 +60,39 @@ abstract class E2EWalletTestBase {
                 ),
             )
         }
+    }
+    
+    fun testPresentationDefinition() {
+        // parse example 1
+        val pd1 = PresentationDefinition.fromJSONString(presentationDefinitionExample1)
+        println("pd1: $pd1")
+//        pd1.id shouldBe "vp token example"
+//        pd1.inputDescriptors.size shouldBe 1
+//        pd1.inputDescriptors.first().id shouldBe "id card credential"
+//        pd1.inputDescriptors.first().format!![VCFormat.ldp_vc]!!.proof_type!! shouldContainExactly setOf("Ed25519Signature2018")
+//        pd1.inputDescriptors.first().constraints!!.fields!!.first().path shouldContainExactly listOf("\$.type")
+//        // parse example 2
+//        val pd2 = PresentationDefinition.fromJSONString(presentationDefinitionExample2)
+//        println("pd2: $pd2")
+//        pd2.id shouldBe "example with selective disclosure"
+//        pd2.inputDescriptors.first().constraints!!.limitDisclosure shouldBe DisclosureLimitation.required
+//        pd2.inputDescriptors.first().constraints!!.fields!!.size shouldBe 4
+//        pd2.inputDescriptors.first().constraints!!.fields!!.flatMap { it.path } shouldContainExactly listOf(
+//            "\$.type",
+//            "\$.credentialSubject.given_name",
+//            "\$.credentialSubject.family_name",
+//            "\$.credentialSubject.birthdate"
+//        )
+//        // parse example 3
+//        val pd3 = PresentationDefinition.fromJSONString(presentationDefinitionExample3)
+//        println("pd3: $pd3")
+//        pd3.id shouldBe "alternative credentials"
+//        pd3.submissionRequirements shouldNotBe null
+//        pd3.submissionRequirements!!.size shouldBe 1
+//        pd3.submissionRequirements!!.first().name shouldBe "Citizenship Information"
+//        pd3.submissionRequirements!!.first().rule shouldBe SubmissionRequirementRule.pick
+//        pd3.submissionRequirements!!.first().count shouldBe 1
+//        pd3.submissionRequirements!!.first().from shouldBe "A"
     }
     
     protected suspend fun requestCredential(issuanceUri: String, did: String): JsonObject {
