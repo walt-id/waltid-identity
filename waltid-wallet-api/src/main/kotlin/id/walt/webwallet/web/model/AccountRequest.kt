@@ -38,7 +38,7 @@ data class KeycloakAccountRequest(
     override val name: String? = null,
     val email: String? = null,
     val username: String,
-    val password: String,
+    val password: String? = null,
     val token: String? = null
 ) : AccountRequest()
 

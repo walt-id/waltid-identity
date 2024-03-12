@@ -20,6 +20,8 @@ import io.ktor.client.plugins.logging.*
 import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
+import java.security.interfaces.ECPublicKey
+import java.security.interfaces.RSAPublicKey
 import kotlinx.datetime.Clock
 import kotlinx.datetime.toJavaInstant
 import kotlinx.serialization.json.Json
@@ -29,80 +31,93 @@ import kotlinx.uuid.UUID
 import kotlinx.uuid.generateUUID
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.transactions.transaction
-import java.security.interfaces.ECPublicKey
-import java.security.interfaces.RSAPublicKey
 
 object KeycloakAccountStrategy : AccountStrategy<KeycloakAccountRequest>("keycloak") {
-    val http = HttpClient {
-        install(ContentNegotiation) { json() }
-        defaultRequest { header(HttpHeaders.ContentType, ContentType.Application.Json) }
+  val http = HttpClient {
+    install(ContentNegotiation) { json() }
+    defaultRequest { header(HttpHeaders.ContentType, ContentType.Application.Json) }
 
-        install(Logging) {
-            logger = Logger.DEFAULT
-            level = LogLevel.ALL
+    install(Logging) {
+      logger = Logger.DEFAULT
+      level = LogLevel.ALL
+    }
+  }
+
+  val config = ConfigManager.getConfig<OidcConfiguration>()
+
+  override suspend fun register(
+      tenant: String,
+      request: KeycloakAccountRequest
+  ): Result<RegistrationResult> {
+
+    val user =
+        mapOf(
+                "username" to request.username,
+                "email" to request.email,
+                "enabled" to true,
+                when (request.password) {
+                  null -> "credentials" to null
+                  else ->
+                      "credentials" to
+                          listOf(mapOf("type" to "password", "value" to request.password))
+                })
+            .toJsonObject()
+
+    val res =
+        http.post(config.keycloakUserApi) {
+          contentType(ContentType.Application.Json)
+          headers {
+            append("Content-Type", "application/json")
+            append("Authorization", "Bearer ${request.token}")
+          }
+          setBody(user)
         }
+
+    if (res.status != HttpStatusCode.Created) {
+      throw RuntimeException(
+          "Keycloak returned error code: ${res.status} [${res.status.description}]")
     }
 
-    val config = ConfigManager.getConfig<OidcConfiguration>()
+    val oidcAccountId =
+        res.headers["Location"]?.split("/")?.last()
+            ?: throw RuntimeException(
+                "Missing header-parameter 'Location' when creating user ${request.username} at the Keycloak user API ${config.keycloakUserApi}")
 
-    override suspend fun register(
-        tenant: String, request: KeycloakAccountRequest
-    ): Result<RegistrationResult> {
-
-        val user = mapOf(
-            "username" to request.username,
-            "email" to request.email,
-            "enabled" to true,
-            "credentials" to listOf(mapOf("type" to "password", "value" to request.password))
-        ).toJsonObject()
-
-        val res = http.post(config.keycloakUserApi) {
-            contentType(ContentType.Application.Json)
-            headers {
-                append("Content-Type", "application/json")
-                append("Authorization", "Bearer ${request.token}")
-            }
-            setBody(user)
-        }
-
-        if (res.status != HttpStatusCode.Created) {
-            throw RuntimeException("Keycloak returned error code: ${res.status} [${res.status.description}]")
-        }
-
-        val oidcAccountId = res.headers["Location"]?.split("/")?.last()
-            ?: throw RuntimeException("Missing header-parameter 'Location' when creating user ${request.username} at the Keycloak user API ${config.keycloakUserApi}")
-
-        val createdAccountId = transaction {
-            val accountId = Accounts.insert {
+    val createdAccountId = transaction {
+      val accountId =
+          Accounts.insert {
                 it[Accounts.tenant] = tenant
                 it[id] = UUID.generateUUID()
                 it[name] = request.username
                 it[email] = request.email
                 it[createdOn] = Clock.System.now().toJavaInstant()
-            }[Accounts.id]
+              }[Accounts.id]
 
-            OidcLogins.insert {
-                it[OidcLogins.tenant] = tenant
-                it[OidcLogins.accountId] = accountId
-                it[oidcId] = oidcAccountId
-            }
+      OidcLogins.insert {
+        it[OidcLogins.tenant] = tenant
+        it[OidcLogins.accountId] = accountId
+        it[oidcId] = oidcAccountId
+      }
 
-            accountId
-        }
-
-        return Result.success(RegistrationResult(createdAccountId))
+      accountId
     }
 
-    private fun verifiedToken(token: String): DecodedJWT {
-        val decoded = JWT.decode(token)
+    return Result.success(RegistrationResult(createdAccountId))
+  }
 
-        val verifier = JWT.require(OidcLoginService.jwkProvider.get(decoded.keyId).makeAlgorithm())
-            .withIssuer(OidcLoginService.oidcRealm).build()
+  private fun verifiedToken(token: String): DecodedJWT {
+    val decoded = JWT.decode(token)
 
-        return verifier.verify(decoded)!!
-    }
+    val verifier =
+        JWT.require(OidcLoginService.jwkProvider.get(decoded.keyId).makeAlgorithm())
+            .withIssuer(OidcLoginService.oidcRealm)
+            .build()
 
-    internal fun Jwk.makeAlgorithm(): Algorithm = when (algorithm) {
+    return verifier.verify(decoded)!!
+  }
+
+  internal fun Jwk.makeAlgorithm(): Algorithm =
+      when (algorithm) {
         "RS256" -> Algorithm.RSA256(publicKey as RSAPublicKey, null)
         "RS384" -> Algorithm.RSA384(publicKey as RSAPublicKey, null)
         "RS512" -> Algorithm.RSA512(publicKey as RSAPublicKey, null)
@@ -111,78 +126,124 @@ object KeycloakAccountStrategy : AccountStrategy<KeycloakAccountRequest>("keyclo
         "ES512" -> Algorithm.ECDSA512(publicKey as ECPublicKey, null)
         null -> Algorithm.RSA256(publicKey as RSAPublicKey, null)
         else -> throw IllegalArgumentException("Unsupported algorithm $algorithm")
-    }
+      }
 
-    override suspend fun authenticate(
-        tenant: String, request: KeycloakAccountRequest
-    ): AuthenticatedUser {
+  override suspend fun authenticate(
+      tenant: String,
+      request: KeycloakAccountRequest
+  ): AuthenticatedUser {
 
-        val token = getUserToken(request)
-
-        val jwt = verifiedToken(token)
-
-        val registeredUserId = if (AccountsService.hasAccountOidcId(jwt.subject)) {
-            AccountsService.getAccountByOidcId(jwt.subject)!!.id
+    val token =
+        if (request.password == null) {
+          getTokenExchange(request)
         } else {
-            AccountsService.register(tenant, request).getOrThrow().id
-        }
-        return AuthenticatedUser(registeredUserId, jwt.subject)
-    }
-
-    suspend fun getAccessToken(): String {
-        return getToken("client_credentials")
-    }
-
-    private suspend fun getUserToken(request: KeycloakAccountRequest): String {
-        return getToken("password", request.username, request.password)
-    }
-
-    suspend fun getToken(
-        grantType: String, username: String? = null, password: String? = null
-    ): String {
-        val requestParams = mutableMapOf(
-            "client_id" to config.clientId, "client_secret" to config.clientSecret, "grant_type" to grantType
-        )
-
-        if (grantType == "password") {
-            require(username != null && password != null) {
-                "Username and password are required for password grant type"
-            }
-            requestParams["username"] = username
-            requestParams["password"] = password
+          getUserToken(request)
         }
 
-        val requestBody = requestParams.map { (k, v) -> "$k=$v" }.joinToString("&")
-        val res = http.post(config.accessTokenUrl) {
-            headers { append("Content-Type", "application/x-www-form-urlencoded") }
-            setBody(requestBody)
+    // val token = getUserToken(request)
+
+    val jwt = verifiedToken(token)
+
+    println("JWT: ${jwt.subject}")
+
+    val registeredUserId =
+        if (AccountsService.hasAccountOidcId(jwt.subject)) {
+          AccountsService.getAccountByOidcId(jwt.subject)!!.id
+        } else {
+          AccountsService.register(tenant, request).getOrThrow().id
+        }
+    return AuthenticatedUser(registeredUserId, jwt.subject)
+  }
+
+  suspend fun getAccessToken(): String {
+    return getToken("client_credentials")
+  }
+
+  private suspend fun getUserToken(request: KeycloakAccountRequest): String {
+    return getToken("password", request.username, request.password)
+  }
+
+  private suspend fun getTokenExchange(request: KeycloakAccountRequest): String {
+    val requestParams =
+        mapOf(
+            "client_id" to config.clientId,
+            "client_secret" to config.clientSecret,
+            "grant_type" to "urn:ietf:params:oauth:grant-type:token-exchange",
+            "subject_token" to request.token,
+            "subject_token_type" to "urn:ietf:params:oauth:token-type:access_token",
+            "requested_subject" to request.username)
+
+    val requestBody = requestParams.map { (k, v) -> "$k=$v" }.joinToString("&")
+    val res =
+        http.post(config.accessTokenUrl) {
+          headers { append("Content-Type", "application/x-www-form-urlencoded") }
+          setBody(requestBody)
         }
 
-        if (res.status != HttpStatusCode.OK) {
-            throw RuntimeException("Keycloak returned error code: ${res.status} [${res.status.description}]")
-        }
-
-        val resBody = Json.parseToJsonElement(res.body())
-
-        return resBody.jsonObject["access_token"]?.jsonPrimitive?.content
-            ?: throw RuntimeException("Keycloak has not returned the required access_token ")
+    if (res.status != HttpStatusCode.OK) {
+      throw RuntimeException(
+          "Keycloak returned error code: ${res.status} [${res.status.description}]")
     }
 
-    suspend fun logout(request: KeycloakLogoutRequest): String {
+    val resBody = Json.parseToJsonElement(res.body())
 
-        val requestParams = mapOf("id" to request.keycloakUserId).toJsonObject()
+    return resBody.jsonObject["access_token"]?.jsonPrimitive?.content
+        ?: throw RuntimeException("Keycloak has not returned the required access_token ")
+  }
 
-        val requestBody = requestParams.map { (k, v) -> "$k=$v" }.joinToString("&")
+  suspend fun getToken(
+      grantType: String,
+      username: String? = null,
+      password: String? = null
+  ): String {
+    val requestParams =
+        mutableMapOf(
+            "client_id" to config.clientId,
+            "client_secret" to config.clientSecret,
+            "grant_type" to grantType)
 
-        val res = http.post(config.keycloakUserApi + "/" + request.keycloakUserId + "/logout") {
-            contentType(ContentType.Application.Json)
-            headers {
-                append("Content-Type", "application/json")
-                append("Authorization", "Bearer ${request.token}")
-            }
-            setBody(requestBody)
+    if (grantType == "password") {
+      require(username != null && password != null) {
+        "Username and password are required for password grant type"
+      }
+      requestParams["username"] = username
+      requestParams["password"] = password
+    }
+
+    val requestBody = requestParams.map { (k, v) -> "$k=$v" }.joinToString("&")
+    val res =
+        http.post(config.accessTokenUrl) {
+          headers { append("Content-Type", "application/x-www-form-urlencoded") }
+          setBody(requestBody)
         }
 
-        return res.status.toString()
+    if (res.status != HttpStatusCode.OK) {
+      throw RuntimeException(
+          "Keycloak returned error code: ${res.status} [${res.status.description}]")
     }
+
+    val resBody = Json.parseToJsonElement(res.body())
+
+    return resBody.jsonObject["access_token"]?.jsonPrimitive?.content
+        ?: throw RuntimeException("Keycloak has not returned the required access_token ")
+  }
+
+  suspend fun logout(request: KeycloakLogoutRequest): String {
+
+    val requestParams = mapOf("id" to request.keycloakUserId).toJsonObject()
+
+    val requestBody = requestParams.map { (k, v) -> "$k=$v" }.joinToString("&")
+
+    val res =
+        http.post(config.keycloakUserApi + "/" + request.keycloakUserId + "/logout") {
+          contentType(ContentType.Application.Json)
+          headers {
+            append("Content-Type", "application/json")
+            append("Authorization", "Bearer ${request.token}")
+          }
+          setBody(requestBody)
+        }
+
+    return res.status.toString()
+  }
 }
