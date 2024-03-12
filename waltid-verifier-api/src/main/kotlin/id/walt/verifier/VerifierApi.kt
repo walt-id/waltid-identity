@@ -173,8 +173,9 @@ fun Application.verfierApi() {
                     ?: PresentationDefinition.primitiveGenerationFromVcTypes(requestedTypes)
                 println("Presentation definition: " + presentationDefinition.toJSON())
 
-                val session =
-                    OIDCVerifierService.initializeAuthorization(presentationDefinition, responseMode = responseMode)
+                val session = OIDCVerifierService.initializeAuthorization(
+                    presentationDefinition, responseMode = responseMode, sessionId = stateId
+                )
 
                 val specificPolicies = requestCredentialsArr
                     .filterIsInstance<JsonObject>()
@@ -196,7 +197,14 @@ fun Application.verfierApi() {
                         vcPolicies = vcPolicies,
                         specificPolicies = specificPolicies,
                         successRedirectUri = successRedirectUri,
-                        errorRedirectUri = errorRedirectUri
+                        errorRedirectUri = errorRedirectUri,
+                        statusCallback = statusCallbackUri?.let {
+                            OIDCVerifierService.StatusCallback(
+                                statusCallbackUri = it,
+                                statusCallbackApiKey = statusCallbackApiKey,
+//                                stateId = stateId
+                            )
+                        }
                     )
 
                 context.respond(authorizeBaseUrl.plus("?").plus(session.authorizationRequest!!.toHttpQueryString()))
