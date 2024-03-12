@@ -358,16 +358,66 @@ object IssuanceExamples {
     //language=JSON
     val issuerOnboardingResponseDefaultExample = """
         {
-          "issuanceKey": "{\"type\":\"local\",\"jwk\":\"{\\\"kty\\\":\\\"EC\\\",\\\"d\\\":\\\"nBuOdeBDAiiiVtnfJGqoh6OLpICXfenS0xVcxsaTD7g\\\",\\\"crv\\\":\\\"P-256\\\",\\\"kid\\\":\\\"vagXR7ehhLlJ2iQaaD0sR1BdvkPyx_Zy2e_qCvsD-0w\\\",\\\"x\\\":\\\"L461HF6vdrLW38h87eFxAti0hGiPYz0F0hi2poze9TM\\\",\\\"y\\\":\\\"d6MpdM3xoyDbx8FNkBtFzKXgPGgG6sLji0Ne9wGfwqQ\\\"}\"}",
-          "issuerDid": "did:jwk:eyJrdHkiOiJFQyIsImNydiI6IlAtMjU2Iiwia2lkIjoidmFnWFI3ZWhoTGxKMmlRYWFEMHNSMUJkdmtQeXhfWnkyZV9xQ3ZzRC0wdyIsIngiOiJMNDYxSEY2dmRyTFczOGg4N2VGeEF0aTBoR2lQWXowRjBoaTJwb3plOVRNIiwieSI6ImQ2TXBkTTN4b3lEYng4Rk5rQnRGektYZ1BHZ0c2c0xqaTBOZTl3R2Z3cVEifQ"
+          "issuanceKey": {
+            "type": "local",
+            "jwk": {
+              "kty": "EC",
+              "d": "sMjI1SVu4vKHLr3JwgUMu10Ihn5OL0sCaqjfZP8xpUU",
+              "crv": "P-256",
+              "kid": "Si07jIXqLsMKHy0vgyvPbcIvIPxdqL7Qs6STqrx1UC8",
+              "x": "q-LZDK-TZQSUczy_1K6TBFeVn60rMv4KjYvTePy2TGs",
+              "y": "qTbiSREfWRZtAKZsW-k-0BHIIYpAN0fhnjaqeMIU5OY"
+            }
+          },
+          "issuerDid": "did:jwk:eyJrdHkiOiJFQyIsImNydiI6IlAtMjU2Iiwia2lkIjoiU2kwN2pJWHFMc01LSHkwdmd5dlBiY0l2SVB4ZHFMN1FzNlNUcXJ4MVVDOCIsIngiOiJxLUxaREstVFpRU1VjenlfMUs2VEJGZVZuNjByTXY0S2pZdlRlUHkyVEdzIiwieSI6InFUYmlTUkVmV1JadEFLWnNXLWstMEJISUlZcEFOMGZobmphcWVNSVU1T1kifQ"
         }
     """.trimIndent()
 
     //language=JSON
     val issuerOnboardingResponseTseExample = """
-        {
-          "issuanceKey": "{\"type\":\"tse\",\"server\":\"http://127.0.0.1:8200/v1/transit\",\"accessKey\":\"dev-only-token\",\"id\":\"k-615009916\",\"_publicKey\":[-20,2,-66,11,25,16,-119,113,-94,-22,-88,-98,-62,29,98,120,115,40,71,63,93,-57,107,33,127,91,-88,44,66,-73,-41,82],\"_keyType\":\"Ed25519\"}",
-          "issuerDid": "did:key:z6MkvLYgq2DVZ68arPvGwDHHoVGHEc3CkGKmdhgEvUSpRwEy"
-        }
+    {
+      "issuanceKey": {
+        "type": "tse",
+        "server": "http://127.0.0.1:8200/v1/transit",
+        "accessKey": "dev-only-token",
+        "id": "k208278175",
+        "_publicKey": [
+          -88,
+          -85,
+          -16,
+          118,
+          -63,
+          124,
+          73,
+          86,
+          16,
+          70,
+          -76,
+          -92,
+          3,
+          60,
+          98,
+          -111,
+          89,
+          19,
+          83,
+          80,
+          -10,
+          94,
+          -26,
+          -116,
+          69,
+          26,
+          -33,
+          -50,
+          49,
+          -55,
+          -117,
+          22
+        ],
+        "_keyType": "Ed25519"
+      },
+      "issuerDid": "did:key:z6MkqogbukAXnhvY9dAtXw7ABpe9meJJRCYHwyrNA2q74o17"
+    }
     """.trimIndent()
 }

@@ -1,9 +1,7 @@
 package id.walt.crypto.keys
 
 import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.decodeFromJsonElement
+import kotlinx.serialization.json.*
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.polymorphic
 import kotlinx.serialization.modules.subclass
@@ -31,6 +29,7 @@ object KeySerialization {
     }
 
     fun serializeKey(key: Key): String = keySerializationJson.encodeToString(key)
+    fun serializeKeyToJson(key: Key): JsonElement = keySerializationJson.encodeToJsonElement(key)
     @JvmBlocking
     @JvmAsync
     @JsPromise

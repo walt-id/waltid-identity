@@ -186,8 +186,6 @@ class TSEKey(
             KeyType.secp256k1 -> throw IllegalArgumentException("Type not supported for TSE: $keyType")
         }
 
-        println(localPublicKey)
-
         check(detachedPlaintext != null) { "An detached plaintext is needed." }
 
         val valid = http.post("$server/verify/${id}") {

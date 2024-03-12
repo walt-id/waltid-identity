@@ -25,10 +25,7 @@ import io.ktor.server.plugins.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.*
 import kotlin.time.Duration.Companion.minutes
 
 private val logger = KotlinLogging.logger {}
@@ -99,51 +96,28 @@ fun Application.issuerApi() {
 
                 // Generate key
 
-                val keyType =
-                    getParamOrThrow(
-                        req.issuanceKeyConfig["type"],
-                        "Mandatory issuanceKeyConfig param 'type' not provided"
-                    )
+                val keyType = getParamOrThrow(
+                    req.issuanceKeyConfig["type"], "Mandatory issuanceKeyConfig param 'type' not provided"
+                )
                 val keyAlgorithm = getParamOrThrow(
-                    req.issuanceKeyConfig["algorithm"],
-                    "Mandatory issuanceKeyConfig param 'algorithm' not provided"
+                    req.issuanceKeyConfig["algorithm"], "Mandatory issuanceKeyConfig param 'algorithm' not provided"
                 ).let { KeyType.valueOf(it) }
 
-                val key = when (keyType) {
-                    "local" -> LocalKey.generate(keyAlgorithm)
-                    "tse" -> TSEKey.generate(
-                        keyAlgorithm,
-                        TSEKeyMetadata(
-                            getParamOrThrow(
-                                req.issuanceKeyConfig["tseServer"],
-                                "Mandatory issuanceKeyConfig param 'tseServer' not provided"
-                            ),
-                            getParamOrThrow(
-                                req.issuanceKeyConfig["tseAccessToken"],
-                                "Mandatory issuanceKeyConfig param 'tseAccessToken' not provided"
-                            )
-                        )
-                    )
-
-                    else -> {
-                        LocalKey.generate(KeyType.Ed25519)
-                    }
-                }
+                val (key, jsonKey) = generateJsonKey(keyType, keyAlgorithm, req)
 
                 logger.debug { "Key created: $key" }
 
                 // Generate DID
 
                 val didMethod = getParamOrThrow(
-                    req.issuerDidConfig["method"],
-                    "Mandatory issuerDidConfig param 'method' not provided"
+                    req.issuerDidConfig["method"], "Mandatory issuerDidConfig param 'method' not provided"
                 )
                 val did = DidService.registerByKey(didMethod, key).did
 
                 logger.debug { "DID created: $did" }
 
                 context.respond(
-                    HttpStatusCode.OK, IssuerOnboardingResponse(KeySerialization.serializeKey(key), did)
+                    HttpStatusCode.OK, IssuerOnboardingResponse(jsonKey, did)
                 )
             }
         }
@@ -367,6 +341,44 @@ fun Application.issuerApi() {
             }
         }
     }
+}
+
+private suspend fun generateJsonKey(
+    keyType: String, keyAlgorithm: KeyType, req: IssuerOnboardingRequest
+): Pair<Key, JsonElement> {
+    val key = when (keyType) {
+        "local" -> LocalKey.generate(keyAlgorithm)
+        "tse" -> TSEKey.generate(
+            keyAlgorithm, TSEKeyMetadata(
+                getParamOrThrow(
+                    req.issuanceKeyConfig["tseServer"], "Mandatory issuanceKeyConfig param 'tseServer' not provided"
+                ), getParamOrThrow(
+                    req.issuanceKeyConfig["tseAccessToken"],
+                    "Mandatory issuanceKeyConfig param 'tseAccessToken' not provided"
+                )
+            )
+        )
+
+        else -> {
+            LocalKey.generate(KeyType.Ed25519)
+        }
+    }
+
+    // TODO: serialize TSE key the same way as the local key
+    val jsonKey = if (keyType == "tse") {
+        KeySerialization.serializeKeyToJson(key)
+    } else {
+        // TODO: serialized the internal jwk to avoid this construct
+        val jsonKey = """
+                        {
+                            "type" : "${keyType}",
+                            "jwk" : ${key.exportJWKObject()}
+                        }
+                    """.trimIndent()
+        Json.parseToJsonElement(jsonKey)
+    }
+
+    return key to jsonKey
 }
 
 private fun getParamOrThrow(element: JsonElement?, errorMessage: String) =

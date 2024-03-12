@@ -3,12 +3,12 @@ package id.walt.issuer
 import id.walt.credentials.vc.vcs.W3CVC
 import id.walt.sdjwt.SDMap
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 
 sealed class BaseIssuanceRequest {
     abstract val issuanceKey: JsonObject
     abstract val issuerDid: String
-
     abstract val vc: W3CVC
     abstract val mapping: JsonObject?
 }
@@ -32,11 +32,10 @@ data class SdJwtIssuanceRequest(
 
 @Serializable
 data class IssuerOnboardingRequest(
-    val issuanceKeyConfig: JsonObject,
-    val issuerDidConfig: JsonObject
+    val issuanceKeyConfig: JsonObject, val issuerDidConfig: JsonObject
 )
 
 @Serializable
 data class IssuerOnboardingResponse(
-    val issuanceKey: String, val issuerDid: String
+    val issuanceKey: JsonElement, val issuerDid: String
 )
