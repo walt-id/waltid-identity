@@ -116,7 +116,7 @@ object KeycloakAccountStrategy : AccountStrategy<KeycloakAccountRequest>("keyclo
     return verifier.verify(decoded)!!
   }
 
-  internal fun Jwk.makeAlgorithm(): Algorithm =
+  private fun Jwk.makeAlgorithm(): Algorithm =
       when (algorithm) {
         "RS256" -> Algorithm.RSA256(publicKey as RSAPublicKey, null)
         "RS384" -> Algorithm.RSA384(publicKey as RSAPublicKey, null)
@@ -199,7 +199,7 @@ object KeycloakAccountStrategy : AccountStrategy<KeycloakAccountRequest>("keyclo
         ?: throw RuntimeException("Keycloak has not returned the required access_token ")
   }
 
-  suspend fun getToken(
+  private suspend fun getToken(
       grantType: String,
       username: String? = null,
       password: String? = null
