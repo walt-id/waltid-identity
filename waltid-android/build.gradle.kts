@@ -52,7 +52,6 @@ dependencies {
     api(project(":waltid-did"))
     api(project(":waltid-verifiable-credentials"))
     api(project(":waltid-sdjwt"))
-    api(project(":waltid-mdoc-credentials"))
 
     implementation("com.nimbusds:nimbus-jose-jwt:9.37.3")
 
