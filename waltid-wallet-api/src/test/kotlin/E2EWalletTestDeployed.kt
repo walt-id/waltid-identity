@@ -5,9 +5,11 @@ import io.ktor.client.plugins.logging.*
 import io.ktor.client.request.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.test.runTest
+import kotlin.test.Ignore
 import kotlin.test.Test
 import kotlin.time.Duration.Companion.seconds
 
+@Ignore // Enable if you want to run tests against a deployed system
 class E2EWalletTestDeployed : E2EWalletTestBase() {
     private lateinit var deployedClient: HttpClient
     private var deployedWalletUrl: String = "https://wallet.walt.id"
@@ -79,7 +81,7 @@ class E2EWalletTestDeployed : E2EWalletTestBase() {
     }
 
 
-    @Test
+    //@Test
     fun e2eIssuerOnboarding() = runTest {
         deployedClient = newClient()
         login()
