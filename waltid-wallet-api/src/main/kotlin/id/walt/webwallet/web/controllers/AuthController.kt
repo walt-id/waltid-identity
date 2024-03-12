@@ -255,10 +255,7 @@ fun Application.auth() {
                               it.username // TODO: change id to wallet-id (also in the frontend)
                           ))
                 }
-                .onFailure {
-                  it.printStackTrace()
-                  call.respond(HttpStatusCode.BadRequest, it.localizedMessage)
-                }
+                .onFailure { call.respond(HttpStatusCode.BadRequest, it.localizedMessage) }
           }
 
       post(
@@ -439,10 +436,7 @@ fun Application.auth() {
                           // frontend)
                           "keycloakUserId" to it.username))
                 }
-                .onFailure {
-                  it.printStackTrace()
-                  call.respond(HttpStatusCode.BadRequest, it.localizedMessage)
-                }
+                .onFailure { call.respond(HttpStatusCode.BadRequest, it.localizedMessage) }
           }
 
       // Terminate Keycloak session
