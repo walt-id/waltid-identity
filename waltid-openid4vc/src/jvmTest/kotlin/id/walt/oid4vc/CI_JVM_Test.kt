@@ -37,7 +37,6 @@ import io.kotest.matchers.shouldNot
 import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.string.beEmpty
 import io.kotest.matchers.string.shouldStartWith
-import io.kotest.matchers.types.instanceOf
 import io.kotest.matchers.types.shouldBeInstanceOf
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -551,7 +550,7 @@ class CI_JVM_Test : AnnotationSpec() {
         val holderKeyId = runBlocking { holderKey.getKeyId() }
         val proofKeyId = "$holderDid#$holderKeyId"
         val proofOfPossession = runBlocking {
-            ProofOfPossession.createJwtProof(holderKey, ciTestProvider.baseUrl, null, nonce, proofKeyId)
+            ProofOfPossession.JWTProofBuilder(ciTestProvider.baseUrl, null, nonce, proofKeyId).build(holderKey)
         }
 
         val credReq = CredentialRequest.forOfferedCredential(offeredCredential, proofOfPossession)
