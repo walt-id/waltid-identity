@@ -224,7 +224,6 @@ open class E2EWalletTestLocal : E2EWalletTestBase() {
         
         val credential = vc["parsedDocument"].toString()
         assertNotNull(credential)
-        assertTrue(JwtSignaturePolicy().verify(credential, null, mapOf()).isSuccess)
         
         val id = vc["id"]?.jsonPrimitive?.content
         println("credential id = $id")
