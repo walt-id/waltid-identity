@@ -14,13 +14,13 @@ private val log = KotlinLogging.logger { }
 
 suspend fun main(args: Array<String>) {
     log.debug { "issuer CLI starting ..." }
-    
+
     log.debug { "Init walt services..." }
     WaltidServices.init()
-    
+
     log.info { "Reading configurations..." }
     ConfigManager.loadConfigs(args)
-    
+
     val webConfig = ConfigManager.getConfig<WebConfig>()
     log.info { "Starting web server (binding to ${webConfig.webHost}, listening on port ${webConfig.webPort})..." }
     embeddedServer(

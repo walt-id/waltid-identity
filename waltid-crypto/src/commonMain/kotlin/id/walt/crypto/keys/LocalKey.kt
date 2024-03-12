@@ -5,6 +5,7 @@ import kotlinx.serialization.json.JsonObject
 expect class LocalKey(jwk: String?) : Key {
 
     override suspend fun getKeyId(): String
+
     override suspend fun getThumbprint(): String
 
     override suspend fun exportJWK(): String
