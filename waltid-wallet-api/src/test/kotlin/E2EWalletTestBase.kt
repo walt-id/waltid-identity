@@ -14,7 +14,10 @@ import io.ktor.http.*
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import kotlinx.uuid.UUID
-import kotlin.test.*
+import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 abstract class E2EWalletTestBase {
     private val didMethodsToTest = listOf("key", "jwk", "web")
@@ -85,7 +88,6 @@ abstract class E2EWalletTestBase {
         return issuanceUri
     }
 
-    @Ignore
     protected suspend fun onboardIssuer() = run {
 
         val endpoint = "$issuerUrl/onboard/issuer"
