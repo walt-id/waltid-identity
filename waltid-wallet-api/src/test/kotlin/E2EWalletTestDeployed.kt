@@ -13,6 +13,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.*
 import kotlin.time.Duration.Companion.seconds
+import PresentationDefinitionFixtures.Companion.presentationDefinitionExample1
 
 class E2EWalletTestDeployed : E2EWalletTestBase() {
     private lateinit var deployedClient: HttpClient
@@ -152,7 +153,7 @@ class E2EWalletTestDeployed : E2EWalletTestBase() {
     
     // Verifier Tests
     @Test
-    fun e2eTestPolicyList() = testApplication {
+    fun e2eTestPolicyList() = runTest {
         deployedClient = newClient()
         val list: JsonObject = testPolicyList()
         
@@ -163,7 +164,7 @@ class E2EWalletTestDeployed : E2EWalletTestBase() {
     }
     
     @Test
-    fun e2eTestVerify() = testApplication {
+    fun e2eTestVerify() = runTest {
         deployedClient = newClient()
         
         var url = testVerifyCredential(VerifierApiExamples.minimal)
@@ -192,7 +193,7 @@ class E2EWalletTestDeployed : E2EWalletTestBase() {
     }
     
     @Test
-    fun e2eTestPresentationSession() = testApplication {
+    fun e2eTestPresentationSession() = runTest {
         deployedClient = newClient()
         val url = testVerifyCredential(VerifierApiExamples.minimal)
         val startStr = "state="
@@ -209,7 +210,7 @@ class E2EWalletTestDeployed : E2EWalletTestBase() {
     }
     
     @Test
-    fun e2eTestPresentationRequest() = testApplication {
+    fun e2eTestPresentationRequest() = runTest {
         deployedClient = newClient()
         getUserToken()
         deployedClient = newClient(token)
@@ -221,6 +222,19 @@ class E2EWalletTestDeployed : E2EWalletTestBase() {
         
         val parsedRequest = testResolvePresentationRequest(url)
         println("Parsed Request = $parsedRequest")
+    }
+    
+    @Test
+    fun e2eTestMatchCredentialsForPresentationDefinition() = runTest {
+        deployedClient = newClient()
+        getUserToken()
+        deployedClient = newClient(token)
+        
+        listAllWallets() // sets the wall
+        
+        val response: JsonArray = listCredentials()
+        println("QUACK >>>>>>>>>>>> Number of credentials in wallet = ${response.size}")
+        testPresentationDefinition(presentationDefinitionExample1)
     }
     override var walletClient: HttpClient
         get() = deployedClient

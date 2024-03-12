@@ -1,3 +1,5 @@
+import PresentationDefinitionFixtures.Companion.presentationDefinitionExample1
+import PresentationDefinitionFixtures.Companion.presentationDefinitionExample2
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
 import id.walt.credentials.verification.policies.JwtSignaturePolicy
@@ -32,15 +34,12 @@ import java.nio.file.Files
 import java.nio.file.Paths
 import kotlin.io.path.Path
 import kotlin.io.path.absolutePathString
-import kotlin.test.Test
-import kotlin.test.assertNotEquals
-import kotlin.test.assertTrue
+import kotlin.test.*
 import kotlin.time.Duration.Companion.seconds
 import id.walt.issuer.base.config.ConfigManager as IssuerConfigManager
 import id.walt.webwallet.config.ConfigManager as WalletConfigManager
 import id.walt.webwallet.config.WebConfig as WalletWebConfig
 import id.walt.verifier.base.config.ConfigManager as VerifierConfigManager
-import kotlin.test.assertNotNull
 
 open class E2EWalletTestLocal : E2EWalletTestBase() {
     
@@ -224,6 +223,7 @@ open class E2EWalletTestLocal : E2EWalletTestBase() {
         
         val credential = vc["parsedDocument"].toString()
         assertNotNull(credential)
+        println("Issued Credential: $credential")
         
         val id = vc["id"]?.jsonPrimitive?.content
         println("credential id = $id")
@@ -284,6 +284,8 @@ open class E2EWalletTestLocal : E2EWalletTestBase() {
         val state = url.substring(start, end)
         println("session id (state) = $state")
         testSession(state)
+        
+        // TODO use this Url to present credentials (filtered according to presentation definition)
     }
     
     @Test
@@ -303,7 +305,16 @@ open class E2EWalletTestLocal : E2EWalletTestBase() {
     
     @Test
     fun e2eTestMatchCredentialsForPresentationDefinition() = testApplication {
-        testPresentationDefinition()
+        runApplication()
+        getUserToken()
+        localWalletClient = newClient(token)
+        listAllWallets() // sets the walletId
+        
+        var numberMatchedCredentials = testPresentationDefinition(presentationDefinitionExample1)
+        assertEquals(1, numberMatchedCredentials)
+        
+        numberMatchedCredentials = testPresentationDefinition(presentationDefinitionExample2)
+        assertEquals(0, numberMatchedCredentials)
     }
     
     

@@ -146,7 +146,7 @@ class SSIKit2WalletService(
 
     override fun matchCredentialsByPresentationDefinition(presentationDefinition: PresentationDefinition): List<WalletCredential> {
         val credentialList = listCredentials(CredentialFilterObject.default)
-
+        
         logger.debug("WalletCredential list is: {}", credentialList.map { it.parsedDocument?.get("type")!!.jsonArray })
 
         data class TypeFilter(val path: String, val type: String? = null, val pattern: String)

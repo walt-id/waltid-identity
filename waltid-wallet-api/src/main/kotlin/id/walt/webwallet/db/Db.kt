@@ -90,7 +90,7 @@ object Db {
                     WalletCredential(
                         wallet = walletId,
                         id = "urn:uuid:" + UUID.generateUUID(Random),
-                        document = IssuanceExamples.universityDegreeCredential,
+                        document = IssuanceExamples.openBadgeCredentialExampleJsonString,
                         disclosures = null,
                         addedOn = Clock.System.now(),
                         manifest = null,
