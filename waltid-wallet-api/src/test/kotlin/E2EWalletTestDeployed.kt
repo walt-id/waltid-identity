@@ -5,7 +5,7 @@ import io.ktor.client.plugins.logging.*
 import io.ktor.client.request.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.test.runTest
-import kotlin.test.*
+import kotlin.test.Test
 import kotlin.time.Duration.Companion.seconds
 
 class E2EWalletTestDeployed : E2EWalletTestBase() {
@@ -76,8 +76,16 @@ class E2EWalletTestDeployed : E2EWalletTestBase() {
         listAllWalletsForUser()
         
         testKeys()
-        
-        testExampleKey()
+    }
+
+    @Test
+    fun e2eIssuerOnboarding() = runTest {
+        deployedClient = newClient()
+        login()
+        getTokenFor()
+        deployedClient = newClient(token)
+
+        onboardIssuer()
     }
     
     @Test
