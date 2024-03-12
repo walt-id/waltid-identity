@@ -1,6 +1,7 @@
 package id.walt.oid4vc.data
 
 import id.walt.crypto.keys.Key
+import id.walt.mdoc.dataelement.*
 import id.walt.oid4vc.util.JwtUtils
 import io.ktor.utils.io.core.*
 import kotlinx.datetime.Clock
@@ -54,7 +55,7 @@ data class ProofOfPossession @OptIn(ExperimentalSerializationApi::class) private
             clientId?.let { put("iss", it) }
             put("aud", issuerUrl)
             put("iat", Clock.System.now().epochSeconds)
-            nonce?.let { put("nonce", nonce) }
+            nonce?.let { put("nonce", it) }
         }
 
         override suspend fun build(key: Key): ProofOfPossession {
@@ -67,8 +68,38 @@ data class ProofOfPossession @OptIn(ExperimentalSerializationApi::class) private
 
     }
 
+    class CWTProofBuilder(private val issuerUrl: String,
+                          private val clientId: String?, private val nonce: String?,
+                          private val coseKey: ByteArray?, private val x5Chain: ByteArray?): ProofBuilder() {
+        val HEADER_LABEL_ALG = 1
+        val HEADER_LABEL_CONTENT_TYPE = 3
+        val HEADER_LABEL_COSE_KEY = "COSE_Key"
+        val HEADER_LABEL_X5CHAIN = 33
+        val LABEL_ISS = 1
+        val LABEL_AUD = 3
+        val LABEL_IAT = 6
+        val LABEL_NONCE = 10
+        val headers = MapElement(buildMap {
+            put(MapKey(HEADER_LABEL_CONTENT_TYPE), StringElement(CWT_HEADER_TYPE))
+            coseKey?.let { put(MapKey(HEADER_LABEL_COSE_KEY), ByteStringElement(it)) }
+            x5Chain?.let { put(MapKey(HEADER_LABEL_X5CHAIN), ByteStringElement(it)) }
+        })
+        val payload = MapElement(buildMap {
+            clientId?.let { put(MapKey(LABEL_ISS), StringElement(it)) }
+            put(MapKey(LABEL_AUD), StringElement(issuerUrl))
+            put(MapKey(LABEL_IAT), NumberElement(Clock.System.now().epochSeconds))
+            nonce?.let { put(MapKey(LABEL_NONCE), ByteStringElement(it.toByteArray())) }
+        })
+
+        override suspend fun build(key: Key): ProofOfPossession {
+            TODO("Not yet implemented")
+        }
+
+    }
+
     companion object : JsonDataObjectFactory<ProofOfPossession>() {
         const val JWT_HEADER_TYPE = "openid4vci-proof+jwt"
+        const val CWT_HEADER_TYPE = "openid4vci-proof+cwt"
         override fun fromJSON(jsonObject: JsonObject) =
             Json.decodeFromJsonElement(ProofOfPossessionSerializer, jsonObject)
     }
