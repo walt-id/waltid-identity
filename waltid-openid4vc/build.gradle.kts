@@ -144,6 +144,7 @@ kotlin {
                 implementation("io.ktor:ktor-client-content-negotiation:$ktor_version")
                 implementation("io.ktor:ktor-serialization-kotlinx-json:$ktor_version")
                 implementation("io.ktor:ktor-client-logging-jvm:$ktor_version")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-slf4j:1.8.1-Beta")
             }
         }
         val jsMain by getting {

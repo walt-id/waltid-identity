@@ -543,7 +543,6 @@ class CI_JVM_Test : AnnotationSpec() {
         tokenResponse.cNonce shouldNotBe null
 
         println("// receive credential")
-        ciTestProvider.deferIssuance = false
         var nonce = tokenResponse.cNonce!!
         val holderDid = TEST_WALLET_DID_WEB1
         val holderKey = runBlocking { LocalKey.importJWK(TEST_WALLET_KEY1) }.getOrThrow()

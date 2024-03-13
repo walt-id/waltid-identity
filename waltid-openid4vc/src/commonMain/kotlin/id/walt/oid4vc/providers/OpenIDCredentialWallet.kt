@@ -54,9 +54,13 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
         nonce: String?,
         client: OpenIDClientConfig? = null
     ): ProofOfPossession {
-        throw NotImplementedError("This object/method is obsolete and will be removed or replaced")
-        //val keyId = resolveDID(did)
-        //return ProofOfPossession.createJwtProof(this, issuerUrl, client?.clientID, nonce, keyId)
+        // NOTE: This object/method is obsolete and will be removed or replaced
+        val keyId = resolveDID(did)
+        return ProofOfPossession.JWTProofBuilder(issuerUrl, client?.clientID, nonce, keyId).let { builder ->
+            builder.build(
+                signToken(TokenTarget.PROOF_OF_POSSESSION, builder.payload, builder.headers, keyId)
+            )
+        }
     }
 
     open fun getCIProviderMetadataUrl(baseUrl: String): String {

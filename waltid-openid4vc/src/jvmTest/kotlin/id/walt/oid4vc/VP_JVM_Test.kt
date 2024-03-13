@@ -178,8 +178,11 @@ class VP_JVM_Test : AnnotationSpec() {
         // parse authorization/presentation request
         val parsedPresentationRequest = AuthorizationRequest.fromHttpParametersAuto(Url(authUrl).parameters.toMap())
         parsedPresentationRequest.presentationDefinition?.toJSON() shouldBe presentationReq.presentationDefinition?.toJSON()
-        // TODO: Determine flow details
-        // TODO: optional (code flow): code response (verifier <-- wallet), token endpoint (verifier -> wallet)
+        // Determine flow details (implicit flow, with vp_token response type, same-device flow with "query" response mode)
+        parsedPresentationRequest.responseType shouldContain ResponseType.VpToken
+        parsedPresentationRequest.responseMode shouldBe ResponseMode.Query
+        // optional (code flow): code response (verifier <-- wallet), token endpoint (verifier -> wallet)
+
         // Generate token response
         val testVP =
             "eyJhbGciOiJFUzI1NksiLCJ0eXAiOiJKV1QiLCJraWQiOiJkaWQ6d2ViOmVudHJhLndhbHQuaWQ6aG9sZGVyIzQ4ZDhhMzQyNjNjZjQ5MmFhN2ZmNjFiNjE4M2U4YmNmIn0.eyJzdWIiOiJkaWQ6d2ViOmVudHJhLndhbHQuaWQ6aG9sZGVyIiwibmJmIjoxNzA4OTUzOTI0LCJpYXQiOjE3MDg5NTM5ODQsImp0aSI6IjEiLCJpc3MiOiJkaWQ6d2ViOmVudHJhLndhbHQuaWQ6aG9sZGVyIiwibm9uY2UiOiIiLCJhdWQiOiJ0ZXN0LXZlcmlmaWVyIiwidnAiOnsiQGNvbnRleHQiOlsiaHR0cHM6Ly93d3cudzMub3JnLzIwMTgvY3JlZGVudGlhbHMvdjEiXSwidHlwZSI6WyJWZXJpZmlhYmxlUHJlc2VudGF0aW9uIl0sImlkIjoiMSIsImhvbGRlciI6ImRpZDp3ZWI6ZW50cmEud2FsdC5pZDpob2xkZXIiLCJ2ZXJpZmlhYmxlQ3JlZGVudGlhbCI6W119fQ.hgGTCeYGGE9qhlSqeBQmY7WnAts6aBSH378-z5WtNDAB8LaQwXKeoOLAURoE5utacYhX-hDZJwBpGg9Zf1ZkgA"
@@ -193,7 +196,7 @@ class VP_JVM_Test : AnnotationSpec() {
                 )
             )
         )
-        // TODO: Optional: respond to token request (code-flow, verifier <-- wallet), respond to authorization request (implicit flow, verifier <-- wallet)
+        // Optional: respond to token request (code-flow, verifier <-- wallet), respond to authorization request (implicit flow, verifier <-- wallet)
         // Optional: post token response to response_uri of verifier (cross-device flow, verifier <-- wallet)
         val responseUri = tokenResponse.toRedirectUri(presentationReq.redirectUri!!, ResponseMode.Query)
 
@@ -203,10 +206,6 @@ class VP_JVM_Test : AnnotationSpec() {
         val parsedTokenResponse = OpenID4VP.parsePresentationResponseFromUrl(responseUri)
         parsedTokenResponse.vpToken?.jsonPrimitive?.content shouldBe testVP
         parsedTokenResponse.presentationSubmission?.descriptorMap?.size shouldBe 1
-
-        // TODO: validate token response
-        // TODO: validation response
-
     }
 
     @Test
