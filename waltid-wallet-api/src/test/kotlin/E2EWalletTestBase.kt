@@ -1,7 +1,5 @@
-import id.walt.oid4vc.data.dif.DisclosureLimitation
-import id.walt.oid4vc.data.dif.PresentationDefinition
-import PresentationDefinitionFixtures.*
-import PresentationDefinitionFixtures.Companion.presentationDefinitionExample1
+import id.walt.issuer.IssuanceExamples.issuerOnboardingRequestDefaultExample
+import id.walt.issuer.IssuerOnboardingResponse
 import id.walt.webwallet.db.models.AccountWalletListing
 import id.walt.webwallet.db.models.WalletDid
 import id.walt.webwallet.utils.IssuanceExamples
@@ -110,18 +108,32 @@ abstract class E2EWalletTestBase {
             )
         }.bodyAsText()
 
-//
         println("Issuance (Offer) URI: $issuanceUri\n")
         return issuanceUri
     }
-    
-    protected suspend fun testExampleKey() = run {
-        println("\nUse Case -> Create Example Key")
-        val endpoint = "$walletUrl/example-key"
-        println("GET ($endpoint)")
-        assertEquals(HttpStatusCode.OK, walletClient.get(endpoint).status)
+
+    protected suspend fun onboardIssuer() = run {
+
+        val endpoint = "$issuerUrl/onboard/issuer"
+        println("POST ($endpoint)\n")
+
+        println("Calling issuer...")
+        val issuerOnboardingRespStr = walletClient.post(endpoint) {
+            //language=JSON
+            contentType(ContentType.Application.Json)
+            setBody(
+                issuerOnboardingRequestDefaultExample
+            )
+        }.also { response ->
+            assertEquals(HttpStatusCode.OK, response.status)
+        }.bodyAsText()
+
+        val issuerResponse = Json.decodeFromString<IssuerOnboardingResponse>(issuerOnboardingRespStr)
+
+        println("Onboarding returned: $issuerResponse\n")
+
     }
-    
+
     protected suspend fun login(user: User = defaultTestUser) = run {
         println("Running login...")
         walletClient.post("$walletUrl/wallet-api/auth/login") {
@@ -285,7 +297,7 @@ abstract class E2EWalletTestBase {
     
     protected suspend fun testKeys() {
         println("\nUse Case -> List Keys\n")
-        var endpoint = "$walletUrl/wallet-api/wallet/$walletId/keys"
+        val endpoint = "$walletUrl/wallet-api/wallet/$walletId/keys"
         println("GET $endpoint")
         val keys = walletClient.get(endpoint).let { response ->
             assertEquals(HttpStatusCode.OK, response.status)
@@ -341,9 +353,7 @@ abstract class E2EWalletTestBase {
         println("\nUse Case -> Test Verification Session\n")
         val endpoint = "$verifierUrl/openid4vc/session/$id"
         println("GET $endpoint")
-        walletClient.get(endpoint).let { response ->
-            assertEquals(HttpStatusCode.OK, response.status)
-        }
+        assertEquals(HttpStatusCode.OK, walletClient.get(endpoint).status)
     }
     
     protected suspend fun testResolvePresentationRequest(url: String): String = run {

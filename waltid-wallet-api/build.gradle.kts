@@ -116,6 +116,9 @@ dependencies {
     testImplementation(project(":waltid-issuer-api"))
     testImplementation(project(":waltid-verifier-api"))
     
+    implementation("org.junit.jupiter:junit-jupiter-api:5.10.2")
+    implementation("org.junit.jupiter:junit-jupiter-params:5.10.2")
+    
     implementation("com.nimbusds:nimbus-jose-jwt:9.37.3")
     implementation("io.ktor:ktor-client-java:$ktorVersion")
 

@@ -12,8 +12,10 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.*
+import kotlin.test.Test
 import kotlin.time.Duration.Companion.seconds
 import PresentationDefinitionFixtures.Companion.presentationDefinitionExample1
+import id.walt.webwallet.Values
 
 class E2EWalletTestDeployed : E2EWalletTestBase() {
     private lateinit var deployedClient: HttpClient
@@ -21,6 +23,12 @@ class E2EWalletTestDeployed : E2EWalletTestBase() {
     private var deployedIssuerUrl: String = "https://issuer.portal.walt.id"
     private var deployedVerifierUrl: String = "https://verifier.portal.walt.id"
     
+    private suspend fun initialise() = runTest {
+        deployedClient = newClient()
+        login()
+        getUserToken()
+        deployedClient = newClient(token)
+    }
     
     private fun newClient(token: String? = null) = HttpClient {
         install(ContentNegotiation) {
@@ -41,7 +49,7 @@ class E2EWalletTestDeployed : E2EWalletTestBase() {
     @Test
     fun e2eTestRegisterNewUser() = runTest {
         deployedClient = newClient()
-        testCreateUser(User(name="tester", email=email, password=password, accountType="email"))
+        testCreateUser(User(name = "tester", email = email, password = password, accountType = "email"))
     }
     
     @Test
@@ -63,7 +71,7 @@ class E2EWalletTestDeployed : E2EWalletTestBase() {
     @Test
     fun e2eTestAuthentication() = runTest {
         deployedClient = newClient()
-        testCreateUser(User(name="tester", email="tester@email.com", password="password", accountType="email"))
+        testCreateUser(User(name = "tester", email = "tester@email.com", password = "password", accountType = "email"))
         
         login(User(name = "tester", email = "tester@email.com", password = "password", accountType = "email"))
         getUserToken()
@@ -77,26 +85,45 @@ class E2EWalletTestDeployed : E2EWalletTestBase() {
     
     @Test
     fun e2eTestKeys() = runTest {
-        deployedClient = newClient()
-        login()
-        getUserToken()
-        deployedClient = newClient(token)
+        initialise()
         
         listAllWallets()
-        
         testKeys()
-        
         testCreateRSAKey()
-        
-        testExampleKey()
+    }
+    
+    
+    @Test
+    fun e2eIssuerOnboarding() = runTest {
+        if (versionCheck(1.1)) {
+            deployedClient = newClient()
+            login()
+            getUserToken()
+            deployedClient = newClient(token)
+            onboardIssuer()
+        } else {
+            println("Test e2eIssuerOnboarding() skipped")
+        }
+    }
+    
+    // check if the given version number is greater than or equal to the release version
+    // @See id.walt.webwallet.Values
+    private fun versionCheck(ver: Double): Boolean {
+        return Values.versionNumber >= ver
+    }
+    
+    @Test
+    fun e2eMyTest() = runTest {
+        if (versionCheck(1.1)) {
+            println("Ok!")
+        } else {
+            println("Test e2eMyTest() skipped")
+        }
     }
     
     @Test
     fun e2eTestDids() = runTest(timeout = 120.seconds) {
-        deployedClient = newClient()
-        login()
-        getUserToken()
-        deployedClient = newClient(token)
+        initialise()
         
         listAllWallets()
         
@@ -113,10 +140,7 @@ class E2EWalletTestDeployed : E2EWalletTestBase() {
     
     @Test
     fun e2eTestWalletCredentials() = testApplication {
-        deployedClient = newClient()
-        login()
-        getUserToken()
-        deployedClient = newClient(token)
+        initialise()
         
         // list all wallets for this user
         listAllWallets()
@@ -129,10 +153,7 @@ class E2EWalletTestDeployed : E2EWalletTestBase() {
     
     @Test
     fun e2eTestIssuance() = runTest {
-        deployedClient = newClient()
-        getUserToken()
-        
-        deployedClient = newClient(token)
+        initialise()
         
         // list all wallets for this user
         listAllWallets()
@@ -186,7 +207,7 @@ class E2EWalletTestDeployed : E2EWalletTestBase() {
         url = testVerifyCredential(VerifierApiExamples.maxExample)
         assertTrue(url.startsWith("openid4vp://authorize?response_type=vp_token"))
         println("vp policy definition explicit presentation definition:verify Url = $url")
-
+        
         url = testVerifyCredential(VerifierApiExamples.presentationDefinitionPolicy)
         assertTrue(url.startsWith("openid4vp://authorize?response_type=vp_token"))
         println("vp policy definition explicit presentation definition:verify Url = $url")
@@ -211,9 +232,7 @@ class E2EWalletTestDeployed : E2EWalletTestBase() {
     
     @Test
     fun e2eTestPresentationRequest() = runTest {
-        deployedClient = newClient()
-        getUserToken()
-        deployedClient = newClient(token)
+        initialise()
         
         listAllWallets() // sets the walletId
         val url = testVerifyCredential(VerifierApiExamples.minimal)
@@ -226,16 +245,14 @@ class E2EWalletTestDeployed : E2EWalletTestBase() {
     
     @Test
     fun e2eTestMatchCredentialsForPresentationDefinition() = runTest {
-        deployedClient = newClient()
-        getUserToken()
-        deployedClient = newClient(token)
-        
-        listAllWallets() // sets the wall
+        initialise()
+        listAllWallets() // sets the wallet id
         
         val response: JsonArray = listCredentials()
-        println("QUACK >>>>>>>>>>>> Number of credentials in wallet = ${response.size}")
         testPresentationDefinition(presentationDefinitionExample1)
+        // TODO ensure num matched credentials is equal to credential list size when no match found for type
     }
+    
     override var walletClient: HttpClient
         get() = deployedClient
         set(value) {
