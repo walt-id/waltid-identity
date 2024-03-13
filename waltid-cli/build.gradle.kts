@@ -120,7 +120,7 @@ application {
     // Works with:
     //     ../gradlew run --args="--help"
     mainClass = "id.walt.cli.MainKt"
-
+    applicationName = "waltid"
 }
 
 tasks.test {
