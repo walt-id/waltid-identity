@@ -295,17 +295,41 @@ abstract class E2EWalletTestBase {
         assertEquals(HttpStatusCode.OK, walletClient.post(endpoint).status)
     }
     
+    protected suspend fun deleteKeys() {
+        println("\nUse Case -> Delete Keys\n")
+        listAllKeys().let { keys ->
+            keys.forEach{
+                val keyId = it.jsonObject["keyId"]?.jsonObject?.get("id")?.jsonPrimitive?.content
+                val endpoint = "$walletUrl/wallet-api/wallet/$walletId/keys/$keyId"
+                println("DELETE $endpoint")
+                walletClient.delete(endpoint).let { response ->
+                    assertEquals(HttpStatusCode.Accepted, response.status)
+                    println("Key deleted!")
+                }
+            }
+        }
+    }
+    
+    protected suspend fun listAllKeys(): JsonArray {
+        println("\nUse Case -> List Keys\n")
+        val endpoint = "$walletUrl/wallet-api/wallet/$walletId/keys"
+        println("GET $endpoint")
+        return walletClient.get(endpoint).let { response ->
+            assertEquals(HttpStatusCode.OK, response.status)
+            response.body<JsonArray>()
+        }
+    }
+    
     protected suspend fun testKeys() {
         println("\nUse Case -> List Keys\n")
         val endpoint = "$walletUrl/wallet-api/wallet/$walletId/keys"
         println("GET $endpoint")
         val keys = walletClient.get(endpoint).let { response ->
             assertEquals(HttpStatusCode.OK, response.status)
-            assertEquals(HttpStatusCode.OK, response.status)
             response.body<JsonArray>()[0].jsonObject
         }
         val algorithm = keys["algorithm"]?.jsonPrimitive?.content
-        assertEquals("Ed25519", algorithm)
+        assertEquals("RSA", algorithm)
     }
     
     suspend fun testDefaultDid() {

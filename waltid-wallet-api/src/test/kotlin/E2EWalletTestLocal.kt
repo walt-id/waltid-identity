@@ -157,10 +157,9 @@ open class E2EWalletTestLocal : E2EWalletTestBase() {
         // list all wallets for this user
         listAllWallets()
         
-        testKeys()
-       
+        deleteKeys()
         testCreateRSAKey()
-
+        testKeys()
     }
 
     @Test

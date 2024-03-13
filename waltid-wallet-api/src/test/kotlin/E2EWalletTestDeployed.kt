@@ -84,12 +84,14 @@ class E2EWalletTestDeployed : E2EWalletTestBase() {
     }
     
     @Test
-    fun e2eTestKeys() = runTest {
+    fun e2eTestKeys() = runTest(timeout = 120.seconds) {
         initialise()
         
         listAllWallets()
-        testKeys()
+        
+        deleteKeys()
         testCreateRSAKey()
+        testKeys()
     }
     
     
@@ -110,15 +112,6 @@ class E2EWalletTestDeployed : E2EWalletTestBase() {
     // @See id.walt.webwallet.Values
     private fun versionCheck(ver: Double): Boolean {
         return Values.versionNumber >= ver
-    }
-    
-    @Test
-    fun e2eMyTest() = runTest {
-        if (versionCheck(1.1)) {
-            println("Ok!")
-        } else {
-            println("Test e2eMyTest() skipped")
-        }
     }
     
     @Test
@@ -246,7 +239,7 @@ class E2EWalletTestDeployed : E2EWalletTestBase() {
     @Test
     fun e2eTestMatchCredentialsForPresentationDefinition() = runTest {
         initialise()
-        listAllWallets() // sets the wallet id
+        listAllWallets() // sets the wall
         
         val response: JsonArray = listCredentials()
         testPresentationDefinition(presentationDefinitionExample1)
