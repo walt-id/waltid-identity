@@ -146,8 +146,16 @@ class E2EWalletTestLocal : E2EWalletTestBase() {
         listAllWalletsForUser()
 
         testKeys()
+    }
 
-        testExampleKey()
+    @Test
+    fun e2eIssuerOnboarding() = testApplication {
+        runApplication()
+        login()
+        getTokenFor()
+        localWalletClient = newClient(token)
+
+        onboardIssuer()
     }
 
     @Test

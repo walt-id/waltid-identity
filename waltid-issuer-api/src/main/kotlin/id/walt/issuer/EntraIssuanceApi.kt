@@ -18,7 +18,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
-private val http = HttpClient() {
+private val http = HttpClient {
     install(ContentNegotiation) {
         json()
     }
@@ -118,7 +118,8 @@ object EntraIssuanceApi {
 
         println("> Create issuance request: $createIssuanceReq")
 
-        val createIssuanceRequestUrl = "https://verifiedid.did.msidentity.com/v1.0/verifiableCredentials/createIssuanceRequest"
+        val createIssuanceRequestUrl =
+            "https://verifiedid.did.msidentity.com/v1.0/verifiableCredentials/createIssuanceRequest"
 
         println("> Sending HTTP POST with create issuance request to: $createIssuanceRequestUrl")
         val response = http.post(createIssuanceRequestUrl) {
@@ -133,7 +134,8 @@ object EntraIssuanceApi {
         val responseObj = response.body<JsonObject>()
         println("> Response JSON body: $responseObj")
 
-        val url = responseObj["url"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("No url from Entra received")
+        val url =
+            responseObj["url"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("No url from Entra received")
 
         return url
     }

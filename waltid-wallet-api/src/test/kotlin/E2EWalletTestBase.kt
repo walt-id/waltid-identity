@@ -1,3 +1,5 @@
+import id.walt.issuer.IssuanceExamples.issuerOnboardingRequestDefaultExample
+import id.walt.issuer.IssuerOnboardingResponse
 import id.walt.webwallet.db.models.AccountWalletListing
 import id.walt.webwallet.db.models.WalletDid
 import id.walt.webwallet.utils.IssuanceExamples
@@ -82,18 +84,32 @@ abstract class E2EWalletTestBase {
             )
         }.bodyAsText()
 
-//
         println("Issuance (Offer) URI: $issuanceUri\n")
         return issuanceUri
     }
-    
-    protected suspend fun testExampleKey() = run {
-        println("\nUse Case -> Create Example Key")
-        val endpoint = "$walletUrl/example-key"
-        println("GET ($endpoint)")
-        assertEquals(HttpStatusCode.OK, walletClient.get(endpoint).status)
+
+    protected suspend fun onboardIssuer() = run {
+
+        val endpoint = "$issuerUrl/onboard/issuer"
+        println("POST ($endpoint)\n")
+
+        println("Calling issuer...")
+        val issuerOnboardingRespStr = walletClient.post(endpoint) {
+            //language=JSON
+            contentType(ContentType.Application.Json)
+            setBody(
+                issuerOnboardingRequestDefaultExample
+            )
+        }.also { response ->
+            assertEquals(HttpStatusCode.OK, response.status)
+        }.bodyAsText()
+
+        val issuerResponse = Json.decodeFromString<IssuerOnboardingResponse>(issuerOnboardingRespStr)
+
+        println("Onboarding returned: $issuerResponse\n")
+
     }
-    
+
     protected suspend fun login(user: User = defaultTestUser) = run {
         println("Running login...")
         walletClient.post("$walletUrl/wallet-api/auth/login") {
