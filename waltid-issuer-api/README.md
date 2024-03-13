@@ -106,7 +106,7 @@ Issuer service relies on the following walt.id libraries:
 ### Running from source
 
 1. run the `id.walt.issuer.Mainkt` file
-2. the issuer backend is available at: http://localhost:7000
+2. the issuer backend is available at: http://localhost:7002
 
 ### Using docker
 

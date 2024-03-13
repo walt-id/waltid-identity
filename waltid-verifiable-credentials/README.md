@@ -96,9 +96,9 @@ Issue a jwt-formatted verifiable credential:
 val dataOverWrites = mapOf("entityIdentification" to entityIdentificationNumber.toJsonElement())
 val dataUpdates = mapOf("issuingAuthority" to issuingAuthorityId.toJsonElement())
 val jwt = w3cCredential.baseIssue(
-  issuerKey = issuerKey,
-  issuerDid = issuerDid,
-  subjectDid = holderDid,
+  key = issuerKey,
+  did = issuerDid,
+  subject = holderDid,
   dataOverwrites = dataOverwrites,
   dataUpdates = dataUpdates,
   additionalJwtHeader = emptyMap(),
@@ -180,7 +180,7 @@ val specificPolicies = Json.parseToJsonElement(
 ).jsonObject.mapValues { it.value.jsonArray.parsePolicyRequests() }
 
 // validate verifiable presentation against the configured policies
-val validationResult = PolicyRunner.verifyPresentation(
+val validationResult = Verifier.verifyPresentation(
         vpTokenJwt = vpToken,
         vpPolicies = vpPolicies,
         globalVcPolicies = vcPolicies,

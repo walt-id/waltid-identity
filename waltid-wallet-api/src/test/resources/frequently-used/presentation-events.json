@@ -1,0 +1,164 @@
+[
+  {
+    "event": "Credential",
+    "action": "Present",
+    "timestamp": "2024-03-06T13:26:21.003Z",
+    "tenant": "",
+    "originator": "",
+    "account": "036669e6-6011-441c-bb53-4ef8ea53dfa2",
+    "wallet": "bd698a0f-1703-4565-aab3-747c374152dd",
+    "credentialId": null,
+    "data": {
+      "type": "id.walt.webwallet.service.events.CredentialEventData",
+      "ecosystem": "n/a",
+      "issuerId": "n/a",
+      "subjectId": "abc839c8-ea3b-48fa-a11c-bee881a5ae72",
+      "issuerKeyId": "n/a",
+      "issuerKeyType": "n/a",
+      "subjectKeyType": "n/a",
+      "credentialType": "n/a",
+      "credentialFormat": "W3C",
+      "credentialProofType": "n/a",
+      "policies":
+      [],
+      "protocol": "oid4vp",
+      "credentialId": "http://example.gov/credentials/1"
+    },
+    "note": null
+  },
+  {
+    "event": "Credential",
+    "action": "Present",
+    "timestamp": "2024-03-06T13:26:21.003Z",
+    "tenant": "",
+    "originator": "",
+    "account": "036669e6-6011-441c-bb53-4ef8ea53dfa2",
+    "wallet": "bd698a0f-1703-4565-aab3-747c374152dd",
+    "credentialId": null,
+    "data": {
+      "type": "id.walt.webwallet.service.events.CredentialEventData",
+      "ecosystem": "n/a",
+      "issuerId": "n/a",
+      "subjectId": "abc839c8-ea3b-48fa-a11c-bee881a5ae72",
+      "issuerKeyId": "n/a",
+      "issuerKeyType": "n/a",
+      "subjectKeyType": "n/a",
+      "credentialType": "n/a",
+      "credentialFormat": "W3C",
+      "credentialProofType": "n/a",
+      "policies":
+      [],
+      "protocol": "oid4vp",
+      "credentialId": "http://example.gov/credentials/2"
+    },
+    "note": null
+  },
+  {
+    "event": "Credential",
+    "action": "Present",
+    "timestamp": "2024-03-06T13:26:21.003Z",
+    "tenant": "",
+    "originator": "",
+    "account": "036669e6-6011-441c-bb53-4ef8ea53dfa2",
+    "wallet": "bd698a0f-1703-4565-aab3-747c374152dd",
+    "credentialId": null,
+    "data": {
+      "type": "id.walt.webwallet.service.events.CredentialEventData",
+      "ecosystem": "n/a",
+      "issuerId": "n/a",
+      "subjectId": "abc839c8-ea3b-48fa-a11c-bee881a5ae72",
+      "issuerKeyId": "n/a",
+      "issuerKeyType": "n/a",
+      "subjectKeyType": "n/a",
+      "credentialType": "n/a",
+      "credentialFormat": "W3C",
+      "credentialProofType": "n/a",
+      "policies":
+      [],
+      "protocol": "oid4vp",
+      "credentialId": "http://example.gov/credentials/3"
+    },
+    "note": null
+  },
+  {
+    "event": "Credential",
+    "action": "Present",
+    "timestamp": "2024-03-06T13:26:21.003Z",
+    "tenant": "",
+    "originator": "",
+    "account": "036669e6-6011-441c-bb53-4ef8ea53dfa2",
+    "wallet": "bd698a0f-1703-4565-aab3-747c374152dd",
+    "credentialId": null,
+    "data": {
+      "type": "id.walt.webwallet.service.events.CredentialEventData",
+      "ecosystem": "n/a",
+      "issuerId": "n/a",
+      "subjectId": "abc839c8-ea3b-48fa-a11c-bee881a5ae72",
+      "issuerKeyId": "n/a",
+      "issuerKeyType": "n/a",
+      "subjectKeyType": "n/a",
+      "credentialType": "n/a",
+      "credentialFormat": "W3C",
+      "credentialProofType": "n/a",
+      "policies":
+      [],
+      "protocol": "oid4vp",
+      "credentialId": "http://example.gov/credentials/2"
+    },
+    "note": null
+  },
+  {
+    "event": "Credential",
+    "action": "Present",
+    "timestamp": "2024-03-06T13:26:21.003Z",
+    "tenant": "",
+    "originator": "",
+    "account": "036669e6-6011-441c-bb53-4ef8ea53dfa2",
+    "wallet": "bd698a0f-1703-4565-aab3-747c374152dd",
+    "credentialId": null,
+    "data": {
+      "type": "id.walt.webwallet.service.events.CredentialEventData",
+      "ecosystem": "n/a",
+      "issuerId": "n/a",
+      "subjectId": "abc839c8-ea3b-48fa-a11c-bee881a5ae72",
+      "issuerKeyId": "n/a",
+      "issuerKeyType": "n/a",
+      "subjectKeyType": "n/a",
+      "credentialType": "n/a",
+      "credentialFormat": "W3C",
+      "credentialProofType": "n/a",
+      "policies":
+      [],
+      "protocol": "oid4vp",
+      "credentialId": "http://example.gov/credentials/3"
+    },
+    "note": null
+  },
+  {
+    "event": "Credential",
+    "action": "Present",
+    "timestamp": "2024-03-06T13:26:21.003Z",
+    "tenant": "",
+    "originator": "",
+    "account": "036669e6-6011-441c-bb53-4ef8ea53dfa2",
+    "wallet": "bd698a0f-1703-4565-aab3-747c374152dd",
+    "credentialId": null,
+    "data": {
+      "type": "id.walt.webwallet.service.events.CredentialEventData",
+      "ecosystem": "n/a",
+      "issuerId": "n/a",
+      "subjectId": "abc839c8-ea3b-48fa-a11c-bee881a5ae72",
+      "issuerKeyId": "n/a",
+      "issuerKeyType": "n/a",
+      "subjectKeyType": "n/a",
+      "credentialType": "n/a",
+      "credentialFormat": "W3C",
+      "credentialProofType": "n/a",
+      "policies":
+      [],
+      "protocol": "oid4vp",
+      "credentialId": "http://example.gov/credentials/3"
+    },
+    "note": null
+  }
+]

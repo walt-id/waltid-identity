@@ -82,7 +82,7 @@
                                         autofocus
                                         class="block w-full rounded-md border-0 py-1.5 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6 px-2 text-gray-600"
                                         name="email"
-                                        required=""
+                                        :required="true"
                                         type="email"
                                     />
                                 </div>
@@ -102,13 +102,13 @@
                                         autocomplete="current-password"
                                         class="block w-full rounded-md border-0 py-1.5 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6 px-2 text-gray-600"
                                         name="password"
-                                        required=""
+                                        :required="true"
                                         type="password"
                                     />
                                 </div>
                             </div>
 
-                            <div>
+                            <div class="flex flex-col gap-1.5">
                                 <button
                                     :class="[success ? 'bg-green-500 hover:bg-green-600 animate-bounce' : 'bg-blue-600  hover:bg-blue-500']"
                                     class="flex w-full justify-center rounded-md px-3 py-2 text-sm font-semibold text-white shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
@@ -233,13 +233,10 @@ import { ArrowRightOnRectangleIcon, BookmarkSquareIcon, EnvelopeIcon, Identifica
 import { Dialog, DialogPanel, DialogTitle, TransitionChild, TransitionRoot } from "@headlessui/vue";
 import { ExclamationCircleIcon, XMarkIcon } from "@heroicons/vue/24/outline";
 import { usePageLeave, useParallax } from "@vueuse/core";
-import ConnectWalletModal from "~/components/modals/ConnectWalletModal.vue";
 import useModalStore from "~/stores/useModalStore";
 import { useUserStore } from "~/stores/user";
 import { storeToRefs } from "pinia";
 import { useTenant } from "~/composables/tenants";
-import {CRYPTO_JWT_TTL} from "@walletconnect/core";
-import {decodeJWT} from "@walletconnect/relay-auth";
 
 const store = useModalStore();
 
@@ -301,10 +298,11 @@ function closeModal() {
 
 function openWeb3() {
     console.log("open web3");
+    alert("Not supported in this version.")
 
-    store.openModal({
+    /*store.openModal({
         component: ConnectWalletModal,
-    });
+    });*/
 }
 
 definePageMeta({
@@ -387,7 +385,6 @@ if (isOidcLogin.value) {
     25%,
     100% {
         transform: scale(2);
-        //opacity: 0;
         filter: blur(1rem);
     }
 }
