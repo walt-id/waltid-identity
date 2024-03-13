@@ -12,7 +12,6 @@ import id.walt.webwallet.service.dto.LinkedWalletDataTransferObject
 import id.walt.webwallet.service.dto.WalletDataTransferObject
 import id.walt.webwallet.service.events.EventLogFilter
 import id.walt.webwallet.service.events.EventLogFilterResult
-import id.walt.webwallet.service.issuers.IssuerDataTransferObject
 import id.walt.webwallet.service.keys.SingleKeyResponse
 import id.walt.webwallet.service.report.ReportRequestParameter
 import id.walt.webwallet.service.settings.WalletSetting
@@ -34,6 +33,8 @@ abstract class WalletService(val tenant: String, val accountId: UUID, val wallet
     abstract suspend fun rejectCredential(parameter: CredentialRequestParameter): Boolean
     abstract suspend fun attachCategory(credentialId: String, categories: List<String>): Boolean
     abstract suspend fun detachCategory(credentialId: String, categories: List<String>): Boolean
+    abstract suspend fun renameCategory(oldName: String, newName: String): Boolean
+    abstract fun getCredentialsByIds(credentialIds: List<String>): List<WalletCredential>
 
     abstract fun matchCredentialsByPresentationDefinition(presentationDefinition: PresentationDefinition): List<WalletCredential>
 
@@ -42,7 +43,7 @@ abstract class WalletService(val tenant: String, val accountId: UUID, val wallet
 
     abstract suspend fun resolvePresentationRequest(request: String): String
     abstract suspend fun useOfferRequest(
-        offer: String, did: String, requireUserInput: Boolean, silent: Boolean
+        offer: String, did: String, requireUserInput: Boolean
     ): List<WalletCredential>
     abstract suspend fun resolveCredentialOffer(offerRequest: CredentialOfferRequest): CredentialOffer
 
@@ -75,12 +76,7 @@ abstract class WalletService(val tenant: String, val accountId: UUID, val wallet
     abstract suspend fun connectWallet(walletId: UUID): Boolean
     abstract suspend fun disconnectWallet(wallet: UUID): Boolean
 
-    // Issuers TODO: move each such component to use-case
-    abstract suspend fun listIssuers(): List<IssuerDataTransferObject>
-    abstract suspend fun getIssuer(name: String): IssuerDataTransferObject
-    abstract fun authorizeIssuer(issuer: String): Boolean
-    abstract fun addIssuer(issuer: IssuerDataTransferObject): Boolean
-    abstract fun getCredentialsByIds(credentialIds: List<String>): List<WalletCredential>
+    // TODO: move each such component to use-case
 
     // Categories
     abstract suspend fun listCategories(): List<WalletCategoryData>
@@ -92,7 +88,7 @@ abstract class WalletService(val tenant: String, val accountId: UUID, val wallet
 
     // Settings
     abstract suspend fun getSettings(): WalletSetting
-    abstract suspend fun setSettings(settings: WalletSetting): Boolean
+    abstract suspend fun setSettings(settings: JsonObject): Boolean
 
 
     // TODO: Push

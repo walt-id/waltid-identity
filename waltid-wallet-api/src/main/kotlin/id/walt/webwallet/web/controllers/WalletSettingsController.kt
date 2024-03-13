@@ -8,6 +8,7 @@ import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
+import kotlinx.serialization.json.JsonObject
 
 fun Application.settings() = walletRoute {
     route("settings", {
@@ -33,7 +34,7 @@ fun Application.settings() = walletRoute {
         post({
             summary = "Update wallet settings"
             request {
-                body<WalletSetting> { description = "Wallet setting object" }
+                body<JsonObject> { description = "Wallet setting object" }
             }
             response {
                 HttpStatusCode.Created to { description = "Wallet settings updated successfully" }
@@ -41,7 +42,7 @@ fun Application.settings() = walletRoute {
             }
         }) {
             runCatching {
-                val request = call.receive<WalletSetting>()
+                val request = call.receive<JsonObject>()
                 getWalletService().setSettings(request)
             }.onSuccess {
                 context.respond(HttpStatusCode.Accepted)

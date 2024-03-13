@@ -1,17 +1,16 @@
 package id.walt.crypto.keys
 
-import kotlin.js.ExperimentalJsExport
-import kotlin.js.JsExport
 import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.decodeFromJsonElement
+import kotlinx.serialization.json.*
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.polymorphic
 import kotlinx.serialization.modules.subclass
 import love.forte.plugin.suspendtrans.annotation.JsPromise
 import love.forte.plugin.suspendtrans.annotation.JvmAsync
 import love.forte.plugin.suspendtrans.annotation.JvmBlocking
+import kotlin.js.ExperimentalJsExport
+import kotlin.js.JsExport
+
 
 @OptIn(ExperimentalJsExport::class)
 @JsExport
@@ -29,7 +28,7 @@ object KeySerialization {
 
   fun serializeKey(key: Key): String = keySerializationJson.encodeToString(key)
 
-  @JvmBlocking
+fun serializeKeyToJson(key: Key): JsonElement = keySerializationJson.encodeToJsonElement(key)  @JvmBlocking
   @JvmAsync
   @JsPromise
   @JsExport.Ignore

@@ -15,6 +15,11 @@ object ConfigManager {
 
   val registeredConfigurations = ConcurrentLinkedQueue<ConfigData>()
   val loadedConfigurations = HashMap<String, WalletConfig>()
+    val preloadedConfigurations = HashMap<String, WalletConfig>()
+
+    fun preloadConfig(id: String, config: WalletConfig) {
+        preloadedConfigurations[id] = config
+    }
 
   @OptIn(ExperimentalHoplite::class)
   private fun loadConfig(config: ConfigData, args: Array<String>) {
@@ -22,6 +27,12 @@ object ConfigManager {
     log.debug { "Loading configuration: \"$id\"..." }
 
     val type = config.type
+
+        preloadedConfigurations[id]?.let {
+            loadedConfigurations[id] = it
+            log.info { "Overwrote wallet configuration with preload: $id" }
+            return
+        }
 
     runCatching {
           ConfigLoaderBuilder.default()

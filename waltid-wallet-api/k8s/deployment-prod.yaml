@@ -98,14 +98,15 @@ data:
     accessTokenUrl = "${oidcRealm}/protocol/openid-connect/token"
     logoutUrl = "${oidcRealm}/protocol/openid-connect/logout"
     clientId = "wallet_backend_prod"
-    clientSecret = "hhzmJsLdJgtbFGKR0GUvUWDMS7SmFoSm"
+    clientSecret = "__DEFAULT_KEYCLOAK_CLIENT_SECRET__"
+    keycloakUserApi = "https://keycloak.walt-test.cloud/admin/realms/waltid-keycloak-ktor/users"
     jwksCache = {
-        cacheSize = 10
-        cacheExpirationHours = 24
-        rateLimit: {
-            bucketSize: 10
-            refillRateMinutes: 1
-        }
+      cacheSize = 10
+      cacheExpirationHours = 24
+      rateLimit: {
+        bucketSize: 10
+        refillRateMinutes: 1
+      }
     }
 ---
 apiVersion: v1
@@ -147,6 +148,34 @@ data:
       "Not relevant to me",
       "Unsure about accuracy",
       "Need more details",
+    ]
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wallet-trust-config
+data:
+  trust.conf: |
+    issuersRecord: {
+        baseUrl = "<url>"
+        trustRecordPath = "<path>"
+    }
+    verifiersRecord: {
+         baseUrl = "<url>"
+         trustRecordPath = "<path>"
+    }
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wallet-logins-config
+data:
+  logins.conf: |
+    enabledLoginMethods: [
+        "email",
+        "web3",
+        "oidc",
+        "passkeys"
     ]
 ---
 apiVersion: v1
@@ -224,6 +253,10 @@ spec:
               mountPath: "/waltid-wallet-api/config/trust.conf"
               subPath: "trust.conf"
               readOnly: true
+            - name: wallet-logins-config
+              mountPath: "/waltid-wallet-api/config/logins.conf"
+              subPath: "logins.conf"
+              readOnly: true
             - name: wallet-nft-config
               mountPath: "/waltid-wallet-api/walt.yaml"
               subPath: "walt.yaml"
@@ -261,12 +294,15 @@ spec:
         - name: wallet-rejection-reason-config
           configMap:
             name: wallet-rejection-reason-config
-        - name: wallet-push-config
-          secret:
-            secretName: wallet-push-config-secret
         - name: wallet-trust-config
           configMap:
             name: wallet-trust-config
+        - name: wallet-logins-config
+          configMap:
+            name: wallet-logins-config
+        - name: wallet-push-config
+          secret:
+            secretName: wallet-push-config-secret
         - name: wallet-nft-config
           secret:
             secretName: wallet-nft-config-secret
@@ -310,7 +346,7 @@ spec:
             - name: NUXT_PUBLIC_ISSUER_CALLBACK_URL
               value: "https://wallet.walt.id"
           ports:
-            - containerPort: 3000
+            - containerPort: 7101
               name: http-api
 ---
 kind: Service

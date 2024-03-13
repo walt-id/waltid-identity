@@ -1,13 +1,9 @@
 package id.walt.webwallet.web.controllers
 
-import io.github.smiley4.ktorswaggerui.dsl.delete
-import io.github.smiley4.ktorswaggerui.dsl.get
-import io.github.smiley4.ktorswaggerui.dsl.post
-import io.github.smiley4.ktorswaggerui.dsl.route
+import io.github.smiley4.ktorswaggerui.dsl.*
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.response.*
-import io.ktor.server.routing.*
 import io.ktor.server.util.*
 import kotlinx.serialization.json.JsonObject
 
@@ -49,12 +45,31 @@ fun Application.categories() = walletRoute {
             delete({
                 summary = "Delete category"
                 response {
-                    HttpStatusCode.Accepted to { description = "Category delete" }
+                    HttpStatusCode.Accepted to { description = "Category deleted" }
                     HttpStatusCode.BadRequest to { description = "Category could not be deleted" }
                 }
             }) {
                 val name = call.parameters.getOrFail("name")
                 runCatching { getWalletService().deleteCategory(name) }.onSuccess {
+                    context.respond(if (it) HttpStatusCode.Accepted else HttpStatusCode.BadRequest)
+                }.onFailure { context.respond(HttpStatusCode.BadRequest, it.localizedMessage) }
+            }
+            put("rename/{newName}", {
+                summary = "Rename category"
+                request {
+                    pathParameter<String>("newName") {
+                        description = "the category new name"
+                        example = "new-category"
+                    }
+                }
+                response {
+                    HttpStatusCode.Accepted to { description = "Category renamed" }
+                    HttpStatusCode.BadRequest to { description = "Category could not be renamed" }
+                }
+            }) {
+                val oldName = call.parameters.getOrFail("name")
+                val newName = call.parameters.getOrFail("newName")
+                runCatching { getWalletService().renameCategory(oldName, newName) }.onSuccess {
                     context.respond(if (it) HttpStatusCode.Accepted else HttpStatusCode.BadRequest)
                 }.onFailure { context.respond(HttpStatusCode.BadRequest, it.localizedMessage) }
             }

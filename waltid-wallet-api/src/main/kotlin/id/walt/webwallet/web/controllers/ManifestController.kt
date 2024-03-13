@@ -42,7 +42,8 @@ fun Application.manifest() = walletRoute {
                     }
                 }
             }) {
-                val manifest = callManifest(call.parameters) { getManifest(it) }
+                val credentialService = CredentialsService()
+                val manifest = callManifest(call.parameters) { getManifest(it, credentialService) }
                 when (manifest) {
                     null -> context.respond(HttpStatusCode.NoContent)
                     else -> context.respond(manifest)
@@ -66,8 +67,9 @@ fun Application.manifest() = walletRoute {
                     }
                 }
             }) {
+                val credentialService = CredentialsService()
                 val manifest = callManifest(call.parameters) {
-                    getManifest(it)
+                    getManifest(it, credentialService)
                 }?.toString()
 
                 when (manifest) {
@@ -93,8 +95,9 @@ fun Application.manifest() = walletRoute {
                     }
                 }
             }) {
+                val credentialService = CredentialsService()
                 val manifest = callManifest(call.parameters) {
-                    getManifest(it)
+                    getManifest(it, credentialService)
                 }?.toString()
 
                 when (manifest) {
@@ -152,10 +155,10 @@ internal suspend fun callManifest(parameters: Parameters, method: suspend (Param
     }
 }
 
-internal fun getManifest(parameters: Parameters): JsonObject? {
+internal fun getManifest(parameters: Parameters, credentialsService: CredentialsService): JsonObject? {
     val walletId = parameters.getOrFail("walletId")
     val credentialId = parameters.getOrFail("credentialId")
-    return CredentialsService.get(kotlinx.uuid.UUID(walletId), credentialId)?.parsedManifest
+    return credentialsService.get(kotlinx.uuid.UUID(walletId), credentialId)?.parsedManifest
 }
 
 internal suspend fun extractManifest(parameters: Parameters): JsonObject? {

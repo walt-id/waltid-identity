@@ -1,8 +1,10 @@
 package id.walt
 
 import id.walt.credentials.vc.vcs.W3CVC
-import id.walt.issuer.*
+import id.walt.issuer.JwtIssuanceRequest
+import id.walt.issuer.SdJwtIssuanceRequest
 import id.walt.issuer.base.config.ConfigManager
+import id.walt.issuer.createCredentialOfferUri
 import id.walt.sdjwt.SDMapBuilder
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
@@ -108,7 +110,8 @@ class IssuerApiTest {
         val jsonMappingObj = Json.decodeFromString<JsonObject>(TEST_MAPPING)
 
         val selectiveDisclosureMap = SDMapBuilder().addField("sd", true).build()
-        val issueRequest = SdJwtIssuanceRequest(jsonKeyObj, TEST_ISSUER_DID, w3cVc, jsonMappingObj, selectiveDisclosureMap)
+        val issueRequest =
+            SdJwtIssuanceRequest(jsonKeyObj, TEST_ISSUER_DID, w3cVc, jsonMappingObj, selectiveDisclosureMap)
 
         ConfigManager.loadConfigs(emptyArray())
         val offerUri = createCredentialOfferUri(listOf(issueRequest))

@@ -1,4 +1,3 @@
-import com.github.benmanes.gradle.versions.updates.DependencyUpdatesTask
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 object Versions {
@@ -31,8 +30,6 @@ repositories {
     //jcenter()
     maven("https://jitpack.io")
     maven("https://maven.walt.id/repository/waltid/")
-    //maven("https://maven.walt.id/repository/waltid/id/walt/core-crypto/")
-    //maven("https://maven.walt.id/repository/waltid/id/walt/waltid-ssikit2")
     mavenLocal()
 }
 
@@ -98,18 +95,10 @@ dependencies {
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:${Versions.COROUTINES_VERSION}")
     //testImplementation("io.ktor:ktor-server-tests-jvm:${Versions.KTOR_VERSION}")
 
-    // CLI
-    //implementation("com.github.ajalt.clikt:clikt:4.2.0")
-
     // OIDC
     api(project(":waltid-openid4vc"))
 
-    // SSIKit
-    //implementation("id.walt:waltid-ssikit:1.2309171812.0")
-    //implementation("id.walt:waltid-sd-jwt:1.2306191408.0")
-    //implementation("id.walt.servicematrix:WaltID-ServiceMatrix:1.1.3")
-
-    // SSI Kit 2
+    // walt.id
     api(project(":waltid-crypto"))
     api(project(":waltid-did"))
 
@@ -118,10 +107,6 @@ dependencies {
 
     // TODO: REMOVE:
     implementation("com.nimbusds:nimbus-jose-jwt:9.37.3")
-
-    //api(project(":waltid-mdocs"))
-    //implementation("id.walt:waltid-ssikit2:1.0.8a-SNAPSHOT")
-    // implementation id.walt:core-crypto -> provided by id.walt:waltid-ssikit2
 }
 
 tasks.withType<Test> {
@@ -198,11 +183,3 @@ publishing {
     renderers = arrayOf<ReportRenderer>(InventoryHtmlReportRenderer("xyzkit-licenses-report.html", "XYZ Kit"))
     filters = arrayOf<DependencyFilter>(LicenseBundleNormalizer())
 }*/
-
-
-
-tasks.withType<DependencyUpdatesTask> {
-    rejectVersionIf {
-        listOf("-beta", "-alpha", "-rc").any { it in candidate.version.lowercase() } || candidate.version.takeLast(4).contains("RC")
-    }
-}

@@ -111,6 +111,10 @@ dependencies {
     // OIDC
     implementation(project(":waltid-openid4vc"))
     implementation(project(":waltid-sdjwt"))
+    
+    testImplementation(project(":waltid-issuer-api"))
+    testImplementation(project(":waltid-verifier-api"))
+    
     implementation("com.nimbusds:nimbus-jose-jwt:9.37.3")
     implementation("io.ktor:ktor-client-java:$ktorVersion")
 
@@ -119,19 +123,28 @@ dependencies {
     // Cache
     implementation("io.github.reactivecircus.cache4k:cache4k:0.13.0")
 
+    // Webauthn
+     implementation("com.webauthn4j:webauthn4j-core:0.22.1.RELEASE") {
+         exclude("ch.qos.logback")
+     }
+
     // DB
     implementation("org.jetbrains.exposed:exposed-core:0.47.0")
     implementation("org.jetbrains.exposed:exposed-jdbc:0.47.0")
     implementation("org.jetbrains.exposed:exposed-dao:0.47.0")
     implementation("org.jetbrains.exposed:exposed-java-time:0.47.0")
     implementation("org.jetbrains.exposed:exposed-json:0.47.0")
+    // drivers
     implementation("org.xerial:sqlite-jdbc:3.44.1.0")
     implementation("org.postgresql:postgresql:42.7.2")
+    implementation("mysql:mysql-connector-java:8.0.33")
+    implementation("com.microsoft.sqlserver:mssql-jdbc:9.4.1.jre8")
     // migration
     //implementation("org.flywaydb:flyway-core:9.22.2")
 
     // Web push
-    implementation("nl.martijndwars:web-push:5.1.1") // todo: replace with https://github.com/interaso/webpush
+    // implementation("dev.blanke.webpush:webpush:6.1.1") // alternative
+    implementation("com.interaso:webpush:1.1.1")
 
     // Config
     implementation("com.sksamuel.hoplite:hoplite-core:2.8.0.RC3")
@@ -147,17 +160,8 @@ dependencies {
 
     // Test
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit:1.9.22")
-
-    /*testImplementation("io.kotest:kotest-runner-junit5:5.5.5")
-    testImplementation("io.kotest:kotest-assertions-core:5.5.5")
-    testImplementation("io.kotest.extensions:kotest-assertions-ktor:2.0.0")*/
+    testImplementation(kotlin("test"))
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.0")
     testImplementation("io.ktor:ktor-server-tests-jvm:$ktorVersion")
-}
-
-
-
-tasks.withType<DependencyUpdatesTask> {
-    rejectVersionIf {
-        listOf("-beta", "-alpha", "-rc").any { it in candidate.version.lowercase() } || candidate.version.takeLast(4).contains("RC")
-    }
+    testImplementation("io.mockk:mockk:1.13.10")
 }

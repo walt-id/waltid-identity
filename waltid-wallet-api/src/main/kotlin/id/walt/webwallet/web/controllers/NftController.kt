@@ -58,7 +58,7 @@ fun Application.nfts() = walletRoute {
             val networks = context.request.queryParameters.getAll("network")
             context.respond(
                 nft.filterTokens("", FilterParameter(accountIds ?: emptyList(), networks ?: emptyList()))
-                // FIX ME -> TENANT HERE
+                // FIXME -> TENANT HERE
             )
         }
         get("list/{account}/{chain}", {
@@ -85,7 +85,8 @@ fun Application.nfts() = walletRoute {
             val chain = call.parameters["chain"] ?: throw IllegalArgumentException("No chain provided")
             val account = call.parameters["account"] ?: throw IllegalArgumentException("No account provided")
             context.respond(
-                nft.getTokens("", // FIX ME -> TENANT HERE
+                nft.getTokens(
+                    "", // FIXME -> TENANT HERE
                     ListFetchParameter(
                         chain = chain,
                         walletId = account
@@ -132,7 +133,8 @@ fun Application.nfts() = walletRoute {
             val collection = context.request.queryParameters["collectionId"]
             val nft = getNftService()
             runCatching {
-                nft.getTokenDetails("", // FIX ME -> TENANT HERE
+                nft.getTokenDetails(
+                    "", // FIXME -> TENANT HERE
                     DetailFetchParameter(
                         chain = chain,
                         walletId = account,

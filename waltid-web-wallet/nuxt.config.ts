@@ -4,8 +4,7 @@ export default defineNuxtConfig({
     srcDir: "src",
     modules: [
         "@vueuse/nuxt",
-        "@nuxtjs/tailwindcss",
-        "@unocss/nuxt",
+        ["@unocss/nuxt", { autoImport: false }],
         "@nuxtjs/i18n",
         "@nuxtjs/color-mode",
         //'@huntersofbook/naive-ui-nuxt',
@@ -37,12 +36,6 @@ export default defineNuxtConfig({
         globalAppMiddleware: {
             isEnabled: true
         }
-    },
-    postcss: {
-        plugins: {
-            tailwindcss: {},
-            autoprefixer: {},
-        },
     },
     pwa: {
         registerWebManifestInRouteRules: true,
@@ -158,10 +151,6 @@ export default defineNuxtConfig({
         storageKey: "color-mode"
     },
 
-    tailwindcss: {
-        configPath: "./tailwind.config.js"
-    },
-
     vite: {
         logLevel: "info"
         /*server: {
@@ -189,8 +178,7 @@ export default defineNuxtConfig({
             "/wallet-api/": "http://localhost:7001/wallet-api"
         }
     },
-    ssr: false,
-    css: ["@near-wallet-selector/modal-ui/styles.css"]
+    ssr: false
 
     // i18n: {
     //     lazy: true,
