@@ -58,7 +58,7 @@ data:
     accessTokenUrl = "${oidcRealm}/protocol/openid-connect/token"
     logoutUrl = "${oidcRealm}/protocol/openid-connect/logout"
     clientId = "waltid_backend"
-    clientSecret = "SiJXBB6U6CmPR8kXmhYDOZ8KdcGR46w8"
+    clientSecret = "__DEFAULT_KEYCLOAK_CLIENT_SECRET__"
     keycloakUserApi = "https://keycloak.walt-test.cloud/admin/realms/waltid-keycloak-ktor/users"
     jwksCache = {
       cacheSize = 10

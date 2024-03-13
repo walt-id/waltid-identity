@@ -3,6 +3,7 @@ package id.walt
 import id.walt.credentials.vc.vcs.W3CVC
 import id.walt.issuer.*
 import id.walt.issuer.base.config.ConfigManager
+import id.walt.issuer.createCredentialOfferUri
 import id.walt.sdjwt.SDMapBuilder
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
