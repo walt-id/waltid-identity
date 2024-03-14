@@ -5,7 +5,7 @@ import com.nimbusds.jose.crypto.ECDSASigner
 import com.nimbusds.jose.crypto.ECDSAVerifier
 import com.nimbusds.jose.jwk.ECKey
 import id.walt.credentials.PresentationBuilder
-import id.walt.crypto.keys.LocalKey
+import id.walt.crypto.keys.JwkKey
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.did.dids.DidService
 import id.walt.oid4vc.data.OpenIDProviderMetadata
@@ -64,7 +64,7 @@ class EBSITestWallet(
     }
 
     val TEST_DID = EBSI_WALLET_TEST_DID
-    val TEST_KEY = runBlocking { LocalKey.importJWK(EBSI_WALLET_TEST_KEY_JWK).getOrThrow() }
+    val TEST_KEY = runBlocking { JwkKey.importJWK(EBSI_WALLET_TEST_KEY_JWK).getOrThrow() }
 
     override fun resolveDID(did: String): String {
         val didObj = runBlocking { DidService.resolve(did) }.getOrThrow()

@@ -365,19 +365,19 @@ walt.id identity.
 
 The library provides the following key entities to work with:
 
-- [LocalKey
-  ](https://github.com/walt-id/waltid-identity/blob/main/waltid-crypto/src/commonMain/kotlin/id/walt/crypto/keys/LocalKey.kt) -
+- [JwkKey
+  ](https://github.com/walt-id/waltid-identity/blob/main/waltid-crypto/src/commonMain/kotlin/id/walt/crypto/keys/JwkKey.kt) -
   an implementation of a local (in-memory) key (private / public)
 - [TSEKey
   ](https://github.com/walt-id/waltid-identity/blob/main/waltid-crypto/src/commonMain/kotlin/id/walt/crypto/keys/TSEKey.kt) -
   an implementation of a Hashicorp Vault Transit Secrets Engine key (private / public)
 
-### Working with LocalKey
+### Working with JwkKey
 
 **Create key**
 
 ```kotlin
-val key = LocalKey.generate(KeyType.Ed25519, LocalKeyMetadata())
+val key = JwkKey.generate(KeyType.Ed25519, JwkKeyMetadata())
 ```
 
 **Sign**
@@ -413,19 +413,19 @@ val verificationResult = key.getPublicKey().verifyRaw(signature as ByteArray)
 - jwk
 
 ```kotlin
-val keyResult = LocalKey.importJWK(jwkString)
+val keyResult = JwkKey.importJWK(jwkString)
 ```
 
 - pem
 
 ```kotlin
-val keyResult = LocalKey.importPEM(pemString)
+val keyResult = JwkKey.importPEM(pemString)
 ```
 
 - raw
 
 ```kotlin
-val key = LocalKey.importRawPublicKey(KeyType.Ed25519, bytes, LocalKeyMetadata())
+val key = JwkKey.importRawPublicKey(KeyType.Ed25519, bytes, JwkKeyMetadata())
 ```
 
 **Export public key**
@@ -543,4 +543,4 @@ vault secrets enable transit
 5. click 'Next', then 'Enable Engine'
 
 For usage examples on _create_, _sign_, _verify_, _import_ and _export_ functions see
-[Working with LocalKey](#working-with-localkey).
+[Working with JwkKey](#working-with-jwkKey).

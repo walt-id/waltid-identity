@@ -1,6 +1,6 @@
 import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.LocalKey
+import id.walt.crypto.keys.JwkKey
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
@@ -9,7 +9,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
-class LocalKeyAndDidManagementTest {
+class JwkKeyAndDidManagementTest {
 
     private val keyTypeMap = mapOf(
         KeyType.Ed25519 to "OKP",
@@ -25,10 +25,10 @@ class LocalKeyAndDidManagementTest {
     private val testObj = JsonObject(mapOf("value1" to JsonPrimitive("123456789")))
 
     @Test
-    fun localKeyGenerationTest() = runTest {
+    fun jwkKeyGenerationTest() = runTest {
         KeyType.entries.forEach {
             println("Generate key for key type $it")
-            val generatedKey = LocalKey.generate(it)
+            val generatedKey = JwkKey.generate(it)
 
             println("Serializing key: $generatedKey")
             val serialized = KeySerialization.serializeKey(generatedKey)
@@ -38,7 +38,7 @@ class LocalKeyAndDidManagementTest {
             println("Decoded $serialized as $decoded")
 
             println("Checking if type=local")
-            assertEquals("local", decoded["type"]!!.jsonPrimitive.content)
+            assertEquals("jwk", decoded["type"]!!.jsonPrimitive.content)
 
             println("Parsing JWK...")
             val jwk = decoded["jwk"]!!.jsonPrimitive.content

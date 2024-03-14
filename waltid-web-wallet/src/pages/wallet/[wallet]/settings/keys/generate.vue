@@ -10,11 +10,11 @@
                             <label class="block text-sm font-medium leading-6 text-gray-900 sm:pt-1.5"
                                 for="format">KMS</label>
                             <div class="mt-2 sm:col-span-2 sm:mt-0">
-                                <select id="format" v-model="data.kms.type" @change="data.kms.config = {}"
+                                <select id="format" v-model="data.keyGenerationRequest.type" @change="data.keyGenerationRequest.config = {}"
                                     class="block px-2 w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:max-w-xs sm:text-sm sm:leading-6"
                                     name="format">
-                                    <option v-for="option in options" :key="option.kms[1]" :value="option.kms[1]">
-                                        {{ option.kms[0] }}
+                                    <option v-for="option in options" :key="option.keyGenerationRequest[1]" :value="option.keyGenerationRequest[1]">
+                                        {{ option.keyGenerationRequest[0] }}
                                     </option>
                                 </select>
                             </div>
@@ -27,7 +27,7 @@
                                     class="block px-2 w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:max-w-xs sm:text-sm sm:leading-6"
                                     name="format">
                                     <option
-                                        v-for="keyType in options.find(option => option.kms[1] == data.kms.type)?.keyType"
+                                        v-for="keyType in options.find(option => option.keyGenerationRequest[1] == data.keyGenerationRequest.type)?.keyType"
                                         :key="keyType[1]" :value="keyType[1]">
                                         {{ keyType[0] }}
                                     </option>
@@ -36,14 +36,14 @@
                         </div>
                     </div>
                 </div>
-                <div v-if="options.find(option => option.kms[1] == data.kms.type)?.config?.length"
+                <div v-if="options.find(option => option.keyGenerationRequest[1] == data.keyGenerationRequest.type)?.config?.length"
                     class="mt-1 space-y-8 border-gray-900/10 pb-12 sm:space-y-0 sm:divide-gray-900/10 sm:border-t sm:pb-0">
                     <div class="sm:grid sm:grid-cols-3 sm:items-start sm:gap-4 sm:py-2"
-                        v-for="config in options.find(option => option.kms[1] == data.kms.type)?.config">
+                        v-for="config in options.find(option => option.keyGenerationRequest[1] == data.keyGenerationRequest.type)?.config">
                         <label class="block text-sm font-medium leading-6 text-gray-900 sm:pt-1.5">{{
                             config.charAt(0).toUpperCase() + config.slice(1)
                         }}</label>
-                        <input v-model="data.kms.config[config]" class=" px-2 block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm
+                        <input v-model="data.keyGenerationRequest.config[config]" class=" px-2 block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm
                             ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset
                             focus:ring-indigo-600 sm:max-w-xs sm:text-sm sm:leading-6" type="text" />
                     </div>
@@ -94,19 +94,19 @@ const response = ref("");
 
 const options = ref([
     {
-        "kms": ["Local", "local"],
+        "keyGenerationRequest": ["JWK", "jwk"],
         "keyType": [["EdDSA_Ed25519", "Ed25519"], ["ECDSA_Secp256k1", "secp256k1"], ["ECDSA_Secp256r1", "secp256r1"], ["RSA", "RSA"]],
         "config": []
     },
     {
-        "kms": ["TSE", "tse"],
+        "keyGenerationRequest": ["TSE", "tse"],
         "keyType": [["EdDSA_Ed25519", "Ed25519"], ["RSA", "RSA"]],
         "config": ["server", "accessKey"]
     },
 ])
 const data: any = ref({
-    "kms": {
-        "type": "local",
+    "keyGenerationRequest": {
+        "type": "jwk",
         "config": {}
     },
     "type": "Ed25519",
@@ -115,7 +115,7 @@ const data: any = ref({
 const currentWallet = useCurrentWallet()
 
 async function generateKey() {
-    if (Object.keys(data.value.kms.config).length !== options.value.find(option => option.kms[1] == data.value.kms.type)?.config?.length) {
+    if (Object.keys(data.value.keyGenerationRequest.config).length !== options.value.find(option => option.keyGenerationRequest[1] == data.value.keyGenerationRequest.type)?.config?.length) {
         return alert("Please fill all fields");
     }
 

@@ -9,35 +9,35 @@ import love.forte.plugin.suspendtrans.annotation.JsPromise
 import kotlin.js.json
 
 @JsExport
-object JsLocalKeyCreator : LocalKeyCreator {
+object JsJwkKeyCreator : JwkKeyCreator {
 
     @JsPromise
     @JsExport.Ignore
-    override suspend fun generate(type: KeyType, metadata: LocalKeyMetadata): LocalKey {
+    override suspend fun generate(type: KeyType, metadata: JwkKeyMetadata): JwkKey {
         val alg = type.jwsAlg()
 
         @Suppress("UNCHECKED_CAST_TO_EXTERNAL_INTERFACE")
         val key = await(jose.generateKeyPair<KeyLike>(alg, json("extractable" to true) as jose.GenerateKeyPairOptions)).privateKey
 
-        return LocalKey(key).apply { init() }
+        return JwkKey(key).apply { init() }
     }
 
     @JsPromise
     @JsExport.Ignore
-    override suspend fun importRawPublicKey(type: KeyType, rawPublicKey: ByteArray, metadata: LocalKeyMetadata): Key {
+    override suspend fun importRawPublicKey(type: KeyType, rawPublicKey: ByteArray, metadata: JwkKeyMetadata): Key {
         val key: KeyLike = await(jose.importSPKI(rawPublicKey.decodeToString(), type.jwsAlg()))
-        return LocalKey(key).apply { init() }
+        return JwkKey(key).apply { init() }
     }
 
     @JsPromise
     @JsExport.Ignore
-    override suspend fun importJWK(jwk: String): Result<LocalKey> =
+    override suspend fun importJWK(jwk: String): Result<JwkKey> =
         runCatching {
             var jsonJWK = JSON.parse<JWK>(jwk)
             while (jsonJWK::class == String::class) {
                jsonJWK = JSON.parse(jsonJWK as String)
             }
-            LocalKey(await(jose.importJWK(jsonJWK)), jsonJWK).apply { init() }
+            JwkKey(await(jose.importJWK(jsonJWK)), jsonJWK).apply { init() }
         }
 
 
@@ -46,7 +46,7 @@ object JsLocalKeyCreator : LocalKeyCreator {
      */
     @JsPromise
     @JsExport.Ignore
-    override suspend fun importPEM(pem: String): Result<LocalKey> =
+    override suspend fun importPEM(pem: String): Result<JwkKey> =
         runCatching {
             val lines = pem.lines()
             fun String.getPemTitle() = this.trim().dropWhile { it == '-' }.dropLastWhile { it == '-' }.trim()
@@ -70,6 +70,6 @@ object JsLocalKeyCreator : LocalKeyCreator {
                 }
             )
 
-            LocalKey(importedPemKey).apply { init() }
+            JwkKey(importedPemKey).apply { init() }
         }
 }

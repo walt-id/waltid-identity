@@ -9,7 +9,7 @@ import id.walt.credentials.vc.vcs.W3CVC
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.LocalKey
+import id.walt.crypto.keys.JwkKey
 import id.walt.did.dids.DidService
 import id.walt.issuer.IssuanceExamples.openBadgeCredentialExample
 import id.walt.issuer.base.config.ConfigManager
@@ -79,11 +79,11 @@ open class CIProvider : OpenIDCredentialIssuer(
 ) {
     companion object {
 
-        val exampleIssuerKey by lazy { runBlocking { LocalKey.generate(KeyType.Ed25519) } }
+        val exampleIssuerKey by lazy { runBlocking { JwkKey.generate(KeyType.Ed25519) } }
         val exampleIssuerDid by lazy { runBlocking { DidService.registerByKey("jwk", exampleIssuerKey).did } }
 
 
-        private val CI_TOKEN_KEY by lazy { runBlocking { LocalKey.generate(KeyType.Ed25519) } }
+        private val CI_TOKEN_KEY by lazy { runBlocking { JwkKey.generate(KeyType.Ed25519) } }
     }
 
     // -------------------------------
