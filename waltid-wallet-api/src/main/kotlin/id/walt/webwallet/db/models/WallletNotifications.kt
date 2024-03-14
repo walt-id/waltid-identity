@@ -3,7 +3,6 @@ package id.walt.webwallet.db.models
 import kotlinx.datetime.Instant
 import kotlinx.datetime.toKotlinInstant
 import kotlinx.serialization.Serializable
-import kotlinx.uuid.UUID
 import kotlinx.uuid.exposed.KotlinxUUIDTable
 import kotlinx.uuid.exposed.kotlinxUUID
 import org.jetbrains.exposed.sql.ResultRow
@@ -21,18 +20,18 @@ object WalletNotifications : KotlinxUUIDTable("notifications") {
 
 @Serializable
 data class Notification(
-    val id: UUID? = null,
-    val account: UUID,
-    val wallet: UUID,
+    val id: String? = null,
+    val account: String,
+    val wallet: String,
     val type: String,
     val status: Boolean,
     val addedOn: Instant,
     val data: String,
 ) {
     constructor(resultRow: ResultRow) : this(
-        id = resultRow[WalletNotifications.id].value,
-        account = resultRow[WalletNotifications.account],
-        wallet = resultRow[WalletNotifications.wallet].value,
+        id = resultRow[WalletNotifications.id].value.toString(),
+        account = resultRow[WalletNotifications.account].toString(),
+        wallet = resultRow[WalletNotifications.wallet].value.toString(),
         type = resultRow[WalletNotifications.type],
         status = resultRow[WalletNotifications.isRead],
         addedOn = resultRow[WalletNotifications.addedOn].toKotlinInstant(),
