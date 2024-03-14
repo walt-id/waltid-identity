@@ -5,14 +5,21 @@ import id.walt.webwallet.db.models.WalletKeys
 import kotlinx.datetime.Clock
 import kotlinx.datetime.toJavaInstant
 import kotlinx.uuid.UUID
-import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.sql.deleteWhere
+import org.jetbrains.exposed.sql.insert
+import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 
 object KeysService {
     fun get(wallet: UUID, keyId: String): WalletKey? = transaction {
         WalletKeys.selectAll().where { (WalletKeys.wallet eq wallet) and (WalletKeys.keyId eq keyId) }
-            .singleOrNull()?.let { WalletKey(it) }
+            .firstOrNull()?.let { WalletKey(it) }
+    }
+
+    fun get(keyId: String): WalletKey? = transaction {
+        WalletKeys.selectAll().where { WalletKeys.keyId eq keyId }.firstOrNull()?.let { WalletKey(it) }
     }
 
     fun list(wallet: UUID): List<WalletKey> = WalletKeys.selectAll().where { WalletKeys.wallet eq wallet }.map { WalletKey(it) }

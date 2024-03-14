@@ -109,7 +109,8 @@ class IssuerApiTest {
         val jsonMappingObj = Json.decodeFromString<JsonObject>(TEST_MAPPING)
 
         val selectiveDisclosureMap = SDMapBuilder().addField("sd", true).build()
-        val issueRequest = SdJwtIssuanceRequest(jsonKeyObj, TEST_ISSUER_DID, w3cVc, jsonMappingObj, selectiveDisclosureMap)
+        val issueRequest =
+            SdJwtIssuanceRequest(jsonKeyObj, TEST_ISSUER_DID, w3cVc, jsonMappingObj, selectiveDisclosureMap)
 
         ConfigManager.loadConfigs(emptyArray())
         val offerUri = createCredentialOfferUri(listOf(issueRequest))

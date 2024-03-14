@@ -14,7 +14,9 @@ import org.jetbrains.exposed.sql.statements.UpdateStatement
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.time.Instant
 
-object CredentialsService {
+class CredentialsService {
+    val categoryService = CategoryService()
+
     private val notDeletedItemsCondition = Op.build { WalletCredentials.deletedOn eq null }
     private val deletedItemsCondition = Op.build { WalletCredentials.deletedOn neq null }
 
@@ -29,12 +31,13 @@ object CredentialsService {
 
     /**
      * Returns a list of credentials identified by the [credentialIdList]
-     * @param wallet wallet id
      * @param credentialIdList the list of credential ids
      * @return list of [WalletCredential] that could match the specified [credentialIdList]
      */
-    fun get(wallet: UUID, credentialIdList: List<String>): List<WalletCredential> = transaction {
-        getCredentialsQuery(wallet, true, *credentialIdList.toTypedArray()).map {
+    fun get(credentialIdList: List<String>): List<WalletCredential> = transaction {
+        WalletCredentials.select {
+            (WalletCredentials.id inList credentialIdList)
+        }.map {
             WalletCredential(it)
         }
     }
@@ -91,10 +94,6 @@ object CredentialsService {
     fun setPending(wallet: UUID, credentialId: String, pending: Boolean = true) =
         updatePending(wallet, credentialId, pending)
 
-    /*fun update(account: UUID, did: DidUpdateDataObject): Boolean {
-        TO-DO
-    }*/
-
     private fun addAll(wallet: UUID, credentials: List<WalletCredential>): List<String> = transaction {
         WalletCredentials.batchInsert(credentials) { credential: WalletCredential ->
             this[WalletCredentials.wallet] = wallet
@@ -125,6 +124,7 @@ object CredentialsService {
         }
     }
 
+    //TODO: copied from IssuersService
     private fun updateColumn(wallet: UUID, credentialId: String, update: (statement: UpdateStatement) -> Unit): Int =
         WalletCredentials.update({ WalletCredentials.wallet eq wallet and (WalletCredentials.id eq credentialId) }) {
             update(it)
@@ -135,21 +135,21 @@ object CredentialsService {
 
     private fun categorizedQuery(wallet: UUID, deleted: Boolean, pending: Boolean, categories: List<String>) =
         WalletCredentials.innerJoin(otherTable = WalletCredentialCategoryMap,
-            onColumn = { id },
-            otherColumn = { credential },
+            onColumn = { WalletCredentials.id },
+            otherColumn = { WalletCredentialCategoryMap.credential },
             additionalConstraint = {
                 WalletCredentials.wallet eq wallet and (WalletCredentialCategoryMap.wallet eq wallet) and deletedCondition(
                     deleted
                 ) and (WalletCredentials.pending eq pending)
             }).innerJoin(otherTable = WalletCategory,
             onColumn = { WalletCredentialCategoryMap.category },
-            otherColumn = { name },
+            otherColumn = { WalletCategory.id },
             additionalConstraint = {
                 WalletCategory.wallet eq wallet and (WalletCredentialCategoryMap.wallet eq wallet) and (WalletCategory.name inList (categories))
             }).selectAll()
 
     private fun uncategorizedQuery(wallet: UUID, deleted: Boolean, pending: Boolean) = WalletCredentials.selectAll().where {
-        WalletCredentials.wallet eq wallet and (WalletCredentials.id notInSubQuery (WalletCredentialCategoryMap.select(
+        WalletCredentials.wallet eq wallet and (WalletCredentials.id notInSubQuery (WalletCredentialCategoryMap.slice(
             WalletCredentialCategoryMap.credential
         ).selectAll()
             .where { WalletCredentialCategoryMap.wallet eq wallet })) and deletedCondition(deleted) and (WalletCredentials.pending eq pending)
@@ -162,10 +162,10 @@ object CredentialsService {
     private fun deletedCondition(deleted: Boolean) =
         deleted.takeIf { it }?.let { deletedItemsCondition } ?: notDeletedItemsCondition
 
-    object Category {
+    class CategoryService {
         fun add(wallet: UUID, credentialId: String, vararg category: String): Int = transaction {
             WalletCredentialCategoryMap.batchUpsert(
-                category.toList(),
+                getCategoryIds(wallet, category.toList()),
                 WalletCredentialCategoryMap.wallet,
                 WalletCredentialCategoryMap.credential,
                 WalletCredentialCategoryMap.category
@@ -178,8 +178,17 @@ object CredentialsService {
 
         fun delete(wallet: UUID, credentialId: String, vararg category: String): Int = transaction {
             WalletCredentialCategoryMap.deleteWhere {
-                WalletCredentialCategoryMap.wallet eq wallet and (credential eq credentialId) and (WalletCredentialCategoryMap.category inList (category.toList()))
+                WalletCredentialCategoryMap.wallet eq wallet and (WalletCredentialCategoryMap.credential eq credentialId) and (WalletCredentialCategoryMap.category inList (getCategoryIds(
+                    wallet, category.toList()
+                )))
             }
+        }
+
+        private fun getCategoryIds(wallet: UUID, category: List<String>): List<Int> = transaction {
+            WalletCategory.selectAll()
+                .where { WalletCategory.wallet eq wallet and (WalletCategory.name inList category.toList()) }.map {
+                    it[WalletCategory.id].value
+                }
         }
     }
 }
@@ -192,6 +201,12 @@ data class CredentialFilterObject(
     val sorDescending: Boolean,
 ) {
     companion object {
-        val default = CredentialFilterObject(null, showDeleted = false, showPending = false, sortBy = "", sorDescending = false)
+        val default = CredentialFilterObject(
+            categories = null,
+            showDeleted = false,
+            showPending = false,
+            sortBy = "",
+            sorDescending = false
+        )
     }
 }
