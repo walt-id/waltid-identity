@@ -173,9 +173,3 @@ data class RegistrationResult(
 )
 
 data class AuthenticatedUser(val id: UUID, val username: String)
-
-abstract class AccountStrategy<in T : AccountRequest>(id: String) {
-  abstract suspend fun register(tenant: String, request: T): Result<RegistrationResult>
-
-  abstract suspend fun authenticate(tenant: String, request: T): AuthenticatedUser
-}
