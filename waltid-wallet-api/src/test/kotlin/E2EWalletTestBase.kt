@@ -60,12 +60,8 @@ abstract class E2EWalletTestBase {
         }
     }
     
-    protected suspend fun testPresentationDefinition(presentationDefinition: String): Int {
+    protected suspend fun testPresentationDefinition(presentationDefinition: String): JsonArray {
         println("\nUse Case -> Match Credentials for Presentation Definition\n")
-        
-        println("*************************************************************************")
-        println(presentationDefinition)
-        println("*************************************************************************")
         
         val endpoint = "$walletUrl/wallet-api/wallet/$walletId/exchange/matchCredentialsForPresentationDefinition"
         println("POST ($endpoint)\n")
@@ -78,7 +74,7 @@ abstract class E2EWalletTestBase {
         }.let { response ->
             assertEquals(HttpStatusCode.OK, response.status)
             println("Number credentials matched = ${response.body<JsonArray>().size}")
-            response.body<JsonArray>().size
+            response.body<JsonArray>()
         }
     }
     
@@ -207,22 +203,14 @@ abstract class E2EWalletTestBase {
         println("\nUse Case -> User Info\n")
         val endpoint = "$walletUrl/wallet-api/auth/user-info"
         println("GET ($endpoint)")
-        walletClient.get(endpoint) {
-            bearerAuth(token)
-        }.let { response ->
-            assertEquals(HttpStatusCode.OK, response.status)
-        }
+        assertEquals(HttpStatusCode.OK, walletClient.get(endpoint){}.status)
     }
     
     protected suspend fun testUserSession() {
         println("\nUse Case -> Session\n")
         val endpoint = "$walletUrl/wallet-api/auth/session"
         println("GET ($endpoint")
-        walletClient.get(endpoint) {
-            bearerAuth(token)
-        }.let { response ->
-            assertEquals(HttpStatusCode.OK, response.status)
-        }
+        assertEquals(HttpStatusCode.OK, walletClient.get(endpoint){}.status)
     }
     
     protected suspend fun deleteCredential(credentialId: String) {
@@ -396,5 +384,21 @@ abstract class E2EWalletTestBase {
             response.bodyAsText()
         }
         return presentationRequest
+    }
+    
+    protected suspend fun testUsePresentationRequest(json: String) = run {
+        val endpoint = "$walletUrl/wallet-api/wallet/$walletId/exchange/usePresentationRequest"
+        
+        println("POST ($endpoint)\n")
+        
+        walletClient.post(endpoint) {
+            //language=JSON
+            contentType(ContentType.Application.Json)
+            setBody(
+                json
+            )
+        }.let { response ->
+            assertEquals(HttpStatusCode.OK, response.status)
+        }
     }
 }

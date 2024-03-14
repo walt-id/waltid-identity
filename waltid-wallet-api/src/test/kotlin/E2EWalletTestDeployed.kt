@@ -75,11 +75,8 @@ class E2EWalletTestDeployed : E2EWalletTestBase() {
         
         login(User(name = "tester", email = "tester@email.com", password = "password", accountType = "email"))
         getUserToken()
-        testUserInfo()
-        testUserSession()
         deployedClient = newClient(token)
         listAllWallets()
-        
         println("WalletId (Deployed Wallet API) = $walletId")
     }
     
@@ -98,10 +95,7 @@ class E2EWalletTestDeployed : E2EWalletTestBase() {
     @Test
     fun e2eIssuerOnboarding() = runTest {
         if (versionCheck(1.1)) {
-            deployedClient = newClient()
-            login()
-            getUserToken()
-            deployedClient = newClient(token)
+            initialise()
             onboardIssuer()
         } else {
             println("Test e2eIssuerOnboarding() skipped")
@@ -239,11 +233,47 @@ class E2EWalletTestDeployed : E2EWalletTestBase() {
     @Test
     fun e2eTestMatchCredentialsForPresentationDefinition() = runTest {
         initialise()
-        listAllWallets() // sets the wall
+        listAllWallets() // sets the wallet id
         
         val response: JsonArray = listCredentials()
         testPresentationDefinition(presentationDefinitionExample1)
         // TODO ensure num matched credentials is equal to credential list size when no match found for type
+    }
+    
+    @Test
+    fun e2eTestFullPresentationUseCase() = testApplication {
+        initialise()
+        listAllWallets()
+        
+        // full e2e run of verification endpoints
+        
+        // 1. /verify in the Verifier API
+        val url = testVerifyCredential(VerifierApiExamples.minimal)
+        println("Verify Url = $url")
+        
+        // 2. resolve presentation request with URI from 1)
+        
+        val parsedRequest = testResolvePresentationRequest(url)
+        println("Parsed Request = $parsedRequest")
+        
+        // 3. Match credentials of the required type, e.g., OpenBadgeCredential
+        val matchedCredentials = testPresentationDefinition(presentationDefinitionExample1)
+        val id = matchedCredentials[0].jsonObject["id"]?.jsonPrimitive?.content
+        assertNotNull(id)
+        
+        val did = matchedCredentials[0].jsonObject["parsedDocument"]?.jsonObject?.get("issuer")?.jsonObject?.get("id")
+        
+        // 4. Use output of 2) and 3) to create presentation to return to relying party
+        val json = """
+           {
+                "did": "${did?.jsonPrimitive?.content}",
+                "presentationRequest": "$parsedRequest",
+                "selectedCredentials": [
+                    "$id"
+                ]
+            }
+        """.trimIndent()
+        testUsePresentationRequest(json)
     }
     
     override var walletClient: HttpClient

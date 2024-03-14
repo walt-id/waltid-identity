@@ -7,5 +7,4 @@ object Values {
     
     val versionNumber: Double
         get() = version.substring(0,3).toDouble()
-    
 }

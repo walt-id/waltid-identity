@@ -194,7 +194,7 @@ class TestCredentialWallet(
         }
 
         println("GENERATED VP: $signed")
-
+        println("credential = ${matchedCredentials[0]}")
         return PresentationResult(
             listOf(JsonPrimitive(signed)), PresentationSubmission(
                 id = presentationId,
@@ -292,7 +292,9 @@ class TestCredentialWallet(
     }
 
     private fun buildDescriptorMapping(session: VPresentationSession, index: Int, vcJwsStr: String) = let {
-        val vcJws = vcJwsStr.base64UrlToBase64().decodeJws()
+        
+        val tmp = vcJwsStr.base64UrlToBase64()
+        val vcJws = tmp.decodeJws()
         val type = vcJws.payload["vc"]?.jsonObject?.get("type")?.jsonArray?.last()?.jsonPrimitive?.contentOrNull
             ?: "VerifiableCredential"
 

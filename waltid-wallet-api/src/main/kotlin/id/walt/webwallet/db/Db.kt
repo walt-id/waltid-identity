@@ -1,5 +1,6 @@
 package id.walt.webwallet.db
 
+import java.util.Base64
 import id.walt.webwallet.config.ConfigManager
 import id.walt.webwallet.config.DatasourceConfiguration
 import id.walt.webwallet.db.models.*
@@ -10,6 +11,8 @@ import id.walt.webwallet.web.model.EmailAccountRequest
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Clock
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
 import kotlinx.uuid.UUID
 import kotlinx.uuid.generateUUID
 import org.jetbrains.exposed.sql.Database
@@ -85,6 +88,7 @@ object Db {
                 val walletResult = AccountsService.getAccountWalletMappings("", accountId)
                 val walletId = walletResult.wallets[0].id
                 
+                val encodedString: String = Base64.getEncoder().encodeToString(IssuanceExamples.openBadgeCredentialExampleJsonString.toByteArray())
                 CredentialsService().add(
                     wallet = walletId,
                     WalletCredential(
@@ -92,6 +96,7 @@ object Db {
                         id = "urn:uuid:" + UUID.generateUUID(Random),
                         document = IssuanceExamples.openBadgeCredentialExampleJsonString,
                         disclosures = null,
+                        parsedDocument = Json.parseToJsonElement(IssuanceExamples.openBadgeCredentialExampleJsonString).jsonObject,
                         addedOn = Clock.System.now(),
                         manifest = null,
                         deletedOn = null,
