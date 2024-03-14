@@ -120,7 +120,8 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
 
     protected abstract fun createSIOPSession(id: String, authorizationRequest: AuthorizationRequest?, expirationTimestamp: Instant): S
 
-    override fun initializeAuthorization(authorizationRequest: AuthorizationRequest, expiresIn: Duration): S {
+    //the idTokenRequestState is added because of AuthorizationSession()
+    override fun initializeAuthorization(authorizationRequest: AuthorizationRequest, expiresIn: Duration, idTokenRequestState: String?): S {
         val resolvedAuthReq = resolveVPAuthorizationParameters(authorizationRequest)
         return if (validateAuthorizationRequest(resolvedAuthReq)) {
             createSIOPSession(

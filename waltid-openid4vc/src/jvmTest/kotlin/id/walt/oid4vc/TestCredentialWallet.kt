@@ -223,6 +223,10 @@ class TestCredentialWallet(
         get() = createDefaultProviderMetadata()
 
     override fun getSession(id: String) = sessionCache[id]
+    override fun getSessionByIdTokenRequestState(idTokenRequestState: String): SIOPSession? {
+        TODO("Not yet implemented")
+    }
+
     override fun putSession(id: String, session: SIOPSession) = sessionCache.put(id, session)
     override fun removeSession(id: String) = sessionCache.remove(id)
 

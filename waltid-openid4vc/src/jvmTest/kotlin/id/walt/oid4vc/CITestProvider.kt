@@ -70,6 +70,10 @@ class CITestProvider : OpenIDCredentialIssuer(
 
     override fun getSession(id: String): IssuanceSession? = authSessions[id]
     override fun putSession(id: String, session: IssuanceSession) = authSessions.put(id, session)
+    override fun getSessionByIdTokenRequestState(idTokenRequestState: String): IssuanceSession? {
+        TODO("Not yet implemented")
+    }
+
     override fun removeSession(id: String) = authSessions.remove(id)
 
     // crypto operations and credential issuance
@@ -148,7 +152,7 @@ class CITestProvider : OpenIDCredentialIssuer(
                 post("/par") {
                     val authReq = AuthorizationRequest.fromHttpParameters(call.receiveParameters().toMap())
                     try {
-                        val session = initializeAuthorization(authReq, 5.minutes)
+                        val session = initializeAuthorization(authReq, 5.minutes, null)
                         call.respond(getPushedAuthorizationSuccessResponse(session).toJSON())
                     } catch (exc: AuthorizationError) {
                         call.respond(HttpStatusCode.BadRequest, exc.toPushedAuthorizationErrorResponse().toJSON())
