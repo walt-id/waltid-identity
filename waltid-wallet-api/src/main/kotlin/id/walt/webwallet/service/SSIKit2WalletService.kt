@@ -376,7 +376,7 @@ class SSIKit2WalletService(
 
   override suspend fun createDid(method: String, args: Map<String, JsonPrimitive>): String {
     val keyId =
-        args["keyId"]?.content?.takeIf { it.isNotEmpty() } ?: generateKey(KeyType.Ed25519.name)
+        args["keyId"]?.content?.takeIf { it.isNotEmpty() } ?: generateKey(KeyType.secp256r1.name)
     val key = getKey(keyId)
     val options = getDidOptions(method, args)
     val result = DidService.registerByKey(method, key, options)
@@ -482,7 +482,8 @@ class SSIKit2WalletService(
           config.signingKeyPem?.trimIndent())
 
   override suspend fun generateKey(type: String): String =
-      LocalKey.generate(KeyType.valueOf(type)).let { createdKey ->
+      OCIKey.generateKey(KeyType.valueOf(type), configurationKey).let { createdKey ->
+        val keyId = createdKey.getKeyId()
         eventUseCase.log(
             action = EventType.Key.Create,
             originator = "wallet",
@@ -490,7 +491,7 @@ class SSIKit2WalletService(
             accountId = accountId,
             walletId = walletId,
             data = eventUseCase.keyEventData(createdKey, "local"))
-        KeysService.add(walletId, createdKey.getKeyId(), KeySerialization.serializeKey(createdKey))
+        KeysService.add(walletId, keyId, KeySerialization.serializeKey(createdKey))
         createdKey.getKeyId()
       }
 
