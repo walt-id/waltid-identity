@@ -25,10 +25,18 @@ fun main(args: Array<String>) {
         handleNoSuchOption(cmd, e)
     } catch (e: CliktError) {
         handleCliktError(cmd, e)
+    } catch (e: Exception) {
+        handleGenericException(cmd, e)
     }
     // finally {
     //     exitProcess(e.statusCode)
     // }
+}
+
+fun handleGenericException(cmd: WaltIdCmd, e: Exception) {
+    val cliktError = CliktError(e.message)
+    printError(cmd, cliktError)
+    cmd.echoFormattedHelp(PrintHelpMessage(cmd.currentContext))
 }
 
 fun handleCliktError(cmd: WaltIdCmd, e: CliktError) {
@@ -66,7 +74,7 @@ fun handlePrintHelpMessage(cmd: WaltIdCmd, e: PrintHelpMessage) {
     cmd.echoFormattedHelp(e)
 }
 
-fun printError(cmd: CliktCommand, e: CliktError? = null, msg: String? = null) {
+fun printError(cmd: CliktCommand, e: Exception? = null, msg: String? = null) {
     println("\n")
     val msgToPrint = msg ?: e?.let { it.localizedMessage }
     cmd.terminal.println(
