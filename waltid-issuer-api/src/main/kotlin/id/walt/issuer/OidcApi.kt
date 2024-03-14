@@ -1,6 +1,7 @@
 package id.walt.issuer
 
 
+import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.data.ResponseMode
 import id.walt.oid4vc.data.ResponseType
 import id.walt.oid4vc.errors.*
@@ -66,18 +67,30 @@ object OidcApi : CIProvider() {
             post("/par") {
                 val authReq = AuthorizationRequest.fromHttpParameters(call.receiveParameters().toMap())
                 try {
-                    val session = initializeAuthorization(authReq, 5.minutes)
+                    val session = initializeAuthorization(authReq, 5.minutes, null)
                     call.respond(getPushedAuthorizationSuccessResponse(session).toJSON())
                 } catch (exc: AuthorizationError) {
                     logger.error(exc) { "Authorization error: " }
                     call.respond(HttpStatusCode.BadRequest, exc.toPushedAuthorizationErrorResponse().toJSON())
                 }
             }
+
+            // Get the keys from?
+            get("/jwks") {
+                call.respondText ( "{\"keys\":[{\"kty\":\"EC\",\"x\":\"bo4FsmViF9au5-iCZbvEy-WZGaRes_eZdpIucmg4XH8\",\"y\":\"htYUXUmIc-IxyR6QMFPwXHXAgj__Fqw9kuSVtSyulhI\",\"crv\":\"P-256\",\"kid\":\"z2dmzD81cgPx8Vki7JbuuMmFYrWPgYoytykUZ3eyqht1j9KbrJNL5rEcHRKkRBDnxzu2352jxSjTEFmM9hjTL2wMtzcTDjjDAQmPpQkaihjoAo8AygRr9M6yZsXHzWXnJRMNPzR3cCYbmvE9Q1sSQ1qzXHBo4iEc7Yb3MGu31ZAHKSd9Qx\"}]}"
+                    , ContentType.Application.Json, HttpStatusCode.OK)
+            }
+
             get("/authorize") {
                 val authReq = runBlocking { AuthorizationRequest.fromHttpParametersAuto(call.parameters.toMap()) }
                 try {
                     val authResp = if (authReq.responseType == ResponseType.code.name) {
-                        processCodeFlowAuthorization(authReq)
+                        // if (authReq.authorizationDetails?.any{ it.types!!.any{ it ==  "CTWalletSameAuthorisedInTime" } }!! || authReq.authorizationDetails?.any{ it.types!!.any{ it ==  "CTWalletSameAuthorisedDeferred" } }!! )  {
+                        if (authReq.authorizationDetails!!.any{ it.format?.value ==  CredentialFormat.jwt_vc.value}){
+                            processCodeFlowAuthorizationEbsi(authReq)
+                        } else {
+                            processCodeFlowAuthorization(authReq)
+                        }
                     } else if (authReq.responseType.contains(ResponseType.token.name)) {
                         processImplicitFlowAuthorization(authReq)
                     } else {
@@ -92,6 +105,9 @@ object OidcApi : CIProvider() {
                         AuthorizationErrorCode.invalid_request,
                         "No redirect_uri found for this authorization request"
                     )
+
+                    println("Redirect Uri is: $redirectUri")
+
                     call.response.apply {
                         status(HttpStatusCode.Found)
                         val defaultResponseMode =
@@ -108,6 +124,27 @@ object OidcApi : CIProvider() {
                     }
                 }
             }
+            post("/direct_post") {
+                val params = call.receiveParameters().toMap()
+
+                println("/direct_post params: $params")
+                println("/direct_post values from params: ${params.values}")
+                println("/direct_post state from param: ${params.get("state")}")
+                val state = params.get("state")?.get(0)!!
+                try {
+                    val resp = processDirectPost(state)
+                    // Get the redirect_uri from the Authorization Request Parameter
+                    println("direct_post redirectUri is:" + resp.toRedirectUri("openid://redirect", ResponseMode.query))
+                    call.response.apply {
+                        status(HttpStatusCode.Found)
+                        header(HttpHeaders.Location, resp.toRedirectUri("openid://redirect", ResponseMode.query))
+                    }
+                } catch (exc: TokenError) {
+                    logger.error(exc) { "Token error: " }
+                    call.respond(HttpStatusCode.BadRequest, exc.toAuthorizationErrorResponse().toJSON())
+                }
+            }
+
             post("/token") {
                 val params = call.receiveParameters().toMap()
 
