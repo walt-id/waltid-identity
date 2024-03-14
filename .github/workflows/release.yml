@@ -132,6 +132,8 @@ jobs:
         with:
           args: apply -n portals -f waltid-verifier-api/k8s/deployment_mod.yaml
       - name: Prepare CD - wallet.walt.id
+        env:
+          PROD_KEYCLOAK_CLIENT_SECRET: ${{ secrets.PROD_KEYCLOAK_CLIENT_SECRET }}
         run: sed "s/_DEFAULT_DEPLOYMENT_/$GITHUB_SHA/g" waltid-wallet-api/k8s/deployment-prod.yaml |
           sed "s/__DEFAULT_KEYCLOAK_CLIENT_SECRET__/$PROD_KEYCLOAK_CLIENT_SECRET/g" > waltid-wallet-api/k8s/deployment_mod.yaml
       - name: Continuous deployment - wallet.walt.id

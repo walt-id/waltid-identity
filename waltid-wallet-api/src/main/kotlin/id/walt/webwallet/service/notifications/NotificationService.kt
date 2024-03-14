@@ -63,8 +63,8 @@ object NotificationService {
         notifications.toList(),
         WalletNotifications.id,
     ) {
-        this[WalletNotifications.account] = it.account
-        this[WalletNotifications.wallet] = it.wallet
+        this[WalletNotifications.account] = UUID(it.account)
+        this[WalletNotifications.wallet] = UUID(it.wallet)
         this[WalletNotifications.type] = it.type
         this[WalletNotifications.addedOn] = it.addedOn.toJavaInstant()
         this[WalletNotifications.data] = it.data
