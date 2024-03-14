@@ -35,9 +35,7 @@ class CredentialsService {
      * @return list of [WalletCredential] that could match the specified [credentialIdList]
      */
     fun get(credentialIdList: List<String>): List<WalletCredential> = transaction {
-        WalletCredentials.select {
-            (WalletCredentials.id inList credentialIdList)
-        }.map {
+        WalletCredentials.selectAll().where { (WalletCredentials.id inList credentialIdList) }.distinct().map {
             WalletCredential(it)
         }
     }
