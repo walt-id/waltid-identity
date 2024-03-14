@@ -100,7 +100,8 @@ Execute the walt.id CLI
 |         |           | <li>Convertion from JWK to PEM</li>            |      ✖️      |
 |   did   |  create   | Create a new DID.                              |      ✖️      | 
 |         |  resolve  | Resolve a DID.                                 |      ✖️      |  
-|   vc    |   issue   | Issue a verifiable credential                  |      ✖️      |
+|   vc    |   sign    | Sign a verifiable credential                   |      ✖️      |
+|         |   issue   | Issue a verifiable credential                  |      ✖️      |
 |         |  verify   | Verify a verifiable credential                 |      ✖️      |
 |         |  present  | Present a verifiable credential                |      ✖️      |
 |         |    ...    |                                                |              |
@@ -233,6 +234,17 @@ Options:
   -h, --help                                  Show this message and exit
 ```
 
+# Note for Windows users
+
+All backslashes need to be escaped on Windows paths.
+
+i.e. The file `C:\foo\key.json` should be passed to the command as `C:\\foo\\key.json`
+
+e.g.
+
+```
+> waltid did create -m KEY -k C:\\foo\\key.json
+```
 # Compatibility
 
 This project is still a work in progress. As such, not all features are already implemented.
