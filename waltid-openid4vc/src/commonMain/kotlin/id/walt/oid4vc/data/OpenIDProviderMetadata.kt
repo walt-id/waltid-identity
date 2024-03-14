@@ -118,12 +118,10 @@ data class OpenIDProviderMetadata @OptIn(ExperimentalSerializationApi::class) co
 ) : JsonDataObject() {
 
     @SerialName("authorization_server")
-    val authorizationServer: String?
-        get() = authorizationServers?.firstOrNull()
+    @EncodeDefault val authorizationServer: String? = authorizationServers?.firstOrNull()
 
-    @SerialName("credentials_supported") @Serializable(CredentialSupportedListSerializer::class)
-    val credentialsSupported
-        get() = credentialConfigurationsSupported?.values
+    @EncodeDefault @SerialName("credentials_supported") @Serializable(CredentialSupportedListSerializer::class)
+    val credentialsSupported = credentialConfigurationsSupported?.values?.toList()
     override fun toJSON(): JsonObject = Json.encodeToJsonElement(OpenIDProviderMetadataSerializer, this).jsonObject
 
     companion object : JsonDataObjectFactory<OpenIDProviderMetadata>() {
