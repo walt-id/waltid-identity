@@ -10,6 +10,7 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.http.*
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import kotlin.collections.set
 
@@ -29,9 +30,6 @@ class VerificationUseCase(
         statusCallbackApiKey: String?,
         stateId: String?,
     ) = let {
-        /*val presentationDefinition = (body["presentation_definition"]
-                    ?: throw IllegalArgumentException("No `presentation_definition` supplied!"))
-                    .let { PresentationDefinition.fromJSON(it.jsonObject) }*/
         val vpPolicies = vpPoliciesJson?.jsonArray?.parsePolicyRequests() ?: listOf(PolicyRequest(JwtSignaturePolicy()))
 
         val vcPolicies = vcPoliciesJson?.jsonArray?.parsePolicyRequests() ?: listOf(PolicyRequest(JwtSignaturePolicy()))
@@ -117,13 +115,35 @@ class VerificationUseCase(
         }
     }
 
-    suspend fun notifySubscribers(sessionId: String) =
+    fun getResult(sessionId: String): Result<String> {
+        val session = OIDCVerifierService.getSession(sessionId)
+            ?: return Result.failure(IllegalArgumentException("Invalid id provided (expired?): $sessionId"))
+
+        val policyResults = OIDCVerifierService.policyResults[session.id]
+
+        return Result.success(
+            Json { prettyPrint = true }.encodeToString(
+                PresentationSessionInfo.fromPresentationSession(
+                    session, policyResults?.toJson()
+                )
+            )
+        )
+    }
+
+    fun getPresentationDefinition(sessionId: String): Result<PresentationDefinition> =
+        OIDCVerifierService.getSession(sessionId)?.presentationDefinition?.let {
+            Result.success(it)
+        } ?: Result.failure(error("Invalid id provided (expired?): $sessionId"))
+
+    suspend fun notifySubscribers(sessionId: String) = runCatching {
         OIDCVerifierService.sessionVerificationInfos[sessionId]?.statusCallback?.let {
-            val response = http.post(it.statusCallbackUri) {
+            http.post(it.statusCallbackUri) {
                 header(HttpHeaders.ContentType, ContentType.Application.Json)
                 it.statusCallbackApiKey?.let { bearerAuth(it) }
                 setBody(mapOf("sessionId" to sessionId))
+            }.also {
+                logger.debug { "status callback: ${it.status}" }
             }
-            logger.debug { "status callback: ${response.status}" }
         }
+    }
 }

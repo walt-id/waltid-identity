@@ -3,9 +3,6 @@ package id.walt.verifier
 import id.walt.credentials.verification.PolicyManager
 import id.walt.oid4vc.data.ResponseMode
 import id.walt.oid4vc.data.dif.*
-import id.walt.oid4vc.responses.TokenResponse
-import id.walt.verifier.oidc.OIDCVerifierService
-import id.walt.verifier.oidc.PresentationSessionInfo
 import id.walt.verifier.oidc.VerificationUseCase
 import io.github.smiley4.ktorswaggerui.dsl.get
 import io.github.smiley4.ktorswaggerui.dsl.post
@@ -19,6 +16,7 @@ import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import io.ktor.server.util.*
 import io.ktor.util.*
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -227,21 +225,12 @@ fun Application.verfierApi() {
                     }
                 }
             }) {
-                val id = call.parameters["id"] ?: throw IllegalArgumentException("No id provided!")
-                val session = OIDCVerifierService.getSession(id)
-                    ?: throw IllegalArgumentException("Invalid id provided (expired?): $id")
-
-                val policyResults = OIDCVerifierService.policyResults[session.id]
-                //?: throw IllegalStateException("No policy results found for id")
-
-                call.respond(
-                    Json { prettyPrint = true }.encodeToString(
-                        PresentationSessionInfo.fromPresentationSession(
-                            session,
-                            policyResults?.toJson()
-                        )
-                    )
-                )
+                val id = call.parameters.getOrFail("id")
+                verificationUseCase.getResult(id).onSuccess {
+                    call.respond(HttpStatusCode.OK, it)
+                }.onFailure {
+                    call.respond(HttpStatusCode.BadRequest, it.localizedMessage)
+                }
             }
             get("/pd/{id}", {
                 tags = listOf("OIDC")
@@ -256,10 +245,10 @@ fun Application.verfierApi() {
                 }
             }) {
                 val id = call.parameters["id"]
-                val pd = id?.let { OIDCVerifierService.getSession(it)?.presentationDefinition }
-                if (pd != null) {
-                    call.respond(pd.toJSON())
-                } else {
+
+                verificationUseCase.getPresentationDefinition(id ?: "").onSuccess {
+                    call.respond(it.toJSON())
+                }.onFailure {
                     call.respond(HttpStatusCode.NotFound)
                 }
             }
