@@ -277,7 +277,7 @@ class VP_JVM_Test : AnnotationSpec() {
         presentationDefinition.inputDescriptors[0].constraints?.fields?.first()?.path?.first() shouldBe "$.type"
         presentationDefinition.inputDescriptors[0].constraints?.fields?.first()?.filter?.get("pattern")?.jsonPrimitive?.content shouldBe "OpenBadgeCredential"
 
-        val siopSession = testWallet.initializeAuthorization(authReq, 5.minutes)
+        val siopSession = testWallet.initializeAuthorization(authReq, 5.minutes, null)
         siopSession.authorizationRequest?.presentationDefinition shouldNotBe null
         val tokenResponse = testWallet.processImplicitFlowAuthorization(siopSession.authorizationRequest!!)
         println("tokenResponse vpToken: ${tokenResponse.vpToken}")
@@ -328,7 +328,7 @@ class VP_JVM_Test : AnnotationSpec() {
         //authReq.presentationDefinition shouldBe null
         //authReq.presentationDefinitionUri shouldNotBe null
 
-        val siopSession = testWallet.initializeAuthorization(authReq, 5.minutes)
+        val siopSession = testWallet.initializeAuthorization(authReq, 5.minutes, null)
         siopSession.authorizationRequest?.presentationDefinition shouldNotBe null
         val tokenResponse = testWallet.processImplicitFlowAuthorization(siopSession.authorizationRequest!!)
         println("tokenResponse vpToken: ${tokenResponse.vpToken}")
@@ -462,7 +462,7 @@ class VP_JVM_Test : AnnotationSpec() {
         presentationDefinition.inputDescriptors[0].constraints?.fields?.first()?.path?.first() shouldBe "$.type"
         presentationDefinition.inputDescriptors[0].constraints?.fields?.first()?.filter?.get("pattern")?.jsonPrimitive?.content shouldBe "OpenBadgeCredential"
 
-        val siopSession = testWallet.initializeAuthorization(authReq, 5.minutes)
+        val siopSession = testWallet.initializeAuthorization(authReq, 5.minutes, null)
         siopSession.authorizationRequest?.presentationDefinition shouldNotBe null
         val tokenResponse = testWallet.processImplicitFlowAuthorization(siopSession.authorizationRequest!!)
         println("tokenResponse vpToken: ${tokenResponse.vpToken}")
@@ -512,7 +512,7 @@ class VP_JVM_Test : AnnotationSpec() {
         println("Verifier session: $verifierSession")
         verifierSession.authorizationRequest shouldNotBe null
 
-        val walletSession = testWallet.initializeAuthorization(verifierSession.authorizationRequest!!, 1.minutes)
+        val walletSession = testWallet.initializeAuthorization(verifierSession.authorizationRequest!!, 1.minutes, null)
         println("Wallet session: $walletSession")
         val tokenResponse = testWallet.processImplicitFlowAuthorization(walletSession.authorizationRequest!!)
         tokenResponse.vpToken shouldNotBe null
@@ -537,7 +537,7 @@ class VP_JVM_Test : AnnotationSpec() {
         }
         val authReq = AuthorizationRequest.fromHttpQueryString(Url(waltVerifierTestRequest).encodedQuery)
         println("Auth req: $authReq")
-        val walletSession = testWallet.initializeAuthorization(authReq, 1.minutes)
+        val walletSession = testWallet.initializeAuthorization(authReq, 1.minutes, null)
         walletSession.authorizationRequest!!.presentationDefinition shouldNotBe null
         println("Resolved presentation definition: ${walletSession.authorizationRequest!!.presentationDefinition!!.toJSONString()}")
         val tokenResponse = testWallet.processImplicitFlowAuthorization(walletSession.authorizationRequest!!)
