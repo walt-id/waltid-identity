@@ -15,7 +15,7 @@ import kotlinx.datetime.Clock
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.time.Duration
-
+import kotlin.time.Duration.Companion.minutes
 /**
  * Base object for a service, providing issuance of verifiable credentials via the OpenID4CI issuance protocol
  * e.g.: Credential issuer
@@ -68,7 +68,8 @@ abstract class OpenIDCredentialIssuer(
 
     override fun initializeAuthorization(
         authorizationRequest: AuthorizationRequest,
-        expiresIn: Duration
+        expiresIn: Duration,
+        idTokenRequestState: String?,
     ): IssuanceSession {
         return if (authorizationRequest.issuerState.isNullOrEmpty()) {
             if (!validateAuthorizationRequest(authorizationRequest)) {
@@ -79,7 +80,7 @@ abstract class OpenIDCredentialIssuer(
             }
             IssuanceSession(
                 randomUUID(), authorizationRequest,
-                Clock.System.now().plus(expiresIn)
+                Clock.System.now().plus(expiresIn), idTokenRequestState
             )
         } else {
             getVerifiedSession(authorizationRequest.issuerState)?.copy(authorizationRequest = authorizationRequest)
@@ -88,9 +89,20 @@ abstract class OpenIDCredentialIssuer(
                     "No valid issuance session found for given issuer state"
                 )
         }.also {
-            putSession(it.id, it)
+            val updatedSession = IssuanceSession(
+                id = it.id,
+                authorizationRequest = authorizationRequest,
+                expirationTimestamp = Clock.System.now().plus(5.minutes),
+                idTokenRequestState = idTokenRequestState,
+                preAuthUserPin = it.preAuthUserPin,
+                credentialOffer = it.credentialOffer,
+                cNonce = it.cNonce,
+                customParameters = it.customParameters
+            )
+            putSession(it.id, updatedSession)
         }
     }
+
 
     open fun initializeCredentialOffer(
         credentialOfferBuilder: CredentialOffer.Builder,
@@ -110,7 +122,7 @@ abstract class OpenIDCredentialIssuer(
             authorizationRequest = null,
             expirationTimestamp = Clock.System.now().plus(expiresIn),
             preAuthUserPin = preAuthUserPin,
-            credentialOffer = credentialOfferBuilder.build()
+            credentialOffer = credentialOfferBuilder.build(),
         ).also {
             putSession(it.id, it)
         }

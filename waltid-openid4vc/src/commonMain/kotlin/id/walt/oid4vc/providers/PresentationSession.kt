@@ -9,6 +9,7 @@ data class PresentationSession(
     override val id: String,
     override val authorizationRequest: AuthorizationRequest?,
     override val expirationTimestamp: Instant,
+    override val idTokenRequestState: String?  = null,      //the idTokenRequestState is added because of AuthorizationSession()
     val presentationDefinition: PresentationDefinition,
     val tokenResponse: TokenResponse? = null,
     val verificationResult: Boolean? = null,
