@@ -62,7 +62,7 @@ object AccountsService {
 
             // Add default data:
             val createdDid =
-                walletService.createDid("key", mapOf("alias" to JsonPrimitive("Onboarding")))
+                walletService.createDid("jwk", mapOf("alias" to JsonPrimitive("Onboarding")))
             walletService.setDefault(createdDid)
           }
           .onFailure { throw IllegalStateException("Could not register user: ${it.message}", it) }

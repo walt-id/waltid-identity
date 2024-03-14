@@ -130,7 +130,7 @@ open class CIProvider : OpenIDCredentialIssuer(
             println("Resolving DID: $did")
             val key = DidService.resolveToKey(did).getOrThrow()
             println("Got key: $key")
-            key.verifyJws(token)
+            key.verifyJws(token).also { println("VERIFICATION IS: $it") }
         } else {
             CI_TOKEN_KEY.verifyJws(token)
         }

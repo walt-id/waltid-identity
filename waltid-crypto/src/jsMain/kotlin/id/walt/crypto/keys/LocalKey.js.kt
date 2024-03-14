@@ -12,6 +12,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import love.forte.plugin.suspendtrans.annotation.JsPromise
@@ -173,7 +174,7 @@ actual class LocalKey actual constructor(
      */
     @JsPromise
     @JsExport.Ignore
-    actual override suspend fun verifyJws(signedJws: String): Result<JsonObject> =
+    actual override suspend fun verifyJws(signedJws: String): Result<JsonElement> =
         runCatching {
             Json.parseToJsonElement(
                 await(jose.compactVerify(signedJws, _internalKey)).payload.toByteArray().decodeToString()

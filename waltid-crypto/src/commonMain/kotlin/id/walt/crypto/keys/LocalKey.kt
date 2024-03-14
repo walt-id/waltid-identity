@@ -1,5 +1,6 @@
 package id.walt.crypto.keys
 
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 
 expect class LocalKey(jwk: String?) : Key {
@@ -29,7 +30,7 @@ expect class LocalKey(jwk: String?) : Key {
      * @return Result wrapping the plaintext; Result failure when the signature fails
      */
     override suspend fun verifyRaw(signed: ByteArray, detachedPlaintext: ByteArray?): Result<ByteArray>
-    override suspend fun verifyJws(signedJws: String): Result<JsonObject>
+    override suspend fun verifyJws(signedJws: String): Result<JsonElement>
     /*
     /**
      * Encrypts as JWE: Encrypts a message using this public key (with the algorithm this key is based on)

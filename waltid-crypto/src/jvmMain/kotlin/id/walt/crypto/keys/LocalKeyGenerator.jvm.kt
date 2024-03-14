@@ -36,7 +36,7 @@ object JvmLocalKeyCreator : LocalKeyCreator {
             KeyType.Ed25519 -> OctetKeyPair.Builder(Curve.Ed25519, Base64URL.encode(rawPublicKey)).build()
             KeyType.secp256k1 -> ecRawToJwk(rawPublicKey, Curve.SECP256K1)
             KeyType.secp256r1 -> ecRawToJwk(rawPublicKey, Curve.P_256)
-            else -> TODO("Not yet implemented: $type")
+            else -> TODO("Not yet implemented: $type for key")
         }
     )
 

@@ -37,13 +37,6 @@ class DidKeyRegistrar : LocalRegistrarMethod("key") {
     @JsPromise
     @JsExport.Ignore
     override suspend fun registerByKey(key: Key, options: DidCreateOptions): DidResult = options.let {
-        if (key.keyType !in setOf(
-                KeyType.Ed25519,
-                KeyType.RSA,//TODO: ??is it supposed to be supported for did:key (uni-registrar doesn't)
-                KeyType.secp256k1,
-                KeyType.secp256r1
-            )
-        ) throw IllegalArgumentException("did:key can not be created with a ${key.keyType} key.")
         val pubKey = key.getPublicKey()
         val identifierComponents = getIdentifierComponents(pubKey, it)
         val identifier = convertRawKeyToMultiBase58Btc(identifierComponents.pubKeyBytes, identifierComponents.multiCodecKeyCode)
