@@ -1,5 +1,6 @@
 package id.walt.webwallet.service
 
+import com.auth0.jwk.JwkProvider
 import com.auth0.jwk.JwkProviderBuilder
 import id.walt.webwallet.config.ConfigManager
 import id.walt.webwallet.config.OidcConfiguration
