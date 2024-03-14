@@ -14,9 +14,9 @@ import kotlinx.serialization.json.*
 @Serializable
 data class ProofOfPossession @OptIn(ExperimentalSerializationApi::class) private constructor(
     @EncodeDefault @SerialName("proof_type") val proofType: ProofType,
-    val jwt: String?,
-    val cwt: String?,
-    val ldp_vp: JsonObject?,
+    val jwt: String? = null,
+    val cwt: String? = null,
+    val ldp_vp: JsonObject? = null,
     override val customParameters: Map<String, JsonElement> = mapOf()
 ) : JsonDataObject() {
     override fun toJSON() = Json.encodeToJsonElement(ProofOfPossessionSerializer, this).jsonObject
