@@ -7,10 +7,7 @@ import kotlinx.datetime.toKotlinInstant
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.*
 import kotlinx.uuid.UUID
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.Table
@@ -66,13 +63,19 @@ data class WalletCredential(
             }.onFailure { it.printStackTrace() }
                 .getOrNull()
 
-        private fun tryParseManifest(manifest: String?) = runCatching {
+        fun tryParseManifest(manifest: String?) = runCatching {
             manifest?.let { ManifestProvider.json.decodeFromString<JsonObject>(it) }
         }.fold(onSuccess = {
             it
         }, onFailure = {
             null
         })
+
+        fun parseIssuerDid(credential: JsonObject?, manifest: JsonObject? = null) =
+            credential?.jsonObject?.get("issuer")?.let {
+                if (it is JsonObject) it.jsonObject["id"]?.jsonPrimitive?.content
+                else it.jsonPrimitive.content
+            } ?: manifest?.jsonObject?.get("input")?.jsonObject?.get("issuer")?.jsonPrimitive?.content
     }
 
 

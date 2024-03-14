@@ -7,7 +7,6 @@ import io.github.smiley4.ktorswaggerui.dsl.route
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.response.*
-import org.jetbrains.exposed.sql.transactions.transaction
 
 fun Application.eventLogs() = walletRoute {
     route("eventlog", {
@@ -57,7 +56,7 @@ fun Application.eventLogs() = walletRoute {
             val startingAfter = call.request.queryParameters["startingAfter"]
             val sortBy = call.request.queryParameters["sortBy"]
             val sortOrder = call.request.queryParameters["sortOrder"]
-            context.respond(transaction {
+            context.respond(
                 wallet.filterEventLog(
                     EventLogFilter(
                         limit = limit,
@@ -67,7 +66,7 @@ fun Application.eventLogs() = walletRoute {
                         data = data,
                     )
                 )
-            })
+            )
         }
     }
 }

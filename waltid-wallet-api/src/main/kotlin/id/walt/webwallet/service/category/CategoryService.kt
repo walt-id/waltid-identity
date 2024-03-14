@@ -8,4 +8,5 @@ interface CategoryService {
     fun get(wallet: UUID, name: String): WalletCategoryData?
     fun add(wallet: UUID, name: String): Int
     fun delete(wallet: UUID, name: String): Int
+    fun rename(wallet: UUID, oldName: String, newName: String): Int
 }
