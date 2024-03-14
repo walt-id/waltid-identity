@@ -3,7 +3,7 @@ package id.walt.crypto.keys
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 
-expect class LocalKey(jwk: String?) : Key {
+expect class JwkKey(jwk: String?) : Key {
 
     override suspend fun getKeyId(): String
 
@@ -48,21 +48,21 @@ expect class LocalKey(jwk: String?) : Key {
     override suspend fun decrypt(encrypted: ByteArray): Result<ByteArray>
      */
 
-    override suspend fun getPublicKey(): LocalKey
+    override suspend fun getPublicKey(): JwkKey
     override suspend fun getPublicKeyRepresentation(): ByteArray
 
 
     override val hasPrivateKey: Boolean
 
 
-    companion object : LocalKeyCreator {
+    companion object : JwkKeyCreator {
 
-        override suspend fun generate(type: KeyType, metadata: LocalKeyMetadata): LocalKey
-        override suspend fun importRawPublicKey(type: KeyType, rawPublicKey: ByteArray, metadata: LocalKeyMetadata): Key
+        override suspend fun generate(type: KeyType, metadata: JwkKeyMetadata): JwkKey
+        override suspend fun importRawPublicKey(type: KeyType, rawPublicKey: ByteArray, metadata: JwkKeyMetadata): Key
 
-        override suspend fun importJWK(jwk: String): Result<LocalKey>
+        override suspend fun importJWK(jwk: String): Result<JwkKey>
 
-        override suspend fun importPEM(pem: String): Result<LocalKey>
+        override suspend fun importPEM(pem: String): Result<JwkKey>
     }
 
 }

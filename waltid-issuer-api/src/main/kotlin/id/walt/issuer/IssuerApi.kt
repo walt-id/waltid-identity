@@ -137,7 +137,7 @@ fun Application.issuerApi() {
                                 description =
                                     "Supply a core-crypto key representation to use to issue the credential, " + "e.g. a local key (internal JWK) or a TSE key."
                                 example = mapOf(
-                                    "type" to "local", "jwk" to "{ ... }"
+                                    "type" to "jwk", "jwk" to "{ ... }"
                                 )
                                 required = true
                             }
@@ -316,7 +316,7 @@ fun Application.issuerApi() {
                                 description =
                                     "Supply a core-crypto key representation to use to issue the credential, " + "e.g. a local key (internal JWK) or a TSE key."
                                 example = mapOf(
-                                    "type" to "local", "jwk" to "{ ... }"
+                                    "type" to "jwk", "jwk" to "{ ... }"
                                 )
                                 required = false
                             }
@@ -347,7 +347,7 @@ private suspend fun generateJsonKey(
     keyType: String, keyAlgorithm: KeyType, req: IssuerOnboardingRequest
 ): Pair<Key, JsonElement> {
     val key = when (keyType) {
-        "local" -> LocalKey.generate(keyAlgorithm)
+        "jwk" -> JwkKey.generate(keyAlgorithm)
         "tse" -> TSEKey.generate(
             keyAlgorithm, TSEKeyMetadata(
                 getParamOrThrow(
@@ -360,7 +360,7 @@ private suspend fun generateJsonKey(
         )
 
         else -> {
-            LocalKey.generate(KeyType.Ed25519)
+            JwkKey.generate(KeyType.Ed25519)
         }
     }
 

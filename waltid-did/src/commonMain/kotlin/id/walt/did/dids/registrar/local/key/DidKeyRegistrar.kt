@@ -2,7 +2,7 @@ package id.walt.did.dids.registrar.local.key
 
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.LocalKey
+import id.walt.crypto.keys.JwkKey
 import id.walt.crypto.utils.JsonCanonicalizationUtils
 import id.walt.crypto.utils.MultiBaseUtils.convertRawKeyToMultiBase58Btc
 import id.walt.crypto.utils.MultiCodecUtils
@@ -29,7 +29,7 @@ class DidKeyRegistrar : LocalRegistrarMethod("key") {
     @JsPromise
     @JsExport.Ignore
     override suspend fun register(options: DidCreateOptions): DidResult = options.get<KeyType>("keyType")?.let {
-        registerByKey(LocalKey.generate(it), options)
+        registerByKey(JwkKey.generate(it), options)
     } ?: throw IllegalArgumentException("KeyType option not found.")
 
     @JvmBlocking

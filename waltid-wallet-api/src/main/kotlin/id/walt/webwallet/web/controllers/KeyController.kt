@@ -1,7 +1,7 @@
 package id.walt.webwallet.web.controllers
 
 import id.walt.crypto.keys.KeyType
-import id.walt.webwallet.web.model.KMS
+import id.walt.webwallet.web.model.KeyGenerationRequest
 import io.github.smiley4.ktorswaggerui.dsl.delete
 import io.github.smiley4.ktorswaggerui.dsl.get
 import io.github.smiley4.ktorswaggerui.dsl.post
@@ -35,7 +35,7 @@ fun Application.keys() = walletRoute {
         post("generate", {
             summary = "Generate new key"
             request {
-                body<KMS> {
+                body<KeyGenerationRequest> {
                     description = "Key configuration (JSON)"
                     example("Example", buildJsonObject {
                         put("kms", buildJsonObject {
@@ -49,11 +49,11 @@ fun Application.keys() = walletRoute {
                 }
             }
         }) {
-            val kms = call.receiveNullable<KMS>()
-            val keyType = kms?.keyType ?: KeyType.Ed25519.toString()
+            val keyGenerationRequest = call.receiveNullable<KeyGenerationRequest>()
+            val keyType = keyGenerationRequest?.keyType ?: KeyType.Ed25519.toString()
 
             runCatching {
-                getWalletService().generateKey(keyType, kms?.data)
+                getWalletService().generateKey(keyType, keyGenerationRequest?.data)
             }.onSuccess {
                 context.respond(it)
             }.onFailure {

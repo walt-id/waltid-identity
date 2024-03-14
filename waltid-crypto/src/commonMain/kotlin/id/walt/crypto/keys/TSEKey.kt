@@ -179,13 +179,13 @@ class TSEKey(
     @JsExport.Ignore
     override suspend fun verifyRaw(signed: ByteArray, detachedPlaintext: ByteArray?): Result<ByteArray> {
         val localPublicKey = when (keyType) {
-            KeyType.Ed25519 -> LocalKey.importRawPublicKey(
+            KeyType.Ed25519 -> JwkKey.importRawPublicKey(
                 type = keyType,
                 rawPublicKey = getBackingPublicKey(),
-                metadata = LocalKeyMetadata() // todo: explicit `keySize`
+                metadata = JwkKeyMetadata() // todo: explicit `keySize`
             )
 
-            KeyType.RSA, KeyType.secp256r1 -> LocalKey.importPEM(getEncodedPublicKey()).getOrThrow()
+            KeyType.RSA, KeyType.secp256r1 -> JwkKey.importPEM(getEncodedPublicKey()).getOrThrow()
             KeyType.secp256k1 -> throw IllegalArgumentException("Type not supported for TSE: $keyType")
         }
 
@@ -252,10 +252,10 @@ class TSEKey(
     override suspend fun getPublicKey(): Key {
         logger.debug { "Getting public key: $keyType" }
 
-        return LocalKey.importRawPublicKey(
+        return JwkKey.importRawPublicKey(
             type = keyType,
             rawPublicKey = getBackingPublicKey(),
-            metadata = LocalKeyMetadata(), // todo: import with explicit `keySize`
+            metadata = JwkKeyMetadata(), // todo: import with explicit `keySize`
         )
     }
 

@@ -21,8 +21,8 @@ import kotlin.js.json
 
 @JsExport
 @Serializable
-@SerialName("local")
-actual class LocalKey actual constructor(
+@SerialName("jwk")
+actual class JwkKey actual constructor(
     var jwk: String?
 ) : Key() {
 
@@ -73,18 +73,18 @@ actual class LocalKey actual constructor(
         }
     }
 
-    @JsName("localKeyUsingKeyLike")
+    @JsName("jwkKeyUsingKeyLike")
     constructor(key: KeyLike) : this(null) {
         _internalKey = key
     }
 
-    @JsName("localKeyUsingKeyLikeAndJWK")
+    @JsName("jwkKeyUsingKeyLikeAndJWK")
     constructor(key: KeyLike, jwk: JWK) : this(null) {
         _internalKey = key
         _internalJwk = jwk
     }
 
-    @JsName("localKeyUsingJWK")
+    @JsName("jwkKeyUsingJWK")
     constructor(jwk: JWK) : this(null) {
         _internalJwk = jwk
     }
@@ -183,8 +183,8 @@ actual class LocalKey actual constructor(
 
     @JsPromise
     @JsExport.Ignore
-    actual override suspend fun getPublicKey(): LocalKey =
-        LocalKey(
+    actual override suspend fun getPublicKey(): JwkKey =
+        JwkKey(
             JSON.parse<JWK>(JSON.stringify(_internalJwk)).apply {
                 d = undefined
                 p = undefined
@@ -236,7 +236,7 @@ actual class LocalKey actual constructor(
         }
 
     actual override val hasPrivateKey: Boolean
-        get() = check(this::_internalKey.isInitialized) { "_internalKey of LocalKey.js.kt is not initialized (tried to to private key operation?) - has init() be called on key?" }
+        get() = check(this::_internalKey.isInitialized) { "_internalKey of JwkKey.js.kt is not initialized (tried to to private key operation?) - has init() be called on key?" }
             .run { _internalKey.type == "private" }
 
 
@@ -248,24 +248,24 @@ actual class LocalKey actual constructor(
     @JsExport.Ignore
     actual override suspend fun getThumbprint(): String = await(jose.calculateJwkThumbprint(JSON.parse(exportJWK())))
 
-    actual companion object : LocalKeyCreator {
+    actual companion object : JwkKeyCreator {
         @JsPromise
         @JsExport.Ignore
-        actual override suspend fun generate(type: KeyType, metadata: LocalKeyMetadata): LocalKey =
-            JsLocalKeyCreator.generate(type, metadata)
+        actual override suspend fun generate(type: KeyType, metadata: JwkKeyMetadata): JwkKey =
+            JsJwkKeyCreator.generate(type, metadata)
 
         @JsPromise
         @JsExport.Ignore
-        actual override suspend fun importRawPublicKey(type: KeyType, rawPublicKey: ByteArray, metadata: LocalKeyMetadata): Key =
-            JsLocalKeyCreator.importRawPublicKey(type, rawPublicKey, metadata)
+        actual override suspend fun importRawPublicKey(type: KeyType, rawPublicKey: ByteArray, metadata: JwkKeyMetadata): Key =
+            JsJwkKeyCreator.importRawPublicKey(type, rawPublicKey, metadata)
 
         @JsPromise
         @JsExport.Ignore
-        actual override suspend fun importJWK(jwk: String): Result<LocalKey> = JsLocalKeyCreator.importJWK(jwk)
+        actual override suspend fun importJWK(jwk: String): Result<JwkKey> = JsJwkKeyCreator.importJWK(jwk)
 
         @JsPromise
         @JsExport.Ignore
-        actual override suspend fun importPEM(pem: String): Result<LocalKey> = JsLocalKeyCreator.importPEM(pem)
+        actual override suspend fun importPEM(pem: String): Result<JwkKey> = JsJwkKeyCreator.importPEM(pem)
     }
 
 }

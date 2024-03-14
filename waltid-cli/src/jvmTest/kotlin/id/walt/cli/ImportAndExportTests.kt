@@ -1,7 +1,7 @@
 package id.walt.cli
 
 import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.LocalKey
+import id.walt.crypto.keys.JwkKey
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
@@ -37,11 +37,11 @@ class ImportAndExportTests {
 
     private fun testBidirectionalConversion(keyType: KeyType) {
 
-        val generatedKey = runBlocking { LocalKey.generate(keyType) }
+        val generatedKey = runBlocking { JwkKey.generate(keyType) }
         val generatedJwk = runBlocking { generatedKey.exportJWK() }
 
         val importedKeyFromJwk = assertDoesNotThrow {
-            runBlocking { LocalKey.importJWK(generatedJwk).getOrThrow() }
+            runBlocking { JwkKey.importJWK(generatedJwk).getOrThrow() }
         }
 
         println("Export PEM:")
@@ -49,7 +49,7 @@ class ImportAndExportTests {
         println(exportedPem)
 
         val importedKeyFromPem = assertDoesNotThrow {
-            runBlocking { LocalKey.importPEM(exportedPem).getOrThrow() }
+            runBlocking { JwkKey.importPEM(exportedPem).getOrThrow() }
         }
 
         val exportedJwk = runBlocking { importedKeyFromPem.exportJWK() }

@@ -3,7 +3,7 @@ import kotlin.test.Test
 
 val didMethodsToTest = listOf("jwk", "web")
 
-class LocalKeyAndDidManagementTest {
+class JwkKeyAndDidManagementTest {
     @Test
     fun localDidKeyTest() = runTest {
         testDidMethodsAndKeys(didMethodsToTest)

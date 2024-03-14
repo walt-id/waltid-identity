@@ -16,31 +16,33 @@ import kotlin.js.JsExport
 @JsExport
 object KeySerialization {
 
-  private val keySerializationModule = SerializersModule {
-    polymorphic(Key::class) {
-      subclass(LocalKey::class)
-      subclass(TSEKey::class)
-      subclass(OCIKey::class)
+    private val keySerializationModule = SerializersModule {
+        polymorphic(Key::class) {
+            subclass(JwkKey::class)
+            subclass(TSEKey::class)
+            subclass(OCIKey::class)
+        }
     }
-  }
 
-  private val keySerializationJson = Json { serializersModule = keySerializationModule }
+    private val keySerializationJson = Json {
+        serializersModule =
+            keySerializationModule
+    }
 
-  fun serializeKey(key: Key): String = keySerializationJson.encodeToString(key)
+    fun serializeKey(key: Key): String = keySerializationJson.encodeToString(key)
+    fun serializeKeyToJson(key: Key): JsonElement = keySerializationJson.encodeToJsonElement(key)
 
-fun serializeKeyToJson(key: Key): JsonElement = keySerializationJson.encodeToJsonElement(key)  @JvmBlocking
-  @JvmAsync
-  @JsPromise
-  @JsExport.Ignore
-  suspend fun deserializeKey(json: String): Result<Key> = runCatching {
-    keySerializationJson.decodeFromString<Key>(json).apply { init() }
-  }
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
+    suspend fun deserializeKey(json: String): Result<Key> =
+        runCatching { keySerializationJson.decodeFromString<Key>(json).apply { init() } }
 
-  @JvmBlocking
-  @JvmAsync
-  @JsPromise
-  @JsExport.Ignore
-  suspend fun deserializeKey(json: JsonObject): Result<Key> = runCatching {
-    keySerializationJson.decodeFromJsonElement<Key>(json).apply { init() }
-  }
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
+    suspend fun deserializeKey(json: JsonObject): Result<Key> =
+        runCatching { keySerializationJson.decodeFromJsonElement<Key>(json).apply { init() } }
 }

@@ -2,8 +2,8 @@ package id.walt.did.utils
 
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.LocalKey
-import id.walt.crypto.keys.LocalKeyMetadata
+import id.walt.crypto.keys.JwkKey
+import id.walt.crypto.keys.JwkKeyMetadata
 import id.walt.crypto.utils.MultiBaseUtils
 import id.walt.crypto.utils.MultiCodecUtils
 import love.forte.plugin.suspendtrans.annotation.JsPromise
@@ -23,10 +23,10 @@ object KeyUtils {
         val publicKeyRaw = MultiBaseUtils.convertMultiBase58BtcToRawKey(identifier)
         //TODO: externalize import call
         return when (val code = MultiCodecUtils.getMultiCodecKeyCode(identifier)) {
-            MultiCodecUtils.JwkJcsPubMultiCodecKeyCode -> LocalKey.importJWK(publicKeyRaw.decodeToString())
+            MultiCodecUtils.JwkJcsPubMultiCodecKeyCode -> JwkKey.importJWK(publicKeyRaw.decodeToString())
             else -> Result.success(
-                LocalKey.importRawPublicKey(
-                    MultiCodecUtils.getKeyTypeFromKeyCode(code), publicKeyRaw, LocalKeyMetadata()
+                JwkKey.importRawPublicKey(
+                    MultiCodecUtils.getKeyTypeFromKeyCode(code), publicKeyRaw, JwkKeyMetadata()
                 )
             )
         }

@@ -26,7 +26,7 @@ class TestJvm {
     @Test
     fun signatureSpeedTestAll() = runTest(timeout = 5.minutes) {
         KeyType.entries.forEach { keyType ->
-            val key = LocalKey.generate(keyType)
+            val key = JwkKey.generate(keyType)
             key.signJws("abc".encodeToByteArray())
 
             val jobs = ArrayList<Job>()
@@ -49,12 +49,12 @@ class TestJvm {
     }
 
     @Test
-    fun testLocalKeySerialization() = runTest {
-        val localKey = LocalKey.generate(KeyType.Ed25519)
-        val localKeySerialized = KeySerialization.serializeKey(localKey)
+    fun testJwkKeySerialization() = runTest {
+        val jwkKey = JwkKey.generate(KeyType.Ed25519)
+        val jwkKeySerialized = KeySerialization.serializeKey(jwkKey)
 
         val jsons = listOf(
-            localKeySerialized to LocalKey::class,
+            jwkKeySerialized to JwkKey::class,
         )
 
         jsons.forEach {
@@ -81,7 +81,7 @@ class TestJvm {
     fun testDeserializedVerify() = runTest {
         val testObjJson = Json.encodeToString(testObj)
 
-        val key = LocalKey.generate(KeyType.Ed25519)
+        val key = JwkKey.generate(KeyType.Ed25519)
         val key2 = KeySerialization.deserializeKey(KeySerialization.serializeKey(key)).getOrThrow()
 
         val jws = key.signJws(testObjJson.toByteArray())
@@ -96,7 +96,7 @@ class TestJvm {
     fun testDeserializedSign() = runTest {
         val testObjJson = Json.encodeToString(testObj)
 
-        val keyToUseForVerifying = LocalKey.generate(KeyType.Ed25519)
+        val keyToUseForVerifying = JwkKey.generate(KeyType.Ed25519)
         val keyToUseForSigning = KeySerialization.deserializeKey(KeySerialization.serializeKey(keyToUseForVerifying)).getOrThrow()
 
         val jws = keyToUseForSigning.signJws(testObjJson.toByteArray())
@@ -113,7 +113,7 @@ class TestJvm {
         println("Plaintext: $plaintext")
 
         println("Generating key: $keyType...")
-        val key = LocalKey.generate(keyType)
+        val key = JwkKey.generate(keyType)
 
         println("  Checking for private key...")
         assertTrue { key.hasPrivateKey }
@@ -162,8 +162,8 @@ class TestJvm {
         println()
     }
 
-    fun exampleSignJwsLocalKey() = runTest {
-        val localKey by lazy { runBlocking { LocalKey.generate(KeyType.Ed25519) } }
+    fun exampleSignJwsJwkKey() = runTest {
+        val jwkKey by lazy { runBlocking { JwkKey.generate(KeyType.Ed25519) } }
 
         val payload = JsonObject(
             mapOf(
@@ -174,11 +174,11 @@ class TestJvm {
         )
 
         println("Signing JWS: $payload")
-        val signed = localKey.signJws(payload.toString().toByteArray())
+        val signed = jwkKey.signJws(payload.toString().toByteArray())
         println("Signed: $signed")
 
         println("Verifying signed: $signed")
-        localKey.verifyJws(signed).also { println("Verified: $it") }
+        jwkKey.verifyJws(signed).also { println("Verified: $it") }
     }
 
     private suspend fun exampleSignRawTSEKey(key: TSEKey) {

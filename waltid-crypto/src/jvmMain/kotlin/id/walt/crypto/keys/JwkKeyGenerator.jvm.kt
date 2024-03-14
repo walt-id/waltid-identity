@@ -12,9 +12,9 @@ import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
 import com.nimbusds.jose.util.Base64URL
 import org.bouncycastle.jce.ECNamedCurveTable
 
-object JvmLocalKeyCreator : LocalKeyCreator {
+object JvmJwkKeyCreator : JwkKeyCreator {
 
-    override suspend fun generate(type: KeyType, metadata: LocalKeyMetadata): LocalKey {
+    override suspend fun generate(type: KeyType, metadata: JwkKeyMetadata): JwkKey {
         val keyGenerator: JWKGenerator<out JWK> = when (type) {
             KeyType.Ed25519 -> OctetKeyPairGenerator(Curve.Ed25519)
             KeyType.secp256r1 -> ECKeyGenerator(Curve.P_256)
@@ -28,10 +28,10 @@ object JvmLocalKeyCreator : LocalKeyCreator {
 
         val jwk = keyGenerator.generate()
 
-        return LocalKey(jwk)
+        return JwkKey(jwk)
     }
 
-    override suspend fun importRawPublicKey(type: KeyType, rawPublicKey: ByteArray, metadata: LocalKeyMetadata): Key = LocalKey(
+    override suspend fun importRawPublicKey(type: KeyType, rawPublicKey: ByteArray, metadata: JwkKeyMetadata): Key = JwkKey(
         when (type) {
             KeyType.Ed25519 -> OctetKeyPair.Builder(Curve.Ed25519, Base64URL.encode(rawPublicKey)).build()
             KeyType.secp256k1 -> ecRawToJwk(rawPublicKey, Curve.SECP256K1)
@@ -40,11 +40,11 @@ object JvmLocalKeyCreator : LocalKeyCreator {
         }
     )
 
-    override suspend fun importJWK(jwk: String): Result<LocalKey> =
-        runCatching { LocalKey(JWK.parse(jwk)) }
+    override suspend fun importJWK(jwk: String): Result<JwkKey> =
+        runCatching { JwkKey(JWK.parse(jwk)) }
 
-    override suspend fun importPEM(pem: String): Result<LocalKey> =
-        runCatching { LocalKey(JWK.parseFromPEMEncodedObjects(pem)) }
+    override suspend fun importPEM(pem: String): Result<JwkKey> =
+        runCatching { JwkKey(JWK.parseFromPEMEncodedObjects(pem)) }
 
     private fun ecRawToJwk(rawPublicKey: ByteArray, curve: Curve): JWK =
         ECNamedCurveTable.getParameterSpec(curve.name).curve.decodePoint(rawPublicKey).let {

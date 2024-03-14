@@ -23,7 +23,7 @@ class VcApiTest {
 
         // Generate key & derive DID from key
         val key = TSEKey.generate(KeyType.Ed25519, tseMetadata)
-        //val key = LocalKey.generate(KeyType.Ed25519)
+        //val key = JwkKey.generate(KeyType.Ed25519)
         val did = DidService.registerByKey("jwk", key).did
 
         // Syntax-sugar to create VC

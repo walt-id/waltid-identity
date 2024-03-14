@@ -5,7 +5,7 @@ import id.walt.webwallet.db.models.WalletDid
 import id.walt.webwallet.utils.IssuanceExamples
 import id.walt.webwallet.web.model.AccountRequest
 import id.walt.webwallet.web.model.EmailAccountRequest
-import id.walt.webwallet.web.model.KMS
+import id.walt.webwallet.web.model.KeyGenerationRequest
 import id.walt.webwallet.web.model.LoginRequestJson
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -264,9 +264,18 @@ abstract class E2EWalletTestBase {
         }
     }
 
+    private suspend fun testKey(keyGenerationRequest: KeyGenerationRequest) {
+        println("Testing creation of ${keyGenerationRequest.keyType} with ${keyGenerationRequest.data?.type}...")
+        val result = walletClient.post("$walletUrl/wallet-api/wallet/$walletId/keys/generate") {
+            setBody(keyGenerationRequest)
+        }
+        println("Result for ${keyGenerationRequest.keyType} with ${keyGenerationRequest.data?.type}: ${result.status}")
+        assertEquals(HttpStatusCode.OK, result.status)
+    }
+
     protected suspend fun testKeys() {
         println("\nUse Case -> List Keys\n")
-        var endpoint = "$walletUrl/wallet-api/wallet/$walletId/keys"
+        val endpoint = "$walletUrl/wallet-api/wallet/$walletId/keys"
         println("GET $endpoint")
         val keys = walletClient.get(endpoint).let { response ->
             assertEquals(HttpStatusCode.OK, response.status)
@@ -277,12 +286,11 @@ abstract class E2EWalletTestBase {
         assertEquals("Ed25519", algorithm)
 
         println("\nUse Case -> Generate new key of type RSA\n")
-        endpoint = "$walletUrl/wallet-api/wallet/$walletId/keys/generate"
-        println("POST: $endpoint")
-        val result = walletClient.post(endpoint) {
-            setBody(KMS(data = KMS.Data("local", config = JsonObject(emptyMap())), keyType = "Ed25519"))
+        listOf(
+            KeyGenerationRequest(KeyGenerationRequest.Data("jwk", JsonObject(emptyMap())), "Ed25519")
+        ).forEach {
+            testKey(it)
         }
-        assertEquals(HttpStatusCode.OK, result.status)
     }
 
     suspend fun testDefaultDid() {

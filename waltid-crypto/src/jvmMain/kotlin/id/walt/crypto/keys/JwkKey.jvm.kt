@@ -34,8 +34,8 @@ private val bouncyCastleProvider = BouncyCastleProvider()
 
 @Suppress("EXPECT_ACTUAL_CLASSIFIERS_ARE_IN_BETA_WARNING")
 @Serializable
-@SerialName("local")
-actual class LocalKey actual constructor(
+@SerialName("jwk")
+actual class JwkKey actual constructor(
     @Suppress("CanBeParameter", "RedundantSuppression")
     var jwk: String?
 ) : Key() {
@@ -235,7 +235,7 @@ actual class LocalKey actual constructor(
      * @return Result wrapping the plaintext; Result failure when the signature fails
      */
 
-    actual override suspend fun getPublicKey(): LocalKey = LocalKey(_internalJwk.toPublicJWK())
+    actual override suspend fun getPublicKey(): JwkKey = JwkKey(_internalJwk.toPublicJWK())
 
     override val keyType: KeyType by lazy {
         when (_internalJwk.keyType) {
@@ -309,21 +309,21 @@ actual class LocalKey actual constructor(
         return kf.generatePrivate(pkcs8KeySpec)
     }
 
-    actual companion object : LocalKeyCreator {
+    actual companion object : JwkKeyCreator {
 
         val prettyJson = Json { prettyPrint = true }
 
-        actual override suspend fun generate(type: KeyType, metadata: LocalKeyMetadata): LocalKey =
-            JvmLocalKeyCreator.generate(type, metadata)
+        actual override suspend fun generate(type: KeyType, metadata: JwkKeyMetadata): JwkKey =
+            JvmJwkKeyCreator.generate(type, metadata)
 
-        actual override suspend fun importJWK(jwk: String): Result<LocalKey> = JvmLocalKeyCreator.importJWK(jwk)
-        actual override suspend fun importPEM(pem: String): Result<LocalKey> = JvmLocalKeyCreator.importPEM(pem)
+        actual override suspend fun importJWK(jwk: String): Result<JwkKey> = JvmJwkKeyCreator.importJWK(jwk)
+        actual override suspend fun importPEM(pem: String): Result<JwkKey> = JvmJwkKeyCreator.importPEM(pem)
         actual override suspend fun importRawPublicKey(
             type: KeyType,
             rawPublicKey: ByteArray,
-            metadata: LocalKeyMetadata
+            metadata: JwkKeyMetadata
         ): Key =
-            JvmLocalKeyCreator.importRawPublicKey(type, rawPublicKey, metadata)
+            JvmJwkKeyCreator.importRawPublicKey(type, rawPublicKey, metadata)
     }
 }
 

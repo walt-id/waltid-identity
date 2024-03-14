@@ -47,7 +47,7 @@ class DidExamples {
 //
 //        val key = if (isVaultAvailable()) TSEKey.generate(
 //            KeyType.Ed25519, tseMetadata
-//        ) else LocalKey.generate(KeyType.Ed25519)
+//        ) else JwkKey.generate(KeyType.Ed25519)
 //
 //        val did = DidService.registerByKey("jwk", key)
 //
@@ -62,7 +62,7 @@ class DidExamples {
 //
 //        val key = if (isVaultAvailable()) TSEKey.generate(
 //            KeyType.Ed25519, tseMetadata
-//        ) else LocalKey.generate(KeyType.Ed25519)
+//        ) else JwkKey.generate(KeyType.Ed25519)
 //
 //        val options = DidKeyCreateOptions(KeyType.Ed25519, useJwkJcsPub = false)
 //        val did = DidService.registerByKey("key", key, options)
@@ -79,7 +79,7 @@ class DidExamples {
 //
 //        val key = if (isVaultAvailable()) TSEKey.generate(
 //            KeyType.Ed25519, tseMetadata
-//        ) else LocalKey.generate(KeyType.Ed25519)
+//        ) else JwkKey.generate(KeyType.Ed25519)
 //
 //        val options = DidKeyCreateOptions(KeyType.Ed25519, useJwkJcsPub = true)
 //        val did = DidService.registerByKey("key", key, options)

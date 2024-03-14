@@ -38,7 +38,7 @@ import id.walt.webwallet.service.settings.SettingsService
 import id.walt.webwallet.service.settings.WalletSetting
 import id.walt.webwallet.usecase.event.EventUseCase
 import id.walt.webwallet.web.controllers.PresentationRequestParameter
-import id.walt.webwallet.web.model.KMS
+import id.walt.webwallet.web.model.KeyGenerationRequest
 import id.walt.webwallet.web.parameter.CredentialRequestParameter
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
@@ -488,7 +488,7 @@ class SSIKit2WalletService(
         }
 
 
-    override suspend fun generateKey(type: String, config: KMS.Data?): String =
+    override suspend fun generateKey(type: String, config: KeyGenerationRequest.Data?): String =
         let {
             config
                 ?.type
@@ -503,7 +503,7 @@ class SSIKit2WalletService(
                                 ?: throw IllegalArgumentException("No accessKey in config"),
                         )
                     )
-                } ?: LocalKey.generate(KeyType.valueOf(type))
+                } ?: JwkKey.generate(KeyType.valueOf(type))
         }
             .also {
                 KeysService.add(walletId, it.getKeyId(), KeySerialization.serializeKey(it))
@@ -513,7 +513,7 @@ class SSIKit2WalletService(
                     tenant = tenant,
                     accountId = accountId,
                     walletId = walletId,
-                    data = eventUseCase.keyEventData(it, "local")
+                    data = eventUseCase.keyEventData(it, "jwk")
                 )
             }.getKeyId()
 
@@ -526,8 +526,8 @@ class SSIKit2WalletService(
 
         val keyResult =
             when (type) {
-                "pem" -> LocalKey.importPEM(jwkOrPem)
-                "jwk" -> LocalKey.importJWK(jwkOrPem)
+                "pem" -> JwkKey.importPEM(jwkOrPem)
+                "jwk" -> JwkKey.importJWK(jwkOrPem)
                 else -> throw IllegalArgumentException("Unknown key type: $type")
             }
 
