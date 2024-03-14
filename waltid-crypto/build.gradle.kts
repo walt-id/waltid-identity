@@ -80,6 +80,12 @@ kotlin {
                 implementation("io.ktor:ktor-client-json:2.3.8")
                 implementation("io.ktor:ktor-client-logging:2.3.8")
 
+                implementation(project.dependencies.platform("org.kotlincrypto.hash:bom:0.4.0"))
+                implementation("org.kotlincrypto.hash:sha2")
+
+                // Date
+                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.5.0")
+
                 // Coroutines
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
 
@@ -112,7 +118,7 @@ kotlin {
                 implementation("com.nimbusds:nimbus-jose-jwt:9.37.3")
 
                 // Multibase
-//                implementation("com.github.multiformats:java-multibase:v1.1.1")
+                implementation("com.github.multiformats:java-multibase:v1.1.1")
             }
         }
         val jvmTest by getting {

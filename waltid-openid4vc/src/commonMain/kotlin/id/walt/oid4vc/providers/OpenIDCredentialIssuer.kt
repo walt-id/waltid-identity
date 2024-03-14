@@ -180,6 +180,7 @@ abstract class OpenIDCredentialIssuer(
             CredentialErrorCode.invalid_request,
             "Session invalid"
         )
+        println("Credential request to validate: $credentialRequest")
         if (credentialRequest.proof == null || !validateProofOfPossession(credentialRequest, nonce)) {
             throw createCredentialError(
                 credentialRequest,
@@ -303,8 +304,10 @@ abstract class OpenIDCredentialIssuer(
     }
 
     private fun validateProofOfPossession(credentialRequest: CredentialRequest, nonce: String): Boolean {
+        println("VALIDATING: ${credentialRequest.proof} with nonce $nonce")
         if (credentialRequest.proof?.proofType != ProofType.jwt || credentialRequest.proof.jwt == null)
             return false
+        println("VERIFYING ITS SIGNATURE")
         return verifyTokenSignature(TokenTarget.PROOF_OF_POSSESSION, credentialRequest.proof.jwt) &&
                 credentialRequest.proof.jwt.let {
                     parseTokenPayload(it)

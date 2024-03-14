@@ -6,6 +6,8 @@ import com.nimbusds.jose.crypto.bc.BouncyCastleProviderSingleton
 import com.nimbusds.jose.jwk.*
 import com.nimbusds.jose.jwk.KeyType.*
 import com.nimbusds.jose.util.Base64URL
+import id.walt.crypto.utils.Base64Utils.base64Decode
+import id.walt.crypto.utils.Base64Utils.base64UrlDecode
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -25,6 +27,7 @@ import org.bouncycastle.util.io.pem.PemWriter
 import java.io.ByteArrayOutputStream
 import java.security.*
 import java.security.spec.PKCS8EncodedKeySpec
+import java.util.*
 
 private val bouncyCastleProvider = BouncyCastleProvider()
 
@@ -167,7 +170,17 @@ actual class LocalKey actual constructor(
     }
 
     actual override suspend fun verifyRaw(signed: ByteArray, detachedPlaintext: ByteArray?): Result<ByteArray> {
-        TODO("Not yet implemented")
+        check(detachedPlaintext != null) { "Detached plaintext is required." }
+
+        val signature = getSignature()
+        signature.initVerify(getInternalPublicKey())
+        signature.update(detachedPlaintext)
+
+        return if (signature.verify(signed)) {
+            Result.success(detachedPlaintext!!)
+        } else {
+            Result.failure(IllegalArgumentException("Signature verification failed!"))
+        }
     }
 
     /**
@@ -175,7 +188,7 @@ actual class LocalKey actual constructor(
      * @param signedJws signed
      * @return Result wrapping the plaintext; Result failure when the signature fails
      */
-    actual override suspend fun verifyJws(signedJws: String): Result<JsonObject> = runCatching {
+    /*actual override suspend fun verifyJws(signedJws: String): Result<JsonObject> = runCatching {
         val jwsObject = JWSObject.parse(signedJws)
 
         check(jwsObject.verify(_internalVerifier)) { "Signature check failed." }
@@ -183,7 +196,44 @@ actual class LocalKey actual constructor(
         val objectElements = jwsObject.payload.toJSONObject()
             .mapValues { it.value.toJsonElement() }
         JsonObject(objectElements)
+    }*/
+
+    actual override suspend fun verifyJws(signedJws: String): Result<JsonElement> {
+        if (keyType == KeyType.Ed25519) {
+            return runCatching {
+
+                val jwsObject = JWSObject.parse(signedJws)
+
+                check(jwsObject.verify(_internalVerifier)) { "Signature check failed." }
+
+                val objectElements = jwsObject.payload.toJSONObject()
+                    .mapValues { it.value.toJsonElement() }
+
+                JsonObject(objectElements)
+            }
+        } else {
+            println("Verifying JWS: $signedJws")
+
+            val (header, payload, signature) = signedJws.split(".")
+
+            println()
+
+            println("VERIFYING: \"$header.$payload\".encodeToByteArray()")
+            println("with Signature: $signature")
+            val x = verifyRaw(signature.base64UrlDecode(), "$header.$payload".encodeToByteArray())
+
+            return if (x.isSuccess)
+                Result.success(Json.parseToJsonElement(payload.base64Decode().decodeToString()))
+            else
+                Result.failure(IllegalArgumentException("signature verification failed"))
+        }
     }
+
+    /**
+     * Verifies JWS: Verifies a signed message using this public key
+     * @param signed signed
+     * @return Result wrapping the plaintext; Result failure when the signature fails
+     */
 
     actual override suspend fun getPublicKey(): LocalKey = LocalKey(_internalJwk.toPublicJWK())
 
@@ -227,6 +277,13 @@ actual class LocalKey actual constructor(
         KeyType.secp256r1, KeyType.secp256k1 -> _internalJwk.toECKey().toPrivateKey()
         KeyType.Ed25519 -> decodeEd25519RawPrivKey(_internalJwk.toOctetKeyPair().d.toString(), getKeyFactory())
         KeyType.RSA -> _internalJwk.toRSAKey().toPrivateKey()
+    }
+
+    private fun getInternalPublicKey() = when (keyType) {
+        KeyType.secp256r1, KeyType.secp256k1 -> _internalJwk.toECKey().toECPublicKey()
+//        KeyType.Ed25519 -> decodeEd25519RawPrivKey(_internalJwk.toOctetKeyPair().d.toString(), getKeyFactory())
+        KeyType.RSA -> _internalJwk.toRSAKey().toRSAPublicKey()
+        else -> TODO("Not yet supported: $keyType")
     }
 
     private fun getSignature(): Signature = when (keyType) {
