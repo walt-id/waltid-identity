@@ -1,8 +1,6 @@
 package id.walt.webwallet.service
 
 import id.walt.crypto.keys.*
-import id.walt.crypto.utils.JwsUtils
-import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.did.dids.DidService
 import id.walt.did.dids.registrar.LocalRegistrar
 import id.walt.did.dids.registrar.dids.DidCheqdCreateOptions
@@ -58,8 +56,8 @@ import kotlinx.uuid.UUID
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
-import kotlin.collections.set
 import java.net.URLDecoder
+import kotlin.collections.set
 import kotlin.time.Duration.Companion.seconds
 
 class SSIKit2WalletService(
@@ -67,7 +65,6 @@ class SSIKit2WalletService(
     accountId: UUID,
     walletId: UUID,
     private val categoryService: CategoryService,
-    private val trustUseCase: TrustValidationUseCase,
     private val settingsService: SettingsService,
     private val eventUseCase: EventUseCase,
     private val http: HttpClient
@@ -256,12 +253,6 @@ class SSIKit2WalletService(
         val id_token: String?,
         val state: String?
     )
-
-    private val ktorClient =
-        HttpClient(CIO) {
-            install(ContentNegotiation) { json() }
-            followRedirects = false
-        }
 
     data class PresentationError(override val message: String, val redirectUri: String?) :
         IllegalArgumentException(message)
@@ -522,7 +513,7 @@ class SSIKit2WalletService(
                     tenant = tenant,
                     accountId = accountId,
                     walletId = walletId,
-                    data = eventUseCase.keyEventData(createdKey, "local")
+                    data = eventUseCase.keyEventData(it, "local")
                 )
             }.getKeyId()
 
