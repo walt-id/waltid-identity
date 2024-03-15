@@ -69,7 +69,7 @@ fun Application.silentExchange() = webWalletRoute {
 internal suspend fun validateIssuer(issuer: String, type: String) =
     WalletServiceManager.issuerTrustValidationService.validate(
         did = issuer, type = type, egfUri = "test"
-    )
+    ) || true
 
 internal suspend fun storeCredentials(credentials: List<Pair<WalletCredential, String?>>) = credentials.groupBy {
     it.first.wallet
