@@ -24,11 +24,12 @@ class VCSignCmd : CliktCommand(
         // .help("The Subject's key to be used. If none is provided, a new one will be generated.")
         .help("A core-crypto key representation to sign the credential")
         .file()
+        .required()
 
     private val issuerDid by option("-i", "--issuer")
         .help("The verifiable credential's issuer DID")
 
-    private val subjectDid by option("-i", "--subject")
+    private val subjectDid by option("-s", "--subject")
         .help("The verifiable credential's subject DID")
         .required()
 
