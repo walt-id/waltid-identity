@@ -24,6 +24,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.uuid.UUID
+import kotlinx.uuid.generateUUID
 import org.jetbrains.exposed.sql.transactions.transaction
 
 fun Application.silentExchange() = webWalletRoute {
@@ -69,7 +70,7 @@ fun Application.silentExchange() = webWalletRoute {
 internal suspend fun validateIssuer(issuer: String, type: String) =
     WalletServiceManager.issuerTrustValidationService.validate(
         did = issuer, type = type, egfUri = "test"
-    ) || true
+    )
 
 internal suspend fun storeCredentials(credentials: List<Pair<WalletCredential, String?>>) = credentials.groupBy {
     it.first.wallet
@@ -92,6 +93,7 @@ internal suspend fun otherStuff(wallet: UUID, credentials: List<Pair<WalletCrede
         }
         prepareNotifications(it, credentials.map { it.first }, type.toString()).runCatching {
             WalletServiceManager.notificationUseCase.add(*this.toTypedArray())
+            // TODO: null notification-id is notified
             WalletServiceManager.notificationUseCase.send(*this.toTypedArray())
         }
     }
@@ -132,6 +134,7 @@ internal fun prepareEvents(account: UUID, credentials: List<Pair<WalletCredentia
 
 internal fun prepareNotifications(account: UUID, credentials: List<WalletCredential>, type: String) = credentials.map {
     Notification(
+        id = UUID.generateUUID().toString(),//TODO: converted back and forth (see notification-service)
         account = account.toString(),
         wallet = it.wallet.toString(),
         type = type,

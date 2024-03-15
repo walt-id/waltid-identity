@@ -6,7 +6,6 @@ import kotlinx.datetime.Instant
 import kotlinx.datetime.toJavaInstant
 import kotlinx.uuid.UUID
 import org.jetbrains.exposed.sql.*
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.inList
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.time.temporal.ChronoUnit
@@ -37,7 +36,7 @@ object NotificationService {
         } ?: Result.failure(Throwable("Notification not found for id: $id"))
     }
 
-    fun add(notifications: List<Notification>): Int = transaction {
+    fun add(notifications: List<Notification>): List<UUID> = transaction {
         insert(*notifications.toTypedArray())
     }
 
@@ -62,16 +61,17 @@ object NotificationService {
     }.orderBy(column = WalletNotifications.addedOn,
         order = ascending?.takeIf { it }?.let { SortOrder.ASC } ?: SortOrder.DESC)
 
-    private fun insert(vararg notifications: Notification): Int = WalletNotifications.batchInsert(
-        data = notifications.toList(),
+    private fun insert(vararg notifications: Notification): List<UUID> = WalletNotifications.batchInsert(
+        data = notifications.toList()
     ) {
+        it.id?.let { UUID(it) }?.let { this[WalletNotifications.id] = it } //TODO: converted back and forth (see silent exchange controller)
         this[WalletNotifications.account] = UUID(it.account)
         this[WalletNotifications.wallet] = UUID(it.wallet)
         this[WalletNotifications.type] = it.type
         this[WalletNotifications.isRead] = it.status
         this[WalletNotifications.addedOn] = it.addedOn.toJavaInstant()
         this[WalletNotifications.data] = it.data
-    }.size
+    }.map { it[WalletNotifications.id].value }
 
     private fun update(notification: Notification) = notification.id?.let {
         UUID(it)
