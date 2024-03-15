@@ -114,7 +114,7 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
         return AuthorizationCodeResponse.success(code, mappedState)
     }
 
-    open fun processCodeFlowAuthorizationEbsi(authorizationRequest: AuthorizationRequest): AuthorizationCodeIDTokenRequestResponse {
+    open fun processCodeFlowAuthorizationEbsi(authorizationRequest: AuthorizationRequest, keyId: String): AuthorizationCodeIDTokenRequestResponse {
         println("Ebsi Authorize Request")
 
         if (!authorizationRequest.responseType.contains(ResponseType.Code))
@@ -141,8 +141,6 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
         val scope = setOf("openid") // How to put the array of scopes in the token above?
 
         // Create a jwt as request object as defined in JAR OAuth2.0 specification
-        // How to get the kid?
-        val kid = "did:key:z2dmzD81cgPx8Vki7JbuuMmFYrWPgYoytykUZ3eyqht1j9KbrJNL5rEcHRKkRBDnxzu2352jxSjTEFmM9hjTL2wMtzcTDjjDAQmPpQkaihjoAo8AygRr9M6yZsXHzWXnJRMNPzR3cCYbmvE9Q1sSQ1qzXHBo4iEc7Yb3MGu31ZAHKSd9Qx#z2dmzD81cgPx8Vki7JbuuMmFYrWPgYoytykUZ3eyqht1j9KbrJNL5rEcHRKkRBDnxzu2352jxSjTEFmM9hjTL2wMtzcTDjjDAQmPpQkaihjoAo8AygRr9M6yZsXHzWXnJRMNPzR3cCYbmvE9Q1sSQ1qzXHBo4iEc7Yb3MGu31ZAHKSd9Qx"
         val requestJar = signToken (
             TokenTarget.TOKEN,
             buildJsonObject {
@@ -157,8 +155,10 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
                 put("scope", "openid") // How can we put an array of scopes?
             }, buildJsonObject {
                 put(JWTClaims.Header.algorithm, "ES256")
-                put(JWTClaims.Header.keyID, kid)
-            }
+                put(JWTClaims.Header.keyID, keyId)
+                put(JWTClaims.Header.type, "jwt")
+            },
+            keyId
         )
 
         // Create a session with the state of id token request since it is needed in the direct_post endpoint
@@ -169,7 +169,7 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
         println("Authorization Id Token Request State is: ${authorizationSession.idTokenRequestState}")
         println("Id Token Request State: $idTokenRequestState")
         println("Id Token Request Nonce: $idTokenRequestNonce")
-        println("Id Token Request is: $requestJar")
+        println("JAR Token is: $requestJar")
 
         return AuthorizationCodeIDTokenRequestResponse.success(idTokenRequestState, clientId, redirectUri, responseType, responseMode, scope, idTokenRequestNonce, null,  requestJar)
     }

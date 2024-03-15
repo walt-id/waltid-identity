@@ -86,8 +86,10 @@ object OidcApi : CIProvider() {
                 try {
                     val authResp = if (authReq.responseType.contains(ResponseType.Code)) {
                         // if (authReq.authorizationDetails?.any{ it.types!!.any{ it ==  "CTWalletSameAuthorisedInTime" } }!! || authReq.authorizationDetails?.any{ it.types!!.any{ it ==  "CTWalletSameAuthorisedDeferred" } }!! )  {
-                        if (authReq.authorizationDetails!!.any{ it.format?.value ==  CredentialFormat.jwt_vc.value}){
-                            processCodeFlowAuthorizationEbsi(authReq)
+                        if (authReq.authorizationDetails!!.any{ it.format?.value ==  CredentialFormat.jwt_vc.value}){ // EBSI
+                            val idTokenJarKid = OidcApi.sessionCredentialPreMapping[authReq.issuerState]?.first()?.issuerDid!!.replaceRange(0..7, "")
+                            println("KID is: $idTokenJarKid")
+                            processCodeFlowAuthorizationEbsi(authReq, idTokenJarKid)
                         } else {
                             processCodeFlowAuthorization(authReq)
                         }
