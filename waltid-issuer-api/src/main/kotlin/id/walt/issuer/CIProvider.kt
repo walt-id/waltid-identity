@@ -134,14 +134,11 @@ open class CIProvider : OpenIDCredentialIssuer(
         runBlocking {
             println("Signing JWS:   $payload")
             println("JWS Signature: target: $target, keyId: $keyId, header: $header")
-            if (header != null) {
-                val kid = "{\"keys\":[{\"kty\":\"EC\",\"x\":\"bo4FsmViF9au5-iCZbvEy-WZGaRes_eZdpIucmg4XH8\",\"y\":\"htYUXUmIc-IxyR6QMFPwXHXAgj__Fqw9kuSVtSyulhI\",\"crv\":\"P-256\",\"kid\":\"z2dmzD81cgPx8Vki7JbuuMmFYrWPgYoytykUZ3eyqht1j9KbrJNL5rEcHRKkRBDnxzu2352jxSjTEFmM9hjTL2wMtzcTDjjDAQmPpQkaihjoAo8AygRr9M6yZsXHzWXnJRMNPzR3cCYbmvE9Q1sSQ1qzXHBo4iEc7Yb3MGu31ZAHKSd9Qx\"}]}"
+            if (header != null && keyId != null) {
+                val myPrivateKey = LocalKey.importJWK("{\"kty\":\"EC\",\"x\":\"bo4FsmViF9au5-iCZbvEy-WZGaRes_eZdpIucmg4XH8\",\"y\":\"htYUXUmIc-IxyR6QMFPwXHXAgj__Fqw9kuSVtSyulhI\",\"crv\":\"P-256\",\"d\":\"UPzeJStN6Wg7zXULIlGVhYh4gG5RN-5knejePt6deqY\"}")
+                val headers = mapOf("alg" to "ES256", "type" to "jwt", "kid" to keyId)
 
-                val myKey = LocalKey.importJWK("{\"kty\":\"EC\",\"x\":\"bo4FsmViF9au5-iCZbvEy-WZGaRes_eZdpIucmg4XH8\",\"y\":\"htYUXUmIc-IxyR6QMFPwXHXAgj__Fqw9kuSVtSyulhI\",\"crv\":\"P-256\",\"d\":\"UPzeJStN6Wg7zXULIlGVhYh4gG5RN-5knejePt6deqY\"}")
-                val headers = mapOf("alg" to "ES256", "type" to "jwt", "kid" to "z2dmzD81cgPx8Vki7JbuuMmFYrWPgYoytykUZ3eyqht1j9KbrJNL5rEcHRKkRBDnxzu2352jxSjTEFmM9hjTL2wMtzcTDjjDAQmPpQkaihjoAo8AygRr9M6yZsXHzWXnJRMNPzR3cCYbmvE9Q1sSQ1qzXHBo4iEc7Yb3MGu31ZAHKSd9Qx")
-
-                println( "JWK Key ID: " + myKey.getOrThrow().getKeyId() )
-                myKey.getOrThrow().signJws(payload.toString().toByteArray(),  headers).also {
+                myPrivateKey.getOrThrow().signJws(payload.toString().toByteArray(), headers).also {
                     println("Signed JWS: >> $it")
                 }
 
@@ -396,7 +393,7 @@ open class CIProvider : OpenIDCredentialIssuer(
     )
 
     // TODO: Hack as this is non stateless because of oidc4vc lib API
-    private val sessionCredentialPreMapping = HashMap<String, List<IssuanceSessionData>>() // session id -> VC
+    val sessionCredentialPreMapping = HashMap<String, List<IssuanceSessionData>>() // session id -> VC
 
     // TODO: Hack as this is non stateless because of oidc4vc lib API
     private val tokenCredentialMapping = HashMap<String, List<IssuanceSessionData>>() // token -> VC
@@ -411,6 +408,14 @@ open class CIProvider : OpenIDCredentialIssuer(
 
     // TODO: Hack as this is non stateless because of oidc4vc lib API
     fun mapSessionIdToToken(sessionId: String, token: String) {
+        println("MAPPING SESSION ID TO TOKEN: $sessionId -->> $token")
+        val premappedVc = sessionCredentialPreMapping.remove(sessionId)
+            ?: throw IllegalArgumentException("No credential pre-mapped with any such session id: $sessionId (for use with token: $token)")
+        println("SWAPPING PRE-MAPPED VC FROM SESSION ID TO NEW TOKEN: $token")
+        tokenCredentialMapping[token] = premappedVc
+    }
+
+    fun mapSessionIdToIdAuthRequestState(sessionId: String, token: String) {
         println("MAPPING SESSION ID TO TOKEN: $sessionId -->> $token")
         val premappedVc = sessionCredentialPreMapping.remove(sessionId)
             ?: throw IllegalArgumentException("No credential pre-mapped with any such session id: $sessionId (for use with token: $token)")
