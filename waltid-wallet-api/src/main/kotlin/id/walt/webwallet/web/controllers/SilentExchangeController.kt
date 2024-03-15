@@ -3,8 +3,6 @@ package id.walt.webwallet.web.controllers
 import id.walt.webwallet.db.models.AccountWalletMappings
 import id.walt.webwallet.db.models.Notification
 import id.walt.webwallet.db.models.WalletCredential
-import id.walt.webwallet.seeker.DefaultCredentialTypeSeeker
-import id.walt.webwallet.seeker.DefaultDidSeeker
 import id.walt.webwallet.service.SSIKit2WalletService
 import id.walt.webwallet.service.WalletServiceManager
 import id.walt.webwallet.service.dids.DidsService
@@ -50,12 +48,16 @@ fun Application.silentExchange() = webWalletRoute {
                 credentialWallet = SSIKit2WalletService.getCredentialWallet(did),
                 clientId = SSIKit2WalletService.testCIClientConfig.clientID
             ).mapNotNull {
-                val manifest = WalletCredential.tryParseManifest(it.manifest) ?: JsonObject(emptyMap())
                 val credential = WalletCredential.parseDocument(it.document, it.id) ?: JsonObject(emptyMap())
-                // prepare credential objects
-                if (validateIssuer(credential, manifest)) {
-                    prepareCredentialData(did, it, credential, manifest)
+                val manifest = WalletCredential.tryParseManifest(it.manifest) ?: JsonObject(emptyMap())
+                val issuerDid = WalletCredential.parseIssuerDid(credential, manifest) ?: "n/a"
+                val type = WalletServiceManager.credentialTypeSeeker.get(credential)
+                //TODO: improve for same issuer - type values
+                if (validateIssuer(issuerDid, type)) {
+                    Pair(it, issuerDid)
                 } else null
+            }.map {
+                prepareCredentialData(did = did, data = it.first, issuerDid = it.second)
             }.flatten().let {
                 storeCredentials(it)
             }
@@ -64,12 +66,11 @@ fun Application.silentExchange() = webWalletRoute {
     }
 }
 
-internal suspend fun validateIssuer(credentialJson: JsonObject, manifestJson: JsonObject) =
+internal suspend fun validateIssuer(issuer: String, type: String) =
     WalletServiceManager.issuerTrustValidationService.validate(
-        did = DefaultDidSeeker().get(manifestJson),
-        type = DefaultCredentialTypeSeeker().get(credentialJson),
-        egfUri = "test"
+        did = issuer, type = type, egfUri = "test"
     )
+
 internal fun storeCredentials(credentials: List<Pair<WalletCredential, String?>>) = credentials.groupBy {
     it.first.wallet
 }.flatMap { entry ->
@@ -97,7 +98,7 @@ internal fun otherStuff(wallet: UUID, credentials: List<Pair<WalletCredential, S
 }
 
 internal fun prepareCredentialData(
-    did: String, data: IssuanceService.CredentialDataResult, credentialJson: JsonObject, manifestJson: JsonObject
+    did: String, data: IssuanceService.CredentialDataResult, issuerDid: String
 ) = DidsService.getWalletsForDid(did).map {
     Pair(
         WalletCredential(
@@ -108,9 +109,8 @@ internal fun prepareCredentialData(
             addedOn = Clock.System.now(),
             manifest = data.manifest,
             deletedOn = null,
-            pending = WalletServiceManager.issuerUseCase.get(
-                wallet = it, name = WalletCredential.parseIssuerDid(credentialJson, manifestJson) ?: ""
-            ).getOrNull()?.authorized ?: true,
+            pending = WalletServiceManager.issuerUseCase.get(wallet = it, name = issuerDid).getOrNull()?.authorized
+                ?: true,
         ), data.type
     )
 }
