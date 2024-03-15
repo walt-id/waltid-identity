@@ -75,8 +75,14 @@ object OidcApi : CIProvider() {
                 }
             }
 
-            // Get the keys from?
+            // Implement in openid4vc lib?
             get("/jwks") {
+//                OidcApi.sessionCredentialPreMapping.forEach {
+//                    it.value.forEach {
+//                        println(it.issuerKey.getPublicKey().exportJWKObject())
+//                    }
+//                }
+
                 call.respondText ( "{\"keys\":[{\"kty\":\"EC\",\"x\":\"bo4FsmViF9au5-iCZbvEy-WZGaRes_eZdpIucmg4XH8\",\"y\":\"htYUXUmIc-IxyR6QMFPwXHXAgj__Fqw9kuSVtSyulhI\",\"crv\":\"P-256\",\"kid\":\"z2dmzD81cgPx8Vki7JbuuMmFYrWPgYoytykUZ3eyqht1j9KbrJNL5rEcHRKkRBDnxzu2352jxSjTEFmM9hjTL2wMtzcTDjjDAQmPpQkaihjoAo8AygRr9M6yZsXHzWXnJRMNPzR3cCYbmvE9Q1sSQ1qzXHBo4iEc7Yb3MGu31ZAHKSd9Qx\"}]}"
                     , ContentType.Application.Json, HttpStatusCode.OK)
             }
@@ -85,7 +91,6 @@ object OidcApi : CIProvider() {
                 val authReq = runBlocking { AuthorizationRequest.fromHttpParametersAuto(call.parameters.toMap()) }
                 try {
                     val authResp = if (authReq.responseType.contains(ResponseType.Code)) {
-                        // if (authReq.authorizationDetails?.any{ it.types!!.any{ it ==  "CTWalletSameAuthorisedInTime" } }!! || authReq.authorizationDetails?.any{ it.types!!.any{ it ==  "CTWalletSameAuthorisedDeferred" } }!! )  {
                         if (authReq.authorizationDetails!!.any{ it.format?.value ==  CredentialFormat.jwt_vc.value}){ // EBSI
                             val idTokenJarKid = OidcApi.sessionCredentialPreMapping[authReq.issuerState]?.first()?.issuerDid!!.replaceRange(0..7, "")
                             println("KID is: $idTokenJarKid")

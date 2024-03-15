@@ -114,9 +114,13 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
         return AuthorizationCodeResponse.success(code, mappedState)
     }
 
+    // TO-DO: JAR OAuth2.0 specification https://www.rfc-editor.org/rfc/rfc9101.html
+    // open fun proccessJar(authorizationRequest: AuthorizationRequest, kid: String){
+    // }
+
+    // Create an ID Token request using JAR OAuth2.0 specification https://www.rfc-editor.org/rfc/rfc9101.html
     open fun processCodeFlowAuthorizationEbsi(authorizationRequest: AuthorizationRequest, keyId: String): AuthorizationCodeIDTokenRequestResponse {
         println("Ebsi Authorize Request")
-
         if (!authorizationRequest.responseType.contains(ResponseType.Code))
             throw AuthorizationError(
                 authorizationRequest,
@@ -124,21 +128,15 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
                 message = "Invalid response type ${authorizationRequest.responseType}, for authorization code flow."
             )
 
-        // Create ID Token Request
-
         // Bind authentication request with state
-        // @see https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest
-        // `state`: RECOMMENDED. Opaque value used to maintain state between the request and the
-        // callback. Typically, Cross-Site Request Forgery (CSRF, XSRF) mitigation is done by
-        // cryptographically binding the value of this parameter with a browser cookie.
         val idTokenRequestState = UUID().toString();
         val idTokenRequestNonce = UUID().toString();
         val responseMode = ResponseMode.DirectPost
 
-        val clientId = this.metadata.issuer!! // :/
+        val clientId = this.metadata.issuer!!
         val redirectUri = this.metadata.issuer + "/direct_post"
         val responseType = "id_token"
-        val scope = setOf("openid") // How to put the array of scopes in the token above?
+        val scope = setOf("openid")
 
         // Create a jwt as request object as defined in JAR OAuth2.0 specification
         val requestJar = signToken (
@@ -152,7 +150,7 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
                 put("redirect_uri", redirectUri)
                 put("response_type", responseType)
                 put("response_mode", responseMode.name)
-                put("scope", "openid") // How can we put an array of scopes?
+                put("scope", "openid")
             }, buildJsonObject {
                 put(JWTClaims.Header.algorithm, "ES256")
                 put(JWTClaims.Header.keyID, keyId)
@@ -161,7 +159,7 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
             keyId
         )
 
-        // Create a session with the state of id token request since it is needed in the direct_post endpoint
+        // Create a session with the state of the ID Token request since it is needed in the direct_post endpoint
         val authorizationSession = initializeAuthorization(authorizationRequest, 5.minutes, idTokenRequestState)
 
         println("Authorization Session Id is: ${authorizationSession.id}")
