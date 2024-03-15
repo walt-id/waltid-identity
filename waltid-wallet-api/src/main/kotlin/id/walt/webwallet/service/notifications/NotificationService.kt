@@ -6,6 +6,7 @@ import kotlinx.datetime.Instant
 import kotlinx.datetime.toJavaInstant
 import kotlinx.uuid.UUID
 import org.jetbrains.exposed.sql.*
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.inList
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.time.temporal.ChronoUnit
@@ -37,7 +38,7 @@ object NotificationService {
     }
 
     fun add(notifications: List<Notification>): Int = transaction {
-        upsert(*notifications.toTypedArray())
+        insert(*notifications.toTypedArray())
     }
 
     fun delete(vararg ids: UUID): Int = transaction {
@@ -45,7 +46,9 @@ object NotificationService {
     }
 
     fun update(vararg notification: Notification): Int = transaction {
-        upsert(*notification)
+        notification.fold(0) { acc, notification ->
+            acc + update(notification)
+        }
     }
 
     private fun filterAll(
@@ -59,14 +62,27 @@ object NotificationService {
     }.orderBy(column = WalletNotifications.addedOn,
         order = ascending?.takeIf { it }?.let { SortOrder.ASC } ?: SortOrder.DESC)
 
-    private fun upsert(vararg notifications: Notification): Int = WalletNotifications.batchUpsert(
-        notifications.toList(),
-        WalletNotifications.id,
+    private fun insert(vararg notifications: Notification): Int = WalletNotifications.batchInsert(
+        data = notifications.toList(),
     ) {
         this[WalletNotifications.account] = UUID(it.account)
         this[WalletNotifications.wallet] = UUID(it.wallet)
         this[WalletNotifications.type] = it.type
+        this[WalletNotifications.isRead] = it.status
         this[WalletNotifications.addedOn] = it.addedOn.toJavaInstant()
         this[WalletNotifications.data] = it.data
     }.size
+
+    private fun update(notification: Notification) = notification.id?.let {
+        UUID(it)
+    }?.let {
+        WalletNotifications.update({ WalletNotifications.id eq it }) {
+            it[this.account] = UUID(notification.account)
+            it[this.wallet] = UUID(notification.wallet)
+            it[this.type] = notification.type
+            it[this.isRead] = notification.status
+            it[this.addedOn] = notification.addedOn.toJavaInstant()
+            it[this.data] = notification.data
+        }
+    } ?: 0
 }
