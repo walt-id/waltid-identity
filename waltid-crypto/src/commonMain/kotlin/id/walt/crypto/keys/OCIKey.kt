@@ -24,10 +24,7 @@ import kotlinx.datetime.Clock
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.plus
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.Transient
-import kotlinx.serialization.encodeToString
+import kotlinx.serialization.*
 import kotlinx.serialization.json.*
 import love.forte.plugin.suspendtrans.annotation.JsPromise
 import love.forte.plugin.suspendtrans.annotation.JvmAsync
@@ -98,10 +95,11 @@ class OCIKey(
   @JvmAsync
   @JsPromise
   @JsExport.Ignore
-  override suspend fun exportJWKObject(): JsonObject =
-      throw NotImplementedError("JWK export is not available for remote keys.")
+  override suspend fun exportJWKObject(): JsonObject {
+      return Json.parseToJsonElement(_publicKey!!).jsonObject
+  }
 
-  @JvmBlocking
+    @JvmBlocking
   @JvmAsync
   @JsPromise
   @JsExport.Ignore
@@ -170,7 +168,6 @@ class OCIKey(
 
     fun base64UrlEncode(input: ByteArray): String = Base64.UrlSafe.encode(input).replace("=", "")
 
-    // Step 1: Create a JSON object containing the header and payload
     val encodedHeader =
         base64UrlEncode(
             Json.encodeToString(
@@ -182,16 +179,13 @@ class OCIKey(
                 .encodeToByteArray())
     val encodedPayload = base64UrlEncode(plaintext)
 
-    // Step 3: Concatenate the encoded header and payload with a period (.)
     val unsignedToken = "$encodedHeader.$encodedPayload"
 
-    // Step 4: Generate a signature for the concatenated string
 
     println("SIGNING: \"${unsignedToken}\".encodeToByteArray()")
     val encodedSignature = (signRaw(unsignedToken.encodeToByteArray())).encodeToBase64Url()
     println("Signature (base64URL): $encodedSignature")
 
-    // Step 6: Concatenate the encoded header, payload, and signature with periods (.)
     return "$unsignedToken.$encodedSignature"
   }
 
@@ -310,6 +304,7 @@ class OCIKey(
           else -> throw IllegalArgumentException("Not supported: $type")
         }
 
+      @OptIn(ExperimentalSerializationApi::class)
     @JvmBlocking
     @JvmAsync
     @JsPromise
@@ -424,7 +419,7 @@ class OCIKey(
     @JsPromise
     @JsExport.Ignore
     @OptIn(ExperimentalEncodingApi::class)
-    suspend fun signingRequest(
+    fun signingRequest(
         method: String,
         restApi: String,
         host: String,
