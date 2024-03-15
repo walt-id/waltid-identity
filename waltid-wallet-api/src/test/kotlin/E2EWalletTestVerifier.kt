@@ -24,6 +24,7 @@ import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.testing.*
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.*
 import java.io.File
@@ -63,7 +64,7 @@ open class E2EWalletTestVerifier : E2EWalletTestBase() {
         }
     }
     
-    private suspend fun ApplicationTestBuilder.runApplication() = run {
+    private suspend fun ApplicationTestBuilder.runApplication() = runBlocking {
         println("Running in ${Path(".").absolutePathString()}")
         localWalletClient = newClient()
         

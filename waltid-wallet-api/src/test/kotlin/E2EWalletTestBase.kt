@@ -332,7 +332,6 @@ abstract class E2EWalletTestBase {
         }
     }
     
-    
     protected suspend fun testCreateRSAKey() {
         println("\nUse Case -> Generate new key of type RSA\n")
         val endpoint = "$walletUrl/wallet-api/wallet/$walletId/keys/generate?type=RSA"

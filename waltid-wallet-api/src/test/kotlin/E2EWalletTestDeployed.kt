@@ -15,6 +15,7 @@ import kotlin.test.*
 import kotlin.test.Test
 import kotlin.time.Duration.Companion.seconds
 import PresentationDefinitionFixtures.Companion.presentationDefinitionExample1
+import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.webwallet.Values
 
 class E2EWalletTestDeployed : E2EWalletTestBase() {
@@ -263,12 +264,14 @@ class E2EWalletTestDeployed : E2EWalletTestBase() {
         val id = matchedCredentials[0].jsonObject["id"]?.jsonPrimitive?.content
         assertNotNull(id)
         
-        val did = matchedCredentials[0].jsonObject["parsedDocument"]?.jsonObject?.get("issuer")?.jsonObject?.get("id")
-        
+        var did: String? = matchedCredentials[0].jsonObject["parsedDocument"]?.jsonObject?.get("credentialSubject")?.jsonObject?.get("id")?.jsonPrimitive?.content
+        assertNotNull(did)
+        did = did.split("#")[0]
+  
         // 4. Use output of 2) and 3) to create presentation to return to relying party
         val json = """
            {
-                "did": "${did?.jsonPrimitive?.content}",
+                "did": "$did",
                 "presentationRequest": "$parsedRequest",
                 "selectedCredentials": [
                     "$id"
