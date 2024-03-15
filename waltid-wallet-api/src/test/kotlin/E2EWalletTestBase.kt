@@ -18,6 +18,16 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import com.zaxxer.hikari.HikariConfig
+import com.zaxxer.hikari.HikariDataSource
+import id.walt.webwallet.config.DatasourceConfiguration
+import id.walt.webwallet.webWalletSetup
+import io.ktor.server.testing.*
+import java.io.File
+import java.nio.file.Files
+import java.nio.file.Paths
+import id.walt.webwallet.config.ConfigManager as WalletConfigManager
+import id.walt.webwallet.config.WebConfig as WalletWebConfig
 
 abstract class E2EWalletTestBase {
     private val didMethodsToTest = listOf("key", "jwk", "web")
@@ -29,7 +39,33 @@ abstract class E2EWalletTestBase {
     protected lateinit var walletId: UUID
     private lateinit var firstDid: String
     
-  
+    companion object {
+        init {
+            Files.createDirectories(Paths.get("./data"))
+            assertTrue(File("./data").exists())
+            val config = DatasourceConfiguration(
+                hikariDataSource = HikariDataSource(HikariConfig().apply {
+                    jdbcUrl = "jdbc:sqlite:data/wallet.db"
+                    driverClassName = "org.sqlite.JDBC"
+                    username = ""
+                    password = ""
+                    transactionIsolation = "TRANSACTION_SERIALIZABLE"
+                    isAutoCommit = true
+                }),
+                recreateDatabaseOnStart = true
+            )
+            
+            WalletConfigManager.preloadConfig(
+                "db.sqlite", config
+            )
+            
+            WalletConfigManager.preloadConfig(
+                "web", WalletWebConfig()
+            )
+            webWalletSetup()
+            WalletConfigManager.loadConfigs(emptyArray())
+        }
+    }
     
     private fun randomString(length: Int) = (1..length).map { alphabet.random() }.toTypedArray().joinToString("")
     
@@ -42,6 +78,27 @@ abstract class E2EWalletTestBase {
     abstract var issuerUrl: String
     abstract var verifierUrl: String
     
+    protected fun deleteAllCredentials() = testApplication {
+        val response: JsonArray = listCredentials()
+        assertNotEquals(response.size, 0)
+        response.forEach {
+            val id = it.jsonObject["id"]?.jsonPrimitive?.content ?: error("No credentials found")
+            deleteCredential(id)
+        }
+        val resp: JsonArray = listCredentials()
+        assertEquals(resp.size, 0)
+    }
+    
+    protected fun issueNewCredential() = testApplication {
+        val availableDids = listAllDids()
+        
+        val issuanceUri = issueJwtCredential()
+        println("Issuance Offer uri = $issuanceUri")
+        
+        // Request credential and store in wallet
+        val vc: JsonObject = requestCredential(issuanceUri, availableDids.first().did)
+        println("issued vc = $vc")
+    }
     protected suspend fun testCreateUser(user: User) {
         println("\nUse Case -> Register User $user\n")
         val endpoint = "$walletUrl/wallet-api/auth/create"

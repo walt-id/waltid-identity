@@ -244,6 +244,8 @@ class E2EWalletTestDeployed : E2EWalletTestBase() {
     fun e2eTestFullPresentationUseCase() = testApplication {
         initialise()
         listAllWallets()
+        deleteAllCredentials()
+        issueNewCredential()
         
         // full e2e run of verification endpoints
         
