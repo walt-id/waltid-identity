@@ -6,6 +6,7 @@ import id.walt.webwallet.db.models.AccountWalletMappings
 import id.walt.webwallet.db.models.AccountWalletPermissions
 import id.walt.webwallet.db.models.Wallets
 import id.walt.webwallet.notificationusecase.NotificationUseCase
+import id.walt.webwallet.seeker.DefaultCredentialTypeSeeker
 import id.walt.webwallet.service.account.AccountsService
 import id.walt.webwallet.service.category.CategoryServiceImpl
 import id.walt.webwallet.service.credentials.CredentialsService
@@ -35,6 +36,7 @@ object WalletServiceManager {
     val issuerTrustValidationService = DefaultTrustValidationService(httpClient, trustConfig.issuersRecord)
     val verifierTrustValidationService = DefaultTrustValidationService(httpClient, trustConfig.verifiersRecord)
     val credentialService = CredentialsService()
+    val credentialTypeSeeker = DefaultCredentialTypeSeeker()
     val eventUseCase = EventUseCase(EventService())
     val notificationUseCase = NotificationUseCase(NotificationService)
     val issuerUseCase = IssuerUseCaseImpl(service = IssuersService, http = httpClient)
