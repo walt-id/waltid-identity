@@ -11,7 +11,7 @@ import kotlinx.uuid.generateUUID
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.transactions.transaction
 
-object OidcUniqueSubjectStrategy : AccountStrategy<OidcUniqueSubjectRequest>("oidc-unique-subject") {
+object OidcUniqueSubjectStrategy : PasswordlessAccountStrategy<OidcUniqueSubjectRequest>() {
     override suspend fun register(tenant: String, request: OidcUniqueSubjectRequest): Result<RegistrationResult> {
         val jwt = verifyToken(request.token)
         val sub = jwt.subject
