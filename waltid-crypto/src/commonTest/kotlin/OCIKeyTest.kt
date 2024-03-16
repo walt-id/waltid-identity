@@ -1,6 +1,6 @@
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.OCIKey
-import id.walt.crypto.keys.OCIKeyConfig
+import id.walt.crypto.keys.OCIKeyMetadata
 import io.ktor.util.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
@@ -17,15 +17,18 @@ class OCIKeyTest {
     """.trimIndent()
 
     private val config =
-        OCIKeyConfig(
-            "ocid1.tenancy.oc1..aaaaaaaaiijfupfvsqwqwgupzdy5yclfzcccmie4ktp2wlgslftv5j7xpk6q",
+        OCIKeyMetadata(
+            tenancyOcid = "ocid1.tenancy.oc1..aaaaaaaaiijfupfvsqwqwgupzdy5yclfzcccmie4ktp2wlgslftv5j7xpk6q",
             "ocid1.user.oc1..aaaaaaaaxjkkfjqxdqk7ldfjrxjmacmbi7sci73rbfiwpioehikavpbtqx5q",
             "bb:d4:4b:0c:c8:3a:49:15:7f:87:55:d5:2b:7e:dd:bc",
-            "ens3g6m3aabyo-management.kms.eu-frankfurt-1.oraclecloud.com",
+            "ens6lotnaagms-management.kms.eu-frankfurt-1.oraclecloud.com",
             "ocid1.tenancy.oc1..aaaaaaaaiijfupfvsqwqwgupzdy5yclfzcccmie4ktp2wlgslftv5j7xpk6q/ocid1.user.oc1..aaaaaaaaxjkkfjqxdqk7ldfjrxjmacmbi7sci73rbfiwpioehikavpbtqx5q/bb:d4:4b:0c:c8:3a:49:15:7f:87:55:d5:2b:7e:dd:bc",
-            "ocid1.key.oc1.eu-frankfurt-1.ens3g6m3aabyo.abtheljr3eq62dewopgedq3nwubek4art77q4erzx7s6hv55e3zcuvp46epa",
-            "ens3g6m3aabyo-crypto.kms.eu-frankfurt-1.oraclecloud.com",
-            signingKeyPem = signingKeyPem
+            "ens6lotnaagms-crypto.kms.eu-frankfurt-1.oraclecloud.com",
+            """
+                         PRIVATE_KEY_HERE
+                """
+
+
         )
     private val payload =
         JsonObject(
@@ -82,7 +85,7 @@ class OCIKeyTest {
 
     private suspend fun ociTestgetPublicKey() {
         val key =
-            OCIKey.getOCIPublicKey(config.OCIDKeyID, config.keyId, config.managementEndpoint, keyVersion, signingKeyPem)
+            OCIKey.getOCIPublicKey(config.userOcid, config.keyId, config.managementEndpoint, keyVersion, signingKeyPem)
         assertEquals(public_key, key.exportPEM())
     }
 }
