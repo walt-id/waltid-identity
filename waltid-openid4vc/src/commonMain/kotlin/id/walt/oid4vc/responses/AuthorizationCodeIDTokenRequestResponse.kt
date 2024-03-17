@@ -41,7 +41,7 @@ data class AuthorizationCodeIDTokenRequestResponse private constructor(
                 parameters["client_id"]?.firstOrNull(),
                 parameters["redirect_uri"]?.firstOrNull(),
                 parameters["response_type"]?.firstOrNull(),
-                parameters["response_mode"]?.firstOrNull()?.let { ResponseMode.fromValue(it) },
+                parameters["response_mode"]?.firstOrNull()?.let { ResponseMode.valueOf(it) },
                 parameters["scope"]!!.toSet(),
                 parameters["nonce"]?.firstOrNull(),
                 parameters["request_uri"]?.firstOrNull(),
