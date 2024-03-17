@@ -146,11 +146,22 @@ object OidcApi : CIProvider() {
                 val params = call.receiveParameters().toMap()
 
                 println("/direct_post params: $params")
+
+                if (params["state"]?.get(0) == null || params["id_token"]?.get(0) == null) {
+                    call.respond(HttpStatusCode.BadRequest, "missing id_token or state parameter")
+                    throw IllegalArgumentException("missing id_token or state parameter")
+                }
+
                 println("/direct_post values from params: ${params.values}")
-                println("/direct_post state from param: ${params.get("state")}")
-                val state = params.get("state")?.get(0)!!
+                println("/direct_post state from param: ${params["state"]}")
+                println("/direct_post token from param: ${params["id_token"]}")
+
+                val state = params["state"]?.get(0)!!
+                val idToken = params["id_token"]?.get(0)!!
+
                 try {
-                    val resp = processDirectPost(state)
+
+                    val resp = processDirectPostIdToken(state, idToken)
                     // Get the redirect_uri from the Authorization Request Parameter
                     println("direct_post redirectUri is:" + resp.toRedirectUri("openid://redirect", ResponseMode.Query))
                     call.response.apply {
