@@ -149,7 +149,7 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
                 put("client_id", clientId)
                 put("redirect_uri", redirectUri)
                 put("response_type", responseType)
-                put("response_mode", responseMode.name)
+                put("response_mode", responseMode.value)
                 put("scope", "openid")
             }, buildJsonObject {
                 put(JWTClaims.Header.algorithm, "ES256")
