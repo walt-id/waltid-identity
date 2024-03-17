@@ -16,14 +16,13 @@ interface ReportService<T> {
 
         override fun frequent(parameter: ReportRequestParameter): List<WalletCredential> =
             (parameter as? CredentialReportRequestParameter)?.let { param ->
-                frequent(param.walletId, EventType.Credential.Present, param.limit).mapNotNull {
-                    it.jsonObject["credentialId"]?.jsonPrimitive?.content
-                }.groupBy { it }.let { group ->
-                    val sorted = group.keys.sortedByDescending {
-                        group[it]?.count()
+                frequent(param.walletId, EventType.Credential.Present, param.limit).groupBy { it.credentialId }
+                    .let { group ->
+                        val sorted = group.keys.sortedByDescending {
+                            group[it]?.count()
+                        }
+                        credentialService.get(sorted.filterNotNull())
                     }
-                    credentialService.get(sorted)
-                }
             } ?: emptyList()
 
         private fun frequent(walletId: UUID, action: EventType.Action, limit: Int) = eventService.get(
@@ -36,7 +35,7 @@ interface ReportService<T> {
             dataFilter = mapOf(
                 "event" to action.type, "action" to action.toString()
             )
-        ).map { it.data }
+        )
     }
 }
 
