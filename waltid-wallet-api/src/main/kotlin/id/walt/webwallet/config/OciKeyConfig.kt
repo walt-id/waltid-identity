@@ -8,7 +8,7 @@ data class OciKeyConfig(
     val userOcid: String,
     val fingerprint: String,
     val managementEndpoint: String,
-    val keyId: String,
     val cryptoEndpoint: String,
-    val signingKeyPem: String? = null
+    val signingKeyPem: String? = null,
+    val enableOCIVault: Boolean
 ) : WalletConfig

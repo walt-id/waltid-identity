@@ -95,6 +95,18 @@ class SSIKit2WalletService(
         }
   }
 
+    val config = ConfigManager.getConfig<OciKeyConfig>()
+    private val configurationKey =
+        OCIKeyMetadata(
+            config.tenancyOcid,
+            config.userOcid,
+            config.fingerprint,
+            config.managementEndpoint,
+            config.cryptoEndpoint,
+            config.signingKeyPem?.trimIndent()
+        )
+
+    private val enableOCIKms = config.enableOCIVault
   override fun listCredentials(filter: CredentialFilterObject): List<WalletCredential> =
       credentialService.list(walletId, filter)
 
@@ -470,29 +482,35 @@ class SSIKit2WalletService(
             keysetHandle = JsonNull)
       }
 
-  val config = ConfigManager.getConfig<OciKeyConfig>()
-  private val configurationKey =
-      OCIKeyMetadata(
-          config.tenancyOcid,
-          config.userOcid,
-          config.fingerprint,
-          config.managementEndpoint,
-          config.keyId,
-          config.cryptoEndpoint,
-          config.signingKeyPem?.trimIndent())
 
   override suspend fun generateKey(type: String): String =
-      OCIKey.generateKey(KeyType.valueOf(type), configurationKey).let { createdKey ->
-        val keyId = createdKey.getKeyId()
-        eventUseCase.log(
-            action = EventType.Key.Create,
-            originator = "wallet",
-            tenant = tenant,
-            accountId = accountId,
-            walletId = walletId,
-            data = eventUseCase.keyEventData(createdKey, "local"))
-        KeysService.add(walletId, keyId, KeySerialization.serializeKey(createdKey))
-        createdKey.getKeyId()
+      if (enableOCIKms) {
+          OCIKey.generateKey(KeyType.valueOf(type), configurationKey).let { createdKey ->
+              val keyId = createdKey.getKeyId()
+              eventUseCase.log(
+                  action = EventType.Key.Create,
+                  originator = "wallet",
+                  tenant = tenant,
+                  accountId = accountId,
+                  walletId = walletId,
+                  data = eventUseCase.keyEventData(createdKey, "oci")
+              )
+              KeysService.add(walletId, keyId, KeySerialization.serializeKey(createdKey))
+              createdKey.getKeyId()
+          }
+      } else {
+          LocalKey.generate(KeyType.valueOf(type)).let { createdKey ->
+              eventUseCase.log(
+                  action = EventType.Key.Create,
+                  originator = "wallet",
+                  tenant = tenant,
+                  accountId = accountId,
+                  walletId = walletId,
+                  data = eventUseCase.keyEventData(createdKey, "local")
+              )
+              KeysService.add(walletId, createdKey.getKeyId(), KeySerialization.serializeKey(createdKey))
+              createdKey.getKeyId()
+          }
       }
 
   override suspend fun importKey(jwkOrPem: String): String {

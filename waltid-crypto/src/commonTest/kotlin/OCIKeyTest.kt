@@ -18,15 +18,16 @@ class OCIKeyTest {
 
     private val config =
         OCIKeyMetadata(
-            tenancyOcid = "ocid1.tenancy.oc1..aaaaaaaaiijfupfvsqwqwgupzdy5yclfzcccmie4ktp2wlgslftv5j7xpk6q",
+            "ocid1.tenancy.oc1..aaaaaaaaiijfupfvsqwqwgupzdy5yclfzcccmie4ktp2wlgslftv5j7xpk6q",
             "ocid1.user.oc1..aaaaaaaaxjkkfjqxdqk7ldfjrxjmacmbi7sci73rbfiwpioehikavpbtqx5q",
             "bb:d4:4b:0c:c8:3a:49:15:7f:87:55:d5:2b:7e:dd:bc",
             "ens6lotnaagms-management.kms.eu-frankfurt-1.oraclecloud.com",
-            "ocid1.tenancy.oc1..aaaaaaaaiijfupfvsqwqwgupzdy5yclfzcccmie4ktp2wlgslftv5j7xpk6q/ocid1.user.oc1..aaaaaaaaxjkkfjqxdqk7ldfjrxjmacmbi7sci73rbfiwpioehikavpbtqx5q/bb:d4:4b:0c:c8:3a:49:15:7f:87:55:d5:2b:7e:dd:bc",
             "ens6lotnaagms-crypto.kms.eu-frankfurt-1.oraclecloud.com",
+
             """
-                         PRIVATE_KEY_HERE
-                """
+                private key here
+            """.trimIndent()
+
 
 
         )
@@ -84,8 +85,9 @@ class OCIKeyTest {
     }
 
     private suspend fun ociTestgetPublicKey() {
+        val keyId = "${config.tenancyOcid}/${config.userOcid}/${config.fingerprint}"
         val key =
-            OCIKey.getOCIPublicKey(config.userOcid, config.keyId, config.managementEndpoint, keyVersion, signingKeyPem)
+            OCIKey.getOCIPublicKey(config.userOcid, keyId, config.managementEndpoint, keyVersion, signingKeyPem)
         assertEquals(public_key, key.exportPEM())
     }
 }
