@@ -1,5 +1,6 @@
 package id.walt.oid4vc.providers
 
+import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.definitions.JWTClaims
 import id.walt.oid4vc.errors.AuthorizationError
@@ -9,15 +10,15 @@ import id.walt.oid4vc.interfaces.ITokenProvider
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.requests.TokenRequest
 import id.walt.oid4vc.responses.*
+import id.walt.did.dids.DidService
+
 import io.ktor.http.*
 import kotlinx.datetime.Clock
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.put
+import kotlinx.serialization.json.*
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 import kotlinx.uuid.UUID
+import kotlin.js.ExperimentalJsExport
 
 abstract class OpenIDProvider<S : AuthorizationSession>(
     val baseUrl: String,
@@ -84,9 +85,72 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
         return verifyAndParseToken(code, TokenTarget.TOKEN)
     }
 
+    @OptIn(ExperimentalJsExport::class)
+    protected open suspend fun verifyAndParseIdToken(token: String): JsonObject? {
+        // 1. Validate Header
+        val header = parseTokenHeader(token)
+        if (!header.keys.containsAll(setOf(
+                JWTClaims.Header.type,
+                JWTClaims.Header.keyID,
+                JWTClaims.Header.algorithm,
+            )
+            )){
+            throw IllegalStateException( "Invalid header in token")
+        }
+
+        // 2. Validate Payload
+        val payload = parseTokenPayload(token)
+        if (!payload.keys.containsAll(setOf(
+                JWTClaims.Payload.issuer,
+                JWTClaims.Payload.subject,
+                JWTClaims.Payload.audience,
+                JWTClaims.Payload.expirationTime,
+                JWTClaims.Payload.issuedAtTime,
+                JWTClaims.Payload.nonce,
+            )
+            )){
+            throw IllegalArgumentException("Invalid payload in token")
+        }
+
+        // 3. Verify iss = sub = did (from kid)
+        val sub = payload[JWTClaims.Payload.subject].toString().removeSurrounding("\"")
+        val iss = payload[JWTClaims.Payload.issuer].toString().removeSurrounding("\"")
+
+        val kidFull  = header[JWTClaims.Header.keyID]
+        val did = kidFull.toString().replaceRange(187..kidFull.toString().length-1, "").replace("\"","")
+
+        if (iss != sub || iss != did || sub != did){
+            println("$sub $iss $did")
+            throw IllegalArgumentException("Invalid payload in token. sub != iss != did")
+        }
+
+        // 4. Verify Signature
+        // 4.a Resolve DID
+        DidService.minimalInit()
+        val didDocument = DidService.resolve(did.removeSurrounding("\"")
+        )
+
+        // 4.b Get verification methods from DID Document
+        val verificationMethods = didDocument.getOrNull()?.get("verificationMethod")
+
+        // 4.c Get the corresponding verification method
+        val verificationMethod = verificationMethods?.jsonArray?.firstOrNull {
+            it.jsonObject["id"].toString() == kidFull.toString()
+        } ?: throw IllegalArgumentException("Invalid verification method")
+
+        // 4.d Verify Token
+        // val key = DidService.resolveToKey(did).getOrThrow()
+        // key.verifyJws(token).isSuccess
+        if (!verifyTokenSignature(TokenTarget.TOKEN,token))
+            throw IllegalArgumentException("Invalid token - cannot verify signature")
+
+        return payload
+    }
+
     protected abstract fun validateAuthorizationRequest(authorizationRequest: AuthorizationRequest): Boolean
 
     abstract fun initializeAuthorization(authorizationRequest: AuthorizationRequest, expiresIn: Duration, idTokenRequestState: String? ): S
+
     open fun processCodeFlowAuthorization(authorizationRequest: AuthorizationRequest): AuthorizationCodeResponse {
         if (!authorizationRequest.responseType.contains(ResponseType.Code))
             throw AuthorizationError(
@@ -99,18 +163,28 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
         return AuthorizationCodeResponse.success(code)
     }
 
-    open fun processDirectPost(state: String) : AuthorizationCodeResponse {
-
+    suspend open fun processDirectPostIdToken(state: String, token: String) : AuthorizationCodeResponse {
         println("Incoming State is $state")
+        println("Incoming ID Token is $token")
+
         // here we get the initial session to retrieve the state of the initial authorization request
         val session = getSessionByIdTokenRequestState(state)
+            ?: throw IllegalStateException( "No authentication request found for given state")
+
         println("Session Id is: ${session?.id}")
         println("Session Authorization Request State is: ${session?.authorizationRequest?.state}")
         println("Session Id Token Request State is: ${session?.idTokenRequestState}")
 
+        // Verify and Parse ID Token
+        val payload = verifyAndParseIdToken(token)
+
+        // Verify nonce - need to add Id token nonce session
+        // if (payload[JWTClaims.Payload.nonce] != session.)
+
         // Generate code and proceed as regular authorization request
         val mappedState = mapOf("state" to listOf(session?.authorizationRequest?.state!!))
         val code = generateAuthorizationCodeFor(session)
+
         return AuthorizationCodeResponse.success(code, mappedState)
     }
 
