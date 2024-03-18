@@ -11,7 +11,7 @@ interface BaseConfig
 
 object ConfigManager {
 
-    val log = KotlinLogging.logger { }
+    private val log = KotlinLogging.logger { }
 
     val registeredConfigurations = ArrayList<Pair<String, KClass<out BaseConfig>>>()
     val loadedConfigurations = HashMap<String, BaseConfig>()
