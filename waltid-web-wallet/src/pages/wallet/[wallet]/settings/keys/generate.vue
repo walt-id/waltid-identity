@@ -103,6 +103,11 @@ const options = ref([
         "keyType": [["EdDSA_Ed25519", "Ed25519"], ["RSA", "RSA"]],
         "config": ["server", "accessKey"]
     },
+  {
+    "keyGenerationRequest": ["OCI", "oci"],
+    "keyType": [["ECDSA_Secp256r1", "secp256r1"], ["RSA", "RSA"]],
+    "config": ["tenancy OCID", "user OCID", "fingerprint", "private key", "management endpoint", "crypto endpoint"]
+  }
 ])
 const data: any = ref({
     "keyGenerationRequest": {
