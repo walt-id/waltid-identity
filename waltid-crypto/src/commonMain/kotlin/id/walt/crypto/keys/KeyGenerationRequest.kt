@@ -1,6 +1,5 @@
 package id.walt.crypto.keys
 
-import id.walt.crypto.keys.KeyType
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 
