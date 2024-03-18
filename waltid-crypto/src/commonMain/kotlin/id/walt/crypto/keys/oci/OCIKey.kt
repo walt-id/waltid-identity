@@ -101,8 +101,9 @@ class OCIKey(
   @JvmAsync
   @JsPromise
   @JsExport.Ignore
-  override suspend fun exportJWKObject(): JsonObject =
-      throw NotImplementedError("JWK export is not available for remote keys.")
+  override suspend fun exportJWKObject(): JsonObject {
+      return Json.parseToJsonElement(_publicKey!!).jsonObject
+  }
 
   @JvmBlocking
   @JvmAsync
