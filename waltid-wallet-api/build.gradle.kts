@@ -39,12 +39,7 @@ kotlin {
 }
 
 dependencies {
-    // nftkit
-    implementation("id.walt:waltid-nftkit:1.2311291144.0") {
-        exclude("com.sksamuel.hoplite", "hoplite-core")
-        exclude("com.sksamuel.hoplite", "hoplite-yaml")
-        exclude("com.sksamuel.hoplite", "hoplite-hikaricp")
-    }
+
 
     /* -- KTOR -- */
 
