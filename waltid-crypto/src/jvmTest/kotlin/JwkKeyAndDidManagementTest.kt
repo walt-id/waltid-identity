@@ -1,6 +1,6 @@
 import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.JwkKey
+import id.walt.crypto.keys.jwk.JWKKey
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
@@ -28,7 +28,7 @@ class JwkKeyAndDidManagementTest {
     fun jwkKeyGenerationTest() = runTest {
         KeyType.entries.forEach {
             println("Generate key for key type $it")
-            val generatedKey = JwkKey.generate(it)
+            val generatedKey = JWKKey.generate(it)
 
             println("Serializing key: $generatedKey")
             val serialized = KeySerialization.serializeKey(generatedKey)

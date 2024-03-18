@@ -2,8 +2,8 @@ package id.walt.did.utils
 
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.JwkKey
-import id.walt.crypto.keys.JwkKeyMetadata
+import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto.keys.jwk.JwkKeyMetadata
 import id.walt.crypto.utils.decodeBase58
 import id.walt.did.utils.KeyUtils.fromPublicKeyMultiBase
 import id.walt.did.utils.KeyUtils.getKeyTypeForVerificationMaterialType
@@ -48,16 +48,16 @@ object KeyMaterial {
         throw IllegalArgumentException("Public key format not supported: $element.")
     }
 
-    private suspend fun importJwk(element: JsonObject): Result<Key> = JwkKey.importJWK(element.toString())
+    private suspend fun importJwk(element: JsonObject): Result<Key> = JWKKey.importJWK(element.toString())
 
     private suspend fun importBase58(content: String, type: KeyType): Result<Key> = runCatching {
-        JwkKey.importRawPublicKey(type, content.decodeBase58(), JwkKeyMetadata())
+        JWKKey.importRawPublicKey(type, content.decodeBase58(), JwkKeyMetadata())
     }
 
     private suspend fun importMultibase(content: String): Result<Key> = fromPublicKeyMultiBase(content)
 
     private suspend fun importHex(content: String, type: KeyType): Result<Key> = runCatching {
-        JwkKey.importRawPublicKey(type, fromHexString(content), JwkKeyMetadata())
+        JWKKey.importRawPublicKey(type, fromHexString(content), JwkKeyMetadata())
     }
 
     private fun fromHexString(hexString: String) =

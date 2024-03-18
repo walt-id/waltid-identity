@@ -2,7 +2,7 @@ package registrars
 
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.JwkKey
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.did.dids.registrar.dids.DidCheqdCreateOptions
 import id.walt.did.dids.registrar.dids.DidCreateOptions
 import id.walt.did.dids.registrar.local.cheqd.DidCheqdRegistrar
@@ -51,7 +51,7 @@ class DidCheqdRegistrarTest : DidRegistrarTestBase(DidCheqdRegistrar()) {
         ) = Stream.of(
             //ed25519
             arguments(
-                runBlocking { JwkKey.generate(KeyType.Ed25519) },
+                runBlocking { JWKKey.generate(KeyType.Ed25519) },
                 DidCheqdCreateOptions(network = "testnet"),
                 ed25519Assertions
             ),

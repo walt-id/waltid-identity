@@ -1,5 +1,7 @@
-package id.walt.crypto.keys
+package id.walt.crypto.keys.jwk
 
+import id.walt.crypto.keys.Key
+import id.walt.crypto.keys.KeyType
 import love.forte.plugin.suspendtrans.annotation.JsPromise
 import love.forte.plugin.suspendtrans.annotation.JvmAsync
 import love.forte.plugin.suspendtrans.annotation.JvmBlocking
@@ -13,7 +15,7 @@ interface JwkKeyCreator {
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    suspend fun generate(type: KeyType, metadata: JwkKeyMetadata = JwkKeyMetadata()): JwkKey
+    suspend fun generate(type: KeyType, metadata: JwkKeyMetadata = JwkKeyMetadata()): JWKKey
     @JvmBlocking
     @JvmAsync
     @JsPromise
@@ -28,11 +30,11 @@ interface JwkKeyCreator {
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    suspend fun importJWK(jwk: String): Result<JwkKey>
+    suspend fun importJWK(jwk: String): Result<JWKKey>
 
     @JvmBlocking
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    suspend fun importPEM(pem: String): Result<JwkKey>
+    suspend fun importPEM(pem: String): Result<JWKKey>
 }

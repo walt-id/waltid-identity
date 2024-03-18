@@ -1,4 +1,6 @@
 import id.walt.crypto.keys.*
+import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto.keys.tse.TSEKey
 import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.http.*
@@ -26,7 +28,7 @@ class TestJvm {
     @Test
     fun signatureSpeedTestAll() = runTest(timeout = 5.minutes) {
         KeyType.entries.forEach { keyType ->
-            val key = JwkKey.generate(keyType)
+            val key = JWKKey.generate(keyType)
             key.signJws("abc".encodeToByteArray())
 
             val jobs = ArrayList<Job>()
@@ -50,11 +52,11 @@ class TestJvm {
 
     @Test
     fun testJwkKeySerialization() = runTest {
-        val jwkKey = JwkKey.generate(KeyType.Ed25519)
+        val jwkKey = JWKKey.generate(KeyType.Ed25519)
         val jwkKeySerialized = KeySerialization.serializeKey(jwkKey)
 
         val jsons = listOf(
-            jwkKeySerialized to JwkKey::class,
+            jwkKeySerialized to JWKKey::class,
         )
 
         jsons.forEach {
@@ -81,7 +83,7 @@ class TestJvm {
     fun testDeserializedVerify() = runTest {
         val testObjJson = Json.encodeToString(testObj)
 
-        val key = JwkKey.generate(KeyType.Ed25519)
+        val key = JWKKey.generate(KeyType.Ed25519)
         val key2 = KeySerialization.deserializeKey(KeySerialization.serializeKey(key)).getOrThrow()
 
         val jws = key.signJws(testObjJson.toByteArray())
@@ -96,7 +98,7 @@ class TestJvm {
     fun testDeserializedSign() = runTest {
         val testObjJson = Json.encodeToString(testObj)
 
-        val keyToUseForVerifying = JwkKey.generate(KeyType.Ed25519)
+        val keyToUseForVerifying = JWKKey.generate(KeyType.Ed25519)
         val keyToUseForSigning = KeySerialization.deserializeKey(KeySerialization.serializeKey(keyToUseForVerifying)).getOrThrow()
 
         val jws = keyToUseForSigning.signJws(testObjJson.toByteArray())
@@ -113,7 +115,7 @@ class TestJvm {
         println("Plaintext: $plaintext")
 
         println("Generating key: $keyType...")
-        val key = JwkKey.generate(keyType)
+        val key = JWKKey.generate(keyType)
 
         println("  Checking for private key...")
         assertTrue { key.hasPrivateKey }
@@ -163,7 +165,7 @@ class TestJvm {
     }
 
     fun exampleSignJwsJwkKey() = runTest {
-        val jwkKey by lazy { runBlocking { JwkKey.generate(KeyType.Ed25519) } }
+        val jwkKey by lazy { runBlocking { JWKKey.generate(KeyType.Ed25519) } }
 
         val payload = JsonObject(
             mapOf(

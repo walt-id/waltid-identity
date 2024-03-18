@@ -1,11 +1,13 @@
-package id.walt.crypto.keys
+package id.walt.crypto.keys.jwk
 
 import com.nimbusds.jose.*
 import com.nimbusds.jose.crypto.*
 import com.nimbusds.jose.crypto.bc.BouncyCastleProviderSingleton
 import com.nimbusds.jose.jwk.*
-import com.nimbusds.jose.jwk.KeyType.*
 import com.nimbusds.jose.util.Base64URL
+import id.walt.crypto.keys.JvmJwkKeyCreator
+import id.walt.crypto.keys.Key
+import id.walt.crypto.keys.KeyType
 import id.walt.crypto.utils.Base64Utils.base64Decode
 import id.walt.crypto.utils.Base64Utils.base64UrlDecode
 import id.walt.crypto.utils.JsonUtils.toJsonElement
@@ -13,6 +15,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import org.bouncycastle.asn1.ASN1BitString
@@ -27,15 +30,14 @@ import org.bouncycastle.util.io.pem.PemWriter
 import java.io.ByteArrayOutputStream
 import java.security.*
 import java.security.spec.PKCS8EncodedKeySpec
-import java.util.*
+import java.util.ArrayList
 
 private val bouncyCastleProvider = BouncyCastleProvider()
-
 
 @Suppress("EXPECT_ACTUAL_CLASSIFIERS_ARE_IN_BETA_WARNING")
 @Serializable
 @SerialName("jwk")
-actual class JwkKey actual constructor(
+actual class JWKKey actual constructor(
     @Suppress("CanBeParameter", "RedundantSuppression")
     var jwk: String?
 ) : Key() {
@@ -235,12 +237,12 @@ actual class JwkKey actual constructor(
      * @return Result wrapping the plaintext; Result failure when the signature fails
      */
 
-    actual override suspend fun getPublicKey(): JwkKey = JwkKey(_internalJwk.toPublicJWK())
+    actual override suspend fun getPublicKey(): JWKKey = JWKKey(_internalJwk.toPublicJWK())
 
     override val keyType: KeyType by lazy {
         when (_internalJwk.keyType) {
-            RSA -> KeyType.RSA
-            EC -> {
+            com.nimbusds.jose.jwk.KeyType.RSA -> KeyType.RSA
+            com.nimbusds.jose.jwk.KeyType.EC -> {
                 when (_internalJwk.toECKey().curve) {
                     Curve.P_256 -> KeyType.secp256r1
                     Curve.SECP256K1 -> KeyType.secp256k1
@@ -248,7 +250,7 @@ actual class JwkKey actual constructor(
                 }
             }
 
-            OKP -> {
+            com.nimbusds.jose.jwk.KeyType.OKP -> {
                 when (_internalJwk.toOctetKeyPair().curve) {
                     Curve.Ed25519 -> KeyType.Ed25519
                     else -> throw IllegalArgumentException("OKP key with curve ${_internalJwk.toOctetKeyPair().curve} not supported")
@@ -313,11 +315,11 @@ actual class JwkKey actual constructor(
 
         val prettyJson = Json { prettyPrint = true }
 
-        actual override suspend fun generate(type: KeyType, metadata: JwkKeyMetadata): JwkKey =
+        actual override suspend fun generate(type: KeyType, metadata: JwkKeyMetadata): JWKKey =
             JvmJwkKeyCreator.generate(type, metadata)
 
-        actual override suspend fun importJWK(jwk: String): Result<JwkKey> = JvmJwkKeyCreator.importJWK(jwk)
-        actual override suspend fun importPEM(pem: String): Result<JwkKey> = JvmJwkKeyCreator.importPEM(pem)
+        actual override suspend fun importJWK(jwk: String): Result<JWKKey> = JvmJwkKeyCreator.importJWK(jwk)
+        actual override suspend fun importPEM(pem: String): Result<JWKKey> = JvmJwkKeyCreator.importPEM(pem)
         actual override suspend fun importRawPublicKey(
             type: KeyType,
             rawPublicKey: ByteArray,

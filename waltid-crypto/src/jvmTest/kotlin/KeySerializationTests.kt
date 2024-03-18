@@ -3,8 +3,8 @@ import TestUtils.loadSerializedLocal
 import TestUtils.loadSerializedTse
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeySerialization
-import id.walt.crypto.keys.JwkKey
-import id.walt.crypto.keys.TSEKey
+import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto.keys.tse.TSEKey
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -25,7 +25,7 @@ class KeySerializationTests {
         keyFile: String, type: String
     ) = runTest {
         // given
-        val key = JwkKey.importJWK(keyFile).getOrThrow()
+        val key = JWKKey.importJWK(keyFile).getOrThrow()
         // when
         val serialized = KeySerialization.serializeKey(key)
         val decoded = Json.decodeFromString<JsonObject>(serialized)
@@ -60,15 +60,15 @@ class KeySerializationTests {
 
         @JvmStatic
         fun `given a serialized key string, when deserializing then the result has the correct class type`(): Stream<Arguments> = Stream.of (
-            arguments(loadSerializedLocal("ed25519.private.json"), JwkKey::class),
-            arguments(loadSerializedLocal("secp256k1.private.json"), JwkKey::class),
-            arguments(loadSerializedLocal("secp256r1.private.json"), JwkKey::class),
-            arguments(loadSerializedLocal("rsa.private.json"), JwkKey::class),
+            arguments(loadSerializedLocal("ed25519.private.json"), JWKKey::class),
+            arguments(loadSerializedLocal("secp256k1.private.json"), JWKKey::class),
+            arguments(loadSerializedLocal("secp256r1.private.json"), JWKKey::class),
+            arguments(loadSerializedLocal("rsa.private.json"), JWKKey::class),
             // public
-            arguments(loadSerializedLocal("ed25519.public.json"), JwkKey::class),
-            arguments(loadSerializedLocal("secp256k1.public.json"), JwkKey::class),
-            arguments(loadSerializedLocal("secp256r1.public.json"), JwkKey::class),
-            arguments(loadSerializedLocal("rsa.public.json"), JwkKey::class),
+            arguments(loadSerializedLocal("ed25519.public.json"), JWKKey::class),
+            arguments(loadSerializedLocal("secp256k1.public.json"), JWKKey::class),
+            arguments(loadSerializedLocal("secp256r1.public.json"), JWKKey::class),
+            arguments(loadSerializedLocal("rsa.public.json"), JWKKey::class),
             //// tse
             // arguments(loadSerializedTse("ed25519.private.json"), TSEKey::class), // FIXME: cannot access key in TSE when pre-serialized
             arguments(loadSerializedTse("ed25519.public.json"), TSEKey::class),

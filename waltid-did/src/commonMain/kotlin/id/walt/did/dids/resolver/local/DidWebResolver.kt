@@ -1,7 +1,7 @@
 package id.walt.did.dids.resolver.local
 
 import id.walt.crypto.keys.Key
-import id.walt.crypto.keys.JwkKey
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.did.dids.DidUtils
 import id.walt.did.dids.document.DidDocument
 import io.ktor.client.*
@@ -77,9 +77,9 @@ class DidWebResolver(private val client: HttpClient) : LocalResolverMethod("web"
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    suspend fun tryConvertAnyPublicKeyJwkToKey(publicKeyJwks: List<String>): Result<JwkKey> {
+    suspend fun tryConvertAnyPublicKeyJwkToKey(publicKeyJwks: List<String>): Result<JWKKey> {
         publicKeyJwks.forEach { publicKeyJwk ->
-            val result = JwkKey.importJWK(publicKeyJwk)
+            val result = JWKKey.importJWK(publicKeyJwk)
             if (result.isSuccess) return result
         }
         return Result.failure(NoSuchElementException("No key could be imported"))

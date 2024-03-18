@@ -7,7 +7,7 @@ import com.nimbusds.jose.crypto.bc.BouncyCastleProviderSingleton
 import com.nimbusds.jose.jwk.ECKey
 import id.walt.credentials.verification.policies.JwtSignaturePolicy
 import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.JwkKey
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.did.dids.DidService
 import id.walt.did.dids.registrar.dids.DidIonCreateOptions
 import id.walt.did.dids.registrar.dids.DidJwkCreateOptions
@@ -1118,7 +1118,7 @@ class CI_JVM_Test : AnnotationSpec() {
 
     //@Test
     suspend fun createDidWebDoc() {
-        val pubKey = JwkKey.importJWK(TEST_WALLET_KEY).getOrThrow().getPublicKey()
+        val pubKey = JWKKey.importJWK(TEST_WALLET_KEY).getOrThrow().getPublicKey()
         val didWebResult = DidService.registerByKey(
             "web",
             pubKey,
@@ -1201,7 +1201,7 @@ class CI_JVM_Test : AnnotationSpec() {
         println("\n============ Wallet ============")
 
         println("> Loading key: $TEST_WALLET_KEY")
-        val testWalletKey = JwkKey.importJWK(TEST_WALLET_KEY).getOrThrow()
+        val testWalletKey = JWKKey.importJWK(TEST_WALLET_KEY).getOrThrow()
         testWalletKey.hasPrivateKey shouldBe true
         println("> Private key loaded!")
 
@@ -1270,7 +1270,7 @@ class CI_JVM_Test : AnnotationSpec() {
 
     //@Test
     suspend fun testCreateKey() {
-        val result = JwkKey.Companion.importJWK(File("/home/work/waltid/entra/keys/priv.jwk").readText().trimIndent())
+        val result = JWKKey.Companion.importJWK(File("/home/work/waltid/entra/keys/priv.jwk").readText().trimIndent())
         result.isSuccess shouldBe true
         val key = result.getOrNull()!!
         key.hasPrivateKey shouldBe true
@@ -1279,7 +1279,7 @@ class CI_JVM_Test : AnnotationSpec() {
 
     //@Test
     suspend fun testGenerateHolderDid2() {
-        val key = JwkKey.generate(KeyType.Ed25519)
+        val key = JWKKey.generate(KeyType.Ed25519)
         println("== Key ==")
         println(key.exportJWK())
         println("== DID ==")

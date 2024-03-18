@@ -1,11 +1,14 @@
-package id.walt.crypto.keys
+package id.walt.crypto.keys.jwk
 
 import JWK
 import KeyLike
 import crypto
+import id.walt.crypto.keys.JsJwkKeyCreator
+import id.walt.crypto.keys.Key
+import id.walt.crypto.keys.KeyType
 import id.walt.crypto.utils.ArrayUtils.toByteArray
 import id.walt.crypto.utils.JwsUtils.jwsAlg
-import id.walt.crypto.utils.PromiseUtils.await
+import id.walt.crypto.utils.PromiseUtils
 import io.ktor.utils.io.core.*
 import jose
 import kotlinx.serialization.SerialName
@@ -22,7 +25,7 @@ import kotlin.js.json
 @JsExport
 @Serializable
 @SerialName("jwk")
-actual class JwkKey actual constructor(
+actual class JWKKey actual constructor(
     var jwk: String?
 ) : Key() {
 
@@ -47,9 +50,9 @@ actual class JwkKey actual constructor(
     override suspend fun init() {
         if (!this::_internalKey.isInitialized) {
             if (jwkToInit != null) {
-                _internalKey = await(jose.importJWK(JSON.parse(jwkToInit!!)))
+                _internalKey = PromiseUtils.await(jose.importJWK(JSON.parse(jwkToInit!!)))
             } else if (this::_internalJwk.isInitialized) {
-                _internalKey = await(jose.importJWK(_internalJwk))
+                _internalKey = PromiseUtils.await(jose.importJWK(_internalJwk))
             }
         }
 
@@ -60,7 +63,7 @@ actual class JwkKey actual constructor(
                     _internalJwk.kid = getThumbprint()
                 }
             } else {
-                _internalJwk = await(jose.exportJWK(_internalKey))
+                _internalJwk = PromiseUtils.await(jose.exportJWK(_internalKey))
 
                 if (jwk == null) {
                     jwk = JSON.stringify(_internalJwk)
@@ -107,8 +110,8 @@ actual class JwkKey actual constructor(
     @JsExport.Ignore
     actual override suspend fun exportPEM(): String {
         return when {
-            hasPrivateKey -> await(jose.exportPKCS8(_internalKey))
-            else -> await(jose.exportSPKI(_internalKey))
+            hasPrivateKey -> PromiseUtils.await(jose.exportPKCS8(_internalKey))
+            else -> PromiseUtils.await(jose.exportSPKI(_internalKey))
         }
     }
 
@@ -139,7 +142,7 @@ actual class JwkKey actual constructor(
 
         val headerEntries = headers.entries.toTypedArray().map { it.toPair() }.toTypedArray()
 
-        return await(
+        return PromiseUtils.await(
             jose.CompactSign(Uint8Array(plaintext.toTypedArray()))
                 .setProtectedHeader(json("alg" to keyType.jwsAlg(), *headerEntries))
                 .sign(_internalKey)
@@ -177,14 +180,14 @@ actual class JwkKey actual constructor(
     actual override suspend fun verifyJws(signedJws: String): Result<JsonElement> =
         runCatching {
             Json.parseToJsonElement(
-                await(jose.compactVerify(signedJws, _internalKey)).payload.toByteArray().decodeToString()
+                PromiseUtils.await(jose.compactVerify(signedJws, _internalKey)).payload.toByteArray().decodeToString()
             ).jsonObject
         }
 
     @JsPromise
     @JsExport.Ignore
-    actual override suspend fun getPublicKey(): JwkKey =
-        JwkKey(
+    actual override suspend fun getPublicKey(): JWKKey =
+        JWKKey(
             JSON.parse<JWK>(JSON.stringify(_internalJwk)).apply {
                 d = undefined
                 p = undefined
@@ -236,7 +239,7 @@ actual class JwkKey actual constructor(
         }
 
     actual override val hasPrivateKey: Boolean
-        get() = check(this::_internalKey.isInitialized) { "_internalKey of JwkKey.js.kt is not initialized (tried to to private key operation?) - has init() be called on key?" }
+        get() = check(this::_internalKey.isInitialized) { "_internalKey of JWKKey.js.kt is not initialized (tried to to private key operation?) - has init() be called on key?" }
             .run { _internalKey.type == "private" }
 
 
@@ -246,12 +249,12 @@ actual class JwkKey actual constructor(
 
     @JsPromise
     @JsExport.Ignore
-    actual override suspend fun getThumbprint(): String = await(jose.calculateJwkThumbprint(JSON.parse(exportJWK())))
+    actual override suspend fun getThumbprint(): String = PromiseUtils.await(jose.calculateJwkThumbprint(JSON.parse(exportJWK())))
 
     actual companion object : JwkKeyCreator {
         @JsPromise
         @JsExport.Ignore
-        actual override suspend fun generate(type: KeyType, metadata: JwkKeyMetadata): JwkKey =
+        actual override suspend fun generate(type: KeyType, metadata: JwkKeyMetadata): JWKKey =
             JsJwkKeyCreator.generate(type, metadata)
 
         @JsPromise
@@ -261,11 +264,11 @@ actual class JwkKey actual constructor(
 
         @JsPromise
         @JsExport.Ignore
-        actual override suspend fun importJWK(jwk: String): Result<JwkKey> = JsJwkKeyCreator.importJWK(jwk)
+        actual override suspend fun importJWK(jwk: String): Result<JWKKey> = JsJwkKeyCreator.importJWK(jwk)
 
         @JsPromise
         @JsExport.Ignore
-        actual override suspend fun importPEM(pem: String): Result<JwkKey> = JsJwkKeyCreator.importPEM(pem)
+        actual override suspend fun importPEM(pem: String): Result<JWKKey> = JsJwkKeyCreator.importPEM(pem)
     }
 
 }

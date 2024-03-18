@@ -1,6 +1,7 @@
 package id.walt.webwallet.service
 
 import id.walt.crypto.keys.*
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.did.dids.DidService
 import id.walt.did.dids.registrar.LocalRegistrar
 import id.walt.did.dids.registrar.dids.DidCheqdCreateOptions

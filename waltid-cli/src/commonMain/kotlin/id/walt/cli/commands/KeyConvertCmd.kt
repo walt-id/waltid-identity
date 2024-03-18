@@ -12,7 +12,7 @@ import com.github.ajalt.mordant.rendering.TextColors
 import com.github.ajalt.mordant.rendering.TextStyles
 import com.github.ajalt.mordant.terminal.YesNoPrompt
 import id.walt.crypto.keys.Key
-import id.walt.crypto.keys.JwkKey
+import id.walt.crypto.keys.jwk.JWKKey
 import kotlinx.coroutines.runBlocking
 import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.bouncycastle.openssl.PEMEncryptedKeyPair
@@ -112,14 +112,14 @@ class KeyConvertCmd : CliktCommand(
         }
     }
 
-    private suspend fun getKey(input: File, keyType: KeyFileFormat = getKeyType(input)): JwkKey {
+    private suspend fun getKey(input: File, keyType: KeyFileFormat = getKeyType(input)): JWKKey {
         val inputContent = input.readText()
         try {
             return run {
                 when (keyType) {
-                    KeyFileFormat.JWK -> JwkKey.importJWK(inputContent).getOrThrow()
-                    KeyFileFormat.PEM -> JwkKey.importPEM(inputContent).getOrThrow()
-                    KeyFileFormat.ENCRYPTED_PEM -> JwkKey.importPEM(decrypt(input).getOrThrow()).getOrThrow()
+                    KeyFileFormat.JWK -> JWKKey.importJWK(inputContent).getOrThrow()
+                    KeyFileFormat.PEM -> JWKKey.importPEM(inputContent).getOrThrow()
+                    KeyFileFormat.ENCRYPTED_PEM -> JWKKey.importPEM(decrypt(input).getOrThrow()).getOrThrow()
                 }
             }
         } catch (e: Throwable) {

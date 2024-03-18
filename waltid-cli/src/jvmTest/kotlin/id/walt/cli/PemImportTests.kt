@@ -1,6 +1,6 @@
 package id.walt.cli
 
-import id.walt.crypto.keys.JwkKey
+import id.walt.crypto.keys.jwk.JWKKey
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 
@@ -27,13 +27,13 @@ class PemImportTests {
 
     @Test
     fun testImportPublicSecp256k1KeyPem() = runTest {
-        val imported = JwkKey.importPEM(publicSecp256k1Key)
+        val imported = JWKKey.importPEM(publicSecp256k1Key)
         println(imported.getOrThrow())
     }
 
     @Test
     fun testImportPrivateSecp256k1KeyPem() = runTest {
-        val imported = JwkKey.importPEM(privateSecp256k1Key)
+        val imported = JWKKey.importPEM(privateSecp256k1Key)
         println(imported.getOrThrow())
     }
 
