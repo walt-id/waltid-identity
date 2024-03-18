@@ -9,7 +9,7 @@ import id.walt.webwallet.usecase.event.EventUseCase
 import kotlinx.datetime.Clock
 import kotlinx.uuid.UUID
 
-class ExplicitClaimUseCase(
+class ExplicitClaimStrategy(
     private val issuanceService: IssuanceService,
     private val credentialService: CredentialsService,
     private val eventUseCase: EventUseCase,

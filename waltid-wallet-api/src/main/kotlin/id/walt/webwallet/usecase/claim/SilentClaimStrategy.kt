@@ -23,7 +23,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.uuid.UUID
 import kotlinx.uuid.generateUUID
 
-class SilentClaimUseCase(
+class SilentClaimStrategy(
     private val issuanceService: IssuanceService,
     private val credentialService: CredentialsService,
     private val issuerTrustValidationService: TrustValidationService,
@@ -34,7 +34,7 @@ class SilentClaimUseCase(
     private val notificationUseCase: NotificationUseCase,
     private val credentialTypeSeeker: Seeker<String>,
 ) {
-    suspend fun claim(did: String, offer: String): List<String> = issuanceService.useOfferRequest(
+    suspend fun claim(did: String, offer: String) = issuanceService.useOfferRequest(
         offer = offer,
         credentialWallet = SSIKit2WalletService.getCredentialWallet(did),
         clientId = SSIKit2WalletService.testCIClientConfig.clientID
@@ -50,36 +50,45 @@ class SilentClaimUseCase(
     }.map {
         prepareCredentialData(did = did, data = it.first, issuerDid = it.second)
     }.flatten().let {
-        storeCredentials("", it)
+        storeCredentials(it)
+    }.onEach { entry ->
+        accountService.getAccountForWallet(entry.key)?.let {
+            createEvents("", it, entry.value, EventType.Credential.Receive)
+            createNotifications(it, entry.value, EventType.Credential.Receive)
+        }
+    }.let {
+        prepareResult(it)
+    }
+
+    private fun prepareResult(credentials: Map<UUID, List<Pair<WalletCredential, String?>>>) = credentials.map {
+        it.value.map { it.first }
+    }.flatten().distinct().fold(emptyList<String>()) { acc, i ->
+        acc + i.id
     }
 
     private suspend fun validateIssuer(issuer: String, type: String) = issuerTrustValidationService.validate(
         did = issuer, type = type, egfUri = "test"
     )
 
-    private suspend fun storeCredentials(tenant: String, credentials: List<Pair<WalletCredential, String?>>) =
-        credentials.groupBy {
-            it.first.wallet
-        }.flatMap { entry ->
-            credentialService.add(
-                wallet = entry.key, credentials = entry.value.map { it.first }.toTypedArray()
-            ).also {
-                otherStuff(tenant, entry.key, entry.value, EventType.Credential.Receive)
-            }
-        }
+    private fun storeCredentials(credentials: List<Pair<WalletCredential, String?>>) = credentials.groupBy {
+        it.first.wallet
+    }.onEach { (t, u) ->
+        credentialService.add(
+            wallet = t, credentials = u.map { it.first }.toTypedArray()
+        )
+    }
 
-    private suspend fun otherStuff(//TODO: rename
-        tenant: String, wallet: UUID, credentials: List<Pair<WalletCredential, String?>>, type: EventType.Action
-    ) {
-        accountService.getAccountForWallet(wallet)?.let {
-            prepareEvents(it, tenant, credentials, type).runCatching {
-                eventUseCase.log(*this.toTypedArray())
-            }
-            prepareNotifications(it, credentials.map { it.first }, type.toString()).runCatching {
-                notificationUseCase.add(*this.toTypedArray())
-                notificationUseCase.send(*this.toTypedArray())
-            }
-        }
+    private suspend fun createNotifications(
+        account: UUID, credentials: List<Pair<WalletCredential, String?>>, type: EventType.Action
+    ) = prepareNotifications(account, credentials.map { it.first }, type.toString()).runCatching {
+        notificationUseCase.add(*this.toTypedArray())
+        notificationUseCase.send(*this.toTypedArray())
+    }
+
+    private fun createEvents(
+        tenant: String, account: UUID, credentials: List<Pair<WalletCredential, String?>>, type: EventType.Action
+    ) = prepareEvents(account, tenant, credentials, type).runCatching {
+        eventUseCase.log(*this.toTypedArray())
     }
 
     private fun prepareCredentialData(
