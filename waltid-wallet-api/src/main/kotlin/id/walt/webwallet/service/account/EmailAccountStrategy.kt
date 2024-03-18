@@ -14,7 +14,7 @@ import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 
-object EmailAccountStrategy : AccountStrategy<EmailAccountRequest>("email") {
+object EmailAccountStrategy : PasswordAccountStrategy<EmailAccountRequest>() {
 
     override suspend fun register(tenant: String, request: EmailAccountRequest): Result<RegistrationResult> = runCatching {
         val name = request.name ?: throw IllegalArgumentException("No name provided!")
@@ -67,12 +67,6 @@ object EmailAccountStrategy : AccountStrategy<EmailAccountRequest>("email") {
             return AuthenticatedUser(id, req.username)
         } else {
             throw UnauthorizedException("Invalid password for \"${req.username}\"!")
-        }
-    }
-
-    private fun hashPassword(password: ByteArray) = Argon2Factory.create().run {
-        hash(10, 65536, 1, password).also {
-            wipeArray(password)
         }
     }
 }
