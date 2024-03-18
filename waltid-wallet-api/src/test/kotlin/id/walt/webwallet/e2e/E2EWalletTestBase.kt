@@ -1,3 +1,5 @@
+package id.walt.webwallet.e2e
+
 import id.walt.issuer.IssuanceExamples.issuerOnboardingRequestDefaultExample
 import id.walt.issuer.IssuerOnboardingResponse
 import id.walt.webwallet.db.models.AccountWalletListing
@@ -64,6 +66,7 @@ abstract class E2EWalletTestBase {
             )
             webWalletSetup()
             WalletConfigManager.loadConfigs(emptyArray())
+            
         }
     }
     
@@ -97,7 +100,6 @@ abstract class E2EWalletTestBase {
         
         // Request credential and store in wallet
         val vc: JsonObject = requestCredential(issuanceUri, availableDids.first().did)
-        println("issued vc = $vc")
     }
     protected suspend fun testCreateUser(user: User) {
         println("\nUse Case -> Register User $user\n")
@@ -117,7 +119,7 @@ abstract class E2EWalletTestBase {
         }
     }
     
-    protected suspend fun testPresentationDefinition(presentationDefinition: String): JsonArray {
+    protected suspend fun matchCredentialByPresentationDefinition(presentationDefinition: String): JsonArray {
         println("\nUse Case -> Match Credentials for Presentation Definition\n")
         
         val endpoint = "$walletUrl/wallet-api/wallet/$walletId/exchange/matchCredentialsForPresentationDefinition"
@@ -354,7 +356,7 @@ abstract class E2EWalletTestBase {
         }
     }
     
-    protected suspend fun listAllKeys(): JsonArray {
+    private suspend fun listAllKeys(): JsonArray {
         println("\nUse Case -> List Keys\n")
         val endpoint = "$walletUrl/wallet-api/wallet/$walletId/keys"
         println("GET $endpoint")
@@ -424,7 +426,7 @@ abstract class E2EWalletTestBase {
         assertEquals(HttpStatusCode.OK, walletClient.get(endpoint).status)
     }
     
-    protected suspend fun testResolvePresentationRequest(url: String): String = run {
+    protected suspend fun resolvePresentationRequest(url: String): String = run {
         val endpoint = "$walletUrl/wallet-api/wallet/$walletId/exchange/resolvePresentationRequest"
         
         println("POST ($endpoint)\n")
@@ -442,7 +444,7 @@ abstract class E2EWalletTestBase {
         return presentationRequest
     }
     
-    protected suspend fun testUsePresentationRequest(json: String) = run {
+    protected suspend fun usePresentationRequest(json: String) = run {
         val endpoint = "$walletUrl/wallet-api/wallet/$walletId/exchange/usePresentationRequest"
         
         println("POST ($endpoint)\n")

@@ -1,7 +1,7 @@
-import PresentationDefinitionFixtures.Companion.presentationDefinitionExample1
-import PresentationDefinitionFixtures.Companion.presentationDefinitionExample2
-import com.zaxxer.hikari.HikariConfig
-import com.zaxxer.hikari.HikariDataSource
+package id.walt.webwallet.e2e
+
+import id.walt.webwallet.e2e.PresentationDefinitionFixtures.Companion.presentationDefinitionExample1
+import id.walt.webwallet.e2e.PresentationDefinitionFixtures.Companion.presentationDefinitionExample2
 import id.walt.issuer.base.config.OIDCIssuerServiceConfig
 import id.walt.issuer.issuerModule
 import id.walt.verifier.base.config.OIDCVerifierServiceConfig
@@ -11,11 +11,9 @@ import id.walt.verifier.VerifierApiExamples.vcVpIndividualPolicies
 import id.walt.verifier.VerifierApiExamples.vpGlobalVcPolicies
 import id.walt.verifier.VerifierApiExamples.vpPolicies
 import id.walt.verifier.verifierModule
-import id.walt.webwallet.config.DatasourceConfiguration
 import id.walt.webwallet.db.Db
 import id.walt.webwallet.utils.WalletHttpClients
 import id.walt.webwallet.webWalletModule
-import id.walt.webwallet.webWalletSetup
 import io.ktor.client.*
 import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.*
@@ -27,16 +25,11 @@ import io.ktor.server.testing.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.*
-import java.io.File
-import java.nio.file.Files
-import java.nio.file.Paths
 import kotlin.io.path.Path
 import kotlin.io.path.absolutePathString
 import kotlin.test.*
 import kotlin.time.Duration.Companion.seconds
 import id.walt.issuer.base.config.ConfigManager as IssuerConfigManager
-import id.walt.webwallet.config.ConfigManager as WalletConfigManager
-import id.walt.webwallet.config.WebConfig as WalletWebConfig
 import id.walt.verifier.base.config.ConfigManager as VerifierConfigManager
 
 open class E2EWalletTestVerifier : E2EWalletTestBase() {
@@ -64,7 +57,7 @@ open class E2EWalletTestVerifier : E2EWalletTestBase() {
         }
     }
     
-    private suspend fun ApplicationTestBuilder.runApplication() = runBlocking {
+    private fun ApplicationTestBuilder.runApplication() = runBlocking {
         println("Running in ${Path(".").absolutePathString()}")
         localWalletClient = newClient()
         
@@ -73,23 +66,18 @@ open class E2EWalletTestVerifier : E2EWalletTestBase() {
         }
         setupTestWebWallet()
         
-        println("Setup issuer...")
-        setupTestIssuer()
-        
         println("Setup verifier...")
         setupTestVerifier()
+        
+        println("Setup issuer...")
+        setupTestIssuer()
         
         println("Starting application...")
         application {
             webWalletModule()
-            issuerModule(withPlugins = false)
             verifierModule(withPlugins = false)
+            issuerModule(withPlugins = false)
         }
-        getUserToken()
-        localWalletClient = newClient(token)
-        
-        // list all wallets for this user (sets wallet id)
-        listAllWallets()
     }
     
     private fun setupTestWebWallet() {
@@ -166,19 +154,48 @@ open class E2EWalletTestVerifier : E2EWalletTestBase() {
     
     @Test
     fun e2eTestPresentationRequest() = testApplication {
-        runApplication()
+        println("Running in ${Path(".").absolutePathString()}")
+        localWalletClient = newClient()
+        
+        WalletHttpClients.defaultMethod = {
+            newClient()
+        }
+        setupTestWebWallet()
+        
+        println("Setup verifier...")
+        setupTestVerifier()
+        
+        println("Starting application...")
+        application {
+            webWalletModule()
+            verifierModule(withPlugins = false)
+        }
         val url = testVerifyCredential(minimal)
         assertTrue(url.startsWith("openid4vp://authorize?response_type=vp_token"))
         println("verify Url = $url")
-
-        val parsedRequest = testResolvePresentationRequest(url)
+        
+        WalletHttpClients.defaultMethod = {
+            newClient()
+        }
+        // list all wallets for this user (sets wallet id)
+        getUserToken()
+        localWalletClient = newClient(token)
+        
+        // list all wallets for this user (sets wallet id)
+        listAllWallets()
+        val parsedRequest = resolvePresentationRequest(url)
         println("Parsed Request = $parsedRequest")
     }
     
     @Test
     fun e2eTestMatchCredentialsForPresentationDefinition() = testApplication {
         runApplication()
-        var matchedCredentials = testPresentationDefinition(presentationDefinitionExample1)
+        getUserToken()
+        localWalletClient = newClient(token)
+        
+        // list all wallets for this user (sets wallet id)
+        listAllWallets()
+        var matchedCredentials = matchCredentialByPresentationDefinition(presentationDefinitionExample1)
         assertEquals(1, matchedCredentials.size)
         
         // if the match fails, SSI Wallet kit returns full list of credentials
@@ -187,15 +204,20 @@ open class E2EWalletTestVerifier : E2EWalletTestBase() {
         
         assertNotEquals(totalNumCredentials, 0)
         
-        matchedCredentials = testPresentationDefinition(presentationDefinitionExample2)
+        matchedCredentials = matchCredentialByPresentationDefinition(presentationDefinitionExample2)
         
         assertEquals(totalNumCredentials, matchedCredentials.size)
     }
     
     @Test
-    fun e2eTestFullPresentationUseCase() = testApplication {
+    fun e2eTestFullPresentation() = testApplication {
         runTest(timeout = 60.seconds) {
             runApplication()
+            getUserToken()
+            localWalletClient = newClient(token)
+            
+            // list all wallets for this user (sets wallet id)
+            listAllWallets()
             deleteAllCredentials()
             issueNewCredential()
 
@@ -206,12 +228,11 @@ open class E2EWalletTestVerifier : E2EWalletTestBase() {
             println("Verify Url = $url")
 
             // 2. resolve presentation request with URI from 1)
-
-            val parsedRequest = testResolvePresentationRequest(url)
+            val parsedRequest = resolvePresentationRequest(url)
             println("Parsed Request = $parsedRequest")
 
             // 3. Match credentials of the required type, e.g., OpenBadgeCredential
-            val matchedCredentials = testPresentationDefinition(presentationDefinitionExample1)
+            val matchedCredentials = matchCredentialByPresentationDefinition(presentationDefinitionExample1)
             assertEquals(1, matchedCredentials.size)
 
             val id = matchedCredentials[0].jsonObject["id"]?.jsonPrimitive?.content
@@ -226,7 +247,7 @@ open class E2EWalletTestVerifier : E2EWalletTestBase() {
                 ]
             }
             """.trimIndent()
-            testUsePresentationRequest(json)
+            usePresentationRequest(json)
         }
     }
     override var walletClient: HttpClient

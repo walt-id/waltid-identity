@@ -1,3 +1,5 @@
+package id.walt.webwallet.e2e
+
 import java.io.File
 import java.net.URLDecoder
 

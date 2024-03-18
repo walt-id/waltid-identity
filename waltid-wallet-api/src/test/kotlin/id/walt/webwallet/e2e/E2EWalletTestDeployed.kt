@@ -1,3 +1,5 @@
+package id.walt.webwallet.e2e
+
 import id.walt.verifier.VerifierApiExamples
 import io.ktor.client.*
 import io.ktor.client.plugins.*
@@ -14,8 +16,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.*
 import kotlin.test.Test
 import kotlin.time.Duration.Companion.seconds
-import PresentationDefinitionFixtures.Companion.presentationDefinitionExample1
-import id.walt.crypto.utils.JsonUtils.toJsonElement
+import id.walt.webwallet.e2e.PresentationDefinitionFixtures.Companion.presentationDefinitionExample1
 import id.walt.webwallet.Values
 
 class E2EWalletTestDeployed : E2EWalletTestBase() {
@@ -227,7 +228,7 @@ class E2EWalletTestDeployed : E2EWalletTestBase() {
         assertTrue(url.startsWith("openid4vp://authorize?response_type=vp_token"))
         println("verify Url = $url")
         
-        val parsedRequest = testResolvePresentationRequest(url)
+        val parsedRequest = resolvePresentationRequest(url)
         println("Parsed Request = $parsedRequest")
     }
     
@@ -237,7 +238,7 @@ class E2EWalletTestDeployed : E2EWalletTestBase() {
         listAllWallets() // sets the wallet id
         
         val response: JsonArray = listCredentials()
-        testPresentationDefinition(presentationDefinitionExample1)
+        matchCredentialByPresentationDefinition(presentationDefinitionExample1)
         // TODO ensure num matched credentials is equal to credential list size when no match found for type
     }
     
@@ -256,11 +257,11 @@ class E2EWalletTestDeployed : E2EWalletTestBase() {
         
         // 2. resolve presentation request with URI from 1)
         
-        val parsedRequest = testResolvePresentationRequest(url)
+        val parsedRequest = resolvePresentationRequest(url)
         println("Parsed Request = $parsedRequest")
         
         // 3. Match credentials of the required type, e.g., OpenBadgeCredential
-        val matchedCredentials = testPresentationDefinition(presentationDefinitionExample1)
+        val matchedCredentials = matchCredentialByPresentationDefinition(presentationDefinitionExample1)
         val id = matchedCredentials[0].jsonObject["id"]?.jsonPrimitive?.content
         assertNotNull(id)
         
@@ -278,7 +279,7 @@ class E2EWalletTestDeployed : E2EWalletTestBase() {
                 ]
             }
         """.trimIndent()
-        testUsePresentationRequest(json)
+        usePresentationRequest(json)
     }
     
     override var walletClient: HttpClient

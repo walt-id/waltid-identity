@@ -1,21 +1,12 @@
-import PresentationDefinitionFixtures.Companion.presentationDefinitionExample1
-import PresentationDefinitionFixtures.Companion.presentationDefinitionExample2
-import com.zaxxer.hikari.HikariConfig
-import com.zaxxer.hikari.HikariDataSource
+package id.walt.webwallet.e2e
+
 import id.walt.issuer.base.config.OIDCIssuerServiceConfig
 import id.walt.issuer.issuerModule
 import id.walt.verifier.base.config.OIDCVerifierServiceConfig
-import id.walt.verifier.VerifierApiExamples.maxExample
-import id.walt.verifier.VerifierApiExamples.minimal
-import id.walt.verifier.VerifierApiExamples.vcVpIndividualPolicies
-import id.walt.verifier.VerifierApiExamples.vpGlobalVcPolicies
-import id.walt.verifier.VerifierApiExamples.vpPolicies
 import id.walt.verifier.verifierModule
-import id.walt.webwallet.config.DatasourceConfiguration
 import id.walt.webwallet.db.Db
 import id.walt.webwallet.utils.WalletHttpClients
 import id.walt.webwallet.webWalletModule
-import id.walt.webwallet.webWalletSetup
 import io.ktor.client.*
 import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.*
@@ -26,16 +17,11 @@ import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.testing.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.*
-import java.io.File
-import java.nio.file.Files
-import java.nio.file.Paths
 import kotlin.io.path.Path
 import kotlin.io.path.absolutePathString
 import kotlin.test.*
 import kotlin.time.Duration.Companion.seconds
 import id.walt.issuer.base.config.ConfigManager as IssuerConfigManager
-import id.walt.webwallet.config.ConfigManager as WalletConfigManager
-import id.walt.webwallet.config.WebConfig as WalletWebConfig
 import id.walt.verifier.base.config.ConfigManager as VerifierConfigManager
 
 open class E2EWalletTestLocal : E2EWalletTestBase() {
@@ -204,11 +190,9 @@ open class E2EWalletTestLocal : E2EWalletTestBase() {
         
         // Request credential and store in wallet
         val vc: JsonObject = requestCredential(issuanceUri, availableDids.first().did)
-        println("issued vc = $vc")
         
         val credential = vc["parsedDocument"].toString()
         assertNotNull(credential)
-        println("Issued Credential: $credential")
         
         val id = vc["id"]?.jsonPrimitive?.content
         println("credential id = $id")
@@ -216,6 +200,9 @@ open class E2EWalletTestLocal : E2EWalletTestBase() {
         
         // demonstrate that the newly issued credential is in the user wallet
         viewCredential(id)
+        println("****************************************")
+        println("vc issued and stored in wallet: $vc")
+        println("****************************************")
     }
     
     @Test

@@ -1,4 +1,4 @@
-
+package id.walt.webwallet.e2e
 class PresentationDefinitionFixtures {
     
     companion object {

@@ -1,6 +1,6 @@
 package id.walt.webwallet.service.report
 
-import TestUtils
+import id.walt.webwallet.e2e.TestUtils
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.service.credentials.CredentialsService
 import id.walt.webwallet.service.events.Event

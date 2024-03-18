@@ -64,7 +64,6 @@ fun Application.webWalletModule(withPlugins: Boolean = true) {
     if (withPlugins) {
         configurePlugins()
     }
-    
     auth()
     push()
     notifications()
