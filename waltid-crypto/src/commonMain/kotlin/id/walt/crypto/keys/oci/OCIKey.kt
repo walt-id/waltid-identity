@@ -78,6 +78,7 @@ class OCIKey(
         keyId, vaultKeyId, config.managementEndpoint, keyVersion, config.signingKeyPem
     )
   }
+    override fun toString(): String = "[OCI ${keyType.name} key @ ${config.tenancyOcid}]"
 
   @JvmBlocking
   @JvmAsync
