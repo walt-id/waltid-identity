@@ -93,9 +93,14 @@ object NotificationController {
                 }) {
                     context.respond(if (useCase.deleteAll(getWalletId()) > 0) HttpStatusCode.Accepted else HttpStatusCode.BadRequest)
                 }
-                put("status", {
+                put("status/{status}", {
                     summary = "Set notification read status"
                     request {
+                        pathParameter<Boolean>("status") {
+                            required = true
+                            allowEmptyValue = false
+                            description = "Notification read status"
+                        }
                         body<List<String>> {
                             description = "The list of notification ids"
                             required = true
@@ -115,7 +120,15 @@ object NotificationController {
                         ) HttpStatusCode.Accepted else HttpStatusCode.BadRequest
                     )
                 }
-                route("id"){
+                route("{id}", {
+                    request {
+                        pathParameter<String>("id") {
+                            required = true
+                            allowEmptyValue = false
+                            description = "Notification id"
+                        }
+                    }
+                }){
                     get({
                         summary = "Get notification by id"
                         response {
@@ -126,11 +139,11 @@ object NotificationController {
                         }
                     }) {
                         val id = call.parameters.getOrFail("id")
-                        context.respond(useCase.findById(UUID(id)).onSuccess {
+                        context.respond(useCase.findById(UUID(id)).fold(onSuccess = {
                             it
-                        }.onFailure {
+                        }, onFailure = {
                             it.localizedMessage
-                        })
+                        }))
                     }
                     delete({
                         summary = "Delete notification by id"

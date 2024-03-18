@@ -8,7 +8,7 @@ import kotlinx.datetime.toJavaInstant
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.transactions.transaction
 
-object Web3WalletAccountStrategy : AccountStrategy<AddressAccountRequest>("web3") {
+object Web3WalletAccountStrategy : PasswordlessAccountStrategy<AddressAccountRequest>() {
 
     override suspend fun register(tenant: String, request: AddressAccountRequest): Result<RegistrationResult> = runCatching {
         val name = request.name

@@ -32,7 +32,7 @@ spec:
       containers:
         - name: keycloak
           image: quay.io/keycloak/keycloak:23.0.6
-          args: ["start-dev"]
+          args: [ "start-dev", "--features=preview" ]
           env:
             - name: KEYCLOAK_ADMIN
               value: "admin"
