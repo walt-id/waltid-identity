@@ -45,7 +45,7 @@ class DidCreateCmd : CliktCommand(
             val result = DidUtil.createDid(method, key)
 
             print.green("DID created:")
-            print.box(result.did)
+            print.box(result)
         }
     }
 
