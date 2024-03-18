@@ -10,11 +10,14 @@ import com.nimbusds.jose.jwk.gen.JWKGenerator
 import com.nimbusds.jose.jwk.gen.OctetKeyPairGenerator
 import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
 import com.nimbusds.jose.util.Base64URL
+import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto.keys.jwk.JwkKeyCreator
+import id.walt.crypto.keys.jwk.JwkKeyMetadata
 import org.bouncycastle.jce.ECNamedCurveTable
 
 object JvmJwkKeyCreator : JwkKeyCreator {
 
-    override suspend fun generate(type: KeyType, metadata: JwkKeyMetadata): JwkKey {
+    override suspend fun generate(type: KeyType, metadata: JwkKeyMetadata): JWKKey {
         val keyGenerator: JWKGenerator<out JWK> = when (type) {
             KeyType.Ed25519 -> OctetKeyPairGenerator(Curve.Ed25519)
             KeyType.secp256r1 -> ECKeyGenerator(Curve.P_256)
@@ -28,10 +31,10 @@ object JvmJwkKeyCreator : JwkKeyCreator {
 
         val jwk = keyGenerator.generate()
 
-        return JwkKey(jwk)
+        return JWKKey(jwk)
     }
 
-    override suspend fun importRawPublicKey(type: KeyType, rawPublicKey: ByteArray, metadata: JwkKeyMetadata): Key = JwkKey(
+    override suspend fun importRawPublicKey(type: KeyType, rawPublicKey: ByteArray, metadata: JwkKeyMetadata): Key = JWKKey(
         when (type) {
             KeyType.Ed25519 -> OctetKeyPair.Builder(Curve.Ed25519, Base64URL.encode(rawPublicKey)).build()
             KeyType.secp256k1 -> ecRawToJwk(rawPublicKey, Curve.SECP256K1)
@@ -40,11 +43,11 @@ object JvmJwkKeyCreator : JwkKeyCreator {
         }
     )
 
-    override suspend fun importJWK(jwk: String): Result<JwkKey> =
-        runCatching { JwkKey(JWK.parse(jwk)) }
+    override suspend fun importJWK(jwk: String): Result<JWKKey> =
+        runCatching { JWKKey(JWK.parse(jwk)) }
 
-    override suspend fun importPEM(pem: String): Result<JwkKey> =
-        runCatching { JwkKey(JWK.parseFromPEMEncodedObjects(pem)) }
+    override suspend fun importPEM(pem: String): Result<JWKKey> =
+        runCatching { JWKKey(JWK.parseFromPEMEncodedObjects(pem)) }
 
     private fun ecRawToJwk(rawPublicKey: ByteArray, curve: Curve): JWK =
         ECNamedCurveTable.getParameterSpec(curve.name).curve.decodePoint(rawPublicKey).let {

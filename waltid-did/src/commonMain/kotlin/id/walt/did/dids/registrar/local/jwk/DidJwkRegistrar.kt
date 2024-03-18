@@ -2,7 +2,7 @@ package id.walt.did.dids.registrar.local.jwk
 
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.JwkKey
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.did.dids.document.DidDocument
 import id.walt.did.dids.document.DidJwkDocument
@@ -24,7 +24,7 @@ class DidJwkRegistrar : LocalRegistrarMethod("jwk") {
     @JsPromise
     @JsExport.Ignore
     override suspend fun register(options: DidCreateOptions) = options.get<KeyType>("keyType")?.let {
-        registerByKey(JwkKey.generate(it), options)
+        registerByKey(JWKKey.generate(it), options)
     } ?: throw IllegalArgumentException("KeyType option not found.")
 
     @JvmBlocking

@@ -2,6 +2,9 @@ package id.walt.crypto.keys
 
 import JWK
 import KeyLike
+import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto.keys.jwk.JwkKeyCreator
+import id.walt.crypto.keys.jwk.JwkKeyMetadata
 import id.walt.crypto.utils.JwsUtils.jwsAlg
 import id.walt.crypto.utils.PromiseUtils.await
 import jose
@@ -13,31 +16,31 @@ object JsJwkKeyCreator : JwkKeyCreator {
 
     @JsPromise
     @JsExport.Ignore
-    override suspend fun generate(type: KeyType, metadata: JwkKeyMetadata): JwkKey {
+    override suspend fun generate(type: KeyType, metadata: JwkKeyMetadata): JWKKey {
         val alg = type.jwsAlg()
 
         @Suppress("UNCHECKED_CAST_TO_EXTERNAL_INTERFACE")
         val key = await(jose.generateKeyPair<KeyLike>(alg, json("extractable" to true) as jose.GenerateKeyPairOptions)).privateKey
 
-        return JwkKey(key).apply { init() }
+        return JWKKey(key).apply { init() }
     }
 
     @JsPromise
     @JsExport.Ignore
     override suspend fun importRawPublicKey(type: KeyType, rawPublicKey: ByteArray, metadata: JwkKeyMetadata): Key {
         val key: KeyLike = await(jose.importSPKI(rawPublicKey.decodeToString(), type.jwsAlg()))
-        return JwkKey(key).apply { init() }
+        return JWKKey(key).apply { init() }
     }
 
     @JsPromise
     @JsExport.Ignore
-    override suspend fun importJWK(jwk: String): Result<JwkKey> =
+    override suspend fun importJWK(jwk: String): Result<JWKKey> =
         runCatching {
             var jsonJWK = JSON.parse<JWK>(jwk)
             while (jsonJWK::class == String::class) {
                jsonJWK = JSON.parse(jsonJWK as String)
             }
-            JwkKey(await(jose.importJWK(jsonJWK)), jsonJWK).apply { init() }
+            JWKKey(await(jose.importJWK(jsonJWK)), jsonJWK).apply { init() }
         }
 
 
@@ -46,7 +49,7 @@ object JsJwkKeyCreator : JwkKeyCreator {
      */
     @JsPromise
     @JsExport.Ignore
-    override suspend fun importPEM(pem: String): Result<JwkKey> =
+    override suspend fun importPEM(pem: String): Result<JWKKey> =
         runCatching {
             val lines = pem.lines()
             fun String.getPemTitle() = this.trim().dropWhile { it == '-' }.dropLastWhile { it == '-' }.trim()
@@ -70,6 +73,6 @@ object JsJwkKeyCreator : JwkKeyCreator {
                 }
             )
 
-            JwkKey(importedPemKey).apply { init() }
+            JWKKey(importedPemKey).apply { init() }
         }
 }

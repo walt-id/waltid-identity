@@ -1,4 +1,4 @@
-package id.walt.crypto.keys
+package id.walt.crypto.keys.jwk
 
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport

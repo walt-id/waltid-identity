@@ -365,11 +365,9 @@ walt.id identity.
 
 The library provides the following key entities to work with:
 
-- [JwkKey
-  ](https://github.com/walt-id/waltid-identity/blob/main/waltid-crypto/src/commonMain/kotlin/id/walt/crypto/keys/JwkKey.kt) -
+- [JWKKey](https://github.com/walt-id/waltid-identity/blob/main/waltid-crypto/src/commonMain/kotlin/id/walt/crypto/keys/JWKKey.kt) -
   an implementation of a local (in-memory) key (private / public)
-- [TSEKey
-  ](https://github.com/walt-id/waltid-identity/blob/main/waltid-crypto/src/commonMain/kotlin/id/walt/crypto/keys/TSEKey.kt) -
+- [TSEKey](https://github.com/walt-id/waltid-identity/blob/main/waltid-crypto/src/commonMain/kotlin/id/walt/crypto/keys/TSEKey.kt) -
   an implementation of a Hashicorp Vault Transit Secrets Engine key (private / public)
 
 ### Working with JwkKey

@@ -3,8 +3,8 @@ import TestUtils.loadPemLocal
 import TestUtils.loadResourceBase64
 import TestUtils.loadResourceBytes
 import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.JwkKey
-import id.walt.crypto.keys.JwkKeyMetadata
+import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto.keys.jwk.JwkKeyMetadata
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.Arguments
@@ -22,7 +22,7 @@ class ImportJwkKeyTestsAndDidManagement {
         keyString: String, keyType: KeyType, isPrivate: Boolean
     ) = runTest {
         // Importing
-        val imported = JwkKey.importJWK(keyString)
+        val imported = JWKKey.importJWK(keyString)
         // Checking import success
         assertTrue { imported.isSuccess }
         // Getting key
@@ -43,7 +43,7 @@ class ImportJwkKeyTestsAndDidManagement {
         println("> Importing supposed $keyType (${if (isPrivate) "private" else "public"}) as PEM:")
 
         // Importing
-        val imported = JwkKey.importPEM(keyString)
+        val imported = JWKKey.importPEM(keyString)
         // Checking import success
         assertTrue("Import of ${if (isPrivate) "private" else "public"} $keyType: ${imported.exceptionOrNull()}") { imported.isSuccess }
         // Getting key
@@ -64,7 +64,7 @@ class ImportJwkKeyTestsAndDidManagement {
         bytes: ByteArray, keyType: KeyType, isPrivate: Boolean
     ) = runTest {
         // Importing
-        val key = JwkKey.importRawPublicKey(keyType, bytes, JwkKeyMetadata())
+        val key = JWKKey.importRawPublicKey(keyType, bytes, JwkKeyMetadata())
         // Checking for private key
         assertEquals(isPrivate, key.hasPrivateKey)
         // Checking for key type

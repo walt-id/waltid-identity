@@ -2,7 +2,7 @@ package id.walt.did.dids.registrar.local.cheqd
 
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.JwkKey
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.base64toBase64Url
 import id.walt.did.dids.document.DidCheqdDocument
 import id.walt.did.dids.registrar.DidResult
@@ -77,7 +77,7 @@ class DidCheqdRegistrar : LocalRegistrarMethod("cheqd") {
     @JsPromise
     @JsExport.Ignore
     override suspend fun register(options: DidCreateOptions): DidResult =
-        registerByKey(JwkKey.generate(KeyType.Ed25519), options)
+        registerByKey(JWKKey.generate(KeyType.Ed25519), options)
 
     @JvmBlocking
     @JvmAsync
@@ -131,6 +131,7 @@ class DidCheqdRegistrar : LocalRegistrarMethod("cheqd") {
     }
 
     private fun updateDid(did: String) {
+        did
         TODO()
     }
 

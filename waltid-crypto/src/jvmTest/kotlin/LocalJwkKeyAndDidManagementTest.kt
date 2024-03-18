@@ -32,6 +32,7 @@ class LocalJwkKeyAndDidManagementTest {
     fun getPublicKeyRepresentation(keyFile: String) = runTest {
         val key = KeySerialization.deserializeKey(keyFile).getOrThrow()
         val publicBytes = key.getPublicKeyRepresentation()
+        println(publicBytes)
     }
 
     @ParameterizedTest

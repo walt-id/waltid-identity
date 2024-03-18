@@ -2,7 +2,7 @@ package id.walt.did.dids.registrar.local.web
 
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.JwkKey
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.did.dids.document.DidDocument
 import id.walt.did.dids.document.DidWebDocument
 import id.walt.did.dids.registrar.DidResult
@@ -24,7 +24,7 @@ class DidWebRegistrar : LocalRegistrarMethod("web") {
     @JsPromise
     @JsExport.Ignore
     override suspend fun register(options: DidCreateOptions): DidResult = options.get<KeyType>("keyType")?.let {
-        registerByKey(JwkKey.generate(it), options)
+        registerByKey(JWKKey.generate(it), options)
     } ?: throw IllegalArgumentException("keyType option not found.")
 
     @JvmBlocking

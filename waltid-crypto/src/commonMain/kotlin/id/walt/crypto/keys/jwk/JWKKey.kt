@@ -1,9 +1,11 @@
-package id.walt.crypto.keys
+package id.walt.crypto.keys.jwk
 
+import id.walt.crypto.keys.Key
+import id.walt.crypto.keys.KeyType
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 
-expect class JwkKey(jwk: String?) : Key {
+expect class JWKKey(jwk: String?) : Key {
 
     override suspend fun getKeyId(): String
 
@@ -48,7 +50,7 @@ expect class JwkKey(jwk: String?) : Key {
     override suspend fun decrypt(encrypted: ByteArray): Result<ByteArray>
      */
 
-    override suspend fun getPublicKey(): JwkKey
+    override suspend fun getPublicKey(): JWKKey
     override suspend fun getPublicKeyRepresentation(): ByteArray
 
 
@@ -57,12 +59,12 @@ expect class JwkKey(jwk: String?) : Key {
 
     companion object : JwkKeyCreator {
 
-        override suspend fun generate(type: KeyType, metadata: JwkKeyMetadata): JwkKey
+        override suspend fun generate(type: KeyType, metadata: JwkKeyMetadata): JWKKey
         override suspend fun importRawPublicKey(type: KeyType, rawPublicKey: ByteArray, metadata: JwkKeyMetadata): Key
 
-        override suspend fun importJWK(jwk: String): Result<JwkKey>
+        override suspend fun importJWK(jwk: String): Result<JWKKey>
 
-        override suspend fun importPEM(pem: String): Result<JwkKey>
+        override suspend fun importPEM(pem: String): Result<JWKKey>
     }
 
 }
