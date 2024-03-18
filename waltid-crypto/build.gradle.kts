@@ -74,10 +74,10 @@ kotlin {
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
 
                 // Ktor client
-                implementation("io.ktor:ktor-client-core:2.3.8")
+                implementation("io.ktor:ktor-client-core:2.3.9")
                 implementation("io.ktor:ktor-client-serialization:2.3.8")
-                implementation("io.ktor:ktor-client-content-negotiation:2.3.8")
-                implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.8")
+                implementation("io.ktor:ktor-client-content-negotiation:2.3.9")
+                implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.9")
                 implementation("io.ktor:ktor-client-json:2.3.8")
                 implementation("io.ktor:ktor-client-logging:2.3.8")
 
@@ -104,7 +104,7 @@ kotlin {
                 implementation("org.bouncycastle:bcpkix-lts8on:2.73.4") // PEM import
 
                 // Ktor client
-                implementation("io.ktor:ktor-client-cio:2.3.8")
+                implementation("io.ktor:ktor-client-cio:2.3.9")
 
                 // Logging
                 implementation("org.slf4j:slf4j-simple:2.0.12")
