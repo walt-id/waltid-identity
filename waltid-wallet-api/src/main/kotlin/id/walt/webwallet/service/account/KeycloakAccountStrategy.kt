@@ -10,6 +10,7 @@ import id.walt.webwallet.config.OidcConfiguration
 import id.walt.webwallet.db.models.Accounts
 import id.walt.webwallet.db.models.OidcLogins
 import id.walt.webwallet.service.OidcLoginService
+import id.walt.webwallet.web.controllers.ByteLoginRequest
 import id.walt.webwallet.web.model.KeycloakAccountRequest
 import id.walt.webwallet.web.model.KeycloakLogoutRequest
 import io.ktor.client.*
@@ -20,8 +21,6 @@ import io.ktor.client.plugins.logging.*
 import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
-import java.security.interfaces.ECPublicKey
-import java.security.interfaces.RSAPublicKey
 import kotlinx.datetime.Clock
 import kotlinx.datetime.toJavaInstant
 import kotlinx.serialization.json.Json
@@ -31,8 +30,10 @@ import kotlinx.uuid.UUID
 import kotlinx.uuid.generateUUID
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.transactions.transaction
+import java.security.interfaces.ECPublicKey
+import java.security.interfaces.RSAPublicKey
 
-object KeycloakAccountStrategy : AccountStrategy<KeycloakAccountRequest>("keycloak") {
+object KeycloakAccountStrategy : PasswordAccountStrategy<KeycloakAccountRequest>() {
   val http = HttpClient {
     install(ContentNegotiation) { json() }
     defaultRequest { header(HttpHeaders.ContentType, ContentType.Application.Json) }
@@ -78,26 +79,32 @@ object KeycloakAccountStrategy : AccountStrategy<KeycloakAccountRequest>("keyclo
           "Keycloak returned error code: ${res.status} [${res.status.description}]")
     }
 
-    val oidcAccountId =
-        res.headers["Location"]?.split("/")?.last()
-            ?: throw RuntimeException(
-                "Missing header-parameter 'Location' when creating user ${request.username} at the Keycloak user API ${config.keycloakUserApi}")
+      val oidcAccountId = res.headers["Location"]?.split("/")?.last() ?: throw RuntimeException(
+          "Missing header-parameter 'Location' when creating user ${request.username} at the Keycloak user API ${config.keycloakUserApi}"
+      )
 
-    val createdAccountId = transaction {
-      val accountId =
-          Accounts.insert {
-                it[Accounts.tenant] = tenant
-                it[id] = UUID.generateUUID()
-                it[name] = request.username
-                it[email] = request.email
-                it[createdOn] = Clock.System.now().toJavaInstant()
-              }[Accounts.id]
-
-      OidcLogins.insert {
-        it[OidcLogins.tenant] = tenant
-        it[OidcLogins.accountId] = accountId
-        it[oidcId] = oidcAccountId
+      val hash = request.password?.let {
+          hashPassword(
+              ByteLoginRequest(
+                  request.username!!, it.toByteArray()
+              ).password
+          )
       }
+      val createdAccountId = transaction {
+          val accountId = Accounts.insert {
+              it[Accounts.tenant] = tenant
+              it[id] = UUID.generateUUID()
+              it[name] = request.username
+              it[email] = request.email
+              it[password] = hash
+              it[createdOn] = Clock.System.now().toJavaInstant()
+          }[Accounts.id]
+
+          OidcLogins.insert {
+              it[OidcLogins.tenant] = tenant
+              it[OidcLogins.accountId] = accountId
+              it[oidcId] = oidcAccountId
+          }
 
       accountId
     }
