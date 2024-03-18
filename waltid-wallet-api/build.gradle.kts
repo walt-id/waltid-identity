@@ -6,7 +6,7 @@ plugins {
     id("io.ktor.plugin") version "2.3.8"
     kotlin("plugin.serialization")
 
-    id("com.github.ben-manes.versions") version "0.49.0"
+    id("com.github.ben-manes.versions") version "0.51.0"
 }
 
 group = "id.walt"
