@@ -5,7 +5,8 @@ import id.walt.webwallet.db.models.WalletDid
 import id.walt.webwallet.utils.IssuanceExamples
 import id.walt.webwallet.web.model.AccountRequest
 import id.walt.webwallet.web.model.EmailAccountRequest
-import id.walt.webwallet.web.model.KeyGenerationRequest
+import id.walt.crypto.keys.KeyGenerationRequest
+import id.walt.crypto.keys.KeyType
 import id.walt.webwallet.web.model.LoginRequestJson
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -265,11 +266,11 @@ abstract class E2EWalletTestBase {
     }
 
     private suspend fun testKey(keyGenerationRequest: KeyGenerationRequest) {
-        println("Testing creation of ${keyGenerationRequest.keyType} with ${keyGenerationRequest.data?.type}...")
+        println("Testing creation of ${keyGenerationRequest.keyType} with ${keyGenerationRequest.backend}...")
         val result = walletClient.post("$walletUrl/wallet-api/wallet/$walletId/keys/generate") {
             setBody(keyGenerationRequest)
         }
-        println("Result for ${keyGenerationRequest.keyType} with ${keyGenerationRequest.data?.type}: ${result.status}")
+        println("Result for ${keyGenerationRequest.keyType} with ${keyGenerationRequest.backend}: ${result.status}")
         assertEquals(HttpStatusCode.OK, result.status)
     }
 
@@ -285,9 +286,9 @@ abstract class E2EWalletTestBase {
         val algorithm = keys["algorithm"]?.jsonPrimitive?.content
         assertEquals("Ed25519", algorithm)
 
-        println("\nUse Case -> Generate new key of type RSA\n")
+        println("\nUse Case -> Generate new key of type Ed25519\n")
         listOf(
-            KeyGenerationRequest(KeyGenerationRequest.Data("jwk", JsonObject(emptyMap())), "Ed25519")
+            KeyGenerationRequest(backend = "jwk", keyType = KeyType.Ed25519)
         ).forEach {
             testKey(it)
         }

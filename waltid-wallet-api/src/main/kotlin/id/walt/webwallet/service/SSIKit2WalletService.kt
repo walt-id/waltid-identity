@@ -39,7 +39,6 @@ import id.walt.webwallet.service.settings.SettingsService
 import id.walt.webwallet.service.settings.WalletSetting
 import id.walt.webwallet.usecase.event.EventUseCase
 import id.walt.webwallet.web.controllers.PresentationRequestParameter
-import id.walt.webwallet.web.model.KeyGenerationRequest
 import id.walt.webwallet.web.parameter.CredentialRequestParameter
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
@@ -150,9 +149,7 @@ class SSIKit2WalletService(
     ): List<WalletCredential> {
         val credentialList = listCredentials(CredentialFilterObject.default)
 
-        logger.debug(
-            "WalletCredential list is: {}",
-            credentialList.map { it.parsedDocument?.get("type")!!.jsonArray })
+        logger.debug { "WalletCredential list is: ${credentialList.map { it.parsedDocument?.get("type")!!.jsonArray }}" }
 
         data class TypeFilter(val path: String, val type: String? = null, val pattern: String)
 
@@ -177,7 +174,7 @@ class SSIKit2WalletService(
                             ?: listOf())
             }
 
-        logger.debug("Using filters: {}", filters)
+        logger.debug { "Using filters: $filters" }
 
         val matchedCredentials =
             when {
@@ -207,7 +204,7 @@ class SSIKit2WalletService(
                     }
             }
 
-        logger.debug("Matched credentials: {}", matchedCredentials)
+        logger.debug { "Matched credentials: $matchedCredentials" }
 
         return matchedCredentials.ifEmpty { credentialList }
     }
@@ -267,9 +264,9 @@ class SSIKit2WalletService(
 
         val authReq =
             AuthorizationRequest.fromHttpParametersAuto(parseQueryString(Url(parameter.request).encodedQuery).toMap())
-        logger.debug("Auth req: {}", authReq)
+        logger.debug { "Auth req: $authReq" }
 
-        logger.debug("USING PRESENTATION REQUEST, SELECTED CREDENTIALS: {}", parameter.selectedCredentials)
+        logger.debug { "Using presentation request, selected credentials: ${parameter.selectedCredentials}" }
 
         SessionAttributes.HACK_outsideMappedSelectedCredentialsPerSession[authReq.state + authReq.presentationDefinition] =
             parameter.selectedCredentials
@@ -280,12 +277,13 @@ class SSIKit2WalletService(
 
         val presentationSession =
             credentialWallet.initializeAuthorization(authReq, 60.seconds, parameter.selectedCredentials.toSet())
-        logger.debug("Initialized authorization (VPPresentationSession): {}", presentationSession)
+        logger.debug { "Initialized authorization (VPPresentationSession): $presentationSession" }
 
-        logger.debug("Resolved presentation definition: ${presentationSession.authorizationRequest!!.presentationDefinition!!.toJSONString()}")
+        logger.debug { "Resolved presentation definition: ${presentationSession.authorizationRequest!!.presentationDefinition!!.toJSONString()}" }
 
-        val tokenResponse = credentialWallet.processImplicitFlowAuthorization(presentationSession.authorizationRequest)
-        val resp = this.http.submitForm(presentationSession.authorizationRequest.responseUri
+        val tokenResponse = credentialWallet.processImplicitFlowAuthorization(presentationSession.authorizationRequest!!)
+        val resp = this.http.submitForm(
+            presentationSession.authorizationRequest.responseUri
             ?: presentationSession.authorizationRequest.redirectUri ?: throw AuthorizationError(
                 presentationSession.authorizationRequest,
                 AuthorizationErrorCode.invalid_request,
@@ -297,9 +295,10 @@ class SSIKit2WalletService(
         })
         val httpResponseBody = runCatching { resp.bodyAsText() }.getOrNull()
         val isResponseRedirectUrl = httpResponseBody != null && httpResponseBody.take(10).lowercase().let {
-            @Suppress("HttpUrlsUsage") it.startsWith("http://") || it.startsWith("https://")
+            @Suppress("HttpUrlsUsage")
+            it.startsWith("http://") || it.startsWith("https://")
         }
-        logger.debug("HTTP Response: {}, body: {}", resp, httpResponseBody)
+        logger.debug { "HTTP Response: $resp, body: $httpResponseBody" }
         parameter.selectedCredentials.forEach {
             credentialService.get(walletId, it)?.run {
                 eventUseCase.log(
@@ -326,7 +325,7 @@ class SSIKit2WalletService(
                     )
                 )
             } else {
-                logger.debug("Response body: $httpResponseBody")
+                logger.debug { "Response body: $httpResponseBody" }
                 Result.failure(
                     PresentationError(
                         message =
@@ -392,7 +391,7 @@ class SSIKit2WalletService(
     /* DIDs */
 
     override suspend fun createDid(method: String, args: Map<String, JsonPrimitive>): String {
-        val keyId = args["keyId"]?.content?.takeIf { it.isNotEmpty() } ?: generateKey(KeyType.Ed25519.name)
+        val keyId = args["keyId"]?.content?.takeIf { it.isNotEmpty() } ?: generateKey()
         val key = getKey(keyId)
         val options = getDidOptions(method, args)
         val result = DidService.registerByKey(method, key, options)
@@ -489,23 +488,8 @@ class SSIKit2WalletService(
         }
 
 
-    override suspend fun generateKey(type: String, config: KeyGenerationRequest.Data?): String =
-        let {
-            config
-                ?.type
-                ?.takeIf { it == "tse" }
-                ?.let {
-                    TSEKey.generate(
-                        KeyType.valueOf(type),
-                        TSEKeyMetadata(
-                            config.config.jsonObject["server"]?.jsonPrimitive?.content
-                                ?: throw IllegalArgumentException("No server in config"),
-                            config.config.jsonObject["accessKey"]?.jsonPrimitive?.content
-                                ?: throw IllegalArgumentException("No accessKey in config"),
-                        )
-                    )
-                } ?: JwkKey.generate(KeyType.valueOf(type))
-        }
+    override suspend fun generateKey(request: KeyGenerationRequest): String =
+        KeyManager.createKey(request)
             .also {
                 KeysService.add(walletId, it.getKeyId(), KeySerialization.serializeKey(it))
                 eventUseCase.log(
@@ -527,8 +511,8 @@ class SSIKit2WalletService(
 
         val keyResult =
             when (type) {
-                "pem" -> JwkKey.importPEM(jwkOrPem)
-                "jwk" -> JwkKey.importJWK(jwkOrPem)
+                "pem" -> JWKKey.importPEM(jwkOrPem)
+                "jwk" -> JWKKey.importJWK(jwkOrPem)
                 else -> throw IllegalArgumentException("Unknown key type: $type")
             }
 

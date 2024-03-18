@@ -1,7 +1,6 @@
 package id.walt.webwallet.web.controllers
 
-import id.walt.crypto.keys.KeyType
-import id.walt.webwallet.web.model.KeyGenerationRequest
+import id.walt.crypto.keys.KeyGenerationRequest
 import io.github.smiley4.ktorswaggerui.dsl.delete
 import io.github.smiley4.ktorswaggerui.dsl.get
 import io.github.smiley4.ktorswaggerui.dsl.post
@@ -13,7 +12,6 @@ import io.ktor.server.response.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonObject
 import org.jetbrains.exposed.sql.transactions.transaction
 
 fun Application.keys() = walletRoute {
@@ -37,23 +35,25 @@ fun Application.keys() = walletRoute {
             request {
                 body<KeyGenerationRequest> {
                     description = "Key configuration (JSON)"
-                    example("Example", buildJsonObject {
-                        put("kms", buildJsonObject {
-                            put("type", JsonPrimitive("tse"))
-                            put("config", buildJsonObject {
-                                put("server", JsonPrimitive("http://0.0.0.0:8200/v1/transit"))
-                                put("accessKey", JsonPrimitive("dev-only-token"))
-                            })
-                        })
-                    }.toString())
+                    example(
+                        "Example",
+                        KeyGenerationRequest(
+                            backend = "tse",
+                            config = JsonObject(
+                                mapOf(
+                                    "server" to JsonPrimitive("http://0.0.0.0:8200/v1/transit"),
+                                    "accessKey" to JsonPrimitive("dev-only-token")
+                                )
+                            )
+                        )
+                    )
                 }
             }
         }) {
-            val keyGenerationRequest = call.receiveNullable<KeyGenerationRequest>()
-            val keyType = keyGenerationRequest?.keyType ?: KeyType.Ed25519.toString()
+            val keyGenerationRequest = call.receiveNullable<KeyGenerationRequest>() ?: KeyGenerationRequest()
 
             runCatching {
-                getWalletService().generateKey(keyType, keyGenerationRequest?.data)
+                getWalletService().generateKey(keyGenerationRequest)
             }.onSuccess {
                 context.respond(it)
             }.onFailure {
