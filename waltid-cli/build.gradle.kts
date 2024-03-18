@@ -45,6 +45,8 @@ kotlin {
 
                 // kotlinx-io
                 implementation("org.jetbrains.kotlinx:kotlinx-io-core:0.3.1")
+                // kotlinx-serialization-json
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.2.2")
 
                 // CLI
                 implementation("com.varabyte.kotter:kotter-jvm:1.1.2")
