@@ -1,7 +1,7 @@
 import TSEKeyTest.Config.TESTABLE_KEY_TYPES
 import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.TSEKey
-import id.walt.crypto.keys.TSEKeyMetadata
+import id.walt.crypto.keys.tse.TSEKey
+import id.walt.crypto.keys.tse.TSEKeyMetadata
 import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.http.*

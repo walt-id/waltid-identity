@@ -1,5 +1,9 @@
-package id.walt.crypto.keys
+package id.walt.crypto.keys.tse
 
+import id.walt.crypto.keys.Key
+import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto.keys.jwk.JwkKeyMetadata
 import id.walt.crypto.utils.Base64Utils.base64UrlDecode
 import id.walt.crypto.utils.Base64Utils.base64toBase64Url
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
@@ -28,15 +32,14 @@ import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 import kotlin.random.Random
 
-// Works with the Hashicorp Transit Secret Engine
-
-private val logger = KotlinLogging.logger {}
+private val logger = KotlinLogging.logger {  }
 
 @OptIn(ExperimentalJsExport::class)
 @JsExport
 @Suppress("TRANSIENT_IS_REDUNDANT")
 @Serializable
 @SerialName("tse")
+// Works with the Hashicorp Transit Secret Engine
 class TSEKey(
     val server: String, private val accessKey: String, private val namespace: String? = null, val id: String,
     //private var publicKey: ByteArray? = null,
@@ -178,16 +181,16 @@ class TSEKey(
     @JsPromise
     @JsExport.Ignore
     override suspend fun verifyRaw(signed: ByteArray, detachedPlaintext: ByteArray?): Result<ByteArray> {
-        val localPublicKey = when (keyType) {
-            KeyType.Ed25519 -> JwkKey.importRawPublicKey(
+        /*val localPublicKey = when (keyType) {
+            KeyType.Ed25519 -> JWKKey.importRawPublicKey(
                 type = keyType,
                 rawPublicKey = getBackingPublicKey(),
                 metadata = JwkKeyMetadata() // todo: explicit `keySize`
             )
 
-            KeyType.RSA, KeyType.secp256r1 -> JwkKey.importPEM(getEncodedPublicKey()).getOrThrow()
+            KeyType.RSA, KeyType.secp256r1 -> JWKKey.importPEM(getEncodedPublicKey()).getOrThrow()
             KeyType.secp256k1 -> throw IllegalArgumentException("Type not supported for TSE: $keyType")
-        }
+        }*/
 
         check(detachedPlaintext != null) { "An detached plaintext is needed." }
 
@@ -252,7 +255,7 @@ class TSEKey(
     override suspend fun getPublicKey(): Key {
         logger.debug { "Getting public key: $keyType" }
 
-        return JwkKey.importRawPublicKey(
+        return JWKKey.importRawPublicKey(
             type = keyType,
             rawPublicKey = getBackingPublicKey(),
             metadata = JwkKeyMetadata(), // todo: import with explicit `keySize`
