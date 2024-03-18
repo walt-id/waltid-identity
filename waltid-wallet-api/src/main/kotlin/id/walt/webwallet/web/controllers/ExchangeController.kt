@@ -14,6 +14,7 @@ import id.walt.webwallet.service.events.EventType
 import id.walt.webwallet.service.exchange.IssuanceService
 import id.walt.webwallet.service.issuers.IssuersService
 import id.walt.webwallet.usecase.issuer.IssuerUseCaseImpl
+import id.walt.webwallet.web.WebBaseRoutes.webWalletRoute
 import io.github.smiley4.ktorswaggerui.dsl.post
 import io.github.smiley4.ktorswaggerui.dsl.route
 import io.ktor.client.*
@@ -21,7 +22,6 @@ import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
-import io.ktor.server.routing.*
 import io.ktor.server.util.*
 import io.ktor.util.*
 import kotlinx.datetime.Clock
@@ -228,7 +228,7 @@ fun Application.exchange() = walletRoute {
     }
 }
 
-fun Application.silentExchange() = routing {
+fun Application.silentExchange() = webWalletRoute {
     route("api", {
         tags = listOf("WalletCredential Exchange")
     }) {
