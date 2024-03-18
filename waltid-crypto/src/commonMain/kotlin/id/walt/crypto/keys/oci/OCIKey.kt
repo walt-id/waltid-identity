@@ -1,5 +1,8 @@
-package id.walt.crypto.keys
+package id.walt.crypto.keys.oci
 
+import id.walt.crypto.keys.Key
+import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.base64Decode
 import id.walt.crypto.utils.Base64Utils.base64UrlDecode
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
@@ -277,7 +280,7 @@ class OCIKey(
   @JsExport.Ignore
   override suspend fun getPublicKey(): Key {
     if (backedKey == null && _publicKey != null) {
-      backedKey = _publicKey?.let { LocalKey.importJWK(it).getOrThrow() }
+      backedKey = _publicKey?.let { JWKKey.importJWK(it).getOrThrow() }
     } else if (backedKey == null) {
       backedKey = retrievePublicKey()
     }
@@ -526,7 +529,7 @@ class OCIKey(
       val publicKeyPem =
           response.body<JsonObject>()["publicKey"]?.jsonPrimitive?.content
               ?: error("No public key returned from OCI.")
-      val publicKey = LocalKey.importPEM(publicKeyPem).getOrThrow()
+      val publicKey = JWKKey.importPEM(publicKeyPem).getOrThrow()
 
       return publicKey
     }

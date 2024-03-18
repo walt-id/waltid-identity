@@ -1,12 +1,12 @@
-package id.walt.crypto.keys
+package id.walt.crypto.keys.oci
 
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 import kotlinx.serialization.Serializable
 
-@Serializable
 @OptIn(ExperimentalJsExport::class)
 @JsExport
+@Serializable
 data class OCIKeyMetadata(
     val tenancyOcid: String,
     val userOcid: String,
