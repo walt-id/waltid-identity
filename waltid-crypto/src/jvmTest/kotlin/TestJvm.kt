@@ -51,7 +51,7 @@ class TestJvm {
     }
 
     @Test
-    fun testJwkKeySerialization() = runTest {
+    fun testJWKKeySerialization() = runTest {
         val jwkKey = JWKKey.generate(KeyType.Ed25519)
         val jwkKeySerialized = KeySerialization.serializeKey(jwkKey)
 
@@ -164,7 +164,7 @@ class TestJvm {
         println()
     }
 
-    fun exampleSignJwsJwkKey() = runTest {
+    fun exampleSignJwsJWKKey() = runTest {
         val jwkKey by lazy { runBlocking { JWKKey.generate(KeyType.Ed25519) } }
 
         val payload = JsonObject(

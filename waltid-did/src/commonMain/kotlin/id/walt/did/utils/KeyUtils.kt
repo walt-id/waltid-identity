@@ -3,7 +3,7 @@ package id.walt.did.utils
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
-import id.walt.crypto.keys.jwk.JwkKeyMetadata
+import id.walt.crypto.keys.jwk.JWKKeyMetadata
 import id.walt.crypto.utils.MultiBaseUtils
 import id.walt.crypto.utils.MultiCodecUtils
 import love.forte.plugin.suspendtrans.annotation.JsPromise
@@ -26,7 +26,7 @@ object KeyUtils {
             MultiCodecUtils.JwkJcsPubMultiCodecKeyCode -> JWKKey.importJWK(publicKeyRaw.decodeToString())
             else -> Result.success(
                 JWKKey.importRawPublicKey(
-                    MultiCodecUtils.getKeyTypeFromKeyCode(code), publicKeyRaw, JwkKeyMetadata()
+                    MultiCodecUtils.getKeyTypeFromKeyCode(code), publicKeyRaw, JWKKeyMetadata()
                 )
             )
         }

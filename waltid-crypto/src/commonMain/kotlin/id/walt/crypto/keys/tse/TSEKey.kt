@@ -3,7 +3,7 @@ package id.walt.crypto.keys.tse
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
-import id.walt.crypto.keys.jwk.JwkKeyMetadata
+import id.walt.crypto.keys.jwk.JWKKeyMetadata
 import id.walt.crypto.utils.Base64Utils.base64UrlDecode
 import id.walt.crypto.utils.Base64Utils.base64toBase64Url
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
@@ -185,7 +185,7 @@ class TSEKey(
             KeyType.Ed25519 -> JWKKey.importRawPublicKey(
                 type = keyType,
                 rawPublicKey = getBackingPublicKey(),
-                metadata = JwkKeyMetadata() // todo: explicit `keySize`
+                metadata = JWKKeyMetadata() // todo: explicit `keySize`
             )
 
             KeyType.RSA, KeyType.secp256r1 -> JWKKey.importPEM(getEncodedPublicKey()).getOrThrow()
@@ -258,7 +258,7 @@ class TSEKey(
         return JWKKey.importRawPublicKey(
             type = keyType,
             rawPublicKey = getBackingPublicKey(),
-            metadata = JwkKeyMetadata(), // todo: import with explicit `keySize`
+            metadata = JWKKeyMetadata(), // todo: import with explicit `keySize`
         )
     }
 

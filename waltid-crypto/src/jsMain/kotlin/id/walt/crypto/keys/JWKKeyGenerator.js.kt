@@ -3,8 +3,8 @@ package id.walt.crypto.keys
 import JWK
 import KeyLike
 import id.walt.crypto.keys.jwk.JWKKey
-import id.walt.crypto.keys.jwk.JwkKeyCreator
-import id.walt.crypto.keys.jwk.JwkKeyMetadata
+import id.walt.crypto.keys.jwk.JWKKeyCreator
+import id.walt.crypto.keys.jwk.JWKKeyMetadata
 import id.walt.crypto.utils.JwsUtils.jwsAlg
 import id.walt.crypto.utils.PromiseUtils.await
 import jose
@@ -12,11 +12,11 @@ import love.forte.plugin.suspendtrans.annotation.JsPromise
 import kotlin.js.json
 
 @JsExport
-object JsJwkKeyCreator : JwkKeyCreator {
+object JsJWKKeyCreator : JWKKeyCreator {
 
     @JsPromise
     @JsExport.Ignore
-    override suspend fun generate(type: KeyType, metadata: JwkKeyMetadata): JWKKey {
+    override suspend fun generate(type: KeyType, metadata: JWKKeyMetadata): JWKKey {
         val alg = type.jwsAlg()
 
         @Suppress("UNCHECKED_CAST_TO_EXTERNAL_INTERFACE")
@@ -27,7 +27,7 @@ object JsJwkKeyCreator : JwkKeyCreator {
 
     @JsPromise
     @JsExport.Ignore
-    override suspend fun importRawPublicKey(type: KeyType, rawPublicKey: ByteArray, metadata: JwkKeyMetadata): Key {
+    override suspend fun importRawPublicKey(type: KeyType, rawPublicKey: ByteArray, metadata: JWKKeyMetadata): Key {
         val key: KeyLike = await(jose.importSPKI(rawPublicKey.decodeToString(), type.jwsAlg()))
         return JWKKey(key).apply { init() }
     }

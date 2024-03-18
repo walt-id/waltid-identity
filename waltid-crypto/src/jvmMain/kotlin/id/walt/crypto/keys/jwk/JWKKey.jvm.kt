@@ -5,7 +5,7 @@ import com.nimbusds.jose.crypto.*
 import com.nimbusds.jose.crypto.bc.BouncyCastleProviderSingleton
 import com.nimbusds.jose.jwk.*
 import com.nimbusds.jose.util.Base64URL
-import id.walt.crypto.keys.JvmJwkKeyCreator
+import id.walt.crypto.keys.JvmJWKKeyCreator
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.utils.Base64Utils.base64Decode
@@ -311,21 +311,21 @@ actual class JWKKey actual constructor(
         return kf.generatePrivate(pkcs8KeySpec)
     }
 
-    actual companion object : JwkKeyCreator {
+    actual companion object : JWKKeyCreator {
 
         val prettyJson = Json { prettyPrint = true }
 
-        actual override suspend fun generate(type: KeyType, metadata: JwkKeyMetadata): JWKKey =
-            JvmJwkKeyCreator.generate(type, metadata)
+        actual override suspend fun generate(type: KeyType, metadata: JWKKeyMetadata): JWKKey =
+            JvmJWKKeyCreator.generate(type, metadata)
 
-        actual override suspend fun importJWK(jwk: String): Result<JWKKey> = JvmJwkKeyCreator.importJWK(jwk)
-        actual override suspend fun importPEM(pem: String): Result<JWKKey> = JvmJwkKeyCreator.importPEM(pem)
+        actual override suspend fun importJWK(jwk: String): Result<JWKKey> = JvmJWKKeyCreator.importJWK(jwk)
+        actual override suspend fun importPEM(pem: String): Result<JWKKey> = JvmJWKKeyCreator.importPEM(pem)
         actual override suspend fun importRawPublicKey(
             type: KeyType,
             rawPublicKey: ByteArray,
-            metadata: JwkKeyMetadata
+            metadata: JWKKeyMetadata
         ): Key =
-            JvmJwkKeyCreator.importRawPublicKey(type, rawPublicKey, metadata)
+            JvmJWKKeyCreator.importRawPublicKey(type, rawPublicKey, metadata)
     }
 }
 

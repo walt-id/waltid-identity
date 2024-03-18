@@ -370,12 +370,12 @@ The library provides the following key entities to work with:
 - [TSEKey](https://github.com/walt-id/waltid-identity/blob/main/waltid-crypto/src/commonMain/kotlin/id/walt/crypto/keys/TSEKey.kt) -
   an implementation of a Hashicorp Vault Transit Secrets Engine key (private / public)
 
-### Working with JwkKey
+### Working with JWKKey
 
 **Create key**
 
 ```kotlin
-val key = JwkKey.generate(KeyType.Ed25519, JwkKeyMetadata())
+val key = JWKKey.generate(KeyType.Ed25519, JWKKeyMetadata())
 ```
 
 **Sign**
@@ -411,19 +411,19 @@ val verificationResult = key.getPublicKey().verifyRaw(signature as ByteArray)
 - jwk
 
 ```kotlin
-val keyResult = JwkKey.importJWK(jwkString)
+val keyResult = JWKKey.importJWK(jwkString)
 ```
 
 - pem
 
 ```kotlin
-val keyResult = JwkKey.importPEM(pemString)
+val keyResult = JWKKey.importPEM(pemString)
 ```
 
 - raw
 
 ```kotlin
-val key = JwkKey.importRawPublicKey(KeyType.Ed25519, bytes, JwkKeyMetadata())
+val key = JWKKey.importRawPublicKey(KeyType.Ed25519, bytes, JWKKeyMetadata())
 ```
 
 **Export public key**
@@ -541,4 +541,4 @@ vault secrets enable transit
 5. click 'Next', then 'Enable Engine'
 
 For usage examples on _create_, _sign_, _verify_, _import_ and _export_ functions see
-[Working with JwkKey](#working-with-jwkKey).
+[Working with JWKKey](#working-with-jwkKey).
