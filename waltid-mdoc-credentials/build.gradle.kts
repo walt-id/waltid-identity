@@ -70,7 +70,7 @@ kotlin {
             dependencies {
                 implementation("org.bouncycastle:bcprov-lts8on:2.73.4")
                 implementation("org.bouncycastle:bcpkix-lts8on:2.73.4")
-                implementation("io.mockk:mockk:1.13.2")
+                implementation("io.mockk:mockk:1.13.10")
 
                 implementation("io.kotest:kotest-runner-junit5:5.5.5")
                 implementation("io.kotest:kotest-assertions-core:5.5.5")
