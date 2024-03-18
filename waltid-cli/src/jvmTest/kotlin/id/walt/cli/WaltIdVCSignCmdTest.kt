@@ -1,6 +1,8 @@
 package id.walt.cli
 
+import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.PrintHelpMessage
+import com.github.ajalt.clikt.testing.CliktCommandTestResult
 import com.github.ajalt.clikt.testing.test
 import id.walt.cli.commands.VCSignCmd
 import kotlin.test.Test
@@ -19,10 +21,9 @@ class WaltIdVCSignCmdTest {
     }
 
     @Test
-    fun `should XXX when called with no argument`() {
+    fun `should print help message when called with no argument`() {
         val result = command.test(emptyList<String>())
-
-        assertContains(result.stdout, "???")
+        assertContains(result.stdout, "Usage: sign")
     }
 
     // -k, —key
@@ -38,24 +39,77 @@ class WaltIdVCSignCmdTest {
     }
 
     @Test
-    fun `should have --issuerDid option`() {
+    fun `should have --issuer option`() {
         val result = command.test(listOf("--help"))
 
-        assertContains(result.stdout, "--issuerDid")
+        assertContains(result.stdout, "--issuer")
     }
 
     @Test
-    fun `should have --subjectDid option`() {
+    fun `should have --subject option`() {
         val result = command.test(listOf("--help"))
 
-        assertContains(result.stdout, "--subjectDid")
+        assertContains(result.stdout, "--subject")
+    }
+
+    // @Test
+    // fun `should have --verifiableCredential option`() {
+    //     val result = command.test(listOf("--help"))
+    //
+    //     assertContains(result.stdout, "--verifiableCredential")
+    // }
+
+    @Test
+    fun `should accept one positional argument after --options`() {
+        val result = command.test(listOf("--help"))
+
+        assertContains(result.stdout, "the verifiable credential file")
     }
 
     @Test
-    fun `should have --verifiableCredential option`() {
-        val result = command.test(listOf("--help"))
+    fun `should fail when option --key is not provided`() = Unit
 
-        assertContains(result.stdout, "--verifiableCredential")
+    @Test
+    fun `should fail when option --issuerDid is not provided`() = Unit
+
+    @Test
+    fun `should fail when option --subjectDid is not provided`() = Unit
+
+    @Test
+    fun `should fail when positional argument 'vc' is not provided`() = Unit
+
+    @Test
+    fun `should fail if a non existent key file is provided`() = Unit
+
+    @Test
+    fun `should fail if a badly formatted DID is provided`() = Unit
+
+
+    @Test
+    fun `should sign an existing VC when the issuer key and a subject DID is provided`() {
+
+        val keyFileName = "ed25519_by_waltid_pvt_key.jwk"
+        val issuerDid = "did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV"
+        val subjectDid = "did:key:z6Mkjm2gaGsodGchfG4k8P6KwCHZsVEPZho5VuEbY94qiBB9"
+
+        val result = command.test("""-k "${keyFileName}" -i ${issuerDid} -s ${subjectDid} """)
+
+        val signedVCFile = getGeneratedFile(command, result)
+
+        assertContains(result.stdout, "Signed VC saved at .*")
+    }
+
+    @Test
+    fun `should generate a valid signature`() = Unit
+
+    @Test
+    fun `should fail if a non-existent key file is provided`() = Unit
+
+    @Test
+    fun `should fail if a non-JWK key file is provided`() = Unit
+
+    private fun getGeneratedFile(cmd: CliktCommand, result: CliktCommandTestResult): String {
+        return "unknown"
     }
 
 }

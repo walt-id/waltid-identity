@@ -234,17 +234,88 @@ Options:
   -h, --help                                  Show this message and exit
 ```
 
+## `waltid vc sign` command
+
+Before signing a VC, we need
+to [create a VC](https://docs.oss.walt.id/issuer/sdks/manage-credentials/sign/w3c-credential), which can be done
+manually or programmatically.
+
+Since our focus here is on the CLI and not the Walt.id API, let's see what it's like to manually create a VC.
+
+#### 1. Create a VC
+
+Walt.id
+provides [a repository of VCs](https://docs.oss.walt.id/issuer/sdks/manage-credentials/sign/w3c-credential#manual-create-credential)
+that can be used as templates for creating your own. Choose the one that best suits your needs.
+
+Let's choose the [OpenBadgeCredential](https://credentials.walt.id/credentials/openbadgecredential), adjust it
+accordingly and save it in a file called `openbadgecredential_sample.json`.
+
+```json
+{
+  "@context": [
+    "https://www.w3.org/2018/credentials/v1",
+    "https://purl.imsglobal.org/spec/ob/v3p0/context.json"
+  ],
+  "id": "urn:uuid:123",
+  "type": [
+    "VerifiableCredential",
+    "OpenBadgeCredential"
+  ],
+  "name": "Coffee Lover Badge",
+  "issuer": {
+    "type": [
+      "Profile"
+    ],
+    "id": "did:example:123",
+    "name": "The Coffee Palace",
+    "url": "https://en.wikipedia.org/wiki/Coffee_palace",
+    "image": "https://www.shutterstock.com/image-vector/coffee-palace-special-lover-600nw-261490277.jpg"
+  },
+  "issuanceDate": "2023-07-20T07:05:44Z",
+  "expirationDate": "2033-07-20T07:05:44Z",
+  "credentialSubject": {
+    "id": "did:example:456",
+    "type": [
+      "AchievementSubject"
+    ],
+    "achievement": {
+      "id": "urn:uuid:ac254bd5-8fad-4bb1-9d29-efd938536926",
+      "type": [
+        "Achievement"
+      ],
+      "name": "Coffee Lover",
+      "description": "A true lover of good coffee",
+      "criteria": {
+        "type": "Criteria",
+        "narrative": "Able to carry out detailed sensory analysis of different coffee tastings."
+      },
+      "image": {
+        "id": "https://www.teepublic.com/magnet/4067432-certified-coffee-lover-caffeine-addict",
+        "type": "Image"
+      }
+    }
+  }
+}
+```
+
+#### 2. Sign the VC
+
+```bash
+$ waltid vc sign -k myKey.json openbadgecredential_sample.json
+```
+
 # Note for Windows users
 
-All backslashes need to be escaped on Windows paths.
+If the input file path is not quoted, all backslashes need to be escaped on Windows.
 
-i.e. The file `C:\foo\key.json` should be passed to the command as `C:\\foo\\key.json`
+| Command                                         | Works? |
+|:------------------------------------------------|:------:|
+| `waltid did create -m KEY -k "C:\foo\key.json"` |   ✅    |
+| `waltid did create -m KEY -k C:\\foo\\key.json` |   ✅    |
+| `waltid did create -m KEY -k C:/foo/key.json`   |   ?    |
+| `waltid did create -m KEY -k C:\foo\key.json`   |   ❌    |
 
-e.g.
-
-```
-> waltid did create -m KEY -k C:\\foo\\key.json
-```
 # Compatibility
 
 This project is still a work in progress. As such, not all features are already implemented.

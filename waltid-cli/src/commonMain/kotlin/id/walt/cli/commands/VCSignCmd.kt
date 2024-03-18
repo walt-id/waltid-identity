@@ -1,11 +1,19 @@
 package id.walt.cli.commands
 
 import com.github.ajalt.clikt.core.CliktCommand
+import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.options.help
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.required
 import com.github.ajalt.clikt.parameters.types.file
+import id.walt.cli.util.DidMethod
+import id.walt.cli.util.DidUtil
 import id.walt.cli.util.PrettyPrinter
+import id.walt.cli.util.VCUtil
+import id.walt.crypto.keys.KeySerialization
+import id.walt.crypto.keys.LocalKey
+import kotlinx.coroutines.runBlocking
+import java.io.File
 
 class VCSignCmd : CliktCommand(
     name = "sign",
@@ -33,5 +41,16 @@ class VCSignCmd : CliktCommand(
         .help("The verifiable credential's subject DID")
         .required()
 
-    override fun run() = Unit
+    private val vc: File by argument(help = "the verifiable credential file").file()
+
+    override fun run() {
+
+        val key = runBlocking { KeySerialization.deserializeKey(keyFile.readText()).getOrThrow() as LocalKey }
+        val issuerDid = issuerDid ?: runBlocking { DidUtil.createDid(DidMethod.KEY, key) }
+        val payload = vc.readText()
+
+        val signedVC = VCUtil().sign(key, issuerDid, subjectDid, payload)
+
+        print("VC signed!")
+    }
 }
