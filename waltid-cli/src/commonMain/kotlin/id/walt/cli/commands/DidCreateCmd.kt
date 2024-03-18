@@ -1,20 +1,16 @@
 package id.walt.cli.commands
 
 import com.github.ajalt.clikt.core.CliktCommand
-import com.github.ajalt.clikt.core.InvalidFileFormat
 import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.help
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.types.enum
 import com.github.ajalt.clikt.parameters.types.file
-import com.github.ajalt.mordant.rendering.TextStyles
 import id.walt.cli.util.DidMethod
 import id.walt.cli.util.DidUtil
+import id.walt.cli.util.KeyUtil
 import id.walt.cli.util.PrettyPrinter
-import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.LocalKey
 import kotlinx.coroutines.runBlocking
-import java.text.ParseException
 
 class DidCreateCmd : CliktCommand(
     name = "create",
@@ -35,7 +31,7 @@ class DidCreateCmd : CliktCommand(
 
     override fun run() {
         runBlocking {
-            val key = getKey()
+            val key = KeyUtil().getKey(keyFile!!)
 
             val jwk = runBlocking { key.exportJWKPretty() }
 
@@ -47,25 +43,5 @@ class DidCreateCmd : CliktCommand(
             print.green("DID created:")
             print.box(result)
         }
-    }
-
-    private suspend fun getKey(): LocalKey {
-        if (keyFile != null) {
-            try {
-                return LocalKey.importJWK(keyFile!!.readText()).getOrThrow()
-            } catch (e: ParseException) {
-                throw InvalidFileFormat(keyFile!!.name, e.let { e.message!! })
-            }
-        } else {
-            return generateDefaultKey()
-        }
-    }
-
-    private suspend fun generateDefaultKey(): LocalKey {
-        echo(TextStyles.dim("Key not provided. Let's generate a new one..."))
-        val key = runBlocking { LocalKey.generate(KeyType.Ed25519) }
-        echo(TextStyles.dim("Key generated with thumbprint ${key.getThumbprint()}"))
-
-        return key
     }
 }
