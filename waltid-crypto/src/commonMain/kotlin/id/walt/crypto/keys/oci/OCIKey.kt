@@ -51,6 +51,8 @@ class OCIKey(
     private var _keyType: KeyType? = null,
 ) : Key() {
 
+    private val vaultKeyId = "${config.tenancyOcid}/${config.userOcid}/${config.fingerprint}"
+
   @Transient
   override var keyType: KeyType
     get() = _keyType!!
@@ -64,16 +66,17 @@ class OCIKey(
   /** returns public key as PEM */
   private suspend fun retrievePublicKey(): Key {
     val keyData =
-        getKeys(config.keyId, config.managementEndpoint, config.tenancyOcid, config.signingKeyPem)
+        getKeys(vaultKeyId, config.managementEndpoint, config.tenancyOcid, config.signingKeyPem)
     val key =
         keyData.firstOrNull { it["id"]?.jsonPrimitive?.content == id }
             ?: throw IllegalArgumentException("Key with id $id not found")
     val keyVersion =
-        getKeyVersion(id, config.keyId, config.managementEndpoint, config.signingKeyPem)
+        getKeyVersion(id, vaultKeyId, config.managementEndpoint, config.signingKeyPem)
     val keyId = key["id"]?.jsonPrimitive?.content ?: ""
 
     return getOCIPublicKey(
-        keyId, config.keyId, config.managementEndpoint, keyVersion, config.signingKeyPem)
+        keyId, vaultKeyId, config.managementEndpoint, keyVersion, config.signingKeyPem
+    )
   }
 
   @JvmBlocking
@@ -147,7 +150,8 @@ class OCIKey(
             .post("https://${config.cryptoEndpoint}/20180608/sign") {
               header(
                   "Authorization",
-                  """Signature version="1",headers="date (request-target) host content-length content-type x-content-sha256",keyId="${config.keyId}",algorithm="rsa-sha256",signature="$signature"""")
+                  """Signature version="1",headers="date (request-target) host content-length content-type x-content-sha256",keyId="$vaultKeyId",algorithm="rsa-sha256",signature="$signature""""
+              )
               header("Date", GMTDate().toHttpDate())
               header("Host", host)
               header("Content-Length", requestBody.length.toString())
@@ -227,7 +231,8 @@ class OCIKey(
             .post("https://${config.cryptoEndpoint}/20180608/verify") {
               header(
                   "Authorization",
-                  """Signature version="1",headers="date (request-target) host content-length content-type x-content-sha256",keyId="${config.keyId}",algorithm="rsa-sha256",signature="$signature"""")
+                  """Signature version="1",headers="date (request-target) host content-length content-type x-content-sha256",keyId="$vaultKeyId",algorithm="rsa-sha256",signature="$signature""""
+              )
               header("Date", GMTDate().toHttpDate())
               header("Host", host)
               header("Content-Length", requestBody.length.toString())
@@ -320,7 +325,7 @@ class OCIKey(
     @JsExport.Ignore
     suspend fun generateKey(type: KeyType, config: OCIKeyMetadata): OCIKey {
       val keyType = keyTypeToOciKeyMapping(type)
-      val keyId = config.keyId
+        val vaultKeyId = "${config.tenancyOcid}/${config.userOcid}/${config.fingerprint}"
       val host = config.managementEndpoint
       val length =
           when (type) {
@@ -355,7 +360,8 @@ class OCIKey(
               .post("https://$host/20180608/keys") {
                 header(
                     "Authorization",
-                    """Signature version="1",headers="date (request-target) host content-length content-type x-content-sha256",keyId="$keyId",algorithm="rsa-sha256",signature="$signature"""")
+                    """Signature version="1",headers="date (request-target) host content-length content-type x-content-sha256",keyId="$vaultKeyId",algorithm="rsa-sha256",signature="$signature""""
+                )
 
                 header("Date", GMTDate().toHttpDate())
                 header("Host", host)
@@ -372,7 +378,7 @@ class OCIKey(
       val OCIDkeyId = keyData["id"]?.jsonPrimitive?.content ?: ""
 
       val publicKey =
-          getOCIPublicKey(OCIDkeyId, config.keyId, host, keyVersion, config.signingKeyPem)
+          getOCIPublicKey(OCIDkeyId, vaultKeyId, host, keyVersion, config.signingKeyPem)
       return OCIKey(config, OCIDkeyId, publicKey.exportJWK(), ociKeyToKeyTypeMapping(keyType))
     }
 
@@ -428,7 +434,7 @@ class OCIKey(
     @JsPromise
     @JsExport.Ignore
     @OptIn(ExperimentalEncodingApi::class)
-    suspend fun signingRequest(
+    fun signingRequest(
         method: String,
         restApi: String,
         host: String,
