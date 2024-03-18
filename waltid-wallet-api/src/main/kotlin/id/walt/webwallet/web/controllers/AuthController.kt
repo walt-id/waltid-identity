@@ -521,8 +521,6 @@ fun PipelineContext<Unit, ApplicationCall>.getUsersSessionToken(): String? =
     call.sessions.get(LoginTokenSession::class)?.token
         ?: call.request.authorization()?.removePrefix("Bearer ")
 
-fun getNftService() = WalletServiceManager.getNftService()
-
 fun PipelineContext<Unit, ApplicationCall>.ensurePermissionsForWallet(
     required: AccountWalletPermissions
 ): Boolean {
