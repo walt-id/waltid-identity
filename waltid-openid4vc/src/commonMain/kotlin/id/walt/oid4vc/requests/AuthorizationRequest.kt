@@ -76,6 +76,30 @@ data class AuthorizationRequest(
         }
     }
 
+    private fun toRequestObjectValue(key: String, value: String): JsonElement {
+        if(setOf("authorization_details", "presentation_definition", "client_metadata").contains(key)) {
+            return Json.parseToJsonElement(value)
+        } else return JsonPrimitive(value)
+    }
+
+    fun toRequestObjectPayload(iss: String, aud: String): JsonObject {
+        return copy(customParameters = mapOf(
+            "iss" to listOf(iss),
+            "aud" to listOf(aud)
+        )).toHttpParameters().mapValues { entry ->
+            when(entry.value.size) {
+                1 -> toRequestObjectValue(entry.key, entry.value[0])
+                else -> JsonArray(entry.value.map { toRequestObjectValue(entry.key, it) })
+            }
+        }.let { JsonObject(it) }
+    }
+
+    fun toHttpParametersWithRequestObject(signedRequestObject: String): Map<String, List<String>> {
+        return toHttpParameters()
+            .filterKeys { setOf("client_id", "response_type", "scope", "redirect_uri").contains(it) }
+            .plus(Pair("request", listOf(signedRequestObject)))
+    }
+
     /**
      * If response_mode is "direct_post", the response_uri parameter must be used and the redirect_uri parameter must be empty.
      * If response_uri and redirect_uri are empty and client_id_scheme is "redirect_uri", the response_uri or redirect_uri (depending on the response_mode) are taken from the client_id parameter

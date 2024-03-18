@@ -62,7 +62,6 @@ order: [...]
  */
 @Serializable
 data class CredentialSupported(
-    val id: String,
     val format: CredentialFormat,
     @SerialName("cryptographic_binding_methods_supported") val cryptographicBindingMethodsSupported: Set<String>? = null,
     @SerialName("cryptographic_suites_supported") val cryptographicSuitesSupported: Set<String>? = null,
@@ -73,6 +72,7 @@ data class CredentialSupported(
     @Serializable(ClaimDescriptorMapSerializer::class) val credentialSubject: Map<String, ClaimDescriptor>? = null,
     @Serializable(ClaimDescriptorNamespacedMapSerializer::class) val claims: Map<String, Map<String, ClaimDescriptor>>? = null,
     val order: List<String>? = null,
+    val scope: String? = null,
     override val customParameters: Map<String, JsonElement> = mapOf()
 ) : JsonDataObject() {
     override fun toJSON(): JsonObject = Json.encodeToJsonElement(CredentialSupportedSerializer, this).jsonObject

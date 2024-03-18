@@ -1,26 +1,15 @@
 package id.walt.oid4vc
 
 import id.walt.oid4vc.data.CredentialOffer
-import id.walt.oid4vc.data.GrantType
 import id.walt.oid4vc.data.OfferedCredential
 import id.walt.oid4vc.data.OpenIDProviderMetadata
 import id.walt.oid4vc.definitions.CROSS_DEVICE_CREDENTIAL_OFFER_URL
-import id.walt.oid4vc.definitions.JWTClaims
-import id.walt.oid4vc.errors.TokenError
-import id.walt.oid4vc.interfaces.ITokenProvider
-import id.walt.oid4vc.providers.IssuanceSession
-import id.walt.oid4vc.providers.TokenTarget
 import id.walt.oid4vc.requests.CredentialOfferRequest
-import id.walt.oid4vc.requests.TokenRequest
-import id.walt.oid4vc.responses.TokenErrorCode
-import id.walt.oid4vc.responses.TokenResponse
 import id.walt.oid4vc.util.http
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.util.*
-import kotlinx.datetime.Clock
-import kotlinx.serialization.json.*
 
 object OpenID4VCI {
     fun getCredentialOfferRequestUrl(
@@ -76,7 +65,7 @@ object OpenID4VCI {
         }.buildString()
     }
 
-    fun getCommonProviderMetadataUrl(baseUrl: String): String {
+    fun getAuthProviderMetadataUrl(baseUrl: String): String {
         return URLBuilder(baseUrl).apply {
             appendPathSegments(".well-known", "openid-configuration")
         }.buildString()
@@ -92,11 +81,15 @@ object OpenID4VCI {
         }
     }
 
+    suspend fun resolveAuthProviderMetadata(baseUrl: String): OpenIDProviderMetadata {
+        return http.get(getAuthProviderMetadataUrl(baseUrl)).bodyAsText().let {
+            OpenIDProviderMetadata.fromJSONString(it)
+        }
+    }
+
     fun resolveOfferedCredentials(credentialOffer: CredentialOffer, providerMetadata: OpenIDProviderMetadata): List<OfferedCredential> {
-        val supportedCredentials =
-            providerMetadata.credentialsSupported?.filter { !it.id.isNullOrEmpty() }?.associateBy { it.id!! } ?: mapOf()
         return credentialOffer.credentialConfigurationIds.mapNotNull { c ->
-            supportedCredentials[c]?.let {
+            providerMetadata.credentialConfigurationsSupported?.get(c)?.let {
                 OfferedCredential.fromProviderMetadata(it)
             }
         }

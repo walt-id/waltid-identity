@@ -4,8 +4,4 @@ import io.ktor.client.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.serialization.kotlinx.json.*
 
-val http = HttpClient {
-    install(ContentNegotiation) {
-        json()
-    }
-}
+expect val http: HttpClient

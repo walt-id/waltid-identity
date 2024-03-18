@@ -111,7 +111,7 @@ kotlin {
         }
         val jvmMain by getting {
             dependencies {
-                implementation("io.ktor:ktor-client-cio:$ktor_version")
+                implementation("io.ktor:ktor-client-apache:$ktor_version")
             }
         }
         val jvmTest by getting {
@@ -139,7 +139,7 @@ kotlin {
                 implementation("io.ktor:ktor-server-default-headers-jvm:$ktor_version")
                 implementation("io.ktor:ktor-server-content-negotiation:$ktor_version")
                 implementation("io.ktor:ktor-client-core:$ktor_version")
-                implementation("io.ktor:ktor-client-cio:$ktor_version")
+                implementation("io.ktor:ktor-client-apache:$ktor_version")
                 implementation("io.ktor:ktor-client-auth:$ktor_version")
                 implementation("io.ktor:ktor-client-content-negotiation:$ktor_version")
                 implementation("io.ktor:ktor-serialization-kotlinx-json:$ktor_version")

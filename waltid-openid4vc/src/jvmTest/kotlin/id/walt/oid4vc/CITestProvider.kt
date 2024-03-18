@@ -51,17 +51,17 @@ class CITestProvider : OpenIDCredentialIssuer(
     config = CredentialIssuerConfig(
         credentialConfigurationsSupported = listOf(
             CredentialSupported(
-                "VerifiableId", CredentialFormat.jwt_vc_json,
+                CredentialFormat.jwt_vc_json,
                 cryptographicBindingMethodsSupported = setOf("did"), cryptographicSuitesSupported = setOf("ES256K"),
                 types = listOf("VerifiableCredential", "VerifiableId"),
                 customParameters = mapOf("foo" to JsonPrimitive("bar"))
             ),
             CredentialSupported(
-                "VerifiableDiploma", CredentialFormat.jwt_vc_json,
+                CredentialFormat.jwt_vc_json,
                 cryptographicBindingMethodsSupported = setOf("did"), cryptographicSuitesSupported = setOf("ES256K"),
                 types = listOf("VerifiableCredential", "VerifiableAttestation", "VerifiableDiploma")
             )
-        ).associateBy { it.id }
+        ).associateBy { "${it.types!!.last()}_${it.format}" }
     )
 ) {
 

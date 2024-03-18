@@ -72,14 +72,13 @@ open class CIProvider : OpenIDCredentialIssuer(
     ).flatMap { entry ->
         CredentialFormat.values().map { format ->
             CredentialSupported(
-                id = "${entry.key}_${format.value}",
                 format = format,
                 cryptographicBindingMethodsSupported = setOf("did"),
                 cryptographicSuitesSupported = setOf("EdDSA", "ES256", "ES256K", "RSA"),
                 types = entry.value
             )
         }
-    }.associateBy { it.id })
+    }.associateBy { "${it.types!!.last()}_${it.format}" })
 ) {
     companion object {
 

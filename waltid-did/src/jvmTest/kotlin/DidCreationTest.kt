@@ -7,12 +7,15 @@ import id.walt.did.dids.registrar.local.key.DidKeyRegistrar
 import id.walt.did.dids.registrar.local.web.DidWebRegistrar
 import id.walt.did.utils.randomUUID
 import id.walt.oid4vc.OpenID4VCI
-import id.walt.oid4vc.data.CredentialOffer
+import id.walt.oid4vc.data.*
+import id.walt.oid4vc.requests.AuthorizationRequest
+import id.walt.oid4vc.responses.AuthorizationCodeResponse
+import id.walt.oid4vc.util.http
+import io.ktor.client.request.*
+import io.ktor.client.statement.*
+import io.ktor.http.*
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.*
 import java.nio.ByteBuffer
 import java.util.UUID
 import kotlin.test.*
@@ -91,6 +94,34 @@ class DidCreationTest {
         val taoIssuer = "https://api-conformance.ebsi.eu/conformance/v3/issuer-mock"
         val issuerMetadata = OpenID4VCI.resolveCIProviderMetadata(taoIssuer)
         assertEquals(taoIssuer, issuerMetadata.credentialIssuer)
+        val authMetadata = OpenID4VCI.resolveAuthProviderMetadata(issuerMetadata.authorizationServer!!)
+        assertEquals(issuerMetadata.authorizationServer, authMetadata.issuer)
 
+        val clientId = "https://test.walt.id"
+        val authReq = AuthorizationRequest(
+            responseType = setOf(ResponseType.Code), clientId,
+            scope = setOf("openid"),
+            redirectUri = "https://test.walt.id",
+            authorizationDetails = listOf(
+                AuthorizationDetails.fromLegacyCredentialParameters(
+                    CredentialFormat.jwt_vc, issuerMetadata.credentialsSupported!!.first { it.types?.contains("VerifiableAuthorisationToOnboard") == true }.types!!                )
+            ),
+            clientMetadata = OpenIDClientMetadata(customParameters = mapOf(
+                "jwks_uri" to JsonPrimitive("https://my-issuer.eu/suffix/xyz/jwks"),
+                "authorization_endpoint" to JsonPrimitive("openid:")
+            ))
+        )
+
+        val signedRequestObject = mainKey.signJws(
+            authReq.toRequestObjectPayload(clientId, authMetadata.issuer!!).toString().toByteArray(),
+            mapOf("kid" to mainKey.getKeyId())
+        )
+
+        val httpResp = http.get(authMetadata.authorizationEndpoint!!) {
+            url { parameters.appendAll(parametersOf(authReq.toHttpParametersWithRequestObject(signedRequestObject)))
+            println(buildString())
+            }
+        }
+        println(httpResp.bodyAsText())
     }
 }

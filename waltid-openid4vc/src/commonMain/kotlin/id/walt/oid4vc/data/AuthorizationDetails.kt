@@ -25,6 +25,7 @@ import kotlinx.serialization.json.jsonObject
 @Serializable
 data class AuthorizationDetails @OptIn(ExperimentalSerializationApi::class) constructor(
     @EncodeDefault val type: String = OPENID_CREDENTIAL_AUTHORIZATION_TYPE,
+    @SerialName("credential_configuration_id") val credentialConfigurationId: String? = null,
     val format: CredentialFormat? = null,
     val types: List<String>? = null,
     @Serializable(ClaimDescriptorMapSerializer::class) val credentialSubject: Map<String, ClaimDescriptor>? = null,
@@ -41,10 +42,19 @@ data class AuthorizationDetails @OptIn(ExperimentalSerializationApi::class) cons
             Json.decodeFromJsonElement(AuthorizationDetailsSerializer, jsonObject)
 
         fun fromOfferedCredential(offeredCredential: OfferedCredential, issuerLocation: String? = null) = AuthorizationDetails(
-            OPENID_CREDENTIAL_AUTHORIZATION_TYPE,
+            OPENID_CREDENTIAL_AUTHORIZATION_TYPE, null,
             offeredCredential.format, offeredCredential.types, null,
             offeredCredential.docType, null,
             offeredCredential.credentialDefinition, issuerLocation?.let { listOf(it) }, offeredCredential.customParameters
+        )
+
+        fun fromLegacyCredentialParameters(format: CredentialFormat, types: List<String>, locations: List<String>? = null) = AuthorizationDetails(
+            OPENID_CREDENTIAL_AUTHORIZATION_TYPE, null,
+            format, types, locations = locations
+        )
+
+        fun fromCredentialConfigurationId(credentialConfigurationId: String, locations: List<String>? = null) = AuthorizationDetails(
+            OPENID_CREDENTIAL_AUTHORIZATION_TYPE, credentialConfigurationId, locations = locations
         )
     }
 }

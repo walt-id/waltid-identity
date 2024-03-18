@@ -2,6 +2,7 @@ package id.walt.oid4vc.data
 
 import id.walt.oid4vc.*
 import id.walt.oid4vc.definitions.*
+import id.walt.oid4vc.util.randomUUID
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
@@ -69,7 +70,7 @@ data class OpenIDProviderMetadata @OptIn(ExperimentalSerializationApi::class) co
     @SerialName("jwks_uri") val jwksUri: String? = null,
     @SerialName("registration_endpoint") val registrationEndpoint: String? = null,
     @EncodeDefault @SerialName("scopes_supported") val scopesSupported: Set<String> = setOf("openid"),
-    @SerialName("response_types_supported") val responseTypesSupported: Set<String>? = null,
+    @SerialName("response_types_supported") val responseTypesSupported: Set<ResponseType>? = null,
     @EncodeDefault @SerialName("response_modes_supported") val responseModesSupported: Set<ResponseMode> = setOf(
         ResponseMode.Query,
         ResponseMode.Fragment
@@ -106,7 +107,7 @@ data class OpenIDProviderMetadata @OptIn(ExperimentalSerializationApi::class) co
     // OID4VCI properties
     @SerialName("credential_issuer") val credentialIssuer: String? = null,
     @SerialName("credential_endpoint") val credentialEndpoint: String? = null,
-    @SerialName("credential_configurations_supported") @Serializable(CredentialSupportedMapSerializer::class) val credentialConfigurationsSupported: Map<String, CredentialSupported>? = null,
+    @SerialName("credential_configurations_supported") @Serializable(CredentialSupportedMapSerializer::class) var credentialConfigurationsSupported: Map<String, CredentialSupported>? = null,
     @SerialName("batch_credential_endpoint") val batchCredentialEndpoint: String? = null,
     @SerialName("deferred_credential_endpoint") val deferredCredentialEndpoint: String? = null,
     @SerialName("authorization_servers") val authorizationServers: Set<String>? = null,
@@ -122,6 +123,12 @@ data class OpenIDProviderMetadata @OptIn(ExperimentalSerializationApi::class) co
 
     @EncodeDefault @SerialName("credentials_supported") @Serializable(CredentialSupportedListSerializer::class)
     val credentialsSupported = credentialConfigurationsSupported?.values?.toList()
+
+    init {
+      if(credentialConfigurationsSupported.isNullOrEmpty() && !credentialsSupported.isNullOrEmpty()) {
+          credentialConfigurationsSupported = credentialsSupported.associateBy { "${it.types?.last() ?: randomUUID()}_${it.format}" }
+      }
+    }
     override fun toJSON(): JsonObject = Json.encodeToJsonElement(OpenIDProviderMetadataSerializer, this).jsonObject
 
     companion object : JsonDataObjectFactory<OpenIDProviderMetadata>() {
