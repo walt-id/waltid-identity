@@ -83,7 +83,11 @@ object OpenID4VCI {
     }
 
     suspend fun resolveCIProviderMetadata(credOffer: CredentialOffer): OpenIDProviderMetadata {
-        return http.get(getCIProviderMetadataUrl(credOffer)).bodyAsText().let {
+        return resolveCIProviderMetadata(credOffer.credentialIssuer)
+    }
+
+    suspend fun resolveCIProviderMetadata(baseUrl: String): OpenIDProviderMetadata {
+        return http.get(getCIProviderMetadataUrl(baseUrl)).bodyAsText().let {
             OpenIDProviderMetadata.fromJSONString(it)
         }
     }
