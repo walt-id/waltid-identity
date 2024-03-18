@@ -21,7 +21,7 @@ import org.junit.Test
 import kotlin.test.BeforeTest
 import kotlin.test.assertEquals
 
-class SilentClaimUseCaseTest {
+class SilentClaimStrategyTest {
     private val json = Json { ignoreUnknownKeys = true }
     private val issuanceService = mockk<IssuanceService>()
     private val credentialService = mockk<CredentialsService>()
@@ -32,7 +32,7 @@ class SilentClaimUseCaseTest {
     private val credentialTypeSeeker = mockk<Seeker<String>>()
     private val didService: DidsService = mockk<DidsService>()
     private val accountService: AccountsService = mockk<AccountsService>()
-    private val sut = SilentClaimUseCase(
+    private val sut = SilentClaimStrategy(
         issuanceService = issuanceService,
         credentialService = credentialService,
         issuerTrustValidationService = issuerTrustValidationService,

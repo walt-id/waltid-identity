@@ -17,8 +17,8 @@ import id.walt.webwallet.service.issuers.IssuersService
 import id.walt.webwallet.service.notifications.NotificationService
 import id.walt.webwallet.service.settings.SettingsService
 import id.walt.webwallet.service.trust.DefaultTrustValidationService
-import id.walt.webwallet.usecase.claim.ExplicitClaimUseCase
-import id.walt.webwallet.usecase.claim.SilentClaimUseCase
+import id.walt.webwallet.usecase.claim.ExplicitClaimStrategy
+import id.walt.webwallet.usecase.claim.SilentClaimStrategy
 import id.walt.webwallet.usecase.event.EventUseCase
 import id.walt.webwallet.usecase.issuer.IssuerUseCaseImpl
 import id.walt.webwallet.utils.WalletHttpClients.getHttpClient
@@ -40,11 +40,11 @@ object WalletServiceManager {
     private val credentialService = CredentialsService()
     private val credentialTypeSeeker = DefaultCredentialTypeSeeker()
     private val eventUseCase = EventUseCase(EventService())
-    private val issuerUseCase = IssuerUseCaseImpl(service = IssuersService, http = httpClient)
+    val issuerUseCase = IssuerUseCaseImpl(service = IssuersService, http = httpClient)
     val issuerTrustValidationService = DefaultTrustValidationService(httpClient, trustConfig.issuersRecord)
     val verifierTrustValidationService = DefaultTrustValidationService(httpClient, trustConfig.verifiersRecord)
     val notificationUseCase = NotificationUseCase(NotificationService, httpClient)
-    val silentClaimUseCase = SilentClaimUseCase(
+    val silentClaimStrategy = SilentClaimStrategy(
         issuanceService = IssuanceService,
         credentialService = credentialService,
         issuerTrustValidationService = issuerTrustValidationService,
@@ -55,7 +55,7 @@ object WalletServiceManager {
         notificationUseCase = notificationUseCase,
         credentialTypeSeeker = credentialTypeSeeker,
     )
-    val explicitClaimUseCase = ExplicitClaimUseCase(
+    val explicitClaimStrategy = ExplicitClaimStrategy(
         issuanceService = IssuanceService,
         credentialService = credentialService,
         eventUseCase = eventUseCase,

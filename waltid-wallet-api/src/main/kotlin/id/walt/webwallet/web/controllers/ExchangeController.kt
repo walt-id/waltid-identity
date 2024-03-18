@@ -47,7 +47,7 @@ fun Application.exchange() = walletRoute {
             val offer = call.receiveText()
 
             runCatching {
-                WalletServiceManager.explicitClaimUseCase.claim(
+                WalletServiceManager.explicitClaimStrategy.claim(
                     tenant = wallet.tenant,
                     account = getUserUUID(),
                     wallet = wallet.walletId,
