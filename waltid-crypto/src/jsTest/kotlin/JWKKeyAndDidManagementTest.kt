@@ -9,7 +9,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
-class JwkKeyAndDidManagementTest {
+class JWKKeyAndDidManagementTest {
 
     private val keyTypeMap = mapOf(
         KeyType.Ed25519 to "OKP",

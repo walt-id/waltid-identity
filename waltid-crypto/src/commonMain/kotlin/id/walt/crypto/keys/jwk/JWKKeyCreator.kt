@@ -10,12 +10,12 @@ import kotlin.js.JsExport
 
 @OptIn(ExperimentalJsExport::class)
 @JsExport
-interface JwkKeyCreator {
+interface JWKKeyCreator {
     @JvmBlocking
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    suspend fun generate(type: KeyType, metadata: JwkKeyMetadata = JwkKeyMetadata()): JWKKey
+    suspend fun generate(type: KeyType, metadata: JWKKeyMetadata = JWKKeyMetadata()): JWKKey
     @JvmBlocking
     @JvmAsync
     @JsPromise
@@ -23,7 +23,7 @@ interface JwkKeyCreator {
     suspend fun importRawPublicKey(
         type: KeyType,
         rawPublicKey: ByteArray,
-        metadata: JwkKeyMetadata
+        metadata: JWKKeyMetadata
     ): Key
 
     @JvmBlocking

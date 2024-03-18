@@ -5,6 +5,6 @@ import kotlin.js.JsExport
 
 @OptIn(ExperimentalJsExport::class)
 @JsExport
-data class JwkKeyMetadata(
+data class JWKKeyMetadata(
     val keySize: Int? = null
 )

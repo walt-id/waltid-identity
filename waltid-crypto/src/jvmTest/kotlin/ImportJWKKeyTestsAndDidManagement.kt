@@ -4,7 +4,7 @@ import TestUtils.loadResourceBase64
 import TestUtils.loadResourceBytes
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
-import id.walt.crypto.keys.jwk.JwkKeyMetadata
+import id.walt.crypto.keys.jwk.JWKKeyMetadata
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.Arguments
@@ -14,7 +14,7 @@ import java.util.stream.Stream
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-class ImportJwkKeyTestsAndDidManagement {
+class ImportJWKKeyTestsAndDidManagement {
 
     @ParameterizedTest
     @MethodSource
@@ -64,7 +64,7 @@ class ImportJwkKeyTestsAndDidManagement {
         bytes: ByteArray, keyType: KeyType, isPrivate: Boolean
     ) = runTest {
         // Importing
-        val key = JWKKey.importRawPublicKey(keyType, bytes, JwkKeyMetadata())
+        val key = JWKKey.importRawPublicKey(keyType, bytes, JWKKeyMetadata())
         // Checking for private key
         assertEquals(isPrivate, key.hasPrivateKey)
         // Checking for key type

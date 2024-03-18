@@ -3,7 +3,7 @@ package id.walt.crypto.keys.jwk
 import JWK
 import KeyLike
 import crypto
-import id.walt.crypto.keys.JsJwkKeyCreator
+import id.walt.crypto.keys.JsJWKKeyCreator
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.utils.ArrayUtils.toByteArray
@@ -251,24 +251,24 @@ actual class JWKKey actual constructor(
     @JsExport.Ignore
     actual override suspend fun getThumbprint(): String = PromiseUtils.await(jose.calculateJwkThumbprint(JSON.parse(exportJWK())))
 
-    actual companion object : JwkKeyCreator {
+    actual companion object : JWKKeyCreator {
         @JsPromise
         @JsExport.Ignore
-        actual override suspend fun generate(type: KeyType, metadata: JwkKeyMetadata): JWKKey =
-            JsJwkKeyCreator.generate(type, metadata)
+        actual override suspend fun generate(type: KeyType, metadata: JWKKeyMetadata): JWKKey =
+            JsJWKKeyCreator.generate(type, metadata)
 
         @JsPromise
         @JsExport.Ignore
-        actual override suspend fun importRawPublicKey(type: KeyType, rawPublicKey: ByteArray, metadata: JwkKeyMetadata): Key =
-            JsJwkKeyCreator.importRawPublicKey(type, rawPublicKey, metadata)
+        actual override suspend fun importRawPublicKey(type: KeyType, rawPublicKey: ByteArray, metadata: JWKKeyMetadata): Key =
+            JsJWKKeyCreator.importRawPublicKey(type, rawPublicKey, metadata)
 
         @JsPromise
         @JsExport.Ignore
-        actual override suspend fun importJWK(jwk: String): Result<JWKKey> = JsJwkKeyCreator.importJWK(jwk)
+        actual override suspend fun importJWK(jwk: String): Result<JWKKey> = JsJWKKeyCreator.importJWK(jwk)
 
         @JsPromise
         @JsExport.Ignore
-        actual override suspend fun importPEM(pem: String): Result<JWKKey> = JsJwkKeyCreator.importPEM(pem)
+        actual override suspend fun importPEM(pem: String): Result<JWKKey> = JsJWKKeyCreator.importPEM(pem)
     }
 
 }

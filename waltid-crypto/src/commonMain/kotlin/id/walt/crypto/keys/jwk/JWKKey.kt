@@ -57,10 +57,10 @@ expect class JWKKey(jwk: String?) : Key {
     override val hasPrivateKey: Boolean
 
 
-    companion object : JwkKeyCreator {
+    companion object : JWKKeyCreator {
 
-        override suspend fun generate(type: KeyType, metadata: JwkKeyMetadata): JWKKey
-        override suspend fun importRawPublicKey(type: KeyType, rawPublicKey: ByteArray, metadata: JwkKeyMetadata): Key
+        override suspend fun generate(type: KeyType, metadata: JWKKeyMetadata): JWKKey
+        override suspend fun importRawPublicKey(type: KeyType, rawPublicKey: ByteArray, metadata: JWKKeyMetadata): Key
 
         override suspend fun importJWK(jwk: String): Result<JWKKey>
 
