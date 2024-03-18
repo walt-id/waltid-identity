@@ -52,31 +52,31 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
       - name: Build and push Docker images (issuer)
-        uses: docker/build-push-action@v4.0.0
+        uses: docker/build-push-action@v5
         with:
           push: true
           file: waltid-issuer-api/Dockerfile
           tags: waltid/issuer-api:dev, waltid/issuer-api:${{ env.release_version }}
       - name: Build and push Docker images (verifier)
-        uses: docker/build-push-action@v4.0.0
+        uses: docker/build-push-action@v5
         with:
           push: true
           file: waltid-verifier-api/Dockerfile
           tags: waltid/verifier-api:dev, waltid/verifier-api:${{ env.release_version }}
       - name: Build and push Docker images (wallet-api)
-        uses: docker/build-push-action@v4.0.0
+        uses: docker/build-push-action@v5
         with:
           push: true
           file: waltid-wallet-api/Dockerfile
           tags: waltid/wallet-api:dev, waltid/wallet-api:${{ env.release_version }}
       - name: Build and push Docker images (waltid-web-wallet)
-        uses: docker/build-push-action@v4.0.0
+        uses: docker/build-push-action@v5
         with:
           push: true
           file: waltid-web-wallet/Dockerfile
           tags: waltid/waltid-web-wallet:dev, waltid/waltid-web-wallet:${{ env.release_version }}
       - name: Build and push Docker images (wallet-portal)
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v5
         with:
           push: true
           file: waltid-web-portal/Dockerfile
