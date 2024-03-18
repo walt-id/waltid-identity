@@ -20,7 +20,6 @@ import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.types.shouldBeInstanceOf
 import io.ktor.client.*
 import io.ktor.client.call.*
-import io.ktor.client.engine.java.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
@@ -40,7 +39,7 @@ class wallettest : AnnotationSpec() {
      * 3. Run test "wallettest" (this file)
      */
 
-    private val ktorClient = HttpClient(Java) {
+    private val ktorClient = HttpClient() {
         install(ContentNegotiation) {
             json()
         }
@@ -66,7 +65,7 @@ class wallettest : AnnotationSpec() {
         // ^^^ UPDATE ABOVE URL WITH OFFER_URI ^^^
 
         AuthorizationRequest(
-            responseType = "",
+            responseType = setOf(),
             clientId = "",
             responseMode = null,
             redirectUri = null,
@@ -120,7 +119,7 @@ class wallettest : AnnotationSpec() {
         providerMetadata.credentialsSupported shouldNotBe null
 
         println("// resolve offered credentials")
-        val offeredCredentials = parsedOfferReq.credentialOffer!!.resolveOfferedCredentials(providerMetadata)
+        val offeredCredentials = OpenID4VCI.resolveOfferedCredentials(parsedOfferReq.credentialOffer!!, providerMetadata)
         println("offeredCredentials: $offeredCredentials")
         offeredCredentials.size shouldBe 1
         offeredCredentials.first().format shouldBe CredentialFormat.jwt_vc_json
@@ -133,7 +132,7 @@ class wallettest : AnnotationSpec() {
             clientId = testCIClientConfig.clientID,
             redirectUri = credentialWallet.config.redirectUri,
             preAuthorizedCode = parsedOfferReq.credentialOffer!!.grants[GrantType.pre_authorized_code.value]!!.preAuthorizedCode,
-            userPin = null
+            txCode = null
         )
         println("tokenReq: $tokenReq")
 

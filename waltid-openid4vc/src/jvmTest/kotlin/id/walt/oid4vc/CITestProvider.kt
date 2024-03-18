@@ -5,14 +5,10 @@ import com.nimbusds.jwt.JWTParser
 import id.walt.credentials.CredentialBuilder
 import id.walt.credentials.CredentialBuilderType
 import id.walt.credentials.issuance.Issuer.baseIssue
-import id.walt.credentials.utils.W3CVcUtils
-import id.walt.credentials.vc.vcs.W3CVC
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.LocalKey
 import id.walt.did.dids.DidService
-import id.walt.did.dids.registrar.dids.DidKeyCreateOptions
-import id.walt.did.dids.resolver.DidResolver
 import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.data.CredentialSupported
 import id.walt.oid4vc.data.ResponseMode
@@ -42,7 +38,6 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.util.*
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonPrimitive
@@ -54,19 +49,19 @@ const val CI_PROVIDER_BASE_URL = "http://localhost:$CI_PROVIDER_PORT"
 class CITestProvider : OpenIDCredentialIssuer(
     baseUrl = CI_PROVIDER_BASE_URL,
     config = CredentialIssuerConfig(
-        credentialsSupported = listOf(
+        credentialConfigurationsSupported = listOf(
             CredentialSupported(
-                CredentialFormat.jwt_vc_json, "VerifiableId",
+                "VerifiableId", CredentialFormat.jwt_vc_json,
                 cryptographicBindingMethodsSupported = setOf("did"), cryptographicSuitesSupported = setOf("ES256K"),
                 types = listOf("VerifiableCredential", "VerifiableId"),
                 customParameters = mapOf("foo" to JsonPrimitive("bar"))
             ),
             CredentialSupported(
-                CredentialFormat.jwt_vc_json, "VerifiableDiploma",
+                "VerifiableDiploma", CredentialFormat.jwt_vc_json,
                 cryptographicBindingMethodsSupported = setOf("did"), cryptographicSuitesSupported = setOf("ES256K"),
                 types = listOf("VerifiableCredential", "VerifiableAttestation", "VerifiableDiploma")
             )
-        )
+        ).associateBy { it.id }
     )
 ) {
 
@@ -75,6 +70,10 @@ class CITestProvider : OpenIDCredentialIssuer(
 
     override fun getSession(id: String): IssuanceSession? = authSessions[id]
     override fun putSession(id: String, session: IssuanceSession) = authSessions.put(id, session)
+    override fun getSessionByIdTokenRequestState(idTokenRequestState: String): IssuanceSession? {
+        TODO("Not yet implemented")
+    }
+
     override fun removeSession(id: String) = authSessions.remove(id)
 
     // crypto operations and credential issuance
@@ -88,7 +87,7 @@ class CITestProvider : OpenIDCredentialIssuer(
         runBlocking { CI_TOKEN_KEY.signJws(payload.toString().toByteArray()) }
 
     fun getKeyFor(token: String): Key {
-        return runBlocking { DidService.resolveToKey((JWTParser.parse(token).header as JWSHeader).keyID) }.getOrThrow()
+        return runBlocking { DidService.resolveToKey((JWTParser.parse(token).header as JWSHeader).keyID.substringBefore("#")) }.getOrThrow()
     }
     override fun verifyTokenSignature(target: TokenTarget, token: String) =
         runBlocking { (if(target == TokenTarget.PROOF_OF_POSSESSION) getKeyFor(token) else CI_TOKEN_KEY).verifyJws(token).isSuccess }
@@ -153,7 +152,7 @@ class CITestProvider : OpenIDCredentialIssuer(
                 post("/par") {
                     val authReq = AuthorizationRequest.fromHttpParameters(call.receiveParameters().toMap())
                     try {
-                        val session = initializeAuthorization(authReq, 5.minutes)
+                        val session = initializeAuthorization(authReq, 5.minutes, null)
                         call.respond(getPushedAuthorizationSuccessResponse(session).toJSON())
                     } catch (exc: AuthorizationError) {
                         call.respond(HttpStatusCode.BadRequest, exc.toPushedAuthorizationErrorResponse().toJSON())
@@ -162,9 +161,9 @@ class CITestProvider : OpenIDCredentialIssuer(
                 get("/authorize") {
                     val authReq = AuthorizationRequest.fromHttpParameters(call.parameters.toMap())
                     try {
-                        val authResp = if (authReq.responseType == ResponseType.code.name) {
+                        val authResp = if (authReq.responseType.contains(ResponseType.Code)) {
                             processCodeFlowAuthorization(authReq)
-                        } else if (authReq.responseType.contains(ResponseType.token.name)) {
+                        } else if (authReq.responseType.contains(ResponseType.Token)) {
                             processImplicitFlowAuthorization(authReq)
                         } else {
                             throw AuthorizationError(
@@ -185,7 +184,7 @@ class CITestProvider : OpenIDCredentialIssuer(
                         call.response.apply {
                             status(HttpStatusCode.Found)
                             val defaultResponseMode =
-                                if (authReq.responseType == ResponseType.code.name) ResponseMode.query else ResponseMode.fragment
+                                if (authReq.responseType.contains(ResponseType.Code)) ResponseMode.Query else ResponseMode.Fragment
                             header(
                                 HttpHeaders.Location,
                                 authResp.toRedirectUri(redirectUri, authReq.responseMode ?: defaultResponseMode)

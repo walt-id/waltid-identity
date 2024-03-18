@@ -44,7 +44,7 @@ import kotlin.time.Duration.Companion.minutes
 open class CIProvider : OpenIDCredentialIssuer(
     baseUrl = let {
         ConfigManager.getConfig<OIDCIssuerServiceConfig>().baseUrl
-    }, config = CredentialIssuerConfig(credentialsSupported = listOf(
+    }, config = CredentialIssuerConfig(credentialConfigurationsSupported = mapOf(
 //        "VerifiableCredential" to listOf("VerifiableCredential"),
         "BankId" to listOf("VerifiableCredential", "BankId"),
         "KycChecksCredential" to listOf("VerifiableCredential", "VerifiableAttestation", "KycChecksCredential"),
@@ -67,15 +67,19 @@ open class CIProvider : OpenIDCredentialIssuer(
         "WalletHolderCredential" to listOf("VerifiableCredential", "WalletHolderCredential"),
         "UniversityDegree" to listOf("VerifiableCredential", "UniversityDegree"),
         "VerifiableId" to listOf("VerifiableCredential", "VerifiableAttestation", "VerifiableId"),
-    ).map {
-        CredentialSupported(
-            format = CredentialFormat.jwt_vc_json,
-            id = it.first,
-            cryptographicBindingMethodsSupported = setOf("did"),
-            cryptographicSuitesSupported = setOf("EdDSA", "ES256", "ES256K", "RSA"),
-            types = it.second
-        )
-    })
+        "CTWalletSameAuthorisedInTime" to listOf("VerifiableCredential", "VerifiableAttestation", "CTWalletSameAuthorisedInTime"),
+        "CTWalletSameAuthorisedDeferred" to listOf("VerifiableCredential", "VerifiableAttestation", "CTWalletSameAuthorisedDeferred")
+    ).flatMap { entry ->
+        CredentialFormat.values().map { format ->
+            CredentialSupported(
+                id = "${entry.key}_${format.value}",
+                format = format,
+                cryptographicBindingMethodsSupported = setOf("did"),
+                cryptographicSuitesSupported = setOf("EdDSA", "ES256", "ES256K", "RSA"),
+                types = entry.value
+            )
+        }
+    }.associateBy { it.id })
 ) {
     companion object {
 
@@ -84,6 +88,7 @@ open class CIProvider : OpenIDCredentialIssuer(
 
 
         private val CI_TOKEN_KEY by lazy { runBlocking { LocalKey.generate(KeyType.Ed25519) } }
+
     }
 
     // -------------------------------
@@ -98,6 +103,20 @@ open class CIProvider : OpenIDCredentialIssuer(
         return authSessions[id]
     }
 
+   override fun getSessionByIdTokenRequestState(idTokenRequestState: String): IssuanceSession? {
+        println("RETRIEVING CI AUTH SESSION by idTokenRequestState: $idTokenRequestState")
+        var properSession: IssuanceSession? = null
+        authSessions.forEach { entry ->
+            print("${entry.key} : ${entry.value}")
+            val session = entry.value as IssuanceSession
+            if (session.idTokenRequestState == idTokenRequestState) {
+                properSession = session
+            }
+        }
+        return properSession
+    }
+
+
     override fun putSession(id: String, session: IssuanceSession): IssuanceSession? {
         println("SETTING CI AUTH SESSION: $id = $session")
         return authSessions.put(id, session)
@@ -108,15 +127,31 @@ open class CIProvider : OpenIDCredentialIssuer(
         return authSessions.remove(id)
     }
 
+
     // ------------------------------------------
     // Simple cryptographics operation interface implementations
-    override fun signToken(target: TokenTarget, payload: JsonObject, header: JsonObject?, keyId: String?) =
+    override fun signToken(target: TokenTarget, payload: JsonObject, header: JsonObject? , keyId: String?) =
         runBlocking {
             println("Signing JWS:   $payload")
             println("JWS Signature: target: $target, keyId: $keyId, header: $header")
-            CI_TOKEN_KEY.signJws(payload.toString().toByteArray()).also {
-                println("Signed JWS: >> $it")
+            if (header != null) {
+                val kid = "{\"keys\":[{\"kty\":\"EC\",\"x\":\"bo4FsmViF9au5-iCZbvEy-WZGaRes_eZdpIucmg4XH8\",\"y\":\"htYUXUmIc-IxyR6QMFPwXHXAgj__Fqw9kuSVtSyulhI\",\"crv\":\"P-256\",\"kid\":\"z2dmzD81cgPx8Vki7JbuuMmFYrWPgYoytykUZ3eyqht1j9KbrJNL5rEcHRKkRBDnxzu2352jxSjTEFmM9hjTL2wMtzcTDjjDAQmPpQkaihjoAo8AygRr9M6yZsXHzWXnJRMNPzR3cCYbmvE9Q1sSQ1qzXHBo4iEc7Yb3MGu31ZAHKSd9Qx\"}]}"
+
+                val myKey = LocalKey.importJWK("{\"kty\":\"EC\",\"x\":\"bo4FsmViF9au5-iCZbvEy-WZGaRes_eZdpIucmg4XH8\",\"y\":\"htYUXUmIc-IxyR6QMFPwXHXAgj__Fqw9kuSVtSyulhI\",\"crv\":\"P-256\",\"d\":\"UPzeJStN6Wg7zXULIlGVhYh4gG5RN-5knejePt6deqY\"}")
+                val headers = mapOf("alg" to "ES256", "type" to "jwt", "kid" to "z2dmzD81cgPx8Vki7JbuuMmFYrWPgYoytykUZ3eyqht1j9KbrJNL5rEcHRKkRBDnxzu2352jxSjTEFmM9hjTL2wMtzcTDjjDAQmPpQkaihjoAo8AygRr9M6yZsXHzWXnJRMNPzR3cCYbmvE9Q1sSQ1qzXHBo4iEc7Yb3MGu31ZAHKSd9Qx")
+
+                println( "JWK Key ID: " + myKey.getOrThrow().getKeyId() )
+                myKey.getOrThrow().signJws(payload.toString().toByteArray(),  headers).also {
+                    println("Signed JWS: >> $it")
+                }
+
+            } else {
+                CI_TOKEN_KEY.signJws(payload.toString().toByteArray()).also {
+                    println("Signed JWS: >> $it")
+                }
             }
+
+
         }
 
     @OptIn(ExperimentalEncodingApi::class)
@@ -195,6 +230,15 @@ open class CIProvider : OpenIDCredentialIssuer(
             message = "Proof JWT header must contain kid claim"
         )
 
+        val proofPayload = credentialRequest.proof?.jwt?.let { parseTokenPayload(it) } ?: throw CredentialError(
+            credentialRequest, CredentialErrorCode.invalid_or_missing_proof, message = "Proof must be JWT proof"
+        )
+
+        val holderDid = proofPayload[JWTClaims.Payload.issuer]?.jsonPrimitive?.content ?: throw CredentialError(
+            credentialRequest,
+            CredentialErrorCode.invalid_or_missing_proof,
+            message = "Proof JWT payload must contain iss claim"
+        )
         //val vc = W3CVC(universityDegreeCredentialExample.toList().associate { it.first to it.second.toJsonElement() })
 
         val data: IssuanceSessionData = (if (subjectDid == null || nonce == null) {
@@ -205,9 +249,10 @@ open class CIProvider : OpenIDCredentialIssuer(
                 IssuanceSessionData(
                     exampleIssuerKey,
                     exampleIssuerDid,
-                    JwtIssuanceRequest(
+                    IssuanceRequest(
                         Json.parseToJsonElement(KeySerialization.serializeKey(exampleIssuerKey)).jsonObject,
                         exampleIssuerDid,
+                        "OpenBadgeCredential_${credentialRequest.format.value}",
                         W3CVC(openBadgeCredentialExample)
                     )
                 )
@@ -218,24 +263,18 @@ open class CIProvider : OpenIDCredentialIssuer(
                 ?: throw IllegalArgumentException("The issuanceIdCredentialMapping does not contain a mapping for: $nonce!")
         }).first()
 
+//        println("IssuerDID: " + issuerKey)
         return CredentialResult(format = credentialRequest.format, credential = JsonPrimitive(runBlocking {
-            val vc = data.request.vc
+            val vc = data.request.credentialData
 
             data.run {
-                when (data.request) {
-                    is JwtIssuanceRequest -> vc.mergingJwtIssue(
+                when (credentialRequest.format) {
+                    CredentialFormat.sd_jwt_vc -> vc.mergingSdJwtIssue(
                         issuerKey = issuerKey,
                         issuerDid = issuerDid,
-                        subjectDid = holderKid,
-                        mappings = request.mapping ?: JsonObject(emptyMap()),
-                        additionalJwtHeader = emptyMap(),
-                        additionalJwtOptions = emptyMap(),
-                    )
-
-                    is SdJwtIssuanceRequest -> vc.mergingSdJwtIssue(
-                        issuerKey = issuerKey,
-                        issuerDid = issuerDid,
-                        subjectDid = holderKid,
+                        // Why DID=KID?
+                        // https://identity.foundation/jwt-vc-presentation-profile/#jwt-vc
+                        subjectDid = holderDid,
                         mappings = request.mapping ?: JsonObject(emptyMap()),
                         additionalJwtHeader = emptyMap(),
                         additionalJwtOptions = emptyMap(),
@@ -244,6 +283,15 @@ open class CIProvider : OpenIDCredentialIssuer(
                             JsonObject(emptyMap())
                         )
                     )
+                    else -> vc.mergingJwtIssue(
+                        issuerKey = issuerKey,
+                        issuerDid = issuerDid,
+                        subjectDid = holderDid,
+                        mappings = request.mapping ?: JsonObject(emptyMap()),
+                        additionalJwtHeader = emptyMap(),
+                        additionalJwtOptions = emptyMap(),
+                    )
+
                 }
             }.also { println("Respond VC: $it") }
         }))
@@ -305,20 +353,11 @@ open class CIProvider : OpenIDCredentialIssuer(
                     format = credentialRequest.format,
                     credential = JsonPrimitive(
                         runBlocking {
-                            val vc = data.request.vc
+                            val vc = data.request.credentialData
 
                             data.run {
-                                when (data.request) {
-                                    is JwtIssuanceRequest -> vc.mergingJwtIssue(
-                                        issuerKey = issuerKey,
-                                        issuerDid = issuerDid,
-                                        subjectDid = subjectDid,
-                                        mappings = request.mapping ?: JsonObject(emptyMap()),
-                                        additionalJwtHeader = emptyMap(),
-                                        additionalJwtOptions = emptyMap(),
-                                    )
-
-                                    is SdJwtIssuanceRequest -> vc.mergingSdJwtIssue(
+                                when (credentialRequest.format) {
+                                    CredentialFormat.sd_jwt_vc -> vc.mergingSdJwtIssue(
                                         issuerKey = issuerKey,
                                         issuerDid = issuerDid,
                                         subjectDid = subjectDid,
@@ -330,6 +369,14 @@ open class CIProvider : OpenIDCredentialIssuer(
                                                 JsonObject(emptyMap()),
                                                 JsonObject(emptyMap())
                                             )
+                                    )
+                                    else -> vc.mergingJwtIssue(
+                                        issuerKey = issuerKey,
+                                        issuerDid = issuerDid,
+                                        subjectDid = subjectDid,
+                                        mappings = request.mapping ?: JsonObject(emptyMap()),
+                                        additionalJwtHeader = emptyMap(),
+                                        additionalJwtOptions = emptyMap(),
                                     )
                                 }
 
@@ -345,7 +392,7 @@ open class CIProvider : OpenIDCredentialIssuer(
 
 
     data class IssuanceSessionData(
-        val issuerKey: Key, val issuerDid: String, val request: BaseIssuanceRequest
+        val issuerKey: Key, val issuerDid: String, val request: IssuanceRequest
     )
 
     // TODO: Hack as this is non stateless because of oidc4vc lib API

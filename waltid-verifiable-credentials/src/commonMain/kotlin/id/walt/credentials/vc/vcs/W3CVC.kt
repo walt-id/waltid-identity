@@ -91,7 +91,9 @@ data class W3CVC(
             data = this.toJsonObject(),
             key = issuerKey,
             jwtHeaders = mapOf(
-                JwsHeader.KEY_ID to issuerDid,
+                // Why KeyID = issuerDid
+                // JwsHeader.KEY_ID to issuerDid,
+                JwsHeader.KEY_ID to (issuerDid+"#"+issuerDid.replaceRange(0..7, "")),
                 *(additionalJwtHeader.entries.map { it.toPair() }.toTypedArray())
             ),
             jwtOptions = mapOf(

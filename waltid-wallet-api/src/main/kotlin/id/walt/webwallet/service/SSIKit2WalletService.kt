@@ -12,14 +12,21 @@ import id.walt.did.dids.registrar.dids.DidKeyCreateOptions
 import id.walt.did.dids.registrar.dids.DidWebCreateOptions
 import id.walt.did.dids.resolver.LocalResolver
 import id.walt.did.utils.EnumUtils.enumValueIgnoreCase
+import id.walt.oid4vc.OpenID4VCI
+import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.data.CredentialOffer
+import id.walt.oid4vc.data.GrantType
+import id.walt.oid4vc.data.OpenIDProviderMetadata
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.errors.AuthorizationError
 import id.walt.oid4vc.providers.CredentialWalletConfig
 import id.walt.oid4vc.providers.OpenIDClientConfig
-import id.walt.oid4vc.requests.AuthorizationRequest
-import id.walt.oid4vc.requests.CredentialOfferRequest
+import id.walt.oid4vc.providers.TokenTarget
+import id.walt.oid4vc.requests.*
 import id.walt.oid4vc.responses.AuthorizationErrorCode
+import id.walt.oid4vc.responses.BatchCredentialResponse
+import id.walt.oid4vc.responses.CredentialResponse
+import id.walt.oid4vc.responses.TokenResponse
 import id.walt.webwallet.db.models.WalletCategoryData
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.db.models.WalletOperationHistories
@@ -43,8 +50,15 @@ import id.walt.webwallet.usecase.event.EventUseCase
 import id.walt.webwallet.web.controllers.PresentationRequestParameter
 import id.walt.webwallet.web.parameter.CredentialRequestParameter
 import io.ktor.client.*
+import io.ktor.client.call.*
+import io.ktor.client.engine.cio.*
+import io.ktor.client.engine.java.*
+import io.ktor.client.plugins.contentnegotiation.*
+import io.ktor.client.plugins.logging.*
+import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
+import io.ktor.client.utils.EmptyContent.contentType
 import io.ktor.http.*
 import io.ktor.util.*
 import kotlinx.coroutines.runBlocking
@@ -192,8 +206,8 @@ class SSIKit2WalletService(
 
         return matchedCredentials.ifEmpty { credentialList }
     }
-    
-    
+
+
     /* SIOP */
     @Serializable
     data class PresentationResponse(
@@ -301,7 +315,7 @@ class SSIKit2WalletService(
 
     private fun getAnyCredentialWallet() =
         credentialWallets.values.firstOrNull() ?: getCredentialWallet("did:test:test")
-    
+
         override suspend fun useOfferRequest(
         offer: String, did: String, requireUserInput: Boolean
     ): List<WalletCredential> {

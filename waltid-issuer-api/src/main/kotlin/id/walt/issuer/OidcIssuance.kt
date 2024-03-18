@@ -22,28 +22,13 @@ object OidcIssuance {
     }
 
 
-    fun issuanceRequestsToCredentialOfferBuilder(issuanceRequests: List<BaseIssuanceRequest>) =
+    fun issuanceRequestsToCredentialOfferBuilder(issuanceRequests: List<IssuanceRequest>) =
         issuanceRequestsToCredentialOfferBuilder(*issuanceRequests.toTypedArray())
 
-    fun issuanceRequestsToCredentialOfferBuilder(vararg issuanceRequests: BaseIssuanceRequest): CredentialOffer.Builder {
-        val vcs = issuanceRequests.map { it.vc }
-
+    fun issuanceRequestsToCredentialOfferBuilder(vararg issuanceRequests: IssuanceRequest): CredentialOffer.Builder {
         var builder = CredentialOffer.Builder(OidcApi.baseUrl)
-
-        vcs.forEach { vc ->
-            val vcContext = vc.getJsonStringArray("@context")
-            val vcType = vc.getJsonStringArray("type")
-
-            builder = builder.addOfferedCredential(
-                OfferedCredential(
-                    format = CredentialFormat.jwt_vc_json,
-                    types = vc["type"]!!.jsonArray.map { it.jsonPrimitive.content },
-                    credentialDefinition = JsonLDCredentialDefinition(
-                        vcContext.map { JsonPrimitive(it) },
-                        vcType
-                    )
-                )
-            )
+        issuanceRequests.forEach { issuanceRequest ->
+            builder.addOfferedCredential(issuanceRequest.credentialConfigurationId)
         }
 
         return builder

@@ -5,18 +5,24 @@ import id.walt.oid4vc.data.dif.PresentationSubmission
 import id.walt.oid4vc.data.dif.PresentationSubmissionSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.*
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
+/**
+ * @param vpToken a JsonElement, according to the [OpenID Spec section 6.1](https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#section-6.1), which defines this as a single string, single JSON object, or a JSON array of strings and/or objects, depending on the presentation format.
+ * The conversion to and from this value is aided by the [VpTokenParameter] utility class.
+ */
 @Serializable
 data class TokenResponse private constructor(
     @SerialName("access_token") val accessToken: String? = null,
     @SerialName("token_type") val tokenType: String? = null,
     @SerialName("expires_in") val expiresIn: Long? = null,
     @SerialName("refresh_token") val refreshToken: String? = null,
-    //@SerialName("vp_token") val vpToken: JsonElement? = null,
-    @SerialName("vp_token") val vpToken: JsonElement? = null, // FIXME shouldn't this just be a String?
+    @SerialName("vp_token") val vpToken: JsonElement? = null,
     @SerialName("id_token") val idToken: String? = null,
     val scope: String? = null,
     @SerialName("c_nonce") val cNonce: String? = null,
@@ -39,12 +45,18 @@ data class TokenResponse private constructor(
         override fun fromJSON(jsonObject: JsonObject) = Json.decodeFromJsonElement(TokenResponseSerializer, jsonObject)
         fun success(
             accessToken: String, tokenType: String, expiresIn: Long? = null, refreshToken: String? = null,
-            scope: String? = null, cNonce: String? = null, cNonceExpiresIn: Long? = null,
-            authorizationPending: Boolean? = null, interval: Long? = null, state: String?
-        ) = TokenResponse(accessToken, tokenType, expiresIn, refreshToken, scope = scope, state = state)
+            scope: String? = null, cNonce: String? = null, cNonceExpiresIn: Duration? = null,
+            authorizationPending: Boolean? = null, interval: Long? = null, state: String? = null
+        ) = TokenResponse(accessToken, tokenType, expiresIn, refreshToken, scope = scope,
+            cNonce = cNonce, cNonceExpiresIn = cNonceExpiresIn, authorizationPending = authorizationPending,
+            interval = interval, state = state)
 
-        fun success(vpToken: JsonElement, presentationSubmission: PresentationSubmission?, idToken: String?, state: String?) =
-            TokenResponse(vpToken = vpToken, presentationSubmission = presentationSubmission, idToken = idToken, state = state)
+        /**
+         * Utility method to construct a success response for a verifiable presentation request
+         * @param vpToken Utility object that aids the construction of the parameter value, according [OpenID Spec section 6.1](https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#section-6.1), which defines this as a single string, single JSON object, or a JSON array of strings and/or objects, depending on the presentation format.
+         */
+        fun success(vpToken: VpTokenParameter, presentationSubmission: PresentationSubmission?, idToken: String?, state: String?) =
+            TokenResponse(vpToken = vpToken.toJsonElement(), presentationSubmission = presentationSubmission, idToken = idToken, state = state)
         fun error(error: TokenErrorCode, errorDescription: String? = null, errorUri: String? = null) =
             TokenResponse(error = error.name, errorDescription = errorDescription, errorUri = errorUri)
 
@@ -96,14 +108,7 @@ data class TokenResponse private constructor(
             tokenType?.let { put("token_type", listOf(it)) }
             expiresIn?.let { put("expires_in", listOf(it.toString())) }
             refreshToken?.let { put("refresh_token", listOf(it)) }
-            //vpToken?.let { put("vp_token", listOf(it.toString())) }
-            vpToken?.let {
-                when (it) {
-                    is JsonPrimitive -> put("vp_token", listOf(it.jsonPrimitive.content))
-                    is JsonArray -> put("vp_token", it.jsonArray.map { it.jsonPrimitive.content })
-                    else -> throw IllegalArgumentException("vpToken is of unsupported JSON type: $it")
-                }
-            }
+            vpToken?.let { put("vp_token", listOf(it.toString())) }
             idToken?.let { put("id_token", listOf(it)) }
             scope?.let { put("scope", listOf(it)) }
             cNonce?.let { put("c_nonce", listOf(it)) }

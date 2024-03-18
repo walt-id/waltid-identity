@@ -7,7 +7,7 @@ import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.interfaces.ISessionCache
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.responses.TokenResponse
-import id.walt.oid4vc.util.randomSessionId
+import id.walt.oid4vc.util.ShortIdUtils
 import kotlinx.datetime.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
@@ -26,18 +26,18 @@ abstract class OpenIDCredentialVerifier(val config: CredentialVerifierConfig) :
 
     protected open fun prepareResponseOrRedirectUri(sessionID: String, responseMode: ResponseMode): String =
         when (responseMode) {
-            ResponseMode.query, ResponseMode.fragment, ResponseMode.form_post -> config.redirectUri ?: config.clientId
+            ResponseMode.Query, ResponseMode.Fragment, ResponseMode.FormPost -> config.redirectUri ?: config.clientId
             else -> config.responseUrl ?: config.clientId
         }
 
     open fun initializeAuthorization(
         presentationDefinition: PresentationDefinition,
-        responseMode: ResponseMode = ResponseMode.fragment,
+        responseMode: ResponseMode = ResponseMode.Fragment,
         scope: Set<String> = setOf(),
         expiresIn: Duration = 60.seconds
     ): PresentationSession {
         val session = PresentationSession(
-            id = randomSessionId(),
+            id = ShortIdUtils.randomSessionId(),
             authorizationRequest = null,
             expirationTimestamp = Clock.System.now().plus(expiresIn),
             presentationDefinition = presentationDefinition
@@ -46,14 +46,14 @@ abstract class OpenIDCredentialVerifier(val config: CredentialVerifierConfig) :
         }
         val presentationDefinitionUri = preparePresentationDefinitionUri(presentationDefinition, session.id)
         val authReq = AuthorizationRequest(
-            responseType = ResponseType.getResponseTypeString(ResponseType.vp_token),
+            responseType = setOf(ResponseType.VpToken),
             clientId = when(config.clientIdScheme) {
-                ClientIdScheme.redirect_uri -> ""
+                ClientIdScheme.RedirectUri -> ""
                 else -> config.clientId
             },
             responseMode = responseMode,
             redirectUri = when (responseMode) {
-                ResponseMode.query, ResponseMode.fragment, ResponseMode.form_post -> prepareResponseOrRedirectUri(
+                ResponseMode.Query, ResponseMode.Fragment, ResponseMode.FormPost -> prepareResponseOrRedirectUri(
                     session.id,
                     responseMode
                 )
@@ -61,7 +61,7 @@ abstract class OpenIDCredentialVerifier(val config: CredentialVerifierConfig) :
                 else -> null
             },
             responseUri = when (responseMode) {
-                ResponseMode.direct_post -> prepareResponseOrRedirectUri(session.id, responseMode)
+                ResponseMode.DirectPost -> prepareResponseOrRedirectUri(session.id, responseMode)
                 else -> null
             },
             presentationDefinitionUri = presentationDefinitionUri,

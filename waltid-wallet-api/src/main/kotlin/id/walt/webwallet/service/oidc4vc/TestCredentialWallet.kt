@@ -273,6 +273,10 @@ class TestCredentialWallet(
     }
 
     override fun getSession(id: String) = sessionCache[id]
+    override fun getSessionByIdTokenRequestState(idTokenRequestState: String): VPresentationSession? {
+        TODO("Not yet implemented")
+    }
+
     override fun putSession(id: String, session: VPresentationSession) = sessionCache.put(id, session)
     override fun removeSession(id: String) = sessionCache.remove(id)
 
@@ -286,7 +290,7 @@ class TestCredentialWallet(
         expiresIn: Duration,
         selectedCredentials: Set<String>
     ): VPresentationSession {
-        return super.initializeAuthorization(authorizationRequest, expiresIn).copy(selectedCredentialIds = selectedCredentials).also {
+        return super.initializeAuthorization(authorizationRequest, expiresIn, null).copy(selectedCredentialIds = selectedCredentials).also {
             putSession(it.id, it)
         }
     }
