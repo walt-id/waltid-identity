@@ -8,10 +8,13 @@ import kotlinx.serialization.json.JsonElement
 
 class VCUtil {
 
-    fun sign(key: LocalKey, issuerDid: String, subjectDid: String, payload: String) {
-        println("VC signed")
+    suspend fun sign(key: LocalKey, issuerDid: String, subjectDid: String, payload: String): String {
         val vcAsMap = Json.decodeFromString<Map<String, JsonElement>>(payload)
         val vc = W3CVC(vcAsMap)
+        val jws = vc.signJws(
+            issuerKey = key, issuerDid = issuerDid, subjectDid = subjectDid
+        )
 
+        return jws
     }
 }

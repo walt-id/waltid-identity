@@ -1,19 +1,18 @@
 package id.walt.cli.commands
 
 import com.github.ajalt.clikt.core.CliktCommand
+import com.github.ajalt.clikt.core.terminal
 import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.options.help
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.required
 import com.github.ajalt.clikt.parameters.types.file
-import id.walt.cli.util.DidMethod
-import id.walt.cli.util.DidUtil
-import id.walt.cli.util.PrettyPrinter
-import id.walt.cli.util.VCUtil
-import id.walt.crypto.keys.KeySerialization
-import id.walt.crypto.keys.LocalKey
+import com.github.ajalt.mordant.terminal.YesNoPrompt
+import id.walt.cli.util.*
 import kotlinx.coroutines.runBlocking
 import java.io.File
+import kotlin.io.path.Path
+import kotlin.io.path.absolutePathString
 
 class VCSignCmd : CliktCommand(
     name = "sign",
@@ -45,12 +44,47 @@ class VCSignCmd : CliktCommand(
 
     override fun run() {
 
-        val key = runBlocking { KeySerialization.deserializeKey(keyFile.readText()).getOrThrow() as LocalKey }
+        val key = runBlocking { KeyUtil().getKey(keyFile) }
         val issuerDid = issuerDid ?: runBlocking { DidUtil.createDid(DidMethod.KEY, key) }
         val payload = vc.readText()
 
-        val signedVC = VCUtil().sign(key, issuerDid, subjectDid, payload)
+        val signedVC = runBlocking {
+            VCUtil().sign(key, issuerDid, subjectDid, payload)
+        }
 
-        print("VC signed!")
+        val signedVCFilePath = saveSignedVC(signedVC)
+
+        signedVCFilePath.let {
+            print.green("Signed VC saved at ${signedVCFilePath}")
+        }
+
+        print.green("Signed VC not saved because the file ${signedVCFilePath} already exists.")
+        print.greenb("Signed VC JWS:")
+        print.box(signedVC)
+    }
+
+    private fun saveSignedVC(signedVC: String): String? {
+
+        val vcFileNamePrefix = vc.nameWithoutExtension
+        val vcFileNameExtension = vc.extension
+        val vcFilePath = vc.parentFile.path
+        val signedVCFileName = "${vcFileNamePrefix}.signed.${vcFileNameExtension}"
+        val signedVCFilePath = Path(vcFilePath, signedVCFileName)
+        val signedVCFile = File(signedVCFilePath.absolutePathString())
+
+        if (signedVCFile.exists()
+            && YesNoPrompt(
+                "The file \"${signedVCFile.path}\" already exists, do you want to overwrite it?",
+                terminal
+            ).ask() == false
+        ) {
+            print.plain("Will not overwrite output file.")
+            return null
+        }
+
+        signedVCFile.writeText(signedVC)
+
+        return signedVCFile.path
+
     }
 }
