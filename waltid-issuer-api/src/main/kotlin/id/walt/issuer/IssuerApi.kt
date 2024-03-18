@@ -2,6 +2,9 @@ package id.walt.issuer
 
 import id.walt.credentials.vc.vcs.W3CVC
 import id.walt.crypto.keys.*
+import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto.keys.tse.TSEKey
+import id.walt.crypto.keys.tse.TSEKeyMetadata
 import id.walt.did.dids.DidService
 import id.walt.issuer.IssuanceExamples.batchExample
 import id.walt.issuer.IssuanceExamples.issuerOnboardingRequestDefaultExample
@@ -347,7 +350,7 @@ private suspend fun generateJsonKey(
     keyType: String, keyAlgorithm: KeyType, req: IssuerOnboardingRequest
 ): Pair<Key, JsonElement> {
     val key = when (keyType) {
-        "jwk" -> JwkKey.generate(keyAlgorithm)
+        "jwk" -> JWKKey.generate(keyAlgorithm)
         "tse" -> TSEKey.generate(
             keyAlgorithm, TSEKeyMetadata(
                 getParamOrThrow(
@@ -360,7 +363,7 @@ private suspend fun generateJsonKey(
         )
 
         else -> {
-            JwkKey.generate(KeyType.Ed25519)
+            JWKKey.generate(KeyType.Ed25519)
         }
     }
 

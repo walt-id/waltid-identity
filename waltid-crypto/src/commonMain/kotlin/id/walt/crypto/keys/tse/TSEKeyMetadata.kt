@@ -1,10 +1,12 @@
-package id.walt.crypto.keys
+package id.walt.crypto.keys.tse
 
+import kotlinx.serialization.Serializable
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 
 @OptIn(ExperimentalJsExport::class)
 @JsExport
+@Serializable
 data class TSEKeyMetadata(
     val server: String,
     val accessKey: String,

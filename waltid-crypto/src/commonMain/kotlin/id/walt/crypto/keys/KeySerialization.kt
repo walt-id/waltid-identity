@@ -1,5 +1,8 @@
 package id.walt.crypto.keys
 
+import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto.keys.oci.OCIKey
+import id.walt.crypto.keys.tse.TSEKey
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import kotlinx.serialization.modules.SerializersModule
@@ -18,7 +21,7 @@ object KeySerialization {
 
     private val keySerializationModule = SerializersModule {
         polymorphic(Key::class) {
-            subclass(JwkKey::class)
+            subclass(JWKKey::class)
             subclass(TSEKey::class)
             subclass(OCIKey::class)
         }
