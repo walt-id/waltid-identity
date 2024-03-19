@@ -3,6 +3,7 @@ package id.walt.cli.commands
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.terminal
 import com.github.ajalt.clikt.parameters.arguments.argument
+import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.help
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.required
@@ -42,6 +43,8 @@ class VCSignCmd : CliktCommand(
 
     private val vc: File by argument(help = "the verifiable credential file").file()
 
+    private val overwrite by option("--overwrite", "-o").flag(default = false)
+
     override fun run() {
 
         val key = runBlocking { KeyUtil().getKey(keyFile) }
@@ -52,39 +55,55 @@ class VCSignCmd : CliktCommand(
             VCUtil().sign(key, issuerDid, subjectDid, payload)
         }
 
-        val signedVCFilePath = saveSignedVC(signedVC)
+        val savedSignedVCFilePath = saveSignedVC(signedVC)
 
-        signedVCFilePath.let {
-            print.green("Signed VC saved at ${signedVCFilePath}")
+        savedSignedVCFilePath?.let {
+            print.green("Done. ", false)
+            print.plain("Signed VC saved at ${savedSignedVCFilePath}")
+            return
         }
 
-        print.green("Signed VC not saved because the file ${signedVCFilePath} already exists.")
-        print.greenb("Signed VC JWS:")
-        print.box(signedVC)
+        print.plain("")
+        print.red("Fail. ", false)
+        print.plain("Signed VC not saved because the file ${getSignedVCFilePath()} already exists. But you can get it below.")
+        print.plain("")
+        print.green("Signed VC JWS:")
+        print.dim("--------------")
+        print.dim(signedVC)
+        print.dim("--------------")
     }
 
     private fun saveSignedVC(signedVC: String): String? {
 
+        val signedVCFilePath = getSignedVCFilePath()
+        val signedVCFile = File(signedVCFilePath)
+
+        if (signedVCFile.exists()) {
+            if (!overwrite) {
+                if (YesNoPrompt(
+                        "The file \"${signedVCFile.path}\" already exists, do you want to overwrite it?",
+                        terminal
+                    ).ask() == false
+                ) {
+                    print.dim("Ok. I will not overwrite the output file.")
+                    return null
+                }
+            } else {
+                print.dim("""The file "${signedVCFile.path}" already exists and I will overwrite it.""")
+            }
+        }
+
+        signedVCFile.writeText(signedVC)
+        return signedVCFile.path
+    }
+
+
+    private fun getSignedVCFilePath(): String {
         val vcFileNamePrefix = vc.nameWithoutExtension
         val vcFileNameExtension = vc.extension
         val vcFilePath = vc.parentFile.path
         val signedVCFileName = "${vcFileNamePrefix}.signed.${vcFileNameExtension}"
-        val signedVCFilePath = Path(vcFilePath, signedVCFileName)
-        val signedVCFile = File(signedVCFilePath.absolutePathString())
-
-        if (signedVCFile.exists()
-            && YesNoPrompt(
-                "The file \"${signedVCFile.path}\" already exists, do you want to overwrite it?",
-                terminal
-            ).ask() == false
-        ) {
-            print.plain("Will not overwrite output file.")
-            return null
-        }
-
-        signedVCFile.writeText(signedVC)
-
-        return signedVCFile.path
-
+        val signedVCFilePath = Path(vcFilePath, signedVCFileName).absolutePathString()
+        return signedVCFilePath
     }
 }

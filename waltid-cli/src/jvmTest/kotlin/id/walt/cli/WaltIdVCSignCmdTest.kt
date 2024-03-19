@@ -94,10 +94,10 @@ class WaltIdVCSignCmdTest {
     fun `should NOT fail when option --issuer is not provided`() {
 
         val result = assertDoesNotThrow {
-            command.test(arrayOf("-k", keyFileName, "-s", subjectDid, vcFilePath))
+            command.test(arrayOf("-k", keyFileName, "-s", subjectDid, vcFilePath, "--overwrite"))
         }
 
-        assertContains(result.output, "VC signed")
+        assertContains(result.output, "Signed VC saved at")
         assertFalse(result.output.contains("Error: missing"))
     }
 
@@ -147,15 +147,11 @@ class WaltIdVCSignCmdTest {
     @Test
     fun `should sign an existing VC when the issuer key and a subject DID is provided`() {
 
-        val keyFileName = "ed25519_by_waltid_pvt_key.jwk"
-        val issuerDid = "did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV"
-        val subjectDid = "did:key:z6Mkjm2gaGsodGchfG4k8P6KwCHZsVEPZho5VuEbY94qiBB9"
-
-        val result = command.test("""-k "${keyFileName}" -i ${issuerDid} -s ${subjectDid} """)
+        val result = command.test("""-k "${keyFileName}" -i ${issuerDid} -s ${subjectDid} "${vcFilePath}" """)
 
         val signedVCFile = getGeneratedFile(command, result)
 
-        assertContains(result.stdout, "Signed VC saved at .*")
+        assertContains(result.stdout, "Signed VC saved at")
     }
 
     @Test
