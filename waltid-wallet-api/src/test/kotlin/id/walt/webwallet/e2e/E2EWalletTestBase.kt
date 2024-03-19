@@ -34,7 +34,7 @@ import id.walt.webwallet.config.WebConfig as WalletWebConfig
 abstract class E2EWalletTestBase {
     private val didMethodsToTest = listOf("key", "jwk", "web")
     
-    private val defaultTestUser = User("tester", "user@email.com", "password", "email")
+    val defaultTestUser = User("tester", "user@email.com", "password", "email")
     
     private val alphabet = ('a'..'z')
     protected lateinit var token: String
@@ -90,6 +90,15 @@ abstract class E2EWalletTestBase {
         }
         val resp: JsonArray = listCredentials()
         assertEquals(resp.size, 0)
+    }
+    
+    protected fun issueNewCredentialForDid(did: String) = testApplication {
+        
+        val issuanceUri = issueJwtCredential()
+        println("Issuance Offer uri = $issuanceUri")
+        
+        // Request credential and store in wallet
+        val vc: JsonObject = requestCredential(issuanceUri, did)
     }
     
     protected fun issueNewCredential() = testApplication {
@@ -186,7 +195,6 @@ abstract class E2EWalletTestBase {
         val issuerResponse = Json.decodeFromString<IssuerOnboardingResponse>(issuerOnboardingRespStr)
 
         println("Onboarding returned: $issuerResponse\n")
-
     }
 
     protected suspend fun login(user: User = defaultTestUser) = run {
@@ -226,7 +234,7 @@ abstract class E2EWalletTestBase {
         println("> Response JSON body token: $token")
     }
     
-    protected suspend fun listAllWallets() {
+    protected suspend fun listAllWalletsSetWalletIdForThisUser() {
         println("\nUse Case -> List Wallets for Account\n")
         val endpoint = "$walletUrl/wallet-api/wallet/accounts/wallets"
         println("GET($endpoint)")

@@ -101,7 +101,7 @@ open class E2EWalletTestLocal : E2EWalletTestBase() {
         localWalletClient = newClient(token)
         
         // list all wallets for this user (sets wallet id)
-        listAllWallets()
+        listAllWalletsSetWalletIdForThisUser()
     }
     
     private fun setupTestWebWallet() {

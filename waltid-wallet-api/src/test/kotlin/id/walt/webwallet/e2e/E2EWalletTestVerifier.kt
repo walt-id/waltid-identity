@@ -182,7 +182,7 @@ open class E2EWalletTestVerifier : E2EWalletTestBase() {
         localWalletClient = newClient(token)
         
         // list all wallets for this user (sets wallet id)
-        listAllWallets()
+        listAllWalletsSetWalletIdForThisUser()
         val parsedRequest = resolvePresentationRequest(url)
         println("Parsed Request = $parsedRequest")
     }
@@ -194,7 +194,7 @@ open class E2EWalletTestVerifier : E2EWalletTestBase() {
         localWalletClient = newClient(token)
         
         // list all wallets for this user (sets wallet id)
-        listAllWallets()
+        listAllWalletsSetWalletIdForThisUser()
         var matchedCredentials = matchCredentialByPresentationDefinition(presentationDefinitionExample1)
         assertEquals(1, matchedCredentials.size)
         
@@ -217,30 +217,33 @@ open class E2EWalletTestVerifier : E2EWalletTestBase() {
             localWalletClient = newClient(token)
             
             // list all wallets for this user (sets wallet id)
-            listAllWallets()
+            listAllWalletsSetWalletIdForThisUser()
             deleteAllCredentials()
             issueNewCredential()
-
+            
             // full e2e run of verification endpoints
-
+            
             // 1. call to /verify in the Verifier API
             val url = testVerifyCredential(minimal)
             println("Verify Url = $url")
-
+            
             // 2. resolve presentation request with URI from 1)
             val parsedRequest = resolvePresentationRequest(url)
             println("Parsed Request = $parsedRequest")
-
+            
             // 3. Match credentials of the required type, e.g., OpenBadgeCredential
             val matchedCredentials = matchCredentialByPresentationDefinition(presentationDefinitionExample1)
             assertEquals(1, matchedCredentials.size)
-
+            
             val id = matchedCredentials[0].jsonObject["id"]?.jsonPrimitive?.content
             assertNotNull(id)
-
+            
+            var issuerDid =
+                matchedCredentials[0].jsonObject["parsedDocument"]?.jsonObject?.get("issuer")?.jsonObject?.get("id")?.jsonPrimitive?.content
             // 4. Use output of 2) and 3) to create presentation to return to relying party
             val json = """
             {
+                "did": "$issuerDid",
                 "presentationRequest": "$parsedRequest",
                 "selectedCredentials": [
                     "$id"
@@ -250,6 +253,7 @@ open class E2EWalletTestVerifier : E2EWalletTestBase() {
             usePresentationRequest(json)
         }
     }
+    
     override var walletClient: HttpClient
         get() = localWalletClient
         set(value) {

@@ -242,7 +242,7 @@ actual class LocalKey actual constructor(
 
     @JsPromise
     @JsExport.Ignore
-    actual override suspend fun getKeyId(): String = _internalJwk.kid ?: getThumbprint()
+    actual override suspend fun getKeyId(): String = getThumbprint()
 
     @JsPromise
     @JsExport.Ignore
