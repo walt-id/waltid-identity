@@ -2,43 +2,45 @@ package id.walt.crypto.keys
 
 import JWK
 import KeyLike
+import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto.keys.jwk.JWKKeyCreator
+import id.walt.crypto.keys.jwk.JWKKeyMetadata
 import id.walt.crypto.utils.JwsUtils.jwsAlg
 import id.walt.crypto.utils.PromiseUtils.await
 import jose
 import love.forte.plugin.suspendtrans.annotation.JsPromise
 import kotlin.js.json
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
-object JsLocalKeyCreator : LocalKeyCreator {
+object JsJWKKeyCreator : JWKKeyCreator {
 
     @JsPromise
     @JsExport.Ignore
-    override suspend fun generate(type: KeyType, metadata: LocalKeyMetadata): LocalKey {
+    override suspend fun generate(type: KeyType, metadata: JWKKeyMetadata): JWKKey {
         val alg = type.jwsAlg()
 
         @Suppress("UNCHECKED_CAST_TO_EXTERNAL_INTERFACE")
         val key = await(jose.generateKeyPair<KeyLike>(alg, json("extractable" to true) as jose.GenerateKeyPairOptions)).privateKey
 
-        return LocalKey(key).apply { init() }
+        return JWKKey(key).apply { init() }
     }
 
     @JsPromise
     @JsExport.Ignore
-    override suspend fun importRawPublicKey(type: KeyType, rawPublicKey: ByteArray, metadata: LocalKeyMetadata): Key {
+    override suspend fun importRawPublicKey(type: KeyType, rawPublicKey: ByteArray, metadata: JWKKeyMetadata): Key {
         val key: KeyLike = await(jose.importSPKI(rawPublicKey.decodeToString(), type.jwsAlg()))
-        return LocalKey(key).apply { init() }
+        return JWKKey(key).apply { init() }
     }
 
     @JsPromise
     @JsExport.Ignore
-    override suspend fun importJWK(jwk: String): Result<LocalKey> =
+    override suspend fun importJWK(jwk: String): Result<JWKKey> =
         runCatching {
             var jsonJWK = JSON.parse<JWK>(jwk)
             while (jsonJWK::class == String::class) {
                jsonJWK = JSON.parse(jsonJWK as String)
             }
-            LocalKey(await(jose.importJWK(jsonJWK)), jsonJWK).apply { init() }
+            JWKKey(await(jose.importJWK(jsonJWK)), jsonJWK).apply { init() }
         }
 
 
@@ -47,7 +49,7 @@ object JsLocalKeyCreator : LocalKeyCreator {
      */
     @JsPromise
     @JsExport.Ignore
-    override suspend fun importPEM(pem: String): Result<LocalKey> =
+    override suspend fun importPEM(pem: String): Result<JWKKey> =
         runCatching {
             val lines = pem.lines()
             fun String.getPemTitle() = this.trim().dropWhile { it == '-' }.dropLastWhile { it == '-' }.trim()
@@ -71,6 +73,6 @@ object JsLocalKeyCreator : LocalKeyCreator {
                 }
             )
 
-            LocalKey(importedPemKey).apply { init() }
+            JWKKey(importedPemKey).apply { init() }
         }
 }

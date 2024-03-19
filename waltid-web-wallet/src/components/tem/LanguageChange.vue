@@ -14,7 +14,7 @@ const local = computed(() => {
 
 <template>
     <div>
-        <Listbox v-model="local" as="div" class="relative flex items-center">
+        <Listbox v-model="jwk" as="div" class="relative flex items-center">
             <ListboxLabel class="sr-only"> Change Language </ListboxLabel>
             <ListboxButton title="Change Language" type="button">
                 <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-gray-100 dark:bg-gray-700">

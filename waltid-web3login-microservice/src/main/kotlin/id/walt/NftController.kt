@@ -7,7 +7,13 @@ import io.github.smiley4.ktorswaggerui.dsl.route
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.response.*
-
+import id.walt.webwallet.service.dto.*
+import id.walt.webwallet.service.nft.fetchers.parameters.*
+import io.github.smiley4.ktorswaggerui.dsl.get
+import io.github.smiley4.ktorswaggerui.dsl.route
+import io.ktor.http.*
+import io.ktor.server.application.*
+import io.ktor.server.response.*
 fun Application.nfts() = walletRoute {
     route("nft", {
         tags = listOf("NFTs")

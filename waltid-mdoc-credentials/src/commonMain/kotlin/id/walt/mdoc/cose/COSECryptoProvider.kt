@@ -5,7 +5,7 @@ package id.walt.mdoc.cose
  * The implementatin must support COSE_Sign1, as well as validation of certificate chains against a root CA.
  * Can be implemented by library user, to integrate their own or custom COSE crypto library
  * Default implementations exist for some platforms.
- * @see SimpleCOSECryptoProvider
+ * @see id.walt.mdoc.SimpleCOSECryptoProvider
  */
 interface COSECryptoProvider {
 

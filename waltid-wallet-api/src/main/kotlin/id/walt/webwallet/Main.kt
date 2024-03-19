@@ -22,16 +22,16 @@ private val log = KotlinLogging.logger { }
 
 fun main(args: Array<String>) {
     log.info { "Starting walt.id wallet..." }
-    
+
     log.debug { "Running in path: ${Path(".").absolutePathString()}" }
-    
+
     webWalletSetup()
-    
+
     log.info { "Reading configurations..." }
     ConfigManager.loadConfigs(args)
-    
+
     Db.start()
-    
+
     val webConfig = ConfigManager.getConfig<WebConfig>()
     log.info { "Starting web server (binding to ${webConfig.webHost}, listening on port ${webConfig.webPort})..." }
     embeddedServer(
@@ -64,11 +64,11 @@ fun Application.webWalletModule(withPlugins: Boolean = true) {
     if (withPlugins) {
         configurePlugins()
     }
-    
+
     auth()
     push()
     notifications()
-    
+
     // Wallet routes
     accounts()
     keys()
@@ -77,7 +77,6 @@ fun Application.webWalletModule(withPlugins: Boolean = true) {
     exchange()
     history()
     web3accounts()
-    nfts()
     issuers()
     eventLogs()
     manifest()

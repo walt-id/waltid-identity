@@ -4,7 +4,7 @@ import id.walt.crypto.keys.KeyType
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 
-@ExperimentalJsExport
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 class DidV1CreateOptions(ledger: String = "test", keyType: KeyType) : DidCreateOptions(
     method = "v1",

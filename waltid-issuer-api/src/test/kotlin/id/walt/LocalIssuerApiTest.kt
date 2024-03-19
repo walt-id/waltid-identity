@@ -9,7 +9,6 @@ import id.walt.sdjwt.SDMapBuilder
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
-import kotlin.js.ExperimentalJsExport
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -17,7 +16,7 @@ class IssuerApiTest {
 
     val TEST_KEY = """
     {
-       "type": "local",
+       "type": "jwk",
        "jwk": "{\"kty\":\"OKP\",\"d\":\"mDhpwaH6JYSrD2Bq7Cs-pzmsjlLj4EOhxyI-9DM1mFI\",\"crv\":\"Ed25519\",\"kid\":\"Vzx7l5fh56F3Pf9aR3DECU5BwfrY6ZJe05aiWYWzan8\",\"x\":\"T3T4-u1Xz3vAV2JwPNxWfs4pik_JLiArz_WTCvrCFUM\"}"
      }
   """
@@ -101,7 +100,7 @@ class IssuerApiTest {
         assertEquals(true, offerUri.contains("//localhost:7002/?credential_offer"))
     }
 
-    @OptIn(ExperimentalJsExport::class)
+
     @Test
     fun testSdJwt() = runTest {
         val jsonKeyObj = Json.decodeFromString<JsonObject>(TEST_KEY)

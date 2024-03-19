@@ -5,6 +5,7 @@ data class OidcConfiguration(
     val providerName: String,
     val oidcRealm: String,
     val oidcJwks: String,
+    val oidcScopes: List<String> = listOf("roles"),
     val jwksCache: OidcJwksCacheConfiguration,
     val authorizeUrl: String,
     val accessTokenUrl: String,
