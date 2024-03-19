@@ -31,9 +31,9 @@ class DidCreateCmd : CliktCommand(
 
     override fun run() {
         runBlocking {
-            val key = KeyUtil().getKey(keyFile!!)
+            val key = KeyUtil(this@DidCreateCmd).getKey(keyFile)
 
-            val jwk = runBlocking { key.exportJWKPretty() }
+            val jwk = key.exportJWKPretty()
 
             print.green("DID Subject key to be used:")
             print.box(jwk)
