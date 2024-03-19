@@ -12,6 +12,7 @@ import io.ktor.server.response.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
 import org.jetbrains.exposed.sql.transactions.transaction
 
 fun Application.keys() = walletRoute {
@@ -35,22 +36,62 @@ fun Application.keys() = walletRoute {
             request {
                 body<KeyGenerationRequest> {
                     description = "Key configuration (JSON)"
+
                     example(
-                        "Example",
-                        KeyGenerationRequest(
-                            backend = "tse",
-                            config = JsonObject(
-                                mapOf(
-                                    "server" to JsonPrimitive("http://0.0.0.0:8200/v1/transit"),
-                                    "accessKey" to JsonPrimitive("dev-only-token")
-                                )
+                        "OCI key generation request",
+                        buildJsonObject {
+                            put("backend", JsonPrimitive("oci"))
+                            put(
+                                "config",
+                                buildJsonObject {
+                                    put(
+                                        "tenancyOcid",
+                                        JsonPrimitive("ocid1.tenancy.oc1..aaaaaaaaiijfupfvsqwqwgupzdy5yclfzcccmie4ktp2wlgslftv5j7xpk6q")
+                                    )
+                                    put(
+                                        "userOcid",
+                                        JsonPrimitive("ocid1.user.oc1..aaaaaaaaxjkkfjqxdqk7ldfjrxjmacmbi7sci73rbfiwpioehikavpbtqx5q")
+                                    )
+                                    put("fingerprint", JsonPrimitive("bb:d4:4b:0c:c8:3a:49:15:7f:87:55:d5:2b:7e:dd:bc"))
+                                    put(
+                                        "cryptoEndpoint",
+                                        JsonPrimitive("ens7pgl2aaam2-crypto.kms.eu-frankfurt-1.oraclecloud.com")
+                                    )
+                                    put(
+                                        "managementEndpoint",
+                                        JsonPrimitive("ens7pgl2aaam2-management.kms.eu-frankfurt-1.oraclecloud.com")
+                                    )
+                                    put("signingKeyPem", JsonPrimitive("privateKey"))
+                                }
                             )
-                        )
+                            put("keyType", JsonPrimitive("secp256r1"))
+                        }
+                            .toString())
+                    example(
+                        "JWK key generation request",
+                        buildJsonObject {
+                            put("backend", JsonPrimitive("jwk"))
+                            put("keyType", JsonPrimitive("Ed25519"))
+                        }
+                            .toString()
+                    )
+                    example(
+                        "TSE key generation request",
+                        buildJsonObject {
+                            put("backend", JsonPrimitive("tse"))
+                            put("config",
+                                buildJsonObject {
+                                    put("server", JsonPrimitive("http://0.0.0.0:8200/v1/transit"))
+                                    put("accessKey", JsonPrimitive("dev-only-token"))
+                                })
+                            put("keyType", JsonPrimitive("Ed25519"))
+
+                        }.toString()
                     )
                 }
             }
         }) {
-            val keyGenerationRequest = call.receiveNullable<KeyGenerationRequest>() ?: KeyGenerationRequest()
+            val keyGenerationRequest = context.receive<KeyGenerationRequest>()
 
             runCatching {
                 getWalletService().generateKey(keyGenerationRequest)
