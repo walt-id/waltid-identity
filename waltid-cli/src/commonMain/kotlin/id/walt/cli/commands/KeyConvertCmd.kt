@@ -9,6 +9,7 @@ import com.github.ajalt.clikt.parameters.options.required
 import com.github.ajalt.clikt.parameters.types.file
 import com.github.ajalt.mordant.terminal.YesNoPrompt
 import id.walt.cli.util.PrettyPrinter
+import id.walt.cli.util.getNormalizedPath
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.LocalKey
 import kotlinx.coroutines.runBlocking
@@ -88,7 +89,7 @@ class KeyConvertCmd : CliktCommand(
         output.writeText(outputContent)
 
         print.greenb("Done. ", false)
-        print.plain("Converted \"${input.absolutePath}\" to \"${output.absolutePath}\".")
+        print.plain("Converted \"${getNormalizedPath(input.absolutePath)}\" to \"${getNormalizedPath(output.absolutePath)}\".")
     }
 
     private operator fun Regex.contains(text: CharSequence?): Boolean = this.matches(text ?: "")
