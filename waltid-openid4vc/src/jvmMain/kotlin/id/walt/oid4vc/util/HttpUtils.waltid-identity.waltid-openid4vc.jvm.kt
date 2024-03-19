@@ -7,6 +7,7 @@ import io.ktor.serialization.kotlinx.json.*
 
 actual val http: HttpClient
   get() = HttpClient(Apache) {
+    followRedirects = false
     install(ContentNegotiation) {
       json()
     }

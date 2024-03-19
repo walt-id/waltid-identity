@@ -160,10 +160,9 @@ data class AuthorizationRequest(
 
         suspend fun fromHttpParametersAuto(parameters: Map<String, List<String>>): AuthorizationRequest {
             return when {
-                parameters.containsKey("response_type") && parameters.containsKey("client_id") -> fromHttpParameters(parameters)
                 parameters.containsKey("request_uri") -> fromRequestObjectByReference(parameters["request_uri"]!!.first())
                 parameters.containsKey("request") -> fromRequestObject(parameters["request"]!!.first())
-                else -> throw Exception("Could not find request parameters or object in given parameters")
+                else -> fromHttpParameters(parameters)
             }
         }
 
@@ -171,7 +170,7 @@ data class AuthorizationRequest(
             return AuthorizationRequest(
                 parameters["response_type"]!!.first().let { ResponseType.fromResponseTypeString(it) },
                 parameters["client_id"]!!.first(),
-                parameters["response_mode"]?.firstOrNull()?.let { ResponseMode.valueOf(it) },
+                parameters["response_mode"]?.firstOrNull()?.let { ResponseMode.fromValue(it) },
                 parameters["redirect_uri"]?.firstOrNull(),
                 parameters["scope"]?.flatMap { it.split(" ") }?.toSet() ?: setOf(),
                 parameters["state"]?.firstOrNull(),

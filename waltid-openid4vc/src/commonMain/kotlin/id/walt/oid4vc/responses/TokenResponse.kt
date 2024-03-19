@@ -57,6 +57,13 @@ data class TokenResponse private constructor(
          */
         fun success(vpToken: VpTokenParameter, presentationSubmission: PresentationSubmission?, idToken: String?, state: String?) =
             TokenResponse(vpToken = vpToken.toJsonElement(), presentationSubmission = presentationSubmission, idToken = idToken, state = state)
+
+        /**
+         * Utility method to construct a success response for an openid id_token request
+         * @param idToken id_token
+         */
+        fun success(idToken: String, state: String? = null) =
+            TokenResponse(idToken = idToken, state = state)
         fun error(error: TokenErrorCode, errorDescription: String? = null, errorUri: String? = null) =
             TokenResponse(error = error.name, errorDescription = errorDescription, errorUri = errorUri)
 
