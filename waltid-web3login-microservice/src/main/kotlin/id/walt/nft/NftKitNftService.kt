@@ -9,8 +9,8 @@ import id.walt.webwallet.service.dto.*
 import id.walt.webwallet.service.nft.fetchers.DataFetcher
 import id.walt.webwallet.service.nft.fetchers.parameters.*
 import kotlinx.uuid.UUID
-import org.jetbrains.exposed.sql.*
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 
 class NftKitNftService : NftService {

@@ -3,20 +3,12 @@ package id.walt.oid4vc
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.crypto.ECDSASigner
 import com.nimbusds.jose.crypto.ECDSAVerifier
-import com.nimbusds.jose.crypto.Ed25519Signer
-import com.nimbusds.jose.crypto.Ed25519Verifier
 import com.nimbusds.jose.crypto.bc.BouncyCastleProviderSingleton
 import com.nimbusds.jose.jwk.ECKey
-import com.nimbusds.jose.jwk.OctetKeyPair
 import id.walt.credentials.PresentationBuilder
-import id.walt.credentials.vc.vcs.W3CVC
-import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.LocalKey
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.did.dids.DidService
-import id.walt.did.dids.registrar.dids.DidCreateOptions
-import id.walt.did.dids.registrar.dids.DidJwkCreateOptions
-import id.walt.did.dids.registrar.local.jwk.DidJwkRegistrar
 import id.walt.oid4vc.data.OpenIDProviderMetadata
 import id.walt.oid4vc.data.ResponseMode
 import id.walt.oid4vc.data.ResponseType
@@ -37,7 +29,10 @@ import id.walt.oid4vc.requests.TokenRequest
 import id.walt.oid4vc.responses.AuthorizationDirectPostResponse
 import id.walt.oid4vc.responses.AuthorizationErrorCode
 import id.walt.oid4vc.responses.TokenErrorCode
-import id.walt.sdjwt.*
+import id.walt.sdjwt.SDJwt
+import id.walt.sdjwt.SDMap
+import id.walt.sdjwt.SDPayload
+import id.walt.sdjwt.SimpleJWTCryptoProvider
 import io.kotest.common.runBlocking
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -56,13 +51,10 @@ import io.ktor.server.routing.*
 import io.ktor.util.*
 import kotlinx.datetime.Instant
 import kotlinx.serialization.json.*
-import java.io.File
-import kotlin.js.ExperimentalJsExport
 
 const val WALLET_PORT = 8001
 const val WALLET_BASE_URL = "http://localhost:${WALLET_PORT}"
 
-@OptIn(ExperimentalJsExport::class)
 class TestCredentialWallet(
     config: CredentialWalletConfig
 ) : OpenIDCredentialWallet<SIOPSession>(WALLET_BASE_URL, config) {
@@ -83,7 +75,7 @@ class TestCredentialWallet(
     override fun signToken(target: TokenTarget, payload: JsonObject, header: JsonObject?, keyId: String?) =
         SDJwt.sign(SDPayload.createSDPayload(payload, SDMap.Companion.fromJSON("{}")), jwtCryptoProvider, keyId).jwt
 
-    @OptIn(ExperimentalJsExport::class)
+
     override fun verifyTokenSignature(target: TokenTarget, token: String) =
         SDJwt.verifyAndParse(token, jwtCryptoProvider).signatureVerified
 
@@ -185,14 +177,14 @@ class TestCredentialWallet(
     val TEST_WALLET_DID_ION = "did:ion:EiDh0EL8wg8oF-7rRiRzEZVfsJvh4sQX4Jock2Kp4j_zxg:eyJkZWx0YSI6eyJwYXRjaGVzIjpbeyJhY3Rpb24iOiJyZXBsYWNlIiwiZG9jdW1lbnQiOnsicHVibGljS2V5cyI6W3siaWQiOiI0OGQ4YTM0MjYzY2Y0OTJhYTdmZjYxYjYxODNlOGJjZiIsInB1YmxpY0tleUp3ayI6eyJjcnYiOiJzZWNwMjU2azEiLCJraWQiOiI0OGQ4YTM0MjYzY2Y0OTJhYTdmZjYxYjYxODNlOGJjZiIsImt0eSI6IkVDIiwidXNlIjoic2lnIiwieCI6IlRLYVE2c0NvY1REc211ajl0VFI5OTZ0RlhwRWNTMkVKTi0xZ09hZGFCdmsiLCJ5IjoiMFRySVlIY2ZDOTNWcEV1dmotSFhUbnlLdDBzbmF5T013R1NKQTFYaURYOCJ9LCJwdXJwb3NlcyI6WyJhdXRoZW50aWNhdGlvbiJdLCJ0eXBlIjoiRWNkc2FTZWNwMjU2azFWZXJpZmljYXRpb25LZXkyMDE5In1dfX1dLCJ1cGRhdGVDb21taXRtZW50IjoiRWlCQnlkZ2R5WHZkVERob3ZsWWItQkV2R3ExQnR2TWJSLURmbDctSHdZMUhUZyJ9LCJzdWZmaXhEYXRhIjp7ImRlbHRhSGFzaCI6IkVpRGJxa05ldzdUcDU2cEJET3p6REc5bThPZndxamlXRjI3bTg2d1k3TS11M1EiLCJyZWNvdmVyeUNvbW1pdG1lbnQiOiJFaUFGOXkzcE1lQ2RQSmZRYjk1ZVV5TVlfaUdCRkMwdkQzeDNKVTB6V0VjWUtBIn19"
 
     val TEST_WALLET_DID_WEB_KEY = "{\"kty\":\"EC\",\"d\":\"uD-uxub011cplvr5Bd6MrIPSEUBsgLk-C1y3tnmfetQ\",\"use\":\"sig\",\"crv\":\"secp256k1\",\"kid\":\"48d8a34263cf492aa7ff61b6183e8bcf\",\"x\":\"TKaQ6sCocTDsmuj9tTR996tFXpEcS2EJN-1gOadaBvk\",\"y\":\"0TrIYHcfC93VpEuvj-HXTnyKt0snayOMwGSJA1XiDX8\"}"
-    /*val TEST_KEY = runBlocking { LocalKey.generate(KeyType.Ed25519) }
+    /*val TEST_KEY = runBlocking { JWKKey.generate(KeyType.Ed25519) }
     val TEST_DID: String = runBlocking {
         DidJwkRegistrar().registerByKey(TEST_KEY, DidJwkCreateOptions())
         //DidService.registerByKey("jwk", TEST_KEY)
     }.did*/
 
     // enable for Entra tests
-    val TEST_KEY = runBlocking { LocalKey.importJWK(TEST_WALLET_DID_WEB_KEY).getOrThrow() }
+    val TEST_KEY = runBlocking { JWKKey.importJWK(TEST_WALLET_DID_WEB_KEY).getOrThrow() }
     val TEST_DID: String = TEST_WALLET_DID_WEB
 
     val jwtCryptoProvider = runBlocking {
@@ -210,8 +202,8 @@ class TestCredentialWallet(
     override fun resolveDID(did: String): String {
         val didObj = runBlocking { DidService.resolve(did) }.getOrThrow()
         return (didObj["authentication"] ?: didObj["assertionMethod"] ?: didObj["verificationMethod"])?.jsonArray?.firstOrNull()?.let {
-            if(it is JsonObject) it.jsonObject?.get("id")?.jsonPrimitive?.content
-            else it.jsonPrimitive?.contentOrNull
+            if(it is JsonObject) it.jsonObject["id"]?.jsonPrimitive?.content
+            else it.jsonPrimitive.contentOrNull
         }?: did
     }
 

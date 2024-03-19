@@ -8,7 +8,7 @@ import kotlin.js.JsExport
  * Crypto provider, that provides signing and verifying of standard JWTs on the target platform
  * Can be implemented by library user, to integrate their own or custom JWT crypto library
  * Default implementations exist for some platforms.
- * @see SimpleJWTCryptoProvider
+ * @see id.walt.sdjwt.SimpleJWTCryptoProvider
  */
 @OptIn(ExperimentalJsExport::class)
 @JsExport

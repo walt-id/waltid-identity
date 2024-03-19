@@ -1,6 +1,5 @@
 package id.walt.oid4vc.requests
 
-import id.walt.oid4vc.data.HTTPDataObject
 import id.walt.oid4vc.util.httpGet
 import id.walt.oid4vc.util.sha256
 import id.walt.sdjwt.SDJwt

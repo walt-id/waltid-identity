@@ -6,7 +6,6 @@ import kotlinx.serialization.json.JsonObject
 import platform.Security.*
 import kotlin.js.ExperimentalJsExport
 
-@OptIn(ExperimentalJsExport::class)
 @OptIn(ExperimentalForeignApi::class)
 class DigitalSignaturesJWTCryptoProvider(private val algorithm: String, private val key: SecKeyRef) :
     JWTCryptoProvider {

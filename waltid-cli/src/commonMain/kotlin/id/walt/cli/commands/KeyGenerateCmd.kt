@@ -13,15 +13,13 @@ import com.github.ajalt.mordant.rendering.TextColors
 import com.github.ajalt.mordant.rendering.TextStyles
 import com.github.ajalt.mordant.terminal.YesNoPrompt
 import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.LocalKey
+import id.walt.crypto.keys.jwk.JWKKey
 import kotlinx.coroutines.runBlocking
 import kotlin.io.path.Path
 import kotlin.io.path.absolutePathString
 import kotlin.io.path.exists
 import kotlin.io.path.writeText
-import kotlin.js.ExperimentalJsExport
 
-@OptIn(ExperimentalJsExport::class)
 class KeyGenerateCmd : CliktCommand(
     name = "generate",
     help = "Generates a new cryptographic key.",
@@ -44,7 +42,7 @@ class KeyGenerateCmd : CliktCommand(
     override fun run() {
         echo(TextStyles.dim("Generating key of type ${keyType.name}..."))
         runBlocking {
-            val key = LocalKey.generate(keyType)
+            val key = JWKKey.generate(keyType)
 
             echo(TextStyles.dim("Key thumbprint is: ${key.getThumbprint()}"))
 

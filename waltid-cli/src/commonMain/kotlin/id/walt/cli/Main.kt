@@ -20,7 +20,7 @@ fun main(args: Array<String>) {
         printUsage(cmd, e)
         exitProcess(e.statusCode)
     } catch (e: MultiUsageError) {
-        var msgs = "Invalid command. Please, review the usage instructions bellow and try again."
+        val msgs = "Invalid command. Please, review the usage instructions bellow and try again."
         // for (error in e.errors) {
         //     if (msgs.length == 0) {
         //         // msgs = error.formatMessage(error.context!!.localization, parameterFormatter(error.context!!))
@@ -41,7 +41,7 @@ fun main(args: Array<String>) {
 
 fun printError(cmd: CliktCommand, e: CliktError? = null, msg: String? = null) {
     println("\n")
-    val msgToPrint = msg ?: e?.let { it.localizedMessage }
+    val msgToPrint = msg ?: e?.localizedMessage
     cmd.terminal.println(
         Panel(
             content = Text(TextColors.brightRed(msgToPrint!!), whitespace = Whitespace.NORMAL, width = 70),

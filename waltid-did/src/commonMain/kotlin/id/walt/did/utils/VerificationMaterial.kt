@@ -5,7 +5,7 @@ import kotlinx.serialization.json.*
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 
-@ExperimentalJsExport
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 object VerificationMaterial {
     private val verificationMethods = arrayOf(

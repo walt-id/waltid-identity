@@ -72,6 +72,21 @@ data:
 apiVersion: v1
 kind: ConfigMap
 metadata:
+  name: wallet-oci-key-config
+data:
+  oci.conf: |
+    tenancyOcid = "ocid1.tenancy.oc1..aaaaaaaaiijfupfvsqwqwgupzdy5yclfzcccmie4ktp2wlgslftv5j7xpk6q"
+    userOcid = "ocid1.user.oc1..aaaaaaaaxjkkfjqxdqk7ldfjrxjmacmbi7sci73rbfiwpioehikavpbtqx5q"
+    fingerprint = "bb:d4:4b:0c:c8:3a:49:15:7f:87:55:d5:2b:7e:dd:bc"
+    managementEndpoint = "ens6bc6aaafs6-management.kms.eu-frankfurt-1.oraclecloud.com"
+    keyId = "ocid1.tenancy.oc1..aaaaaaaaiijfupfvsqwqwgupzdy5yclfzcccmie4ktp2wlgslftv5j7xpk6q/ocid1.user.oc1..aaaaaaaaxjkkfjqxdqk7ldfjrxjmacmbi7sci73rbfiwpioehikavpbtqx5q/bb:d4:4b:0c:c8:3a:49:15:7f:87:55:d5:2b:7e:dd:bc"
+    cryptoEndpoint = "ens6bc6aaafs6-crypto.kms.eu-frankfurt-1.oraclecloud.com"
+    signingKeyPem = "private_key_pem"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
   name: wallet-marketplace-config
 data:
   marketplace.conf: |
@@ -175,6 +190,10 @@ spec:
               mountPath: "/waltid-wallet-api/config/oidc.conf"
               subPath: "oidc.conf"
               readOnly: true
+            - name: wallet-oci-key-config
+              mountPath: "/waltid-wallet-api/config/oci.conf"
+              subPath: "oci.conf"
+              readOnly: true
             - name: wallet-marketplace-config
               mountPath: "/waltid-wallet-api/config/marketplace.conf"
               subPath: "marketplace.conf"
@@ -224,6 +243,9 @@ spec:
         - name: wallet-oidc-config
           configMap:
             name: wallet-oidc-config
+        - name: wallet-oci-key-config
+          configMap:
+            name: wallet-oci-key-config
         - name: wallet-marketplace-config
           configMap:
             name: wallet-marketplace-config

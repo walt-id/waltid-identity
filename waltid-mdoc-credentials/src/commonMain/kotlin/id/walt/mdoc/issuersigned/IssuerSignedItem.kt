@@ -17,7 +17,6 @@ import kotlinx.serialization.encoding.Encoder
  * @param elementIdentifier Element identifier
  * @param elementValue Value of this element
  */
-@OptIn(ExperimentalSerializationApi::class)
 @Serializable(with = IssuerSignedItemSerializer::class)
 data class IssuerSignedItem(
     val digestID: NumberElement,

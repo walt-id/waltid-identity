@@ -14,7 +14,6 @@ import id.walt.mdoc.issuersigned.IssuerSigned
 import id.walt.mdoc.issuersigned.IssuerSignedItem
 import id.walt.mdoc.mdocauth.DeviceAuthentication
 import id.walt.mdoc.mso.MSO
-import korlibs.crypto.HMAC
 import kotlinx.datetime.Clock
 import kotlinx.serialization.*
 

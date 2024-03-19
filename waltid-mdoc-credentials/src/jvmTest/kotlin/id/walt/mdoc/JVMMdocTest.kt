@@ -212,7 +212,7 @@ class JVMMdocTest: AnnotationSpec() {
     mdocTampered.verify(MDocVerificationParams(VerificationType.forIssuance, ISSUER_KEY_ID), cryptoProvider) shouldBe false
 
     // test presentation with device signature
-    val ephemeralReaderKey = COSE.OneKey.generateKey(AlgorithmID.ECDSA_256)
+    val ephemeralReaderKey = OneKey.generateKey(AlgorithmID.ECDSA_256)
     val deviceAuthentication = DeviceAuthentication(sessionTranscript = ListElement(listOf(
       NullElement(),
       EncodedCBORElement(ephemeralReaderKey.AsCBOR().EncodeToBytes()),
@@ -266,7 +266,7 @@ class JVMMdocTest: AnnotationSpec() {
       .sign(sessionTranscript, cryptoProvider, READER_KEY_ID)
 
     val deviceRequest = DeviceRequest(listOf(docReq))
-    var devReqCbor = deviceRequest.toCBORHex()
+    val devReqCbor = deviceRequest.toCBORHex()
     println("DEVICE REQUEST: $devReqCbor")
 
     // parse and verify mdoc request
@@ -429,7 +429,7 @@ class JVMMdocTest: AnnotationSpec() {
 
 
     // test presentation with device signature
-    val ephemeralReaderKey = COSE.OneKey.generateKey(AlgorithmID.ECDSA_256)
+    val ephemeralReaderKey = OneKey.generateKey(AlgorithmID.ECDSA_256)
     val deviceAuthentication = DeviceAuthentication(sessionTranscript = ListElement(listOf(
       NullElement(),
       EncodedCBORElement(ephemeralReaderKey.AsCBOR().EncodeToBytes()),

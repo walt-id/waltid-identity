@@ -20,7 +20,7 @@ class MDocRequestBuilder(val docType: String) {
    * @return this builder object
    */
   fun addDataElementRequest(nameSpace: String, elementIdentifier: String, intentToRetain: Boolean): MDocRequestBuilder {
-    nameSpaces.getOrPut(nameSpace) { mutableMapOf() }.put(elementIdentifier, intentToRetain)
+    nameSpaces.getOrPut(nameSpace) { mutableMapOf() }[elementIdentifier] = intentToRetain
     return this
   }
 
@@ -35,7 +35,7 @@ class MDocRequestBuilder(val docType: String) {
 
   /**
    * Build mdoc request object
-   * @param reader authentication COSE Sign1 structure, if required
+   * @param readerAuth authentication COSE Sign1 structure, if required
    * @return the mdoc request object
    */
   fun build(readerAuth: COSESign1? = null) = MDocRequest(

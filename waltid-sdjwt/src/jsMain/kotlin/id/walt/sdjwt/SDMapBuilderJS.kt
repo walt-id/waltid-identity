@@ -1,6 +1,5 @@
 package id.walt.sdjwt
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 @JsName("SDMapBuilder")
 class SDMapBuilderJS(

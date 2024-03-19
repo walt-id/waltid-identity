@@ -8,8 +8,6 @@ import id.walt.webwallet.db.models.Wallets
 import id.walt.webwallet.service.account.AccountsService
 import id.walt.webwallet.service.category.CategoryServiceImpl
 import id.walt.webwallet.service.events.EventService
-import id.walt.webwallet.service.nft.NftKitNftService
-import id.walt.webwallet.service.nft.NftService
 import id.walt.webwallet.service.settings.SettingsService
 import id.walt.webwallet.service.trust.DefaultTrustValidationService
 import id.walt.webwallet.usecase.event.EventUseCase
@@ -91,6 +89,4 @@ object WalletServiceManager {
             .selectAll().where { (AccountWalletMappings.tenant eq tenant) and (AccountWalletMappings.accountId eq account) }.map {
                 it[Wallets.id].value
             }
-
-    fun getNftService(): NftService = NftKitNftService()
 }

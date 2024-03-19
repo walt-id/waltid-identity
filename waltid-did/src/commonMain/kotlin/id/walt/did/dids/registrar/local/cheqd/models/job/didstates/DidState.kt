@@ -13,9 +13,8 @@ import kotlinx.serialization.modules.subclass
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 
-@ExperimentalJsExport
+@OptIn(ExperimentalJsExport::class, ExperimentalSerializationApi::class)
 @JsExport
-@OptIn(ExperimentalSerializationApi::class)
 @Polymorphic
 @Serializable
 @JsonClassDiscriminator("state")
@@ -23,7 +22,7 @@ abstract class DidState {
     abstract val state: String
 }
 
-@ExperimentalJsExport
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 val didStateSerializationModule = SerializersModule {
     polymorphic(DidState::class) {
