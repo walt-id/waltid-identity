@@ -4,6 +4,7 @@ import id.walt.crypto.keys.LocalKey
 import id.walt.did.dids.DidService
 import id.walt.did.dids.registrar.DidResult
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.JsonObject
 
 class DidUtil {
 
@@ -24,6 +25,12 @@ class DidUtil {
         fun createDid(method: DidMethod, key: LocalKey): DidResult {
             return runBlocking {
                 DidService.registerByKey(method.name.lowercase(), key) //, options)
+            }
+        }
+
+        fun resolveDid(did:String): JsonObject? {
+            return runBlocking {
+                DidService.resolve(did).getOrNull()
             }
         }
 
