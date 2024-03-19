@@ -86,7 +86,7 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
     }
 
     @OptIn(ExperimentalJsExport::class)
-    protected open suspend fun verifyAndParseIdToken(token: String): JsonObject? {
+    protected open fun verifyAndParseIdToken(token: String): JsonObject? {
         // 1. Validate Header
         val header = parseTokenHeader(token)
         if (!header.keys.containsAll(setOf(
@@ -112,12 +112,12 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
             throw IllegalArgumentException("Invalid payload in token")
         }
 
-        // 3. Verify iss = sub = did (from kid)
+        // 3. Verify iss = sub = did
         val sub = payload[JWTClaims.Payload.subject].toString().removeSurrounding("\"")
         val iss = payload[JWTClaims.Payload.issuer].toString().removeSurrounding("\"")
 
-        val kidFull  = header[JWTClaims.Header.keyID]
-        val did = kidFull.toString().replaceRange(187..kidFull.toString().length-1, "").replace("\"","")
+        val kid  = header[JWTClaims.Header.keyID]
+        val did = kid.toString().substringBefore("#").replace("\"","")
 
         if (iss != sub || iss != did || sub != did){
             println("$sub $iss $did")
@@ -126,21 +126,22 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
 
         // 4. Verify Signature
         // 4.a Resolve DID
-        DidService.minimalInit()
-        val didDocument = DidService.resolve(did.removeSurrounding("\"")
-        )
+        // DidService.minimalInit()
+        // val didDocument = DidService.resolve(did.removeSurrounding("\"")
+        //)
 
         // 4.b Get verification methods from DID Document
-        val verificationMethods = didDocument.getOrNull()?.get("verificationMethod")
+        // val verificationMethods = didDocument.getOrNull()?.get("verificationMethod")
 
         // 4.c Get the corresponding verification method
-        val verificationMethod = verificationMethods?.jsonArray?.firstOrNull {
-            it.jsonObject["id"].toString() == kidFull.toString()
-        } ?: throw IllegalArgumentException("Invalid verification method")
+        // val verificationMethod = verificationMethods?.jsonArray?.firstOrNull {
+        //    it.jsonObject["id"].toString() == kidFull.toString()
+        //} ?: throw IllegalArgumentException("Invalid verification method")
 
         // 4.d Verify Token
         // val key = DidService.resolveToKey(did).getOrThrow()
         // key.verifyJws(token).isSuccess
+
         if (!verifyTokenSignature(TokenTarget.TOKEN,token))
             throw IllegalArgumentException("Invalid token - cannot verify signature")
 
@@ -163,9 +164,9 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
         return AuthorizationCodeResponse.success(code)
     }
 
-    suspend open fun processDirectPostIdToken(state: String, token: String) : AuthorizationCodeResponse {
+    open fun processDirectPost(state: String, tokenPayload: JsonObject) : AuthorizationCodeResponse {
         println("Incoming State is $state")
-        println("Incoming ID Token is $token")
+        println("Incoming Token payload is $tokenPayload")
 
         // here we get the initial session to retrieve the state of the initial authorization request
         val session = getSessionByIdTokenRequestState(state)
@@ -174,9 +175,6 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
         println("Session Id is: ${session?.id}")
         println("Session Authorization Request State is: ${session?.authorizationRequest?.state}")
         println("Session Id Token Request State is: ${session?.idTokenRequestState}")
-
-        // Verify and Parse ID Token
-        val payload = verifyAndParseIdToken(token)
 
         // Verify nonce - need to add Id token nonce session
         // if (payload[JWTClaims.Payload.nonce] != session.)
