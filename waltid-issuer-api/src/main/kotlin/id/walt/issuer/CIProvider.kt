@@ -68,7 +68,9 @@ open class CIProvider : OpenIDCredentialIssuer(
         "UniversityDegree" to listOf("VerifiableCredential", "UniversityDegree"),
         "VerifiableId" to listOf("VerifiableCredential", "VerifiableAttestation", "VerifiableId"),
         "CTWalletSameAuthorisedInTime" to listOf("VerifiableCredential", "VerifiableAttestation", "CTWalletSameAuthorisedInTime"),
-        "CTWalletSameAuthorisedDeferred" to listOf("VerifiableCredential", "VerifiableAttestation", "CTWalletSameAuthorisedDeferred")
+        "CTWalletSameAuthorisedDeferred" to listOf("VerifiableCredential", "VerifiableAttestation", "CTWalletSameAuthorisedDeferred"),
+        "CTWalletSamePreAuthorisedInTime" to listOf("VerifiableCredential", "VerifiableAttestation", "CTWalletSamePreAuthorisedInTime"),
+        "CTWalletSamePreAuthorisedDeferred" to listOf("VerifiableCredential", "VerifiableAttestation", "CTWalletSamePreAuthorisedDeferred")
     ).flatMap { entry ->
         CredentialFormat.values().map { format ->
             CredentialSupported(
@@ -135,6 +137,7 @@ open class CIProvider : OpenIDCredentialIssuer(
             println("Signing JWS:   $payload")
             println("JWS Signature: target: $target, keyId: $keyId, header: $header")
             if (header != null && keyId != null) {
+
                 val myPrivateKey = LocalKey.importJWK("{\"kty\":\"EC\",\"x\":\"bo4FsmViF9au5-iCZbvEy-WZGaRes_eZdpIucmg4XH8\",\"y\":\"htYUXUmIc-IxyR6QMFPwXHXAgj__Fqw9kuSVtSyulhI\",\"crv\":\"P-256\",\"d\":\"UPzeJStN6Wg7zXULIlGVhYh4gG5RN-5knejePt6deqY\"}")
                 val headers = mapOf("alg" to "ES256", "type" to "jwt", "kid" to keyId)
 
