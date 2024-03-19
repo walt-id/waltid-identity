@@ -1,4 +1,3 @@
-import com.github.benmanes.gradle.versions.updates.DependencyUpdatesTask
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
@@ -40,12 +39,7 @@ kotlin {
 }
 
 dependencies {
-    // nftkit
-    implementation("id.walt:waltid-nftkit:1.2311291144.0") {
-        exclude("com.sksamuel.hoplite", "hoplite-core")
-        exclude("com.sksamuel.hoplite", "hoplite-yaml")
-        exclude("com.sksamuel.hoplite", "hoplite-hikaricp")
-    }
+
 
     /* -- KTOR -- */
 
@@ -80,7 +74,6 @@ dependencies {
     implementation("io.ktor:ktor-client-json-jvm:$ktorVersion")
     implementation("io.ktor:ktor-client-cio-jvm:$ktorVersion")
     implementation("io.ktor:ktor-client-logging-jvm:$ktorVersion")
-    implementation("io.ktor:ktor-client-cio-jvm:$ktorVersion")
 
     /* -- Kotlin -- */
 
@@ -105,18 +98,18 @@ dependencies {
     implementation("de.mkammerer:argon2-jvm:2.11")
 
 
-    // waltid-did
-    implementation(project(":waltid-crypto"))
-    implementation(project(":waltid-did"))
-
     // OIDC
     implementation(project(":waltid-openid4vc"))
     implementation(project(":waltid-sdjwt"))
-    
+
+    implementation(project(":waltid-crypto"))
+    implementation(project(":waltid-did"))
+
     testImplementation(project(":waltid-issuer-api"))
     testImplementation(project(":waltid-verifier-api"))
-    
+
     implementation("com.nimbusds:nimbus-jose-jwt:9.37.3")
+
     implementation("io.ktor:ktor-client-java:$ktorVersion")
 
     /* -- Misc --*/

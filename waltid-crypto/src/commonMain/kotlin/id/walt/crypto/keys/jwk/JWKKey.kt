@@ -1,8 +1,11 @@
-package id.walt.crypto.keys
+package id.walt.crypto.keys.jwk
 
+import id.walt.crypto.keys.Key
+import id.walt.crypto.keys.KeyType
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 
-expect class LocalKey(jwk: String?) : Key {
+expect class JWKKey(jwk: String?) : Key {
 
     override suspend fun getKeyId(): String
 
@@ -29,7 +32,7 @@ expect class LocalKey(jwk: String?) : Key {
      * @return Result wrapping the plaintext; Result failure when the signature fails
      */
     override suspend fun verifyRaw(signed: ByteArray, detachedPlaintext: ByteArray?): Result<ByteArray>
-    override suspend fun verifyJws(signedJws: String): Result<JsonObject>
+    override suspend fun verifyJws(signedJws: String): Result<JsonElement>
     /*
     /**
      * Encrypts as JWE: Encrypts a message using this public key (with the algorithm this key is based on)
@@ -47,21 +50,21 @@ expect class LocalKey(jwk: String?) : Key {
     override suspend fun decrypt(encrypted: ByteArray): Result<ByteArray>
      */
 
-    override suspend fun getPublicKey(): LocalKey
+    override suspend fun getPublicKey(): JWKKey
     override suspend fun getPublicKeyRepresentation(): ByteArray
 
 
     override val hasPrivateKey: Boolean
 
 
-    companion object : LocalKeyCreator {
+    companion object : JWKKeyCreator {
 
-        override suspend fun generate(type: KeyType, metadata: LocalKeyMetadata): LocalKey
-        override suspend fun importRawPublicKey(type: KeyType, rawPublicKey: ByteArray, metadata: LocalKeyMetadata): Key
+        override suspend fun generate(type: KeyType, metadata: JWKKeyMetadata): JWKKey
+        override suspend fun importRawPublicKey(type: KeyType, rawPublicKey: ByteArray, metadata: JWKKeyMetadata): Key
 
-        override suspend fun importJWK(jwk: String): Result<LocalKey>
+        override suspend fun importJWK(jwk: String): Result<JWKKey>
 
-        override suspend fun importPEM(pem: String): Result<LocalKey>
+        override suspend fun importPEM(pem: String): Result<JWKKey>
     }
 
 }

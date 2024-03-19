@@ -1,3 +1,4 @@
+import io.ktor.util.*
 import java.io.File
 import java.net.URLDecoder
 
@@ -12,4 +13,5 @@ object TestUtils {
     fun loadResourceBytes(relativePath: String): ByteArray =
         URLDecoder.decode(this::class.java.classLoader.getResource(relativePath)!!.path, "UTF-8")
             .let { File(it).readBytes() }
+    fun loadResourceBase64(relativePath: String): ByteArray = loadResource(relativePath).decodeBase64Bytes()
 }

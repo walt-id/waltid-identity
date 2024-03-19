@@ -1,11 +1,7 @@
 package id.walt.did
 
-import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.LocalKey
-import id.walt.crypto.keys.TSEKey
-import id.walt.crypto.keys.TSEKeyMetadata
+import id.walt.crypto.keys.tse.TSEKeyMetadata
 import id.walt.did.dids.DidService
-import id.walt.did.dids.registrar.dids.DidKeyCreateOptions
 import id.walt.did.helpers.WaltidServices
 import io.ktor.client.*
 import io.ktor.client.request.*
@@ -51,7 +47,7 @@ class DidExamples {
 //
 //        val key = if (isVaultAvailable()) TSEKey.generate(
 //            KeyType.Ed25519, tseMetadata
-//        ) else LocalKey.generate(KeyType.Ed25519)
+//        ) else JWKKey.generate(KeyType.Ed25519)
 //
 //        val did = DidService.registerByKey("jwk", key)
 //
@@ -66,7 +62,7 @@ class DidExamples {
 //
 //        val key = if (isVaultAvailable()) TSEKey.generate(
 //            KeyType.Ed25519, tseMetadata
-//        ) else LocalKey.generate(KeyType.Ed25519)
+//        ) else JWKKey.generate(KeyType.Ed25519)
 //
 //        val options = DidKeyCreateOptions(KeyType.Ed25519, useJwkJcsPub = false)
 //        val did = DidService.registerByKey("key", key, options)
@@ -83,7 +79,7 @@ class DidExamples {
 //
 //        val key = if (isVaultAvailable()) TSEKey.generate(
 //            KeyType.Ed25519, tseMetadata
-//        ) else LocalKey.generate(KeyType.Ed25519)
+//        ) else JWKKey.generate(KeyType.Ed25519)
 //
 //        val options = DidKeyCreateOptions(KeyType.Ed25519, useJwkJcsPub = true)
 //        val did = DidService.registerByKey("key", key, options)

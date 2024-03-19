@@ -23,6 +23,7 @@ fun main(args: Array<String>) {
         handleMultiUsageError(cmd, e)
     } catch (e: NoSuchOption) {
         handleNoSuchOption(cmd, e)
+
     } catch (e: CliktError) {
         handleCliktError(cmd, e)
     } catch (e: Exception) {
@@ -76,7 +77,7 @@ fun handlePrintHelpMessage(cmd: WaltIdCmd, e: PrintHelpMessage) {
 
 fun printError(cmd: CliktCommand, e: Exception? = null, msg: String? = null) {
     println("\n")
-    val msgToPrint = msg ?: e?.let { it.localizedMessage }
+    val msgToPrint = msg ?: e?.localizedMessage
     cmd.terminal.println(
         Panel(
             content = Text(

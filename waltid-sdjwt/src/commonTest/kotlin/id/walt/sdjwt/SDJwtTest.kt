@@ -9,10 +9,8 @@ import io.kotest.matchers.maps.shouldNotContainKey
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import kotlinx.serialization.json.*
-import kotlin.js.ExperimentalJsExport
 import kotlin.test.Test
 
-@OptIn(ExperimentalJsExport::class)
 class SDJwtTest {
     @Test
     fun testParseSdJwt() {
@@ -76,7 +74,7 @@ class SDJwtTest {
 
         sdPayload_3.undisclosedPayload shouldContainKey SDJwt.DIGESTS_KEY
         sdPayload_3.undisclosedPayload.keys shouldNotContainAnyOf setOf("sub", "nestedObject")
-        val nestedDisclosure = sdPayload_3.sDisclosures.firstOrNull() { sd -> sd.key == "nestedObject" && sd.value is JsonObject }
+        val nestedDisclosure = sdPayload_3.sDisclosures.firstOrNull { sd -> sd.key == "nestedObject" && sd.value is JsonObject }
         nestedDisclosure shouldNotBe null
         nestedDisclosure!!.value.jsonObject shouldContainKey SDJwt.DIGESTS_KEY
         nestedDisclosure.value.jsonObject shouldNotContainKey "arrProp"
@@ -110,7 +108,7 @@ class SDJwtTest {
 
         sdPayload_4.undisclosedPayload shouldContainKey SDJwt.DIGESTS_KEY
         sdPayload_4.undisclosedPayload.keys shouldNotContainAnyOf setOf("sub", "nestedObject")
-        val nestedDisclosure = sdPayload_4.sDisclosures.firstOrNull() { sd -> sd.key == "nestedObject" && sd.value is JsonObject }
+        val nestedDisclosure = sdPayload_4.sDisclosures.firstOrNull { sd -> sd.key == "nestedObject" && sd.value is JsonObject }
         nestedDisclosure shouldNotBe null
         nestedDisclosure!!.value.jsonObject shouldContainKey SDJwt.DIGESTS_KEY
         nestedDisclosure.value.jsonObject shouldNotContainKey "arrProp"

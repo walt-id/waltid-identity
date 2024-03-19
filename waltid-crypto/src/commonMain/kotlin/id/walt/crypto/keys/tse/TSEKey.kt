@@ -1,5 +1,9 @@
-package id.walt.crypto.keys
+package id.walt.crypto.keys.tse
 
+import id.walt.crypto.keys.Key
+import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto.keys.jwk.JWKKeyMetadata
 import id.walt.crypto.utils.Base64Utils.base64UrlDecode
 import id.walt.crypto.utils.Base64Utils.base64toBase64Url
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
@@ -28,15 +32,14 @@ import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 import kotlin.random.Random
 
-// Works with the Hashicorp Transit Secret Engine
-
-private val logger = KotlinLogging.logger {}
+private val logger = KotlinLogging.logger {  }
 
 @OptIn(ExperimentalJsExport::class)
 @JsExport
 @Suppress("TRANSIENT_IS_REDUNDANT")
 @Serializable
 @SerialName("tse")
+// Works with the Hashicorp Transit Secret Engine
 class TSEKey(
     val server: String, private val accessKey: String, private val namespace: String? = null, val id: String,
     //private var publicKey: ByteArray? = null,
@@ -49,9 +52,11 @@ class TSEKey(
         crossinline block: suspend CoroutineScope.() -> T
     ): Deferred<T> = GlobalScope.async(Dispatchers.Unconfined, start = CoroutineStart.LAZY) {
         block.invoke(this)
+        //retrieveKeyType()
     }
 
     @Transient
+    //val retrievedKeyType = lazySuspended { retrieveKeyType() }
     val retrievedKeyType = lazySuspended { retrieveKeyType() }
 
     @Transient
@@ -105,7 +110,8 @@ class TSEKey(
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    override suspend fun getKeyId(): String = id
+//    override suspend fun getKeyId(): String = id
+    override suspend fun getKeyId(): String = getPublicKey().getKeyId()
 
     @JvmBlocking
     @JvmAsync
@@ -175,16 +181,16 @@ class TSEKey(
     @JsPromise
     @JsExport.Ignore
     override suspend fun verifyRaw(signed: ByteArray, detachedPlaintext: ByteArray?): Result<ByteArray> {
-        val localPublicKey = when (keyType) {
-            KeyType.Ed25519 -> LocalKey.importRawPublicKey(
+        /*val localPublicKey = when (keyType) {
+            KeyType.Ed25519 -> JWKKey.importRawPublicKey(
                 type = keyType,
                 rawPublicKey = getBackingPublicKey(),
-                metadata = LocalKeyMetadata() // todo: explicit `keySize`
+                metadata = JWKKeyMetadata() // todo: explicit `keySize`
             )
 
-            KeyType.RSA, KeyType.secp256r1 -> LocalKey.importPEM(getEncodedPublicKey()).getOrThrow()
+            KeyType.RSA, KeyType.secp256r1 -> JWKKey.importPEM(getEncodedPublicKey()).getOrThrow()
             KeyType.secp256k1 -> throw IllegalArgumentException("Type not supported for TSE: $keyType")
-        }
+        }*/
 
         check(detachedPlaintext != null) { "An detached plaintext is needed." }
 
@@ -207,7 +213,7 @@ class TSEKey(
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    override suspend fun verifyJws(signedJws: String): Result<JsonObject> {
+    override suspend fun verifyJws(signedJws: String): Result<JsonElement> {
         val parts = signedJws.split(".")
         check(parts.size == 3) { "Invalid JWT part count: ${parts.size} instead of 3" }
 
@@ -234,12 +240,13 @@ class TSEKey(
     @JsPromise
     @JsExport.Ignore
     suspend fun getEncodedPublicKey(): String = // TODO add to base Key
-        lazyOf(http.get("$server/keys/$id") {
-            header("X-Vault-Token", accessKey)
-            namespace?.let { header("X-Vault-Namespace", namespace) }
-        }
-            .tseJsonDataBody().jsonObject["keys"]?.jsonObject?.get("1")?.jsonObject?.get("public_key")?.jsonPrimitive?.content
-            ?: throwTSEError("No keys/1/public_key in data response")).value
+        lazyOf(
+            http.get("$server/keys/$id") {
+                header("X-Vault-Token", accessKey)
+                namespace?.let { header("X-Vault-Namespace", namespace) }
+            }.tseJsonDataBody().jsonObject["keys"]?.jsonObject?.get("1")?.jsonObject?.get("public_key")?.jsonPrimitive?.content
+                ?: throwTSEError("No keys/1/public_key in data response")
+        ).value
 
     @JvmBlocking
     @JvmAsync
@@ -248,10 +255,10 @@ class TSEKey(
     override suspend fun getPublicKey(): Key {
         logger.debug { "Getting public key: $keyType" }
 
-        return LocalKey.importRawPublicKey(
+        return JWKKey.importRawPublicKey(
             type = keyType,
             rawPublicKey = getBackingPublicKey(),
-            metadata = LocalKeyMetadata(), // todo: import with explicit `keySize`
+            metadata = JWKKeyMetadata(), // todo: import with explicit `keySize`
         )
     }
 
@@ -363,14 +370,14 @@ class TSEKey(
 }
 
 /*suspend fun main() {
-    val tseKey = TSEKey.generate(KeyType.Ed25519, TSEKeyMetadata("http://127.0.0.1:8200/v1/transit", "dev-only-token"))
+    val tseKey = TSEKey.generate(KeyType.Ed25519, TSEKeyMetadata("http://0.0.0.0:8200/v1/transit", "hvs.1eeHn0cyrzOyjeohJalj0gCW"))
     val plaintext = "This is a plaintext 123".encodeToByteArray()
 
     val signed = tseKey.signRaw(plaintext) as String
 
     val verified = tseKey.verifyRaw(signed.decodeBase64Bytes(), plaintext)
 
-    println("TSEKey: $tseKey")
+    println("TSEKey: ${tseKey.getEncodedPublicKey()}")
     println("Plaintext: ${plaintext.decodeToString()}")
     println("Signed: $signed")
     println("Verified signature success: ${verified.isSuccess}")

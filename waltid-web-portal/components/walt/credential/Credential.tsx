@@ -1,7 +1,6 @@
 'use client';
 
 import WaltIcon from '@/components/walt/logo/WaltIcon';
-import { AvailableCredential } from '@/types/credentials';
 
 type Props = {
   id: string;

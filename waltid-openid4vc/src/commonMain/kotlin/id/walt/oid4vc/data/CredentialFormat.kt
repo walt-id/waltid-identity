@@ -21,7 +21,7 @@ enum class CredentialFormat(val value: String) {
 
     companion object {
         fun fromValue(value: String): CredentialFormat? {
-            return CredentialFormat.values().find { it.value == value }
+            return entries.find { it.value == value }
         }
     }
 }

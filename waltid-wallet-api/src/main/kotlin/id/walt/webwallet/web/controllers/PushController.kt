@@ -25,8 +25,12 @@ object PushController {
                     }
                 }) {
                     val subscription = call.receive<Subscription>()
-                    PushManager.registerSubscription(subscription)
-                    call.respond(HttpStatusCode.OK)
+                    runCatching { PushManager.registerSubscription(subscription) }
+                        .onSuccess {
+                            call.respond(HttpStatusCode.OK)
+                        }.onFailure {
+                            call.respond(HttpStatusCode.FailedDependency)
+                        }
                 }
 
                 get("shownotif", {

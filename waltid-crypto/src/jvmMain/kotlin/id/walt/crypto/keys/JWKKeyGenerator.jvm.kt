@@ -10,11 +10,14 @@ import com.nimbusds.jose.jwk.gen.JWKGenerator
 import com.nimbusds.jose.jwk.gen.OctetKeyPairGenerator
 import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
 import com.nimbusds.jose.util.Base64URL
+import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto.keys.jwk.JWKKeyCreator
+import id.walt.crypto.keys.jwk.JWKKeyMetadata
 import org.bouncycastle.jce.ECNamedCurveTable
 
-object JvmLocalKeyCreator : LocalKeyCreator {
+object JvmJWKKeyCreator : JWKKeyCreator {
 
-    override suspend fun generate(type: KeyType, metadata: LocalKeyMetadata): LocalKey {
+    override suspend fun generate(type: KeyType, metadata: JWKKeyMetadata): JWKKey {
         val keyGenerator: JWKGenerator<out JWK> = when (type) {
             KeyType.Ed25519 -> OctetKeyPairGenerator(Curve.Ed25519)
             KeyType.secp256r1 -> ECKeyGenerator(Curve.P_256)
@@ -28,23 +31,23 @@ object JvmLocalKeyCreator : LocalKeyCreator {
 
         val jwk = keyGenerator.generate()
 
-        return LocalKey(jwk)
+        return JWKKey(jwk)
     }
 
-    override suspend fun importRawPublicKey(type: KeyType, rawPublicKey: ByteArray, metadata: LocalKeyMetadata): Key = LocalKey(
+    override suspend fun importRawPublicKey(type: KeyType, rawPublicKey: ByteArray, metadata: JWKKeyMetadata): Key = JWKKey(
         when (type) {
             KeyType.Ed25519 -> OctetKeyPair.Builder(Curve.Ed25519, Base64URL.encode(rawPublicKey)).build()
             KeyType.secp256k1 -> ecRawToJwk(rawPublicKey, Curve.SECP256K1)
             KeyType.secp256r1 -> ecRawToJwk(rawPublicKey, Curve.P_256)
-            else -> TODO("Not yet implemented: $type")
+            else -> TODO("Not yet implemented: $type for key")
         }
     )
 
-    override suspend fun importJWK(jwk: String): Result<LocalKey> =
-        runCatching { LocalKey(JWK.parse(jwk)) }
+    override suspend fun importJWK(jwk: String): Result<JWKKey> =
+        runCatching { JWKKey(JWK.parse(jwk)) }
 
-    override suspend fun importPEM(pem: String): Result<LocalKey> =
-        runCatching { LocalKey(JWK.parseFromPEMEncodedObjects(pem)) }
+    override suspend fun importPEM(pem: String): Result<JWKKey> =
+        runCatching { JWKKey(JWK.parseFromPEMEncodedObjects(pem)) }
 
     private fun ecRawToJwk(rawPublicKey: ByteArray, curve: Curve): JWK =
         ECNamedCurveTable.getParameterSpec(curve.name).curve.decodePoint(rawPublicKey).let {
