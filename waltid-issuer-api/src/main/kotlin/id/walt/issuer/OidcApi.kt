@@ -147,27 +147,39 @@ object OidcApi : CIProvider() {
 
                 println("/direct_post params: $params")
 
-                if (params["state"]?.get(0) == null || params["id_token"]?.get(0) == null) {
-                    call.respond(HttpStatusCode.BadRequest, "missing id_token or state parameter")
-                    throw IllegalArgumentException("missing id_token or state parameter")
+                if (params["state"]?.get(0) == null || (params["id_token"]?.get(0) == null && params["vp_token"]?.get(0) == null)) {
+                    call.respond(HttpStatusCode.BadRequest, "missing state/id_token/vp_token parameter")
+                    throw IllegalArgumentException("missing missing state/id_token/vp_token  parameter")
                 }
 
                 println("/direct_post values from params: ${params.values}")
                 println("/direct_post state from param: ${params["state"]}")
                 println("/direct_post token from param: ${params["id_token"]}")
 
-                val state = params["state"]?.get(0)!!
-                val idToken = params["id_token"]?.get(0)!!
-
                 try {
+                    if (params["id_token"]?.get(0) != null) {
+                        val state = params["state"]?.get(0)!!
+                        val idToken = params["id_token"]?.get(0)!!
 
-                    val resp = processDirectPostIdToken(state, idToken)
-                    // Get the redirect_uri from the Authorization Request Parameter
-                    println("direct_post redirectUri is:" + resp.toRedirectUri("openid://redirect", ResponseMode.Query))
-                    call.response.apply {
-                        status(HttpStatusCode.Found)
-                        header(HttpHeaders.Location, resp.toRedirectUri("openid://redirect", ResponseMode.Query))
+                        // Verify and Parse ID Token
+                        val payload = verifyAndParseIdToken(idToken)
+
+                        // Process response
+                        val resp = processDirectPost(state, payload!!)
+
+                        // Get the redirect_uri from the Authorization Request Parameter
+                        println("direct_post redirectUri is:" + resp.toRedirectUri("openid://redirect", ResponseMode.Query))
+
+                        call.response.apply {
+                            status(HttpStatusCode.Found)
+                            header(HttpHeaders.Location, resp.toRedirectUri("openid://redirect", ResponseMode.Query))
+                        }
+
+                    } else {
+                        // else it is a vp_token
+                        call.respond(HttpStatusCode.BadRequest, "vp_token not implemented")
                     }
+
                 } catch (exc: TokenError) {
                     logger.error(exc) { "Token error: " }
                     call.respond(HttpStatusCode.BadRequest, exc.toAuthorizationErrorResponse().toJSON())
