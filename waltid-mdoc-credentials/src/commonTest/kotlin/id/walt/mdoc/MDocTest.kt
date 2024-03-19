@@ -1,24 +1,20 @@
 package id.walt.mdoc
 
-import kotlinx.serialization.*
 import cbor.Cbor
 import id.walt.mdoc.cose.COSEMac0
-import id.walt.mdoc.dataelement.*
-import id.walt.mdoc.devicesigned.DeviceAuth
 import id.walt.mdoc.cose.COSESign1
 import id.walt.mdoc.cose.HMAC256
+import id.walt.mdoc.dataelement.*
 import id.walt.mdoc.dataretrieval.DeviceRequest
 import id.walt.mdoc.dataretrieval.DeviceResponse
+import id.walt.mdoc.devicesigned.DeviceAuth
 import id.walt.mdoc.doc.MDocBuilder
-import id.walt.mdoc.doc.MDocVerificationParams
-import id.walt.mdoc.doc.VerificationType
 import id.walt.mdoc.docrequest.MDocRequestBuilder
 import id.walt.mdoc.issuersigned.IssuerSignedItem
 import id.walt.mdoc.mdocauth.DeviceAuthentication
 import id.walt.mdoc.mso.ValidityInfo
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldContainAll
-import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
@@ -26,11 +22,14 @@ import korlibs.crypto.encoding.Hex
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.decodeFromByteArray
+import kotlinx.serialization.decodeFromHexString
+import kotlinx.serialization.encodeToHexString
 import kotlin.test.Test
 
 class MDocTest {
 
-    @OptIn(ExperimentalSerializationApi::class)
     @Test
     fun testSerialization() {
         val textItem = IssuerSignedItem(0u.toDE(),byteArrayOf(1, 2, 3).toDE(),"family_name".toDE(), "Doe".toDE())
@@ -88,7 +87,6 @@ class MDocTest {
         }
     }
 
-    @OptIn(ExperimentalSerializationApi::class)
     @Test
     fun testDeserialize() {
         // try deserializing example from ISO/IEC FDIS 18013-5: D.4.1.2 mdoc response
@@ -225,7 +223,7 @@ class MDocTest {
             .build()
 
         val deviceRequest = DeviceRequest(listOf(docReq))
-        var devReqCbor = deviceRequest.toCBORHex()
+        val devReqCbor = deviceRequest.toCBORHex()
         println("DEVICE REQUEST: $devReqCbor")
 
         val parsedDevReq = DeviceRequest.fromCBORHex(devReqCbor)

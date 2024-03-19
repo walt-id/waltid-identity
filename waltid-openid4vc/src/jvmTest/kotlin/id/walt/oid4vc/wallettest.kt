@@ -128,7 +128,7 @@ class wallettest : AnnotationSpec() {
         println("offeredCredentials[0]: $offeredCredential")
 
         println("// fetch access token using pre-authorized code (skipping authorization step)")
-        var tokenReq = TokenRequest(
+        val tokenReq = TokenRequest(
             grantType = GrantType.pre_authorized_code,
             clientId = testCIClientConfig.clientID,
             redirectUri = credentialWallet.config.redirectUri,
@@ -137,7 +137,7 @@ class wallettest : AnnotationSpec() {
         )
         println("tokenReq: $tokenReq")
 
-        var tokenResp = ktorClient.submitForm(
+        val tokenResp = ktorClient.submitForm(
             providerMetadata.tokenEndpoint!!, formParameters = parametersOf(tokenReq.toHttpParameters())
         ).body<JsonObject>().let { TokenResponse.fromJSON(it) }
         println("tokenResp: $tokenResp")
@@ -149,7 +149,7 @@ class wallettest : AnnotationSpec() {
 
         println("// receive credential")
         ciTestProvider.deferIssuance = false
-        var nonce = tokenResp.cNonce!!
+        val nonce = tokenResp.cNonce!!
 
         val credReq = CredentialRequest.forOfferedCredential(
             offeredCredential = offeredCredential,

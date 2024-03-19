@@ -43,7 +43,7 @@ object OidcAccountStrategy : PasswordlessAccountStrategy<OidcAccountRequest>() {
 
 
     override suspend fun authenticate(tenant: String, request: OidcAccountRequest): AuthenticatedUser {
-        val jwt = JwkUtils.verifyToken(request.token)
+        val jwt = verifyToken(request.token)
 
         val registeredUserId = if (AccountsService.hasAccountOidcId(jwt.subject)) {
             AccountsService.getAccountByOidcId(jwt.subject)!!.id

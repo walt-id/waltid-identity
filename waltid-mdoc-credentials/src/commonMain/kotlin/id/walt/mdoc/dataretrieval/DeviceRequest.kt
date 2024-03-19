@@ -24,12 +24,10 @@ class DeviceRequest(
   /**
    * Serialize to CBOR data
    */
-  @OptIn(ExperimentalSerializationApi::class)
   fun toCBOR() = toMapElement().toCBOR()
   /**
    * Serialize to CBOR hex string
    */
-  @OptIn(ExperimentalSerializationApi::class)
   fun toCBORHex() = toMapElement().toCBORHex()
   companion object {
     /**

@@ -6,7 +6,7 @@ import kotlinx.serialization.SerializationException
 /**
  * Common base for COSESign1 and COSEMac0 data structures, with high level dynamic properties and methods
  */
-abstract class COSESimpleBase<T: COSESimpleBase<T>>() {
+abstract class COSESimpleBase<T: COSESimpleBase<T>> {
   abstract val data: List<AnyDataElement>
 
   /**

@@ -237,6 +237,7 @@ import useModalStore from "~/stores/useModalStore";
 import { useUserStore } from "~/stores/user";
 import { storeToRefs } from "pinia";
 import { useTenant } from "~/composables/tenants";
+import {decodeJwt} from "jose";
 
 const store = useModalStore();
 
@@ -340,10 +341,10 @@ async function tryLoginWithOidcSession() {
         redirect: "manual",
     });
 
-    console.log(token);
+
 
     const tokenText = await token.text();
-    console.log(tokenText);
+  console.log("text token : " + tokenText);
 
     await signIn(
         {
@@ -354,11 +355,13 @@ async function tryLoginWithOidcSession() {
         { callbackUrl: signInRedirectUrl.value },
     )
         .then(() => {
+          console.log("Signed in with OIDC");
+          console.log("Token: " + decodeJwt(tokenText).sub);
             user.value = {
                 token: tokenText,
                 id: "",
-                email: decodeJWT(tokenText).payload.email,
-                name: decodeJWT(tokenText).payload.name,
+              email: decodeJwt(tokenText).email,
+              name: decodeJwt(tokenText).name,
                 oidcSession: true
             };
 

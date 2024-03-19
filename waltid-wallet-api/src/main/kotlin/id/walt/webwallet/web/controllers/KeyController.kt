@@ -1,6 +1,6 @@
 package id.walt.webwallet.web.controllers
 
-import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.KeyGenerationRequest
 import io.github.smiley4.ktorswaggerui.dsl.delete
 import io.github.smiley4.ktorswaggerui.dsl.get
 import io.github.smiley4.ktorswaggerui.dsl.post
@@ -9,9 +9,10 @@ import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
-import io.ktor.server.routing.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
 import org.jetbrains.exposed.sql.transactions.transaction
 
 fun Application.keys() = walletRoute {
@@ -33,16 +34,72 @@ fun Application.keys() = walletRoute {
         post("generate", {
             summary = "Generate new key"
             request {
-                queryParameter<String>("type") {
-                    description = "Key type to use. Choose from: ${KeyType.entries.joinToString()}"
+                body<KeyGenerationRequest> {
+                    description = "Key configuration (JSON)"
+
+                    example(
+                        "OCI key generation request",
+                        buildJsonObject {
+                            put("backend", JsonPrimitive("oci"))
+                            put(
+                                "config",
+                                buildJsonObject {
+                                    put(
+                                        "tenancyOcid",
+                                        JsonPrimitive("ocid1.tenancy.oc1..aaaaaaaaiijfupfvsqwqwgupzdy5yclfzcccmie4ktp2wlgslftv5j7xpk6q")
+                                    )
+                                    put(
+                                        "userOcid",
+                                        JsonPrimitive("ocid1.user.oc1..aaaaaaaaxjkkfjqxdqk7ldfjrxjmacmbi7sci73rbfiwpioehikavpbtqx5q")
+                                    )
+                                    put("fingerprint", JsonPrimitive("bb:d4:4b:0c:c8:3a:49:15:7f:87:55:d5:2b:7e:dd:bc"))
+                                    put(
+                                        "cryptoEndpoint",
+                                        JsonPrimitive("ens7pgl2aaam2-crypto.kms.eu-frankfurt-1.oraclecloud.com")
+                                    )
+                                    put(
+                                        "managementEndpoint",
+                                        JsonPrimitive("ens7pgl2aaam2-management.kms.eu-frankfurt-1.oraclecloud.com")
+                                    )
+                                    put("signingKeyPem", JsonPrimitive("privateKey"))
+                                }
+                            )
+                            put("keyType", JsonPrimitive("secp256r1"))
+                        }
+                            .toString())
+                    example(
+                        "JWK key generation request",
+                        buildJsonObject {
+                            put("backend", JsonPrimitive("jwk"))
+                            put("keyType", JsonPrimitive("Ed25519"))
+                        }
+                            .toString()
+                    )
+                    example(
+                        "TSE key generation request",
+                        buildJsonObject {
+                            put("backend", JsonPrimitive("tse"))
+                            put("config",
+                                buildJsonObject {
+                                    put("server", JsonPrimitive("http://0.0.0.0:8200/v1/transit"))
+                                    put("accessKey", JsonPrimitive("dev-only-token"))
+                                })
+                            put("keyType", JsonPrimitive("Ed25519"))
+
+                        }.toString()
+                    )
                 }
             }
         }) {
-            val type = call.request.queryParameters["type"]
-                ?: KeyType.Ed25519.toString()
+            val keyGenerationRequest = context.receive<KeyGenerationRequest>()
 
-            val keyId = getWalletService().generateKey(type)
-            context.respond(keyId)
+            runCatching {
+                getWalletService().generateKey(keyGenerationRequest)
+            }.onSuccess {
+                context.respond(it)
+            }.onFailure {
+                context.respond(HttpStatusCode.BadRequest, it.localizedMessage)
+            }
         }
 
 

@@ -2,7 +2,6 @@ package id.walt.sdjwt
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
-import kotlin.js.ExperimentalJsExport
 
 /**
  * Selective disclosure map, that describes for each payload field recursively, whether it should be selectively disclosable / selected for disclosure.
@@ -10,7 +9,6 @@ import kotlin.js.ExperimentalJsExport
  * @param decoyMode **For SD-JWT issuance:** Generate decoy digests for this hierarchical level randomly or fixed, set to NONE for parsed SD-JWTs, **for presentation:** _unused_
  * @param decoys  **For SD-JWT issuance:** Num (fixed mode) or max num (random mode) of decoy digests to add for this hierarchical level. 0 if NONE, **for presentation:** _unused_
  */
-@OptIn(ExperimentalJsExport::class)
 @Serializable
 class SDMap(
     val fields: Map<String, SDField>,
@@ -36,7 +34,7 @@ class SDMap(
 
     fun prettyPrint(indentBy: Int = 0): String {
         val indentation = (0).rangeTo(indentBy).joinToString(" ") { "" }
-        return "${indentation} + with decoys: ${decoyMode} (${decoys})\n" + keys.flatMap { key ->
+        return "$indentation + with decoys: $decoyMode (${decoys})\n" + keys.flatMap { key ->
             listOfNotNull(
                 "${indentation}- $key: ${fields[key]?.sd == true}",
                 fields[key]?.children?.prettyPrint(indentBy + 2)
