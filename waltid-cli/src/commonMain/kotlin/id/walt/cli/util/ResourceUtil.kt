@@ -3,8 +3,6 @@ package id.walt.cli.util
 import java.io.File
 import java.io.FileNotFoundException
 import java.net.URI
-import java.nio.file.Paths
-import kotlin.io.path.exists
 
 fun getResourcePath(obj: Any, filename: String): String {
     // The returned URL has white spaces replaced by %20.
@@ -12,7 +10,12 @@ fun getResourcePath(obj: Any, filename: String): String {
     val path = obj.javaClass.getClassLoader().getResource(filename)?.let {
         File(URI(it.toString())).path
     }
-   return path!!.replace("\\", "/")
+
+    path?.let {
+        return getNormalizedPath(path)
+    }
+
+    throw FileNotFoundException(path)
 }
 //    // If Windows path, escape backslash
 //    val winPathRegex = """"^[a-zA-Z]:\\\\.*"""".toRegex()
