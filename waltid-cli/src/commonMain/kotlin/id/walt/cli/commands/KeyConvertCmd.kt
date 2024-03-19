@@ -78,7 +78,7 @@ class KeyConvertCmd : CliktCommand(
 
         if (output.exists()
             && YesNoPrompt(
-                "The file \"${output.absolutePath}\" already exists, do you want to overwrite it?",
+                "The file \"${getNormalizedPath(output.absolutePath)}\" already exists, do you want to overwrite it?",
                 terminal
             ).ask() == false
         ) {
