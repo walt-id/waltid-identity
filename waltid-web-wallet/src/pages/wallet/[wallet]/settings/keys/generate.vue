@@ -43,12 +43,19 @@
             class="mt-1 space-y-8 border-gray-900/10 pb-12 sm:space-y-0 sm:divide-gray-900/10 sm:border-t sm:pb-0">
           <div class="sm:grid sm:grid-cols-3 sm:items-start sm:gap-4 sm:py-2"
                v-for="config in options.find(option => option.keyGenerationRequest[1] == data.keyGenerationRequest.type)?.config">
-            <label class="block text-sm font-medium leading-6 text-gray-900 sm:pt-1.5">{{
-                config.charAt(0).toUpperCase() + config.slice(1)
-              }}</label>
-            <input v-model="data.keyGenerationRequest.config[config]" class=" px-2 block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm
-                            ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset
-                            focus:ring-indigo-600 sm:max-w-xs sm:text-sm sm:leading-6" type="text"/>
+            <label class="block text-sm font-medium leading-6 text-gray-900 sm:pt-1.5">
+              {{ config.charAt(0).toUpperCase() + config.slice(1) }}
+            </label>
+            <template v-if="config === 'signingKeyPem'">
+        <textarea v-model="data.keyGenerationRequest.config[config]"
+                  class="px-2 block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:max-w-xs sm:text-sm sm:leading-6"
+                  rows="4"></textarea>
+            </template>
+            <template v-else>
+              <input v-model="data.keyGenerationRequest.config[config]"
+                     class="px-2 block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:max-w-xs sm:text-sm sm:leading-6"
+                     type="text">
+            </template>
           </div>
         </div>
       </div>
