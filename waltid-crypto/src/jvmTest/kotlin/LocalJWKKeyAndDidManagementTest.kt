@@ -93,8 +93,14 @@ class LocalJWKKeyAndDidManagementTest {
     @ParameterizedTest
     @MethodSource
     fun verifyJws(keyFile: String, signature: String) = runTest {
+        println("Verifying signature:")
+        println(signature)
         val key = KeySerialization.deserializeKey(keyFile).getOrThrow()
+        println("... with key: ($key)")
+        println(key.exportJWK())
         val verificationResult = key.verifyJws(signature)
+        println("Result: $verificationResult")
+
         assertTrue(verificationResult.isSuccess)
         assertEquals(payload, verificationResult.getOrThrow())
     }
