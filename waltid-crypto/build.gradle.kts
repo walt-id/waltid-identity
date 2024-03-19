@@ -133,7 +133,7 @@ kotlin {
         val jsMain by getting {
             dependencies {
                 // JOSE
-                implementation(npm("jose", "4.14.4"))
+                implementation(npm("jose", "5.2.3"))
 
                 // Multibase
                 // implementation(npm("multiformats", "12.1.2"))

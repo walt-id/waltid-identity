@@ -1,10 +1,8 @@
 package id.walt.crypto.keys.jwk
 
-import com.google.crypto.tink.subtle.EcdsaVerifyJce
 import com.google.crypto.tink.subtle.Ed25519Verify
-import com.google.crypto.tink.subtle.EllipticCurves
-import com.google.crypto.tink.subtle.Enums
 import com.nimbusds.jose.JWSAlgorithm
+import com.nimbusds.jose.JWSObject
 import com.nimbusds.jose.JWSSigner
 import com.nimbusds.jose.JWSVerifier
 import com.nimbusds.jose.crypto.*
@@ -16,6 +14,7 @@ import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.utils.Base64Utils.base64UrlDecode
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
+import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -202,20 +201,16 @@ actual class JWKKey actual constructor(
         if (keyType == KeyType.Ed25519) {
             val tinkVerifier = Ed25519Verify(_internalJwk.toOctetKeyPair().toPublicJWK().decodedX)
             return runCatching { tinkVerifier.verify(signed, detachedPlaintext) }.map { detachedPlaintext }
-        } else if (keyType == KeyType.secp256r1) {
+        } /*else if (keyType == KeyType.secp256r1) {
             val tinkVerifier = EcdsaVerifyJce(_internalJwk.toECKey().toECPublicKey(), Enums.HashType.SHA256, EllipticCurves.EcdsaEncoding.DER)
             return runCatching { tinkVerifier.verify(signed, detachedPlaintext) }.map { detachedPlaintext }
-        }
+        }*/
 
         val signature = getSignatureAlgorithm()
         signature.initVerify(getInternalPublicKey())
         signature.update(detachedPlaintext)
 
-        return if (signature.verify(signed)) {
-            Result.success(detachedPlaintext)
-        } else {
-            Result.failure(IllegalArgumentException("Signature verification failed!"))
-        }
+        return runCatching { signature.verify(signed) }.map { detachedPlaintext }
     }
 
 
@@ -237,7 +232,7 @@ actual class JWKKey actual constructor(
     actual override suspend fun verifyJws(signedJws: String): Result<JsonElement> {
 
         // Nimbus verification:
-        /*return runCatching {
+        return runCatching {
             val jwsObject = JWSObject.parse(signedJws)
 
             check(jwsObject.verify(_internalVerifier)) { "Signature check failed." }
@@ -246,16 +241,13 @@ actual class JWKKey actual constructor(
                 .mapValues { it.value.toJsonElement() }
 
             JsonObject(objectElements)
-        }*/
+        }.recoverCatching {
+            // Custom verification
+            val (header, payload, signature) = signedJws.split(".")
 
-
-        // Custom verification
-        val (header, payload, signature) = signedJws.split(".")
-
-        val res = verifyRaw(signature.base64UrlDecode(), "$header.$payload".encodeToByteArray()).map { it.decodeToString().decodeJws(allowMissingSignature = true).payload }
-        return res
-
-
+            val res = verifyRaw(signature.base64UrlDecode(), "$header.$payload".encodeToByteArray()).map { it.decodeToString().decodeJws(allowMissingSignature = true).payload }
+            res.getOrThrow()
+        }
 
 //        if (keyType == KeyType.Ed25519) {
         /*return runCatching {
@@ -346,7 +338,7 @@ actual class JWKKey actual constructor(
 
     private fun getSignatureAlgorithm(): Signature = when (keyType) {
         KeyType.secp256k1 -> Signature.getInstance("SHA256withECDSA", "BC")//Legacy SunEC curve disabled
-        KeyType.secp256r1 -> Signature.getInstance("SHA256withECDSA")
+        KeyType.secp256r1 -> Signature.getInstance("SHA256withECDSA", "BC")
         KeyType.Ed25519 -> Signature.getInstance("Ed25519")
         KeyType.RSA -> Signature.getInstance("SHA256withRSA")
     }
