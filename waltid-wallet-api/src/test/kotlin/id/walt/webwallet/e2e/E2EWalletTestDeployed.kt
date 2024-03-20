@@ -77,7 +77,7 @@ class E2EWalletTestDeployed : E2EWalletTestBase() {
         login(User(name = "tester", email = "tester@email.com", password = "password", accountType = "email"))
         getUserToken()
         deployedClient = newClient(token)
-        listAllWalletsSetWalletIdForThisUser()
+        listAllWalletsSetWalletId()
         println("WalletId (Deployed Wallet API) = $walletId")
     }
     
@@ -85,7 +85,7 @@ class E2EWalletTestDeployed : E2EWalletTestBase() {
     fun e2eTestKeys() = runTest(timeout = 120.seconds) {
         initialise()
         
-        listAllWalletsSetWalletIdForThisUser()
+        listAllWalletsSetWalletId()
         
         deleteKeys()
         testCreateRSAKey()
@@ -112,8 +112,8 @@ class E2EWalletTestDeployed : E2EWalletTestBase() {
     @Test
     fun e2eTestDids() = runTest(timeout = 120.seconds) {
         initialise()
-        
-        listAllWalletsSetWalletIdForThisUser()
+
+        listAllWalletsSetWalletId()
         
         // delete dids first to avoid duplicates when we create new ones
         var availableDids = listAllDids()
@@ -130,7 +130,7 @@ class E2EWalletTestDeployed : E2EWalletTestBase() {
     fun e2eTestWalletCredentials() = testApplication {
         initialise()
         
-        listAllWalletsSetWalletIdForThisUser()
+        listAllWalletsSetWalletId()
         
         val response: JsonArray = listCredentials()
         assertNotEquals(response.size, 0)
@@ -142,7 +142,7 @@ class E2EWalletTestDeployed : E2EWalletTestBase() {
     @Test
     fun e2eTestIssuance() = runTest {
         initialise()
-        listAllWalletsSetWalletIdForThisUser()
+        listAllWalletsSetWalletId()
         
         // create a did for issuance and
         // list all Dids for this user and set default for credential issuance
@@ -220,7 +220,7 @@ class E2EWalletTestDeployed : E2EWalletTestBase() {
     fun e2eTestPresentationRequest() = runTest {
         initialise()
         
-        listAllWalletsSetWalletIdForThisUser() // sets the walletId
+        listAllWalletsSetWalletId() // sets the walletId
         val url = testVerifyCredential(VerifierApiExamples.minimal)
         assertTrue(url.startsWith("openid4vp://authorize?response_type=vp_token"))
         println("verify Url = $url")
@@ -232,13 +232,20 @@ class E2EWalletTestDeployed : E2EWalletTestBase() {
     @Test
     fun e2eTestMatchCredentialsForPresentationDefinition() = runTest {
         initialise()
-        listAllWalletsSetWalletIdForThisUser() // sets the wallet id
+        listAllWalletsSetWalletId() // sets the wallet id
         
         val response: JsonArray = listCredentials()
         matchCredentialByPresentationDefinition(presentationDefinitionExample1)
         // TODO ensure num matched credentials is equal to credential list size when no match found for type
     }
-    
+
+    @Test
+    fun e2eTestDeleteCredentials()= testApplication {
+        initialise()
+        listAllWalletsSetWalletId()
+        deleteAllCredentials()
+
+    }
     
     @Test
     fun e2eTestFullPresentationUseCaseForDidJwk() = testApplication {
@@ -252,12 +259,8 @@ class E2EWalletTestDeployed : E2EWalletTestBase() {
     
     private fun e2eTestFullPresentationUseCase(didType: String? = null) = run {
         runTest(timeout = 120.seconds) {
-            deployedClient = newClient()
             initialise()
-            login()
-            getUserToken()
-            deployedClient = newClient(token)
-            listAllWalletsSetWalletIdForThisUser()
+            listAllWalletsSetWalletId()
             deleteAllCredentials()
             
             if (didType != null) {

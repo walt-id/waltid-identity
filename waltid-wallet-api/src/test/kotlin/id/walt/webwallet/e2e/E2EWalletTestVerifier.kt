@@ -182,7 +182,7 @@ open class E2EWalletTestVerifier : E2EWalletTestBase() {
         localWalletClient = newClient(token)
         
         // list all wallets for this user (sets wallet id)
-        listAllWalletsSetWalletIdForThisUser()
+        listAllWalletsSetWalletId()
         val parsedRequest = resolvePresentationRequest(url)
         println("Parsed Request = $parsedRequest")
     }
@@ -194,7 +194,7 @@ open class E2EWalletTestVerifier : E2EWalletTestBase() {
         localWalletClient = newClient(token)
         
         // list all wallets for this user (sets wallet id)
-        listAllWalletsSetWalletIdForThisUser()
+        listAllWalletsSetWalletId()
         var matchedCredentials = matchCredentialByPresentationDefinition(presentationDefinitionExample1)
         assertEquals(1, matchedCredentials.size)
         
@@ -217,7 +217,9 @@ open class E2EWalletTestVerifier : E2EWalletTestBase() {
             localWalletClient = newClient(token)
             
             // list all wallets for this user (sets wallet id)
-            listAllWalletsSetWalletIdForThisUser()
+
+
+            listAllWalletsSetWalletId()
             deleteAllCredentials()
             issueNewCredential()
             
@@ -237,13 +239,18 @@ open class E2EWalletTestVerifier : E2EWalletTestBase() {
             
             val id = matchedCredentials[0].jsonObject["id"]?.jsonPrimitive?.content
             assertNotNull(id)
-            
+            var holderDid: String? =
+                matchedCredentials[0].jsonObject["parsedDocument"]?.jsonObject?.get("credentialSubject")?.jsonObject?.get(
+                    "id"
+                )?.jsonPrimitive?.content
+            assertNotNull(holderDid)
+            holderDid = holderDid.split("#")[0]
             var issuerDid =
                 matchedCredentials[0].jsonObject["parsedDocument"]?.jsonObject?.get("issuer")?.jsonObject?.get("id")?.jsonPrimitive?.content
             // 4. Use output of 2) and 3) to create presentation to return to relying party
             val json = """
             {
-                "did": "$issuerDid",
+                "did": "$holderDid",
                 "presentationRequest": "$parsedRequest",
                 "selectedCredentials": [
                     "$id"

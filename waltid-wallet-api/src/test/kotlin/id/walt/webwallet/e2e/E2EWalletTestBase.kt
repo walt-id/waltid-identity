@@ -25,6 +25,7 @@ import com.zaxxer.hikari.HikariDataSource
 import id.walt.webwallet.config.DatasourceConfiguration
 import id.walt.webwallet.webWalletSetup
 import io.ktor.server.testing.*
+import kotlinx.coroutines.runBlocking
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.Paths
@@ -81,9 +82,8 @@ abstract class E2EWalletTestBase {
     abstract var issuerUrl: String
     abstract var verifierUrl: String
     
-    protected fun deleteAllCredentials() = testApplication {
+    protected fun deleteAllCredentials() = runBlocking {
         val response: JsonArray = listCredentials()
-        assertNotEquals(response.size, 0)
         response.forEach {
             val id = it.jsonObject["id"]?.jsonPrimitive?.content ?: error("No credentials found")
             deleteCredential(id)
@@ -92,7 +92,7 @@ abstract class E2EWalletTestBase {
         assertEquals(resp.size, 0)
     }
     
-    protected fun issueNewCredentialForDid(did: String) = testApplication {
+    protected fun issueNewCredentialForDid(did: String) = runBlocking {
         
         val issuanceUri = issueJwtCredential()
         println("Issuance Offer uri = $issuanceUri")
@@ -101,7 +101,7 @@ abstract class E2EWalletTestBase {
         val vc: JsonObject = requestCredential(issuanceUri, did)
     }
     
-    protected fun issueNewCredential() = testApplication {
+    protected fun issueNewCredential() = runBlocking {
         val availableDids = listAllDids()
         
         val issuanceUri = issueJwtCredential()
@@ -234,7 +234,7 @@ abstract class E2EWalletTestBase {
         println("> Response JSON body token: $token")
     }
     
-    protected suspend fun listAllWalletsSetWalletIdForThisUser() {
+    protected suspend fun listAllWalletsSetWalletId() {
         println("\nUse Case -> List Wallets for Account\n")
         val endpoint = "$walletUrl/wallet-api/wallet/accounts/wallets"
         println("GET($endpoint)")
