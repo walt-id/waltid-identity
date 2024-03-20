@@ -1,4 +1,4 @@
-package id.walt.webwallet.usecase.issuance
+package id.walt.webwallet.usecase.claim
 
 import id.walt.webwallet.db.models.AccountWalletMappings
 import id.walt.webwallet.db.models.Notification
@@ -24,7 +24,7 @@ import kotlinx.uuid.UUID
 import kotlinx.uuid.generateUUID
 import org.jetbrains.exposed.sql.transactions.transaction
 
-class IssuanceUseCase(
+class SilentClaimUseCase(
     private val issuanceService: IssuanceService,
     private val credentialService: CredentialsService,
     private val issuerTrustValidationService: TrustValidationService,
@@ -33,38 +33,7 @@ class IssuanceUseCase(
     private val notificationUseCase: NotificationUseCase,
     private val credentialTypeSeeker: Seeker<String>,
 ) {
-    suspend fun explicitClaim(
-        tenant: String, account: UUID, wallet: UUID, did: String, offer: String, pending: Boolean = true
-    ): List<WalletCredential> = issuanceService.useOfferRequest(
-        offer, SSIKit2WalletService.getCredentialWallet(did), SSIKit2WalletService.testCIClientConfig.clientID
-    ).map {
-        WalletCredential(
-            wallet = wallet,
-            id = it.id,
-            document = it.document,
-            disclosures = it.disclosures,
-            addedOn = Clock.System.now(),
-            manifest = it.manifest,
-            deletedOn = null,
-            pending = pending,
-        ).also { credential ->
-            eventUseCase.log(
-                action = EventType.Credential.Receive,
-                originator = "", //parsedOfferReq.credentialOffer!!.credentialIssuer,
-                tenant = tenant,
-                accountId = account,
-                walletId = wallet,
-                data = eventUseCase.credentialEventData(credential = credential, type = it.type),
-                credentialId = credential.id,
-            )
-        }
-    }.also {
-        credentialService.add(
-            wallet = wallet, credentials = it.toTypedArray()
-        )
-    }
-
-    suspend fun silentClaim(did: String, offer: String): List<String> = issuanceService.useOfferRequest(
+    suspend fun claim(did: String, offer: String): List<String> = issuanceService.useOfferRequest(
         offer = offer,
         credentialWallet = SSIKit2WalletService.getCredentialWallet(did),
         clientId = SSIKit2WalletService.testCIClientConfig.clientID
@@ -98,7 +67,7 @@ class IssuanceUseCase(
             }
         }
 
-    private suspend fun otherStuff(
+    private suspend fun otherStuff(//TODO: rename
         tenant: String, wallet: UUID, credentials: List<Pair<WalletCredential, String?>>, type: EventType.Action
     ) {
         //TODO: no dsl here
