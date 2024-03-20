@@ -30,7 +30,7 @@ class VCSignCmd : CliktCommand(
 
     private val keyFile by option("-k", "--key")
         // .help("The Subject's key to be used. If none is provided, a new one will be generated.")
-        .help("A core-crypto key representation to sign the credential")
+        .help("A core-crypto key representation to sign the credential (required)")
         .file()
         .required()
 
@@ -38,12 +38,14 @@ class VCSignCmd : CliktCommand(
         .help("The verifiable credential's issuer DID")
 
     private val subjectDid by option("-s", "--subject")
-        .help("The verifiable credential's subject DID")
+        .help("The verifiable credential's subject DID (required)")
         .required()
 
-    private val vc: File by argument(help = "the verifiable credential file").file()
+    private val vc: File by argument(help = "the verifiable credential file (required").file()
 
-    private val overwrite by option("--overwrite", "-o").flag(default = false)
+    private val overwrite by option("--overwrite", "-o")
+        .help("Flag to overwrite the signed output file if it exists")
+        .flag(default = false)
 
     override fun run() {
 
