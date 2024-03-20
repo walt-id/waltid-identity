@@ -99,6 +99,7 @@ object ConfigManager {
     registerConfig(ConfigData("rejectionreason", RejectionReasonConfig::class))
 
     registerConfig(ConfigData("oci", OciKeyConfig::class))
+    registerConfig(ConfigData("auth", AuthConfig::class))
   }
 
   fun loadConfigs(args: Array<String>) {

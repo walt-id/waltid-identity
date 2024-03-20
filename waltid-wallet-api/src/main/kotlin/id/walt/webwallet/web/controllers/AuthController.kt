@@ -1,5 +1,6 @@
 package id.walt.webwallet.web.controllers
 
+import id.walt.webwallet.config.AuthConfig
 import id.walt.webwallet.config.ConfigManager
 import id.walt.webwallet.config.OidcConfiguration
 import id.walt.webwallet.config.WebConfig
@@ -30,12 +31,12 @@ import io.ktor.server.plugins.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.sessions.*
+import io.ktor.util.*
 import io.ktor.util.pipeline.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.uuid.SecureRandom
 import kotlinx.uuid.UUID
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.selectAll
@@ -61,11 +62,9 @@ data class LoginTokenSession(val token: String) : Principal
 data class OidcTokenSession(val token: String) : Principal
 
 object AuthKeys {
-    private val secureRandom = SecureRandom
-
-    // TODO make statically configurable for HA deployments
-    val encryptionKey = secureRandom.nextBytes(16)
-    val signKey = secureRandom.nextBytes(16)
+    private val config = ConfigManager.getConfig<AuthConfig>()
+    val encryptionKey: ByteArray = config.encryptionKey.decodeBase64Bytes()
+    val signKey: ByteArray = config.signKey.decodeBase64Bytes()
 }
 
 fun Application.configureSecurity() {
