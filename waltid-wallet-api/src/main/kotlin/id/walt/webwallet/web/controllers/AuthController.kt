@@ -1,5 +1,11 @@
 package id.walt.webwallet.web.controllers
 
+import com.nimbusds.jose.JWSAlgorithm
+import com.nimbusds.jose.JWSHeader
+import com.nimbusds.jose.JWSObject
+import com.nimbusds.jose.Payload
+import com.nimbusds.jose.crypto.MACSigner
+import com.nimbusds.jose.crypto.MACVerifier
 import id.walt.webwallet.config.AuthConfig
 import id.walt.webwallet.config.ConfigManager
 import id.walt.webwallet.config.OidcConfiguration
@@ -10,7 +16,6 @@ import id.walt.webwallet.service.OidcLoginService
 import id.walt.webwallet.service.WalletServiceManager
 import id.walt.webwallet.service.account.AccountsService
 import id.walt.webwallet.service.account.KeycloakAccountStrategy
-import id.walt.webwallet.utils.RandomUtils
 import id.walt.webwallet.web.ForbiddenException
 import id.walt.webwallet.web.InsufficientPermissionsException
 import id.walt.webwallet.web.UnauthorizedException
@@ -31,7 +36,6 @@ import io.ktor.server.plugins.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.sessions.*
-import io.ktor.util.*
 import io.ktor.util.pipeline.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -55,16 +59,16 @@ data class ByteLoginRequest(val username: String, val password: ByteArray) {
     override fun toString() = "[LOGIN REQUEST FOR: $username]"
 }
 
-fun generateToken() = RandomUtils.randomBase64UrlString(256)
-
 data class LoginTokenSession(val token: String) : Principal
 
 data class OidcTokenSession(val token: String) : Principal
 
 object AuthKeys {
     private val config = ConfigManager.getConfig<AuthConfig>()
-    val encryptionKey: ByteArray = config.encryptionKey.decodeBase64Bytes()
-    val signKey: ByteArray = config.signKey.decodeBase64Bytes()
+    val encryptionKey: ByteArray = config.encryptionKey.encodeToByteArray()
+    val signKey: ByteArray = config.signKey.encodeToByteArray()
+
+    val tokenKey: ByteArray = config.tokenKey.encodeToByteArray()
 }
 
 fun Application.configureSecurity() {
@@ -124,11 +128,8 @@ fun Application.configureSecurity() {
 
         bearer("auth-bearer") {
             authenticate { tokenCredential ->
-                if (securityUserTokenMapping.contains(tokenCredential.token)) {
-                    UserIdPrincipal(securityUserTokenMapping[tokenCredential.token].toString())
-                } else {
-                    null
-                }
+                val verificationResult = verifyToken(tokenCredential.token)
+                verificationResult.getOrNull()?.let { UserIdPrincipal(it) }
             }
         }
 
@@ -143,18 +144,18 @@ fun Application.configureSecurity() {
                 }
             }
             authenticate { tokenCredential ->
-                if (securityUserTokenMapping.contains(tokenCredential.token)) {
-                    UserIdPrincipal(securityUserTokenMapping[tokenCredential.token].toString())
-                } else {
-                    null
-                }
+                val verificationResult = verifyToken(tokenCredential.token)
+                verificationResult.getOrNull()?.let { UserIdPrincipal(it) }
             }
         }
 
         session<LoginTokenSession>("auth-session") {
             validate { session ->
-                if (securityUserTokenMapping.contains(session.token)) {
-                    UserIdPrincipal(securityUserTokenMapping[session.token].toString())
+                val verificationResult = verifyToken(session.token)
+                val userId = verificationResult.getOrNull()
+
+                if (userId != null) {
+                    UserIdPrincipal(userId)
                 } else {
                     sessions.clear("login")
                     null
@@ -170,8 +171,6 @@ fun Application.configureSecurity() {
         }
     }
 }
-
-val securityUserTokenMapping = HashMap<String, UUID>() // Token -> UUID
 
 fun Application.auth() {
     webWalletRoute {
@@ -242,22 +241,7 @@ fun Application.auth() {
                         HttpStatusCode.BadRequest to { description = "Login failed" }
                     }
                 }) {
-                val reqBody = LoginRequestJson.decodeFromString<AccountRequest>(call.receive())
-                AccountsService.authenticate("", reqBody)
-                    .onSuccess { // FIXME -> TENANT HERE
-                        securityUserTokenMapping[it.token] = it.id
-                        call.sessions.set(LoginTokenSession(it.token))
-                        call.response.status(HttpStatusCode.OK)
-                        call.respond(
-                            mapOf(
-                                "token" to it.token,
-                                "id" to it.id.toString(),
-                                "username" to
-                                        it.username // TODO: change id to wallet-id (also in the frontend)
-                            )
-                        )
-                    }
-                    .onFailure { call.respond(HttpStatusCode.BadRequest, it.localizedMessage) }
+                doLogin()
             }
 
             post(
@@ -305,10 +289,7 @@ fun Application.auth() {
                 }
                 get("session", { summary = "Return session ID if logged in" }) {
                     val token = getUsersSessionToken() ?: throw UnauthorizedException("Invalid session")
-
-                    if (securityUserTokenMapping.contains(token))
-                        call.respond(mapOf("token" to mapOf("accessToken" to token)))
-                    else throw UnauthorizedException("Invalid (outdated?) session!")
+                    call.respond(mapOf("token" to mapOf("accessToken" to token)))
                 }
             }
 
@@ -426,22 +407,7 @@ fun Application.auth() {
                         HttpStatusCode.BadRequest to { description = "Bad request" }
                     }
                 }) {
-                val reqBody = LoginRequestJson.decodeFromString<AccountRequest>(call.receive())
-                AccountsService.authenticate("", reqBody)
-                    .onSuccess { // FIXME -> TENANT HERE
-                        securityUserTokenMapping[it.token] = it.id
-                        call.sessions.set(LoginTokenSession(it.token))
-                        call.response.status(HttpStatusCode.OK)
-                        call.respond(
-                            mapOf(
-                                "token" to it.token,
-                                "id" to it.id.toString(), // TODO: change id to wallet-id (also in the
-                                // frontend)
-                                "keycloakUserId" to it.username
-                            )
-                        )
-                    }
-                    .onFailure { call.respond(HttpStatusCode.BadRequest, it.localizedMessage) }
+                doLogin()
             }
 
             // Terminate Keycloak session
@@ -476,12 +442,43 @@ fun Application.auth() {
     }
 }
 
-private fun PipelineContext<Unit, ApplicationCall>.clearUserSession() {
-    getUsersSessionToken()?.let {
-        logger.debug { "Clearing user token session" }
-        securityUserTokenMapping.remove(it)
-    }
+/**
+ * @param token JWS token provided by user
+ * @return user/account ID if token is valid
+ */
+fun verifyToken(token: String): Result<String> {
+    println("Verifying token: $token")
+    val jwsObject = JWSObject.parse(token)
+    val verifier = MACVerifier(AuthKeys.tokenKey)
 
+    return runCatching { jwsObject.verify(verifier) }
+        .mapCatching { valid -> if (valid) jwsObject.payload.toString() else throw IllegalArgumentException("Token is not valid.") }
+        .also { println("Result is: $it") }
+}
+
+suspend fun PipelineContext<Unit, ApplicationCall>.doLogin() {
+    val reqBody = LoginRequestJson.decodeFromString<AccountRequest>(call.receive())
+    AccountsService.authenticate("", reqBody)
+        .onSuccess { // FIXME -> TENANT HERE
+            // security token mapping was here
+            val token = JWSObject(JWSHeader(JWSAlgorithm.HS256), Payload(it.id.toString())).apply {
+                sign(MACSigner(AuthKeys.tokenKey))
+            }.serialize()
+
+            call.sessions.set(LoginTokenSession(token))
+            call.response.status(HttpStatusCode.OK)
+            call.respond(
+                mapOf(
+                    "token" to token,
+                    "id" to it.id.toString(), // TODO: change id to wallet-id (also in the frontend)
+                    "username" to it.username
+                )
+            )
+        }
+        .onFailure { call.respond(HttpStatusCode.BadRequest, it.localizedMessage) }
+}
+
+private fun PipelineContext<Unit, ApplicationCall>.clearUserSession() {
     call.sessions.get<LoginTokenSession>()?.let {
         logger.debug { "Clearing login token session" }
         call.sessions.clear<LoginTokenSession>()
