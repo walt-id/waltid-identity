@@ -447,13 +447,11 @@ fun Application.auth() {
  * @return user/account ID if token is valid
  */
 fun verifyToken(token: String): Result<String> {
-    println("Verifying token: $token")
     val jwsObject = JWSObject.parse(token)
     val verifier = MACVerifier(AuthKeys.tokenKey)
 
     return runCatching { jwsObject.verify(verifier) }
         .mapCatching { valid -> if (valid) jwsObject.payload.toString() else throw IllegalArgumentException("Token is not valid.") }
-        .also { println("Result is: $it") }
 }
 
 suspend fun PipelineContext<Unit, ApplicationCall>.doLogin() {
