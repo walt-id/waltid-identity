@@ -16,8 +16,9 @@ import id.walt.webwallet.service.issuers.IssuersService
 import id.walt.webwallet.service.notifications.NotificationService
 import id.walt.webwallet.service.settings.SettingsService
 import id.walt.webwallet.service.trust.DefaultTrustValidationService
+import id.walt.webwallet.usecase.claim.ExplicitClaimUseCase
+import id.walt.webwallet.usecase.claim.SilentClaimUseCase
 import id.walt.webwallet.usecase.event.EventUseCase
-import id.walt.webwallet.usecase.issuance.IssuanceUseCase
 import id.walt.webwallet.usecase.issuer.IssuerUseCaseImpl
 import id.walt.webwallet.utils.WalletHttpClients.getHttpClient
 import kotlinx.datetime.Clock
@@ -42,7 +43,7 @@ object WalletServiceManager {
     val issuerTrustValidationService = DefaultTrustValidationService(httpClient, trustConfig.issuersRecord)
     val verifierTrustValidationService = DefaultTrustValidationService(httpClient, trustConfig.verifiersRecord)
     val notificationUseCase = NotificationUseCase(NotificationService, httpClient)
-    val issuanceUseCase = IssuanceUseCase(
+    val silentClaimUseCase = SilentClaimUseCase(
         issuanceService = IssuanceService,
         credentialService = credentialService,
         issuerTrustValidationService = issuerTrustValidationService,
@@ -50,6 +51,11 @@ object WalletServiceManager {
         eventUseCase = eventUseCase,
         notificationUseCase = notificationUseCase,
         credentialTypeSeeker = credentialTypeSeeker,
+    )
+    val explicitClaimUseCase = ExplicitClaimUseCase(
+        issuanceService = IssuanceService,
+        credentialService = credentialService,
+        eventUseCase = eventUseCase,
     )
 
     fun getWalletService(tenant: String, account: UUID, wallet: UUID): WalletService =
@@ -103,8 +109,7 @@ object WalletServiceManager {
 
     @Deprecated(
         replaceWith = ReplaceWith(
-            "AccountsService.getAccountWalletMappings(account)",
-            "id.walt.service.account.AccountsService"
+            "AccountsService.getAccountWalletMappings(account)", "id.walt.service.account.AccountsService"
         ), message = "depreacted"
     )
     fun listWallets(tenant: String, account: UUID): List<UUID> =

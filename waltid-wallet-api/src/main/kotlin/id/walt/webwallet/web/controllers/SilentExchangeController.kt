@@ -27,7 +27,7 @@ fun Application.silentExchange() = webWalletRoute {
             val offer = call.receiveText()
 
             runCatching {
-                WalletServiceManager.issuanceUseCase.silentClaim(did, offer)
+                WalletServiceManager.silentClaimUseCase.claim(did, offer)
             }.onSuccess {
                 context.respond(HttpStatusCode.Accepted, it.size)
             }.onFailure {
