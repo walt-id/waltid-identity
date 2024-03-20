@@ -75,7 +75,7 @@ fun Application.exchange() = walletRoute {
             }.onSuccess {
                 context.respond(HttpStatusCode.OK, it)
             }.onFailure {  error ->
-                println("wallet exception: $error")
+                error.printStackTrace()
                 context.respond(HttpStatusCode.BadRequest, error.localizedMessage) }
         }
 
