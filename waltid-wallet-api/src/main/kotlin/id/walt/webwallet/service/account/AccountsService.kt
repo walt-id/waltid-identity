@@ -9,7 +9,6 @@ import id.walt.webwallet.service.events.EventService
 import id.walt.webwallet.service.events.EventType
 import id.walt.webwallet.service.issuers.IssuersService
 import id.walt.webwallet.usecase.event.EventUseCase
-import id.walt.webwallet.web.controllers.generateToken
 import id.walt.webwallet.web.model.*
 import kotlinx.datetime.toKotlinInstant
 import kotlinx.serialization.Serializable
@@ -89,82 +88,83 @@ object AccountsService {
             AuthenticationResult(
                 id = it.id,
                 username = it.username,
-                token = generateToken()
+//                token = generateToken()
             )
         )
     },
         onFailure = { Result.failure(it) })
 
-  fun getAccountWalletMappings(tenant: String, account: UUID) =
-      AccountWalletListing(
-          account,
-          wallets =
-              transaction {
+    fun getAccountWalletMappings(tenant: String, account: UUID) =
+        AccountWalletListing(
+            account,
+            wallets =
+            transaction {
                 AccountWalletMappings.innerJoin(Wallets)
                     .selectAll()
                     .where {
-                      (AccountWalletMappings.tenant eq tenant) and
-                          (AccountWalletMappings.accountId eq account)
+                        (AccountWalletMappings.tenant eq tenant) and
+                                (AccountWalletMappings.accountId eq account)
                     }
                     .map {
-                      AccountWalletListing.WalletListing(
-                          id = it[AccountWalletMappings.wallet].value,
-                          name = it[Wallets.name],
-                          createdOn = it[Wallets.createdOn].toKotlinInstant(),
-                          addedOn = it[AccountWalletMappings.addedOn].toKotlinInstant(),
-                          permission = it[AccountWalletMappings.permissions])
+                        AccountWalletListing.WalletListing(
+                            id = it[AccountWalletMappings.wallet].value,
+                            name = it[Wallets.name],
+                            createdOn = it[Wallets.createdOn].toKotlinInstant(),
+                            addedOn = it[AccountWalletMappings.addedOn].toKotlinInstant(),
+                            permission = it[AccountWalletMappings.permissions]
+                        )
                     }
-              })
+            })
 
-  fun hasAccountEmail(tenant: String, email: String) = transaction {
-    Accounts.selectAll()
-        .where { (Accounts.tenant eq tenant) and (Accounts.email eq email) }
-        .count() > 0
-  }
+    fun hasAccountEmail(tenant: String, email: String) = transaction {
+        Accounts.selectAll()
+            .where { (Accounts.tenant eq tenant) and (Accounts.email eq email) }
+            .count() > 0
+    }
 
-  fun hasAccountWeb3WalletAddress(address: String) = transaction {
-    Accounts.innerJoin(Web3Wallets).selectAll().where { Web3Wallets.address eq address }.count() > 0
-  }
+    fun hasAccountWeb3WalletAddress(address: String) = transaction {
+        Accounts.innerJoin(Web3Wallets).selectAll().where { Web3Wallets.address eq address }.count() > 0
+    }
 
-  fun hasAccountOidcId(oidcId: String): Boolean = transaction {
-    Accounts.crossJoin(OidcLogins) // TODO crossJoin
-        .selectAll()
-        .where {
-          (Accounts.tenant eq OidcLogins.tenant) and
-              (Accounts.id eq OidcLogins.accountId) and
-              (OidcLogins.oidcId eq oidcId)
-        }
-        .count() > 0
-  }
+    fun hasAccountOidcId(oidcId: String): Boolean = transaction {
+        Accounts.crossJoin(OidcLogins) // TODO crossJoin
+            .selectAll()
+            .where {
+                (Accounts.tenant eq OidcLogins.tenant) and
+                        (Accounts.id eq OidcLogins.accountId) and
+                        (OidcLogins.oidcId eq oidcId)
+            }
+            .count() > 0
+    }
 
-  fun getAccountByWeb3WalletAddress(address: String) = transaction {
-    Accounts.innerJoin(Web3Wallets)
-        .selectAll()
-        .where { Web3Wallets.address eq address }
-        .map { Account(it) }
-  }
+    fun getAccountByWeb3WalletAddress(address: String) = transaction {
+        Accounts.innerJoin(Web3Wallets)
+            .selectAll()
+            .where { Web3Wallets.address eq address }
+            .map { Account(it) }
+    }
 
-  fun getAccountByOidcId(oidcId: String) = transaction {
-    Accounts.crossJoin(OidcLogins) // TODO crossJoin
-        .selectAll()
-        .where {
-          (Accounts.tenant eq OidcLogins.tenant) and
-              (Accounts.id eq OidcLogins.accountId) and
-              (OidcLogins.oidcId eq oidcId)
-        }
-        .map { Account(it) }
-        .firstOrNull()
-  }
+    fun getAccountByOidcId(oidcId: String) = transaction {
+        Accounts.crossJoin(OidcLogins) // TODO crossJoin
+            .selectAll()
+            .where {
+                (Accounts.tenant eq OidcLogins.tenant) and
+                        (Accounts.id eq OidcLogins.accountId) and
+                        (OidcLogins.oidcId eq oidcId)
+            }
+            .map { Account(it) }
+            .firstOrNull()
+    }
 
-  fun getNameFor(account: UUID) =
-      Accounts.selectAll().where { Accounts.id eq account }.single()[Accounts.email]
+    fun getNameFor(account: UUID) =
+        Accounts.selectAll().where { Accounts.id eq account }.single()[Accounts.email]
 }
 
 @Serializable
 data class AuthenticationResult(
     val id: UUID,
     val username: String,
-    val token: String,
+//    val token: String,
 )
 
 @Serializable
