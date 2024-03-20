@@ -12,7 +12,7 @@ import id.walt.cli.util.DidMethod
 import id.walt.cli.util.DidUtil
 import id.walt.cli.util.PrettyPrinter
 import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.LocalKey
+import id.walt.crypto.keys.jwk.JWKKey
 import kotlinx.coroutines.runBlocking
 import java.text.ParseException
 
@@ -49,10 +49,10 @@ class DidCreateCmd : CliktCommand(
         }
     }
 
-    private suspend fun getKey(): LocalKey {
+    private suspend fun getKey(): JWKKey {
         if (keyFile != null) {
             try {
-                return LocalKey.importJWK(keyFile!!.readText()).getOrThrow()
+                return JWKKey.importJWK(keyFile!!.readText()).getOrThrow()
             } catch (e: ParseException) {
                 throw InvalidFileFormat(keyFile!!.name, e.let { e.message!! })
             }
@@ -61,9 +61,9 @@ class DidCreateCmd : CliktCommand(
         }
     }
 
-    private suspend fun generateDefaultKey(): LocalKey {
+    private suspend fun generateDefaultKey(): JWKKey {
         echo(TextStyles.dim("Key not provided. Let's generate a new one..."))
-        val key = runBlocking { LocalKey.generate(KeyType.Ed25519) }
+        val key = runBlocking { JWKKey.generate(KeyType.Ed25519) }
         echo(TextStyles.dim("Key generated with thumbprint ${key.getThumbprint()}"))
 
         return key
