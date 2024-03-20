@@ -1,6 +1,6 @@
 package id.walt.cli.util
 
-import id.walt.crypto.keys.LocalKey
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.did.dids.DidService
 import id.walt.did.dids.registrar.DidResult
 import kotlinx.coroutines.runBlocking
@@ -22,7 +22,7 @@ class DidUtil {
             }
         }
 
-        fun createDid(method: DidMethod, key: LocalKey): DidResult {
+        fun createDid(method: DidMethod, key: JWKKey): DidResult {
             return runBlocking {
                 DidService.registerByKey(method.name.lowercase(), key) //, options)
             }
