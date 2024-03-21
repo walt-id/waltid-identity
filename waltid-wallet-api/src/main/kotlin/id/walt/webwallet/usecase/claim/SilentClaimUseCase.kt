@@ -1,11 +1,11 @@
 package id.walt.webwallet.usecase.claim
 
-import id.walt.webwallet.db.models.AccountWalletMappings
 import id.walt.webwallet.db.models.Notification
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.notificationusecase.NotificationUseCase
 import id.walt.webwallet.seeker.Seeker
 import id.walt.webwallet.service.SSIKit2WalletService
+import id.walt.webwallet.service.account.AccountsService
 import id.walt.webwallet.service.credentials.CredentialsService
 import id.walt.webwallet.service.dids.DidsService
 import id.walt.webwallet.service.events.Event
@@ -22,12 +22,13 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.uuid.UUID
 import kotlinx.uuid.generateUUID
-import org.jetbrains.exposed.sql.transactions.transaction
 
 class SilentClaimUseCase(
     private val issuanceService: IssuanceService,
     private val credentialService: CredentialsService,
     private val issuerTrustValidationService: TrustValidationService,
+    private val accountService: AccountsService,
+    private val didService: DidsService,
     private val issuerUseCase: IssuerUseCase,
     private val eventUseCase: EventUseCase,
     private val notificationUseCase: NotificationUseCase,
@@ -49,7 +50,7 @@ class SilentClaimUseCase(
     }.map {
         prepareCredentialData(did = did, data = it.first, issuerDid = it.second)
     }.flatten().let {
-        storeCredentials("global", it)
+        storeCredentials("", it)
     }
 
     private suspend fun validateIssuer(issuer: String, type: String) = issuerTrustValidationService.validate(
@@ -70,12 +71,7 @@ class SilentClaimUseCase(
     private suspend fun otherStuff(//TODO: rename
         tenant: String, wallet: UUID, credentials: List<Pair<WalletCredential, String?>>, type: EventType.Action
     ) {
-        //TODO: no dsl here
-        transaction {
-            AccountWalletMappings.select(AccountWalletMappings.accountId)
-                .where { AccountWalletMappings.wallet eq wallet }.firstOrNull()
-                ?.let { it[AccountWalletMappings.accountId] }
-        }?.let {
+        accountService.getAccountForWallet(wallet)?.let {
             prepareEvents(it, tenant, credentials, type).runCatching {
                 eventUseCase.log(*this.toTypedArray())
             }
@@ -88,7 +84,7 @@ class SilentClaimUseCase(
 
     private fun prepareCredentialData(
         did: String, data: IssuanceService.CredentialDataResult, issuerDid: String
-    ) = DidsService.getWalletsForDid(did).map {
+    ) = didService.getWalletsForDid(did).map {
         Pair(
             WalletCredential(
                 wallet = it,
