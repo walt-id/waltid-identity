@@ -75,7 +75,7 @@ val didResult = DidService.register(options = options)
 Register the DID with a given key:
 
 ```kotlin
-val key = LocalKey.generate(KeyType.Ed25519)
+val key = JWKKey.generate(KeyType.Ed25519)
 val options = DidKeyCreateOptions(
     useJwkJcsPub = true
 )

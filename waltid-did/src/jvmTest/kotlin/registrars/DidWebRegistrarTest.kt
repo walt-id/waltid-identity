@@ -2,7 +2,7 @@ package registrars
 
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.LocalKey
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.did.dids.DidUtils
 import id.walt.did.dids.registrar.dids.DidCreateOptions
 import id.walt.did.dids.registrar.dids.DidWebCreateOptions
@@ -53,19 +53,19 @@ class DidWebRegistrarTest : DidRegistrarTestBase(DidWebRegistrar()) {
             Stream.of(
                 //empty-path
                 arguments(
-                    runBlocking { LocalKey.generate(KeyType.Ed25519) },
+                    runBlocking { JWKKey.generate(KeyType.Ed25519) },
                     DidWebCreateOptions(domain = "localhost:3000", path = "", keyType = KeyType.Ed25519),
                     webKeyAssertions
                 ),
                 //prefixed-path
                 arguments(
-                    runBlocking { LocalKey.generate(KeyType.Ed25519) },
+                    runBlocking { JWKKey.generate(KeyType.Ed25519) },
                     DidWebCreateOptions(domain = "walt.id", path = "/prefix-test", keyType = KeyType.Ed25519),
                     webKeyAssertions
                 ),
                 //non-prefixed-path
                 arguments(
-                    runBlocking { LocalKey.generate(KeyType.Ed25519) },
+                    runBlocking { JWKKey.generate(KeyType.Ed25519) },
                     DidWebCreateOptions(domain = "walt.id", path = "no-prefix/test", keyType = KeyType.Ed25519),
                     webKeyAssertions
                 )

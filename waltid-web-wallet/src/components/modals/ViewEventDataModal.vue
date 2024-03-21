@@ -5,7 +5,7 @@
             <div class="sm:flex sm:items-start">
                 <div class="shadow p-3 mt-2 font-mono">
                     <h3 class="font-semibold mb-2">{{ props.title }}</h3>
-                    <pre v-if="props.data!=null">{{ JSON.stringify(props.data, null, 2) }}</pre>
+                    <pre v-if="props.data != null">{{ JSON.stringify(props.data, null, 2) }}</pre>
                     <pre v-else>No data available.</pre>
                 </div>
             </div>

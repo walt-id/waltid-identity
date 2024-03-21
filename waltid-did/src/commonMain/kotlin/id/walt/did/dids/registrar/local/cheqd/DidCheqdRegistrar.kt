@@ -2,7 +2,7 @@ package id.walt.did.dids.registrar.local.cheqd
 
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.LocalKey
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.base64toBase64Url
 import id.walt.did.dids.document.DidCheqdDocument
 import id.walt.did.dids.registrar.DidResult
@@ -32,15 +32,15 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.encodeToJsonElement
-import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
 import love.forte.plugin.suspendtrans.annotation.JsPromise
 import love.forte.plugin.suspendtrans.annotation.JvmAsync
 import love.forte.plugin.suspendtrans.annotation.JvmBlocking
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 
-@ExperimentalJsExport
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 class DidCheqdRegistrar : LocalRegistrarMethod("cheqd") {
 
@@ -77,7 +77,7 @@ class DidCheqdRegistrar : LocalRegistrarMethod("cheqd") {
     @JsPromise
     @JsExport.Ignore
     override suspend fun register(options: DidCreateOptions): DidResult =
-        registerByKey(LocalKey.generate(KeyType.Ed25519), options)
+        registerByKey(JWKKey.generate(KeyType.Ed25519), options)
 
     @JvmBlocking
     @JvmAsync
@@ -131,6 +131,7 @@ class DidCheqdRegistrar : LocalRegistrarMethod("cheqd") {
     }
 
     private fun updateDid(did: String) {
+        did
         TODO()
     }
 

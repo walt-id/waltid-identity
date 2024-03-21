@@ -6,6 +6,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonClassDiscriminator
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import love.forte.plugin.suspendtrans.annotation.JsPromise
 import love.forte.plugin.suspendtrans.annotation.JvmAsync
@@ -107,7 +108,7 @@ abstract class Key {
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    abstract suspend fun verifyJws(signedJws: String): Result<JsonObject>
+    abstract suspend fun verifyJws(signedJws: String): Result<JsonElement>
 
     /*/**
      * encrypts a message using this public key (with the algorithm this key is based on)

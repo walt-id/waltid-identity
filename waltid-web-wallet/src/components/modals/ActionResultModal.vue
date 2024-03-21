@@ -28,6 +28,7 @@ import { CheckCircleIcon, ExclamationCircleIcon } from "@heroicons/vue/24/outlin
 import useModalStore from "~/stores/useModalStore";
 import CloseButton from "./CloseButton.vue";
 import OkButton from "./OkButton.vue";
+import { DialogTitle } from "@headlessui/vue";
 
 const store = useModalStore();
 

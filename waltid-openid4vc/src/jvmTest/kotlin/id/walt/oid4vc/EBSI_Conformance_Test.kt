@@ -18,7 +18,6 @@ import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.util.*
-import kotlinx.serialization.json.jsonPrimitive
 
 class EBSI_Conformance_Test : StringSpec({
 

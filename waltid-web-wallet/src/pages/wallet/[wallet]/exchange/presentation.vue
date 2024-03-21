@@ -146,7 +146,7 @@ import {useTitle} from "@vueuse/core";
 import VerifiableCredentialCard from "~/components/credentials/VerifiableCredentialCard.vue";
 
 import {Disclosure, DisclosureButton, DisclosurePanel} from "@headlessui/vue";
-import {encodeDisclosure, parseDisclosures} from "../../../../composables/disclosures";
+import {encodeDisclosure, parseDisclosures} from "~/composables/disclosures";
 
 
 const currentWallet = useCurrentWallet();

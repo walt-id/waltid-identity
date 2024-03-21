@@ -1,28 +1,31 @@
-package id.walt.crypto.keys
+package id.walt.crypto.keys.jwk
 
 import JWK
 import KeyLike
 import crypto
+import id.walt.crypto.keys.JsJWKKeyCreator
+import id.walt.crypto.keys.Key
+import id.walt.crypto.keys.KeyType
 import id.walt.crypto.utils.ArrayUtils.toByteArray
 import id.walt.crypto.utils.JwsUtils.jwsAlg
-import id.walt.crypto.utils.PromiseUtils.await
+import id.walt.crypto.utils.PromiseUtils
 import io.ktor.utils.io.core.*
 import jose
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import love.forte.plugin.suspendtrans.annotation.JsPromise
 import org.khronos.webgl.Uint8Array
 import kotlin.js.json
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 @Serializable
-@SerialName("local")
-actual class LocalKey actual constructor(
+@SerialName("jwk")
+actual class JWKKey actual constructor(
     var jwk: String?
 ) : Key() {
 
@@ -47,9 +50,9 @@ actual class LocalKey actual constructor(
     override suspend fun init() {
         if (!this::_internalKey.isInitialized) {
             if (jwkToInit != null) {
-                _internalKey = await(jose.importJWK(JSON.parse(jwkToInit!!)))
+                _internalKey = PromiseUtils.await(jose.importJWK(JSON.parse(jwkToInit!!)))
             } else if (this::_internalJwk.isInitialized) {
-                _internalKey = await(jose.importJWK(_internalJwk))
+                _internalKey = PromiseUtils.await(jose.importJWK(_internalJwk))
             }
         }
 
@@ -60,7 +63,7 @@ actual class LocalKey actual constructor(
                     _internalJwk.kid = getThumbprint()
                 }
             } else {
-                _internalJwk = await(jose.exportJWK(_internalKey))
+                _internalJwk = PromiseUtils.await(jose.exportJWK(_internalKey))
 
                 if (jwk == null) {
                     jwk = JSON.stringify(_internalJwk)
@@ -73,18 +76,18 @@ actual class LocalKey actual constructor(
         }
     }
 
-    @JsName("localKeyUsingKeyLike")
+    @JsName("jwkKeyUsingKeyLike")
     constructor(key: KeyLike) : this(null) {
         _internalKey = key
     }
 
-    @JsName("localKeyUsingKeyLikeAndJWK")
+    @JsName("jwkKeyUsingKeyLikeAndJWK")
     constructor(key: KeyLike, jwk: JWK) : this(null) {
         _internalKey = key
         _internalJwk = jwk
     }
 
-    @JsName("localKeyUsingJWK")
+    @JsName("jwkKeyUsingJWK")
     constructor(jwk: JWK) : this(null) {
         _internalJwk = jwk
     }
@@ -107,8 +110,8 @@ actual class LocalKey actual constructor(
     @JsExport.Ignore
     actual override suspend fun exportPEM(): String {
         return when {
-            hasPrivateKey -> await(jose.exportPKCS8(_internalKey))
-            else -> await(jose.exportSPKI(_internalKey))
+            hasPrivateKey -> PromiseUtils.await(jose.exportPKCS8(_internalKey))
+            else -> PromiseUtils.await(jose.exportSPKI(_internalKey))
         }
     }
 
@@ -139,7 +142,7 @@ actual class LocalKey actual constructor(
 
         val headerEntries = headers.entries.toTypedArray().map { it.toPair() }.toTypedArray()
 
-        return await(
+        return PromiseUtils.await(
             jose.CompactSign(Uint8Array(plaintext.toTypedArray()))
                 .setProtectedHeader(json("alg" to keyType.jwsAlg(), *headerEntries))
                 .sign(_internalKey)
@@ -169,22 +172,22 @@ actual class LocalKey actual constructor(
 
     /**
      * Verifies JWS: Verifies a signed message using this public key
-     * @param signed signed
+     * @param signedJws signed
      * @return Result wrapping the plaintext; Result failure when the signature fails
      */
     @JsPromise
     @JsExport.Ignore
-    actual override suspend fun verifyJws(signedJws: String): Result<JsonObject> =
+    actual override suspend fun verifyJws(signedJws: String): Result<JsonElement> =
         runCatching {
             Json.parseToJsonElement(
-                await(jose.compactVerify(signedJws, _internalKey)).payload.toByteArray().decodeToString()
+                PromiseUtils.await(jose.compactVerify(signedJws, _internalKey)).payload.toByteArray().decodeToString()
             ).jsonObject
         }
 
     @JsPromise
     @JsExport.Ignore
-    actual override suspend fun getPublicKey(): LocalKey =
-        LocalKey(
+    actual override suspend fun getPublicKey(): JWKKey =
+        JWKKey(
             JSON.parse<JWK>(JSON.stringify(_internalJwk)).apply {
                 d = undefined
                 p = undefined
@@ -236,7 +239,7 @@ actual class LocalKey actual constructor(
         }
 
     actual override val hasPrivateKey: Boolean
-        get() = check(this::_internalKey.isInitialized) { "_internalKey of LocalKey.js.kt is not initialized (tried to to private key operation?) - has init() be called on key?" }
+        get() = check(this::_internalKey.isInitialized) { "_internalKey of JWKKey.js.kt is not initialized (tried to to private key operation?) - has init() be called on key?" }
             .run { _internalKey.type == "private" }
 
 
@@ -246,26 +249,26 @@ actual class LocalKey actual constructor(
 
     @JsPromise
     @JsExport.Ignore
-    actual override suspend fun getThumbprint(): String = await(jose.calculateJwkThumbprint(JSON.parse(exportJWK())))
+    actual override suspend fun getThumbprint(): String = PromiseUtils.await(jose.calculateJwkThumbprint(JSON.parse(exportJWK())))
 
-    actual companion object : LocalKeyCreator {
+    actual companion object : JWKKeyCreator {
         @JsPromise
         @JsExport.Ignore
-        actual override suspend fun generate(type: KeyType, metadata: LocalKeyMetadata): LocalKey =
-            JsLocalKeyCreator.generate(type, metadata)
-
-        @JsPromise
-        @JsExport.Ignore
-        actual override suspend fun importRawPublicKey(type: KeyType, rawPublicKey: ByteArray, metadata: LocalKeyMetadata): Key =
-            JsLocalKeyCreator.importRawPublicKey(type, rawPublicKey, metadata)
+        actual override suspend fun generate(type: KeyType, metadata: JWKKeyMetadata): JWKKey =
+            JsJWKKeyCreator.generate(type, metadata)
 
         @JsPromise
         @JsExport.Ignore
-        actual override suspend fun importJWK(jwk: String): Result<LocalKey> = JsLocalKeyCreator.importJWK(jwk)
+        actual override suspend fun importRawPublicKey(type: KeyType, rawPublicKey: ByteArray, metadata: JWKKeyMetadata): Key =
+            JsJWKKeyCreator.importRawPublicKey(type, rawPublicKey, metadata)
 
         @JsPromise
         @JsExport.Ignore
-        actual override suspend fun importPEM(pem: String): Result<LocalKey> = JsLocalKeyCreator.importPEM(pem)
+        actual override suspend fun importJWK(jwk: String): Result<JWKKey> = JsJWKKeyCreator.importJWK(jwk)
+
+        @JsPromise
+        @JsExport.Ignore
+        actual override suspend fun importPEM(pem: String): Result<JWKKey> = JsJWKKeyCreator.importPEM(pem)
     }
 
 }

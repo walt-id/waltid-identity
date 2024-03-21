@@ -1,6 +1,6 @@
 import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.LocalKey
+import id.walt.crypto.keys.jwk.JWKKey
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
@@ -9,7 +9,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
-class LocalKeyAndDidManagementTest {
+class JWKKeyAndDidManagementTest {
 
     private val keyTypeMap = mapOf(
         KeyType.Ed25519 to "OKP",
@@ -25,57 +25,39 @@ class LocalKeyAndDidManagementTest {
     private val testObj = JsonObject(mapOf("value1" to JsonPrimitive("123456789")))
 
     @Test
-    fun localKeyGenerationTest() = runTest {
+    fun jwkKeyGenerationTest() = runTest {
         KeyType.entries.forEach {
             println("Generate key for key type $it")
-            val generatedKey = LocalKey.generate(it)
+            val generatedKey = JWKKey.generate(it)
 
             println("Serializing key: $generatedKey")
             val serialized = KeySerialization.serializeKey(generatedKey)
 
             println("Decoding serialized key: $serialized")
             val decoded = Json.parseToJsonElement(serialized).jsonObject
-            println("Decoded $serialized as $decoded")
 
-            println("Checking if type=local")
-            assertEquals("local", decoded["type"]!!.jsonPrimitive.content)
+            assertEquals("jwk", decoded["type"]!!.jsonPrimitive.content)
 
-            println("Parsing JWK...")
             val jwk = decoded["jwk"]!!.jsonPrimitive.content
-            println("JWK is: $jwk")
-
-            println("Parsing JWK...")
             val jwkObj = Json.parseToJsonElement(jwk).jsonObject
-            println("Parsed as: $jwkObj")
 
-            println("Getting kty, d, crv, kid, x...")
             val kty = jwkObj["kty"].toString().removeSurrounding("\"")
             val d = jwkObj["d"].toString().removeSurrounding("\"")
             val crv = jwkObj["crv"].toString().removeSurrounding("\"")
             val kid = jwkObj["kid"].toString().removeSurrounding("\"")
             val x = jwkObj["x"].toString().removeSurrounding("\"")
 
-            println("Checking kty, d, crv, kid, x...")
             assertEquals(kty, getKeyTypeMap(it))
             assertNotNull(d)
             assertNotNull(crv)
             assertNotNull(kid)
             assertNotNull(x)
 
-            println("use the generated key to sign using JWS and RAW signature types")
-
-            println("Signing JWS...")
+            // use the generated key to sign using JWS and RAW signature types
             signJws(serialized)
+            signRaw(serialized)
 
-            println("Signing raw...")
-
-            try {
-                signRaw(serialized)
-            } catch (e: NotImplementedError) {
-                println("Raw signatures not implemented on this platform!")
-            }
-
-            println("export the key as JWK or JSON")
+            // export the key as JWK or JSON
             exportJwk(serialized)
             exportJson(serialized)
         }
