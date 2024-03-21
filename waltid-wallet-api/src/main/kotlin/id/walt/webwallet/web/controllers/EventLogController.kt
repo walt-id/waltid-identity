@@ -50,7 +50,7 @@ fun Application.eventLogs() = walletRoute {
             }
         }) {
             val wallet = getWalletService()
-            val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: -1
+            val limit = call.request.queryParameters["limit"]?.toIntOrNull()
             val data = call.request.queryParameters.getAll("filter")
                 ?.associate { it.substringBefore("=") to it.substringAfter("=") } ?: emptyMap()
             val startingAfter = call.request.queryParameters["startingAfter"]
