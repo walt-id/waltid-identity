@@ -1,7 +1,7 @@
 import TSEKeyTest.Config.TESTABLE_KEY_TYPES
 import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.TSEKey
-import id.walt.crypto.keys.TSEKeyMetadata
+import id.walt.crypto.keys.tse.TSEKey
+import id.walt.crypto.keys.tse.TSEKeyMetadata
 import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.http.*
@@ -16,12 +16,12 @@ import kotlin.test.assertTrue
 class TSEKeyTest {
 
     private object Config {
-        internal const val BASE_SERVER = "http://127.0.0.1:8200"
-        internal const val BASE_URL = "$BASE_SERVER/v1/transit"
-        internal const val TOKEN = "dev-only-token"
-        internal val NAMESPACE = null
+        const val BASE_SERVER = "http://127.0.0.1:8200"
+        const val BASE_URL = "$BASE_SERVER/v1/transit"
+        const val TOKEN = "dev-only-token"
+        val NAMESPACE = null
 
-        internal val payload = JsonObject(
+        val payload = JsonObject(
             mapOf(
                 "sub" to JsonPrimitive("16bb17e0-e733-4622-9384-122bc2fc6290"),
                 "iss" to JsonPrimitive("http://localhost:3000"),

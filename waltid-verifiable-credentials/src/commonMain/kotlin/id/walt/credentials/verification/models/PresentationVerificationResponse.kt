@@ -5,6 +5,7 @@ import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 import kotlin.time.Duration
 import kotlin.time.DurationUnit
+
 @OptIn(ExperimentalJsExport::class)
 @JsExport
 data class PresentationVerificationResponse(

@@ -10,7 +10,7 @@ import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 import kotlin.js.JsName
 
-@ExperimentalJsExport
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 open class DidCreateOptions(val method: String, val options: JsonElement) {
 
@@ -32,7 +32,7 @@ open class DidCreateOptions(val method: String, val options: JsonElement) {
         }
 }
 
-@ExperimentalJsExport
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 internal fun options(options: Map<String, Any>, secret: Map<String, Any> = emptyMap()) = mapOf(
     "options" to options,
@@ -44,6 +44,6 @@ internal fun options(options: Map<String, Any>, secret: Map<String, Any> = empty
     "secret" to secret
 )
 
-@ExperimentalJsExport
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 internal fun options(vararg inlineOptions: Pair<String, Any>) = options(mapOf(*inlineOptions))

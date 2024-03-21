@@ -3,7 +3,6 @@ package id.walt.mdoc.docrequest
 import id.walt.mdoc.cose.COSECryptoProvider
 import id.walt.mdoc.cose.COSESign1
 import id.walt.mdoc.dataelement.*
-import id.walt.mdoc.mdocauth.DeviceAuthentication
 import id.walt.mdoc.readerauth.ReaderAuthentication
 import kotlinx.serialization.Serializable
 

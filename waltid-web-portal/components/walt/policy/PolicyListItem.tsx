@@ -1,4 +1,3 @@
-import { ReactNode } from 'react';
 import Checkbox from '@/components/walt/forms/Checkbox';
 
 type Props = {

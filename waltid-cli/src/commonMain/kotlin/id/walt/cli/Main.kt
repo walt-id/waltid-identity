@@ -23,14 +23,12 @@ fun main(args: Array<String>) {
         handleMultiUsageError(cmd, e)
     } catch (e: NoSuchOption) {
         handleNoSuchOption(cmd, e)
+
     } catch (e: CliktError) {
         handleCliktError(cmd, e)
     } catch (e: Exception) {
         handleGenericException(cmd, e)
     }
-    // finally {
-    //     exitProcess(e.statusCode)
-    // }
 }
 
 fun handleGenericException(cmd: WaltIdCmd, e: Exception) {
@@ -51,18 +49,8 @@ fun handleNoSuchOption(cmd: WaltIdCmd, e: NoSuchOption) {
 
 fun handleMultiUsageError(cmd: WaltIdCmd, e: MultiUsageError) {
     var msgs = "Invalid command. Please, review the usage instructions bellow and try again."
-    // for (error in e.errors) {
-    //     if (msgs.length == 0) {
-    //         // msgs = error.formatMessage(error.context!!.localization, parameterFormatter(error.context!!))
-    //         msgs = "${error.localizedMessage} - ${error.message} "
-    //     } else {
-    //         msgs = """${msgs} ${error.toString() ?: ""}"""
-    //     }
-    // }
     printError(cmd, e, msgs)
     printUsage(cmd, e)
-
-
 }
 
 fun handleInvalidFileFormat(cmd: WaltIdCmd, e: InvalidFileFormat) {
@@ -76,7 +64,7 @@ fun handlePrintHelpMessage(cmd: WaltIdCmd, e: PrintHelpMessage) {
 
 fun printError(cmd: CliktCommand, e: Exception? = null, msg: String? = null) {
     println("\n")
-    val msgToPrint = msg ?: e?.let { it.localizedMessage }
+    val msgToPrint = msg ?: e?.localizedMessage
     cmd.terminal.println(
         Panel(
             content = Text(

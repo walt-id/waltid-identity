@@ -3,11 +3,13 @@ package id.walt.mdoc
 import COSE.*
 import cbor.Cbor
 import com.upokecenter.cbor.CBORObject
-import id.walt.mdoc.cose.*
+import id.walt.mdoc.cose.COSECryptoProvider
+import id.walt.mdoc.cose.COSESign1
+import id.walt.mdoc.cose.COSESign1Serializer
+import id.walt.mdoc.cose.X5_CHAIN
 import korlibs.crypto.encoding.Hex
 import kotlinx.serialization.ExperimentalSerializationApi
 import java.io.ByteArrayInputStream
-import java.io.Console
 import java.security.KeyStore
 import java.security.cert.*
 import javax.net.ssl.TrustManagerFactory
@@ -19,10 +21,7 @@ import javax.net.ssl.X509TrustManager
  */
 class SimpleCOSECryptoProvider(keys: List<COSECryptoProviderKeyInfo>): COSECryptoProvider {
 
-  private val keyMap: Map<String, COSECryptoProviderKeyInfo>
-  init {
-    keyMap = keys.associateBy { it.keyID }
-  }
+  private val keyMap: Map<String, COSECryptoProviderKeyInfo> = keys.associateBy { it.keyID }
 
   @OptIn(ExperimentalSerializationApi::class)
   override fun sign1(payload: ByteArray, keyID: String?): COSESign1 {
@@ -51,11 +50,10 @@ class SimpleCOSECryptoProvider(keys: List<COSECryptoProviderKeyInfo>): COSECrypt
     sign1Msg.sign(OneKey(keyInfo.publicKey, keyInfo.privateKey))
 
     val cborObj = sign1Msg.EncodeToCBORObject()
-    println("Signed message: " + Hex.encode(cborObj.EncodeToBytes()));
-    return Cbor.decodeFromByteArray(COSESign1Serializer, cborObj.EncodeToBytes())
+    println("Signed message: " + Hex.encode(cborObj.EncodeToBytes()))
+      return Cbor.decodeFromByteArray(COSESign1Serializer, cborObj.EncodeToBytes())
   }
 
-  @OptIn(ExperimentalSerializationApi::class)
   override fun verify1(coseSign1: COSESign1, keyID: String?): Boolean {
     val keyInfo = keyID?.let { keyMap[it] } ?: throw Exception("No key ID given, or key with given ID not found")
     val sign1Msg = Sign1Message.DecodeFromBytes(coseSign1.toCBOR(), MessageTag.Sign1) as Sign1Message

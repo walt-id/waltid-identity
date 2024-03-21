@@ -44,7 +44,7 @@ class VPTestVerifier : OpenIDCredentialVerifier(
         sessionID: String
     ): String {
         val cachedPresDef = presentationDefinition.copy(id = randomUUID())
-        presentationDefinitionCache.put(cachedPresDef.id, presentationDefinition)
+        presentationDefinitionCache[cachedPresDef.id] = presentationDefinition
         return "$VP_VERIFIER_BASE_URL/pd/${cachedPresDef.id}"
     }
 

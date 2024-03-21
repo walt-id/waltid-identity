@@ -1,8 +1,10 @@
 package id.walt.sdjwt
 
+import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 import kotlin.js.JsName
 
+@OptIn(ExperimentalJsExport::class)
 @JsExport.Ignore
 @JsName("zzz_unused_SDMapBuilder")
 class SDMapBuilder(
@@ -12,7 +14,7 @@ class SDMapBuilder(
     private val fields = mutableMapOf<String, SDField>()
 
     fun addField(key: String, sd: Boolean, children: SDMap? = null): SDMapBuilder {
-        fields.put(key, SDField(sd, children))
+        fields[key] = SDField(sd, children)
         return this
     }
 

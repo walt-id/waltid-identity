@@ -1,4 +1,4 @@
-import id.walt.crypto.keys.LocalKey
+import id.walt.crypto.keys.jwk.JWKKey
 import io.ktor.util.*
 import io.ktor.utils.io.core.*
 import kotlinx.coroutines.test.runTest
@@ -21,7 +21,7 @@ class KeySignTests {
               "qi": "aJsDBhxQFDbpQr20TjgxImwBslVP9xIauy3ncCmjHix6Fc1l51gL71V1OWGnXaStGfoWy0gKkUnJuU3_X_xA_QwzAXPJYa-juRlD8BxTf7rmR_HC-XiVdyNnkU3afHtK4nShS2EuN2EXOrYDrbQoA13_a6Itk_55vDpJ3jciwS8"
             }
         """.trimIndent()
-        val privateKeyResult = LocalKey.importJWK(privateKeyJsonString)
+        val privateKeyResult = JWKKey.importJWK(privateKeyJsonString)
         val privateKey = privateKeyResult.getOrThrow()
 
         val res = privateKey.signRaw("Hello world!".toByteArray())

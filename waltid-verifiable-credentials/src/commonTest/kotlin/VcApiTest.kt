@@ -1,7 +1,7 @@
 import id.walt.credentials.vc.vcs.W3CVC
 import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.TSEKey
-import id.walt.crypto.keys.TSEKeyMetadata
+import id.walt.crypto.keys.tse.TSEKey
+import id.walt.crypto.keys.tse.TSEKeyMetadata
 import id.walt.did.dids.DidService
 import id.walt.did.helpers.WaltidServices
 import io.ktor.client.*
@@ -23,7 +23,7 @@ class VcApiTest {
 
         // Generate key & derive DID from key
         val key = TSEKey.generate(KeyType.Ed25519, tseMetadata)
-        //val key = LocalKey.generate(KeyType.Ed25519)
+        //val key = JWKKey.generate(KeyType.Ed25519)
         val did = DidService.registerByKey("jwk", key).did
 
         // Syntax-sugar to create VC

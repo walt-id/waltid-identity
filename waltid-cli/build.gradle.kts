@@ -48,6 +48,9 @@ kotlin {
                 // kotlinx-serialization-json
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.2.2")
 
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
+                implementation ("com.google.code.gson:gson:2.10.1")
+
                 // CLI
                 implementation("com.varabyte.kotter:kotter-jvm:1.1.2")
                 implementation("com.github.ajalt.mordant:mordant:2.3.0")

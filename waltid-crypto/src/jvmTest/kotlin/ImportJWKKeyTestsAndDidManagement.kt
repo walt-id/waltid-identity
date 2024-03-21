@@ -1,9 +1,10 @@
 import TestUtils.loadJwkLocal
 import TestUtils.loadPemLocal
+import TestUtils.loadResourceBase64
 import TestUtils.loadResourceBytes
 import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.LocalKey
-import id.walt.crypto.keys.LocalKeyMetadata
+import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto.keys.jwk.JWKKeyMetadata
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.Arguments
@@ -13,7 +14,7 @@ import java.util.stream.Stream
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-class ImportLocalKeyTestsAndDidManagement {
+class ImportJWKKeyTestsAndDidManagement {
 
     @ParameterizedTest
     @MethodSource
@@ -21,7 +22,7 @@ class ImportLocalKeyTestsAndDidManagement {
         keyString: String, keyType: KeyType, isPrivate: Boolean
     ) = runTest {
         // Importing
-        val imported = LocalKey.importJWK(keyString)
+        val imported = JWKKey.importJWK(keyString)
         // Checking import success
         assertTrue { imported.isSuccess }
         // Getting key
@@ -42,7 +43,7 @@ class ImportLocalKeyTestsAndDidManagement {
         println("> Importing supposed $keyType (${if (isPrivate) "private" else "public"}) as PEM:")
 
         // Importing
-        val imported = LocalKey.importPEM(keyString)
+        val imported = JWKKey.importPEM(keyString)
         // Checking import success
         assertTrue("Import of ${if (isPrivate) "private" else "public"} $keyType: ${imported.exceptionOrNull()}") { imported.isSuccess }
         // Getting key
@@ -63,13 +64,15 @@ class ImportLocalKeyTestsAndDidManagement {
         bytes: ByteArray, keyType: KeyType, isPrivate: Boolean
     ) = runTest {
         // Importing
-        val key = LocalKey.importRawPublicKey(keyType, bytes, LocalKeyMetadata())
+        val key = JWKKey.importRawPublicKey(keyType, bytes, JWKKeyMetadata())
         // Checking for private key
         assertEquals(isPrivate, key.hasPrivateKey)
         // Checking for key type
         assertEquals(keyType, key.keyType)
         // Checking keyId from thumbprint
         assertEquals(key.getThumbprint(), key.getKeyId())
+
+        println(key.exportJWK())
     }
 
 
@@ -117,12 +120,19 @@ class ImportLocalKeyTestsAndDidManagement {
                 arguments(loadPemLocal("secp256r1.public.pem"), KeyType.secp256r1, false),
                 // rsa
                 arguments(loadPemLocal("rsa.public.pem"), KeyType.RSA, false),
+                // rsa (exported from Hashicorp Vault)
+                arguments(loadPemLocal("rsa-vault.public.pem"), KeyType.RSA, false),
+                // ECDSA P-256 / Secp256r1 (exported from Hashicorp Vault)
+                arguments(loadPemLocal("ecdsa-vault.public.pem"), KeyType.secp256r1, false),
             )
 
         @JvmStatic
         fun `given raw string, when imported then the import succeeds having the correct key type, key id and hasPrivate values`(): Stream<Arguments> =
             Stream.of(
                 arguments(loadResourceBytes("public-bytes/ed25519.bin"), KeyType.Ed25519, false),
+
+                arguments(loadResourceBase64("public-bytes/ed25519-vault.base64"), KeyType.Ed25519, false),
+
                 // secp256r1 (throwing Invalid point encoding 0x30)
 //                arguments(loadResourceBytes("public-bytes/secp256k1.bin"), KeyType.secp256k1, false),
                 // secp256r1 (throwing Invalid point encoding 0x30)

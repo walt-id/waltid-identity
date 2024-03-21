@@ -95,7 +95,6 @@ abstract class DataElement<T> (
   /**
    * Serialize and wrap in EncodedCBORElement (#6.24-tagged CBOR data element)
    */
-  @OptIn(ExperimentalSerializationApi::class)
   fun toEncodedCBORElement() = EncodedCBORElement(this.toCBOR())
 
   companion object {
@@ -189,7 +188,6 @@ class FullDateElement(value: LocalDate, subType: DEFullDateMode = DEFullDateMode
  */
 @Serializable(with = DataElementSerializer::class)
 class EncodedCBORElement(cborData: ByteArray): DataElement<ByteArray>(cborData, DEAttribute(DEType.encodedCbor)) {
-  @OptIn(ExperimentalSerializationApi::class)
   constructor(element: AnyDataElement) : this(element.toCBOR())
 
   /**
@@ -203,7 +201,7 @@ class EncodedCBORElement(cborData: ByteArray): DataElement<ByteArray>(cborData, 
    * Decode encoded data element to specific data element type
    */
   inline fun <reified T: AnyDataElement> decodeDataElement(): T {
-    return fromCBOR<T>(value)
+    return fromCBOR(value)
   }
   /**
    * Decode encoded data element to specific type
@@ -216,9 +214,8 @@ class EncodedCBORElement(cborData: ByteArray): DataElement<ByteArray>(cborData, 
     /**
      * Create from CBOR data to be wrapped by this encoded CBOR element
      */
-    @OptIn(ExperimentalSerializationApi::class)
     fun fromEncodedCBORElementData(data: ByteArray): EncodedCBORElement
-      = fromCBOR<EncodedCBORElement>(data)
+      = fromCBOR(data)
   }
 }
 

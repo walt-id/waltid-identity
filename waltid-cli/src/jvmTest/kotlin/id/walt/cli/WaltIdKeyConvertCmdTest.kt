@@ -107,6 +107,8 @@ class WaltIdKeyConvertCmdTest {
         val inputFileName = "invalidKey.jwk"
         var inputFilePath = getResourcePath(this, inputFileName)
 
+
+
         var result = KeyConvertCmd().test("--input=\"$inputFilePath\" --verbose")
         var expectedErrorMessage = ".*Invalid file format*".toRegex()
         assertContains(result.stderr, expectedErrorMessage)
@@ -145,7 +147,7 @@ class WaltIdKeyConvertCmdTest {
         val inputFilePath = getResourcePath(this, inputFileName)
         val outputFilePath = getOutputFilePath(inputFilePath, outputFileName)
 
-        // Only as long as Ed25519 is not fully supported in LocalKey.exportPEM()
+        // Only as long as Ed25519 is not fully supported in JWKKey.exportPEM()
         val result1 = KeyConvertCmd().test("--input=\"$inputFilePath\"")
         assertContains(result1.stderr, "Something went wrong when converting the key")
 

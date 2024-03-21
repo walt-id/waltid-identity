@@ -1,4 +1,4 @@
-import id.walt.crypto.keys.LocalKey
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.keys.KeyType
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.encodeToString
@@ -18,7 +18,7 @@ class TestJs {
         )
 
         println("Generating key: $keyType...")
-        val key = LocalKey.generate(keyType)
+        val key = JWKKey.generate(keyType)
 
         println("  Checking for private key...")
         assertTrue { key.hasPrivateKey }

@@ -48,7 +48,7 @@ export default function IssueSection() {
     } else {
       console.log("show qr-offer");
       localStorage.setItem('offer', JSON.stringify(credentialsToIssue));
-      router.push(`/offer?ids=${idsToIssue.join(',')}`);
+      await router.push(`/offer?ids=${idsToIssue.join(',')}`);
     }
   }
 

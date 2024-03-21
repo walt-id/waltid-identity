@@ -12,7 +12,7 @@ import kotlinx.uuid.generateUUID
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.transactions.transaction
 
-object OidcAccountStrategy : AccountStrategy<OidcAccountRequest>("oidc") {
+object OidcAccountStrategy : PasswordlessAccountStrategy<OidcAccountRequest>() {
     override suspend fun register(tenant: String, request: OidcAccountRequest): Result<RegistrationResult> {
         val jwt = verifyToken(request.token)
 
@@ -43,7 +43,7 @@ object OidcAccountStrategy : AccountStrategy<OidcAccountRequest>("oidc") {
 
 
     override suspend fun authenticate(tenant: String, request: OidcAccountRequest): AuthenticatedUser {
-        val jwt = JwkUtils.verifyToken(request.token)
+        val jwt = verifyToken(request.token)
 
         val registeredUserId = if (AccountsService.hasAccountOidcId(jwt.subject)) {
             AccountsService.getAccountByOidcId(jwt.subject)!!.id

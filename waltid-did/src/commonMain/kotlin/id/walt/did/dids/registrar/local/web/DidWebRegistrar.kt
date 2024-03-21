@@ -2,7 +2,7 @@ package id.walt.did.dids.registrar.local.web
 
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.LocalKey
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.did.dids.document.DidDocument
 import id.walt.did.dids.document.DidWebDocument
 import id.walt.did.dids.registrar.DidResult
@@ -12,11 +12,11 @@ import id.walt.did.utils.ExtensionMethods.ensurePrefix
 import love.forte.plugin.suspendtrans.annotation.JsPromise
 import love.forte.plugin.suspendtrans.annotation.JvmAsync
 import love.forte.plugin.suspendtrans.annotation.JvmBlocking
+import net.thauvin.erik.urlencoder.UrlEncoderUtil
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
-import net.thauvin.erik.urlencoder.UrlEncoderUtil
 
-@ExperimentalJsExport
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 class DidWebRegistrar : LocalRegistrarMethod("web") {
     @JvmBlocking
@@ -24,7 +24,7 @@ class DidWebRegistrar : LocalRegistrarMethod("web") {
     @JsPromise
     @JsExport.Ignore
     override suspend fun register(options: DidCreateOptions): DidResult = options.get<KeyType>("keyType")?.let {
-        registerByKey(LocalKey.generate(it), options)
+        registerByKey(JWKKey.generate(it), options)
     } ?: throw IllegalArgumentException("keyType option not found.")
 
     @JvmBlocking
