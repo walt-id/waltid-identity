@@ -32,13 +32,13 @@ object WalletServiceManager {
     private val categoryService = CategoryServiceImpl
     private val settingsService = SettingsService
     private val httpClient = getHttpClient()
-    private val trustConfig = ConfigManager.getConfig<TrustConfig>()
+    private val trustConfig by lazy { ConfigManager.getConfig<TrustConfig>() }
     val issuerTrustValidationService = DefaultTrustValidationService(httpClient, trustConfig.issuersRecord)
     val verifierTrustValidationService = DefaultTrustValidationService(httpClient, trustConfig.verifiersRecord)
     val credentialService = CredentialsService()
     val credentialTypeSeeker = DefaultCredentialTypeSeeker()
     val eventUseCase = EventUseCase(EventService())
-    val notificationUseCase = NotificationUseCase(NotificationService)
+    val notificationUseCase = NotificationUseCase(NotificationService, httpClient)
     val issuerUseCase = IssuerUseCaseImpl(service = IssuersService, http = httpClient)
 
     fun getWalletService(tenant: String, account: UUID, wallet: UUID): WalletService =

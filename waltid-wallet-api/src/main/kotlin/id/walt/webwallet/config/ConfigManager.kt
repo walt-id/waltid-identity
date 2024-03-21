@@ -100,6 +100,7 @@ object ConfigManager {
 
     registerConfig(ConfigData("oci", OciKeyConfig::class))
     registerConfig(ConfigData("auth", AuthConfig::class))
+    registerConfig(ConfigData("notification", NotificationConfig::class))
   }
 
   fun loadConfigs(args: Array<String>) {
