@@ -5,6 +5,7 @@ import id.walt.oid4vc.requests.CredentialOfferRequest
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.db.models.WalletOperationHistory
 import id.walt.webwallet.service.SSIKit2WalletService
+import id.walt.webwallet.service.WalletServiceManager
 import io.github.smiley4.ktorswaggerui.dsl.post
 import io.github.smiley4.ktorswaggerui.dsl.route
 import io.ktor.http.*
@@ -46,17 +47,23 @@ fun Application.exchange() = walletRoute {
             val offer = call.receiveText()
 
             runCatching {
-                wallet.useOfferRequest(offer = offer, did = did, requireUserInput = requireUserInput)
-                    .also {
-                        wallet.addOperationHistory(
-                            WalletOperationHistory.new(
-                                tenant = wallet.tenant,
-                                wallet = wallet,
-                                "useOfferRequest",
-                                mapOf("did" to did, "offer" to offer)
-                            )
+                WalletServiceManager.issuanceUseCase.explicitClaim(
+                    tenant = wallet.tenant,
+                    account = getUserUUID(),
+                    wallet = wallet.walletId,
+                    did = did,
+                    offer = offer,
+                    pending = requireUserInput
+                ).also {
+                    wallet.addOperationHistory(
+                        WalletOperationHistory.new(
+                            tenant = wallet.tenant,
+                            wallet = wallet,
+                            "useOfferRequest",
+                            mapOf("did" to did, "offer" to offer)
                         )
-                    }
+                    )
+                }
             }.onSuccess {
                 context.respond(HttpStatusCode.OK, it)
             }.onFailure {  error ->

@@ -11,11 +11,13 @@ import id.walt.webwallet.service.account.AccountsService
 import id.walt.webwallet.service.category.CategoryServiceImpl
 import id.walt.webwallet.service.credentials.CredentialsService
 import id.walt.webwallet.service.events.EventService
+import id.walt.webwallet.service.exchange.IssuanceService
 import id.walt.webwallet.service.issuers.IssuersService
 import id.walt.webwallet.service.notifications.NotificationService
 import id.walt.webwallet.service.settings.SettingsService
 import id.walt.webwallet.service.trust.DefaultTrustValidationService
 import id.walt.webwallet.usecase.event.EventUseCase
+import id.walt.webwallet.usecase.issuance.IssuanceUseCase
 import id.walt.webwallet.usecase.issuer.IssuerUseCaseImpl
 import id.walt.webwallet.utils.WalletHttpClients.getHttpClient
 import kotlinx.datetime.Clock
@@ -33,13 +35,22 @@ object WalletServiceManager {
     private val settingsService = SettingsService
     private val httpClient = getHttpClient()
     private val trustConfig by lazy { ConfigManager.getConfig<TrustConfig>() }
+    private val credentialService = CredentialsService()
+    private val credentialTypeSeeker = DefaultCredentialTypeSeeker()
+    private val eventUseCase = EventUseCase(EventService())
+    private val issuerUseCase = IssuerUseCaseImpl(service = IssuersService, http = httpClient)
     val issuerTrustValidationService = DefaultTrustValidationService(httpClient, trustConfig.issuersRecord)
     val verifierTrustValidationService = DefaultTrustValidationService(httpClient, trustConfig.verifiersRecord)
-    val credentialService = CredentialsService()
-    val credentialTypeSeeker = DefaultCredentialTypeSeeker()
-    val eventUseCase = EventUseCase(EventService())
     val notificationUseCase = NotificationUseCase(NotificationService, httpClient)
-    val issuerUseCase = IssuerUseCaseImpl(service = IssuersService, http = httpClient)
+    val issuanceUseCase = IssuanceUseCase(
+        issuanceService = IssuanceService,
+        credentialService = credentialService,
+        issuerTrustValidationService = issuerTrustValidationService,
+        issuerUseCase = issuerUseCase,
+        eventUseCase = eventUseCase,
+        notificationUseCase = notificationUseCase,
+        credentialTypeSeeker = credentialTypeSeeker,
+    )
 
     fun getWalletService(tenant: String, account: UUID, wallet: UUID): WalletService =
         walletServices.getOrPut(Pair(account, wallet)) {
