@@ -10,6 +10,7 @@ import id.walt.webwallet.seeker.DefaultCredentialTypeSeeker
 import id.walt.webwallet.service.account.AccountsService
 import id.walt.webwallet.service.category.CategoryServiceImpl
 import id.walt.webwallet.service.credentials.CredentialsService
+import id.walt.webwallet.service.dids.DidsService
 import id.walt.webwallet.service.events.EventService
 import id.walt.webwallet.service.exchange.IssuanceService
 import id.walt.webwallet.service.issuers.IssuersService
@@ -47,6 +48,8 @@ object WalletServiceManager {
         issuanceService = IssuanceService,
         credentialService = credentialService,
         issuerTrustValidationService = issuerTrustValidationService,
+        accountService = AccountsService,
+        didService = DidsService,
         issuerUseCase = issuerUseCase,
         eventUseCase = eventUseCase,
         notificationUseCase = notificationUseCase,
