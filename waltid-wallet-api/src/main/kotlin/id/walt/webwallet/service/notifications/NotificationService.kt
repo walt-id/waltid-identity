@@ -36,8 +36,8 @@ object NotificationService {
         } ?: Result.failure(Throwable("Notification not found for id: $id"))
     }
 
-    fun add(notification: Notification): Int = transaction {
-        upsert(notification)
+    fun add(notifications: List<Notification>): Int = transaction {
+        upsert(*notifications.toTypedArray())
     }
 
     fun delete(vararg ids: UUID): Int = transaction {

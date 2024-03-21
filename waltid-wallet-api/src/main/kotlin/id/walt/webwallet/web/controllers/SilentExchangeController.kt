@@ -71,7 +71,7 @@ internal suspend fun validateIssuer(issuer: String, type: String) =
         did = issuer, type = type, egfUri = "test"
     )
 
-internal fun storeCredentials(credentials: List<Pair<WalletCredential, String?>>) = credentials.groupBy {
+internal suspend fun storeCredentials(credentials: List<Pair<WalletCredential, String?>>) = credentials.groupBy {
     it.first.wallet
 }.flatMap { entry ->
     WalletServiceManager.credentialService.add(
@@ -81,7 +81,7 @@ internal fun storeCredentials(credentials: List<Pair<WalletCredential, String?>>
     }
 }
 
-internal fun otherStuff(wallet: UUID, credentials: List<Pair<WalletCredential, String?>>, type: EventType.Action) {
+internal suspend fun otherStuff(wallet: UUID, credentials: List<Pair<WalletCredential, String?>>, type: EventType.Action) {
     //TODO: no dsl here
     transaction {
         AccountWalletMappings.select(AccountWalletMappings.accountId).where { AccountWalletMappings.wallet eq wallet }
