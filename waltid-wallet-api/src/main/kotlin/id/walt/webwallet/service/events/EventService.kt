@@ -12,25 +12,27 @@ import org.jetbrains.exposed.sql.transactions.transaction
 import java.time.LocalDate
 
 class EventService {
+
     fun get(
         accountId: UUID,
         walletId: UUID,
-        limit: Int,
+        limit: Int?,
         offset: Long,
         sortOrder: String,
         sortBy: String,
         dataFilter: Map<String, String>
     ) = transaction {
-        Events.selectAll().where { Events.account eq accountId or (Events.wallet eq walletId) }
-            .orderBy(getColumn(sortBy) ?: Events.timestamp,
-                sortOrder.takeIf { it.uppercase() == "ASC" }?.let { SortOrder.ASC } ?: SortOrder.DESC)
-            .limit(n = limit, offset = offset).addWhereClause(dataFilter).map {
-                Event(it)
-            }
+        let {
+            limit?.let { getFilterQueryLimited(accountId, walletId, sortOrder, sortBy, dataFilter, it, offset) }
+                ?: getFilterQueryUnlimited(accountId, walletId, sortOrder, sortBy, dataFilter)
+        }.map {
+            Event(it)
+        }
     }
 
-    fun count(walletId: UUID, dataFilter: Map<String, String>): Long =
+    fun count(walletId: UUID, dataFilter: Map<String, String>): Long = transaction {
         Events.selectAll().where { Events.wallet eq walletId }.addWhereClause(dataFilter).count()
+    }
 
 
     fun add(event: Event): Unit = transaction {
@@ -67,6 +69,27 @@ class EventService {
         }
         this
     }
+
+    private fun getFilterQueryLimited(
+        accountId: UUID,
+        walletId: UUID,
+        sortOrder: String,
+        sortBy: String,
+        dataFilter: Map<String, String>,
+        limit: Int,
+        offset: Long,
+    ) = getFilterQueryUnlimited(accountId, walletId, sortBy, sortOrder, dataFilter).limit(n = limit, offset = offset)
+
+    private fun getFilterQueryUnlimited(
+        accountId: UUID,
+        walletId: UUID,
+        sortOrder: String,
+        sortBy: String,
+        dataFilter: Map<String, String>,
+    ) = Events.selectAll().where { Events.account eq accountId or (Events.wallet eq walletId) }
+        .orderBy(getColumn(sortBy) ?: Events.timestamp,
+            sortOrder.takeIf { it.uppercase() == "ASC" }?.let { SortOrder.ASC } ?: SortOrder.DESC)
+        .addWhereClause(dataFilter)
 
     private fun getColumn(name: String) = Events.columns.singleOrNull {
         it.name == name.lowercase()

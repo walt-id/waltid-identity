@@ -25,7 +25,7 @@ interface ReportService<T> {
                     }
             } ?: emptyList()
 
-        private fun frequent(walletId: UUID, action: EventType.Action, limit: Int) = eventService.get(
+        private fun frequent(walletId: UUID, action: EventType.Action, limit: Int?) = eventService.get(
             accountId = UUID.NIL,
             walletId = walletId,
             limit = limit,
@@ -41,9 +41,9 @@ interface ReportService<T> {
 
 abstract class ReportRequestParameter(
     open val walletId: UUID,
-    open val limit: Int,
+    open val limit: Int?,
 )
 
 data class CredentialReportRequestParameter(
-    override val walletId: UUID, override val limit: Int
+    override val walletId: UUID, override val limit: Int?
 ) : ReportRequestParameter(walletId, limit)

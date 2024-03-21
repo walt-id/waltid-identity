@@ -31,7 +31,7 @@ fun Application.reports() = walletRoute {
                     }
                 }
             }) {
-                val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: -1
+                val limit = call.request.queryParameters["limit"]?.toIntOrNull()
                 context.respond(
                     getWalletService().getFrequentCredentials(
                         CredentialReportRequestParameter(
