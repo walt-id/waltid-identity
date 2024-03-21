@@ -9,6 +9,9 @@ class NotificationUseCase(
     private val service: NotificationService,
 ) {
 
+    fun add(vararg notification: Notification){
+
+    }
     fun setStatus(vararg id: UUID, isRead: Boolean) = id.mapNotNull {
         service.get(it).getOrNull()
     }.map {
@@ -37,6 +40,10 @@ class NotificationUseCase(
     fun deleteById(id: UUID) = service.delete(id)
     fun deleteAll(wallet: UUID) = service.list(wallet).mapNotNull { it.id?.let { UUID(it) } }.let {
         service.delete(*it.toTypedArray())
+    }
+
+    fun send(vararg notification: Notification) {
+
     }
 
     private fun parseSortOrder(sort: String) = sort.lowercase().takeIf { it == "asc" }?.let { true } ?: false

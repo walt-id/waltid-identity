@@ -5,17 +5,24 @@ import id.walt.webwallet.config.TrustConfig
 import id.walt.webwallet.db.models.AccountWalletMappings
 import id.walt.webwallet.db.models.AccountWalletPermissions
 import id.walt.webwallet.db.models.Wallets
+import id.walt.webwallet.notificationusecase.NotificationUseCase
 import id.walt.webwallet.service.account.AccountsService
 import id.walt.webwallet.service.category.CategoryServiceImpl
+import id.walt.webwallet.service.credentials.CredentialsService
 import id.walt.webwallet.service.events.EventService
+import id.walt.webwallet.service.issuers.IssuersService
+import id.walt.webwallet.service.notifications.NotificationService
 import id.walt.webwallet.service.settings.SettingsService
 import id.walt.webwallet.service.trust.DefaultTrustValidationService
 import id.walt.webwallet.usecase.event.EventUseCase
+import id.walt.webwallet.usecase.issuer.IssuerUseCaseImpl
 import id.walt.webwallet.utils.WalletHttpClients.getHttpClient
 import kotlinx.datetime.Clock
 import kotlinx.datetime.toJavaInstant
 import kotlinx.uuid.UUID
-import org.jetbrains.exposed.sql.*
+import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.sql.insert
+import org.jetbrains.exposed.sql.selectAll
 import java.util.concurrent.ConcurrentHashMap
 
 object WalletServiceManager {
@@ -27,7 +34,10 @@ object WalletServiceManager {
     private val trustConfig = ConfigManager.getConfig<TrustConfig>()
     val issuerTrustValidationService = DefaultTrustValidationService(httpClient, trustConfig.issuersRecord)
     val verifierTrustValidationService = DefaultTrustValidationService(httpClient, trustConfig.verifiersRecord)
+    val credentialService = CredentialsService()
     val eventUseCase = EventUseCase(EventService())
+    val notificationUseCase = NotificationUseCase(NotificationService)
+    val issuerUseCase = IssuerUseCaseImpl(service = IssuersService, http = httpClient)
 
     fun getWalletService(tenant: String, account: UUID, wallet: UUID): WalletService =
         walletServices.getOrPut(Pair(account, wallet)) {

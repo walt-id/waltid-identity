@@ -30,16 +30,16 @@ class EventService {
         Events.selectAll().where { Events.wallet eq walletId }.addWhereClause(dataFilter).count()
 
 
-    fun add(event: Event): Unit = transaction {
-        Events.insert {
-            it[tenant] = event.tenant
-            it[originator] = event.originator ?: "unknown"
-            it[account] = event.account
-            it[wallet] = event.wallet
-            it[timestamp] = event.timestamp.toJavaInstant()
-            it[this.event] = event.event
-            it[action] = event.action
-            it[data] = Json.encodeToString(event.data)
+    fun add(events: List<Event>): Unit = transaction {
+        Events.batchInsert(events) {
+            this[Events.tenant] = it.tenant
+            this[Events.originator] = it.originator ?: "unknown"
+            this[Events.account] = it.account
+            this[Events.wallet] = it.wallet
+            this[Events.timestamp] = it.timestamp.toJavaInstant()
+            this[Events.event] = it.event
+            this[Events.action] = it.action
+            this[Events.data] = Json.encodeToString(it.data)
         }
     }
 
