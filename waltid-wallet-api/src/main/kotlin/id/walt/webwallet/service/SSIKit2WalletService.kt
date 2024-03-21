@@ -29,7 +29,6 @@ import id.walt.webwallet.service.dids.DidsService
 import id.walt.webwallet.service.dto.LinkedWalletDataTransferObject
 import id.walt.webwallet.service.dto.WalletDataTransferObject
 import id.walt.webwallet.service.events.*
-import id.walt.webwallet.service.exchange.IssuanceService
 import id.walt.webwallet.service.keys.KeysService
 import id.walt.webwallet.service.keys.SingleKeyResponse
 import id.walt.webwallet.service.oidc4vc.TestCredentialWallet
@@ -47,7 +46,6 @@ import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.util.*
 import kotlinx.coroutines.runBlocking
-import kotlinx.datetime.Clock
 import kotlinx.datetime.toJavaInstant
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
@@ -349,38 +347,6 @@ class SSIKit2WalletService(
 
     private fun getAnyCredentialWallet() =
         credentialWallets.values.firstOrNull() ?: getCredentialWallet("did:test:test")
-
-    override suspend fun useOfferRequest(
-        offer: String, did: String, requireUserInput: Boolean
-    ): List<WalletCredential> {
-        val addableCredentials =
-            IssuanceService.useOfferRequest(offer, getCredentialWallet(did), testCIClientConfig.clientID).map {
-                WalletCredential(
-                    wallet = walletId,
-                    id = it.id,
-                    document = it.document,
-                    disclosures = it.disclosures,
-                    addedOn = Clock.System.now(),
-                    manifest = it.manifest,
-                    deletedOn = null,
-                    pending = requireUserInput,
-                ).also { credential ->
-                    eventUseCase.log(
-                        action = EventType.Credential.Receive,
-                        originator = "", //parsedOfferReq.credentialOffer!!.credentialIssuer,
-                        tenant = tenant,
-                        accountId = accountId,
-                        walletId = walletId,
-                        data = eventUseCase.credentialEventData(credential = credential, type = it.type),
-                        credentialId = credential.id,
-                    )
-                }
-            }
-        credentialService.add(
-            wallet = walletId, credentials = addableCredentials.toTypedArray()
-        )
-        return addableCredentials
-    }
 
     override suspend fun resolveCredentialOffer(
         offerRequest: CredentialOfferRequest
