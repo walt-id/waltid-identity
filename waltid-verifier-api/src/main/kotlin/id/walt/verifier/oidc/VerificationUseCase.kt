@@ -47,7 +47,8 @@ class VerificationUseCase(
         val presentationDefinition =
             (presentationDefinitionJson?.let { PresentationDefinition.fromJSON(it.jsonObject) })
                 ?: PresentationDefinition.primitiveGenerationFromVcTypes(requestedTypes)
-        println("Presentation definition: " + presentationDefinition.toJSON())
+
+        logger.debug { "Presentation definition: " + presentationDefinition.toJSON() }
 
         val session = OIDCVerifierService.initializeAuthorization(
             presentationDefinition, responseMode = responseMode, sessionId = stateId
@@ -59,10 +60,9 @@ class VerificationUseCase(
                 ?: throw IllegalArgumentException("No `policies` supplied, in `request_credentials`.")).jsonArray.parsePolicyRequests()
         }
 
-        println("vpPolicies: $vpPolicies")
-        println("vcPolicies: $vcPolicies")
-        println("spPolicies: $specificPolicies")
-
+        logger.debug { "vpPolicies: $vpPolicies" }
+        logger.debug { "vcPolicies: $vcPolicies" }
+        logger.debug { "spPolicies: $specificPolicies" }
 
         OIDCVerifierService.sessionVerificationInfos[session.id] = OIDCVerifierService.SessionVerificationInformation(
             vpPolicies = vpPolicies,
@@ -80,6 +80,7 @@ class VerificationUseCase(
     }
 
     fun verify(sessionId: String?, tokenResponseParameters: Map<String, List<String>>): Result<String> {
+        logger.debug { "Verifying session $sessionId" }
         val session = sessionId?.let { OIDCVerifierService.getSession(it) }
             ?: return Result.failure(error("State parameter doesn't refer to an existing session, or session expired"))
         val tokenResponse = TokenResponse.fromHttpParameters(tokenResponseParameters)
@@ -89,30 +90,34 @@ class VerificationUseCase(
 
         val maybePresentationSessionResult = runCatching { OIDCVerifierService.verify(tokenResponse, session) }
 
-        if (maybePresentationSessionResult.getOrNull() != null) {
+        val retVal: Result<String> = if (maybePresentationSessionResult.getOrNull() != null) {
             val presentationSession = maybePresentationSessionResult.getOrThrow()
             if (presentationSession.verificationResult == true) {
                 val redirectUri = sessionVerificationInfo.successRedirectUri?.replace("\$id", session.id) ?: ""
-                return Result.success(redirectUri)
+                Result.success(redirectUri)
             } else {
                 val policyResults = OIDCVerifierService.policyResults[session.id]
                 val redirectUri = sessionVerificationInfo.errorRedirectUri?.replace("\$id", session.id)
 
                 if (redirectUri != null) {
-                    return Result.failure(error(redirectUri))
+                    Result.failure<String>(error(redirectUri))
+                }
+
+                if (policyResults == null) {
+                    Result.failure<String>(error("Verification policies did not succeed"))
                 } else {
-                    if (policyResults == null) {
-                        return Result.failure(error("Verification policies did not succeed"))
-                    } else {
-                        val failedPolicies =
-                            policyResults.results.flatMap { it.policyResults.map { it } }.filter { it.result.isFailure }
-                        return Result.failure(error("Verification policies did not succeed: ${failedPolicies.joinToString { it.request.policy.name }}"))
-                    }
+                    val failedPolicies =
+                        policyResults.results.flatMap { it.policyResults.map { it } }.filter { it.result.isFailure }
+                    Result.failure(error("Verification policies did not succeed: ${failedPolicies.joinToString { it.request.policy.name }}"))
                 }
             }
         } else {
-            return Result.failure(error("Verification failed"))
+            Result.failure(error("Verification failed"))
         }
+
+        logger.debug { "Returning: ${retVal}" }
+
+        return retVal
     }
 
     fun getResult(sessionId: String): Result<String> {
