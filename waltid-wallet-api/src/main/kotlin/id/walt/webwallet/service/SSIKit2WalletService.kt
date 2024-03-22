@@ -2,6 +2,8 @@ package id.walt.webwallet.service
 
 import id.walt.crypto.keys.*
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto.keys.oci.OCIKeyMetadata
+import id.walt.crypto.utils.JsonUtils.toJsonObject
 import id.walt.did.dids.DidService
 import id.walt.did.dids.registrar.LocalRegistrar
 import id.walt.did.dids.registrar.dids.DidCheqdCreateOptions
@@ -18,6 +20,8 @@ import id.walt.oid4vc.providers.OpenIDClientConfig
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.requests.CredentialOfferRequest
 import id.walt.oid4vc.responses.AuthorizationErrorCode
+import id.walt.webwallet.config.ConfigManager
+import id.walt.webwallet.config.OciKeyConfig
 import id.walt.webwallet.db.models.WalletCategoryData
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.db.models.WalletOperationHistories
@@ -486,21 +490,46 @@ class SSIKit2WalletService(
                 keysetHandle = JsonNull
             )
         }
-
-
+    val config = ConfigManager.getConfig<OciKeyConfig>()
+    private val ociKeyMetadata = mapOf(
+        "tenancyOcid" to config.tenancyOcid,
+        "userOcid" to config.userOcid,
+        "fingerprint" to config.fingerprint,
+        "managementEndpoint" to config.managementEndpoint,
+        "cryptoEndpoint" to config.cryptoEndpoint,
+        "signingKeyPem" to (config.signingKeyPem?.trimIndent() ?: ""),
+    ).toJsonObject()
     override suspend fun generateKey(request: KeyGenerationRequest): String =
-        KeyManager.createKey(request)
-            .also {
-                KeysService.add(walletId, it.getKeyId(), KeySerialization.serializeKey(it))
-                eventUseCase.log(
-                    action = EventType.Key.Create,
-                    originator = "wallet",
-                    tenant = tenant,
-                    accountId = accountId,
-                    walletId = walletId,
-                    data = eventUseCase.keyEventData(it, "jwk")
-                )
-            }.getKeyId()
+        if (request.config?.isEmpty() == true) {
+            println("is Empty" + request.config)
+            request.config = ociKeyMetadata
+            println("the new request is " + request.config)
+            KeyManager.createKey(request)
+                .also {
+                    KeysService.add(walletId, it.getKeyId(), KeySerialization.serializeKey(it))
+                    eventUseCase.log(
+                        action = EventType.Key.Create,
+                        originator = "wallet",
+                        tenant = tenant,
+                        accountId = accountId,
+                        walletId = walletId,
+                        data = eventUseCase.keyEventData(it, "jwk")
+                    )
+                }.getKeyId()
+        } else {
+            KeyManager.createKey(request)
+                .also {
+                    KeysService.add(walletId, it.getKeyId(), KeySerialization.serializeKey(it))
+                    eventUseCase.log(
+                        action = EventType.Key.Create,
+                        originator = "wallet",
+                        tenant = tenant,
+                        accountId = accountId,
+                        walletId = walletId,
+                        data = eventUseCase.keyEventData(it, "jwk")
+                    )
+                }.getKeyId()
+        }
 
     override suspend fun importKey(jwkOrPem: String): String {
         val type =
