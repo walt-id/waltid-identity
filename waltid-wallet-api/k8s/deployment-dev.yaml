@@ -218,6 +218,10 @@ spec:
               mountPath: "/waltid-wallet-api/config/logins.conf"
               subPath: "logins.conf"
               readOnly: true
+            - name: wallet-auth-secret
+              mountPath: "/waltid-wallet-api/config/auth.conf"
+              subPath: "auth.conf"
+              readOnly: true
             - name: wallet-nft-config
               mountPath: "/waltid-wallet-api/walt.yaml"
               subPath: "walt.yaml"
@@ -261,6 +265,9 @@ spec:
         - name: wallet-logins-config
           configMap:
             name: wallet-logins-config
+        - name: wallet-auth-secret
+          secret:
+            secretName: wallet-auth-secret
         - name: wallet-push-config
           secret:
             secretName: wallet-push-config-secret
