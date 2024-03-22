@@ -49,6 +49,7 @@ object OidcUniqueSubjectStrategy : PasswordlessAccountStrategy<OidcUniqueSubject
         } else {
             AccountsService.register(tenant, request).getOrThrow().id
         }
-        return AuthenticatedUser(registeredUserId, jwt.subject)
+        // TODO: change id to wallet-id (also in the frontend)
+        return UsernameAuthenticatedUser(registeredUserId, jwt.subject)
     }
 }
