@@ -50,11 +50,18 @@ class VCSignCmd : CliktCommand(
     override fun run() {
 
         val key = runBlocking { KeyUtil().getKey(keyFile) }
-        val issuerDid = issuerDid ?: runBlocking { DidUtil.createDid(DidMethod.KEY, key) }
+        var issuerDid = this.issuerDid
+
+        if (issuerDid == null) {
+            print.dim("Issuer DID not provided. Let's generate one.")
+            issuerDid = runBlocking { DidUtil.createDid(DidMethod.KEY, key) }
+            print.dim("Generated DID: ${issuerDid}")
+        }
+
         val payload = vc.readText()
 
         val signedVC = runBlocking {
-            VCUtil().sign(key, issuerDid, subjectDid, payload)
+            VCUtil.sign(key, issuerDid, subjectDid, payload)
         }
 
         val savedSignedVCFilePath = saveSignedVC(signedVC)
