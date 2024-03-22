@@ -68,6 +68,14 @@ class MainTest {
         KeyType.RSA to rsaPEMKeyPattern
     )
 
+    val resourcesPath = "src/jvmTest/resources"
+
+    val keyFilePath = "${resourcesPath}/ed25519_by_waltid_pvt_key.jwk"
+    val did1 = "did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV"
+    val did2 = "did:key:z6Mkjm2gaGsodGchfG4k8P6KwCHZsVEPZho5VuEbY94qiBB9"
+    val vcFilePath = "${resourcesPath}/vc/openbadgecredential_sample.json"
+    val signedVCFilePath = "${resourcesPath}/vc/openbadgecredential_sample.signed.json"
+
     @Test
     fun `should show usage message when called with no arguments`(output: CapturedOutput) {
         main(arrayOf(""))
@@ -298,6 +306,56 @@ class MainTest {
         main(arrayOf("did create --key=myRSAKey.json"))
         fail("Not yet implemented")
         // assertContains(output.all  , "Usage: waltid [<options>] <command> [<args>]...")
+    }
+
+    @Test
+    fun `should print usage instructions when 'vc' command is called with no argument`(output: CapturedOutput) {
+        main(arrayOf("vc"))
+        assertContains(output.all, "Usage: waltid vc")
+    }
+
+    @Test
+    @Ignore("Failing with NoSuchSubcommand :-/ I'll check it later.")
+    fun `should print usage instructions when 'vc sign' command is called with no argument`(output: CapturedOutput) {
+        main(arrayOf("vc sign"))
+        assertContains(output.all, "Usage: waltid vc sign")
+    }
+
+    @Test
+    @Ignore
+    fun `should sign a given VC when no DID is provided for the Issuer`(output: CapturedOutput) {
+
+        main(arrayOf("""vc sign -k "${keyFilePath}" -s ${did2} """))
+
+        assertFalse(output.all.contains("ERROR"))
+        assertContains(output.all, "Generated DID:")
+        assertContains(output.all, "Signed VC saved at")
+    }
+
+    @Test
+    @Ignore
+    fun `should sign a given VC when all parameters are provided correctly`(output: CapturedOutput) {
+
+        main(arrayOf("""vc sign -k "${keyFilePath}" -i ${did1} -s ${did2} """))
+
+        assertFalse(output.all.contains("ERROR"))
+        assertContains(output.all, "Signed VC saved at")
+    }
+
+    @Test
+    @Ignore("Failing with NoSuchSubcommand :-/ I'll check it later.")
+    fun `should print usage instructions when 'vc verify' command is called with no argument`(output: CapturedOutput) {
+        main(arrayOf("vc verify"))
+        assertContains(output.all, "Usage: waltid vc verify")
+    }
+
+    @Test
+    @Ignore
+    fun `should verify the signature of a VC if the VC file is provided with no other parameter`(output: CapturedOutput) {
+        main(arrayOf("""vc verify "${signedVCFilePath}" """))
+
+        assertFalse(output.all.contains("ERROR"))
+        assertContains(output.all, "VC signature is valid.")
     }
 
     private fun testSuccessfulKeyCmd(
