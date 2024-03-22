@@ -489,15 +489,18 @@ class SSIKit2WalletService(
                 keysetHandle = JsonNull
             )
         }
-    val config = ConfigManager.getConfig<OciKeyConfig>()
-    private val ociKeyMetadata = mapOf(
-        "tenancyOcid" to config.tenancyOcid,
-        "userOcid" to config.userOcid,
-        "fingerprint" to config.fingerprint,
-        "managementEndpoint" to config.managementEndpoint,
-        "cryptoEndpoint" to config.cryptoEndpoint,
-        "signingKeyPem" to (config.signingKeyPem?.trimIndent() ?: ""),
-    ).toJsonObject()
+    private val ociKeyMetadata by lazy {
+        ConfigManager.getConfig<OciKeyConfig>().let {
+            mapOf(
+                "tenancyOcid" to it.tenancyOcid,
+                "userOcid" to it.userOcid,
+                "fingerprint" to it.fingerprint,
+                "managementEndpoint" to it.managementEndpoint,
+                "cryptoEndpoint" to it.cryptoEndpoint,
+                "signingKeyPem" to (it.signingKeyPem?.trimIndent() ?: ""),
+            ).toJsonObject()
+        }
+    }
     override suspend fun generateKey(request: KeyGenerationRequest): String = let {
         request.config = request.config ?: ociKeyMetadata
         KeyManager.createKey(request)
