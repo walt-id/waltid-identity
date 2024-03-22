@@ -53,6 +53,10 @@ class WaltIdCmd : CliktCommand(
                        --subject=did:key:z6Mkjm2gaGsodGchfG4k8P6KwCHZsVEPZho5VuEbY94qiBB9\
                        --issuer=did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV\
                        ./myVC.json
+        
+        VC verification
+        ----------------
+        waltid vc verify ./myVC.signed.json
         """,
     printHelpOnEmptyArgs = true
 ) {
