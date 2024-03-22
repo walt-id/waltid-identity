@@ -37,16 +37,16 @@ class EventService {
 
     fun add(event: Event): Unit = transaction {
         Events.insert {
-            it[tenant] = event.tenant
-            it[originator] = event.originator ?: "unknown"
-            it[account] = event.account
-            it[wallet] = event.wallet
-            it[timestamp] = event.timestamp.toJavaInstant()
+            it[this.tenant] = event.tenant
+            it[this.originator] = event.originator ?: "unknown"
+            it[this.account] = event.account
+            it[this.wallet] = event.wallet
+            it[this.credentialId] = event.credentialId
+            it[this.timestamp] = event.timestamp.toJavaInstant()
             it[this.event] = event.event
-            it[action] = event.action
-            it[data] = Json.encodeToString(event.data)
-            event.credentialId?.let { c -> it[credentialId] = c }
-            event.note?.let { n -> it[note] = n }
+            it[this.action] = event.action
+            it[this.data] = Json.encodeToString(event.data)
+            it[this.note] = event.note
         }
     }
 
