@@ -43,6 +43,7 @@ Now, you can run:
 | `waltid did create --key=./myRSAKey.json`                                                                                                                                                           | Creates a new did:key with the key provided in the spoecified file                                                      | 
 | `waltid vc sign --key=./myEd25519Key.json --subject=did:key:z6Mkjm2gaGsodGchfG4k8P6KwCHZsVEPZho5VuEbY94qiBB9 --issuer=did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV ./myCredential.json` | Signs a verifiable credential JSON. The VC needs [to be created first](#1.-create-a-vc).                                |
 | `waltid vc sign --key=./myEd25519Key.json --subject=did:key:z6Mkjm2gaGsodGchfG4k8P6KwCHZsVEPZho5VuEbY94qiBB9 ./myCredential.json`                                                                   | Signs a verifiable credential JSON with a generated Issuer DID   .                                                      |
+| `waltid vc verify ./openbadgecredential_sample.signed.json`                                                                                                                                         | Verifies the signature of the provided VC.                                                                              |
 
 ## In production
 
@@ -101,9 +102,9 @@ Execute the walt.id CLI
 |         |           | <li> from PEM to JWK</li>                      |      ✔️      |
 |         |           | <li>Convertion from JWK to PEM</li>            |      ✖️      |
 |   did   |  create   | Create a new DID.                              |      ✔️      | 
-|         |  resolve  | Resolve a DID.                                 |      ✖️      |  
+|         |  resolve  | Resolve a DID.                                 |      ✔️      |  
 |   vc    |   sign    | Sign a verifiable credential                   |      ✔️      |
-|         |  verify   | Verify a verifiable credential                 |      ✖️      |
+|         |  verify   | Verify a verifiable credential                 |      ✔️      |
 |         |    ...    |                                                |              |
 
 # Reference
@@ -350,6 +351,20 @@ $ waltid vc sign --key myKey.json
                  openbadgecredential_sample.json
 ```
 
+## `waltid vc verify` command
+
+```bash
+Usage: waltid vc verify [<options>] <vc>
+
+  Verifies the signature of a Verifiable Credential. Future plans to add new policies possibilities.
+
+Options:
+  -h, --help  Show this message and exit
+
+Arguments:
+  <vc>  the verifiable credential file (in the JWS format) to be verified (required)
+```
+
 # Note for Windows users
 
 If the input file path is not quoted, all backslashes need to be escaped on Windows.
@@ -401,7 +416,7 @@ This project is still a work in progress. As such, not all features are already 
   * secp256k1 Public + Private Key ✅
   * secp256r1 ✅
 
-### DID create
+### DID create and resolve
 
 * Supported DID methods
   * KEY ✅
@@ -410,3 +425,18 @@ This project is still a work in progress. As such, not all features are already 
   * EBSI ❌
   * CHEQD ❌
   * IOTA ❌
+
+### VC sign
+
+* JWK Key ✅
+* TSE Key ❌
+
+### VC verify
+
+* Signature ✅
+* Expired ❌
+* Not before ❌
+* Schema ❌
+* Holder Binding ❌
+* Allowed Issuer ❌
+* Webhook ❌

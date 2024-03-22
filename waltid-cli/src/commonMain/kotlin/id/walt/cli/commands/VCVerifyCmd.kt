@@ -10,7 +10,7 @@ import java.io.File
 
 class VCVerifyCmd : CliktCommand(
     name = "verify",
-    help = "Verifies a Verifiable Credential under a set of policies.",
+    help = "Verifies the signature of a Verifiable Credential. Future plans to add new policies possibilities.",
     printHelpOnEmptyArgs = true
 ) {
     val print: PrettyPrinter = PrettyPrinter(this)
