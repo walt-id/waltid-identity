@@ -9,10 +9,7 @@ import id.walt.cli.commands.KeyGenerateCmd
 import id.walt.crypto.keys.KeyType
 import kotlinx.coroutines.test.runTest
 import java.io.File
-import kotlin.test.Test
-import kotlin.test.assertContains
-import kotlin.test.assertFailsWith
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 class WaltIdKeyGenerateCmdTest {
 
@@ -119,6 +116,10 @@ class WaltIdKeyGenerateCmdTest {
     }
 
     @Test
+    @Ignore
+    fun `should generate key of type secp256r1`() = Unit
+
+    @Test
     fun `should ignore key type case`() = runTest {
         val command = KeyGenerateCmd()
 
@@ -131,7 +132,6 @@ class WaltIdKeyGenerateCmdTest {
             """"x": ".*?"""",
             """"y": ".*?""""
         )
-
 
         val result1 = command.test("--keyType=secp256k1")
         assertExpectations(result1, expected1, expected2)
