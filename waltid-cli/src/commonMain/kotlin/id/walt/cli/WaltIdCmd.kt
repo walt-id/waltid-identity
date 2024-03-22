@@ -4,6 +4,7 @@ import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.subcommands
 import com.github.ajalt.clikt.parameters.groups.provideDelegate
 import id.walt.cli.commands.CommonOptions
+import id.walt.cli.commands.DidCmd
 import id.walt.cli.commands.KeyCmd
 
 class WaltIdCmd : CliktCommand(
@@ -25,6 +26,8 @@ class WaltIdCmd : CliktCommand(
         waltid key -h
         waltid key generate -h
         waltid key convert -h
+        waltid did -h
+        waltid did create -h
         
         Key generation
         ---------------
@@ -36,11 +39,16 @@ class WaltIdCmd : CliktCommand(
         Key conversion
         ---------------
         waltid key convert --input=myRsaKey.pem
+        
+        DID creation
+        -------------
+        waltid did create 
+        waltid did create -k myKey.json
         """,
     printHelpOnEmptyArgs = true
 ) {
     init {
-        subcommands(KeyCmd())
+        subcommands(KeyCmd(), DidCmd())
     }
 
     private val commonOptions by CommonOptions()
