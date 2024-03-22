@@ -241,7 +241,7 @@ fun Application.auth() {
                         HttpStatusCode.BadRequest to { description = "Login failed" }
                     }
                 }) {
-                doLogin()
+                doLogin(loginType = "email")
             }
 
             post(
@@ -407,7 +407,7 @@ fun Application.auth() {
                         HttpStatusCode.BadRequest to { description = "Bad request" }
                     }
                 }) {
-                doLogin()
+                doLogin(loginType = "keycloak")
             }
 
             // Terminate Keycloak session
@@ -454,7 +454,7 @@ fun verifyToken(token: String): Result<String> {
         .mapCatching { valid -> if (valid) jwsObject.payload.toString() else throw IllegalArgumentException("Token is not valid.") }
 }
 
-suspend fun PipelineContext<Unit, ApplicationCall>.doLogin() {
+suspend fun PipelineContext<Unit, ApplicationCall>.doLogin(loginType: String) {
     val reqBody = LoginRequestJson.decodeFromString<AccountRequest>(call.receive())
     AccountsService.authenticate("", reqBody)
         .onSuccess { // FIXME -> TENANT HERE
@@ -463,15 +463,26 @@ suspend fun PipelineContext<Unit, ApplicationCall>.doLogin() {
                 sign(MACSigner(AuthKeys.tokenKey))
             }.serialize()
 
+
             call.sessions.set(LoginTokenSession(token))
             call.response.status(HttpStatusCode.OK)
-            call.respond(
-                mapOf(
-                    "token" to token,
-                    "id" to it.id.toString(), // TODO: change id to wallet-id (also in the frontend)
-                    "username" to it.username
+            if (loginType == "keycloak") {
+                call.respond(
+                    mapOf(
+                        "token" to token,
+                        "id" to it.id.toString(), // TODO: change id to wallet-id (also in the frontend)
+                        "keycloakId" to it.username
+                    )
                 )
-            )
+            } else {
+                call.respond(
+                    mapOf(
+                        "token" to token,
+                        "id" to it.id.toString(), // TODO: change id to wallet-id (also in the frontend)
+                        "username" to it.username
+                    )
+                )
+            }
         }
         .onFailure { call.respond(HttpStatusCode.BadRequest, it.localizedMessage) }
 }
