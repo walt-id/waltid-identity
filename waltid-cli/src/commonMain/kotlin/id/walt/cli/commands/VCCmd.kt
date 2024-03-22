@@ -10,7 +10,7 @@ class VCCmd : CliktCommand(
 ) {
 
     init {
-        subcommands(VCSignCmd())
+        subcommands(VCSignCmd(), VCVerifyCmd())
     }
 
     override fun run(): Unit {}
