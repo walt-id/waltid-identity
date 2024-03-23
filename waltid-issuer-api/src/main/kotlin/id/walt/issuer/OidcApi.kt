@@ -75,17 +75,34 @@ object OidcApi : CIProvider() {
                 }
             }
 
-            // Implement in openid4vc lib?
             get("/jwks") {
-//                OidcApi.sessionCredentialPreMapping.forEach {
-//                    it.value.forEach {
-//                        println(it.issuerKey.getPublicKey().exportJWKObject())
-//                    }
-//                }
-
-                call.respondText ( "{\"keys\":[{\"kty\":\"EC\",\"x\":\"bo4FsmViF9au5-iCZbvEy-WZGaRes_eZdpIucmg4XH8\",\"y\":\"htYUXUmIc-IxyR6QMFPwXHXAgj__Fqw9kuSVtSyulhI\",\"crv\":\"P-256\",\"kid\":\"z2dmzD81cgPx8Vki7JbuuMmFYrWPgYoytykUZ3eyqht1j9KbrJNL5rEcHRKkRBDnxzu2352jxSjTEFmM9hjTL2wMtzcTDjjDAQmPpQkaihjoAo8AygRr9M6yZsXHzWXnJRMNPzR3cCYbmvE9Q1sSQ1qzXHBo4iEc7Yb3MGu31ZAHKSd9Qx\"}]}"
-                    , ContentType.Application.Json, HttpStatusCode.OK)
+                var jwks = buildJsonObject{}
+                OidcApi.sessionCredentialPreMapping.forEach {
+                    it.value.forEach {
+                        jwks = buildJsonObject {
+                            put("keys", buildJsonArray {
+                                val jwkWithKid = buildJsonObject {
+                                    it.issuerKey.getPublicKey().exportJWKObject().forEach {
+                                        put(it.key, it.value)
+                                    }
+                                    if (it.issuerDid.length == 186) // Edge case when issuer uses did:key with ebsi encoding (jwk_jcs-pub (0xeb51)
+                                        put("kid", it.issuerDid.replaceRange(0..7, ""))
+                                    else
+                                        put("kid", it.issuerKey.getPublicKey().getKeyId())
+                                }
+                                add(jwkWithKid)
+                                jwks.forEach {
+                                    it.value.jsonArray.forEach{
+                                        add(it)
+                                    }
+                                }
+                            })
+                        }
+                    }
+                }
+                call.respond(HttpStatusCode.OK, jwks)
             }
+
 
             get("/authorize") {
                 val authReq = runBlocking { AuthorizationRequest.fromHttpParametersAuto(call.parameters.toMap()) }
