@@ -68,7 +68,7 @@ class TestCredentialWallet(
         }
     }
 
-    override fun signToken(target: TokenTarget, payload: JsonObject, header: JsonObject?, keyId: String?): String {
+    override fun signToken(target: TokenTarget, payload: JsonObject, header: JsonObject?, keyId: String?, privKeyJwk: String?): String {
         fun debugStateMsg() = "(target: $target, payload: $payload, header: $header, keyId: $keyId)"
         println("SIGNING TOKEN: ${debugStateMsg()}")
 

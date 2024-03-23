@@ -110,8 +110,10 @@ object OidcApi : CIProvider() {
                     val authResp = if (authReq.responseType.contains(ResponseType.Code)) {
                         if (authReq.authorizationDetails!!.any{ it.format?.value ==  CredentialFormat.jwt_vc.value}){ // EBSI
                             val idTokenJarKid = OidcApi.sessionCredentialPreMapping[authReq.issuerState]?.first()?.issuerDid!!.replaceRange(0..7, "")
+                            val privKeyJwk= OidcApi.sessionCredentialPreMapping[authReq.issuerState]?.first()?.issuerKey!!.exportJWK()
+                            println("PrivateKey is: $idTokenJarKid")
                             println("KID is: $idTokenJarKid")
-                            processCodeFlowAuthorizationEbsi(authReq, idTokenJarKid)
+                            processCodeFlowAuthorizationEbsi(authReq, idTokenJarKid, privKeyJwk)
                         } else {
                             processCodeFlowAuthorization(authReq)
                         }
