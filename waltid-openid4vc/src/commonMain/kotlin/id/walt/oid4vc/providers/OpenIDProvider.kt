@@ -191,7 +191,7 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
     // }
 
     // Create an ID Token request using JAR OAuth2.0 specification https://www.rfc-editor.org/rfc/rfc9101.html
-    open fun processCodeFlowAuthorizationEbsi(authorizationRequest: AuthorizationRequest, keyId: String): AuthorizationCodeIDTokenRequestResponse {
+    open fun processCodeFlowAuthorizationEbsi(authorizationRequest: AuthorizationRequest, keyId: String, privKeyJwk: String): AuthorizationCodeIDTokenRequestResponse {
         println("Ebsi Authorize Request")
         if (!authorizationRequest.responseType.contains(ResponseType.Code))
             throw AuthorizationError(
@@ -228,7 +228,8 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
                 put(JWTClaims.Header.keyID, keyId)
                 put(JWTClaims.Header.type, "jwt")
             },
-            keyId
+            keyId,
+            privKeyJwk
         )
 
         // Create a session with the state of the ID Token request since it is needed in the direct_post endpoint

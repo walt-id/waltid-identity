@@ -11,7 +11,7 @@ interface ITokenProvider {
      * Signs and returns the given [payload] with the optionally specified additional [header]s as _JWT token_,
      * using the appropriate key and algorithm for the given token [target], and/or the optionally given [keyId].
      */
-    fun signToken(target: TokenTarget, payload: JsonObject, header: JsonObject? = null, keyId: String? = null): String
+    fun signToken(target: TokenTarget, payload: JsonObject, header: JsonObject? = null, keyId: String? = null, privKeyJwk: String? = null): String
 
     /**
      * Verifies the signature of the given _JWT_ [token], ensuring the appropriate key and algorithm for the given token [target] was used.

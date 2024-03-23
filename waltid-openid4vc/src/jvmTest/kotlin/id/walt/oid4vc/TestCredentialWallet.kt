@@ -72,7 +72,7 @@ class TestCredentialWallet(
         expirationTimestamp: Instant
     ) = SIOPSession(id, authorizationRequest, expirationTimestamp)
 
-    override fun signToken(target: TokenTarget, payload: JsonObject, header: JsonObject?, keyId: String?) =
+    override fun signToken(target: TokenTarget, payload: JsonObject, header: JsonObject?, keyId: String?, privateKeyJwk: String?) =
         SDJwt.sign(SDPayload.createSDPayload(payload, SDMap.Companion.fromJSON("{}")), jwtCryptoProvider, keyId).jwt
 
     @OptIn(ExperimentalJsExport::class)

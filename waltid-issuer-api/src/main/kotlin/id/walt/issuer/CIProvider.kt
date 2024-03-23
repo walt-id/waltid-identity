@@ -132,16 +132,15 @@ open class CIProvider : OpenIDCredentialIssuer(
 
     // ------------------------------------------
     // Simple cryptographics operation interface implementations
-    override fun signToken(target: TokenTarget, payload: JsonObject, header: JsonObject? , keyId: String?) =
+    override fun signToken(target: TokenTarget, payload: JsonObject, header: JsonObject? , keyId: String?, privKeyJwk: String?) =
         runBlocking {
             println("Signing JWS:   $payload")
             println("JWS Signature: target: $target, keyId: $keyId, header: $header")
-            if (header != null && keyId != null) {
-
-                val myPrivateKey = LocalKey.importJWK("{\"kty\":\"EC\",\"x\":\"bo4FsmViF9au5-iCZbvEy-WZGaRes_eZdpIucmg4XH8\",\"y\":\"htYUXUmIc-IxyR6QMFPwXHXAgj__Fqw9kuSVtSyulhI\",\"crv\":\"P-256\",\"d\":\"UPzeJStN6Wg7zXULIlGVhYh4gG5RN-5knejePt6deqY\"}")
+            if (header != null && keyId != null && privKeyJwk != null)  {
+                val privKey = LocalKey.importJWK(privKeyJwk)
                 val headers = mapOf("alg" to "ES256", "type" to "jwt", "kid" to keyId)
 
-                myPrivateKey.getOrThrow().signJws(payload.toString().toByteArray(), headers).also {
+                privKey.getOrThrow().signJws(payload.toString().toByteArray(), headers).also {
                     println("Signed JWS: >> $it")
                 }
 
@@ -150,8 +149,6 @@ open class CIProvider : OpenIDCredentialIssuer(
                     println("Signed JWS: >> $it")
                 }
             }
-
-
         }
 
     @OptIn(ExperimentalEncodingApi::class)

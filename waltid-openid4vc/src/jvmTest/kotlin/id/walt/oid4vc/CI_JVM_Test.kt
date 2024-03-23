@@ -528,7 +528,9 @@ class CI_JVM_Test : AnnotationSpec() {
 
         // TODO: Validate authorization code
         // TODO: generate access token
-        val accessToken = ciTestProvider.signToken(TokenTarget.ACCESS, buildJsonObject {
+        val accessToken = ciTestProvider.signToken(
+            target = TokenTarget.ACCESS,
+            payload = buildJsonObject {
             put(JWTClaims.Payload.subject, "test-issuance-session")
             put(JWTClaims.Payload.issuer, ciTestProvider.baseUrl)
             put(JWTClaims.Payload.audience, TokenTarget.ACCESS.name)
