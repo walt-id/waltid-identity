@@ -43,44 +43,42 @@ class SilentClaimStrategy(
         val manifest = WalletCredential.tryParseManifest(it.manifest) ?: JsonObject(emptyMap())
         val issuerDid = WalletCredential.parseIssuerDid(credential, manifest) ?: "n/a"
         val type = credentialTypeSeeker.get(credential)
+        val egfUri = "test"
         //TODO: improve for same issuer - type values
-        if (validateIssuer(issuerDid, type)) {
+        if (validateIssuer(issuerDid, type, egfUri)) {
             Pair(it, issuerDid)
         } else null
     }.map {
         prepareCredentialData(did = did, data = it.first, issuerDid = it.second)
-    }.flatten().let {
-        storeCredentials(it)
-    }.onEach { entry ->
-        accountService.getAccountForWallet(entry.key)?.let {
-            createEvents("", it, entry.value, EventType.Credential.Receive)
-            createNotifications(it, entry.value, EventType.Credential.Receive)
-        }
-    }.let {
-        prepareResult(it)
-    }
-
-    private fun prepareResult(credentials: Map<UUID, List<Pair<WalletCredential, String?>>>) = credentials.map {
-        it.value.map { it.first }
-    }.flatten().distinct().fold(emptyList<String>()) { acc, i ->
-        acc + i.id
-    }
-
-    private suspend fun validateIssuer(issuer: String, type: String) = issuerTrustValidationService.validate(
-        did = issuer, type = type, egfUri = "test"
-    )
-
-    private fun storeCredentials(credentials: List<Pair<WalletCredential, String?>>) = credentials.groupBy {
+    }.flatten().groupBy {
         it.first.wallet
-    }.onEach { (t, u) ->
+    }.mapNotNull { entry ->
+        val credentials = entry.value.map { it.first }.toTypedArray()
+        storeCredentials(entry.key, credentials).getOrNull()?.let {
+            accountService.getAccountForWallet(entry.key)?.run {
+                createEvents("", this, entry.value, EventType.Credential.Receive)
+                createNotifications(this, credentials, EventType.Credential.Receive)
+            }
+            entry.value.map { it.first.id }
+        }
+    }.flatten().fold(emptyList<String>()) { acc, i ->
+        acc + i
+    }
+
+    private suspend fun validateIssuer(issuer: String, type: String, egfUri: String) =
+        issuerTrustValidationService.validate(
+            did = issuer, type = type, egfUri = egfUri
+        )
+
+    private fun storeCredentials(wallet: UUID, credentials: Array<WalletCredential>) = runCatching {
         credentialService.add(
-            wallet = t, credentials = u.map { it.first }.toTypedArray()
+            wallet = wallet, credentials = credentials
         )
     }
 
     private suspend fun createNotifications(
-        account: UUID, credentials: List<Pair<WalletCredential, String?>>, type: EventType.Action
-    ) = prepareNotifications(account, credentials.map { it.first }, type.toString()).runCatching {
+        account: UUID, credentials: Array<WalletCredential>, type: EventType.Action
+    ) = prepareNotifications(account, credentials, type.toString()).runCatching {
         notificationUseCase.add(*this.toTypedArray())
         notificationUseCase.send(*this.toTypedArray())
     }
@@ -124,7 +122,7 @@ class SilentClaimStrategy(
         )
     }
 
-    private fun prepareNotifications(account: UUID, credentials: List<WalletCredential>, type: String) =
+    private fun prepareNotifications(account: UUID, credentials: Array<WalletCredential>, type: String) =
         credentials.map {
             Notification(
                 id = UUID.generateUUID().toString(),//TODO: converted back and forth (see notification-service)
