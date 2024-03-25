@@ -167,7 +167,8 @@ object KeycloakAccountStrategy : PasswordAccountStrategy<KeycloakAccountRequest>
         } else {
           AccountsService.register(tenant, request).getOrThrow().id
         }
-    return AuthenticatedUser(registeredUserId, jwt.subject)
+      // TODO: change id to wallet-id (also in the frontend)
+    return KeycloakAuthenticatedUser(registeredUserId, jwt.subject)
   }
 
   suspend fun getAccessToken(): String {
