@@ -35,18 +35,18 @@ class EventService {
     }
 
 
-    fun add(event: Event): Unit = transaction {
-        Events.insert {
-            it[this.tenant] = event.tenant
-            it[this.originator] = event.originator ?: "unknown"
-            it[this.account] = event.account
-            it[this.wallet] = event.wallet
-            it[this.credentialId] = event.credentialId
-            it[this.timestamp] = event.timestamp.toJavaInstant()
-            it[this.event] = event.event
-            it[this.action] = event.action
-            it[this.data] = Json.encodeToString(event.data)
-            it[this.note] = event.note
+    fun add(events: List<Event>): Unit = transaction {
+        Events.batchInsert(events) {
+            this[Events.tenant] = it.tenant
+            this[Events.originator] = it.originator ?: "unknown"
+            this[Events.account] = it.account
+            this[Events.wallet] = it.wallet
+            this[Events.credentialId] = it.credentialId
+            this[Events.timestamp] = it.timestamp.toJavaInstant()
+            this[Events.event] = it.event
+            this[Events.action] = it.action
+            this[Events.data] = Json.encodeToString(it.data)
+            this[Events.note] = it.note
         }
     }
 
