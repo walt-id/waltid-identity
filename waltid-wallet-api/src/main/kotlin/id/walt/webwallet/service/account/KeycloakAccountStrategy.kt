@@ -138,7 +138,7 @@ object KeycloakAccountStrategy : PasswordAccountStrategy<KeycloakAccountRequest>
   override suspend fun authenticate(
       tenant: String,
       request: KeycloakAccountRequest
-  ): KeycloakAuthenticatedUser {
+  ): AuthenticatedUser {
 
     val token =
         when {
