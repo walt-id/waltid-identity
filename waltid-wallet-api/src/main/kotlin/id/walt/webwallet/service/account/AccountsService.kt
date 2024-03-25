@@ -116,6 +116,12 @@ object AccountsService {
                     }
             })
 
+    fun getAccountForWallet(wallet: UUID) = transaction {
+        AccountWalletMappings.select(AccountWalletMappings.accountId)
+            .where { AccountWalletMappings.wallet eq wallet }.firstOrNull()
+            ?.let { it[AccountWalletMappings.accountId] }
+    }
+
     fun hasAccountEmail(tenant: String, email: String) = transaction {
         Accounts.selectAll()
             .where { (Accounts.tenant eq tenant) and (Accounts.email eq email) }

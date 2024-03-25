@@ -22,6 +22,7 @@ import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.util.*
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
@@ -254,6 +255,7 @@ object  IssuanceService {
         )
     }
 
+    @Serializable
     data class CredentialDataResult(
         val id: String,
         val document: String,
