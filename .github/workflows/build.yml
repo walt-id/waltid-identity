@@ -43,5 +43,5 @@ jobs:
           MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
         with:
-          arguments: build publish --no-daemon
+          arguments: build --no-daemon
         if: ${{ steps.frontend-changed-files.outputs.any_changed == 'false' }}
