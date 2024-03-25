@@ -2,31 +2,25 @@ package id.walt.webwallet.service.notifications
 
 import id.walt.webwallet.db.models.Notification
 import id.walt.webwallet.db.models.WalletNotifications
-import kotlinx.datetime.Instant
+import kotlinx.datetime.LocalDate
 import kotlinx.datetime.toJavaInstant
+import kotlinx.datetime.toJavaLocalDate
 import kotlinx.uuid.UUID
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.inList
+import org.jetbrains.exposed.sql.javatime.date
+import org.jetbrains.exposed.sql.javatime.dateParam
 import org.jetbrains.exposed.sql.transactions.transaction
-import java.time.temporal.ChronoUnit
 
 object NotificationService {
     fun list(
         wallet: UUID,
-        type: String? = null,
-        addedOn: Instant? = null,
+        type: String? = null, addedOn: String? = null,
         isRead: Boolean? = null,
         sortAscending: Boolean? = null
     ): List<Notification> = transaction {
-        filterAll(wallet, type, isRead, sortAscending).mapNotNull { result ->
-            if (addedOn != null) {
-                addedOn.takeIf {
-                    result[WalletNotifications.addedOn].truncatedTo(ChronoUnit.DAYS) == it.toJavaInstant()
-                        .truncatedTo(ChronoUnit.DAYS)
-                }?.let {
-                    Notification(result)
-                }
-            } else Notification(result)
+        filterAll(wallet, type, isRead, addedOn, sortAscending).mapNotNull {
+            Notification(it)
         }
     }
 
@@ -51,13 +45,16 @@ object NotificationService {
     }
 
     private fun filterAll(
-        wallet: UUID, type: String?, isRead: Boolean?, ascending: Boolean?
+        wallet: UUID, type: String?, isRead: Boolean?, addedOn: String?, ascending: Boolean?
     ) = WalletNotifications.selectAll().where {
         WalletNotifications.wallet eq wallet
     }.andWhere {
         isRead?.let { WalletNotifications.isRead eq it } ?: Op.TRUE
     }.andWhere {
         type?.let { WalletNotifications.type eq it } ?: Op.TRUE
+    }.andWhere {
+        runCatching { LocalDate.parse(addedOn!!) }.getOrNull()
+            ?.let { WalletNotifications.addedOn.date() eq dateParam(it.toJavaLocalDate()) } ?: Op.TRUE
     }.orderBy(column = WalletNotifications.addedOn,
         order = ascending?.takeIf { it }?.let { SortOrder.ASC } ?: SortOrder.DESC)
 
