@@ -1,5 +1,6 @@
 package id.walt.cli.commands
 
+import com.github.ajalt.clikt.core.BadParameterValue
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.terminal
 import com.github.ajalt.clikt.parameters.arguments.argument
@@ -45,6 +46,14 @@ class VCSignCmd : CliktCommand(
 
         val key = runBlocking { KeyUtil().getKey(keyFile) }
         val issuerDid = issuerDid ?: runBlocking { DidUtil.createDid(DidMethod.KEY, key) }
+
+        // Check if it's a valid DID
+        try {
+            DidUtil.resolveDid(issuerDid)
+        } catch (e: IllegalArgumentException) {
+            throw BadParameterValue("DID not supported: ${issuerDid}")
+        }
+
         val payload = vc.readText()
 
         val signedVC = runBlocking {
