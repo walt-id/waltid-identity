@@ -66,7 +66,7 @@ object AccountsService {
           }
           .onFailure { throw IllegalStateException("Could not register user: ${it.message}", it) }
 
-    suspend fun authenticate(tenant: String, request: AccountRequest): Result<AuthenticationResult> = runCatching {
+    suspend fun authenticate(tenant: String, request: AccountRequest): Result<AuthenticatedUser> = runCatching {
         when (request) {
             is EmailAccountRequest -> EmailAccountStrategy.authenticate(tenant, request)
             is AddressAccountRequest -> Web3WalletAccountStrategy.authenticate(tenant, request)
@@ -82,17 +82,10 @@ object AccountsService {
             originator = "wallet",
             accountId = it.id,
             walletId = UUID.NIL,
-            data = AccountEventData(accountId = it.username)
+            data = AccountEventData(accountId = it.id.toString())
         )
-        Result.success(
-            AuthenticationResult(
-                id = it.id,
-                username = it.username,
-//                token = generateToken()
-            )
-        )
-    },
-        onFailure = { Result.failure(it) })
+        Result.success(it)
+    }, onFailure = { Result.failure(it) })
 
     fun getAccountWalletMappings(tenant: String, account: UUID) =
         AccountWalletListing(
@@ -167,15 +160,29 @@ object AccountsService {
 }
 
 @Serializable
-data class AuthenticationResult(
-    val id: UUID,
-    val username: String,
-//    val token: String,
-)
-
-@Serializable
 data class RegistrationResult(
     val id: UUID,
 )
 
-data class AuthenticatedUser(val id: UUID, val username: String)
+@Serializable
+sealed class AuthenticatedUser {
+    abstract val id: UUID
+}
+
+@Serializable
+data class UsernameAuthenticatedUser(
+    override val id: UUID,
+    val username: String,
+) : AuthenticatedUser()
+
+@Serializable
+data class AddressAuthenticatedUser(
+    override val id: UUID,
+    val address: String,
+) : AuthenticatedUser()
+
+@Serializable
+data class KeycloakAuthenticatedUser(
+    override val id: UUID,
+    val keycloakUserId: String,
+) : AuthenticatedUser()

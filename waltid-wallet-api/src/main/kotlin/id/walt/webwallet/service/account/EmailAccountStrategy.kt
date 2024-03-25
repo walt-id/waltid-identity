@@ -64,7 +64,8 @@ object EmailAccountStrategy : PasswordAccountStrategy<EmailAccountRequest>() {
 
         if (passwordMatches) {
             val id = matchedAccount[Accounts.id]
-            return AuthenticatedUser(id, req.username)
+            // TODO: change id to wallet-id (also in the frontend)
+            return UsernameAuthenticatedUser(id, req.username)
         } else {
             throw UnauthorizedException("Invalid password for \"${req.username}\"!")
         }
