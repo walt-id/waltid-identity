@@ -2,6 +2,8 @@ package id.walt.cli.commands
 
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.parameters.arguments.argument
+import com.github.ajalt.clikt.parameters.options.multiple
+import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.types.file
 import id.walt.cli.util.PrettyPrinter
 import id.walt.cli.util.VCUtil
@@ -22,6 +24,22 @@ class VCVerifyCmd : CliktCommand(
     // .required()
 
     private val vc: File by argument(help = "the verifiable credential file (in the JWS format) to be verified (required)").file()
+
+    // val policies: Map<String, String?> by option(
+    val policies: List<String> by option(
+        "-p",
+        "--policy",
+        help = """Specify a policy to be applied in the verification process.
+                  Multiple policies are accepted. 
+                  If no policy is specified, only the Signature Policy will be applied.
+                  To define multiple policies, use --policy PolicyName1 --policy PolicyName2 (...) 
+                  Some policies require parameters. To specify it, use: 
+                  PolicyName='{"policyParam1"="policyVal1", "policyParam2"="policyVal2"}'
+                """.trimIndent()
+    ).multiple()
+    // associate()
+
+    //
 
     override fun run() {
 

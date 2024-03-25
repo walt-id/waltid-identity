@@ -2,6 +2,8 @@ package id.walt.cli.commands
 
 import com.github.ajalt.clikt.core.PrintHelpMessage
 import com.github.ajalt.clikt.testing.test
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.assertDoesNotThrow
 import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertFailsWith
@@ -53,4 +55,16 @@ class WaltIdVCVerifyCmdTest {
         assertContains(result.output, "The VC signature is valid")
     }
 
+    @Test
+    fun `should have --policy option`() {
+        val result = command.test(listOf("--policy=aPolicy", "${vcFilePath}"))
+        assertFalse(result.output.contains("Error: no such option --policy"))
+    }
+
+    @Test
+    fun `should accept multiple --policy options`() {
+        assertDoesNotThrow {
+            command.parse(listOf("--policy=foo --policy=bar", "${vcFilePath}"))
+        }
+    }
 }
