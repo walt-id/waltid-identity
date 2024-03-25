@@ -545,7 +545,7 @@ class SSIKit2WalletService(
 
     override fun filterEventLog(filter: EventLogFilter): EventLogFilterResult = runCatching {
         val startingAfterItemIndex = filter.startingAfter?.toLongOrNull()?.takeIf { it >= 0 } ?: -1L
-        val pageSize = filter.limit
+        val pageSize = filter.limit ?: -1
         val count = eventUseCase.count(walletId, filter.data)
         val offset = startingAfterItemIndex + 1
         val events = eventUseCase.get(
