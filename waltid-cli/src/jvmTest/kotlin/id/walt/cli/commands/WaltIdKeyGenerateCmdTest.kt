@@ -1,11 +1,10 @@
-package id.walt.cli
+package id.walt.cli.commands
 
 import com.github.ajalt.clikt.core.BadParameterValue
 import com.github.ajalt.clikt.core.IncorrectOptionValueCount
 import com.github.ajalt.clikt.core.PrintHelpMessage
 import com.github.ajalt.clikt.testing.CliktCommandTestResult
 import com.github.ajalt.clikt.testing.test
-import id.walt.cli.commands.KeyGenerateCmd
 import id.walt.crypto.keys.KeyType
 import kotlinx.coroutines.test.runTest
 import java.io.File
