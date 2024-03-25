@@ -1,4 +1,4 @@
-package id.walt.cli
+package id.walt.cli.commands
 
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.MissingArgument
@@ -6,7 +6,6 @@ import com.github.ajalt.clikt.core.MissingOption
 import com.github.ajalt.clikt.core.PrintHelpMessage
 import com.github.ajalt.clikt.testing.CliktCommandTestResult
 import com.github.ajalt.clikt.testing.test
-import id.walt.cli.commands.VCSignCmd
 import kotlinx.io.files.FileNotFoundException
 import org.junit.jupiter.api.assertDoesNotThrow
 import kotlin.test.Test
@@ -20,7 +19,7 @@ class WaltIdVCSignCmdTest {
 
     val resourcesPath = "src/jvmTest/resources"
 
-    val keyFileName = "${resourcesPath}/ed25519_by_waltid_pvt_key.jwk"
+    val keyFileName = "${resourcesPath}/key/ed25519_by_waltid_pvt_key.jwk"
     val issuerDid = "did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV"
     val subjectDid = "did:key:z6Mkjm2gaGsodGchfG4k8P6KwCHZsVEPZho5VuEbY94qiBB9"
     val vcFilePath = "${resourcesPath}/vc/openbadgecredential_sample.json"

@@ -1,9 +1,8 @@
-package id.walt.cli
+package id.walt.cli.commands
 
 import com.github.ajalt.clikt.core.InvalidFileFormat
 import com.github.ajalt.clikt.core.PrintHelpMessage
 import com.github.ajalt.clikt.testing.test
-import id.walt.cli.commands.DidCreateCmd
 import id.walt.cli.util.getResourcePath
 import kotlinx.io.files.FileNotFoundException
 import org.junit.jupiter.api.assertDoesNotThrow
@@ -134,8 +133,8 @@ class WaltIdDidCreateCmdTest {
     @Test
     fun `should create different DIDs when provided with different keys`() {
 
-        val didFile1 = "ed25519_key_sample1.json"
-        val didFile2 = "ed25519_key_sample2.json"
+        val didFile1 = "key/ed25519_key_sample1.json"
+        val didFile2 = "key/ed25519_key_sample2.json"
 
         val didFilePath1 = getResourcePath(this, didFile1)
         val didFilePath2 = getResourcePath(this, didFile2)
@@ -154,7 +153,7 @@ class WaltIdDidCreateCmdTest {
 
     @Test
     fun `should fail if a PEM key file is provided`() {
-        val keyFile1 = "secp256k1_key_sample1.pem"
+        val keyFile1 = "key/secp256k1_key_sample1.pem"
         val keyFilePath1 = getResourcePath(this, keyFile1)
 
         val failure = assertFailsWith<InvalidFileFormat> {
@@ -166,7 +165,7 @@ class WaltIdDidCreateCmdTest {
 
     @Test
     fun `should fail if the the provided --key is in a not supported format`() {
-        val didFile1 = "invalidKey.jwk"
+        val didFile1 = "key/invalidKey.jwk"
         val didFilePath1 = getResourcePath(this, didFile1)
 
         val failure = assertFailsWith<InvalidFileFormat> {

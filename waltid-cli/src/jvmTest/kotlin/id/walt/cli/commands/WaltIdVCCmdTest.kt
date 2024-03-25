@@ -1,8 +1,7 @@
-package id.walt.cli
+package id.walt.cli.commands
 
 import com.github.ajalt.clikt.core.PrintHelpMessage
 import com.github.ajalt.clikt.testing.test
-import id.walt.cli.commands.VCCmd
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertContains

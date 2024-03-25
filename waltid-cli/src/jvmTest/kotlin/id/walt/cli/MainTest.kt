@@ -70,7 +70,7 @@ class MainTest {
 
     val resourcesPath = "src/jvmTest/resources"
 
-    val keyFilePath = "${resourcesPath}/ed25519_by_waltid_pvt_key.jwk"
+    val keyFilePath = "${resourcesPath}/key/ed25519_by_waltid_pvt_key.jwk"
     val did1 = "did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV"
     val did2 = "did:key:z6Mkjm2gaGsodGchfG4k8P6KwCHZsVEPZho5VuEbY94qiBB9"
     val vcFilePath = "${resourcesPath}/vc/openbadgecredential_sample.json"
@@ -184,7 +184,7 @@ class MainTest {
     fun `should convert the RSA key in the specified file from the JWK to the PEM format when 'key convert -i myRSAKey' is executed`(
         output: CapturedOutput
     ) {
-        val inputFileName = getResourcePath(this, "rsa_by_waltid_pub_pvt_key.jwk")
+        val inputFileName = getResourcePath(this, "key/rsa_by_waltid_pub_pvt_key.jwk")
         testSuccessfulKeyConvertion(inputFileName, pemKeyPatterns[KeyType.RSA], output)
     }
 
@@ -192,7 +192,7 @@ class MainTest {
     fun `should fail when trying to convert the Ed25519 key in the specified file from the JWK to the PEM format when 'key convert -i myEd25519Key' is executed`(
         output: CapturedOutput
     ) {
-        val inputFileName = getResourcePath(this, "ed25519_by_waltid_pub_pvt_key.jwk")
+        val inputFileName = getResourcePath(this, "key/ed25519_by_waltid_pub_pvt_key.jwk")
         testFailedKeyConvertion(inputFileName, pemKeyPatterns[KeyType.RSA], output)
     }
 
