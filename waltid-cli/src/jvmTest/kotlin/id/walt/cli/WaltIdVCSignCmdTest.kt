@@ -116,13 +116,12 @@ class WaltIdVCSignCmdTest {
     }
 
     @Test
-    @Ignore
     fun `should fail if a badly formatted DID is provided`() {
 
         val weirdDid = "did:foo:bar"
         val result = command.test(arrayOf("-k", keyFileName, "-i", weirdDid, "-s", subjectDid, vcFilePath))
 
-        assertContains(result.output, "DID not recognizable")
+        assertContains(result.output, "DID not supported")
     }
 
 
