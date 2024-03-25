@@ -22,12 +22,6 @@ class VCSignCmd : CliktCommand(
 ) {
     val print: PrettyPrinter = PrettyPrinter(this)
 
-    // -k, —key
-    // -i, —issuerDid<str>
-    // -s, —subjectDid=<str>
-    // -vc, —verifiableCredential=<filepath>
-
-
     private val keyFile by option("-k", "--key")
         // .help("The Subject's key to be used. If none is provided, a new one will be generated.")
         .help("A core-crypto key representation to sign the credential (required)")
