@@ -4,6 +4,7 @@ import id.walt.crypto.keys.Key
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.did.dids.DidService
 import kotlinx.datetime.Clock
+import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.Instant
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
@@ -14,7 +15,11 @@ import love.forte.plugin.suspendtrans.annotation.JvmAsync
 import love.forte.plugin.suspendtrans.annotation.JvmBlocking
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.DurationUnit
+import kotlin.time.toDuration
+
 @OptIn(ExperimentalJsExport::class)
 @JsExport
 class PresentationBuilder {
@@ -34,7 +39,7 @@ class PresentationBuilder {
      * when the JWT was issued at
      */
     var jwtIssuedAt: Instant? = Clock.System.now()
-
+    var jwtExpiration: Instant? = Clock.System.now().plus(1.toDuration(DurationUnit.MINUTES))
     /**
      * jti: JWT ID
      */
@@ -50,6 +55,7 @@ class PresentationBuilder {
      */
     var audience: String? = null
 
+
     var vpContext = listOf("https://www.w3.org/2018/credentials/v1")
     var vpType = listOf("VerifiablePresentation")
 
@@ -61,6 +67,7 @@ class PresentationBuilder {
         "sub" to did,
         "nbf" to jwtNotBefore?.epochSeconds,
         "iat" to jwtIssuedAt?.epochSeconds,
+        "exp" to jwtExpiration?.epochSeconds,
         "jti" to presentationId,
         "iss" to did,
         "nonce" to (nonce ?: ""),

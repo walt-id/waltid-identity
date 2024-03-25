@@ -13,7 +13,8 @@ import kotlinx.serialization.encoding.Encoder
 enum class GrantType(val value: String) {
     implicit("implicit"),
     authorization_code("authorization_code"),
-    pre_authorized_code("urn:ietf:params:oauth:grant-type:pre-authorized_code");
+    pre_authorized_code("urn:ietf:params:oauth:grant-type:pre-authorized_code"),
+    vp_token("vp_token");
 
     companion object {
         fun fromValue(value: String): GrantType? {

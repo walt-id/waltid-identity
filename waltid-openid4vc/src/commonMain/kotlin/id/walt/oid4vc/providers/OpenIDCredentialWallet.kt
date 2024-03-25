@@ -167,14 +167,14 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
                 result.presentations.first().let { VpTokenParameter.fromJsonElement(it) },
                 if (idToken == null) result.presentationSubmission else null,
                 idToken = idToken,
-                state = session.authorizationRequest?.state
+                state = session.authorizationRequest?.state, grantType = null, scope = null
             )
         } else {
             TokenResponse.success(
                 JsonArray(result.presentations).let { VpTokenParameter.fromJsonElement(it) },
                 if (idToken == null) result.presentationSubmission else null,
                 idToken = idToken,
-                state = session.authorizationRequest?.state
+                state = session.authorizationRequest?.state, grantType = null, scope = null
             )
         }
     }

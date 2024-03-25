@@ -1,3 +1,4 @@
+import id.walt.credentials.PresentationBuilder
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.LocalKey
 import id.walt.crypto.utils.MultiBaseUtils
@@ -7,12 +8,18 @@ import id.walt.did.dids.registrar.local.key.DidKeyRegistrar
 import id.walt.did.dids.registrar.local.web.DidWebRegistrar
 import id.walt.did.utils.randomUUID
 import id.walt.oid4vc.OpenID4VCI
+import id.walt.oid4vc.OpenID4VP
 import id.walt.oid4vc.data.*
+import id.walt.oid4vc.data.dif.DescriptorMapping
+import id.walt.oid4vc.data.dif.PresentationDefinition
+import id.walt.oid4vc.data.dif.PresentationSubmission
+import id.walt.oid4vc.interfaces.PresentationResult
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.requests.CredentialRequest
 import id.walt.oid4vc.requests.TokenRequest
 import id.walt.oid4vc.responses.AuthorizationCodeResponse
 import id.walt.oid4vc.responses.AuthorizationDirectPostResponse
+import id.walt.oid4vc.responses.CredentialResponse
 import id.walt.oid4vc.responses.TokenResponse
 import id.walt.oid4vc.util.http
 import io.ktor.client.request.*
@@ -36,6 +43,8 @@ import kotlinx.serialization.json.*
 import java.nio.ByteBuffer
 import java.util.UUID
 import kotlin.test.*
+import kotlin.time.DurationUnit
+import kotlin.time.toDuration
 
 class DidCreationTest {
 
@@ -98,7 +107,7 @@ class DidCreationTest {
     }
 
     val CLIENT_MOCK_PORT = 5000
-    val CLIENT_MOCK_URL = "http://localhost:5000/client-mock"
+    val CLIENT_MOCK_URL = "http://192.168.0.122:5000/client-mock"
     val CLIENT_MAIN_KEY = runBlocking { LocalKey.generate(KeyType.secp256k1) }
     val CLIENT_VCSIGN_KEY = runBlocking { LocalKey.generate(KeyType.secp256r1) }
     fun startClientMockServer() {
@@ -241,5 +250,41 @@ class DidCreationTest {
         }
         println(credRespRaw.bodyAsText())
         assertEquals(HttpStatusCode.OK, credRespRaw.status)
+        val credResp = CredentialResponse.fromJSONString(credRespRaw.bodyAsText())
+        println(credResp.credential)
+
+        val presDefResp = http.get("https://api-conformance.ebsi.eu/authorisation/v4/presentation-definitions") {
+            parameter("scope", "openid didr_invite")
+        }
+        println(presDefResp.bodyAsText())
+        val presDef = PresentationDefinition.fromJSONString(presDefResp.bodyAsText())
+
+        //OpenID4VP.createPresentationRequest(PresentationDefinitionParameter.fromPresentationDefinitionScope("openid didr_invite"),
+        //    clientId = CLIENT_MOCK_URL, clientIdScheme = ClientIdScheme.RedirectUri, )
+
+        val tokenResponse = OpenID4VP.generatePresentationResponse(
+            PresentationResult(listOf(JsonPrimitive(
+                PresentationBuilder().also {
+                    it.did = did
+                    it.addCredential(credResp.credential!!)
+                    it.nonce = tokenResp.cNonce
+                    it.audience = "https://api-conformance.ebsi.eu/authorisation/v4"
+                    it.jwtExpiration = Clock.System.now().plus(1.toDuration(DurationUnit.MINUTES))
+                }.buildPresentationJsonString().let {
+                    CLIENT_VCSIGN_KEY.signJws(
+                        it.encodeToByteArray(),
+                        headers = mapOf("kid" to "$did#${CLIENT_VCSIGN_KEY.getKeyId()}", "typ" to "JWT")
+                    )
+                }
+            )), PresentationSubmission(
+                presDef.id, presDef.id, presDef.inputDescriptors.map {
+                    DescriptorMapping(it.id, it.format!!.keys.first(), DescriptorMapping.vpPath(1, 0))
+                }
+            )), grantType = GrantType.vp_token, scope = "openid didr_invite"
+        )
+        println(tokenResponse.vpToken.toString())
+        val accessTokenResponse = http.submitForm("https://api-conformance.ebsi.eu/authorisation/v4/token",
+            formParameters = parametersOf(tokenResponse.toHttpParameters())) {}.bodyAsText()
+        println(accessTokenResponse)
     }
 }

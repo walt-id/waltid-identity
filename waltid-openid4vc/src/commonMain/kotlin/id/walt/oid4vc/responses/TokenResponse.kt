@@ -36,6 +36,7 @@ data class TokenResponse private constructor(
     val error: String? = null,
     @SerialName("error_description") val errorDescription: String? = null,
     @SerialName("error_uri") val errorUri: String? = null,
+    @SerialName("grant_type") val grantType: GrantType? = null,
     override val customParameters: Map<String, JsonElement> = mapOf()
 ) : JsonDataObject(), IHTTPDataObject {
     val isSuccess get() = accessToken != null || (vpToken != null && presentationSubmission != null)
@@ -55,8 +56,8 @@ data class TokenResponse private constructor(
          * Utility method to construct a success response for a verifiable presentation request
          * @param vpToken Utility object that aids the construction of the parameter value, according [OpenID Spec section 6.1](https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#section-6.1), which defines this as a single string, single JSON object, or a JSON array of strings and/or objects, depending on the presentation format.
          */
-        fun success(vpToken: VpTokenParameter, presentationSubmission: PresentationSubmission?, idToken: String?, state: String?) =
-            TokenResponse(vpToken = vpToken.toJsonElement(), presentationSubmission = presentationSubmission, idToken = idToken, state = state)
+        fun success(vpToken: VpTokenParameter, presentationSubmission: PresentationSubmission?, idToken: String?, state: String?, grantType: GrantType?, scope: String?) =
+            TokenResponse(vpToken = vpToken.toJsonElement(), presentationSubmission = presentationSubmission, idToken = idToken, state = state, grantType = grantType, scope = scope)
 
         /**
          * Utility method to construct a success response for an openid id_token request
@@ -82,7 +83,8 @@ data class TokenResponse private constructor(
             "state",
             "error",
             "error_description",
-            "error_uri"
+            "error_uri",
+            "grant_type"
         )
 
         fun fromHttpParameters(parameters: Map<String, List<String>>): TokenResponse {
@@ -103,6 +105,7 @@ data class TokenResponse private constructor(
                 parameters["error"]?.firstOrNull(),
                 parameters["error_description"]?.firstOrNull(),
                 parameters["error_uri"]?.firstOrNull(),
+                parameters["grant_type"]?.firstOrNull()?.let { GrantType.fromValue(it) },
                 parameters.filter { !knownKeys.contains(it.key) && it.value.isNotEmpty() }
                     .mapValues { Json.parseToJsonElement(it.value.first()) }
             )
@@ -127,6 +130,7 @@ data class TokenResponse private constructor(
             error?.let { put("error", listOf(it)) }
             errorDescription?.let { put("error_description", listOf(it)) }
             errorUri?.let { put("error_uri", listOf(it)) }
+            grantType?.let { put("grant_type", listOf(it.value)) }
             putAll(customParameters.mapValues { listOf(it.value.toString()) })
         }
     }

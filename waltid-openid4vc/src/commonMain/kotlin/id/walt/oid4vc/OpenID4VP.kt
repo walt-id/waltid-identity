@@ -120,21 +120,22 @@ object OpenID4VP {
         state: String? = null,
         code: String? = null,
         idToken: String? = null,
-        iss: String? = null
+        iss: String? = null,
+        grantType: GrantType? = null, scope: String? = null
     ): TokenResponse {
         return if (presentationResult.presentations.size == 1) {
             TokenResponse.success(
                 VpTokenParameter.fromJsonElement(presentationResult.presentations.first()),
                 presentationResult.presentationSubmission,
                 state = state,
-                idToken = idToken
+                idToken = idToken, grantType = grantType, scope = scope
             )
         } else {
             TokenResponse.success(
                 VpTokenParameter.fromJsonElement(JsonArray(presentationResult.presentations)),
                 presentationResult.presentationSubmission,
                 state = state,
-                idToken = idToken
+                idToken = idToken, grantType = grantType, scope = scope
             )
         }.copy(customParameters = buildMap {
             code?.let { put("code", JsonPrimitive(it)) }

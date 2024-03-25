@@ -128,6 +128,7 @@ kotlin {
                 implementation("io.ktor:ktor-server-content-negotiation:2.3.8")
                 implementation("io.ktor:ktor-server-netty:2.3.8")
                 implementation(project(":waltid-openid4vc"))
+                implementation(project(":waltid-verifiable-credentials"))
             }
         }
         val jsMain by getting {
