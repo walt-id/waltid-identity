@@ -6,7 +6,10 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.uuid.UUID
 import org.jetbrains.exposed.sql.*
+import org.jetbrains.exposed.sql.javatime.date
+import org.jetbrains.exposed.sql.javatime.dateParam
 import org.jetbrains.exposed.sql.transactions.transaction
+import java.time.LocalDate
 
 class EventService {
     fun get(
@@ -30,16 +33,18 @@ class EventService {
         Events.selectAll().where { Events.wallet eq walletId }.addWhereClause(dataFilter).count()
 
 
-    fun add(events: List<Event>): Unit = transaction {
-        Events.batchInsert(events) {
-            this[Events.tenant] = it.tenant
-            this[Events.originator] = it.originator ?: "unknown"
-            this[Events.account] = it.account
-            this[Events.wallet] = it.wallet
-            this[Events.timestamp] = it.timestamp.toJavaInstant()
-            this[Events.event] = it.event
-            this[Events.action] = it.action
-            this[Events.data] = Json.encodeToString(it.data)
+    fun add(event: Event): Unit = transaction {
+        Events.insert {
+            it[tenant] = event.tenant
+            it[originator] = event.originator ?: "unknown"
+            it[account] = event.account
+            it[wallet] = event.wallet
+            it[timestamp] = event.timestamp.toJavaInstant()
+            it[this.event] = event.event
+            it[action] = event.action
+            it[data] = Json.encodeToString(event.data)
+            event.credentialId?.let { c -> it[credentialId] = c }
+            event.note?.let { n -> it[note] = n }
         }
     }
 
@@ -50,6 +55,14 @@ class EventService {
                 "action" -> this.andWhere { Events.action eq it.value }
                 "tenant" -> this.andWhere { Events.tenant eq it.value }
                 "originator" -> this.andWhere { Events.originator eq it.value }
+                "credentialid" -> this.andWhere { Events.credentialId eq it.value }
+                "timestamp", "addedon", "createdon" -> runCatching {
+                    LocalDate.parse(it.value)
+                }.getOrNull()?.let {
+                    this.andWhere {
+                        Events.timestamp.date() eq dateParam(it)
+                    }
+                }
             }
         }
         this
