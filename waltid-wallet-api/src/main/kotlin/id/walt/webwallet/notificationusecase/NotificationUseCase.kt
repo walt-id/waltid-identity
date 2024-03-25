@@ -37,7 +37,7 @@ class NotificationUseCase(
     fun findAll(wallet: UUID, parameter: NotificationFilterParameter) = service.list(
         wallet = wallet,
         type = parameter.type,
-        addedOn = parameter.addedOn?.let { Instant.parse(it) },
+        addedOn = parameter.addedOn,
         isRead = parameter.isRead,
         sortAscending = parseSortOrder(parameter.sort)
     )
