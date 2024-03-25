@@ -120,7 +120,7 @@ kotlin {
                 implementation(kotlin("test"))
                 implementation("io.kotest:kotest-assertions-core:5.8.0")
 
-                implementation("io.kotest:kotest-assertions-json:5.8.0")
+                implementation("io.kotest:kotest-assertions-json:5.8.1")
             }
         }
         val jvmMain by getting {
@@ -134,7 +134,7 @@ kotlin {
 
                 implementation("io.kotest:kotest-runner-junit5:5.8.0")
                 implementation("io.kotest:kotest-assertions-core:5.8.0")
-                implementation("io.kotest:kotest-assertions-json:5.8.0")
+                implementation("io.kotest:kotest-assertions-json:5.8.1")
             }
         }
         val jsMain by getting {
