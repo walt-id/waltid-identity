@@ -118,15 +118,15 @@ dependencies {
     implementation("io.github.reactivecircus.cache4k:cache4k:0.13.0")
 
     // Webauthn
-     implementation("com.webauthn4j:webauthn4j-core:0.22.1.RELEASE") {
-         exclude("ch.qos.logback")
-     }
+    implementation("com.webauthn4j:webauthn4j-core:0.22.1.RELEASE") {
+        exclude("ch.qos.logback")
+    }
 
     // DB
     implementation("org.jetbrains.exposed:exposed-core:0.47.0")
     implementation("org.jetbrains.exposed:exposed-jdbc:0.47.0")
     implementation("org.jetbrains.exposed:exposed-dao:0.47.0")
-    implementation("org.jetbrains.exposed:exposed-java-time:0.47.0")
+    implementation("org.jetbrains.exposed:exposed-java-time:0.48.0")
     implementation("org.jetbrains.exposed:exposed-json:0.47.0")
     // drivers
     implementation("org.xerial:sqlite-jdbc:3.44.1.0")

@@ -21,7 +21,7 @@ class EventUseCase(
         data: EventData,
         credentialId: String? = null,
         note: String? = null
-    ) = eventService.add(
+    ) = log(
         Event(
             action = action,
             tenant = tenant,
@@ -33,6 +33,8 @@ class EventUseCase(
             note = note,
         )
     )
+
+    fun log(vararg event: Event) = eventService.add(event.toList())
 
     fun count(walletId: UUID, dataFilter: Map<String, String>) = eventService.count(walletId, dataFilter)
 

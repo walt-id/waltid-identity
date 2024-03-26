@@ -6,6 +6,7 @@ import com.nimbusds.jose.JWSObject
 import com.nimbusds.jose.Payload
 import com.nimbusds.jose.crypto.MACSigner
 import com.nimbusds.jose.crypto.MACVerifier
+import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.webwallet.config.AuthConfig
 import id.walt.webwallet.config.ConfigManager
 import id.walt.webwallet.config.OidcConfiguration
@@ -37,10 +38,7 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.sessions.*
 import io.ktor.util.pipeline.*
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.*
 import kotlinx.uuid.UUID
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.selectAll
@@ -463,14 +461,11 @@ suspend fun PipelineContext<Unit, ApplicationCall>.doLogin() {
                 sign(MACSigner(AuthKeys.tokenKey))
             }.serialize()
 
+
             call.sessions.set(LoginTokenSession(token))
             call.response.status(HttpStatusCode.OK)
             call.respond(
-                mapOf(
-                    "token" to token,
-                    "id" to it.id.toString(), // TODO: change id to wallet-id (also in the frontend)
-                    "username" to it.username
-                )
+                Json.encodeToJsonElement(it).jsonObject.minus("type").plus(Pair("token", token.toJsonElement()))
             )
         }
         .onFailure { call.respond(HttpStatusCode.BadRequest, it.localizedMessage) }

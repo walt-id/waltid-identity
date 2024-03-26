@@ -11,8 +11,8 @@
 </a>
 </div>
 
-
 ## Installation
+
 Add the crypto library as a dependency to your Kotlin or Java project.
 
 ### walt.id Repository
@@ -336,7 +336,6 @@ walt.id identity.
 | ECDSA | secp256k1 | ES256K  | ECDSA + SECG curve secp256k1 (Koblitz curve as used in Bitcoin) |
 |  RSA  |    RSA    |  RS256  | RSA                                                             |
 
-
 ### Available on platforms
 
 |  Platform   |           | Availability |
@@ -348,9 +347,6 @@ walt.id identity.
 |             |  OpenSSL  |   &cross;    |
 | WebAssembly |   WASM    |   &cross;    |
 
-
-
-
 ### JWS compatibility (recommended)
 
 | Algorithm | JVM provider |   JS provider / platform    |
@@ -359,7 +355,6 @@ walt.id identity.
 |   ES256   | Nimbus JOSE  | jose / Node.js & Web Crypto |
 |  ES256K   | Nimbus JOSE  |       jose / Node.js        |
 |   RS256   | Nimbus JOSE  | jose / Node.js & Web Crypto |
-
 
 ## How to use it
 

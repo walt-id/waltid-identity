@@ -22,4 +22,7 @@ external interface RemoteJWKSetOptions {
         set(value) = definedExternally
 }
 
-external fun <T : KeyLike> createRemoteJWKSet(url: URL, options: RemoteJWKSetOptions = definedExternally): (protectedHeader: JWSHeaderParameters, token: FlattenedJWSInput) -> Promise<T>
+external fun <T : KeyLike> createRemoteJWKSet(
+    url: URL,
+    options: RemoteJWKSetOptions = definedExternally
+): (protectedHeader: JWSHeaderParameters, token: FlattenedJWSInput) -> Promise<T>
