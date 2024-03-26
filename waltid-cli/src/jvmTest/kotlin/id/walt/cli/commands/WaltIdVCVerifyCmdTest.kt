@@ -57,14 +57,30 @@ class WaltIdVCVerifyCmdTest {
 
     @Test
     fun `should have --policy option`() {
-        val result = command.test(listOf("--policy=aPolicy", "${vcFilePath}"))
+        val result = command.test(listOf("--policy=aPolicy", "${signedVCFilePath}"))
         assertFalse(result.output.contains("Error: no such option --policy"))
     }
 
     @Test
     fun `should accept multiple --policy options`() {
         assertDoesNotThrow {
-            command.parse(listOf("--policy=foo --policy=bar", "${vcFilePath}"))
+            command.parse(listOf("--policy=foo --policy=bar", "${signedVCFilePath}"))
         }
     }
+
+    @Test
+    fun `should not require a --policy`() {
+        val result = command.test(listOf("${signedVCFilePath}"))
+        assertContains(result.output, "The VC signature is valid")
+    }
+
+    @Test
+    fun `should apply only the specified policy`() {
+        val result1 = command.test(listOf("${signedVCFilePath}"))
+        assertContains(result1.output, "The VC signature is valid")
+
+        val result2 = command.test(listOf("--policy=xxx", signedVCFilePath))
+        assertContains(result2.output, "xxx: success")
+    }
+
 }
