@@ -47,14 +47,15 @@ class VCVerifyCmd : CliktCommand(
 
         val jws = vc.readText()
 
-        val result = runBlocking { VCUtil.verify(jws) }
+        val result = runBlocking { VCUtil.verify(jws, policies) }
 
-        if (result.isSuccess) {
-            print.green("Success! ", false)
-            print.plain("The VC signature is valid.")
-        } else {
-            print.red("Fail! ", false)
-            print.plain("VC signature is not valid.")
-        }
+        // if (result.isSuccess) {
+        //     print.green("Success! ", false)
+        //     print.plain("The VC signature is valid.")
+        // } else {
+        //     print.red("Fail! ", false)
+        //     // print.plain("VC signature is not valid.")
+        //     result.exceptionOrNull()?.let { it.message ?: "VC signature is not valid." }?.let { print.plain(it) }
+        // }
     }
 }
