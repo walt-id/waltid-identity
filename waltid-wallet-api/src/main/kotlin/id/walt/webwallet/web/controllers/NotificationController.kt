@@ -126,7 +126,7 @@ object NotificationController {
                             description = "Notification id"
                         }
                     }
-                }){
+                }) {
                     get({
                         summary = "Get notification by id"
                         response {

@@ -36,7 +36,10 @@ class KeySerializationTests {
 
     @ParameterizedTest
     @MethodSource
-    fun `given a serialized key string, when deserializing then the result has the correct class type`(serialized: String, clazz: KClass<Key>) =
+    fun `given a serialized key string, when deserializing then the result has the correct class type`(
+        serialized: String,
+        clazz: KClass<Key>
+    ) =
         runTest {
             // when
             val key = KeySerialization.deserializeKey(serialized).getOrThrow()
@@ -46,20 +49,21 @@ class KeySerializationTests {
 
     companion object {
         @JvmStatic
-        fun `given key, when serializing it then the serialization result contains the correct type and key-string`(): Stream<Arguments> = Stream.of(
-            arguments(loadJwkLocal("ed25519.private.json"), "jwk"),
-            arguments(loadJwkLocal("secp256k1.private.json"), "jwk"),
-            arguments(loadJwkLocal("secp256r1.private.json"), "jwk"),
-            arguments(loadJwkLocal("rsa.private.json"), "jwk"),
-            // public
-            arguments(loadJwkLocal("ed25519.public.json"), "jwk"),
-            arguments(loadJwkLocal("secp256k1.public.json"), "jwk"),
-            arguments(loadJwkLocal("secp256r1.public.json"), "jwk"),
-            arguments(loadJwkLocal("rsa.public.json"), "jwk"),
-        )
+        fun `given key, when serializing it then the serialization result contains the correct type and key-string`(): Stream<Arguments> =
+            Stream.of(
+                arguments(loadJwkLocal("ed25519.private.json"), "jwk"),
+                arguments(loadJwkLocal("secp256k1.private.json"), "jwk"),
+                arguments(loadJwkLocal("secp256r1.private.json"), "jwk"),
+                arguments(loadJwkLocal("rsa.private.json"), "jwk"),
+                // public
+                arguments(loadJwkLocal("ed25519.public.json"), "jwk"),
+                arguments(loadJwkLocal("secp256k1.public.json"), "jwk"),
+                arguments(loadJwkLocal("secp256r1.public.json"), "jwk"),
+                arguments(loadJwkLocal("rsa.public.json"), "jwk"),
+            )
 
         @JvmStatic
-        fun `given a serialized key string, when deserializing then the result has the correct class type`(): Stream<Arguments> = Stream.of (
+        fun `given a serialized key string, when deserializing then the result has the correct class type`(): Stream<Arguments> = Stream.of(
             arguments(loadSerializedLocal("ed25519.private.json"), JWKKey::class),
             arguments(loadSerializedLocal("secp256k1.private.json"), JWKKey::class),
             arguments(loadSerializedLocal("secp256r1.private.json"), JWKKey::class),

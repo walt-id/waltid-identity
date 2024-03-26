@@ -11,7 +11,7 @@ import io.ktor.server.response.*
 fun Application.reports() = walletRoute {
     route("reports", {
         tags = listOf("WalletReports")
-    }){
+    }) {
         route("frequent", {
             summary = "List most frequently used"
             request {
@@ -20,7 +20,7 @@ fun Application.reports() = walletRoute {
                     required = false
                 }
             }
-        }){
+        }) {
             get("credentials", {
                 summary = "Credentials"
                 response {

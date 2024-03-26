@@ -194,7 +194,7 @@ class E2EWalletTestLocal : E2EWalletTestBase() {
         deleteCredential(id)
     }
 
-//    @Test(temporary disabled due to failure caused by ktor client)
+    //    @Test(temporary disabled due to failure caused by ktor client)
     fun e2eTestIssuance() = testApplication {
         runApplication()
         login()
