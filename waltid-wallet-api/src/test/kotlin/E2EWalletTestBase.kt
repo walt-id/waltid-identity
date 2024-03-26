@@ -1,3 +1,5 @@
+import id.walt.crypto.keys.KeyGenerationRequest
+import id.walt.crypto.keys.KeyType
 import id.walt.issuer.IssuanceExamples.issuerOnboardingRequestDefaultExample
 import id.walt.issuer.IssuerOnboardingResponse
 import id.walt.webwallet.db.models.AccountWalletListing
@@ -5,8 +7,6 @@ import id.walt.webwallet.db.models.WalletDid
 import id.walt.webwallet.utils.IssuanceExamples
 import id.walt.webwallet.web.model.AccountRequest
 import id.walt.webwallet.web.model.EmailAccountRequest
-import id.walt.crypto.keys.KeyGenerationRequest
-import id.walt.crypto.keys.KeyType
 import id.walt.webwallet.web.model.LoginRequestJson
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -30,7 +30,6 @@ abstract class E2EWalletTestBase {
     protected lateinit var token: String
     protected lateinit var walletId: UUID
     private lateinit var firstDid: String
-
 
 
     private fun randomString(length: Int) = (1..length).map { alphabet.random() }.toTypedArray().joinToString("")

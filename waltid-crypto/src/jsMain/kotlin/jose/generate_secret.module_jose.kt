@@ -8,4 +8,7 @@ external interface GenerateSecretOptions {
         set(value) = definedExternally
 }
 
-external fun <T : KeyLike> generateSecret(alg: String, options: GenerateSecretOptions = definedExternally): Promise<dynamic /* T | Uint8Array */>
+external fun <T : KeyLike> generateSecret(
+    alg: String,
+    options: GenerateSecretOptions = definedExternally
+): Promise<dynamic /* T | Uint8Array */>

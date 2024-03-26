@@ -285,15 +285,15 @@ class SSIKit2WalletService(
         val tokenResponse = credentialWallet.processImplicitFlowAuthorization(presentationSession.authorizationRequest!!)
         val resp = this.http.submitForm(
             presentationSession.authorizationRequest.responseUri
-            ?: presentationSession.authorizationRequest.redirectUri ?: throw AuthorizationError(
-                presentationSession.authorizationRequest,
-                AuthorizationErrorCode.invalid_request,
-                "No response_uri or redirect_uri found on authorization request"
-            ), parameters {
-            tokenResponse.toHttpParameters().forEach { entry ->
-                entry.value.forEach { append(entry.key, it) }
-            }
-        })
+                ?: presentationSession.authorizationRequest.redirectUri ?: throw AuthorizationError(
+                    presentationSession.authorizationRequest,
+                    AuthorizationErrorCode.invalid_request,
+                    "No response_uri or redirect_uri found on authorization request"
+                ), parameters {
+                tokenResponse.toHttpParameters().forEach { entry ->
+                    entry.value.forEach { append(entry.key, it) }
+                }
+            })
         val httpResponseBody = runCatching { resp.bodyAsText() }.getOrNull()
         val isResponseRedirectUrl = httpResponseBody != null && httpResponseBody.take(10).lowercase().let {
             @Suppress("HttpUrlsUsage")
@@ -455,6 +455,7 @@ class SSIKit2WalletService(
                 keysetHandle = JsonNull
             )
         }
+
     private val ociKeyMetadata by lazy {
         ConfigManager.getConfig<OciKeyConfig>().let {
             mapOf(
@@ -467,6 +468,7 @@ class SSIKit2WalletService(
             ).toJsonObject()
         }
     }
+
     override suspend fun generateKey(request: KeyGenerationRequest): String = let {
         request.config = request.config ?: ociKeyMetadata
         KeyManager.createKey(request)

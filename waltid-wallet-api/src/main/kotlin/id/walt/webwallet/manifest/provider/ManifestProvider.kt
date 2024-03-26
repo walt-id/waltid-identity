@@ -9,7 +9,7 @@ interface ManifestProvider {
     fun display(): JsonObject
     fun issuer(): JsonObject
 
-    companion object{
+    companion object {
         const val EntraManifestType = "msentra"
         val json = Json { ignoreUnknownKeys }
         fun new(manifest: String): ManifestProvider =

@@ -11,7 +11,11 @@ object OidcLoginService {
     private val oidcConfig = ConfigManager.getConfig<OidcConfiguration>()
     val jwkProvider: JwkProvider = JwkProviderBuilder(URL(oidcConfig.oidcJwks))
         .cached(oidcConfig.jwksCache.cacheSize.toLong(), oidcConfig.jwksCache.cacheExpirationHours.toLong(), TimeUnit.HOURS)
-        .rateLimited(oidcConfig.jwksCache.rateLimit.bucketSize.toLong(), oidcConfig.jwksCache.rateLimit.refillRateMinutes.toLong(), TimeUnit.MINUTES)
+        .rateLimited(
+            oidcConfig.jwksCache.rateLimit.bucketSize.toLong(),
+            oidcConfig.jwksCache.rateLimit.refillRateMinutes.toLong(),
+            TimeUnit.MINUTES
+        )
         .build()
     val oidcRealm = oidcConfig.oidcRealm
 
