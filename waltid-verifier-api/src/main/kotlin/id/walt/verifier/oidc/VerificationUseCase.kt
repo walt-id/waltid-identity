@@ -145,7 +145,7 @@ class VerificationUseCase(
             http.post(it.statusCallbackUri) {
                 header(HttpHeaders.ContentType, ContentType.Application.Json)
                 it.statusCallbackApiKey?.let { bearerAuth(it) }
-                setBody(mapOf("sessionId" to sessionId))
+                setBody(getResult(sessionId).getOrThrow())
             }.also {
                 logger.debug { "status callback: ${it.status}" }
             }
