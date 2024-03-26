@@ -4,8 +4,6 @@ import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.service.credentials.CredentialsService
 import id.walt.webwallet.service.events.EventService
 import id.walt.webwallet.service.events.EventType
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.uuid.UUID
 
 interface ReportService<T> {

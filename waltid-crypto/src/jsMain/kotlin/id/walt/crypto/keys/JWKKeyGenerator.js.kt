@@ -38,7 +38,7 @@ object JsJWKKeyCreator : JWKKeyCreator {
         runCatching {
             var jsonJWK = JSON.parse<JWK>(jwk)
             while (jsonJWK::class == String::class) {
-               jsonJWK = JSON.parse(jsonJWK as String)
+                jsonJWK = JSON.parse(jsonJWK as String)
             }
             JWKKey(await(jose.importJWK(jsonJWK)), jsonJWK).apply { init() }
         }
@@ -60,7 +60,7 @@ object JsJWKKeyCreator : JWKKeyCreator {
 
             val importedPemKey: KeyLike = await(
                 when {
-                    hasPrivateKey -> jose.importPKCS8(lines.dropWhile { !it.getPemTitle().isPemTitle("BEGIN", "PRIVATE KEY")  }
+                    hasPrivateKey -> jose.importPKCS8(lines.dropWhile { !it.getPemTitle().isPemTitle("BEGIN", "PRIVATE KEY") }
                         .dropLastWhile { !it.getPemTitle().isPemTitle("END", "PRIVATE KEY") }.joinToString("\n"), "")
 
                     hasPublicKey -> jose.importSPKI(lines.dropWhile { !it.getPemTitle().isPemTitle("BEGIN", "PUBLIC KEY") }

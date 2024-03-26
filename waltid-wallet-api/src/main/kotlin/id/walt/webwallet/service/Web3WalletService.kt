@@ -82,7 +82,7 @@ object Web3WalletService {
 
     private fun setIsOwner(tenant: String, accountId: UUID, walletId: UUID, isOwner: Boolean) = transaction {
         Web3Wallets.update(
-            {(Web3Wallets.tenant eq tenant) and (Web3Wallets.accountId eq accountId) and (Web3Wallets.id eq walletId) }
+            { (Web3Wallets.tenant eq tenant) and (Web3Wallets.accountId eq accountId) and (Web3Wallets.id eq walletId) }
         ) {
             it[owner] = isOwner
         }

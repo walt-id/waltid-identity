@@ -47,7 +47,7 @@ object IssuanceExamples {
   }
 }
 """.trimIndent()
-    
+
     //language=json
     val openBadgeCredentialExampleJsonString = """
 {
@@ -115,10 +115,10 @@ object IssuanceExamples {
 }
 """.trimIndent()
     val openBadgeCredentialExample = Json.parseToJsonElement(openBadgeCredentialExampleJsonString).jsonObject.toMap()
-    
-    
+
+
     val testCredential =
-            """
+        """
             {
               "issuanceKey": {
                 "type": "jwk",
@@ -183,7 +183,7 @@ object IssuanceExamples {
               }
             }
             """.trimIndent()
-    
+
     val universityDegreeCredentialExample2 = mapOf(
         "@context" to listOf(
             "https://www.w3.org/2018/credentials/v1", "https://www.w3.org/2018/credentials/examples/v1"
@@ -203,7 +203,7 @@ object IssuanceExamples {
             )
         ),
     )
-    
+
     val universityDegreeCredentialSignedExample = universityDegreeCredentialExample2.plus(
         mapOf(
             "proof" to mapOf(
@@ -215,7 +215,7 @@ object IssuanceExamples {
             )
         )
     )
-    
+
     //language=JSON
     val batchExample = """
         [
@@ -324,7 +324,7 @@ object IssuanceExamples {
           }
         ]
     """.trimIndent()
-    
+
     //language=JSON
     val sdJwtExample = """
         {

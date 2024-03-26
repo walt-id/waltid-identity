@@ -8,7 +8,6 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.http.*
-import kotlinx.datetime.Instant
 import kotlinx.uuid.UUID
 
 class NotificationUseCase(

@@ -10,8 +10,10 @@ object TestUtils {
     fun loadResource(relativePath: String): String =
         URLDecoder.decode(this::class.java.classLoader.getResource(relativePath)!!.path, "UTF-8")
             .let { File(it).readText() }
+
     fun loadResourceBytes(relativePath: String): ByteArray =
         URLDecoder.decode(this::class.java.classLoader.getResource(relativePath)!!.path, "UTF-8")
             .let { File(it).readBytes() }
+
     fun loadResourceBase64(relativePath: String): ByteArray = loadResource(relativePath).decodeBase64Bytes()
 }

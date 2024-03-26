@@ -1,5 +1,5 @@
-import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.jwk.JWKKey
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlin.test.Test

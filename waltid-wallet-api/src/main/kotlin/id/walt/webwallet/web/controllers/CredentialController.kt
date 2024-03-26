@@ -145,7 +145,7 @@ fun Application.credentials() = walletRoute {
                     HttpStatusCode.Accepted to { description = "Credential accepted successfully" }
                     HttpStatusCode.BadRequest to { description = "Credential acceptance failed" }
                 }
-            }){
+            }) {
                 val credentialId = call.parameters.getOrFail("credentialId")
                 runCatching { getWalletService().acceptCredential(CredentialRequestParameter(credentialId)) }.onSuccess {
                     if (it) context.respond(HttpStatusCode.Accepted) else context.respond(HttpStatusCode.BadRequest)

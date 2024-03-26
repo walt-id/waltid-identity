@@ -30,6 +30,7 @@ abstract class Key {
     @JsPromise
     @JsExport.Ignore
     abstract suspend fun getKeyId(): String
+
     @JvmBlocking
     @JvmAsync
     @JsPromise
@@ -46,6 +47,7 @@ abstract class Key {
     @JsPromise
     @JsExport.Ignore
     abstract suspend fun exportJWK(): String
+
     @JvmBlocking
     @JvmAsync
     @JsPromise
@@ -131,6 +133,7 @@ abstract class Key {
     @JsPromise
     @JsExport.Ignore
     abstract suspend fun getPublicKey(): Key
+
     @JvmBlocking
     @JvmAsync
     @JsPromise
@@ -147,5 +150,6 @@ abstract class Key {
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    open suspend fun init() {}
+    open suspend fun init() {
+    }
 }

@@ -29,7 +29,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.slf4j.LoggerFactory
 
-object  IssuanceService {
+object IssuanceService {
 
     private val http = WalletHttpClients.getHttpClient()
     private val logger = LoggerFactory.getLogger(this::class.java)

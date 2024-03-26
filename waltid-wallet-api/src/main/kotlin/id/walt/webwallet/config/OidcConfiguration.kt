@@ -14,11 +14,11 @@ data class OidcConfiguration(
     val clientSecret: String,
     val keycloakUserApi: String
 ) : WalletConfig {
-  data class OidcJwksCacheConfiguration(
-      val cacheSize: Int,
-      val cacheExpirationHours: Int,
-      val rateLimit: JwksRateLimit
-  ) {
-    data class JwksRateLimit(val bucketSize: Int, val refillRateMinutes: Int)
-  }
+    data class OidcJwksCacheConfiguration(
+        val cacheSize: Int,
+        val cacheExpirationHours: Int,
+        val rateLimit: JwksRateLimit
+    ) {
+        data class JwksRateLimit(val bucketSize: Int, val refillRateMinutes: Int)
+    }
 }

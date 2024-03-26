@@ -19,8 +19,7 @@
       "credentialType": "n/a",
       "credentialFormat": "W3C",
       "credentialProofType": "n/a",
-      "policies":
-      [],
+      "policies": [],
       "protocol": "oid4vp",
       "credentialId": "http://example.gov/credentials/1"
     },
@@ -46,8 +45,7 @@
       "credentialType": "n/a",
       "credentialFormat": "W3C",
       "credentialProofType": "n/a",
-      "policies":
-      [],
+      "policies": [],
       "protocol": "oid4vp",
       "credentialId": "http://example.gov/credentials/2"
     },
@@ -73,8 +71,7 @@
       "credentialType": "n/a",
       "credentialFormat": "W3C",
       "credentialProofType": "n/a",
-      "policies":
-      [],
+      "policies": [],
       "protocol": "oid4vp",
       "credentialId": "http://example.gov/credentials/3"
     },
@@ -100,8 +97,7 @@
       "credentialType": "n/a",
       "credentialFormat": "W3C",
       "credentialProofType": "n/a",
-      "policies":
-      [],
+      "policies": [],
       "protocol": "oid4vp",
       "credentialId": "http://example.gov/credentials/2"
     },
@@ -127,8 +123,7 @@
       "credentialType": "n/a",
       "credentialFormat": "W3C",
       "credentialProofType": "n/a",
-      "policies":
-      [],
+      "policies": [],
       "protocol": "oid4vp",
       "credentialId": "http://example.gov/credentials/3"
     },
@@ -154,8 +149,7 @@
       "credentialType": "n/a",
       "credentialFormat": "W3C",
       "credentialProofType": "n/a",
-      "policies":
-      [],
+      "policies": [],
       "protocol": "oid4vp",
       "credentialId": "http://example.gov/credentials/3"
     },

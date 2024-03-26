@@ -18,8 +18,18 @@ object KeyManager {
 
     init {
         register<JWKKey>("jwk") { generateRequest: KeyGenerationRequest -> JWKKey.generate(generateRequest.keyType) }
-        register<TSEKey>("tse") { generateRequest: KeyGenerationRequest -> TSEKey.generate(generateRequest.keyType, Json.decodeFromJsonElement(generateRequest.config!!)) }
-        register<OCIKey>("oci") { generateRequest: KeyGenerationRequest -> OCIKey.generateKey(generateRequest.keyType, Json.decodeFromJsonElement(generateRequest.config!!)) }
+        register<TSEKey>("tse") { generateRequest: KeyGenerationRequest ->
+            TSEKey.generate(
+                generateRequest.keyType,
+                Json.decodeFromJsonElement(generateRequest.config!!)
+            )
+        }
+        register<OCIKey>("oci") { generateRequest: KeyGenerationRequest ->
+            OCIKey.generateKey(
+                generateRequest.keyType,
+                Json.decodeFromJsonElement(generateRequest.config!!)
+            )
+        }
     }
 
     private inline fun <reified T : Key> register(typeId: String, noinline createFunction: suspend (KeyGenerationRequest) -> T) {

@@ -76,7 +76,6 @@ class ImportJWKKeyTestsAndDidManagement {
     }
 
 
-
     companion object {
         @JvmStatic
         fun `given jwk string, when imported then the import succeeds having the correct key type, key id and hasPrivate values`(): Stream<Arguments> =

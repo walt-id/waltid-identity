@@ -11,22 +11,22 @@ interface WalletConfig
 
 object ConfigManager {
 
-  private val log = KotlinLogging.logger {}
+    private val log = KotlinLogging.logger {}
 
-  val registeredConfigurations = ConcurrentLinkedQueue<ConfigData>()
-  val loadedConfigurations = HashMap<String, WalletConfig>()
+    val registeredConfigurations = ConcurrentLinkedQueue<ConfigData>()
+    val loadedConfigurations = HashMap<String, WalletConfig>()
     val preloadedConfigurations = HashMap<String, WalletConfig>()
 
     fun preloadConfig(id: String, config: WalletConfig) {
         preloadedConfigurations[id] = config
     }
 
-  @OptIn(ExperimentalHoplite::class)
-  private fun loadConfig(config: ConfigData, args: Array<String>) {
-    val id = config.id
-    log.debug { "Loading configuration: \"$id\"..." }
+    @OptIn(ExperimentalHoplite::class)
+    private fun loadConfig(config: ConfigData, args: Array<String>) {
+        val id = config.id
+        log.debug { "Loading configuration: \"$id\"..." }
 
-    val type = config.type
+        val type = config.type
 
         preloadedConfigurations[id]?.let {
             loadedConfigurations[id] = it
@@ -34,86 +34,90 @@ object ConfigManager {
             return
         }
 
-    runCatching {
-          ConfigLoaderBuilder.default()
-              .addCommandLineSource(args)
-              .addDefaultParsers()
-              .addFileSource("config/$id.conf", optional = true)
-              .addEnvironmentSource()
-              .withExplicitSealedTypes()
-              .build()
-              .loadConfigOrThrow(type, emptyList())
+        runCatching {
+            ConfigLoaderBuilder.default()
+                .addCommandLineSource(args)
+                .addDefaultParsers()
+                .addFileSource("config/$id.conf", optional = true)
+                .addEnvironmentSource()
+                .withExplicitSealedTypes()
+                .build()
+                .loadConfigOrThrow(type, emptyList())
         }
-        .onSuccess {
-          loadedConfigurations[id] = it
-          config.onLoad?.invoke(it)
-        }
-        .onFailure {
-          log.error { "Could not load configuration for \"$id\": ${it.stackTraceToString()}" }
-        }
-  }
-
-  inline fun <reified ConfigClass : WalletConfig> getConfigIdentifier(): String =
-      registeredConfigurations.firstOrNull { it.type == ConfigClass::class }?.id
-          ?: throw IllegalArgumentException(
-              "No such configuration registered: \"${ConfigClass::class.jvmName}\"!")
-
-  inline fun <reified ConfigClass : WalletConfig> getConfig(): ConfigClass =
-      getConfigIdentifier<ConfigClass>().let { configKey ->
-        (loadedConfigurations[configKey]
-                ?: throw NotFoundException("No loaded configuration: \"$configKey\""))
-            .let { loadedConfig ->
-              loadedConfig as? ConfigClass
-                  ?: throw IllegalArgumentException(
-                      "Invalid config class type: \"${loadedConfig::class.jvmName}\" is not a \"${ConfigClass::class.jvmName}\"!")
+            .onSuccess {
+                loadedConfigurations[id] = it
+                config.onLoad?.invoke(it)
             }
-      }
+            .onFailure {
+                log.error { "Could not load configuration for \"$id\": ${it.stackTraceToString()}" }
+            }
+    }
 
-  private fun registerConfig(data: ConfigData) {
-    if (registeredConfigurations.any { it.id == data.id })
-        throw IllegalArgumentException(
-            "A configuration with the name \"${data.id}\" already exists!")
+    inline fun <reified ConfigClass : WalletConfig> getConfigIdentifier(): String =
+        registeredConfigurations.firstOrNull { it.type == ConfigClass::class }?.id
+            ?: throw IllegalArgumentException(
+                "No such configuration registered: \"${ConfigClass::class.jvmName}\"!"
+            )
 
-    registeredConfigurations.add(data)
-  }
+    inline fun <reified ConfigClass : WalletConfig> getConfig(): ConfigClass =
+        getConfigIdentifier<ConfigClass>().let { configKey ->
+            (loadedConfigurations[configKey]
+                ?: throw NotFoundException("No loaded configuration: \"$configKey\""))
+                .let { loadedConfig ->
+                    loadedConfig as? ConfigClass
+                        ?: throw IllegalArgumentException(
+                            "Invalid config class type: \"${loadedConfig::class.jvmName}\" is not a \"${ConfigClass::class.jvmName}\"!"
+                        )
+                }
+        }
 
-  /** All configurations registered in this function will be loaded on startup */
-  private fun registerConfigurations() {
-    registerConfig(
-        ConfigData("db", DatabaseConfiguration::class) {
-          registerConfig(
-              ConfigData((it as DatabaseConfiguration).database, DatasourceConfiguration::class))
-        })
-    registerConfig(ConfigData("tenant", TenantConfig::class))
-    registerConfig(ConfigData("web", WebConfig::class))
-    registerConfig(ConfigData("push", PushConfig::class))
+    private fun registerConfig(data: ConfigData) {
+        if (registeredConfigurations.any { it.id == data.id })
+            throw IllegalArgumentException(
+                "A configuration with the name \"${data.id}\" already exists!"
+            )
 
-    registerConfig(ConfigData("wallet", RemoteWalletConfig::class))
-    registerConfig(ConfigData("marketplace", MarketPlaceConfiguration::class))
-    registerConfig(ConfigData("chainexplorer", ChainExplorerConfiguration::class))
-    registerConfig(ConfigData("runtime", RuntimeConfig::class))
+        registeredConfigurations.add(data)
+    }
 
-    registerConfig(ConfigData("oidc", OidcConfiguration::class))
-    registerConfig(ConfigData("logins", LoginMethodsConfig::class))
-    registerConfig(ConfigData("trust", TrustConfig::class))
-    registerConfig(ConfigData("rejectionreason", RejectionReasonConfig::class))
+    /** All configurations registered in this function will be loaded on startup */
+    private fun registerConfigurations() {
+        registerConfig(
+            ConfigData("db", DatabaseConfiguration::class) {
+                registerConfig(
+                    ConfigData((it as DatabaseConfiguration).database, DatasourceConfiguration::class)
+                )
+            })
+        registerConfig(ConfigData("tenant", TenantConfig::class))
+        registerConfig(ConfigData("web", WebConfig::class))
+        registerConfig(ConfigData("push", PushConfig::class))
 
-    registerConfig(ConfigData("oci", OciKeyConfig::class))
-    registerConfig(ConfigData("auth", AuthConfig::class))
-    registerConfig(ConfigData("notification", NotificationConfig::class))
-  }
+        registerConfig(ConfigData("wallet", RemoteWalletConfig::class))
+        registerConfig(ConfigData("marketplace", MarketPlaceConfiguration::class))
+        registerConfig(ConfigData("chainexplorer", ChainExplorerConfiguration::class))
+        registerConfig(ConfigData("runtime", RuntimeConfig::class))
 
-  fun loadConfigs(args: Array<String>) {
-    log.debug { "Loading configurations..." }
+        registerConfig(ConfigData("oidc", OidcConfiguration::class))
+        registerConfig(ConfigData("logins", LoginMethodsConfig::class))
+        registerConfig(ConfigData("trust", TrustConfig::class))
+        registerConfig(ConfigData("rejectionreason", RejectionReasonConfig::class))
 
-    if (registeredConfigurations.isEmpty()) registerConfigurations()
+        registerConfig(ConfigData("oci", OciKeyConfig::class))
+        registerConfig(ConfigData("auth", AuthConfig::class))
+        registerConfig(ConfigData("notification", NotificationConfig::class))
+    }
 
-    registeredConfigurations.forEach { loadConfig(it, args) }
-  }
+    fun loadConfigs(args: Array<String>) {
+        log.debug { "Loading configurations..." }
 
-  data class ConfigData(
-      val id: String,
-      val type: KClass<out WalletConfig>,
-      val onLoad: ((WalletConfig) -> Unit)? = null,
-  )
+        if (registeredConfigurations.isEmpty()) registerConfigurations()
+
+        registeredConfigurations.forEach { loadConfig(it, args) }
+    }
+
+    data class ConfigData(
+        val id: String,
+        val type: KClass<out WalletConfig>,
+        val onLoad: ((WalletConfig) -> Unit)? = null,
+    )
 }

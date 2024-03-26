@@ -88,8 +88,10 @@ class LocalJWKKeyAndDidManagementTest {
         val key = KeySerialization.deserializeKey(keyFile).getOrThrow()
         assertEquals(keyId, key.getKeyId())
     }
+
     fun getThumbprint() = runTest {}
     fun verifyRaw() = runTest {}
+
     @ParameterizedTest
     @MethodSource
     fun verifyJws(keyFile: String, signature: String) = runTest {
@@ -109,6 +111,7 @@ class LocalJWKKeyAndDidManagementTest {
         assertTrue(verificationResult.isSuccess)
         assertEquals(payload, verificationResult.getOrThrow())
     }
+
     @ParameterizedTest
     @MethodSource
     fun exportJWK(keyFile: String, jwkFile: String) = runTest {
@@ -116,6 +119,7 @@ class LocalJWKKeyAndDidManagementTest {
         val export = key.exportJWK()
         assertEquals(jwkFile.replace("\\s".toRegex(), ""), export)
     }
+
     @ParameterizedTest
     @MethodSource
     fun exportJWKObject(keyFile: String, jwkFile: String) = runTest {
@@ -123,6 +127,7 @@ class LocalJWKKeyAndDidManagementTest {
         val export = key.exportJWKObject()
         assertEquals(jwkFile.replace("\\s".toRegex(), ""), export.toString())
     }
+
     @ParameterizedTest
     @MethodSource
     @Disabled // not implemented
@@ -145,6 +150,7 @@ class LocalJWKKeyAndDidManagementTest {
             arguments(loadSerializedLocal("secp256r1.public.json"), loadResourceBytes("public-bytes/secp256r1.bin")),
             arguments(loadSerializedLocal("rsa.public.json"), loadResourceBytes("public-bytes/rsa.bin")),
         )
+
         @JvmStatic
         fun getPublicKey(): Stream<Arguments> = Stream.of(
             arguments(loadSerializedLocal("ed25519.private.json"), loadSerializedLocal("ed25519.public.json")),
@@ -157,6 +163,7 @@ class LocalJWKKeyAndDidManagementTest {
             arguments(loadSerializedLocal("secp256r1.public.json"), loadSerializedLocal("secp256r1.public.json")),
             arguments(loadSerializedLocal("rsa.public.json"), loadSerializedLocal("rsa.public.json")),
         )
+
         @JvmStatic
         fun getKeyType(): Stream<Arguments> = Stream.of(
             arguments(loadSerializedLocal("ed25519.private.json"), KeyType.Ed25519),

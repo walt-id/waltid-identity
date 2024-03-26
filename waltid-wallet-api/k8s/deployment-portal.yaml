@@ -50,11 +50,15 @@ metadata:
 data:
   marketplace.conf: |
     marketplaces = [
-      {chain = "ethereum", name = "OpenSea", url = "https://opensea.io/assets/ethereum/%s/%s"},
-      {chain = "polygon", name = "OpenSea", url = "https://opensea.io/assets/matic/%s/%s"},
-      {chain = "tezos", name = "Rarible", url = "https://rarible.com/token/tezos/%s/%s"},
-      {chain = "flow", name = "FlowVerse", url = "https://nft.flowverse.co/marketplace/%s/%s"},
-      {chain = "unique", name = "Unique", url = "https://unqnft.io/market/%s/%s"},
+        {
+            chain = "ethereum", name = "OpenSea", url = "https://opensea.io/assets/ethereum/%s/%s"
+        },
+        {chain = "polygon", name = "OpenSea", url = "https://opensea.io/assets/matic/%s/%s"},
+        {chain = "tezos", name = "Rarible", url = "https://rarible.com/token/tezos/%s/%s"},
+        {chain = "flow", name = "FlowVerse", url = "https://nft.flowverse.co/marketplace/%s/%s"},
+        {
+            chain = "unique", name = "Unique", url = "https://unqnft.io/market/%s/%s"
+        },
     ]
 ---
 apiVersion: v1
@@ -64,11 +68,13 @@ metadata:
 data:
   chainexplorer.conf: |
     explorers = [
-      {chain = "ethereum", url = "https://etherscan.io/address/%s"},
-      {chain = "polygon", url = "https://polygonscan.com/address/%s"},
-      {chain = "mumbai", url = "https://mumbai.polygonscan.com/address/%s"},
-      {chain = "tezos", url = "https://tzkt.io/%s/operations"},
-      {chain = "ghostnet", url = "https://ghostnet.tzkt.io/%s/operations"},
+        {chain = "ethereum", url = "https://etherscan.io/address/%s"},
+        {
+            chain = "polygon", url = "https://polygonscan.com/address/%s"
+        },
+        {chain = "mumbai", url = "https://mumbai.polygonscan.com/address/%s"},
+        {chain = "tezos", url = "https://tzkt.io/%s/operations"},
+        {chain = "ghostnet", url = "https://ghostnet.tzkt.io/%s/operations"},
     ]
 ---
 apiVersion: v1

@@ -23,10 +23,24 @@ external fun jwtDecrypt(jwt: Uint8Array, key: Uint8Array, options: JWTDecryptOpt
 
 external fun jwtDecrypt(jwt: Uint8Array, key: Uint8Array): Promise<JWTDecryptResult>
 
-external fun <T : KeyLike> jwtDecrypt(jwt: String, getKey: JWTDecryptGetKey, options: JWTDecryptOptions = definedExternally): Promise<JWTDecryptResult /* JWTDecryptResult & ResolvedKey<T> */>
+external fun <T : KeyLike> jwtDecrypt(
+    jwt: String,
+    getKey: JWTDecryptGetKey,
+    options: JWTDecryptOptions = definedExternally
+): Promise<JWTDecryptResult /* JWTDecryptResult & ResolvedKey<T> */>
 
-external fun <T : KeyLike> jwtDecrypt(jwt: String, getKey: JWTDecryptGetKey): Promise<JWTDecryptResult /* JWTDecryptResult & ResolvedKey<T> */>
+external fun <T : KeyLike> jwtDecrypt(
+    jwt: String,
+    getKey: JWTDecryptGetKey
+): Promise<JWTDecryptResult /* JWTDecryptResult & ResolvedKey<T> */>
 
-external fun <T : KeyLike> jwtDecrypt(jwt: Uint8Array, getKey: JWTDecryptGetKey, options: JWTDecryptOptions = definedExternally): Promise<JWTDecryptResult /* JWTDecryptResult & ResolvedKey<T> */>
+external fun <T : KeyLike> jwtDecrypt(
+    jwt: Uint8Array,
+    getKey: JWTDecryptGetKey,
+    options: JWTDecryptOptions = definedExternally
+): Promise<JWTDecryptResult /* JWTDecryptResult & ResolvedKey<T> */>
 
-external fun <T : KeyLike> jwtDecrypt(jwt: Uint8Array, getKey: JWTDecryptGetKey): Promise<JWTDecryptResult /* JWTDecryptResult & ResolvedKey<T> */>
+external fun <T : KeyLike> jwtDecrypt(
+    jwt: Uint8Array,
+    getKey: JWTDecryptGetKey
+): Promise<JWTDecryptResult /* JWTDecryptResult & ResolvedKey<T> */>

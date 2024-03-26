@@ -68,15 +68,15 @@ object Db {
         WalletSettings,
         WalletNotifications,
     ).toTypedArray()
-    
-    
+
+
     private fun recreateDatabase() {
         transaction {
             addLogger(StdOutSqlLogger)
-            
+
             SchemaUtils.drop(*(tables.reversedArray()))
             SchemaUtils.create(*tables)
-            
+
             runBlocking {
 
                 AccountsService.register(request = EmailAccountRequest("Max Mustermann", "string@string.string", "string"))
@@ -84,7 +84,7 @@ object Db {
                 val accountId = accountResult.getOrNull()?.id!!
                 val walletResult = AccountsService.getAccountWalletMappings("", accountId)
                 val walletId = walletResult.wallets[0].id
-                
+
                 CredentialsService().add(
                     wallet = walletId,
                     WalletCredential(

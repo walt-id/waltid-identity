@@ -16,6 +16,7 @@ interface JWKKeyCreator {
     @JsPromise
     @JsExport.Ignore
     suspend fun generate(type: KeyType, metadata: JWKKeyMetadata = JWKKeyMetadata()): JWKKey
+
     @JvmBlocking
     @JvmAsync
     @JsPromise

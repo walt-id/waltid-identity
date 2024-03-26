@@ -1,7 +1,6 @@
 package id.walt.crypto.utils
 
 
-
 object MultiBaseUtils {
 
     fun convertRawKeyToMultiBase58Btc(key: ByteArray, code: UInt): String {

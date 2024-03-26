@@ -91,7 +91,7 @@ class SilentClaimStrategyTest {
     fun `given an untrusted issuer, when claiming the offer, then an event is logged and a notification created and sent`() =
         runTest {
             coEvery { issuerTrustValidationService.validate(any(), any(), any()) } returns false
-            
+
             val result = sut.claim(did, offer)
 
             assertEquals(0, result.size)

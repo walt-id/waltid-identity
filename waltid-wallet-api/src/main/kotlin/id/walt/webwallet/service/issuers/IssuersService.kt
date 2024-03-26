@@ -3,7 +3,6 @@ package id.walt.webwallet.service.issuers
 import id.walt.webwallet.db.models.WalletIssuers
 import kotlinx.uuid.UUID
 import org.jetbrains.exposed.sql.*
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.statements.UpdateStatement
 import org.jetbrains.exposed.sql.transactions.transaction
 
@@ -31,8 +30,8 @@ object IssuersService {
     private fun queryIssuer(wallet: UUID, name: String) =
         WalletIssuers.selectAll().where { WalletIssuers.wallet eq wallet and (WalletIssuers.name eq name) }
             .singleOrNull()?.let {
-            IssuerDataTransferObject(it)
-        }
+                IssuerDataTransferObject(it)
+            }
 
     private fun addToWalletQuery(
         wallet: UUID,

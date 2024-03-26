@@ -36,8 +36,8 @@ class DefaultTrustValidationService(
     private inline fun <reified T> tryParseResponse(response: String): T? = json.decodeFromString<T>(response)
 
     private fun validate(record: JsonObject): Boolean {
-        val from = record.jsonObject["validFromDT"]?.jsonPrimitive?.content?.let { Instant.parse(it) }?: Instant.DISTANT_FUTURE
-        val until = record.jsonObject["validUntilDT"]?.jsonPrimitive?.content?.let { Instant.parse(it) }?:Instant.DISTANT_PAST
+        val from = record.jsonObject["validFromDT"]?.jsonPrimitive?.content?.let { Instant.parse(it) } ?: Instant.DISTANT_FUTURE
+        val until = record.jsonObject["validUntilDT"]?.jsonPrimitive?.content?.let { Instant.parse(it) } ?: Instant.DISTANT_PAST
         val status = record.jsonObject["status"]?.jsonPrimitive?.content
         val now = Clock.System.now()
         return now in from..until && "current" == status

@@ -13,4 +13,7 @@ class ForbiddenException(message: String) : WebException(HttpStatusCode.Forbidde
 class InsufficientPermissionsException(
     minimumRequired: AccountWalletPermissions,
     current: AccountWalletPermissions,
-) : WebException(HttpStatusCode.Forbidden, "You do not have enough permissions to access this action. Minimum required permissions: $minimumRequired, your current permissions: $current")
+) : WebException(
+    HttpStatusCode.Forbidden,
+    "You do not have enough permissions to access this action. Minimum required permissions: $minimumRequired, your current permissions: $current"
+)

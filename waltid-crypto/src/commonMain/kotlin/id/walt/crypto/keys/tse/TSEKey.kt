@@ -32,7 +32,7 @@ import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 import kotlin.random.Random
 
-private val logger = KotlinLogging.logger {  }
+private val logger = KotlinLogging.logger { }
 
 @OptIn(ExperimentalJsExport::class)
 @JsExport

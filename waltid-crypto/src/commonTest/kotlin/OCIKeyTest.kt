@@ -1,15 +1,3 @@
-import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.oci.OCIKey
-import id.walt.crypto.keys.oci.OCIKeyMetadata
-import io.ktor.util.*
-import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlin.test.Ignore
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertTrue
-
 /* FIXME
 class OCIKeyTest {
 

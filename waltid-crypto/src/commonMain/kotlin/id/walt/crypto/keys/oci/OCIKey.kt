@@ -7,8 +7,10 @@ import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.base64Decode
 import id.walt.crypto.utils.Base64Utils.base64UrlDecode
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
+import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.crypto.utils.JwsUtils.jwsAlg
 import id.walt.crypto.utils.sha256WithRsa
+import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.plugins.*
@@ -38,6 +40,8 @@ import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 
+private val log = KotlinLogging.logger { }
+
 @OptIn(ExperimentalJsExport::class)
 @JsExport
 @Suppress("TRANSIENT_IS_REDUNDANT")
@@ -66,13 +70,10 @@ class OCIKey(
 
     /** returns public key as PEM */
     private suspend fun retrievePublicKey(): Key {
-        val keyData =
-            getKeys(vaultKeyId, config.managementEndpoint, config.tenancyOcid, config.signingKeyPem)
+        val keyData = getKeys(vaultKeyId, config.managementEndpoint, config.tenancyOcid, config.signingKeyPem)
         val key =
-            keyData.firstOrNull { it["id"]?.jsonPrimitive?.content == id }
-                ?: throw IllegalArgumentException("Key with id $id not found")
-        val keyVersion =
-            getKeyVersion(id, vaultKeyId, config.managementEndpoint, config.signingKeyPem)
+            keyData.firstOrNull { it["id"]?.jsonPrimitive?.content == id } ?: throw IllegalArgumentException("Key with id $id not found")
+        val keyVersion = getKeyVersion(id, vaultKeyId, config.managementEndpoint, config.signingKeyPem)
         val keyId = key["id"]?.jsonPrimitive?.content ?: ""
 
         return getOCIPublicKey(
@@ -92,32 +93,26 @@ class OCIKey(
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    override suspend fun getThumbprint(): String {
-        TODO("Not yet implemented")
-    }
+    override suspend fun getThumbprint(): String = TODO("Not yet implemented")
 
     @JvmBlocking
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    override suspend fun exportJWK(): String =
-        throw NotImplementedError("JWK export is not available for remote keys.")
+    override suspend fun exportJWK(): String = throw NotImplementedError("JWK export is not available for remote keys.")
 
     @JvmBlocking
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    override suspend fun exportJWKObject(): JsonObject {
-        return Json.parseToJsonElement(_publicKey!!).jsonObject
-    }
+    override suspend fun exportJWKObject(): JsonObject = Json.parseToJsonElement(_publicKey!!).jsonObject
 
     @JvmBlocking
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    override suspend fun exportPEM(): String {
-        throw NotImplementedError("PEM export is not available for remote keys.")
-    }
+    override suspend fun exportPEM(): String = throw NotImplementedError("PEM export is not available for remote keys.")
+
 
     @Transient
     private val ociSigningAlgorithm by lazy {
@@ -133,49 +128,36 @@ class OCIKey(
     @JsPromise
     @JsExport.Ignore
     override suspend fun signRaw(plaintext: ByteArray): ByteArray {
-        val encodedMessage: String = SHA256().digest(plaintext).encodeBase64()
+        return retry {
+            val encodedMessage: String = SHA256().digest(plaintext).encodeBase64()
 
-        val requestBody =
-            JsonObject(
+            val requestBody = JsonObject(
                 mapOf(
                     "keyId" to JsonPrimitive(id),
                     "message" to JsonPrimitive(encodedMessage),
                     "signingAlgorithm" to JsonPrimitive(ociSigningAlgorithm),
                     "messageType" to JsonPrimitive("DIGEST")
                 )
-            )
-                .toString()
+            ).toString()
 
-        val signature =
-            signingRequest(
+            val signature = signingRequest(
                 "POST", "/20180608/sign", config.cryptoEndpoint, requestBody, config.signingKeyPem
             )
 
-        val response =
-            http
-                .post("https://${config.cryptoEndpoint}/20180608/sign") {
-                    header(
-                        "Authorization",
-                        """Signature version="1",headers="date (request-target) host content-length content-type x-content-sha256",keyId="$vaultKeyId",algorithm="rsa-sha256",signature="$signature""""
-                    )
-                    header("Date", GMTDate().toHttpDate())
-                    header("Host", host)
-                    header("Content-Length", requestBody.length.toString())
-                    header("Accept", "application/json")
-                    header("Connection", "keep-alive")
-                    header("Content-Type", "application/json")
-                    header("x-content-sha256", calculateSHA256(requestBody))
-                    setBody(requestBody)
-                }
-                .ociJsonDataBody()
-                .jsonObject["signature"]
-                ?.jsonPrimitive
-                ?.content
-                ?.base64Decode()
-        return response ?: error("No signature returned from OCI.")
+            val response = http.post("https://${config.cryptoEndpoint}/20180608/sign") {
+                header(
+                    "Authorization",
+                    """Signature version="1",headers="date (request-target) host content-length content-type x-content-sha256",keyId="$vaultKeyId",algorithm="rsa-sha256",signature="$signature""""
+                )
+
+                header("Host", host)
+                header("x-content-sha256", calculateSHA256(requestBody))
+                setBody(requestBody)
+            }.ociJsonDataBody().jsonObject["signature"]?.jsonPrimitive?.content?.base64Decode()
+            response ?: error("No signature returned from OCI.")
+        }
     }
 
-    @OptIn(ExperimentalEncodingApi::class)
     @JvmBlocking
     @JvmAsync
     @JsPromise
@@ -191,7 +173,10 @@ class OCIKey(
         var rawSignature = signRaw("$header.$payload".encodeToByteArray())
 
         if (keyType in listOf(KeyType.secp256r1, KeyType.secp256k1)) {
+            log.trace { "Converted DER to IEEE P1363 signature." }
             rawSignature = EccUtils.convertDERtoIEEEP1363(rawSignature)
+        } else {
+            log.trace { "Did not convert DER to IEEE P1363 signature." }
         }
 
         val encodedSignature = rawSignature.encodeToBase64Url()
@@ -205,47 +190,32 @@ class OCIKey(
     @JsPromise
     @JsExport.Ignore
     override suspend fun verifyRaw(
-        signed: ByteArray,
-        detachedPlaintext: ByteArray?
+        signed: ByteArray, detachedPlaintext: ByteArray?
     ): Result<ByteArray> {
         check(detachedPlaintext != null) { "An detached plaintext is needed." }
 
-        val requestBody =
-            JsonObject(
-                mapOf(
-                    "keyId" to JsonPrimitive(id),
-                    "message" to JsonPrimitive(detachedPlaintext.encodeBase64()),
-                    "signature" to JsonPrimitive(signed.encodeBase64()),
-                    "signingAlgorithm" to JsonPrimitive(ociSigningAlgorithm)
-                )
+        val requestBody = JsonObject(
+            mapOf(
+                "keyId" to JsonPrimitive(id),
+                "message" to JsonPrimitive(detachedPlaintext.encodeBase64()),
+                "signature" to JsonPrimitive(signed.encodeBase64()),
+                "signingAlgorithm" to JsonPrimitive(ociSigningAlgorithm)
             )
-                .toString()
+        ).toString()
 
-        val signature =
-            signingRequest(
-                "POST", "/20180608/verify", config.cryptoEndpoint, requestBody, config.signingKeyPem
+        val signature = signingRequest(
+            "POST", "/20180608/verify", config.cryptoEndpoint, requestBody, config.signingKeyPem
+        )
+
+        val response = http.post("https://${config.cryptoEndpoint}/20180608/verify") {
+            header(
+                "Authorization",
+                """Signature version="1",headers="date (request-target) host content-length content-type x-content-sha256",keyId="$vaultKeyId",algorithm="rsa-sha256",signature="$signature""""
             )
-
-        val response =
-            http
-                .post("https://${config.cryptoEndpoint}/20180608/verify") {
-                    header(
-                        "Authorization",
-                        """Signature version="1",headers="date (request-target) host content-length content-type x-content-sha256",keyId="$vaultKeyId",algorithm="rsa-sha256",signature="$signature""""
-                    )
-                    header("Date", GMTDate().toHttpDate())
-                    header("Host", host)
-                    header("Content-Length", requestBody.length.toString())
-                    header("Accept", "application/json")
-                    header("Connection", "keep-alive")
-                    header("Content-Type", "application/json")
-                    header("x-content-sha256", calculateSHA256(requestBody))
-                    setBody(requestBody)
-                }
-                .ociJsonDataBody()
-                .jsonObject["isSignatureValid"]
-                ?.jsonPrimitive
-                ?.boolean ?: false
+            header("Host", host)
+            header("x-content-sha256", calculateSHA256(requestBody))
+            setBody(requestBody)
+        }.ociJsonDataBody().jsonObject["isSignatureValid"]?.jsonPrimitive?.boolean ?: false
         return if (response) Result.success(detachedPlaintext)
         else Result.failure(Exception("Signature is not valid"))
     }
@@ -255,11 +225,8 @@ class OCIKey(
     @JsPromise
     @JsExport.Ignore
     override suspend fun verifyJws(signedJws: String): Result<JsonElement> {
-        val parts = signedJws.split(".")
-        check(parts.size == 3) { "Invalid JWT part count: ${parts.size} instead of 3" }
-        val header = parts[0]
-        val headers: Map<String, JsonElement> =
-            Json.decodeFromString(header.base64UrlDecode().decodeToString())
+        val (header, payload, signature) = signedJws.decodeJws(withSignature = true)
+        val headers: Map<String, JsonElement> = header.toMap()
         headers["alg"]?.let {
             val algValue = it.jsonPrimitive.content
             check(algValue == keyType.jwsAlg()) {
@@ -267,13 +234,9 @@ class OCIKey(
             }
         }
 
-        val payload = parts[1]
-        val signature = parts[2].base64UrlDecode()
-
         val signable = "$header.$payload".encodeToByteArray()
-        return verifyRaw(signature, signable).map {
-            val verifiedPayload =
-                it.decodeToString().substringAfter(".").base64UrlDecode().decodeToString()
+        return verifyRaw(signature.base64UrlDecode(), signable).map {
+            val verifiedPayload = it.decodeToString().substringAfter(".").base64UrlDecode().decodeToString()
             Json.parseToJsonElement(verifiedPayload)
         }
     }
@@ -285,104 +248,82 @@ class OCIKey(
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    override suspend fun getPublicKey(): Key {
-        if (backedKey == null && _publicKey != null) {
-            backedKey = _publicKey?.let { JWKKey.importJWK(it).getOrThrow() }
-        } else if (backedKey == null) {
-            backedKey = retrievePublicKey()
-        }
-
-        return backedKey!!
-    }
+    override suspend fun getPublicKey(): Key = backedKey ?: when {
+        _publicKey != null -> _publicKey!!.let { JWKKey.importJWK(it).getOrThrow() }
+        else -> retrievePublicKey()
+    }.also { newBackedKey -> backedKey = newBackedKey }
 
     @JvmBlocking
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    override suspend fun getPublicKeyRepresentation(): ByteArray {
-        TODO("Not yet implemented")
-    }
+    override suspend fun getPublicKeyRepresentation(): ByteArray = TODO("Not yet implemented")
 
     companion object {
 
-        private fun keyTypeToOciKeyMapping(type: KeyType) =
-            when (type) {
-                KeyType.secp256r1 -> "ECDSA"
-                KeyType.RSA -> "RSA"
-                KeyType.secp256k1 -> throw IllegalArgumentException("Not supported: $type")
-                KeyType.Ed25519 -> throw IllegalArgumentException("Not supported: $type")
-            }
+        private fun keyTypeToOciKeyMapping(type: KeyType) = when (type) {
+            KeyType.secp256r1 -> "ECDSA"
+            KeyType.RSA -> "RSA"
+            KeyType.secp256k1 -> throw IllegalArgumentException("Not supported: $type")
+            KeyType.Ed25519 -> throw IllegalArgumentException("Not supported: $type")
+        }
 
-        private fun ociKeyToKeyTypeMapping(type: String) =
-            when (type) {
-                "ECDSA" -> KeyType.secp256r1
-                "RSA" -> KeyType.RSA
-                else -> throw IllegalArgumentException("Not supported: $type")
-            }
+        private fun ociKeyToKeyTypeMapping(type: String) = when (type) {
+            "ECDSA" -> KeyType.secp256r1
+            "RSA" -> KeyType.RSA
+            else -> throw IllegalArgumentException("Not supported: $type")
+        }
 
         @JvmBlocking
         @JvmAsync
         @JsPromise
         @JsExport.Ignore
         suspend fun generateKey(type: KeyType, config: OCIKeyMetadata): OCIKey {
-            val keyType = keyTypeToOciKeyMapping(type)
-            val vaultKeyId = "${config.tenancyOcid}/${config.userOcid}/${config.fingerprint}"
-            val host = config.managementEndpoint
-            val length =
-                when (type) {
+            return retry {
+                val keyType = keyTypeToOciKeyMapping(type)
+                val vaultKeyId = "${config.tenancyOcid}/${config.userOcid}/${config.fingerprint}"
+                val host = config.managementEndpoint
+                val length = when (type) {
                     KeyType.Ed25519 -> throw IllegalArgumentException("Not supported: $type")
                     KeyType.secp256r1 -> 32
                     KeyType.RSA -> 256
                     KeyType.secp256k1 -> throw IllegalArgumentException("Not supported: $type")
                 }
-            val requestBody =
-                JsonObject(
+                val requestBody = JsonObject(
                     mapOf(
                         "compartmentId" to JsonPrimitive(config.tenancyOcid),
                         "displayName" to JsonPrimitive("WaltID"),
-                        "keyShape" to
-                                JsonObject(
-                                    mapOf(
-                                        "algorithm" to JsonPrimitive(keyType),
-                                        "length" to JsonPrimitive(length),
-                                        when (type) {
-                                            KeyType.secp256r1 -> "curveId" to JsonPrimitive("NIST_P256")
-                                            else -> "curveId" to JsonPrimitive(null)
-                                        },
-                                    )
-                                ),
+                        "keyShape" to JsonObject(
+                            mapOf(
+                                "algorithm" to JsonPrimitive(keyType),
+                                "length" to JsonPrimitive(length),
+                                when (type) {
+                                    KeyType.secp256r1 -> "curveId" to JsonPrimitive("NIST_P256")
+                                    else -> "curveId" to JsonPrimitive(null)
+                                },
+                            )
+                        ),
                         "protectionMode" to JsonPrimitive("SOFTWARE"),
                     )
-                )
-                    .toString()
+                ).toString()
 
-            val signature =
-                signingRequest("POST", "/20180608/keys", host, requestBody, config.signingKeyPem)
-            val keyData =
-                http
-                    .post("https://$host/20180608/keys") {
-                        header(
-                            "Authorization",
-                            """Signature version="1",headers="date (request-target) host content-length content-type x-content-sha256",keyId="$vaultKeyId",algorithm="rsa-sha256",signature="$signature""""
-                        )
+                val signature = signingRequest("POST", "/20180608/keys", host, requestBody, config.signingKeyPem)
+                val keyData = http.post("https://$host/20180608/keys") {
+                    header(
+                        "Authorization",
+                        """Signature version="1",headers="date (request-target) host content-length content-type x-content-sha256",keyId="$vaultKeyId",algorithm="rsa-sha256",signature="$signature""""
+                    )
+                    header("Host", host)
+                    header("x-content-sha256", calculateSHA256(requestBody))
+                    setBody(requestBody)
+                }.ociJsonDataBody()
 
-                        header("Date", GMTDate().toHttpDate())
-                        header("Host", host)
-                        header("Content-Length", requestBody.length.toString())
-                        header("Accept", "application/json")
-                        header("Connection", "keep-alive")
-                        header("Content-Type", "application/json")
-                        header("x-content-sha256", calculateSHA256(requestBody))
-                        setBody(requestBody)
-                    }
-                    .ociJsonDataBody()
+                val keyVersion = keyData["currentKeyVersion"]?.jsonPrimitive?.content ?: ""
+                val OCIDkeyId = keyData["id"]?.jsonPrimitive?.content ?: ""
 
-            val keyVersion = keyData["currentKeyVersion"]?.jsonPrimitive?.content ?: ""
-            val OCIDkeyId = keyData["id"]?.jsonPrimitive?.content ?: ""
-
-            val publicKey =
-                getOCIPublicKey(OCIDkeyId, vaultKeyId, host, keyVersion, config.signingKeyPem)
-            return OCIKey(config, OCIDkeyId, publicKey.exportJWK(), ociKeyToKeyTypeMapping(keyType))
+                val publicKey = getOCIPublicKey(OCIDkeyId, vaultKeyId, host, keyVersion, config.signingKeyPem)
+                OCIKey(config, OCIDkeyId, publicKey.exportJWK(), ociKeyToKeyTypeMapping(keyType))
+            }
         }
 
         @JvmBlocking
@@ -390,24 +331,17 @@ class OCIKey(
         @JsPromise
         @JsExport.Ignore
         suspend fun getKeyVersion(
-            ocidKeyId: String,
-            keyId: String,
-            host: String,
-            signingKey: String?
+            ocidKeyId: String, keyId: String, host: String, signingKey: String?
         ): String {
             val signature = signingRequest("GET", "/20180608/keys/$ocidKeyId", host, null, signingKey)
 
-            val response =
-                http.get("https://$host/20180608/keys/$ocidKeyId") {
-                    header(
-                        "Authorization",
-                        """Signature version="1",headers="host (request-target) date",keyId="$keyId",algorithm="rsa-sha256",signature="$signature""""
-                    )
-                    header("Date", GMTDate().toHttpDate())
-                    header("Host", host)
-                    header("Accept", "application/json")
-                    header("Connection", "keep-alive")
-                }
+            val response = http.get("https://$host/20180608/keys/$ocidKeyId") {
+                header(
+                    "Authorization",
+                    """Signature version="1",headers="host (request-target) date",keyId="$keyId",algorithm="rsa-sha256",signature="$signature""""
+                )
+                header("Host", host)
+            }
 
             return response.body<JsonObject>()["currentKeyVersion"]?.jsonPrimitive?.content ?: ""
         }
@@ -419,20 +353,17 @@ class OCIKey(
         suspend fun HttpResponse.ociJsonDataBody(): JsonObject {
             val baseMsg = { "OCI server (URL: ${this.request.url}) returned invalid response: " }
 
-            if (!status.isSuccess())
-                throw IllegalStateException(
-                    baseMsg.invoke() + "non-success status: $status - ${this.bodyAsText()}"
-                )
+            if (!status.isSuccess()) throw IllegalStateException(
+                baseMsg.invoke() + "non-success status: $status - ${this.bodyAsText()}"
+            )
 
-            return runCatching { this.body<JsonObject>() }
-                .getOrElse {
-                    val bodyStr = this.bodyAsText()
-                    throw IllegalArgumentException(
-                        baseMsg.invoke() +
-                                if (bodyStr == "") "empty response (instead of JSON data)"
-                                else "invalid response: $bodyStr"
-                    )
-                }
+            return runCatching { this.body<JsonObject>() }.getOrElse {
+                val bodyStr = this.bodyAsText()
+                throw IllegalArgumentException(
+                    baseMsg.invoke() + if (bodyStr == "") "empty response (instead of JSON data)"
+                    else "invalid response: $bodyStr"
+                )
+            }
         }
 
         @JvmBlocking
@@ -441,33 +372,25 @@ class OCIKey(
         @JsExport.Ignore
         @OptIn(ExperimentalEncodingApi::class)
         fun signingRequest(
-            method: String,
-            restApi: String,
-            host: String,
-            requestBody: String?,
-            signingKey: String? // = null
+            method: String, restApi: String, host: String, requestBody: String?, signingKey: String? // = null
         ): String {
             val date = GMTDate().toHttpDate()
             val requestTarget = "(request-target): ${method.lowercase()} $restApi"
             val hostHeader = "host: $host"
             val dateHeader = "date: $date"
-            val signingString =
-                when (method) {
-                    "GET" -> "$hostHeader\n$requestTarget\n$dateHeader"
-                    "POST",
-                    "PUT" -> {
-                        val contentTypeHeader = "content-type: application/json"
-                        val contentLengthHeader = "content-length: ${requestBody?.length ?: 0}"
-                        val sha256Header = "x-content-sha256: ${calculateSHA256(requestBody)}"
-                        "$dateHeader\n$requestTarget\n$hostHeader\n$contentLengthHeader\n$contentTypeHeader\n$sha256Header"
-                    }
-
-                    else -> throw IllegalArgumentException("Unsupported HTTP method: $method")
+            val signingString = when (method) {
+                "GET" -> "$hostHeader\n$requestTarget\n$dateHeader"
+                "POST", "PUT" -> {
+                    val contentTypeHeader = "content-type: application/json"
+                    val contentLengthHeader = "content-length: ${requestBody?.length ?: 0}"
+                    val sha256Header = "x-content-sha256: ${calculateSHA256(requestBody)}"
+                    "$dateHeader\n$requestTarget\n$hostHeader\n$contentLengthHeader\n$contentTypeHeader\n$sha256Header"
                 }
 
-            val privateOciApiKey =
-                signingKey
-                    ?: error("No private key provided for OCI signing. Please provide a private key.")
+                else -> throw IllegalArgumentException("Unsupported HTTP method: $method")
+            }
+
+            val privateOciApiKey = signingKey ?: error("No private key provided for OCI signing. Please provide a private key.")
 
             return Base64.encode(sha256WithRsa(privateOciApiKey, signingString.encodeToByteArray()))
         }
@@ -485,33 +408,21 @@ class OCIKey(
         @JsPromise
         @JsExport.Ignore
         suspend fun getKeys(
-            keyId: String,
-            host: String,
-            tenancyOcid: String,
-            signingKey: String?
+            keyId: String, host: String, tenancyOcid: String, signingKey: String?
         ): Array<JsonObject> {
-            val signature =
-                signingRequest(
-                    "GET",
-                    "/20180608/keys?compartmentId=$tenancyOcid&sortBy=TIMECREATED&sortOrder=DESC",
-                    host,
-                    null,
-                    signingKey
-                )
+            val signature = signingRequest(
+                "GET", "/20180608/keys?compartmentId=$tenancyOcid&sortBy=TIMECREATED&sortOrder=DESC", host, null, signingKey
+            )
 
-            val response =
-                http.get(
-                    "https://$host/20180608/keys?compartmentId=$tenancyOcid&sortBy=TIMECREATED&sortOrder=DESC"
-                ) {
-                    header(
-                        "Authorization",
-                        """Signature version="1",headers="host (request-target) date",keyId="$keyId",algorithm="rsa-sha256",signature="$signature""""
-                    )
-                    header("Date", GMTDate().toHttpDate())
-                    header("Host", host)
-                    header("Accept", "application/json")
-                    header("Connection", "keep-alive")
-                }
+            val response = http.get(
+                "https://$host/20180608/keys?compartmentId=$tenancyOcid&sortBy=TIMECREATED&sortOrder=DESC"
+            ) {
+                header(
+                    "Authorization",
+                    """Signature version="1",headers="host (request-target) date",keyId="$keyId",algorithm="rsa-sha256",signature="$signature""""
+                )
+                header("Host", host)
+            }
 
             return response.body<Array<JsonObject>>()
         }
@@ -521,33 +432,21 @@ class OCIKey(
         @JsPromise
         @JsExport.Ignore
         suspend fun getOCIPublicKey(
-            OCIDKeyID: String,
-            keyId: String,
-            host: String,
-            keyVersion: String,
-            signingKeyPem: String?
+            OCIDKeyID: String, keyId: String, host: String, keyVersion: String, signingKeyPem: String?
         ): Key {
+            val signature = signingRequest(
+                "GET", "/20180608/keys/$OCIDKeyID/keyVersions/$keyVersion", host, null, signingKeyPem
+            )
 
-            val signature =
-                signingRequest(
-                    "GET", "/20180608/keys/$OCIDKeyID/keyVersions/$keyVersion", host, null, signingKeyPem
+            val response = http.get("https://$host/20180608/keys/$OCIDKeyID/keyVersions/$keyVersion") {
+                header(
+                    "Authorization",
+                    """Signature version="1",headers="host (request-target) date",keyId="$keyId",algorithm="rsa-sha256",signature="$signature""""
                 )
+                header("Host", host)
+            }
 
-            val response =
-                http.get("https://$host/20180608/keys/$OCIDKeyID/keyVersions/$keyVersion") {
-                    header(
-                        "Authorization",
-                        """Signature version="1",headers="host (request-target) date",keyId="$keyId",algorithm="rsa-sha256",signature="$signature""""
-                    )
-                    header("Date", GMTDate().toHttpDate())
-                    header("Host", host)
-                    header("Accept", "application/json")
-                    header("Connection", "keep-alive")
-                }
-
-            val publicKeyPem =
-                response.body<JsonObject>()["publicKey"]?.jsonPrimitive?.content
-                    ?: error("No public key returned from OCI.")
+            val publicKeyPem = response.body<JsonObject>()["publicKey"]?.jsonPrimitive?.content ?: error("No public key returned from OCI.")
             val publicKey = JWKKey.importPEM(publicKeyPem).getOrThrow()
 
             return publicKey
@@ -558,54 +457,42 @@ class OCIKey(
         @JsPromise
         @JsExport.Ignore
         suspend fun deleteKey(
-            OCIDKeyID: String,
-            keyId: String,
-            host: String,
-            signingKeyPem: String
+            OCIDKeyID: String, keyId: String, host: String, signingKeyPem: String
         ): Pair<HttpResponse, JsonObject> {
-            val localDateTime = Clock.System.now()
-            // add 7 days to the current date
-            val timeOfDeletion = localDateTime.plus(7, DateTimeUnit.DAY, TimeZone.currentSystemDefault())
+            return retry {
+                val localDateTime = Clock.System.now()
+                val timeOfDeletion = localDateTime.plus(5, DateTimeUnit.MINUTE, TimeZone.currentSystemDefault())
 
-            val requestBody =
-                JsonObject(
+                val requestBody = JsonObject(
                     mapOf(
                         "timeOfDeletion" to JsonPrimitive(timeOfDeletion.toString()),
                     )
-                )
-                    .toString()
-            val signature =
-                signingRequest(
-                    "POST",
-                    "/20180608/keys/$OCIDKeyID/actions/scheduleDeletion",
-                    host,
-                    requestBody,
-                    signingKeyPem
+                ).toString()
+                val signature = signingRequest(
+                    "POST", "/20180608/keys/$OCIDKeyID/actions/scheduleDeletion", host, requestBody, signingKeyPem
                 )
 
-            val response =
-                http.post("https://$host/20180608/keys/$OCIDKeyID/actions/scheduleDeletion") {
+                val response = http.post("https://$host/20180608/keys/$OCIDKeyID/actions/scheduleDeletion") {
                     header(
                         "Authorization",
                         """Signature version="1",headers="date (request-target) host content-length content-type x-content-sha256",keyId="$keyId",algorithm="rsa-sha256",signature="$signature""""
                     )
-
-                    header("Date", GMTDate().toHttpDate())
                     header("Host", host)
-                    header("Content-Length", requestBody.length.toString())
-                    header("Accept", "application/json")
-                    header("Connection", "keep-alive")
-                    header("Content-Type", "application/json")
                     header("x-content-sha256", calculateSHA256(requestBody))
                     setBody(requestBody)
                 }
 
-            return response to response.body<JsonObject>()
+                response to response.body<JsonObject>()
+            }
         }
 
-        val http = HttpClient {
+        private val http = HttpClient {
             install(ContentNegotiation) { json() }
-            defaultRequest { header(HttpHeaders.ContentType, ContentType.Application.Json) }
+            defaultRequest {
+                header(HttpHeaders.Date, GMTDate().toHttpDate())
+                header(HttpHeaders.ContentType, ContentType.Application.Json)
+                header(HttpHeaders.Accept, ContentType.Application.Json)
+            }
             install(Logging) {
                 logger = Logger.DEFAULT
                 level = LogLevel.ALL
@@ -613,3 +500,16 @@ class OCIKey(
         }
     }
 }
+
+
+private suspend fun <T> retry(retriesLeft: Int = 3, currentTry: Int = 1, block: suspend () -> T): T =
+    runCatching { block.invoke() }.fold(
+        onSuccess = { it },
+        onFailure = { error ->
+            when {
+                retriesLeft <= 0 -> throw IllegalStateException("Failed after $currentTry retries: ${error.message}", error)
+                else -> retry(retriesLeft - 1, currentTry + 1, block)
+            }
+        })
+
+

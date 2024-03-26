@@ -1,4 +1,6 @@
-import id.walt.crypto.keys.*
+import id.walt.crypto.keys.Key
+import id.walt.crypto.keys.KeySerialization
+import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.keys.tse.TSEKey
 import io.ktor.client.*

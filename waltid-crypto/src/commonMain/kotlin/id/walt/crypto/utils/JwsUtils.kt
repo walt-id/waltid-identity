@@ -28,7 +28,9 @@ object JwsUtils {
         Json.parseToJsonElement(Base64.decode(this.base64UrlToBase64()).decodeToString()).jsonObject
 
     data class JwsParts(val header: JsonObject, val payload: JsonObject, val signature: String) {
-        override fun toString() = "${Json.encodeToString(header).encodeToByteArray().encodeToBase64Url()}.${Json.encodeToString(payload).encodeToByteArray().encodeToBase64Url()}.$signature"
+        override fun toString() = "${Json.encodeToString(header).encodeToByteArray().encodeToBase64Url()}.${
+            Json.encodeToString(payload).encodeToByteArray().encodeToBase64Url()
+        }.$signature"
     }
 
     fun String.decodeJws(withSignature: Boolean = false, allowMissingSignature: Boolean = false): JwsParts {

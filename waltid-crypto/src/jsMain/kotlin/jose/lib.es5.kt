@@ -1,4 +1,5 @@
 @file:Suppress("INTERFACE_WITH_SUPERCLASS", "OVERRIDING_FINAL_MEMBER", "RETURN_TYPE_MISMATCH_ON_OVERRIDE", "CONFLICTING_OVERLOADS")
+
 package tsstdlib
 
 import org.khronos.webgl.ArrayBuffer
@@ -10,14 +11,25 @@ external interface DateConstructor {
     operator fun invoke(): String
     var prototype: Date
     fun parse(s: String): Number
-    fun UTC(year: Number, month: Number, date: Number = definedExternally, hours: Number = definedExternally, minutes: Number = definedExternally, seconds: Number = definedExternally, ms: Number = definedExternally): Number
+    fun UTC(
+        year: Number,
+        month: Number,
+        date: Number = definedExternally,
+        hours: Number = definedExternally,
+        minutes: Number = definedExternally,
+        seconds: Number = definedExternally,
+        ms: Number = definedExternally
+    ): Number
+
     fun now(): Number
 }
 
 external interface ConcatArray<T> {
     var length: Number
+
     @nativeGetter
     operator fun get(n: Number): T?
+
     @nativeSetter
     operator fun set(n: Number, value: T)
     fun join(separator: String = definedExternally): String
@@ -32,12 +44,16 @@ external interface ArrayConstructor {
     fun <T, U> from(iterable: ArrayLike<T>, mapfn: (v: T, k: Number) -> U, thisArg: Any = definedExternally): Array<U>
     fun <T, U> from(iterable: ArrayLike<T>, mapfn: (v: T, k: Number) -> U): Array<U>
     fun <T> of(vararg items: T): Array<T>
+
     @nativeInvoke
     operator fun invoke(arrayLength: Number = definedExternally): Array<Any>
+
     @nativeInvoke
     operator fun invoke(): Array<Any>
+
     @nativeInvoke
     operator fun <T> invoke(arrayLength: Number): Array<T>
+
     @nativeInvoke
     operator fun <T> invoke(vararg items: T): Array<T>
     fun isArray(arg: Any): Boolean
@@ -45,13 +61,18 @@ external interface ArrayConstructor {
 }
 
 external interface PromiseLike<T> {
-    fun then(onfulfilled: ((value: T) -> Any?)? = definedExternally, onrejected: ((reason: Any) -> Any?)? = definedExternally): PromiseLike<dynamic /* TResult1 | TResult2 */>
+    fun then(
+        onfulfilled: ((value: T) -> Any?)? = definedExternally,
+        onrejected: ((reason: Any) -> Any?)? = definedExternally
+    ): PromiseLike<dynamic /* TResult1 | TResult2 */>
 }
 
 external interface ArrayLike<T> {
     var length: Number
+
     @nativeGetter
     operator fun get(n: Number): T?
+
     @nativeSetter
     operator fun set(n: Number, value: T)
 }
@@ -76,7 +97,12 @@ external interface ArrayBufferConstructor {
 }
 
 external interface Uint8ArrayConstructor {
-    fun from(arrayLike: Iterable<Number>, mapfn: (v: Number, k: Number) -> Number = definedExternally, thisArg: Any = definedExternally): Uint8Array
+    fun from(
+        arrayLike: Iterable<Number>,
+        mapfn: (v: Number, k: Number) -> Number = definedExternally,
+        thisArg: Any = definedExternally
+    ): Uint8Array
+
     fun from(arrayLike: Iterable<Number>): Uint8Array
     fun from(arrayLike: Iterable<Number>, mapfn: (v: Number, k: Number) -> Number = definedExternally): Uint8Array
     var prototype: Uint8Array

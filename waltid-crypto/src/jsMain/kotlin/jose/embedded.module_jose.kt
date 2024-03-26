@@ -2,4 +2,7 @@
 
 import kotlin.js.Promise
 
-external fun <T : KeyLike> EmbeddedJWK(protectedHeader: JWSHeaderParameters = definedExternally, token: FlattenedJWSInput = definedExternally): Promise<T>
+external fun <T : KeyLike> EmbeddedJWK(
+    protectedHeader: JWSHeaderParameters = definedExternally,
+    token: FlattenedJWSInput = definedExternally
+): Promise<T>
