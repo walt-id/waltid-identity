@@ -59,12 +59,12 @@ object AccountsService {
             data = AccountEventData(accountId = request.name)
         )
 
-            // Add default data:
-            val createdDid =
-                walletService.createDid("jwk", mapOf("alias" to JsonPrimitive("Onboarding")))
-            walletService.setDefault(createdDid)
-          }
-          .onFailure { throw IllegalStateException("Could not register user: ${it.message}", it) }
+        // Add default data:
+        val createdDid =
+            walletService.createDid("jwk", mapOf("alias" to JsonPrimitive("Onboarding")))
+        walletService.setDefault(createdDid)
+    }
+        .onFailure { throw IllegalStateException("Could not register user: ${it.message}", it) }
 
     suspend fun authenticate(tenant: String, request: AccountRequest): Result<AuthenticatedUser> = runCatching {
         when (request) {

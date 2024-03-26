@@ -123,6 +123,10 @@ kotlin {
         }
         val jvmTest by getting {
             dependencies {
+                // Logging
+//                implementation("org.slf4j:slf4j-simple:2.0.12")
+
+                // Test
                 implementation(kotlin("test"))
 
                 implementation("org.junit.jupiter:junit-jupiter-api:5.10.2")

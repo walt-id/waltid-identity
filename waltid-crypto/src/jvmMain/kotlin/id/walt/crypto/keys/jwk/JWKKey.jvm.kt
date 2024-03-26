@@ -6,6 +6,7 @@ import com.nimbusds.jose.crypto.*
 import com.nimbusds.jose.crypto.bc.BouncyCastleProviderSingleton
 import com.nimbusds.jose.jwk.*
 import com.nimbusds.jose.util.Base64URL
+import id.walt.crypto.keys.EccUtils
 import id.walt.crypto.keys.JvmJWKKeyCreator
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
@@ -38,7 +39,7 @@ import kotlin.math.min
 
 
 private val bouncyCastleProvider = BouncyCastleProvider()
-private val log = KotlinLogging.logger {  }
+private val log = KotlinLogging.logger { }
 
 @Suppress("EXPECT_ACTUAL_CLASSIFIERS_ARE_IN_BETA_WARNING")
 @Serializable
@@ -187,6 +188,8 @@ actual class JWKKey actual constructor(
     actual override suspend fun signJws(plaintext: ByteArray, headers: Map<String, String>): String {
         check(hasPrivateKey) { "No private key is attached to this key!" }
 
+        log.debug { "Signing JWS! Key: ${toString()}" }
+
         // Nimbus signature:
         val jwsObject = JWSObject(
             JWSHeader.Builder(_internalJwsAlgorithm).customParams(headers).build(),
@@ -206,10 +209,12 @@ actual class JWKKey actual constructor(
         var signed = signRaw(payloadToSign.encodeToByteArray())
 
         if (keyType in listOf(KeyType.secp256r1, KeyType.secp256k1)) { // Convert DER to IEEE P1363
-            signed = convertToJWSFormat(signed)
+            log.trace { "Converted DER to IEEE P1363 signature" }
+            signed = EccUtils.convertDERtoIEEEP1363(signed)
         }
 
         val customJws = "$payloadToSign.${signed.encodeToBase64Url()}"
+        log.debug { "Signed JWS: $customJws" }
 
         return customJws
     }
@@ -356,15 +361,15 @@ actual class JWKKey actual constructor(
         return publicKey
     }*/
 
-   /* private fun decodeEd25519RawPublicKey(octetKeyPair: OctetKeyPair): PublicKey {
-        val publicKeyParams = Ed25519PublicKeyParameters(octetKeyPair.decodedX, 0)
-        val publicKeyBytes = publicKeyParams.encoded
+    /* private fun decodeEd25519RawPublicKey(octetKeyPair: OctetKeyPair): PublicKey {
+         val publicKeyParams = Ed25519PublicKeyParameters(octetKeyPair.decodedX, 0)
+         val publicKeyBytes = publicKeyParams.encoded
 
-        val publicKeySpec = X509EncodedKeySpec(publicKeyBytes)
-        val keyFactory = KeyFactory.getInstance("EdDSA")
+         val publicKeySpec = X509EncodedKeySpec(publicKeyBytes)
+         val keyFactory = KeyFactory.getInstance("EdDSA")
 
-        return keyFactory.generatePublic(publicKeySpec)
-    }*/
+         return keyFactory.generatePublic(publicKeySpec)
+     }*/
 
     actual companion object : JWKKeyCreator {
 
