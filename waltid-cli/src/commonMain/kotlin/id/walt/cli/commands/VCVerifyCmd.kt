@@ -4,6 +4,7 @@ import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.options.multiple
 import com.github.ajalt.clikt.parameters.options.option
+import com.github.ajalt.clikt.parameters.types.choice
 import com.github.ajalt.clikt.parameters.types.file
 import id.walt.cli.util.PrettyPrinter
 import id.walt.cli.util.VCUtil
@@ -15,6 +16,7 @@ class VCVerifyCmd : CliktCommand(
     help = "Verifies the signature of a Verifiable Credential. Future plans to add new policies possibilities.",
     printHelpOnEmptyArgs = true
 ) {
+
     val print: PrettyPrinter = PrettyPrinter(this)
 
     // private val keyFile by option("-k", "--key")
@@ -36,10 +38,22 @@ class VCVerifyCmd : CliktCommand(
                   Some policies require parameters. To specify it, use: 
                   PolicyName='{"policyParam1"="policyVal1", "policyParam2"="policyVal2"}'
                 """.trimIndent()
-    ).multiple()
-    // associate()
+    )
+        .choice(
+            "schema",
+            "holder-binding",
+            "expired",
+            "webhook",
+            "maximum-credentials",
+            "minimum-credentials",
+            "signature",
+            "allowed-issuer",
+            "not-before"
+        )
+        // .default("signature")
+        .multiple()
 
-    //
+    // associate()
 
     override fun run() {
 
@@ -47,14 +61,27 @@ class VCVerifyCmd : CliktCommand(
 
         val jws = vc.readText()
 
-        val result = runBlocking { VCUtil.verify(jws) }
+        val results = runBlocking { VCUtil.verify(jws, policies) }
 
-        if (result.isSuccess) {
-            print.green("Success! ", false)
-            print.plain("The VC signature is valid.")
-        } else {
-            print.red("Fail! ", false)
-            print.plain("VC signature is not valid.")
+        print.box("Verification Result")
+        results.forEach {
+            if (it.isSuccess()) {
+                print.dim("${it.request.policy.name}: ", false)
+                print.green("Success!")
+            } else {
+                print.dim("${it.request.policy.name}: ", false)
+                print.red("Fail! ", false)
+                it.result.exceptionOrNull()?.message?.let { msg -> print.plain(msg) }
+            }
         }
+
+        // if (result.isSuccess) {
+        //     print.green("Success! ", false)
+        //     print.plain("The VC signature is valid.")
+        // } else {
+        //     print.red("Fail! ", false)
+        //     // print.plain("VC signature is not valid.")
+        //     result.exceptionOrNull()?.let { it.message ?: "VC signature is not valid." }?.let { print.plain(it) }
+        // }
     }
 }
