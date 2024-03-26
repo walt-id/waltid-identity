@@ -20,9 +20,9 @@ import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.requests.TokenRequest
 import id.walt.webwallet.service.SessionAttributes.HACK_outsideMappedSelectedCredentialsPerSession
 import id.walt.webwallet.service.SessionAttributes.HACK_outsideMappedSelectedDisclosuresPerSession
-import id.walt.webwallet.utils.WalletHttpClients.getHttpClient
 import id.walt.webwallet.service.credentials.CredentialsService
 import id.walt.webwallet.service.keys.KeysService
+import id.walt.webwallet.utils.WalletHttpClients.getHttpClient
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
@@ -84,7 +84,13 @@ class TestCredentialWallet(
         return runBlocking {
             val authKeyId = resolveDidAuthentication(did)
 
-            key.signJws(Json.encodeToString(payload).encodeToByteArray(), mapOf("typ" to "JWT", "kid" to authKeyId))
+            val payloadToSign = Json.encodeToString(payload).encodeToByteArray()
+            key.signJws(payloadToSign, mapOf("typ" to "JWT", "kid" to authKeyId))
+                .also { signed ->
+                    key.getPublicKey().verifyJws(signed).also {
+                        println("RE-VERIFICATION: $it")
+                    }
+                }
         }
 
         //JwtService.getService().sign(payload, keyId)
@@ -149,7 +155,7 @@ class TestCredentialWallet(
 
         val credentialsPresented = matchedCredentials.map {
             if (selectedDisclosures?.containsKey(it.id) == true) {
-                it.document + "~${selectedDisclosures[it.id]!!.joinToString("~") }"
+                it.document + "~${selectedDisclosures[it.id]!!.joinToString("~")}"
             } else {
                 it.document
             }
@@ -301,7 +307,10 @@ class TestCredentialWallet(
             format = VCFormat.jwt_vp,  // jwt_vp_json
             path = "$",
             pathNested = DescriptorMapping(
-                id = getDescriptorId(type, session.presentationDefinition),//session.presentationDefinition?.inputDescriptors?.get(index)?.id,
+                id = getDescriptorId(
+                    type,
+                    session.presentationDefinition
+                ),//session.presentationDefinition?.inputDescriptors?.get(index)?.id,
                 format = VCFormat.jwt_vc_json,
                 path = "$.verifiableCredential[$index]",
             )

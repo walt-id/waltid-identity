@@ -1,8 +1,8 @@
 package id.walt.crypto.keys.oci
 
+import kotlinx.serialization.Serializable
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
-import kotlinx.serialization.Serializable
 
 @OptIn(ExperimentalJsExport::class)
 @JsExport

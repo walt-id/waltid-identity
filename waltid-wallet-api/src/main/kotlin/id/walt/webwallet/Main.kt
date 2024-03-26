@@ -65,7 +65,7 @@ fun Application.webWalletModule(withPlugins: Boolean = true) {
         configurePlugins()
     }
     health()
-    
+
     auth()
     push()
     notifications()

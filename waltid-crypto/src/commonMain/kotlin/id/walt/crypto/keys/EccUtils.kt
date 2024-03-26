@@ -16,16 +16,35 @@ object EccUtils {
      *
      * for EC: Secp256r1 & Secp256k1
      */
-    fun convertDERtoIEEEP1363(sig: ByteArray): ByteArray {
-        val rLength = sig[3].toInt()
-        val r = sig.copyOfRange(4, 4 + rLength)
-        val s = sig.copyOfRange(4 + rLength + 2, sig.size)
 
-        // Ensure r and s are always 32 bytes
-        val rPadded = r.padStart(32)
-        val sPadded = s.padStart(32)
+    fun convertDERtoIEEEP1363(derSignature: ByteArray): ByteArray {
+        // Assuming the signature starts with a DER sequence (0x30) followed by the length (which we skip)
+        var index = 2 // Skipping the sequence byte and the length of the sequence
 
-        return rPadded + sPadded
+        fun ByteArray.trimLeadingZeroes(): ByteArray = this.dropWhile { it == 0x00.toByte() }.toByteArray()
+
+        // Function to parse an integer (DER format starts with 0x02 followed by length)
+        fun parseInteger(): ByteArray {
+            if (derSignature[index] != 0x02.toByte()) throw IllegalArgumentException("Expected integer")
+            index++ // Skip the integer marker
+            val length = derSignature[index++].toInt() // Next byte is the length
+            val integer = derSignature.copyOfRange(index, index + length)
+            index += length
+            return integer
+        }
+
+        // Parse r and s integers
+        val r = parseInteger().trimLeadingZeroes()
+        val s = parseInteger().trimLeadingZeroes()
+
+        // Convert to fixed-length (32 bytes for each integer)
+        val fixedLengthR = ByteArray(32)
+        val fixedLengthS = ByteArray(32)
+        r.copyInto(fixedLengthR, 32 - r.size)
+        s.copyInto(fixedLengthS, 32 - s.size)
+
+        // Concatenate r and s
+        return fixedLengthR + fixedLengthS
     }
 
 }
