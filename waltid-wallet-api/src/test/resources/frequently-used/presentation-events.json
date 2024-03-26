@@ -7,7 +7,7 @@
     "originator": "",
     "account": "036669e6-6011-441c-bb53-4ef8ea53dfa2",
     "wallet": "bd698a0f-1703-4565-aab3-747c374152dd",
-    "credentialId": null,
+    "credentialId": "http://example.gov/credentials/1",
     "data": {
       "type": "id.walt.webwallet.service.events.CredentialEventData",
       "ecosystem": "n/a",
@@ -19,8 +19,7 @@
       "credentialType": "n/a",
       "credentialFormat": "W3C",
       "credentialProofType": "n/a",
-      "policies":
-      [],
+      "policies": [],
       "protocol": "oid4vp",
       "credentialId": "http://example.gov/credentials/1"
     },
@@ -34,7 +33,7 @@
     "originator": "",
     "account": "036669e6-6011-441c-bb53-4ef8ea53dfa2",
     "wallet": "bd698a0f-1703-4565-aab3-747c374152dd",
-    "credentialId": null,
+    "credentialId": "http://example.gov/credentials/2",
     "data": {
       "type": "id.walt.webwallet.service.events.CredentialEventData",
       "ecosystem": "n/a",
@@ -46,8 +45,7 @@
       "credentialType": "n/a",
       "credentialFormat": "W3C",
       "credentialProofType": "n/a",
-      "policies":
-      [],
+      "policies": [],
       "protocol": "oid4vp",
       "credentialId": "http://example.gov/credentials/2"
     },
@@ -61,7 +59,7 @@
     "originator": "",
     "account": "036669e6-6011-441c-bb53-4ef8ea53dfa2",
     "wallet": "bd698a0f-1703-4565-aab3-747c374152dd",
-    "credentialId": null,
+    "credentialId": "http://example.gov/credentials/3",
     "data": {
       "type": "id.walt.webwallet.service.events.CredentialEventData",
       "ecosystem": "n/a",
@@ -73,8 +71,7 @@
       "credentialType": "n/a",
       "credentialFormat": "W3C",
       "credentialProofType": "n/a",
-      "policies":
-      [],
+      "policies": [],
       "protocol": "oid4vp",
       "credentialId": "http://example.gov/credentials/3"
     },
@@ -88,7 +85,7 @@
     "originator": "",
     "account": "036669e6-6011-441c-bb53-4ef8ea53dfa2",
     "wallet": "bd698a0f-1703-4565-aab3-747c374152dd",
-    "credentialId": null,
+    "credentialId": "http://example.gov/credentials/2",
     "data": {
       "type": "id.walt.webwallet.service.events.CredentialEventData",
       "ecosystem": "n/a",
@@ -100,8 +97,7 @@
       "credentialType": "n/a",
       "credentialFormat": "W3C",
       "credentialProofType": "n/a",
-      "policies":
-      [],
+      "policies": [],
       "protocol": "oid4vp",
       "credentialId": "http://example.gov/credentials/2"
     },
@@ -115,7 +111,7 @@
     "originator": "",
     "account": "036669e6-6011-441c-bb53-4ef8ea53dfa2",
     "wallet": "bd698a0f-1703-4565-aab3-747c374152dd",
-    "credentialId": null,
+    "credentialId": "http://example.gov/credentials/3",
     "data": {
       "type": "id.walt.webwallet.service.events.CredentialEventData",
       "ecosystem": "n/a",
@@ -127,8 +123,7 @@
       "credentialType": "n/a",
       "credentialFormat": "W3C",
       "credentialProofType": "n/a",
-      "policies":
-      [],
+      "policies": [],
       "protocol": "oid4vp",
       "credentialId": "http://example.gov/credentials/3"
     },
@@ -142,7 +137,7 @@
     "originator": "",
     "account": "036669e6-6011-441c-bb53-4ef8ea53dfa2",
     "wallet": "bd698a0f-1703-4565-aab3-747c374152dd",
-    "credentialId": null,
+    "credentialId": "http://example.gov/credentials/3",
     "data": {
       "type": "id.walt.webwallet.service.events.CredentialEventData",
       "ecosystem": "n/a",
@@ -154,8 +149,7 @@
       "credentialType": "n/a",
       "credentialFormat": "W3C",
       "credentialProofType": "n/a",
-      "policies":
-      [],
+      "policies": [],
       "protocol": "oid4vp",
       "credentialId": "http://example.gov/credentials/3"
     },

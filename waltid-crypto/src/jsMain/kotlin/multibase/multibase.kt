@@ -1,5 +1,3 @@
-import org.khronos.webgl.Uint8Array
-
 /*
 @JsModule("multibase")
 @JsNonModule

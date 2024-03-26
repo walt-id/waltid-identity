@@ -15,7 +15,8 @@ object PushManager {
     private val pushConfig by lazy { ConfigManager.getConfig<PushConfig>() }
 
     // subject: "mailto:dev@walt.id"
-    private val pushService = WebPushService(pushConfig.pushSubject, VapidKeys.create(pushConfig.pushPublicKey, pushConfig.pushPrivateKey.value))
+    private val pushService =
+        WebPushService(pushConfig.pushSubject, VapidKeys.create(pushConfig.pushPublicKey, pushConfig.pushPrivateKey.value))
 
     val subscriptions = ArrayList<Subscription>()
 
