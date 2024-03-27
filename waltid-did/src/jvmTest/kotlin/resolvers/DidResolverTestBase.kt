@@ -36,9 +36,7 @@ abstract class DidResolverTestBase {
 
         //region-DidDocument assertions-
         private val didDocAssertions: resolverAssertion<DidDocument> = { did, key, result ->
-            val doc = result.getOrNull()
-            assert(result.isSuccess)
-            assertNotNull(doc)
+            val doc = result.getOrThrow()
             // assert [id] and [did] are identical
             assert(doc["id"]!!.jsonPrimitive.content == did)
             verificationMethodAssertions(doc, key) { v, k ->
