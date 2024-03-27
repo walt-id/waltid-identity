@@ -110,7 +110,10 @@ object ConfigManager {
     /** All configurations registered in this function will be loaded on startup */
     private fun registerConfigurations() {
         registerRequiredConfig("db", DatabaseConfiguration::class) {
-            registerRequiredConfig((it as DatabaseConfiguration).database, DatasourceConfiguration::class)
+            val dbConfigFile = (it as DatabaseConfiguration).database
+
+            registerRequiredConfig(dbConfigFile, multiple = true, type = DatasourceJsonConfiguration::class)
+            registerRequiredConfig(dbConfigFile, multiple = true, type = DatasourceConfiguration::class)
         }
         registerRequiredConfig("web", WebConfig::class)
         registerRequiredConfig("logins", LoginMethodsConfig::class)
