@@ -8,7 +8,7 @@ import com.nimbusds.jose.jwk.ECKey
 import id.walt.credentials.PresentationBuilder
 import id.walt.credentials.vc.vcs.W3CVC
 import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.LocalKey
+//import id.walt.crypto.keys.LocalKey
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.did.dids.DidService
@@ -39,7 +39,7 @@ import id.walt.sdjwt.SimpleJWTCryptoProvider
 import io.kotest.common.runBlocking
 import io.ktor.client.*
 import io.ktor.client.call.*
-import io.ktor.client.engine.java.*
+//import io.ktor.client.engine.java.*
 import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*

@@ -372,7 +372,7 @@ class SSIKit2WalletService(
     private fun getAnyCredentialWallet() =
         credentialWallets.values.firstOrNull() ?: getCredentialWallet("did:test:test")
 
-        override suspend fun useOfferRequest(
+        suspend fun useOfferRequest(
         offer: String, did: String, requireUserInput: Boolean
     ): List<WalletCredential> {
         val addableCredentials =

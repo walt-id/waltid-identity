@@ -29,7 +29,7 @@ import id.walt.sdjwt.SDPayload
 import id.walt.sdjwt.SimpleJWTCryptoProvider
 import io.kotest.common.runBlocking
 import io.ktor.client.*
-import io.ktor.client.engine.java.*
+//import io.ktor.client.engine.java.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.plugins.logging.*
 import io.ktor.client.request.*
@@ -41,7 +41,6 @@ import kotlinx.datetime.Instant
 import kotlinx.serialization.json.*
 import java.util.UUID
 import kotlin.js.ExperimentalJsExport
-import java.util.UUID
 
 const val EBSI_WALLET_PORT = 8011
 const val EBSI_WALLET_BASE_URL = "http://localhost:${EBSI_WALLET_PORT}"
