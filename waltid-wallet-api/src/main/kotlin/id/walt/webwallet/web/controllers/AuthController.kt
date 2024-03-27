@@ -37,6 +37,7 @@ import io.ktor.server.plugins.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.sessions.*
+import io.ktor.util.*
 import io.ktor.util.pipeline.*
 import kotlinx.serialization.json.*
 import kotlinx.uuid.UUID
@@ -288,7 +289,10 @@ fun Application.auth() {
 
             authenticate("auth-session", "auth-bearer", "auth-bearer-alternative") {
                 get("user-info", { summary = "Return user ID if logged in" }) {
-                    call.respond(AccountsService.get(getUserUUID()))
+                    getUsersSessionToken()?.split('.')?.getOrNull(1)?.run {
+                        val uuid = this.decodeBase64String()
+                        call.respond(AccountsService.get(UUID(uuid)))
+                    } ?: call.respond(HttpStatusCode.BadRequest)
                 }
                 get("session", { summary = "Return session ID if logged in" }) {
                     val token = getUsersSessionToken() ?: throw UnauthorizedException("Invalid session")
