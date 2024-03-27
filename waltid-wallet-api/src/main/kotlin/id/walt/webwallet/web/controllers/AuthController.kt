@@ -9,12 +9,12 @@ import com.nimbusds.jose.crypto.MACVerifier
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.webwallet.config.AuthConfig
 import id.walt.webwallet.config.ConfigManager
-import id.walt.webwallet.config.OidcConfiguration
 import id.walt.webwallet.config.WebConfig
 import id.walt.webwallet.db.models.AccountWalletMappings
 import id.walt.webwallet.db.models.AccountWalletPermissions
 import id.walt.webwallet.service.OidcLoginService
 import id.walt.webwallet.service.WalletServiceManager
+import id.walt.webwallet.service.WalletServiceManager.oidcConfig
 import id.walt.webwallet.service.account.AccountsService
 import id.walt.webwallet.service.account.KeycloakAccountStrategy
 import id.walt.webwallet.web.ForbiddenException
@@ -71,7 +71,6 @@ object AuthKeys {
 
 fun Application.configureSecurity() {
     val webConfig = ConfigManager.getConfig<WebConfig>()
-    val oidcConfig = ConfigManager.getConfig<OidcConfiguration>()
     install(Sessions) {
         cookie<LoginTokenSession>("login") {
             // cookie.encoding = CookieEncoding.BASE64_ENCODING
@@ -248,23 +247,29 @@ fun Application.auth() {
                     summary = "Register with [email + password] or [wallet address + ecosystem]"
                     request {
                         body<EmailAccountRequest> {
+
+                            fun AccountRequest.encodeExample(type: String) =
+                                JsonObject(loginRequestJson.encodeToJsonElement(this).jsonObject.toMutableMap()
+                                    .apply {
+                                        this["type"] = JsonPrimitive(type)
+                                    })
+                                    .toString()
+
                             example(
                                 "E-mail + password",
-                                buildJsonObject {
-                                    put("name", JsonPrimitive("Max Mustermann"))
-                                    put("email", JsonPrimitive("user@email.com"))
-                                    put("password", JsonPrimitive("password"))
-                                    put("type", JsonPrimitive("email"))
-                                }
-                                    .toString())
+                                EmailAccountRequest(
+                                    name = "Max Mustermann",
+                                    email = "user@email.com",
+                                    password = "password"
+                                ).encodeExample("email")
+                            )
                             example(
                                 "Wallet address + ecosystem",
-                                buildJsonObject {
-                                    put("address", JsonPrimitive("0xABC"))
-                                    put("ecosystem", JsonPrimitive("ecosystem"))
-                                    put("type", JsonPrimitive("address"))
-                                }
-                                    .toString())
+                                AddressAccountRequest(address = "0xABC", ecosystem = "ecosystem").encodeExample("address")
+                            )
+                            example("OIDC", OidcAccountRequest(token = "ey...").encodeExample("oidc"))
+                            example("OIDC Unique Subject", OidcUniqueSubjectRequest(token = "ey...").encodeExample("oidc-unique-subject"))
+                            example("Keycloak", KeycloakAccountRequest().encodeExample("keycloak"))
                         }
                     }
                     response {
@@ -272,7 +277,7 @@ fun Application.auth() {
                         HttpStatusCode.BadRequest to { description = "Registration failed" }
                     }
                 }) {
-                val req = LoginRequestJson.decodeFromString<AccountRequest>(call.receive())
+                val req = loginRequestJson.decodeFromString<AccountRequest>(call.receive())
                 AccountsService.register("", req)
                     .onSuccess {
                         call.response.status(HttpStatusCode.Created)
@@ -303,7 +308,6 @@ fun Application.auth() {
             }
 
             get("logout-oidc", { description = "Logout via OIDC provider" }) {
-                val oidcConfig = ConfigManager.getConfig<OidcConfiguration>()
                 val webConfig = ConfigManager.getConfig<WebConfig>()
                 call.respondRedirect(
                     "${oidcConfig.logoutUrl}?post_logout_redirect_uri=${webConfig.publicBaseUrl}&client_id=${oidcConfig.clientId}"
@@ -350,7 +354,7 @@ fun Application.auth() {
                         HttpStatusCode.BadRequest to { description = "Registration failed" }
                     }
                 }) {
-                val req = LoginRequestJson.decodeFromString<AccountRequest>(call.receive())
+                val req = loginRequestJson.decodeFromString<AccountRequest>(call.receive())
 
                 logger.debug { "Creating Keycloak user" }
 
@@ -453,7 +457,7 @@ fun verifyToken(token: String): Result<String> {
 }
 
 suspend fun PipelineContext<Unit, ApplicationCall>.doLogin() {
-    val reqBody = LoginRequestJson.decodeFromString<AccountRequest>(call.receive())
+    val reqBody = loginRequestJson.decodeFromString<AccountRequest>(call.receive())
     AccountsService.authenticate("", reqBody)
         .onSuccess { // FIXME -> TENANT HERE
             // security token mapping was here
