@@ -2,6 +2,7 @@ package id.walt.webwallet.db
 
 import id.walt.webwallet.config.ConfigManager
 import id.walt.webwallet.config.DatasourceConfiguration
+import id.walt.webwallet.config.DatasourceJsonConfiguration
 import id.walt.webwallet.db.models.*
 import id.walt.webwallet.service.account.AccountsService
 import id.walt.webwallet.service.credentials.CredentialsService
@@ -10,6 +11,8 @@ import id.walt.webwallet.web.model.EmailAccountRequest
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Clock
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.uuid.UUID
 import kotlinx.uuid.generateUUID
 import org.jetbrains.exposed.sql.Database
@@ -22,6 +25,7 @@ import org.slf4j.bridge.SLF4JBridgeHandler
 import java.sql.Connection
 import kotlin.io.path.Path
 import kotlin.io.path.absolutePathString
+import kotlin.io.path.createDirectories
 import kotlin.random.Random
 
 object Db {
@@ -30,18 +34,25 @@ object Db {
 
     lateinit var datasourceConfig: DatasourceConfiguration
 
-    val dataDirectoryPath = Path("data")
+    private const val SQLITE_PREFIX = "jdbc:sqlite:"
 
     private fun connect() {
+        val datasourceJsonConfig = ConfigManager.getConfigLoader<DatasourceConfiguration>().loadConfigOrThrow<DatasourceJsonConfiguration>().hikariDataSource.jsonObject
+        val jdbcUrl = datasourceJsonConfig["driverClassName"]?.jsonPrimitive?.content
+        if (jdbcUrl?.startsWith(SQLITE_PREFIX) == true) {
+            val path = Path(jdbcUrl.removePrefix(SQLITE_PREFIX))
+            path.createDirectories()
+        }
+
+        if (jdbcUrl?.contains("sqlite") == true) {
+            log.info { "Will use sqlite database (${jdbcUrl}), working directory: ${Path(".").absolutePathString()}" }
+        }
+
         datasourceConfig = ConfigManager.getConfig<DatasourceConfiguration>()
         val hikariDataSourceConfig = datasourceConfig.hikariDataSource
 
         // connect
         log.info { "Connecting to database at \"${hikariDataSourceConfig.jdbcUrl}\"..." }
-
-        if (hikariDataSourceConfig.jdbcUrl.contains("sqlite")) {
-            println("Will use sqlite database (${hikariDataSourceConfig.jdbcUrl}), working directory: ${Path(".").absolutePathString()}")
-        }
 
         Database.connect(hikariDataSourceConfig)
         TransactionManager.manager.defaultIsolationLevel =
