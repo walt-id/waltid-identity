@@ -288,7 +288,7 @@ fun Application.auth() {
 
             authenticate("auth-session", "auth-bearer", "auth-bearer-alternative") {
                 get("user-info", { summary = "Return user ID if logged in" }) {
-                    call.respond(getUserId().name)
+                    call.respond(AccountsService.get(getUserUUID()))
                 }
                 get("session", { summary = "Return session ID if logged in" }) {
                     val token = getUsersSessionToken() ?: throw UnauthorizedException("Invalid session")
