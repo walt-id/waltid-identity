@@ -24,10 +24,9 @@ class UniResolverTest {
         did: String, document: String
     ) = runTest {
         println("Resolving: $did")
-        val result = sut.resolve(did)
+        val result = sut.resolve(did).getOrThrow()
 
-        check(result.isSuccess) { "Non successful: ${result.exceptionOrNull()}" }
-        check(document == result.getOrNull()?.toString()) { "Non equal: $document" }
+        check(document == result.toString()) { "Non equal: $document" }
     }
 
     @ParameterizedTest
