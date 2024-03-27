@@ -26,7 +26,7 @@ object ConfigManager {
     @OptIn(ExperimentalHoplite::class)
     private fun loadConfig(config: ConfigData, args: Array<String>) {
         val id = config.id
-        log.debug { "Loading configuration: \"$id\"..." }
+        log.debug { "Loading ${if (config.required) "required" else "optional"} configuration: \"$id\" (${config.type.simpleName ?: config.type.jvmName})..." }
 
         val type = config.type
 
@@ -47,6 +47,7 @@ object ConfigManager {
                 .build().also { loader -> configLoaders[id] = loader }
                 .loadConfigOrThrow(type, emptyList())
         }.onSuccess {
+            log.trace { "Loaded config \"$id\": $it" }
             loadedConfigurations[id] = it
             config.onLoad?.invoke(it)
         }.onFailure {
@@ -56,9 +57,16 @@ object ConfigManager {
                     |---- vvv Configuration error vvv ----
                     |Could not load configuration for "$id": ${it.stackTraceToString()}
                     |---- ^^^ Configuration error ^^^ ---
-                    |""".trimMargin() }
+                    |""".trimMargin()
+                }
             } else {
-                log.info { "Optional configuration not loaded: ${it.message}" }
+                if (it.message != null) {
+                    val shorterMessage = it.message!!.removePrefix("Error loading config because:")
+                        .lines().filterNot { it.isBlank() }.joinToString() { it.trim().removePrefix("- ") }
+                    log.info { "OPTIONAL configuration \"$id\" not loaded: $shorterMessage [This is not a mistake if you are not using named feature. The feature will not be available when not configured.]" }
+                } else {
+                    log.info { "OPTIONAL configuration \"$id\" not loaded: ${it.stackTraceToString()}" }
+                }
             }
         }
     }
