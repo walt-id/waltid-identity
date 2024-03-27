@@ -2,7 +2,11 @@ package id.walt.webwallet.db.models
 
 import kotlinx.datetime.Instant
 import kotlinx.datetime.toKotlinInstant
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 import kotlinx.uuid.exposed.KotlinxUUIDTable
 import kotlinx.uuid.exposed.kotlinxUUID
 import org.jetbrains.exposed.sql.ResultRow
@@ -26,7 +30,10 @@ data class Notification(
     val type: String,
     val status: Boolean,
     val addedOn: Instant,
-    val data: String,
+    @Transient
+    val data: String = "",
+    @SerialName("data")
+    val parsedData: JsonObject = NotificationDataSerializer.decodeFromString(data)
 ) {
     constructor(resultRow: ResultRow) : this(
         id = resultRow[WalletNotifications.id].value.toString(),
@@ -47,3 +54,5 @@ data class Notification(
         val detail: String,
     ) : Data
 }
+
+private val NotificationDataSerializer = Json { ignoreUnknownKeys = true }

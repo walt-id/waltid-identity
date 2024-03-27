@@ -61,7 +61,7 @@ class MSO (
    */
   fun verifySignedItems(nameSpace: String, items: List<EncodedCBORElement>): Boolean {
     val msoDigests = getValueDigestsFor(nameSpace)
-    val algorithm = DigestAlgorithm.values().first { it.value == digestAlgorithm.value }
+    val algorithm = DigestAlgorithm.entries.first { it.value == digestAlgorithm.value }
     return items.all {
       val digestId = it.decode<IssuerSignedItem>().digestID.value.toInt()
       return msoDigests.containsKey(digestId) && msoDigests[digestId]!!.contentEquals(digestItem(it, algorithm))
@@ -85,7 +85,6 @@ class MSO (
      * @param digestAlgorithm Digest algorithm, defaults to SHA-256
      * @return The Mobile security object, protecting the given data
      */
-    @OptIn(ExperimentalSerializationApi::class)
     fun createFor(nameSpaces: Map<String, List<IssuerSignedItem>>,
                   deviceKeyInfo: DeviceKeyInfo,
                   docType: String,
@@ -95,14 +94,14 @@ class MSO (
         "1.0".toDE(),
         digestAlgorithm.value.toDE(),
         nameSpaces.mapValues { entry ->
-          entry.value.map { item ->
+          entry.value.associate { item ->
             Pair(
               item.digestID.value.toInt(),
               ByteStringElement(
                 digestItem(EncodedCBORElement(item.toMapElement()), digestAlgorithm)
               )
             )
-          }.toMap().toDE()
+          }.toDE()
         }.toDE(),
         deviceKeyInfo,
         docType.toDE(),

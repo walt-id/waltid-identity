@@ -1,5 +1,6 @@
 @file:JsQualifier("tsstdlib.Intl")
 @file:Suppress("INTERFACE_WITH_SUPERCLASS", "OVERRIDING_FINAL_MEMBER", "RETURN_TYPE_MISMATCH_ON_OVERRIDE", "CONFLICTING_OVERLOADS")
+
 package tsstdlib.Intl
 
 import kotlin.js.Date
@@ -42,7 +43,11 @@ external interface Collator {
 
     companion object {
         @nativeInvoke
-        operator fun invoke(locales: Any /* String | Array<String> */ = definedExternally, options: CollatorOptions = definedExternally): Collator
+        operator fun invoke(
+            locales: Any /* String | Array<String> */ = definedExternally,
+            options: CollatorOptions = definedExternally
+        ): Collator
+
         fun supportedLocalesOf(locales: Any /* String | Array<String> */, options: CollatorOptions = definedExternally): Array<String>
     }
 }
@@ -109,7 +114,11 @@ external interface NumberFormat {
 
     companion object {
         @nativeInvoke
-        operator fun invoke(locales: Any /* String | Array<String> */ = definedExternally, options: NumberFormatOptions = definedExternally): NumberFormat
+        operator fun invoke(
+            locales: Any /* String | Array<String> */ = definedExternally,
+            options: NumberFormatOptions = definedExternally
+        ): NumberFormat
+
         fun supportedLocalesOf(locales: Any /* String | Array<String> */, options: NumberFormatOptions = definedExternally): Array<String>
     }
 }
@@ -202,7 +211,11 @@ external interface DateTimeFormat {
 
     companion object {
         @nativeInvoke
-        operator fun invoke(locales: Any /* String | Array<String> */ = definedExternally, options: DateTimeFormatOptions = definedExternally): DateTimeFormat
+        operator fun invoke(
+            locales: Any /* String | Array<String> */ = definedExternally,
+            options: DateTimeFormatOptions = definedExternally
+        ): DateTimeFormat
+
         fun supportedLocalesOf(locales: Any /* String | Array<String> */, options: DateTimeFormatOptions = definedExternally): Array<String>
     }
 }

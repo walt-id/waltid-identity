@@ -8,7 +8,7 @@ object IssuanceExamples {
     val universityDegreeCredential = """
 {
   "issuanceKey": {
-    "type": "local",
+    "type": "jwk",
     "jwk": "{\"kty\":\"OKP\",\"d\":\"mDhpwaH6JYSrD2Bq7Cs-pzmsjlLj4EOhxyI-9DM1mFI\",\"crv\":\"Ed25519\",\"kid\":\"Vzx7l5fh56F3Pf9aR3DECU5BwfrY6ZJe05aiWYWzan8\",\"x\":\"T3T4-u1Xz3vAV2JwPNxWfs4pik_JLiArz_WTCvrCFUM\"}"
   },
   "issuerDid": "did:key:z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp",
@@ -47,12 +47,12 @@ object IssuanceExamples {
   }
 }
 """.trimIndent()
-    
+
     //language=json
     val openBadgeCredentialExampleJsonString = """
 {
   "issuanceKey": {
-    "type": "local",
+    "type": "jwk",
     "jwk": "{\"kty\":\"OKP\",\"d\":\"mDhpwaH6JYSrD2Bq7Cs-pzmsjlLj4EOhxyI-9DM1mFI\",\"crv\":\"Ed25519\",\"kid\":\"Vzx7l5fh56F3Pf9aR3DECU5BwfrY6ZJe05aiWYWzan8\",\"x\":\"T3T4-u1Xz3vAV2JwPNxWfs4pik_JLiArz_WTCvrCFUM\"}"
   },
   "issuerDid": "did:key:z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp",
@@ -115,13 +115,13 @@ object IssuanceExamples {
 }
 """.trimIndent()
     val openBadgeCredentialExample = Json.parseToJsonElement(openBadgeCredentialExampleJsonString).jsonObject.toMap()
-    
-    
+
+
     val testCredential =
-            """
+        """
             {
               "issuanceKey": {
-                "type": "local",
+                "type": "jwk",
                 "jwk": "{\"kty\":\"OKP\",\"d\":\"mDhpwaH6JYSrD2Bq7Cs-pzmsjlLj4EOhxyI-9DM1mFI\",\"crv\":\"Ed25519\",\"kid\":\"Vzx7l5fh56F3Pf9aR3DECU5BwfrY6ZJe05aiWYWzan8\",\"x\":\"T3T4-u1Xz3vAV2JwPNxWfs4pik_JLiArz_WTCvrCFUM\"}"
               },
               "issuerDid": "did:key:z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp",
@@ -183,7 +183,7 @@ object IssuanceExamples {
               }
             }
             """.trimIndent()
-    
+
     val universityDegreeCredentialExample2 = mapOf(
         "@context" to listOf(
             "https://www.w3.org/2018/credentials/v1", "https://www.w3.org/2018/credentials/examples/v1"
@@ -203,7 +203,7 @@ object IssuanceExamples {
             )
         ),
     )
-    
+
     val universityDegreeCredentialSignedExample = universityDegreeCredentialExample2.plus(
         mapOf(
             "proof" to mapOf(
@@ -215,13 +215,13 @@ object IssuanceExamples {
             )
         )
     )
-    
+
     //language=JSON
     val batchExample = """
         [
           {
             "issuanceKey": {
-              "type": "local",
+              "type": "jwk",
               "jwk": "{\"kty\":\"OKP\",\"d\":\"mDhpwaH6JYSrD2Bq7Cs-pzmsjlLj4EOhxyI-9DM1mFI\",\"crv\":\"Ed25519\",\"kid\":\"Vzx7l5fh56F3Pf9aR3DECU5BwfrY6ZJe05aiWYWzan8\",\"x\":\"T3T4-u1Xz3vAV2JwPNxWfs4pik_JLiArz_WTCvrCFUM\"}"
             },
             "issuerDid": "did:key:z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp",
@@ -261,7 +261,7 @@ object IssuanceExamples {
           },
           {
             "issuanceKey": {
-              "type": "local",
+              "type": "jwk",
               "jwk": "{\"kty\":\"OKP\",\"d\":\"mDhpwaH6JYSrD2Bq7Cs-pzmsjlLj4EOhxyI-9DM1mFI\",\"crv\":\"Ed25519\",\"kid\":\"Vzx7l5fh56F3Pf9aR3DECU5BwfrY6ZJe05aiWYWzan8\",\"x\":\"T3T4-u1Xz3vAV2JwPNxWfs4pik_JLiArz_WTCvrCFUM\"}"
             },
             "issuerDid": "did:key:z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp",
@@ -324,12 +324,12 @@ object IssuanceExamples {
           }
         ]
     """.trimIndent()
-    
+
     //language=JSON
     val sdJwtExample = """
         {
           "issuanceKey": {
-            "type": "local",
+            "type": "jwk",
             "jwk": "{\"kty\":\"OKP\",\"d\":\"mDhpwaH6JYSrD2Bq7Cs-pzmsjlLj4EOhxyI-9DM1mFI\",\"crv\":\"Ed25519\",\"kid\":\"Vzx7l5fh56F3Pf9aR3DECU5BwfrY6ZJe05aiWYWzan8\",\"x\":\"T3T4-u1Xz3vAV2JwPNxWfs4pik_JLiArz_WTCvrCFUM\"}"
           },
           "issuerDid": "did:key:z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp",

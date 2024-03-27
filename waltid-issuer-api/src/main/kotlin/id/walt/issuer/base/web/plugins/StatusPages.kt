@@ -23,6 +23,7 @@ fun Application.configureStatusPages() {
             call.respond(HttpStatusCode.NotFound, ex.message ?: "Not found")
         }
         exception<UnauthorizedException> { call, cause ->
+            cause.printStackTrace()
             call.respond(HttpStatusCode.Unauthorized, cause.message ?: "")
         }
         exception<Throwable> { call, cause ->

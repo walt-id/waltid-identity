@@ -3,7 +3,7 @@
 import org.khronos.webgl.Uint8Array
 import kotlin.js.Promise
 
-external open class EncryptJWT(payload: JWTPayload) : ProduceJWT {
+open external class EncryptJWT(payload: JWTPayload) : ProduceJWT {
     open var _cek: Any
     open var _iv: Any
     open var _keyManagementParameters: Any

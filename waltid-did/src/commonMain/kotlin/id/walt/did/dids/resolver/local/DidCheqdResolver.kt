@@ -16,7 +16,7 @@ import love.forte.plugin.suspendtrans.annotation.JvmBlocking
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 
-@ExperimentalJsExport
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 class DidCheqdResolver : LocalResolverMethod("cheqd") {
     private val httpClient = HttpClient() //TODO: inject
@@ -40,7 +40,7 @@ class DidCheqdResolver : LocalResolverMethod("cheqd") {
         // (no functionality provided by crypto, only multibase58btc available)
     }
 
-    private val json = Json() { ignoreUnknownKeys = true }
+    private val json = Json { ignoreUnknownKeys = true }
 
     private suspend fun resolveDid(did: String): DidDocument {
         val response = httpClient.get("https://resolver.cheqd.net/1.0/identifiers/${did}") {

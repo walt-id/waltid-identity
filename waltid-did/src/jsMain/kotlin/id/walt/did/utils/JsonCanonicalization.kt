@@ -3,7 +3,7 @@ package id.walt.did.utils
 import canonicalize
 import io.ktor.utils.io.core.*
 
-@ExperimentalJsExport
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 actual object JsonCanonicalization {
     actual fun getCanonicalBytes(json: String): ByteArray = canonicalize(json).toByteArray()

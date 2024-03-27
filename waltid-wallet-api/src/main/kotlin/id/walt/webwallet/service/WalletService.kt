@@ -1,5 +1,6 @@
 package id.walt.webwallet.service
 
+import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.oid4vc.data.CredentialOffer
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.requests.CredentialOfferRequest
@@ -42,9 +43,6 @@ abstract class WalletService(val tenant: String, val accountId: UUID, val wallet
     abstract suspend fun usePresentationRequest(parameter: PresentationRequestParameter): Result<String?>
 
     abstract suspend fun resolvePresentationRequest(request: String): String
-    abstract suspend fun useOfferRequest(
-        offer: String, did: String, requireUserInput: Boolean
-    ): List<WalletCredential>
     abstract suspend fun resolveCredentialOffer(offerRequest: CredentialOfferRequest): CredentialOffer
 
     // DIDs
@@ -56,7 +54,7 @@ abstract class WalletService(val tenant: String, val accountId: UUID, val wallet
 
     // Keys
     abstract suspend fun listKeys(): List<SingleKeyResponse>
-    abstract suspend fun generateKey(type: String): String
+    abstract suspend fun generateKey(request: KeyGenerationRequest = KeyGenerationRequest()): String
     abstract suspend fun exportKey(alias: String, format: String, private: Boolean): String
     abstract suspend fun loadKey(alias: String): JsonObject
     abstract suspend fun importKey(jwkOrPem: String): String

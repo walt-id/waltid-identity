@@ -6,7 +6,6 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 
 /**
@@ -15,7 +14,7 @@ import kotlin.js.JsExport
  * @property FIXED: Fixed number of decoy digests to be added
  * @property RANDOM: Random number of decoy digests to be added
  */
-@OptIn(ExperimentalJsExport::class)
+@OptIn(kotlin.js.ExperimentalJsExport::class)
 @JsExport
 @Serializable
 enum class DecoyMode {

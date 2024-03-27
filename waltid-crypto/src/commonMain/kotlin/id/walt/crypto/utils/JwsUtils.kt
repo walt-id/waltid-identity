@@ -2,6 +2,8 @@ package id.walt.crypto.utils
 
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.utils.Base64Utils.base64UrlToBase64
+import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
@@ -25,11 +27,15 @@ object JwsUtils {
     fun String.decodeJwsPart(): JsonObject =
         Json.parseToJsonElement(Base64.decode(this.base64UrlToBase64()).decodeToString()).jsonObject
 
-    data class JwsParts(val header: JsonObject, val payload: JsonObject, val signature: String)
+    data class JwsParts(val header: JsonObject, val payload: JsonObject, val signature: String) {
+        override fun toString() = "${Json.encodeToString(header).encodeToByteArray().encodeToBase64Url()}.${
+            Json.encodeToString(payload).encodeToByteArray().encodeToBase64Url()
+        }.$signature"
+    }
 
-    fun String.decodeJws(withSignature: Boolean = false): JwsParts {
+    fun String.decodeJws(withSignature: Boolean = false, allowMissingSignature: Boolean = false): JwsParts {
         check(startsWith("ey")) { "String does not look like JWS: $this" }
-        check(count { it == '.' } == 2) { "String does not have JWS part amount of 3 (= 2 dots): $this" }
+        check(count { it == '.' } == 2 || (allowMissingSignature && count { it == '.' } == 1)) { "String does not have JWS part amount of 3 (= 2 dots): $this" }
 
         val splitted = split(".")
         val header = runCatching { splitted[0].decodeJwsPart() }.getOrElse { ex ->

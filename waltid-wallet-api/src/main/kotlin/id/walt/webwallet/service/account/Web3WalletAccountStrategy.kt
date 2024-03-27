@@ -44,6 +44,7 @@ object Web3WalletAccountStrategy : PasswordlessAccountStrategy<AddressAccountReq
         } else {
             AccountsService.register(tenant, request).getOrThrow().id
         }
-        return AuthenticatedUser(registeredUserId, request.address)
+        // TODO: change id to wallet-id (also in the frontend)
+        return AddressAuthenticatedUser(registeredUserId, request.address)
     }
 }
