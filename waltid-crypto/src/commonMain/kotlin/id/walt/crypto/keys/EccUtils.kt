@@ -47,4 +47,52 @@ object EccUtils {
         return fixedLengthR + fixedLengthS
     }
 
+
+    fun convertDERtoIEEEP1363HandleExtra(derSignature: ByteArray): ByteArray {
+        fun parseLength(bytes: ByteArray, indexAccessor: () -> Int): Int {
+            val lengthByte = bytes[indexAccessor()].toInt() and 0xFF
+            if (lengthByte < 128) return lengthByte
+
+            val numLengthBytes = lengthByte - 128
+            if (numLengthBytes > 4) throw IllegalArgumentException("Unsupported length for DER parsing")
+
+            var length = 0
+            repeat(numLengthBytes) {
+                length = length shl 8
+                length = length or (bytes[indexAccessor()].toInt() and 0xFF)
+            }
+            return length
+        }
+
+        fun ByteArray.trimLeadingZero() = if (this.isNotEmpty() && this[0] == 0.toByte()) this.drop(1).toByteArray() else this
+
+        fun parseDerInteger(bytes: ByteArray, indexAccessor: () -> Int): ByteArray {
+            if (bytes[indexAccessor()] != 0x02.toByte()) throw IllegalArgumentException("Expected integer marker")
+            val length = parseLength(bytes, indexAccessor)
+            return bytes.copyOfRange(indexAccessor(), indexAccessor() + length).trimLeadingZero()
+        }
+
+        var index = 0
+
+        // Ensure the signature starts with a DER sequence marker (0x30)
+        if (derSignature[index++] != 0x30.toByte()) throw IllegalArgumentException("Not a DER sequence")
+
+        // Skip the sequence length
+        val sequenceLength = parseLength(derSignature) { index++ }
+
+        // Validate the total length
+        if (sequenceLength + index != derSignature.size) throw IllegalArgumentException("Length mismatch in DER sequence")
+
+        // Parse r and s integers
+        val r = parseDerInteger(derSignature) { index++ }.trimLeadingZero()
+        val s = parseDerInteger(derSignature) { index++ }.trimLeadingZero()
+
+        // Ensure r and s are of expected length, padding if necessary
+        val fixedLengthR = ByteArray(32) { if (it < 32 - r.size) 0 else r[it + r.size - 32] }
+        val fixedLengthS = ByteArray(32) { if (it < 32 - s.size) 0 else s[it + s.size - 32] }
+
+        // Concatenate r and s
+        return fixedLengthR + fixedLengthS
+    }
+
 }
