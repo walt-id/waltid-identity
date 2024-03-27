@@ -134,10 +134,6 @@ const currentWallet = useCurrentWallet()
 async function generateKey() {
 
 
-  if (Object.keys(data.keyGenerationRequest.config).length !== options.value.find(option => option.keyGenerationRequest[1] == data.keyGenerationRequest.type)?.config?.length) {
-    return alert("Please fill all fields");
-  }
-
   const body = {
     backend: data.keyGenerationRequest.type,
     keyType: data.type,

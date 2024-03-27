@@ -1,22 +1,22 @@
 package id.walt.verifier
 
 import id.walt.credentials.verification.PolicyManager
-import id.walt.credentials.verification.models.PolicyRequest
-import id.walt.credentials.verification.models.PolicyRequest.Companion.parsePolicyRequests
-import id.walt.credentials.verification.policies.JwtSignaturePolicy
 import id.walt.oid4vc.data.ResponseMode
 import id.walt.oid4vc.data.dif.*
-import id.walt.oid4vc.responses.TokenResponse
-import id.walt.verifier.oidc.OIDCVerifierService
-import id.walt.verifier.oidc.PresentationSessionInfo
+import id.walt.verifier.oidc.VerificationUseCase
 import io.github.smiley4.ktorswaggerui.dsl.get
 import io.github.smiley4.ktorswaggerui.dsl.post
 import io.github.smiley4.ktorswaggerui.dsl.route
+import io.ktor.client.*
+import io.ktor.client.plugins.contentnegotiation.*
+import io.ktor.client.plugins.logging.*
 import io.ktor.http.*
+import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import io.ktor.server.util.*
 import io.ktor.util.*
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -52,6 +52,15 @@ data class CredentialVerificationRequest(
 const val defaultAuthorizeBaseUrl = "openid4vp://authorize"
 
 private val prettyJson = Json { prettyPrint = true }
+private val httpClient = HttpClient() {
+    install(ContentNegotiation) {
+        json()
+    }
+    install(Logging) {
+        logger = Logger.SIMPLE
+        level = LogLevel.ALL
+    }
+}
 
 val verifiableIdPresentationDefinitionExample = JsonObject(
     mapOf(
@@ -73,6 +82,8 @@ val verifiableIdPresentationDefinitionExample = JsonObject(
                 ).toJSON(),
     )
 ).let { prettyJson.encodeToString(it) }
+
+private val verificationUseCase = VerificationUseCase(httpClient)
 
 
 fun Application.verfierApi() {
@@ -106,6 +117,21 @@ fun Application.verfierApi() {
                         example = ""
                         required = false
                     }
+                    headerParameter<String>("statusCallbackUri") {
+                        description = "Callback to push state changes of the presentation process to"
+                        example = ""
+                        required = false
+                    }
+                    headerParameter<String>("statusCallbackApiKey") {
+                        description = ""
+                        example = ""
+                        required = false
+                    }
+                    headerParameter<String>("stateId") {
+                        description = ""
+                        example = ""
+                        required = false
+                    }
                     body<JsonObject> {
                         description =
                             "Presentation definition, describing the presentation requirement for this verification session. ID of the presentation definition is automatically assigned randomly."
@@ -127,59 +153,23 @@ fun Application.verfierApi() {
                     context.request.header("responseMode")?.let { ResponseMode.valueOf(it) } ?: ResponseMode.direct_post
                 val successRedirectUri = context.request.header("successRedirectUri")
                 val errorRedirectUri = context.request.header("errorRedirectUri")
-
-
+                val statusCallbackUri = context.request.header("statusCallbackUri")
+                val statusCallbackApiKey = context.request.header("statusCallbackApiKey")
+                val stateId = context.request.header("stateId")
                 val body = context.receive<JsonObject>()
 
-                /*val presentationDefinition = (body["presentation_definition"]
-                    ?: throw IllegalArgumentException("No `presentation_definition` supplied!"))
-                    .let { PresentationDefinition.fromJSON(it.jsonObject) }*/
-
-                val vpPolicies = body["vp_policies"]?.jsonArray?.parsePolicyRequests()
-                    ?: listOf(PolicyRequest(JwtSignaturePolicy()))
-
-                val vcPolicies = body["vc_policies"]?.jsonArray?.parsePolicyRequests()
-                    ?: listOf(PolicyRequest(JwtSignaturePolicy()))
-
-                val requestCredentialsArr = body["request_credentials"]!!.jsonArray
-
-                val requestedTypes = requestCredentialsArr.map {
-                    when (it) {
-                        is JsonPrimitive -> it.contentOrNull
-                        is JsonObject -> it["credential"]?.jsonPrimitive?.contentOrNull
-                        else -> throw IllegalArgumentException("Invalid JSON type for requested credential: $it")
-                    } ?: throw IllegalArgumentException("Invalid VC type for requested credential: $it")
-                }
-
-                val presentationDefinition = (body["presentation_definition"]?.let { PresentationDefinition.fromJSON(it.jsonObject) })
-                    ?: PresentationDefinition.primitiveGenerationFromVcTypes(requestedTypes)
-                println("Presentation definition: " + presentationDefinition.toJSON())
-
-                val session =
-                    OIDCVerifierService.initializeAuthorization(presentationDefinition, responseMode = responseMode)
-
-                val specificPolicies = requestCredentialsArr
-                    .filterIsInstance<JsonObject>()
-                    .associate {
-                        (it["credential"] ?: throw IllegalArgumentException("No `credential` name supplied, in `request_credentials`."))
-                            .jsonPrimitive.content to (it["policies"]
-                            ?: throw IllegalArgumentException("No `policies` supplied, in `request_credentials`."))
-                            .jsonArray.parsePolicyRequests()
-                    }
-
-                println("vpPolicies: $vpPolicies")
-                println("vcPolicies: $vcPolicies")
-                println("spPolicies: $specificPolicies")
-
-
-                OIDCVerifierService.sessionVerificationInfos[session.id] =
-                    OIDCVerifierService.SessionVerificationInformation(
-                        vpPolicies = vpPolicies,
-                        vcPolicies = vcPolicies,
-                        specificPolicies = specificPolicies,
-                        successRedirectUri = successRedirectUri,
-                        errorRedirectUri = errorRedirectUri
-                    )
+                val session = verificationUseCase.createSession(
+                    vpPoliciesJson = body["vp_policies"],
+                    vcPoliciesJson = body["vc_policies"],
+                    requestCredentialsJson = body["request_credentials"]!!,
+                    presentationDefinitionJson = body["presentation_definition"],
+                    responseMode = responseMode,
+                    successRedirectUri = successRedirectUri,
+                    errorRedirectUri = errorRedirectUri,
+                    statusCallbackUri = statusCallbackUri,
+                    statusCallbackApiKey = statusCallbackApiKey,
+                    stateId = stateId,
+                )
 
                 context.respond(authorizeBaseUrl.plus("?").plus(session.authorizationRequest!!.toHttpQueryString()))
             }
@@ -208,45 +198,15 @@ fun Application.verfierApi() {
                     }
                 }
             }) {
-                val session = call.parameters["state"]?.let { OIDCVerifierService.getSession(it) }
-                    ?: return@post call.respond(
-                        HttpStatusCode.BadRequest,
-                        "State parameter doesn't refer to an existing session, or session expired"
-                    )
-
-                val tokenResponse = TokenResponse.fromHttpParameters(context.request.call.receiveParameters().toMap())
-                val sessionVerificationInfo = OIDCVerifierService.sessionVerificationInfos[session.id]
-                    ?: throw IllegalStateException("No session verification information found for session id!")
-
-                val maybePresentationSessionResult = runCatching { OIDCVerifierService.verify(tokenResponse, session) }
-
-                if (maybePresentationSessionResult.getOrNull() != null) {
-                    val presentationSession = maybePresentationSessionResult.getOrThrow()
-                    if (presentationSession.verificationResult == true) {
-                        val redirectUri = sessionVerificationInfo.successRedirectUri?.replace("\$id", session.id) ?: ""
-                        call.respond(HttpStatusCode.OK, redirectUri)
-                    } else {
-                        val policyResults = OIDCVerifierService.policyResults[session.id]
-                        val redirectUri = sessionVerificationInfo.errorRedirectUri?.replace("\$id", session.id)
-
-                        if (redirectUri != null) {
-                            call.respond(HttpStatusCode.BadRequest, redirectUri)
-                        } else {
-                            if (policyResults == null) {
-                                call.respond(HttpStatusCode.BadRequest, "Verification policies did not succeed")
-                            } else {
-                                val failedPolicies =
-                                    policyResults.results.flatMap { it.policyResults.map { it } }.filter { it.result.isFailure }
-                                call.respond(
-                                    HttpStatusCode.BadRequest,
-                                    "Verification policies did not succeed: ${failedPolicies.joinToString { it.request.policy.name }}"
-                                )
-                            }
-                        }
+                val sessionId = call.parameters["state"]
+                verificationUseCase.verify(sessionId, context.request.call.receiveParameters().toMap())
+                    .onSuccess {
+                        call.respond(HttpStatusCode.OK, it)
+                    }.onFailure {
+                        call.respond(HttpStatusCode.BadRequest, it.localizedMessage)
+                    }.also {
+                        sessionId?.run { verificationUseCase.notifySubscribers(this) }
                     }
-                } else {
-                    call.respond(HttpStatusCode.BadRequest, "Verification failed")
-                }
             }
             get("/session/{id}", {
                 tags = listOf("Credential Verification")
@@ -265,21 +225,12 @@ fun Application.verfierApi() {
                     }
                 }
             }) {
-                val id = call.parameters["id"] ?: throw IllegalArgumentException("No id provided!")
-                val session = OIDCVerifierService.getSession(id)
-                    ?: throw IllegalArgumentException("Invalid id provided (expired?): $id")
-
-                val policyResults = OIDCVerifierService.policyResults[session.id]
-                //?: throw IllegalStateException("No policy results found for id")
-
-                call.respond(
-                    Json { prettyPrint = true }.encodeToString(
-                        PresentationSessionInfo.fromPresentationSession(
-                            session,
-                            policyResults?.toJson()
-                        )
-                    )
-                )
+                val id = call.parameters.getOrFail("id")
+                verificationUseCase.getResult(id).onSuccess {
+                    call.respond(HttpStatusCode.OK, it)
+                }.onFailure {
+                    call.respond(HttpStatusCode.BadRequest, it.localizedMessage)
+                }
             }
             get("/pd/{id}", {
                 tags = listOf("OIDC")
@@ -294,10 +245,10 @@ fun Application.verfierApi() {
                 }
             }) {
                 val id = call.parameters["id"]
-                val pd = id?.let { OIDCVerifierService.getSession(it)?.presentationDefinition }
-                if (pd != null) {
-                    call.respond(pd.toJSON())
-                } else {
+
+                verificationUseCase.getPresentationDefinition(id ?: "").onSuccess {
+                    call.respond(it.toJSON())
+                }.onFailure {
                     call.respond(HttpStatusCode.NotFound)
                 }
             }
