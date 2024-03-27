@@ -362,8 +362,8 @@ class SSIKit2WalletService(
     override suspend fun createDid(method: String, args: Map<String, JsonPrimitive>): String {
         val keyId = args["keyId"]?.content?.takeIf { it.isNotEmpty() } ?: generateKey()
         val key = getKey(keyId)
-        val options = getDidOptions(method, args)
-        val result = DidService.registerByKey(method, key, options)
+        val result = DidService.registerDefaultDidMethodByKey(method, key, args)
+
         DidsService.add(
             wallet = walletId,
             did = result.did,
