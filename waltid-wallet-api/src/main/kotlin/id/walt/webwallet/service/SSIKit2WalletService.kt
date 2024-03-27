@@ -470,7 +470,10 @@ class SSIKit2WalletService(
     }
 
     override suspend fun generateKey(request: KeyGenerationRequest): String = let {
-        request.config = request.config ?: ociKeyMetadata
+        if (request.backend == "oci" && request.config == null) {
+            request.config = ociKeyMetadata
+        }
+
         KeyManager.createKey(request)
             .also {
                 KeysService.add(walletId, it.getKeyId(), KeySerialization.serializeKey(it))
