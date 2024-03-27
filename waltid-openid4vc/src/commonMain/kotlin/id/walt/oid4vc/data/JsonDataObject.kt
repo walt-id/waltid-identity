@@ -27,11 +27,11 @@ abstract class JsonDataObjectSerializer<T : JsonDataObject>(serializer: KSeriali
     private val knownElementNames get() = descriptor.elementNames.filter { it != customParametersName }.toSet()
 
     open fun serializeKnownElement(name: String, element: JsonElement, builderMap: MutableMap<String, JsonElement>) {
-        builderMap.put(name, element)
+        builderMap[name] = element
     }
 
     open fun deserializeKnownElement(name: String, element: JsonElement, builderMap: MutableMap<String, JsonElement>) {
-        builderMap.put(name, element)
+        builderMap[name] = element
     }
 
     override fun transformSerialize(element: JsonElement): JsonElement {

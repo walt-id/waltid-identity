@@ -2,7 +2,7 @@ package registrars
 
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.LocalKey
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.did.dids.registrar.dids.DidCreateOptions
 import id.walt.did.dids.registrar.dids.DidKeyCreateOptions
 import id.walt.did.dids.registrar.local.key.DidKeyRegistrar
@@ -51,25 +51,25 @@ class DidKeyRegistrarTest : DidRegistrarTestBase(DidKeyRegistrar()) {
             Stream.of(
                 //ed25519
                 arguments(
-                    runBlocking { LocalKey.generate(KeyType.Ed25519) },
+                    runBlocking { JWKKey.generate(KeyType.Ed25519) },
                     DidKeyCreateOptions(useJwkJcsPub = true),
                     ed25519KeyAssertions
                 ),
                 //rsa
                 arguments(
-                    runBlocking { LocalKey.generate(KeyType.RSA) },
+                    runBlocking { JWKKey.generate(KeyType.RSA) },
                     DidKeyCreateOptions(),
                     rsaKeyAssertions
                 ),
                 //secp256k1
                 arguments(
-                    runBlocking { LocalKey.generate(KeyType.secp256k1) },
+                    runBlocking { JWKKey.generate(KeyType.secp256k1) },
                     DidKeyCreateOptions(),
                     secp256KeyAssertions
                 ),
                 //secp256r1
                 arguments(
-                    runBlocking { LocalKey.generate(KeyType.secp256r1) },
+                    runBlocking { JWKKey.generate(KeyType.secp256r1) },
                     DidKeyCreateOptions(),
                     secp256KeyAssertions
                 ),

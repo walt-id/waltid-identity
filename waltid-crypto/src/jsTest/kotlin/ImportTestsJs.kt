@@ -1,5 +1,5 @@
-import id.walt.crypto.keys.LocalKey
 import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.jwk.JWKKey
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
@@ -53,7 +53,7 @@ class ImportTestsJs {
     fun importJwk() = runTest {
         // Private
         println("Importing private JWK...")
-        val privateKeyResult = LocalKey.importJWK(privateKeyJsonString)
+        val privateKeyResult = JWKKey.importJWK(privateKeyJsonString)
         assertTrue { privateKeyResult.isSuccess }
         println("  Getting private key...")
         val privateKey = privateKeyResult.getOrThrow()
@@ -73,7 +73,7 @@ class ImportTestsJs {
 
         // Public
         println("Importing public JWK...")
-        val publicKeyResult = LocalKey.importJWK(publicKeyJwkString)
+        val publicKeyResult = JWKKey.importJWK(publicKeyJwkString)
         println("  Checking import success...")
         assertTrue { publicKeyResult.isSuccess }
         println("  Getting public key...")
@@ -98,7 +98,7 @@ class ImportTestsJs {
     fun importPem() = runTest {
         // Private
         println("Importing private PEM...")
-        val privateKeyResult = LocalKey.importPEM(privateKeyPem)
+        val privateKeyResult = JWKKey.importPEM(privateKeyPem)
         println("  Checking import success...${privateKeyResult.exceptionOrNull() ?: ""}")
         assertTrue { privateKeyResult.isSuccess }
 
@@ -117,7 +117,7 @@ class ImportTestsJs {
 
         // Public
         println("Importing public PEM...")
-        val publicKeyResult = LocalKey.importPEM(publicKeyPem)
+        val publicKeyResult = JWKKey.importPEM(publicKeyPem)
         println("  Checking import success...${privateKeyResult.exceptionOrNull() ?: ""}")
         assertTrue { publicKeyResult.isSuccess }
 

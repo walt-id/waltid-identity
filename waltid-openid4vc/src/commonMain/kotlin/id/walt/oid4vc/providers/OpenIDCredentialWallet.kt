@@ -440,7 +440,7 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
     }
 
     protected open fun executeIdTokenAuthorization(idTokenRequestUri: Url, holderDid: String, client: OpenIDClientConfig): Url {
-        var authReq = AuthorizationRequest.fromHttpQueryString(idTokenRequestUri.encodedQuery).let { authorizationRequest ->
+        val authReq = AuthorizationRequest.fromHttpQueryString(idTokenRequestUri.encodedQuery).let { authorizationRequest ->
             authorizationRequest.customParameters["request"]?.let { AuthorizationJSONRequest.fromJSON(SDJwt.parse(it.first()).fullPayload) }
                 ?: authorizationRequest
         }

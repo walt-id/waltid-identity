@@ -70,7 +70,6 @@ class MDocBuilder(val docType: String) {
    * @param cryptoProvider COSE crypto provider impl to use for signing this document
    * @param keyID ID of the key to use for signing, if required by crypto provider
    */
-  @OptIn(ExperimentalSerializationApi::class)
   suspend fun signAsync(validityInfo: ValidityInfo,
                         deviceKeyInfo: DeviceKeyInfo, cryptoProvider: AsyncCOSECryptoProvider, keyID: String? = null): MDoc {
     val mso = MSO.createFor(nameSpacesMap, deviceKeyInfo, docType, validityInfo)
@@ -85,7 +84,6 @@ class MDocBuilder(val docType: String) {
    * @param cryptoProvider COSE crypto provider impl to use for signing this document
    * @param keyID ID of the key to use for signing, if required by crypto provider
    */
-  @OptIn(ExperimentalSerializationApi::class)
   fun sign(validityInfo: ValidityInfo,
            deviceKeyInfo: DeviceKeyInfo, cryptoProvider: COSECryptoProvider, keyID: String? = null): MDoc {
     val mso = MSO.createFor(nameSpacesMap, deviceKeyInfo, docType, validityInfo)

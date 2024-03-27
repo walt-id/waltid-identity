@@ -1,4 +1,4 @@
-import { ReactNode, ElementType, SVGProps } from 'react';
+import { ReactNode } from 'react';
 
 type Props = {
   children: ReactNode;

@@ -3,29 +3,22 @@ package id.walt.mdoc
 import cbor.Cbor
 import id.walt.mdoc.dataelement.*
 import id.walt.mdoc.doc.MDocBuilder
-import id.walt.mdoc.doc.MDocVerificationParams
-import id.walt.mdoc.doc.VerificationType
-import id.walt.mdoc.docrequest.MDocRequestBuilder
-import id.walt.mdoc.mdocauth.DeviceAuthentication
 import id.walt.mdoc.mso.DeviceKeyInfo
 import id.walt.mdoc.mso.ValidityInfo
-import io.kotest.matchers.collections.shouldHaveSize
-import io.kotest.matchers.maps.shouldContainKey
-import io.kotest.matchers.shouldBe
-import io.kotest.matchers.shouldNotBe
 import korlibs.crypto.encoding.Hex
-import kotlinx.coroutines.*
+import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.promise
 import kotlinx.datetime.Clock
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.plus
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.encodeToHexString
-import kotlin.test.Test
 
 class JSTest {
 
-  @OptIn(DelicateCoroutinesApi::class, ExperimentalJsExport::class)
+  @OptIn(DelicateCoroutinesApi::class)
   //@Test
   fun test1() = GlobalScope.promise {
     val key: dynamic = object {}
@@ -44,7 +37,7 @@ class JSTest {
     println("test signing mdl")
     // create device key info structure of device public key, for holder binding
     val deviceKeyInfo = DeviceKeyInfo(MapElement(mapOf(MapKey("k") to StringElement("1234"))))
-    println("device key info: ${deviceKeyInfo}")
+    println("device key info: $deviceKeyInfo")
     // build mdoc of type mDL and sign using issuer key with holder binding to device key
     val mdoc = MDocBuilder("org.iso.18013.5.1.mDL")
       .addItemToSign("org.iso.18013.5.1", "family_name", "Doe".toDE())

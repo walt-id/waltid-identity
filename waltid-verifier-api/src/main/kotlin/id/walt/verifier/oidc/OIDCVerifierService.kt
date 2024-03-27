@@ -13,6 +13,7 @@ import id.walt.oid4vc.providers.PresentationSession
 import id.walt.oid4vc.responses.TokenResponse
 import id.walt.verifier.base.config.ConfigManager
 import id.walt.verifier.base.config.OIDCVerifierServiceConfig
+import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -24,9 +25,11 @@ import kotlinx.serialization.json.jsonPrimitive
 object OIDCVerifierService : OpenIDCredentialVerifier(
     config = CredentialVerifierConfig(ConfigManager.getConfig<OIDCVerifierServiceConfig>().baseUrl.let { "$it/openid4vc/verify" })
 ) {
+    private val logger = KotlinLogging.logger {}
+
     // ------------------------------------
     // Simple in-memory session management
-    val presentationSessions = HashMap<String, PresentationSession>()
+    private val presentationSessions = HashMap<String, PresentationSession>()
 
     data class SessionVerificationInformation(
         val vpPolicies: List<PolicyRequest>,
@@ -34,6 +37,12 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
         val specificPolicies: Map<String, List<PolicyRequest>>,
         val successRedirectUri: String?,
         val errorRedirectUri: String?,
+        val statusCallback: StatusCallback? = null,
+    )
+
+    data class StatusCallback(
+        val statusCallbackUri: String,
+        val statusCallbackApiKey: String? = null,
     )
 
     val sessionVerificationInfos = HashMap<String, SessionVerificationInformation>()
@@ -47,13 +56,9 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
 
     // ------------------------------------
     // Abstract verifier service provider interface implementation
-    /*override fun preparePresentationDefinitionUri(presentationDefinition: PresentationDefinition, sessionID: String): String {
-        return ConfigManager.getConfig<OIDCVerifierServiceConfig>().baseUrl.let { "$it/vp/pd/$sessionID" }
-    }*/
     override fun preparePresentationDefinitionUri(
-        presentationDefinition: PresentationDefinition,
-        sessionID: String
-    ): String? {
+        presentationDefinition: PresentationDefinition, sessionID: String
+    ): String {
         val baseUrl = ConfigManager.getConfig<OIDCVerifierServiceConfig>().baseUrl
         return "$baseUrl/openid4vc/pd/$sessionID"
     }
@@ -72,7 +77,7 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
             is JsonObject -> tokenResponse.vpToken.toString()
             is JsonPrimitive -> tokenResponse.vpToken!!.jsonPrimitive.content
             null -> {
-                println("Null in tokenResponse.vpToken!")
+                logger.debug { "Null in tokenResponse.vpToken!" }
                 return false
             }
 
@@ -82,7 +87,8 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
 
         if (tokenResponse.vpToken is JsonObject) TODO("Token response is jsonobject - not yet handled")
 
-        println("VP token: $vpToken")
+        logger.debug { "VP token: $vpToken" }
+
         val results = runBlocking {
             Verifier.verifyPresentation(
                 vpTokenJwt = vpToken,
@@ -90,8 +96,7 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
                 globalVcPolicies = policies.vcPolicies,
                 specificCredentialPolicies = policies.specificPolicies,
                 presentationContext = mapOf(
-                    "presentationDefinition" to session.presentationDefinition,
-                    "challenge" to session.id
+                    "presentationDefinition" to session.presentationDefinition, "challenge" to session.id
                 )
             )
         }
@@ -99,25 +104,5 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
         policyResults[session.id] = results
 
         return results.overallSuccess()
-
-        /*
-        val vpToken = when (tokenResponse.vpToken) {
-            is JsonObject -> tokenResponse.vpToken.toString()
-            is JsonPrimitive -> tokenResponse.vpToken!!.jsonPrimitive.content
-            null -> {
-                println("Null in tokenResponse.vpToken!")
-                return false
-            }
-
-            else -> throw IllegalArgumentException("Illegal tokenResponse.vpToken: ${tokenResponse.vpToken}")
-        }
-        println("Verifying vpToken: $vpToken")
-
-
-        return Auditor.getService().verify(
-            vpToken, listOf(
-                SignaturePolicy()
-            )
-        ).result*/
     }
 }
