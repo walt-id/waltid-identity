@@ -5,6 +5,9 @@ services:
   #     POSTGRES_PASSWORD: secret
   wallet-api:
     image: waltid/wallet-api:latest
+    build:
+      context: ../
+      dockerfile: waltid-wallet-api/Dockerfile
     volumes:
       - ./wallet-api/config:/waltid-wallet-api/config
       - ./wallet-api/walt.yaml:/waltid-wallet-api/walt.yaml

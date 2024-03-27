@@ -1,5 +1,3 @@
-import com.github.benmanes.gradle.versions.updates.DependencyUpdatesTask
-
 plugins {
     kotlin("multiplatform")
     kotlin("plugin.serialization")

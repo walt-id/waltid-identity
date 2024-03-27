@@ -24,13 +24,14 @@ object Accounts : Table("accounts") {
 
     override val primaryKey = PrimaryKey(tenant, id)
 
+    /*
     init {
-        //foreignKey(id, loginWeb3Wallet, target = Web3Wallets.primaryKey)
+        foreignKey(id, loginWeb3Wallet, target = Web3Wallets.primaryKey)
 
-        /*check {
+        check {
             (email.isNotNull() and password.isNotNull()) or loginWeb3Wallet.isNotNull()
-        }*/
-    }
+        }
+    }*/
 }
 
 @Serializable

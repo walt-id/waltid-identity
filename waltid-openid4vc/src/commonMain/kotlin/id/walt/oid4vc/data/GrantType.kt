@@ -17,7 +17,7 @@ enum class GrantType(val value: String) {
 
     companion object {
         fun fromValue(value: String): GrantType? {
-            return GrantType.values().find { it.value == value }
+            return entries.find { it.value == value }
         }
     }
 }

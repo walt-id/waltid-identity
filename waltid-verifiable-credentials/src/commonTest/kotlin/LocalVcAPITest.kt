@@ -1,11 +1,13 @@
 import id.walt.credentials.vc.vcs.W3CVC
-import id.walt.crypto.keys.*
+import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.did.dids.DidService
 import id.walt.did.dids.registrar.dids.DidWebCreateOptions
 import id.walt.sdjwt.SDMap
 import kotlinx.serialization.json.JsonElement
-import kotlin.js.ExperimentalJsExport
-import kotlin.test.*
+import kotlin.test.assertContains
+import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 
 val keysToTest = listOf(KeyType.Ed25519, KeyType.secp256r1, KeyType.secp256k1, KeyType.RSA)
@@ -31,7 +33,7 @@ suspend fun testDidMethodsAndKeys(methods: List<String>) {
 }
 
 private suspend fun testCreateSignCredential(didMethodsToTest: List<String>, keyType: KeyType) {
-    val key = LocalKey.generate(keyType)
+    val key = JWKKey.generate(keyType)
     println("Create and Sign VC using KeyType ${keyType}...\n")
 
     didMethodsToTest.forEach {
@@ -44,8 +46,7 @@ private suspend fun testCreateSignCredential(didMethodsToTest: List<String>, key
     }
 }
 
-@OptIn(ExperimentalJsExport::class)
-private suspend fun testDidMethod(didMethod: String, key: LocalKey) {
+private suspend fun testDidMethod(didMethod: String, key: JWKKey) {
     if (didMethod == "cheqd" && key.keyType != KeyType.Ed25519) {
         return
     }
@@ -83,12 +84,11 @@ private fun testIssuerDid(did: JsonElement?, key: String) {
 
 }
 
-@OptIn(ExperimentalJsExport::class)
-private suspend fun testWeb(key: LocalKey) {
+private suspend fun testWeb(key: JWKKey) {
     val TEST_WALLET_KEY =
         "{\"kty\":\"EC\",\"d\":\"uD-uxub011cplvr5Bd6MrIPSEUBsgLk-C1y3tnmfetQ\",\"use\":\"sig\",\"crv\":\"secp256k1\",\"kid\":\"48d8a34263cf492aa7ff61b6183e8bcf\",\"x\":\"TKaQ6sCocTDsmuj9tTR996tFXpEcS2EJN-1gOadaBvk\",\"y\":\"0TrIYHcfC93VpEuvj-HXTnyKt0snayOMwGSJA1XiDX8\"}"
 
-    val pubKey = LocalKey.importJWK(TEST_WALLET_KEY).getOrThrow().getPublicKey()
+    val pubKey = JWKKey.importJWK(TEST_WALLET_KEY).getOrThrow().getPublicKey()
     val didWebResult = DidService.registerByKey(
         "web",
         pubKey,
@@ -121,12 +121,12 @@ private suspend fun testWeb(key: LocalKey) {
 }
 
 
-suspend fun testCheqd(key: LocalKey) {
+suspend fun testCheqd(key: JWKKey) {
     if (key.keyType != KeyType.Ed25519) {
         return
     }
     val cheqdid = DidService.registerByKey("cheqd", key).did
-    println("\n>>>>>>>>> cheqd DID = ${cheqdid}")
+    println("\n>>>>>>>>> cheqd DID = $cheqdid")
     val vc = createVC(cheqdid)
     assertNotNull(vc)
     testIssuerDid(vc["issuer"], "did:cheqd")

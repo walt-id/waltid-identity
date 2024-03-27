@@ -63,7 +63,7 @@ class JwsSignatureScheme : SignatureScheme {
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    suspend fun verify(data: String): Result<JsonObject> = runCatching {
+    suspend fun verify(data: String): Result<JsonElement> = runCatching {
         val jws = data.decodeJws()
 
         val header = jws.header

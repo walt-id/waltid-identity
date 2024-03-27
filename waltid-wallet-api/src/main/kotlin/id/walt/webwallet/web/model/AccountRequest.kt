@@ -8,7 +8,7 @@ import kotlinx.serialization.modules.polymorphic
 
 @Serializable
 sealed class AccountRequest {
-  abstract val name: String?
+    abstract val name: String?
 }
 
 @Serializable
@@ -51,16 +51,16 @@ data class KeycloakLogoutRequest(val keycloakUserId: String? = null, val token: 
 data class OidcUniqueSubjectRequest(override val name: String? = null, val token: String) :
     AccountRequest()
 
-val module = SerializersModule {
-  polymorphic(AccountRequest::class) {
-    EmailAccountRequest::class
-    AddressAccountRequest::class
-    OidcAccountRequest::class
-    KeycloakAccountRequest::class
-  }
+val accountRequestSerializer = SerializersModule {
+    polymorphic(AccountRequest::class) {
+        EmailAccountRequest::class
+        AddressAccountRequest::class
+        OidcAccountRequest::class
+        KeycloakAccountRequest::class
+    }
 }
 
-val LoginRequestJson = Json {
-  serializersModule = module
-  ignoreUnknownKeys = true
+val loginRequestJson = Json {
+    serializersModule = accountRequestSerializer
+    ignoreUnknownKeys = true
 }

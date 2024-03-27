@@ -8,12 +8,11 @@ import com.github.ajalt.mordant.terminal.Terminal
 import com.github.ajalt.mordant.terminal.TerminalInfo
 import com.github.ajalt.mordant.terminal.TerminalInterface
 import id.walt.cli.commands.KeyConvertCmd
+import id.walt.cli.util.getResourcePath
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.test.runTest
 import java.io.File
-import java.io.FileNotFoundException
 import java.io.StringWriter
-import java.net.URI
 import kotlin.test.*
 
 class WaltIdKeyConvertCmdTest {
@@ -79,7 +78,7 @@ class WaltIdKeyConvertCmdTest {
         val inputFileName = "rsa_by_openssl_pvt_key.pem"
         val outputFileName = "rsa_by_openssl_pvt_key.jwk"
 
-        val inputFilePath = getFilePath(inputFileName)
+        val inputFilePath = getResourcePath(this, inputFileName)
         val outputFilePath = getOutputFilePath(inputFilePath, outputFileName)
 
         KeyConvertCmd().parse(listOf("--input=${inputFilePath}"))
@@ -106,7 +105,9 @@ class WaltIdKeyConvertCmdTest {
 
         // Stored in src/jvmTest/resources
         val inputFileName = "invalidKey.jwk"
-        var inputFilePath = getFilePath(inputFileName)
+        var inputFilePath = getResourcePath(this, inputFileName)
+
+
 
         var result = KeyConvertCmd().test("--input=\"$inputFilePath\" --verbose")
         var expectedErrorMessage = ".*Invalid file format*".toRegex()
@@ -123,7 +124,7 @@ class WaltIdKeyConvertCmdTest {
         val inputFileName = "rsa_by_openssl_pub_key.pem"
         val outputFileName = "existingFile.jwk"
 
-        val inputFilePath = getFilePath(inputFileName)
+        val inputFilePath = getResourcePath(this, inputFileName)
         val outputFilePath = getOutputFilePath(inputFilePath, outputFileName)
 
         // Creates the output file to simulate its previous existence
@@ -143,10 +144,10 @@ class WaltIdKeyConvertCmdTest {
         val inputFileName = "ed25519_by_waltid_pvt_key.jwk"
         val outputFileName = "ed25519_by_waltid_pvt_key.pem"
 
-        val inputFilePath = getFilePath(inputFileName)
+        val inputFilePath = getResourcePath(this, inputFileName)
         val outputFilePath = getOutputFilePath(inputFilePath, outputFileName)
 
-        // Only as long as Ed25519 is not fully supported in LocalKey.exportPEM()
+        // Only as long as Ed25519 is not fully supported in JWKKey.exportPEM()
         val result1 = KeyConvertCmd().test("--input=\"$inputFilePath\"")
         assertContains(result1.stderr, "Something went wrong when converting the key")
 
@@ -163,7 +164,7 @@ class WaltIdKeyConvertCmdTest {
         val inputFileName = "rsa_by_openssl_pub_key.pem"
         val outputFileName = "rsa_by_openssl_pub_key.jwk"
 
-        val inputFilePath = getFilePath(inputFileName)
+        val inputFilePath = getResourcePath(this, inputFileName)
         val outputFilePath = getOutputFilePath(inputFilePath, outputFileName)
 
         deleteOutputFile(outputFilePath)
@@ -231,7 +232,7 @@ class WaltIdKeyConvertCmdTest {
         val inputFileName = "rsa_encrypted_private_key.pem"
         val outputFileName = "rsa_encrypted_private_key.jwk"
 
-        val inputFilePath = getFilePath(inputFileName)
+        val inputFilePath = getResourcePath(this, inputFileName)
 
         class PassphraseTerminal : TerminalInterface {
             override val info: TerminalInfo
@@ -280,7 +281,7 @@ class WaltIdKeyConvertCmdTest {
         val inputFileName = "rsa_by_openssl_encrypted_pvt_key.pem"
         val outputFileName = "rsa_by_openssl_encrypted_pvt_key.jwk"
 
-        val inputFilePath = getFilePath(inputFileName)
+        val inputFilePath = getResourcePath(this, inputFileName)
         val outputFilePath = getOutputFilePath(inputFilePath, outputFileName)
 
         val result = KeyConvertCmd().test("--input=\"$inputFilePath\" --passphrase=123123")
@@ -300,7 +301,7 @@ class WaltIdKeyConvertCmdTest {
         val inputFileName = "rsa_by_openssl_encrypted_pub_key.pem"
         val outputFileName = "rsa_by_openssl_encrypted_pub_key.jwk"
 
-        val inputFilePath = getFilePath(inputFileName)
+        val inputFilePath = getResourcePath(this, inputFileName)
         val outputFilePath = getOutputFilePath(inputFilePath, outputFileName)
 
         val result = KeyConvertCmd().test("--input=\"$inputFilePath\"")
@@ -471,16 +472,6 @@ class WaltIdKeyConvertCmdTest {
     @Ignore
     fun `should convert secp256r1 pub & pvt key PEM file to a valid JWK`() = Unit
 
-    fun getFilePath(filename: String): String {
-        // The returned URL has white spaces replaced by %20.
-        // So, we need to decode it first to get rid of %20 from the file path
-        this.javaClass.getClassLoader().getResource(filename)?.let {
-            return URI(it.toString()).path
-        }
-
-        throw FileNotFoundException(filename)
-    }
-
     fun getOutputFilePath(inputFilePath: String, outputFileName: String): String {
         return "${inputFilePath.dropLastWhile { it != '/' }}$outputFileName"
     }
@@ -493,7 +484,7 @@ class WaltIdKeyConvertCmdTest {
     private fun testSuccessfulConvertion(
         inputFileName: String, outputFileName: String, expectedFragments: List<String>, extraArgs: String = ""
     ) {
-        val inputFilePath = getFilePath(inputFileName)
+        val inputFilePath = getResourcePath(this, inputFileName)
         val outputFilePath = getOutputFilePath(inputFilePath, outputFileName)
 
         deleteOutputFile(outputFilePath)
@@ -516,7 +507,7 @@ class WaltIdKeyConvertCmdTest {
 
     fun testFailingConversion(inputFileName: String, expectedErrorMessage: String, verbose: Boolean = false) {
 
-        val inputFilePath = getFilePath(inputFileName)
+        val inputFilePath = getResourcePath(this, inputFileName)
         var args = "--input=\"$inputFilePath\""
 
         if (verbose) {

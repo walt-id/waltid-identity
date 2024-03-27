@@ -4,7 +4,7 @@ import id.walt.crypto.keys.KeyType
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 
-@ExperimentalJsExport
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 class DidWebCreateOptions(domain: String, path: String = "", keyType: KeyType = KeyType.Ed25519) : DidCreateOptions(
     method = "web",

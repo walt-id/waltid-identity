@@ -33,7 +33,7 @@ data class UserData(val email: String, val password: String, val id: String? = n
 
 object OidcApi : CIProvider() {
 
-    val logger = KotlinLogging.logger { }
+    private val logger = KotlinLogging.logger { }
 
     private fun Application.oidcRoute(build: Route.() -> Unit) {
         routing {
