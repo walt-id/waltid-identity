@@ -12,7 +12,7 @@ import java.security.cert.X509Certificate
  * @param publicKey Public key for COSE verification
  * @param privateKey Private key for COSE signing
  * @param x5Chain certificate chain, including intermediate and signing key certificates, but excluding root CA certificate!
- * @param trustedRootCA enforce trusted root CA, if not publicly known, for certificate path validation
+ * @param trustedRootCAs enforce trusted root CA, if not publicly known, for certificate path validation
  */
 data class COSECryptoProviderKeyInfo(
   val keyID: String,

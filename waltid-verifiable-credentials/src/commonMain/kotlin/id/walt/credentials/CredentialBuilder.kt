@@ -17,7 +17,7 @@ import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 import kotlin.js.JsName
 import kotlin.time.Duration
-import kotlin.time.Duration.Companion.minutes
+
 @OptIn(ExperimentalJsExport::class)
 @JsExport
 enum class CredentialBuilderType {

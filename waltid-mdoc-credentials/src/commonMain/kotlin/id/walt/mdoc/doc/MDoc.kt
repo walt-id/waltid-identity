@@ -272,3 +272,4 @@ internal object MDocSerializer : KSerializer<MDoc> {
         return MDoc.fromMapElement(decoder.decodeSerializableValue(DataElementSerializer) as MapElement)
     }
 }
+

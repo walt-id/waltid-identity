@@ -42,7 +42,6 @@
 
 <script lang="ts" setup>
 import CenterMain from "~/components/CenterMain.vue";
-import { InboxArrowDownIcon } from "@heroicons/vue/24/outline";
 
 const currentWallet = useCurrentWallet()
 const issuers = await useLazyFetch(`/wallet-api/wallet/${currentWallet.value}/issuers`).data;

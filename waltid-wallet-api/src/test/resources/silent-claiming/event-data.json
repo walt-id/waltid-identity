@@ -1,0 +1,14 @@
+{
+  "ecosystem": "n/a",
+  "issuerId": "n/a",
+  "subjectId": "n/a",
+  "issuerKeyId": "n/a",
+  "issuerKeyType": "n/a",
+  "subjectKeyType": "n/a",
+  "credentialType": "n/a",
+  "credentialFormat": "n/a",
+  "credentialProofType": "n/a",
+  "policies": [],
+  "protocol": "n/a",
+  "credentialId": "http://example.gov/credentials/1"
+}

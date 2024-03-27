@@ -12,12 +12,11 @@ import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 import kotlin.js.JsName
 
-@ExperimentalJsExport
 @JsExport
-@OptIn(ExperimentalSerializationApi::class)
+@OptIn(ExperimentalSerializationApi::class, ExperimentalJsExport::class)
 @Serializable
 data class DidKeyDocument(
-    @EncodeDefault @SerialName("@context")  val context: List<String> = DEFAULT_CONTEXT,
+    @EncodeDefault @SerialName("@context") val context: List<String> = DEFAULT_CONTEXT,
     val id: String, // did:key:
 
     val verificationMethod: List<VerificationMethod>?,

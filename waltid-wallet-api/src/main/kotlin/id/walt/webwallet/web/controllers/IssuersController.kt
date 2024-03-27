@@ -1,14 +1,12 @@
 package id.walt.webwallet.web.controllers
 
+import id.walt.webwallet.service.WalletServiceManager
 import id.walt.webwallet.service.issuers.CredentialDataTransferObject
 import id.walt.webwallet.service.issuers.IssuerDataTransferObject
-import id.walt.webwallet.service.issuers.IssuersService
-import id.walt.webwallet.usecase.issuer.IssuerUseCaseImpl
 import io.github.smiley4.ktorswaggerui.dsl.get
 import io.github.smiley4.ktorswaggerui.dsl.post
 import io.github.smiley4.ktorswaggerui.dsl.put
 import io.github.smiley4.ktorswaggerui.dsl.route
-import io.ktor.client.*
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
@@ -17,10 +15,6 @@ import io.ktor.server.util.*
 import kotlinx.serialization.Serializable
 
 fun Application.issuers() = walletRoute {
-    val useCase = IssuerUseCaseImpl(
-        service = IssuersService,
-        http = HttpClient()
-    )
     route("issuers", {
         tags = listOf("Issuers")
     }) {
@@ -33,7 +27,7 @@ fun Application.issuers() = walletRoute {
                 }
             }
         }) {
-            context.respond(useCase.list(getWalletService().walletId))
+            context.respond(WalletServiceManager.issuerUseCase.list(getWalletService().walletId))
         }
         post("add", {
             summary = "Add issuer to wallet"
@@ -49,7 +43,7 @@ fun Application.issuers() = walletRoute {
             }
         }) {
             val issuer = call.receive<IssuerParameter>()
-            useCase.add(
+            WalletServiceManager.issuerUseCase.add(
                 IssuerDataTransferObject(
                     wallet = getWalletService().walletId,
                     name = issuer.name,
@@ -85,7 +79,7 @@ fun Application.issuers() = walletRoute {
                     }
                 }
             }) {
-                useCase.get(getWalletService().walletId, call.parameters.getOrFail("issuer")).onSuccess {
+                WalletServiceManager.issuerUseCase.get(getWalletService().walletId, call.parameters.getOrFail("issuer")).onSuccess {
                     context.respond(it)
                 }.onFailure {
                     context.respondText(it.localizedMessage, ContentType.Text.Plain, HttpStatusCode.NotFound)
@@ -98,7 +92,7 @@ fun Application.issuers() = walletRoute {
                     HttpStatusCode.BadRequest to { description = "Authorization failed" }
                 }
             }) {
-                useCase.authorize(getWalletService().walletId, call.parameters.getOrFail("issuer")).onSuccess {
+                WalletServiceManager.issuerUseCase.authorize(getWalletService().walletId, call.parameters.getOrFail("issuer")).onSuccess {
                     context.respond(HttpStatusCode.Accepted)
                 }.onFailure {
                     context.respond(HttpStatusCode.BadRequest, it.localizedMessage)
@@ -127,7 +121,7 @@ fun Application.issuers() = walletRoute {
                     }
                 }
             }) {
-                useCase.credentials(getWalletService().walletId, call.parameters.getOrFail("issuer")).onSuccess {
+                WalletServiceManager.issuerUseCase.credentials(getWalletService().walletId, call.parameters.getOrFail("issuer")).onSuccess {
                     context.respond(it)
                 }.onFailure {
                     context.respond(HttpStatusCode.BadRequest, it.localizedMessage)

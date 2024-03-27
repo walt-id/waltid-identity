@@ -274,7 +274,7 @@ async function createCredential() {
     const json = await (await request).json();
     const options = parseCreationOptionsFromJSON(json);
     const response = await create(options);
-    fetch("...", {
+    await fetch("...", {
         method: "POST",
         body: JSON.stringify(response),
     });
@@ -325,7 +325,7 @@ async function webAuthnRegister() {
     rawCredentialId = credential!!.rawId
 }
 
-var rawCredentialId: Uint8Array
+let rawCredentialId: Uint8Array
 
 async function webAuthnLogin() {
     const randomStringFromServer = "abc123"

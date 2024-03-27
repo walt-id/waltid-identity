@@ -1,4 +1,3 @@
-import com.github.benmanes.gradle.versions.updates.DependencyUpdatesTask
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 object Versions {
@@ -14,7 +13,7 @@ plugins {
     kotlin("plugin.serialization") // Versions.KOTLIN_VERSION
 
     id("io.ktor.plugin") version "2.3.8" // Versions.KTOR_VERSION
-    id("org.owasp.dependencycheck") version "9.0.9"
+    id("org.owasp.dependencycheck") version "9.0.10"
     id("com.github.jk1.dependency-license-report") version "2.5"
     application
     `maven-publish`

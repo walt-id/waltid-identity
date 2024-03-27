@@ -1,10 +1,11 @@
 package id.walt.mdoc.cose
 
-import cbor.Cbor
-import id.walt.mdoc.dataelement.*
+import id.walt.mdoc.dataelement.AnyDataElement
+import id.walt.mdoc.dataelement.ByteStringElement
+import id.walt.mdoc.dataelement.DataElementSerializer
+import id.walt.mdoc.dataelement.NullElement
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.SerializationException
 import kotlinx.serialization.Serializer
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.encoding.Decoder

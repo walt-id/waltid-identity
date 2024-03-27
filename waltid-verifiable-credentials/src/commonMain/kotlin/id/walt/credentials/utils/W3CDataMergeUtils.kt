@@ -16,7 +16,7 @@ import kotlin.js.JsExport
 @JsExport
 object W3CDataMergeUtils {
 
-    val log = KotlinLogging.logger { }
+    private val log = KotlinLogging.logger { }
 
     fun JsonPrimitive.isTemplate() =
         this.content.let { it.first() == '<' && it.last() == '>' && it.length > 2 && !it.contains(" ") }

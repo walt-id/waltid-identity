@@ -2,8 +2,6 @@ package id.walt.mdoc.readerauth
 
 import cbor.Cbor
 import id.walt.mdoc.dataelement.*
-import id.walt.mdoc.mdocauth.DeviceAuthentication
-import id.walt.mdoc.mdocauth.DeviceAuthenticationSerializer
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable

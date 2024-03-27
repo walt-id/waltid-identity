@@ -18,7 +18,7 @@ enum class VerificationType {
      * ALL verification types enabled
      */
     val all: VerificationTypes
-      get() = VerificationType.values().toSet()
+      get() = entries.toSet()
 
     /**
      * Verification types for presentation i.e.: all verification types

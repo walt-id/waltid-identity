@@ -12,6 +12,8 @@ import id.walt.oid4vc.requests.*
 import id.walt.oid4vc.responses.*
 import id.walt.oid4vc.util.JwtUtils
 import id.walt.oid4vc.util.randomUUID
+import id.walt.oid4vc.util.sha256
+import id.walt.sdjwt.SDJwt
 import io.ktor.http.*
 import io.ktor.utils.io.charsets.*
 import io.ktor.utils.io.core.*

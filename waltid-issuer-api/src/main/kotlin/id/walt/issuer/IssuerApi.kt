@@ -2,6 +2,9 @@ package id.walt.issuer
 
 import id.walt.credentials.vc.vcs.W3CVC
 import id.walt.crypto.keys.*
+import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto.keys.tse.TSEKey
+import id.walt.crypto.keys.tse.TSEKeyMetadata
 import id.walt.did.dids.DidService
 import id.walt.issuer.IssuanceExamples.batchExample
 import id.walt.issuer.IssuanceExamples.issuerOnboardingRequestDefaultExample
@@ -138,7 +141,7 @@ fun Application.issuerApi() {
                                 description =
                                     "Supply a core-crypto key representation to use to issue the credential, " + "e.g. a local key (internal JWK) or a TSE key."
                                 example = mapOf(
-                                    "type" to "local", "jwk" to "{ ... }"
+                                    "type" to "jwk", "jwk" to "{ ... }"
                                 )
                                 required = true
                             }
@@ -317,7 +320,7 @@ fun Application.issuerApi() {
                                 description =
                                     "Supply a core-crypto key representation to use to issue the credential, " + "e.g. a local key (internal JWK) or a TSE key."
                                 example = mapOf(
-                                    "type" to "local", "jwk" to "{ ... }"
+                                    "type" to "jwk", "jwk" to "{ ... }"
                                 )
                                 required = false
                             }
@@ -348,7 +351,7 @@ private suspend fun generateJsonKey(
     keyType: String, keyAlgorithm: KeyType, req: IssuerOnboardingRequest
 ): Pair<Key, JsonElement> {
     val key = when (keyType) {
-        "local" -> LocalKey.generate(keyAlgorithm)
+        "jwk" -> JWKKey.generate(keyAlgorithm)
         "tse" -> TSEKey.generate(
             keyAlgorithm, TSEKeyMetadata(
                 getParamOrThrow(
@@ -361,7 +364,7 @@ private suspend fun generateJsonKey(
         )
 
         else -> {
-            LocalKey.generate(KeyType.Ed25519)
+            JWKKey.generate(KeyType.Ed25519)
         }
     }
 

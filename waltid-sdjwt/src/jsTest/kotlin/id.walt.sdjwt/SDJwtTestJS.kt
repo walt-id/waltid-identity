@@ -21,7 +21,7 @@ class SDJwtTestJS {
     // Generate shared secret for HMAC crypto algorithm
     private val sharedSecret = "ef23f749-7238-481a-815c-f0c2157dfa8e"
 
-    @OptIn(DelicateCoroutinesApi::class, ExperimentalJsExport::class)
+    @OptIn(DelicateCoroutinesApi::class)
     @Test
     fun test1() = GlobalScope.promise {
         val cryptoProvider = SimpleAsyncJWTCryptoProvider(

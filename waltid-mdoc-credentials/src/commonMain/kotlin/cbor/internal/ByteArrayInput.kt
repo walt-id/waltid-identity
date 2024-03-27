@@ -6,7 +6,7 @@ package cbor.internal
 
 internal class ByteArrayInput(private var array: ByteArray) {
     private var position: Int = 0
-    public val availableBytes: Int get() = array.size - position
+    val availableBytes: Int get() = array.size - position
 
     fun read(): Int {
         return if (position < array.size) array[position++].toInt() and 0xFF else -1
@@ -51,7 +51,7 @@ internal class ByteArrayOutput {
         array = newArray
     }
 
-    public fun toByteArray(): ByteArray {
+    fun toByteArray(): ByteArray {
         val newArray = ByteArray(position)
         array.copyInto(newArray, startIndex = 0, endIndex = this.position)
         return newArray
