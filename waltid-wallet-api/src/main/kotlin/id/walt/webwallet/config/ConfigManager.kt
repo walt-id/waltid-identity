@@ -86,6 +86,18 @@ object ConfigManager {
                 }
         }
 
+    fun registerConfig(
+        id: String,
+        type: KClass<out WalletConfig>,
+        onLoad: ((WalletConfig) -> Unit)? = null
+    ) = registerConfig(ConfigData(id, type, false, onLoad))
+
+    fun registerRequiredConfig(
+        id: String,
+        type: KClass<out WalletConfig>,
+        onLoad: ((WalletConfig) -> Unit)? = null
+    ) = registerConfig(ConfigData(id, type, true, onLoad))
+
     private fun registerConfig(data: ConfigData) {
         if (registeredConfigurations.any { it.id == data.id })
             throw IllegalArgumentException(
@@ -97,30 +109,28 @@ object ConfigManager {
 
     /** All configurations registered in this function will be loaded on startup */
     private fun registerConfigurations() {
-        registerConfig(
-            ConfigData("db", DatabaseConfiguration::class) {
-                registerConfig(
-                    ConfigData((it as DatabaseConfiguration).database, DatasourceConfiguration::class)
-                )
-            })
-        registerConfig(ConfigData("tenant", TenantConfig::class))
-        registerConfig(ConfigData("web", WebConfig::class))
-        registerConfig(ConfigData("push", PushConfig::class))
+        registerRequiredConfig("db", DatabaseConfiguration::class) {
+            registerRequiredConfig((it as DatabaseConfiguration).database, DatasourceConfiguration::class)
+        }
+        registerRequiredConfig("web", WebConfig::class)
+        registerRequiredConfig("logins", LoginMethodsConfig::class)
+        registerRequiredConfig("auth", AuthConfig::class)
 
-        registerConfig(ConfigData("wallet", RemoteWalletConfig::class))
-        registerConfig(ConfigData("marketplace", MarketPlaceConfiguration::class))
-        registerConfig(ConfigData("chainexplorer", ChainExplorerConfiguration::class))
-        registerConfig(ConfigData("runtime", RuntimeConfig::class))
+        registerConfig("tenant", TenantConfig::class)
+        registerConfig("push", PushConfig::class)
 
-        registerConfig(ConfigData("oidc", OidcConfiguration::class))
-        registerConfig(ConfigData("logins", LoginMethodsConfig::class))
-        registerConfig(ConfigData("trust", TrustConfig::class))
-        registerConfig(ConfigData("rejectionreason", RejectionReasonConfig::class))
-        registerConfig(ConfigData("registration-defaults", RegistrationDefaultsConfig::class))
+        registerConfig("wallet", RemoteWalletConfig::class)
+        registerConfig("marketplace", MarketPlaceConfiguration::class)
+        registerConfig("chainexplorer", ChainExplorerConfiguration::class)
+        registerConfig("runtime", RuntimeConfig::class)
 
-        registerConfig(ConfigData("oci", OciKeyConfig::class))
-        registerConfig(ConfigData("auth", AuthConfig::class))
-        registerConfig(ConfigData("notification", NotificationConfig::class))
+        registerConfig("oidc", OidcConfiguration::class)
+        registerConfig("trust", TrustConfig::class)
+        registerConfig("rejectionreason", RejectionReasonConfig::class)
+        registerConfig("registration-defaults", RegistrationDefaultsConfig::class)
+
+        registerConfig("oci", OciKeyConfig::class)
+        registerConfig("notification", NotificationConfig::class)
     }
 
     fun loadConfigs(args: Array<String>) {
