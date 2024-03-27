@@ -17,6 +17,8 @@ object ConfigManager {
     val loadedConfigurations = HashMap<String, WalletConfig>()
     val preloadedConfigurations = HashMap<String, WalletConfig>()
 
+    val configLoaders = HashMap<String, ConfigLoader>()
+
     fun preloadConfig(id: String, config: WalletConfig) {
         preloadedConfigurations[id] = config
     }
@@ -42,7 +44,7 @@ object ConfigManager {
                 .addEnvironmentSource()
                 .addFileSource("config/$id.conf", optional = true)
                 .withExplicitSealedTypes()
-                .build()
+                .build().also { loader -> configLoaders[id] = loader }
                 .loadConfigOrThrow(type, emptyList())
         }.onSuccess {
             loadedConfigurations[id] = it
@@ -57,6 +59,11 @@ object ConfigManager {
             ?: throw IllegalArgumentException(
                 "No such configuration registered: \"${ConfigClass::class.jvmName}\"!"
             )
+
+    inline fun <reified ConfigClass : WalletConfig> getConfigLoader(): ConfigLoader =
+        getConfigIdentifier<ConfigClass>().let { configKey ->
+            configLoaders[configKey] ?: error("No config loader registered for: $configKey")
+        }
 
     inline fun <reified ConfigClass : WalletConfig> getConfig(): ConfigClass =
         getConfigIdentifier<ConfigClass>().let { configKey ->
