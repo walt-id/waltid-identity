@@ -78,8 +78,6 @@ object Verifier {
                 results.add(policyResult)
             }
         }, onError = { policyResult, exception ->
-            // println("Error executing policy: ${policyResult.request.policy.name}")
-            // exception.printStackTrace()
             resultMutex.withLock {
                 results.add(policyResult)
             }
@@ -157,8 +155,6 @@ object Verifier {
                             results[idx].policyResults.add(policyResult)
                         }
                     }, onError = { policyResult, exception ->
-                        // println("Error executing policy: ${policyResult.request.policy.name}")
-                        // exception.printStackTrace()
                         resultMutex.withLock {
                             policiesRun++
                             results[idx].policyResults.add(policyResult)

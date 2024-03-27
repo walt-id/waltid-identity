@@ -80,7 +80,7 @@ kotlin {
                 implementation("io.ktor:ktor-client-json:2.3.8")
                 implementation("io.ktor:ktor-client-logging:2.3.8")
 
-                implementation(project.dependencies.platform("org.kotlincrypto.hash:bom:0.4.0"))
+                implementation(project.dependencies.platform("org.kotlincrypto.hash:bom:0.5.1"))
                 implementation("org.kotlincrypto.hash:sha2")
 
                 // Date
@@ -123,6 +123,10 @@ kotlin {
         }
         val jvmTest by getting {
             dependencies {
+                // Logging
+//                implementation("org.slf4j:slf4j-simple:2.0.12")
+
+                // Test
                 implementation(kotlin("test"))
 
                 implementation("org.junit.jupiter:junit-jupiter-api:5.10.2")

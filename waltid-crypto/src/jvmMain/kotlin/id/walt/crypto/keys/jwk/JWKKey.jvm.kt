@@ -1,14 +1,12 @@
 package id.walt.crypto.keys.jwk
 
 import com.google.crypto.tink.subtle.Ed25519Verify
-import com.nimbusds.jose.JWSAlgorithm
-import com.nimbusds.jose.JWSObject
-import com.nimbusds.jose.JWSSigner
-import com.nimbusds.jose.JWSVerifier
+import com.nimbusds.jose.*
 import com.nimbusds.jose.crypto.*
 import com.nimbusds.jose.crypto.bc.BouncyCastleProviderSingleton
 import com.nimbusds.jose.jwk.*
 import com.nimbusds.jose.util.Base64URL
+import id.walt.crypto.keys.EccUtils
 import id.walt.crypto.keys.JvmJWKKeyCreator
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
@@ -16,31 +14,32 @@ import id.walt.crypto.utils.Base64Utils.base64UrlDecode
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.crypto.utils.JwsUtils.decodeJws
+import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import org.bouncycastle.asn1.ASN1BitString
+import org.bouncycastle.asn1.ASN1Integer
 import org.bouncycastle.asn1.ASN1Sequence
 import org.bouncycastle.asn1.DEROctetString
 import org.bouncycastle.asn1.edec.EdECObjectIdentifiers
 import org.bouncycastle.asn1.pkcs.PrivateKeyInfo
 import org.bouncycastle.asn1.x509.AlgorithmIdentifier
-import org.bouncycastle.crypto.params.Ed25519PublicKeyParameters
 import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.bouncycastle.util.io.pem.PemObject
 import org.bouncycastle.util.io.pem.PemWriter
 import java.io.ByteArrayOutputStream
 import java.security.*
 import java.security.spec.PKCS8EncodedKeySpec
-import java.security.spec.X509EncodedKeySpec
+import kotlin.math.max
+import kotlin.math.min
 
 
 private val bouncyCastleProvider = BouncyCastleProvider()
+private val log = KotlinLogging.logger { }
 
 @Suppress("EXPECT_ACTUAL_CLASSIFIERS_ARE_IN_BETA_WARNING")
 @Serializable
@@ -155,11 +154,29 @@ actual class JWKKey actual constructor(
 
     actual override suspend fun signRaw(plaintext: ByteArray): ByteArray {
         check(hasPrivateKey) { "No private key is attached to this key!" }
+
         val signature = getSignatureAlgorithm()
         signature.initSign(getPrivateKey())
         signature.update(plaintext)
         val sig = signature.sign()
         return sig
+    }
+
+    // Helper function to convert ECDSA (DER) signature to JWS (IEEE P1363) format
+    private fun convertToJWSFormat(signature: ByteArray): ByteArray {
+        val derSignature = ASN1Sequence.getInstance(signature)
+        val r = (derSignature.getObjectAt(0) as ASN1Integer).value
+        val s = (derSignature.getObjectAt(1) as ASN1Integer).value
+
+        val rBytes = r.toByteArray()
+        val sBytes = s.toByteArray()
+        val jwsSignature = ByteArray(64)
+
+        // Pad the R and S components to 32 bytes each
+        System.arraycopy(rBytes, max(0, rBytes.size - 32), jwsSignature, max(0, 32 - rBytes.size), min(32, rBytes.size))
+        System.arraycopy(sBytes, max(0, sBytes.size - 32), jwsSignature, 32 + max(0, 32 - sBytes.size), min(32, sBytes.size))
+
+        return jwsSignature
     }
 
     /**
@@ -171,32 +188,40 @@ actual class JWKKey actual constructor(
     actual override suspend fun signJws(plaintext: ByteArray, headers: Map<String, String>): String {
         check(hasPrivateKey) { "No private key is attached to this key!" }
 
+        log.debug { "Signing JWS! Key: ${toString()}" }
+
         // Nimbus signature:
-        /*val jwsObject = JWSObject(
+        val jwsObject = JWSObject(
             JWSHeader.Builder(_internalJwsAlgorithm).customParams(headers).build(),
             Payload(plaintext)
         )
+        /*jwsObject.sign(_internalSigner)
 
-        jwsObject.sign(_internalSigner)
-        return jwsObject.serialize()*/
+        val nimbusJws = jwsObject.serialize()*/
 
         // TODO for Custom signature: check if JSON encoding of JsonObject for header & payload is correct (or 1 space is missing?)
         // Custom signature:
-        val appendedHeader = HashMap(headers).apply {
+        /*val appendedHeader = HashMap(headers).apply {
             put("alg", _internalJwsAlgorithm.name)
+        }*/
+
+        val payloadToSign = jwsObject.header.toBase64URL().toString() + '.' + jwsObject.payload.toBase64URL().toString()
+        var signed = signRaw(payloadToSign.encodeToByteArray())
+
+        if (keyType in listOf(KeyType.secp256r1, KeyType.secp256k1)) { // Convert DER to IEEE P1363
+            log.trace { "Converted DER to IEEE P1363 signature" }
+            signed = EccUtils.convertDERtoIEEEP1363(signed)
         }
 
-        val header = Json.encodeToString(appendedHeader).encodeToByteArray().encodeToBase64Url()
-        val payload = plaintext.encodeToBase64Url()
+        val customJws = "$payloadToSign.${signed.encodeToBase64Url()}"
+        log.debug { "Signed JWS: $customJws" }
 
-        val rawSignature = signRaw("$header.$payload".encodeToByteArray()).encodeToBase64Url()
-        val jws = "$header.$payload.$rawSignature"
-
-        return jws
+        return customJws
     }
 
     actual override suspend fun verifyRaw(signed: ByteArray, detachedPlaintext: ByteArray?): Result<ByteArray> {
         check(detachedPlaintext != null) { "Detached plaintext is required." }
+
 
         if (keyType == KeyType.Ed25519) {
             val tinkVerifier = Ed25519Verify(_internalJwk.toOctetKeyPair().toPublicJWK().decodedX)
@@ -231,57 +256,28 @@ actual class JWKKey actual constructor(
 
     actual override suspend fun verifyJws(signedJws: String): Result<JsonElement> {
 
-        // Nimbus verification:
+        // Nimbus verification (handles IEEE P1363):
         return runCatching {
             val jwsObject = JWSObject.parse(signedJws)
 
             check(jwsObject.verify(_internalVerifier)) { "Signature check failed." }
+
+            log.debug { "> Signature verification: Nimbus verification passed: $signedJws" }
 
             val objectElements = jwsObject.payload.toJSONObject()
                 .mapValues { it.value.toJsonElement() }
 
             JsonObject(objectElements)
         }.recoverCatching {
-            // Custom verification
+            // Custom verification (handles DER):
             val (header, payload, signature) = signedJws.split(".")
 
-            val res = verifyRaw(signature.base64UrlDecode(), "$header.$payload".encodeToByteArray()).map { it.decodeToString().decodeJws(allowMissingSignature = true).payload }
+            log.debug { "> Signature verification: Fallback verification checking... (NIMBUS VERIFICATION FAILED) for: $signedJws" }
+            val res = verifyRaw(signature.base64UrlDecode(), "$header.$payload".encodeToByteArray()).map {
+                it.decodeToString().decodeJws(allowMissingSignature = true).payload
+            }
             res.getOrThrow()
         }
-
-//        if (keyType == KeyType.Ed25519) {
-        /*return runCatching {
-            val jwsObject = JWSObject.parse(signedJws)
-
-            check(jwsObject.verify(_internalVerifier)) { "Signature check failed." }
-
-            val objectElements = jwsObject.payload.toJSONObject()
-                .mapValues { it.value.toJsonElement() }
-
-            JsonObject(objectElements)
-        }.also {
-            println("NIMBUS: $it")
-            val (header, payload, signature) = signedJws.split(".")
-
-            val res = verifyRaw(signature.base64UrlDecode(), "$header.$payload".encodeToByteArray()).map { it.decodeToString().decodeJws(allowMissingSignature = true).payload }
-            println("R A W : $res")
-        }*/
-        /*} else {
-            println("Verifying JWS: $signedJws")
-
-            val (header, payload, signature) = signedJws.split(".")
-
-            println()
-
-            println("VERIFYING: \"$header.$payload\".encodeToByteArray()")
-            println("with Signature: $signature")
-            val x = verifyRaw(signature.base64UrlDecode(), "$header.$payload".encodeToByteArray())
-
-            return if (x.isSuccess)
-                Result.success(Json.parseToJsonElement(payload.base64Decode().decodeToString()))
-            else
-                Result.failure(IllegalArgumentException("signature verification failed"))
-        }*/
     }
 
     actual override suspend fun getPublicKey(): JWKKey = JWKKey(_internalJwk.toPublicJWK())
@@ -337,16 +333,10 @@ actual class JWKKey actual constructor(
     }
 
     private fun getSignatureAlgorithm(): Signature = when (keyType) {
-        KeyType.secp256k1 -> Signature.getInstance("SHA256withECDSA", "BC")//Legacy SunEC curve disabled
-        KeyType.secp256r1 -> Signature.getInstance("SHA256withECDSA", "BC")
+        KeyType.secp256k1 -> Signature.getInstance("SHA256withECDSA", "BC") // Legacy SunEC curve disabled
+        KeyType.secp256r1 -> Signature.getInstance("SHA256withECDSA")
         KeyType.Ed25519 -> Signature.getInstance("Ed25519")
         KeyType.RSA -> Signature.getInstance("SHA256withRSA")
-    }
-
-    private fun getKeyFactory() = when (keyType) {
-        KeyType.secp256r1, KeyType.secp256k1 -> KeyFactory.getInstance("ECDSA")
-        KeyType.Ed25519 -> KeyFactory.getInstance("Ed25519")
-        KeyType.RSA -> KeyFactory.getInstance("RSA")
     }
 
     private fun decodeEd25519RawPrivateKey(base64: String): PrivateKey {
@@ -371,19 +361,19 @@ actual class JWKKey actual constructor(
         return publicKey
     }*/
 
-    private fun decodeEd25519RawPublicKey(octetKeyPair: OctetKeyPair): PublicKey {
-        val publicKeyParams = Ed25519PublicKeyParameters(octetKeyPair.decodedX, 0)
-        val publicKeyBytes = publicKeyParams.encoded
+    /* private fun decodeEd25519RawPublicKey(octetKeyPair: OctetKeyPair): PublicKey {
+         val publicKeyParams = Ed25519PublicKeyParameters(octetKeyPair.decodedX, 0)
+         val publicKeyBytes = publicKeyParams.encoded
 
-        val publicKeySpec = X509EncodedKeySpec(publicKeyBytes)
-        val keyFactory = KeyFactory.getInstance("EdDSA")
+         val publicKeySpec = X509EncodedKeySpec(publicKeyBytes)
+         val keyFactory = KeyFactory.getInstance("EdDSA")
 
-        return keyFactory.generatePublic(publicKeySpec)
-    }
+         return keyFactory.generatePublic(publicKeySpec)
+     }*/
 
     actual companion object : JWKKeyCreator {
 
-        val prettyJson = Json { prettyPrint = true }
+//        val prettyJson = Json { prettyPrint = true }
 
         actual override suspend fun generate(type: KeyType, metadata: JWKKeyMetadata): JWKKey =
             JvmJWKKeyCreator.generate(type, metadata)
@@ -410,18 +400,3 @@ object JWKSerializer : KSerializer<JWK> {
         encoder.encodeString(value.toJSONString())
 }
 */
-suspend fun main() {
-    Security.addProvider(BouncyCastleProvider())
-
-    val key = JWKKey.generate(KeyType.secp256r1)
-
-    println(key.jwk)
-
-    println("Signing...")
-    val signature = key.signJws("""{"plain": "test"}""".encodeToByteArray(), emptyMap())
-    println("Signature: $signature")
-
-    println("Verifying...")
-    println(key.getPublicKey().verifyJws(signature))
-
-}

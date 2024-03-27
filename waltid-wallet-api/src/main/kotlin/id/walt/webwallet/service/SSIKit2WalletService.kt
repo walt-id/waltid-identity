@@ -2,6 +2,7 @@ package id.walt.webwallet.service
 
 import id.walt.crypto.keys.*
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto.utils.JsonUtils.toJsonObject
 import id.walt.did.dids.DidService
 import id.walt.did.dids.registrar.LocalRegistrar
 import id.walt.did.dids.registrar.dids.DidCheqdCreateOptions
@@ -18,6 +19,8 @@ import id.walt.oid4vc.providers.OpenIDClientConfig
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.requests.CredentialOfferRequest
 import id.walt.oid4vc.responses.AuthorizationErrorCode
+import id.walt.webwallet.config.ConfigManager
+import id.walt.webwallet.config.OciKeyConfig
 import id.walt.webwallet.db.models.WalletCategoryData
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.db.models.WalletOperationHistories
@@ -29,7 +32,6 @@ import id.walt.webwallet.service.dids.DidsService
 import id.walt.webwallet.service.dto.LinkedWalletDataTransferObject
 import id.walt.webwallet.service.dto.WalletDataTransferObject
 import id.walt.webwallet.service.events.*
-import id.walt.webwallet.service.exchange.IssuanceService
 import id.walt.webwallet.service.keys.KeysService
 import id.walt.webwallet.service.keys.SingleKeyResponse
 import id.walt.webwallet.service.oidc4vc.TestCredentialWallet
@@ -47,7 +49,6 @@ import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.util.*
 import kotlinx.coroutines.runBlocking
-import kotlinx.datetime.Clock
 import kotlinx.datetime.toJavaInstant
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
@@ -284,15 +285,15 @@ class SSIKit2WalletService(
         val tokenResponse = credentialWallet.processImplicitFlowAuthorization(presentationSession.authorizationRequest!!)
         val resp = this.http.submitForm(
             presentationSession.authorizationRequest.responseUri
-            ?: presentationSession.authorizationRequest.redirectUri ?: throw AuthorizationError(
-                presentationSession.authorizationRequest,
-                AuthorizationErrorCode.invalid_request,
-                "No response_uri or redirect_uri found on authorization request"
-            ), parameters {
-            tokenResponse.toHttpParameters().forEach { entry ->
-                entry.value.forEach { append(entry.key, it) }
-            }
-        })
+                ?: presentationSession.authorizationRequest.redirectUri ?: throw AuthorizationError(
+                    presentationSession.authorizationRequest,
+                    AuthorizationErrorCode.invalid_request,
+                    "No response_uri or redirect_uri found on authorization request"
+                ), parameters {
+                tokenResponse.toHttpParameters().forEach { entry ->
+                    entry.value.forEach { append(entry.key, it) }
+                }
+            })
         val httpResponseBody = runCatching { resp.bodyAsText() }.getOrNull()
         val isResponseRedirectUrl = httpResponseBody != null && httpResponseBody.take(10).lowercase().let {
             @Suppress("HttpUrlsUsage")
@@ -350,38 +351,6 @@ class SSIKit2WalletService(
     private fun getAnyCredentialWallet() =
         credentialWallets.values.firstOrNull() ?: getCredentialWallet("did:test:test")
 
-    override suspend fun useOfferRequest(
-        offer: String, did: String, requireUserInput: Boolean
-    ): List<WalletCredential> {
-        val addableCredentials =
-            IssuanceService.useOfferRequest(offer, getCredentialWallet(did), testCIClientConfig.clientID).map {
-                WalletCredential(
-                    wallet = walletId,
-                    id = it.id,
-                    document = it.document,
-                    disclosures = it.disclosures,
-                    addedOn = Clock.System.now(),
-                    manifest = it.manifest,
-                    deletedOn = null,
-                    pending = requireUserInput,
-                ).also { credential ->
-                    eventUseCase.log(
-                        action = EventType.Credential.Receive,
-                        originator = "", //parsedOfferReq.credentialOffer!!.credentialIssuer,
-                        tenant = tenant,
-                        accountId = accountId,
-                        walletId = walletId,
-                        data = eventUseCase.credentialEventData(credential = credential, type = it.type),
-                        credentialId = credential.id,
-                    )
-                }
-            }
-        credentialService.add(
-            wallet = walletId, credentials = addableCredentials.toTypedArray()
-        )
-        return addableCredentials
-    }
-
     override suspend fun resolveCredentialOffer(
         offerRequest: CredentialOfferRequest
     ): CredentialOffer {
@@ -393,8 +362,8 @@ class SSIKit2WalletService(
     override suspend fun createDid(method: String, args: Map<String, JsonPrimitive>): String {
         val keyId = args["keyId"]?.content?.takeIf { it.isNotEmpty() } ?: generateKey()
         val key = getKey(keyId)
-        val options = getDidOptions(method, args)
-        val result = DidService.registerByKey(method, key, options)
+        val result = DidService.registerDefaultDidMethodByKey(method, key, args)
+
         DidsService.add(
             wallet = walletId,
             did = result.did,
@@ -487,8 +456,21 @@ class SSIKit2WalletService(
             )
         }
 
+    private val ociKeyMetadata by lazy {
+        ConfigManager.getConfig<OciKeyConfig>().let {
+            mapOf(
+                "tenancyOcid" to it.tenancyOcid,
+                "userOcid" to it.userOcid,
+                "fingerprint" to it.fingerprint,
+                "managementEndpoint" to it.managementEndpoint,
+                "cryptoEndpoint" to it.cryptoEndpoint,
+                "signingKeyPem" to (it.signingKeyPem?.trimIndent() ?: ""),
+            ).toJsonObject()
+        }
+    }
 
-    override suspend fun generateKey(request: KeyGenerationRequest): String =
+    override suspend fun generateKey(request: KeyGenerationRequest): String = let {
+        request.config = request.config ?: ociKeyMetadata
         KeyManager.createKey(request)
             .also {
                 KeysService.add(walletId, it.getKeyId(), KeySerialization.serializeKey(it))
@@ -501,6 +483,7 @@ class SSIKit2WalletService(
                     data = eventUseCase.keyEventData(it, "jwk")
                 )
             }.getKeyId()
+    }
 
     override suspend fun importKey(jwkOrPem: String): String {
         val type =
@@ -579,7 +562,7 @@ class SSIKit2WalletService(
 
     override fun filterEventLog(filter: EventLogFilter): EventLogFilterResult = runCatching {
         val startingAfterItemIndex = filter.startingAfter?.toLongOrNull()?.takeIf { it >= 0 } ?: -1L
-        val pageSize = filter.limit
+        val pageSize = filter.limit ?: -1
         val count = eventUseCase.count(walletId, filter.data)
         val offset = startingAfterItemIndex + 1
         val events = eventUseCase.get(
