@@ -460,6 +460,7 @@ class SSIKit2WalletService(
         ConfigManager.getConfig<OciKeyConfig>().let {
             mapOf(
                 "tenancyOcid" to it.tenancyOcid,
+                "compartmentOcid" to it.compartmentOcid,
                 "userOcid" to it.userOcid,
                 "fingerprint" to it.fingerprint,
                 "managementEndpoint" to it.managementEndpoint,
