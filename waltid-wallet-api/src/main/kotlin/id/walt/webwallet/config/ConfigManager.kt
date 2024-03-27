@@ -50,7 +50,16 @@ object ConfigManager {
             loadedConfigurations[id] = it
             config.onLoad?.invoke(it)
         }.onFailure {
-            log.error { "Could not load configuration for \"$id\": ${it.stackTraceToString()}" }
+            if (config.required) {
+                log.error {
+                    """
+                    |---- vvv Configuration error vvv ----
+                    |Could not load configuration for "$id": ${it.stackTraceToString()}
+                    |---- ^^^ Configuration error ^^^ ---
+                    |""".trimMargin() }
+            } else {
+                log.info { "Optional configuration not loaded: ${it.message}" }
+            }
         }
     }
 
@@ -125,6 +134,7 @@ object ConfigManager {
     data class ConfigData(
         val id: String,
         val type: KClass<out WalletConfig>,
+        val required: Boolean = false,
         val onLoad: ((WalletConfig) -> Unit)? = null,
     )
 }
