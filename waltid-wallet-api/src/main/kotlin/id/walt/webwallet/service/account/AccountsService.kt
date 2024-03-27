@@ -23,7 +23,7 @@ object AccountsService {
 
     private val eventUseCase = EventUseCase(EventService())
     fun registerAuthenticationMethods() {
-        val loginMethods = ConfigManager.getConfig<LoginMethodsConfig>().enabledLoginMethods
+//        val loginMethods = ConfigManager.getConfig<LoginMethodsConfig>().enabledLoginMethods
     }
 
     val defaultGenerationConfig by lazy { ConfigManager.getConfig<RegistrationDefaultsConfig>() }

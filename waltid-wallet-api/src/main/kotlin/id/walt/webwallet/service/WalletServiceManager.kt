@@ -1,6 +1,7 @@
 package id.walt.webwallet.service
 
 import id.walt.webwallet.config.ConfigManager
+import id.walt.webwallet.config.OidcConfiguration
 import id.walt.webwallet.config.TrustConfig
 import id.walt.webwallet.db.models.AccountWalletMappings
 import id.walt.webwallet.db.models.AccountWalletPermissions
@@ -40,6 +41,7 @@ object WalletServiceManager {
     private val credentialService = CredentialsService()
     private val credentialTypeSeeker = DefaultCredentialTypeSeeker()
     private val eventUseCase = EventUseCase(EventService())
+    val oidcConfig by lazy { ConfigManager.getConfig<OidcConfiguration>() }
     val issuerUseCase = IssuerUseCaseImpl(service = IssuersService, http = httpClient)
     val issuerTrustValidationService = DefaultTrustValidationService(httpClient, trustConfig.issuersRecord)
     val verifierTrustValidationService = DefaultTrustValidationService(httpClient, trustConfig.verifiersRecord)
