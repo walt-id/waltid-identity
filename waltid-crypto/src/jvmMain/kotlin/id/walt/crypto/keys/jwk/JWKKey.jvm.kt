@@ -188,7 +188,7 @@ actual class JWKKey actual constructor(
     actual override suspend fun signJws(plaintext: ByteArray, headers: Map<String, String>): String {
         check(hasPrivateKey) { "No private key is attached to this key!" }
 
-        log.debug { "Signing JWS! Key: ${toString()}" }
+        log.trace { "Signing JWS, Key: ${toString()}" }
 
         // Nimbus signature:
         val jwsObject = JWSObject(
@@ -214,7 +214,7 @@ actual class JWKKey actual constructor(
         }
 
         val customJws = "$payloadToSign.${signed.encodeToBase64Url()}"
-        log.debug { "Signed JWS: $customJws" }
+        log.trace { "Signed JWS: $customJws" }
 
         return customJws
     }
