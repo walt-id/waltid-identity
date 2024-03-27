@@ -7,7 +7,7 @@ import id.walt.webwallet.db.models.WalletDid
 import id.walt.webwallet.utils.IssuanceExamples
 import id.walt.webwallet.web.model.AccountRequest
 import id.walt.webwallet.web.model.EmailAccountRequest
-import id.walt.webwallet.web.model.LoginRequestJson
+import id.walt.webwallet.web.model.loginRequestJson
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
@@ -115,7 +115,7 @@ abstract class E2EWalletTestBase {
         println("Running login...")
         walletClient.post("$walletUrl/wallet-api/auth/login") {
             setBody(
-                LoginRequestJson.encodeToString(
+                loginRequestJson.encodeToString(
                     EmailAccountRequest(
                         email = user.email, password = user.password
                     ) as AccountRequest

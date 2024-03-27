@@ -36,6 +36,7 @@ object ConfigManager {
 
         runCatching {
             ConfigLoaderBuilder.default()
+                .addDecoder(JsonElementDecoder())
                 .addCommandLineSource(args)
                 .addDefaultParsers()
                 .addFileSource("config/$id.conf", optional = true)
@@ -43,14 +44,12 @@ object ConfigManager {
                 .withExplicitSealedTypes()
                 .build()
                 .loadConfigOrThrow(type, emptyList())
+        }.onSuccess {
+            loadedConfigurations[id] = it
+            config.onLoad?.invoke(it)
+        }.onFailure {
+            log.error { "Could not load configuration for \"$id\": ${it.stackTraceToString()}" }
         }
-            .onSuccess {
-                loadedConfigurations[id] = it
-                config.onLoad?.invoke(it)
-            }
-            .onFailure {
-                log.error { "Could not load configuration for \"$id\": ${it.stackTraceToString()}" }
-            }
     }
 
     inline fun <reified ConfigClass : WalletConfig> getConfigIdentifier(): String =
@@ -101,6 +100,7 @@ object ConfigManager {
         registerConfig(ConfigData("logins", LoginMethodsConfig::class))
         registerConfig(ConfigData("trust", TrustConfig::class))
         registerConfig(ConfigData("rejectionreason", RejectionReasonConfig::class))
+        registerConfig(ConfigData("registration-defaults", RegistrationDefaultsConfig::class))
 
         registerConfig(ConfigData("oci", OciKeyConfig::class))
         registerConfig(ConfigData("auth", AuthConfig::class))
