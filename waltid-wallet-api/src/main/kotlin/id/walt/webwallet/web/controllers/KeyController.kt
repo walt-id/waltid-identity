@@ -49,6 +49,10 @@ fun Application.keys() = walletRoute {
                                         JsonPrimitive("ocid1.tenancy.oc1..aaaaaaaaiijfupfvsqwqwgupzdy5yclfzcccmie4ktp2wlgslftv5j7xpk6q")
                                     )
                                     put(
+                                        "compartmentOcid",
+                                        JsonPrimitive("ocid1.compartment.oc1..aaaaaaaaxjkkfjqxdqk7ldfjrxjmacmbi7sci73rbfiwpioehikavpbtqx5q")
+                                    )
+                                    put(
                                         "userOcid",
                                         JsonPrimitive("ocid1.user.oc1..aaaaaaaaxjkkfjqxdqk7ldfjrxjmacmbi7sci73rbfiwpioehikavpbtqx5q")
                                     )

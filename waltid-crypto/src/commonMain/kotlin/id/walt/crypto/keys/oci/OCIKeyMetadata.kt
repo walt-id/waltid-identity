@@ -9,6 +9,7 @@ import kotlin.js.JsExport
 @Serializable
 data class OCIKeyMetadata(
     val tenancyOcid: String,
+    val compartmentOcid: String,
     val userOcid: String,
     val fingerprint: String,
     val managementEndpoint: String,
