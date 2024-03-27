@@ -16,8 +16,6 @@ class WaltIdVCVerifyCmdTest {
 
     val command = VCVerifyCmd()
 
-    // val key = runBlocking { JWKKey.generate(KeyType.Ed25519) }
-
     val resourcesPath = "src/jvmTest/resources"
 
     val keyFileName = "${resourcesPath}/key/ed25519_by_waltid_pvt_key.jwk"
