@@ -136,7 +136,7 @@ open class CIProvider : OpenIDCredentialIssuer(
             println("Signing JWS:   $payload")
             println("JWS Signature: target: $target, keyId: $keyId, header: $header")
             if (header != null && keyId != null && privKeyJwk != null)  {
-                val privKey = LocalKey.importJWK(privKeyJwk)
+                val privKey = JWKKey.importJWK(privKeyJwk)
                 val headers = mapOf("alg" to "ES256", "type" to "jwt", "kid" to keyId)
 
                 privKey.getOrThrow().signJws(payload.toString().toByteArray(), headers).also {

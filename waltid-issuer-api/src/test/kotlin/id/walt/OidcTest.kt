@@ -14,6 +14,13 @@ class OidcTest {
         ConfigManager.loadConfigs(emptyArray())
         val ciTestProvider = CIProvider()
 
+//        println("Aaaaaaaaa")
+//        println("Aaaaaaaaa")
+//        var aa = CredentialOffer.Builder(ciTestProvider.baseUrl).addOfferedCredential("VerifiableId")
+//        println(aa)
+//        println( aa.build())
+//        println("Aaaaaaaaa")
+//        println("Aaaaaaaaa")
 
         // -------- CREDENTIAL ISSUER ----------
         // as CI provider, initialize credential offer for user

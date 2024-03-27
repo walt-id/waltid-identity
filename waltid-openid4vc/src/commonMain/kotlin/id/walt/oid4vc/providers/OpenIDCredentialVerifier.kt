@@ -7,7 +7,6 @@ import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.interfaces.ISessionCache
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.responses.TokenResponse
-import id.walt.oid4vc.util.randomSessionId
 import id.walt.oid4vc.util.ShortIdUtils
 import kotlinx.datetime.Clock
 import kotlin.time.Duration

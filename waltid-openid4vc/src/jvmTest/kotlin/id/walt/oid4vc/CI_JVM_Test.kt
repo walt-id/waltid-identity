@@ -547,7 +547,7 @@ class CI_JVM_Test : AnnotationSpec() {
         println("// receive credential")
         var nonce = tokenResponse.cNonce!!
         val holderDid = TEST_WALLET_DID_WEB1
-        val holderKey = runBlocking { LocalKey.importJWK(TEST_WALLET_KEY1) }.getOrThrow()
+        val holderKey = runBlocking { JWKKey.importJWK(TEST_WALLET_KEY1) }.getOrThrow()
         val holderKeyId = runBlocking { holderKey.getKeyId() }
         val proofKeyId = "$holderDid#$holderKeyId"
         val proofOfPossession = runBlocking {

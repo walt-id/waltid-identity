@@ -108,7 +108,9 @@ object OidcApi : CIProvider() {
                 val authReq = runBlocking { AuthorizationRequest.fromHttpParametersAuto(call.parameters.toMap()) }
                 try {
                     val authResp = if (authReq.responseType.contains(ResponseType.Code)) {
-                        if (authReq.authorizationDetails!!.any{ it.format?.value ==  CredentialFormat.jwt_vc.value}){ // EBSI
+                        println("authresp is: $authReq")
+                         if (authReq.authorizationDetails?.any{ it.types!!.any{ it ==  "CTWalletSameAuthorisedInTime" } }!! || authReq.authorizationDetails?.any{ it.types!!.any{ it ==  "CTWalletSameAuthorisedDeferred" } }!! ){
+//                        if (authReq.authorizationDetails!!.any{ it.format?.value ==  CredentialFormat.jwt_vc.value}){ // EBSI latest change at 27/3/2024 now supports both jwt_vc and jwt_vc_json
                             val idTokenJarKid = OidcApi.sessionCredentialPreMapping[authReq.issuerState]?.first()?.issuerDid!!.replaceRange(0..7, "")
                             val privKeyJwk= OidcApi.sessionCredentialPreMapping[authReq.issuerState]?.first()?.issuerKey!!.exportJWK()
                             println("PrivateKey is: $idTokenJarKid")
