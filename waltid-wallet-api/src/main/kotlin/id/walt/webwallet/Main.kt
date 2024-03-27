@@ -16,7 +16,6 @@ import org.bouncycastle.jce.provider.BouncyCastleProvider
 import java.security.Security
 import kotlin.io.path.Path
 import kotlin.io.path.absolutePathString
-import kotlin.io.path.createDirectories
 
 private val log = KotlinLogging.logger { }
 
@@ -34,6 +33,7 @@ fun main(args: Array<String>) {
 
     val webConfig = ConfigManager.getConfig<WebConfig>()
     log.info { "Starting web server (binding to ${webConfig.webHost}, listening on port ${webConfig.webPort})..." }
+
     embeddedServer(
         CIO,
         port = webConfig.webPort,
@@ -45,7 +45,6 @@ fun main(args: Array<String>) {
 fun webWalletSetup() {
     log.info { "Setting up..." }
     Security.addProvider(BouncyCastleProvider())
-    runCatching { Db.dataDirectoryPath.createDirectories() }
 }
 
 private fun Application.configurePlugins() {
