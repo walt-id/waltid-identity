@@ -89,17 +89,19 @@ object ConfigManager {
     fun registerConfig(
         id: String,
         type: KClass<out WalletConfig>,
+        multiple: Boolean = false,
         onLoad: ((WalletConfig) -> Unit)? = null
-    ) = registerConfig(ConfigData(id, type, false, onLoad))
+    ) = registerConfig(ConfigData(id, type, false, multiple, onLoad))
 
     fun registerRequiredConfig(
         id: String,
         type: KClass<out WalletConfig>,
+        multiple: Boolean = false,
         onLoad: ((WalletConfig) -> Unit)? = null
-    ) = registerConfig(ConfigData(id, type, true, onLoad))
+    ) = registerConfig(ConfigData(id, type, true, multiple, onLoad))
 
     private fun registerConfig(data: ConfigData) {
-        if (registeredConfigurations.any { it.id == data.id })
+        if (registeredConfigurations.any { it.id == data.id } && !data.multiple)
             throw IllegalArgumentException(
                 "A configuration with the name \"${data.id}\" already exists!"
             )
@@ -147,7 +149,10 @@ object ConfigManager {
     data class ConfigData(
         val id: String,
         val type: KClass<out WalletConfig>,
+        /** is this configuration mandatory or optional? */
         val required: Boolean = false,
+        /** are multiple configurations of the same name allowed? */
+        val multiple: Boolean = false,
         val onLoad: ((WalletConfig) -> Unit)? = null,
     )
 }
