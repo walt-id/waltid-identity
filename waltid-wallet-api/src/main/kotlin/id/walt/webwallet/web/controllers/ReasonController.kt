@@ -1,7 +1,5 @@
 package id.walt.webwallet.web.controllers
 
-import id.walt.webwallet.config.ConfigManager
-import id.walt.webwallet.config.RejectionReasonConfig
 import id.walt.webwallet.service.credentials.RejectionReasonService
 import id.walt.webwallet.web.WebBaseRoutes.authenticatedWebWalletRoute
 import io.github.smiley4.ktorswaggerui.dsl.get
@@ -24,7 +22,7 @@ fun Application.reasons() = authenticatedWebWalletRoute {
                 }
             }
         }) {
-            val service = RejectionReasonService(ConfigManager.getConfig<RejectionReasonConfig>())
+            val service = RejectionReasonService()
             context.respond(service.list())
         }
     }
