@@ -1,5 +1,6 @@
 package id.walt.webwallet
 
+import id.walt.did.helpers.WaltidServices
 import id.walt.webwallet.config.ConfigManager
 import id.walt.webwallet.config.WebConfig
 import id.walt.webwallet.db.Db
@@ -19,15 +20,16 @@ import kotlin.io.path.absolutePathString
 
 private val log = KotlinLogging.logger { }
 
-fun main(args: Array<String>) {
+suspend fun main(args: Array<String>) {
     log.info { "Starting walt.id wallet..." }
 
     log.debug { "Running in path: ${Path(".").absolutePathString()}" }
 
-    webWalletSetup()
-
     log.info { "Reading configurations..." }
     ConfigManager.loadConfigs(args)
+
+    webWalletSetup()
+    WaltidServices.minimalInit()
 
     Db.start()
 
