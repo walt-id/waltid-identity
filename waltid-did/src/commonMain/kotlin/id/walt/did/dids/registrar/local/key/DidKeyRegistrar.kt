@@ -30,7 +30,7 @@ class DidKeyRegistrar : LocalRegistrarMethod("key") {
     @JsExport.Ignore
     override suspend fun register(options: DidCreateOptions): DidResult = options.get<KeyType>("keyType")?.let {
         registerByKey(JWKKey.generate(it), options)
-    } ?: throw IllegalArgumentException("KeyType option not found.")
+    } ?: throw IllegalArgumentException("Option \"keyType\" not found.")
 
     @JvmBlocking
     @JvmAsync
