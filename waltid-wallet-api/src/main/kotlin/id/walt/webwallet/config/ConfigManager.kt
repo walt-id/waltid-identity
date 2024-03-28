@@ -14,13 +14,13 @@ object ConfigManager {
     private val log = KotlinLogging.logger {}
 
     val registeredConfigurations = ConcurrentLinkedQueue<ConfigData>()
-    val loadedConfigurations = HashMap<String, WalletConfig>()
-    val preloadedConfigurations = HashMap<String, WalletConfig>()
+    val loadedConfigurations = HashMap<Pair<String, KClass<out WalletConfig>>, WalletConfig>()
+    val preloadedConfigurations = HashMap<Pair<String, KClass<out WalletConfig>>, WalletConfig>()
 
     val configLoaders = HashMap<String, ConfigLoader>()
 
     fun preloadConfig(id: String, config: WalletConfig) {
-        preloadedConfigurations[id] = config
+        preloadedConfigurations[Pair(id, config::class)] = config
     }
 
     @OptIn(ExperimentalHoplite::class)
@@ -29,9 +29,10 @@ object ConfigManager {
         log.debug { "Loading ${if (config.required) "required" else "optional"} configuration: \"$id\" (${config.type.simpleName ?: config.type.jvmName})..." }
 
         val type = config.type
+        val configKey = Pair(id, type)
 
-        preloadedConfigurations[id]?.let {
-            loadedConfigurations[id] = it
+        preloadedConfigurations[configKey]?.let {
+            loadedConfigurations[configKey] = it
             log.info { "Overwrote wallet configuration with preload: $id" }
             return
         }
@@ -48,7 +49,7 @@ object ConfigManager {
                 .loadConfigOrThrow(type, emptyList())
         }.onSuccess {
             log.trace { "Loaded config \"$id\": $it" }
-            loadedConfigurations[id] = it
+            loadedConfigurations[configKey] = it
             config.onLoad?.invoke(it)
         }.onFailure {
             if (config.required) {
@@ -84,7 +85,7 @@ object ConfigManager {
 
     inline fun <reified ConfigClass : WalletConfig> getConfig(): ConfigClass =
         getConfigIdentifier<ConfigClass>().let { configKey ->
-            (loadedConfigurations[configKey]
+            (loadedConfigurations[Pair(configKey, ConfigClass::class)]
                 ?: throw NotFoundException("No loaded configuration: \"$configKey\""))
                 .let { loadedConfig ->
                     loadedConfig as? ConfigClass
