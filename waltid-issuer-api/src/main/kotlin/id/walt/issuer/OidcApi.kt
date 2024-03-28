@@ -85,8 +85,8 @@ object OidcApi : CIProvider() {
                                     it.issuerKey.getPublicKey().exportJWKObject().forEach {
                                         put(it.key, it.value)
                                     }
-                                    if (it.issuerDid.length == 186) // Edge case when issuer uses did:key with ebsi encoding (jwk_jcs-pub (0xeb51)
-                                        put("kid", it.issuerDid.replaceRange(0..7, ""))
+                                    if (it.issuerDid.startsWith("did:key") && it.issuerDid.length == 186) // Edge case when issuer uses did:key with ebsi encoding (jwk_jcs-pub (0xeb51)
+                                        put("kid", it.issuerDid.removePrefix("did:key:"))
                                     else
                                         put("kid", it.issuerKey.getPublicKey().getKeyId())
                                 }
@@ -103,19 +103,17 @@ object OidcApi : CIProvider() {
                 call.respond(HttpStatusCode.OK, jwks)
             }
 
-
             get("/authorize") {
                 val authReq = runBlocking { AuthorizationRequest.fromHttpParametersAuto(call.parameters.toMap()) }
                 try {
                     val authResp = if (authReq.responseType.contains(ResponseType.Code)) {
                         println("authresp is: $authReq")
-                         if (authReq.authorizationDetails?.any{ it.types!!.any{ it ==  "CTWalletSameAuthorisedInTime" } }!! || authReq.authorizationDetails?.any{ it.types!!.any{ it ==  "CTWalletSameAuthorisedDeferred" } }!! ){
-//                        if (authReq.authorizationDetails!!.any{ it.format?.value ==  CredentialFormat.jwt_vc.value}){ // EBSI latest change at 27/3/2024 now supports both jwt_vc and jwt_vc_json
-                            val idTokenJarKid = OidcApi.sessionCredentialPreMapping[authReq.issuerState]?.first()?.issuerDid!!.replaceRange(0..7, "")
+                        if (authReq.clientId.startsWith("did:key") && authReq.clientId.length==186) {  // EBSI conformance latest change at 27/3/2024 now supports both jwt_vc and jwt_vc_json
+                            val idTokenRequestKid = OidcApi.sessionCredentialPreMapping[authReq.issuerState]?.first()?.issuerDid!!.removePrefix("did:key:")
                             val privKeyJwk= OidcApi.sessionCredentialPreMapping[authReq.issuerState]?.first()?.issuerKey!!.exportJWK()
-                            println("PrivateKey is: $idTokenJarKid")
-                            println("KID is: $idTokenJarKid")
-                            processCodeFlowAuthorizationEbsi(authReq, idTokenJarKid, privKeyJwk)
+                            println("PrivateKey is: $privKeyJwk")
+                            println("KID is: $idTokenRequestKid")
+                            processCodeFlowAuthorizationWithIdTokenRequest(authReq, idTokenRequestKid, privKeyJwk)
                         } else {
                             processCodeFlowAuthorization(authReq)
                         }

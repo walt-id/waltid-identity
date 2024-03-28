@@ -77,7 +77,7 @@ kotlin {
                 implementation("io.ktor:ktor-client-core:$ktor_version")
                 implementation("io.ktor:ktor-client-content-negotiation:$ktor_version")
                 implementation("io.ktor:ktor-serialization-kotlinx-json:$ktor_version")
-//                implementation("io.ktor:ktor-client-okhttp:$ktor_version")
+
 
                 // JSON
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
@@ -106,7 +106,6 @@ kotlin {
                 implementation(project(":waltid-did"))
                 implementation(project(":waltid-verifiable-credentials"))
                 implementation("io.kotest:kotest-assertions-core:5.8.0")
-
                 implementation("io.kotest:kotest-assertions-json:5.8.0")
             }
         }
@@ -146,6 +145,8 @@ kotlin {
                 implementation("io.ktor:ktor-serialization-kotlinx-json:$ktor_version")
                 implementation("io.ktor:ktor-client-logging-jvm:$ktor_version")
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-slf4j:1.8.0")
+                implementation("io.ktor:ktor-client-okhttp:$ktor_version")
+
             }
         }
         val jsMain by getting {
