@@ -37,4 +37,10 @@ class WaltIdCmdTest {
         val result = WaltIdCmd().test(listOf("--help"))
         assertContains(result.stdout, "Commands:(\n+.*)+did".toRegex(RegexOption.MULTILINE))
     }
+
+    @Test
+    fun `should have 'vc' subcommand`() {
+        val result = WaltIdCmd().test(listOf("--help"))
+        assertContains(result.stdout, "Commands:(\n+.*)+vc".toRegex(RegexOption.MULTILINE))
+    }
 }

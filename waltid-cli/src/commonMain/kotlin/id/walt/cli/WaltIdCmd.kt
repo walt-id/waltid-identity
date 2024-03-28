@@ -6,6 +6,7 @@ import com.github.ajalt.clikt.parameters.groups.provideDelegate
 import id.walt.cli.commands.CommonOptions
 import id.walt.cli.commands.DidCmd
 import id.walt.cli.commands.KeyCmd
+import id.walt.cli.commands.VCCmd
 
 class WaltIdCmd : CliktCommand(
     name = "waltid",
@@ -44,11 +45,19 @@ class WaltIdCmd : CliktCommand(
         -------------
         waltid did create 
         waltid did create -k myKey.json
+        
+        VC signing
+        -------------
+        waltid vc sign --key=./myKey.json --subject=did:key:z6Mkjm2gaGsodGchfG4k8P6KwCHZsVEPZho5VuEbY94qiBB9 ./myVC.json
+        waltid vc sign --key=./myKey.json \
+                       --subject=did:key:z6Mkjm2gaGsodGchfG4k8P6KwCHZsVEPZho5VuEbY94qiBB9\
+                       --issuer=did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV\
+                       ./myVC.json
         """,
     printHelpOnEmptyArgs = true
 ) {
     init {
-        subcommands(KeyCmd(), DidCmd())
+        subcommands(KeyCmd(), DidCmd(), VCCmd())
     }
 
     private val commonOptions by CommonOptions()
