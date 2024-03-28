@@ -6,7 +6,6 @@ import id.walt.webwallet.config.TrustConfig
 import id.walt.webwallet.db.models.AccountWalletMappings
 import id.walt.webwallet.db.models.AccountWalletPermissions
 import id.walt.webwallet.db.models.Wallets
-import id.walt.webwallet.notificationusecase.NotificationUseCase
 import id.walt.webwallet.seeker.DefaultCredentialTypeSeeker
 import id.walt.webwallet.service.account.AccountsService
 import id.walt.webwallet.service.category.CategoryServiceImpl
@@ -23,6 +22,8 @@ import id.walt.webwallet.usecase.claim.SilentClaimStrategy
 import id.walt.webwallet.usecase.event.EventFilterUseCase
 import id.walt.webwallet.usecase.event.EventUseCase
 import id.walt.webwallet.usecase.issuer.IssuerUseCaseImpl
+import id.walt.webwallet.usecase.notification.NotificationFilterUseCase
+import id.walt.webwallet.usecase.notification.NotificationUseCase
 import id.walt.webwallet.utils.WalletHttpClients.getHttpClient
 import kotlinx.datetime.Clock
 import kotlinx.datetime.toJavaInstant
@@ -49,6 +50,7 @@ object WalletServiceManager {
     val issuerTrustValidationService = DefaultTrustValidationService(httpClient, trustConfig.issuersRecord)
     val verifierTrustValidationService = DefaultTrustValidationService(httpClient, trustConfig.verifiersRecord)
     val notificationUseCase = NotificationUseCase(NotificationService, httpClient)
+    val notificationFilterUseCase = NotificationFilterUseCase(NotificationService, credentialService)
     val silentClaimStrategy = SilentClaimStrategy(
         issuanceService = IssuanceService,
         credentialService = credentialService,

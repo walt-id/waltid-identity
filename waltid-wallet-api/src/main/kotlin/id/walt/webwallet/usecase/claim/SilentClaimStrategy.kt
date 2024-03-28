@@ -2,7 +2,7 @@ package id.walt.webwallet.usecase.claim
 
 import id.walt.webwallet.db.models.Notification
 import id.walt.webwallet.db.models.WalletCredential
-import id.walt.webwallet.notificationusecase.NotificationUseCase
+import id.walt.webwallet.usecase.notification.NotificationUseCase
 import id.walt.webwallet.seeker.Seeker
 import id.walt.webwallet.service.SSIKit2WalletService
 import id.walt.webwallet.service.account.AccountsService

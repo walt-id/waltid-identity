@@ -1,7 +1,6 @@
 package id.walt.webwallet.usecase.claim
 
 import TestUtils
-import id.walt.webwallet.notificationusecase.NotificationUseCase
 import id.walt.webwallet.seeker.Seeker
 import id.walt.webwallet.service.account.AccountsService
 import id.walt.webwallet.service.credentials.CredentialsService
@@ -12,13 +11,14 @@ import id.walt.webwallet.service.issuers.IssuerDataTransferObject
 import id.walt.webwallet.service.trust.TrustValidationService
 import id.walt.webwallet.usecase.event.EventUseCase
 import id.walt.webwallet.usecase.issuer.IssuerUseCase
+import id.walt.webwallet.usecase.notification.NotificationUseCase
 import io.mockk.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.uuid.UUID
 import kotlinx.uuid.generateUUID
-import org.junit.Test
 import kotlin.test.BeforeTest
+import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class SilentClaimStrategyTest {
