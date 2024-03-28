@@ -34,10 +34,7 @@ object Db {
     internal const val SQLITE_PREFIX = "jdbc:sqlite:"
 
     private fun connect() {
-        val jdbcUrl = ConfigManager
-            .getConfigLoader<DatasourceConfiguration>()
-            .loadConfigOrThrow<DatasourceJsonConfiguration>()
-            .jdbcUrl
+        val jdbcUrl = ConfigManager.getConfig<DatasourceJsonConfiguration>().jdbcUrl
 
         if (jdbcUrl?.contains("sqlite") == true) {
             log.info { "Will use sqlite database (${jdbcUrl}), working directory: ${Path(".").absolutePathString()}" }
