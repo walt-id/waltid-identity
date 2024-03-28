@@ -35,7 +35,7 @@ class TestJvm {
 
             val jobs = ArrayList<Job>()
 
-            val n = 10_000
+            val n = 10_00
             val dispatchMs = measureTimeMillis {
                 repeat(n) {
                     jobs.add(GlobalScope.launch {
