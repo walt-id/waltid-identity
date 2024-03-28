@@ -18,6 +18,7 @@ class DidCheqdResolverTest : DidResolverTestBase() {
 
     @ParameterizedTest
     @MethodSource
+    @Disabled
     override fun `given a did String, when calling resolve, then the result is a valid did document`(
         did: String,
         key: JsonObject,

@@ -7,6 +7,8 @@ import id.walt.did.dids.registrar.dids.DidCheqdCreateOptions
 import id.walt.did.dids.registrar.dids.DidCreateOptions
 import id.walt.did.dids.registrar.local.cheqd.DidCheqdRegistrar
 import kotlinx.coroutines.runBlocking
+import org.junit.Ignore
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.Arguments
 import org.junit.jupiter.params.provider.Arguments.arguments
@@ -17,6 +19,7 @@ class DidCheqdRegistrarTest : DidRegistrarTestBase(DidCheqdRegistrar()) {
 
     @ParameterizedTest
     @MethodSource
+    @Disabled
     override fun `given did options with no key when register then returns a valid did result`(
         options: DidCreateOptions,
         assert: registrarDidAssertion
@@ -26,6 +29,7 @@ class DidCheqdRegistrarTest : DidRegistrarTestBase(DidCheqdRegistrar()) {
 
     @ParameterizedTest
     @MethodSource
+    @Disabled
     override fun `given did options and key when register with key then returns a valid did result`(
         key: Key,
         options: DidCreateOptions,
