@@ -1,4 +1,4 @@
-package id.walt.webwallet.notificationusecase
+package id.walt.webwallet.usecase.notification
 
 import id.walt.webwallet.config.ConfigManager
 import id.walt.webwallet.config.NotificationConfig
@@ -16,6 +16,7 @@ class NotificationUseCase(
 ) {
     private val logger = KotlinLogging.logger {}
     private val config by lazy { ConfigManager.getConfig<NotificationConfig>() }
+
     fun add(vararg notification: Notification) = service.add(notification.toList())
     fun setStatus(vararg id: UUID, isRead: Boolean) = id.mapNotNull {
         service.get(it).getOrNull()
@@ -33,14 +34,6 @@ class NotificationUseCase(
         )
     }.size
 
-    fun findAll(wallet: UUID, parameter: NotificationFilterParameter) = service.list(
-        wallet = wallet,
-        type = parameter.type,
-        addedOn = parameter.addedOn,
-        isRead = parameter.isRead,
-        sortAscending = parseSortOrder(parameter.sort)
-    )
-
     fun findById(id: UUID) = service.get(id)
     fun deleteById(id: UUID) = service.delete(id)
     fun deleteAll(wallet: UUID) = service.list(wallet).mapNotNull { it.id?.let { UUID(it) } }.let {
@@ -56,13 +49,4 @@ class NotificationUseCase(
             logger.debug { "notification sent: ${it.status}" }
         }
     }
-
-    private fun parseSortOrder(sort: String) = sort.lowercase().takeIf { it == "asc" }?.let { true } ?: false
 }
-
-data class NotificationFilterParameter(
-    val type: String?,
-    val isRead: Boolean?,
-    val sort: String = "desc",
-    val addedOn: String? = null,
-)

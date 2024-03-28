@@ -15,11 +15,12 @@ import org.jetbrains.exposed.sql.transactions.transaction
 object NotificationService {
     fun list(
         wallet: UUID,
-        type: String? = null, addedOn: String? = null,
+        type: String? = null,
+        addedOn: String? = null,
         isRead: Boolean? = null,
-        sortAscending: Boolean? = null
+        sortAscending: Boolean? = null,
     ): List<Notification> = transaction {
-        filterAll(wallet, type, isRead, addedOn, sortAscending).mapNotNull {
+        filterAll(wallet, type, isRead, addedOn, sortAscending).map {
             Notification(it)
         }
     }
