@@ -16,7 +16,8 @@ import java.util.stream.Stream
 class DidCheqdResolverTest : DidResolverTestBase() {
     override val sut: LocalResolverMethod = DidCheqdResolver()
 
-    @ParameterizedTest
+    // FIXME: Enable CHEQD tests again (web service is currently down)
+   /* @ParameterizedTest
     @MethodSource
     override fun `given a did String, when calling resolve, then the result is a valid did document`(
         did: String,
@@ -35,7 +36,7 @@ class DidCheqdResolverTest : DidResolverTestBase() {
         assert: resolverAssertion<Key>
     ) {
         super.`given a did String, when calling resolveToKey, then the result is valid key`(did, key, assert)
-    }
+    }*/
 
     companion object {
         @JvmStatic

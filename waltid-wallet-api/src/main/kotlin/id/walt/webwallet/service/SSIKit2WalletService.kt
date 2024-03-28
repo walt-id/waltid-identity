@@ -31,7 +31,9 @@ import id.walt.webwallet.service.credentials.CredentialsService
 import id.walt.webwallet.service.dids.DidsService
 import id.walt.webwallet.service.dto.LinkedWalletDataTransferObject
 import id.walt.webwallet.service.dto.WalletDataTransferObject
-import id.walt.webwallet.service.events.*
+import id.walt.webwallet.service.events.EventDataNotAvailable
+import id.walt.webwallet.service.events.EventService
+import id.walt.webwallet.service.events.EventType
 import id.walt.webwallet.service.keys.KeysService
 import id.walt.webwallet.service.keys.SingleKeyResponse
 import id.walt.webwallet.service.oidc4vc.TestCredentialWallet
@@ -471,7 +473,10 @@ class SSIKit2WalletService(
     }
 
     override suspend fun generateKey(request: KeyGenerationRequest): String = let {
-        request.config = request.config ?: ociKeyMetadata
+        if (request.backend == "oci" && request.config == null) {
+            request.config = ociKeyMetadata
+        }
+
         KeyManager.createKey(request)
             .also {
                 KeysService.add(walletId, it.getKeyId(), KeySerialization.serializeKey(it))
@@ -561,31 +566,6 @@ class SSIKit2WalletService(
         }
     }
 
-    override fun filterEventLog(filter: EventLogFilter): EventLogFilterResult = runCatching {
-        val startingAfterItemIndex = filter.startingAfter?.toLongOrNull()?.takeIf { it >= 0 } ?: -1L
-        val pageSize = filter.limit ?: -1
-        val count = eventUseCase.count(walletId, filter.data)
-        val offset = startingAfterItemIndex + 1
-        val events = eventUseCase.get(
-            EventUseCase.EventFilterParameter(
-                accountId = accountId,
-                walletId = walletId,
-                offset = offset,
-                logFilter = filter,
-            )
-        )
-        EventLogFilterDataResult(
-            items = events,
-            count = events.size,
-            currentStartingAfter = computeCurrentStartingAfter(startingAfterItemIndex),
-            nextStartingAfter =
-            computeNextStartingAfter(startingAfterItemIndex, pageSize, count)
-        )
-    }
-        .fold(
-            onSuccess = { it },
-            onFailure = { EventLogFilterErrorResult(reason = it.localizedMessage) })
-
     override suspend fun linkWallet(
         wallet: WalletDataTransferObject
     ): LinkedWalletDataTransferObject = Web3WalletService.link(tenant, walletId, wallet)
@@ -639,16 +619,5 @@ class SSIKit2WalletService(
 
             else -> throw IllegalArgumentException("Did method not supported: $method")
         }
-
-    //TODO: move to related entity
-    private fun computeCurrentStartingAfter(afterItemIndex: Long): String? = let {
-        afterItemIndex.takeIf { it >= 0 }?.toString()
-    }
-
-    //TODO: move to related entity
-    private fun computeNextStartingAfter(afterItemIndex: Long, pageSize: Int, count: Long): String? = let {
-        val itemIndex = afterItemIndex + pageSize
-        itemIndex.takeIf { it < count }?.toString()
-    }
 }
 
