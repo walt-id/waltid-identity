@@ -291,7 +291,7 @@ class OCIKey(
                 }
                 val requestBody = JsonObject(
                     mapOf(
-                        "compartmentId" to JsonPrimitive(config.tenancyOcid),
+                        "compartmentId" to JsonPrimitive(config.compartmentOcid),
                         "displayName" to JsonPrimitive("WaltID"),
                         "keyShape" to JsonObject(
                             mapOf(
