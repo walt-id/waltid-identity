@@ -218,7 +218,7 @@ class VP_JVM_Test : AnnotationSpec() {
             VpTokenParameter(setOf(presStr1, presStr2)), VpTokenParameter(listOf(presObj, presObj))
         )
         presParams.forEach { param ->
-            val tokenResponse = TokenResponse.success(param, null, null, null)
+            val tokenResponse = TokenResponse.success(param, null, null, null, null, null)
 
             if (param.vpTokenObjects.plus(param.vpTokenStrings).size == 1) {
                 tokenResponse.vpToken shouldNot beInstanceOf<JsonArray>()
@@ -781,5 +781,14 @@ class VP_JVM_Test : AnnotationSpec() {
         response.status shouldBe HttpStatusCode.Created
         val responseObj = response.body<JsonObject>()
         return responseObj["url"]?.jsonPrimitive?.content
+    }
+
+    @Test
+    suspend fun testNGISargasso() {
+        val presReq = OpenID4VP.parsePresentationRequestFromUrl("openid4vp://authorize?client_id=https%3A%2F%2Fdev-aqvc.aqvc.me%3A443%2Fapi%2Faqio%2Finteraction%2F110e025b-553b-4ceb-b605-caf2dc848656%2FverifyPresentation%2F37ebb09a-7cdd-4c16-859a-63ede7d60cbd&presentation_definition_uri=https%3A%2F%2Fdev-aqvc.aqvc.me%3A443%2Fapi%2Faqio%2Finteraction%2F110e025b-553b-4ceb-b605-caf2dc848656%2FrequestProof%2F37ebb09a-7cdd-4c16-859a-63ede7d60cbd%3Fstate%3DhQsAWOOokMih3ID1WiX4-w&client_id_scheme=redirect_uri&response_uri=https%3A%2F%2Fdev-aqvc.aqvc.me%3A443%2Fapi%2Faqio%2Finteraction%2F110e025b-553b-4ceb-b605-caf2dc848656%2FverifyPresentation%2F37ebb09a-7cdd-4c16-859a-63ede7d60cbd&response_type=vp_token&response_mode=direct_post&nonce=3_DpJy5X0Y8o-v06ajpsYA&state=hQsAWOOokMih3ID1WiX4-w")
+
+        presReq.presentationDefinitionUri shouldNotBe null
+        val presDef = PresentationDefinition.fromJSONString(http.get(presReq.presentationDefinitionUri!!).bodyAsText())
+        println(presDef.toJSONString())
     }
 }

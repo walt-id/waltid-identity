@@ -13,6 +13,7 @@ import id.walt.oid4vc.data.*
 import id.walt.oid4vc.data.dif.DescriptorMapping
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.data.dif.PresentationSubmission
+import id.walt.oid4vc.data.dif.VCFormat
 import id.walt.oid4vc.interfaces.PresentationResult
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.requests.CredentialRequest
@@ -38,9 +39,12 @@ import io.ktor.util.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.Clock
+import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.Instant
+import kotlinx.datetime.plus
 import kotlinx.serialization.json.*
 import java.nio.ByteBuffer
+import java.time.Duration
 import java.util.UUID
 import kotlin.test.*
 import kotlin.time.DurationUnit
@@ -107,7 +111,7 @@ class DidCreationTest {
     }
 
     val CLIENT_MOCK_PORT = 5000
-    val CLIENT_MOCK_URL = "http://192.168.0.122:5000/client-mock"
+    val CLIENT_MOCK_URL = "https://c6b8-62-178-27-231.ngrok-free.app/client-mock"//"http://192.168.0.122:5000/client-mock"
     val CLIENT_MAIN_KEY = runBlocking { LocalKey.generate(KeyType.secp256k1) }
     val CLIENT_VCSIGN_KEY = runBlocking { LocalKey.generate(KeyType.secp256r1) }
     fun startClientMockServer() {
@@ -124,7 +128,7 @@ class DidCreationTest {
                     call.respond(buildJsonObject {
                         put("keys", buildJsonArray {
                             add(CLIENT_MAIN_KEY.exportJWKObject())
-                            add(CLIENT_VCSIGN_KEY.exportJWKObject())
+                            add(CLIENT_VCSIGN_KEY.exportJWKObject().also { println(it.toString()) })
                         })
                     })
                 }
@@ -132,6 +136,7 @@ class DidCreationTest {
         }.start()
     }
 
+    @OptIn(ExperimentalStdlibApi::class)
     @Test
     fun ebsiDidOnboarding() = runTest {
         startClientMockServer()
@@ -142,8 +147,8 @@ class DidCreationTest {
         }.let { MultiBaseUtils.encodeMultiBase58Btc(it) }
         assertEquals('z', didMSI.first())
         val did = "did:ebsi:$didMSI"
-        //val taoIssuer = "https://api-conformance.ebsi.eu/conformance/v3/issuer-mock"
-        val taoIssuer = "http://localhost:3000/conformance/v3/issuer-mock"
+        val taoIssuer = "https://api-conformance.ebsi.eu/conformance/v3/issuer-mock"
+        //val taoIssuer = "http://localhost:3000/conformance/v3/issuer-mock"
         val issuerMetadata = OpenID4VCI.resolveCIProviderMetadata(taoIssuer)
         assertEquals(taoIssuer, issuerMetadata.credentialIssuer)
         val authMetadata = OpenID4VCI.resolveAuthProviderMetadata(issuerMetadata.authorizationServer!!)
@@ -277,14 +282,38 @@ class DidCreationTest {
                     )
                 }
             )), PresentationSubmission(
-                presDef.id, presDef.id, presDef.inputDescriptors.map {
-                    DescriptorMapping(it.id, it.format!!.keys.first(), DescriptorMapping.vpPath(1, 0))
+                presDef.id, presDef.id, presDef.inputDescriptors.mapIndexed { index, inputDescriptor ->
+                    DescriptorMapping(inputDescriptor.id, presDef.format!!.keys.first(), DescriptorMapping.vpPath(1,0),
+                        null) //DescriptorMapping("0", inputDescriptor.format!!.keys.first(), "${DescriptorMapping.vpPath(1,0)}.verifiableCredential[$index]"))
                 }
-            )), grantType = GrantType.vp_token, scope = "openid didr_invite"
+            ).also { println(it.toJSONString()) }), grantType = GrantType.vp_token, scope = "openid didr_invite"
         )
         println(tokenResponse.vpToken.toString())
         val accessTokenResponse = http.submitForm("https://api-conformance.ebsi.eu/authorisation/v4/token",
-            formParameters = parametersOf(tokenResponse.toHttpParameters())) {}.bodyAsText()
-        println(accessTokenResponse)
+            formParameters = parametersOf(tokenResponse.toHttpParameters())) {}.bodyAsText().let { TokenResponse.fromJSONString(it) }
+        assertNotNull(accessTokenResponse.accessToken)
+        println(accessTokenResponse.accessToken)
+
+        // insert DID document:
+        http.post("https://api-conformance.ebsi.eu/did-registry/v5/jsonrpc") {
+            bearerAuth(accessTokenResponse.accessToken!!)
+            contentType(ContentType.Application.Json)
+            setBody(buildJsonObject {
+                put("jsonrpc", "2.0")
+                put("method", "insertDidDocument")
+                put("params", buildJsonArray {
+                    add(buildJsonObject {
+                        put("from", TODO())
+                        put("did", did)
+                        put("baseDocument", TODO())
+                        put("vMethodId", CLIENT_MAIN_KEY.getThumbprint())
+                        put("publicKey", CLIENT_MAIN_KEY.getPublicKeyRepresentation().toHexString().let { "0x04$it" })
+                        put("isSecp256k1", true)
+                        put("notBefore", Clock.System.now().epochSeconds)
+                        put("notAfter", Clock.System.now().plus(365*24, DateTimeUnit.HOUR).epochSeconds)
+                    })
+                })
+            })
+        }
     }
 }
