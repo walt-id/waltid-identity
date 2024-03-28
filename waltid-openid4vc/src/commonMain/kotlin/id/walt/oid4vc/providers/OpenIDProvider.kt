@@ -113,11 +113,10 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
         }
 
         // 3. Verify iss = sub = did
-        val sub = payload[JWTClaims.Payload.subject].toString().removeSurrounding("\"")
-        val iss = payload[JWTClaims.Payload.issuer].toString().removeSurrounding("\"")
-
-        val kid  = header[JWTClaims.Header.keyID]
-        val did = kid.toString().substringBefore("#").replace("\"","")
+        val sub = payload[JWTClaims.Payload.subject]!!.jsonPrimitive.content
+        val iss = payload[JWTClaims.Payload.issuer]!!.jsonPrimitive.content
+        val kid = header[JWTClaims.Header.keyID]!!.jsonPrimitive.content
+        val did = kid.substringBefore("#")
 
         if (iss != sub || iss != did || sub != did){
             println("$sub $iss $did")
@@ -125,6 +124,7 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
         }
 
         // 4. Verify Signature
+
         // 4.a Resolve DID
         // DidService.minimalInit()
         // val didDocument = DidService.resolve(did.removeSurrounding("\"")
@@ -191,8 +191,7 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
     // }
 
     // Create an ID Token request using JAR OAuth2.0 specification https://www.rfc-editor.org/rfc/rfc9101.html
-    open fun processCodeFlowAuthorizationEbsi(authorizationRequest: AuthorizationRequest, keyId: String, privKeyJwk: String): AuthorizationCodeIDTokenRequestResponse {
-        println("Ebsi Authorize Request")
+    open fun processCodeFlowAuthorizationWithIdTokenRequest(authorizationRequest: AuthorizationRequest, keyId: String, privKeyJwk: String): AuthorizationCodeIDTokenRequestResponse {
         if (!authorizationRequest.responseType.contains(ResponseType.Code))
             throw AuthorizationError(
                 authorizationRequest,
