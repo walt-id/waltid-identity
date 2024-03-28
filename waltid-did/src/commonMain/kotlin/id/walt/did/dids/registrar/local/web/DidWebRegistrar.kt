@@ -9,6 +9,8 @@ import id.walt.did.dids.registrar.DidResult
 import id.walt.did.dids.registrar.dids.DidCreateOptions
 import id.walt.did.dids.registrar.local.LocalRegistrarMethod
 import id.walt.did.utils.ExtensionMethods.ensurePrefix
+import kotlinx.uuid.UUID
+import kotlinx.uuid.generateUUID
 import love.forte.plugin.suspendtrans.annotation.JsPromise
 import love.forte.plugin.suspendtrans.annotation.JvmAsync
 import love.forte.plugin.suspendtrans.annotation.JvmBlocking
@@ -32,19 +34,15 @@ class DidWebRegistrar : LocalRegistrarMethod("web") {
     @JsPromise
     @JsExport.Ignore
     override suspend fun registerByKey(key: Key, options: DidCreateOptions): DidResult =
-        options.get<String>("domain")?.takeIf {
-            it.isNotEmpty()
-        }?.let {
+        options.get<String>("domain")?.takeIf { it.isNotEmpty() }?.let {
             val domain = UrlEncoderUtil.encode(it)
             val path = options.get<String>("path")?.takeIf { it.isNotEmpty() }?.let {
-                it.ensurePrefix("/").split("/").joinToString(":") { part -> UrlEncoderUtil.encode(part) }
+                it.replace("[random-uuid]", UUID.generateUUID().toString()).ensurePrefix("/").split("/").joinToString(":") { part -> UrlEncoderUtil.encode(part) }
             } ?: ""
             DidResult(
                 "did:web:$domain$path", DidDocument(
                     DidWebDocument(
-                        did = "did:web:$domain$path",
-                        keyId = key.getKeyId(),
-                        didKey = key.getPublicKey().exportJWKObject()
+                        did = "did:web:$domain$path", keyId = key.getKeyId(), didKey = key.getPublicKey().exportJWKObject()
                     ).toMap()
                 )
             )

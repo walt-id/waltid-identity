@@ -48,6 +48,8 @@ class EventUseCase(
         dataFilter = parameter.logFilter.data
     )
 
+    fun delete(id: Int) = eventService.delete(id)
+
     fun credentialEventData(credential: WalletCredential, type: String?) = CredentialEventData(
         ecosystem = EventDataNotAvailable,
         issuerId = WalletCredential.parseIssuerDid(credential.parsedDocument, credential.parsedManifest)

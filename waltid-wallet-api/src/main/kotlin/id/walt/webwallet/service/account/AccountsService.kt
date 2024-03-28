@@ -2,6 +2,7 @@ package id.walt.webwallet.service.account
 
 import id.walt.webwallet.config.ConfigManager
 import id.walt.webwallet.config.LoginMethodsConfig
+import id.walt.webwallet.config.RegistrationDefaultsConfig
 import id.walt.webwallet.db.models.*
 import id.walt.webwallet.service.WalletServiceManager
 import id.walt.webwallet.service.events.AccountEventData
@@ -22,9 +23,10 @@ object AccountsService {
 
     private val eventUseCase = EventUseCase(EventService())
     fun registerAuthenticationMethods() {
-        val loginMethods = ConfigManager.getConfig<LoginMethodsConfig>().enabledLoginMethods
-
+//        val loginMethods = ConfigManager.getConfig<LoginMethodsConfig>().enabledLoginMethods
     }
+
+    val defaultGenerationConfig by lazy { ConfigManager.getConfig<RegistrationDefaultsConfig>() }
 
     suspend fun register(tenant: String = "", request: AccountRequest): Result<RegistrationResult> = when (request) {
         is EmailAccountRequest -> EmailAccountStrategy.register(tenant, request)
@@ -60,11 +62,19 @@ object AccountsService {
         )
 
         // Add default data:
-        val createdDid =
-            walletService.createDid("jwk", mapOf("alias" to JsonPrimitive("Onboarding")))
+
+        val createdKey = walletService.generateKey(defaultGenerationConfig.keyGenerationRequest)
+
+        val createdDid = walletService.createDid(
+            method = defaultGenerationConfig.didMethod,
+            args = defaultGenerationConfig.didConfig.toMutableMap().apply {
+                put("keyId", JsonPrimitive(createdKey))
+                put("alias", JsonPrimitive("Onboarding"))
+            }
+        )
+
         walletService.setDefault(createdDid)
-    }
-        .onFailure { throw IllegalStateException("Could not register user: ${it.message}", it) }
+    }.onFailure { throw IllegalStateException("Could not register user: ${it.message}", it) }
 
     suspend fun authenticate(tenant: String, request: AccountRequest): Result<AuthenticatedUser> = runCatching {
         when (request) {
@@ -155,8 +165,11 @@ object AccountsService {
             .firstOrNull()
     }
 
-    fun getNameFor(account: UUID) =
-        Accounts.selectAll().where { Accounts.id eq account }.single()[Accounts.email]
+    fun get(account: UUID) = transaction {
+        Accounts.selectAll().where { Accounts.id eq account }.single().let {
+            Account(it)
+        }
+    }
 }
 
 @Serializable
