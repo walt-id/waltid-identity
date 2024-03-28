@@ -15,7 +15,7 @@ import kotlinx.datetime.Clock
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.time.Duration
-
+import kotlin.time.Duration.Companion.minutes
 /**
  * Base object for a service, providing issuance of verifiable credentials via the OpenID4CI issuance protocol
  * e.g.: Credential issuer
@@ -27,7 +27,7 @@ abstract class OpenIDCredentialIssuer(
 
     override val metadata
         get() = createDefaultProviderMetadata().copy(
-            credentialsSupported = config.credentialsSupported
+            credentialConfigurationsSupported = config.credentialConfigurationsSupported
         )
     private var _supportedCredentialFormats: Set<CredentialFormat>? = null
     val supportedCredentialFormats
@@ -39,7 +39,7 @@ abstract class OpenIDCredentialIssuer(
     private fun isCredentialTypeSupported(format: CredentialFormat, types: List<String>?, docType: String?): Boolean {
         if (types.isNullOrEmpty() && docType.isNullOrEmpty())
             return false
-        return config.credentialsSupported.any { cred ->
+        return config.credentialConfigurationsSupported.values.any { cred ->
             format == cred.format && (
                     (docType != null && cred.docType == docType) ||
                             (types != null && cred.types != null && cred.types.containsAll(types))
@@ -49,7 +49,7 @@ abstract class OpenIDCredentialIssuer(
 
     private fun isSupportedAuthorizationDetails(authorizationDetails: AuthorizationDetails): Boolean {
         return authorizationDetails.type == OPENID_CREDENTIAL_AUTHORIZATION_TYPE &&
-                config.credentialsSupported.any { credentialSupported ->
+                config.credentialConfigurationsSupported.values.any { credentialSupported ->
                     credentialSupported.format == authorizationDetails.format &&
                             ((authorizationDetails.types != null && credentialSupported.types?.containsAll(
                                 authorizationDetails.types
@@ -68,7 +68,8 @@ abstract class OpenIDCredentialIssuer(
 
     override fun initializeAuthorization(
         authorizationRequest: AuthorizationRequest,
-        expiresIn: Duration
+        expiresIn: Duration,
+        idTokenRequestState: String?,
     ): IssuanceSession {
         return if (authorizationRequest.issuerState.isNullOrEmpty()) {
             if (!validateAuthorizationRequest(authorizationRequest)) {
@@ -79,7 +80,7 @@ abstract class OpenIDCredentialIssuer(
             }
             IssuanceSession(
                 randomUUID(), authorizationRequest,
-                Clock.System.now().plus(expiresIn)
+                Clock.System.now().plus(expiresIn), idTokenRequestState = idTokenRequestState
             )
         } else {
             getVerifiedSession(authorizationRequest.issuerState)?.copy(authorizationRequest = authorizationRequest)
@@ -88,28 +89,41 @@ abstract class OpenIDCredentialIssuer(
                     "No valid issuance session found for given issuer state"
                 )
         }.also {
-            putSession(it.id, it)
+            val updatedSession = IssuanceSession(
+                id = it.id,
+                authorizationRequest = authorizationRequest,
+                expirationTimestamp = Clock.System.now().plus(5.minutes),
+                idTokenRequestState = idTokenRequestState,
+                txCode = it.txCode,
+                txCodeValue = it.txCodeValue,
+                credentialOffer = it.credentialOffer,
+                cNonce = it.cNonce,
+                customParameters = it.customParameters
+            )
+            putSession(it.id, updatedSession)
         }
     }
+
 
     open fun initializeCredentialOffer(
         credentialOfferBuilder: CredentialOffer.Builder,
         expiresIn: Duration,
         allowPreAuthorized: Boolean,
-        preAuthUserPin: String? = null
+        txCode: TxCode? = null, txCodeValue: String? = null
     ): IssuanceSession {
         val sessionId = randomUUID()
         credentialOfferBuilder.addAuthorizationCodeGrant(sessionId)
         if (allowPreAuthorized)
             credentialOfferBuilder.addPreAuthorizedCodeGrant(
                 generateToken(sessionId, TokenTarget.TOKEN),
-                !preAuthUserPin.isNullOrEmpty()
+                txCode
             )
         return IssuanceSession(
             id = sessionId,
             authorizationRequest = null,
             expirationTimestamp = Clock.System.now().plus(expiresIn),
-            preAuthUserPin = preAuthUserPin,
+            txCode = txCode,
+            txCodeValue = txCodeValue,
             credentialOffer = credentialOfferBuilder.build()
         ).also {
             putSession(it.id, it)
@@ -125,8 +139,8 @@ abstract class OpenIDCredentialIssuer(
     }
 
     override fun generateTokenResponse(session: IssuanceSession, tokenRequest: TokenRequest): TokenResponse {
-        if (tokenRequest.grantType == GrantType.pre_authorized_code && !session.preAuthUserPin.isNullOrEmpty() &&
-            session.preAuthUserPin != tokenRequest.userPin
+        if (tokenRequest.grantType == GrantType.pre_authorized_code && session.txCode != null &&
+            session.txCodeValue != tokenRequest.txCode
         ) {
             throw TokenError(
                 tokenRequest,

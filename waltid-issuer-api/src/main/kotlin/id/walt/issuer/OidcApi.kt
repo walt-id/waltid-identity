@@ -1,6 +1,7 @@
 package id.walt.issuer
 
 
+import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.data.ResponseMode
 import id.walt.oid4vc.data.ResponseType
 import id.walt.oid4vc.errors.*
@@ -66,19 +67,57 @@ object OidcApi : CIProvider() {
             post("/par") {
                 val authReq = AuthorizationRequest.fromHttpParameters(call.receiveParameters().toMap())
                 try {
-                    val session = initializeAuthorization(authReq, 5.minutes)
+                    val session = initializeAuthorization(authReq, 5.minutes, null)
                     call.respond(getPushedAuthorizationSuccessResponse(session).toJSON())
                 } catch (exc: AuthorizationError) {
                     logger.error(exc) { "Authorization error: " }
                     call.respond(HttpStatusCode.BadRequest, exc.toPushedAuthorizationErrorResponse().toJSON())
                 }
             }
+
+            get("/jwks") {
+                var jwks = buildJsonObject{}
+                OidcApi.sessionCredentialPreMapping.forEach {
+                    it.value.forEach {
+                        jwks = buildJsonObject {
+                            put("keys", buildJsonArray {
+                                val jwkWithKid = buildJsonObject {
+                                    it.issuerKey.getPublicKey().exportJWKObject().forEach {
+                                        put(it.key, it.value)
+                                    }
+                                    if (it.issuerDid.startsWith("did:key") && it.issuerDid.length == 186) // Edge case when issuer uses did:key with ebsi encoding (jwk_jcs-pub (0xeb51)
+                                        put("kid", it.issuerDid.removePrefix("did:key:"))
+                                    else
+                                        put("kid", it.issuerKey.getPublicKey().getKeyId())
+                                }
+                                add(jwkWithKid)
+                                jwks.forEach {
+                                    it.value.jsonArray.forEach{
+                                        add(it)
+                                    }
+                                }
+                            })
+                        }
+                    }
+                }
+                call.respond(HttpStatusCode.OK, jwks)
+            }
+
             get("/authorize") {
                 val authReq = runBlocking { AuthorizationRequest.fromHttpParametersAuto(call.parameters.toMap()) }
                 try {
-                    val authResp = if (authReq.responseType == ResponseType.code.name) {
-                        processCodeFlowAuthorization(authReq)
-                    } else if (authReq.responseType.contains(ResponseType.token.name)) {
+                    val authResp = if (authReq.responseType.contains(ResponseType.Code)) {
+                        println("authresp is: $authReq")
+                        if (authReq.clientId.startsWith("did:key") && authReq.clientId.length==186) {  // EBSI conformance latest change at 27/3/2024 now supports both jwt_vc and jwt_vc_json
+                            val idTokenRequestKid = OidcApi.sessionCredentialPreMapping[authReq.issuerState]?.first()?.issuerDid!!.removePrefix("did:key:")
+                            val privKeyJwk= OidcApi.sessionCredentialPreMapping[authReq.issuerState]?.first()?.issuerKey!!.exportJWK()
+                            println("PrivateKey is: $privKeyJwk")
+                            println("KID is: $idTokenRequestKid")
+                            processCodeFlowAuthorizationWithIdTokenRequest(authReq, idTokenRequestKid, privKeyJwk)
+                        } else {
+                            processCodeFlowAuthorization(authReq)
+                        }
+                    } else if (authReq.responseType.contains(ResponseType.Token)) {
                         processImplicitFlowAuthorization(authReq)
                     } else {
                         throw AuthorizationError(
@@ -96,10 +135,13 @@ object OidcApi : CIProvider() {
                         AuthorizationErrorCode.invalid_request,
                         "No redirect_uri found for this authorization request"
                     )
+
+                    println("Redirect Uri is: $redirectUri")
+
                     call.response.apply {
                         status(HttpStatusCode.Found)
                         val defaultResponseMode =
-                            if (authReq.responseType == ResponseType.code.name) ResponseMode.query else ResponseMode.fragment
+                            if (authReq.responseType.contains(ResponseType.Code)) ResponseMode.Query else ResponseMode.Fragment
                         header(
                             HttpHeaders.Location,
                             authResp.toRedirectUri(redirectUri, authReq.responseMode ?: defaultResponseMode)
@@ -119,6 +161,50 @@ object OidcApi : CIProvider() {
                     }
                 }
             }
+            post("/direct_post") {
+                val params = call.receiveParameters().toMap()
+
+                println("/direct_post params: $params")
+
+                if (params["state"]?.get(0) == null || (params["id_token"]?.get(0) == null && params["vp_token"]?.get(0) == null)) {
+                    call.respond(HttpStatusCode.BadRequest, "missing state/id_token/vp_token parameter")
+                    throw IllegalArgumentException("missing missing state/id_token/vp_token  parameter")
+                }
+
+                println("/direct_post values from params: ${params.values}")
+                println("/direct_post state from param: ${params["state"]}")
+                println("/direct_post token from param: ${params["id_token"]}")
+
+                try {
+                    if (params["id_token"]?.get(0) != null) {
+                        val state = params["state"]?.get(0)!!
+                        val idToken = params["id_token"]?.get(0)!!
+
+                        // Verify and Parse ID Token
+                        val payload = verifyAndParseIdToken(idToken)
+
+                        // Process response
+                        val resp = processDirectPost(state, payload!!)
+
+                        // Get the redirect_uri from the Authorization Request Parameter
+                        println("direct_post redirectUri is:" + resp.toRedirectUri("openid://redirect", ResponseMode.Query))
+
+                        call.response.apply {
+                            status(HttpStatusCode.Found)
+                            header(HttpHeaders.Location, resp.toRedirectUri("openid://redirect", ResponseMode.Query))
+                        }
+
+                    } else {
+                        // else it is a vp_token
+                        call.respond(HttpStatusCode.BadRequest, "vp_token not implemented")
+                    }
+
+                } catch (exc: TokenError) {
+                    logger.error(exc) { "Token error: " }
+                    call.respond(HttpStatusCode.BadRequest, exc.toAuthorizationErrorResponse().toJSON())
+                }
+            }
+
             post("/token") {
                 val params = call.receiveParameters().toMap()
 

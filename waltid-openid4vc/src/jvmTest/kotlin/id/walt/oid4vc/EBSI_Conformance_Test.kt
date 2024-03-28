@@ -11,7 +11,6 @@ import io.kotest.data.row
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import io.ktor.client.*
-import io.ktor.client.engine.java.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
@@ -30,7 +29,7 @@ class EBSI_Conformance_Test : StringSpec({
     lateinit var credentialWallet: EBSITestWallet
     lateinit var ebsiClientConfig: OpenIDClientConfig
 
-    val ktorClient = HttpClient(Java) {
+    val ktorClient = HttpClient() {
         install(ContentNegotiation) {
             json()
         }

@@ -1,0 +1,53 @@
+title OID4VP
+
+participant "Service provider" as SP
+participant "waltid-openid4vc" as WID
+participant "User wallet" as UW
+SP-#red>WID: Generate presentation request (authorization request)
+activate WID #red
+WID--#red>SP: Presentation request object
+deactivate WID
+SP-#red>WID: Generate authorization URL for presentation req.
+activate WID #red
+WID--#red>SP: Authorization URL
+deactivate WID
+alt Cross-device
+SP->SP: Display presentation authorization URL as QR code
+UW->UW: scan QR code
+else Same-device
+SP->UW: Call authorization URL on wallet
+end
+UW-#red>WID: Parse presentation request from authoriztion req.
+activate WID #red
+WID--#red>UW: Presentation request object
+deactivate WID
+UW-#red>WID: Determine flow: \n* Implicit/Code flow \n* Same/Cross-device flow
+activate WID #red
+WID--#red>UW: Flow details
+deactivate WID
+alt Code flow
+UW-->SP: Authorization code
+SP->UW: Call token endpoint using authorization code
+end
+UW-#red>WID: Extract presentation definition (by value or ref.)
+activate WID #red
+WID--#red>UW: Presentation definition with required credentials
+deactivate WID
+UW->UW: Generate and sign verifiable presentation with required credentials
+UW-#red>WID: Create token response with previously created VP
+activate WID #red
+WID--#red>UW: Token response
+deactivate WID
+alt Code flow
+UW-->SP: Reply to **token request** with generated vp_token
+else Same-device implicit flow
+UW-->SP: Reply to **authorization request** with generated vp_token
+else cross-device flow
+UW->SP: **Post** token response to **response_uri/redirect_uri** of Service provicer
+end
+SP-#red>WID: Parse token response
+activate WID #red
+WID--#red>SP: Token response object
+deactivate WID
+SP->SP: Validate token response
+SP-->UW: Reply to token response
