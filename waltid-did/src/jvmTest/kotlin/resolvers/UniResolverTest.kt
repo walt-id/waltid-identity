@@ -24,10 +24,9 @@ class UniResolverTest {
         did: String, document: String
     ) = runTest {
         println("Resolving: $did")
-        val result = sut.resolve(did)
+        val result = sut.resolve(did).getOrThrow()
 
-        check(result.isSuccess) { "Non successful: ${result.exceptionOrNull()}" }
-        check(document == result.getOrNull()?.toString()) { "Non equal: $document" }
+        check(document == result.toString()) { "Non equal: $document" }
     }
 
     @ParameterizedTest
@@ -56,14 +55,15 @@ class UniResolverTest {
                         Companion::class.java.classLoader.getResource("uniresolver/base58/document.json")!!.toString()
                     ).path.let { File(it).readText() }
                         .replace("[\\s\\n\\r]".toRegex(), "")),
-                arguments(
+                // FIXME: Enable CHEQD tests again (web service is currently down)
+                /*arguments(
                     "did:cheqd:testnet:55dbc8bf-fba3-4117-855c-1e0dc1d3bb47",
                     URI(
                         Companion::class.java.classLoader.getResource("uniresolver/multibase/document.json")!!
                             .toString()
                     ).path.let { File(it).readText() }
                         .replace("[\\s\\n\\r]".toRegex(), ""),
-                ),
+                ),*/
                 arguments(
                     "did:io:0x476c81C27036D05cB5ebfe30ae58C23351a61C4A",
                     URI(
@@ -91,14 +91,15 @@ class UniResolverTest {
                     ).path.let { File(it).readText() }
                         .replace("[\\s\\n\\r]".toRegex(), ""),
                 ),
-                arguments(
+                // FIXME: Enable CHEQD tests again (web service is currently down)
+                /*arguments(
                     "did:cheqd:testnet:55dbc8bf-fba3-4117-855c-1e0dc1d3bb47",
                     URI(
                         Companion::class.java.classLoader.getResource("uniresolver/multibase/publicKeyJwk.json")!!
                             .toString()
                     ).path.let { File(it).readText() }
                         .replace("[\\s\\n\\r]".toRegex(), ""),
-                ),
+                ),*/
                 arguments(
                     "did:io:0x476c81C27036D05cB5ebfe30ae58C23351a61C4A",
                     URI(

@@ -1,6 +1,7 @@
 package id.walt.webwallet.service
 
 import id.walt.webwallet.config.ConfigManager
+import id.walt.webwallet.config.OidcConfiguration
 import id.walt.webwallet.config.TrustConfig
 import id.walt.webwallet.db.models.AccountWalletMappings
 import id.walt.webwallet.db.models.AccountWalletPermissions
@@ -19,6 +20,7 @@ import id.walt.webwallet.service.settings.SettingsService
 import id.walt.webwallet.service.trust.DefaultTrustValidationService
 import id.walt.webwallet.usecase.claim.ExplicitClaimStrategy
 import id.walt.webwallet.usecase.claim.SilentClaimStrategy
+import id.walt.webwallet.usecase.event.EventFilterUseCase
 import id.walt.webwallet.usecase.event.EventUseCase
 import id.walt.webwallet.usecase.issuer.IssuerUseCaseImpl
 import id.walt.webwallet.utils.WalletHttpClients.getHttpClient
@@ -39,7 +41,10 @@ object WalletServiceManager {
     private val trustConfig by lazy { ConfigManager.getConfig<TrustConfig>() }
     private val credentialService = CredentialsService()
     private val credentialTypeSeeker = DefaultCredentialTypeSeeker()
-    private val eventUseCase = EventUseCase(EventService())
+    private val eventService = EventService()
+    val eventUseCase = EventUseCase(eventService)
+    val eventFilterUseCase = EventFilterUseCase(eventService)
+    val oidcConfig by lazy { ConfigManager.getConfig<OidcConfiguration>() }
     val issuerUseCase = IssuerUseCaseImpl(service = IssuersService, http = httpClient)
     val issuerTrustValidationService = DefaultTrustValidationService(httpClient, trustConfig.issuersRecord)
     val verifierTrustValidationService = DefaultTrustValidationService(httpClient, trustConfig.verifiersRecord)
@@ -75,7 +80,7 @@ object WalletServiceManager {
         }
 
     fun createWallet(tenant: String, forAccount: UUID): UUID {
-        val accountName = AccountsService.getNameFor(forAccount)
+        val accountName = AccountsService.get(forAccount).email
 
         // TODO: remove testing code / lock behind dev-mode
         if (accountName?.contains("multi-wallet") == true) {

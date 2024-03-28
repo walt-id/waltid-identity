@@ -41,6 +41,7 @@ object KeyManager {
 
     suspend fun createKey(generationRequest: KeyGenerationRequest): Key {
         val function = keyTypeGeneration[generationRequest.backend] ?: error("No such key backend registered: ${generationRequest.backend}")
+        log.debug { "Creating key with generation request: $generationRequest" }
 
         return function.invoke(generationRequest)
     }

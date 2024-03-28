@@ -51,7 +51,7 @@ data class KeycloakLogoutRequest(val keycloakUserId: String? = null, val token: 
 data class OidcUniqueSubjectRequest(override val name: String? = null, val token: String) :
     AccountRequest()
 
-val module = SerializersModule {
+val accountRequestSerializer = SerializersModule {
     polymorphic(AccountRequest::class) {
         EmailAccountRequest::class
         AddressAccountRequest::class
@@ -60,7 +60,7 @@ val module = SerializersModule {
     }
 }
 
-val LoginRequestJson = Json {
-    serializersModule = module
+val loginRequestJson = Json {
+    serializersModule = accountRequestSerializer
     ignoreUnknownKeys = true
 }

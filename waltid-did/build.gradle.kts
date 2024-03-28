@@ -85,6 +85,9 @@ kotlin {
                 // Date
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.5.0")
 
+                // UUID
+                implementation("app.softwork:kotlinx-uuid-core:0.0.25")
+
                 // Crypto
                 api(project(":waltid-crypto"))
 
