@@ -7,5 +7,5 @@ import kotlin.js.JsExport
 @JsExport
 class DidSovCreateOptions(network: String) : DidCreateOptions(
     method = "sov",
-    options = options("network" to network)
+    config = config("network" to network)
 )
