@@ -101,9 +101,10 @@ jobs:
       - name: Prepare CD - wallet.walt-test.cloud
         env:
           DEV_KEYCLOAK_CLIENT_SECRET: ${{ secrets.DEV_KEYCLOAK_CLIENT_SECRET }}
-          DEV_OCI_PRIVATE_KEY_PEM: ${{ secrets.DEV_OCI_PRIVATE_KEY_PEM }}
-        run: |
-          sed -e "s/_DEFAULT_DEPLOYMENT_/$GITHUB_SHA/g" -e "s/__DEFAULT_KEYCLOAK_CLIENT_SECRET__/$DEV_KEYCLOAK_CLIENT_SECRET/g" -e "s/__PRIVATE_KEY_PEM__/${DEV_OCI_PRIVATE_KEY_PEM}/g" waltid-wallet-api/k8s/deployment-dev.yaml > waltid-wallet-api/k8s/deployment_mod.yaml
+
+        run: sed "s/_DEFAULT_DEPLOYMENT_/$GITHUB_SHA/g" waltid-wallet-api/k8s/deployment-dev.yaml |
+          sed "s/__DEFAULT_KEYCLOAK_CLIENT_SECRET__/$DEV_KEYCLOAK_CLIENT_SECRET/g" > waltid-wallet-api/k8s/deployment_mod.yaml
+
       - name: Continuous deployment - wallet.walt-test.cloud
         uses: actions-hub/kubectl@master
         env:

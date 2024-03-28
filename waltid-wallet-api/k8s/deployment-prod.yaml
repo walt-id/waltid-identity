@@ -54,21 +54,6 @@ data:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: wallet-oci-key-config
-data:
-  oci.conf: |
-    tenancyOcid = "ocid1.tenancy.oc1..aaaaaaaaiijfupfvsqwqwgupzdy5yclfzcccmie4ktp2wlgslftv5j7xpk6q"
-    userOcid = "ocid1.user.oc1..aaaaaaaaxjkkfjqxdqk7ldfjrxjmacmbi7sci73rbfiwpioehikavpbtqx5q"
-    fingerprint = "bb:d4:4b:0c:c8:3a:49:15:7f:87:55:d5:2b:7e:dd:bc"
-    managementEndpoint = "entaftlvaaemy-management.kms.eu-frankfurt-1.oraclecloud.com"
-    keyId = "ocid1.tenancy.oc1..aaaaaaaaiijfupfvsqwqwgupzdy5yclfzcccmie4ktp2wlgslftv5j7xpk6q/ocid1.user.oc1..aaaaaaaaxjkkfjqxdqk7ldfjrxjmacmbi7sci73rbfiwpioehikavpbtqx5q/bb:d4:4b:0c:c8:3a:49:15:7f:87:55:d5:2b:7e:dd:bc"
-    cryptoEndpoint = "entaftlvaaemy-crypto.kms.eu-frankfurt-1.oraclecloud.com"
-    signingKeyPem = "__PRIVATE_KEY_PEM__"
-
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
   name: wallet-wallet-config
 data:
   wallet.conf: |
@@ -235,10 +220,6 @@ spec:
               mountPath: "/waltid-wallet-api/config/oidc.conf"
               subPath: "oidc.conf"
               readOnly: true
-            - name: wallet-oci-key-config
-              mountPath: "/waltid-wallet-api/config/oci.conf"
-              subPath: "oci.conf"
-              readOnly: true
             - name: wallet-marketplace-config
               mountPath: "/waltid-wallet-api/config/marketplace.conf"
               subPath: "marketplace.conf"
@@ -267,6 +248,10 @@ spec:
               mountPath: "/waltid-wallet-api/config/auth.conf"
               subPath: "auth.conf"
               readOnly: true
+            - name: wallet-oci-secret
+              mountPath: "/waltid-wallet-api/config/oci.conf"
+              subPath: "oci.conf"
+              readOnly: true
             - name: wallet-nft-config
               mountPath: "/waltid-wallet-api/walt.yaml"
               subPath: "walt.yaml"
@@ -292,9 +277,7 @@ spec:
         - name: wallet-oidc-config
           configMap:
             name: wallet-oidc-config
-        - name: wallet-oci-key-config
-          configMap:
-            name: wallet-oci-key-config
+
         - name: wallet-marketplace-config
           configMap:
             name: wallet-marketplace-config
@@ -313,6 +296,9 @@ spec:
         - name: wallet-auth-secret
           secret:
             secretName: wallet-auth-secret
+        - name: wallet-oci-secret
+          secret:
+            secretName: wallet-oci-secret
         - name: wallet-push-config
           secret:
             secretName: wallet-push-config-secret
