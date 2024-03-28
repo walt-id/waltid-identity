@@ -21,7 +21,7 @@ repositories {
     mavenLocal()
     mavenCentral()
     maven("https://jitpack.io")
-    maven("https://maven.walt.id/repository/waltid/")
+    maven("https://maven.waltid.dev/releases")
     maven("https://maven.walt.id/repository/waltid-ssi-kit/")
 }
 

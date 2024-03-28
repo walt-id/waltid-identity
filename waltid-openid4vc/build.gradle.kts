@@ -19,7 +19,7 @@ repositories {
         }
     }*/
     maven("https://repo.danubetech.com/repository/maven-public/")
-    maven("https://maven.walt.id/repository/waltid/") {
+    maven("https://maven.waltid.dev/releases") {
         content {
             includeGroup("id.walt")
             includeGroup("id.walt.servicematrix")
@@ -177,7 +177,7 @@ kotlin {
             val hasMavenAuth = secretMavenUsername.isNotEmpty() && secretMavenPassword.isNotEmpty()
             if (hasMavenAuth) {
                 maven {
-                    url = uri("https://maven.walt.id/repository/waltid/")
+                    url = uri("https://maven.waltid.dev/releases")
                     credentials {
                         username = secretMavenUsername
                         password = secretMavenPassword
