@@ -5,11 +5,10 @@ import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
 import com.auth0.jwt.interfaces.DecodedJWT
 import id.walt.crypto.utils.JsonUtils.toJsonObject
-import id.walt.webwallet.config.ConfigManager
-import id.walt.webwallet.config.OidcConfiguration
 import id.walt.webwallet.db.models.Accounts
 import id.walt.webwallet.db.models.OidcLogins
 import id.walt.webwallet.service.OidcLoginService
+import id.walt.webwallet.service.WalletServiceManager.oidcConfig
 import id.walt.webwallet.web.controllers.ByteLoginRequest
 import id.walt.webwallet.web.model.KeycloakAccountRequest
 import id.walt.webwallet.web.model.KeycloakLogoutRequest
@@ -44,8 +43,6 @@ object KeycloakAccountStrategy : PasswordAccountStrategy<KeycloakAccountRequest>
         }
     }
 
-    val config = ConfigManager.getConfig<OidcConfiguration>()
-
     override suspend fun register(
         tenant: String,
         request: KeycloakAccountRequest
@@ -66,7 +63,7 @@ object KeycloakAccountStrategy : PasswordAccountStrategy<KeycloakAccountRequest>
                 .toJsonObject()
 
         val res =
-            http.post(config.keycloakUserApi) {
+            http.post(oidcConfig.keycloakUserApi) {
                 contentType(ContentType.Application.Json)
                 headers {
                     append("Content-Type", "application/json")
@@ -82,7 +79,7 @@ object KeycloakAccountStrategy : PasswordAccountStrategy<KeycloakAccountRequest>
         }
 
         val oidcAccountId = res.headers["Location"]?.split("/")?.last() ?: throw RuntimeException(
-            "Missing header-parameter 'Location' when creating user ${request.username} at the Keycloak user API ${config.keycloakUserApi}"
+            "Missing header-parameter 'Location' when creating user ${request.username} at the Keycloak user API ${oidcConfig.keycloakUserApi}"
         )
 
         val hash = request.password?.let {
@@ -187,8 +184,8 @@ object KeycloakAccountStrategy : PasswordAccountStrategy<KeycloakAccountRequest>
     private suspend fun getTokenExchange(request: KeycloakAccountRequest): String {
         val requestParams =
             mapOf(
-                "client_id" to config.clientId,
-                "client_secret" to config.clientSecret,
+                "client_id" to oidcConfig.clientId,
+                "client_secret" to oidcConfig.clientSecret,
                 "grant_type" to "urn:ietf:params:oauth:grant-type:token-exchange",
                 "subject_token" to request.token,
                 "subject_token_type" to "urn:ietf:params:oauth:token-type:access_token",
@@ -197,7 +194,7 @@ object KeycloakAccountStrategy : PasswordAccountStrategy<KeycloakAccountRequest>
 
         val requestBody = requestParams.map { (k, v) -> "$k=$v" }.joinToString("&")
         val res =
-            http.post(config.accessTokenUrl) {
+            http.post(oidcConfig.accessTokenUrl) {
                 headers { append("Content-Type", "application/x-www-form-urlencoded") }
                 setBody(requestBody)
             }
@@ -221,8 +218,8 @@ object KeycloakAccountStrategy : PasswordAccountStrategy<KeycloakAccountRequest>
     ): String {
         val requestParams =
             mutableMapOf(
-                "client_id" to config.clientId,
-                "client_secret" to config.clientSecret,
+                "client_id" to oidcConfig.clientId,
+                "client_secret" to oidcConfig.clientSecret,
                 "grant_type" to grantType
             )
 
@@ -236,7 +233,7 @@ object KeycloakAccountStrategy : PasswordAccountStrategy<KeycloakAccountRequest>
 
         val requestBody = requestParams.map { (k, v) -> "$k=$v" }.joinToString("&")
         val res =
-            http.post(config.accessTokenUrl) {
+            http.post(oidcConfig.accessTokenUrl) {
                 headers { append("Content-Type", "application/x-www-form-urlencoded") }
                 setBody(requestBody)
             }
@@ -260,7 +257,7 @@ object KeycloakAccountStrategy : PasswordAccountStrategy<KeycloakAccountRequest>
         val requestBody = requestParams.map { (k, v) -> "$k=$v" }.joinToString("&")
 
         val res =
-            http.post(config.keycloakUserApi + "/" + request.keycloakUserId + "/logout") {
+            http.post(oidcConfig.keycloakUserApi + "/" + request.keycloakUserId + "/logout") {
                 contentType(ContentType.Application.Json)
                 headers {
                     append("Content-Type", "application/json")

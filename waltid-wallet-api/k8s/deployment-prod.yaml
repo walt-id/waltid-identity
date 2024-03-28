@@ -60,10 +60,10 @@ data:
     tenancyOcid = "ocid1.tenancy.oc1..aaaaaaaaiijfupfvsqwqwgupzdy5yclfzcccmie4ktp2wlgslftv5j7xpk6q"
     userOcid = "ocid1.user.oc1..aaaaaaaaxjkkfjqxdqk7ldfjrxjmacmbi7sci73rbfiwpioehikavpbtqx5q"
     fingerprint = "bb:d4:4b:0c:c8:3a:49:15:7f:87:55:d5:2b:7e:dd:bc"
-    managementEndpoint = "ens6bc6aaafs6-management.kms.eu-frankfurt-1.oraclecloud.com"
+    managementEndpoint = "entaftlvaaemy-management.kms.eu-frankfurt-1.oraclecloud.com"
     keyId = "ocid1.tenancy.oc1..aaaaaaaaiijfupfvsqwqwgupzdy5yclfzcccmie4ktp2wlgslftv5j7xpk6q/ocid1.user.oc1..aaaaaaaaxjkkfjqxdqk7ldfjrxjmacmbi7sci73rbfiwpioehikavpbtqx5q/bb:d4:4b:0c:c8:3a:49:15:7f:87:55:d5:2b:7e:dd:bc"
-    cryptoEndpoint = "ens6bc6aaafs6-crypto.kms.eu-frankfurt-1.oraclecloud.com"
-    signingKeyPem = "private_key_pem"
+    cryptoEndpoint = "entaftlvaaemy-crypto.kms.eu-frankfurt-1.oraclecloud.com"
+    signingKeyPem = "__PRIVATE_KEY_PEM__"
 
 ---
 apiVersion: v1

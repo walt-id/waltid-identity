@@ -9,12 +9,12 @@ import com.nimbusds.jose.crypto.MACVerifier
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.webwallet.config.AuthConfig
 import id.walt.webwallet.config.ConfigManager
-import id.walt.webwallet.config.OidcConfiguration
 import id.walt.webwallet.config.WebConfig
 import id.walt.webwallet.db.models.AccountWalletMappings
 import id.walt.webwallet.db.models.AccountWalletPermissions
 import id.walt.webwallet.service.OidcLoginService
 import id.walt.webwallet.service.WalletServiceManager
+import id.walt.webwallet.service.WalletServiceManager.oidcConfig
 import id.walt.webwallet.service.account.AccountsService
 import id.walt.webwallet.service.account.KeycloakAccountStrategy
 import id.walt.webwallet.web.ForbiddenException
@@ -71,7 +71,6 @@ object AuthKeys {
 
 fun Application.configureSecurity() {
     val webConfig = ConfigManager.getConfig<WebConfig>()
-    val oidcConfig = ConfigManager.getConfig<OidcConfiguration>()
     install(Sessions) {
         cookie<LoginTokenSession>("login") {
             // cookie.encoding = CookieEncoding.BASE64_ENCODING
@@ -309,7 +308,6 @@ fun Application.auth() {
             }
 
             get("logout-oidc", { description = "Logout via OIDC provider" }) {
-                val oidcConfig = ConfigManager.getConfig<OidcConfiguration>()
                 val webConfig = ConfigManager.getConfig<WebConfig>()
                 call.respondRedirect(
                     "${oidcConfig.logoutUrl}?post_logout_redirect_uri=${webConfig.publicBaseUrl}&client_id=${oidcConfig.clientId}"
