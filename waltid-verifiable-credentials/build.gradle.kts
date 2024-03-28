@@ -51,6 +51,7 @@ kotlin {
         }
     }
     js(IR) {
+        moduleName = "verifiable-credentials"
         /*browser {
             commonWebpackConfig {
                 cssSupport {
