@@ -93,6 +93,23 @@ fun Application.exchange() = walletRoute {
 
             context.respond(matchedCredentials)
         }
+        post("unmatchedCredentialsForPresentationDefinition", {
+            summary =
+                "Returns the credentials that are required by the presentation definition but not found in the wallet"
+
+            request {
+                body<PresentationDefinition> { description = "Presentation definition" }
+            }
+            response {
+                HttpStatusCode.OK to {
+                    body<List<String>> {
+                        description = "Credentials types that are missing to fulfill the presentation definition"
+                    }
+                }
+            }
+        }) {
+            TODO()
+        }
 
         post("usePresentationRequest", {
             summary = "Present credential(s) to a Relying Party"
