@@ -16,7 +16,7 @@ data class RegistrationDefaultsConfig(
     val keyGenerationRequest = Json.decodeFromJsonElement<KeyGenerationRequest>(defaultKeyConfig)
 
     val didMethod = defaultDidConfig["method"]!!.jsonPrimitive.content
-    val didConfig = defaultDidConfig["config"]?.jsonObject?.mapValues { it.value.jsonPrimitive } ?: emptyMap()
+    val didConfig: Map<String, JsonPrimitive> = defaultDidConfig["config"]?.jsonObject?.mapValues { it.value.jsonPrimitive } ?: emptyMap()
 
 
 

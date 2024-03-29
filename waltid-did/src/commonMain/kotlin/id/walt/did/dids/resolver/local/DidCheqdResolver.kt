@@ -4,6 +4,7 @@ import id.walt.crypto.keys.Key
 import id.walt.did.dids.document.DidCheqdDocument
 import id.walt.did.dids.document.DidDocument
 import io.ktor.client.*
+import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import kotlinx.serialization.json.Json
@@ -47,8 +48,10 @@ class DidCheqdResolver : LocalResolverMethod("cheqd") {
                 headers {
                     append("contentType", "application/did+ld+json")
                 }
-            }.bodyAsText()
-        val resolution = Json.decodeFromString<JsonObject>(response)
+            }
+        val responseText = response.bodyAsText()
+
+        val resolution = runCatching { Json.parseToJsonElement(responseText) }.getOrElse { throw RuntimeException("Illegal non-JSON response (${response.status}), body: >>$responseText<< (end of body), error: >>${it.stackTraceToString()}<<") }
 
         val didDocument = resolution.jsonObject["didResolutionMetadata"]?.jsonObject?.get("error")?.let {
             throw IllegalArgumentException("Could not resolve did:cheqd, resolver responded: ${it.jsonPrimitive.content}")
