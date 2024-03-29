@@ -1,0 +1,35 @@
+{
+  "input_descriptors":
+  [
+    {
+      "id": "VerifiableCredential#1",
+      "format":
+      {
+        "jwt_vc_json":
+        {
+          "alg":
+          [
+            "EdDSA"
+          ]
+        }
+      },
+      "constraints":
+      {
+        "fields":
+        [
+          {
+            "path":
+            [
+              "$.type"
+            ],
+            "filter":
+            {
+              "type": "string",
+              "pattern": "VerifiableCredential#1"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}
