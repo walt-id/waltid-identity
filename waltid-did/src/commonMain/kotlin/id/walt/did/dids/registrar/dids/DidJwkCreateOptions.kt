@@ -8,5 +8,5 @@ import kotlin.js.JsExport
 @JsExport
 class DidJwkCreateOptions(keyType: KeyType = KeyType.Ed25519) : DidCreateOptions(
     method = "jwk",
-    options = options("keyType" to keyType.name.lowercase())
+    config = config("keyType" to keyType.name.lowercase())
 )

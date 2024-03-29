@@ -27,17 +27,19 @@ class DidWebRegistrar : LocalRegistrarMethod("web") {
     @JsExport.Ignore
     override suspend fun register(options: DidCreateOptions): DidResult = options.get<KeyType>("keyType")?.let {
         registerByKey(JWKKey.generate(it), options)
-    } ?: throw IllegalArgumentException("keyType option not found.")
+    } ?: throw IllegalArgumentException("Option \"keyType\" not found.")
 
     @JvmBlocking
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    override suspend fun registerByKey(key: Key, options: DidCreateOptions): DidResult =
-        options.get<String>("domain")?.takeIf { it.isNotEmpty() }?.let {
+    override suspend fun registerByKey(key: Key, options: DidCreateOptions): DidResult {
+        println("Domain: " + options.get<String>("domain"))
+        return options.get<String>("domain")?.takeIf { it.isNotEmpty() }?.let {
             val domain = UrlEncoderUtil.encode(it)
             val path = options.get<String>("path")?.takeIf { it.isNotEmpty() }?.let {
-                it.replace("[random-uuid]", UUID.generateUUID().toString()).ensurePrefix("/").split("/").joinToString(":") { part -> UrlEncoderUtil.encode(part) }
+                it.replace("[random-uuid]", UUID.generateUUID().toString()).ensurePrefix("/").split("/")
+                    .joinToString(":") { part -> UrlEncoderUtil.encode(part) }
             } ?: ""
             DidResult(
                 "did:web:$domain$path", DidDocument(
@@ -46,5 +48,6 @@ class DidWebRegistrar : LocalRegistrarMethod("web") {
                     ).toMap()
                 )
             )
-        } ?: throw IllegalArgumentException("Domain option not found.")
+        } ?: throw IllegalArgumentException("Option \"domain\" not found.")
+    }
 }

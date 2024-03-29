@@ -8,5 +8,5 @@ import kotlin.js.JsExport
 @JsExport
 class DidWebCreateOptions(domain: String, path: String = "", keyType: KeyType = KeyType.Ed25519) : DidCreateOptions(
     method = "web",
-    options = options("domain" to domain, "path" to path, "keyType" to keyType)
+    config = config("domain" to domain, "path" to path, "keyType" to keyType)
 )

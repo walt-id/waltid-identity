@@ -3,6 +3,7 @@ package id.walt.webwallet.db.models
 import kotlinx.datetime.Instant
 import kotlinx.datetime.toKotlinInstant
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 import kotlinx.uuid.UUID
 import kotlinx.uuid.exposed.kotlinxUUID
 import org.jetbrains.exposed.sql.ResultRow
@@ -40,6 +41,7 @@ data class Account(
     val id: UUID,
     val name: String? = null,
     val email: String? = null,
+    @Transient
     val updatePasswordTo: String? = null,
     //val loginWeb3Wallet: UUID? = null,
     val createdOn: Instant

@@ -8,5 +8,5 @@ import kotlin.js.JsExport
 @JsExport
 class DidV1CreateOptions(ledger: String = "test", keyType: KeyType) : DidCreateOptions(
     method = "v1",
-    options = options("ledger" to ledger, "keytype" to keyType.name.lowercase())
+    config = config("ledger" to ledger, "keytype" to keyType.name.lowercase())
 )
