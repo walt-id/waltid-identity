@@ -3,19 +3,27 @@ package id.walt.webwallet.usecase.exchange
 import TestUtils
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.webwallet.db.models.WalletCredential
+import id.walt.webwallet.usecase.exchange.strategies.FilterPresentationDefinitionMatchStrategy
+import io.mockk.every
+import io.mockk.mockk
 import kotlinx.datetime.Clock
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.uuid.UUID
+import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
 
 class FilterPresentationDefinitionMatchStrategyTest {
 
-    private val sut = FilterPresentationDefinitionMatchStrategy()
-    private val presentationDefinition = TestUtils.loadResource("presentation-definition.json")
+    private val filterParserMock = mockk<PresentationDefinitionFilterParser>()
+    private val sut = FilterPresentationDefinitionMatchStrategy(filterParserMock)
+    private val presentationDefinition =
+        PresentationDefinition.fromJSON(Json.decodeFromString(TestUtils.loadResource("presentation-definition/definition.json")))
+    private val filters =
+        Json.decodeFromString<List<List<TypeFilter>>>(TestUtils.loadResource("presentation-definition/filters.json"))
     private val credentials = listOf(
         WalletCredential(
             wallet = UUID(),
@@ -46,10 +54,14 @@ class FilterPresentationDefinitionMatchStrategyTest {
         ),
     )
 
+    @BeforeTest
+    fun setup() {
+        every { filterParserMock.parse(any()) } returns filters
+    }
+
     @Test
     fun `match array type`() {
-        val pd = PresentationDefinition.fromJSON(Json.decodeFromString(presentationDefinition))
-        val result = sut.match(listOf(credentials[0]), pd)
+        val result = sut.match(listOf(credentials[0]), presentationDefinition)
         assertEquals(expected = 1, actual = result.size)
         assertEquals(
             expected = "VerifiableCredential#1",
@@ -59,8 +71,7 @@ class FilterPresentationDefinitionMatchStrategyTest {
 
     @Test
     fun `match primitive type`() {
-        val pd = PresentationDefinition.fromJSON(Json.decodeFromString(presentationDefinition))
-        val result = sut.match(listOf(credentials[1]), pd)
+        val result = sut.match(listOf(credentials[1]), presentationDefinition)
         assertEquals(expected = 1, actual = result.size)
         assertEquals(
             expected = "VerifiableCredential#1", actual = result[0].parsedDocument!!["type"]!!.jsonPrimitive.content

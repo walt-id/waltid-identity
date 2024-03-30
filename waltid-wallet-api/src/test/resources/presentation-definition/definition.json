@@ -30,6 +30,36 @@
           }
         ]
       }
+    },
+    {
+      "id": "VerifiableCredential#2",
+      "format":
+      {
+        "jwt_vc_json":
+        {
+          "alg":
+          [
+            "EdDSA"
+          ]
+        }
+      },
+      "constraints":
+      {
+        "fields":
+        [
+          {
+            "path":
+            [
+              "$.type"
+            ],
+            "filter":
+            {
+              "type": "string",
+              "pattern": "VerifiableCredential#2"
+            }
+          }
+        ]
+      }
     }
   ]
 }
