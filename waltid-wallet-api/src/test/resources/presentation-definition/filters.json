@@ -1,0 +1,9 @@
+[
+    [
+        {
+            "path": "type",
+            "type": "string",
+            "pattern": "VerifiableCredential#1"
+        }
+    ]
+]

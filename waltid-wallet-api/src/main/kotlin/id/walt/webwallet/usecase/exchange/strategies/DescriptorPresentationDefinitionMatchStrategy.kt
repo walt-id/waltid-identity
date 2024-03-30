@@ -1,4 +1,4 @@
-package id.walt.webwallet.usecase.exchange
+package id.walt.webwallet.usecase.exchange.strategies
 
 import id.walt.oid4vc.data.dif.InputDescriptor
 import id.walt.oid4vc.data.dif.PresentationDefinition
@@ -6,7 +6,7 @@ import id.walt.webwallet.db.models.WalletCredential
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
 
-class DescriptorPresentationDefinitionMatchStrategy : PresentationDefinitionMatchStrategy {
+class DescriptorPresentationDefinitionMatchStrategy : PresentationDefinitionMatchStrategy<List<WalletCredential>> {
     override fun match(
         credentials: List<WalletCredential>, presentationDefinition: PresentationDefinition
     ): List<WalletCredential> = match(credentials, presentationDefinition.inputDescriptors)

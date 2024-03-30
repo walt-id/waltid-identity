@@ -1,11 +1,12 @@
 package id.walt.webwallet.usecase.exchange
 
 import id.walt.oid4vc.data.dif.PresentationDefinition
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.jsonPrimitive
 
 class PresentationDefinitionFilterParser {
-    fun parse(presentationDefinition: PresentationDefinition): List<List<TypeFilter>> {
-        val filters = presentationDefinition.inputDescriptors.mapNotNull { inputDescriptor ->
+    fun parse(presentationDefinition: PresentationDefinition): List<List<TypeFilter>> =
+        presentationDefinition.inputDescriptors.mapNotNull { inputDescriptor ->
             inputDescriptor.constraints?.fields?.filter { field -> field.path.any { path -> path.contains("type") } }
                 ?.map {
                     val path = it.path.first().removePrefix("$.")
@@ -18,8 +19,7 @@ class PresentationDefinitionFilterParser {
                     TypeFilter(path, filterType, filterPattern)
                 }?.plus(inputDescriptor.schema?.map { schema -> TypeFilter("type", "string", schema.uri) } ?: listOf())
         }
-        return filters
-    }
 }
 
+@Serializable
 data class TypeFilter(val path: String, val type: String? = null, val pattern: String)

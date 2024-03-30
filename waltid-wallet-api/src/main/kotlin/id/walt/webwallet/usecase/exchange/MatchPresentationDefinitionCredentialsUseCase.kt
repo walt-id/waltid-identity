@@ -4,13 +4,14 @@ import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.service.credentials.CredentialFilterObject
 import id.walt.webwallet.service.credentials.CredentialsService
+import id.walt.webwallet.usecase.exchange.strategies.PresentationDefinitionMatchStrategy
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.json.jsonArray
 import kotlinx.uuid.UUID
 
 class MatchPresentationDefinitionCredentialsUseCase(
     private val credentialService: CredentialsService,
-    private vararg val matchStrategies: PresentationDefinitionMatchStrategy,
+    private vararg val matchStrategies: PresentationDefinitionMatchStrategy<List<WalletCredential>>,
 ) {
     private val logger = KotlinLogging.logger { }
 
