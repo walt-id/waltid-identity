@@ -107,7 +107,11 @@ fun Application.exchange() = walletRoute {
                 }
             }
         }) {
-            TODO()
+            val presentationDefinition = PresentationDefinition.fromJSON(context.receive<JsonObject>())
+            val unmatchedCredentialTypes = WalletServiceManager.unmatchedPresentationDefinitionCredentialsUseCase.find(
+                getWalletId(), presentationDefinition
+            )
+            context.respond(unmatchedCredentialTypes)
         }
 
         post("usePresentationRequest", {

@@ -7,7 +7,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
 
-abstract class FilterBasePresentationDefinitionMatchStrategy<T> : PresentationDefinitionMatchStrategy<T> {
+abstract class BaseFilterPresentationDefinitionMatchStrategy<T> : PresentationDefinitionMatchStrategy<T> {
 
     protected fun isMatching(credential: WalletCredential, fields: List<TypeFilter>) = fields.all { typeFilter ->
         val credField = credential.parsedDocument!![typeFilter.path] ?: return@all false
