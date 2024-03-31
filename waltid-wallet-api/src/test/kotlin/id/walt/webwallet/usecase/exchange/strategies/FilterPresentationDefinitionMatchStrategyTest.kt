@@ -59,7 +59,7 @@ class FilterPresentationDefinitionMatchStrategyTest {
 
     @BeforeTest
     fun setup() {
-        every { filterParserMock.parse(any()) } returns filters
+        every { filterParserMock.parse(any()) } returns listOf(filters[0])
     }
 
     @Test

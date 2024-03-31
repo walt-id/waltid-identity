@@ -5,5 +5,12 @@
             "type": "string",
             "pattern": "VerifiableCredential#1"
         }
+    ],
+    [
+        {
+            "path": "type",
+            "type": "string",
+            "pattern": "VerifiableCredential#2"
+        }
     ]
 ]
