@@ -7,11 +7,11 @@ import id.walt.webwallet.usecase.exchange.TypeFilter
 
 class FilterNoMatchPresentationDefinitionMatchStrategy(
     private val filterParser: PresentationDefinitionFilterParser,
-) : FilterBasePresentationDefinitionMatchStrategy<List<List<TypeFilter>>>() {
+) : BaseFilterPresentationDefinitionMatchStrategy<List<TypeFilter>>() {
 
     override fun match(
         credentials: List<WalletCredential>, presentationDefinition: PresentationDefinition
-    ): List<List<TypeFilter>> = match(credentials, filterParser.parse(presentationDefinition))
+    ): List<TypeFilter> = match(credentials, filterParser.parse(presentationDefinition))
 
     private fun match(
         credentialList: List<WalletCredential>, filters: List<List<TypeFilter>>
@@ -19,5 +19,5 @@ class FilterNoMatchPresentationDefinitionMatchStrategy(
         credentialList.none { credential ->
             isMatching(credential, fields)
         }
-    }
+    }.flatten().distinct()
 }

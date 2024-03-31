@@ -7,7 +7,7 @@ import id.walt.webwallet.usecase.exchange.TypeFilter
 
 class FilterPresentationDefinitionMatchStrategy(
     private val filterParser: PresentationDefinitionFilterParser,
-) : FilterBasePresentationDefinitionMatchStrategy<List<WalletCredential>>() {
+) : BaseFilterPresentationDefinitionMatchStrategy<List<WalletCredential>>() {
 
     override fun match(
         credentials: List<WalletCredential>, presentationDefinition: PresentationDefinition
