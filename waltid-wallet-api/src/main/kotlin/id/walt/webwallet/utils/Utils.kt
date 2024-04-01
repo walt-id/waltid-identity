@@ -4,6 +4,10 @@ import java.io.BufferedReader
 import java.util.*
 import java.util.zip.GZIPInputStream
 
+fun hexToInt(hex: String) = Integer.parseInt(hex.startsWith("0x").takeIf { it }?.let {
+    hex.substring(2)
+} ?: hex)
+
 object Base64Utils {
     fun decode(base64: String): ByteArray = Base64.getDecoder().decode(base64)
 }
