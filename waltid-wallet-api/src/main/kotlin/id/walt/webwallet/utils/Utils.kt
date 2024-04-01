@@ -1,5 +1,6 @@
 package id.walt.webwallet.utils
 
+import java.io.BufferedReader
 import java.util.*
 import java.util.zip.GZIPInputStream
 
@@ -9,21 +10,33 @@ object Base64Utils {
 
 object GzipUtils {
     fun uncompress(data: ByteArray, idx: ULong? = null, bitSize: Int) =
-        GZIPInputStream(data.inputStream()).bufferedReader().use {
+        GZIPInputStream(data.inputStream()).bufferedReader().use { buffer ->
             idx?.let { index ->
-                var int = it.read()
-                var count = 0UL
-                var char = int.toChar()
-                while (int != -1 && count <= index) {
-                    char = int.toChar()
-                    int = it.read()
-                    count += bitSize.toULong()
+                seekStartPosition(index, buffer, bitSize).takeIf { it != -1 }?.let {
+                    extractBitValue(buffer, bitSize)
                 }
-                char
-            }?.let {
-                val array = CharArray(1)
-                array[0] = it
-                array
-            } ?: it.readText().toCharArray()
+            }
         }
+
+    private fun seekStartPosition(index: ULong, it: BufferedReader, bitSize: Int): Int {
+        var int = it.read()
+        var count = 0UL
+        while (int != -1 && count < index) {
+            int = it.read()
+            count += bitSize.toULong()
+        }
+        return int
+    }
+
+    private fun extractBitValue(it: BufferedReader, bitSize: Int): List<Char> {
+        var int = it.read()
+        var count = 0UL
+        val result = mutableListOf<Char>()
+//        while (int != -1 && count++ < bitSize.toULong()) {
+        while (count++ < bitSize.toULong()) {
+            int = it.read()
+            result.add(int.toChar())
+        }
+        return result
+    }
 }
