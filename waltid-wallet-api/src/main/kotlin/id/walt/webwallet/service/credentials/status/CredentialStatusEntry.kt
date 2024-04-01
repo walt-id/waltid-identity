@@ -17,7 +17,7 @@ data class StatusListEntry(
     val id: String,
     override val type: String, //"RevocationList2021Status", "BitstringStatusListEntry", "StatusList2021Entry"
     val statusPurpose: String = "revocation",
-    val statusListIndex: Long,
+    val statusListIndex: ULong,
     val statusListCredential: String,
 ) : CredentialStatusEntry()
 

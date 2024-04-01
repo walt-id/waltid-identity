@@ -29,4 +29,5 @@ class CredentialStatusUseCase(
 data class CredentialStatusResult(
     val type: String,
     val result: Boolean,
+    val message: String? = null,
 )
