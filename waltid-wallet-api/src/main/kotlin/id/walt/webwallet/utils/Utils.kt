@@ -1,8 +1,8 @@
 package id.walt.webwallet.utils
 
 import java.io.BufferedReader
+import java.io.InputStream
 import java.util.*
-import java.util.zip.GZIPInputStream
 
 fun hexToInt(hex: String) = Integer.parseInt(hex.startsWith("0x").takeIf { it }?.let {
     hex.substring(2)
@@ -12,9 +12,9 @@ object Base64Utils {
     fun decode(base64: String): ByteArray = Base64.getDecoder().decode(base64)
 }
 
-object GzipUtils {
-    fun uncompress(data: ByteArray, idx: ULong? = null, bitSize: Int) =
-        GZIPInputStream(data.inputStream()).bufferedReader().use { buffer ->
+object StreamUtils {
+    fun getBitValue(inputStream: InputStream, idx: ULong? = null, bitSize: Int) =
+        inputStream.bufferedReader().use { buffer ->
             idx?.let { index ->
                 seekStartPosition(index, buffer, bitSize).takeIf { it != -1 }?.let {
                     extractBitValue(buffer, bitSize)
@@ -28,6 +28,7 @@ object GzipUtils {
         while (int != -1 && count < index) {
             int = it.read()
             count += bitSize.toULong()
+            println(count)
         }
         return int
     }
