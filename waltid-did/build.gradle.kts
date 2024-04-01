@@ -92,7 +92,7 @@ kotlin {
                 api(project(":waltid-crypto"))
 
                 // Encodings
-                implementation("net.thauvin.erik.urlencoder:urlencoder-lib:1.4.0")
+                implementation("net.thauvin.erik.urlencoder:urlencoder-lib:1.5.0")
 
                 // Logging
                 implementation("io.github.oshai:kotlin-logging:6.0.3")
