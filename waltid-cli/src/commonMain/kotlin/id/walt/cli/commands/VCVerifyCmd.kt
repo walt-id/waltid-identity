@@ -8,7 +8,13 @@ import com.github.ajalt.clikt.parameters.types.choice
 import com.github.ajalt.clikt.parameters.types.file
 import id.walt.cli.util.PrettyPrinter
 import id.walt.cli.util.VCUtil
+import id.walt.credentials.verification.JsonSchemaVerificationException
+import id.walt.credentials.verification.policies.ExpirationDatePolicy
+import id.walt.credentials.verification.policies.NotBeforeDatePolicy
+import id.walt.crypto.utils.JsonUtils.toJsonElement
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import java.io.File
@@ -62,8 +68,13 @@ class VCVerifyCmd : CliktCommand(
         // val key = runBlocking { KeyUtil().getKey(keyFile) }
 
         val jws = vc.readText()
-
-        val results = runBlocking { VCUtil.verify(jws, policies) }
+        val args = emptyMap<String, JsonElement>().toMutableMap()
+        if ("schema" in policies) {
+            val schema =
+                File("/Users/alegomes/coding/waltid-identity/waltid-cli/src/jvmTest/resources/schema/ob_v3p0_achievementcredential_schema.json").readText()
+            args["schema"] = Json.parseToJsonElement(schema).toJsonElement()
+        }
+        val results = runBlocking { VCUtil.verify(jws, policies, args) }
 
         print.box("Verification Result")
         results.forEach {
@@ -80,20 +91,37 @@ class VCVerifyCmd : CliktCommand(
                     // } else if (innerException is IllegalStateException) {
                     //     reason = innerException.message!!
                     // }
-                } else if (!(it.result.getOrThrow() as JsonObject).get("policy_available")!!
-                        .equals(JsonPrimitive(true))
+                } else if (it.result.getOrNull() !is Unit &&
+                    !(it.result.getOrThrow() as JsonObject).get("policy_available")!!.equals(JsonPrimitive(true))
                 ) { // If policy_available == false
-                    details =
-                        " Pero no mucho. Neither 'exp', 'validUntil' nor 'expirationDate' found ¯\\_(ツ)_/¯ Is it a bug?"
+                    when (it.request.policy) {
+                        is ExpirationDatePolicy -> {
+                            details =
+                                " Pero no mucho. Neither 'exp', 'validUntil' nor 'expirationDate' found. Is it a bug? ¯\\_(ツ)_/¯"
+                        }
+
+                        is NotBeforeDatePolicy -> {
+                            details = "Not that much. Neither 'nbf' not 'iat' found. Is it a bug? ¯\\_(ツ)_/¯"
+                        }
+
+                    }
+
 
                 }
                 print.dim("${it.request.policy.name}: ", false)
                 print.green("Success! ", false)
                 print.plain(details)
             } else {
-                print.dim("${it.request.policy.name}: ", false)
-                print.red("Fail! ", false)
-                it.result.exceptionOrNull()?.message?.let { msg -> print.italic(msg) }
+                val exception = it.result.exceptionOrNull()
+                if (exception is JsonSchemaVerificationException) {
+                    exception.validationErrors.forEach { err ->
+                        print.dim("${it.request.policy.name}: ", false)
+                        print.red("Fail! ", false)
+                        print.italic(""" "${err.objectPath}" (in ${err.schemaPath}) -> ${err.message}""")
+                    }
+                } else {
+                    exception?.message?.let { print.italic(it) }
+                }
             }
         }
     }
