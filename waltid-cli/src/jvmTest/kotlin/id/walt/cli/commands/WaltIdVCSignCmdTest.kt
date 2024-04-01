@@ -8,10 +8,7 @@ import com.github.ajalt.clikt.testing.CliktCommandTestResult
 import com.github.ajalt.clikt.testing.test
 import kotlinx.io.files.FileNotFoundException
 import org.junit.jupiter.api.assertDoesNotThrow
-import kotlin.test.Test
-import kotlin.test.assertContains
-import kotlin.test.assertFailsWith
-import kotlin.test.assertFalse
+import kotlin.test.*
 
 class WaltIdVCSignCmdTest {
 
@@ -23,7 +20,6 @@ class WaltIdVCSignCmdTest {
     val issuerDid = "did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV"
     val subjectDid = "did:key:z6Mkjm2gaGsodGchfG4k8P6KwCHZsVEPZho5VuEbY94qiBB9"
     val vcFilePath = "${resourcesPath}/vc/openbadgecredential_sample.json"
-
 
     @Test
     fun `should print help message when called with --help argument`() {
@@ -37,11 +33,6 @@ class WaltIdVCSignCmdTest {
         val result = command.test(emptyList<String>())
         assertContains(result.stdout, "Usage: sign")
     }
-
-    // -k, —key
-    // -i, —issuerDid<str>
-    // -s, —subjectDid=<str>
-    // -vc, —verifiableCredential=<filepath>
 
     @Test
     fun `should have --key option`() {
@@ -64,13 +55,6 @@ class WaltIdVCSignCmdTest {
         assertContains(result.stdout, "--subject")
     }
 
-    // @Test
-    // fun `should have --verifiableCredential option`() {
-    //     val result = command.test(listOf("--help"))
-    //
-    //     assertContains(result.stdout, "--verifiableCredential")
-    // }
-
     @Test
     fun `should accept one positional argument after --options`() {
         val result = command.test(listOf("--help"))
@@ -83,7 +67,6 @@ class WaltIdVCSignCmdTest {
 
         val failure = assertFailsWith<MissingOption> {
             command.parse(arrayOf("-i", issuerDid, "-s", subjectDid, vcFilePath))
-            // """"-i ${issuerDid} -s ${subjectDid}"""
         }
 
         failure.message?.let { assertContains(it, "missing option --key") }
@@ -135,11 +118,9 @@ class WaltIdVCSignCmdTest {
     fun `should fail if a badly formatted DID is provided`() {
 
         val weirdDid = "did:foo:bar"
-        // val failure = assertFailsWith<FileNotFoundException> {
-        command.parse(arrayOf("-k", keyFileName, "-i", weirdDid, "-s", subjectDid, vcFilePath))
-        // }
+        val result = command.test(arrayOf("-k", keyFileName, "-i", weirdDid, "-s", subjectDid, vcFilePath))
 
-        // failure.message?.let { assertContains(it, "(No such file or directory)") }
+        assertContains(result.output, "DID not supported")
     }
 
 
@@ -154,12 +135,15 @@ class WaltIdVCSignCmdTest {
     }
 
     @Test
+    @Ignore
     fun `should generate a valid signature`() = Unit
 
     @Test
+    @Ignore
     fun `should fail if a non-existent key file is provided`() = Unit
 
     @Test
+    @Ignore
     fun `should fail if a non-JWK key file is provided`() = Unit
 
     private fun getGeneratedFile(cmd: CliktCommand, result: CliktCommandTestResult): String {
