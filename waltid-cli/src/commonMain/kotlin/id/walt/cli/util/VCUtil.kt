@@ -38,7 +38,11 @@ class VCUtil {
             return jws
         }
 
-        suspend fun verify(jws: String, policies: List<String>): List<PolicyResult> {
+        suspend fun verify(
+            jws: String,
+            policies: List<String>,
+            args: Map<String, JsonElement> = emptyMap()
+        ): List<PolicyResult> {
 
             val policies = policies.ifEmpty { listOf("signature") }
 
@@ -46,7 +50,7 @@ class VCUtil {
 
             policies.forEach { policy ->
                 val verificationPolicy = PolicyManager.getPolicy(policy)
-                requests += PolicyRequest(policy = verificationPolicy)
+                requests += PolicyRequest(policy = verificationPolicy, args = args[policy])
             }
 
             try {
