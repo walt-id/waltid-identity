@@ -16,31 +16,19 @@ object StreamUtils {
     fun getBitValue(inputStream: InputStream, idx: ULong? = null, bitSize: Int) =
         inputStream.bufferedReader().use { buffer ->
             idx?.let { index ->
-                seekStartPosition(index, buffer, bitSize).takeIf { it != -1 }?.let {
-                    extractBitValue(buffer, bitSize)
-                }
+                buffer.skip((index * bitSize.toULong()).toLong())
+                extractBitValue(buffer, index, bitSize.toULong())
             }
         }
 
-    private fun seekStartPosition(index: ULong, it: BufferedReader, bitSize: Int): Int {
-        var int = it.read()
-        var count = 0UL
-        while (int != -1 && count < index) {
-            int = it.read()
-            count += bitSize.toULong()
-            println(count)
-        }
-        return int
-    }
-
-    private fun extractBitValue(it: BufferedReader, bitSize: Int): List<Char> {
-        var int = it.read()
-        var count = 0UL
+    private fun extractBitValue(it: BufferedReader, index: ULong, bitSize: ULong): List<Char> {
+        var int = 0
+        var count = index * bitSize
         val result = mutableListOf<Char>()
-//        while (int != -1 && count++ < bitSize.toULong()) {
-        while (count++ < bitSize.toULong()) {
-            int = it.read()
+        while (count < index * bitSize + bitSize) {
+            int = it.read().takeIf { it != -1 } ?: error("Reached end of stream")
             result.add(int.toChar())
+            count += 1.toULong()
         }
         return result
     }
