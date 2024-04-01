@@ -25,6 +25,7 @@ import id.walt.webwallet.usecase.event.EventUseCase
 import id.walt.webwallet.usecase.exchange.MatchPresentationDefinitionCredentialsUseCase
 import id.walt.webwallet.usecase.exchange.NoMatchPresentationDefinitionCredentialsUseCase
 import id.walt.webwallet.usecase.exchange.PresentationDefinitionFilterParser
+import id.walt.webwallet.usecase.exchange.strategies.DescriptorNoMatchPresentationDefinitionMatchStrategy
 import id.walt.webwallet.usecase.exchange.strategies.DescriptorPresentationDefinitionMatchStrategy
 import id.walt.webwallet.usecase.exchange.strategies.FilterNoMatchPresentationDefinitionMatchStrategy
 import id.walt.webwallet.usecase.exchange.strategies.FilterPresentationDefinitionMatchStrategy
@@ -67,6 +68,7 @@ object WalletServiceManager {
     val unmatchedPresentationDefinitionCredentialsUseCase = NoMatchPresentationDefinitionCredentialsUseCase(
         credentialService,
         FilterNoMatchPresentationDefinitionMatchStrategy(filterParser),
+        DescriptorNoMatchPresentationDefinitionMatchStrategy(),
     )
     val silentClaimStrategy = SilentClaimStrategy(
         issuanceService = IssuanceService,
