@@ -19,12 +19,13 @@ class StatusListCredentialStatusService(
             val credential = json.decodeFromString<JsonObject>(fetchStatusListCredential(entry.statusListCredential))
             val subject = extractCredentialSubject(credential) ?: error("")
             validateStatusListCredential(subject, credential).takeIf { it }?.let {
-                val bit = getStatusBit(subject.encodedList, entry.statusListIndex, subject.statusSize)
-                CredentialStatusResult(
-                    type = entry.statusPurpose,
-                    result = false,
-                    message = getStatusMessage(bit.toString(), subject.statusMessage)
-                )
+                getStatusBit(subject.encodedList, entry.statusListIndex, subject.statusSize)?.let {
+                    CredentialStatusResult(
+                        type = entry.statusPurpose,
+                        result = false,
+                        message = getStatusMessage(it.joinToString(), subject.statusMessage)
+                    )
+                } ?: error("Failed to retrieve bit value")
             } ?: error("Failed to validate status list credential")
         } ?: error("Error parsing status list entry")
 
