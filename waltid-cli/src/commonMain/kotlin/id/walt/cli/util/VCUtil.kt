@@ -50,7 +50,7 @@ class VCUtil {
             }
 
             try {
-                return Verifier.verifyCredential(jws, requests)
+                return Verifier.verifyCredential(jws, requests) // jws.decodeJws().payload.toString(), requests
             } catch (e: IllegalStateException) {
                 println("Something went wrong.")
                 return emptyList<PolicyResult>()

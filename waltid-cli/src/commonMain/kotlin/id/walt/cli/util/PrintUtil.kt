@@ -32,6 +32,11 @@ class PrettyPrinter(val cmd: CliktCommand) {
         cmd.echo(m, linebreak)
     }
 
+    fun italic(m: String, linebreak: Boolean = true) {
+        cmd.echo(TextStyles.italic(m), linebreak)
+    }
+
+
     fun panel(header: String, m: String) {
         cmd.terminal.println(
             Panel(

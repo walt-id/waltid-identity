@@ -9,6 +9,8 @@ import com.github.ajalt.clikt.parameters.types.file
 import id.walt.cli.util.PrettyPrinter
 import id.walt.cli.util.VCUtil
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import java.io.File
 
 class VCVerifyCmd : CliktCommand(
@@ -65,23 +67,34 @@ class VCVerifyCmd : CliktCommand(
 
         print.box("Verification Result")
         results.forEach {
-            if (it.isSuccess()) {
+            if (it.isSuccess()) { // Not enough to be a successful verification. Sometimes, the verification succeeds because the policy is not even applied.
+
+                var policyAvailable = false
+                var details = ""
+                val innerException = it.result.exceptionOrNull()
+
+                if (innerException != null) {
+                    details = innerException.message!!
+                    // if (innerException is ExpirationDatePolicyException && (innerException as ExpirationDatePolicyException).policyAvailable) {
+                    //     reason = "??"
+                    // } else if (innerException is IllegalStateException) {
+                    //     reason = innerException.message!!
+                    // }
+                } else if (!(it.result.getOrThrow() as JsonObject).get("policy_available")!!
+                        .equals(JsonPrimitive(true))
+                ) { // If policy_available == false
+                    details =
+                        " Pero no mucho. Neither 'exp', 'validUntil' nor 'expirationDate' found ¯\\_(ツ)_/¯ Is it a bug?"
+
+                }
                 print.dim("${it.request.policy.name}: ", false)
-                print.green("Success!")
+                print.green("Success! ", false)
+                print.plain(details)
             } else {
                 print.dim("${it.request.policy.name}: ", false)
                 print.red("Fail! ", false)
-                it.result.exceptionOrNull()?.message?.let { msg -> print.plain(msg) }
+                it.result.exceptionOrNull()?.message?.let { msg -> print.italic(msg) }
             }
         }
-
-        // if (result.isSuccess) {
-        //     print.green("Success! ", false)
-        //     print.plain("The VC signature is valid.")
-        // } else {
-        //     print.red("Fail! ", false)
-        //     // print.plain("VC signature is not valid.")
-        //     result.exceptionOrNull()?.let { it.message ?: "VC signature is not valid." }?.let { print.plain(it) }
-        // }
     }
 }
