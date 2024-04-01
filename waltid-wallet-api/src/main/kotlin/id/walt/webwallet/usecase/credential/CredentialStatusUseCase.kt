@@ -1,12 +1,14 @@
 package id.walt.webwallet.usecase.credential
 
 import id.walt.webwallet.service.credentials.CredentialsService
+import id.walt.webwallet.service.credentials.status.StatusListEntry
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import kotlinx.uuid.UUID
 
 class CredentialStatusUseCase(
     private val credentialService: CredentialsService,
+//    private val credentialStatusServiceFactory: CredentialStatusServiceFactory,
 ) {
     fun get(wallet: UUID, credentialId: String): List<CredentialStatusResult> =
         credentialService.get(wallet, credentialId)?.parsedDocument?.let {
@@ -27,13 +29,4 @@ class CredentialStatusUseCase(
 data class CredentialStatusResult(
     val type: String,
     val result: Boolean,
-)
-
-@Serializable
-data class StatusListEntry(
-    val id: String,
-    val type: String, //"RevocationList2021Status", "BitstringStatusListEntry", "StatusList2021Entry"
-    val statusPurpose: String = "revocation",
-    val statusListIndex: Long,
-    val statusListCredential: String,
 )
