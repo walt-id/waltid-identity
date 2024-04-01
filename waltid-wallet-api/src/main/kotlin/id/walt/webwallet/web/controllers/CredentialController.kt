@@ -181,6 +181,16 @@ fun Application.credentials() = walletRoute {
                     context.respond(HttpStatusCode.BadRequest, it.localizedMessage)
                 }
             }
+            get("status", {
+                summary = "Get credential status"
+                response {
+                    HttpStatusCode.OK to { body<String> { description = "Credential status" } }
+                    HttpStatusCode.NotFound to { description = "Credential status could not be established" }
+                }
+            }) {
+                val credentialId = call.parameters.getOrFail("credentialId")
+                context.respond(HttpStatusCode.OK, "ToDo: $credentialId")
+            }
             route("category", {
                 request {
                     body<List<String>> {
