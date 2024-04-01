@@ -3,13 +3,14 @@ package id.walt.webwallet.service.credentials.status
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.webwallet.usecase.credential.CredentialStatusResult
 import id.walt.webwallet.utils.Base64Utils
-import id.walt.webwallet.utils.GzipUtils
+import id.walt.webwallet.utils.StreamUtils
 import id.walt.webwallet.utils.hexToInt
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.jsonObject
+import java.util.zip.GZIPInputStream
 
 class StatusListCredentialStatusService(
     private val credentialFetcher: CredentialFetcher,
@@ -40,7 +41,7 @@ class StatusListCredentialStatusService(
         }
 
     private fun getStatusBit(bitstring: String, idx: ULong, bitSize: Int) =
-        GzipUtils.uncompress(Base64Utils.decode(bitstring), idx, bitSize)
+        StreamUtils.getBitValue(GZIPInputStream(Base64Utils.decode(bitstring).inputStream()), idx, bitSize)
 
     private fun getStatusResult(bit: String) = hexToInt(bit) != 0
 
