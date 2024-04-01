@@ -1,5 +1,6 @@
 package id.walt.cli.commands
 
+import com.github.ajalt.clikt.core.BadParameterValue
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.terminal
 import com.github.ajalt.clikt.parameters.arguments.argument
@@ -21,12 +22,6 @@ class VCSignCmd : CliktCommand(
     printHelpOnEmptyArgs = true
 ) {
     val print: PrettyPrinter = PrettyPrinter(this)
-
-    // -k, —key
-    // -i, —issuerDid<str>
-    // -s, —subjectDid=<str>
-    // -vc, —verifiableCredential=<filepath>
-
 
     private val keyFile by option("-k", "--key")
         // .help("The Subject's key to be used. If none is provided, a new one will be generated.")
@@ -50,12 +45,13 @@ class VCSignCmd : CliktCommand(
     override fun run() {
 
         val key = runBlocking { KeyUtil().getKey(keyFile) }
-        var issuerDid = this.issuerDid
+        val issuerDid = issuerDid ?: runBlocking { DidUtil.createDid(DidMethod.KEY, key) }
 
-        if (issuerDid == null) {
-            print.dim("Issuer DID not provided. Let's generate one.")
-            issuerDid = runBlocking { DidUtil.createDid(DidMethod.KEY, key) }
-            print.dim("Generated DID: ${issuerDid}")
+        // Check if it's a valid DID
+        try {
+            DidUtil.resolveDid(issuerDid)
+        } catch (e: IllegalArgumentException) {
+            throw BadParameterValue("DID not supported: ${issuerDid}")
         }
 
         val payload = vc.readText()
