@@ -2,7 +2,6 @@ package id.walt.webwallet.usecase.claim
 
 import id.walt.webwallet.db.models.Notification
 import id.walt.webwallet.db.models.WalletCredential
-import id.walt.webwallet.usecase.notification.NotificationUseCase
 import id.walt.webwallet.seeker.Seeker
 import id.walt.webwallet.service.SSIKit2WalletService
 import id.walt.webwallet.service.account.AccountsService
@@ -11,9 +10,11 @@ import id.walt.webwallet.service.dids.DidsService
 import id.walt.webwallet.service.events.Event
 import id.walt.webwallet.service.events.EventType
 import id.walt.webwallet.service.exchange.IssuanceService
+import id.walt.webwallet.service.trust.IssuerNameResolveService
 import id.walt.webwallet.service.trust.TrustValidationService
 import id.walt.webwallet.usecase.event.EventUseCase
 import id.walt.webwallet.usecase.issuer.IssuerUseCase
+import id.walt.webwallet.usecase.notification.NotificationUseCase
 import kotlinx.datetime.Clock
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -27,6 +28,7 @@ class SilentClaimStrategy(
     private val issuanceService: IssuanceService,
     private val credentialService: CredentialsService,
     private val issuerTrustValidationService: TrustValidationService,
+    private val issuerNameResolveService: IssuerNameResolveService,
     private val accountService: AccountsService,
     private val didService: DidsService,
     private val issuerUseCase: IssuerUseCase,
@@ -122,7 +124,7 @@ class SilentClaimStrategy(
         )
     }
 
-    private fun prepareNotifications(account: UUID, credentials: Array<WalletCredential>, type: String) =
+    private suspend fun prepareNotifications(account: UUID, credentials: Array<WalletCredential>, type: String) =
         credentials.map {
             Notification(
                 id = UUID.generateUUID().toString(),//TODO: converted back and forth (see notification-service)
@@ -137,9 +139,18 @@ class SilentClaimStrategy(
                         logo = it.parsedManifest?.jsonObject?.get("display")?.jsonObject?.get("card")?.jsonObject?.get(
                             "logo"
                         )?.jsonObject?.get("uri")?.jsonPrimitive?.content ?: "",//TODO: placeholder logo?
-                        detail = "todo"//TODO: compute the message
+                        detail = computeNotificationDetailMessage(
+                            did = WalletCredential.parseIssuerDid(
+                                it.parsedDocument,
+                                it.parsedManifest
+                            ) ?: "", type = credentialTypeSeeker.get(it.parsedDocument ?: JsonObject(emptyMap()))
+                        )
                     )
                 )
             )
         }
+
+    private suspend fun computeNotificationDetailMessage(did: String, type: String): String = let {
+        "${issuerNameResolveService.resolve(did)} has issued a new credential to you($type)"
+    }
 }
