@@ -92,6 +92,7 @@ class VCVerifyCmd : CliktCommand(
                     //     reason = innerException.message!!
                     // }
                 } else if (it.result.getOrNull() !is Unit &&
+                    "policy_available" in it.result.getOrThrow() as JsonObject &&
                     !(it.result.getOrThrow() as JsonObject).get("policy_available")!!.equals(JsonPrimitive(true))
                 ) { // If policy_available == false
                     when (it.request.policy) {
@@ -111,15 +112,21 @@ class VCVerifyCmd : CliktCommand(
                 print.dim("${it.request.policy.name}: ", false)
                 print.green("Success! ", false)
                 print.plain(details)
-            } else {
+            } else { // isFailure
                 val exception = it.result.exceptionOrNull()
                 if (exception is JsonSchemaVerificationException) {
                     exception.validationErrors.forEach { err ->
                         print.dim("${it.request.policy.name}: ", false)
                         print.red("Fail! ", false)
-                        print.italic(""" "${err.objectPath}" (in ${err.schemaPath}) -> ${err.message}""")
+                        if (err.objectPath.isEmpty()) {
+                            print.italic("""-> ${err.message}""")
+                        } else {
+                            print.italic(""""${err.objectPath}" (in ${err.schemaPath}) -> ${err.message}""")
+                        }
                     }
                 } else {
+                    print.dim("${it.request.policy.name}: ", false)
+                    print.red("Fail! ", false)
                     exception?.message?.let { print.italic(it) }
                 }
             }
