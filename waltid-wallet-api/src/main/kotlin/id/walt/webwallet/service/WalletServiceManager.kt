@@ -16,6 +16,7 @@ import id.walt.webwallet.service.exchange.IssuanceService
 import id.walt.webwallet.service.issuers.IssuersService
 import id.walt.webwallet.service.notifications.NotificationService
 import id.walt.webwallet.service.settings.SettingsService
+import id.walt.webwallet.service.trust.DefaultIssuerNameResolveService
 import id.walt.webwallet.service.trust.DefaultTrustValidationService
 import id.walt.webwallet.usecase.claim.ExplicitClaimStrategy
 import id.walt.webwallet.usecase.claim.SilentClaimStrategy
@@ -55,6 +56,7 @@ object WalletServiceManager {
         issuanceService = IssuanceService,
         credentialService = credentialService,
         issuerTrustValidationService = issuerTrustValidationService,
+        issuerNameResolveService = DefaultIssuerNameResolveService(httpClient, trustConfig.issuersRecord),
         accountService = AccountsService,
         didService = DidsService,
         issuerUseCase = issuerUseCase,
