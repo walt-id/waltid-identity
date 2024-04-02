@@ -25,7 +25,7 @@ class StatusListCredentialStatusService(
             credentialValidator.validate(entry.statusPurpose, subject.statusPurpose, subject.type, credential)
                 .takeIf { it }?.let {
                     getStatusBit(subject.encodedList, entry.statusListIndex, subject.statusSize)?.let {
-                        val bit = it.joinToString()
+                        val bit = it.joinToString("")
                         CredentialStatusResult(
                             type = entry.statusPurpose,
                             result = getStatusResult(bit),
