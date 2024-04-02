@@ -22,15 +22,14 @@ object JsonUtils {
 
     //TODO: remove from WallletNotifications.kt when PR-278 (minor event and notification improvements) is merged
     fun tryGetData(json: JsonObject, key: String): JsonElement? = key.split('.').let {
-        var js: JsonElement? = json.toJsonElement()
+        var element: JsonElement? = json.toJsonElement()
         for (i in it) {
-            val element = js?.jsonObject?.get(i)
-            js = when (element) {
-                is JsonObject -> element
-                is JsonArray -> element.jsonArray
+            element = when (element) {
+                is JsonObject -> element[i]
+                is JsonArray -> element[0].jsonObject[i]
                 else -> element?.jsonPrimitive
             }
         }
-        js
+        element
     }
 }
