@@ -40,10 +40,13 @@ Now, you can run:
 | `waltid did -h`                                                                                                                                                                                     | Print WaltID CLI DID command usage message                                                                              |
 | `waltid did create -h`                                                                                                                                                                              | Print WaltID CLI DID create command usage message                                                                       |
 | `waltid did create`                                                                                                                                                                                 | Creates a new did:key                                                                                                   |
-| `waltid did create --key=./myRSAKey.json`                                                                                                                                                           | Creates a new did:key with the key provided in the spoecified file                                                      | 
+| `waltid did create --key=./myRSAKey.json`                                                                                                                                                           | Creates a new did:key with the key provided in the specified file.                                                      | 
 | `waltid vc sign --key=./myEd25519Key.json --subject=did:key:z6Mkjm2gaGsodGchfG4k8P6KwCHZsVEPZho5VuEbY94qiBB9 --issuer=did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV ./myCredential.json` | Signs a verifiable credential JSON. The VC needs [to be created first](#1.-create-a-vc).                                |
 | `waltid vc sign --key=./myEd25519Key.json --subject=did:key:z6Mkjm2gaGsodGchfG4k8P6KwCHZsVEPZho5VuEbY94qiBB9 ./myCredential.json`                                                                   | Signs a verifiable credential JSON with a generated Issuer DID   .                                                      |
-| `waltid vc verify ./openbadgecredential_sample.signed.json`                                                                                                                                         | Verifies the signature of the provided VC.                                                                              |
+| `waltid vc verify ./myCredential.signed.json`                                                                                                                                                       | Verifies the signature of the provided VC.                                                                              |
+| `waltid vc verify --policy=signature ./myCredential.signed.json`                                                                                                                                    | Verifies the signature of the provided VC.                                                                              |
+| `waltid vc verify --policy=schema --arg=schema=./ob_v3p0_achievementcredential_schema.json  ./myCredential.signed.json`                                                                             | Validates the VC's structure under the rules of the provided JSON schema file.                                          |
+| `waltid vc verify --policy=signature --policy=schema --arg=schema=./ob_v3p0_achievementcredential_schema.json  ./myCredential.signed.json`                                                          | Verifies the VC according to both policies, signature and schema.                                                       |
 
 ## In production
 
@@ -134,6 +137,9 @@ Usage: waltid [<options>] <command> [<args>]...
   │    waltid key convert -h                                                                                           │
   │    waltid did -h                                                                                                   │
   │    waltid did create -h                                                                                            │
+  │    waltid vc -h                                                                                                    │
+  │    waltid vc sign -h                                                                                               │
+  │    waltid vc verify -h                                                                                             │
   │                                                                                                                    │
   │    Key generation                                                                                                  │
   │    ---------------                                                                                                 │
@@ -158,6 +164,13 @@ Usage: waltid [<options>] <command> [<args>]...
   │                   --subject=did:key:z6Mkjm2gaGsodGchfG4k8P6KwCHZsVEPZho5VuEbY94qiBB9\                              │
   │                   --issuer=did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV\                               │
   │                   ./myVC.json                                                                                      │
+  │                                                                                                                    │
+  │    VC verification                                                                                                 │
+  │    ----------------                                                                                                │
+  │    waltid vc verify ./myVC.signed.json                                                                             │
+  │    waltid vc verify --policy=signature ./myVC.signed.json                                                          │
+  │    waltid vc verify --policy=schema --arg=schema=mySchema.json ./myVC.signed.json                                  │
+  │    waltid vc verify --policy=signature --policy=schema --arg=schema=mySchema.json ./myVC.signed.json               │
   ╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
 
 Common Options:
@@ -259,7 +272,8 @@ Options:
   -h, --help  Show this message and exit
 
 Commands:
-  sign  Signs a Verifiable Credential.
+  sign    Signs a Verifiable Credential.
+  verify  Verify the specified VC under a set of specified policies.
 ```
 
 ## `waltid vc sign` command
@@ -306,20 +320,23 @@ accordingly and save it in a file called `openbadgecredential_sample.json`.
     "VerifiableCredential",
     "OpenBadgeCredential"
   ],
-  "name": "Coffee Lover Badge",
+  "name": "JFF x vc-edu PlugFest 3 Interoperability",
   "issuer": {
     "type": [
       "Profile"
     ],
     "id": "did:example:123",
-    "name": "The Coffee Palace",
-    "url": "https://en.wikipedia.org/wiki/Coffee_palace",
-    "image": "https://www.shutterstock.com/image-vector/coffee-palace-special-lover-600nw-261490277.jpg"
+    "name": "Jobs for the Future (JFF)",
+    "url": "https://www.jff.org/",
+    "image": {
+      "id": "https://w3c-ccg.github.io/vc-ed/plugfest-1-2022/images/JFF_LogoLockup.png",
+      "type": "Image"
+    }
   },
   "issuanceDate": "2023-07-20T07:05:44Z",
   "expirationDate": "2033-07-20T07:05:44Z",
   "credentialSubject": {
-    "id": "did:example:456",
+    "id": "did:example:123",
     "type": [
       "AchievementSubject"
     ],
@@ -328,19 +345,24 @@ accordingly and save it in a file called `openbadgecredential_sample.json`.
       "type": [
         "Achievement"
       ],
-      "name": "Coffee Lover",
-      "description": "A true lover of good coffee",
+      "name": "JFF x vc-edu PlugFest 3 Interoperability",
+      "description": "This wallet supports the use of W3C Verifiable Credentials and has demonstrated interoperability during the presentation request workflow during JFF x VC-EDU PlugFest 3.",
       "criteria": {
         "type": "Criteria",
-        "narrative": "Able to carry out detailed sensory analysis of different coffee tastings."
+        "narrative": "Wallet solutions providers earned this badge by demonstrating interoperability during the presentation request workflow. This includes successfully receiving a presentation request, allowing the holder to select at least two types of verifiable credentials to create a verifiable presentation, returning the presentation to the requestor, and passing verification of the presentation and the included credentials."
       },
       "image": {
-        "id": "https://www.teepublic.com/magnet/4067432-certified-coffee-lover-caffeine-addict",
+        "id": "https://w3c-ccg.github.io/vc-ed/plugfest-3-2023/images/JFF-VC-EDU-PLUGFEST3-badge-image.png",
         "type": "Image"
       }
     }
+  },
+  "credentialSchema": {
+    "id": "https://purl.imsglobal.org/spec/ob/v3p0/schema/json/ob_v3p0_achievementcredential_schema.json",
+    "type": "FullJsonSchemaValidator2021"
   }
 }
+
 ```
 
 #### 2. Sign the VC
@@ -356,13 +378,17 @@ $ waltid vc sign --key myKey.json
 ```bash
 Usage: waltid vc verify [<options>] <vc>
 
-  Verifies the signature of a Verifiable Credential. Future plans to add new policies possibilities.
+  Verify the specified VC under a set of specified policies.
 
 Options:
-  -h, --help  Show this message and exit
+  -p, --policy=(schema|holder-binding|expired|webhook|maximum-credentials|minimum-credentials|signature|allowed-issuer|not-before)
+                     Specify a policy to be applied in the verification process. Multiple policies are accepted. If no policy is specified, only the Signature Policy will be applied. To define multiple policies,
+                     use --policy PolicyName1 --policy PolicyName2 (...) Some policies require parameters. To specify it, use --arg arg1=value1 '
+  -a, --arg=<value>  Argument required by some policies.
+  -h, --help         Show this message and exit
 
 Arguments:
-  <vc>  the verifiable credential file (in the JWS format) to be verified (required)
+  <vc>  the verifiable credential file (in JWS format) to be verified (required)
 ```
 
 # Note for Windows users
@@ -436,7 +462,7 @@ This project is still a work in progress. As such, not all features are already 
 * Signature ✅
 * Expired ❌
 * Not before ❌
-* Schema ❌
+* Schema ✅
 * Holder Binding ❌
 * Allowed Issuer ❌
 * Webhook ❌
