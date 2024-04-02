@@ -1150,7 +1150,7 @@ class CI_JVM_Test : AnnotationSpec() {
             }
             routing {
                 post("/callback") {
-                    println("ENTRA CALLBACK")
+                    println("ENTRA CALLBACK (Issuer)")
                     val callbackBody = call.receiveText().also { println(it) }.let { Json.parseToJsonElement(it) }.jsonObject
                     ENTRA_STATUS = callbackBody["requestStatus"]!!.jsonPrimitive.content
                     if(ENTRA_STATUS == "issuance_successful")
@@ -1176,7 +1176,7 @@ class CI_JVM_Test : AnnotationSpec() {
         val createIssuanceReq = "{\n" +
                 "    \"callback\": {\n" +
                 //"        \"url\": \"https://httpstat.us/200\",\n" +
-                "        \"url\": \"https://aa97-2001-871-25f-66b3-9ea8-fc44-915d-107e.ngrok-free.app/callback\",\n" +
+                "        \"url\": \"https://0fc7-2001-871-25f-66b3-9ea8-fc44-915d-107e.ngrok-free.app/callback\",\n" +
                 "        \"state\": \"1234\",\n" +
                 "        \"headers\": {\n" +
                 "            \"api-key\": \"1234\"\n" +
@@ -1288,12 +1288,16 @@ class CI_JVM_Test : AnnotationSpec() {
 
         println("> Success: " + CredentialResponse.Companion.success(CredentialFormat.jwt_vc_json, vc).credential?.toString())
 
-        entraIssuanceRequest.authorizationRequest.redirectUri?.let { http.submitForm(it, parameters {
-            append("state", "1234")
-        }) }?.also {
+        entraIssuanceRequest.authorizationRequest.redirectUri?.let { http.post(it) {
+            contentType(ContentType.Application.Json)
+            setBody(buildJsonObject {
+                put("state", entraIssuanceRequest.authorizationRequest.state)
+                put("code", "issuance_successful")
+            })
+         }?.also {
             println("ENTRA redirect URI response: ${it.status}")
             println(it.bodyAsText())
-        }
+        }}
         synchronized(CALLBACK_COMPLETE) {
             CALLBACK_COMPLETE.wait(1000)
             ENTRA_STATUS shouldBe "issuance_successful"
