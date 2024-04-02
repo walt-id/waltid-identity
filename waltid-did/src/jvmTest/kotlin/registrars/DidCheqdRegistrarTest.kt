@@ -15,7 +15,8 @@ import java.util.stream.Stream
 
 class DidCheqdRegistrarTest : DidRegistrarTestBase(DidCheqdRegistrar()) {
 
-    @ParameterizedTest
+    /* FIXME: Re-enable CHEQD tests (their API is currently broken)
+    @ParameterizedTest*/
     @MethodSource
     override fun `given did options with no key when register then returns a valid did result`(
         options: DidCreateOptions,
@@ -24,7 +25,8 @@ class DidCheqdRegistrarTest : DidRegistrarTestBase(DidCheqdRegistrar()) {
         super.`given did options with no key when register then returns a valid did result`(options, assert)
     }
 
-    @ParameterizedTest
+    /* FIXME: Re-enable CHEQD tests (their API is currently broken)
+    @ParameterizedTest*/
     @MethodSource
     override fun `given did options and key when register with key then returns a valid did result`(
         key: Key,

@@ -15,7 +15,7 @@ class DidCreationTest {
 
     @Test
     fun checkDidDocumentIsValidJson() = runTest {
-        val result = registrar.register(DidWebCreateOptions("localhost", "/xyz/abc"))
+        val result = registrar.register(DidWebCreateOptions("localhost", "/xyz/abc").also { println(it.config) })
 
         val didDoc1 = result.didDocument.toJsonObject()
         val didDoc2 = Json.parseToJsonElement(

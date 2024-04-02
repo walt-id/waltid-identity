@@ -16,6 +16,7 @@ const val EventDataNotAvailable = "n/a"
 
 @Serializable
 data class Event(
+    val id: Int? = null,
     val event: String,
     val action: String,
     val timestamp: Instant = Clock.System.now(),
@@ -28,6 +29,7 @@ data class Event(
     val note: String? = null,
 ) {
     constructor(
+        id: Int? = null,
         action: EventType.Action,
         tenant: String,
         originator: String?,
@@ -37,6 +39,7 @@ data class Event(
         credentialId: String? = null,
         note: String? = null,
     ) : this(
+        id = id,
         event = action.type,
         action = action.toString(),
         tenant = tenant,
@@ -49,6 +52,7 @@ data class Event(
     )
 
     constructor(row: ResultRow) : this(
+        id = row[Events.id].value,
         event = row[Events.event],
         action = row[Events.action],
         timestamp = row[Events.timestamp].toKotlinInstant(),

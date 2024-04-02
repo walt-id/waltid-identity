@@ -37,6 +37,7 @@ import io.ktor.server.plugins.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.sessions.*
+import io.ktor.util.*
 import io.ktor.util.pipeline.*
 import kotlinx.serialization.json.*
 import kotlinx.uuid.UUID
@@ -288,7 +289,10 @@ fun Application.auth() {
 
             authenticate("auth-session", "auth-bearer", "auth-bearer-alternative") {
                 get("user-info", { summary = "Return user ID if logged in" }) {
-                    call.respond(getUserId().name)
+                    getUsersSessionToken()?.split('.')?.getOrNull(1)?.run {
+                        val uuid = this.decodeBase64String()
+                        call.respond(AccountsService.get(UUID(uuid)))
+                    } ?: call.respond(HttpStatusCode.BadRequest)
                 }
                 get("session", { summary = "Return session ID if logged in" }) {
                     val token = getUsersSessionToken() ?: throw UnauthorizedException("Invalid session")
@@ -367,48 +371,44 @@ fun Application.auth() {
             }
 
             // Login a Keycloak user
-            post(
-                "login",
-                {
-                    summary = "Keycloak login with [username + password]"
-                    description = "Login of a user managed by Keycloak."
-                    request {
-                        body<KeycloakAccountRequest> {
-                            example(
-                                "Keycloak username + password",
-                                buildJsonObject {
-                                    put("type", JsonPrimitive("keycloak"))
-                                    put("username", JsonPrimitive("Max_Mustermann"))
-                                    put("password", JsonPrimitive("password"))
-                                }
-                                    .toString())
-                            example(
-                                "Keycloak username + Access Token ",
-                                buildJsonObject {
-                                    put("type", JsonPrimitive("keycloak"))
-                                    put("username", JsonPrimitive("Max_Mustermann"))
-                                    put("token", JsonPrimitive("eyJhb..."))
-                                }
-                                    .toString())
+            post("login", {
+                summary = "Keycloak login with [username + password]"
+                description = "Login of a user managed by Keycloak."
+                request {
+                    body<KeycloakAccountRequest> {
+                        example(
+                            "Keycloak username + password",
+                            buildJsonObject {
+                                put("type", JsonPrimitive("keycloak"))
+                                put("username", JsonPrimitive("Max_Mustermann"))
+                                put("password", JsonPrimitive("password"))
+                            }
+                                .toString())
+                        example(
+                            "Keycloak username + Access Token ",
+                            buildJsonObject {
+                                put("type", JsonPrimitive("keycloak"))
+                                put("username", JsonPrimitive("Max_Mustermann"))
+                                put("token", JsonPrimitive("eyJhb..."))
+                            }
+                                .toString())
 
-                            example(
-                                "Keycloak user Access Token ",
-                                buildJsonObject {
-                                    put("type", JsonPrimitive("keycloak"))
-                                    put("token", JsonPrimitive("eyJhb..."))
-                                }
-                                    .toString())
-                        }
+                        example(
+                            "Keycloak user Access Token ",
+                            buildJsonObject {
+                                put("type", JsonPrimitive("keycloak"))
+                                put("token", JsonPrimitive("eyJhb..."))
+                            }
+                                .toString())
                     }
+                }
 
-                    logger.debug { "Login via Keycloak" }
-
-                    response {
-                        HttpStatusCode.OK to { description = "Login successful" }
-                        HttpStatusCode.Unauthorized to { description = "Unauthorized" }
-                        HttpStatusCode.BadRequest to { description = "Bad request" }
-                    }
-                }) {
+                response {
+                    HttpStatusCode.OK to { description = "Login successful" }
+                    HttpStatusCode.Unauthorized to { description = "Unauthorized" }
+                    HttpStatusCode.BadRequest to { description = "Bad request" }
+                }
+            }) {
                 doLogin()
             }
 

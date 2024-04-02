@@ -8,5 +8,5 @@ import kotlin.js.JsExport
 @JsExport
 class DidOydCreateOptions(document: JsonObject) : DidCreateOptions(
     method = "oyd",
-    options = mapOf("didDocument" to document)
+    config = mapOf("didDocument" to document)
 )
