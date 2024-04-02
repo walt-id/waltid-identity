@@ -37,4 +37,10 @@ class WaltIdVCCmdTest {
         val result = command.test()
         assertContains(result.stdout, "sign")
     }
+
+    @Test
+    fun `should have subcommand 'verify'`() {
+        val result = command.test()
+        assertContains(result.stdout, "verify")
+    }
 }
