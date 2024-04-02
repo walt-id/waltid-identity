@@ -1,7 +1,9 @@
 package id.walt.webwallet.service.credentials.status.fetch
 
 import id.walt.crypto.utils.JsonUtils.toJsonElement
+import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.did.dids.DidService
+import id.walt.webwallet.utils.Base64Utils
 import id.walt.webwallet.utils.HttpUtils
 import id.walt.webwallet.utils.JsonUtils
 import io.ktor.client.*
@@ -21,7 +23,12 @@ class EntraStatusListCredentialFetchStrategy(
             val parameters = HttpUtils.parseQueryParam(url.substringAfter("?"))
             val serviceEndpoint = getServiceEndpoint(it, parameters["service"])
             parameters["queries"]?.toJsonElement()?.jsonObject?.let {
-                getServiceEndpointResponse(serviceEndpoint, did, it).toJsonElement().jsonObject
+                getServiceEndpointResponse(serviceEndpoint, did, it).toJsonElement().jsonObject.let {
+                    JsonUtils.tryGetData(it, "replies.entries.data")?.let {
+                        Base64Utils.decode(it.jsonPrimitive.content).decodeToString()
+                            .decodeJws(allowMissingSignature = true).payload
+                    } ?: error("Failed to parse service-endpoint reponsed: $serviceEndpoint")
+                }
             } ?: error("Failed to parse descriptor from 'queries' parameter")
         } ?: error("Failed to resolve did: $did")
     }
@@ -49,18 +56,15 @@ class EntraStatusListCredentialFetchStrategy(
         )
     }
 
-    private suspend fun getCredential(url: String) {}
-
     @Serializable
     private data class IdentityHubRequest(
         val requestId: String,
         val target: String,
         val messages: List<Message>,
-    ){
+    ) {
         @Serializable
         data class Message(
             val descriptor: JsonObject,
         )
     }
 }
-//did:web:tel-did-web-storage.dxt.online?service=IdentityHub&queries=W3sibWV0aG9kIjoiQ29sbGVjdGlvbnNRdWVyeSIsInNjaGVtYSI6Imh0dHBzOi8vdzNpZC5vcmcvdmMtc3RhdHVzLWxpc3QtMjAyMS92MSIsIm9iamVjdElkIjoiZDkwMDQyNTEtZjg1ZS00MjIzLTg5ZjQtMTI1NGFmMjBhYTJlIn1d
