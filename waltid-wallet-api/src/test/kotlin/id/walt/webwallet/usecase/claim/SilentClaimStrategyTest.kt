@@ -8,6 +8,7 @@ import id.walt.webwallet.service.dids.DidsService
 import id.walt.webwallet.service.events.CredentialEventData
 import id.walt.webwallet.service.exchange.IssuanceService
 import id.walt.webwallet.service.issuers.IssuerDataTransferObject
+import id.walt.webwallet.service.trust.IssuerNameResolveService
 import id.walt.webwallet.service.trust.TrustValidationService
 import id.walt.webwallet.usecase.event.EventUseCase
 import id.walt.webwallet.usecase.issuer.IssuerUseCase
@@ -26,6 +27,7 @@ class SilentClaimStrategyTest {
     private val issuanceService = mockk<IssuanceService>()
     private val credentialService = mockk<CredentialsService>()
     private val issuerTrustValidationService = mockk<TrustValidationService>()
+    private val issuerNameResolveService = mockk<IssuerNameResolveService>()
     private val issuerUseCase = mockk<IssuerUseCase>()
     private val eventUseCase = mockk<EventUseCase>()
     private val notificationUseCase = mockk<NotificationUseCase>()
@@ -36,6 +38,7 @@ class SilentClaimStrategyTest {
         issuanceService = issuanceService,
         credentialService = credentialService,
         issuerTrustValidationService = issuerTrustValidationService,
+        issuerNameResolveService = issuerNameResolveService,
         accountService = accountService,
         didService = didService,
         issuerUseCase = issuerUseCase,
@@ -71,6 +74,7 @@ class SilentClaimStrategyTest {
         every { eventUseCase.log(any()) } just Runs
         every { notificationUseCase.add(any()) } returns listOf(UUID.generateUUID())
         coEvery { notificationUseCase.send(any()) } just Runs
+        coEvery { issuerNameResolveService.resolve(any()) } returns "test"
     }
 
     @Test
