@@ -14,7 +14,7 @@ class CredentialStatusUseCase(
     suspend fun get(wallet: UUID, credentialId: String): List<CredentialStatusResult> =
         credentialService.get(wallet, credentialId)?.parsedDocument?.let {
             getStatusEntry(it).fold(emptyList()) { acc, i ->
-                acc.plus(credentialStatusServiceFactory.new().get(i))
+                acc.plus(credentialStatusServiceFactory.new(i.type).get(i))
             }
         } ?: error("Credential not found or invliad document for id: $credentialId")
 

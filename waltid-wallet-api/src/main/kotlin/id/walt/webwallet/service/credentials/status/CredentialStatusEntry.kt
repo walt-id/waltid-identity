@@ -31,8 +31,12 @@ object CredentialStatusEntryBaseSerializer : JsonContentPolymorphicSerializer<Cr
         val json = element.jsonObject
         val type = json.getValue("type").jsonPrimitive.content
         return when (type) {
-            "RevocationList2021Status", "BitstringStatusListEntry", "StatusList2021Entry" -> StatusListEntry.serializer()
+            in CredentialStatusTypes.StatusList.type -> StatusListEntry.serializer()
             else -> throw IllegalArgumentException("$type is not a supported Base type.")
         }
     }
+}
+
+enum class CredentialStatusTypes(vararg val type: String) {
+    StatusList("RevocationList2021Status", "BitstringStatusListEntry", "StatusList2021Entry")
 }
