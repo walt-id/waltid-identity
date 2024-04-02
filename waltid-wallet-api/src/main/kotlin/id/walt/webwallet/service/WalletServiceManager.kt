@@ -16,6 +16,7 @@ import id.walt.webwallet.service.credentials.status.StatusListCredentialStatusSe
 import id.walt.webwallet.service.credentials.status.fetch.DefaultStatusListCredentialFetchStrategy
 import id.walt.webwallet.service.credentials.status.fetch.EntraStatusListCredentialFetchStrategy
 import id.walt.webwallet.service.credentials.status.fetch.StatusListCredentialFetchFactory
+import id.walt.webwallet.service.dids.DidResolverService
 import id.walt.webwallet.service.dids.DidsService
 import id.walt.webwallet.service.events.EventService
 import id.walt.webwallet.service.exchange.IssuanceService
@@ -61,7 +62,7 @@ object WalletServiceManager {
     private val filterParser = PresentationDefinitionFilterParser()
     private val statusListCredentialFetchFactory = StatusListCredentialFetchFactory(
         defaultStrategy = DefaultStatusListCredentialFetchStrategy(),
-        entraStrategy = EntraStatusListCredentialFetchStrategy(httpClient)
+        entraStrategy = EntraStatusListCredentialFetchStrategy(httpClient, DidResolverService(), JwsDecoder())
     )
     private val credentialStatusServiceFactory = CredentialStatusServiceFactory(
         statusListService = StatusListCredentialStatusService(
