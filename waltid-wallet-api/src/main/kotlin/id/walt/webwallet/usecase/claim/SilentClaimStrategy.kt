@@ -151,6 +151,6 @@ class SilentClaimStrategy(
         }
 
     private suspend fun computeNotificationDetailMessage(did: String, type: String): String = let {
-        "${issuerNameResolveService.resolve(did)} has issued a new credential to you($type)"
+        "${issuerNameResolveService.resolve(did)} has issued a new credential to you ($type)"
     }
 }
