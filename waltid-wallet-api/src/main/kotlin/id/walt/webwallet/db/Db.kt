@@ -2,6 +2,7 @@ package id.walt.webwallet.db
 
 import id.walt.webwallet.config.ConfigManager
 import id.walt.webwallet.config.DatasourceConfiguration
+import id.walt.webwallet.config.DatasourceJsonConfiguration
 import id.walt.webwallet.db.models.*
 import id.walt.webwallet.service.account.AccountsService
 import id.walt.webwallet.service.credentials.CredentialsService
@@ -30,18 +31,20 @@ object Db {
 
     lateinit var datasourceConfig: DatasourceConfiguration
 
-    val dataDirectoryPath = Path("data")
+    internal const val SQLITE_PREFIX = "jdbc:sqlite:"
 
     private fun connect() {
+        val jdbcUrl = ConfigManager.getConfig<DatasourceJsonConfiguration>().jdbcUrl
+
+        if (jdbcUrl?.contains("sqlite") == true) {
+            log.info { "Will use sqlite database (${jdbcUrl}), working directory: ${Path(".").absolutePathString()}" }
+        }
+
         datasourceConfig = ConfigManager.getConfig<DatasourceConfiguration>()
         val hikariDataSourceConfig = datasourceConfig.hikariDataSource
 
         // connect
         log.info { "Connecting to database at \"${hikariDataSourceConfig.jdbcUrl}\"..." }
-
-        if (hikariDataSourceConfig.jdbcUrl.contains("sqlite")) {
-            println("Will use sqlite database (${hikariDataSourceConfig.jdbcUrl}), working directory: ${Path(".").absolutePathString()}")
-        }
 
         Database.connect(hikariDataSourceConfig)
         TransactionManager.manager.defaultIsolationLevel =

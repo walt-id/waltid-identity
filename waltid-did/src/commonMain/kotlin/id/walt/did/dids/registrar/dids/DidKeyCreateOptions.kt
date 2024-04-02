@@ -13,5 +13,5 @@ import kotlin.js.JsExport
 @JsExport
 class DidKeyCreateOptions(keyType: KeyType = KeyType.Ed25519, useJwkJcsPub: Boolean = false) : DidCreateOptions(
     method = "key",
-    options = options("keyType" to keyType.name.lowercase(), "useJwkJcsPub" to useJwkJcsPub)
+    config = config("keyType" to keyType.name.lowercase(), "useJwkJcsPub" to useJwkJcsPub)
 )
