@@ -14,22 +14,25 @@ object ConfigManager {
     private val log = KotlinLogging.logger {}
 
     val registeredConfigurations = ConcurrentLinkedQueue<ConfigData>()
-    val loadedConfigurations = HashMap<String, WalletConfig>()
-    val preloadedConfigurations = HashMap<String, WalletConfig>()
+    val loadedConfigurations = HashMap<Pair<String, KClass<out WalletConfig>>, WalletConfig>()
+    val preloadedConfigurations = HashMap<Pair<String, KClass<out WalletConfig>>, WalletConfig>()
+
+    val configLoaders = HashMap<String, ConfigLoader>()
 
     fun preloadConfig(id: String, config: WalletConfig) {
-        preloadedConfigurations[id] = config
+        preloadedConfigurations[Pair(id, config::class)] = config
     }
 
     @OptIn(ExperimentalHoplite::class)
     private fun loadConfig(config: ConfigData, args: Array<String>) {
         val id = config.id
-        log.debug { "Loading configuration: \"$id\"..." }
+        log.debug { "Loading ${if (config.required) "required" else "optional"} configuration: \"$id\" (${config.type.simpleName ?: config.type.jvmName})..." }
 
         val type = config.type
+        val configKey = Pair(id, type)
 
-        preloadedConfigurations[id]?.let {
-            loadedConfigurations[id] = it
+        preloadedConfigurations[configKey]?.let {
+            loadedConfigurations[configKey] = it
             log.info { "Overwrote wallet configuration with preload: $id" }
             return
         }
@@ -39,16 +42,33 @@ object ConfigManager {
                 .addDecoder(JsonElementDecoder())
                 .addCommandLineSource(args)
                 .addDefaultParsers()
-                .addFileSource("config/$id.conf", optional = true)
                 .addEnvironmentSource()
+                .addFileSource("config/$id.conf", optional = true)
                 .withExplicitSealedTypes()
-                .build()
+                .build().also { loader -> configLoaders[id] = loader }
                 .loadConfigOrThrow(type, emptyList())
         }.onSuccess {
-            loadedConfigurations[id] = it
+            log.trace { "Loaded config \"$id\": $it" }
+            loadedConfigurations[configKey] = it
             config.onLoad?.invoke(it)
         }.onFailure {
-            log.error { "Could not load configuration for \"$id\": ${it.stackTraceToString()}" }
+            if (config.required) {
+                log.error {
+                    """
+                    |---- vvv Configuration error vvv ----
+                    |Could not load configuration for "$id": ${it.stackTraceToString()}
+                    |---- ^^^ Configuration error ^^^ ---
+                    |""".trimMargin()
+                }
+            } else {
+                if (it.message != null) {
+                    val shorterMessage = it.message!!.removePrefix("Error loading config because:")
+                        .lines().filterNot { it.isBlank() }.joinToString() { it.trim().removePrefix("- ") }
+                    log.info { "OPTIONAL configuration \"$id\" not loaded: $shorterMessage [This is not a mistake if you are not using named feature. The feature will not be available when not configured.]" }
+                } else {
+                    log.info { "OPTIONAL configuration \"$id\" not loaded: ${it.stackTraceToString()}" }
+                }
+            }
         }
     }
 
@@ -58,9 +78,14 @@ object ConfigManager {
                 "No such configuration registered: \"${ConfigClass::class.jvmName}\"!"
             )
 
+    inline fun <reified ConfigClass : WalletConfig> getConfigLoader(): ConfigLoader =
+        getConfigIdentifier<ConfigClass>().let { configKey ->
+            configLoaders[configKey] ?: error("No config loader registered for: $configKey")
+        }
+
     inline fun <reified ConfigClass : WalletConfig> getConfig(): ConfigClass =
         getConfigIdentifier<ConfigClass>().let { configKey ->
-            (loadedConfigurations[configKey]
+            (loadedConfigurations[Pair(configKey, ConfigClass::class)]
                 ?: throw NotFoundException("No loaded configuration: \"$configKey\""))
                 .let { loadedConfig ->
                     loadedConfig as? ConfigClass
@@ -70,8 +95,22 @@ object ConfigManager {
                 }
         }
 
+    fun registerConfig(
+        id: String,
+        type: KClass<out WalletConfig>,
+        multiple: Boolean = false,
+        onLoad: ((WalletConfig) -> Unit)? = null
+    ) = registerConfig(ConfigData(id, type, false, multiple, onLoad))
+
+    fun registerRequiredConfig(
+        id: String,
+        type: KClass<out WalletConfig>,
+        multiple: Boolean = false,
+        onLoad: ((WalletConfig) -> Unit)? = null
+    ) = registerConfig(ConfigData(id, type, true, multiple, onLoad))
+
     private fun registerConfig(data: ConfigData) {
-        if (registeredConfigurations.any { it.id == data.id })
+        if (registeredConfigurations.any { it.id == data.id } && !data.multiple)
             throw IllegalArgumentException(
                 "A configuration with the name \"${data.id}\" already exists!"
             )
@@ -81,30 +120,31 @@ object ConfigManager {
 
     /** All configurations registered in this function will be loaded on startup */
     private fun registerConfigurations() {
-        registerConfig(
-            ConfigData("db", DatabaseConfiguration::class) {
-                registerConfig(
-                    ConfigData((it as DatabaseConfiguration).database, DatasourceConfiguration::class)
-                )
-            })
-        registerConfig(ConfigData("tenant", TenantConfig::class))
-        registerConfig(ConfigData("web", WebConfig::class))
-        registerConfig(ConfigData("push", PushConfig::class))
+        registerRequiredConfig("db", DatabaseConfiguration::class) {
+            val dbConfigFile = (it as DatabaseConfiguration).database
 
-        registerConfig(ConfigData("wallet", RemoteWalletConfig::class))
-        registerConfig(ConfigData("marketplace", MarketPlaceConfiguration::class))
-        registerConfig(ConfigData("chainexplorer", ChainExplorerConfiguration::class))
-        registerConfig(ConfigData("runtime", RuntimeConfig::class))
+            registerRequiredConfig(dbConfigFile, multiple = true, type = DatasourceJsonConfiguration::class)
+            registerRequiredConfig(dbConfigFile, multiple = true, type = DatasourceConfiguration::class)
+        }
+        registerRequiredConfig("web", WebConfig::class)
+        registerRequiredConfig("logins", LoginMethodsConfig::class)
+        registerRequiredConfig("auth", AuthConfig::class)
 
-        registerConfig(ConfigData("oidc", OidcConfiguration::class))
-        registerConfig(ConfigData("logins", LoginMethodsConfig::class))
-        registerConfig(ConfigData("trust", TrustConfig::class))
-        registerConfig(ConfigData("rejectionreason", RejectionReasonConfig::class))
-        registerConfig(ConfigData("registration-defaults", RegistrationDefaultsConfig::class))
+        registerConfig("tenant", TenantConfig::class)
+        registerConfig("push", PushConfig::class)
 
-        registerConfig(ConfigData("oci", OciKeyConfig::class))
-        registerConfig(ConfigData("auth", AuthConfig::class))
-        registerConfig(ConfigData("notification", NotificationConfig::class))
+        registerConfig("wallet", RemoteWalletConfig::class)
+        registerConfig("marketplace", MarketPlaceConfiguration::class)
+        registerConfig("chainexplorer", ChainExplorerConfiguration::class)
+        registerConfig("runtime", RuntimeConfig::class)
+
+        registerConfig("oidc", OidcConfiguration::class)
+        registerConfig("trust", TrustConfig::class)
+        registerConfig("rejectionreason", RejectionReasonConfig::class)
+        registerConfig("registration-defaults", RegistrationDefaultsConfig::class)
+
+        registerConfig("oci", OciKeyConfig::class)
+        registerConfig("notification", NotificationConfig::class)
     }
 
     fun loadConfigs(args: Array<String>) {
@@ -118,6 +158,10 @@ object ConfigManager {
     data class ConfigData(
         val id: String,
         val type: KClass<out WalletConfig>,
+        /** is this configuration mandatory or optional? */
+        val required: Boolean = false,
+        /** are multiple configurations of the same name allowed? */
+        val multiple: Boolean = false,
         val onLoad: ((WalletConfig) -> Unit)? = null,
     )
 }
