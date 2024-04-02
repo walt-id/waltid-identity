@@ -1,5 +1,6 @@
 package id.walt.cli.commands
 
+import com.github.ajalt.clikt.core.MissingOption
 import com.github.ajalt.clikt.core.PrintHelpMessage
 import com.github.ajalt.clikt.testing.test
 import id.walt.cli.util.KeyUtil
@@ -7,9 +8,11 @@ import id.walt.cli.util.VCUtil
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.assertDoesNotThrow
+import org.junit.jupiter.api.assertThrows
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertContains
+import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
 class WaltIdVCVerifyCmdTest {
@@ -47,6 +50,7 @@ class WaltIdVCVerifyCmdTest {
     val signedValidHolderVCFilePath = "${resourcesPath}/vc/openbadgecredential_sample.signed.json"
     val signedInvalidHolderVCFilePath = "${resourcesPath}/vc/openbadgecredential_sample.invalidholder.signed.json"
 
+    val schemaFilePath = "${resourcesPath}/schema/ob_v3p0_achievementcredential_schema.json"
 
     @Test
     fun `should print help message when called with --help argument`() {
@@ -152,15 +156,6 @@ class WaltIdVCVerifyCmdTest {
     }
 
     @Test
-    fun `should verify the VC's schema when --policy=schema`() {
-        val result1 = command.test(listOf("--policy=schema", signedValidSchemaVCFilePath))
-        assertContains(result1.output, "schema: Success")
-
-        val result2 = command.test(listOf("--policy=schema", signedInvalidSchemaVCFilePath))
-        assertContains(result2.output, """schema: Fail!.*missing required properties: \[name\].*""".toRegex())
-    }
-
-    @Test
     fun `should verify the VP's issuer - ie the presenter - when --policy=holder-binding`() {
         val result1 = command.test(listOf("--policy=holder-binding", signedValidHolderVCFilePath))
         assertContains(result1.output, "holder-binding: Success")
@@ -170,6 +165,24 @@ class WaltIdVCVerifyCmdTest {
     }
 
     // Parameterized Verification Policies
+
+    @Test
+    fun `should require --arg schema=filepath when --policy=schema`() {
+        val failure =
+            assertThrows<MissingOption> { command.parse(listOf("--policy=schema", signedValidSchemaVCFilePath)) }
+        assertEquals(failure.paramName, "--arg")
+    }
+
+    @Test
+    fun `should verify the VC's schema when --policy=schema`() {
+        val result1 =
+            command.test(listOf("--policy=schema", "--arg=schema=${schemaFilePath}", signedValidSchemaVCFilePath))
+        assertContains(result1.output, "schema: Success")
+
+        val result2 =
+            command.test(listOf("--policy=schema", "--arg=schema=${schemaFilePath}", signedInvalidSchemaVCFilePath))
+        assertContains(result2.output, """schema: Fail!.*missing required properties: \[name\].*""".toRegex())
+    }
 
     @Test
     fun `should (call the URL) when --policy=webhook`() {
