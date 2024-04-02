@@ -43,6 +43,8 @@ import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.Instant
 import kotlinx.datetime.plus
 import kotlinx.serialization.json.*
+import org.komputing.khash.keccak.Keccak
+import org.komputing.khash.keccak.KeccakParameter
 import java.nio.ByteBuffer
 import java.time.Duration
 import java.util.UUID
@@ -111,7 +113,7 @@ class DidCreationTest {
     }
 
     val CLIENT_MOCK_PORT = 5000
-    val CLIENT_MOCK_URL = "https://c6b8-62-178-27-231.ngrok-free.app/client-mock"//"http://192.168.0.122:5000/client-mock"
+    val CLIENT_MOCK_URL = "https://96fa-2001-871-25f-66b3-9ea8-fc44-915d-107e.ngrok-free.app/client-mock"//"http://192.168.0.122:5000/client-mock"
     val CLIENT_MAIN_KEY = runBlocking { LocalKey.generate(KeyType.secp256k1) }
     val CLIENT_VCSIGN_KEY = runBlocking { LocalKey.generate(KeyType.secp256r1) }
     fun startClientMockServer() {
@@ -294,6 +296,11 @@ class DidCreationTest {
         assertNotNull(accessTokenResponse.accessToken)
         println(accessTokenResponse.accessToken)
 
+        // compute ethereum address from public key
+        // https://www.rareskills.io/post/generate-ethereum-address-from-private-key-python
+        // An ethereum address is the last 20 bytes of the keccack256 of the public key. The public key algorithm is secp256k1 [...] The public key is the concatenation of x and y, and that is what we take the hash of.
+        // getPublicKeyRepresentation seems to return some other bytes first and then the 64 bytes of the concatenation of the x and y coordinates
+        val ethAddr = CLIENT_MAIN_KEY.getPublicKeyRepresentation().takeLast(64).toByteArray().let { Keccak.digest(it, KeccakParameter.KECCAK_256) }.takeLast(20).toByteArray().toHexString().let { "0x$it" }
         // insert DID document:
         http.post("https://api-conformance.ebsi.eu/did-registry/v5/jsonrpc") {
             bearerAuth(accessTokenResponse.accessToken!!)
@@ -303,7 +310,7 @@ class DidCreationTest {
                 put("method", "insertDidDocument")
                 put("params", buildJsonArray {
                     add(buildJsonObject {
-                        put("from", TODO())
+                        put("from", ethAddr)
                         put("did", did)
                         put("baseDocument", TODO())
                         put("vMethodId", CLIENT_MAIN_KEY.getThumbprint())
