@@ -1,8 +1,8 @@
 package id.walt.webwallet.service.credentials.status.fetch
 
 import id.walt.crypto.utils.JsonUtils.toJsonElement
-import id.walt.crypto.utils.JwsUtils.decodeJws
-import id.walt.did.dids.DidService
+import id.walt.webwallet.service.JwsDecoder
+import id.walt.webwallet.service.dids.DidResolverService
 import id.walt.webwallet.utils.Base64Utils
 import id.walt.webwallet.utils.HttpUtils
 import id.walt.webwallet.utils.JsonUtils
@@ -17,16 +17,17 @@ import kotlinx.uuid.UUID
 
 class EntraStatusListCredentialFetchStrategy(
     private val http: HttpClient,
+    private val didResolverService: DidResolverService,
+    private val jwsDecoder: JwsDecoder,
 ) : StatusListCredentialFetchStrategy {
     override suspend fun fetch(url: String): JsonObject = url.substringBefore("?").let { did ->
-        DidService.resolve(did).getOrNull()?.let {
+        didResolverService.resolve(did)?.let {
             val parameters = HttpUtils.parseQueryParam(url.substringAfter("?"))
             val serviceEndpoint = getServiceEndpoint(it, parameters["service"])
             parameters["queries"]?.toJsonElement()?.jsonObject?.let {
                 getServiceEndpointResponse(serviceEndpoint, did, it).toJsonElement().jsonObject.let {
                     JsonUtils.tryGetData(it, "replies.entries.data")?.let {
-                        Base64Utils.decode(it.jsonPrimitive.content).decodeToString()
-                            .decodeJws(allowMissingSignature = true).payload
+                        jwsDecoder.payload(Base64Utils.decode(it.jsonPrimitive.content).decodeToString())
                     } ?: error("Failed to parse service-endpoint reponsed: $serviceEndpoint")
                 }
             } ?: error("Failed to parse descriptor from 'queries' parameter")
