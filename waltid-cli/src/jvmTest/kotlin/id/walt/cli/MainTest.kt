@@ -74,7 +74,14 @@ class MainTest {
     val did1 = "did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV"
     val did2 = "did:key:z6Mkjm2gaGsodGchfG4k8P6KwCHZsVEPZho5VuEbY94qiBB9"
     val vcFilePath = "${resourcesPath}/vc/openbadgecredential_sample.json"
+
     val signedVCFilePath = "${resourcesPath}/vc/openbadgecredential_sample.signed.json"
+    val badSignedVCFilePath = "${resourcesPath}/vc/openbadgecredential_sample.signed.badsignature.json"
+
+    val signedValidSchemaVCFilePath = "${resourcesPath}/vc/openbadgecredential_sample.signed.json"
+    val signedInvalidSchemaVCFilePath = "${resourcesPath}/vc/openbadgecredential_sample.invalidschema.signed.json"
+
+    val schemaFilePath = "${resourcesPath}/schema/ob_v3p0_achievementcredential_schema.json"
 
     @Test
     fun `should show usage message when called with no arguments`(output: CapturedOutput) {
@@ -350,12 +357,59 @@ class MainTest {
     }
 
     @Test
-    @Ignore
     fun `should verify the signature of a VC if the VC file is provided with no other parameter`(output: CapturedOutput) {
-        main(arrayOf("""vc verify "${signedVCFilePath}" """))
+        main(arrayOf("vc", "verify", "signature", "${signedVCFilePath}"))
 
         assertFalse(output.all.contains("ERROR"))
-        assertContains(output.all, "VC signature is valid.")
+        assertContains(output.all, "signature: Success! ")
+    }
+
+    @Test
+    fun `should succeed the signature verification when a valid VC is provided`(output: CapturedOutput) {
+        main(arrayOf("vc", "verify", "signature", "${signedVCFilePath}"))
+
+        assertFalse(output.all.contains("ERROR"))
+        assertContains(output.all, "signature: Success! ")
+    }
+
+    @Test
+    fun `should fail the signature verification when an invalid VC is provided`(output: CapturedOutput) {
+        main(arrayOf("vc", "verify", "signature", "${badSignedVCFilePath}"))
+
+        assertContains(output.all, "signature: Fail!")
+    }
+
+
+    @Test
+    fun `should succeed the schema verification when a valid VC is provided`(output: CapturedOutput) {
+        main(arrayOf("vc", "verify", "schema", "--schema=${schemaFilePath}", "${signedValidSchemaVCFilePath}"))
+
+        assertFalse(output.all.contains("ERROR"))
+        assertContains(output.all, "schema: Success! ")
+    }
+
+    @Test
+    fun `should fail the schema verification when an invalid VC is provided`(output: CapturedOutput) {
+        main(arrayOf("vc", "verify", "schema", "--schema=${schemaFilePath}", "${signedInvalidSchemaVCFilePath}"))
+
+        assertContains(output.all, "schema: Fail!")
+        assertContains(output.all, "missing required properties: [name]")
+    }
+
+    @Test
+    fun `should apply all policies specified`(output: CapturedOutput) {
+        main(
+            arrayOf(
+                "vc",
+                "verify",
+                "signature",
+                "schema",
+                "--schema=${schemaFilePath}",
+                "${signedInvalidSchemaVCFilePath}"
+            )
+        )
+        assertContains(output.all, "signature: Success!")
+        assertContains(output.all, "schema: Success!")
     }
 
     private fun testSuccessfulKeyCmd(
