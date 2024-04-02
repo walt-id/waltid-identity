@@ -165,8 +165,11 @@ object AccountsService {
             .firstOrNull()
     }
 
-    fun getNameFor(account: UUID) =
-        Accounts.selectAll().where { Accounts.id eq account }.single()[Accounts.email]
+    fun get(account: UUID) = transaction {
+        Accounts.selectAll().where { Accounts.id eq account }.single().let {
+            Account(it)
+        }
+    }
 }
 
 @Serializable
