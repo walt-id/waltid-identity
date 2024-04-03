@@ -12,7 +12,6 @@ import id.walt.did.dids.registrar.dids.DidWebCreateOptions
 import id.walt.did.dids.resolver.LocalResolver
 import id.walt.did.utils.EnumUtils.enumValueIgnoreCase
 import id.walt.oid4vc.data.CredentialOffer
-import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.errors.AuthorizationError
 import id.walt.oid4vc.providers.CredentialWalletConfig
 import id.walt.oid4vc.providers.OpenIDClientConfig
@@ -146,71 +145,6 @@ class SSIKit2WalletService(
 
     override suspend fun rejectCredential(parameter: CredentialRequestParameter): Boolean =
         credentialService.delete(walletId, parameter.credentialId, true)
-
-    override fun matchCredentialsByPresentationDefinition(
-        presentationDefinition: PresentationDefinition
-    ): List<WalletCredential> {
-        val credentialList = listCredentials(CredentialFilterObject.default)
-
-        logger.debug { "WalletCredential list is: ${credentialList.map { it.parsedDocument?.get("type")!!.jsonArray }}" }
-
-        data class TypeFilter(val path: String, val type: String? = null, val pattern: String)
-
-        val filters =
-            presentationDefinition.inputDescriptors.mapNotNull { inputDescriptor ->
-                inputDescriptor.constraints
-                    ?.fields
-                    ?.filter { field -> field.path.any { path -> path.contains("type") } }
-                    ?.map {
-                        val path = it.path.first().removePrefix("$.")
-                        val filterType = it.filter?.get("type")?.jsonPrimitive?.content
-                        val filterPattern =
-                            it.filter?.get("pattern")?.jsonPrimitive?.content
-                                ?: throw IllegalArgumentException(
-                                    "No filter pattern in presentation definition constraint"
-                                )
-
-                        TypeFilter(path, filterType, filterPattern)
-                    }
-                    ?.plus(
-                        inputDescriptor.schema?.map { schema -> TypeFilter("type", "string", schema.uri) }
-                            ?: listOf())
-            }
-
-        logger.debug { "Using filters: $filters" }
-
-        val matchedCredentials =
-            when {
-                filters.isNotEmpty() ->
-                    credentialList.filter { credential ->
-                        filters.any { fields ->
-                            fields.all { typeFilter ->
-                                val credField = credential.parsedDocument!![typeFilter.path] ?: return@all false
-
-                                when (credField) {
-                                    is JsonPrimitive -> credField.jsonPrimitive.content == typeFilter.pattern
-                                    is JsonArray ->
-                                        credField.jsonArray.last().jsonPrimitive.content == typeFilter.pattern
-
-                                    else -> false
-                                }
-                            }
-                        }
-                    }
-
-                else ->
-                    credentialList.filter { cred ->
-                        presentationDefinition.inputDescriptors.any { desc ->
-                            desc.name ==
-                                    cred.parsedDocument?.get("type")?.jsonArray?.last()?.jsonPrimitive?.content
-                        }
-                    }
-            }
-
-        logger.debug { "Matched credentials: $matchedCredentials" }
-
-        return matchedCredentials.ifEmpty { credentialList }
-    }
 
     private fun getQueryParams(url: String): Map<String, MutableList<String>> {
         val params: MutableMap<String, MutableList<String>> = HashMap()

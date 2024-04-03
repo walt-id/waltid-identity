@@ -2,7 +2,6 @@ package id.walt.webwallet.service
 
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.oid4vc.data.CredentialOffer
-import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.requests.CredentialOfferRequest
 import id.walt.webwallet.db.models.WalletCategoryData
 import id.walt.webwallet.db.models.WalletCredential
@@ -34,8 +33,6 @@ abstract class WalletService(val tenant: String, val accountId: UUID, val wallet
     abstract suspend fun detachCategory(credentialId: String, categories: List<String>): Boolean
     abstract suspend fun renameCategory(oldName: String, newName: String): Boolean
     abstract fun getCredentialsByIds(credentialIds: List<String>): List<WalletCredential>
-
-    abstract fun matchCredentialsByPresentationDefinition(presentationDefinition: PresentationDefinition): List<WalletCredential>
 
     // SIOP
     abstract suspend fun usePresentationRequest(parameter: PresentationRequestParameter): Result<String?>
