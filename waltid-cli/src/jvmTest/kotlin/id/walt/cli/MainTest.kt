@@ -358,7 +358,7 @@ class MainTest {
 
     @Test
     fun `should verify the signature of a VC if the VC file is provided with no other parameter`(output: CapturedOutput) {
-        main(arrayOf("vc", "verify", "signature", "${signedVCFilePath}"))
+        main(arrayOf("vc", "verify", "--policy=signature", "${signedVCFilePath}"))
 
         assertFalse(output.all.contains("ERROR"))
         assertContains(output.all, "signature: Success! ")
@@ -366,7 +366,7 @@ class MainTest {
 
     @Test
     fun `should succeed the signature verification when a valid VC is provided`(output: CapturedOutput) {
-        main(arrayOf("vc", "verify", "signature", "${signedVCFilePath}"))
+        main(arrayOf("vc", "verify", "--policy=signature", "${signedVCFilePath}"))
 
         assertFalse(output.all.contains("ERROR"))
         assertContains(output.all, "signature: Success! ")
@@ -374,7 +374,7 @@ class MainTest {
 
     @Test
     fun `should fail the signature verification when an invalid VC is provided`(output: CapturedOutput) {
-        main(arrayOf("vc", "verify", "signature", "${badSignedVCFilePath}"))
+        main(arrayOf("vc", "verify", "--policy=signature", "${badSignedVCFilePath}"))
 
         assertContains(output.all, "signature: Fail!")
     }
@@ -382,7 +382,16 @@ class MainTest {
 
     @Test
     fun `should succeed the schema verification when a valid VC is provided`(output: CapturedOutput) {
-        main(arrayOf("vc", "verify", "schema", "--schema=${schemaFilePath}", "${signedValidSchemaVCFilePath}"))
+        main(
+            arrayOf(
+                "vc",
+                "verify",
+                "--policy=schema",
+                "-a",
+                "schema=${schemaFilePath}",
+                "${signedValidSchemaVCFilePath}"
+            )
+        )
 
         assertFalse(output.all.contains("ERROR"))
         assertContains(output.all, "schema: Success! ")
@@ -390,7 +399,16 @@ class MainTest {
 
     @Test
     fun `should fail the schema verification when an invalid VC is provided`(output: CapturedOutput) {
-        main(arrayOf("vc", "verify", "schema", "--schema=${schemaFilePath}", "${signedInvalidSchemaVCFilePath}"))
+        main(
+            arrayOf(
+                "vc",
+                "verify",
+                "--policy=schema",
+                "-a",
+                "schema=${schemaFilePath}",
+                "${signedInvalidSchemaVCFilePath}"
+            )
+        )
 
         assertContains(output.all, "schema: Fail!")
         assertContains(output.all, "missing required properties: [name]")
@@ -402,14 +420,16 @@ class MainTest {
             arrayOf(
                 "vc",
                 "verify",
-                "signature",
-                "schema",
-                "--schema=${schemaFilePath}",
+                "--policy=signature",
+                "--policy=schema",
+                "-a",
+                "schema=${schemaFilePath}",
                 "${signedInvalidSchemaVCFilePath}"
             )
         )
         assertContains(output.all, "signature: Success!")
-        assertContains(output.all, "schema: Success!")
+        assertContains(output.all, "schema: Fail!")
+        assertContains(output.all, "schema: Fail!.*missing required properties".toRegex())
     }
 
     private fun testSuccessfulKeyCmd(

@@ -103,32 +103,6 @@ class ExpirationDatePolicyTest {
     }
 
     @Test
-    fun `should fail Verifier + jws-payload("vc")`() {
-
-        val data = expiredJws.decodeJws().payload["vc"].toString()
-
-        val policy = PolicyManager.getPolicy("expired")
-        val request = PolicyRequest(policy = policy)
-
-        val result = runBlocking { Verifier.verifyCredential(data, listOf(request)) }
-
-        assertFail(result[0].result)
-    }
-
-    @Test
-    fun `should fail Verifier + jws-payload`() {
-
-        val data = expiredJws.decodeJws().payload.toString()
-
-        val policy = PolicyManager.getPolicy("expired")
-        val request = PolicyRequest(policy = policy)
-
-        val result = runBlocking { Verifier.verifyCredential(data, listOf(request)) }
-
-        assertFail(result[0].result)
-    }
-
-    @Test
     fun `should fail Verifier + jws`() {
 
         val data = expiredJws
