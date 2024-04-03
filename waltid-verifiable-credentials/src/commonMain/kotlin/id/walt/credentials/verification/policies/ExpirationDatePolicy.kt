@@ -16,24 +16,27 @@ import kotlin.js.JsExport
 class ExpirationDatePolicy : CredentialWrapperValidatorPolicy(
     "expired", "Verifies that the credentials expiration date (`exp` for JWTs) has not been exceeded."
 ) {
+
+    private fun JsonPrimitive.parseDate(): Instant? =
+        longOrNull?.let { Instant.fromEpochSeconds(it) }
+            ?: if (isString) Instant.parse(content) else null
+
+    private fun JsonObject.retrieveExpirationDate(): Pair<Instant, String>? {
+        return JSON_WRAPPER_KEYS.firstNotNullOfOrNull { get(it)?.jsonPrimitive?.parseDate()?.to(it) }
+            ?: get("vc")?.jsonObject?.run {
+                JSON_CREDENTIAL_KEYS.firstNotNullOfOrNull { get(it)?.jsonPrimitive?.parseDate()?.to(it) }
+            }
+    }
+
+
     @JvmBlocking
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
     override suspend fun verify(data: JsonElement, args: Any?, context: Map<String, Any>): Result<Any> {
-        var successfulKey = ""
+        if (data !is JsonObject) return UNAVAILABLE_RESULT
 
-        fun setKey(key: String) {
-            successfulKey = key
-        }
-
-        val exp = data.jsonObject["exp"]?.jsonPrimitive?.longOrNull?.let { setKey("jwt:exp"); Instant.fromEpochSeconds(it) }
-            ?: data.jsonObject["validUntil"]?.jsonPrimitive?.let { setKey("validUntil"); Instant.parse(it.content) }
-            ?: data.jsonObject["expirationDate"]?.jsonPrimitive?.let { setKey("expirationDate"); Instant.parse(it.content) }
-            ?: return Result.success(
-                JsonObject(mapOf("policy_available" to JsonPrimitive(false)))
-            )
-
+        val (exp, successfulKey) = data.retrieveExpirationDate() ?: return UNAVAILABLE_RESULT
         val now = Clock.System.now()
 
         if (now > exp) {
@@ -64,5 +67,12 @@ class ExpirationDatePolicy : CredentialWrapperValidatorPolicy(
                 )
             )
         }
+    }
+
+    companion object {
+        private val UNAVAILABLE_RESULT = Result.success(JsonObject(mapOf("policy_available" to JsonPrimitive(false))))
+
+        private val JSON_WRAPPER_KEYS = listOf("exp", "validUntil", "expirationDate")
+        private val JSON_CREDENTIAL_KEYS = listOf("validUntil", "expirationDate")
     }
 }
