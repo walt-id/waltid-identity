@@ -25,12 +25,10 @@ object Base64Utils {
 }
 
 object StreamUtils {
-    fun getBitValue(inputStream: InputStream, idx: ULong? = null, bitSize: Int) =
+    fun getBitValue(inputStream: InputStream, index: ULong, bitSize: Int) =
         inputStream.bufferedReader().use { buffer ->
-            idx?.let { index ->
-                buffer.skip((index * bitSize.toULong()).toLong())
-                extractBitValue(buffer, index, bitSize.toULong())
-            }
+            buffer.skip((index * bitSize.toULong()).toLong())
+            extractBitValue(buffer, index, bitSize.toULong())
         }
 
     private fun extractBitValue(it: BufferedReader, index: ULong, bitSize: ULong): List<Char> {
