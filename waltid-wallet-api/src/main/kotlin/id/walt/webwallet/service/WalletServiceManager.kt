@@ -22,6 +22,13 @@ import id.walt.webwallet.usecase.claim.ExplicitClaimStrategy
 import id.walt.webwallet.usecase.claim.SilentClaimStrategy
 import id.walt.webwallet.usecase.event.EventFilterUseCase
 import id.walt.webwallet.usecase.event.EventUseCase
+import id.walt.webwallet.usecase.exchange.MatchPresentationDefinitionCredentialsUseCase
+import id.walt.webwallet.usecase.exchange.NoMatchPresentationDefinitionCredentialsUseCase
+import id.walt.webwallet.usecase.exchange.PresentationDefinitionFilterParser
+import id.walt.webwallet.usecase.exchange.strategies.DescriptorNoMatchPresentationDefinitionMatchStrategy
+import id.walt.webwallet.usecase.exchange.strategies.DescriptorPresentationDefinitionMatchStrategy
+import id.walt.webwallet.usecase.exchange.strategies.FilterNoMatchPresentationDefinitionMatchStrategy
+import id.walt.webwallet.usecase.exchange.strategies.FilterPresentationDefinitionMatchStrategy
 import id.walt.webwallet.usecase.issuer.IssuerUseCaseImpl
 import id.walt.webwallet.usecase.notification.NotificationFilterUseCase
 import id.walt.webwallet.usecase.notification.NotificationUseCase
@@ -44,6 +51,7 @@ object WalletServiceManager {
     private val credentialService = CredentialsService()
     private val credentialTypeSeeker = DefaultCredentialTypeSeeker()
     private val eventService = EventService()
+    private val filterParser = PresentationDefinitionFilterParser()
     val eventUseCase = EventUseCase(eventService)
     val eventFilterUseCase = EventFilterUseCase(eventService)
     val oidcConfig by lazy { ConfigManager.getConfig<OidcConfiguration>() }
@@ -52,6 +60,16 @@ object WalletServiceManager {
     val verifierTrustValidationService = DefaultTrustValidationService(httpClient, trustConfig.verifiersRecord)
     val notificationUseCase = NotificationUseCase(NotificationService, httpClient)
     val notificationFilterUseCase = NotificationFilterUseCase(NotificationService, credentialService)
+    val matchPresentationDefinitionCredentialsUseCase = MatchPresentationDefinitionCredentialsUseCase(
+        credentialService,
+        FilterPresentationDefinitionMatchStrategy(filterParser),
+        DescriptorPresentationDefinitionMatchStrategy()
+    )
+    val unmatchedPresentationDefinitionCredentialsUseCase = NoMatchPresentationDefinitionCredentialsUseCase(
+        credentialService,
+        FilterNoMatchPresentationDefinitionMatchStrategy(filterParser),
+        DescriptorNoMatchPresentationDefinitionMatchStrategy(),
+    )
     val silentClaimStrategy = SilentClaimStrategy(
         issuanceService = IssuanceService,
         credentialService = credentialService,
