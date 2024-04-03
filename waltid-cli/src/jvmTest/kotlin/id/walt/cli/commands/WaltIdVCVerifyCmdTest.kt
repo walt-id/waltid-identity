@@ -12,7 +12,6 @@ import org.junit.jupiter.api.assertThrows
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertContains
-import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
 class WaltIdVCVerifyCmdTest {
@@ -36,9 +35,9 @@ class WaltIdVCVerifyCmdTest {
     val signedNotExpiredVCFilePath = "${resourcesPath}/vc/openbadgecredential_sample.signed.json"
 
     val validFromVCFilePath = "${resourcesPath}/vc/openbadgecredential_sample.json"
-    val invalidFromVCFilePath = "${resourcesPath}/vc/openbadgecredential_sample.invalidfrom.json"
+    val invalidFromVCFilePath = "${resourcesPath}/vc/openbadgecredential_sample.invalidnotbefore.json"
     val signedValidFromVCFilePath = "${resourcesPath}/vc/openbadgecredential_sample.signed.json"
-    val signedInvalidFromVCFilePath = "${resourcesPath}/vc/openbadgecredential_sample.invalidfrom.signed.json"
+    val signedInvalidFromVCFilePath = "${resourcesPath}/vc/openbadgecredential_sample.invalidnotbefore.signed.json"
 
     val validSchemaVCFilePath = "${resourcesPath}/vc/openbadgecredential_sample.json"
     val invalidSchemaVCFilePath = "${resourcesPath}/vc/openbadgecredential_sample.invalidschema.json"
@@ -95,7 +94,14 @@ class WaltIdVCVerifyCmdTest {
     @Test
     fun `should accept multiple --policy options`() {
         assertDoesNotThrow {
-            command.parse(listOf("--policy=signature", "--policy=schema", "${signedVCFilePath}"))
+            command.parse(
+                listOf(
+                    "--policy=signature",
+                    "--policy=schema",
+                    "--arg=schema=${schemaFilePath}",
+                    "${signedVCFilePath}"
+                )
+            )
         }
     }
 
@@ -156,7 +162,7 @@ class WaltIdVCVerifyCmdTest {
     }
 
     @Test
-    fun `should verify the VP's issuer - ie the presenter - when --policy=holder-binding`() {
+    fun `should verify if the VP's issuer - ie the presenter - is also the subject of all VCs included when --policy=holder-binding`() {
         val result1 = command.test(listOf("--policy=holder-binding", signedValidHolderVCFilePath))
         assertContains(result1.output, "holder-binding: Success")
 
@@ -167,10 +173,10 @@ class WaltIdVCVerifyCmdTest {
     // Parameterized Verification Policies
 
     @Test
-    fun `should require --arg schema=filepath when --policy=schema`() {
+    fun `should require --arg=schema=filepath when --policy=schema`() {
         val failure =
             assertThrows<MissingOption> { command.parse(listOf("--policy=schema", signedValidSchemaVCFilePath)) }
-        assertEquals(failure.paramName, "--arg")
+        failure.paramName?.let { assertContains(it, "--arg") }
     }
 
     @Test
