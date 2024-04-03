@@ -11,6 +11,7 @@ import com.github.ajalt.clikt.parameters.types.choice
 import com.github.ajalt.clikt.parameters.types.file
 import id.walt.cli.util.PrettyPrinter
 import id.walt.cli.util.VCUtil
+import id.walt.credentials.verification.ExpirationDatePolicyException
 import id.walt.credentials.verification.JsonSchemaVerificationException
 import id.walt.credentials.verification.policies.ExpirationDatePolicy
 import id.walt.credentials.verification.policies.NotBeforeDatePolicy
@@ -96,7 +97,7 @@ class VCVerifyCmd : CliktCommand(
     //         // "allowed-issuer",
     //         // "not-before"
     //     )
-        // .default("signature")
+    // .default("signature")
     // .multiple()
 
 
@@ -146,11 +147,6 @@ class VCVerifyCmd : CliktCommand(
 
                 if (innerException != null) {
                     details = innerException.message!!
-                    // if (innerException is ExpirationDatePolicyException && (innerException as ExpirationDatePolicyException).policyAvailable) {
-                    //     reason = "??"
-                    // } else if (innerException is IllegalStateException) {
-                    //     reason = innerException.message!!
-                    // }
                 } else if (it.result.getOrNull() !is Unit &&
                     "policy_available" in it.result.getOrThrow() as JsonObject &&
                     !(it.result.getOrThrow() as JsonObject).get("policy_available")!!.equals(JsonPrimitive(true))
@@ -173,23 +169,33 @@ class VCVerifyCmd : CliktCommand(
                 print.green("Success! ", false)
                 print.plain(details)
             } else { // isFailure
-                val exception = it.result.exceptionOrNull()
-                if (exception is JsonSchemaVerificationException) {
-                    exception.validationErrors.forEach { err ->
-                        print.dim("${it.request.policy.name}: ", false)
-                        print.red("Fail! ", false)
-                        if (err.objectPath.isEmpty()) {
-                            print.italic("""-> ${err.message}""")
-                        } else {
-                            print.italic(""""${err.objectPath}" (in ${err.schemaPath}) -> ${err.message}""")
+                when (val exception = it.result.exceptionOrNull()) {
+
+                    is JsonSchemaVerificationException -> {
+                        exception.validationErrors.forEach { err ->
+                            print.dim("${it.request.policy.name}: ", false)
+                            print.red("Fail! ", false)
+                            if (err.objectPath.isEmpty()) {
+                                print.italic("""-> ${err.message}""")
+                            } else {
+                                print.italic(""""${err.objectPath}" (in ${err.schemaPath}) -> ${err.message}""")
+                            }
                         }
                     }
-                } else {
-                    print.dim("${it.request.policy.name}: ", false)
-                    print.red("Fail! ", false)
-                    exception?.message?.let { print.italic(it) }
+
+                    is ExpirationDatePolicyException -> {
+                        print.dim("${it.request.policy.name}: ", false)
+                        print.red("Fail! ", false)
+                        print.italic("VC expired since ${exception.date}")
+                    }
+
+                    else -> {
+                        print.dim("${it.request.policy.name}: ", false)
+                        print.red("Fail! ", false)
+                        exception?.message?.let { print.italic(it) }
+                    }
                 }
-            }
-        }
-    }
-}
+            } // isFailure
+        } // results.forEach
+    } // run()
+} // class
