@@ -1,7 +1,9 @@
 import id.walt.credentials.PresentationBuilder
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.LocalKey
+import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.crypto.utils.MultiBaseUtils
+import id.walt.did.dids.document.DidEbsiDocument
 import id.walt.did.dids.registrar.dids.DidKeyCreateOptions
 import id.walt.did.dids.registrar.dids.DidWebCreateOptions
 import id.walt.did.dids.registrar.local.key.DidKeyRegistrar
@@ -298,10 +300,26 @@ class DidCreationTest {
 
         // compute ethereum address from public key
         // https://www.rareskills.io/post/generate-ethereum-address-from-private-key-python
-        // An ethereum address is the last 20 bytes of the keccack256 of the public key. The public key algorithm is secp256k1 [...] The public key is the concatenation of x and y, and that is what we take the hash of.
-        // getPublicKeyRepresentation seems to return some other bytes first and then the 64 bytes of the concatenation of the x and y coordinates
-        val ethAddr = CLIENT_MAIN_KEY.getPublicKeyRepresentation().takeLast(64).toByteArray().let { Keccak.digest(it, KeccakParameter.KECCAK_256) }.takeLast(20).toByteArray().toHexString().let { "0x$it" }
+        // "An ethereum address is the last 20 bytes of the keccak256 of the public key. The public key algorithm is secp256k1 [...] The public key is the concatenation of x and y, and that is what we take the hash of."
+        // getPublicKeyRepresentation() seems to return some other bytes first and then the 64 bytes of the concatenation of the x and y coordinates
+        val ethAddr = CLIENT_MAIN_KEY.getPublicKeyRepresentation().takeLast(64).toByteArray().let {
+            Keccak.digest(it, KeccakParameter.KECCAK_256)
+        }.takeLast(20).toByteArray().toHexString().let { "0x$it" }
         // insert DID document:
+        val basicDidDocument = DidEbsiDocument(
+            id = did, verificationMethod = listOf(
+                DidEbsiDocument.VerificationMethod(
+                    id = "$did#${CLIENT_MAIN_KEY.getKeyId()}",
+                    type = CLIENT_MAIN_KEY.keyType.name,
+                    controller = did,
+                    publicKeyJwk = CLIENT_MAIN_KEY.exportJWKObject()
+                )
+            ),
+            assertionMethod = null,
+            authentication = listOf("$did#${CLIENT_MAIN_KEY.getKeyId()}"),
+            capabilityInvocation = listOf("$did#${CLIENT_MAIN_KEY.getKeyId()}"),
+            capabilityDelegation = null, keyAgreement = null
+        )
         http.post("https://api-conformance.ebsi.eu/did-registry/v5/jsonrpc") {
             bearerAuth(accessTokenResponse.accessToken!!)
             contentType(ContentType.Application.Json)
@@ -312,7 +330,7 @@ class DidCreationTest {
                     add(buildJsonObject {
                         put("from", ethAddr)
                         put("did", did)
-                        put("baseDocument", TODO())
+                        put("baseDocument", Json.encodeToJsonElement(basicDidDocument))
                         put("vMethodId", CLIENT_MAIN_KEY.getThumbprint())
                         put("publicKey", CLIENT_MAIN_KEY.getPublicKeyRepresentation().toHexString().let { "0x04$it" })
                         put("isSecp256k1", true)

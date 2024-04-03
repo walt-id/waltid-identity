@@ -89,6 +89,7 @@ kotlin {
 
                 // Crypto
                 api(project(":waltid-crypto"))
+                implementation("com.github.komputing.khash:keccak:1.1.3")
 
                 // Encodings
                 implementation("net.thauvin.erik.urlencoder:urlencoder-lib:1.4.0")
@@ -129,7 +130,6 @@ kotlin {
                 implementation("io.ktor:ktor-server-netty:2.3.8")
                 implementation(project(":waltid-openid4vc"))
                 implementation(project(":waltid-verifiable-credentials"))
-                implementation("com.github.komputing.khash:keccak:1.1.3")
             }
         }
         val jsMain by getting {
