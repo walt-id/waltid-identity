@@ -116,7 +116,7 @@ class WaltIdVCVerifyCmdTest {
         val result1 = command.test(listOf("${signedVCFilePath}"))
         assertContains(result1.output, "signature: Success")
 
-        val result2 = command.test(listOf("--policy=schema", signedVCFilePath))
+        val result2 = command.test(listOf("--policy=schema", "--arg=schema=${schemaFilePath}", signedVCFilePath))
         assertContains(result2.output, "schema: Success")
     }
 
@@ -143,7 +143,7 @@ class WaltIdVCVerifyCmdTest {
         assertContains(result1.output, "expired: Success")
 
         val result2 = command.test(listOf("--policy=expired", signedExpiredVCFilePath))
-        assertContains(result2.output, "expired: Fail!$".toRegex())
+        assertContains(result2.output, "expired: Fail! VC expired since")
     }
 
     @Test
@@ -152,7 +152,7 @@ class WaltIdVCVerifyCmdTest {
         assertContains(result1.output, "not-before: Success")
 
         val result2 = command.test(listOf("--policy=not-before", signedInvalidFromVCFilePath))
-        assertContains(result2.output, "not-before: Fail!$".toRegex())
+        assertContains(result2.output, "not-before: Fail! VC not valid until")
     }
 
     @Test
