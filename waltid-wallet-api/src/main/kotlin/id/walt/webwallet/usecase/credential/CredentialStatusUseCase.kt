@@ -16,7 +16,7 @@ class CredentialStatusUseCase(
             getStatusEntry(it).fold(emptyList()) { acc, i ->
                 acc.plus(credentialStatusServiceFactory.new(i.type).get(i))
             }
-        } ?: error("Credential not found or invliad document for id: $credentialId")
+        } ?: error("Credential not found or invalid document for id: $credentialId")
 
     private fun getStatusEntry(json: JsonObject) = json.jsonObject["credentialStatus"]?.let {
         when (it) {
