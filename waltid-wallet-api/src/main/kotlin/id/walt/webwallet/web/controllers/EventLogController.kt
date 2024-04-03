@@ -31,12 +31,12 @@ fun Application.eventLogs() = walletRoute {
                 }
                 queryParameter<String>("startingAfter") {
                     description = "Starting after page"
-                    example = "<hash>"
+                    example = ""
                     required = false
                 }
                 queryParameter<String>("sortBy") {
                     description = "The property to sort by"
-                    example = "tenant"
+                    example = ""
                     required = false
                 }
                 queryParameter<String>("sortOrder") {

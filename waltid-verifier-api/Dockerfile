@@ -28,6 +28,11 @@ FROM docker.io/eclipse-temurin:17
 COPY --from=buildstage /work/waltid-verifier-api/build/install/ /
 WORKDIR /waltid-verifier-api
 
+# Non-root user
+RUN groupadd -r appuser && useradd --no-log-init -r -g appuser appuser
+RUN chown -R appuser:appuser /waltid-verifier-api
+USER appuser
+
 EXPOSE 7003
 
 ENTRYPOINT ["/waltid-verifier-api/bin/waltid-verifier-api"]
