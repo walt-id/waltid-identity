@@ -32,13 +32,6 @@ class VCUtil {
 
         suspend fun sign(key: JWKKey, issuerDid: String, subjectDid: String, payload: String): String {
 
-            val mappings = JsonObject(emptyMap<String, JsonElement>())
-            // JsonObject(
-            //     mapOf(
-            //         "exp" to "123456".toJsonElement()
-            //     )
-            // )
-
             val vcAsMap = Json.decodeFromString<Map<String, JsonElement>>(payload)
             val vc = W3CVC(vcAsMap)
             val jws =
@@ -46,7 +39,7 @@ class VCUtil {
                     issuerKey = key,
                     issuerDid = issuerDid,
                     subjectDid = subjectDid,
-                    mappings = mappings,
+                    mappings = JsonObject(emptyMap<String, JsonElement>()),
                     additionalJwtHeader = emptyMap<String, String>(),
                     additionalJwtOptions = emptyMap<String, JsonObject>()
                 )
@@ -76,8 +69,6 @@ class VCUtil {
                 println("Something went wrong.")
                 return emptyList<PolicyResult>()
             }
-
-
         }
     }
 }
