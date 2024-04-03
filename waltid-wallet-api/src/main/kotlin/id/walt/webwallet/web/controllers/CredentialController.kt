@@ -52,8 +52,8 @@ fun Application.credentials() = walletRoute {
             }
         }) {
             val categories = call.request.queryParameters.getAll("category")
-            val showDeleted = call.request.queryParameters["showDeleted"].toBoolean()
-            val showPending = call.request.queryParameters["showPending"].toBoolean()
+            val showDeleted = call.request.queryParameters["showDeleted"]?.toBooleanStrictOrNull()
+            val showPending = call.request.queryParameters["showPending"]?.toBooleanStrictOrNull()
             val sortBy = call.request.queryParameters["sortBy"] ?: "addedOn"
             val descending = call.request.queryParameters["descending"].toBoolean()
             context.respond(

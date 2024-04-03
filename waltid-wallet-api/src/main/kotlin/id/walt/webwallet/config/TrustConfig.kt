@@ -7,5 +7,6 @@ data class TrustConfig(
     data class TrustRecord(
         val baseUrl: String,
         val trustRecordPath: String,
+        val governanceRecordPath: String,
     )
 }

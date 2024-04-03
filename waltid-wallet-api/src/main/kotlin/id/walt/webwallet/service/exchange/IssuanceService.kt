@@ -229,7 +229,6 @@ object IssuanceService {
         }
     }
 
-    //TODO: move to related entity
     private fun parseJwtCredentialResponse(
         credentialJwt: JwsUtils.JwsParts, document: String, manifest: JsonObject?, type: String
     ) = let {
@@ -247,7 +246,6 @@ object IssuanceService {
         )
     }
 
-    //TODO: move to related entity
     private fun parseSdJwtCredentialResponse(
         credentialJwt: JwsUtils.JwsParts, document: String, manifest: JsonObject?, type: String
     ) = let {

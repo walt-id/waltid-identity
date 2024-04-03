@@ -1,7 +1,6 @@
 package id.walt.webwallet.usecase.claim
 
 import TestUtils
-import id.walt.webwallet.notificationusecase.NotificationUseCase
 import id.walt.webwallet.seeker.Seeker
 import id.walt.webwallet.service.account.AccountsService
 import id.walt.webwallet.service.credentials.CredentialsService
@@ -9,16 +8,18 @@ import id.walt.webwallet.service.dids.DidsService
 import id.walt.webwallet.service.events.CredentialEventData
 import id.walt.webwallet.service.exchange.IssuanceService
 import id.walt.webwallet.service.issuers.IssuerDataTransferObject
+import id.walt.webwallet.service.trust.IssuerNameResolveService
 import id.walt.webwallet.service.trust.TrustValidationService
 import id.walt.webwallet.usecase.event.EventUseCase
 import id.walt.webwallet.usecase.issuer.IssuerUseCase
+import id.walt.webwallet.usecase.notification.NotificationUseCase
 import io.mockk.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.uuid.UUID
 import kotlinx.uuid.generateUUID
-import org.junit.Test
 import kotlin.test.BeforeTest
+import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class SilentClaimStrategyTest {
@@ -26,6 +27,7 @@ class SilentClaimStrategyTest {
     private val issuanceService = mockk<IssuanceService>()
     private val credentialService = mockk<CredentialsService>()
     private val issuerTrustValidationService = mockk<TrustValidationService>()
+    private val issuerNameResolveService = mockk<IssuerNameResolveService>()
     private val issuerUseCase = mockk<IssuerUseCase>()
     private val eventUseCase = mockk<EventUseCase>()
     private val notificationUseCase = mockk<NotificationUseCase>()
@@ -36,6 +38,7 @@ class SilentClaimStrategyTest {
         issuanceService = issuanceService,
         credentialService = credentialService,
         issuerTrustValidationService = issuerTrustValidationService,
+        issuerNameResolveService = issuerNameResolveService,
         accountService = accountService,
         didService = didService,
         issuerUseCase = issuerUseCase,
@@ -71,6 +74,7 @@ class SilentClaimStrategyTest {
         every { eventUseCase.log(any()) } just Runs
         every { notificationUseCase.add(any()) } returns listOf(UUID.generateUUID())
         coEvery { notificationUseCase.send(any()) } just Runs
+        coEvery { issuerNameResolveService.resolve(any()) } returns "test"
     }
 
     @Test
