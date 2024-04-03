@@ -10,7 +10,7 @@ class StatusListCredentialFetchFactory(
     private val defaultStrategy: DefaultStatusListCredentialFetchStrategy,
     private val entraStrategy: EntraStatusListCredentialFetchStrategy,
 ) {
-    private val didPattern = "^did:([\\d\\D]+):(.+)"
+    private val didPattern = "^did:([^:]+):(.+)"
     private val urlPattern =
         "^((https?:)(\\/\\/\\/?)([\\w]*(?::[\\w]*)?@)?([\\d\\w\\.-]+)(?::(\\d+))?)?([\\/\\\\w\\.()-]*)?(?:([?][^#]*)?(#.*)?)*"
 
