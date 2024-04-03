@@ -1,5 +1,6 @@
 package id.walt.webwallet.usecase.credential
 
+import id.walt.webwallet.service.credentials.CredentialStatusServiceFactory
 import id.walt.webwallet.service.credentials.CredentialsService
 import id.walt.webwallet.service.credentials.status.StatusListEntry
 import kotlinx.serialization.Serializable
@@ -8,12 +9,13 @@ import kotlinx.uuid.UUID
 
 class CredentialStatusUseCase(
     private val credentialService: CredentialsService,
-//    private val credentialStatusServiceFactory: CredentialStatusServiceFactory,
+    private val credentialStatusServiceFactory: CredentialStatusServiceFactory,
 ) {
-    fun get(wallet: UUID, credentialId: String): List<CredentialStatusResult> =
+    suspend fun get(wallet: UUID, credentialId: String): List<CredentialStatusResult> =
         credentialService.get(wallet, credentialId)?.parsedDocument?.let {
-            val statusEntries = getStatusEntry(it)
-            emptyList()
+            getStatusEntry(it).fold(emptyList()) { acc, i ->
+                acc.plus(credentialStatusServiceFactory.new().get(i))
+            }
         } ?: error("Credential not found or invliad document for id: $credentialId")
 
     private fun getStatusEntry(json: JsonObject) = json.jsonObject["credentialStatus"]?.let {

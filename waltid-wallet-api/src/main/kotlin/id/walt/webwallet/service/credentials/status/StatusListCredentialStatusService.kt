@@ -1,6 +1,8 @@
 package id.walt.webwallet.service.credentials.status
 
 import id.walt.crypto.utils.JsonUtils.toJsonElement
+import id.walt.webwallet.service.credentials.CredentialValidator
+import id.walt.webwallet.service.credentials.status.fetch.StatusListCredentialFetchFactory
 import id.walt.webwallet.usecase.credential.CredentialStatusResult
 import id.walt.webwallet.utils.Base64Utils
 import id.walt.webwallet.utils.StreamUtils
@@ -13,13 +15,14 @@ import kotlinx.serialization.json.jsonObject
 import java.util.zip.GZIPInputStream
 
 class StatusListCredentialStatusService(
-    private val credentialFetcher: CredentialFetcher,
+    private val credentialFetchFactory: StatusListCredentialFetchFactory,
     private val credentialValidator: CredentialValidator,
 ) : CredentialStatusService {
     private val json = Json { ignoreUnknownKeys = true }
-    override fun get(statusEntry: CredentialStatusEntry): CredentialStatusResult =
+    override suspend fun get(statusEntry: CredentialStatusEntry): CredentialStatusResult =
         (statusEntry as? StatusListEntry)?.let { entry ->
-            val credential = json.decodeFromString<JsonObject>(credentialFetcher.fetch(entry.statusListCredential))
+//            val credential = json.decodeFromString<JsonObject>(credentialFetcher.fetch(entry.statusListCredential))
+            val credential = credentialFetchFactory.new(entry.statusListCredential).fetch(entry.statusListCredential)
             val subject =
                 extractCredentialSubject(credential) ?: error("Failed to prase status list credential subject")
             credentialValidator.validate(entry.statusPurpose, subject.statusPurpose, subject.type, credential)

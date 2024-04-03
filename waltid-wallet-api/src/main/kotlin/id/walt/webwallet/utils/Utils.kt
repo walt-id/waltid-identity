@@ -8,6 +8,18 @@ fun hexToInt(hex: String) = Integer.parseInt(hex.startsWith("0x").takeIf { it }?
     hex.substring(2)
 } ?: hex)
 
+object HttpUtils {
+    fun parseQueryParam(query: String) = query.split("&").mapNotNull {
+        it.split("=").takeIf {
+            it.size > 1
+        }?.let {
+            Pair(it[0], it[1])
+        }
+    }.associate {
+        it.first to it.second
+    }
+}
+
 object Base64Utils {
     fun decode(base64: String): ByteArray = Base64.getDecoder().decode(base64)
 }
