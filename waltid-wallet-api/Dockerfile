@@ -27,15 +27,10 @@ FROM docker.io/eclipse-temurin:17
 COPY --from=buildstage /work/waltid-wallet-api/build/install/ /
 WORKDIR /waltid-wallet-api
 
-ARG USERNAME=wallet
-ARG USER_UID=1000
-ARG USER_GID=$USER_UID
-
-RUN groupadd --gid $USER_GID $USERNAME \
-    && useradd --uid $USER_UID --gid $USER_GID -m $USERNAME
-RUN chown -R $USERNAME:$USERNAME /waltid-wallet-api
-
-USER $USERNAME
+# Non-root user
+RUN groupadd -r appuser && useradd --no-log-init -r -g appuser appuser
+RUN chown -R appuser:appuser /waltid-wallet-api
+USER appuser
 
 EXPOSE 7001
 ENTRYPOINT ["/waltid-wallet-api/bin/waltid-wallet-api"]
