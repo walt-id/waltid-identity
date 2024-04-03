@@ -1288,16 +1288,15 @@ class CI_JVM_Test : AnnotationSpec() {
 
         println("> Success: " + CredentialResponse.Companion.success(CredentialFormat.jwt_vc_json, vc).credential?.toString())
 
-        entraIssuanceRequest.authorizationRequest.redirectUri?.let { http.post(it) {
-            contentType(ContentType.Application.Json)
-            setBody(buildJsonObject {
-                put("state", entraIssuanceRequest.authorizationRequest.state)
-                put("code", "issuance_successful")
-            })
-         }?.also {
-            println("ENTRA redirect URI response: ${it.status}")
-            println(it.bodyAsText())
-        }}
+        entraIssuanceRequest.authorizationRequest.redirectUri?.let { redirectUri ->
+            http.post(redirectUri) {
+                contentType(ContentType.Application.Json)
+                setBody(EntraIssuanceCompletionResponse(EntraIssuanceCompletionCode.issuance_successful, entraIssuanceRequest.authorizationRequest.state!!))
+            }.also {
+                println("ENTRA redirect URI response: ${it.status}")
+                println(it.bodyAsText())
+            }
+        }?.status shouldBe HttpStatusCode.Accepted
 //        synchronized(CALLBACK_COMPLETE) {
 //            CALLBACK_COMPLETE.wait(1000)
 //            ENTRA_STATUS shouldBe "issuance_successful"
