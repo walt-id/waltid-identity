@@ -13,6 +13,7 @@ import id.walt.cli.util.PrettyPrinter
 import id.walt.cli.util.VCUtil
 import id.walt.credentials.verification.ExpirationDatePolicyException
 import id.walt.credentials.verification.JsonSchemaVerificationException
+import id.walt.credentials.verification.NotBeforePolicyException
 import id.walt.credentials.verification.policies.ExpirationDatePolicy
 import id.walt.credentials.verification.policies.NotBeforeDatePolicy
 import id.walt.crypto.utils.JsonUtils.toJsonElement
@@ -187,6 +188,12 @@ class VCVerifyCmd : CliktCommand(
                         print.dim("${it.request.policy.name}: ", false)
                         print.red("Fail! ", false)
                         print.italic("VC expired since ${exception.date}")
+                    }
+
+                    is NotBeforePolicyException -> {
+                        print.dim("${it.request.policy.name}: ", false)
+                        print.red("Fail! ", false)
+                        print.italic("VC not valid until ${exception.date}")
                     }
 
                     else -> {
