@@ -61,7 +61,7 @@ object WalletServiceManager {
     private val eventService = EventService()
     private val filterParser = PresentationDefinitionFilterParser()
     private val statusListCredentialFetchFactory = StatusListCredentialFetchFactory(
-        defaultStrategy = DefaultStatusListCredentialFetchStrategy(),
+        defaultStrategy = DefaultStatusListCredentialFetchStrategy(httpClient),
         entraStrategy = EntraStatusListCredentialFetchStrategy(httpClient, DidResolverService(), JwsDecoder())
     )
     private val credentialStatusServiceFactory = CredentialStatusServiceFactory(
