@@ -9,7 +9,13 @@ import id.walt.webwallet.db.models.Wallets
 import id.walt.webwallet.seeker.DefaultCredentialTypeSeeker
 import id.walt.webwallet.service.account.AccountsService
 import id.walt.webwallet.service.category.CategoryServiceImpl
+import id.walt.webwallet.service.credentials.CredentialStatusServiceFactory
+import id.walt.webwallet.service.credentials.CredentialValidator
 import id.walt.webwallet.service.credentials.CredentialsService
+import id.walt.webwallet.service.credentials.status.StatusListCredentialStatusService
+import id.walt.webwallet.service.credentials.status.fetch.DefaultStatusListCredentialFetchStrategy
+import id.walt.webwallet.service.credentials.status.fetch.EntraStatusListCredentialFetchStrategy
+import id.walt.webwallet.service.credentials.status.fetch.StatusListCredentialFetchFactory
 import id.walt.webwallet.service.dids.DidsService
 import id.walt.webwallet.service.events.EventService
 import id.walt.webwallet.service.exchange.IssuanceService
@@ -20,6 +26,7 @@ import id.walt.webwallet.service.trust.DefaultIssuerNameResolveService
 import id.walt.webwallet.service.trust.DefaultTrustValidationService
 import id.walt.webwallet.usecase.claim.ExplicitClaimStrategy
 import id.walt.webwallet.usecase.claim.SilentClaimStrategy
+import id.walt.webwallet.usecase.credential.CredentialStatusUseCase
 import id.walt.webwallet.usecase.event.EventFilterUseCase
 import id.walt.webwallet.usecase.event.EventUseCase
 import id.walt.webwallet.usecase.exchange.MatchPresentationDefinitionCredentialsUseCase
@@ -52,6 +59,16 @@ object WalletServiceManager {
     private val credentialTypeSeeker = DefaultCredentialTypeSeeker()
     private val eventService = EventService()
     private val filterParser = PresentationDefinitionFilterParser()
+    private val statusListCredentialFetchFactory = StatusListCredentialFetchFactory(
+        defaultStrategy = DefaultStatusListCredentialFetchStrategy(),
+        entraStrategy = EntraStatusListCredentialFetchStrategy(httpClient)
+    )
+    private val credentialStatusServiceFactory = CredentialStatusServiceFactory(
+        statusListService = StatusListCredentialStatusService(
+            credentialFetchFactory = statusListCredentialFetchFactory,
+            credentialValidator = CredentialValidator(),
+        ),
+    )
     val eventUseCase = EventUseCase(eventService)
     val eventFilterUseCase = EventFilterUseCase(eventService)
     val oidcConfig by lazy { ConfigManager.getConfig<OidcConfiguration>() }
@@ -88,6 +105,10 @@ object WalletServiceManager {
         issuanceService = IssuanceService,
         credentialService = credentialService,
         eventUseCase = eventUseCase,
+    )
+    val credentialStatusUseCase = CredentialStatusUseCase(
+        credentialService = credentialService,
+        credentialStatusServiceFactory = credentialStatusServiceFactory,
     )
 
     fun getWalletService(tenant: String, account: UUID, wallet: UUID): WalletService =

@@ -1,4 +1,4 @@
-package id.walt.webwallet.service.credentials.status
+package id.walt.webwallet.service.credentials
 
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
