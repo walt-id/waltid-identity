@@ -22,6 +22,8 @@ import id.walt.webwallet.usecase.claim.ExplicitClaimStrategy
 import id.walt.webwallet.usecase.claim.SilentClaimStrategy
 import id.walt.webwallet.usecase.event.EventFilterUseCase
 import id.walt.webwallet.usecase.event.EventUseCase
+import id.walt.webwallet.usecase.exchange.DescriptorPresentationDefinitionMatchStrategy
+import id.walt.webwallet.usecase.exchange.FilterPresentationDefinitionMatchStrategy
 import id.walt.webwallet.usecase.exchange.MatchPresentationDefinitionCredentialsUseCase
 import id.walt.webwallet.usecase.issuer.IssuerUseCaseImpl
 import id.walt.webwallet.usecase.notification.NotificationFilterUseCase
@@ -53,7 +55,9 @@ object WalletServiceManager {
     val verifierTrustValidationService = DefaultTrustValidationService(httpClient, trustConfig.verifiersRecord)
     val notificationUseCase = NotificationUseCase(NotificationService, httpClient)
     val notificationFilterUseCase = NotificationFilterUseCase(NotificationService, credentialService)
-    val matchPresentationDefinitionCredentialsUseCase = MatchPresentationDefinitionCredentialsUseCase(credentialService)
+    val matchPresentationDefinitionCredentialsUseCase = MatchPresentationDefinitionCredentialsUseCase(
+        credentialService, FilterPresentationDefinitionMatchStrategy(), DescriptorPresentationDefinitionMatchStrategy()
+    )
     val silentClaimStrategy = SilentClaimStrategy(
         issuanceService = IssuanceService,
         credentialService = credentialService,
