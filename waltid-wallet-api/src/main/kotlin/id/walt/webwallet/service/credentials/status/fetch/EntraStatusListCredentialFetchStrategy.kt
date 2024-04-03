@@ -3,36 +3,45 @@ package id.walt.webwallet.service.credentials.status.fetch
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.webwallet.service.JwsDecoder
 import id.walt.webwallet.service.dids.DidResolverService
+import id.walt.webwallet.service.endpoint.ServiceEndpointProvider
 import id.walt.webwallet.utils.Base64Utils
 import id.walt.webwallet.utils.HttpUtils
 import id.walt.webwallet.utils.JsonUtils
-import io.ktor.client.*
-import io.ktor.client.request.*
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.uuid.UUID
+import kotlinx.serialization.json.*
 
 class EntraStatusListCredentialFetchStrategy(
-    private val http: HttpClient,
+    private val serviceEndpointProvider: ServiceEndpointProvider,
     private val didResolverService: DidResolverService,
     private val jwsDecoder: JwsDecoder,
 ) : StatusListCredentialFetchStrategy {
+    private val json = Json { ignoreUnknownKeys = true }
     override suspend fun fetch(url: String): JsonObject = url.substringBefore("?").let { did ->
         didResolverService.resolve(did)?.let {
             val parameters = HttpUtils.parseQueryParam(url.substringAfter("?"))
             val serviceEndpoint = getServiceEndpoint(it, parameters["service"])
-            parameters["queries"]?.toJsonElement()?.jsonObject?.let {
-                getServiceEndpointResponse(serviceEndpoint, did, it).toJsonElement().jsonObject.let {
-                    JsonUtils.tryGetData(it, "replies.entries.data")?.let {
-                        jwsDecoder.payload(Base64Utils.decode(it.jsonPrimitive.content).decodeToString())
-                    } ?: error("Failed to parse service-endpoint reponsed: $serviceEndpoint")
-                }
+            parameters["queries"]?.let {
+                parseQueries(it).let {
+                    serviceEndpointProvider.get(serviceEndpoint, did, it).let {
+                        Json.decodeFromString<JsonElement>(it)
+                    }.jsonObject.let {
+                        JsonUtils.tryGetData(it, "replies.entries.data")?.let {
+                            Base64Utils.decode(it.jsonPrimitive.content).decodeToString().let { jwsDecoder.payload(it) }
+                        }
+                    }
+                } ?: error("Failed to parse service-endpoint reponse: $serviceEndpoint")
             } ?: error("Failed to parse descriptor from 'queries' parameter")
         } ?: error("Failed to resolve did: $did")
     }
+
+    private fun parseQueries(queries: String) =
+        Base64Utils.decode(queries).decodeToString().let {
+            Json.decodeFromString<JsonElement>(it)
+        }.toJsonElement().let {
+            when (it) {
+                is JsonArray -> it[0].jsonObject
+                else -> it.jsonObject
+            }
+        }
 
     private fun getServiceEndpoint(did: JsonObject, service: String?) =
         JsonUtils.tryGetData(did, "service")?.jsonArray?.firstOrNull {
@@ -43,29 +52,5 @@ class EntraStatusListCredentialFetchStrategy(
             } ?: error("Failed to extract service endpoint from did document")
         } ?: error("Failed to extract service from did document")
 
-    private suspend fun getServiceEndpointResponse(url: String, did: String, descriptor: JsonObject) = http.post(url) {
-        setBody(
-            IdentityHubRequest(
-                requestId = UUID().toString(),
-                target = did,
-                messages = listOf(
-                    IdentityHubRequest.Message(
-                        descriptor = descriptor,
-                    )
-                )
-            )
-        )
-    }
 
-    @Serializable
-    private data class IdentityHubRequest(
-        val requestId: String,
-        val target: String,
-        val messages: List<Message>,
-    ) {
-        @Serializable
-        data class Message(
-            val descriptor: JsonObject,
-        )
-    }
 }
