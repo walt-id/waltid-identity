@@ -1,8 +1,8 @@
 package id.walt.webwallet.web.controllers
 
-import id.walt.webwallet.notificationusecase.NotificationFilterParameter
 import id.walt.webwallet.service.WalletServiceManager
 import id.walt.webwallet.service.push.PushManager
+import id.walt.webwallet.usecase.notification.NotificationFilterParameter
 import io.github.smiley4.ktorswaggerui.dsl.*
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -63,6 +63,10 @@ object NotificationController {
                             description = "Sort by date added: ASC or DESC"
                             example = "ASC"
                         }
+                        queryParameter<Boolean>("showPending") {
+                            description = "Filter by 'pending' credentials"
+                            example = false
+                        }
                     }
                     response {
                         HttpStatusCode.OK to {
@@ -72,12 +76,13 @@ object NotificationController {
                     }
                 }) {
                     context.respond(
-                        WalletServiceManager.notificationUseCase.findAll(
+                        WalletServiceManager.notificationFilterUseCase.filter(
                             getWalletId(), NotificationFilterParameter(
                                 type = call.request.queryParameters["type"],
                                 isRead = call.request.queryParameters["isRead"]?.toBooleanStrictOrNull(),
                                 addedOn = call.request.queryParameters["addedOn"],
                                 sort = call.request.queryParameters["sort"] ?: "desc",
+                                showPending = call.request.queryParameters["showPending"]?.toBooleanStrictOrNull(),
                             )
                         )
                     )

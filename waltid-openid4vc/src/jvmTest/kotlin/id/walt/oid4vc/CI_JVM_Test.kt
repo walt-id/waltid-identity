@@ -40,12 +40,19 @@ import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.engine.java.*
 import io.ktor.client.plugins.contentnegotiation.*
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.logging.*
 import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
+import io.ktor.server.application.*
+import io.ktor.server.engine.*
+import io.ktor.server.netty.*
+import io.ktor.server.plugins.contentnegotiation.*
+import io.ktor.server.request.*
+import io.ktor.server.routing.*
 import io.ktor.util.*
 import kotlinx.serialization.json.*
 import java.io.File
@@ -1133,6 +1140,26 @@ class CI_JVM_Test : AnnotationSpec() {
         println(didKeyResult.did)
     }
 
+    val ENTRA_CALLBACK_PORT = 9002
+    val CALLBACK_COMPLETE = Object()
+    var ENTRA_STATUS: String = "none"
+    suspend fun startEntraCallbackServer() {
+        embeddedServer(Netty, port = ENTRA_CALLBACK_PORT) {
+            install(io.ktor.server.plugins.contentnegotiation.ContentNegotiation) {
+                json()
+            }
+            routing {
+                post("/callback") {
+                    println("ENTRA CALLBACK (Issuer)")
+                    val callbackBody = call.receiveText().also { println(it) }.let { Json.parseToJsonElement(it) }.jsonObject
+                    ENTRA_STATUS = callbackBody["requestStatus"]!!.jsonPrimitive.content
+                    if(ENTRA_STATUS == "issuance_successful")
+                        CALLBACK_COMPLETE.notifyAll()
+                }
+            }
+        }.start()
+    }
+
     @Test
     suspend fun testEntraIssuance() {
         println("--- ENTRA ISSUANCE TEST ---")
@@ -1144,11 +1171,12 @@ class CI_JVM_Test : AnnotationSpec() {
         println("> Doing Entra authorize...")
         val accessToken = entraAuthorize()
         println("> Using access token: $accessToken")
+        startEntraCallbackServer()
 
         val createIssuanceReq = "{\n" +
                 "    \"callback\": {\n" +
                 //"        \"url\": \"https://httpstat.us/200\",\n" +
-                "        \"url\": \"https://9ffd-62-178-27-231.ngrok-free.app\",\n" +
+                "        \"url\": \"https://0fc7-2001-871-25f-66b3-9ea8-fc44-915d-107e.ngrok-free.app/callback\",\n" +
                 "        \"state\": \"1234\",\n" +
                 "        \"headers\": {\n" +
                 "            \"api-key\": \"1234\"\n" +
@@ -1194,7 +1222,7 @@ class CI_JVM_Test : AnnotationSpec() {
         //val url = "openid-vc://?request_uri=https://verifiedid.did.msidentity.com/v1.0/tenants/37a99dab-212b-44d9-9b49-7756cb4dd915/verifiableCredentials/issuanceRequests/67e271be-be8b-42f8-9cb9-1b57ee010e41"
         println(">>>> URL from response: $url")
 
-        return
+        //return
         //val url = "openid-vc://?request_uri=https://verifiedid.did.msidentity.com/v1.0/tenants/3c32ed40-8a10-465b-8ba4-0b1e86882668/verifiableCredentials/issuanceRequests/a7e5db5b-2fba-4d02-bc0d-21ee82191386"
 
 
@@ -1259,6 +1287,20 @@ class CI_JVM_Test : AnnotationSpec() {
         println("> VC is: $vc")
 
         println("> Success: " + CredentialResponse.Companion.success(CredentialFormat.jwt_vc_json, vc).credential?.toString())
+
+        entraIssuanceRequest.authorizationRequest.redirectUri?.let { redirectUri ->
+            http.post(redirectUri) {
+                contentType(ContentType.Application.Json)
+                setBody(EntraIssuanceCompletionResponse(EntraIssuanceCompletionCode.issuance_successful, entraIssuanceRequest.authorizationRequest.state!!))
+            }.also {
+                println("ENTRA redirect URI response: ${it.status}")
+                println(it.bodyAsText())
+            }
+        }?.status shouldBe HttpStatusCode.Accepted
+//        synchronized(CALLBACK_COMPLETE) {
+//            CALLBACK_COMPLETE.wait(1000)
+//            ENTRA_STATUS shouldBe "issuance_successful"
+//        }
     }
 
     //@Test

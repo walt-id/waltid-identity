@@ -28,5 +28,10 @@ FROM docker.io/eclipse-temurin:17
 COPY --from=buildstage /work/waltid-issuer-api/build/install/ /
 WORKDIR /waltid-issuer-api
 
+# Non-root user
+RUN groupadd -r appuser && useradd --no-log-init -r -g appuser appuser
+RUN chown -R appuser:appuser /waltid-issuer-api
+USER appuser
+
 EXPOSE 7002
 ENTRYPOINT ["/waltid-issuer-api/bin/waltid-issuer-api"]
