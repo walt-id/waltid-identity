@@ -1,10 +1,12 @@
 package id.walt.cli.commands
 
 import com.github.ajalt.clikt.core.CliktCommand
+import com.github.ajalt.clikt.core.Context
 import com.github.ajalt.clikt.core.FileNotFound
 import com.github.ajalt.clikt.core.MissingOption
 import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.options.associate
+import com.github.ajalt.clikt.parameters.options.help
 import com.github.ajalt.clikt.parameters.options.multiple
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.types.choice
@@ -24,51 +26,58 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import java.io.File
 
-// sealed class LoadConfig(name: String): OptionGroup(name)
-// class SchemaPolicy : LoadConfig("Options for --policy=schema") {
-//     val schema by option().file().required()
-// }
-//
-// class HolderBindingPolicy : LoadConfig("Options for --policy=holder-binding") {
-//     val xxx by option().file().required()
-// }
+
 class VCVerifyCmd : CliktCommand(
     name = "verify",
-    help = "Verify the specified VC under a set of specified policies.",
-    printHelpOnEmptyArgs = true,
-    allowMultipleSubcommands = true
+    printHelpOnEmptyArgs = true
 ) {
 
-    // init {
-    //     subcommands(
-    //         VCVerifySignatureCmd(),
-    //         VCVerifySchemaCmd())
-    // }
+    override fun commandHelp(context: Context): String {
+        // val style = context.theme.info
+        return """VC verification command.
+            
+         Verifies the specified VC under a set of specified policies.
 
-    // Shared context with subcommands
-    // val config by findOrSetObject { mutableMapOf<String, File>() }
+        The available policies are:
+        
+        - schema: Verifies a credentials data against a JSON Schema (Draft 7 - see https://json-schema.org/specification-links#draft-7).
+        - holder-binding: Verifies that issuer of the Verifiable Presentation (presenter) is also the subject of all Verifiable Credentials contained within.
+        - presentation-definition: Verifies that with an Verifiable Presentation at minimum the list of credentials `request_credentials` has been presented.
+        - expired: Verifies that the credentials expiration date (`exp` for JWTs) has not been exceeded.
+        - webhook: Sends the credential data to an webhook URL as HTTP POST, and returns the verified status based on the webhooks set status code (success = 200 - 299).
+        - maximum-credentials: Verifies that a maximum number of credentials in the Verifiable Presentation is not exceeded.
+        - minimum-credentials: Verifies that a minimum number of credentials are included in the Verifiable Presentation.
+        - signature: Checks a JWT credential by verifying its cryptographic signature using the key referenced by the DID in `iss`.
+        - allowed-issuer: Checks that the issuer of the credential is present in the supplied list.
+        - not-before: Verifies that the credentials not-before date (for JWT: `nbf`, if unavailable: `iat` - 1 min) is correctly exceeded.
+        
+        Multiple policies are accepted. e.g.
+     
+            waltid vc verify --policy=signature --policy=expired vc.json
+   
+        If no policy is specified, only the Signature Policy will be applied. i.e.
+        
+            waltid vc verify vc.json
+        
+        Some policies require parameters. To specify it, use --arg or -a options. e.g.
+        
+            --arg=param1=value1 --a param2=value2
+            
+            e.g.
+
+            waltid vc verify --policy=schema -a schema=mySchema.json vc.json
+        """.trimIndent()
+    }
+
 
     val print: PrettyPrinter = PrettyPrinter(this)
 
-    // private val keyFile by option("-k", "--key")
-    //     // .help("The Subject's key to be used. If none is provided, a new one will be generated.")
-    //     .help("A core-crypto key representation to sign the credential (required)")
-    //     .file()
-    // .required()
-
     private val vc: File by argument(help = "the verifiable credential file (in JWS format) to be verified (required)").file()
 
-    // val policies: List<String> by option().groupChoice(
     val policies: List<String> by option(
         "-p",
         "--policy",
-        help = """Specify a policy to be applied in the verification process.
-                  Multiple policies are accepted.
-                  If no policy is specified, only the Signature Policy will be applied.
-                  To define multiple policies, use --policy PolicyName1 --policy PolicyName2 (...)
-                  Some policies require parameters. To specify it, use --arg arg1=value1
-                  '
-                """.trimIndent()
+        help = """Specify a policy to be applied in the verification process."""
     ).choice(
         "schema",
         "holder-binding",
@@ -84,25 +93,16 @@ class VCVerifyCmd : CliktCommand(
     val policyArguments: Map<String, String> by option(
         "-a",
         "--arg",
-        help = "Argument required by some policies."
-    ).associate()
-
-    // .groupChoice(
-    //         "schema" to SchemaPolicy(),
-    //         "holder-binding" to HolderBinding()
-    //         // "expired",
-    //         // "webhook",
-    //         // "maximum-credentials",
-    //         // "minimum-credentials",
-    //         // "signature",
-    //         // "allowed-issuer",
-    //         // "not-before"
-    //     )
-    // .default("signature")
-    // .multiple()
-
-
-    // associate()
+    ).associate().help {
+        """Argument required by some policies, namely:
+            
+            |Policy|Expected Argument|
+            |------|--------|
+            |signature| - |
+            |expired| - |
+            |schema|schema=/path/to/schema.json|
+        """.trimMargin()
+    }
 
     override fun run() {
 
@@ -132,7 +132,6 @@ class VCVerifyCmd : CliktCommand(
             }
 
             val schema = File(schemaFilePath).readText()
-            // File("/Users/alegomes/coding/waltid-identity/waltid-cli/src/jvmTest/resources/schema/ob_v3p0_achievementcredential_schema.json").readText()
             args["schema"] = Json.parseToJsonElement(schema).toJsonElement()
         }
 
