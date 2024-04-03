@@ -1,6 +1,8 @@
 import presetIcons from "@unocss/preset-icons";
 
 export default defineNuxtConfig({
+    devtools: { enabled: true },
+
     srcDir: "src",
     modules: [
         "@vueuse/nuxt",
