@@ -16,6 +16,7 @@ import id.walt.cli.util.VCUtil
 import id.walt.credentials.verification.ExpirationDatePolicyException
 import id.walt.credentials.verification.JsonSchemaVerificationException
 import id.walt.credentials.verification.NotBeforePolicyException
+import id.walt.credentials.verification.models.PolicyResult
 import id.walt.credentials.verification.policies.ExpirationDatePolicy
 import id.walt.credentials.verification.policies.NotBeforeDatePolicy
 import id.walt.crypto.utils.JsonUtils.toJsonElement
@@ -106,15 +107,91 @@ class VCVerifyCmd : CliktCommand(
 
     override fun run() {
 
-        //     echo("Saving VC file into the context")
-        //     config["vc"] = vc
-        // }
-        // {
-        //
-        // val key = runBlocking { KeyUtil().getKey(keyFile) }
-
         val jws = vc.readText()
+        val args = checkAndLoadArguments()
+
+        val results = runBlocking { VCUtil.verify(jws, policies, args) }
+
+        print.box("Verification Result")
+        results.forEach {
+            if (it.isSuccess()) { // Not enough to be a successful verification. Sometimes, the verification succeeds because the policy is not even applied.
+                handleSuccess(it)
+            } else {
+                handleFailure(it)
+            }
+        }
+    }
+
+    private fun handleFailure(it: PolicyResult) {
+        when (val exception = it.result.exceptionOrNull()) {
+
+            is JsonSchemaVerificationException -> {
+                exception.validationErrors.forEach { err ->
+                    print.dim("${it.request.policy.name}: ", false)
+                    print.red("Fail! ", false)
+                    if (err.objectPath.isEmpty()) {
+                        print.italic("""-> ${err.message}""")
+                    } else {
+                        print.italic(""""${err.objectPath}" (in ${err.schemaPath}) -> ${err.message}""")
+                    }
+                }
+            }
+
+            is ExpirationDatePolicyException -> {
+                print.dim("${it.request.policy.name}: ", false)
+                print.red("Fail! ", false)
+                print.italic("VC expired since ${exception.date}")
+            }
+
+            is NotBeforePolicyException -> {
+                print.dim("${it.request.policy.name}: ", false)
+                print.red("Fail! ", false)
+                print.italic("VC not valid until ${exception.date}")
+            }
+
+            else -> {
+                print.dim("${it.request.policy.name}: ", false)
+                print.red("Fail! ", false)
+                exception?.message?.let { print.italic(it) }
+            }
+        }
+    }
+
+    private fun handleSuccess(it: PolicyResult) {
+        var details = ""
+        val innerException = it.result.exceptionOrNull()
+
+        if (innerException != null) {
+            details = innerException.message!!
+        } else if (it.result.getOrNull() !is Unit &&
+            "policy_available" in it.result.getOrThrow() as JsonObject &&
+            !(it.result.getOrThrow() as JsonObject).get("policy_available")!!.equals(JsonPrimitive(true))
+        ) { // If policy_available == false
+            when (it.request.policy) {
+                is ExpirationDatePolicy -> {
+                    details =
+                        " Pero no mucho. Neither 'exp', 'validUntil' nor 'expirationDate' found. Is it a bug? ¯\\_(ツ)_/¯"
+                }
+
+                is NotBeforeDatePolicy -> {
+                    details = "Not that much. Neither 'nbf' not 'iat' found. Is it a bug? ¯\\_(ツ)_/¯"
+                }
+            }
+        }
+        print.dim("${it.request.policy.name}: ", false)
+        print.green("Success! ", false)
+        print.plain(details)
+    }
+
+    private fun checkAndLoadArguments(): MutableMap<String, JsonElement> {
         val args = emptyMap<String, JsonElement>().toMutableMap()
+        args.putAll(getSchemaPolicyArguments())
+        return args
+    }
+
+    private fun getSchemaPolicyArguments(): Map<out String, JsonElement> {
+        val args = emptyMap<String, JsonElement>().toMutableMap()
+
         if ("schema" in policies) {
 
             // Argument provided?
@@ -135,73 +212,6 @@ class VCVerifyCmd : CliktCommand(
             args["schema"] = Json.parseToJsonElement(schema).toJsonElement()
         }
 
-        val results = runBlocking { VCUtil.verify(jws, policies, args) }
-
-        print.box("Verification Result")
-        results.forEach {
-            if (it.isSuccess()) { // Not enough to be a successful verification. Sometimes, the verification succeeds because the policy is not even applied.
-
-                var policyAvailable = false
-                var details = ""
-                val innerException = it.result.exceptionOrNull()
-
-                if (innerException != null) {
-                    details = innerException.message!!
-                } else if (it.result.getOrNull() !is Unit &&
-                    "policy_available" in it.result.getOrThrow() as JsonObject &&
-                    !(it.result.getOrThrow() as JsonObject).get("policy_available")!!.equals(JsonPrimitive(true))
-                ) { // If policy_available == false
-                    when (it.request.policy) {
-                        is ExpirationDatePolicy -> {
-                            details =
-                                " Pero no mucho. Neither 'exp', 'validUntil' nor 'expirationDate' found. Is it a bug? ¯\\_(ツ)_/¯"
-                        }
-
-                        is NotBeforeDatePolicy -> {
-                            details = "Not that much. Neither 'nbf' not 'iat' found. Is it a bug? ¯\\_(ツ)_/¯"
-                        }
-
-                    }
-
-
-                }
-                print.dim("${it.request.policy.name}: ", false)
-                print.green("Success! ", false)
-                print.plain(details)
-            } else { // isFailure
-                when (val exception = it.result.exceptionOrNull()) {
-
-                    is JsonSchemaVerificationException -> {
-                        exception.validationErrors.forEach { err ->
-                            print.dim("${it.request.policy.name}: ", false)
-                            print.red("Fail! ", false)
-                            if (err.objectPath.isEmpty()) {
-                                print.italic("""-> ${err.message}""")
-                            } else {
-                                print.italic(""""${err.objectPath}" (in ${err.schemaPath}) -> ${err.message}""")
-                            }
-                        }
-                    }
-
-                    is ExpirationDatePolicyException -> {
-                        print.dim("${it.request.policy.name}: ", false)
-                        print.red("Fail! ", false)
-                        print.italic("VC expired since ${exception.date}")
-                    }
-
-                    is NotBeforePolicyException -> {
-                        print.dim("${it.request.policy.name}: ", false)
-                        print.red("Fail! ", false)
-                        print.italic("VC not valid until ${exception.date}")
-                    }
-
-                    else -> {
-                        print.dim("${it.request.policy.name}: ", false)
-                        print.red("Fail! ", false)
-                        exception?.message?.let { print.italic(it) }
-                    }
-                }
-            } // isFailure
-        } // results.forEach
-    } // run()
-} // class
+        return args
+    }
+}
