@@ -1,5 +1,6 @@
 package id.walt.cli.util
 
+import id.walt.credentials.issuance.Issuer.mergingJwtIssue
 import id.walt.credentials.vc.vcs.W3CVC
 import id.walt.credentials.verification.PolicyManager
 import id.walt.credentials.verification.Verifier
@@ -10,6 +11,7 @@ import id.walt.did.dids.DidService
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 
 class VCUtil {
 
@@ -29,11 +31,26 @@ class VCUtil {
         }
 
         suspend fun sign(key: JWKKey, issuerDid: String, subjectDid: String, payload: String): String {
+
+            val mappings = JsonObject(emptyMap<String, JsonElement>())
+            // JsonObject(
+            //     mapOf(
+            //         "exp" to "123456".toJsonElement()
+            //     )
+            // )
+
             val vcAsMap = Json.decodeFromString<Map<String, JsonElement>>(payload)
             val vc = W3CVC(vcAsMap)
-            val jws = vc.signJws(
-                issuerKey = key, issuerDid = issuerDid, subjectDid = subjectDid
-            )
+            val jws =
+                vc.mergingJwtIssue(
+                    issuerKey = key,
+                    issuerDid = issuerDid,
+                    subjectDid = subjectDid,
+                    mappings = mappings,
+                    additionalJwtHeader = emptyMap<String, String>(),
+                    additionalJwtOptions = emptyMap<String, JsonObject>()
+                )
+            // .w3cVc.signJws(issuerKey = key, issuerDid = issuerDid, subjectDid = subjectDid)
 
             return jws
         }
