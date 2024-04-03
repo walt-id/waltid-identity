@@ -1,11 +1,15 @@
 package id.walt.webwallet.service.credentials.status
 
 import kotlinx.serialization.DeserializationStrategy
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 import kotlinx.serialization.json.JsonContentPolymorphicSerializer
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+
+const val RevocationStatusPurpose = "revocation"
 
 @Serializable(CredentialStatusEntryBaseSerializer::class)
 sealed class CredentialStatusEntry {
@@ -16,11 +20,14 @@ sealed class CredentialStatusEntry {
 data class StatusListEntry(
     val id: String,
     override val type: String, //"RevocationList2021Status", "BitstringStatusListEntry", "StatusList2021Entry"
-    val statusPurpose: String = "revocation",
+    @SerialName("statusPurpose")
+    val statusPurposeOptional: String? = RevocationStatusPurpose,
     val statusListIndex: ULong,
     val statusListCredential: String,
-) : CredentialStatusEntry()
-
+) : CredentialStatusEntry() {
+    @Transient
+    val statusPurpose = statusPurposeOptional!!//workaround for optional json field (but required for app logic)
+}
 
 object CredentialStatusEntryBaseSerializer : JsonContentPolymorphicSerializer<CredentialStatusEntry>(
     CredentialStatusEntry::class,

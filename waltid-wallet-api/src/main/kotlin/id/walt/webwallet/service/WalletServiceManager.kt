@@ -68,6 +68,7 @@ object WalletServiceManager {
         statusListService = StatusListCredentialStatusService(
             credentialFetchFactory = statusListCredentialFetchFactory,
             credentialValidator = CredentialValidator(),
+            bitStringValueParser = BitStringValueParser(),
         ),
     )
     val eventUseCase = EventUseCase(eventService)

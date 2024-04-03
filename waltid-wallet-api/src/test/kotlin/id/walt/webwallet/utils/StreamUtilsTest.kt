@@ -11,14 +11,14 @@ class StreamUtilsTest {
 
     @Test
     fun `test unit bitsize, no overflow`() {
-        val value = StreamUtils.getBitValue(inputStream = bitString.toByteArray().inputStream(), idx = 4UL, bitSize = 1)
+        val value = StreamUtils.getBitValue(inputStream = bitString.toByteArray().inputStream(), index = 4UL, bitSize = 1)
         assertNotNull(value)
         assertEquals(expected = "4", actual = value.joinToString(""))
     }
 
     @Test
     fun `test non-unit bitsize, no overflow`() {
-        val value = StreamUtils.getBitValue(inputStream = bitString.toByteArray().inputStream(), idx = 4UL, bitSize = 2)
+        val value = StreamUtils.getBitValue(inputStream = bitString.toByteArray().inputStream(), index = 4UL, bitSize = 2)
         assertNotNull(value)
         assertEquals(expected = "89", actual = value.joinToString(""))
     }
@@ -28,7 +28,7 @@ class StreamUtilsTest {
         assertFailsWith<IllegalStateException> {
             StreamUtils.getBitValue(
                 inputStream = bitString.toByteArray().inputStream(),
-                idx = 16UL,
+                index = 16UL,
                 bitSize = 1
             )
         }
@@ -39,7 +39,7 @@ class StreamUtilsTest {
         assertFailsWith<IllegalStateException> {
             StreamUtils.getBitValue(
                 inputStream = bitString.toByteArray().inputStream(),
-                idx = 1UL,
+                index = 1UL,
                 bitSize = 9
             )
         }
