@@ -1,5 +1,3 @@
-import com.github.benmanes.gradle.versions.updates.DependencyUpdatesTask
-
 import love.forte.plugin.suspendtrans.ClassInfo
 import love.forte.plugin.suspendtrans.SuspendTransformConfiguration
 import love.forte.plugin.suspendtrans.TargetPlatform
@@ -13,7 +11,8 @@ plugins {
     id("love.forte.plugin.suspend-transform") version "0.6.0"
 }
 
-group = "id.walt.did"
+group = "id.walt.ebsi"
+version = "1.0.0-SNAPSHOT"
 
 repositories {
     mavenCentral()
@@ -37,10 +36,10 @@ suspendTransform {
     useJsDefault()
 }
 
-
 kotlin {
     jvmToolchain(15)
 }
+
 
 kotlin {
     jvm {
@@ -97,9 +96,6 @@ kotlin {
                 // Logging
                 implementation("io.github.oshai:kotlin-logging:6.0.3")
 
-                //EBSI
-                implementation(project(":waltid-ebsi"))
-
             }
         }
         val commonTest by getting {
@@ -118,9 +114,6 @@ kotlin {
 
                 // Json canonicalization
                 implementation("io.github.erdtman:java-json-canonicalization:1.1")
-
-                // Multiformat
-//                implementation("com.github.multiformats:java-multibase:v1.1.1")
             }
         }
         val jvmTest by getting {
@@ -131,8 +124,6 @@ kotlin {
                 implementation("io.ktor:ktor-server-test-host:2.3.8")
                 implementation("io.ktor:ktor-server-content-negotiation:2.3.8")
                 implementation("io.ktor:ktor-server-netty:2.3.8")
-                implementation(project(":waltid-openid4vc"))
-                implementation(project(":waltid-verifiable-credentials"))
             }
         }
         val jsMain by getting {

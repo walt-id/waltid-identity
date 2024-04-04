@@ -32,4 +32,7 @@ include(
     // Reporting
     "waltid-reporting"
 )
-
+include("waltid-ebsi")
+include("waltid-ebsi")
+include("waltid-ebsi:commonMain")
+findProject(":waltid-ebsi:commonMain")?.name = "commonMain"

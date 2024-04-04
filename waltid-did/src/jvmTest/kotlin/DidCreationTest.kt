@@ -8,7 +8,11 @@ import id.walt.did.dids.registrar.dids.DidKeyCreateOptions
 import id.walt.did.dids.registrar.dids.DidWebCreateOptions
 import id.walt.did.dids.registrar.local.key.DidKeyRegistrar
 import id.walt.did.dids.registrar.local.web.DidWebRegistrar
+import id.walt.did.utils.EbsiRPCUtils
 import id.walt.did.utils.randomUUID
+import id.walt.ebsi.rpc.EbsiRpcRequests
+import id.walt.ebsi.rpc.JsonRpcResponse
+import id.walt.ebsi.rpc.UnsignedTransactionResponse
 import id.walt.oid4vc.OpenID4VCI
 import id.walt.oid4vc.OpenID4VP
 import id.walt.oid4vc.data.*
@@ -115,7 +119,7 @@ class DidCreationTest {
     }
 
     val CLIENT_MOCK_PORT = 5000
-    val CLIENT_MOCK_URL = "https://96fa-2001-871-25f-66b3-9ea8-fc44-915d-107e.ngrok-free.app/client-mock"//"http://192.168.0.122:5000/client-mock"
+    val CLIENT_MOCK_URL = "https://2d21-62-178-27-231.ngrok-free.app/client-mock"//"http://192.168.0.122:5000/client-mock"
     val CLIENT_MAIN_KEY = runBlocking { LocalKey.generate(KeyType.secp256k1) }
     val CLIENT_VCSIGN_KEY = runBlocking { LocalKey.generate(KeyType.secp256r1) }
     fun startClientMockServer() {
@@ -298,47 +302,18 @@ class DidCreationTest {
         assertNotNull(accessTokenResponse.accessToken)
         println(accessTokenResponse.accessToken)
 
-        // compute ethereum address from public key
-        // https://www.rareskills.io/post/generate-ethereum-address-from-private-key-python
-        // "An ethereum address is the last 20 bytes of the keccak256 of the public key. The public key algorithm is secp256k1 [...] The public key is the concatenation of x and y, and that is what we take the hash of."
-        // getPublicKeyRepresentation() seems to return some other bytes first and then the 64 bytes of the concatenation of the x and y coordinates
-        val ethAddr = CLIENT_MAIN_KEY.getPublicKeyRepresentation().takeLast(64).toByteArray().let {
-            Keccak.digest(it, KeccakParameter.KECCAK_256)
-        }.takeLast(20).toByteArray().toHexString().let { "0x$it" }
         // insert DID document:
-        val basicDidDocument = DidEbsiDocument(
-            id = did, verificationMethod = listOf(
-                DidEbsiDocument.VerificationMethod(
-                    id = "$did#${CLIENT_MAIN_KEY.getKeyId()}",
-                    type = CLIENT_MAIN_KEY.keyType.name,
-                    controller = did,
-                    publicKeyJwk = CLIENT_MAIN_KEY.exportJWKObject()
-                )
-            ),
-            assertionMethod = null,
-            authentication = listOf("$did#${CLIENT_MAIN_KEY.getKeyId()}"),
-            capabilityInvocation = listOf("$did#${CLIENT_MAIN_KEY.getKeyId()}"),
-            capabilityDelegation = null, keyAgreement = null
-        )
-        http.post("https://api-conformance.ebsi.eu/did-registry/v5/jsonrpc") {
+        val insertDidRpcRequest = EbsiRpcRequests.generateInsertDidDocumentRequest(1, did, CLIENT_MAIN_KEY,
+            DidEbsiDocument.createBaseDocument(did, CLIENT_MAIN_KEY).let { Json.encodeToJsonElement(it) })
+        val insertDidHttpResponse = http.post("https://api-conformance.ebsi.eu/did-registry/v5/jsonrpc") {
             bearerAuth(accessTokenResponse.accessToken!!)
             contentType(ContentType.Application.Json)
-            setBody(buildJsonObject {
-                put("jsonrpc", "2.0")
-                put("method", "insertDidDocument")
-                put("params", buildJsonArray {
-                    add(buildJsonObject {
-                        put("from", ethAddr)
-                        put("did", did)
-                        put("baseDocument", Json.encodeToJsonElement(basicDidDocument))
-                        put("vMethodId", CLIENT_MAIN_KEY.getThumbprint())
-                        put("publicKey", CLIENT_MAIN_KEY.getPublicKeyRepresentation().toHexString().let { "0x04$it" })
-                        put("isSecp256k1", true)
-                        put("notBefore", Clock.System.now().epochSeconds)
-                        put("notAfter", Clock.System.now().plus(365*24, DateTimeUnit.HOUR).epochSeconds)
-                    })
-                })
+            setBody(Json.encodeToJsonElement(insertDidRpcRequest).also {
+                    println(it)
             })
         }
+        assertEquals(HttpStatusCode.OK, insertDidHttpResponse.status)
+        val insertDidRpcResponse = Json.decodeFromString<UnsignedTransactionResponse>(insertDidHttpResponse.bodyAsText())
+        assertEquals(1, insertDidRpcResponse.id)
     }
 }

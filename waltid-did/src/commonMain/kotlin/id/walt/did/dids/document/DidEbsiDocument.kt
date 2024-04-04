@@ -1,5 +1,6 @@
 package id.walt.did.dids.document
 
+import id.walt.crypto.keys.Key
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
@@ -30,6 +31,22 @@ data class DidEbsiDocument(
     companion object {
         private val DEFAULT_CONTEXT =
             listOf("https://www.w3.org/ns/did/v1", "https://w3id.org/security/suites/jws-2020/v1")
+
+        @JsExport.Ignore
+        suspend fun createBaseDocument(did: String, secp256k1Key: Key) = DidEbsiDocument(
+            id = did, verificationMethod = listOf(
+                DidEbsiDocument.VerificationMethod(
+                    id = "$did#${secp256k1Key.getKeyId()}",
+                    type = secp256k1Key.keyType.name,
+                    controller = did,
+                    publicKeyJwk = secp256k1Key.getPublicKey().exportJWKObject()
+                )
+            ),
+            assertionMethod = null,
+            authentication = listOf("$did#${secp256k1Key.getKeyId()}"),
+            capabilityInvocation = listOf("$did#${secp256k1Key.getKeyId()}"),
+            capabilityDelegation = null, keyAgreement = null
+        )
     }
 
     @Serializable
