@@ -4,6 +4,7 @@ import JWK
 import KeyLike
 import crypto
 import id.walt.crypto.keys.JsJWKKeyCreator
+import id.walt.crypto.keys.JwkKeyMeta
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.utils.ArrayUtils.toByteArray
@@ -203,6 +204,12 @@ actual class JWKKey actual constructor(
     @JsExport.Ignore
     actual override suspend fun getPublicKeyRepresentation(): ByteArray {
         return getPublicKey().exportPEM().toByteArray()
+    }
+
+    @JsPromise
+    @JsExport.Ignore
+    actual override suspend fun getMeta(): JwkKeyMeta {
+        TODO("Not yet implemented")
     }
 
     override val keyType: KeyType

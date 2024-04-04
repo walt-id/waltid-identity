@@ -141,6 +141,25 @@ fun Application.keys() = walletRoute {
             )
         }
 
+        get("meta/{alias}", {
+            summary = "Show a specific key"
+            request {
+                pathParameter<String>("alias") {
+                    description = "Key to show"
+
+                }
+            }
+            response {
+                HttpStatusCode.OK to {
+                    description = "The key document (JSON)"
+                    body<JsonObject>()
+                }
+            }
+        }) {
+            val keyId = context.parameters["alias"] ?: error("No key supplied")
+            context.respond(getWalletService().loadKey(keyId))
+        }
+
         get("export/{keyId}", {
             summary = "Load a specific key"
 
