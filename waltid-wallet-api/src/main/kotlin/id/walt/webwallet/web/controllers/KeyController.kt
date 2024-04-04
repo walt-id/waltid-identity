@@ -118,95 +118,82 @@ fun Application.keys() = walletRoute {
 
             context.respond(HttpStatusCode.OK)
         }
-
-        get("load/{alias}", {
-            summary = "Show a specific key"
+        route("{keyId}", {
             request {
-                pathParameter<String>("alias") {
-                    description = "Key to show"
-
-                }
-            }
-            response {
-                HttpStatusCode.OK to {
-                    description = "The key document (JSON)"
-                    body<JsonObject>()
+                pathParameter<String>("keyId") {
+                    description = "the key id (or alias)"
+                    example = "bc6fa6b0593648238c4616800bed7746"
                 }
             }
         }) {
-            context.respond(
-                getWalletService().loadKey(
-                    context.parameters["alias"] ?: throw IllegalArgumentException("No key supplied")
+
+            get("load", {
+                summary = "Show a specific key"
+                response {
+                    HttpStatusCode.OK to {
+                        description = "The key document (JSON)"
+                        body<JsonObject>()
+                    }
+                }
+            }) {
+                context.respond(
+                    getWalletService().loadKey(
+                        context.parameters["keyId"] ?: throw IllegalArgumentException("No key supplied")
+                    )
                 )
-            )
-        }
-
-        get("meta/{alias}", {
-            summary = "Show a specific key"
-            request {
-                pathParameter<String>("alias") {
-                    description = "Key to show"
-
-                }
             }
-            response {
-                HttpStatusCode.OK to {
-                    description = "The key document (JSON)"
-                    body<JsonObject>()
+
+            get("meta", {
+                summary = "Show a specific key meta info"
+                response {
+                    HttpStatusCode.OK to {
+                        description = "The key document (JSON)"
+                        body<JsonObject>()
+                    }
                 }
+            }) {
+                val keyId = context.parameters["keyId"] ?: error("No key supplied")
+                context.respond(getWalletService().getKeyMeta(keyId))
             }
-        }) {
-            val keyId = context.parameters["alias"] ?: error("No key supplied")
-            context.respond(getWalletService().getKeyMeta(keyId))
-        }
 
-        get("export/{keyId}", {
-            summary = "Load a specific key"
+            get("export", {
+                summary = "Load a specific key"
 
-            request {
-                pathParameter<String>("keyId") {
-                    description = "the key id (or alias)"
-                    example = "bc6fa6b0593648238c4616800bed7746"
+                request {
+                    queryParameter<String>("format") {
+                        description = "Select format to export the key, e.g. 'JWK' / 'PEM'. JWK by default."
+                        example = "JWK"
+                        required = false
+                    }
+                    queryParameter<Boolean>("loadPrivateKey") {
+                        description =
+                            "Select if the secret private key should be loaded - take special care in this case! False by default."
+                        example = false
+                        required = false
+                    }
                 }
-                queryParameter<String>("format") {
-                    description = "Select format to export the key, e.g. 'JWK' / 'PEM'. JWK by default."
-                    example = "JWK"
-                    required = false
-                }
-                queryParameter<Boolean>("loadPrivateKey") {
-                    description =
-                        "Select if the secret private key should be loaded - take special care in this case! False by default."
-                    example = false
-                    required = false
-                }
+            }) {
+                val keyId = context.parameters["keyId"] ?: throw IllegalArgumentException("No key id provided.")
+
+                val format = context.request.queryParameters["format"] ?: "JWK"
+                val loadPrivateKey = context.request.queryParameters["loadPrivateKey"].toBoolean()
+
+                context.respond(getWalletService().exportKey(keyId, format, loadPrivateKey))
             }
-        }) {
-            val keyId = context.parameters["keyId"] ?: throw IllegalArgumentException("No key id provided.")
 
-            val format = context.request.queryParameters["format"] ?: "JWK"
-            val loadPrivateKey = context.request.queryParameters["loadPrivateKey"].toBoolean()
-
-            context.respond(getWalletService().exportKey(keyId, format, loadPrivateKey))
-        }
-
-        delete("{keyId}", {
-            summary = "Delete a specific key"
-            request {
-                pathParameter<String>("keyId") {
-                    description = "the key id (or alias)"
-                    example = "bc6fa6b0593648238c4616800bed7746"
+            delete({
+                summary = "Delete a specific key"
+                response {
+                    HttpStatusCode.Accepted to { description = "Key deleted" }
+                    HttpStatusCode.BadRequest to { description = "Key could not be deleted" }
                 }
-            }
-            response {
-                HttpStatusCode.Accepted to { description = "Key deleted" }
-                HttpStatusCode.BadRequest to { description = "Key could not be deleted" }
-            }
-        }) {
-            val keyId = context.parameters["keyId"] ?: throw IllegalArgumentException("No key id provided.")
+            }) {
+                val keyId = context.parameters["keyId"] ?: throw IllegalArgumentException("No key id provided.")
 
-            val success = getWalletService().deleteKey(keyId)
+                val success = getWalletService().deleteKey(keyId)
 
-            context.respond(if (success) HttpStatusCode.Accepted else HttpStatusCode.BadRequest)
+                context.respond(if (success) HttpStatusCode.Accepted else HttpStatusCode.BadRequest)
+            }
         }
     }
 }
