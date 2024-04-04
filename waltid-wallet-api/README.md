@@ -46,13 +46,6 @@ docker run \
 -t waltid/wallet-api
 ```
 
-```bash
-docker run \
--p 7001:7001 -it \
--v $(pwd)/wallet-api/config:/waltid-wallet-api/config \
--t waltid/wallet-api-remotedb-only
-```
-
 - Visit the web wallet hosted under [localhost:7101](http://localhost:7101).
 - Visit the wallet-api hosted under [localhost:7001](http://localhost:7001).
 
@@ -62,10 +55,6 @@ Update the wallet-api container by running the following commands from the root 
 
 ```bash
 docker build -t waltid/wallet-api -f waltid-wallet-api/Dockerfile .
-```
-
-```bash
-docker build -t waltid/wallet-api-only -f waltid-wallet-api/remotedb-only.Dockerfile .
 ```
 
 # Database configuration
