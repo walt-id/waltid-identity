@@ -264,9 +264,10 @@ class OCIKey(
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    override suspend fun getMeta(): OciKeyMeta {
-        TODO()
-    }
+    override suspend fun getMeta(): OciKeyMeta = OciKeyMeta(
+        keyId = vaultKeyId,
+        keyVersion = getKeyVersion(id, vaultKeyId, config.managementEndpoint, config.signingKeyPem)
+    )
 
     companion object {
 

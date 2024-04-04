@@ -1,6 +1,5 @@
 package id.walt.crypto.keys.tse
 
-import id.walt.crypto.keys.JwkKeyMeta
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.TseKeyMeta
@@ -273,9 +272,7 @@ class TSEKey(
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    override suspend fun getMeta(): TseKeyMeta {
-        TODO("Not yet implemented")
-    }
+    override suspend fun getMeta(): TseKeyMeta = TseKeyMeta(getKeyId())
 
     /*
         val user = "corecrypto"
