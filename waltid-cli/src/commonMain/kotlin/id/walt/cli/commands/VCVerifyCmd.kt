@@ -101,6 +101,7 @@ class VCVerifyCmd : CliktCommand(
             |------|--------|
             |signature| - |
             |expired| - |
+            |not-before| - |
             |schema|schema=/path/to/schema.json|
         """.trimMargin()
     }
