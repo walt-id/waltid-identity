@@ -66,12 +66,6 @@ jobs:
           push: true
           file: waltid-wallet-api/Dockerfile
           tags: waltid/wallet-api:latest, waltid/wallet-api:${{ inputs.release_version }}
-      - name: Build and push Docker images (wallet-api-remotedb-only)
-        uses: docker/build-push-action@v4.0.0
-        with:
-          push: true
-          file: waltid-wallet-api-remotedb-only/Dockerfile
-          tags: waltid/wallet-api-remotedb-only:latest, waltid/wallet-api-remotedb-only:${{ inputs.release_version }}
       - name: Build and push Docker images (waltid-web-wallet)
         uses: docker/build-push-action@v4.0.0
         with:

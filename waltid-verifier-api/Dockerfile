@@ -27,10 +27,10 @@ FROM docker.io/eclipse-temurin:17
 RUN useradd --create-home waltid
 
 COPY --from=buildstage /work/waltid-verifier-api/build/install/ /
-#RUN chown -R waltid:waltid /waltid-verifier-api
 
 WORKDIR /waltid-verifier-api
 
+RUN mkdir /waltid-verifier-api/config && chown waltid:waltid /waltid-verifier-api/config
 USER waltid
 
 EXPOSE 7003
