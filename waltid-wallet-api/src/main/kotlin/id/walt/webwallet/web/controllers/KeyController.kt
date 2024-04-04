@@ -157,7 +157,7 @@ fun Application.keys() = walletRoute {
             }
         }) {
             val keyId = context.parameters["alias"] ?: error("No key supplied")
-            context.respond(getWalletService().loadKey(keyId))
+            context.respond(getWalletService().getKeyMeta(keyId))
         }
 
         get("export/{keyId}", {
