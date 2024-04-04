@@ -27,11 +27,11 @@ FROM docker.io/eclipse-temurin:17
 RUN useradd --create-home waltid
 
 COPY --from=buildstage /work/waltid-issuer-api/build/install/ /
-RUN chown -R waltid:waltid /waltid-issuer-api
+#RUN chown -R waltid:waltid /waltid-issuer-api
 
 WORKDIR /waltid-issuer-api
 
-COPY waltid-issuer-api/docker-entrypoint.sh /
+USER waltid
 
 EXPOSE 7002
-ENTRYPOINT ["/docker-entrypoint.sh"]
+ENTRYPOINT ["/waltid-issuer-api/bin/waltid-issuer-api"]
