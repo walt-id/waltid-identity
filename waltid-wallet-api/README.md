@@ -40,9 +40,9 @@ cd docker-compose && docker compose up
 
 ```bash
 docker run \
--p 7001:7001 \
--itv $(pwd)/waltid-wallet-api/config:/waltid-wallet-api/config \
--itv $(pwd)/waltid-wallet-api/data:/waltid-wallet-api/data \
+-p 7001:7001 -it \
+-v $(pwd)/wallet-api/config:/waltid-wallet-api/config \
+-v $(pwd)/wallet-api/data:/waltid-wallet-api/data \
 -t waltid/wallet-api
 ```
 

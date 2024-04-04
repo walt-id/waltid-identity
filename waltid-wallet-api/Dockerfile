@@ -1,6 +1,5 @@
 FROM docker.io/gradle:jdk17 as buildstage
 
-
 COPY gradle/ /work/gradle
 COPY settings.gradle.kts build.gradle.kts gradle.properties gradlew /work/
 COPY waltid-openid4vc/build.gradle.kts /work/waltid-openid4vc/
@@ -10,7 +9,6 @@ COPY waltid-did/build.gradle.kts /work/waltid-did/
 
 WORKDIR /work/waltid-wallet-api/
 RUN gradle build || return 0
-
 
 COPY waltid-openid4vc/. /work/waltid-openid4vc
 COPY waltid-sdjwt/. /work/waltid-sdjwt
@@ -24,13 +22,17 @@ RUN gradle clean installDist
 
 FROM docker.io/eclipse-temurin:17
 
+# Non-root user
+RUN useradd --create-home waltid
+
 COPY --from=buildstage /work/waltid-wallet-api/build/install/ /
+RUN chown -R waltid:waltid /waltid-wallet-api
+
 WORKDIR /waltid-wallet-api
 
-# Non-root user
-RUN groupadd -r appuser && useradd --no-log-init -r -g appuser appuser
-RUN chown -R appuser:appuser /waltid-wallet-api
-USER appuser
+RUN mkdir /waltid-wallet-api/data
+
+COPY waltid-wallet-api/docker-entrypoint.sh /
 
 EXPOSE 7001
-ENTRYPOINT ["/waltid-wallet-api/bin/waltid-wallet-api"]
+ENTRYPOINT ["/docker-entrypoint.sh"]
