@@ -378,17 +378,61 @@ $ waltid vc sign --key myKey.json
 ```bash
 Usage: waltid vc verify [<options>] <vc>
 
-  Verify the specified VC under a set of specified policies.
+  VC verification command.
+
+  ╭─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+  │     Verifies the specified VC under a set of specified policies.                                                                                                    │
+  │                                                                                                                                                                     │
+  │    The available policies are:                                                                                                                                      │
+  │                                                                                                                                                                     │
+  │    - schema: Verifies a credentials data against a JSON Schema (Draft 7 - see https://json-schema.org/specification-links#draft-7).                                 │
+  │    - holder-binding: Verifies that issuer of the Verifiable Presentation (presenter) is also the subject of all Verifiable Credentials contained within.            │
+  │    - presentation-definition: Verifies that with an Verifiable Presentation at minimum the list of credentials `request_credentials` has been presented.            │
+  │    - expired: Verifies that the credentials expiration date (`exp` for JWTs) has not been exceeded.                                                                 │
+  │    - webhook: Sends the credential data to an webhook URL as HTTP POST, and returns the verified status based on the webhooks set status code (success = 200 - 299).│
+  │    - maximum-credentials: Verifies that a maximum number of credentials in the Verifiable Presentation is not exceeded.                                             │
+  │    - minimum-credentials: Verifies that a minimum number of credentials are included in the Verifiable Presentation.                                                │
+  │    - signature: Checks a JWT credential by verifying its cryptographic signature using the key referenced by the DID in `iss`.                                      │
+  │    - allowed-issuer: Checks that the issuer of the credential is present in the supplied list.                                                                      │
+  │    - not-before: Verifies that the credentials not-before date (for JWT: `nbf`, if unavailable: `iat` - 1 min) is correctly exceeded.                               │
+  │                                                                                                                                                                     │
+  │    Multiple policies are accepted. e.g.                                                                                                                             │
+  │                                                                                                                                                                     │
+  │        waltid vc verify --policy=signature --policy=expired vc.json                                                                                                 │
+  │                                                                                                                                                                     │
+  │    If no policy is specified, only the Signature Policy will be applied. i.e.                                                                                       │
+  │                                                                                                                                                                     │
+  │        waltid vc verify vc.json                                                                                                                                     │
+  │                                                                                                                                                                     │
+  │    Some policies require parameters. To specify it, use --arg or -a options. e.g.                                                                                   │
+  │                                                                                                                                                                     │
+  │        --arg=param1=value1 --a param2=value2                                                                                                                        │
+  │                                                                                                                                                                     │
+  │        e.g.                                                                                                                                                         │
+  │                                                                                                                                                                     │
+  │        waltid vc verify --policy=schema -a schema=mySchema.json vc.json                                                                                             │
+  ╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
 
 Options:
-  -p, --policy=(schema|holder-binding|expired|webhook|maximum-credentials|minimum-credentials|signature|allowed-issuer|not-before)
-                     Specify a policy to be applied in the verification process. Multiple policies are accepted. If no policy is specified, only the Signature Policy will be applied. To define multiple policies,
-                     use --policy PolicyName1 --policy PolicyName2 (...) Some policies require parameters. To specify it, use --arg arg1=value1 '
-  -a, --arg=<value>  Argument required by some policies.
-  -h, --help         Show this message and exit
+  -p, --policy=(schema|holder-binding|expired|webhook|maximum-credentials|minimum-credentials|signature|allowed-issuer|not-before)  Specify a policy to be applied in the verification process.
+  -a, --arg=<value>                                                                                                                 Argument required by some policies, namely:
+
+                                                                                                                                    ┌────────────┬─────────────────────────────┐
+                                                                                                                                    │ Policy     │ Expected Argument           │
+                                                                                                                                    ╞════════════╪═════════════════════════════╡
+                                                                                                                                    │ signature  │ -                           │
+                                                                                                                                    ├────────────┼─────────────────────────────┤
+                                                                                                                                    │ expired    │ -                           │
+                                                                                                                                    ├────────────┼─────────────────────────────┤
+                                                                                                                                    │ not-before │ -                           │
+                                                                                                                                    ├────────────┼─────────────────────────────┤
+                                                                                                                                    │ schema     │ schema=/path/to/schema.json │
+                                                                                                                                    └────────────┴─────────────────────────────┘
+  -h, --help                                                                                                                        Show this message and exit
 
 Arguments:
   <vc>  the verifiable credential file (in JWS format) to be verified (required)
+
 ```
 
 # Note for Windows users
@@ -460,8 +504,8 @@ This project is still a work in progress. As such, not all features are already 
 ### VC verify
 
 * Signature ✅
-* Expired ❌
-* Not before ❌
+* Expired ✅
+* Not before ✅
 * Schema ✅
 * Holder Binding ❌
 * Allowed Issuer ❌
