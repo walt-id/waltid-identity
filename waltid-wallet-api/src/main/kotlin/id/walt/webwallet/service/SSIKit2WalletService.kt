@@ -2,6 +2,7 @@ package id.walt.webwallet.service
 
 import id.walt.crypto.keys.*
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.crypto.utils.JsonUtils.toJsonObject
 import id.walt.did.dids.DidService
 import id.walt.did.dids.registrar.LocalRegistrar
@@ -378,6 +379,7 @@ class SSIKit2WalletService(
     }
 
     override suspend fun loadKey(alias: String): JsonObject = getKey(alias).exportJWKObject()
+    override suspend fun getKeyMeta(alias: String): JsonObject = getKey(alias).getMeta().toJsonElement().jsonObject
 
     override suspend fun listKeys(): List<SingleKeyResponse> =
         KeysService.list(walletId).map {
