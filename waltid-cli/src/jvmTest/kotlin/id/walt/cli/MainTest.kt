@@ -83,6 +83,13 @@ class MainTest {
 
     val schemaFilePath = "${resourcesPath}/schema/ob_v3p0_achievementcredential_schema.json"
 
+    val signedExpiredVCFilePath = "${resourcesPath}/vc/openbadgecredential_sample.expired.signed.json"
+    val signedNotExpiredVCFilePath = "${resourcesPath}/vc/openbadgecredential_sample.signed.json"
+
+    val signedValidFromVCFilePath = "${resourcesPath}/vc/openbadgecredential_sample.signed.json"
+    val signedInvalidFromVCFilePath = "${resourcesPath}/vc/openbadgecredential_sample.invalidnotbefore.signed.json"
+
+
     @Test
     fun `should show usage message when called with no arguments`(output: CapturedOutput) {
         main(arrayOf(""))
@@ -379,6 +386,31 @@ class MainTest {
         assertContains(output.all, "signature: Fail!")
     }
 
+    @Test
+    fun `should succeed if the credentials expiration date (exp for JWTs) has not been exceeded when --policy=expired`(
+        output: CapturedOutput
+    ) {
+        main(arrayOf("vc", "verify", "--policy=expired", signedNotExpiredVCFilePath))
+        assertContains(output, "expired: Success")
+    }
+
+    @Test
+    fun `should fail if the credentials expiration date (exp for JWTs) has been exceeded when --policy=expired`(output: CapturedOutput) {
+        main(arrayOf("vc", "verify", "--policy=expired", signedExpiredVCFilePath))
+        assertContains(output, "expired: Fail! VC expired since")
+    }
+
+    @Test
+    fun `should succeed if credential is valid when --policy=not-before`(output: CapturedOutput) {
+        main(arrayOf("vc", "verify", "--policy=not-before", signedValidFromVCFilePath))
+        assertContains(output, "not-before: Success")
+    }
+
+    @Test
+    fun `should fail if credential is not valid yet when --policy=not-before`(output: CapturedOutput) {
+        main(arrayOf("vc", "verify", "--policy=not-before", signedInvalidFromVCFilePath))
+        assertContains(output, "not-before: Fail! VC not valid until")
+    }
 
     @Test
     fun `should succeed the schema verification when a valid VC is provided`(output: CapturedOutput) {
