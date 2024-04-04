@@ -61,8 +61,8 @@ expect class JWKKey(jwk: String?) : Key {
 
     companion object : JWKKeyCreator {
 
-        override suspend fun generate(type: KeyType, metadata: JWKKeyMetadata): JWKKey
-        override suspend fun importRawPublicKey(type: KeyType, rawPublicKey: ByteArray, metadata: JWKKeyMetadata): Key
+        override suspend fun generate(type: KeyType, metadata: JwkKeyMeta?): JWKKey
+        override suspend fun importRawPublicKey(type: KeyType, rawPublicKey: ByteArray, metadata: JwkKeyMeta?): Key
 
         override suspend fun importJWK(jwk: String): Result<JWKKey>
 

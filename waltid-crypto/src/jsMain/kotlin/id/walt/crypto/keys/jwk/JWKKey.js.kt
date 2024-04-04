@@ -261,12 +261,12 @@ actual class JWKKey actual constructor(
     actual companion object : JWKKeyCreator {
         @JsPromise
         @JsExport.Ignore
-        actual override suspend fun generate(type: KeyType, metadata: JWKKeyMetadata): JWKKey =
+        actual override suspend fun generate(type: KeyType, metadata: JwkKeyMeta?): JWKKey =
             JsJWKKeyCreator.generate(type, metadata)
 
         @JsPromise
         @JsExport.Ignore
-        actual override suspend fun importRawPublicKey(type: KeyType, rawPublicKey: ByteArray, metadata: JWKKeyMetadata): Key =
+        actual override suspend fun importRawPublicKey(type: KeyType, rawPublicKey: ByteArray, metadata: JwkKeyMeta?): Key =
             JsJWKKeyCreator.importRawPublicKey(type, rawPublicKey, metadata)
 
         @JsPromise
