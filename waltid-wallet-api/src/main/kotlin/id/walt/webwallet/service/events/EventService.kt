@@ -24,8 +24,23 @@ class EventService {
         dataFilter: Map<String, String>
     ) = transaction {
         let {
-            limit?.let { getFilterQueryLimited(accountId, walletId, sortOrder, sortBy, dataFilter, it, offset) }
-                ?: getFilterQueryUnlimited(accountId, walletId, sortOrder, sortBy, dataFilter)
+            limit?.let {
+                getFilterQueryLimited(
+                    accountId = accountId,
+                    walletId = walletId,
+                    sortOrder = sortOrder,
+                    sortBy = sortBy,
+                    dataFilter = dataFilter,
+                    limit = it,
+                    offset = offset
+                )
+            } ?: getFilterQueryUnlimited(
+                accountId = accountId,
+                walletId = walletId,
+                sortOrder = sortOrder,
+                sortBy = sortBy,
+                dataFilter = dataFilter
+            )
         }.map {
             Event(it)
         }
@@ -83,7 +98,13 @@ class EventService {
         dataFilter: Map<String, String>,
         limit: Int,
         offset: Long,
-    ) = getFilterQueryUnlimited(accountId, walletId, sortBy, sortOrder, dataFilter).limit(n = limit, offset = offset)
+    ) = getFilterQueryUnlimited(
+        accountId = accountId,
+        walletId = walletId,
+        sortOrder = sortOrder,
+        sortBy = sortBy,
+        dataFilter = dataFilter
+    ).limit(n = limit, offset = offset)
 
     private fun getFilterQueryUnlimited(
         accountId: UUID,
