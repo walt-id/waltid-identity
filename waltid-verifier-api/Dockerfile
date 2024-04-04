@@ -27,11 +27,11 @@ FROM docker.io/eclipse-temurin:17
 RUN useradd --create-home waltid
 
 COPY --from=buildstage /work/waltid-verifier-api/build/install/ /
-RUN chown -R waltid:waltid /waltid-verifier-api
+#RUN chown -R waltid:waltid /waltid-verifier-api
 
 WORKDIR /waltid-verifier-api
 
-COPY waltid-verifier-api/docker-entrypoint.sh /
+USER waltid
 
 EXPOSE 7003
-ENTRYPOINT ["/docker-entrypoint.sh"]
+ENTRYPOINT ["/waltid-verifier-api/bin/waltid-verifier-api"]
