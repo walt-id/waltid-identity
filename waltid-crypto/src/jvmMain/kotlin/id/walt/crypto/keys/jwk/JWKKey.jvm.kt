@@ -73,9 +73,7 @@ actual class JWKKey actual constructor(
         else -> TODO("Not yet implemented for: $keyType")
     }
 
-    actual override suspend fun getMeta(): JwkKeyMeta {
-        TODO("Not yet implemented")
-    }
+    actual override suspend fun getMeta(): JwkKeyMeta = JwkKeyMeta(getKeyId())
 
     actual override suspend fun exportJWK(): String = _internalJwk.toJSONString()
 

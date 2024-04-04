@@ -208,9 +208,7 @@ actual class JWKKey actual constructor(
 
     @JsPromise
     @JsExport.Ignore
-    actual override suspend fun getMeta(): JwkKeyMeta {
-        TODO("Not yet implemented")
-    }
+    actual override suspend fun getMeta(): JwkKeyMeta = JwkKeyMeta(getKeyId())
 
     override val keyType: KeyType
         get() {
@@ -256,7 +254,8 @@ actual class JWKKey actual constructor(
 
     @JsPromise
     @JsExport.Ignore
-    actual override suspend fun getThumbprint(): String = PromiseUtils.await(jose.calculateJwkThumbprint(JSON.parse(exportJWK())))
+    actual override suspend fun getThumbprint(): String =
+        PromiseUtils.await(jose.calculateJwkThumbprint(JSON.parse(exportJWK())))
 
     actual companion object : JWKKeyCreator {
         @JsPromise
@@ -266,7 +265,11 @@ actual class JWKKey actual constructor(
 
         @JsPromise
         @JsExport.Ignore
-        actual override suspend fun importRawPublicKey(type: KeyType, rawPublicKey: ByteArray, metadata: JwkKeyMeta?): Key =
+        actual override suspend fun importRawPublicKey(
+            type: KeyType,
+            rawPublicKey: ByteArray,
+            metadata: JwkKeyMeta?
+        ): Key =
             JsJWKKeyCreator.importRawPublicKey(type, rawPublicKey, metadata)
 
         @JsPromise
