@@ -56,8 +56,8 @@ object WalletServiceManager {
     val eventFilterUseCase = EventFilterUseCase(eventService)
     val oidcConfig by lazy { ConfigManager.getConfig<OidcConfiguration>() }
     val issuerUseCase = IssuerUseCaseImpl(service = IssuersService, http = httpClient)
-    val issuerTrustValidationService = DefaultTrustValidationService(httpClient, trustConfig.issuersRecord)
-    val verifierTrustValidationService = DefaultTrustValidationService(httpClient, trustConfig.verifiersRecord)
+    val issuerTrustValidationService by lazy { DefaultTrustValidationService(httpClient, trustConfig.issuersRecord) }
+    val verifierTrustValidationService by lazy { DefaultTrustValidationService(httpClient, trustConfig.verifiersRecord) }
     val notificationUseCase = NotificationUseCase(NotificationService, httpClient)
     val notificationFilterUseCase = NotificationFilterUseCase(NotificationService, credentialService)
     val matchPresentationDefinitionCredentialsUseCase = MatchPresentationDefinitionCredentialsUseCase(
@@ -70,18 +70,20 @@ object WalletServiceManager {
         FilterNoMatchPresentationDefinitionMatchStrategy(filterParser),
         DescriptorNoMatchPresentationDefinitionMatchStrategy(),
     )
-    val silentClaimStrategy = SilentClaimStrategy(
-        issuanceService = IssuanceService,
-        credentialService = credentialService,
-        issuerTrustValidationService = issuerTrustValidationService,
-        issuerNameResolveService = DefaultIssuerNameResolveService(httpClient, trustConfig.issuersRecord),
-        accountService = AccountsService,
-        didService = DidsService,
-        issuerUseCase = issuerUseCase,
-        eventUseCase = eventUseCase,
-        notificationUseCase = notificationUseCase,
-        credentialTypeSeeker = credentialTypeSeeker,
-    )
+    val silentClaimStrategy by lazy {
+        SilentClaimStrategy(
+            issuanceService = IssuanceService,
+            credentialService = credentialService,
+            issuerTrustValidationService = issuerTrustValidationService,
+            issuerNameResolveService = DefaultIssuerNameResolveService(httpClient, trustConfig.issuersRecord),
+            accountService = AccountsService,
+            didService = DidsService,
+            issuerUseCase = issuerUseCase,
+            eventUseCase = eventUseCase,
+            notificationUseCase = notificationUseCase,
+            credentialTypeSeeker = credentialTypeSeeker,
+        )
+    }
     val explicitClaimStrategy = ExplicitClaimStrategy(
         issuanceService = IssuanceService,
         credentialService = credentialService,
