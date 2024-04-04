@@ -10,9 +10,6 @@ import io.ktor.server.response.*
 import kotlinx.serialization.Serializable
 
 fun Application.trustRegistry() = authenticatedWebWalletRoute {
-    val issuerTustService = WalletServiceManager.issuerTrustValidationService
-    val verifierTustService = WalletServiceManager.verifierTrustValidationService
-
     route("trust", {
         tags = listOf("TrustRegistry")
     }) {
@@ -26,8 +23,8 @@ fun Application.trustRegistry() = authenticatedWebWalletRoute {
         }) {
             val request = call.receive<TrustRequest>()
             val result = request.isVerifier.takeIf { it }
-                ?.let { verifierTustService.validate(request.did, request.credentialType, request.egfUri) }
-                ?: issuerTustService.validate(request.did, request.credentialType, request.egfUri)
+                ?.let { WalletServiceManager.verifierTrustValidationService.validate(request.did, request.credentialType, request.egfUri) }
+                ?: WalletServiceManager.issuerTrustValidationService.validate(request.did, request.credentialType, request.egfUri)
             context.respond(TrustResponse(result))
         }
     }
