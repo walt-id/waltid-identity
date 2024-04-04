@@ -29,7 +29,5 @@ COPY --from=buildstage /work/waltid-wallet-api/build/install/ /
 
 WORKDIR /waltid-wallet-api
 
-COPY waltid-wallet-api/docker-entrypoint.sh /
-
 EXPOSE 7001
 ENTRYPOINT ["/waltid-wallet-api/bin/waltid-wallet-api"]
