@@ -394,7 +394,7 @@ actual class JWKKey actual constructor(
 
 //        val prettyJson = Json { prettyPrint = true }
 
-        actual override suspend fun generate(type: KeyType, metadata: JWKKeyMetadata): JWKKey =
+        actual override suspend fun generate(type: KeyType, metadata: JwkKeyMeta?): JWKKey =
             JvmJWKKeyCreator.generate(type, metadata)
 
         actual override suspend fun importJWK(jwk: String): Result<JWKKey> = JvmJWKKeyCreator.importJWK(jwk)
@@ -402,7 +402,7 @@ actual class JWKKey actual constructor(
         actual override suspend fun importRawPublicKey(
             type: KeyType,
             rawPublicKey: ByteArray,
-            metadata: JWKKeyMetadata
+            metadata: JwkKeyMeta?
         ): Key =
             JvmJWKKeyCreator.importRawPublicKey(type, rawPublicKey, metadata)
     }
