@@ -22,9 +22,14 @@ RUN gradle clean installDist
 
 FROM docker.io/eclipse-temurin:17
 
+# Non-root user
+RUN useradd --create-home waltid
+
 COPY --from=buildstage /work/waltid-wallet-api/build/install/ /
 
 WORKDIR /waltid-wallet-api
+
+COPY waltid-wallet-api/docker-entrypoint.sh /
 
 EXPOSE 7001
 ENTRYPOINT ["/waltid-wallet-api/bin/waltid-wallet-api"]
