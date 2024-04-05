@@ -25,7 +25,15 @@ class IssuerUseCaseImpl(
     override fun list(wallet: UUID): List<IssuerDataTransferObject> = service.list(wallet)
 
     override fun add(issuer: IssuerDataTransferObject): Result<Boolean> = runCatching {
-        service.add(issuer.wallet, issuer.did, issuer.name, issuer.description, issuer.uiEndpoint, issuer.configurationEndpoint) > 0
+        service.add(
+            issuer.wallet,
+            issuer.did,
+            issuer.name,
+            issuer.description,
+            issuer.uiEndpoint,
+            issuer.configurationEndpoint,
+            issuer.authorized
+        ) > 0
     }
 
     override fun authorize(wallet: UUID, did: String): Result<Boolean> = runCatching {

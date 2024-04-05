@@ -17,8 +17,16 @@ object IssuersService {
         }
     }
 
-    fun add(wallet: UUID, did: String, name: String?, description: String?, uiEndpoint: String, configurationEndpoint: String) = transaction {
-        addToWalletQuery(wallet, did, name, description, uiEndpoint, configurationEndpoint)
+    fun add(
+        wallet: UUID,
+        did: String,
+        name: String?,
+        description: String?,
+        uiEndpoint: String,
+        configurationEndpoint: String,
+        authorized: Boolean = false
+    ) = transaction {
+        addToWalletQuery(wallet, did, name, description, uiEndpoint, configurationEndpoint, authorized)
     }.insertedCount
 
     fun authorize(wallet: UUID, issuer: String) = transaction {
@@ -40,7 +48,7 @@ object IssuersService {
         description: String?,
         uiEndpoint: String,
         configurationEndpoint: String,
-        authorized: Boolean = false
+        authorized: Boolean,
     ) = WalletIssuers.upsert(
         keys = arrayOf(WalletIssuers.wallet, WalletIssuers.did),
         onUpdate = listOf(
