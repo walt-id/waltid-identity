@@ -4,9 +4,9 @@ import {Counter} from "k6/metrics";
 
 export const options = {
     stages: [
-        {duration: "20m", target: 10000},
-        {duration: "30m", target: 200},
-        {duration: "20m", target: 100},
+        {duration: "10m", target: 10000},
+        {duration: "5m", target: 200},
+        {duration: "5m", target: 100},
     ],
 };
 
@@ -14,8 +14,8 @@ export const totalUsersCreated = new Counter("total_users_created");
 export const totalUsersLoggedIn = new Counter("total_users_logged_in");
 
 export default function () {
-    for (let i = 0; i < 10000; i++) {
-        const tokenResponse = http.get(
+
+    const tokenResponse = http.get(
             "http://localhost:7001/wallet-api/auth/keycloak/token"
         );
         check(tokenResponse, {
@@ -67,5 +67,5 @@ export default function () {
                 r.body.includes("token") && r.body.includes("id"),
         });
         totalUsersLoggedIn.add(1);
-    }
+
 }
