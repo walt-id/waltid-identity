@@ -18,10 +18,21 @@ data class IssuerDataTransferObject(
     constructor(resultRow: ResultRow) : this(
         wallet = resultRow[WalletIssuers.wallet].value,
         did = resultRow[WalletIssuers.did],
+        name = resultRow[WalletIssuers.name],
         description = resultRow[WalletIssuers.description],
         uiEndpoint = resultRow[WalletIssuers.uiEndpoint],
         configurationEndpoint = resultRow[WalletIssuers.configurationEndpoint],
         authorized = resultRow[WalletIssuers.authorized],
+    )
+
+    constructor(copy: IssuerDataTransferObject) : this(
+        wallet = copy.wallet,
+        did = copy.did,
+        name = copy.name,
+        description = copy.description,
+        uiEndpoint = copy.uiEndpoint,
+        configurationEndpoint = copy.configurationEndpoint,
+        authorized = copy.authorized,
     )
 
     companion object {
