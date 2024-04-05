@@ -6,7 +6,7 @@ import kotlin.js.JsExport
 @OptIn(ExperimentalJsExport::class)
 @JsExport
 object DidUtils {
-    private const val PATTERN = "^did:([a-z]+):(.+)"
+    private const val PATTERN = "^did:([^:]+):(.+)"
     fun methodFromDid(did: String) = did.removePrefix("did:").substringBefore(":")
 
     fun identifierFromDid(did: String): String? = pathFromDid(did)?.substringBefore('#')
