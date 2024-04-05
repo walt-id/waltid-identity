@@ -21,10 +21,10 @@ import id.walt.webwallet.service.dids.DidsService
 import id.walt.webwallet.service.endpoint.EntraServiceEndpointProvider
 import id.walt.webwallet.service.events.EventService
 import id.walt.webwallet.service.exchange.IssuanceService
+import id.walt.webwallet.service.issuers.DefaultIssuerNameResolutionService
 import id.walt.webwallet.service.issuers.IssuersService
 import id.walt.webwallet.service.notifications.NotificationService
 import id.walt.webwallet.service.settings.SettingsService
-import id.walt.webwallet.service.issuers.DefaultIssuerNameResolutionService
 import id.walt.webwallet.service.trust.DefaultTrustValidationService
 import id.walt.webwallet.usecase.claim.ExplicitClaimStrategy
 import id.walt.webwallet.usecase.claim.SilentClaimStrategy
