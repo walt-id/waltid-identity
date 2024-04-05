@@ -131,15 +131,13 @@ open class CIProvider : OpenIDCredentialIssuer(
 
     // ------------------------------------------
     // Simple cryptographics operation interface implementations
-    override fun signToken(target: TokenTarget, payload: JsonObject, header: JsonObject? , keyId: String?, privKeyJwk: String?) =
+    override fun signToken(target: TokenTarget, payload: JsonObject, header: JsonObject? , keyId: String?, privKey: Key?) =
         runBlocking {
             println("Signing JWS:   $payload")
             println("JWS Signature: target: $target, keyId: $keyId, header: $header")
-            if (header != null && keyId != null && privKeyJwk != null)  {
-                val privKey = JWKKey.importJWK(privKeyJwk)
+            if (header != null && keyId != null && privKey != null)  {
                 val headers = mapOf("alg" to "ES256", "type" to "jwt", "kid" to keyId)
-
-                privKey.getOrThrow().signJws(payload.toString().toByteArray(), headers).also {
+                privKey.signJws(payload.toString().toByteArray(), headers).also {
                     println("Signed JWS: >> $it")
                 }
 

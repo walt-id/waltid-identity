@@ -1,5 +1,6 @@
 package id.walt.oid4vc.providers
 
+import id.walt.crypto.keys.Key
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.definitions.JWTClaims
@@ -191,7 +192,7 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
     // }
 
     // Create an ID Token request using JAR OAuth2.0 specification https://www.rfc-editor.org/rfc/rfc9101.html
-    open fun processCodeFlowAuthorizationWithIdTokenRequest(authorizationRequest: AuthorizationRequest, keyId: String, privKeyJwk: String): AuthorizationCodeIDTokenRequestResponse {
+    open fun processCodeFlowAuthorizationWithIdTokenRequest(authorizationRequest: AuthorizationRequest, keyId: String, privKey: Key): AuthorizationCodeIDTokenRequestResponse {
         if (!authorizationRequest.responseType.contains(ResponseType.Code))
             throw AuthorizationError(
                 authorizationRequest,
@@ -228,7 +229,7 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
                 put(JWTClaims.Header.type, "jwt")
             },
             keyId,
-            privKeyJwk
+            privKey
         )
 
         // Create a session with the state of the ID Token request since it is needed in the direct_post endpoint
