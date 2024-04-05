@@ -83,7 +83,7 @@ _Kotlin DSL_
 ```kotlin
 [...]
 repositories {
-    maven("https://maven.walt.id/repository/waltid/")
+    maven("https://maven.waltid.dev/releases")
 }
 [...]
 val sdJwtVersion = "1.2306071235.0"
