@@ -83,7 +83,7 @@ class CITestProvider : OpenIDCredentialIssuer(
     val deferredCredentialRequests = mutableMapOf<String, CredentialRequest>()
     var deferIssuance = false
 
-    override fun signToken(target: TokenTarget, payload: JsonObject, header: JsonObject?, keyId: String?, privKeyJwk: String?) =
+    override fun signToken(target: TokenTarget, payload: JsonObject, header: JsonObject?, keyId: String?, privKey: Key?) =
         runBlocking { CI_TOKEN_KEY.signJws(payload.toString().toByteArray()) }
 
     fun getKeyFor(token: String): Key {

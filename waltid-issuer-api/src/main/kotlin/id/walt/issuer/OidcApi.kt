@@ -107,10 +107,10 @@ object OidcApi : CIProvider() {
                         println("authresp is: $authReq")
                         if (authReq.clientId.startsWith("did:key") && authReq.clientId.length==186) {  // EBSI conformance
                             val idTokenRequestKid = OidcApi.sessionCredentialPreMapping[authReq.issuerState]?.first()?.issuerKey!!.getKeyId()
-                            val privKeyJwk= OidcApi.sessionCredentialPreMapping[authReq.issuerState]?.first()?.issuerKey!!.exportJWK()
-                            println("PrivateKey is: $privKeyJwk")
+                            val privKey = OidcApi.sessionCredentialPreMapping[authReq.issuerState]?.first()?.issuerKey!!
+                            println("PrivateKey is: $privKey")
                             println("KID is: $idTokenRequestKid")
-                            processCodeFlowAuthorizationWithIdTokenRequest(authReq, idTokenRequestKid, privKeyJwk)
+                            processCodeFlowAuthorizationWithIdTokenRequest(authReq, idTokenRequestKid, privKey)
                         } else {
                             processCodeFlowAuthorization(authReq)
                         }

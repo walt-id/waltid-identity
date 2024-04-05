@@ -7,6 +7,7 @@ import com.nimbusds.jose.crypto.bc.BouncyCastleProviderSingleton
 import com.nimbusds.jose.jwk.ECKey
 import id.walt.credentials.PresentationBuilder
 import id.walt.credentials.vc.vcs.W3CVC
+import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 //import id.walt.crypto.keys.LocalKey
 import id.walt.crypto.keys.jwk.JWKKey
@@ -78,7 +79,7 @@ class TestCredentialWallet(
         expirationTimestamp: Instant
     ) = SIOPSession(id, authorizationRequest, expirationTimestamp)
 
-    override fun signToken(target: TokenTarget, payload: JsonObject, header: JsonObject?, keyId: String?, privateKeyJwk: String?) =
+    override fun signToken(target: TokenTarget, payload: JsonObject, header: JsonObject?, keyId: String?, privKey: Key?) =
         SDJwt.sign(SDPayload.createSDPayload(payload, SDMap.Companion.fromJSON("{}")), jwtCryptoProvider, keyId).jwt
 
     @OptIn(ExperimentalJsExport::class)

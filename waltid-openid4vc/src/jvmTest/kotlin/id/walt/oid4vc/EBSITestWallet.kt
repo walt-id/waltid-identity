@@ -5,6 +5,7 @@ import com.nimbusds.jose.crypto.ECDSASigner
 import com.nimbusds.jose.crypto.ECDSAVerifier
 import com.nimbusds.jose.jwk.ECKey
 import id.walt.credentials.PresentationBuilder
+import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.did.dids.DidService
@@ -107,7 +108,7 @@ class EBSITestWallet(
         )
     }
 
-    override fun signToken(target: TokenTarget, payload: JsonObject, header: JsonObject?, keyId: String?, privKeyJwk: String?) =
+    override fun signToken(target: TokenTarget, payload: JsonObject, header: JsonObject?, keyId: String?, privKey: Key?) =
         SDJwt.sign(SDPayload.createSDPayload(payload, SDMap.Companion.fromJSON("{}")), jwtCryptoProvider, keyId).jwt
 
     @OptIn(ExperimentalJsExport::class)
