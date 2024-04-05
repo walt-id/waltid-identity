@@ -25,16 +25,6 @@ data class IssuerDataTransferObject(
         authorized = resultRow[WalletIssuers.authorized],
     )
 
-    constructor(copy: IssuerDataTransferObject) : this(
-        wallet = copy.wallet,
-        did = copy.did,
-        name = copy.name,
-        description = copy.description,
-        uiEndpoint = copy.uiEndpoint,
-        configurationEndpoint = copy.configurationEndpoint,
-        authorized = copy.authorized,
-    )
-
     companion object {
         fun default(wallet: UUID) = IssuerDataTransferObject(
             wallet = wallet,

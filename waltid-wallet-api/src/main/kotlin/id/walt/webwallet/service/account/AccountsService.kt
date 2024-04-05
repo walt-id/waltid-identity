@@ -1,15 +1,12 @@
 package id.walt.webwallet.service.account
 
 import id.walt.webwallet.config.ConfigManager
-import id.walt.webwallet.config.LoginMethodsConfig
 import id.walt.webwallet.config.RegistrationDefaultsConfig
 import id.walt.webwallet.db.models.*
 import id.walt.webwallet.service.WalletServiceManager
 import id.walt.webwallet.service.events.AccountEventData
-import id.walt.webwallet.service.events.EventService
 import id.walt.webwallet.service.events.EventType
 import id.walt.webwallet.service.issuers.IssuersService
-import id.walt.webwallet.usecase.event.EventUseCase
 import id.walt.webwallet.web.model.*
 import kotlinx.datetime.toKotlinInstant
 import kotlinx.serialization.Serializable
@@ -21,7 +18,6 @@ import org.jetbrains.exposed.sql.transactions.transaction
 
 object AccountsService {
 
-    private val eventUseCase = EventUseCase(EventService())
     fun registerAuthenticationMethods() {
 //        val loginMethods = ConfigManager.getConfig<LoginMethodsConfig>().enabledLoginMethods
     }
@@ -53,7 +49,7 @@ object AccountsService {
         }
 
         val walletService = WalletServiceManager.getWalletService(tenant, registeredUserId, createdInitialWalletId)
-        eventUseCase.log(
+        WalletServiceManager.eventUseCase.log(
             action = EventType.Account.Create,
             originator = "wallet",
             tenant = tenant,
@@ -87,7 +83,7 @@ object AccountsService {
 
         }
     }.fold(onSuccess = {
-        eventUseCase.log(
+        WalletServiceManager.eventUseCase.log(
             action = EventType.Account.Login,
             tenant = tenant,
             originator = "wallet",

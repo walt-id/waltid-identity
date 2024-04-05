@@ -15,12 +15,10 @@ import id.walt.webwallet.usecase.event.EventUseCase
 import id.walt.webwallet.usecase.issuer.IssuerNameResolutionUseCase
 import id.walt.webwallet.usecase.issuer.IssuerUseCase
 import id.walt.webwallet.usecase.notification.NotificationUseCase
-import id.walt.webwallet.utils.JsonUtils
 import kotlinx.datetime.Clock
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.uuid.UUID
 import kotlinx.uuid.generateUUID
 
@@ -85,7 +83,7 @@ class SilentClaimStrategy(
         notificationUseCase.send(*this.toTypedArray())
     }
 
-    private fun createEvents(
+    private suspend fun createEvents(
         tenant: String, account: UUID, credentials: List<Pair<WalletCredential, String?>>, type: EventType.Action
     ) = prepareEvents(account, tenant, credentials, type).runCatching {
         eventUseCase.log(*this.toTypedArray())
@@ -108,7 +106,7 @@ class SilentClaimStrategy(
         )
     }
 
-    private fun prepareEvents(
+    private suspend fun prepareEvents(
         account: UUID, tenant: String, credentials: List<Pair<WalletCredential, String?>>, type: EventType.Action
     ) = credentials.map {
         Event(
@@ -117,9 +115,7 @@ class SilentClaimStrategy(
             originator = "",
             account = account,
             wallet = it.first.wallet,
-            data = eventUseCase.credentialEventData(
-                credential = it.first, type = it.second
-            ),
+            data = eventUseCase.credentialEventData(credential = it.first, type = it.second),
             credentialId = it.first.id,
         )
     }
@@ -136,7 +132,7 @@ class SilentClaimStrategy(
                 data = Json.encodeToString(
                     Notification.CredentialData(
                         credentialId = it.id,
-                        logo = getLogo(it),
+                        logo = WalletCredential.getManifestLogo(it.parsedManifest) ?: "",//TODO: placeholder logo?
                         detail = computeNotificationDetailMessage(
                             issuer = getIssuerName(it),
                             type = credentialTypeSeeker.get(it.parsedDocument ?: JsonObject(emptyMap()))
@@ -146,18 +142,15 @@ class SilentClaimStrategy(
             )
         }
 
-    private fun getLogo(credential: WalletCredential) =
-        credential.parsedManifest?.let { JsonUtils.tryGetData(it, "display.card.logo.uri")?.jsonPrimitive?.content }
-            ?: ""//TODO: placeholder logo?
-
-    private suspend fun getIssuerName(credential: WalletCredential) = issuerNameResolutionUseCase.resolve(
-        wallet = credential.wallet, did = WalletCredential.parseIssuerDid(
-            credential.parsedDocument,
-            credential.parsedManifest
-        ) ?: ""
-    )
+    private suspend fun getIssuerName(credential: WalletCredential) =
+        WalletCredential.getManifestIssuerName(credential.parsedManifest) ?: issuerNameResolutionUseCase.resolve(
+            wallet = credential.wallet, did = WalletCredential.parseIssuerDid(
+                credential.parsedDocument,
+                credential.parsedManifest
+            ) ?: ""
+        )
 
     private fun computeNotificationDetailMessage(issuer: String, type: String): String = let {
-        "$issuer has issued a new credential to you ($type)"
+        "$issuer has issued a new credential to you ($type)"//TODO: make configurable
     }
 }

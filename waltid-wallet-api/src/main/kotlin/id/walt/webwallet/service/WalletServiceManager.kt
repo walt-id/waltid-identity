@@ -81,10 +81,11 @@ object WalletServiceManager {
         ),
     )
     private val issuerNameResolutionService = DefaultIssuerNameResolutionService(httpClient, trustConfig.issuersRecord)
-    val eventUseCase = EventUseCase(eventService)
+    val issuerUseCase = IssuerUseCaseImpl(service = IssuersService, http = httpClient)
+    private val issuerNameResolutionUseCase = IssuerNameResolutionUseCase(issuerUseCase, issuerNameResolutionService)
+    val eventUseCase = EventUseCase(eventService, issuerNameResolutionUseCase)
     val eventFilterUseCase = EventFilterUseCase(eventService)
     val oidcConfig by lazy { ConfigManager.getConfig<OidcConfiguration>() }
-    val issuerUseCase = IssuerUseCaseImpl(service = IssuersService, http = httpClient)
     val issuerTrustValidationService by lazy { DefaultTrustValidationService(httpClient, trustConfig.issuersRecord) }
     val verifierTrustValidationService by lazy { DefaultTrustValidationService(httpClient, trustConfig.verifiersRecord) }
     val notificationUseCase = NotificationUseCase(NotificationService, httpClient)
@@ -104,7 +105,7 @@ object WalletServiceManager {
             issuanceService = IssuanceService,
             credentialService = credentialService,
             issuerTrustValidationService = issuerTrustValidationService,
-            issuerNameResolutionUseCase = IssuerNameResolutionUseCase(issuerUseCase, issuerNameResolutionService),
+            issuerNameResolutionUseCase = issuerNameResolutionUseCase,
             accountService = AccountsService,
             didService = DidsService,
             issuerUseCase = issuerUseCase,

@@ -27,7 +27,9 @@ data class DidEventData(
 @Serializable
 data class CredentialEventData(
     val ecosystem: String,
+    val logo: String?,
     val issuerId: String,
+    val issuerName: String?,
     val subjectId: String,
     val issuerKeyId: String,
     val issuerKeyType: String,
