@@ -1,0 +1,36 @@
+{
+    "id": "did:ion:EiD...<SNIP>",
+    "@context":
+    [
+        "https://www.w3.org/ns/did/v1",
+        {
+            "@base": "did:ion:EiD...<SNIP>..."
+        }
+    ],
+    "service":
+    [
+        {
+            "id": "#linkeddomains",
+            "type": "LinkedDomains",
+            "serviceEndpoint":
+            {
+                "origins":
+                [
+                    "https://contoso.com/"
+                ]
+            }
+        },
+        {
+            "id": "#hub",
+            "type": "IdentityHub",
+            "serviceEndpoint":
+            {
+                "instances":
+                [
+                    "https://verifiedid.hub.msidentity.com/v1.0/11111111-2222-3333-4444-000000000000"
+                ],
+                "origins": []
+            }
+        }
+    ]
+}

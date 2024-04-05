@@ -1,11 +1,14 @@
 package id.walt.issuer
 
 import id.walt.credentials.vc.vcs.W3CVC
-import id.walt.crypto.keys.*
+import id.walt.crypto.keys.Key
+import id.walt.crypto.keys.KeySerialization
+import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.keys.tse.TSEKey
 import id.walt.crypto.keys.tse.TSEKeyMetadata
 import id.walt.did.dids.DidService
+import id.walt.did.dids.registrar.dids.DidCreateOptions
 import id.walt.issuer.IssuanceExamples.batchExample
 import id.walt.issuer.IssuanceExamples.issuerOnboardingRequestDefaultExample
 import id.walt.issuer.IssuanceExamples.issuerOnboardingRequestTseExample
@@ -115,7 +118,12 @@ fun Application.issuerApi() {
                 val didMethod = getParamOrThrow(
                     req.issuerDidConfig["method"], "Mandatory issuerDidConfig param 'method' not provided"
                 )
-                val did = DidService.registerByKey(didMethod, key).did
+
+                val did = DidService.registerByKey(
+                    didMethod,
+                    key,
+                    DidCreateOptions(didMethod, req.issuerDidConfig as JsonElement)
+                ).did
 
                 logger.debug { "DID created: $did" }
 

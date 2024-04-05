@@ -87,11 +87,31 @@ fun Application.exchange() = walletRoute {
             }
         }) {
             val presentationDefinition = PresentationDefinition.fromJSON(context.receive<JsonObject>())
-
-            val wallet = getWalletService()
-            val matchedCredentials = wallet.matchCredentialsByPresentationDefinition(presentationDefinition)
-
+            val matchedCredentials = WalletServiceManager.matchPresentationDefinitionCredentialsUseCase.match(
+                getWalletId(), presentationDefinition
+            )
             context.respond(matchedCredentials)
+        }
+        post("unmatchedCredentialsForPresentationDefinition", {
+            summary =
+                "Returns the credentials that are required by the presentation definition but not found in the wallet"
+
+            request {
+                body<PresentationDefinition> { description = "Presentation definition" }
+            }
+            response {
+                HttpStatusCode.OK to {
+                    body<List<String>> {
+                        description = "Credentials types that are missing to fulfill the presentation definition"
+                    }
+                }
+            }
+        }) {
+            val presentationDefinition = PresentationDefinition.fromJSON(context.receive<JsonObject>())
+            val unmatchedCredentialTypes = WalletServiceManager.unmatchedPresentationDefinitionCredentialsUseCase.find(
+                getWalletId(), presentationDefinition
+            )
+            context.respond(unmatchedCredentialTypes)
         }
 
         post("usePresentationRequest", {
