@@ -378,6 +378,8 @@ class SSIKit2WalletService(
     }
 
     override suspend fun loadKey(alias: String): JsonObject = getKey(alias).exportJWKObject()
+    override suspend fun getKeyMeta(alias: String): JsonObject =
+        Json.encodeToJsonElement(getKey(alias).getMeta()).jsonObject
 
     override suspend fun listKeys(): List<SingleKeyResponse> =
         KeysService.list(walletId).map {

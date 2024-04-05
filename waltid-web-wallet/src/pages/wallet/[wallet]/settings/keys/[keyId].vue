@@ -125,7 +125,7 @@ const enableLoadPrivateKey = ref(false);
 
 const currentWallet = useCurrentWallet()
 
-// const key = await $fetch(`/wallet-api/wallet/${currentWallet.value}/keys/load/${keyId}`);
+// const key = await $fetch(`/wallet-api/wallet/${currentWallet.value}/keys/${keyId}/load`);
 refreshNuxtData();
 
 function exportKey() {
