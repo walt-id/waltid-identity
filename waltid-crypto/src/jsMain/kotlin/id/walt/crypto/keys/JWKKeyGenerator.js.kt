@@ -4,7 +4,6 @@ import JWK
 import KeyLike
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.keys.jwk.JWKKeyCreator
-import id.walt.crypto.keys.jwk.JWKKeyMetadata
 import id.walt.crypto.utils.JwsUtils.jwsAlg
 import id.walt.crypto.utils.PromiseUtils.await
 import jose
@@ -16,7 +15,7 @@ object JsJWKKeyCreator : JWKKeyCreator {
 
     @JsPromise
     @JsExport.Ignore
-    override suspend fun generate(type: KeyType, metadata: JWKKeyMetadata): JWKKey {
+    override suspend fun generate(type: KeyType, metadata: JwkKeyMeta?): JWKKey {
         val alg = type.jwsAlg()
 
         @Suppress("UNCHECKED_CAST_TO_EXTERNAL_INTERFACE")
@@ -27,7 +26,7 @@ object JsJWKKeyCreator : JWKKeyCreator {
 
     @JsPromise
     @JsExport.Ignore
-    override suspend fun importRawPublicKey(type: KeyType, rawPublicKey: ByteArray, metadata: JWKKeyMetadata): Key {
+    override suspend fun importRawPublicKey(type: KeyType, rawPublicKey: ByteArray, metadata: JwkKeyMeta?): Key {
         val key: KeyLike = await(jose.importSPKI(rawPublicKey.decodeToString(), type.jwsAlg()))
         return JWKKey(key).apply { init() }
     }

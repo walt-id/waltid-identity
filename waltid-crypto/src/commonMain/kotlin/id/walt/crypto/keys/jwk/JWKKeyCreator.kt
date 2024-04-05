@@ -1,5 +1,6 @@
 package id.walt.crypto.keys.jwk
 
+import id.walt.crypto.keys.JwkKeyMeta
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import love.forte.plugin.suspendtrans.annotation.JsPromise
@@ -15,7 +16,7 @@ interface JWKKeyCreator {
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    suspend fun generate(type: KeyType, metadata: JWKKeyMetadata = JWKKeyMetadata()): JWKKey
+    suspend fun generate(type: KeyType, metadata: JwkKeyMeta? = null): JWKKey
 
     @JvmBlocking
     @JvmAsync
@@ -24,7 +25,7 @@ interface JWKKeyCreator {
     suspend fun importRawPublicKey(
         type: KeyType,
         rawPublicKey: ByteArray,
-        metadata: JWKKeyMetadata
+        metadata: JwkKeyMeta?
     ): Key
 
     @JvmBlocking
