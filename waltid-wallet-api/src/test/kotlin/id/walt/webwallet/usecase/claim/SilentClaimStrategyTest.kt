@@ -74,7 +74,7 @@ class SilentClaimStrategyTest {
         every { eventUseCase.log(any()) } just Runs
         every { notificationUseCase.add(any()) } returns listOf(UUID.generateUUID())
         coEvery { notificationUseCase.send(any()) } just Runs
-        coEvery { issuerNameResolveService.resolve(any()) } returns "test"
+        coEvery { issuerNameResolveService.resolve(any()) } returns Result.success("test")
     }
 
     @Test
