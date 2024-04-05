@@ -37,7 +37,7 @@ class EventUseCase(
 
     fun log(vararg event: Event) = eventService.add(event.toList())
 
-    fun count(walletId: UUID, dataFilter: Map<String, String>) = eventService.count(walletId, dataFilter)
+    fun count(walletId: UUID, dataFilter: Map<String, List<String>>) = eventService.count(walletId, dataFilter)
 
     fun get(parameter: EventFilterParameter) = eventService.get(
         accountId = parameter.accountId,
