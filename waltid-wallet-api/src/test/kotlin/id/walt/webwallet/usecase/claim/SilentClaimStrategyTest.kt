@@ -8,9 +8,9 @@ import id.walt.webwallet.service.dids.DidsService
 import id.walt.webwallet.service.events.CredentialEventData
 import id.walt.webwallet.service.exchange.IssuanceService
 import id.walt.webwallet.service.issuers.IssuerDataTransferObject
-import id.walt.webwallet.service.issuers.IssuerNameResolutionService
 import id.walt.webwallet.service.trust.TrustValidationService
 import id.walt.webwallet.usecase.event.EventUseCase
+import id.walt.webwallet.usecase.issuer.IssuerNameResolutionUseCase
 import id.walt.webwallet.usecase.issuer.IssuerUseCase
 import id.walt.webwallet.usecase.notification.NotificationUseCase
 import io.mockk.*
@@ -27,7 +27,7 @@ class SilentClaimStrategyTest {
     private val issuanceService = mockk<IssuanceService>()
     private val credentialService = mockk<CredentialsService>()
     private val issuerTrustValidationService = mockk<TrustValidationService>()
-    private val issuerNameResolveService = mockk<IssuerNameResolutionService>()
+    private val issuerNameResolutionUseCase = mockk<IssuerNameResolutionUseCase>()
     private val issuerUseCase = mockk<IssuerUseCase>()
     private val eventUseCase = mockk<EventUseCase>()
     private val notificationUseCase = mockk<NotificationUseCase>()
@@ -38,7 +38,7 @@ class SilentClaimStrategyTest {
         issuanceService = issuanceService,
         credentialService = credentialService,
         issuerTrustValidationService = issuerTrustValidationService,
-        issuerNameResolveService = issuerNameResolveService,
+        issuerNameResolutionUseCase = issuerNameResolutionUseCase,
         accountService = accountService,
         didService = didService,
         issuerUseCase = issuerUseCase,
@@ -70,11 +70,11 @@ class SilentClaimStrategyTest {
         coEvery { issuanceService.useOfferRequest(any(), any(), any()) } returns listOf(credentialData)
         coEvery { issuerUseCase.get(wallet, any()) } returns Result.success(issuerData)
         every { credentialService.add(wallet = any(), any()) } returns listOf(credentialId)
-        every { eventUseCase.credentialEventData(any(), any()) } returns eventData
+        coEvery { eventUseCase.credentialEventData(any(), any()) } returns eventData
         every { eventUseCase.log(any()) } just Runs
         every { notificationUseCase.add(any()) } returns listOf(UUID.generateUUID())
         coEvery { notificationUseCase.send(any()) } just Runs
-        coEvery { issuerNameResolveService.resolve(any()) } returns Result.success("test")
+        coEvery { issuerNameResolutionUseCase.resolve(wallet, any()) } returns "test"
     }
 
     @Test
