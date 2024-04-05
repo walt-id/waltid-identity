@@ -38,6 +38,7 @@ import id.walt.webwallet.usecase.exchange.strategies.DescriptorNoMatchPresentati
 import id.walt.webwallet.usecase.exchange.strategies.DescriptorPresentationDefinitionMatchStrategy
 import id.walt.webwallet.usecase.exchange.strategies.FilterNoMatchPresentationDefinitionMatchStrategy
 import id.walt.webwallet.usecase.exchange.strategies.FilterPresentationDefinitionMatchStrategy
+import id.walt.webwallet.usecase.issuer.IssuerNameResolutionUseCase
 import id.walt.webwallet.usecase.issuer.IssuerUseCaseImpl
 import id.walt.webwallet.usecase.notification.NotificationFilterUseCase
 import id.walt.webwallet.usecase.notification.NotificationUseCase
@@ -79,6 +80,7 @@ object WalletServiceManager {
             bitStringValueParser = BitStringValueParser(),
         ),
     )
+    private val issuerNameResolutionService = DefaultIssuerNameResolutionService(httpClient, trustConfig.issuersRecord)
     val eventUseCase = EventUseCase(eventService)
     val eventFilterUseCase = EventFilterUseCase(eventService)
     val oidcConfig by lazy { ConfigManager.getConfig<OidcConfiguration>() }
@@ -102,7 +104,7 @@ object WalletServiceManager {
             issuanceService = IssuanceService,
             credentialService = credentialService,
             issuerTrustValidationService = issuerTrustValidationService,
-            issuerNameResolveService = DefaultIssuerNameResolutionService(httpClient, trustConfig.issuersRecord),
+            issuerNameResolutionUseCase = IssuerNameResolutionUseCase(issuerUseCase, issuerNameResolutionService),
             accountService = AccountsService,
             didService = DidsService,
             issuerUseCase = issuerUseCase,
