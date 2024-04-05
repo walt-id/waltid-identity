@@ -44,6 +44,7 @@ object AccountsService {
             //TODO: inject
             IssuersService.add(
                 wallet = walletId,
+                did = "did:web:walt.id",
                 name = "walt.id",
                 description = "walt.id issuer portal",
                 uiEndpoint = "https://portal.walt.id/credentials?ids=",

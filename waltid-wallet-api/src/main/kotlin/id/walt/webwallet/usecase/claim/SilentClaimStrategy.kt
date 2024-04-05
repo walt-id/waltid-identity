@@ -103,7 +103,7 @@ class SilentClaimStrategy(
                 addedOn = Clock.System.now(),
                 manifest = data.manifest,
                 deletedOn = null,
-                pending = issuerUseCase.get(wallet = it, name = issuerDid).getOrNull()?.authorized ?: true,
+                pending = issuerUseCase.get(wallet = it, did = issuerDid).getOrNull()?.authorized ?: true,
             ), data.type
         )
     }

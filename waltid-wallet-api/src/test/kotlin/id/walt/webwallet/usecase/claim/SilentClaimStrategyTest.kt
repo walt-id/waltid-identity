@@ -52,7 +52,7 @@ class SilentClaimStrategyTest {
     private val wallet = UUID("bd698a0f-1703-4565-aab3-747c374152dd")
     private val issuerData = IssuerDataTransferObject(
         wallet = wallet,
-        name = "name",
+        did = "name",
         uiEndpoint = "uiEndpoint",
     )
     private val credentialType = "test-credential-type"
