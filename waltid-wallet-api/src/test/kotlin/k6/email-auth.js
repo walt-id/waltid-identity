@@ -15,26 +15,19 @@ export const totalUsersLoggedIn = new Counter("total_users_logged_in");
 
 export default function () {
     for (let i = 0; i < 10000; i++) {
-        const tokenResponse = http.get(
-            "http://localhost:7001/wallet-api/auth/keycloak/token"
-        );
-        check(tokenResponse, {
-            "access token generated": (r) => r.status == 200,
-        });
         // Loop 10,000 times to create 10,000 users
-        const username = Math.random().toString(36).slice(2, 15) + "@gmail.com";
-        const email = username;
+        const username = Math.random().toString(36).slice(2, 15);
+        const email = username + "@gmail.com";
         const password = "test";
 
         // Register user
         const registerResponse = http.post(
-            "http://localhost:7001/wallet-api/auth/keycloak/create",
+            "http://localhost:7001/wallet-api/auth/create",
             JSON.stringify({
-                username: username,
+                name: username,
                 email: email,
                 password: password,
-                type: "keycloak",
-                token: tokenResponse.body,
+                type: "email",
             }),
             {headers: {"Content-Type": "application/json"}}
         );
@@ -51,12 +44,11 @@ export default function () {
 
         // Login user
         const loginResponse = http.post(
-            "http://localhost:7001/wallet-api/auth/keycloak/login",
+            "http://localhost:7001/wallet-api/auth/login",
             JSON.stringify({
-                username: username,
+                email: email,
                 password: password,
-                type: "keycloak",
-                token: tokenResponse.body,
+                type: "email",
             }),
             {headers: {"Content-Type": "application/json"}}
         );
