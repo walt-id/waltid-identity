@@ -87,13 +87,15 @@ data class W3CVC(
         /** Set additional options in the JWT payload */
         additionalJwtOptions: Map<String, JsonElement> = emptyMap()
     ): String {
+        var kid = issuerDid
+        if (issuerDid.startsWith("did:key") && issuerDid.length==186) // EBSI conformance corner case when issuer uses did:key instead of did:ebsi and no trust framework is defined
+            kid = issuerDid + "#" + issuerDid.removePrefix("did:key:")
+
         return JwsSignatureScheme().sign(
             data = this.toJsonObject(),
             key = issuerKey,
             jwtHeaders = mapOf(
-                // Why KeyID = issuerDid
-                // JwsHeader.KEY_ID to issuerDid,
-                JwsHeader.KEY_ID to (issuerDid+"#"+issuerDid.replaceRange(0..7, "")),
+                JwsHeader.KEY_ID to kid,
                 *(additionalJwtHeader.entries.map { it.toPair() }.toTypedArray())
             ),
             jwtOptions = mapOf(

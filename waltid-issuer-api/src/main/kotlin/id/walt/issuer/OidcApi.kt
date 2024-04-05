@@ -85,10 +85,7 @@ object OidcApi : CIProvider() {
                                     it.issuerKey.getPublicKey().exportJWKObject().forEach {
                                         put(it.key, it.value)
                                     }
-                                    if (it.issuerDid.startsWith("did:key") && it.issuerDid.length == 186) // Edge case when issuer uses did:key with ebsi encoding (jwk_jcs-pub (0xeb51)
-                                        put("kid", it.issuerDid.removePrefix("did:key:"))
-                                    else
-                                        put("kid", it.issuerKey.getPublicKey().getKeyId())
+                                    put("kid", it.issuerKey.getPublicKey().getKeyId())
                                 }
                                 add(jwkWithKid)
                                 jwks.forEach {
@@ -108,8 +105,8 @@ object OidcApi : CIProvider() {
                 try {
                     val authResp = if (authReq.responseType.contains(ResponseType.Code)) {
                         println("authresp is: $authReq")
-                        if (authReq.clientId.startsWith("did:key") && authReq.clientId.length==186) {  // EBSI conformance latest change at 27/3/2024 now supports both jwt_vc and jwt_vc_json
-                            val idTokenRequestKid = OidcApi.sessionCredentialPreMapping[authReq.issuerState]?.first()?.issuerDid!!.removePrefix("did:key:")
+                        if (authReq.clientId.startsWith("did:key") && authReq.clientId.length==186) {  // EBSI conformance
+                            val idTokenRequestKid = OidcApi.sessionCredentialPreMapping[authReq.issuerState]?.first()?.issuerKey!!.getKeyId()
                             val privKeyJwk= OidcApi.sessionCredentialPreMapping[authReq.issuerState]?.first()?.issuerKey!!.exportJWK()
                             println("PrivateKey is: $privKeyJwk")
                             println("KID is: $idTokenRequestKid")
