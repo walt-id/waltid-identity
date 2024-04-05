@@ -267,8 +267,6 @@ open class CIProvider : OpenIDCredentialIssuer(
                     CredentialFormat.sd_jwt_vc -> vc.mergingSdJwtIssue(
                         issuerKey = issuerKey,
                         issuerDid = issuerDid,
-                        // Why DID=KID?
-                        // https://identity.foundation/jwt-vc-presentation-profile/#jwt-vc
                         subjectDid = holderDid,
                         mappings = request.mapping ?: JsonObject(emptyMap()),
                         additionalJwtHeader = emptyMap(),
