@@ -31,6 +31,10 @@ suspendTransform {
     useJsDefault()
 }
 
+tasks.withType<org.gradle.language.jvm.tasks.ProcessResources> {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
 java {
     sourceCompatibility = JavaVersion.VERSION_15
     targetCompatibility = JavaVersion.VERSION_15
