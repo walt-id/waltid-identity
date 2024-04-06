@@ -4,7 +4,11 @@ import id.walt.credentials.verification.policies.*
 import id.walt.credentials.verification.policies.vp.HolderBindingPolicy
 import id.walt.credentials.verification.policies.vp.MaximumCredentialsPolicy
 import id.walt.credentials.verification.policies.vp.MinimumCredentialsPolicy
+import kotlin.js.ExperimentalJsExport
+import kotlin.js.JsExport
 
+@OptIn(ExperimentalJsExport::class)
+@JsExport
 object PolicyManager {
     private val mappedPolicies = HashMap<String, VerificationPolicy>()
 

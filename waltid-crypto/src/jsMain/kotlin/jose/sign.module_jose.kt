@@ -3,7 +3,7 @@
 import org.khronos.webgl.Uint8Array
 import kotlin.js.Promise
 
-external open class SignJWT(payload: JWTPayload) : ProduceJWT {
+open external class SignJWT(payload: JWTPayload) : ProduceJWT {
     open var _protectedHeader: Any
     open fun setProtectedHeader(protectedHeader: JWTHeaderParameters): SignJWT /* this */
     open fun sign(key: KeyLike, options: SignOptions = definedExternally): Promise<String>

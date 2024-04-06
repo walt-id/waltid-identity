@@ -3,6 +3,7 @@ package id.walt.did.dids.resolver
 import id.walt.crypto.keys.Key
 import id.walt.did.utils.KeyMaterial
 import id.walt.did.utils.VerificationMaterial
+import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.plugins.*
@@ -13,7 +14,16 @@ import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import love.forte.plugin.suspendtrans.annotation.JsPromise
+import love.forte.plugin.suspendtrans.annotation.JvmAsync
+import love.forte.plugin.suspendtrans.annotation.JvmBlocking
+import kotlin.js.ExperimentalJsExport
+import kotlin.js.JsExport
 
+private val log = KotlinLogging.logger {  }
+
+@OptIn(ExperimentalJsExport::class)
+@JsExport
 class UniresolverResolver : DidResolver {
     @Suppress("MemberVisibilityCanBePrivate")
     //var resolverUrl = "http://localhost:8080/1.0"
@@ -22,6 +32,10 @@ class UniresolverResolver : DidResolver {
 
     override val name = "uniresolver @ $resolverUrl"
 
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     override suspend fun getSupportedMethods() = runCatching { lazyOf(getMethods()).value }
 
     private val http = HttpClient {
@@ -33,9 +47,21 @@ class UniresolverResolver : DidResolver {
         }
     }
 
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     override suspend fun resolve(did: String): Result<JsonObject> =
-        runCatching { http.get("$resolverUrl/identifiers/$did").body() }
+        runCatching {
+            http.get("$resolverUrl/identifiers/$did")
+        }.map { response ->
+            runCatching { response.body<JsonObject>() }.getOrElse { throw RuntimeException("HTTP response (status ${response.status}) is not JSON, body: ${response.bodyAsText()}", it)  }
+        }
 
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     override suspend fun resolveToKey(did: String): Result<Key> = resolve(did).fold(
         onSuccess = {
             VerificationMaterial.get(it)?.let {

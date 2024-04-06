@@ -27,7 +27,7 @@ import kotlinx.serialization.json.*
 import kotlinx.uuid.UUID
 import kotlinx.uuid.generateUUID
 
-private val http = HttpClient() {
+private val http = HttpClient {
     install(ContentNegotiation) {
         json()
     }
@@ -234,7 +234,7 @@ fun Application.entraVerifierApi() {
                     val result = response.verifiedCredentialsData.map {
                         val asJson = Json.encodeToJsonElement(it)
                         val policyResults = callMapping.vcPolicies.map {
-                            it.runPolicyRequest(asJson, emptyMap()).let { res -> PolicyResult(it, res) }
+                            PolicyResult(it, it.runPolicyRequest(asJson, emptyMap()))
                         }
                         CredentialPolicyResults(it.type.last(), it, policyResults)
                     }

@@ -2,14 +2,17 @@ package id.walt.webwallet.db
 
 import id.walt.webwallet.config.ConfigManager
 import id.walt.webwallet.config.DatasourceConfiguration
+import id.walt.webwallet.config.DatasourceJsonConfiguration
 import id.walt.webwallet.db.models.*
-import id.walt.webwallet.db.models.todo.AccountIssuers
-import id.walt.webwallet.db.models.todo.Issuers
 import id.walt.webwallet.service.account.AccountsService
-import id.walt.webwallet.service.issuers.IssuersService
+import id.walt.webwallet.service.credentials.CredentialsService
+import id.walt.webwallet.utils.IssuanceExamples
 import id.walt.webwallet.web.model.EmailAccountRequest
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.runBlocking
+import kotlinx.datetime.Clock
+import kotlinx.uuid.UUID
+import kotlinx.uuid.generateUUID
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SchemaUtils
 import org.jetbrains.exposed.sql.StdOutSqlLogger
@@ -20,6 +23,7 @@ import org.slf4j.bridge.SLF4JBridgeHandler
 import java.sql.Connection
 import kotlin.io.path.Path
 import kotlin.io.path.absolutePathString
+import kotlin.random.Random
 
 object Db {
 
@@ -27,34 +31,20 @@ object Db {
 
     lateinit var datasourceConfig: DatasourceConfiguration
 
-    val dataDirectoryPath = Path("data")
+    internal const val SQLITE_PREFIX = "jdbc:sqlite:"
 
     private fun connect() {
+        val jdbcUrl = ConfigManager.getConfig<DatasourceJsonConfiguration>().jdbcUrl
+
+        if (jdbcUrl?.contains("sqlite") == true) {
+            log.info { "Will use sqlite database (${jdbcUrl}), working directory: ${Path(".").absolutePathString()}" }
+        }
+
         datasourceConfig = ConfigManager.getConfig<DatasourceConfiguration>()
         val hikariDataSourceConfig = datasourceConfig.hikariDataSource
 
-        /*if (hikariDataSourceConfig.jdbcUrl.startsWith("jdbc:sqlite:data/")) {
-            log.info { "Creating data directory at ${dataDirectoryPath.absolutePathString()}" }
-            dataDirectoryPath.createDirectories()
-        } else {
-            println(dataDirectoryPath.absolutePathString())
-        }*/
-
-        /*val databaseConfig = ConfigManager.getConfig<DatabaseConfiguration>()
-
-        //migrate
-        Flyway.configure()
-            .locations(databaseConfig.database.replace(".", "/"))
-            .dataSource(datasourceConfig.hikariDataSource)
-            .load()
-            .migrate()*/
-
         // connect
         log.info { "Connecting to database at \"${hikariDataSourceConfig.jdbcUrl}\"..." }
-
-        if (hikariDataSourceConfig.jdbcUrl.contains("sqlite")) {
-            println("Will use sqlite database (${hikariDataSourceConfig.jdbcUrl}), working directory: ${Path(".").absolutePathString()}")
-        }
 
         Database.connect(hikariDataSourceConfig)
         TransactionManager.manager.defaultIsolationLevel =
@@ -63,7 +53,6 @@ object Db {
 
     // Make sure the creation order is correct (references / foreignKeys have to exist)
     val tables = listOf(
-        Issuers,
         Accounts,
         Wallets,
         WalletOperationHistories,
@@ -72,28 +61,44 @@ object Db {
         WalletCredentials,
         AccountWalletMappings,
 
-        //AccountWeb3WalletMappings,
         Web3Wallets,
-        AccountIssuers,
+        WalletIssuers,
         Events,
+        WalletCategory,
+        WalletCredentialCategoryMap,
+
+        OidcLogins,
+        WalletSettings,
+        WalletNotifications,
     ).toTypedArray()
 
-    fun recreateDatabase() {
+
+    private fun recreateDatabase() {
         transaction {
             addLogger(StdOutSqlLogger)
-
 
             SchemaUtils.drop(*(tables.reversedArray()))
             SchemaUtils.create(*tables)
 
             runBlocking {
+
                 AccountsService.register(request = EmailAccountRequest("Max Mustermann", "string@string.string", "string"))
-                AccountsService.register(request = EmailAccountRequest("Max Mustermann", "user@email.com", "password"))
-                IssuersService.add(
-                    name = "walt.id",
-                    description = "walt.id issuer portal",
-                    uiEndpoint = "https://portal.walt.id/credentials?ids=",
-                    configurationEndpoint = "https://issuer.portal.walt.id/.well-known/openid-credential-issuer"
+                val accountResult = AccountsService.register(request = EmailAccountRequest("Max Mustermann", "user@email.com", "password"))
+                val accountId = accountResult.getOrNull()?.id!!
+                val walletResult = AccountsService.getAccountWalletMappings("", accountId)
+                val walletId = walletResult.wallets[0].id
+
+                CredentialsService().add(
+                    wallet = walletId,
+                    WalletCredential(
+                        wallet = walletId,
+                        id = "urn:uuid:" + UUID.generateUUID(Random),
+                        document = IssuanceExamples.universityDegreeCredential,
+                        disclosures = null,
+                        addedOn = Clock.System.now(),
+                        manifest = null,
+                        deletedOn = null,
+                    )
                 )
             }
         }
@@ -109,6 +114,7 @@ object Db {
             recreateDatabase()
         } else {
             transaction {
+                SchemaUtils.drop(WalletCredentialCategoryMap, WalletCategory, WalletIssuers)// migration
                 SchemaUtils.createMissingTablesAndColumns(*tables)
             }
         }

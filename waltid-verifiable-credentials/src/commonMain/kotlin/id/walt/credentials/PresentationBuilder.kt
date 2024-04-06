@@ -9,8 +9,15 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import kotlinx.uuid.UUID
 import kotlinx.uuid.generateUUID
+import love.forte.plugin.suspendtrans.annotation.JsPromise
+import love.forte.plugin.suspendtrans.annotation.JvmAsync
+import love.forte.plugin.suspendtrans.annotation.JvmBlocking
+import kotlin.js.ExperimentalJsExport
+import kotlin.js.JsExport
 import kotlin.time.Duration.Companion.minutes
 
+@OptIn(ExperimentalJsExport::class)
+@JsExport
 class PresentationBuilder {
 
     /***
@@ -70,7 +77,10 @@ class PresentationBuilder {
 
     fun buildPresentationJson() = buildPresentationMap().toJsonElement()
     fun buildPresentationJsonString() = Json.encodeToString(buildPresentationJson())
-
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     suspend fun buildAndSign(key: Key): String {
         return key.signJws(
             plaintext = buildPresentationJsonString().encodeToByteArray(),

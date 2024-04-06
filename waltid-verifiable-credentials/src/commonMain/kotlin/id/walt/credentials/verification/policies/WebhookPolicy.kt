@@ -11,7 +11,14 @@ import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import love.forte.plugin.suspendtrans.annotation.JsPromise
+import love.forte.plugin.suspendtrans.annotation.JvmAsync
+import love.forte.plugin.suspendtrans.annotation.JvmBlocking
+import kotlin.js.ExperimentalJsExport
+import kotlin.js.JsExport
 
+@OptIn(ExperimentalJsExport::class)
+@JsExport
 class WebhookPolicy : CredentialWrapperValidatorPolicy(
     "webhook",
     "Sends the credential data to an webhook URL as HTTP POST, and returns the verified status based on the webhooks set status code (success = 200 - 299)."
@@ -22,7 +29,10 @@ class WebhookPolicy : CredentialWrapperValidatorPolicy(
             json()
         }
     }
-
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     override suspend fun verify(data: JsonElement, args: Any?, context: Map<String, Any>): Result<Any> {
         val url = (args as JsonPrimitive).content
 

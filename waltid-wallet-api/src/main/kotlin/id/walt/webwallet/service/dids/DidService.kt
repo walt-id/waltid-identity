@@ -11,11 +11,17 @@ import org.jetbrains.exposed.sql.transactions.transaction
 
 object DidsService {
     fun get(wallet: UUID, did: String): WalletDid? = transaction {
-        WalletDids.select { (WalletDids.wallet eq wallet) and (WalletDids.did eq did.replace("%3A", ":")) }
+        WalletDids.selectAll().where { (WalletDids.wallet eq wallet) and (WalletDids.did eq did.replace("%3A", ":")) }
             .singleOrNull()?.let { WalletDid(it) }
     }
 
-    fun list(wallet: UUID): List<WalletDid> = WalletDids.select { WalletDids.wallet eq wallet }.map { WalletDid(it) }
+    fun list(wallet: UUID): List<WalletDid> = WalletDids.selectAll().where { WalletDids.wallet eq wallet }.map { WalletDid(it) }
+
+    fun getWalletsForDid(did: String): List<UUID> = transaction {
+        WalletDids.selectAll().where { WalletDids.did eq did }.map {
+            it[WalletDids.wallet].value
+        }
+    }
 
     fun add(wallet: UUID, did: String, document: String, keyId: String, alias: String? = null) = transaction {
         val now = Clock.System.now()

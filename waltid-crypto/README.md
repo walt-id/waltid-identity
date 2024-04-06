@@ -11,6 +11,35 @@
 </a>
 </div>
 
+## Installation
+
+Add the crypto library as a dependency to your Kotlin or Java project.
+
+### walt.id Repository
+
+Add the Maven repository which hosts the walt.id libraries to your build.gradle file.
+
+```kotlin
+repositories {
+    maven { url = uri("https://maven.waltid.dev/releases") }
+} 
+```
+
+### Library Dependency
+
+Adding the crypto library as dependency. Specify the version that coincides with the latest or required
+snapshot for your project. [Latest releases](https://github.com/walt-id/waltid-identity/releases).
+
+```kotlin
+dependencies {
+  implementation("id.walt.crypto:waltid-crypto:<version>")
+}
+```
+
+Replace `version` with the version of the walt.id crypto library you want to use.
+Note: As the crypto lib is part of the mono-repo walt.id identity, you need to use the version of
+walt.id identity.
+
 ## What it provides
 
 <table>
@@ -307,7 +336,6 @@
 | ECDSA | secp256k1 | ES256K  | ECDSA + SECG curve secp256k1 (Koblitz curve as used in Bitcoin) |
 |  RSA  |    RSA    |  RS256  | RSA                                                             |
 
-
 ### Available on platforms
 
 |  Platform   |           | Availability |
@@ -319,9 +347,6 @@
 |             |  OpenSSL  |   &cross;    |
 | WebAssembly |   WASM    |   &cross;    |
 
-
-
-
 ### JWS compatibility (recommended)
 
 | Algorithm | JVM provider |   JS provider / platform    |
@@ -331,24 +356,21 @@
 |  ES256K   | Nimbus JOSE  |       jose / Node.js        |
 |   RS256   | Nimbus JOSE  | jose / Node.js & Web Crypto |
 
-
 ## How to use it
 
 The library provides the following key entities to work with:
 
-- [LocalKey
-  ](https://github.com/walt-id/waltid-identity/blob/main/waltid-crypto/src/commonMain/kotlin/id/walt/crypto/keys/LocalKey.kt) -
+- [JWKKey](https://github.com/walt-id/waltid-identity/blob/main/waltid-crypto/src/commonMain/kotlin/id/walt/crypto/keys/JWKKey.kt) -
   an implementation of a local (in-memory) key (private / public)
-- [TSEKey
-  ](https://github.com/walt-id/waltid-identity/blob/main/waltid-crypto/src/commonMain/kotlin/id/walt/crypto/keys/TSEKey.kt) -
+- [TSEKey](https://github.com/walt-id/waltid-identity/blob/main/waltid-crypto/src/commonMain/kotlin/id/walt/crypto/keys/TSEKey.kt) -
   an implementation of a Hashicorp Vault Transit Secrets Engine key (private / public)
 
-### Working with LocalKey
+### Working with JWKKey
 
 **Create key**
 
 ```kotlin
-val key = LocalKey.generate(KeyType.Ed25519, LocalKeyMetadata())
+val key = JWKKey.generate(KeyType.Ed25519, JWKKeyMetadata())
 ```
 
 **Sign**
@@ -384,19 +406,19 @@ val verificationResult = key.getPublicKey().verifyRaw(signature as ByteArray)
 - jwk
 
 ```kotlin
-val keyResult = LocalKey.importJWK(jwkString)
+val keyResult = JWKKey.importJWK(jwkString)
 ```
 
 - pem
 
 ```kotlin
-val keyResult = LocalKey.importPEM(pemString)
+val keyResult = JWKKey.importPEM(pemString)
 ```
 
 - raw
 
 ```kotlin
-val key = LocalKey.importRawPublicKey(KeyType.Ed25519, bytes, LocalKeyMetadata())
+val key = JWKKey.importRawPublicKey(KeyType.Ed25519, bytes, JWKKeyMetadata())
 ```
 
 **Export public key**
@@ -478,7 +500,7 @@ vault server -dev -dev-root-token-id="dev-only-token"
 #### Docker
 
 ```shell
-docker run -p 8200:8200 --cap-add=IPC_LOCK -e VAULT_DEV_ROOT_TOKEN_ID=myroot -e VAULT_DEV_LISTEN_ADDRESS=0.0.0.0:8200 hashicorp/vault
+docker run -p 8200:8200 --cap-add=IPC_LOCK -e VAULT_DEV_ROOT_TOKEN_ID=dev-only-token -e VAULT_DEV_LISTEN_ADDRESS=0.0.0.0:8200 hashicorp/vault
 ```
 
 ### Enable a Transit Secrets Engine instance
@@ -514,4 +536,4 @@ vault secrets enable transit
 5. click 'Next', then 'Enable Engine'
 
 For usage examples on _create_, _sign_, _verify_, _import_ and _export_ functions see
-[Working with LocalKey](#working-with-localkey).
+[Working with JWKKey](#working-with-jwkKey).

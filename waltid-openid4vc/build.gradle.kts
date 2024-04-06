@@ -2,9 +2,9 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
-    kotlin("multiplatform") version "1.9.22"
-    id("org.jetbrains.kotlin.plugin.serialization") version "1.9.22"
-    id("dev.petuska.npm.publish") version "3.4.1"
+    kotlin("multiplatform")
+    kotlin("plugin.serialization")
+    id("dev.petuska.npm.publish") version "3.4.2"
     id("maven-publish")
     id("com.github.ben-manes.versions")
 }
@@ -13,18 +13,13 @@ group = "id.walt"
 
 repositories {
     mavenCentral()
-    maven("https://jitpack.io") {
+    /*maven("https://jitpack.io") {
         content {
             includeGroup("com.github.multiformats")
         }
-    }
-    maven("https://maven.walt.id/repository/waltid-ssi-kit/") {
-        content {
-            includeGroup("id.walt")
-        }
-    }
+    }*/
     maven("https://repo.danubetech.com/repository/maven-public/")
-    maven("https://maven.walt.id/repository/waltid/") {
+    maven("https://maven.waltid.dev/releases") {
         content {
             includeGroup("id.walt")
             includeGroup("id.walt.servicematrix")
@@ -66,7 +61,7 @@ kotlin {
                 }
             }
         }
-        nodejs() {
+        nodejs {
             generateTypeScriptDefinitions()
         }
         binaries.library()
@@ -79,18 +74,16 @@ kotlin {
 //        isMingwX64 -> mingwX64("native")
 //        else -> throw GradleException("Host OS is not supported in Kotlin/Native.")
 //    }
-    val ktor_version = "2.3.7"
+    val ktor_version = "2.3.8"
     val HOPLITE_VERSION = "2.8.0.RC3"
-
-    val kryptoVersion = "4.0.10"
 
     sourceSets {
         val commonMain by getting {
             dependencies {
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0")
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
                 implementation("io.ktor:ktor-http:$ktor_version")
-                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.4.1")
+                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.5.0")
                 implementation(project(":waltid-sdjwt"))
                 implementation("app.softwork:kotlinx-uuid-core:0.0.22")
             }
@@ -101,36 +94,37 @@ kotlin {
                 implementation(project(":waltid-crypto"))
                 implementation(project(":waltid-did"))
                 implementation(project(":waltid-verifiable-credentials"))
-                implementation("io.kotest:kotest-assertions-core:5.7.2")
+                implementation("io.kotest:kotest-assertions-core:5.8.0")
 
-                implementation("io.kotest:kotest-assertions-json:5.7.2")
+                implementation("io.kotest:kotest-assertions-json:5.8.0")
 
-                implementation ("io.github.microutils:kotlin-logging:1.12.5")
+                implementation("io.github.microutils:kotlin-logging:1.12.5")
             }
         }
         val jvmMain by getting {
             dependencies {
                 implementation("io.ktor:ktor-client-java:$ktor_version")
+                implementation("org.sqids:sqids:0.1.0")
             }
         }
         val jvmTest by getting {
             dependencies {
                 //implementation("io.mockk:mockk:1.13.2")
-                implementation("com.nimbusds:nimbus-jose-jwt:9.37.1")
-                implementation("io.kotest:kotest-runner-junit5:5.7.2")
-                implementation("io.kotest:kotest-assertions-core:5.7.2")
-                implementation("io.kotest:kotest-assertions-json:5.7.2")
+                implementation("com.nimbusds:nimbus-jose-jwt:9.37.3")
+                implementation("io.kotest:kotest-runner-junit5:5.8.0")
+                implementation("io.kotest:kotest-assertions-core:5.8.0")
+                implementation("io.kotest:kotest-assertions-json:5.8.0")
                 implementation("com.google.crypto.tink:tink:1.12.0") // for JOSE using Ed25519
                 // Multibase
-                implementation("com.github.multiformats:java-multibase:v1.1.1")
+                // implementation("com.github.multiformats:java-multibase:v1.1.1")
                 // TODO: current version implementation("id.walt:waltid-ssikit:1.2311131043.0")
                 //implementation("id.walt:waltid-ssikit:1.JWTTYP") {
                 //    exclude("waltid-sd-jwt-jvm")
                 //    exclude(module = "waltid-sd-jwt-jvm")
                 //}
-                implementation("org.bouncycastle:bcprov-jdk18on:1.77") // for secp256k1 (which was removed with Java 17)
-                implementation("org.bouncycastle:bcpkix-jdk18on:1.77") // PEM import
-                implementation("io.github.oshai:kotlin-logging-jvm:5.1.0")
+                implementation("org.bouncycastle:bcprov-lts8on:2.73.4") // for secp256k1 (which was removed with Java 17)
+                implementation("org.bouncycastle:bcpkix-lts8on:2.73.4") // PEM import
+                implementation("io.github.oshai:kotlin-logging-jvm:6.0.3")
 
                 implementation("io.ktor:ktor-server-core-jvm:$ktor_version")
                 implementation("io.ktor:ktor-server-netty-jvm:$ktor_version")
@@ -154,24 +148,10 @@ kotlin {
                 // Config
                 implementation("com.sksamuel.hoplite:hoplite-core:${HOPLITE_VERSION}")
                 implementation("com.sksamuel.hoplite:hoplite-hocon:${HOPLITE_VERSION}")
-                // https://mvnrepository.com/artifact/com.github.jnr/jnr-ffi
-                implementation("com.github.jnr:jnr-ffi:2.2.15")
-                // https://mvnrepository.com/artifact/com.github.ben-manes.caffeine/caffeine
-                implementation("com.github.ben-manes.caffeine:caffeine:3.1.8")
-// https://mvnrepository.com/artifact/net.java.dev.jna/jna
-                implementation("net.java.dev.jna:jna:5.13.0")
-// https://mvnrepository.com/artifact/com.goterl/lazysodium-java
-                implementation("com.goterl:lazysodium-java:5.1.4")
-// https://mvnrepository.com/artifact/com.goterl/resource-loader
-                implementation("com.goterl:resource-loader:2.0.2")
-// https://mvnrepository.com/artifact/com.beust/klaxon
-                implementation("com.beust:klaxon:5.6")
-                implementation("com.soywiz.korlibs.krypto:krypto:$kryptoVersion")
                 // https://mvnrepository.com/artifact/org.jetbrains.kotlinx/kotlinx-coroutines-slf4j
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-slf4j:1.7.3")
-// https://mvnrepository.com/artifact/org.jetbrains.kotlin/kotlin-stdlib
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-slf4j:1.8.0")
+                // https://mvnrepository.com/artifact/org.jetbrains.kotlin/kotlin-stdlib
                 implementation("org.jetbrains.kotlin:kotlin-stdlib:1.9.20")
-
             }
         }
         val jsMain by getting {
@@ -197,7 +177,7 @@ kotlin {
             val hasMavenAuth = secretMavenUsername.isNotEmpty() && secretMavenPassword.isNotEmpty()
             if (hasMavenAuth) {
                 maven {
-                    url = uri("https://maven.walt.id/repository/waltid/")
+                    url = uri("https://maven.waltid.dev/releases")
                     credentials {
                         username = secretMavenUsername
                         password = secretMavenPassword

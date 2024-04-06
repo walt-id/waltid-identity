@@ -2,14 +2,9 @@ package id.walt.cli.commands
 
 import com.github.ajalt.clikt.completion.CompletionCandidates
 import com.github.ajalt.clikt.core.CliktCommand
-import com.github.ajalt.clikt.core.findOrSetObject
-import com.github.ajalt.clikt.core.requireObject
-import com.github.ajalt.clikt.output.TermUi
 import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.types.enum
-import id.walt.cli.commands.CommandConfigUtils.get
-import id.walt.cli.commands.CommandConfigUtils.set
 import id.walt.did.dids.DidService
 import kotlinx.coroutines.runBlocking
 
@@ -34,7 +29,7 @@ class Did : CliktCommand(help = "Run commands on DIDs") {
 
     companion object {
         internal fun initializeDidServices(serviceType: ServiceType) {
-            println("Initializing ${serviceType} services...")
+            println("Initializing $serviceType services...")
 
             runBlocking {
                 when (serviceType) {

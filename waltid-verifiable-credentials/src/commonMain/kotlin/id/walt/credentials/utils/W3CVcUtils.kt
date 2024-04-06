@@ -7,7 +7,11 @@ import kotlinx.serialization.json.jsonObject
 import kotlin.collections.component1
 import kotlin.collections.component2
 import kotlin.collections.set
+import kotlin.js.ExperimentalJsExport
+import kotlin.js.JsExport
 
+@OptIn(ExperimentalJsExport::class)
+@JsExport
 object W3CVcUtils {
 
     fun W3CVC.overwrite(map: Map<String, JsonElement>): W3CVC = W3CVC(

@@ -70,7 +70,7 @@ object Web3WalletService {
          * === 2 different accounts exist, which the user should have access to (merged) when logging in with web3-address
          */
         transaction {
-            Web3Wallets.select { (Web3Wallets.tenant eq tenant) and (Web3Wallets.accountId eq accountId) }.map {
+            Web3Wallets.selectAll().where { (Web3Wallets.tenant eq tenant) and (Web3Wallets.accountId eq accountId) }.map {
                 LinkedWalletDataTransferObject(
                     it[Web3Wallets.id],
                     it[Web3Wallets.address],
@@ -82,7 +82,7 @@ object Web3WalletService {
 
     private fun setIsOwner(tenant: String, accountId: UUID, walletId: UUID, isOwner: Boolean) = transaction {
         Web3Wallets.update(
-            {(Web3Wallets.tenant eq tenant) and (Web3Wallets.accountId eq accountId) and (Web3Wallets.id eq walletId) }
+            { (Web3Wallets.tenant eq tenant) and (Web3Wallets.accountId eq accountId) and (Web3Wallets.id eq walletId) }
         ) {
             it[owner] = isOwner
         }

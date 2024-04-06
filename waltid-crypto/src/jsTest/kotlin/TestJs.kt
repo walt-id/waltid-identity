@@ -1,5 +1,5 @@
-import id.walt.crypto.keys.LocalKey
 import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.jwk.JWKKey
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -18,7 +18,7 @@ class TestJs {
         )
 
         println("Generating key: $keyType...")
-        val key = LocalKey.generate(keyType)
+        val key = JWKKey.generate(keyType)
 
         println("  Checking for private key...")
         assertTrue { key.hasPrivateKey }
@@ -53,7 +53,7 @@ class TestJs {
         println("  Public key: ${check2.getOrNull()}")
     }
 
-//    @Test
+    @Test
     fun apiTestAll() = runTest {
         KeyType.entries.forEach { test(it) }
     }

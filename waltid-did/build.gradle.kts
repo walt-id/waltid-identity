@@ -1,8 +1,14 @@
+import love.forte.plugin.suspendtrans.ClassInfo
+import love.forte.plugin.suspendtrans.SuspendTransformConfiguration
+import love.forte.plugin.suspendtrans.TargetPlatform
+import love.forte.plugin.suspendtrans.gradle.SuspendTransformGradleExtension
+
 plugins {
     kotlin("multiplatform")
     kotlin("plugin.serialization")
     id("maven-publish")
     id("com.github.ben-manes.versions")
+    id("love.forte.plugin.suspend-transform") version "0.6.0"
 }
 
 group = "id.walt.did"
@@ -15,6 +21,18 @@ repositories {
 java {
     sourceCompatibility = JavaVersion.VERSION_15
     targetCompatibility = JavaVersion.VERSION_15
+}
+
+suspendTransform {
+    enabled = true
+    includeRuntime = true
+    /*jvm {
+
+    }
+    js {
+
+    }*/
+    useJsDefault()
 }
 
 
@@ -50,60 +68,66 @@ kotlin {
         val commonMain by getting {
             dependencies {
                 // JSON
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0")
-                implementation("io.github.optimumcode:json-schema-validator:0.0.2")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
+                implementation("io.github.optimumcode:json-schema-validator:0.0.8")
 
                 // Ktor client
-                implementation("io.ktor:ktor-client-core:2.3.7")
-                implementation("io.ktor:ktor-client-serialization:2.3.7")
-                implementation("io.ktor:ktor-client-content-negotiation:2.3.7")
-                implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.7")
-                implementation("io.ktor:ktor-client-json:2.3.7")
-                implementation("io.ktor:ktor-client-logging:2.3.7")
+                implementation("io.ktor:ktor-client-core:2.3.8")
+                implementation("io.ktor:ktor-client-serialization:2.3.8")
+                implementation("io.ktor:ktor-client-content-negotiation:2.3.8")
+                implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.8")
+                implementation("io.ktor:ktor-client-json:2.3.9")
+                implementation("io.ktor:ktor-client-logging:2.3.8")
 
                 // Coroutines
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
 
                 // Date
-                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.4.1")
+                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.5.0")
+
+                // UUID
+                implementation("app.softwork:kotlinx-uuid-core:0.0.25")
 
                 // Crypto
                 api(project(":waltid-crypto"))
 
+                // Encodings
+                implementation("net.thauvin.erik.urlencoder:urlencoder-lib:1.5.0")
+
                 // Logging
-                implementation("io.github.oshai:kotlin-logging:5.1.0")
+                implementation("io.github.oshai:kotlin-logging:6.0.3")
 
             }
         }
         val commonTest by getting {
             dependencies {
                 implementation(kotlin("test"))
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.0")
             }
         }
         val jvmMain by getting {
             dependencies {
                 // Ktor client
-                implementation("io.ktor:ktor-client-cio:2.3.7")
+                implementation("io.ktor:ktor-client-cio:2.3.8")
 
                 // Logging
-                implementation("org.slf4j:slf4j-simple:2.0.9")
+                implementation("org.slf4j:slf4j-simple:2.0.12")
 
                 // Json canonicalization
                 implementation("io.github.erdtman:java-json-canonicalization:1.1")
 
                 // Multiformat
-                implementation("com.github.multiformats:java-multibase:v1.1.1")
+//                implementation("com.github.multiformats:java-multibase:v1.1.1")
             }
         }
         val jvmTest by getting {
             dependencies {
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
                 implementation(kotlin("test"))
-                implementation("org.junit.jupiter:junit-jupiter-params:5.9.0")
-                implementation("io.ktor:ktor-server-test-host:2.3.7")
-                implementation("io.ktor:ktor-server-content-negotiation:2.3.7")
-                implementation("io.ktor:ktor-server-netty:2.3.7")
+                implementation("org.junit.jupiter:junit-jupiter-params:5.10.2")
+                implementation("io.ktor:ktor-server-test-host:2.3.8")
+                implementation("io.ktor:ktor-server-content-negotiation:2.3.8")
+                implementation("io.ktor:ktor-server-netty:2.3.8")
             }
         }
         val jsMain by getting {
@@ -115,7 +139,7 @@ kotlin {
         publishing {
             repositories {
                 maven {
-                    url = uri("https://maven.walt.id/repository/waltid/")
+                    url = uri("https://maven.waltid.dev/releases")
                     val envUsername = System.getenv("MAVEN_USERNAME")
                     val envPassword = System.getenv("MAVEN_PASSWORD")
 
@@ -141,4 +165,14 @@ kotlin {
             languageSettings.enableLanguageFeature("InlineClasses")
         }
     }
+}
+
+extensions.getByType<SuspendTransformGradleExtension>().apply {
+    transformers[TargetPlatform.JS] = mutableListOf(
+        SuspendTransformConfiguration.jsPromiseTransformer.copy(
+            copyAnnotationExcludes = listOf(
+                ClassInfo("kotlin.js", "JsExport.Ignore")
+            )
+        )
+    )
 }

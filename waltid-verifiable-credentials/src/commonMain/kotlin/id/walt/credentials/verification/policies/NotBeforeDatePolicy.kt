@@ -5,12 +5,23 @@ import id.walt.credentials.verification.NotBeforePolicyException
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.serialization.json.*
+import love.forte.plugin.suspendtrans.annotation.JsPromise
+import love.forte.plugin.suspendtrans.annotation.JvmAsync
+import love.forte.plugin.suspendtrans.annotation.JvmBlocking
+import kotlin.js.ExperimentalJsExport
+import kotlin.js.JsExport
 import kotlin.time.Duration.Companion.minutes
 
+@OptIn(ExperimentalJsExport::class)
+@JsExport
 class NotBeforeDatePolicy : CredentialWrapperValidatorPolicy(
     "not-before",
     "Verifies that the credentials not-before date (for JWT: `nbf`, if unavailable: `iat` - 1 min) is correctly exceeded."
 ) {
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     override suspend fun verify(data: JsonElement, args: Any?, context: Map<String, Any>): Result<Any> {
         var successfulKey = ""
         fun getEpochTimestamp(key: String) =

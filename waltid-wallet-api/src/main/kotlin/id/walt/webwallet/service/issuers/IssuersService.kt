@@ -1,71 +1,65 @@
 package id.walt.webwallet.service.issuers
 
-import id.walt.webwallet.db.models.todo.AccountIssuers
-import id.walt.webwallet.db.models.todo.Issuers
-import io.ktor.client.*
-import io.ktor.client.engine.cio.*
-import io.ktor.client.plugins.contentnegotiation.*
-import io.ktor.client.request.*
-import io.ktor.client.statement.*
-import io.ktor.serialization.kotlinx.json.*
-import kotlinx.serialization.json.*
+import id.walt.webwallet.db.models.WalletIssuers
 import kotlinx.uuid.UUID
-import kotlinx.uuid.generateUUID
-import org.jetbrains.exposed.sql.innerJoin
-import org.jetbrains.exposed.sql.insert
-import org.jetbrains.exposed.sql.selectAll
+import org.jetbrains.exposed.sql.*
+import org.jetbrains.exposed.sql.statements.UpdateStatement
 import org.jetbrains.exposed.sql.transactions.transaction
 
 object IssuersService {
-    private val client = HttpClient(CIO) {
-        install(ContentNegotiation) {
-            json()
+    fun get(wallet: UUID, name: String): IssuerDataTransferObject? = transaction {
+        queryIssuer(wallet, name)
+    }
+
+    fun list(wallet: UUID): List<IssuerDataTransferObject> = transaction {
+        WalletIssuers.selectAll().where { WalletIssuers.wallet eq wallet }.map {
+            IssuerDataTransferObject(it)
         }
     }
 
-    fun get(account: UUID, name: String): IssuerDataTransferObject? = list(account).singleOrNull {
-        it.name == name
-    }
+    fun add(wallet: UUID, name: String, description: String?, uiEndpoint: String, configurationEndpoint: String) = transaction {
+        addToWalletQuery(wallet, name, description, uiEndpoint, configurationEndpoint)
+    }.insertedCount
 
-    fun list(account: UUID): List<IssuerDataTransferObject> = transaction {
-        Issuers.innerJoin(
-            AccountIssuers,
-            onColumn = { Issuers.id },
-            otherColumn = { AccountIssuers.issuer },
-            additionalConstraint = {
-                AccountIssuers.id eq account
-            }).selectAll().map {
-            IssuerDataTransferObject(
-                name = it[Issuers.name],
-                description = it[Issuers.description],
-                uiEndpoint = it[Issuers.uiEndpoint],
-                configurationEndpoint = it[Issuers.configurationEndpoint],
-            )
+    fun authorize(wallet: UUID, issuer: String) = transaction {
+        updateColumn(wallet, issuer) {
+            it[WalletIssuers.authorized] = true
         }
     }
 
-    fun add(name: String, description: String, uiEndpoint: String, configurationEndpoint: String) = transaction {
-        Issuers.insert {
-            it[Issuers.id] = UUID.generateUUID()
-            it[Issuers.name] = name
-            it[Issuers.description] = description
-            it[Issuers.uiEndpoint] = uiEndpoint
-            it[Issuers.configurationEndpoint] = configurationEndpoint
-        }[Issuers.id].value
+    private fun queryIssuer(wallet: UUID, name: String) =
+        WalletIssuers.selectAll().where { WalletIssuers.wallet eq wallet and (WalletIssuers.name eq name) }
+            .singleOrNull()?.let {
+                IssuerDataTransferObject(it)
+            }
+
+    private fun addToWalletQuery(
+        wallet: UUID,
+        name: String,
+        description: String?,
+        uiEndpoint: String,
+        configurationEndpoint: String,
+        authorized: Boolean = false
+    ) = WalletIssuers.upsert(
+        keys = arrayOf(WalletIssuers.wallet, WalletIssuers.name),
+        onUpdate = listOf(
+            WalletIssuers.description to stringLiteral(description ?: ""),
+            WalletIssuers.uiEndpoint to stringLiteral(uiEndpoint),
+            WalletIssuers.configurationEndpoint to stringLiteral(configurationEndpoint),
+            WalletIssuers.authorized to booleanLiteral(authorized)
+        )
+    ) {
+        it[this.wallet] = wallet
+        it[this.name] = name
+        it[this.description] = description
+        it[this.uiEndpoint] = uiEndpoint
+        it[this.configurationEndpoint] = configurationEndpoint
+        it[this.authorized] = authorized
     }
 
-    suspend fun fetchCredentials(url: String): List<CredentialDataTransferObject> =
-        fetchConfiguration(url).jsonObject["credentials_supported"]!!.jsonArray.map {
-            CredentialDataTransferObject(
-                id = it.jsonObject["id"]!!.jsonPrimitive.content,
-                format = it.jsonObject["format"]!!.jsonPrimitive.content,
-                types = it.jsonObject["types"]!!.jsonArray.map {
-                    it.jsonPrimitive.content
-                })
+    //TODO: copied from CredentialsService
+    private fun updateColumn(wallet: UUID, issuer: String, update: (statement: UpdateStatement) -> Unit): Int =
+        WalletIssuers.update({ WalletIssuers.wallet eq wallet and (WalletIssuers.name eq issuer) }) {
+            update(it)
         }
-
-    private suspend fun fetchConfiguration(url: String): JsonObject = let {
-        Json.parseToJsonElement(client.get(url).bodyAsText()).jsonObject
-    }
-
 }

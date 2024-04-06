@@ -1,4 +1,8 @@
-import id.walt.crypto.keys.*
+import id.walt.crypto.keys.Key
+import id.walt.crypto.keys.KeySerialization
+import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto.keys.tse.TSEKey
 import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.http.*
@@ -26,12 +30,12 @@ class TestJvm {
     @Test
     fun signatureSpeedTestAll() = runTest(timeout = 5.minutes) {
         KeyType.entries.forEach { keyType ->
-            val key = LocalKey.generate(keyType)
+            val key = JWKKey.generate(keyType)
             key.signJws("abc".encodeToByteArray())
 
             val jobs = ArrayList<Job>()
 
-            val n = 10_000
+            val n = 10_00
             val dispatchMs = measureTimeMillis {
                 repeat(n) {
                     jobs.add(GlobalScope.launch {
@@ -49,13 +53,23 @@ class TestJvm {
     }
 
     @Test
-    @EnabledIf("isVaultAvailable")
-    fun testKeySerialization() = runTest {
-        val localKey = LocalKey.generate(KeyType.Ed25519)
-        val localKeySerialized = KeySerialization.serializeKey(localKey)
+    fun testJWKKeySerialization() = runTest {
+        val jwkKey = JWKKey.generate(KeyType.Ed25519)
+        val jwkKeySerialized = KeySerialization.serializeKey(jwkKey)
 
         val jsons = listOf(
-            localKeySerialized to LocalKey::class,
+            jwkKeySerialized to JWKKey::class,
+        )
+
+        jsons.forEach {
+            check(it)
+        }
+    }
+
+    @Test
+    @EnabledIf("isVaultAvailable")
+    fun testTseKeySerialization() = runTest {
+        val jsons = listOf(
             """{"type":"tse","server":"http://127.0.0.1:8200/v1/transit","accessKey":"dev-only-token","id":"k-307668075","_publicKey":[-41,-105,-126,77,-74,88,-28,123,93,-81,105,-13,-93,-111,27,81,-90,-1,86,59,68,105,-108,118,-68,121,18,-114,71,-69,-106,-109],"_keyType":"Ed25519"}""" to TSEKey::class,
             //"""{"type":"tse","server":"http://127.0.0.1:8200/v1/transit","accessKey":"dev-only-token","id":"k-307668075"}""" to TSEKey::class // TODO: cannot access key information in TSE when pre-generated (ID will ofc not be found)
         )
@@ -71,7 +85,7 @@ class TestJvm {
     fun testDeserializedVerify() = runTest {
         val testObjJson = Json.encodeToString(testObj)
 
-        val key = LocalKey.generate(KeyType.Ed25519)
+        val key = JWKKey.generate(KeyType.Ed25519)
         val key2 = KeySerialization.deserializeKey(KeySerialization.serializeKey(key)).getOrThrow()
 
         val jws = key.signJws(testObjJson.toByteArray())
@@ -86,7 +100,7 @@ class TestJvm {
     fun testDeserializedSign() = runTest {
         val testObjJson = Json.encodeToString(testObj)
 
-        val keyToUseForVerifying = LocalKey.generate(KeyType.Ed25519)
+        val keyToUseForVerifying = JWKKey.generate(KeyType.Ed25519)
         val keyToUseForSigning = KeySerialization.deserializeKey(KeySerialization.serializeKey(keyToUseForVerifying)).getOrThrow()
 
         val jws = keyToUseForSigning.signJws(testObjJson.toByteArray())
@@ -103,7 +117,7 @@ class TestJvm {
         println("Plaintext: $plaintext")
 
         println("Generating key: $keyType...")
-        val key = LocalKey.generate(keyType)
+        val key = JWKKey.generate(keyType)
 
         println("  Checking for private key...")
         assertTrue { key.hasPrivateKey }
@@ -152,8 +166,8 @@ class TestJvm {
         println()
     }
 
-    fun exampleSignJwsLocalKey() = runTest {
-        val localKey by lazy { runBlocking { LocalKey.generate(KeyType.Ed25519) } }
+    fun exampleSignJwsJWKKey() = runTest {
+        val jwkKey by lazy { runBlocking { JWKKey.generate(KeyType.Ed25519) } }
 
         val payload = JsonObject(
             mapOf(
@@ -164,11 +178,11 @@ class TestJvm {
         )
 
         println("Signing JWS: $payload")
-        val signed = localKey.signJws(payload.toString().toByteArray())
+        val signed = jwkKey.signJws(payload.toString().toByteArray())
         println("Signed: $signed")
 
         println("Verifying signed: $signed")
-        localKey.verifyJws(signed).also { println("Verified: $it") }
+        jwkKey.verifyJws(signed).also { println("Verified: $it") }
     }
 
     private suspend fun exampleSignRawTSEKey(key: TSEKey) {

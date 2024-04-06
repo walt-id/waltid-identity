@@ -3,8 +3,7 @@
   "server": "http://127.0.0.1:8200/v1/transit",
   "accessKey": "dev-only-token",
   "id": "k-307668075",
-  "_publicKey":
-  [
+  "_publicKey": [
     -41,
     -105,
     -126,

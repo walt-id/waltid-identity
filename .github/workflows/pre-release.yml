@@ -10,6 +10,11 @@ jobs:
     name: "Pre-release"
     runs-on: ubuntu-latest
     steps:
+      - name: Free Disk Space (Ubuntu)
+        uses: jlumbroso/free-disk-space@v1.3.1  
+        with:
+          tool-cache: false
+          docker-images: false
       - uses: actions/checkout@v3
       - name: Calculate release version
         run: |
@@ -102,7 +107,7 @@ jobs:
           include-compare: true
           semver: true
       - name: Create Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:

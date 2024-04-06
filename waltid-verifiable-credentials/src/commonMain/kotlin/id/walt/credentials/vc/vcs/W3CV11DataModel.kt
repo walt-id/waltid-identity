@@ -4,15 +4,18 @@ package id.walt.credentials.vc.vcs
 import id.walt.credentials.vc.vcs.CredentialDataModel.Companion.w3cJson
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonObject
+import kotlin.js.ExperimentalJsExport
+import kotlin.js.JsExport
 
 /**
  * W3C V2.0
  * https://www.w3.org/TR/vc-data-model-2.0/
  */
+@OptIn(ExperimentalJsExport::class)
+@JsExport
 @Serializable
 data class W3CV11DataModel(
     @SerialName("@context") val context: List<String> = defaultContext,

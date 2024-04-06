@@ -1,9 +1,15 @@
+import love.forte.plugin.suspendtrans.ClassInfo
+import love.forte.plugin.suspendtrans.SuspendTransformConfiguration
+import love.forte.plugin.suspendtrans.TargetPlatform
+import love.forte.plugin.suspendtrans.gradle.SuspendTransformGradleExtension
+
 plugins {
     kotlin("multiplatform")
     id("com.android.library")
     kotlin("plugin.serialization")
     id("maven-publish")
     id("com.github.ben-manes.versions")
+    id("love.forte.plugin.suspend-transform") version "0.6.0"
 }
 
 group = "id.walt.crypto"
@@ -11,6 +17,18 @@ group = "id.walt.crypto"
 repositories {
     mavenCentral()
     maven("https://jitpack.io")
+}
+
+suspendTransform {
+    enabled = true
+    includeRuntime = true
+    /*jvm {
+
+    }
+    js {
+
+    }*/
+    useJsDefault()
 }
 
 java {
@@ -48,8 +66,11 @@ kotlin {
             }
         }*/
         nodejs {
-            generateTypeScriptDefinitions()
+            testTask {
+                useMocha()
+            }
         }
+        generateTypeScriptDefinitions()
         binaries.library()
     }
 
@@ -79,28 +100,34 @@ kotlin {
         val commonMain by getting {
             dependencies {
                 // JSON
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.2")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
 
                 // Ktor client
-                implementation("io.ktor:ktor-client-core:2.3.7")
-                implementation("io.ktor:ktor-client-serialization:2.3.7")
-                implementation("io.ktor:ktor-client-content-negotiation:2.3.7")
-                implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.7")
-                implementation("io.ktor:ktor-client-json:2.3.7")
-                implementation("io.ktor:ktor-client-logging:2.3.7")
+                implementation("io.ktor:ktor-client-core:2.3.8")
+                implementation("io.ktor:ktor-client-serialization:2.3.8")
+                implementation("io.ktor:ktor-client-content-negotiation:2.3.8")
+                implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.8")
+                implementation("io.ktor:ktor-client-json:2.3.9")
+                implementation("io.ktor:ktor-client-logging:2.3.8")
+
+                implementation(project.dependencies.platform("org.kotlincrypto.hash:bom:0.5.1"))
+                implementation("org.kotlincrypto.hash:sha2")
+
+                // Date
+                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.5.0")
 
                 // Coroutines
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
 
                 // Logging
-                implementation("io.github.oshai:kotlin-logging:5.1.1")
+                implementation("io.github.oshai:kotlin-logging:6.0.3")
             }
         }
         val commonTest by getting {
             dependencies {
                 implementation(kotlin("test-common"))
                 implementation(kotlin("test-annotations-common"))
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.0")
             }
         }
         val jvmMain by getting {
@@ -108,38 +135,42 @@ kotlin {
                 //implementation("dev.whyoleg.cryptography:cryptography-jdk:0.1.0")
                 implementation("com.google.crypto.tink:tink:1.12.0") // for JOSE using Ed25519
 
-                implementation("org.bouncycastle:bcprov-jdk18on:1.77") // for secp256k1 (which was removed with Java 17)
-                implementation("org.bouncycastle:bcpkix-jdk18on:1.77") // PEM import
+                implementation("org.bouncycastle:bcprov-lts8on:2.73.4") // for secp256k1 (which was removed with Java 17)
+                implementation("org.bouncycastle:bcpkix-lts8on:2.73.4") // PEM import
 
                 // Ktor client
-                implementation("io.ktor:ktor-client-cio:2.3.7")
+                implementation("io.ktor:ktor-client-cio:2.3.8")
 
                 // Logging
-                implementation("org.slf4j:slf4j-simple:2.0.9")
+                implementation("org.slf4j:slf4j-simple:2.0.12")
 
                 // JOSE
                 implementation("com.nimbusds:nimbus-jose-jwt:9.37.3")
 
                 // Multibase
-                implementation("com.github.multiformats:java-multibase:v1.1.1")
+//                implementation("com.github.multiformats:java-multibase:v1.1.1")
             }
         }
         val jvmTest by getting {
             dependencies {
+                // Logging
+//                implementation("org.slf4j:slf4j-simple:2.0.12")
+
+                // Test
                 implementation(kotlin("test"))
 
-                implementation("org.junit.jupiter:junit-jupiter-api:5.10.1")
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.2")
-                implementation("org.junit.jupiter:junit-jupiter-params:5.10.1")
+                implementation("org.junit.jupiter:junit-jupiter-api:5.10.2")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
+                implementation("org.junit.jupiter:junit-jupiter-params:5.10.2")
             }
         }
         val jsMain by getting {
             dependencies {
                 // JOSE
-                implementation(npm("jose", "4.14.4"))
+                implementation(npm("jose", "5.2.3"))
 
                 // Multibase
-                implementation(npm("multiformats", "12.1.2"))
+                // implementation(npm("multiformats", "12.1.2"))
             }
         }
         val jsTest by getting {
@@ -150,7 +181,7 @@ kotlin {
         publishing {
             repositories {
                 maven {
-                    url = uri("https://maven.walt.id/repository/waltid/")
+                    url = uri("https://maven.waltid.dev/releases")
                     val envUsername = System.getenv("MAVEN_USERNAME")
                     val envPassword = System.getenv("MAVEN_PASSWORD")
 
@@ -176,6 +207,16 @@ kotlin {
             languageSettings.enableLanguageFeature("InlineClasses")
         }
     }
+}
+
+extensions.getByType<SuspendTransformGradleExtension>().apply {
+    transformers[TargetPlatform.JS] = mutableListOf(
+        SuspendTransformConfiguration.jsPromiseTransformer.copy(
+            copyAnnotationExcludes = listOf(
+                ClassInfo("kotlin.js", "JsExport.Ignore")
+            )
+        )
+    )
 }
 
 android {
