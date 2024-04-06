@@ -30,6 +30,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
@@ -109,7 +110,7 @@ private fun MainUiContent(
     val systemKeyboard = LocalSoftwareKeyboardController.current
 
     val keyTypeOptions = listOf(KeyType.RSA, KeyType.secp256r1)
-    var selectedKeyType: KeyType by remember { mutableStateOf(keyTypeOptions[0]) }
+    var selectedKeyType: KeyType by rememberSaveable { mutableStateOf(keyTypeOptions[0]) }
 
 
     Column(
