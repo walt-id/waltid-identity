@@ -14,14 +14,14 @@ import java.security.spec.ECPublicKeySpec
 import java.security.spec.RSAPublicKeySpec
 import java.util.UUID
 
-actual class AndroidKey() : Key() {
+class AndroidKey() : Key() {
 
     override val keyType: KeyType
         get() = internalKeyType
 
     private lateinit var internalKeyType: KeyType
 
-    actual override val hasPrivateKey: Boolean
+    override val hasPrivateKey: Boolean
         get() {
             return (keyStore.getKey(internalKeyId, null) as PrivateKey?) != null
         }
@@ -38,13 +38,13 @@ actual class AndroidKey() : Key() {
         println("Initialised instance of AndroidKey {keyId: '$internalKeyId'}")
     }
 
-    actual override suspend fun getKeyId(): String = internalKeyId
+    override suspend fun getKeyId(): String = internalKeyId
 
-    actual override suspend fun getThumbprint(): String {
+    override suspend fun getThumbprint(): String {
         TODO("Not yet implemented")
     }
 
-    actual override suspend fun exportJWK(): String {
+    override suspend fun exportJWK(): String {
         val publicKey = keyStore.getCertificate(internalKeyId)?.publicKey
         checkNotNull(publicKey) { "This AndroidKey instance does not have a public key associated with it. This should not happen." }
 
@@ -77,16 +77,16 @@ actual class AndroidKey() : Key() {
         }
     }
 
-    actual override suspend fun exportJWKObject(): JsonObject {
+    override suspend fun exportJWKObject(): JsonObject {
         val jwkString = exportJWK()
         return Json.parseToJsonElement(jwkString) as JsonObject
     }
 
-    actual override suspend fun exportPEM(): String {
+    override suspend fun exportPEM(): String {
         TODO("Not yet implemented")
     }
 
-    actual override suspend fun signRaw(plaintext: ByteArray): ByteArray {
+    override suspend fun signRaw(plaintext: ByteArray): ByteArray {
         check(hasPrivateKey) { "No private key is attached to this key!" }
 
         val privateKey: PrivateKey = keyStore.getKey(internalKeyId, null) as PrivateKey
@@ -103,7 +103,7 @@ actual class AndroidKey() : Key() {
         return Base64.encodeToString(signature, Base64.DEFAULT).toByteArray()
     }
 
-    actual override suspend fun signJws(plaintext: ByteArray, headers: Map<String, String>): String {
+    override suspend fun signJws(plaintext: ByteArray, headers: Map<String, String>): String {
         check(hasPrivateKey) { "No private key is attached to this key!" }
 
         val privateKey: PrivateKey = keyStore.getKey(internalKeyId, null) as PrivateKey
@@ -123,7 +123,7 @@ actual class AndroidKey() : Key() {
         return "$encodedHeaders.$encodedPayload.$encodedSignature"
     }
 
-    actual override suspend fun verifyRaw(signed: ByteArray, detachedPlaintext: ByteArray?): Result<ByteArray> {
+    override suspend fun verifyRaw(signed: ByteArray, detachedPlaintext: ByteArray?): Result<ByteArray> {
         val certificate: Certificate? = keyStore.getCertificate(internalKeyId)
 
         return if (certificate != null) {
@@ -149,11 +149,11 @@ actual class AndroidKey() : Key() {
         }
     }
 
-    actual override suspend fun verifyJws(signedJws: String): Result<JsonObject> {
+    override suspend fun verifyJws(signedJws: String): Result<JsonObject> {
         TODO("Not yet implemented")
     }
 
-    actual override suspend fun getPublicKey(): AndroidKey {
+    override suspend fun getPublicKey(): AndroidKey {
         return if (hasPrivateKey) {
             val keyPair = keyStore.getEntry(internalKeyId, null) as? KeyStore.PrivateKeyEntry
             checkNotNull(keyPair) { "This AndroidKey instance does not have a KeyPair!" }
@@ -164,7 +164,7 @@ actual class AndroidKey() : Key() {
         } else this
     }
 
-    actual override suspend fun getPublicKeyRepresentation(): ByteArray {
+    override suspend fun getPublicKeyRepresentation(): ByteArray {
         return if (hasPrivateKey) {
             val keyPair = keyStore.getEntry(internalKeyId, null) as? KeyStore.PrivateKeyEntry
             checkNotNull(keyPair) { "This AndroidKey instance does not have a KeyPair!" }
@@ -181,8 +181,8 @@ actual class AndroidKey() : Key() {
         KeyType.RSA -> Signature.getInstance("SHA256withRSA")
     }
 
-    actual companion object : AndroidKeyCreator {
-        actual override suspend fun generate(
+    companion object : AndroidKeyCreator {
+        override suspend fun generate(
             type: KeyType, metadata: LocalKeyMetadata
         ): AndroidKey = AndroidKeyGenerator.generate(type, metadata)
 

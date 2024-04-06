@@ -1,7 +1,6 @@
 package id.walt.androidSample.app.features.main
 
 import android.util.Base64
-import android.util.Log
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.crypto.MACSigner
 import com.nimbusds.jose.crypto.MACVerifier
