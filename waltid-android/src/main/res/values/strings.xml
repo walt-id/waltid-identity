@@ -21,6 +21,9 @@
     <string name="label_generate_did">Generate DID</string>
     <string name="label_sign_credential">Sign a Credential</string>
     <string name="label_create_and_sign_sdjwt">Create and sign an SD-JWT</string>
+    <string name="label_go_back">Go Back</string>
+    <string name="label_nothing_to_show">No text to display</string>
+
     <string name="signature">Signature: %s</string>
     <string name="jws">JWS: %s</string>
     <string name="did">DID: %s</string>
