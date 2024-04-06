@@ -65,6 +65,6 @@ export default function () {
                 r.body.includes("token") && r.body.includes("id"),
         });
         totalUsersLoggedIn.add(1);
-    sleep(1);
+
 
 }
