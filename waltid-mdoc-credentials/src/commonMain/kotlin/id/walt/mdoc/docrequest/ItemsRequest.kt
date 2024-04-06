@@ -1,10 +1,10 @@
 package id.walt.mdoc.docrequest
 
-import cbor.Cbor
-import id.walt.mdoc.dataelement.*
+import id.walt.mdoc.dataelement.MapElement
+import id.walt.mdoc.dataelement.MapKey
+import id.walt.mdoc.dataelement.StringElement
+import id.walt.mdoc.dataelement.toDE
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.decodeFromByteArray
-import kotlinx.serialization.decodeFromHexString
 
 /**
  * Request for items of a given doc type, that's part of the MDoc request.

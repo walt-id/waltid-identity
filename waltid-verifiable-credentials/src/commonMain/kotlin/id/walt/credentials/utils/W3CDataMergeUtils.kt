@@ -3,17 +3,27 @@ package id.walt.credentials.utils
 import id.walt.credentials.vc.vcs.W3CVC
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.json.*
+import love.forte.plugin.suspendtrans.annotation.JsPromise
+import love.forte.plugin.suspendtrans.annotation.JvmAsync
+import love.forte.plugin.suspendtrans.annotation.JvmBlocking
 import kotlin.collections.component1
 import kotlin.collections.component2
 import kotlin.collections.set
+import kotlin.js.ExperimentalJsExport
+import kotlin.js.JsExport
 
+@OptIn(ExperimentalJsExport::class)
+@JsExport
 object W3CDataMergeUtils {
 
-    val log = KotlinLogging.logger { }
+    private val log = KotlinLogging.logger { }
 
     fun JsonPrimitive.isTemplate() =
         this.content.let { it.first() == '<' && it.last() == '>' && it.length > 2 && !it.contains(" ") }
-
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     suspend fun getTemplateData(
         functionCall: String,
         dataFunctions: Map<String, suspend (FunctionCall) -> JsonElement>,
@@ -45,7 +55,10 @@ object W3CDataMergeUtils {
         log.debug { "Called function: $functionCall, got: $result" }
         return result
     }
-
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     suspend fun MutableMap<String, JsonElement>.patch(
         k: String,
         v: JsonElement,
@@ -122,7 +135,10 @@ object W3CDataMergeUtils {
             return context[func] ?: throw IllegalArgumentException("Cannot find in context: $func")
         }
     }
-
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     suspend fun W3CVC.mergeWithMapping(
         mapping: JsonObject,
         context: Map<String, JsonElement>,

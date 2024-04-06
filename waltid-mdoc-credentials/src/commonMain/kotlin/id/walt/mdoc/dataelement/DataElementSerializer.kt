@@ -20,16 +20,14 @@ internal object DataElementSerializer: KSerializer<AnyDataElement> {
 
   override fun deserialize(decoder: Decoder): AnyDataElement {
     val curHead = decoder.peek()
-    val majorType = curHead.shr(5)
-    return when(majorType) {
+      return when(val majorType = curHead.shr(5)) {
       0, 1 -> NumberElement(decoder.decodeLong())
       2 -> ByteStringElement(decoder.decodeByteString())
       3 -> StringElement(decoder.decodeString())
       4 -> ListElement(decoder.decodeSerializableValue(ListSerializer(DataElementSerializer)))
       5 -> MapElement(decoder.decodeSerializableValue(MapSerializer(MapKeySerializer, DataElementSerializer)))
       6 -> {
-        val tag = decoder.decodeTag()
-        when(tag) {
+          when(val tag = decoder.decodeTag()) {
           ENCODED_CBOR -> EncodedCBORElement(decoder.decodeByteString())
           TDATE, TIME -> deserializeDateTime(decoder, tag)
           FULL_DATE_STR, FULL_DATE_INT -> deserializeFullDate(decoder, tag)

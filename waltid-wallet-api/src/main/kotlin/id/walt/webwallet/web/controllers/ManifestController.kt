@@ -11,6 +11,7 @@ import io.github.smiley4.ktorswaggerui.dsl.route
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.response.*
+import io.ktor.server.util.*
 import kotlinx.serialization.json.JsonObject
 
 fun Application.manifest() = walletRoute {
@@ -20,7 +21,7 @@ fun Application.manifest() = walletRoute {
         route("{credentialId}") {
             get({
                 summary =
-                    "Get credential manifest, if available, otherwise empty object"//<--TODO: decide empty response type
+                    "Get credential manifest, if available, otherwise null"
                 request {
                     pathParameter<String>("credentialId") {
                         required = true
@@ -34,12 +35,19 @@ fun Application.manifest() = walletRoute {
                             description = "The display info json object"
                         }
                     }
+                    HttpStatusCode.NoContent to {
+                        body<JsonObject> {
+                            description = "The display info json object"
+                        }
+                    }
                 }
             }) {
-                val manifest = callManifest(call.parameters) {
-                    getManifest(it)
+                val credentialService = CredentialsService()
+                val manifest = callManifest(call.parameters) { getManifest(it, credentialService) }
+                when (manifest) {
+                    null -> context.respond(HttpStatusCode.NoContent)
+                    else -> context.respond(manifest)
                 }
-                context.respond(manifest)
             }
             get("display", {
                 summary =
@@ -59,10 +67,15 @@ fun Application.manifest() = walletRoute {
                     }
                 }
             }) {
-                val manifest = callManifest(call.parameters){
-                    getManifest(it)
-                }.toString()
-                context.respond(ManifestProvider.new(manifest).display())
+                val credentialService = CredentialsService()
+                val manifest = callManifest(call.parameters) {
+                    getManifest(it, credentialService)
+                }?.toString()
+
+                when (manifest) {
+                    null -> context.respond(HttpStatusCode.NoContent)
+                    else -> context.respond(ManifestProvider.new(manifest).display())
+                }
             }
             get("issuer", {
                 summary =
@@ -82,10 +95,15 @@ fun Application.manifest() = walletRoute {
                     }
                 }
             }) {
-                val manifest = callManifest(call.parameters){
-                    getManifest(it)
-                }.toString()
-                context.respond(ManifestProvider.new(manifest).issuer())
+                val credentialService = CredentialsService()
+                val manifest = callManifest(call.parameters) {
+                    getManifest(it, credentialService)
+                }?.toString()
+
+                when (manifest) {
+                    null -> context.respond(HttpStatusCode.NoContent)
+                    else -> context.respond(ManifestProvider.new(manifest).issuer())
+                }
             }
         }
         route("extract") {
@@ -105,6 +123,11 @@ fun Application.manifest() = walletRoute {
                             description = "The manifest issuer info json object"
                         }
                     }
+                    HttpStatusCode.NoContent to {
+                        body<JsonObject> {
+                            description = "No/empty manifest"
+                        }
+                    }
                     HttpStatusCode.BadRequest to {
                         body<String> {
                             description = "Error message"
@@ -112,17 +135,19 @@ fun Application.manifest() = walletRoute {
                     }
                 }
             }) {
-                val manifest = callManifest(call.parameters){
-                    extractManifest(it)
+                val manifest = callManifest(call.parameters) { extractManifest(it) }
+
+                when (manifest) {
+                    null -> context.respond(HttpStatusCode.NoContent)
+                    else -> context.respond(manifest)
                 }
-                context.respond(manifest)
             }
         }
     }
 }
 
-internal suspend fun callManifest(parameters: Parameters, method: suspend (Parameters) -> JsonObject): JsonObject {
-    val runtimeConfig = ConfigManager.getConfig<RuntimeConfig>()
+internal suspend fun callManifest(parameters: Parameters, method: suspend (Parameters) -> JsonObject?): JsonObject? {
+    val runtimeConfig by lazy { ConfigManager.getConfig<RuntimeConfig>() }
     return if (runtimeConfig.mock) {
         EntraMockManifestExtractor().extract("")
     } else {
@@ -130,17 +155,13 @@ internal suspend fun callManifest(parameters: Parameters, method: suspend (Param
     }
 }
 
-internal fun getManifest(parameters: Parameters): JsonObject {
-    val walletId = parameters["walletId"] ?: throw IllegalArgumentException("Missing wallet id.")
-    val credentialId = parameters["credentialId"] ?: throw IllegalArgumentException("Missing credential id.")
-    return ManifestProvider.json.decodeFromString(
-        CredentialsService.Manifest.get(
-            kotlinx.uuid.UUID(walletId), credentialId
-        ) ?: ""
-    )
+internal fun getManifest(parameters: Parameters, credentialsService: CredentialsService): JsonObject? {
+    val walletId = parameters.getOrFail("walletId")
+    val credentialId = parameters.getOrFail("credentialId")
+    return credentialsService.get(kotlinx.uuid.UUID(walletId), credentialId)?.parsedManifest
 }
 
-internal suspend fun extractManifest(parameters: Parameters): JsonObject {
-    val offer = parameters["offer"] ?: throw IllegalArgumentException("Missing offer request uri.")
-    return ManifestExtractor.new(offer).extract(offer)
+internal suspend fun extractManifest(parameters: Parameters): JsonObject? {
+    val offer = parameters.getOrFail("offer")
+    return ManifestExtractor.new(offer)?.extract(offer)
 }

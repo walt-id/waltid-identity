@@ -9,7 +9,7 @@ import id.walt.credentials.vc.vcs.W3CVC
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.LocalKey
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.did.dids.DidService
 import id.walt.issuer.IssuanceExamples.openBadgeCredentialExample
 import id.walt.issuer.base.config.ConfigManager
@@ -51,10 +51,19 @@ open class CIProvider : OpenIDCredentialIssuer(
         "KycDataCredential" to listOf("VerifiableCredential", "VerifiableAttestation", "KycDataCredential"),
         "PassportCh" to listOf("VerifiableCredential", "VerifiableAttestation", "VerifiableId", "PassportCh"),
         "PND91Credential" to listOf("VerifiableCredential", "PND91Credential"),
-        "MortgageEligibility" to listOf("VerifiableCredential", "VerifiableAttestation", "VerifiableId", "MortgageEligibility"),
+        "MortgageEligibility" to listOf(
+            "VerifiableCredential",
+            "VerifiableAttestation",
+            "VerifiableId",
+            "MortgageEligibility"
+        ),
         "PortableDocumentA1" to listOf("VerifiableCredential", "VerifiableAttestation", "PortableDocumentA1"),
         "OpenBadgeCredential" to listOf("VerifiableCredential", "OpenBadgeCredential"),
-        "VaccinationCertificate" to listOf("VerifiableCredential", "VerifiableAttestation", "VaccinationCertificate"),
+        "VaccinationCertificate" to listOf(
+            "VerifiableCredential",
+            "VerifiableAttestation",
+            "VaccinationCertificate"
+        ),
         "WalletHolderCredential" to listOf("VerifiableCredential", "WalletHolderCredential"),
         "UniversityDegree" to listOf("VerifiableCredential", "UniversityDegree"),
         "VerifiableId" to listOf("VerifiableCredential", "VerifiableAttestation", "VerifiableId"),
@@ -70,11 +79,11 @@ open class CIProvider : OpenIDCredentialIssuer(
 ) {
     companion object {
 
-        val exampleIssuerKey by lazy { runBlocking { LocalKey.generate(KeyType.Ed25519) } }
+        val exampleIssuerKey by lazy { runBlocking { JWKKey.generate(KeyType.Ed25519) } }
         val exampleIssuerDid by lazy { runBlocking { DidService.registerByKey("jwk", exampleIssuerKey).did } }
 
 
-        private val CI_TOKEN_KEY by lazy { runBlocking { LocalKey.generate(KeyType.Ed25519) } }
+        private val CI_TOKEN_KEY by lazy { runBlocking { JWKKey.generate(KeyType.Ed25519) } }
     }
 
     // -------------------------------
@@ -121,7 +130,7 @@ open class CIProvider : OpenIDCredentialIssuer(
             println("Resolving DID: $did")
             val key = DidService.resolveToKey(did).getOrThrow()
             println("Got key: $key")
-            key.verifyJws(token)
+            key.verifyJws(token).also { println("VERIFICATION IS: $it") }
         } else {
             CI_TOKEN_KEY.verifyJws(token)
         }
@@ -254,29 +263,36 @@ open class CIProvider : OpenIDCredentialIssuer(
             credReq.proof?.jwt?.let { jwt -> parseTokenHeader(jwt) }
                 ?.get(JWTClaims.Header.keyID)
                 ?.jsonPrimitive?.content
-                ?: throw CredentialError(credReq, CredentialErrorCode.invalid_or_missing_proof, message = "Proof must be JWT proof")
+                ?: throw CredentialError(
+                    credReq,
+                    CredentialErrorCode.invalid_or_missing_proof,
+                    message = "Proof must be JWT proof"
+                )
         }.distinct()
 
         if (keyIdsDistinct.size >= 2) {
             throw IllegalArgumentException("More than one key id requested")
         }
 
-        val keyId = keyIdsDistinct.first()
+//        val keyId = keyIdsDistinct.first()
 
 
 
 
         batchCredentialRequest.credentialRequests.first().let { credentialRequest ->
-            val jwt = credentialRequest.proof?.jwt ?: throw IllegalArgumentException("No proof.jwt in credential request!")
+            val jwt =
+                credentialRequest.proof?.jwt ?: throw IllegalArgumentException("No proof.jwt in credential request!")
             val jwtParts = jwt.split(".")
 
-            fun decodeJwtPart(idx: Int) = Json.parseToJsonElement(Base64.decode(jwtParts[idx]).decodeToString()).jsonObject
+            fun decodeJwtPart(idx: Int) =
+                Json.parseToJsonElement(Base64.decode(jwtParts[idx]).decodeToString()).jsonObject
 
             val header = decodeJwtPart(0)
             val payload = decodeJwtPart(1)
 
             val subjectDid =
-                header["kid"]?.jsonPrimitive?.contentOrNull ?: throw IllegalArgumentException("No kid in proof.jwt header!")
+                header["kid"]?.jsonPrimitive?.contentOrNull
+                    ?: throw IllegalArgumentException("No kid in proof.jwt header!")
             val nonce = payload["nonce"]?.jsonPrimitive?.contentOrNull
                 ?: throw IllegalArgumentException("No nonce in proof.jwt payload!")
 
@@ -309,10 +325,11 @@ open class CIProvider : OpenIDCredentialIssuer(
                                         mappings = request.mapping ?: JsonObject(emptyMap()),
                                         additionalJwtHeader = emptyMap(),
                                         additionalJwtOptions = emptyMap(),
-                                        disclosureMap = data.request.selectiveDisclosure ?: SDMap.Companion.generateSDMap(
-                                            JsonObject(emptyMap()),
-                                            JsonObject(emptyMap())
-                                        )
+                                        disclosureMap = data.request.selectiveDisclosure
+                                            ?: SDMap.Companion.generateSDMap(
+                                                JsonObject(emptyMap()),
+                                                JsonObject(emptyMap())
+                                            )
                                     )
                                 }
 

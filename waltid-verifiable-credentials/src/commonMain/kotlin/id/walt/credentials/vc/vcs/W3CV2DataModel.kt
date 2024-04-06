@@ -6,15 +6,19 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonObject
+import kotlin.js.ExperimentalJsExport
+import kotlin.js.JsExport
 
 /**
  * W3C V2.0
  * https://www.w3.org/TR/vc-data-model-2.0/
  */
+@OptIn(ExperimentalJsExport::class)
+@JsExport
 @Serializable
 data class W3CV2DataModel(
     @SerialName("@context")
-    val context: List<String> = W3CV11DataModel.defaultContext, // [https://www.w3.org/ns/credentials/v2, https://www.w3.org/ns/credentials/examples/v2]
+    val context: List<String> = defaultContext, // [https://www.w3.org/ns/credentials/v2, https://www.w3.org/ns/credentials/examples/v2]
     val type: List<String> = listOf("VerifiableCredential"), // [VerifiableCredential, ExampleAlumniCredential]
     val credentialSubject: JsonObject,
     val id: String? = null, // http://university.example/credentials/1872

@@ -1,7 +1,6 @@
 package id.walt.mdoc.mdocauth
 
 import cbor.Cbor
-import id.walt.mdoc.cose.COSESign1Serializer
 import id.walt.mdoc.dataelement.*
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer

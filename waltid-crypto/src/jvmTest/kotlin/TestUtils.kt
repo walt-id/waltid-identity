@@ -1,4 +1,6 @@
+import io.ktor.util.*
 import java.io.File
+import java.net.URLDecoder
 
 object TestUtils {
     fun loadJwkLocal(filename: String): String = loadResource("jwk/$filename")
@@ -6,7 +8,12 @@ object TestUtils {
     fun loadSerializedLocal(filename: String): String = loadResource("serialized/local/$filename")
     fun loadSerializedTse(filename: String): String = loadResource("serialized/tse/$filename")
     fun loadResource(relativePath: String): String =
-        this::class.java.classLoader.getResource(relativePath)!!.path.let { File(it).readText() }
+        URLDecoder.decode(this::class.java.classLoader.getResource(relativePath)!!.path, "UTF-8")
+            .let { File(it).readText() }
+
     fun loadResourceBytes(relativePath: String): ByteArray =
-        this::class.java.classLoader.getResource(relativePath)!!.path.let { File(it).readBytes() }
+        URLDecoder.decode(this::class.java.classLoader.getResource(relativePath)!!.path, "UTF-8")
+            .let { File(it).readBytes() }
+
+    fun loadResourceBase64(relativePath: String): ByteArray = loadResource(relativePath).decodeBase64Bytes()
 }

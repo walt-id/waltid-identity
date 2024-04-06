@@ -21,17 +21,25 @@ fun Application.configureOpenApi() {
             """.trimIndent().replace("\n", "<br/>")
         }
 
-        securityScheme("authenticated-session") {
+        securityScheme("auth-session") {
             name = "Session-Cookie Authentication"
             type = AuthType.API_KEY
             location = AuthKeyLocation.COOKIE
         }
 
-        securityScheme("authenticated-bearer") {
+        securityScheme("auth-bearer") {
             name = "Bearer token authentication"
             description = "Set as \"Authorization: Bearer %token-here%\" to authenticate."
             scheme = AuthScheme.BEARER
             type = AuthType.HTTP
+        }
+
+        securityScheme("auth-bearer-alternative") {
+            name = "Bearer token authentication (alternative header)"
+            description = "Set alternative header \"waltid-authorization: Bearer %token-here%\" to authenticate."
+            scheme = AuthScheme.BEARER
+            type = AuthType.HTTP
+            location = AuthKeyLocation.HEADER
         }
 
         defaultUnauthorizedResponse {

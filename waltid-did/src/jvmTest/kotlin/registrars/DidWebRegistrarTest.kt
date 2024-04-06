@@ -2,14 +2,14 @@ package registrars
 
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.LocalKey
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.did.dids.DidUtils
 import id.walt.did.dids.registrar.dids.DidCreateOptions
 import id.walt.did.dids.registrar.dids.DidWebCreateOptions
 import id.walt.did.dids.registrar.local.web.DidWebRegistrar
-import id.walt.did.utils.EncodingUtils
 import id.walt.did.utils.ExtensionMethods.ensurePrefix
 import kotlinx.coroutines.runBlocking
+import net.thauvin.erik.urlencoder.UrlEncoderUtil
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.Arguments
 import org.junit.jupiter.params.provider.Arguments.arguments
@@ -53,19 +53,19 @@ class DidWebRegistrarTest : DidRegistrarTestBase(DidWebRegistrar()) {
             Stream.of(
                 //empty-path
                 arguments(
-                    runBlocking { LocalKey.generate(KeyType.Ed25519) },
+                    runBlocking { JWKKey.generate(KeyType.Ed25519) },
                     DidWebCreateOptions(domain = "localhost:3000", path = "", keyType = KeyType.Ed25519),
                     webKeyAssertions
                 ),
                 //prefixed-path
                 arguments(
-                    runBlocking { LocalKey.generate(KeyType.Ed25519) },
+                    runBlocking { JWKKey.generate(KeyType.Ed25519) },
                     DidWebCreateOptions(domain = "walt.id", path = "/prefix-test", keyType = KeyType.Ed25519),
                     webKeyAssertions
                 ),
                 //non-prefixed-path
                 arguments(
-                    runBlocking { LocalKey.generate(KeyType.Ed25519) },
+                    runBlocking { JWKKey.generate(KeyType.Ed25519) },
                     DidWebCreateOptions(domain = "walt.id", path = "no-prefix/test", keyType = KeyType.Ed25519),
                     webKeyAssertions
                 )
@@ -91,7 +91,7 @@ class DidWebRegistrarTest : DidRegistrarTestBase(DidWebRegistrar()) {
             // assert [did identifier] and [domain + path] are identical
             assert(
                 //TODO: avoid computations in result comparison
-                EncodingUtils.urlDecode(DidUtils.identifierFromDid(did)!!) == domain.plus(
+                UrlEncoderUtil.decode(DidUtils.identifierFromDid(did)!!) == domain.plus(
                     path.takeIf { !it.isNullOrEmpty() }?.ensurePrefix("/")?.replace("/", ":") ?: ""
                 )
             )

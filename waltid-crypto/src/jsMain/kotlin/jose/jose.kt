@@ -68,5 +68,8 @@ external object jose {
 
     fun calculateJwkThumbprint(jwk: JWK, digestAlgorithm: String /* "sha256" | "sha384" | "sha512" */ = definedExternally): Promise<String>
 
-    fun calculateJwkThumbprintUri(jwk: JWK, digestAlgorithm: String /* "sha256" | "sha384" | "sha512" */ = definedExternally): Promise<String>
+    fun calculateJwkThumbprintUri(
+        jwk: JWK,
+        digestAlgorithm: String /* "sha256" | "sha384" | "sha512" */ = definedExternally
+    ): Promise<String>
 }

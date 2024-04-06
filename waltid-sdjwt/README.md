@@ -71,7 +71,7 @@ specification:  [draft-ietf-oauth-selective-disclosure-jwt-04](https://datatrack
         [...]
 <dependency>
 <groupId>id.walt</groupId>
-<artifactId>waltid-sd-jwt-jvm</artifactId>
+<artifactId>waltid-sdjwt-jvm</artifactId>
 <version>[ version ]</version>
 </dependency>
 ```
@@ -83,13 +83,13 @@ _Kotlin DSL_
 ```kotlin
 [...]
 repositories {
-    maven("https://maven.walt.id/repository/waltid/")
+    maven("https://maven.waltid.dev/releases")
 }
 [...]
 val sdJwtVersion = "1.2306071235.0"
 [...]
 dependencies {
-    implementation("id.walt:waltid-sd-jwt-jvm:$sdJwtVersion")
+    implementation("id.walt:waltid-sdjwt-jvm:$sdJwtVersion")
 }
 ```
 

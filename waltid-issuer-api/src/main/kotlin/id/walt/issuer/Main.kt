@@ -27,7 +27,7 @@ suspend fun main(args: Array<String>) {
         CIO,
         port = webConfig.webPort,
         host = webConfig.webHost,
-        module = Application::module
+        module = Application::issuerModule
     ).start(wait = true)
 }
 
@@ -40,8 +40,10 @@ fun Application.configurePlugins() {
     configureOpenApi()
 }
 
-fun Application.module() {
-    configurePlugins()
+fun Application.issuerModule(withPlugins: Boolean = true) {
+    if (withPlugins) {
+        configurePlugins()
+    }
     oidcApi()
     issuerApi()
     entraIssuance()

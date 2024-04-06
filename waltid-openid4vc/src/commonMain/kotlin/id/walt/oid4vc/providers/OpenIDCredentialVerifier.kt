@@ -1,12 +1,13 @@
 package id.walt.oid4vc.providers
 
+import id.walt.oid4vc.data.ClientIdScheme
 import id.walt.oid4vc.data.ResponseMode
 import id.walt.oid4vc.data.ResponseType
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.interfaces.ISessionCache
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.responses.TokenResponse
-import id.walt.oid4vc.util.randomUUID
+import id.walt.oid4vc.util.randomSessionId
 import kotlinx.datetime.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
@@ -33,10 +34,11 @@ abstract class OpenIDCredentialVerifier(val config: CredentialVerifierConfig) :
         presentationDefinition: PresentationDefinition,
         responseMode: ResponseMode = ResponseMode.fragment,
         scope: Set<String> = setOf(),
-        expiresIn: Duration = 60.seconds
+        expiresIn: Duration = 60.seconds,
+        sessionId: String? = null, // A calling party may provide a unique session Id
     ): PresentationSession {
         val session = PresentationSession(
-            id = randomUUID(),
+            id = sessionId ?: randomSessionId(),
             authorizationRequest = null,
             expirationTimestamp = Clock.System.now().plus(expiresIn),
             presentationDefinition = presentationDefinition
@@ -46,14 +48,16 @@ abstract class OpenIDCredentialVerifier(val config: CredentialVerifierConfig) :
         val presentationDefinitionUri = preparePresentationDefinitionUri(presentationDefinition, session.id)
         val authReq = AuthorizationRequest(
             responseType = ResponseType.getResponseTypeString(ResponseType.vp_token),
-            clientId = config.clientId,
+            clientId = when(config.clientIdScheme) {
+                ClientIdScheme.redirect_uri -> ""
+                else -> config.clientId
+            },
             responseMode = responseMode,
             redirectUri = when (responseMode) {
                 ResponseMode.query, ResponseMode.fragment, ResponseMode.form_post -> prepareResponseOrRedirectUri(
                     session.id,
                     responseMode
                 )
-
                 else -> null
             },
             responseUri = when (responseMode) {

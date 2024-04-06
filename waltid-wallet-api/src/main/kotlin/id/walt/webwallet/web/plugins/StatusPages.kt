@@ -20,9 +20,8 @@ private fun statusCodeForException(cause: Throwable) = when (cause) {
 fun Application.configureStatusPages() {
     install(StatusPages) {
         exception<UnauthorizedException> { call, cause ->
-            call.respond(HttpStatusCode.Unauthorized, cause.message ?: "")
             cause.printStackTrace()
-            //call.respond(HttpStatusCode.Forbidden, cause.message ?: "")
+            call.respond(HttpStatusCode.Unauthorized, cause.message ?: "")
         }
         exception<Throwable> { call, cause ->
             cause.printStackTrace()

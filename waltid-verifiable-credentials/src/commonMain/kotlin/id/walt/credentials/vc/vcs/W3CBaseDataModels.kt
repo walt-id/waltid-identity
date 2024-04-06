@@ -1,7 +1,11 @@
 package id.walt.credentials.vc.vcs
 
 import kotlinx.serialization.Serializable
+import kotlin.js.ExperimentalJsExport
+import kotlin.js.JsExport
 
+@OptIn(ExperimentalJsExport::class)
+@JsExport
 object W3CBaseDataModels {
 
     @Serializable

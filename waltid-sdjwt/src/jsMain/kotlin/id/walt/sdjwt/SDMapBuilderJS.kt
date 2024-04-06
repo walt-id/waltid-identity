@@ -1,6 +1,5 @@
 package id.walt.sdjwt
 
-@ExperimentalJsExport
 @JsExport
 @JsName("SDMapBuilder")
 class SDMapBuilderJS(

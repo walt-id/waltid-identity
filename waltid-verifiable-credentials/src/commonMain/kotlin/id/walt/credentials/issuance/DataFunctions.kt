@@ -10,8 +10,12 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.uuid.UUID
 import kotlinx.uuid.generateUUID
+import kotlin.js.ExperimentalJsExport
+import kotlin.js.JsExport
 import kotlin.time.Duration
 
+@OptIn(ExperimentalJsExport::class)
+@JsExport
 val dataFunctions = mapOf<String, suspend (call: W3CDataMergeUtils.FunctionCall) -> JsonElement>(
     "subjectDid" to { it.fromContext() },
     "issuerDid" to { it.fromContext() },

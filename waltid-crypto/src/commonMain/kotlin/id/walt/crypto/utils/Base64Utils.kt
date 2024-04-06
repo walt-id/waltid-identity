@@ -2,8 +2,11 @@ package id.walt.crypto.utils
 
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
+import kotlin.js.ExperimentalJsExport
+import kotlin.js.JsExport
 
-@OptIn(ExperimentalEncodingApi::class)
+@OptIn(ExperimentalJsExport::class, ExperimentalEncodingApi::class)
+@JsExport
 object Base64Utils {
 
     fun String.base64toBase64Url() = this.replace("+", "-").replace("/", "_").dropLastWhile { it == '=' }

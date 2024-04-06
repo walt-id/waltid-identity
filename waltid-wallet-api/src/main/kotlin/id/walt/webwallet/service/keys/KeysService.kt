@@ -9,16 +9,20 @@ import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.deleteWhere
 import org.jetbrains.exposed.sql.insert
-import org.jetbrains.exposed.sql.select
+import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 
 object KeysService {
     fun get(wallet: UUID, keyId: String): WalletKey? = transaction {
-        WalletKeys.select { (WalletKeys.wallet eq wallet) and (WalletKeys.keyId eq keyId) }
-            .singleOrNull()?.let { WalletKey(it) }
+        WalletKeys.selectAll().where { (WalletKeys.wallet eq wallet) and (WalletKeys.keyId eq keyId) }
+            .firstOrNull()?.let { WalletKey(it) }
     }
 
-    fun list(wallet: UUID): List<WalletKey> = WalletKeys.select { WalletKeys.wallet eq wallet }.map { WalletKey(it) }
+    fun get(keyId: String): WalletKey? = transaction {
+        WalletKeys.selectAll().where { WalletKeys.keyId eq keyId }.firstOrNull()?.let { WalletKey(it) }
+    }
+
+    fun list(wallet: UUID): List<WalletKey> = WalletKeys.selectAll().where { WalletKeys.wallet eq wallet }.map { WalletKey(it) }
 
     fun add(wallet: UUID, keyId: String, document: String) = transaction {
         WalletKeys.insert {

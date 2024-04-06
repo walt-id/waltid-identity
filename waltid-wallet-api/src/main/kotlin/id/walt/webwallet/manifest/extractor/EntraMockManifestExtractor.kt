@@ -7,7 +7,8 @@ import kotlinx.serialization.json.JsonObject
 class EntraMockManifestExtractor : ManifestExtractor {
 
     override suspend fun extract(offerRequestUrl: String): JsonObject =
-        Json.decodeFromString("""
+        Json.decodeFromString(
+            """
         {
             "id": "133d7e92-d227-f74d-1a5b-354cbc8df49a",
             "display":
@@ -84,6 +85,7 @@ class EntraMockManifestExtractor : ManifestExtractor {
             "iat": 1704289683,
             "type": "${ManifestProvider.EntraManifestType}"
         }
-        """.trimIndent())
+        """.trimIndent()
+        )
 
 }

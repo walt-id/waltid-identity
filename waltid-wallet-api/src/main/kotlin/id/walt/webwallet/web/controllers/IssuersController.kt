@@ -1,15 +1,18 @@
-package id.walt.web.controllers
+package id.walt.webwallet.web.controllers
 
+import id.walt.webwallet.service.WalletServiceManager
 import id.walt.webwallet.service.issuers.CredentialDataTransferObject
-import id.walt.webwallet.service.issuers.IssuerCredentialsDataTransferObject
 import id.walt.webwallet.service.issuers.IssuerDataTransferObject
-import id.walt.webwallet.service.issuers.IssuersService
-import id.walt.webwallet.web.controllers.walletRoute
 import io.github.smiley4.ktorswaggerui.dsl.get
+import io.github.smiley4.ktorswaggerui.dsl.post
+import io.github.smiley4.ktorswaggerui.dsl.put
 import io.github.smiley4.ktorswaggerui.dsl.route
 import io.ktor.http.*
 import io.ktor.server.application.*
+import io.ktor.server.request.*
 import io.ktor.server.response.*
+import io.ktor.server.util.*
+import kotlinx.serialization.Serializable
 
 fun Application.issuers() = walletRoute {
     route("issuers", {
@@ -24,7 +27,35 @@ fun Application.issuers() = walletRoute {
                 }
             }
         }) {
-            context.respond(getWalletService().listIssuers())
+            context.respond(WalletServiceManager.issuerUseCase.list(getWalletService().walletId))
+        }
+        post("add", {
+            summary = "Add issuer to wallet"
+            request {
+                body<IssuerParameter> {
+                    description = "Issuer data"
+                    required = true
+                }
+            }
+            response {
+                HttpStatusCode.Created to { description = "Issuer added successfully" }
+                HttpStatusCode.BadRequest to { description = "Failed to add issuer to wallet" }
+            }
+        }) {
+            val issuer = call.receive<IssuerParameter>()
+            WalletServiceManager.issuerUseCase.add(
+                IssuerDataTransferObject(
+                    wallet = getWalletService().walletId,
+                    name = issuer.name,
+                    description = issuer.description,
+                    uiEndpoint = issuer.uiEndpoint,
+                    configurationEndpoint = issuer.configurationEndpoint,
+                )
+            ).onSuccess {
+                context.respond(HttpStatusCode.Created)
+            }.onFailure {
+                context.respond(HttpStatusCode.BadRequest, it.localizedMessage)
+            }
         }
         route("{issuer}", {
             request {
@@ -48,14 +79,23 @@ fun Application.issuers() = walletRoute {
                     }
                 }
             }) {
-                runCatching {
-                    getWalletService().getIssuer(
-                        call.parameters["issuer"] ?: throw IllegalArgumentException("No issuer name provided.")
-                    )
-                }.onSuccess {
+                WalletServiceManager.issuerUseCase.get(getWalletService().walletId, call.parameters.getOrFail("issuer")).onSuccess {
                     context.respond(it)
                 }.onFailure {
                     context.respondText(it.localizedMessage, ContentType.Text.Plain, HttpStatusCode.NotFound)
+                }
+            }
+            put("authorize", {
+                summary = "Authorize issuer to automatically add credentials to the wallet in future"
+                response {
+                    HttpStatusCode.Accepted to { description = "Authorization succeed" }
+                    HttpStatusCode.BadRequest to { description = "Authorization failed" }
+                }
+            }) {
+                WalletServiceManager.issuerUseCase.authorize(getWalletService().walletId, call.parameters.getOrFail("issuer")).onSuccess {
+                    context.respond(HttpStatusCode.Accepted)
+                }.onFailure {
+                    context.respond(HttpStatusCode.BadRequest, it.localizedMessage)
                 }
             }
         }
@@ -81,19 +121,20 @@ fun Application.issuers() = walletRoute {
                     }
                 }
             }) {
-                runCatching {
-                    val issuer = getWalletService().getIssuer(
-                        call.parameters["issuer"] ?: throw IllegalArgumentException("No issuer name provided.")
-                    )
-                    IssuerCredentialsDataTransferObject(
-                        issuer = issuer, credentials = IssuersService.fetchCredentials(issuer.configurationEndpoint)
-                    )
-                }.onSuccess {
+                WalletServiceManager.issuerUseCase.credentials(getWalletService().walletId, call.parameters.getOrFail("issuer")).onSuccess {
                     context.respond(it)
                 }.onFailure {
-                    context.respondText(it.localizedMessage, ContentType.Text.Plain, HttpStatusCode.InternalServerError)
+                    context.respond(HttpStatusCode.BadRequest, it.localizedMessage)
                 }
             }
         }
     }
 }
+
+@Serializable
+internal data class IssuerParameter(
+    val name: String,
+    val description: String? = "no description",
+    val uiEndpoint: String = "",
+    val configurationEndpoint: String = "",
+)

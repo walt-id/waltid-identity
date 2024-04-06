@@ -34,7 +34,7 @@ class SDMap(
 
     fun prettyPrint(indentBy: Int = 0): String {
         val indentation = (0).rangeTo(indentBy).joinToString(" ") { "" }
-        return "${indentation} + with decoys: ${decoyMode} (${decoys})\n" + keys.flatMap { key ->
+        return "$indentation + with decoys: $decoyMode (${decoys})\n" + keys.flatMap { key ->
             listOfNotNull(
                 "${indentation}- $key: ${fields[key]?.sd == true}",
                 fields[key]?.children?.prettyPrint(indentBy + 2)

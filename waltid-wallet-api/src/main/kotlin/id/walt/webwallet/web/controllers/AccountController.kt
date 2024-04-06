@@ -1,6 +1,5 @@
 package id.walt.webwallet.web.controllers
 
-import id.walt.web.controllers.getUserUUID
 import id.walt.webwallet.db.models.AccountWalletListing
 import id.walt.webwallet.service.account.AccountsService
 import id.walt.webwallet.web.WebBaseRoutes.authenticatedWebWalletRoute
@@ -21,7 +20,7 @@ fun Application.accounts() {
                     response { HttpStatusCode.OK to { body<AccountWalletListing>() } }
                 }) {
                     val user = getUserUUID()
-                    context.respond(AccountsService.getAccountWalletMappings("", user)) // FIX ME -> TENANT HERE
+                    context.respond(AccountsService.getAccountWalletMappings("", user)) // FIXME -> TENANT HERE
                 }
             }
         }

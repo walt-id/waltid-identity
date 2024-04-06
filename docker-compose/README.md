@@ -5,22 +5,29 @@ This package is a docker compose configuration that starts all the services and 
 ## Executing The Package
 
 ```bash
-docker compose up
+docker-compose pull
+docker-compose up
+```
+
+Note: If you are facing issues with the containers, try running the following command to remove the existing containers and then run the above command again.
+
+```bash
+docker-compose down
 ```
 
 ## Services Exposed
 port mapping below
 
-- Issuer API: `8000`
-- Verifier API: `9000`
-- Wallet API: `4545`
+- Wallet API: [http://localhost:7001](http://localhost:7001)
+- Issuer API: [http://localhost:7002](http://localhost:7002)
+- Verifier API: [http://localhost:7003](http://localhost:7003)
 
 ## Apps
 port mapping below
 
-- Web Wallet: `3000`
-- Web Portal: `4000`
-- Credential Repo: `5001`
+- Web Wallet: [http://localhost:7101](http://localhost:7101)
+- Web Portal: [http://localhost:7102](http://localhost:7102)
+- Credential Repo: [http://localhost:7103](http://localhost:7103)
 
 
 ## Configurations
@@ -30,7 +37,7 @@ Config locations:
 - wallet API: `wallet-backend`
 - issuer API: `issuer-api/config`
 - verifier API: `verifier-api/config`
-- ingress: `ingress.conf`
+- ingress: `Caddyfile`
 - environment: `.env`
 
 ## Troubleshooting

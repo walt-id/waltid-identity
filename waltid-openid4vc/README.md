@@ -13,6 +13,34 @@
 
 </div>
 
+## Installation
+Add the openid4vc library as a dependency to your Kotlin or Java project.
+
+### walt.id Repository
+
+Add the Maven repository which hosts the walt.id libraries to your build.gradle file.
+
+```kotlin
+repositories {
+    maven { url = uri("https://maven.waltid.dev/releases") }
+} 
+```
+
+### Library Dependency
+
+Adding the openid4vc library as dependency. Specify the version that coincides with the latest or required
+snapshot for your project. [Latest releases](https://github.com/walt-id/waltid-identity/releases).
+
+```kotlin
+dependencies {
+  implementation("id.walt:waltid-openid4vc:<version>")
+}
+```
+
+Replace `version` with the version of the walt.id openid4vc library you want to use.
+Note: As the openid4vc lib is part of the mono-repo walt.id identity, you need to use the version of
+walt.id identity.
+
 ## Getting Started
 
 ### What it provides
@@ -41,9 +69,12 @@ To use it, depending on the kind of service provider you want to implement,
 The following examples show how to use the library, with simple, minimal implementations of Issuer, Verifier and Wallet REST endpoints and
 business logic, for processing the OpenID4VC protocols.
 
-The examples are based on **JVM** and make use of [**ktor**](https://ktor.io/) for the HTTP server endpoints and client-side request
-handling, and the [**waltid-ssikit**](https://github.com/walt-id/waltid-ssikit) for the cryptographic operations and credential and
-presentation handling.
+The examples are based on **JVM** and make use of the following libraries:
+- [**ktor**](https://ktor.io/) for the HTTP server endpoints and client-side request
+handling
+- [**waltid-crypto**](https://github.com/walt-id/waltid-identity/tree/main/waltid-crypto) for cryptographic operations
+- [**waltid-did**](https://github.com/walt-id/waltid-identity/tree/main/waltid-did) for DID-related operations 
+- [**waltid-verifiable-credentials**](https://github.com/walt-id/waltid-identity/tree/main/waltid-verifiable-credentials) for credential and presentation handling
 
 ### Issuer
 
@@ -64,60 +95,58 @@ These endpoints are well-defined, and need to be available under this exact path
 Returns the
 issuer [provider metadata](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html#name-credential-issuer-metadata).
 
-https://github.com/walt-id/waltid-openid4vc/blob/bd9374826d7acbd0d77d15cd2a81098e643eb6fa/src/jvmTest/kotlin/id/walt/oid4vc/CITestProvider.kt#L115-L120
+https://github.com/walt-id/waltid-identity/blob/main/waltid-openid4vc/src/jvmTest/kotlin/id/walt/oid4vc/CITestProvider.kt#L147-L152
 
 **Other required endpoints**
 
 These endpoints can have any path, according to your requirements or preferences, but need to be referenced in the provider metadata,
 returned by the well-defined configuration endpoints listed above.
 
+
 * `POST /par`
 
-Endpoint to
-receive [pushed authorization requests](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html#name-pushed-authorization-reques),
-referenced in the provider metadata as `pushed_authorization_request_endpoint`, see
-also [here](https://www.rfc-editor.org/rfc/rfc9126.html#name-authorization-server-metada).
-
-https://github.com/walt-id/waltid-openid4vc/blob/bd9374826d7acbd0d77d15cd2a81098e643eb6fa/src/jvmTest/kotlin/id/walt/oid4vc/CITestProvider.kt#L121-L129
+Endpoint to receive [pushed authorization requests](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html#name-pushed-authorization-reques), referenced in the provider metadata as `pushed_authorization_request_endpoint`, 
+see [here](https://www.rfc-editor.org/rfc/rfc9126.html#name-authorization-server-metada).
+  
+  https://github.com/walt-id/waltid-identity/blob/main/waltid-openid4vc/src/jvmTest/kotlin/id/walt/oid4vc/CITestProvider.kt#L153-L161
 
 * `GET /authorize`
 
 [Authorization endpoint](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html#name-authorization-request), referenced
-in provider metadata as `authorization_endpoint`, see [here](https://www.rfc-editor.org/rfc/rfc8414.html#section-2)
+in provider metadata as `authorization_endpoint`, see [here](https://www.rfc-editor.org/rfc/rfc8414.html#section-2).
 
 Not required for the pre-authorized issuance flow.
 
-https://github.com/walt-id/waltid-openid4vc/blob/bd9374826d7acbd0d77d15cd2a81098e643eb6fa/src/jvmTest/kotlin/id/walt/oid4vc/CITestProvider.kt#L130-L158
+https://github.com/walt-id/waltid-identity/blob/main/waltid-openid4vc/src/jvmTest/kotlin/id/walt/oid4vc/CITestProvider.kt#L162-L206
 
 * `POST /token`
 
 [Token endpoint](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html#name-token-endpoint), referenced in provider
-metadata as `token_endpoint`, see [here](https://www.rfc-editor.org/rfc/rfc8414.html#section-2)
+metadata as `token_endpoint`, see [here](https://www.rfc-editor.org/rfc/rfc8414.html#section-2).
 
-https://github.com/walt-id/waltid-openid4vc/blob/bd9374826d7acbd0d77d15cd2a81098e643eb6fa/src/jvmTest/kotlin/id/walt/oid4vc/CITestProvider.kt#L159-L168
+https://github.com/walt-id/waltid-identity/blob/main/waltid-openid4vc/src/jvmTest/kotlin/id/walt/oid4vc/CITestProvider.kt#L207-L216
 
 * `POST /credential`
 
-[Credential endpoint](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html#name-credential-endpoint) to fetch the
-issued credential, after authorization flow is completed. Referenced in provider metadata as `credential_endpoint`, as
-defined [here](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html#name-credential-issuer-metadata-p.
+[Credential endpoint](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html#name-credential-endpoint) to fetch the issued credential, after authorization flow is completed. Referenced in provider metadata as `credential_endpoint`, as
+defined [here](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html#name-credential-issuer-metadata-p).
 
-https://github.com/walt-id/waltid-openid4vc/blob/bd9374826d7acbd0d77d15cd2a81098e643eb6fa/src/jvmTest/kotlin/id/walt/oid4vc/CITestProvider.kt#L169-L181
+https://github.com/walt-id/waltid-identity/blob/main/waltid-openid4vc/src/jvmTest/kotlin/id/walt/oid4vc/CITestProvider.kt#L217-L229
 
 * `POST /credential_deferred`
 
 [Deferred credential endpoint](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html#name-deferred-credential-endpoin),
 to fetch issued credential if issuance is deferred. Referenced in provider metadata as `deferred_credential_endpoint` (missing in spec).
 
-https://github.com/walt-id/waltid-openid4vc/blob/bd9374826d7acbd0d77d15cd2a81098e643eb6fa/src/jvmTest/kotlin/id/walt/oid4vc/CITestProvider.kt#L182-L193
+https://github.com/walt-id/waltid-identity/blob/main/waltid-openid4vc/src/jvmTest/kotlin/id/walt/oid4vc/CITestProvider.kt#L230-L245
 
 * `POST /batch_credential`
 
 [Batch credential endpoint](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html#name-batch-credential-endpoint) to
 fetch multiple issued credentials. Referenced in provider metadata as `batch_credential_endpoint`, as
-defined [here](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html#name-credential-issuer-metadata-p.
+defined [here](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html#name-credential-issuer-metadata-p).
 
-https://github.com/walt-id/waltid-openid4vc/blob/bd9374826d7acbd0d77d15cd2a81098e643eb6fa/src/jvmTest/kotlin/id/walt/oid4vc/CITestProvider.kt#L194-L205
+https://github.com/walt-id/waltid-identity/blob/main/waltid-openid4vc/src/jvmTest/kotlin/id/walt/oid4vc/CITestProvider.kt#L246-L258
 
 #### Business logic
 
@@ -127,19 +156,19 @@ cryptographic operations for issuing credentials.
 
 * **Configuration of issuance provider**
 
-https://github.com/walt-id/waltid-openid4vc/blob/bd9374826d7acbd0d77d15cd2a81098e643eb6fa/src/jvmTest/kotlin/id/walt/oid4vc/CITestProvider.kt#L39-L56
+https://github.com/walt-id/waltid-identity/blob/main/waltid-openid4vc/src/jvmTest/kotlin/id/walt/oid4vc/CITestProvider.kt#L54-L71
 
 * **Simple session management example**
 
 Here we implement a simplistic in-memory session management:
 
-https://github.com/walt-id/waltid-openid4vc/blob/5f7b3b226326a12a2de48e1207dd546e542e2b92/src/jvmTest/kotlin/id/walt/oid4vc/CITestProvider.kt#L58-L63
+https://github.com/walt-id/waltid-identity/blob/main/waltid-openid4vc/src/jvmTest/kotlin/id/walt/oid4vc/CITestProvider.kt#L73-L78
 
 * **Crypto operations and credential issuance**
 
-Token signing and credential issuance based on [**waltid-ssikit**](https://github.com/walt-id/waltid-ssikit)
+Token signing and credential issuance based on [**waltid-crypto**](https://github.com/walt-id/waltid-identity/tree/main/waltid-crypto), [**waltid-did**](https://github.com/walt-id/waltid-identity/tree/main/waltid-did) and [**waltid-verifiable-credentials**](https://github.com/walt-id/waltid-identity/tree/main/waltid-verifiable-credentials).
 
-https://github.com/walt-id/waltid-openid4vc/blob/5f7b3b226326a12a2de48e1207dd546e542e2b92/src/jvmTest/kotlin/id/walt/oid4vc/CITestProvider.kt#L65-L113
+https://github.com/walt-id/waltid-identity/blob/main/waltid-openid4vc/src/jvmTest/kotlin/id/walt/oid4vc/CITestProvider.kt#L80-L139
 
 ### Verifier
 

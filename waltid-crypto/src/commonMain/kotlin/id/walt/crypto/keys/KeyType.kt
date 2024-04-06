@@ -1,11 +1,15 @@
 package id.walt.crypto.keys
 
 import kotlinx.serialization.Serializable
+import kotlin.js.ExperimentalJsExport
+import kotlin.js.JsExport
 
 /*
  * ECC vs ECDSA vs EdDSA vs ECDH
  */
 
+@OptIn(ExperimentalJsExport::class)
+@JsExport
 @Serializable
 enum class KeyType {
     // EdDSA
@@ -19,6 +23,8 @@ enum class KeyType {
     RSA // RSA
 }
 
+@OptIn(ExperimentalJsExport::class)
+@JsExport
 enum class KeyCategory {
     RSA,
     ECC,

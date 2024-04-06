@@ -1,6 +1,5 @@
 package id.walt.webwallet.web.controllers
 
-import id.walt.web.controllers.getWalletService
 import io.github.smiley4.ktorswaggerui.dsl.post
 import io.ktor.http.*
 import io.ktor.server.response.*
@@ -46,7 +45,7 @@ object DidCreation {
                     description = "Domain to use to host did:web document at"
                 }
                 queryParameter<String>("path") {
-                    description = "Path to host the did:web document at"
+                    description = "Path to host the did:web document at. Starting with a: \"/\""
                 }
             }
         }) {

@@ -1,3 +1,5 @@
+import com.github.benmanes.gradle.versions.updates.DependencyUpdatesTask
+
 allprojects {
 
     version = "1.0.0-SNAPSHOT"
@@ -27,4 +29,12 @@ repositories {
 }
 kotlin {
     jvmToolchain(8)
+}
+
+allprojects {
+    tasks.withType<DependencyUpdatesTask> {
+        rejectVersionIf {
+            listOf("-beta", "-alpha", "-rc").any { it in candidate.version.lowercase() } || candidate.version.takeLast(4).contains("RC")
+        }
+    }
 }

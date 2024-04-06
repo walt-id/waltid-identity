@@ -5,29 +5,24 @@ import io.ktor.server.application.*
 import io.ktor.server.plugins.compression.*
 import io.ktor.server.plugins.cors.routing.*
 import io.ktor.server.plugins.forwardedheaders.*
-import io.ktor.server.plugins.methodoverride.*
 
 fun Application.configureHTTP() {
-    install(Compression) {
-        gzip {
-            priority = 1.0
-        }
-        deflate {
-            priority = 10.0
-            minimumSize(1024) // condition
-        }
-    }
+    install(Compression)
     install(CORS) {
+        allowHeaders { true }
         allowMethod(HttpMethod.Options)
+        allowMethod(HttpMethod.Get)
+        allowMethod(HttpMethod.Post)
+        allowMethod(HttpMethod.Delete)
+        allowMethod(HttpMethod.Put)
+        allowMethod(HttpMethod.Patch)
         allowNonSimpleContentTypes = true
         allowCredentials = true
 
+        allowOrigins { true }
         anyHost()
-//        allowHost("localhost:3000")
-//        allowHost("127.0.0.1:3000")
-//        allowHost("0.0.0.0:3000")
     }
     install(ForwardedHeaders) // WARNING: for security, do not include this if not behind a reverse proxy
     install(XForwardedHeaders) // WARNING: for security, do not include this if not behind a reverse proxy
-    install(XHttpMethodOverride)
+//    install(XHttpMethodOverride)//nginx delete verb
 }

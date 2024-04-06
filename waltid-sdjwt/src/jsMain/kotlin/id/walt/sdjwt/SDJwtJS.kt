@@ -7,7 +7,6 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlin.js.Promise
 
-@ExperimentalJsExport
 @JsExport
 class SDJwtJS(
     sdJwt: SDJwt
