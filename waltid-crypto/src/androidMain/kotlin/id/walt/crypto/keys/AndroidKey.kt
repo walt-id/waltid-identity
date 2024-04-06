@@ -174,6 +174,10 @@ class AndroidKey() : Key() {
         }
     }
 
+    override suspend fun getMeta(): KeyMeta {
+        TODO("Not yet implemented")
+    }
+
     private fun getSignature(): Signature = when (keyType) {
         KeyType.secp256k1 -> Signature.getInstance("SHA256withECDSA", "BC")//Legacy SunEC curve disabled
         KeyType.secp256r1 -> Signature.getInstance("SHA256withECDSA")
@@ -183,8 +187,8 @@ class AndroidKey() : Key() {
 
     companion object : AndroidKeyCreator {
         override suspend fun generate(
-            type: KeyType, metadata: LocalKeyMetadata
+            type: KeyType,
+            metadata: JwkKeyMeta?
         ): AndroidKey = AndroidKeyGenerator.generate(type, metadata)
-
     }
 }

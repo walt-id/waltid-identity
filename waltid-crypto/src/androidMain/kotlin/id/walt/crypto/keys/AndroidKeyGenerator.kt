@@ -15,7 +15,7 @@ object AndroidKeyGenerator : AndroidKeyCreator {
     const val ANDROID_KEYSTORE = "AndroidKeyStore"
 
     // Create an instance using key type
-    override suspend fun generate(type: KeyType, metadata: LocalKeyMetadata): AndroidKey {
+    override suspend fun generate(type: KeyType, metadata: JwkKeyMeta?): AndroidKey {
         val uniqueId = UUID.randomUUID().toString()
         val alias = "$KEY_PAIR_ALIAS_PREFIX$uniqueId"
         KeyPairGenerator.getInstance(getAlgorithmFor(type), ANDROID_KEYSTORE).apply {
