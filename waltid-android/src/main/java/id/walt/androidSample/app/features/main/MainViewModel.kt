@@ -9,7 +9,6 @@ import id.walt.credentials.CredentialBuilder
 import id.walt.credentials.CredentialBuilderType
 import id.walt.crypto.keys.AndroidKey
 import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.LocalKeyMetadata
 import id.walt.did.dids.DidService
 import id.walt.sdjwt.SDJwt
 import id.walt.sdjwt.SDPayload
@@ -109,7 +108,7 @@ interface MainViewModel {
 
         override fun onSignRaw(plainText: String, keyType: KeyType) {
             viewModelScope.launch {
-                AndroidKey.generate(keyType, LocalKeyMetadata()).run {
+                AndroidKey.generate(keyType).run {
                     androidKey = this
                     val signedContent = this.signRaw(plainText.toByteArray())
                     displayText.value = Base64.encodeToString(signedContent, Base64.DEFAULT)
@@ -121,7 +120,7 @@ interface MainViewModel {
 
         override fun onSignJWS(plainText: String, keyType: KeyType) {
             viewModelScope.launch {
-                AndroidKey.generate(keyType, LocalKeyMetadata()).run {
+                AndroidKey.generate(keyType).run {
                     androidKey = this
                     signJws(plainText.toByteArray(), mapOf("kid" to this.getKeyId())).also {
                         displayText.value = it
