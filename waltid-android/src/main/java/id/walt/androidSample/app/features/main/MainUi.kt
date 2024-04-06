@@ -163,90 +163,101 @@ private fun MainUiContent(
                 .padding(bottom = 20.dp)
         )
 
-        Button(
-            onClick = {
-                systemKeyboard?.hide()
-                authenticateWithBiometric(
-                    context = context as FragmentActivity,
-                    onAuthenticated = { viewModel.onSignJWS(plainText, selectedKeyType) },
-                    onFailure = { viewModel.onBiometricsAuthFailure() }
-                )
-            },
-            enabled = plainText.isNotBlank() && isBiometricsAvailable,
-        ) {
-            Text(text = stringResource(R.string.label_sign_jws))
-        }
+       Column(
+           modifier = Modifier.padding(horizontal = 50.dp)
+       ) {
+           Button(
+               modifier = Modifier.fillMaxWidth(),
+               onClick = {
+                   systemKeyboard?.hide()
+                   authenticateWithBiometric(
+                       context = context as FragmentActivity,
+                       onAuthenticated = { viewModel.onSignJWS(plainText, selectedKeyType) },
+                       onFailure = { viewModel.onBiometricsAuthFailure() }
+                   )
+               },
+               enabled = plainText.isNotBlank() && isBiometricsAvailable,
+           ) {
+               Text(text = stringResource(R.string.label_sign_jws))
+           }
 
-        Button(
-            onClick = {
-                systemKeyboard?.hide()
-                authenticateWithBiometric(
-                    context = context as FragmentActivity,
-                    onAuthenticated = { viewModel.onSignRaw(plainText, selectedKeyType) },
-                    onFailure = { viewModel.onBiometricsAuthFailure() }
-                )
-            },
-            enabled = plainText.isNotBlank() && isBiometricsAvailable,
-        ) {
-            Text(text = stringResource(R.string.label_sign))
-        }
+           Button(
+               modifier = Modifier.fillMaxWidth(),
+               onClick = {
+                   systemKeyboard?.hide()
+                   authenticateWithBiometric(
+                       context = context as FragmentActivity,
+                       onAuthenticated = { viewModel.onSignRaw(plainText, selectedKeyType) },
+                       onFailure = { viewModel.onBiometricsAuthFailure() }
+                   )
+               },
+               enabled = plainText.isNotBlank() && isBiometricsAvailable,
+           ) {
+               Text(text = stringResource(R.string.label_sign))
+           }
 
-        Button(
-            onClick = {
-                systemKeyboard?.hide()
-                viewModel.onVerifyPlainText(signature!!, plainText.toByteArray())
-            },
-            enabled = signature != null,
-        ) {
-            Text(text = stringResource(R.string.label_verify_signature))
-        }
+           Button(
+               modifier = Modifier.fillMaxWidth(),
+               onClick = {
+                   systemKeyboard?.hide()
+                   viewModel.onVerifyPlainText(signature!!, plainText.toByteArray())
+               },
+               enabled = signature != null,
+           ) {
+               Text(text = stringResource(R.string.label_verify_signature))
+           }
 
-        Button(
-            onClick = {
-                systemKeyboard?.hide()
-                viewModel.onRetrievePublicKey()
-            },
-            enabled = signature != null,
-        ) {
-            Text(text = stringResource(R.string.label_get_public_key))
-        }
+           Button(
+               modifier = Modifier.fillMaxWidth(),
+               onClick = {
+                   systemKeyboard?.hide()
+                   viewModel.onRetrievePublicKey()
+               },
+               enabled = signature != null,
+           ) {
+               Text(text = stringResource(R.string.label_get_public_key))
+           }
 
-        Button(
-            onClick = {
-                systemKeyboard?.hide()
-                viewModel.onGenerateDid()
-            },
-            enabled = signature != null,
-        ) {
-            Text(text = stringResource(R.string.label_generate_did))
-        }
+           Button(
+               modifier = Modifier.fillMaxWidth(),
+               onClick = {
+                   systemKeyboard?.hide()
+                   viewModel.onGenerateDid()
+               },
+               enabled = signature != null,
+           ) {
+               Text(text = stringResource(R.string.label_generate_did))
+           }
 
-        Button(
-            onClick = {
-                systemKeyboard?.hide()
-                authenticateWithBiometric(
-                    context = context as FragmentActivity,
-                    onAuthenticated = { viewModel.onSignCredential() },
-                    onFailure = { viewModel.onBiometricsAuthFailure() }
-                )
-            },
-            enabled = signature != null,
-        ) {
-            Text(text = stringResource(R.string.label_sign_credential))
-        }
+           Button(
+               modifier = Modifier.fillMaxWidth(),
+               onClick = {
+                   systemKeyboard?.hide()
+                   authenticateWithBiometric(
+                       context = context as FragmentActivity,
+                       onAuthenticated = { viewModel.onSignCredential() },
+                       onFailure = { viewModel.onBiometricsAuthFailure() }
+                   )
+               },
+               enabled = signature != null,
+           ) {
+               Text(text = stringResource(R.string.label_sign_credential))
+           }
 
-        Button(
-            onClick = {
-                systemKeyboard?.hide()
-                authenticateWithBiometric(
-                    context = context as FragmentActivity,
-                    onAuthenticated = { viewModel.onCreateAndSignSDJWT() },
-                    onFailure = { viewModel.onBiometricsAuthFailure() }
-                )
-            }
-        ) {
-            Text(text = stringResource(R.string.label_create_and_sign_sdjwt))
-        }
+           Button(
+               modifier = Modifier.fillMaxWidth(),
+               onClick = {
+                   systemKeyboard?.hide()
+                   authenticateWithBiometric(
+                       context = context as FragmentActivity,
+                       onAuthenticated = { viewModel.onCreateAndSignSDJWT() },
+                       onFailure = { viewModel.onBiometricsAuthFailure() }
+                   )
+               }
+           ) {
+               Text(text = stringResource(R.string.label_create_and_sign_sdjwt))
+           }
+       }
     }
 }
 
