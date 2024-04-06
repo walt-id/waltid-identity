@@ -2,8 +2,8 @@ package id.walt.crypto.keys.tse
 
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.TseKeyMeta
 import id.walt.crypto.keys.jwk.JWKKey
-import id.walt.crypto.keys.jwk.JWKKeyMetadata
 import id.walt.crypto.utils.Base64Utils.base64UrlDecode
 import id.walt.crypto.utils.Base64Utils.base64toBase64Url
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
@@ -258,7 +258,7 @@ class TSEKey(
         return JWKKey.importRawPublicKey(
             type = keyType,
             rawPublicKey = getBackingPublicKey(),
-            metadata = JWKKeyMetadata(), // todo: import with explicit `keySize`
+            metadata = null, // todo: import with explicit `keySize`
         )
     }
 
@@ -267,6 +267,12 @@ class TSEKey(
     @JsPromise
     @JsExport.Ignore
     override suspend fun getPublicKeyRepresentation(): ByteArray = getBackingPublicKey()
+
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
+    override suspend fun getMeta(): TseKeyMeta = TseKeyMeta(getKeyId())
 
     /*
         val user = "corecrypto"
