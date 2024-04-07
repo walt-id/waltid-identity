@@ -1,20 +1,14 @@
 import http from "k6/http";
-import {check, sleep} from "k6";
+import {check} from "k6";
 import {Counter} from "k6/metrics";
 
 export const options = {
-    scenarios: {
-        contacts: {
-            executor: 'per-vu-iterations',
-            vus: 100,
-            iterations: 1000,
-        }
-    },
-    thresholds: {
-        http_req_failed: ['rate<0.01']// http errors should be less than 1%
-        //   http_req_duration: ['p(95)<2000'], // 95 percent of response times must be below 2000ms
-    },
-}
+    stages: [
+        {duration: "10m", target: 100},
+        {duration: "5m", target: 200},
+        {duration: "5m", target: 100},
+    ],
+};
 
 export const totalUsersCreated = new Counter("total_users_created");
 export const totalUsersLoggedIn = new Counter("total_users_logged_in");
@@ -65,6 +59,5 @@ export default function () {
                 r.body.includes("token") && r.body.includes("id"),
         });
         totalUsersLoggedIn.add(1);
-
 
 }
