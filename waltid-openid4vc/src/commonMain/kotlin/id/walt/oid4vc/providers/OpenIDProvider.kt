@@ -166,16 +166,9 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
     }
 
     open fun processDirectPost(state: String, tokenPayload: JsonObject) : AuthorizationCodeResponse {
-        println("Incoming State is $state")
-        println("Incoming Token payload is $tokenPayload")
-
         // here we get the initial session to retrieve the state of the initial authorization request
         val session = getSessionByIdTokenRequestState(state)
             ?: throw IllegalStateException( "No authentication request found for given state")
-
-        println("Session Id is: ${session?.id}")
-        println("Session Authorization Request State is: ${session?.authorizationRequest?.state}")
-        println("Session Id Token Request State is: ${session?.idTokenRequestState}")
 
         // Verify nonce - need to add Id token nonce session
         // if (payload[JWTClaims.Payload.nonce] != session.)
@@ -234,13 +227,6 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
 
         // Create a session with the state of the ID Token request since it is needed in the direct_post endpoint
         val authorizationSession = initializeAuthorization(authorizationRequest, 5.minutes, idTokenRequestState)
-
-        println("Authorization Session Id is: ${authorizationSession.id}")
-        println("Authorization State is: ${authorizationSession.authorizationRequest?.state}")
-        println("Authorization Id Token Request State is: ${authorizationSession.idTokenRequestState}")
-        println("Id Token Request State: $idTokenRequestState")
-        println("Id Token Request Nonce: $idTokenRequestNonce")
-        println("JAR Token is: $requestJar")
 
         return AuthorizationCodeIDTokenRequestResponse.success(idTokenRequestState, clientId, redirectUri, responseType, responseMode, scope, idTokenRequestNonce, null,  requestJar)
     }
