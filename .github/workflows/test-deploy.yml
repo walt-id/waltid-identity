@@ -101,8 +101,10 @@ jobs:
       - name: Prepare CD - wallet.walt-test.cloud
         env:
           DEV_KEYCLOAK_CLIENT_SECRET: ${{ secrets.DEV_KEYCLOAK_CLIENT_SECRET }}
+
         run: sed "s/_DEFAULT_DEPLOYMENT_/$GITHUB_SHA/g" waltid-wallet-api/k8s/deployment-dev.yaml |
           sed "s/__DEFAULT_KEYCLOAK_CLIENT_SECRET__/$DEV_KEYCLOAK_CLIENT_SECRET/g" > waltid-wallet-api/k8s/deployment_mod.yaml
+
       - name: Continuous deployment - wallet.walt-test.cloud
         uses: actions-hub/kubectl@master
         env:

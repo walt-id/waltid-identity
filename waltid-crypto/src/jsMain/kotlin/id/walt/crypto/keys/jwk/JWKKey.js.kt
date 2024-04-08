@@ -4,6 +4,7 @@ import JWK
 import KeyLike
 import crypto
 import id.walt.crypto.keys.JsJWKKeyCreator
+import id.walt.crypto.keys.JwkKeyMeta
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.utils.ArrayUtils.toByteArray
@@ -205,6 +206,10 @@ actual class JWKKey actual constructor(
         return getPublicKey().exportPEM().toByteArray()
     }
 
+    @JsPromise
+    @JsExport.Ignore
+    actual override suspend fun getMeta(): JwkKeyMeta = JwkKeyMeta(getKeyId())
+
     override val keyType: KeyType
         get() {
             val k = _internalKey.asDynamic()
@@ -249,17 +254,22 @@ actual class JWKKey actual constructor(
 
     @JsPromise
     @JsExport.Ignore
-    actual override suspend fun getThumbprint(): String = PromiseUtils.await(jose.calculateJwkThumbprint(JSON.parse(exportJWK())))
+    actual override suspend fun getThumbprint(): String =
+        PromiseUtils.await(jose.calculateJwkThumbprint(JSON.parse(exportJWK())))
 
     actual companion object : JWKKeyCreator {
         @JsPromise
         @JsExport.Ignore
-        actual override suspend fun generate(type: KeyType, metadata: JWKKeyMetadata): JWKKey =
+        actual override suspend fun generate(type: KeyType, metadata: JwkKeyMeta?): JWKKey =
             JsJWKKeyCreator.generate(type, metadata)
 
         @JsPromise
         @JsExport.Ignore
-        actual override suspend fun importRawPublicKey(type: KeyType, rawPublicKey: ByteArray, metadata: JWKKeyMetadata): Key =
+        actual override suspend fun importRawPublicKey(
+            type: KeyType,
+            rawPublicKey: ByteArray,
+            metadata: JwkKeyMeta?
+        ): Key =
             JsJWKKeyCreator.importRawPublicKey(type, rawPublicKey, metadata)
 
         @JsPromise

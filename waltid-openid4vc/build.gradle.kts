@@ -13,7 +13,7 @@ group = "id.walt"
 
 repositories {
     mavenCentral()
-    maven("https://maven.walt.id/repository/waltid/") {
+    maven("https://maven.waltid.dev/releases") {
         content {
             includeGroup("id.walt")
         }
@@ -174,7 +174,7 @@ kotlin {
             val hasMavenAuth = secretMavenUsername.isNotEmpty() && secretMavenPassword.isNotEmpty()
             if (hasMavenAuth) {
                 maven {
-                    url = uri("https://maven.walt.id/repository/waltid/")
+                    url = uri("https://maven.waltid.dev/releases")
                     credentials {
                         username = secretMavenUsername
                         password = secretMavenPassword

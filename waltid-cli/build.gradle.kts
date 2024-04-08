@@ -43,9 +43,7 @@ kotlin {
                 api(project(":waltid-sdjwt"))
                 api(project(":waltid-openid4vc"))
 
-                // kotlinx-io
-                implementation("org.jetbrains.kotlinx:kotlinx-io-core:0.3.1")
-
+                implementation("org.jetbrains.kotlinx:kotlinx-io-core:0.3.2")
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
                 implementation ("com.google.code.gson:gson:2.10.1")
 
@@ -58,7 +56,7 @@ kotlin {
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
 
                 // Logging
-                implementation("io.github.oshai:kotlin-logging:6.0.3")
+                implementation("io.github.oshai:kotlin-logging:6.0.4")
             }
         }
         val commonTest by getting {
@@ -90,7 +88,7 @@ kotlin {
         /*publishing {
             repositories {
                 maven {
-                    url = uri("https://maven.walt.id/repository/waltid/")
+                    url = uri("https://maven.waltid.dev/releases")
                     val envUsername = System.getenv("MAVEN_USERNAME")
                     val envPassword = System.getenv("MAVEN_PASSWORD")
 

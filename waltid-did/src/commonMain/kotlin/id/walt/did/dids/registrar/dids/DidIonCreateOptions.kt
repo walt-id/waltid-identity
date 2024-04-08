@@ -7,5 +7,5 @@ import kotlin.js.JsExport
 @JsExport
 class DidIonCreateOptions : DidCreateOptions(
     method = "ion",
-    options = emptyMap()
+    config = emptyMap()
 )

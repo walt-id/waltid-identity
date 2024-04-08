@@ -1,5 +1,6 @@
 package id.walt.crypto.keys.jwk
 
+import id.walt.crypto.keys.JwkKeyMeta
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import kotlinx.serialization.json.JsonElement
@@ -52,6 +53,7 @@ expect class JWKKey(jwk: String?) : Key {
 
     override suspend fun getPublicKey(): JWKKey
     override suspend fun getPublicKeyRepresentation(): ByteArray
+    override suspend fun getMeta(): JwkKeyMeta
 
 
     override val hasPrivateKey: Boolean
@@ -59,8 +61,8 @@ expect class JWKKey(jwk: String?) : Key {
 
     companion object : JWKKeyCreator {
 
-        override suspend fun generate(type: KeyType, metadata: JWKKeyMetadata): JWKKey
-        override suspend fun importRawPublicKey(type: KeyType, rawPublicKey: ByteArray, metadata: JWKKeyMetadata): Key
+        override suspend fun generate(type: KeyType, metadata: JwkKeyMeta?): JWKKey
+        override suspend fun importRawPublicKey(type: KeyType, rawPublicKey: ByteArray, metadata: JwkKeyMeta?): Key
 
         override suspend fun importJWK(jwk: String): Result<JWKKey>
 

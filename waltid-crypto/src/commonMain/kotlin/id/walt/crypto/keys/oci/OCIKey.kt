@@ -3,6 +3,7 @@ package id.walt.crypto.keys.oci
 import id.walt.crypto.keys.EccUtils
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.OciKeyMeta
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.base64Decode
 import id.walt.crypto.utils.Base64Utils.base64UrlDecode
@@ -259,6 +260,15 @@ class OCIKey(
     @JsExport.Ignore
     override suspend fun getPublicKeyRepresentation(): ByteArray = TODO("Not yet implemented")
 
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
+    override suspend fun getMeta(): OciKeyMeta = OciKeyMeta(
+        keyId = vaultKeyId,
+        keyVersion = getKeyVersion(id, vaultKeyId, config.managementEndpoint, config.signingKeyPem)
+    )
+
     companion object {
 
         private fun keyTypeToOciKeyMapping(type: KeyType) = when (type) {
@@ -291,7 +301,7 @@ class OCIKey(
                 }
                 val requestBody = JsonObject(
                     mapOf(
-                        "compartmentId" to JsonPrimitive(config.tenancyOcid),
+                        "compartmentId" to JsonPrimitive(config.compartmentOcid),
                         "displayName" to JsonPrimitive("WaltID"),
                         "keyShape" to JsonObject(
                             mapOf(

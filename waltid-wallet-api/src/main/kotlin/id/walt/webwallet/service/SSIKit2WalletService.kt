@@ -164,73 +164,6 @@ class SSIKit2WalletService(
     override suspend fun rejectCredential(parameter: CredentialRequestParameter): Boolean =
         credentialService.delete(walletId, parameter.credentialId, true)
 
-    override fun matchCredentialsByPresentationDefinition(
-        presentationDefinition: PresentationDefinition
-    ): List<WalletCredential> {
-        val credentialList = listCredentials(CredentialFilterObject.default)
-
-        logger.debug { "WalletCredential list is: ${credentialList.map { it.parsedDocument?.get("type")!!.jsonArray }}" }
-
-        data class TypeFilter(val path: String, val type: String? = null, val pattern: String)
-
-        val filters =
-            presentationDefinition.inputDescriptors.mapNotNull { inputDescriptor ->
-                inputDescriptor.constraints
-                    ?.fields
-                    ?.filter { field -> field.path.any { path -> path.contains("type") } }
-                    ?.map {
-                        val path = it.path.first().removePrefix("$.")
-                        val filterType = it.filter?.get("type")?.jsonPrimitive?.content
-                        val filterPattern =
-                            it.filter?.get("pattern")?.jsonPrimitive?.content
-                                ?: throw IllegalArgumentException(
-                                    "No filter pattern in presentation definition constraint"
-                                )
-
-                        TypeFilter(path, filterType, filterPattern)
-                    }
-                    ?.plus(
-                        inputDescriptor.schema?.map { schema -> TypeFilter("type", "string", schema.uri) }
-                            ?: listOf())
-            }
-
-        logger.debug { "Using filters: $filters" }
-
-        val matchedCredentials =
-            when {
-                filters.isNotEmpty() ->
-                    credentialList.filter { credential ->
-                        filters.any { fields ->
-                            fields.all { typeFilter ->
-                                val credField = credential.parsedDocument!![typeFilter.path] ?: return@all false
-
-                                when (credField) {
-                                    is JsonPrimitive -> credField.jsonPrimitive.content == typeFilter.pattern
-                                    is JsonArray ->
-                                        credField.jsonArray.last().jsonPrimitive.content == typeFilter.pattern
-
-                                    else -> false
-                                }
-                            }
-                        }
-                    }
-
-                else ->
-                    credentialList.filter { cred ->
-                        presentationDefinition.inputDescriptors.any { desc ->
-                            desc.name ==
-                                    cred.parsedDocument?.get("type")?.jsonArray?.last()?.jsonPrimitive?.content
-                        }
-                    }
-            }
-
-        logger.debug { "Matched credentials: $matchedCredentials" }
-
-        return matchedCredentials.ifEmpty { credentialList }
-    }
-
-
-
     private fun getQueryParams(url: String): Map<String, MutableList<String>> {
         val params: MutableMap<String, MutableList<String>> = HashMap()
         val urlParts = url.split("\\?".toRegex()).dropLastWhile { it.isEmpty() }.toTypedArray()
@@ -495,6 +428,8 @@ class SSIKit2WalletService(
     }
 
     override suspend fun loadKey(alias: String): JsonObject = getKey(alias).exportJWKObject()
+    override suspend fun getKeyMeta(alias: String): JsonObject =
+        Json.encodeToJsonElement(getKey(alias).getMeta()).jsonObject
 
     override suspend fun listKeys(): List<SingleKeyResponse> =
         KeysService.list(walletId).map {
@@ -513,6 +448,7 @@ class SSIKit2WalletService(
         ConfigManager.getConfig<OciKeyConfig>().let {
             mapOf(
                 "tenancyOcid" to it.tenancyOcid,
+                "compartmentOcid" to it.compartmentOcid,
                 "userOcid" to it.userOcid,
                 "fingerprint" to it.fingerprint,
                 "managementEndpoint" to it.managementEndpoint,
@@ -523,7 +459,10 @@ class SSIKit2WalletService(
     }
 
     override suspend fun generateKey(request: KeyGenerationRequest): String = let {
-        request.config = request.config ?: ociKeyMetadata
+        if (request.backend == "oci" && request.config == null) {
+            request.config = ociKeyMetadata
+        }
+
         KeyManager.createKey(request)
             .also {
                 KeysService.add(walletId, it.getKeyId(), KeySerialization.serializeKey(it))
@@ -613,31 +552,6 @@ class SSIKit2WalletService(
         }
     }
 
-    override fun filterEventLog(filter: EventLogFilter): EventLogFilterResult = runCatching {
-        val startingAfterItemIndex = filter.startingAfter?.toLongOrNull()?.takeIf { it >= 0 } ?: -1L
-        val pageSize = filter.limit ?: -1
-        val count = eventUseCase.count(walletId, filter.data)
-        val offset = startingAfterItemIndex + 1
-        val events = eventUseCase.get(
-            EventUseCase.EventFilterParameter(
-                accountId = accountId,
-                walletId = walletId,
-                offset = offset,
-                logFilter = filter,
-            )
-        )
-        EventLogFilterDataResult(
-            items = events,
-            count = events.size,
-            currentStartingAfter = computeCurrentStartingAfter(startingAfterItemIndex),
-            nextStartingAfter =
-            computeNextStartingAfter(startingAfterItemIndex, pageSize, count)
-        )
-    }
-        .fold(
-            onSuccess = { it },
-            onFailure = { EventLogFilterErrorResult(reason = it.localizedMessage) })
-
     override suspend fun linkWallet(
         wallet: WalletDataTransferObject
     ): LinkedWalletDataTransferObject = Web3WalletService.link(tenant, walletId, wallet)
@@ -691,16 +605,5 @@ class SSIKit2WalletService(
 
             else -> throw IllegalArgumentException("Did method not supported: $method")
         }
-
-    //TODO: move to related entity
-    private fun computeCurrentStartingAfter(afterItemIndex: Long): String? = let {
-        afterItemIndex.takeIf { it >= 0 }?.toString()
-    }
-
-    //TODO: move to related entity
-    private fun computeNextStartingAfter(afterItemIndex: Long, pageSize: Int, count: Long): String? = let {
-        val itemIndex = afterItemIndex + pageSize
-        itemIndex.takeIf { it < count }?.toString()
-    }
 }
 

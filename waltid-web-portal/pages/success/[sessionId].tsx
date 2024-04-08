@@ -175,7 +175,9 @@ export default function Success() {
         </div>
         <div className="mt-10 px-12">
           <div className="flex flex-row items-center justify-center mb-5 text-gray-500">
-            The VP was verified along with:
+            {
+              policyResults[index + 1]?.policies.length ? "The VP was verified along with:" : "The VP was not verified against any policies"
+            }
           </div>
           <div className="xs:grid xs:grid-cols-2 items-center justify-center">
             {
