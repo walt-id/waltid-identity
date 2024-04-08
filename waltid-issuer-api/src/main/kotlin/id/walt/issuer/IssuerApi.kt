@@ -42,7 +42,7 @@ suspend fun createCredentialOfferUri(issuanceRequests: List<BaseIssuanceRequest>
         credentialOfferBuilder = credentialOfferBuilder, expiresIn = 5.minutes, allowPreAuthorized = true
     )
     OidcApi.setIssuanceDataForIssuanceId(issuanceSession.id, issuanceRequests.map {
-        CIProvider.IssuanceSessionData(KeySerialization.deserializeKey(it.issuanceKey)
+        CIProvider.IssuanceSessionData(KeySerialization.deserializeKey(it.issuerKey)
             .onFailure { throw IllegalArgumentException("Invalid key was supplied, error occurred is: $it") }
             .getOrThrow(), it.issuerDid, it)
     })  // TODO: Hack as this is non stateless because of oidc4vc lib API
@@ -103,10 +103,10 @@ fun Application.issuerApi() {
                 // Generate key
 
                 val keyType = getParamOrThrow(
-                    req.issuanceKeyConfig["type"], "Mandatory issuanceKeyConfig param 'type' not provided"
+                    req.issuerKeyConfig["type"], "Mandatory issuerKeyConfig param 'type' not provided"
                 )
                 val keyAlgorithm = getParamOrThrow(
-                    req.issuanceKeyConfig["algorithm"], "Mandatory issuanceKeyConfig param 'algorithm' not provided"
+                    req.issuerKeyConfig["algorithm"], "Mandatory issuerKeyConfig param 'algorithm' not provided"
                 ).let { KeyType.valueOf(it) }
 
                 val (key, jsonKey) = generateJsonKey(keyType, keyAlgorithm, req)
@@ -362,10 +362,10 @@ private suspend fun generateJsonKey(
         "tse" -> TSEKey.generate(
             keyAlgorithm, TSEKeyMetadata(
                 getParamOrThrow(
-                    req.issuanceKeyConfig["tseServer"], "Mandatory issuanceKeyConfig param 'tseServer' not provided"
+                    req.issuerKeyConfig["tseServer"], "Mandatory issuerKeyConfig param 'tseServer' not provided"
                 ), getParamOrThrow(
-                    req.issuanceKeyConfig["tseAccessToken"],
-                    "Mandatory issuanceKeyConfig param 'tseAccessToken' not provided"
+                    req.issuerKeyConfig["tseAccessToken"],
+                    "Mandatory issuerKeyConfig param 'tseAccessToken' not provided"
                 )
             )
         )
