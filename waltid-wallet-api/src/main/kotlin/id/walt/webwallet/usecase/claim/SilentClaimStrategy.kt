@@ -11,7 +11,7 @@ import id.walt.webwallet.service.events.Event
 import id.walt.webwallet.service.events.EventType
 import id.walt.webwallet.service.exchange.IssuanceService
 import id.walt.webwallet.service.trust.TrustValidationService
-import id.walt.webwallet.usecase.event.EventUseCase
+import id.walt.webwallet.usecase.event.EventLogUseCase
 import id.walt.webwallet.usecase.issuer.IssuerNameResolutionUseCase
 import id.walt.webwallet.usecase.issuer.IssuerUseCase
 import id.walt.webwallet.usecase.notification.NotificationUseCase
@@ -30,7 +30,7 @@ class SilentClaimStrategy(
     private val accountService: AccountsService,
     private val didService: DidsService,
     private val issuerUseCase: IssuerUseCase,
-    private val eventUseCase: EventUseCase,
+    private val eventUseCase: EventLogUseCase,
     private val notificationUseCase: NotificationUseCase,
     private val credentialTypeSeeker: Seeker<String>,
 ) {

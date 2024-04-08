@@ -30,7 +30,7 @@ import id.walt.webwallet.usecase.claim.ExplicitClaimStrategy
 import id.walt.webwallet.usecase.claim.SilentClaimStrategy
 import id.walt.webwallet.usecase.credential.CredentialStatusUseCase
 import id.walt.webwallet.usecase.event.EventFilterUseCase
-import id.walt.webwallet.usecase.event.EventUseCase
+import id.walt.webwallet.usecase.event.EventLogUseCase
 import id.walt.webwallet.usecase.exchange.MatchPresentationDefinitionCredentialsUseCase
 import id.walt.webwallet.usecase.exchange.NoMatchPresentationDefinitionCredentialsUseCase
 import id.walt.webwallet.usecase.exchange.PresentationDefinitionFilterParser
@@ -83,7 +83,7 @@ object WalletServiceManager {
     private val issuerNameResolutionService = DefaultIssuerNameResolutionService(httpClient, trustConfig.issuersRecord)
     val issuerUseCase = IssuerUseCaseImpl(service = IssuersService, http = httpClient)
     private val issuerNameResolutionUseCase = IssuerNameResolutionUseCase(issuerUseCase, issuerNameResolutionService)
-    val eventUseCase = EventUseCase(eventService, issuerNameResolutionUseCase)
+    val eventUseCase = EventLogUseCase(eventService, issuerNameResolutionUseCase)
     val eventFilterUseCase = EventFilterUseCase(eventService)
     val oidcConfig by lazy { ConfigManager.getConfig<OidcConfiguration>() }
     val issuerTrustValidationService by lazy { DefaultTrustValidationService(httpClient, trustConfig.issuersRecord) }

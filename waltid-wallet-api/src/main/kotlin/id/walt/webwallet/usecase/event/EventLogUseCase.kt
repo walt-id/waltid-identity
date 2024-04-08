@@ -10,7 +10,7 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.uuid.UUID
 
-class EventUseCase(
+class EventLogUseCase(
     private val eventService: EventService,
     private val issuerNameResolutionUseCase: IssuerNameResolutionUseCase,
 ) {

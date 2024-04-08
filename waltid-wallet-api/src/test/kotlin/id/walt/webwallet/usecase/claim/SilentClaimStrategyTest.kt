@@ -9,7 +9,7 @@ import id.walt.webwallet.service.events.CredentialEventData
 import id.walt.webwallet.service.exchange.IssuanceService
 import id.walt.webwallet.service.issuers.IssuerDataTransferObject
 import id.walt.webwallet.service.trust.TrustValidationService
-import id.walt.webwallet.usecase.event.EventUseCase
+import id.walt.webwallet.usecase.event.EventLogUseCase
 import id.walt.webwallet.usecase.issuer.IssuerNameResolutionUseCase
 import id.walt.webwallet.usecase.issuer.IssuerUseCase
 import id.walt.webwallet.usecase.notification.NotificationUseCase
@@ -29,7 +29,7 @@ class SilentClaimStrategyTest {
     private val issuerTrustValidationService = mockk<TrustValidationService>()
     private val issuerNameResolutionUseCase = mockk<IssuerNameResolutionUseCase>()
     private val issuerUseCase = mockk<IssuerUseCase>()
-    private val eventUseCase = mockk<EventUseCase>()
+    private val eventUseCase = mockk<EventLogUseCase>()
     private val notificationUseCase = mockk<NotificationUseCase>()
     private val credentialTypeSeeker = mockk<Seeker<String>>()
     private val didService: DidsService = mockk<DidsService>()

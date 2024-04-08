@@ -40,7 +40,7 @@ import id.walt.webwallet.service.report.ReportRequestParameter
 import id.walt.webwallet.service.report.ReportService
 import id.walt.webwallet.service.settings.SettingsService
 import id.walt.webwallet.service.settings.WalletSetting
-import id.walt.webwallet.usecase.event.EventUseCase
+import id.walt.webwallet.usecase.event.EventLogUseCase
 import id.walt.webwallet.web.controllers.PresentationRequestParameter
 import id.walt.webwallet.web.parameter.CredentialRequestParameter
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -68,7 +68,7 @@ class SSIKit2WalletService(
     walletId: UUID,
     private val categoryService: CategoryService,
     private val settingsService: SettingsService,
-    private val eventUseCase: EventUseCase,
+    private val eventUseCase: EventLogUseCase,
     private val http: HttpClient
 ) : WalletService(tenant, accountId, walletId) {
     private val logger = KotlinLogging.logger { }
