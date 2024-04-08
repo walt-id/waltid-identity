@@ -263,6 +263,10 @@ open class CIProvider : OpenIDCredentialIssuer(
             val vc = data.request.credentialData
 
             data.run {
+                var issuerKid = issuerDid
+                if (issuerDid.startsWith("did:key") && issuerDid.length==186) // EBSI conformance corner case when issuer uses did:key instead of did:ebsi and no trust framework is defined
+                    issuerKid = issuerDid + "#" + issuerDid.removePrefix("did:key:")
+
                 when (credentialRequest.format) {
                     CredentialFormat.sd_jwt_vc -> vc.mergingSdJwtIssue(
                         issuerKey = issuerKey,
@@ -279,6 +283,7 @@ open class CIProvider : OpenIDCredentialIssuer(
                     else -> vc.mergingJwtIssue(
                         issuerKey = issuerKey,
                         issuerDid = issuerDid,
+                        issuerKid = issuerKid,
                         subjectDid = holderDid,
                         mappings = request.mapping ?: JsonObject(emptyMap()),
                         additionalJwtHeader = emptyMap(),
