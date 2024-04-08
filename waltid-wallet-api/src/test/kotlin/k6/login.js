@@ -1,5 +1,5 @@
 import http from "k6/http";
-import {check, sleep} from "k6";
+import {check} from "k6";
 import {Counter} from "k6/metrics";
 import {SharedArray} from 'k6/data';
 import {scenario} from 'k6/execution';
@@ -58,10 +58,15 @@ export default function () {
         {headers: {"Content-Type": "application/json"}}
     );
 
+    if (resp.status != 200) {
+        console.log(resp.status);
+        console.log(resp);
+    }
+
     check(resp, {
             'status is 200': (r) => r.status == 200,
         },
         {statusCodeTag: 'httpOk'}
     );
-    sleep(1); // one request iteration per second
+    //sleep(0.1); // one request iteration per second
 }
