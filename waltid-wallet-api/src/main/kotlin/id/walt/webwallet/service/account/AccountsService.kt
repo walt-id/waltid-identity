@@ -1,7 +1,6 @@
 package id.walt.webwallet.service.account
 
 import id.walt.webwallet.config.ConfigManager
-import id.walt.webwallet.config.LoginMethodsConfig
 import id.walt.webwallet.config.RegistrationDefaultsConfig
 import id.walt.webwallet.db.models.*
 import id.walt.webwallet.service.WalletServiceManager
@@ -86,14 +85,14 @@ object AccountsService {
 
         }
     }.fold(onSuccess = {
-        /*eventUseCase.log(
+        eventUseCase.log(
             action = EventType.Account.Login,
             tenant = tenant,
             originator = "wallet",
             accountId = it.id,
             walletId = UUID.NIL,
             data = AccountEventData(accountId = it.id.toString())
-        )*/
+        )
         Result.success(it)
     }, onFailure = { Result.failure(it) })
 

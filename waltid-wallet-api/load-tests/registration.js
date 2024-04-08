@@ -1,5 +1,5 @@
 import http from 'k6/http';
-import { sleep, check } from 'k6';
+import {check} from 'k6';
 
 export let options = {
     stages: [
@@ -40,7 +40,7 @@ export default function () {
         },
     };
 
-    let response = http.post(url, payload, params);
+    let resp = http.post(url, payload, params);
 
     const isSuccess = check(response, {
             'status is 201': (r) => r.status === 201,
@@ -49,6 +49,6 @@ export default function () {
     );
 
     if (!isSuccess) {
-        fail(`- Response returned error code: ${resp.status}`)
+        fail(`- Response returned error code: ${resp.status}, ${resp.body}`)
     }
 }

@@ -8,7 +8,7 @@ import {scenario} from 'k6/execution';
  * This test registers 10k users whereas the test will fail if more than 5% of the requests will take more than 1s.
  */
 
-let arraySize = 250;
+let arraySize = 100000;
 
 function generateArray() {
     const arr = new Array(arraySize);
@@ -30,9 +30,9 @@ export const options = {
     scenarios: {
         'register-user-data': {
             executor: 'shared-iterations',
-            vus: 24,
+            vus: 128,
             iterations: data.length,
-            maxDuration: '1m',
+            maxDuration: '15m',
         },
 
     },
@@ -62,7 +62,7 @@ export default function () {
     );
 
     if (!isSuccess) {
-        fail(`- Response returned error code: ${resp.status}`)
+        fail(`- Response returned error code: ${resp.status}, ${resp.body}`)
     }
     // sleep(0.5); // one request iteration per second
 }

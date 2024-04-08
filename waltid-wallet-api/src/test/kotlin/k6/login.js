@@ -10,7 +10,7 @@ import {scenario} from 'k6/execution';
  * within 1second, otherwise the test will terminate with a failure. Furthermore, 99.9% of the http-response codes must
  * be 200.
  */
-const registerdUsers = 10000;
+const registerdUsers = 100000;
 
 let arraySize = registerdUsers;
 
@@ -34,7 +34,7 @@ export const options = {
     scenarios: {
         'register-user-data': {
             executor: 'shared-iterations',
-            vus: 10,
+            vus: 1000,
             iterations: registerdUsers,
             maxDuration: '30m',
         },

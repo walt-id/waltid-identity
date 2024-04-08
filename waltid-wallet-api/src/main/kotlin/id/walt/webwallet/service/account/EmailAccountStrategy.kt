@@ -15,37 +15,34 @@ import org.jetbrains.exposed.sql.transactions.transaction
 
 object EmailAccountStrategy : PasswordAccountStrategy<EmailAccountRequest>() {
 
-    override suspend fun register(tenant: String, request: EmailAccountRequest): Result<RegistrationResult> = runCatching {
-        val name = request.name ?: throw IllegalArgumentException("No name provided!")
-        val email = request.email
+    override suspend fun register(tenant: String, request: EmailAccountRequest): Result<RegistrationResult> =
+        runCatching {
+            val name = request.name ?: throw IllegalArgumentException("No name provided!")
+            val email = request.email
 
-        if (AccountsService.hasAccountEmail(tenant, email)) {
-            throw IllegalArgumentException("Account already exists!")
+            if (AccountsService.hasAccountEmail(tenant, email)) {
+                throw IllegalArgumentException("Account already exists!")
+            }
+
+            val hash = hashPassword(ByteLoginRequest(request).password)
+
+            val createdAccountId = transaction {
+                Accounts.insert {
+                    it[Accounts.tenant] = tenant
+                    it[id] = UUID.generateUUID()
+                    it[Accounts.name] = name
+                    it[Accounts.email] = email
+                    it[password] = hash
+                    it[createdOn] = Clock.System.now().toJavaInstant()
+                }[Accounts.id]
+            }
+
+            RegistrationResult(createdAccountId)
         }
-
-        val hash = hashPassword(ByteLoginRequest(request).password)
-
-        val createdAccountId = transaction {
-            Accounts.insert {
-                it[Accounts.tenant] = tenant
-                it[id] = UUID.generateUUID()
-                it[Accounts.name] = name
-                it[Accounts.email] = email
-                it[password] = hash
-                it[createdOn] = Clock.System.now().toJavaInstant()
-            }[Accounts.id]
-        }
-
-        RegistrationResult(createdAccountId)
-    }
 
     override suspend fun authenticate(tenant: String, request: EmailAccountRequest): AuthenticatedUser =
         ByteLoginRequest(request).let { req ->
             val email = request.email
-
-            /*if (!AccountsService.hasAccountEmail(tenant, email)) {
-                throw UnauthorizedException("Unknown user \"${req.username}\".")
-            }*/
 
             val (matchedAccount, pwHash) = transaction {
 
