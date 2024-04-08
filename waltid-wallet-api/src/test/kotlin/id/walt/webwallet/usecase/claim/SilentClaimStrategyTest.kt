@@ -70,7 +70,7 @@ class SilentClaimStrategyTest {
         coEvery { issuanceService.useOfferRequest(any(), any(), any()) } returns listOf(credentialData)
         coEvery { issuerUseCase.get(wallet, any()) } returns Result.success(issuerData)
         every { credentialService.add(wallet = any(), any()) } returns listOf(credentialId)
-        coEvery { eventUseCase.credentialEventData(any(), any()) } returns eventData
+        coEvery { eventUseCase.credentialEventData(any(), any(), any(), any()) } returns eventData
         every { eventUseCase.log(any()) } just Runs
         every { notificationUseCase.add(any()) } returns listOf(UUID.generateUUID())
         coEvery { notificationUseCase.send(any()) } just Runs

@@ -53,33 +53,51 @@ class EventUseCase(
 
     fun delete(id: Int) = eventService.delete(id)
 
-    suspend fun credentialEventData(credential: WalletCredential, type: String?) =
+    fun credentialEventData(
+        credential: WalletCredential,
+        subject: CredentialEventDataActor.Subject? = null,
+        organization: CredentialEventDataActor.Organization? = null,
+        type: String? = null,
+    ) = CredentialEventData(
+        ecosystem = EventDataNotAvailable,
+        type = credential.parsedDocument?.let {
+            JsonUtils.tryGetData(it, "type")?.jsonArray?.last()?.jsonPrimitive?.content
+        } ?: EventDataNotAvailable,
+        format = type ?: EventDataNotAvailable,
+        proofType = EventDataNotAvailable,
+        protocol = "oid4vp",
+        credentialId = credential.id,
+        //TODO: these calls are made multiple times (e.g. see notifications in [SilentClaimStrategy]
+        logo = WalletCredential.getManifestLogo(credential.parsedManifest),
+        subject = subject,
+        organization = organization,
+        //end TODO
+    )
+
+    fun subjectData(credential: WalletCredential) = CredentialEventDataActor.Subject(
+        subjectId = credential.parsedDocument?.let {
+            JsonUtils.tryGetData(it, "credentialSubject.id")?.jsonPrimitive?.content
+        } ?: EventDataNotAvailable,
+        subjectKeyType = EventDataNotAvailable,
+    )
+
+    suspend fun issuerData(credential: WalletCredential) =
         WalletCredential.parseIssuerDid(credential.parsedDocument, credential.parsedManifest).let {
-            CredentialEventData(
-                ecosystem = EventDataNotAvailable,
-                //TODO: these calls are made multiple times (e.g. see notifications in [SilentClaimStrategy]
-                logo = WalletCredential.getManifestLogo(credential.parsedManifest),
-                issuerId = it ?: EventDataNotAvailable,
-                issuerName = WalletCredential.getManifestIssuerName(credential.parsedManifest) ?: it?.let {
+            CredentialEventDataActor.Organization.Issuer(
+                did = it ?: EventDataNotAvailable,
+                name = WalletCredential.getManifestIssuerName(credential.parsedManifest) ?: it?.let {
                     issuerNameResolutionUseCase.resolve(credential.wallet, it)
                 } ?: EventDataNotAvailable,
-                //end TODO
-                subjectId = credential.parsedDocument?.let {
-                    JsonUtils.tryGetData(it, "credentialSubject.id")?.jsonPrimitive?.content
-                } ?: EventDataNotAvailable,
-                issuerKeyId = EventDataNotAvailable,
-                issuerKeyType = EventDataNotAvailable,
-                subjectKeyType = EventDataNotAvailable,
-                credentialType = credential.parsedDocument?.let {
-                    JsonUtils.tryGetData(it, "type")?.jsonArray?.last()?.jsonPrimitive?.content
-                } ?: EventDataNotAvailable,
-                credentialFormat = type ?: EventDataNotAvailable,
-                credentialProofType = EventDataNotAvailable,
-                policies = emptyList(),
-                protocol = "oid4vp",
-                credentialId = credential.id,
+                keyId = EventDataNotAvailable,
+                keyType = EventDataNotAvailable,
             )
         }
+
+    fun verifierData() = CredentialEventDataActor.Organization.Verifier(
+        did = EventDataNotAvailable,
+        name = EventDataNotAvailable,
+        policies = emptyList(),
+    )
 
     fun didEventData(did: String, document: DidDocument) = didEventData(did, document.toString())
 

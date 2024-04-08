@@ -1,5 +1,6 @@
 package id.walt.webwallet.service.events
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -26,18 +27,42 @@ data class DidEventData(
 
 @Serializable
 data class CredentialEventData(
+    val credentialId: String,
     val ecosystem: String,
     val logo: String?,
-    val issuerId: String,
-    val issuerName: String?,
-    val subjectId: String,
-    val issuerKeyId: String,
-    val issuerKeyType: String,
-    val subjectKeyType: String,
-    val credentialType: String,
-    val credentialFormat: String,
-    val credentialProofType: String,
-    val policies: List<String>,
+    @SerialName("credentialType")
+    val type: String,
+    val format: String,
+    val proofType: String,
     val protocol: String,
-    val credentialId: String,
+    val subject: CredentialEventDataActor.Subject? = null,
+    val organization: CredentialEventDataActor.Organization? = null,
 ) : EventData()
+
+@Serializable
+sealed interface CredentialEventDataActor {
+    @Serializable
+    data class Subject(
+        val subjectId: String,
+        val subjectKeyType: String,
+    ) : CredentialEventDataActor
+
+    //TODO better naming
+    @Serializable
+    sealed interface Organization : CredentialEventDataActor {
+        @Serializable
+        data class Issuer(
+            val did: String,
+            val name: String?,
+            val keyId: String,
+            val keyType: String,
+        ) : Organization
+
+        @Serializable
+        data class Verifier(
+            val did: String,
+            val name: String?,
+            val policies: List<String>,
+        ) : Organization
+    }
+}

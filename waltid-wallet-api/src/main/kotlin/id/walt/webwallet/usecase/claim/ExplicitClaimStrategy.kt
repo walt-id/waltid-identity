@@ -37,7 +37,12 @@ class ExplicitClaimStrategy(
                 tenant = tenant,
                 accountId = account,
                 walletId = wallet,
-                data = eventUseCase.credentialEventData(credential = credential, type = it.type),
+                data = eventUseCase.credentialEventData(
+                    credential = credential,
+                    subject = eventUseCase.subjectData(credential),
+                    organization = eventUseCase.issuerData(credential),
+                    type = it.type
+                ),
                 credentialId = credential.id,
             )
         }
