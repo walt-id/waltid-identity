@@ -109,7 +109,7 @@ open class CIProvider : OpenIDCredentialIssuer(
         var properSession: IssuanceSession? = null
         authSessions.forEach { entry ->
             print("${entry.key} : ${entry.value}")
-            val session = entry.value as IssuanceSession
+            val session = entry.value
             if (session.idTokenRequestState == idTokenRequestState) {
                 properSession = session
             }
@@ -212,17 +212,19 @@ open class CIProvider : OpenIDCredentialIssuer(
         if (credentialRequest.format == CredentialFormat.mso_mdoc) throw CredentialError(
             credentialRequest, CredentialErrorCode.unsupported_credential_format
         )
+
         /*val types = credentialRequest.types ?: credentialRequest.credentialDefinition?.types ?: throw CredentialError(
             credentialRequest, CredentialErrorCode.unsupported_credential_type
-        )*/
+        )
         val proofHeader = credentialRequest.proof?.jwt?.let { parseTokenHeader(it) } ?: throw CredentialError(
             credentialRequest, CredentialErrorCode.invalid_or_missing_proof, message = "Proof must be JWT proof"
         )
+
         val holderKid = proofHeader[JWTClaims.Header.keyID]?.jsonPrimitive?.content ?: throw CredentialError(
             credentialRequest,
             CredentialErrorCode.invalid_or_missing_proof,
             message = "Proof JWT header must contain kid claim"
-        )
+        )*/
 
         val proofPayload = credentialRequest.proof?.jwt?.let { parseTokenPayload(it) } ?: throw CredentialError(
             credentialRequest, CredentialErrorCode.invalid_or_missing_proof, message = "Proof must be JWT proof"

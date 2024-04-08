@@ -174,7 +174,7 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
         // if (payload[JWTClaims.Payload.nonce] != session.)
 
         // Generate code and proceed as regular authorization request
-        val mappedState = mapOf("state" to listOf(session?.authorizationRequest?.state!!))
+        val mappedState = mapOf("state" to listOf(session.authorizationRequest?.state!!))
         val code = generateAuthorizationCodeFor(session)
 
         return AuthorizationCodeResponse.success(code, mappedState)
@@ -226,7 +226,7 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
         )
 
         // Create a session with the state of the ID Token request since it is needed in the direct_post endpoint
-        val authorizationSession = initializeAuthorization(authorizationRequest, 5.minutes, idTokenRequestState)
+        initializeAuthorization(authorizationRequest, 5.minutes, idTokenRequestState)
 
         return AuthorizationCodeIDTokenRequestResponse.success(idTokenRequestState, clientId, redirectUri, responseType, responseMode, scope, idTokenRequestNonce, null,  requestJar)
     }
