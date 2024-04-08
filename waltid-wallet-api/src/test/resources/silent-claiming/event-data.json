@@ -8,8 +8,8 @@
   "issuerKeyType": "n/a",
   "subjectKeyType": "n/a",
   "credentialType": "n/a",
-  "credentialFormat": "n/a",
-  "credentialProofType": "n/a",
+  "format": "n/a",
+  "proofType": "n/a",
   "policies": [],
   "protocol": "n/a",
   "credentialId": "http://example.gov/credentials/1"
