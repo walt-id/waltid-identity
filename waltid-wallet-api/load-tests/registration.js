@@ -3,10 +3,11 @@ import { sleep, check } from 'k6';
 
 export let options = {
     stages: [
-        { duration: '1m', target: 20 },  // Stay at 20 users for 1 minute
+        { duration: '1m', target: 24 },
     ],
     thresholds: {
-        'http_req_duration': ['p(95)<500'], // 95% of requests must complete below 500ms
+        checks: ['rate==1.00'],
+        http_req_duration: [{threshold: 'p(95) < 500', abortOnFail: true}], // terminate the process if the response time increases to more than 1s for more than 5% of the requests
     },
 };
 
@@ -41,7 +42,13 @@ export default function () {
 
     let response = http.post(url, payload, params);
 
-    check(response, {
-        'is status 201': (r) => r.status === 201,
-    });
+    const isSuccess = check(response, {
+            'status is 201': (r) => r.status === 201,
+        },
+        {statusCodeTag: 'httpOk'}
+    );
+
+    if (!isSuccess) {
+        fail(`- Response returned error code: ${resp.status}`)
+    }
 }
