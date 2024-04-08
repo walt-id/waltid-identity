@@ -104,12 +104,11 @@ object OidcApi : CIProvider() {
                 val authReq = runBlocking { AuthorizationRequest.fromHttpParametersAuto(call.parameters.toMap()) }
                 try {
                     val authResp = if (authReq.responseType.contains(ResponseType.Code)) {
-                        println("authresp is: $authReq")
                         if (authReq.clientId.startsWith("did:key") && authReq.clientId.length==186) {  // EBSI conformance
                             val idTokenRequestKid = OidcApi.sessionCredentialPreMapping[authReq.issuerState]?.first()?.issuerKey!!.getKeyId()
                             val privKey = OidcApi.sessionCredentialPreMapping[authReq.issuerState]?.first()?.issuerKey!!
-                            println("PrivateKey is: $privKey")
-                            println("KID is: $idTokenRequestKid")
+                            logger.info{"PrivateKey is: $privKey"}
+                            logger.info{"KID is: $idTokenRequestKid"}
                             processCodeFlowAuthorizationWithIdTokenRequest(authReq, idTokenRequestKid, privKey)
                         } else {
                             processCodeFlowAuthorization(authReq)
@@ -133,7 +132,7 @@ object OidcApi : CIProvider() {
                         "No redirect_uri found for this authorization request"
                     )
 
-                    println("Redirect Uri is: $redirectUri")
+                    logger.info{"Redirect Uri is: $redirectUri"}
 
                     call.response.apply {
                         status(HttpStatusCode.Found)
@@ -160,17 +159,16 @@ object OidcApi : CIProvider() {
             }
             post("/direct_post") {
                 val params = call.receiveParameters().toMap()
-
-                println("/direct_post params: $params")
+                logger.info {"/direct_post params: $params"}
 
                 if (params["state"]?.get(0) == null || (params["id_token"]?.get(0) == null && params["vp_token"]?.get(0) == null)) {
                     call.respond(HttpStatusCode.BadRequest, "missing state/id_token/vp_token parameter")
                     throw IllegalArgumentException("missing missing state/id_token/vp_token  parameter")
                 }
 
-                println("/direct_post values from params: ${params.values}")
-                println("/direct_post state from param: ${params["state"]}")
-                println("/direct_post token from param: ${params["id_token"]}")
+                logger.info{"/direct_post values from params: ${params.values}"}
+                logger.info{"/direct_post state from param: ${params["state"]}"}
+                logger.info{"/direct_post token from param: ${params["id_token"]}"}
 
                 try {
                     if (params["id_token"]?.get(0) != null) {
@@ -184,7 +182,7 @@ object OidcApi : CIProvider() {
                         val resp = processDirectPost(state, payload!!)
 
                         // Get the redirect_uri from the Authorization Request Parameter
-                        println("direct_post redirectUri is:" + resp.toRedirectUri("openid://redirect", ResponseMode.Query))
+                        logger.info{"direct_post redirectUri is:" + resp.toRedirectUri("openid://redirect", ResponseMode.Query)}
 
                         call.response.apply {
                             status(HttpStatusCode.Found)
@@ -205,14 +203,14 @@ object OidcApi : CIProvider() {
             post("/token") {
                 val params = call.receiveParameters().toMap()
 
-                println("/token params: $params")
+                logger.info{"/token params: $params"}
 
                 val tokenReq = TokenRequest.fromHttpParameters(params)
-                println("/token tokenReq from params: $tokenReq")
+                logger.info{"/token tokenReq from params: $tokenReq"}
 
                 try {
                     val tokenResp = processTokenRequest(tokenReq)
-                    println("/token tokenResp: $tokenResp")
+                    logger.info{"/token tokenResp: $tokenResp"}
 
                     val sessionId = Json.parseToJsonElement(
                         Base64.decode(
