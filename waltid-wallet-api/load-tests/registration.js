@@ -49,6 +49,6 @@ export default function () {
     );
 
     if (!isSuccess) {
-        fail(`- Response returned error code: ${resp.status}`)
+    fail(`- Response returned error code: ${response.status}, ${response.body}`)
     }
 }
