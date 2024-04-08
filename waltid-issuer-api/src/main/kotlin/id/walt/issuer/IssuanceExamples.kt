@@ -330,11 +330,11 @@ object IssuanceExamples {
     //language=JSON
     val issuerOnboardingRequestDefaultExample = """
         {
-          "issuerKeyConfig": {
-            "type": "jwk",
-            "algorithm": "secp256r1"
+          "key": {
+            "backend": "jwk",
+            "keyType": "secp256r1"
           },
-          "issuerDidConfig": {
+          "did": {
             "method" : "jwk"
           }
         }
@@ -343,14 +343,16 @@ object IssuanceExamples {
     //language=JSON
     val issuerOnboardingRequestTseExample = """
         {
-          "issuerKeyConfig": {
-            "type": "tse",
-            "tseServer": "http://127.0.0.1:8200/v1/transit",
-            "tseAccessToken": "dev-only-token",
-            "algorithm": "Ed25519"
+          "key": {
+            "backend": "tse",
+            "keyType": "Ed25519",
+            "config": {
+              "server": "http://127.0.0.1:8200/v1/transit",
+              "accessKey": "dev-only-token"
+            }
           },
-          "issuerDidConfig": {
-            "method" : "key"
+          "did": {
+            "method": "key"
           }
         }
     """.trimIndent()
@@ -358,18 +360,20 @@ object IssuanceExamples {
     //language=JSON
     val issuerOnboardingRequestOciExample = """
         {
-          "issuanceKeyConfig": {
-            "type": "oci",
-            "tenancyOcid": "ocid1.tenancy.oc1..aaaaaaaaiijfupfvsqwqwgupzdy5yclfzcccmie4ktp2wlgslftv5j7xpk6q",
-            "compartmentOcid": "ocid1.tenancy.oc1..aaaaaaaaiijfupfvsqwqwgupzdy5yclfzcccmie4ktp2wlgslftv5j7xpk6q",
-            "userOcid": "ocid1.user.oc1..aaaaaaaaxjkkfjqxdqk7ldfjrxjmacmbi7sci73rbfiwpioehikavpbtqx5q",
-            "fingerprint": "bb:d4:4b:0c:c8:3a:49:15:7f:87:55:d5:2b:7e:dd:bc",
-            "managementEndpoint": "entaftlvaaemy-management.kms.eu-frankfurt-1.oraclecloud.com",
-            "cryptoEndpoint": "entaftlvaaemy-crypto.kms.eu-frankfurt-1.oraclecloud.com",
-            "signingKeyPem": "-----BEGIN PRIVATE KEY-----\n\n-----END PRIVATE KEY-----\n",
-            "algorithm": "secp256r1"
+          "key": {
+            "backend": "oci",
+            "keyType": "secp256r1",
+            "config": {
+              "tenancyOcid": "ocid1.tenancy.oc1..aaaaaaaaiijfupfvsqwqwgupzdy5yclfzcccmie4ktp2wlgslftv5j7xpk6q",
+              "compartmentOcid": "ocid1.tenancy.oc1..aaaaaaaaiijfupfvsqwqwgupzdy5yclfzcccmie4ktp2wlgslftv5j7xpk6q",
+              "userOcid": "ocid1.user.oc1..aaaaaaaaxjkkfjqxdqk7ldfjrxjmacmbi7sci73rbfiwpioehikavpbtqx5q",
+              "fingerprint": "bb:d4:4b:0c:c8:3a:49:15:7f:87:55:d5:2b:7e:dd:bc",
+              "managementEndpoint": "entaftlvaaemy-management.kms.eu-frankfurt-1.oraclecloud.com",
+              "cryptoEndpoint": "entaftlvaaemy-crypto.kms.eu-frankfurt-1.oraclecloud.com",
+              "signingKeyPem": "-----BEGIN PRIVATE KEY-----\n\n-----END PRIVATE KEY-----\n"
+            }
           },
-          "issuerDidConfig": {
+          "did": {
             "method": "jwk"
           }
         }

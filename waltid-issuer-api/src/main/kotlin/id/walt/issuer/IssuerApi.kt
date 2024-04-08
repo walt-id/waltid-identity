@@ -1,16 +1,9 @@
 package id.walt.issuer
 
 import id.walt.credentials.vc.vcs.W3CVC
-import id.walt.crypto.keys.Key
+import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeySerialization
-import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.jwk.JWKKey
-import id.walt.crypto.keys.oci.OCIKey
-import id.walt.crypto.keys.oci.OCIKeyMetadata
-import id.walt.crypto.keys.tse.TSEKey
-import id.walt.crypto.keys.tse.TSEKeyMetadata
 import id.walt.did.dids.DidService
-import id.walt.did.dids.registrar.dids.DidCreateOptions
 import id.walt.issuer.IssuanceExamples.batchExample
 import id.walt.issuer.IssuanceExamples.issuerOnboardingRequestDefaultExample
 import id.walt.issuer.IssuanceExamples.issuerOnboardingRequestOciExample
@@ -35,7 +28,8 @@ import io.ktor.server.plugins.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
-import kotlinx.serialization.json.*
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 import kotlin.time.Duration.Companion.minutes
 
 private val logger = KotlinLogging.logger {}
@@ -105,40 +99,13 @@ fun Application.issuerApi() {
                     }
                 }
             }) {
-                val req = context.receive<IssuerOnboardingRequest>()
+                val req = context.receive<OnboardingRequest>()
+                val key = KeyManager.createKey(req.keyGenerationRequest)
 
-                logger.debug { "Onboarding issuer according config: $req" }
+                val did = DidService.registerDefaultDidMethodByKey(req.didMethod, key, req.didConfig).did
+                val serializedKey = KeySerialization.serializeKeyToJson(key)
 
-                // Generate key
-
-                val keyType = getParamOrThrow(
-                    req.issuerKeyConfig["type"], "Mandatory issuerKeyConfig param 'type' not provided"
-                )
-                val keyAlgorithm = getParamOrThrow(
-                    req.issuerKeyConfig["algorithm"], "Mandatory issuerKeyConfig param 'algorithm' not provided"
-                ).let { KeyType.valueOf(it) }
-
-                val (key, jsonKey) = generateJsonKey(keyType, keyAlgorithm, req)
-
-                logger.debug { "Key created: $key" }
-
-                // Generate DID
-
-                val didMethod = getParamOrThrow(
-                    req.issuerDidConfig["method"], "Mandatory issuerDidConfig param 'method' not provided"
-                )
-
-                val did = DidService.registerByKey(
-                    didMethod,
-                    key,
-                    DidCreateOptions(didMethod, req.issuerDidConfig as JsonElement)
-                ).did
-
-                logger.debug { "DID created: $did" }
-
-                context.respond(
-                    HttpStatusCode.OK, IssuerOnboardingResponse(jsonKey, did)
-                )
+                context.respond(HttpStatusCode.OK, IssuerOnboardingResponse(serializedKey, did))
             }
         }
         route("", {
@@ -362,66 +329,3 @@ fun Application.issuerApi() {
         }
     }
 }
-
-private suspend fun generateJsonKey(
-    keyType: String, keyAlgorithm: KeyType, req: IssuerOnboardingRequest
-): Pair<Key, JsonElement> {
-    val key = when (keyType) {
-        "jwk" -> JWKKey.generate(keyAlgorithm)
-        "tse" -> TSEKey.generate(
-            keyAlgorithm, TSEKeyMetadata(
-                getParamOrThrow(
-                    req.issuerKeyConfig["tseServer"], "Mandatory issuerKeyConfig param 'tseServer' not provided"
-                ), getParamOrThrow(
-                    req.issuerKeyConfig["tseAccessToken"],
-                    "Mandatory issuerKeyConfig param 'tseAccessToken' not provided"
-                )
-            )
-        )
-        "oci" -> OCIKey.generateKey(
-            keyAlgorithm, OCIKeyMetadata(
-                getParamOrThrow(
-                    req.issuanceKeyConfig["tenancyOcid"], "Mandatory issuanceKeyConfig param 'tenancyOcid' not provided"
-                ), getParamOrThrow(
-                    req.issuanceKeyConfig["compartmentOcid"],
-                    "Mandatory issuanceKeyConfig param 'compartmentOcid' not provided"
-                ), getParamOrThrow(
-                    req.issuanceKeyConfig["userOcid"], "Mandatory issuanceKeyConfig param 'userOcid' not provided"
-                ), getParamOrThrow(
-                    req.issuanceKeyConfig["fingerprint"], "Mandatory issuanceKeyConfig param 'fingerprint' not provided"
-                ), getParamOrThrow(
-                    req.issuanceKeyConfig["managementEndpoint"],
-                    "Mandatory issuanceKeyConfig param 'managementEndpoint' not provided"
-                ), getParamOrThrow(
-                    req.issuanceKeyConfig["cryptoEndpoint"],
-                    "Mandatory issuanceKeyConfig param 'cryptoEndpoint' not provided"
-                ), req.issuanceKeyConfig["signingKeyPem"]?.jsonPrimitive?.contentOrNull
-            )
-        )
-
-        else -> {
-            JWKKey.generate(KeyType.Ed25519)
-        }
-    }
-
-    // TODO: serialize TSE key the same way as the local key
-    val jsonKey = when (keyType) {
-        "tse", "oci" -> KeySerialization.serializeKeyToJson(key)
-        else -> {
-            // TODO: serialized the internal jwk to avoid this construct
-            val jwkJson = """
-                        {
-                            "type" : "${keyType}",
-                            "jwk" : ${key.exportJWKObject()}
-                        }
-                    """.trimIndent()
-            Json.parseToJsonElement(jwkJson)
-        }
-    }
-
-
-    return key to jsonKey
-}
-
-private fun getParamOrThrow(element: JsonElement?, errorMessage: String) =
-    element?.jsonPrimitive?.contentOrNull ?: throw IllegalArgumentException(errorMessage)
