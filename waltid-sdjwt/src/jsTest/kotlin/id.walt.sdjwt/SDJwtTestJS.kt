@@ -62,8 +62,8 @@ class SDJwtTestJS {
 
         val sdMap = SDMapBuilderJS().addField(
             "sub", true,
-            SDMapBuilderJS().addField("child", true).build()
-        ).build()
+            SDMapBuilderJS().addField("child", true).buildAsJSON()
+        ).buildAsJSON()
 
         //val sdMap = js("{\"fields\":{\"sub\":{\"sd\":true,\"children\":{\"fields\":{\"child\":{\"sd\":true,\"children\":null}},\"decoyMode\":\"NONE\",\"decoys\":0}}},\"decoyMode\":\"FIXED\",\"decoys\":2}")
         val sdPayload = SDPayloadBuilder(originalClaimsSet).buildForSDMap(sdMap)
