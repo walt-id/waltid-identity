@@ -51,6 +51,7 @@ kotlin {
         }
     }
     js(IR) {
+        moduleName = "dids"
         /*browser {
             commonWebpackConfig {
                 cssSupport {

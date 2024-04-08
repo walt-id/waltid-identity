@@ -50,6 +50,7 @@ kotlin {
         }
     }
     js(IR) {
+        moduleName = "crypto"
         /*browser {
             commonWebpackConfig {
                 cssSupport {
@@ -58,11 +59,11 @@ kotlin {
             }
         }*/
         nodejs {
+            generateTypeScriptDefinitions()
             testTask {
                 useMocha()
             }
         }
-        generateTypeScriptDefinitions()
         binaries.library()
     }
 
