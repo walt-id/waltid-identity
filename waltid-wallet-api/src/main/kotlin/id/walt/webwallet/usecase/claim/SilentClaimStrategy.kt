@@ -115,7 +115,11 @@ class SilentClaimStrategy(
             originator = "",
             account = account,
             wallet = it.first.wallet,
-            data = eventUseCase.credentialEventData(credential = it.first, type = it.second),
+            data = eventUseCase.credentialEventData(
+                credential = it.first,
+                subject = eventUseCase.subjectData(it.first),
+                organization = eventUseCase.issuerData(it.first), type = it.second
+            ),
             credentialId = it.first.id,
         )
     }
@@ -142,6 +146,7 @@ class SilentClaimStrategy(
             )
         }
 
+    //TODO: duplicated in [EventUseCase]
     private suspend fun getIssuerName(credential: WalletCredential) =
         WalletCredential.getManifestIssuerName(credential.parsedManifest) ?: issuerNameResolutionUseCase.resolve(
             wallet = credential.wallet, did = WalletCredential.parseIssuerDid(

@@ -113,7 +113,7 @@ class SSIKit2WalletService(
                 tenant = tenant,
                 accountId = accountId,
                 walletId = walletId,
-                data = eventUseCase.credentialEventData(this, null),
+                data = eventUseCase.credentialEventData(this),
                 credentialId = this.id
             )
         }
@@ -243,11 +243,17 @@ class SSIKit2WalletService(
                 // logo: authRequest->OpenIDClientMetadata->logoUri
                 eventUseCase.log(
                     action = EventType.Credential.Present,
-                    originator = presentationSession.authorizationRequest.clientMetadata?.clientName?: EventDataNotAvailable,
+                    originator = presentationSession.authorizationRequest.clientMetadata?.clientName
+                        ?: EventDataNotAvailable,
                     tenant = tenant,
                     accountId = accountId,
                     walletId = walletId,
-                    data = eventUseCase.credentialEventData(this, null),
+                    data = eventUseCase.credentialEventData(
+                        credential = this,
+                        subject = eventUseCase.subjectData(this),
+                        organization = eventUseCase.verifierData(),
+                        type = null
+                    ),
                     credentialId = this.id,
                     note = parameter.note,
                 )
