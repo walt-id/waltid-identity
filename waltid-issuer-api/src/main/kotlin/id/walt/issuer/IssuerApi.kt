@@ -5,14 +5,18 @@ import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto.keys.oci.OCIKey
+import id.walt.crypto.keys.oci.OCIKeyMetadata
 import id.walt.crypto.keys.tse.TSEKey
 import id.walt.crypto.keys.tse.TSEKeyMetadata
 import id.walt.did.dids.DidService
 import id.walt.did.dids.registrar.dids.DidCreateOptions
 import id.walt.issuer.IssuanceExamples.batchExample
 import id.walt.issuer.IssuanceExamples.issuerOnboardingRequestDefaultExample
+import id.walt.issuer.IssuanceExamples.issuerOnboardingRequestOciExample
 import id.walt.issuer.IssuanceExamples.issuerOnboardingRequestTseExample
 import id.walt.issuer.IssuanceExamples.issuerOnboardingResponseDefaultExample
+import id.walt.issuer.IssuanceExamples.issuerOnboardingResponseOciExample
 import id.walt.issuer.IssuanceExamples.issuerOnboardingResponseTseExample
 import id.walt.issuer.IssuanceExamples.openBadgeCredentialExampleJsonString
 import id.walt.issuer.IssuanceExamples.sdJwtExample
@@ -76,6 +80,7 @@ fun Application.issuerApi() {
                         description = "Issuer onboarding request (key & DID) config."
                         example("Local key + ed25519 key (default)", issuerOnboardingRequestDefaultExample)
                         example("Hashicorp Vault Transit Engine (TSE) key + RSA", issuerOnboardingRequestTseExample)
+                        example("Oracle Cloud Infrastructure (OCI) key + secp256r1 ", issuerOnboardingRequestOciExample)
                         required = true
                     }
                 }
@@ -91,6 +96,10 @@ fun Application.issuerApi() {
                             example(
                                 "Remote Ed25519 key + did:key",
                                 issuerOnboardingResponseTseExample,
+                            )
+                            example(
+                                "OCI key + did:jwk",
+                                issuerOnboardingResponseOciExample,
                             )
                         }
                     }
@@ -369,6 +378,26 @@ private suspend fun generateJsonKey(
                 )
             )
         )
+        "oci" -> OCIKey.generateKey(
+            keyAlgorithm, OCIKeyMetadata(
+                getParamOrThrow(
+                    req.issuanceKeyConfig["tenancyOcid"], "Mandatory issuanceKeyConfig param 'tenancyOcid' not provided"
+                ), getParamOrThrow(
+                    req.issuanceKeyConfig["compartmentOcid"],
+                    "Mandatory issuanceKeyConfig param 'compartmentOcid' not provided"
+                ), getParamOrThrow(
+                    req.issuanceKeyConfig["userOcid"], "Mandatory issuanceKeyConfig param 'userOcid' not provided"
+                ), getParamOrThrow(
+                    req.issuanceKeyConfig["fingerprint"], "Mandatory issuanceKeyConfig param 'fingerprint' not provided"
+                ), getParamOrThrow(
+                    req.issuanceKeyConfig["managementEndpoint"],
+                    "Mandatory issuanceKeyConfig param 'managementEndpoint' not provided"
+                ), getParamOrThrow(
+                    req.issuanceKeyConfig["cryptoEndpoint"],
+                    "Mandatory issuanceKeyConfig param 'cryptoEndpoint' not provided"
+                ), req.issuanceKeyConfig["signingKeyPem"]?.jsonPrimitive?.contentOrNull
+            )
+        )
 
         else -> {
             JWKKey.generate(KeyType.Ed25519)
@@ -376,18 +405,20 @@ private suspend fun generateJsonKey(
     }
 
     // TODO: serialize TSE key the same way as the local key
-    val jsonKey = if (keyType == "tse") {
-        KeySerialization.serializeKeyToJson(key)
-    } else {
-        // TODO: serialized the internal jwk to avoid this construct
-        val jsonKey = """
+    val jsonKey = when (keyType) {
+        "tse", "oci" -> KeySerialization.serializeKeyToJson(key)
+        else -> {
+            // TODO: serialized the internal jwk to avoid this construct
+            val jwkJson = """
                         {
                             "type" : "${keyType}",
                             "jwk" : ${key.exportJWKObject()}
                         }
                     """.trimIndent()
-        Json.parseToJsonElement(jsonKey)
+            Json.parseToJsonElement(jwkJson)
+        }
     }
+
 
     return key to jsonKey
 }
