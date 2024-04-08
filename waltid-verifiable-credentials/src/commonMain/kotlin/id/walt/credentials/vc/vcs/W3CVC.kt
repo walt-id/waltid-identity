@@ -81,15 +81,14 @@ data class W3CVC(
     suspend fun signJws(
         issuerKey: Key,
         issuerDid: String,
+        issuerKid: String? = null,
         subjectDid: String,
         /** Set additional options in the JWT header */
         additionalJwtHeader: Map<String, String> = emptyMap(),
         /** Set additional options in the JWT payload */
         additionalJwtOptions: Map<String, JsonElement> = emptyMap()
     ): String {
-        var kid = issuerDid
-        if (issuerDid.startsWith("did:key") && issuerDid.length==186) // EBSI conformance corner case when issuer uses did:key instead of did:ebsi and no trust framework is defined
-            kid = issuerDid + "#" + issuerDid.removePrefix("did:key:")
+        val kid = issuerKid ?: issuerDid
 
         return JwsSignatureScheme().sign(
             data = this.toJsonObject(),
