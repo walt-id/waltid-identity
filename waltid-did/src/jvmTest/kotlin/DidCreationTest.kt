@@ -3,6 +3,7 @@ import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.LocalKey
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.crypto.utils.MultiBaseUtils
+import id.walt.did.dids.document.DidEbsiBaseDocument
 import id.walt.did.dids.document.DidEbsiDocument
 import id.walt.did.dids.registrar.dids.DidKeyCreateOptions
 import id.walt.did.dids.registrar.dids.DidWebCreateOptions
@@ -119,7 +120,7 @@ class DidCreationTest {
     }
 
     val CLIENT_MOCK_PORT = 5000
-    val CLIENT_MOCK_URL = "https://2d21-62-178-27-231.ngrok-free.app/client-mock"//"http://192.168.0.122:5000/client-mock"
+    val CLIENT_MOCK_URL = "https://76a7-62-178-27-231.ngrok-free.app/client-mock"//"http://192.168.0.122:5000/client-mock"
     val CLIENT_MAIN_KEY = runBlocking { LocalKey.generate(KeyType.secp256k1) }
     val CLIENT_VCSIGN_KEY = runBlocking { LocalKey.generate(KeyType.secp256r1) }
     fun startClientMockServer() {
@@ -304,7 +305,7 @@ class DidCreationTest {
 
         // insert DID document:
         val insertDidRpcRequest = EbsiRpcRequests.generateInsertDidDocumentRequest(1, did, CLIENT_MAIN_KEY,
-            DidEbsiDocument.createBaseDocument(did, CLIENT_MAIN_KEY).let { Json.encodeToJsonElement(it) })
+            DidEbsiBaseDocument().let { Json.encodeToJsonElement(it) })
         val insertDidHttpResponse = http.post("https://api-conformance.ebsi.eu/did-registry/v5/jsonrpc") {
             bearerAuth(accessTokenResponse.accessToken!!)
             contentType(ContentType.Application.Json)
@@ -312,8 +313,10 @@ class DidCreationTest {
                     println(it)
             })
         }
+        println(insertDidHttpResponse.bodyAsText())
         assertEquals(HttpStatusCode.OK, insertDidHttpResponse.status)
         val insertDidRpcResponse = Json.decodeFromString<UnsignedTransactionResponse>(insertDidHttpResponse.bodyAsText())
         assertEquals(1, insertDidRpcResponse.id)
+
     }
 }

@@ -13,6 +13,11 @@ import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 import kotlin.js.JsName
 
+@Serializable
+class DidEbsiBaseDocument(
+    @EncodeDefault @SerialName("@context")  val context: List<String> = DidEbsiDocument.DEFAULT_CONTEXT
+)
+
 @ExperimentalJsExport
 @JsExport
 @OptIn(ExperimentalSerializationApi::class)
@@ -29,24 +34,8 @@ data class DidEbsiDocument(
     val keyAgreement: List<String>?
 ) {
     companion object {
-        private val DEFAULT_CONTEXT =
+        public val DEFAULT_CONTEXT =
             listOf("https://www.w3.org/ns/did/v1", "https://w3id.org/security/suites/jws-2020/v1")
-
-        @JsExport.Ignore
-        suspend fun createBaseDocument(did: String, secp256k1Key: Key) = DidEbsiDocument(
-            id = did, verificationMethod = listOf(
-                DidEbsiDocument.VerificationMethod(
-                    id = "$did#${secp256k1Key.getKeyId()}",
-                    type = secp256k1Key.keyType.name,
-                    controller = did,
-                    publicKeyJwk = secp256k1Key.getPublicKey().exportJWKObject()
-                )
-            ),
-            assertionMethod = null,
-            authentication = listOf("$did#${secp256k1Key.getKeyId()}"),
-            capabilityInvocation = listOf("$did#${secp256k1Key.getKeyId()}"),
-            capabilityDelegation = null, keyAgreement = null
-        )
     }
 
     @Serializable

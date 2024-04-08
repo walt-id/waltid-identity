@@ -40,7 +40,8 @@ object EbsiRpcRequests {
     method = EbsiRpcMethod.insertDidDocument,
     params = listOf(InsertDidDocumentParams(
       Utils.toEthereumAddress(secp256k1Key), did,
-      baseDocument.toString(), secp256k1Key.getThumbprint(), secp256k1Key.getPublicKeyRepresentation().toHexString().let { "0x04$it" },
+      baseDocument.toString(), secp256k1Key.getThumbprint(),
+      Utils.getPublicKeyXYRepresentation(secp256k1Key).toHexString().let { "0x04$it" },
       (secp256k1Key.keyType == KeyType.secp256k1).also {
         if(!it) throw IllegalArgumentException("Key for inserting Did document must have type Secp256k1")
       }, notBefore.epochSeconds, notAfter.epochSeconds
