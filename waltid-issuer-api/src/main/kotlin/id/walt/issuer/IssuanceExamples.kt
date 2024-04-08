@@ -7,7 +7,7 @@ object IssuanceExamples {
     //language=json
     val universityDegreeCredential = """
 {
-  "issuanceKey": {
+  "issuerKey": {
     "type": "jwk",
     "jwk": "{\"kty\":\"OKP\",\"d\":\"mDhpwaH6JYSrD2Bq7Cs-pzmsjlLj4EOhxyI-9DM1mFI\",\"crv\":\"Ed25519\",\"kid\":\"Vzx7l5fh56F3Pf9aR3DECU5BwfrY6ZJe05aiWYWzan8\",\"x\":\"T3T4-u1Xz3vAV2JwPNxWfs4pik_JLiArz_WTCvrCFUM\"}"
   },
@@ -51,7 +51,7 @@ object IssuanceExamples {
     //language=json
     val openBadgeCredentialExampleJsonString = """
         {
-          "issuanceKey": {
+          "issuerKey": {
             "type": "jwk",
             "jwk": "{\"kty\":\"OKP\",\"d\":\"mDhpwaH6JYSrD2Bq7Cs-pzmsjlLj4EOhxyI-9DM1mFI\",\"crv\":\"Ed25519\",\"kid\":\"Vzx7l5fh56F3Pf9aR3DECU5BwfrY6ZJe05aiWYWzan8\",\"x\":\"T3T4-u1Xz3vAV2JwPNxWfs4pik_JLiArz_WTCvrCFUM\"}"
           },
@@ -152,7 +152,7 @@ object IssuanceExamples {
     val batchExample = """
         [
           {
-            "issuanceKey": {
+            "issuerKey": {
               "type": "jwk",
               "jwk": "{\"kty\":\"OKP\",\"d\":\"mDhpwaH6JYSrD2Bq7Cs-pzmsjlLj4EOhxyI-9DM1mFI\",\"crv\":\"Ed25519\",\"kid\":\"Vzx7l5fh56F3Pf9aR3DECU5BwfrY6ZJe05aiWYWzan8\",\"x\":\"T3T4-u1Xz3vAV2JwPNxWfs4pik_JLiArz_WTCvrCFUM\"}"
             },
@@ -192,7 +192,7 @@ object IssuanceExamples {
             }
           },
           {
-            "issuanceKey": {
+            "issuerKey": {
               "type": "jwk",
               "jwk": "{\"kty\":\"OKP\",\"d\":\"mDhpwaH6JYSrD2Bq7Cs-pzmsjlLj4EOhxyI-9DM1mFI\",\"crv\":\"Ed25519\",\"kid\":\"Vzx7l5fh56F3Pf9aR3DECU5BwfrY6ZJe05aiWYWzan8\",\"x\":\"T3T4-u1Xz3vAV2JwPNxWfs4pik_JLiArz_WTCvrCFUM\"}"
             },
@@ -260,7 +260,7 @@ object IssuanceExamples {
     //language=JSON
     val sdJwtExample = """
         {
-          "issuanceKey": {
+          "issuerKey": {
             "type": "jwk",
             "jwk": "{\"kty\":\"OKP\",\"d\":\"mDhpwaH6JYSrD2Bq7Cs-pzmsjlLj4EOhxyI-9DM1mFI\",\"crv\":\"Ed25519\",\"kid\":\"Vzx7l5fh56F3Pf9aR3DECU5BwfrY6ZJe05aiWYWzan8\",\"x\":\"T3T4-u1Xz3vAV2JwPNxWfs4pik_JLiArz_WTCvrCFUM\"}"
           },
@@ -330,7 +330,7 @@ object IssuanceExamples {
     //language=JSON
     val issuerOnboardingRequestDefaultExample = """
         {
-          "issuanceKeyConfig": {
+          "issuerKeyConfig": {
             "type": "jwk",
             "algorithm": "secp256r1"
           },
@@ -343,7 +343,7 @@ object IssuanceExamples {
     //language=JSON
     val issuerOnboardingRequestTseExample = """
         {
-          "issuanceKeyConfig": {
+          "issuerKeyConfig": {
             "type": "tse",
             "tseServer": "http://127.0.0.1:8200/v1/transit",
             "tseAccessToken": "dev-only-token",
@@ -401,7 +401,7 @@ object IssuanceExamples {
     //language=JSON
     val issuerOnboardingResponseDefaultExample = """
         {
-          "issuanceKey": {
+          "issuerKey": {
             "type": "jwk",
             "jwk": {
               "kty": "EC",
@@ -419,7 +419,7 @@ object IssuanceExamples {
     //language=JSON
     val issuerOnboardingResponseTseExample = """
     {
-      "issuanceKey": {
+      "issuerKey": {
         "type": "tse",
         "server": "http://127.0.0.1:8200/v1/transit",
         "accessKey": "dev-only-token",

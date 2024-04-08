@@ -51,6 +51,7 @@ kotlin {
         }
     }
     js(IR) {
+        moduleName = "verifiable-credentials"
         /*browser {
             commonWebpackConfig {
                 cssSupport {
@@ -87,7 +88,7 @@ kotlin {
                 implementation("app.softwork:kotlinx-uuid-core:0.0.22")
 
                 // Loggin
-                implementation("io.github.oshai:kotlin-logging:6.0.3")
+                implementation("io.github.oshai:kotlin-logging:6.0.4")
 
                 // walt.id
                 api(project(":waltid-crypto"))
