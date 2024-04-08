@@ -6,6 +6,7 @@ import id.walt.webwallet.service.account.AccountsService
 import id.walt.webwallet.service.credentials.CredentialsService
 import id.walt.webwallet.service.dids.DidsService
 import id.walt.webwallet.service.events.CredentialEventData
+import id.walt.webwallet.service.events.CredentialEventDataActor
 import id.walt.webwallet.service.exchange.IssuanceService
 import id.walt.webwallet.service.issuers.IssuerDataTransferObject
 import id.walt.webwallet.service.trust.TrustValidationService
@@ -70,7 +71,11 @@ class SilentClaimStrategyTest {
         coEvery { issuanceService.useOfferRequest(any(), any(), any()) } returns listOf(credentialData)
         coEvery { issuerUseCase.get(wallet, any()) } returns Result.success(issuerData)
         every { credentialService.add(wallet = any(), any()) } returns listOf(credentialId)
-        coEvery { eventUseCase.credentialEventData(any(), any(), any(), any()) } returns eventData
+        every { eventUseCase.credentialEventData(any(), any(), any(), any()) } returns eventData
+        every { eventUseCase.subjectData(any()) } returns CredentialEventDataActor.Subject(
+            "subjectId",
+            "subjectKeyType"
+        )
         every { eventUseCase.log(any()) } just Runs
         every { notificationUseCase.add(any()) } returns listOf(UUID.generateUUID())
         coEvery { notificationUseCase.send(any()) } just Runs
