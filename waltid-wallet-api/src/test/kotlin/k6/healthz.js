@@ -10,9 +10,9 @@ import {Counter} from "k6/metrics";
 export const options = {
     // target defines the parallel processes that call the system
     stages: [
-        {duration: "30s", target: 10000}, // ramp up
-        {duration: "5m", target: 10000}, // stable
-        {duration: "30s", target: 0}, // ram-down to 0 users
+        // {duration: "30s", target: 10000}, // ramp up
+        {duration: "1m", target: 1000}, // stable
+        // {duration: "30s", target: 0}, // ram-down to 0 users
     ],
     thresholds: {
         http_req_duration: ['p(99)<100'] // 99% of requests must complete within 100ms
@@ -34,5 +34,4 @@ export default function () {
             return false;
         },
     });
-    sleep(1); // one request iteration per second
 }

@@ -1,6 +1,5 @@
 package id.walt.webwallet.service.account
 
-import de.mkammerer.argon2.Argon2Factory
 import id.walt.webwallet.db.models.Accounts
 import id.walt.webwallet.web.UnauthorizedException
 import id.walt.webwallet.web.controllers.ByteLoginRequest
@@ -40,11 +39,13 @@ object EmailAccountStrategy : PasswordAccountStrategy<EmailAccountRequest>() {
         RegistrationResult(createdAccountId)
     }
 
-
-    //override suspend fun authenticate(tenant: String, request: EmailAccountRequest): AuthenticatedUser = UsernameAuthenticatedUser(UUID("a218913e-b8ec-4ef4-a945-7e9ada448ff9"), request.email)
     override suspend fun authenticate(tenant: String, request: EmailAccountRequest): AuthenticatedUser =
         ByteLoginRequest(request).let { req ->
             val email = request.email
+
+            /*if (!AccountsService.hasAccountEmail(tenant, email)) {
+                throw UnauthorizedException("Unknown user \"${req.username}\".")
+            }*/
 
             val (matchedAccount, pwHash) = transaction {
 
@@ -60,13 +61,7 @@ object EmailAccountStrategy : PasswordAccountStrategy<EmailAccountRequest>() {
                 Pair(matchedAccount, pwHash)
             }
 
-            val passwordMatches = Argon2Factory.create().run {
-                verify(pwHash, req.password).also {
-                    wipeArray(req.password)
-                }
-            }
-
-            if (passwordMatches) {
+            if (verifyPassword(pwHash, req)) {
                 val id = matchedAccount[Accounts.id]
                 // TODO: change id to wallet-id (also in the frontend)
                 return UsernameAuthenticatedUser(id, req.username)

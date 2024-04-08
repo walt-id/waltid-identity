@@ -86,14 +86,14 @@ object AccountsService {
 
         }
     }.fold(onSuccess = {
-        eventUseCase.log(
+        /*eventUseCase.log(
             action = EventType.Account.Login,
             tenant = tenant,
             originator = "wallet",
             accountId = it.id,
             walletId = UUID.NIL,
             data = AccountEventData(accountId = it.id.toString())
-        )
+        )*/
         Result.success(it)
     }, onFailure = { Result.failure(it) })
 
