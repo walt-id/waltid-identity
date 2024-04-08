@@ -238,9 +238,12 @@ class SSIKit2WalletService(
         logger.debug { "HTTP Response: $resp, body: $httpResponseBody" }
         parameter.selectedCredentials.forEach {
             credentialService.get(walletId, it)?.run {
+                // verifier:
+                // name: authRequest->OpenIDClientMetadata->clientMetadata
+                // logo: authRequest->OpenIDClientMetadata->logoUri
                 eventUseCase.log(
                     action = EventType.Credential.Present,
-                    originator = presentationSession.presentationDefinition?.name ?: EventDataNotAvailable,
+                    originator = presentationSession.authorizationRequest.clientMetadata?.clientName?: EventDataNotAvailable,
                     tenant = tenant,
                     accountId = accountId,
                     walletId = walletId,
