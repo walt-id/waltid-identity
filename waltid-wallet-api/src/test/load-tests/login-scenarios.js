@@ -68,5 +68,5 @@ export default function () {
         },
         {statusCodeTag: 'httpOk'}
     );
-    //sleep(0.1); // one request iteration per second
+    //sleep(1); // one request iteration per second
 }

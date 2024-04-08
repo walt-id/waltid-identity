@@ -1,10 +1,9 @@
 import http from "k6/http";
-import {check, sleep} from "k6";
+import {check} from "k6";
 import {Counter} from "k6/metrics";
 
 /**
- * This test simulates 10k users/processes that are all hitting the health-check once a second.
- *
+ * This test simulates 10k users/processes that are all hitting the health-check as often as possible.
  */
 
 export const options = {
