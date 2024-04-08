@@ -95,7 +95,7 @@ kotlin {
                 implementation("net.thauvin.erik.urlencoder:urlencoder-lib:1.5.0")
 
                 // Logging
-                implementation("io.github.oshai:kotlin-logging:6.0.3")
+                implementation("io.github.oshai:kotlin-logging:6.0.4")
 
             }
         }
