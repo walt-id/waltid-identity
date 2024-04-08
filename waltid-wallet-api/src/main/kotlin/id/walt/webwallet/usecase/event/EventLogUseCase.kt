@@ -81,13 +81,11 @@ class EventLogUseCase(
         subjectKeyType = EventDataNotAvailable,
     )
 
-    suspend fun issuerData(credential: WalletCredential) =
+    fun issuerData(credential: WalletCredential) =
         WalletCredential.parseIssuerDid(credential.parsedDocument, credential.parsedManifest).let {
             CredentialEventDataActor.Organization.Issuer(
                 did = it ?: EventDataNotAvailable,
-                name = WalletCredential.getManifestIssuerName(credential.parsedManifest) ?: it?.let {
-                    issuerNameResolutionUseCase.resolve(credential.wallet, it)
-                } ?: EventDataNotAvailable,
+//                name = WalletCredential.getManifestIssuerName(credential.parsedManifest),
                 keyId = EventDataNotAvailable,
                 keyType = EventDataNotAvailable,
             )
@@ -95,7 +93,7 @@ class EventLogUseCase(
 
     fun verifierData() = CredentialEventDataActor.Organization.Verifier(
         did = EventDataNotAvailable,
-        name = EventDataNotAvailable,
+//        name = EventDataNotAvailable,
         policies = emptyList(),
     )
 

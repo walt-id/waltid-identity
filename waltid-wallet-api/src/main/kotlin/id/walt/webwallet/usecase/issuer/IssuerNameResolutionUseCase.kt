@@ -15,13 +15,6 @@ class IssuerNameResolutionUseCase(
         )
     }.let { it.takeIf { !it.name.isNullOrEmpty() } ?: resolveNameAndUpdate(it) }.name ?: did
 
-    private suspend fun resolveNameAndUpdate(issuer: IssuerDataTransferObject) = IssuerDataTransferObject(
-        wallet = issuer.wallet,
-        did = issuer.did,
-        name = nameResolutionService.resolve(issuer.did).getOrNull(),
-        description = issuer.description,
-        uiEndpoint = issuer.uiEndpoint,
-        configurationEndpoint = issuer.configurationEndpoint,
-        authorized = issuer.authorized,
-    ).also { issuerUseCase.add(it) }
+    private suspend fun resolveNameAndUpdate(issuer: IssuerDataTransferObject) =
+        issuer.copy(name = nameResolutionService.resolve(issuer.did).getOrNull()).also { issuerUseCase.add(it) }
 }
