@@ -7,6 +7,6 @@ import kotlin.js.JsExport
 @JsExport
 class DidEthrCreateOptions(network: String = "goerli") : DidCreateOptions(
     method = "ethr",
-    options = options("network" to network)
+    config = config("network" to network)
 )
 

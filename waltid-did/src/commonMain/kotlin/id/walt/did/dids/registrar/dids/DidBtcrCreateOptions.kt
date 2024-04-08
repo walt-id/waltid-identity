@@ -7,5 +7,5 @@ import kotlin.js.JsExport
 @JsExport
 class DidBtcrCreateOptions(chain: String) : DidCreateOptions(
     method = "btcr",
-    options = options("chain" to chain)
+    config = config("chain" to chain)
 )

@@ -6,8 +6,7 @@ import com.nimbusds.jose.crypto.*
 import com.nimbusds.jose.crypto.bc.BouncyCastleProviderSingleton
 import com.nimbusds.jose.jwk.*
 import com.nimbusds.jose.util.Base64URL
-import id.walt.crypto.keys.EccUtils
-import id.walt.crypto.keys.JvmJWKKeyCreator
+import id.walt.crypto.keys.*
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.utils.Base64Utils.base64UrlDecode
@@ -74,6 +73,8 @@ actual class JWKKey actual constructor(
         else -> TODO("Not yet implemented for: $keyType")
     }
 
+    actual override suspend fun getMeta(): JwkKeyMeta = JwkKeyMeta(getKeyId())
+
     actual override suspend fun exportJWK(): String = _internalJwk.toJSONString()
 
     actual override suspend fun exportJWKObject(): JsonObject =
@@ -86,7 +87,12 @@ actual class JWKKey actual constructor(
             KeyType.secp256r1, KeyType.secp256k1 -> _internalJwk.toECKey().let {
                 if (hasPrivateKey) {
                     pemObjects.add(PemObject("PRIVATE KEY", it.toECPrivateKey().encoded))
-                    pemObjects.add(PemObject("PUBLIC KEY", getPublicKey()._internalJwk.toECKey().toECPublicKey().encoded))
+                    pemObjects.add(
+                        PemObject(
+                            "PUBLIC KEY",
+                            getPublicKey()._internalJwk.toECKey().toECPublicKey().encoded
+                        )
+                    )
                 } else {
                     pemObjects.add(PemObject("PUBLIC KEY", it.toECPublicKey().encoded))
                 }
@@ -97,7 +103,12 @@ actual class JWKKey actual constructor(
             KeyType.RSA -> _internalJwk.toRSAKey().let {
                 if (hasPrivateKey) {
                     pemObjects.add(PemObject("RSA PRIVATE KEY", it.toRSAPrivateKey().encoded))
-                    pemObjects.add(PemObject("RSA PUBLIC KEY", getPublicKey()._internalJwk.toRSAKey().toRSAPublicKey().encoded))
+                    pemObjects.add(
+                        PemObject(
+                            "RSA PUBLIC KEY",
+                            getPublicKey()._internalJwk.toRSAKey().toRSAPublicKey().encoded
+                        )
+                    )
                 } else {
                     pemObjects.add(PemObject("RSA PUBLIC KEY", it.toRSAPublicKey().encoded))
                 }
@@ -174,7 +185,13 @@ actual class JWKKey actual constructor(
 
         // Pad the R and S components to 32 bytes each
         System.arraycopy(rBytes, max(0, rBytes.size - 32), jwsSignature, max(0, 32 - rBytes.size), min(32, rBytes.size))
-        System.arraycopy(sBytes, max(0, sBytes.size - 32), jwsSignature, 32 + max(0, 32 - sBytes.size), min(32, sBytes.size))
+        System.arraycopy(
+            sBytes,
+            max(0, sBytes.size - 32),
+            jwsSignature,
+            32 + max(0, 32 - sBytes.size),
+            min(32, sBytes.size)
+        )
 
         return jwsSignature
     }
@@ -188,7 +205,7 @@ actual class JWKKey actual constructor(
     actual override suspend fun signJws(plaintext: ByteArray, headers: Map<String, String>): String {
         check(hasPrivateKey) { "No private key is attached to this key!" }
 
-        log.debug { "Signing JWS! Key: ${toString()}" }
+        log.trace { "Signing JWS, Key: ${toString()}" }
 
         // Nimbus signature:
         val jwsObject = JWSObject(
@@ -214,7 +231,7 @@ actual class JWKKey actual constructor(
         }
 
         val customJws = "$payloadToSign.${signed.encodeToBase64Url()}"
-        log.debug { "Signed JWS: $customJws" }
+        log.trace { "Signed JWS: $customJws" }
 
         return customJws
     }
@@ -375,7 +392,7 @@ actual class JWKKey actual constructor(
 
 //        val prettyJson = Json { prettyPrint = true }
 
-        actual override suspend fun generate(type: KeyType, metadata: JWKKeyMetadata): JWKKey =
+        actual override suspend fun generate(type: KeyType, metadata: JwkKeyMeta?): JWKKey =
             JvmJWKKeyCreator.generate(type, metadata)
 
         actual override suspend fun importJWK(jwk: String): Result<JWKKey> = JvmJWKKeyCreator.importJWK(jwk)
@@ -383,7 +400,7 @@ actual class JWKKey actual constructor(
         actual override suspend fun importRawPublicKey(
             type: KeyType,
             rawPublicKey: ByteArray,
-            metadata: JWKKeyMetadata
+            metadata: JwkKeyMeta?
         ): Key =
             JvmJWKKeyCreator.importRawPublicKey(type, rawPublicKey, metadata)
     }

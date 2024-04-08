@@ -6,6 +6,7 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.uuid.UUID
 import org.jetbrains.exposed.sql.*
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.javatime.date
 import org.jetbrains.exposed.sql.javatime.dateParam
 import org.jetbrains.exposed.sql.transactions.transaction
@@ -48,6 +49,10 @@ class EventService {
             this[Events.data] = Json.encodeToString(it.data)
             this[Events.note] = it.note
         }
+    }
+
+    fun delete(id: Int): Int = transaction {
+        Events.deleteWhere { Events.id eq id }
     }
 
     private fun Query.addWhereClause(dataFilter: Map<String, String>) = let {

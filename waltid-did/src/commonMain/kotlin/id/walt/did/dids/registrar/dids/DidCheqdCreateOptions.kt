@@ -7,5 +7,5 @@ import kotlin.js.JsExport
 @JsExport
 class DidCheqdCreateOptions(network: String) : DidCreateOptions(
     method = "cheqd",
-    options = mapOf("network" to network)
+    config = mapOf("network" to network)
 )

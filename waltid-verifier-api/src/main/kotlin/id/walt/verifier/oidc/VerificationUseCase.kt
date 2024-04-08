@@ -82,7 +82,7 @@ class VerificationUseCase(
     fun verify(sessionId: String?, tokenResponseParameters: Map<String, List<String>>): Result<String> {
         logger.debug { "Verifying session $sessionId" }
         val session = sessionId?.let { OIDCVerifierService.getSession(it) }
-            ?: return Result.failure(error("State parameter doesn't refer to an existing session, or session expired"))
+            ?: return Result.failure(Exception("State parameter doesn't refer to an existing session, or session expired"))
         val tokenResponse = TokenResponse.fromHttpParameters(tokenResponseParameters)
         val sessionVerificationInfo = OIDCVerifierService.sessionVerificationInfos[session.id] ?: return Result.failure(
             IllegalStateException("No session verification information found for session id!")
@@ -90,34 +90,30 @@ class VerificationUseCase(
 
         val maybePresentationSessionResult = runCatching { OIDCVerifierService.verify(tokenResponse, session) }
 
-        val retVal: Result<String> = if (maybePresentationSessionResult.getOrNull() != null) {
+        if (maybePresentationSessionResult.getOrNull() != null) {
             val presentationSession = maybePresentationSessionResult.getOrThrow()
             if (presentationSession.verificationResult == true) {
                 val redirectUri = sessionVerificationInfo.successRedirectUri?.replace("\$id", session.id) ?: ""
-                Result.success(redirectUri)
+                return Result.success(redirectUri)
             } else {
                 val policyResults = OIDCVerifierService.policyResults[session.id]
                 val redirectUri = sessionVerificationInfo.errorRedirectUri?.replace("\$id", session.id)
 
                 if (redirectUri != null) {
-                    Result.failure<String>(error(redirectUri))
+                    return Result.failure(Exception(redirectUri))
                 }
 
-                if (policyResults == null) {
-                    Result.failure<String>(error("Verification policies did not succeed"))
+                return if (policyResults == null) {
+                    Result.failure(Exception("Verification policies did not succeed"))
                 } else {
                     val failedPolicies =
                         policyResults.results.flatMap { it.policyResults.map { it } }.filter { it.result.isFailure }
-                    Result.failure(error("Verification policies did not succeed: ${failedPolicies.joinToString { it.request.policy.name }}"))
+                    Result.failure(Exception("Verification policies did not succeed: ${failedPolicies.joinToString { it.request.policy.name }}"))
                 }
             }
         } else {
-            Result.failure(error("Verification failed"))
+            return Result.failure(Exception("Verification failed"))
         }
-
-        logger.debug { "Returning: ${retVal}" }
-
-        return retVal
     }
 
     fun getResult(sessionId: String): Result<String> {
@@ -145,7 +141,7 @@ class VerificationUseCase(
             http.post(it.statusCallbackUri) {
                 header(HttpHeaders.ContentType, ContentType.Application.Json)
                 it.statusCallbackApiKey?.let { bearerAuth(it) }
-                setBody(mapOf("sessionId" to sessionId))
+                setBody(getResult(sessionId).getOrThrow())
             }.also {
                 logger.debug { "status callback: ${it.status}" }
             }

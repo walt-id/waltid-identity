@@ -1,0 +1,28 @@
+{
+    "requestId": "c5784162-84af-4aab-aff5-f1f8438dfc33",
+    "replies":
+    [
+        {
+            "messageId": "bafkreig6d3ouzy47w346pf6rrsh7rywie47uezpp6kaeyhy5fpyocwcuwe",
+            "status":
+            {
+                "code": 200
+            },
+            "entries":
+            [
+                {
+                    "descriptor":
+                    {
+                        "method": "CollectionsWrite",
+                        "schema": "https://w3id.org/vc-status-list-2021/v1",
+                        "dataFormat": "application/vc+jwt",
+                        "objectId": "cca8bd0a-83c2-4ae1-9f43-e99943cdfa5c",
+                        "clock": 0,
+                        "cid": "bafkreicelhoivs5q7zti5nkqwocny3e65p6hxya52hho4ibzshrshu4wgy"
+                    },
+                    "data": "H4sIAAAAAAAA/zMwNABDAKb12i0IAAAA"
+                }
+            ]
+        }
+    ]
+}
