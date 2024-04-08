@@ -53,7 +53,7 @@ sealed interface CredentialEventDataActor {
         @Serializable
         data class Issuer(
             val did: String,
-            val name: String?,
+            val name: String? = null,
             val keyId: String,
             val keyType: String,
         ) : Organization
@@ -61,7 +61,7 @@ sealed interface CredentialEventDataActor {
         @Serializable
         data class Verifier(
             val did: String,
-            val name: String?,
+            val name: String? = null,
             val policies: List<String>,
         ) : Organization
     }
