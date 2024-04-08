@@ -34,13 +34,23 @@ suspend fun main(args: Array<String>) {
     Db.start()
 
     val webConfig = ConfigManager.getConfig<WebConfig>()
-    log.info { "Starting web server (binding to ${webConfig.webHost}, listening on port ${webConfig.webPort})..." }
+    log.info { "Starting web server (binding to ${webConfig.webHost}, listening on port ${webConfig.webPort}) ..." }
+    // According class io.ktor.server.engine.ApplicationEngine the Ktor config will be determined by the number of available processors
+    log.debug { "Available Processors: ${Runtime.getRuntime().availableProcessors()}" }
+
 
     embeddedServer(
         CIO,
         port = webConfig.webPort,
         host = webConfig.webHost,
-        module = Application::webWalletModule
+        module = Application::webWalletModule,
+        configure = {
+//            connectionGroupSize = 10
+//            workerGroupSize = 5
+//            callGroupSize = 5
+            shutdownGracePeriod = 2000
+            shutdownTimeout = 3000
+        }
     ).start(wait = true)
 }
 
