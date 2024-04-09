@@ -23,54 +23,35 @@ class EventFilterUseCaseTest {
     private val sut = EventFilterUseCase(eventServiceMock, issuerNameResolutionMock, verifierNameResolutionMock)
     private val account = UUID()
     private val wallet = UUID()
-    private val eventData = CredentialEventData(
-        credentialId = "String",
-        ecosystem = "String",
-        logo = "String",
-        type = "String",
-        format = "String",
-        proofType = "String",
-        protocol = "String",
-        subject = CredentialEventDataActor.Subject(
-            subjectId = "String",
-            subjectKeyType = "String",
-        ),
-        organization = CredentialEventDataActor.Organization.Issuer(
-            did = "String",
-            name = null,
-            keyId = "String",
-            keyType = "String",
-        )
+    private val issuerData = CredentialEventDataActor.Organization.Issuer(
+        did = "String",
+        name = null,
+        keyId = "String",
+        keyType = "String",
     )
-    private val eventList = listOf(
-        Event(
-            event = "Credential",
-            action = "Receive",
-            tenant = "",
-            account = account,
-            wallet = wallet,
-            data = Json.encodeToJsonElement(eventData).jsonObject
-        )
+    private val verifierData = CredentialEventDataActor.Organization.Verifier(
+        did = "String",
+        name = null,
+        policies = emptyList()
     )
+    private val noFilter = EventLogFilter(sortOrder = "asc", sortBy = "")
 
     @Test
-    fun `test unfiltered`() = runTest {
-        val filter = EventLogFilter(sortOrder = "asc", sortBy = "")
+    fun `given an issuance event, when listing events, then result contains the issuer resolved name`() = runTest {
         every {
             eventServiceMock.get(
                 account,
                 wallet,
-                filter.limit,
+                noFilter.limit,
                 any(),
-                filter.sortOrder!!,
-                filter.sortBy!!,
-                filter.data
+                noFilter.sortOrder!!,
+                noFilter.sortBy!!,
+                noFilter.data
             )
-        } returns eventList
-        every { eventServiceMock.count(wallet, filter.data) } returns 1
+        } returns listOf(getEvent(EventType.Credential.Receive, issuerData))
+        every { eventServiceMock.count(wallet, noFilter.data) } returns 1
         coEvery { issuerNameResolutionMock.resolve("String") } returns "issuer-name"
-        coEvery { verifierNameResolutionMock.resolve("String") } returns "verifier-name"
-        val result = sut.filter(account, wallet, filter)
+        val result = sut.filter(account, wallet, noFilter)
         assertTrue(result is EventLogFilterDataResult)
         assertEquals(expected = 1, actual = result.items.size)
         assertEquals(
@@ -78,4 +59,53 @@ class EventFilterUseCaseTest {
             actual = JsonUtils.tryGetData(result.items[0].data, "organization.name")!!.jsonPrimitive.content
         )
     }
+
+    @Test
+    fun `given a presentation event, when listing events, then result contains the verifier resolved name`() = runTest {
+        every {
+            eventServiceMock.get(
+                account,
+                wallet,
+                noFilter.limit,
+                any(),
+                noFilter.sortOrder!!,
+                noFilter.sortBy!!,
+                noFilter.data
+            )
+        } returns listOf(getEvent(EventType.Credential.Present, verifierData))
+        every { eventServiceMock.count(wallet, noFilter.data) } returns 1
+        coEvery { verifierNameResolutionMock.resolve("String") } returns "verifier-name"
+        val result = sut.filter(account, wallet, noFilter)
+        assertTrue(result is EventLogFilterDataResult)
+        assertEquals(expected = 1, actual = result.items.size)
+        assertEquals(
+            expected = "verifier-name",
+            actual = JsonUtils.tryGetData(result.items[0].data, "organization.name")!!.jsonPrimitive.content
+        )
+    }
+
+    private fun getEvent(action: EventType.Action, organization: CredentialEventDataActor.Organization) =
+        CredentialEventData(
+            credentialId = "String",
+            ecosystem = "String",
+            logo = "String",
+            type = "String",
+            format = "String",
+            proofType = "String",
+            protocol = "String",
+            subject = CredentialEventDataActor.Subject(
+                subjectId = "String",
+                subjectKeyType = "String",
+            ),
+            organization = organization
+        ).let {
+            Event(
+                event = action.type,
+                action = action.toString(),
+                tenant = "",
+                account = account,
+                wallet = wallet,
+                data = Json.encodeToJsonElement(it).jsonObject
+            )
+        }
 }
