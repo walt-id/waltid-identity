@@ -9,7 +9,6 @@ import org.jetbrains.exposed.sql.ResultRow
 data class IssuerDataTransferObject(
     val wallet: UUID,
     val did: String,
-    val name: String? = null,
     val description: String? = "no description",
     val uiEndpoint: String = "",
     val configurationEndpoint: String = "",
@@ -18,7 +17,6 @@ data class IssuerDataTransferObject(
     constructor(resultRow: ResultRow) : this(
         wallet = resultRow[WalletIssuers.wallet].value,
         did = resultRow[WalletIssuers.did],
-        name = resultRow[WalletIssuers.name],
         description = resultRow[WalletIssuers.description],
         uiEndpoint = resultRow[WalletIssuers.uiEndpoint],
         configurationEndpoint = resultRow[WalletIssuers.configurationEndpoint],
@@ -29,7 +27,6 @@ data class IssuerDataTransferObject(
         fun default(wallet: UUID) = IssuerDataTransferObject(
             wallet = wallet,
             did = "did:web:walt.id",
-            name = "walt.id",
             description = "walt.id issuer portal",
             uiEndpoint = "https://portal.walt.id/credentials?ids=",
             configurationEndpoint = "https://issuer.portal.walt.id/.well-known/openid-credential-issuer",
