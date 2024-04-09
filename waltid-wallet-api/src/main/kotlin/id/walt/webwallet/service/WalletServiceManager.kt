@@ -8,6 +8,7 @@ import id.walt.webwallet.db.models.AccountWalletPermissions
 import id.walt.webwallet.db.models.Wallets
 import id.walt.webwallet.seeker.DefaultCredentialTypeSeeker
 import id.walt.webwallet.service.account.AccountsService
+import id.walt.webwallet.service.cache.EntityNameResolutionCacheService
 import id.walt.webwallet.service.category.CategoryServiceImpl
 import id.walt.webwallet.service.credentials.CredentialStatusServiceFactory
 import id.walt.webwallet.service.credentials.CredentialValidator
@@ -38,7 +39,7 @@ import id.walt.webwallet.usecase.exchange.strategies.DescriptorNoMatchPresentati
 import id.walt.webwallet.usecase.exchange.strategies.DescriptorPresentationDefinitionMatchStrategy
 import id.walt.webwallet.usecase.exchange.strategies.FilterNoMatchPresentationDefinitionMatchStrategy
 import id.walt.webwallet.usecase.exchange.strategies.FilterPresentationDefinitionMatchStrategy
-import id.walt.webwallet.usecase.issuer.IssuerNameResolutionUseCase
+import id.walt.webwallet.usecase.entity.EntityNameResolutionUseCase
 import id.walt.webwallet.usecase.issuer.IssuerUseCaseImpl
 import id.walt.webwallet.usecase.notification.NotificationFilterUseCase
 import id.walt.webwallet.usecase.notification.NotificationUseCase
@@ -81,9 +82,11 @@ object WalletServiceManager {
         ),
     )
     private val issuerNameResolutionService = DefaultNameResolutionService(httpClient, trustConfig.issuersRecord)
+    private val verifierNameResolutionService = DefaultNameResolutionService(httpClient, trustConfig.verifiersRecord)
+    private val issuerNameResolutionUseCase = EntityNameResolutionUseCase(EntityNameResolutionCacheService, issuerNameResolutionService)
+    private val verifierNameResolutionUseCase = EntityNameResolutionUseCase(EntityNameResolutionCacheService, verifierNameResolutionService)
     val issuerUseCase = IssuerUseCaseImpl(service = IssuersService, http = httpClient)
-    private val issuerNameResolutionUseCase = IssuerNameResolutionUseCase(issuerUseCase, issuerNameResolutionService)
-    val eventUseCase = EventLogUseCase(eventService, issuerNameResolutionUseCase)
+    val eventUseCase = EventLogUseCase(eventService)
     val eventFilterUseCase = EventFilterUseCase(eventService, issuerNameResolutionUseCase)
     val oidcConfig by lazy { ConfigManager.getConfig<OidcConfiguration>() }
     val issuerTrustValidationService by lazy { DefaultTrustValidationService(httpClient, trustConfig.issuersRecord) }

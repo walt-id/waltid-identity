@@ -4,7 +4,6 @@ import id.walt.crypto.keys.Key
 import id.walt.did.dids.document.DidDocument
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.service.events.*
-import id.walt.webwallet.usecase.issuer.IssuerNameResolutionUseCase
 import id.walt.webwallet.utils.JsonUtils
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
@@ -12,7 +11,6 @@ import kotlinx.uuid.UUID
 
 class EventLogUseCase(
     private val eventService: EventService,
-    private val issuerNameResolutionUseCase: IssuerNameResolutionUseCase,
 ) {
 
     fun log(

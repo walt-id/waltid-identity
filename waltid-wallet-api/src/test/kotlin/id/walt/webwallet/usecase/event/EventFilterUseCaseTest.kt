@@ -1,7 +1,7 @@
 package id.walt.webwallet.usecase.event
 
 import id.walt.webwallet.service.events.*
-import id.walt.webwallet.usecase.issuer.IssuerNameResolutionUseCase
+import id.walt.webwallet.usecase.entity.EntityNameResolutionUseCase
 import id.walt.webwallet.utils.JsonUtils
 import io.mockk.coEvery
 import io.mockk.every
@@ -18,7 +18,7 @@ import kotlin.test.assertTrue
 
 class EventFilterUseCaseTest {
     private val eventServiceMock = mockk<EventService>()
-    private val issuerNameResolutionMock = mockk<IssuerNameResolutionUseCase>()
+    private val issuerNameResolutionMock = mockk<EntityNameResolutionUseCase>()
     private val sut = EventFilterUseCase(eventServiceMock, issuerNameResolutionMock)
     private val account = UUID()
     private val wallet = UUID()
