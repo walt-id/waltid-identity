@@ -21,7 +21,7 @@ import id.walt.webwallet.service.dids.DidsService
 import id.walt.webwallet.service.endpoint.EntraServiceEndpointProvider
 import id.walt.webwallet.service.events.EventService
 import id.walt.webwallet.service.exchange.IssuanceService
-import id.walt.webwallet.service.issuers.DefaultIssuerNameResolutionService
+import id.walt.webwallet.service.entity.DefaultNameResolutionService
 import id.walt.webwallet.service.issuers.IssuersService
 import id.walt.webwallet.service.notifications.NotificationService
 import id.walt.webwallet.service.settings.SettingsService
@@ -80,7 +80,7 @@ object WalletServiceManager {
             bitStringValueParser = BitStringValueParser(),
         ),
     )
-    private val issuerNameResolutionService = DefaultIssuerNameResolutionService(httpClient, trustConfig.issuersRecord)
+    private val issuerNameResolutionService = DefaultNameResolutionService(httpClient, trustConfig.issuersRecord)
     val issuerUseCase = IssuerUseCaseImpl(service = IssuersService, http = httpClient)
     private val issuerNameResolutionUseCase = IssuerNameResolutionUseCase(issuerUseCase, issuerNameResolutionService)
     val eventUseCase = EventLogUseCase(eventService, issuerNameResolutionUseCase)
