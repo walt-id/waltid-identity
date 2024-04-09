@@ -8,7 +8,7 @@ import kotlinx.uuid.UUID
 class EventFilterUseCase(
     private val service: EventService,
     private val issuerNameResolutionUseCase: EntityNameResolutionUseCase,
-//    private val verifierNameResolutionService: VerifierNameResolutionService,
+    private val verifierNameResolutionUseCase: EntityNameResolutionUseCase,
 ) {
     private val json = Json { ignoreUnknownKeys = true }
     private val eventFilterByActionCondition: (event: Event, actions: List<EventType.Action>) -> Boolean = { e, a ->
@@ -36,13 +36,8 @@ class EventFilterUseCase(
             nextStartingAfter = computeNextStartingAfter(startingAfterItemIndex, pageSize, count)
         )
     }.fold(onSuccess = {
-//        val items = resolveEntityNames(it.items.filter {
-//            eventFilterByActionCondition(it, listOf(EventType.Credential.Receive, EventType.Credential.Present))
-//        }).plus(it.items.filter {
-//            !eventFilterByActionCondition(it, listOf(EventType.Credential.Receive, EventType.Credential.Present))
-//        })
-
         it.copy(
+            //TODO: normally, would build a separate dto out of db data
             items = tryResolveEntityNames(it.items)
         )
     }, onFailure = { EventLogFilterErrorResult(reason = it.localizedMessage) })
@@ -57,46 +52,30 @@ class EventFilterUseCase(
     }
 
     private suspend fun tryResolveEntityNames(items: List<Event>) = items.map { event ->
-        tryDecodeData(event.data)?.let {
-            when (it.organization) {
-                is CredentialEventDataActor.Organization.Issuer -> event.wallet?.let { w ->
-                    event.copy(
-                        data = updateIssuerName(w, it, it.organization)
-                    )
-                }
-
-                is CredentialEventDataActor.Organization.Verifier -> event
-                else -> event
-            }
+        tryDecodeData<CredentialEventData>(event.data)?.let { data ->
+            data.organization?.let { event.copy(data = updateEntityName(data, it)) }
         } ?: event
     }
 
-    private fun tryDecodeData(data: JsonObject) =
-        runCatching { json.decodeFromJsonElement<CredentialEventData>(data) }.getOrNull()
+    private inline fun <reified T> tryDecodeData(data: JsonObject) =
+        runCatching { json.decodeFromJsonElement<T>(data) }.getOrNull()
 
-    private suspend fun updateIssuerName(
-        wallet: UUID,
+    private suspend fun updateEntityName(
         data: CredentialEventData,
-        issuer: CredentialEventDataActor.Organization.Issuer
-    ) = json.encodeToJsonElement(
-        data.copy(
-            organization = issuer.copy(
-                name = issuerNameResolutionUseCase.resolve(issuer.did)
-            )
+        entity: CredentialEventDataActor.Organization
+    ) = when (entity) {
+        is CredentialEventDataActor.Organization.Issuer -> entity.copy(
+            name = issuerNameResolutionUseCase.resolve(entity.did)
         )
-    ).jsonObject
 
-    //TODO: duplicated
-//    private suspend fun updateVerifierName(
-//        data: CredentialEventData,
-//        verifier: CredentialEventDataActor.Organization.Verifier
-//    ) = json.encodeToJsonElement(
-//        data.copy(
-//            organization = verifier.copy(
-//                name = verifierNameResolutionService.resolve(verifier.did).getOrNull() ?: verifier.did
-//            )
-//        )
-//    ).jsonObject
+        is CredentialEventDataActor.Organization.Verifier -> entity.copy(
+            name = verifierNameResolutionUseCase.resolve(entity.did)
+        )
+    }.let {
+        json.encodeToJsonElement(
+            data.copy(organization = it)
+        )
+    }.jsonObject
 
     //TODO: solve original order
 //    private suspend fun resolveEntityNames(items: List<Event>): List<Event> = items.groupBy {
