@@ -1,12 +1,12 @@
 package id.walt.webwallet.usecase.issuer
 
 import id.walt.webwallet.service.issuers.IssuerDataTransferObject
-import id.walt.webwallet.service.issuers.IssuerNameResolutionService
+import id.walt.webwallet.service.entity.EntityNameResolutionService
 import kotlinx.uuid.UUID
 
 class IssuerNameResolutionUseCase(
     private val issuerUseCase: IssuerUseCase,
-    private val nameResolutionService: IssuerNameResolutionService
+    private val nameResolutionService: EntityNameResolutionService
 ) {
     suspend fun resolve(wallet: UUID, did: String): String = let {
         issuerUseCase.get(wallet, did).getOrNull() ?: IssuerDataTransferObject(
