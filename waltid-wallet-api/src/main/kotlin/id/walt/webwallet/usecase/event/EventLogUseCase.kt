@@ -2,6 +2,7 @@ package id.walt.webwallet.usecase.event
 
 import id.walt.crypto.keys.Key
 import id.walt.did.dids.document.DidDocument
+import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.service.events.*
 import id.walt.webwallet.utils.JsonUtils
@@ -83,16 +84,14 @@ class EventLogUseCase(
         WalletCredential.parseIssuerDid(credential.parsedDocument, credential.parsedManifest).let {
             CredentialEventDataActor.Organization.Issuer(
                 did = it ?: EventDataNotAvailable,
-//                name = WalletCredential.getManifestIssuerName(credential.parsedManifest),
                 keyId = EventDataNotAvailable,
                 keyType = EventDataNotAvailable,
             )
         }
 
-    fun verifierData() = CredentialEventDataActor.Organization.Verifier(
-        did = EventDataNotAvailable,
-//        name = EventDataNotAvailable,
-        policies = emptyList(),
+    fun verifierData(request: AuthorizationRequest) = CredentialEventDataActor.Organization.Verifier(
+        did = request.clientId.takeIf { it.isNotEmpty() } ?: EventDataNotAvailable,
+        policies = emptyList(),//TODO: from input-descriptors?
     )
 
     fun didEventData(did: String, document: DidDocument) = didEventData(did, document.toString())
