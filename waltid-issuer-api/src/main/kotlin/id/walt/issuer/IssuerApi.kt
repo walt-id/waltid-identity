@@ -11,6 +11,7 @@ import id.walt.did.dids.DidService
 import id.walt.did.dids.registrar.dids.DidCreateOptions
 import id.walt.issuer.IssuanceExamples.batchExample
 import id.walt.issuer.IssuanceExamples.issuerOnboardingRequestDefaultExample
+import id.walt.issuer.IssuanceExamples.issuerOnboardingRequestDidWebExample
 import id.walt.issuer.IssuanceExamples.issuerOnboardingRequestTseExample
 import id.walt.issuer.IssuanceExamples.issuerOnboardingResponseDefaultExample
 import id.walt.issuer.IssuanceExamples.issuerOnboardingResponseTseExample
@@ -76,6 +77,7 @@ fun Application.issuerApi() {
                         description = "Issuer onboarding request (key & DID) config."
                         example("Local key + ed25519 key (default)", issuerOnboardingRequestDefaultExample)
                         example("Hashicorp Vault Transit Engine (TSE) key + RSA", issuerOnboardingRequestTseExample)
+                        example("Passing arguments to the DID", issuerOnboardingRequestDidWebExample)
                         required = true
                     }
                 }
