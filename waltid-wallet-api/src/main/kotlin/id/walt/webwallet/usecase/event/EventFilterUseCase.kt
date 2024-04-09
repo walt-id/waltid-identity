@@ -1,13 +1,13 @@
 package id.walt.webwallet.usecase.event
 
 import id.walt.webwallet.service.events.*
-import id.walt.webwallet.usecase.issuer.IssuerNameResolutionUseCase
+import id.walt.webwallet.usecase.entity.EntityNameResolutionUseCase
 import kotlinx.serialization.json.*
 import kotlinx.uuid.UUID
 
 class EventFilterUseCase(
     private val service: EventService,
-    private val issuerNameResolutionUseCase: IssuerNameResolutionUseCase,
+    private val issuerNameResolutionUseCase: EntityNameResolutionUseCase,
 //    private val verifierNameResolutionService: VerifierNameResolutionService,
 ) {
     private val json = Json { ignoreUnknownKeys = true }
@@ -43,7 +43,7 @@ class EventFilterUseCase(
 //        })
 
         it.copy(
-            items = tryResolveName(it.items)
+            items = tryResolveEntityNames(it.items)
         )
     }, onFailure = { EventLogFilterErrorResult(reason = it.localizedMessage) })
 
@@ -56,7 +56,7 @@ class EventFilterUseCase(
         itemIndex.takeIf { it < count }?.toString()
     }
 
-    private suspend fun tryResolveName(items: List<Event>) = items.map { event ->
+    private suspend fun tryResolveEntityNames(items: List<Event>) = items.map { event ->
         tryDecodeData(event.data)?.let {
             when (it.organization) {
                 is CredentialEventDataActor.Organization.Issuer -> event.wallet?.let { w ->
@@ -81,7 +81,7 @@ class EventFilterUseCase(
     ) = json.encodeToJsonElement(
         data.copy(
             organization = issuer.copy(
-                name = issuerNameResolutionUseCase.resolve(wallet, issuer.did)
+                name = issuerNameResolutionUseCase.resolve(issuer.did)
             )
         )
     ).jsonObject

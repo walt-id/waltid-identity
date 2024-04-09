@@ -11,8 +11,8 @@ import id.walt.webwallet.service.events.Event
 import id.walt.webwallet.service.events.EventType
 import id.walt.webwallet.service.exchange.IssuanceService
 import id.walt.webwallet.service.trust.TrustValidationService
+import id.walt.webwallet.usecase.entity.EntityNameResolutionUseCase
 import id.walt.webwallet.usecase.event.EventLogUseCase
-import id.walt.webwallet.usecase.issuer.IssuerNameResolutionUseCase
 import id.walt.webwallet.usecase.issuer.IssuerUseCase
 import id.walt.webwallet.usecase.notification.NotificationUseCase
 import kotlinx.datetime.Clock
@@ -26,7 +26,7 @@ class SilentClaimStrategy(
     private val issuanceService: IssuanceService,
     private val credentialService: CredentialsService,
     private val issuerTrustValidationService: TrustValidationService,
-    private val issuerNameResolutionUseCase: IssuerNameResolutionUseCase,
+    private val issuerNameResolutionUseCase: EntityNameResolutionUseCase,
     private val accountService: AccountsService,
     private val didService: DidsService,
     private val issuerUseCase: IssuerUseCase,
@@ -146,10 +146,10 @@ class SilentClaimStrategy(
             )
         }
 
-    //TODO: duplicated in [EventUseCase]
+    //TODO: delay to notification filtering (similar to event filtering)
     private suspend fun getIssuerName(credential: WalletCredential) =
         WalletCredential.getManifestIssuerName(credential.parsedManifest) ?: issuerNameResolutionUseCase.resolve(
-            wallet = credential.wallet, did = WalletCredential.parseIssuerDid(
+            did = WalletCredential.parseIssuerDid(
                 credential.parsedDocument,
                 credential.parsedManifest
             ) ?: ""

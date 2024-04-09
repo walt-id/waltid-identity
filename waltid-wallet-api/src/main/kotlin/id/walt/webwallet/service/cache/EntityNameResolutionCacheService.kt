@@ -26,7 +26,7 @@ object EntityNameResolutionCacheService {
             EntityNameResolutionCache.did
         ) {
             it[this.name] = data.name
-            it[this.age] = Clock.System.now().toJavaInstant()
+            it[this.timestamp] = Clock.System.now().toJavaInstant()
         }
     }
 
