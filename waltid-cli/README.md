@@ -308,7 +308,8 @@ provides [a repository of VCs](https://docs.oss.walt.id/issuer/sdks/manage-crede
 that can be used as templates for creating your own. Choose the one that best suits your needs.
 
 Let's choose the [OpenBadgeCredential](https://credentials.walt.id/credentials/openbadgecredential), adjust it
-accordingly and save it in a file called `openbadgecredential_sample.json`.
+accordingly and save it in a file called `openbadgecredential_sample.json`. For convenience, there
+is [an example file you can use](https://github.com/walt-id/waltid-identity/blob/main/waltid-cli/src/jvmTest/resources/vc/openbadgecredential_sample.json).
 
 ```json
 {
@@ -371,7 +372,7 @@ accordingly and save it in a file called `openbadgecredential_sample.json`.
 ```
 $ waltid vc sign --key myKey.json 
                  --subject did:key:z6Mkjm2gaGsodGchfG4k8P6KwCHZsVEPZho5VuEbY94qiBB9 
-                 openbadgecredential_sample.json
+                 ./openbadgecredential_sample.json
 ```
 
 ## `waltid vc verify` command
