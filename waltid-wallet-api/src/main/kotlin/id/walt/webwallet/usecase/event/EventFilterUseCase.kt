@@ -42,10 +42,12 @@ class EventFilterUseCase(
         )
     }, onFailure = { EventLogFilterErrorResult(reason = it.localizedMessage) })
 
+    //TODO: move to separate use case
     private fun computeCurrentStartingAfter(afterItemIndex: Long): String? = let {
         afterItemIndex.takeIf { it >= 0 }?.toString()
     }
 
+    //TODO: move to separate use case
     private fun computeNextStartingAfter(afterItemIndex: Long, pageSize: Int, count: Long): String? = let {
         val itemIndex = afterItemIndex + pageSize
         itemIndex.takeIf { it < count }?.toString()

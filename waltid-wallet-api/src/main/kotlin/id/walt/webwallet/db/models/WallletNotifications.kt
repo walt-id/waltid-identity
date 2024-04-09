@@ -1,12 +1,13 @@
 package id.walt.webwallet.db.models
 
-import id.walt.crypto.utils.JsonUtils.toJsonElement
 import kotlinx.datetime.Instant
 import kotlinx.datetime.toKotlinInstant
-import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.Transient
-import kotlinx.serialization.json.*
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.decodeFromJsonElement
+import kotlinx.serialization.json.jsonObject
 import kotlinx.uuid.exposed.KotlinxUUIDTable
 import kotlinx.uuid.exposed.kotlinxUUID
 import org.jetbrains.exposed.sql.ResultRow
@@ -30,9 +31,26 @@ data class Notification(
     val type: String,
     val status: Boolean,
     val addedOn: Instant,
-    @Transient val data: String = "",
-    @SerialName("data") val parsedData: JsonObject = NotificationDataSerializer.decodeFromString(data)
+    val data: Data,
 ) {
+    constructor(
+        id: String? = null,
+        account: String,
+        wallet: String,
+        type: String,
+        status: Boolean,
+        addedOn: Instant,
+        data: JsonElement,
+    ) : this(
+        id = id,
+        account = account,
+        wallet = wallet,
+        type = type,
+        status = status,
+        addedOn = addedOn,
+        data = NotificationDataSerializer.decodeFromJsonElement<Data>(data),
+    )
+
     constructor(resultRow: ResultRow) : this(
         id = resultRow[WalletNotifications.id].value.toString(),
         account = resultRow[WalletNotifications.account].toString(),
@@ -40,30 +58,20 @@ data class Notification(
         type = resultRow[WalletNotifications.type],
         status = resultRow[WalletNotifications.isRead],
         addedOn = resultRow[WalletNotifications.addedOn].toKotlinInstant(),
-        data = resultRow[WalletNotifications.data],
+        data = NotificationDataSerializer.parseToJsonElement(resultRow[WalletNotifications.data]).jsonObject,
     )
 
-    fun tryGetData(json: JsonObject, key: String): JsonElement? = key.split('.').let {
-        var js: JsonElement? = json.toJsonElement()
-        for (i in it) {
-            val element = js?.jsonObject?.get(i)
-            js = when (element) {
-                is JsonObject -> element
-                is JsonArray -> element.jsonArray
-                else -> element?.jsonPrimitive
-            }
-        }
-        js
-    }
-
-    interface Data
+    @Serializable
+    sealed interface Data
 
     @Serializable
-    data class CredentialData(
+    data class CredentialIssuanceData(
         val credentialId: String,
-        val logo: String,
-        val detail: String,
+        val credentialType: String = "",
+        val issuer: String = "",
+        val logo: String = "",
     ) : Data
 }
 
 private val NotificationDataSerializer = Json { ignoreUnknownKeys = true }
+fun Notification.Data.serialize() = NotificationDataSerializer.encodeToString(this)

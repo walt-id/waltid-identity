@@ -20,7 +20,12 @@ object JsonUtils {
             else -> throw IllegalArgumentException("Unknown type for: $this")
         }
 
-    //TODO: remove from WallletNotifications.kt when PR-278 (minor event and notification improvements) is merged
+    /**
+     * Attempts to extract the value identified by [key] from [json]
+     * @param json the json object to parse
+     * @param key the key to look for (dot-notation)
+     * @return the [JsonElement] value of the [key] if found, otherwise null
+     */
     fun tryGetData(json: JsonObject, key: String): JsonElement? = key.split('.').let {
         var element: JsonElement? = json.toJsonElement()
         for (i in it) {
