@@ -19,7 +19,8 @@ import kotlin.test.assertTrue
 class EventFilterUseCaseTest {
     private val eventServiceMock = mockk<EventService>()
     private val issuerNameResolutionMock = mockk<EntityNameResolutionUseCase>()
-    private val sut = EventFilterUseCase(eventServiceMock, issuerNameResolutionMock)
+    private val verifierNameResolutionMock = mockk<EntityNameResolutionUseCase>()
+    private val sut = EventFilterUseCase(eventServiceMock, issuerNameResolutionMock, verifierNameResolutionMock)
     private val account = UUID()
     private val wallet = UUID()
     private val eventData = CredentialEventData(
@@ -67,13 +68,14 @@ class EventFilterUseCaseTest {
             )
         } returns eventList
         every { eventServiceMock.count(wallet, filter.data) } returns 1
-        coEvery { issuerNameResolutionMock.resolve(wallet, "String") } returns "issuer-name"
+        coEvery { issuerNameResolutionMock.resolve("String") } returns "issuer-name"
+        coEvery { verifierNameResolutionMock.resolve("String") } returns "verifier-name"
         val result = sut.filter(account, wallet, filter)
         assertTrue(result is EventLogFilterDataResult)
         assertEquals(expected = 1, actual = result.items.size)
         assertEquals(
-            expected = "String",
-            actual = JsonUtils.tryGetData(result.items[0].data, "organization.did")!!.jsonPrimitive.content
+            expected = "issuer-name",
+            actual = JsonUtils.tryGetData(result.items[0].data, "organization.name")!!.jsonPrimitive.content
         )
     }
 }
