@@ -25,6 +25,7 @@ object EntityNameResolutionCacheService {
         EntityNameResolutionCache.upsert(
             EntityNameResolutionCache.did
         ) {
+            it[this.did] = data.did
             it[this.name] = data.name
             it[this.timestamp] = Clock.System.now().toJavaInstant()
         }
