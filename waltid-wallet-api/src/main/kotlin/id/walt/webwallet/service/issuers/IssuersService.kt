@@ -20,13 +20,12 @@ object IssuersService {
     fun add(
         wallet: UUID,
         did: String,
-        name: String?,
         description: String?,
         uiEndpoint: String,
         configurationEndpoint: String,
         authorized: Boolean = false
     ) = transaction {
-        addToWalletQuery(wallet, did, name, description, uiEndpoint, configurationEndpoint, authorized)
+        addToWalletQuery(wallet, did, description, uiEndpoint, configurationEndpoint, authorized)
     }.insertedCount
 
     fun authorize(wallet: UUID, issuer: String) = transaction {
@@ -44,7 +43,6 @@ object IssuersService {
     private fun addToWalletQuery(
         wallet: UUID,
         did: String,
-        name: String?,
         description: String?,
         uiEndpoint: String,
         configurationEndpoint: String,
@@ -52,7 +50,6 @@ object IssuersService {
     ) = WalletIssuers.upsert(
         keys = arrayOf(WalletIssuers.wallet, WalletIssuers.did),
         onUpdate = listOf(
-            name?.let { WalletIssuers.name to stringLiteral(it) },
             description?.let { WalletIssuers.description to stringLiteral(it) },
             WalletIssuers.uiEndpoint to stringLiteral(uiEndpoint),
             WalletIssuers.configurationEndpoint to stringLiteral(configurationEndpoint),
@@ -63,7 +60,6 @@ object IssuersService {
     ) {
         it[this.wallet] = wallet
         it[this.did] = did
-        it[this.name] = name
         it[this.description] = description
         it[this.uiEndpoint] = uiEndpoint
         it[this.configurationEndpoint] = configurationEndpoint

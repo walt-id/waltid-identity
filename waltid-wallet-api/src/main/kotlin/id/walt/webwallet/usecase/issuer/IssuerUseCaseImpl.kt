@@ -28,7 +28,6 @@ class IssuerUseCaseImpl(
         service.add(
             issuer.wallet,
             issuer.did,
-            issuer.name,
             issuer.description,
             issuer.uiEndpoint,
             issuer.configurationEndpoint,
