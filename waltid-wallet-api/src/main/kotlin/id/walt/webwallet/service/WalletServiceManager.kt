@@ -41,6 +41,8 @@ import id.walt.webwallet.usecase.exchange.strategies.FilterNoMatchPresentationDe
 import id.walt.webwallet.usecase.exchange.strategies.FilterPresentationDefinitionMatchStrategy
 import id.walt.webwallet.usecase.entity.EntityNameResolutionUseCase
 import id.walt.webwallet.usecase.issuer.IssuerUseCaseImpl
+import id.walt.webwallet.usecase.notification.NotificationDataFormatter
+import id.walt.webwallet.usecase.notification.NotificationDispatchUseCase
 import id.walt.webwallet.usecase.notification.NotificationFilterUseCase
 import id.walt.webwallet.usecase.notification.NotificationUseCase
 import id.walt.webwallet.utils.WalletHttpClients.getHttpClient
@@ -85,14 +87,16 @@ object WalletServiceManager {
     private val verifierNameResolutionService = DefaultNameResolutionService(httpClient, trustConfig.verifiersRecord)
     private val issuerNameResolutionUseCase = EntityNameResolutionUseCase(EntityNameResolutionCacheService, issuerNameResolutionService)
     private val verifierNameResolutionUseCase = EntityNameResolutionUseCase(EntityNameResolutionCacheService, verifierNameResolutionService)
+    private val notificationDataFormatter = NotificationDataFormatter(issuerNameResolutionUseCase)
+    private val notificationDispatchUseCase = NotificationDispatchUseCase(httpClient, notificationDataFormatter)
     val issuerUseCase = IssuerUseCaseImpl(service = IssuersService, http = httpClient)
     val eventUseCase = EventLogUseCase(eventService)
     val eventFilterUseCase = EventFilterUseCase(eventService, issuerNameResolutionUseCase, verifierNameResolutionUseCase)
     val oidcConfig by lazy { ConfigManager.getConfig<OidcConfiguration>() }
     val issuerTrustValidationService by lazy { DefaultTrustValidationService(httpClient, trustConfig.issuersRecord) }
     val verifierTrustValidationService by lazy { DefaultTrustValidationService(httpClient, trustConfig.verifiersRecord) }
-    val notificationUseCase = NotificationUseCase(NotificationService, httpClient)
-    val notificationFilterUseCase = NotificationFilterUseCase(NotificationService, credentialService)
+    val notificationUseCase = NotificationUseCase(NotificationService)
+    val notificationFilterUseCase = NotificationFilterUseCase(NotificationService, credentialService, notificationDataFormatter)
     val matchPresentationDefinitionCredentialsUseCase = MatchPresentationDefinitionCredentialsUseCase(
         credentialService,
         FilterPresentationDefinitionMatchStrategy(filterParser),
@@ -108,12 +112,12 @@ object WalletServiceManager {
             issuanceService = IssuanceService,
             credentialService = credentialService,
             issuerTrustValidationService = issuerTrustValidationService,
-            issuerNameResolutionUseCase = issuerNameResolutionUseCase,
             accountService = AccountsService,
             didService = DidsService,
             issuerUseCase = issuerUseCase,
             eventUseCase = eventUseCase,
             notificationUseCase = notificationUseCase,
+            notificationDispatchUseCase = notificationDispatchUseCase,
             credentialTypeSeeker = credentialTypeSeeker,
         )
     }

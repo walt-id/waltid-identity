@@ -2,6 +2,7 @@ package id.walt.webwallet.service.notifications
 
 import id.walt.webwallet.db.models.Notification
 import id.walt.webwallet.db.models.WalletNotifications
+import id.walt.webwallet.db.models.serialize
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.toJavaInstant
 import kotlinx.datetime.toJavaLocalDate
@@ -62,13 +63,15 @@ object NotificationService {
     private fun insert(vararg notifications: Notification): List<UUID> = WalletNotifications.batchInsert(
         data = notifications.toList()
     ) {
-        it.id?.let { UUID(it) }?.let { this[WalletNotifications.id] = it } //TODO: converted back and forth (see silent exchange controller)
+        it.id?.let { UUID(it) }?.let {
+            this[WalletNotifications.id] = it
+        } //TODO: converted back and forth (see silent exchange controller)
         this[WalletNotifications.account] = UUID(it.account)
         this[WalletNotifications.wallet] = UUID(it.wallet)
         this[WalletNotifications.type] = it.type
         this[WalletNotifications.isRead] = it.status
         this[WalletNotifications.addedOn] = it.addedOn.toJavaInstant()
-        this[WalletNotifications.data] = it.data
+        this[WalletNotifications.data] = it.data.serialize()
     }.map { it[WalletNotifications.id].value }
 
     private fun update(notification: Notification) = notification.id?.let {
@@ -80,7 +83,7 @@ object NotificationService {
             it[this.type] = notification.type
             it[this.isRead] = notification.status
             it[this.addedOn] = notification.addedOn.toJavaInstant()
-            it[this.data] = notification.data
+            it[this.data] = notification.data.serialize()
         }
     } ?: 0
 }

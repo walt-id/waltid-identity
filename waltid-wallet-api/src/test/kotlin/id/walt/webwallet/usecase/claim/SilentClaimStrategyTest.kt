@@ -10,9 +10,10 @@ import id.walt.webwallet.service.events.CredentialEventDataActor
 import id.walt.webwallet.service.exchange.IssuanceService
 import id.walt.webwallet.service.issuers.IssuerDataTransferObject
 import id.walt.webwallet.service.trust.TrustValidationService
-import id.walt.webwallet.usecase.event.EventLogUseCase
 import id.walt.webwallet.usecase.entity.EntityNameResolutionUseCase
+import id.walt.webwallet.usecase.event.EventLogUseCase
 import id.walt.webwallet.usecase.issuer.IssuerUseCase
+import id.walt.webwallet.usecase.notification.NotificationDispatchUseCase
 import id.walt.webwallet.usecase.notification.NotificationUseCase
 import io.mockk.*
 import kotlinx.coroutines.test.runTest
@@ -32,6 +33,7 @@ class SilentClaimStrategyTest {
     private val issuerUseCase = mockk<IssuerUseCase>()
     private val eventUseCase = mockk<EventLogUseCase>()
     private val notificationUseCase = mockk<NotificationUseCase>()
+    private val notificationDispatchUseCaseMock = mockk<NotificationDispatchUseCase>()
     private val credentialTypeSeeker = mockk<Seeker<String>>()
     private val didService: DidsService = mockk<DidsService>()
     private val accountService: AccountsService = mockk<AccountsService>()
@@ -39,12 +41,12 @@ class SilentClaimStrategyTest {
         issuanceService = issuanceService,
         credentialService = credentialService,
         issuerTrustValidationService = issuerTrustValidationService,
-        issuerNameResolutionUseCase = issuerNameResolutionUseCase,
         accountService = accountService,
         didService = didService,
         issuerUseCase = issuerUseCase,
         eventUseCase = eventUseCase,
         notificationUseCase = notificationUseCase,
+        notificationDispatchUseCase = notificationDispatchUseCaseMock,
         credentialTypeSeeker = credentialTypeSeeker
     )
     private val did = "did:my:test"
@@ -76,9 +78,15 @@ class SilentClaimStrategyTest {
             "subjectId",
             "subjectKeyType"
         )
+        every { eventUseCase.issuerData(any()) } returns CredentialEventDataActor.Organization.Issuer(
+            "did",
+            "name",
+            "keyId",
+            "keyType",
+        )
         every { eventUseCase.log(any()) } just Runs
         every { notificationUseCase.add(any()) } returns listOf(UUID.generateUUID())
-        coEvery { notificationUseCase.send(any()) } just Runs
+        coEvery { notificationDispatchUseCaseMock.send(any()) } just Runs
         coEvery { issuerNameResolutionUseCase.resolve(any()) } returns "test"
     }
 
@@ -93,11 +101,11 @@ class SilentClaimStrategyTest {
             assertEquals(credentialId, result[0])
             verify(exactly = 1) { eventUseCase.log(any()) }
             verify(exactly = 1) { notificationUseCase.add(any()) }
-            coVerify(exactly = 1) { notificationUseCase.send(any()) }
+            coVerify(exactly = 1) { notificationDispatchUseCaseMock.send(any()) }
         }
 
     @Test
-    fun `given an untrusted issuer, when claiming the offer, then an event is logged and a notification created and sent`() =
+    fun `given an untrusted issuer, when claiming the offer, then no event is logged and no notification created and sent`() =
         runTest {
             coEvery { issuerTrustValidationService.validate(any(), any(), any()) } returns false
 
@@ -106,6 +114,6 @@ class SilentClaimStrategyTest {
             assertEquals(0, result.size)
             verify(exactly = 0) { eventUseCase.log(any()) }
             verify(exactly = 0) { notificationUseCase.add(any()) }
-            coVerify(exactly = 0) { notificationUseCase.send(any()) }
+            coVerify(exactly = 0) { notificationDispatchUseCaseMock.send(any()) }
         }
 }
