@@ -4,7 +4,7 @@ import kotlinx.uuid.exposed.KotlinxUUIDTable
 
 object WalletIssuers : KotlinxUUIDTable("wallet_issuers") {
     val wallet = reference("wallet", Wallets)
-    val did = varchar("did", 512)
+    val did = varchar("did", 1024)
     val name = varchar("name", 512).nullable()
     val description = text("description").nullable().default("no description")
     val uiEndpoint = varchar("ui", 128)
