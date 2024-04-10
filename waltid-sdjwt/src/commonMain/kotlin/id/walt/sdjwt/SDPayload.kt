@@ -141,7 +141,7 @@ data class SDPayload internal constructor(
                 add(key)
                 add(value)
             }.toString().encodeToByteArray()).let { disclosure ->
-                SDisclosure(disclosure, salt, key, value)
+                SDisclosure(disclosure.trimEnd('='), salt, key, value)
             }
         }
 

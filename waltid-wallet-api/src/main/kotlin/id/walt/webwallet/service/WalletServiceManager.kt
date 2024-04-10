@@ -42,6 +42,7 @@ import id.walt.webwallet.usecase.issuer.IssuerUseCaseImpl
 import id.walt.webwallet.usecase.notification.NotificationFilterUseCase
 import id.walt.webwallet.usecase.notification.NotificationUseCase
 import id.walt.webwallet.utils.WalletHttpClients.getHttpClient
+import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.datetime.Clock
 import kotlinx.datetime.toJavaInstant
 import kotlinx.uuid.UUID
@@ -51,6 +52,8 @@ import org.jetbrains.exposed.sql.selectAll
 import java.util.concurrent.ConcurrentHashMap
 
 object WalletServiceManager {
+
+    private val logger = KotlinLogging.logger { }
 
     private val walletServices = ConcurrentHashMap<Pair<UUID, UUID>, WalletService>()
     private val categoryService = CategoryServiceImpl
@@ -132,10 +135,10 @@ object WalletServiceManager {
         }
 
     fun createWallet(tenant: String, forAccount: UUID): UUID {
-        val accountName = AccountsService.get(forAccount).email
+        val accountName = AccountsService.get(forAccount).email ?: "wallet name not defined"
 
         // TODO: remove testing code / lock behind dev-mode
-        if (accountName?.contains("multi-wallet") == true) {
+        if (accountName.contains("multi-wallet") == true) {
             val second = Wallets.insert {
                 it[name] = "ABC Company wallet"
                 it[createdOn] = Clock.System.now().toJavaInstant()
@@ -155,7 +158,8 @@ object WalletServiceManager {
             it[createdOn] = Clock.System.now().toJavaInstant()
         }[Wallets.id].value
 
-        println("Creating wallet mapping: $forAccount -> $walletId")
+        logger.debug { "Creating wallet mapping: $forAccount -> $walletId" }
+
         AccountWalletMappings.insert {
             it[AccountWalletMappings.tenant] = tenant
             it[accountId] = forAccount

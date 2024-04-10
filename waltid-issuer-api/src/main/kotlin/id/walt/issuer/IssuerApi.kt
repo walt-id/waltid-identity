@@ -11,6 +11,7 @@ import id.walt.did.dids.DidService
 import id.walt.did.dids.registrar.dids.DidCreateOptions
 import id.walt.issuer.IssuanceExamples.batchExample
 import id.walt.issuer.IssuanceExamples.issuerOnboardingRequestDefaultExample
+import id.walt.issuer.IssuanceExamples.issuerOnboardingRequestDidWebExample
 import id.walt.issuer.IssuanceExamples.issuerOnboardingRequestTseExample
 import id.walt.issuer.IssuanceExamples.issuerOnboardingResponseDefaultExample
 import id.walt.issuer.IssuanceExamples.issuerOnboardingResponseTseExample
@@ -35,7 +36,7 @@ import kotlinx.serialization.json.*
 import kotlin.time.Duration.Companion.minutes
 
 private val logger = KotlinLogging.logger {}
-suspend fun createCredentialOfferUri(issuanceRequests: List<IssuanceRequest>): String {
+suspend fun createCredentialOfferUri(issuanceRequests: List<BaseIssuanceRequest>): String {
     val credentialOfferBuilder =
         OidcIssuance.issuanceRequestsToCredentialOfferBuilder(issuanceRequests)
 
@@ -75,8 +76,12 @@ fun Application.issuerApi() {
                 request {
                     body<IssuerOnboardingRequest> {
                         description = "Issuer onboarding request (key & DID) config."
-                        example("Local key + ed25519 key (default)", issuerOnboardingRequestDefaultExample)
-                        example("Hashicorp Vault Transit Engine (TSE) key + RSA", issuerOnboardingRequestTseExample)
+                        example("did:jwk + JWK key (Ed25519)", issuerOnboardingRequestDefaultExample)
+                        example(
+                            "did:key + TSE (Hashicorp Vault Transit Engine key - RSA)",
+                            issuerOnboardingRequestTseExample
+                        )
+                        example("did:web + JWK key (Secp256k1)", issuerOnboardingRequestDidWebExample)
                         required = true
                     }
                 }
@@ -86,11 +91,11 @@ fun Application.issuerApi() {
                         description = "Issuer onboarding response"
                         body<IssuerOnboardingResponse> {
                             example(
-                                "Local secp256r1 key + did:jwk",
+                                "did:web + JWK key (Secp256r1)",
                                 issuerOnboardingResponseDefaultExample,
                             )
                             example(
-                                "Remote Ed25519 key + did:key",
+                                "did:key + TSE (Hashicorp Vault Transit Engine key - Ed25519)",
                                 issuerOnboardingResponseTseExample,
                             )
                         }
@@ -104,10 +109,10 @@ fun Application.issuerApi() {
                 // Generate key
 
                 val keyType = getParamOrThrow(
-                    req.issuanceKeyConfig["type"], "Mandatory issuanceKeyConfig param 'type' not provided"
+                    req.issuerKeyConfig["type"], "Mandatory issuerKeyConfig param 'type' not provided"
                 )
                 val keyAlgorithm = getParamOrThrow(
-                    req.issuanceKeyConfig["algorithm"], "Mandatory issuanceKeyConfig param 'algorithm' not provided"
+                    req.issuerKeyConfig["algorithm"], "Mandatory issuerKeyConfig param 'algorithm' not provided"
                 ).let { KeyType.valueOf(it) }
 
                 val (key, jsonKey) = generateJsonKey(keyType, keyAlgorithm, req)
@@ -120,16 +125,16 @@ fun Application.issuerApi() {
                     req.issuerDidConfig["method"], "Mandatory issuerDidConfig param 'method' not provided"
                 )
 
-                val did = DidService.registerByKey(
+                val didDoc = DidService.registerByKey(
                     didMethod,
                     key,
                     DidCreateOptions(didMethod, req.issuerDidConfig as JsonElement)
-                ).did
+                )
 
-                logger.debug { "DID created: $did" }
+                logger.debug { "DID created: $didDoc" }
 
                 context.respond(
-                    HttpStatusCode.OK, IssuerOnboardingResponse(jsonKey, did)
+                    HttpStatusCode.OK, IssuerOnboardingResponse(jsonKey, didDoc)
                 )
             }
         }
@@ -217,7 +222,7 @@ fun Application.issuerApi() {
                         description = "This endpoint issues a W3C Verifiable Credential, and returns an issuance URL "
 
                         request {
-                            body<IssuanceRequest> {
+                            body<BaseIssuanceRequest> {
                                 description =
                                     "Pass the unsigned credential that you intend to issue as the body of the request."
                                 example("OpenBadgeCredential example", openBadgeCredentialExampleJsonString)
@@ -238,7 +243,7 @@ fun Application.issuerApi() {
                             }
                         }
                     }) {
-                        val jwtIssuanceRequest = context.receive<IssuanceRequest>()
+                        val jwtIssuanceRequest = context.receive<BaseIssuanceRequest>()
                         val offerUri = createCredentialOfferUri(listOf(jwtIssuanceRequest))
 
                         context.respond(
@@ -251,7 +256,7 @@ fun Application.issuerApi() {
                             "This endpoint issues a list W3C Verifiable Credentials, and returns an issuance URL "
 
                         request {
-                            body<List<IssuanceRequest>> {
+                            body<List<BaseIssuanceRequest>> {
                                 description =
                                     "Pass the unsigned credential that you intend to issue as the body of the request."
                                 example("Batch example", batchExample)
@@ -273,7 +278,7 @@ fun Application.issuerApi() {
                     }) {
 
 
-                        val issuanceRequests = context.receive<List<IssuanceRequest>>()
+                        val issuanceRequests = context.receive<List<BaseIssuanceRequest>>()
                         val offerUri = createCredentialOfferUri(issuanceRequests)
                         logger.debug { "Offer URI: $offerUri" }
 
@@ -288,7 +293,7 @@ fun Application.issuerApi() {
                         description = "This endpoint issues a W3C Verifiable Credential, and returns an issuance URL "
 
                         request {
-                            body<IssuanceRequest> {
+                            body<BaseIssuanceRequest> {
                                 description =
                                     "Pass the unsigned credential that you intend to issue as the body of the request."
                                 example("SD-JWT example", sdJwtExample)
@@ -309,7 +314,7 @@ fun Application.issuerApi() {
                             }
                         }
                     }) {
-                        val sdJwtIssuanceRequest = context.receive<IssuanceRequest>()
+                        val sdJwtIssuanceRequest = context.receive<BaseIssuanceRequest>()
 
                         val offerUri = createCredentialOfferUri(listOf(sdJwtIssuanceRequest))
 
@@ -363,10 +368,10 @@ private suspend fun generateJsonKey(
         "tse" -> TSEKey.generate(
             keyAlgorithm, TSEKeyMetadata(
                 getParamOrThrow(
-                    req.issuanceKeyConfig["tseServer"], "Mandatory issuanceKeyConfig param 'tseServer' not provided"
+                    req.issuerKeyConfig["tseServer"], "Mandatory issuerKeyConfig param 'tseServer' not provided"
                 ), getParamOrThrow(
-                    req.issuanceKeyConfig["tseAccessToken"],
-                    "Mandatory issuanceKeyConfig param 'tseAccessToken' not provided"
+                    req.issuerKeyConfig["tseAccessToken"],
+                    "Mandatory issuerKeyConfig param 'tseAccessToken' not provided"
                 )
             )
         )

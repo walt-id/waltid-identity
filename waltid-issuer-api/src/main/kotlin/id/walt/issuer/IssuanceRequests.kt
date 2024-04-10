@@ -1,28 +1,47 @@
 package id.walt.issuer
 
 import id.walt.credentials.vc.vcs.W3CVC
+import id.walt.did.dids.registrar.DidResult
 import id.walt.sdjwt.SDMap
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 
-@Serializable
-data class IssuanceRequest(
-    val issuanceKey: JsonObject,
-    val issuerDid: String,
+sealed class BaseIssuanceRequest {
+    abstract val issuanceKey: JsonObject
+    abstract val issuerDid: String
+    abstract val credentialConfigurationId: String
+    abstract val credentialData: W3CVC
+    abstract val mapping: JsonObject?
+    abstract val selectiveDisclosure: SDMap?
+}
 
-    val credentialConfigurationId: String,
-    val credentialData: W3CVC,
-    val mapping: JsonObject? = null,
-    val selectiveDisclosure: SDMap? = null,
-)
+@Serializable
+data class JwtIssuanceRequest(
+    override val issuanceKey: JsonObject, override val issuerDid: String,
+
+    override  val credentialConfigurationId: String, override val credentialData: W3CVC, override val mapping: JsonObject? = null
+) : BaseIssuanceRequest() {
+    override val selectiveDisclosure: SDMap?
+        get() = null
+}
+
+@Serializable
+data class SdJwtIssuanceRequest(
+    override val issuanceKey: JsonObject,
+    override val issuerDid: String,
+
+    override  val credentialConfigurationId: String, override val credentialData: W3CVC,
+    override val mapping: JsonObject? = null,
+    override val selectiveDisclosure: SDMap? = null,
+) : BaseIssuanceRequest()
 
 @Serializable
 data class IssuerOnboardingRequest(
-    val issuanceKeyConfig: JsonObject, val issuerDidConfig: JsonObject
+    val issuerKeyConfig: JsonObject, val issuerDidConfig: JsonObject
 )
 
 @Serializable
 data class IssuerOnboardingResponse(
-    val issuanceKey: JsonElement, val issuerDid: String
+    val issuerKey: JsonElement, val issuerDidDoc: DidResult
 )
