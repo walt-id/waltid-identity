@@ -1,6 +1,7 @@
 package id.walt.issuer
 
 import id.walt.credentials.vc.vcs.W3CVC
+import id.walt.did.dids.registrar.DidResult
 import id.walt.sdjwt.SDMap
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
@@ -37,5 +38,5 @@ data class IssuerOnboardingRequest(
 
 @Serializable
 data class IssuerOnboardingResponse(
-    val issuerKey: JsonElement, val issuerDid: String
+    val issuerKey: JsonElement, val issuerDidDoc: DidResult
 )

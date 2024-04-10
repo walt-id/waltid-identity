@@ -4,7 +4,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 
 object IssuanceExamples {
-    //language=json
+    // language=json
     val universityDegreeCredential = """
 {
   "issuerKey": {
@@ -48,7 +48,7 @@ object IssuanceExamples {
 }
 """.trimIndent()
 
-    //language=json
+    // language=json
     val openBadgeCredentialExampleJsonString = """
         {
           "issuerKey": {
@@ -148,7 +148,7 @@ object IssuanceExamples {
         )
     )
 
-    //language=JSON
+    // language=JSON
     val batchExample = """
         [
           {
@@ -257,7 +257,7 @@ object IssuanceExamples {
         ]
     """.trimIndent()
 
-    //language=JSON
+    // language=JSON
     val sdJwtExample = """
         {
           "issuerKey": {
@@ -327,7 +327,7 @@ object IssuanceExamples {
         }
     """.trimIndent()
 
-    //language=JSON
+    // language=JSON
     val issuerOnboardingRequestDefaultExample = """
         {
           "issuerKeyConfig": {
@@ -340,7 +340,7 @@ object IssuanceExamples {
         }
     """.trimIndent()
 
-    //language=JSON
+    // language=JSON
     val issuerOnboardingRequestTseExample = """
         {
           "issuerKeyConfig": {
@@ -355,7 +355,24 @@ object IssuanceExamples {
         }
     """.trimIndent()
 
-    //language=JSON
+    // language=JSON
+    val issuerOnboardingRequestDidWebExample = """
+        {
+          "issuerKeyConfig": {
+            "type": "jwk",
+            "algorithm": "secp256k1"
+          },
+          "issuerDidConfig": {
+            "method": "web",
+            "config": {
+                "domain": "example.com",
+                "path": "optional-user-id-1234"
+            }
+          }
+        }
+    """.trimIndent()
+
+    // language=JSON
     val issuerOnboardingResponseDefaultExample = """
         {
           "issuerKey": {
@@ -373,7 +390,7 @@ object IssuanceExamples {
         }
     """.trimIndent()
 
-    //language=JSON
+    // language=JSON
     val issuerOnboardingResponseTseExample = """
     {
       "issuerKey": {
