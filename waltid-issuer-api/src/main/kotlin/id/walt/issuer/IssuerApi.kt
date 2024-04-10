@@ -11,6 +11,7 @@ import id.walt.did.dids.DidService
 import id.walt.did.dids.registrar.dids.DidCreateOptions
 import id.walt.issuer.IssuanceExamples.batchExample
 import id.walt.issuer.IssuanceExamples.issuerOnboardingRequestDefaultExample
+import id.walt.issuer.IssuanceExamples.issuerOnboardingRequestDidWebExample
 import id.walt.issuer.IssuanceExamples.issuerOnboardingRequestTseExample
 import id.walt.issuer.IssuanceExamples.issuerOnboardingResponseDefaultExample
 import id.walt.issuer.IssuanceExamples.issuerOnboardingResponseTseExample
@@ -74,8 +75,12 @@ fun Application.issuerApi() {
                 request {
                     body<IssuerOnboardingRequest> {
                         description = "Issuer onboarding request (key & DID) config."
-                        example("Local key + ed25519 key (default)", issuerOnboardingRequestDefaultExample)
-                        example("Hashicorp Vault Transit Engine (TSE) key + RSA", issuerOnboardingRequestTseExample)
+                        example("did:jwk + JWK key (Ed25519)", issuerOnboardingRequestDefaultExample)
+                        example(
+                            "did:key + TSE (Hashicorp Vault Transit Engine key - RSA)",
+                            issuerOnboardingRequestTseExample
+                        )
+                        example("did:web + JWK key (Secp256k1)", issuerOnboardingRequestDidWebExample)
                         required = true
                     }
                 }
@@ -85,11 +90,11 @@ fun Application.issuerApi() {
                         description = "Issuer onboarding response"
                         body<IssuerOnboardingResponse> {
                             example(
-                                "Local secp256r1 key + did:jwk",
+                                "did:web + JWK key (Secp256r1)",
                                 issuerOnboardingResponseDefaultExample,
                             )
                             example(
-                                "Remote Ed25519 key + did:key",
+                                "did:key + TSE (Hashicorp Vault Transit Engine key - Ed25519)",
                                 issuerOnboardingResponseTseExample,
                             )
                         }
@@ -119,16 +124,16 @@ fun Application.issuerApi() {
                     req.issuerDidConfig["method"], "Mandatory issuerDidConfig param 'method' not provided"
                 )
 
-                val did = DidService.registerByKey(
+                val didDoc = DidService.registerByKey(
                     didMethod,
                     key,
                     DidCreateOptions(didMethod, req.issuerDidConfig as JsonElement)
-                ).did
+                )
 
-                logger.debug { "DID created: $did" }
+                logger.debug { "DID created: $didDoc" }
 
                 context.respond(
-                    HttpStatusCode.OK, IssuerOnboardingResponse(jsonKey, did)
+                    HttpStatusCode.OK, IssuerOnboardingResponse(jsonKey, didDoc)
                 )
             }
         }
