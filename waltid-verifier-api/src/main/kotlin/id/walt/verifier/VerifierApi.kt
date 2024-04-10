@@ -124,7 +124,7 @@ fun Application.verfierApi() {
             }) {
                 val authorizeBaseUrl = context.request.header("authorizeBaseUrl") ?: defaultAuthorizeBaseUrl
                 val responseMode =
-                    context.request.header("responseMode")?.let { ResponseMode.valueOf(it) } ?: ResponseMode.DirectPost
+                    context.request.header("responseMode")?.let { ResponseMode.fromValue(it) } ?: ResponseMode.DirectPost
                 val successRedirectUri = context.request.header("successRedirectUri")
                 val errorRedirectUri = context.request.header("errorRedirectUri")
 

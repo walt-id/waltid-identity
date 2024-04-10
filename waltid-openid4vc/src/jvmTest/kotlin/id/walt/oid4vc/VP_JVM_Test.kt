@@ -404,7 +404,7 @@ class VP_JVM_Test : AnnotationSpec() {
                 responseMode = requestPayload["response_mode"]!!.jsonPrimitive.content.let {
                     when (it) {
                         "post" -> ResponseMode.DirectPost
-                        else -> ResponseMode.valueOf(it)
+                        else -> ResponseMode.fromValue(it)
                     }
                 },
                 redirectUri = requestPayload["redirect_uri"]?.jsonPrimitive?.contentOrNull,
