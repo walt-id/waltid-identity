@@ -11,6 +11,7 @@ import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.did.dids.DidService
+import id.walt.did.dids.DidUtils
 import id.walt.issuer.IssuanceExamples.openBadgeCredentialExample
 import id.walt.issuer.base.config.ConfigManager
 import id.walt.issuer.base.config.OIDCIssuerServiceConfig
@@ -229,12 +230,16 @@ open class CIProvider : OpenIDCredentialIssuer(
         val proofPayload = credentialRequest.proof?.jwt?.let { parseTokenPayload(it) } ?: throw CredentialError(
             credentialRequest, CredentialErrorCode.invalid_or_missing_proof, message = "Proof must be JWT proof"
         )
+        val proofHeader = credentialRequest.proof?.jwt?.let { parseTokenHeader(it) } ?: throw CredentialError(
+            credentialRequest, CredentialErrorCode.invalid_or_missing_proof, message = "Proof must be JWT proof"
+        )
 
-        val holderDid = proofPayload[JWTClaims.Payload.issuer]?.jsonPrimitive?.content ?: throw CredentialError(
+        val holderKid = proofHeader[JWTClaims.Header.keyID]?.jsonPrimitive?.content ?: throw CredentialError(
             credentialRequest,
             CredentialErrorCode.invalid_or_missing_proof,
-            message = "Proof JWT payload must contain iss claim"
+            message = "Proof JWT header must contain kid claim"
         )
+        val holderDid = if(DidUtils.isDidUrl(holderKid)) holderKid.substringBefore("#") else holderKid
         //val vc = W3CVC(universityDegreeCredentialExample.toList().associate { it.first to it.second.toJsonElement() })
 
         val data: IssuanceSessionData = (if (subjectDid == null || nonce == null) {
