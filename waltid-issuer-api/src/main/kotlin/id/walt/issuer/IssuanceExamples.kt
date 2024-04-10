@@ -359,13 +359,14 @@ object IssuanceExamples {
     val issuerOnboardingRequestDidWebExample = """
         {
           "issuerKeyConfig": {
-            "type": "local",
+            "type": "jwk",
             "algorithm": "secp256k1"
           },
           "issuerDidConfig": {
             "method": "web",
             "config": {
-                "domain": "example.com"
+                "domain": "example.com",
+                "path": "optional-user-id-1234"
             }
           }
         }
