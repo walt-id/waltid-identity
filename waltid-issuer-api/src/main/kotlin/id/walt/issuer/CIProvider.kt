@@ -250,7 +250,7 @@ open class CIProvider : OpenIDCredentialIssuer(
                 IssuanceSessionData(
                     exampleIssuerKey,
                     exampleIssuerDid,
-                    IssuanceRequest(
+                    JwtIssuanceRequest(
                         Json.parseToJsonElement(KeySerialization.serializeKey(exampleIssuerKey)).jsonObject,
                         exampleIssuerDid,
                         "OpenBadgeCredential_${credentialRequest.format.value}",
@@ -394,7 +394,7 @@ open class CIProvider : OpenIDCredentialIssuer(
 
 
     data class IssuanceSessionData(
-        val issuerKey: Key, val issuerDid: String, val request: IssuanceRequest
+        val issuerKey: Key, val issuerDid: String, val request: BaseIssuanceRequest
     )
 
     // TODO: Hack as this is non stateless because of oidc4vc lib API

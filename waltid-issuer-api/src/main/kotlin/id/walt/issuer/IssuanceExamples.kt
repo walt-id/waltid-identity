@@ -4,10 +4,10 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 
 object IssuanceExamples {
-    //language=json
+    // language=json
     val universityDegreeCredential = """
 {
-  "issuanceKey": {
+  "issuerKey": {
     "type": "jwk",
     "jwk": "{\"kty\":\"OKP\",\"d\":\"mDhpwaH6JYSrD2Bq7Cs-pzmsjlLj4EOhxyI-9DM1mFI\",\"crv\":\"Ed25519\",\"kid\":\"Vzx7l5fh56F3Pf9aR3DECU5BwfrY6ZJe05aiWYWzan8\",\"x\":\"T3T4-u1Xz3vAV2JwPNxWfs4pik_JLiArz_WTCvrCFUM\"}"
   },
@@ -48,10 +48,10 @@ object IssuanceExamples {
 }
 """.trimIndent()
 
-    //language=json
+    // language=json
     val openBadgeCredentialExampleJsonString = """
         {
-          "issuanceKey": {
+          "issuerKey": {
             "type": "jwk",
             "jwk": "{\"kty\":\"OKP\",\"d\":\"mDhpwaH6JYSrD2Bq7Cs-pzmsjlLj4EOhxyI-9DM1mFI\",\"crv\":\"Ed25519\",\"kid\":\"Vzx7l5fh56F3Pf9aR3DECU5BwfrY6ZJe05aiWYWzan8\",\"x\":\"T3T4-u1Xz3vAV2JwPNxWfs4pik_JLiArz_WTCvrCFUM\"}"
           },
@@ -148,11 +148,11 @@ object IssuanceExamples {
         )
     )
 
-    //language=JSON
+    // language=JSON
     val batchExample = """
         [
           {
-            "issuanceKey": {
+            "issuerKey": {
               "type": "jwk",
               "jwk": "{\"kty\":\"OKP\",\"d\":\"mDhpwaH6JYSrD2Bq7Cs-pzmsjlLj4EOhxyI-9DM1mFI\",\"crv\":\"Ed25519\",\"kid\":\"Vzx7l5fh56F3Pf9aR3DECU5BwfrY6ZJe05aiWYWzan8\",\"x\":\"T3T4-u1Xz3vAV2JwPNxWfs4pik_JLiArz_WTCvrCFUM\"}"
             },
@@ -192,7 +192,7 @@ object IssuanceExamples {
             }
           },
           {
-            "issuanceKey": {
+            "issuerKey": {
               "type": "jwk",
               "jwk": "{\"kty\":\"OKP\",\"d\":\"mDhpwaH6JYSrD2Bq7Cs-pzmsjlLj4EOhxyI-9DM1mFI\",\"crv\":\"Ed25519\",\"kid\":\"Vzx7l5fh56F3Pf9aR3DECU5BwfrY6ZJe05aiWYWzan8\",\"x\":\"T3T4-u1Xz3vAV2JwPNxWfs4pik_JLiArz_WTCvrCFUM\"}"
             },
@@ -257,10 +257,10 @@ object IssuanceExamples {
         ]
     """.trimIndent()
 
-    //language=JSON
+    // language=JSON
     val sdJwtExample = """
         {
-          "issuanceKey": {
+          "issuerKey": {
             "type": "jwk",
             "jwk": "{\"kty\":\"OKP\",\"d\":\"mDhpwaH6JYSrD2Bq7Cs-pzmsjlLj4EOhxyI-9DM1mFI\",\"crv\":\"Ed25519\",\"kid\":\"Vzx7l5fh56F3Pf9aR3DECU5BwfrY6ZJe05aiWYWzan8\",\"x\":\"T3T4-u1Xz3vAV2JwPNxWfs4pik_JLiArz_WTCvrCFUM\"}"
           },
@@ -327,10 +327,10 @@ object IssuanceExamples {
         }
     """.trimIndent()
 
-    //language=JSON
+    // language=JSON
     val issuerOnboardingRequestDefaultExample = """
         {
-          "issuanceKeyConfig": {
+          "issuerKeyConfig": {
             "type": "jwk",
             "algorithm": "secp256r1"
           },
@@ -340,10 +340,10 @@ object IssuanceExamples {
         }
     """.trimIndent()
 
-    //language=JSON
+    // language=JSON
     val issuerOnboardingRequestTseExample = """
         {
-          "issuanceKeyConfig": {
+          "issuerKeyConfig": {
             "type": "tse",
             "tseServer": "http://127.0.0.1:8200/v1/transit",
             "tseAccessToken": "dev-only-token",
@@ -355,10 +355,27 @@ object IssuanceExamples {
         }
     """.trimIndent()
 
-    //language=JSON
+    // language=JSON
+    val issuerOnboardingRequestDidWebExample = """
+        {
+          "issuerKeyConfig": {
+            "type": "jwk",
+            "algorithm": "secp256k1"
+          },
+          "issuerDidConfig": {
+            "method": "web",
+            "config": {
+                "domain": "example.com",
+                "path": "optional-user-id-1234"
+            }
+          }
+        }
+    """.trimIndent()
+
+    // language=JSON
     val issuerOnboardingResponseDefaultExample = """
         {
-          "issuanceKey": {
+          "issuerKey": {
             "type": "jwk",
             "jwk": {
               "kty": "EC",
@@ -373,10 +390,10 @@ object IssuanceExamples {
         }
     """.trimIndent()
 
-    //language=JSON
+    // language=JSON
     val issuerOnboardingResponseTseExample = """
     {
-      "issuanceKey": {
+      "issuerKey": {
         "type": "tse",
         "server": "http://127.0.0.1:8200/v1/transit",
         "accessKey": "dev-only-token",

@@ -40,16 +40,19 @@ object EmailAccountStrategy : PasswordAccountStrategy<EmailAccountRequest>() {
         RegistrationResult(createdAccountId)
     }
 
+
+    //override suspend fun authenticate(tenant: String, request: EmailAccountRequest): AuthenticatedUser = UsernameAuthenticatedUser(UUID("a218913e-b8ec-4ef4-a945-7e9ada448ff9"), request.email)
     override suspend fun authenticate(tenant: String, request: EmailAccountRequest): AuthenticatedUser =
         ByteLoginRequest(request).let { req ->
             val email = request.email
 
-            if (!AccountsService.hasAccountEmail(tenant, email)) {
-                throw UnauthorizedException("Unknown user \"${req.username}\".")
-            }
-
             val (matchedAccount, pwHash) = transaction {
-                val matchedAccount = Accounts.selectAll().where { (Accounts.tenant eq tenant) and (Accounts.email eq email) }.first()
+
+                val accounts = Accounts.selectAll().where { (Accounts.tenant eq tenant) and (Accounts.email eq email) }
+                if (accounts.empty()) {
+                    throw UnauthorizedException("Unknown user \"${req.username}\".")
+                }
+                val matchedAccount = accounts.first()
 
                 val pwHash = matchedAccount[Accounts.password]
                     ?: throw UnauthorizedException("User \"${req.username}\" does not have password authentication enabled.")

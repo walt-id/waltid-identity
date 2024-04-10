@@ -65,7 +65,7 @@ const { data: credentials, pending, refresh, error } = await useLazyFetch(`/wall
 refreshNuxtData();
 
 function credentialTypeOf(credential) {
-    return credential.type[credential.type.length - 1];
+    return credential?.type[credential.type.length - 1];
 }
 
 useHead({
@@ -128,7 +128,7 @@ if (process.client) {
         }
     }
 
-    initialiseState();
+    // initialiseState();  // DISABLED: notifications
 
     function subscribe() {
         navigator.serviceWorker.ready.then(function (serviceWorkerRegistration) {
