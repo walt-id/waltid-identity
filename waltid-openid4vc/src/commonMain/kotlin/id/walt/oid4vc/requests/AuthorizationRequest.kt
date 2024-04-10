@@ -47,7 +47,7 @@ data class AuthorizationRequest(
         return buildMap {
             put("response_type", listOf(ResponseType.getResponseTypeString(responseType)))
             put("client_id", listOf(clientId))
-            responseMode?.let { put("response_mode", listOf(it.name)) }
+            responseMode?.let { put("response_mode", listOf(it.value)) }
             redirectUri?.let { put("redirect_uri", listOf(it)) }
             if (scope.isNotEmpty())
                 put("scope", listOf(scope.joinToString(" ")))
