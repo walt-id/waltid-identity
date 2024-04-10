@@ -75,9 +75,12 @@ fun Application.issuerApi() {
                 request {
                     body<IssuerOnboardingRequest> {
                         description = "Issuer onboarding request (key & DID) config."
-                        example("Local key + ed25519 key (default)", issuerOnboardingRequestDefaultExample)
-                        example("Hashicorp Vault Transit Engine (TSE) key + RSA", issuerOnboardingRequestTseExample)
-                        example("Passing arguments to the DID", issuerOnboardingRequestDidWebExample)
+                        example("did:jwk + JWK key (Ed25519)", issuerOnboardingRequestDefaultExample)
+                        example(
+                            "did:key + TSE (Hashicorp Vault Transit Engine key - RSA)",
+                            issuerOnboardingRequestTseExample
+                        )
+                        example("did:web + JWK key (Secp256k1)", issuerOnboardingRequestDidWebExample)
                         required = true
                     }
                 }
@@ -87,11 +90,11 @@ fun Application.issuerApi() {
                         description = "Issuer onboarding response"
                         body<IssuerOnboardingResponse> {
                             example(
-                                "Local secp256r1 key + did:jwk",
+                                "did:web + JWK key (Secp256r1)",
                                 issuerOnboardingResponseDefaultExample,
                             )
                             example(
-                                "Remote Ed25519 key + did:key",
+                                "did:key + TSE (Hashicorp Vault Transit Engine key - Ed25519)",
                                 issuerOnboardingResponseTseExample,
                             )
                         }
