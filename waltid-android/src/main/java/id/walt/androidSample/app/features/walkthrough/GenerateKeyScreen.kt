@@ -2,6 +2,7 @@
 
 package id.walt.androidSample.app.features.walkthrough
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -25,6 +26,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -59,6 +61,7 @@ fun GenerateKeyScreen(
 
     val algorithmOptions = viewModel.keyAlgorithmOptions
     val selectedAlgorithmOption by viewModel.selectedKeyAlgorithm.collectAsStateWithLifecycle()
+    val key by viewModel.generatedKey.collectAsStateWithLifecycle()
 
     Scaffold(
         contentColor = MaterialTheme.colorScheme.onSurface,
@@ -101,14 +104,17 @@ fun GenerateKeyScreen(
                 )
 
                 Text(
-                    text = "",
-                    textAlign = TextAlign.Center,
+                    text = key ?: "",
+                    textAlign = TextAlign.Justify,
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth()
                         .padding(16.dp)
+                        .clickable {
+                            println(key)
+                        }
                 )
 
                 RadioGroup(
@@ -119,7 +125,7 @@ fun GenerateKeyScreen(
                 )
 
                 OutlinedButton(
-                    onClick = { /*TODO*/ }, modifier = Modifier.fillMaxWidth(),
+                    onClick = viewModel::onGenerateKeyClick, modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.textButtonColors(
                         contentColor = MaterialTheme.colorScheme.onSurface,
                         containerColor = MaterialTheme.colorScheme.surface,
@@ -128,7 +134,7 @@ fun GenerateKeyScreen(
                     Text("Generate Key")
                 }
                 OutlinedButton(
-                    onClick = { /*TODO*/ }, modifier = Modifier.fillMaxWidth(),
+                    onClick = viewModel::onProgressToStepTwoClick, modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.textButtonColors(
                         contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
                         containerColor = MaterialTheme.colorScheme.primaryContainer,
