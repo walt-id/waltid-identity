@@ -124,16 +124,16 @@ fun Application.issuerApi() {
                     req.issuerDidConfig["method"], "Mandatory issuerDidConfig param 'method' not provided"
                 )
 
-                val did = DidService.registerByKey(
+                val didDoc = DidService.registerByKey(
                     didMethod,
                     key,
                     DidCreateOptions(didMethod, req.issuerDidConfig as JsonElement)
-                ).did
+                )
 
-                logger.debug { "DID created: $did" }
+                logger.debug { "DID created: $didDoc" }
 
                 context.respond(
-                    HttpStatusCode.OK, IssuerOnboardingResponse(jsonKey, did)
+                    HttpStatusCode.OK, IssuerOnboardingResponse(jsonKey, didDoc)
                 )
             }
         }
