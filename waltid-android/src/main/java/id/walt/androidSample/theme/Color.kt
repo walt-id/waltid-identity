@@ -1,7 +1,8 @@
-package com.example.compose
+package id.walt.androidSample.theme
+
 import androidx.compose.ui.graphics.Color
 
-val md_theme_light_primary = Color(0xFF005BC1)
+val md_theme_light_primary = Color(0xFF0573f0)
 val md_theme_light_onPrimary = Color(0xFFFFFFFF)
 val md_theme_light_primaryContainer = Color(0xFFD8E2FF)
 val md_theme_light_onPrimaryContainer = Color(0xFF001A41)
