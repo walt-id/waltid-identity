@@ -1302,8 +1302,8 @@ class CI_JVM_Test : AnnotationSpec() {
 
         val createIssuanceReq = "{\n" +
                 "    \"callback\": {\n" +
-                //"        \"url\": \"https://httpstat.us/200\",\n" +
-                "        \"url\": \"https://0fc7-2001-871-25f-66b3-9ea8-fc44-915d-107e.ngrok-free.app/callback\",\n" +
+                "        \"url\": \"https://httpstat.us/200\",\n" +
+                //"        \"url\": \"https://0fc7-2001-871-25f-66b3-9ea8-fc44-915d-107e.ngrok-free.app/callback\",\n" +
                 "        \"state\": \"1234\",\n" +
                 "        \"headers\": {\n" +
                 "            \"api-key\": \"1234\"\n" +
@@ -1349,7 +1349,7 @@ class CI_JVM_Test : AnnotationSpec() {
         //val url = "openid-vc://?request_uri=https://verifiedid.did.msidentity.com/v1.0/tenants/37a99dab-212b-44d9-9b49-7756cb4dd915/verifiableCredentials/issuanceRequests/67e271be-be8b-42f8-9cb9-1b57ee010e41"
         println(">>>> URL from response: $url")
 
-        //return
+        return
         //val url = "openid-vc://?request_uri=https://verifiedid.did.msidentity.com/v1.0/tenants/3c32ed40-8a10-465b-8ba4-0b1e86882668/verifiableCredentials/issuanceRequests/a7e5db5b-2fba-4d02-bc0d-21ee82191386"
 
 
