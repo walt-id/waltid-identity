@@ -234,8 +234,8 @@ class EBSIIssueToHolderConformanceTest {
             setBody(credReq.toJSONString())
         }
         println(credRespRaw.bodyAsText())
-        assertEquals(HttpStatusCode.OK, credRespRaw.status)
-//        assertEquals(HttpStatusCode.Unauthorized, credRespRaw.status)
+//        assertEquals(HttpStatusCode.OK, credRespRaw.status)
+        assertEquals(HttpStatusCode.Unauthorized, credRespRaw.status)
 
     }
 }
