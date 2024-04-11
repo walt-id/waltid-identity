@@ -272,6 +272,9 @@ open class CIProvider : OpenIDCredentialIssuer(
                 if (issuerDid.startsWith("did:key") && issuerDid.length==186) // EBSI conformance corner case when issuer uses did:key instead of did:ebsi and no trust framework is defined
                     issuerKid = issuerDid + "#" + issuerDid.removePrefix("did:key:")
 
+                if (issuerDid.startsWith("did:ebsi"))
+                    issuerKid = issuerDid + "#" + issuerKey.getKeyId()
+
                 when (credentialRequest.format) {
                     CredentialFormat.sd_jwt_vc -> vc.mergingSdJwtIssue(
                         issuerKey = issuerKey,
