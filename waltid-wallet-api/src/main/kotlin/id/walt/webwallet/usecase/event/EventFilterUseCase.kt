@@ -11,9 +11,6 @@ class EventFilterUseCase(
     private val verifierNameResolutionUseCase: EntityNameResolutionUseCase,
 ) {
     private val json = Json { ignoreUnknownKeys = true }
-    private val eventFilterByActionCondition: (event: Event, actions: List<EventType.Action>) -> Boolean = { e, a ->
-        e.action in a.map { it.toString() } && e.event in a.map { it.type }
-    }
 
     suspend fun filter(accountId: UUID, walletId: UUID, filter: EventLogFilter) = runCatching {
         val startingAfterItemIndex = filter.startingAfter?.toLongOrNull()?.takeIf { it >= 0 } ?: -1L
@@ -78,30 +75,4 @@ class EventFilterUseCase(
             data.copy(organization = it)
         )
     }.jsonObject
-
-    //TODO: solve original order
-//    private suspend fun resolveEntityNames(items: List<Event>): List<Event> = items.groupBy {
-//        JsonUtils.tryGetData(it.data, "organization")
-//    }.mapNotNull { m ->
-//        m.key?.let {
-//            //TODO: parameterize organization type
-//            json.decodeFromJsonElement<CredentialEventDataActor.Organization.Issuer>(it)
-//        }?.let { entity ->
-//            issuerNameResolutionUseCase.resolve(entity.did).getOrNull()?.let { entityName ->
-//                m.value.map { e ->
-//                    json.decodeFromJsonElement<CredentialEventData>(e.data).let { d ->
-//                        e.copy(
-//                            data = json.encodeToJsonElement(
-//                                d.copy(
-//                                    organization = (d.organization as? CredentialEventDataActor.Organization.Issuer)!!.copy(
-//                                        name = entityName
-//                                    )
-//                                )
-//                            ).jsonObject
-//                        )
-//                    }
-//                }
-//            }
-//        } ?: m.value
-//    }.flatten()
 }
