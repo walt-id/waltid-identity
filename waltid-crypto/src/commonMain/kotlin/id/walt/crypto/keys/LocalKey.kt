@@ -1,5 +1,6 @@
 package id.walt.crypto.keys
 
+import id.walt.crypto.utils.ECDSASignature
 import kotlinx.serialization.json.JsonObject
 
 expect class LocalKey(jwk: String?) : Key {
@@ -22,6 +23,7 @@ expect class LocalKey(jwk: String?) : Key {
      */
     override suspend fun signRaw(plaintext: ByteArray): ByteArray
     override suspend fun signJws(plaintext: ByteArray, headers: Map<String, String>): String
+    override suspend fun signECDSA(plaintext: ByteArray): ECDSASignature
 
     /**
      * Verifies JWS: Verifies a signed message using this public key

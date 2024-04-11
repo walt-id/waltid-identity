@@ -3,6 +3,7 @@ package id.walt.crypto.keys
 import id.walt.crypto.utils.Base64Utils.base64UrlDecode
 import id.walt.crypto.utils.Base64Utils.base64toBase64Url
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
+import id.walt.crypto.utils.ECDSASignature
 import id.walt.crypto.utils.JwsUtils.jwsAlg
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
@@ -168,6 +169,14 @@ class TSEKey(
         val signatureBase64Url = signatureBase64.base64toBase64Url()
 
         return "$signable.$signatureBase64Url"
+    }
+
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
+    override suspend fun signECDSA(plaintext: ByteArray): ECDSASignature {
+        TODO("Not yet implemented")
     }
 
     @JvmBlocking

@@ -6,6 +6,7 @@ import com.nimbusds.jose.crypto.bc.BouncyCastleProviderSingleton
 import com.nimbusds.jose.jwk.*
 import com.nimbusds.jose.jwk.KeyType.*
 import com.nimbusds.jose.util.Base64URL
+import id.walt.crypto.utils.ECDSASignature
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -164,6 +165,10 @@ actual class LocalKey actual constructor(
 
         jwsObject.sign(_internalSigner)
         return jwsObject.serialize()
+    }
+
+    actual override suspend fun signECDSA(plaintext: ByteArray): ECDSASignature {
+        TODO("Not yet implemented")
     }
 
     actual override suspend fun verifyRaw(signed: ByteArray, detachedPlaintext: ByteArray?): Result<ByteArray> {

@@ -4,6 +4,7 @@ import JWK
 import KeyLike
 import crypto
 import id.walt.crypto.utils.ArrayUtils.toByteArray
+import id.walt.crypto.utils.ECDSASignature
 import id.walt.crypto.utils.JwsUtils.jwsAlg
 import id.walt.crypto.utils.PromiseUtils.await
 import io.ktor.utils.io.core.*
@@ -144,6 +145,12 @@ actual class LocalKey actual constructor(
                 .setProtectedHeader(json("alg" to keyType.jwsAlg(), *headerEntries))
                 .sign(_internalKey)
         )
+    }
+
+    @JsPromise
+    @JsExport.Ignore
+    actual override suspend fun signECDSA(plaintext: ByteArray): ECDSASignature {
+        TODO("Not yet implemented")
     }
 
     @JsPromise

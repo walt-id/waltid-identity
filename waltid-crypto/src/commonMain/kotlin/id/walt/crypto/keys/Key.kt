@@ -1,5 +1,6 @@
 package id.walt.crypto.keys
 
+import id.walt.crypto.utils.ECDSASignature
 import id.walt.crypto.utils.JsonUtils.prettyJson
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
@@ -91,6 +92,12 @@ abstract class Key {
     @JsPromise
     @JsExport.Ignore
     abstract suspend fun signJws(plaintext: ByteArray, headers: Map<String, String> = emptyMap()): String
+
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
+    abstract suspend fun signECDSA(plaintext: ByteArray): ECDSASignature
 
     /**
      * verifies a signed message using this public key
