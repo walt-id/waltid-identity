@@ -262,8 +262,6 @@ actual class JWKKey actual constructor(
 
             check(jwsObject.verify(_internalVerifier)) { "Signature check failed." }
 
-            log.debug { "> Signature verification: Nimbus verification passed: $signedJws" }
-
             val objectElements = jwsObject.payload.toJSONObject()
                 .mapValues { it.value.toJsonElement() }
 

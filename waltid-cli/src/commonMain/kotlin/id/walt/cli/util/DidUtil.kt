@@ -1,5 +1,6 @@
 package id.walt.cli.util
 
+import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.did.dids.DidService
 import kotlinx.coroutines.runBlocking
@@ -30,6 +31,12 @@ class DidUtil {
         fun resolveDid(did:String): JsonObject? {
             return runBlocking {
                 DidService.resolve(did).getOrNull()
+            }
+        }
+
+        fun resolveToKey(did: String): Key? {
+            return runBlocking {
+                DidService.resolveToKey(did).getOrNull()
             }
         }
 

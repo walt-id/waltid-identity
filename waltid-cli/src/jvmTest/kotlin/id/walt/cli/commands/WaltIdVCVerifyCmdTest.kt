@@ -50,7 +50,7 @@ class WaltIdVCVerifyCmdTest {
     val signedValidHolderVCFilePath = "${resourcesPath}/vc/openbadgecredential_sample.signed.json"
     val signedInvalidHolderVCFilePath = "${resourcesPath}/vc/openbadgecredential_sample.invalidholder.signed.json"
 
-    val schemaFilePath = "${resourcesPath}/schema/ob_v3p0_achievementcredential_schema.json"
+    val schemaFilePath = "${resourcesPath}/schema/OpenBadgeV3_schema.json"
 
     @Test
     fun `should print help message when called with --help argument`() {

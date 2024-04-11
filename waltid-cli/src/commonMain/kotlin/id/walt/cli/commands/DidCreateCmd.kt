@@ -22,7 +22,6 @@ class DidCreateCmd : CliktCommand(
     private val method by option("-m", "--method")
         .help("The DID method to be used.")
         .enum<DidMethod>(ignoreCase = true)
-        // .choice(DidMethod.KEY.name, DidMethod.JWK.name)
         .default(DidMethod.KEY)
 
     private val keyFile by option("-k", "--key")

@@ -81,7 +81,7 @@ class MainTest {
     val signedValidSchemaVCFilePath = "${resourcesPath}/vc/openbadgecredential_sample.signed.json"
     val signedInvalidSchemaVCFilePath = "${resourcesPath}/vc/openbadgecredential_sample.invalidschema.signed.json"
 
-    val schemaFilePath = "${resourcesPath}/schema/ob_v3p0_achievementcredential_schema.json"
+    val schemaFilePath = "${resourcesPath}/schema/OpenBadgeV3_schema.json"
 
     val signedExpiredVCFilePath = "${resourcesPath}/vc/openbadgecredential_sample.expired.signed.json"
     val signedNotExpiredVCFilePath = "${resourcesPath}/vc/openbadgecredential_sample.signed.json"

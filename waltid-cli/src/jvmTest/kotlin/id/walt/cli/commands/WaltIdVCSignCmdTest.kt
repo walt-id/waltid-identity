@@ -1,10 +1,8 @@
 package id.walt.cli.commands
 
-import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.MissingArgument
 import com.github.ajalt.clikt.core.MissingOption
 import com.github.ajalt.clikt.core.PrintHelpMessage
-import com.github.ajalt.clikt.testing.CliktCommandTestResult
 import com.github.ajalt.clikt.testing.test
 import kotlinx.io.files.FileNotFoundException
 import org.junit.jupiter.api.assertDoesNotThrow
@@ -120,7 +118,7 @@ class WaltIdVCSignCmdTest {
         val weirdDid = "did:foo:bar"
         val result = command.test(arrayOf("-k", keyFileName, "-i", weirdDid, "-s", subjectDid, vcFilePath))
 
-        assertContains(result.output, "DID not supported")
+        assertContains(result.output, "DID can not be resolved")
     }
 
 
@@ -128,8 +126,6 @@ class WaltIdVCSignCmdTest {
     fun `should sign an existing VC when the issuer key and a subject DID is provided`() {
 
         val result = command.test("""-k "${keyFileName}" -i ${issuerDid} -s ${subjectDid} "${vcFilePath}" """)
-
-        val signedVCFile = getGeneratedFile(command, result)
 
         assertContains(result.stdout, "Signed VC saved at")
     }
@@ -145,9 +141,5 @@ class WaltIdVCSignCmdTest {
     @Test
     @Ignore
     fun `should fail if a non-JWK key file is provided`() = Unit
-
-    private fun getGeneratedFile(cmd: CliktCommand, result: CliktCommandTestResult): String {
-        return "unknown"
-    }
 
 }
