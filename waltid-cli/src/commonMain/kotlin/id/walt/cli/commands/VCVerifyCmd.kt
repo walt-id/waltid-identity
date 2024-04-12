@@ -16,6 +16,7 @@ import id.walt.cli.util.VCUtil
 import id.walt.credentials.verification.ExpirationDatePolicyException
 import id.walt.credentials.verification.JsonSchemaVerificationException
 import id.walt.credentials.verification.NotBeforePolicyException
+import id.walt.credentials.verification.PolicyManager
 import id.walt.credentials.verification.models.PolicyResult
 import id.walt.credentials.verification.policies.ExpirationDatePolicy
 import id.walt.credentials.verification.policies.NotBeforeDatePolicy
@@ -27,49 +28,48 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import java.io.File
 
-
 class VCVerifyCmd : CliktCommand(
     name = "verify",
-    printHelpOnEmptyArgs = true
+    printHelpOnEmptyArgs = true,
 ) {
 
     override fun commandHelp(context: Context): String {
-        // val style = context.theme.info
-        return """VC verification command.
+        var help = """
+        VC verification command.
             
-         Verifies the specified VC under a set of specified policies.
+        Verifies the specified VC under a set of specified policies.
 
         The available policies are:
         
-        - schema: Verifies a credentials data against a JSON Schema (Draft 7 - see https://json-schema.org/specification-links#draft-7).
-        - holder-binding: Verifies that issuer of the Verifiable Presentation (presenter) is also the subject of all Verifiable Credentials contained within.
-        - presentation-definition: Verifies that with an Verifiable Presentation at minimum the list of credentials `request_credentials` has been presented.
-        - expired: Verifies that the credentials expiration date (`exp` for JWTs) has not been exceeded.
-        - webhook: Sends the credential data to an webhook URL as HTTP POST, and returns the verified status based on the webhooks set status code (success = 200 - 299).
-        - maximum-credentials: Verifies that a maximum number of credentials in the Verifiable Presentation is not exceeded.
-        - minimum-credentials: Verifies that a minimum number of credentials are included in the Verifiable Presentation.
-        - signature: Checks a JWT credential by verifying its cryptographic signature using the key referenced by the DID in `iss`.
-        - allowed-issuer: Checks that the issuer of the credential is present in the supplied list.
-        - not-before: Verifies that the credentials not-before date (for JWT: `nbf`, if unavailable: `iat` - 1 min) is correctly exceeded.
-        
+        """.trimIndent()
+        help += "\u0085\u0085"
+
+        PolicyManager.listPolicyDescriptions().entries.forEach {
+            help += "- ${it.key}: ${it.value}\u0085"
+        }
+
+        help += "\u0085"
+
+        help += """
         Multiple policies are accepted. e.g.
-     
+
             waltid vc verify --policy=signature --policy=expired vc.json
-   
+
         If no policy is specified, only the Signature Policy will be applied. i.e.
-        
+
             waltid vc verify vc.json
-        
-        Some policies require parameters. To specify it, use --arg or -a options. e.g.
-        
+
+        Some policies require parameters. To specify it, use --arg or -a options.
+
             --arg=param1=value1 --a param2=value2
-            
-            e.g.
+
+        e.g.
 
             waltid vc verify --policy=schema -a schema=mySchema.json vc.json
         """.trimIndent()
-    }
 
+        return help
+    }
 
     val print: PrettyPrinter = PrettyPrinter(this)
 
@@ -198,7 +198,6 @@ class VCVerifyCmd : CliktCommand(
             // Argument provided?
             if ("schema" !in policyArguments || policyArguments["schema"]!!.isEmpty()) {
                 throw MissingOption(this.option("--arg for the 'schema' policy (--arg=schema=/file/path/to/schema.json)"))
-                // throw Exception("missing schema policy argument: use --arg schema=schemaFilePath")
             }
 
             val schemaFilePath = policyArguments.get("schema")!!
