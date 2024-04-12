@@ -71,7 +71,13 @@ open class CIProvider : OpenIDCredentialIssuer(
         "CTWalletSameAuthorisedInTime" to listOf("VerifiableCredential", "VerifiableAttestation", "CTWalletSameAuthorisedInTime"),
         "CTWalletSameAuthorisedDeferred" to listOf("VerifiableCredential", "VerifiableAttestation", "CTWalletSameAuthorisedDeferred"),
         "CTWalletSamePreAuthorisedInTime" to listOf("VerifiableCredential", "VerifiableAttestation", "CTWalletSamePreAuthorisedInTime"),
-        "CTWalletSamePreAuthorisedDeferred" to listOf("VerifiableCredential", "VerifiableAttestation", "CTWalletSamePreAuthorisedDeferred")
+        "CTWalletSamePreAuthorisedDeferred" to listOf("VerifiableCredential", "VerifiableAttestation", "CTWalletSamePreAuthorisedDeferred"),
+
+        "AlpsTourReservation" to listOf("VerifiableCredential", "VerifiableAttestation", "AlpsTourReservation"),
+        "EducationalID" to listOf("VerifiableCredential", "VerifiableAttestation", "EducationalID"),
+        "HotelReservation" to listOf("VerifiableCredential", "VerifiableAttestation", "HotelReservation"),
+        "Iso18013DriversLicenseCredential" to listOf("VerifiableCredential", "VerifiableAttestation", "Iso18013DriversLicenseCredential"),
+        "TaxReceipt" to listOf("VerifiableCredential", "VerifiableAttestation", "TaxReceipt"),
     ).flatMap { entry ->
         CredentialFormat.values().map { format ->
             CredentialSupported(
