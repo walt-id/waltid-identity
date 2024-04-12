@@ -24,8 +24,8 @@ const getOfferUrl = async (credentials: Array<AvailableCredential>, NEXT_PUBLIC_
       mapping?: any,
       selectiveDisclosure?: any
     } = {
-      'issuerDid': 'did:jwk:eyJrdHkiOiJPS1AiLCJjcnYiOiJFZDI1NTE5Iiwia2lkIjoiQ0ZRLU5yYTV5bnlCc2Z4d3k3YU5mOGR1QUVVQ01sTUlyUklyRGc2REl5NCIsIngiOiJoNW5idzZYOUptSTBCdnVRNU0wSlhmek84czJlRWJQZFYyOXdzSFRMOXBrIn0',
-      'issuerKey': { "type": "jwk", "jwk": "{\"kty\":\"OKP\",\"d\":\"HIN9WcVCqhGvwZ8I47WeMtxGceSKpvaEnu5eXAoWyDo\",\"crv\":\"Ed25519\",\"kid\":\"CFQ-Nra5ynyBsfxwy7aNf8duAEUCMlMIrRIrDg6DIy4\",\"x\":\"h5nbw6X9JmI0BvuQ5M0JXfzO8s2eEbPdV29wsHTL9pk\"}" },
+      'issuerDid': 'did:ebsi:zf39qHTXaLrr6iy3tQhT3UZ',
+      'issuerKey': { "type": "jwk", "jwk": '{"kty":"EC","x":"SgfOvOk1TL5yiXhK5Nq7OwKfn_RUkDizlIhAf8qd2wE","y":"u_y5JZOsw3SrnNPydzJkoaiqb8raSdCNE_nPovt1fNI","crv":"P - 256","d":"UqSi2MbJmPczfRmwRDeOJrdivoEy - qk4OEDjFwJYlUI"}' },
       credentialConfigurationId: Object.keys(credential_configurations_supported).find(key => key === c.id + "_jwt_vc_json") as string,
       credentialData: offer
     }
