@@ -25,7 +25,7 @@ const getOfferUrl = async (credentials: Array<AvailableCredential>, NEXT_PUBLIC_
       selectiveDisclosure?: any
     } = {
       'issuerDid': 'did:ebsi:zf39qHTXaLrr6iy3tQhT3UZ',
-      'issuerKey': { "type": "jwk", "jwk": '{"kty":"EC","x":"SgfOvOk1TL5yiXhK5Nq7OwKfn_RUkDizlIhAf8qd2wE","y":"u_y5JZOsw3SrnNPydzJkoaiqb8raSdCNE_nPovt1fNI","crv":"P - 256","d":"UqSi2MbJmPczfRmwRDeOJrdivoEy - qk4OEDjFwJYlUI"}' },
+      'issuerKey': { "type": "jwk", "jwk": "{\"kty\":\"EC\",\"x\":\"SgfOvOk1TL5yiXhK5Nq7OwKfn_RUkDizlIhAf8qd2wE\",\"y\":\"u_y5JZOsw3SrnNPydzJkoaiqb8raSdCNE_nPovt1fNI\",\"crv\":\"P-256\",\"d\":\"UqSi2MbJmPczfRmwRDeOJrdivoEy-qk4OEDjFwJYlUI\"}"},
       credentialConfigurationId: Object.keys(credential_configurations_supported).find(key => key === c.id + "_jwt_vc_json") as string,
       credentialData: offer
     }
