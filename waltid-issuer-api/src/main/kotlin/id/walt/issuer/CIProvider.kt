@@ -78,6 +78,7 @@ open class CIProvider : OpenIDCredentialIssuer(
         "HotelReservation" to listOf("VerifiableCredential", "VerifiableAttestation", "HotelReservation"),
         "Iso18013DriversLicenseCredential" to listOf("VerifiableCredential", "VerifiableAttestation", "Iso18013DriversLicenseCredential"),
         "TaxReceipt" to listOf("VerifiableCredential", "VerifiableAttestation", "TaxReceipt"),
+        "VerifiablePortableDocumentA1" to listOf("VerifiableCredential", "VerifiableAttestation", "VerifiablePortableDocumentA1"),
     ).flatMap { entry ->
         CredentialFormat.values().map { format ->
             CredentialSupported(
