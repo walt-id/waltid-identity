@@ -80,15 +80,7 @@ class VCVerifyCmd : CliktCommand(
         "--policy",
         help = """Specify a policy to be applied in the verification process."""
     ).choice(
-        "schema",
-        "holder-binding",
-        "expired",
-        "webhook",
-        "maximum-credentials",
-        "minimum-credentials",
-        "signature",
-        "allowed-issuer",
-        "not-before"
+        *PolicyManager.listPolicyDescriptions().keys.toTypedArray()
     ).multiple()
 
     val policyArguments: Map<String, String> by option(
