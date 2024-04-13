@@ -152,18 +152,21 @@ class VCVerifyCmd : CliktCommand(
 
     private fun handleSuccess(it: PolicyResult) {
         var details = ""
-        val innerException = it.result.exceptionOrNull()
 
-        if (innerException != null) {
-            details = innerException.message!!
-        } else if (it.result.getOrNull() !is Unit &&
-            "policy_available" in it.result.getOrThrow() as JsonObject &&
+        // val innerException = it.result.exceptionOrNull()
+        // if (innerException != null) {
+        //     details = innerException.message!!
+        // } else
+        // if (it.result.getOrNull() !is Unit &&
+
+        if ("policy_available" in it.result.getOrThrow() as JsonObject &&
             !(it.result.getOrThrow() as JsonObject).get("policy_available")!!.equals(JsonPrimitive(true))
-        ) { // If policy_available == false
+        ) { // i.e. If policy_available == false
+
             when (it.request.policy) {
                 is ExpirationDatePolicy -> {
                     details =
-                        " Pero no mucho. Neither 'exp', 'validUntil' nor 'expirationDate' found. Is it a bug? ¯\\_(ツ)_/¯"
+                        " [warning] The policy has not even been applied because neither 'exp', 'validUntil' nor 'expirationDate' were found."
                 }
 
                 is NotBeforeDatePolicy -> {
