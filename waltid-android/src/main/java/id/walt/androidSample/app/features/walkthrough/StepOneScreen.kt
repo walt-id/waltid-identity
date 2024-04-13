@@ -26,6 +26,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import id.walt.androidSample.app.features.walkthrough.components.WalkthroughStep
 import id.walt.androidSample.app.features.walkthrough.components.WaltPrimaryButton
+import id.walt.androidSample.app.features.walkthrough.components.WaltSecondaryButton
 import id.walt.androidSample.theme.WaltIdAndroidSampleTheme
 import id.walt.androidSample.utils.ObserveAsEvents
 
@@ -60,8 +61,13 @@ fun StepOneScreen(
             modifier = Modifier.padding(bottom = 32.dp)
         )
 
-        Spacer(modifier = Modifier.weight(1f))
+        Spacer(modifier = Modifier.height(8.dp))
 
+        WaltSecondaryButton(
+            text = "Generate Key",
+            onClick = { /*TODO*/ },
+            modifier = Modifier.fillMaxWidth()
+        )
         WaltPrimaryButton(
             text = "Next Step",
             onClick = { /*TODO*/ },
@@ -82,7 +88,7 @@ private fun AlgorithmRadioGroup(
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .height(64.dp)
+                    .height(40.dp)
                     .selectable(
                         selected = (option == selectedOption),
                         onClick = { onOptionSelected(option) },
