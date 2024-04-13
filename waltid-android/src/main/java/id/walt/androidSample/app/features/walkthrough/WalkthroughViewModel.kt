@@ -8,11 +8,13 @@ import id.walt.crypto.keys.KeyType
 import id.walt.did.dids.DidService
 import id.walt.did.dids.registrar.DidResult
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -24,8 +26,14 @@ sealed interface WalkthroughStep {
     data object Five : WalkthroughStep
 }
 
+sealed interface VerificationResult {
+    data object Failed: VerificationResult
+    data object Success: VerificationResult
+    data object JWSVerificationNotAvailable: VerificationResult
+}
+
 interface WalkthroughViewModel {
-    val events: Flow<WalkthroughEvent>
+    val events: SharedFlow<WalkthroughEvent>
 
     // Step One
     val keyAlgorithmOptions: List<KeyAlgorithmOption>
@@ -47,7 +55,7 @@ interface WalkthroughViewModel {
     val signedOutput: StateFlow<String?>
 
     // Step Five
-    val verifiedText: StateFlow<String?>
+    val verificationResult: StateFlow<VerificationResult?>
 
     fun onKeyAlgorithmSelected(keyAlgorithmOption: KeyAlgorithmOption)
     fun onMethodOptionSelected(methodOption: MethodOption)
@@ -68,7 +76,7 @@ interface WalkthroughViewModel {
 
 
     class Fake : WalkthroughViewModel {
-        override val events = emptyFlow<WalkthroughEvent>()
+        override val events = MutableSharedFlow<WalkthroughEvent>()
         override val keyAlgorithmOptions = KeyAlgorithmOption.all()
         override val selectedKeyAlgorithm = MutableStateFlow(KeyAlgorithmOption.RSA)
         override val generatedKey =
@@ -81,7 +89,7 @@ interface WalkthroughViewModel {
         override val signOptions = SignOption.all()
         override val selectedSignOption = MutableStateFlow(SignOption.Raw)
         override val signedOutput = MutableStateFlow("awdkjawklfjawklfjawf jaklfj")
-        override val verifiedText = MutableStateFlow("fawlkfjkalwjfalkfjkalwjflkawjf")
+        override val verificationResult = MutableStateFlow(VerificationResult.Success)
 
         override fun onKeyAlgorithmSelected(keyAlgorithmOption: KeyAlgorithmOption) = Unit
         override fun onMethodOptionSelected(methodOption: MethodOption) = Unit
@@ -106,7 +114,7 @@ interface WalkthroughViewModel {
         private var currentStep = 1
 
         private val _events = Channel<WalkthroughEvent>()
-        override val events = _events.receiveAsFlow()
+        override val events = _events.receiveAsFlow().shareIn(viewModelScope, started = SharingStarted.WhileSubscribed(5_000L))
 
         override val keyAlgorithmOptions = KeyAlgorithmOption.all()
         override val selectedKeyAlgorithm = MutableStateFlow<KeyAlgorithmOption>(KeyAlgorithmOption.RSA)
@@ -128,7 +136,7 @@ interface WalkthroughViewModel {
         private var signedOutputByteArray: ByteArray? = null
         override val signedOutput = MutableStateFlow<String?>(null)
 
-        override val verifiedText = MutableStateFlow<String?>(null)
+        override val verificationResult = MutableStateFlow<VerificationResult?>(null)
 
         override fun onKeyAlgorithmSelected(keyAlgorithmOption: KeyAlgorithmOption) {
             selectedKeyAlgorithm.update { currentAlgorithm ->
@@ -225,14 +233,14 @@ interface WalkthroughViewModel {
                             signedOutputByteArray?.let { byteArrayToVerify ->
                                 val result = androidKey.verifyRaw(byteArrayToVerify, plainText.value.toByteArray())
                                 if (result.isSuccess) {
-                                    _events.send(WalkthroughEvent.Verification.Success)
+                                    verificationResult.update { VerificationResult.Success }
                                 } else {
-                                    _events.send(WalkthroughEvent.Verification.Failed)
+                                    verificationResult.update { VerificationResult.Failed }
                                 }
                             }
                         }
 
-                        SignOption.JWS -> _events.send(WalkthroughEvent.Verification.JWSNotAvailable)
+                        SignOption.JWS -> verificationResult.update { VerificationResult.JWSVerificationNotAvailable }
                     }
                 }
             }
@@ -298,11 +306,6 @@ sealed interface WalkthroughEvent {
     sealed interface Biometrics : WalkthroughEvent {
         data object BiometricsUnavailable : Biometrics
         data object BiometricAuthenticationFailure : Biometrics
-    }
-    sealed interface Verification : WalkthroughEvent {
-        data object JWSNotAvailable : Verification
-        data object Success : Verification
-        data object Failed : Verification
     }
 }
 

@@ -34,7 +34,6 @@ fun AppNavHost(
             WalkthroughEvent.NavigateEvent.ToStepFive -> navController.navigate(NavigationItem.WalkthroughStepFive.route)
             WalkthroughEvent.NavigateEvent.CompleteWalkthrough -> { /* TODO */ }
             is WalkthroughEvent.Biometrics -> {}
-            is WalkthroughEvent.Verification -> {}
         }
     }
 
