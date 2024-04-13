@@ -65,6 +65,8 @@ fun StepFourScreen(
     ObserveAsEvents(flow = viewModel.events) { event ->
         when (event) {
             is WalkthroughEvent.NavigateEvent -> {}
+            is WalkthroughEvent.Verification -> {}
+
             WalkthroughEvent.Biometrics.BiometricAuthenticationFailure -> Toast.makeText(
                 ctx,
                 ctx.getString(R.string.biometric_authentication_failure),
@@ -76,6 +78,7 @@ fun StepFourScreen(
                 ctx.getString(R.string.biometric_unavailable),
                 Toast.LENGTH_SHORT
             ).show()
+
         }
     }
 
