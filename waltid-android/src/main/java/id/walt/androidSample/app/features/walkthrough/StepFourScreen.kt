@@ -25,6 +25,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.navigation.NavController
+import androidx.navigation.compose.rememberNavController
 import id.walt.androidSample.app.features.walkthrough.components.WalkthroughStep
 import id.walt.androidSample.app.features.walkthrough.components.WaltPrimaryButton
 import id.walt.androidSample.app.features.walkthrough.components.WaltSecondaryButton
@@ -32,7 +34,11 @@ import id.walt.androidSample.theme.WaltIdAndroidSampleTheme
 
 
 @Composable
-fun StepFourScreen() {
+fun StepFourScreen(
+    viewModel: WalkthroughViewModel,
+    navController: NavController,
+    modifier: Modifier = Modifier,
+) {
 
     val methodOptions = SignOption.all()
     var selectedMethodOption: SignOption by remember {
@@ -115,6 +121,6 @@ sealed interface SignOption {
 @Composable
 private fun Preview() {
     WaltIdAndroidSampleTheme {
-        StepFourScreen()
+        StepFourScreen(WalkthroughViewModel.Fake(), rememberNavController())
     }
 }

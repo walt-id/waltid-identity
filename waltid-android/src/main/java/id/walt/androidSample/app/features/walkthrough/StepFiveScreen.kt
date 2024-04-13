@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.navigation.NavController
+import androidx.navigation.compose.rememberNavController
 import id.walt.androidSample.app.features.walkthrough.components.WalkthroughStep
 import id.walt.androidSample.app.features.walkthrough.components.WaltPrimaryButton
 import id.walt.androidSample.app.features.walkthrough.components.WaltSecondaryButton
@@ -12,7 +14,11 @@ import id.walt.androidSample.theme.WaltIdAndroidSampleTheme
 
 
 @Composable
-fun StepFiveScreen() {
+fun StepFiveScreen(
+    viewModel: WalkthroughViewModel,
+    navController: NavController,
+    modifier: Modifier = Modifier,
+) {
     WalkthroughStep(title = "Step 5 - Verify Signed Text", description = "Verify the signed text using the generated key pair.") {
         Spacer(modifier = Modifier.weight(1f))
         WaltSecondaryButton(text = "Verify", onClick = { /*TODO*/ }, modifier = Modifier.fillMaxWidth())
@@ -24,6 +30,6 @@ fun StepFiveScreen() {
 @Composable
 private fun Preview() {
     WaltIdAndroidSampleTheme {
-        StepFiveScreen()
+        StepFiveScreen(WalkthroughViewModel.Fake(), rememberNavController())
     }
 }
