@@ -8,7 +8,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import id.walt.androidSample.app.features.main.MainViewModel
 import id.walt.androidSample.app.features.result.ResultUi
-import id.walt.androidSample.app.features.walkthrough.GenerateKeyScreen
+import id.walt.androidSample.app.features.walkthrough.StepOneScreen
 import id.walt.androidSample.app.features.walkthrough.WalkthroughViewModel
 
 @Composable
@@ -24,7 +24,7 @@ fun AppNavHost(
     ) {
         val sharedViewModel = MainViewModel.Default()
         composable(NavigationItem.Main.route) {
-           GenerateKeyScreen(viewModel = viewModel<WalkthroughViewModel.Default>(), navController = navController)
+           StepOneScreen(viewModel = viewModel<WalkthroughViewModel.Default>(), navController = navController)
         }
         composable(NavigationItem.Result.route) {
             ResultUi(sharedViewModel, navController)

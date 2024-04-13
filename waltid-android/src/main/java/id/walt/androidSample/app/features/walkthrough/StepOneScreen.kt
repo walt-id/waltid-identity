@@ -26,11 +26,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -42,11 +38,12 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import id.walt.androidSample.R
+import id.walt.androidSample.app.features.walkthrough.components.WaltPrimaryButton
 import id.walt.androidSample.theme.WaltIdAndroidSampleTheme
 import id.walt.androidSample.utils.ObserveAsEvents
 
 @Composable
-fun GenerateKeyScreen(
+fun StepOneScreen(
     viewModel: WalkthroughViewModel,
     navController: NavController,
 ) {
@@ -103,19 +100,7 @@ fun GenerateKeyScreen(
                     textAlign = TextAlign.Start,
                 )
 
-                Text(
-                    text = key ?: "",
-                    textAlign = TextAlign.Justify,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth()
-                        .padding(16.dp)
-                        .clickable {
-                            println(key)
-                        }
-                )
+                Spacer(modifier = Modifier.weight(1f))
 
                 RadioGroup(
                     selectedOption = selectedAlgorithmOption,
@@ -124,24 +109,13 @@ fun GenerateKeyScreen(
                     modifier = Modifier.padding(bottom = 32.dp)
                 )
 
-                OutlinedButton(
-                    onClick = viewModel::onGenerateKeyClick, modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.textButtonColors(
-                        contentColor = MaterialTheme.colorScheme.onSurface,
-                        containerColor = MaterialTheme.colorScheme.surface,
-                    ),
-                ) {
-                    Text("Generate Key")
-                }
-                OutlinedButton(
-                    onClick = viewModel::onProgressToStepTwoClick, modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.textButtonColors(
-                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    ),
-                ) {
-                    Text("Next Step")
-                }
+                Spacer(modifier = Modifier.weight(1f))
+
+                WaltPrimaryButton(
+                    text = "Next Step",
+                    onClick = { /*TODO*/ },
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
         }
     }
@@ -184,9 +158,9 @@ private fun RadioGroup(
 
 @Preview
 @Composable
-private fun GenerateKeyScreenPreview() {
+private fun StepOneScreenPreview() {
     WaltIdAndroidSampleTheme {
         val ctx = LocalContext.current
-        GenerateKeyScreen(WalkthroughViewModel.Fake(), NavController(ctx))
+        StepOneScreen(WalkthroughViewModel.Fake(), NavController(ctx))
     }
 }
