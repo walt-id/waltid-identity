@@ -29,10 +29,11 @@ fun AppNavHost(
     ObserveAsEvents(flow = walkthroughViewModel.events) { event ->
         when (event) {
             is WalkthroughEvent.NavigateEvent.ToStepTwo -> navController.navigate(NavigationItem.WalkthroughStepTwo.route)
-            WalkthroughEvent.NavigateEvent.ToStepFive -> navController.navigate(NavigationItem.WalkthroughStepThree.route)
+            WalkthroughEvent.NavigateEvent.ToStepThree -> navController.navigate(NavigationItem.WalkthroughStepThree.route)
             WalkthroughEvent.NavigateEvent.ToStepFour -> navController.navigate(NavigationItem.WalkthroughStepFour.route)
-            WalkthroughEvent.NavigateEvent.ToStepThree -> navController.navigate(NavigationItem.WalkthroughStepFive.route)
+            WalkthroughEvent.NavigateEvent.ToStepFive -> navController.navigate(NavigationItem.WalkthroughStepFive.route)
             WalkthroughEvent.NavigateEvent.CompleteWalkthrough -> { /* TODO */ }
+            is WalkthroughEvent.Biometrics -> {}
         }
     }
 

@@ -63,7 +63,7 @@ fun StepOneScreen(
         )
         WaltPrimaryButton(
             text = "Next Step",
-            onClick = viewModel::onNextStepClick,
+            onClick = viewModel::onGoToStepTwoClick,
             enabled = generatedKey != null,
             modifier = Modifier.fillMaxWidth()
         )
