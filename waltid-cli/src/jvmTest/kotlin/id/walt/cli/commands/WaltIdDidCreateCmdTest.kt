@@ -20,7 +20,7 @@ class WaltIdDidCreateCmdTest {
     }
 
     @Test
-    fun `should create a key of type did when called with no argument`() {
+    fun `should create a did-key from a random Ed25519 key when called with no argument`() {
         val result = command.test(emptyList<String>())
 
         assertContains(result.stdout, "DID created")
