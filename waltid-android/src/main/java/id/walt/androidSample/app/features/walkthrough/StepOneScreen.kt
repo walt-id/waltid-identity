@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import id.walt.androidSample.R
+import id.walt.androidSample.app.features.walkthrough.components.WalkthroughStep
 import id.walt.androidSample.app.features.walkthrough.components.WaltPrimaryButton
 import id.walt.androidSample.theme.WaltIdAndroidSampleTheme
 import id.walt.androidSample.utils.ObserveAsEvents
@@ -49,7 +50,7 @@ fun StepOneScreen(
 ) {
 
     ObserveAsEvents(flow = viewModel.events) { event ->
-        when(event) {
+        when (event) {
             is WalkthroughEvent.NavigateEvent.NavigateToStepTwo -> {
                 /* TODO NAVIGATE */
             }
@@ -60,64 +61,26 @@ fun StepOneScreen(
     val selectedAlgorithmOption by viewModel.selectedKeyAlgorithm.collectAsStateWithLifecycle()
     val key by viewModel.generatedKey.collectAsStateWithLifecycle()
 
-    Scaffold(
-        contentColor = MaterialTheme.colorScheme.onSurface,
-        containerColor = MaterialTheme.colorScheme.surface
-    ) { padding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding),
-            contentAlignment = Alignment.TopCenter
-        ) {
-            Column(
-                modifier = Modifier
-                    .widthIn(max = 600.dp)
-                    .fillMaxSize()
-                    .padding(horizontal = 16.dp)
-                    .padding(top = 32.dp, bottom = 12.dp),
-                horizontalAlignment = Alignment.Start
-            ) {
-                Surface(
-                    shape = CircleShape,
-                    modifier = Modifier.size(80.dp)
-                ) {
-                    Icon(
-                        painterResource(id = R.drawable.logo_waltid),
-                        contentDescription = "Logo",
-                        tint = MaterialTheme.colorScheme.primary,
-                    )
-                }
+    WalkthroughStep(
+        title = "Step 1 - Generate a Key",
+        description = "Choose between using either the RSA or ECDSA algorithm to generate a key pair."
+    ) {
+        Spacer(modifier = Modifier.weight(1f))
 
-                Spacer(Modifier.height(36.dp))
-                Text(
-                    text = "Step 1 - Generate a Key",
-                    style = MaterialTheme.typography.headlineMedium
-                )
-                Spacer(Modifier.height(36.dp))
-                Text(
-                    text = "Choose between using either the RSA or ECDSA algorithm to generate a key pair.",
-                    textAlign = TextAlign.Start,
-                )
+        RadioGroup(
+            selectedOption = selectedAlgorithmOption,
+            options = algorithmOptions,
+            onOptionSelected = viewModel::onKeyAlgorithmSelected,
+            modifier = Modifier.padding(bottom = 32.dp)
+        )
 
-                Spacer(modifier = Modifier.weight(1f))
+        Spacer(modifier = Modifier.weight(1f))
 
-                RadioGroup(
-                    selectedOption = selectedAlgorithmOption,
-                    options = algorithmOptions,
-                    onOptionSelected = viewModel::onKeyAlgorithmSelected,
-                    modifier = Modifier.padding(bottom = 32.dp)
-                )
-
-                Spacer(modifier = Modifier.weight(1f))
-
-                WaltPrimaryButton(
-                    text = "Next Step",
-                    onClick = { /*TODO*/ },
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-        }
+        WaltPrimaryButton(
+            text = "Next Step",
+            onClick = { /*TODO*/ },
+            modifier = Modifier.fillMaxWidth()
+        )
     }
 }
 
