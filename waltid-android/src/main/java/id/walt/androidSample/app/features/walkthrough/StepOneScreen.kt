@@ -24,6 +24,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
+import androidx.navigation.compose.rememberNavController
 import id.walt.androidSample.app.features.walkthrough.components.WalkthroughStep
 import id.walt.androidSample.app.features.walkthrough.components.WaltPrimaryButton
 import id.walt.androidSample.app.features.walkthrough.components.WaltSecondaryButton
@@ -34,6 +35,7 @@ import id.walt.androidSample.utils.ObserveAsEvents
 fun StepOneScreen(
     viewModel: WalkthroughViewModel,
     navController: NavController,
+    modifier: Modifier = Modifier,
 ) {
 
     ObserveAsEvents(flow = viewModel.events) { event ->
@@ -115,7 +117,6 @@ private fun AlgorithmRadioGroup(
 @Composable
 private fun StepOneScreenPreview() {
     WaltIdAndroidSampleTheme {
-        val ctx = LocalContext.current
-        StepOneScreen(WalkthroughViewModel.Fake(), NavController(ctx))
+        StepOneScreen(WalkthroughViewModel.Fake(), rememberNavController())
     }
 }
