@@ -90,6 +90,10 @@ private fun MethodRadioGroup(
 sealed interface MethodOption {
     data object Key : MethodOption
     data object JWK : MethodOption
+
+    companion object {
+        fun all() = listOf(Key, JWK)
+    }
 }
 
 @Preview
