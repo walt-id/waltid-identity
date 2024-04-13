@@ -8,11 +8,16 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
+import id.walt.androidSample.R
 import id.walt.androidSample.app.features.walkthrough.components.WalkthroughStep
 import id.walt.androidSample.app.features.walkthrough.components.WaltPrimaryButton
 import id.walt.androidSample.app.features.walkthrough.components.WaltSecondaryButton
@@ -26,7 +31,9 @@ fun StepFiveScreen(
     modifier: Modifier = Modifier,
 ) {
 
-    val verifiedText by viewModel.verifiedText.collectAsStateWithLifecycle()
+    val ctx = LocalContext.current
+
+    val verificationResult by viewModel.verificationResult.collectAsStateWithLifecycle()
 
     WalkthroughStep(
         title = "Step 5 - Verify Signed Text",
@@ -34,17 +41,45 @@ fun StepFiveScreen(
         modifier = modifier,
     ) {
 
-        if (verifiedText != null) {
-            Text(
-                text = verifiedText.toString(),
-                color = MaterialTheme.colorScheme.primary,
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier
-                    .padding(vertical = 8.dp)
-                    .weight(1f),
-            )
-        } else {
-            Spacer(modifier = Modifier.weight(1f))
+
+        when(verificationResult) {
+            VerificationResult.Success -> {
+                Text(
+                    text = stringResource(id = R.string.success),
+                    color = Color.Green.copy(alpha = 0.6f),
+                    style = MaterialTheme.typography.titleMedium,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .padding(vertical = 8.dp)
+                        .fillMaxWidth()
+                        .weight(1f),
+                )
+            }
+            VerificationResult.Failed -> {
+                Text(
+                    text = stringResource(id = R.string.verification_failed),
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.titleMedium,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .padding(vertical = 8.dp)
+                        .fillMaxWidth()
+                        .weight(1f),
+                )
+            }
+            VerificationResult.JWSVerificationNotAvailable -> {
+                Text(
+                    text = stringResource(id = R.string.verification_jws_not_available),
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.titleMedium,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .padding(vertical = 8.dp)
+                        .fillMaxWidth()
+                        .weight(1f),
+                )
+            }
+            null ->  Spacer(modifier = Modifier.weight(1f))
         }
 
         WaltSecondaryButton(
@@ -55,7 +90,7 @@ fun StepFiveScreen(
         WaltPrimaryButton(
             text = "Complete Walkthrough",
             onClick = viewModel::onCompleteWalkthroughClick,
-            enabled = verifiedText != null,
+            enabled = verificationResult != null,
             modifier = Modifier.fillMaxWidth()
         )
     }

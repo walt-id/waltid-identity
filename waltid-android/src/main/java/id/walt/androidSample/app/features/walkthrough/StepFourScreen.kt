@@ -65,7 +65,6 @@ fun StepFourScreen(
     ObserveAsEvents(flow = viewModel.events) { event ->
         when (event) {
             is WalkthroughEvent.NavigateEvent -> {}
-            is WalkthroughEvent.Verification -> {}
 
             WalkthroughEvent.Biometrics.BiometricAuthenticationFailure -> Toast.makeText(
                 ctx,
