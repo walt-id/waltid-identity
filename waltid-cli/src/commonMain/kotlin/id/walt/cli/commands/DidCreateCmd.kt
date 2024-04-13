@@ -40,7 +40,8 @@ class DidCreateCmd : CliktCommand(
             val result = DidUtil.createDid(method, key)
 
             print.green("DID created:")
-            print.box(result)
+            // print.box(result) // Can't be used because truncates long DIDs
+            print.plain(result)
         }
     }
 }
