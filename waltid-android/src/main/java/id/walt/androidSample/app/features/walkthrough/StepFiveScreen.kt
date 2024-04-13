@@ -54,7 +54,7 @@ fun StepFiveScreen(
         )
         WaltPrimaryButton(
             text = "Complete Walkthrough",
-            onClick = { /*TODO*/ },
+            onClick = viewModel::onCompleteWalkthroughClick,
             enabled = verifiedText != null,
             modifier = Modifier.fillMaxWidth()
         )

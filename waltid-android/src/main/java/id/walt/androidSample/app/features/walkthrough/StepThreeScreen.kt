@@ -75,7 +75,7 @@ fun StepThreeScreen(
         )
         WaltPrimaryButton(
             text = "Next Step",
-            onClick = viewModel::onNextStepClick,
+            onClick = viewModel::onGoToStepFourClick,
             enabled = generatedDID != null,
             modifier = Modifier.fillMaxWidth()
         )
