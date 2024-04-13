@@ -31,6 +31,11 @@ class WaltIdDidResolveCmdTest {
     val waltidDidSecp256r1 =
         "did:key:zWmu9RCrS3hBhGSyhKfNSywuTWFCMjMxJeKhMPt6m3jwpBpWY3VaLqLiNMiVM4FpUNsSm3psdggkevuYHK6Lq1pnoznV7N6Uo7RDLu34gyGxLRhkL16B5r2ZP2QcNDFu"
 
+    // waltid did lib (from DidKeyResolverTest)
+    val waltidDidLibEd25519 = "did:key:z6MkrP3u6dEz2gpWq89J7DMWtPCYW8dGrpPBzkfkDt9FXrQg"
+    val waltidDidLibSecp256r1 = "did:key:zDnaeWUm6JXpipAtL1N1hQFA4BQUwGCdaAVbpEZjN3Pf9nMrb"
+    val waltidDidLibSecp256k1 = "did:key:zQ3shTZmje6ppF4oboKTX85hUWGrR1nxrWnFA3tnJhsHEC8c4"
+
     @Test
     fun `should resolve uniresolver P-521 did|key example`() {
         assertDoesNotThrow {
@@ -112,6 +117,27 @@ class WaltIdDidResolveCmdTest {
     fun `should resolve waltid Secp256r1 did|key`() {
         assertDoesNotThrow {
             command.parse(listOf("-d", waltidDidSecp256r1))
+        }
+    }
+
+    @Test
+    fun `should resolve waltid-did lib Ed25519 did|key`() {
+        assertDoesNotThrow {
+            command.parse(listOf("-d", waltidDidLibEd25519))
+        }
+    }
+
+    @Test
+    fun `should resolve waltid-did lib Secp256k1 did|key`() {
+        assertDoesNotThrow {
+            command.parse(listOf("-d", waltidDidLibSecp256k1))
+        }
+    }
+
+    @Test
+    fun `should resolve waltid-did lib Secp256r1 did|key`() {
+        assertDoesNotThrow {
+            command.parse(listOf("-d", waltidDidLibSecp256r1))
         }
     }
 }
