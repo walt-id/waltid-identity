@@ -21,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
 import id.walt.androidSample.app.features.walkthrough.components.WalkthroughStep
@@ -36,25 +37,48 @@ fun StepThreeScreen(
     modifier: Modifier = Modifier,
 ) {
 
-    val methodOptions = listOf(MethodOption.Key, MethodOption.JWK)
-    var selectedMethodOption: MethodOption by remember {
-        mutableStateOf(MethodOption.Key)
-    }
+    val methodOptions = viewModel.methodOptions
+    val selectedMethodOption by viewModel.selectedMethod.collectAsStateWithLifecycle()
+    val generatedDID by viewModel.did.collectAsStateWithLifecycle()
 
-    WalkthroughStep(title = "Step 3 - Generate DID", description = "Generate a DID using the generated key pair.") {
+    WalkthroughStep(
+        title = "Step 3 - Generate DID",
+        description = "Generate a DID using the generated key pair.",
+        modifier = modifier,
+    ) {
 
-        Spacer(modifier = Modifier.weight(1f))
+        if (generatedDID != null) {
+            Text(
+                text = generatedDID.toString(),
+                color = MaterialTheme.colorScheme.primary,
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier
+                    .padding(vertical = 8.dp)
+                    .weight(1f),
+            )
+        } else {
+            Spacer(modifier = Modifier.weight(1f))
+        }
 
         MethodRadioGroup(
             selectedOption = selectedMethodOption,
             options = methodOptions,
-            onOptionSelected = { selectedMethodOption = it },
+            onOptionSelected = viewModel::onMethodOptionSelected,
         )
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        WaltSecondaryButton(text = "Generate DID", onClick = { /*TODO*/ }, modifier = Modifier.fillMaxWidth())
-        WaltPrimaryButton(text = "Next Step", onClick = { /*TODO*/ }, modifier = Modifier.fillMaxWidth())
+        WaltSecondaryButton(
+            text = "Generate DID",
+            onClick = viewModel::onGenerateDIDClick,
+            modifier = Modifier.fillMaxWidth()
+        )
+        WaltPrimaryButton(
+            text = "Next Step",
+            onClick = viewModel::onNextStepClick,
+            enabled = generatedDID != null,
+            modifier = Modifier.fillMaxWidth()
+        )
     }
 }
 

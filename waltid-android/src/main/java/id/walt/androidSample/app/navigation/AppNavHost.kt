@@ -13,16 +13,28 @@ import id.walt.androidSample.app.features.walkthrough.StepFourScreen
 import id.walt.androidSample.app.features.walkthrough.StepOneScreen
 import id.walt.androidSample.app.features.walkthrough.StepThreeScreen
 import id.walt.androidSample.app.features.walkthrough.StepTwoScreen
+import id.walt.androidSample.app.features.walkthrough.WalkthroughEvent
 import id.walt.androidSample.app.features.walkthrough.WalkthroughViewModel
+import id.walt.androidSample.utils.ObserveAsEvents
 
 @Composable
 fun AppNavHost(
     modifier: Modifier = Modifier,
     navController: NavHostController,
-    startDestination: String = NavigationItem.Main.route,
+    startDestination: String = NavigationItem.WalkthroughStepOne.route,
 ) {
 
     val walkthroughViewModel = viewModel<WalkthroughViewModel.Default>()
+
+    ObserveAsEvents(flow = walkthroughViewModel.events) { event ->
+        when (event) {
+            is WalkthroughEvent.NavigateEvent.ToStepTwo -> navController.navigate(NavigationItem.WalkthroughStepTwo.route)
+            WalkthroughEvent.NavigateEvent.ToStepFive -> navController.navigate(NavigationItem.WalkthroughStepThree.route)
+            WalkthroughEvent.NavigateEvent.ToStepFour -> navController.navigate(NavigationItem.WalkthroughStepFour.route)
+            WalkthroughEvent.NavigateEvent.ToStepThree -> navController.navigate(NavigationItem.WalkthroughStepFive.route)
+            WalkthroughEvent.NavigateEvent.CompleteWalkthrough -> { /* TODO */ }
+        }
+    }
 
     NavHost(
         modifier = modifier,
@@ -31,7 +43,7 @@ fun AppNavHost(
     ) {
         val sharedViewModel = MainViewModel.Default()
         composable(NavigationItem.Main.route) {
-           StepOneScreen(viewModel = walkthroughViewModel, navController = navController)
+            StepOneScreen(viewModel = walkthroughViewModel, navController = navController)
         }
         composable(NavigationItem.Result.route) {
             ResultUi(sharedViewModel, navController)

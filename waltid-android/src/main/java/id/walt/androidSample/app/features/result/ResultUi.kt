@@ -24,7 +24,7 @@ import id.walt.androidSample.app.features.main.MainViewModel
 import id.walt.androidSample.models.CopiedText
 import id.walt.androidSample.theme.WaltIdAndroidSampleTheme
 import id.walt.androidSample.ui.BasicText
-import id.walt.androidSample.utils.collectImmediatelyAsState
+import id.walt.androidSample.utils.collectImmediatelyAsStateWithLifecycle
 
 @Composable
 fun ResultUi(
@@ -32,7 +32,7 @@ fun ResultUi(
     navHostController: NavHostController,
 ) {
 
-    val textToShow = viewModel.displayText.collectImmediatelyAsState()
+    val textToShow = viewModel.displayText.collectImmediatelyAsStateWithLifecycle()
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,

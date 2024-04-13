@@ -16,6 +16,7 @@ fun WaltPrimaryButton(
     text: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
 ) {
     OutlinedButton(
         onClick = onClick, modifier = modifier,
@@ -23,6 +24,7 @@ fun WaltPrimaryButton(
             contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
             containerColor = MaterialTheme.colorScheme.primaryContainer,
         ),
+        enabled = enabled
     ) {
         Text(text)
     }
