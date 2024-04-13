@@ -18,7 +18,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -37,22 +36,14 @@ fun StepOneScreen(
     navController: NavController,
     modifier: Modifier = Modifier,
 ) {
-
-    ObserveAsEvents(flow = viewModel.events) { event ->
-        when (event) {
-            is WalkthroughEvent.NavigateEvent.NavigateToStepTwo -> {
-                /* TODO NAVIGATE */
-            }
-        }
-    }
-
     val algorithmOptions = viewModel.keyAlgorithmOptions
     val selectedAlgorithmOption by viewModel.selectedKeyAlgorithm.collectAsStateWithLifecycle()
-    val key by viewModel.generatedKey.collectAsStateWithLifecycle()
+    val generatedKey by viewModel.generatedKey.collectAsStateWithLifecycle()
 
     WalkthroughStep(
         title = "Step 1 - Generate a Key",
-        description = "Choose between using either the RSA or ECDSA algorithm to generate a key pair."
+        description = "Choose between using either the RSA or ECDSA algorithm to generate a key pair.",
+        modifier = modifier,
     ) {
         Spacer(modifier = Modifier.weight(1f))
 
@@ -67,12 +58,13 @@ fun StepOneScreen(
 
         WaltSecondaryButton(
             text = "Generate Key",
-            onClick = { /*TODO*/ },
+            onClick = viewModel::onGenerateKeyClick,
             modifier = Modifier.fillMaxWidth()
         )
         WaltPrimaryButton(
             text = "Next Step",
-            onClick = { /*TODO*/ },
+            onClick = viewModel::onNextStepClick,
+            enabled = generatedKey != null,
             modifier = Modifier.fillMaxWidth()
         )
     }

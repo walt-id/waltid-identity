@@ -17,20 +17,19 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
 import id.walt.androidSample.app.features.walkthrough.components.WalkthroughStep
 import id.walt.androidSample.app.features.walkthrough.components.WaltPrimaryButton
 import id.walt.androidSample.app.features.walkthrough.components.WaltSecondaryButton
 import id.walt.androidSample.theme.WaltIdAndroidSampleTheme
+import id.walt.androidSample.utils.collectImmediatelyAsStateWithLifecycle
 
 
 @Composable
@@ -40,39 +39,62 @@ fun StepFourScreen(
     modifier: Modifier = Modifier,
 ) {
 
-    val methodOptions = SignOption.all()
-    var selectedMethodOption: SignOption by remember {
-        mutableStateOf(SignOption.Plain)
-    }
-    var inputText by remember { mutableStateOf("") }
+    val inputText by viewModel.plainText.collectImmediatelyAsStateWithLifecycle()
+    val signOptions = viewModel.signOptions
+    val selectedSignOption by viewModel.selectedSignOption.collectAsStateWithLifecycle()
+    val signedText by viewModel.signedOutput.collectAsStateWithLifecycle()
 
-    WalkthroughStep(title = "Step 4 - Sign Input", description = "Sign the input using the generated key pair.") {
+    WalkthroughStep(
+        title = "Step 4 - Sign Input",
+        description = "Sign the input using the generated key pair.",
+        modifier = modifier,
+    ) {
 
         Spacer(modifier = Modifier.height(16.dp))
 
         OutlinedTextField(
             value = inputText,
-            onValueChange = { inputText = it },
+            onValueChange = viewModel::onPlainTextChanged,
             label = { Text("Input text to sign here") },
         )
 
-        Spacer(modifier = Modifier.weight(1f))
+        if (signedText != null) {
+            Text(
+                text = signedText.toString(),
+                color = MaterialTheme.colorScheme.primary,
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier
+                    .padding(vertical = 8.dp)
+                    .weight(1f),
+            )
+        } else {
+            Spacer(modifier = Modifier.weight(1f))
+        }
 
-        MethodRadioGroup(
-            selectedOption = selectedMethodOption,
-            options = methodOptions,
-            onOptionSelected = { selectedMethodOption = it },
+        SignRadioGroup(
+            selectedOption = selectedSignOption,
+            options = signOptions,
+            onOptionSelected = viewModel::onSignOptionSelected,
         )
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        WaltSecondaryButton(text = "Sign Input", onClick = { /*TODO*/ }, modifier = Modifier.fillMaxWidth())
-        WaltPrimaryButton(text = "Next Step", onClick = { /*TODO*/ }, modifier = Modifier.fillMaxWidth())
+        WaltSecondaryButton(
+            text = "Sign Input",
+            onClick = viewModel::onSignTextClick,
+            modifier = Modifier.fillMaxWidth()
+        )
+        WaltPrimaryButton(
+            text = "Next Step",
+            onClick = viewModel::onNextStepClick,
+            enabled = signedText != null,
+            modifier = Modifier.fillMaxWidth(),
+        )
     }
 }
 
 @Composable
-private fun MethodRadioGroup(
+private fun SignRadioGroup(
     selectedOption: SignOption,
     options: List<SignOption>,
     onOptionSelected: (SignOption) -> Unit,

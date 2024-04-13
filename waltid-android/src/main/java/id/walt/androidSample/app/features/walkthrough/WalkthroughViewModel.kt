@@ -45,6 +45,9 @@ interface WalkthroughViewModel {
     val verifiedText: StateFlow<String?>
 
     fun onKeyAlgorithmSelected(keyAlgorithmOption: KeyAlgorithmOption)
+    fun onMethodOptionSelected(methodOption: MethodOption)
+    fun onSignOptionSelected(signOption: SignOption)
+    fun onPlainTextChanged(plainText: String)
     fun onGenerateKeyClick()
     fun onRetrievePublicKeyClick()
     fun onGenerateDIDClick()
@@ -58,17 +61,20 @@ interface WalkthroughViewModel {
         override val keyAlgorithmOptions = KeyAlgorithmOption.all()
         override val selectedKeyAlgorithm = MutableStateFlow(KeyAlgorithmOption.RSA)
         override val generatedKey = MutableStateFlow("{\"kty\":\"RSA\",\"n\":\"ALzEWJVtxmkmYAeEStt8OSv73SbYL65IRMJ0MjgDt3wwj8KV+0mct3v\\/V3hMjqE2nMJBxj88+vNIRxoRIIzdqU\\/yl7BsV3AVib2qgCw5NybiBxTl3YGbPg4VLt2d5TCHfVpIrMDDUMZaHSlXRilGXLN98pae9IJ1MNuufVnId7iuwosvAMAoNhaD6Webglq88fYHGE0p7M+ISwiWVUjiPhK+YahPwKv5TM+q82dUOZ3eReR7NVCHrglLNOjyxqY7Qc7Kea7klOki0tzbcl7KH2kCfubeKirI4EZujjITaMrHahyAAER91Kv3PYJu2m9eR80IoNg0eKh62+XmlzYpBp8=\",\"e\":\"AQAB\"}")
-        override val publicKey = MutableStateFlow("")
+        override val publicKey = MutableStateFlow("dakwfjaklfjaklfjkalfk")
         override val methodOptions = MethodOption.all()
         override val selectedMethod = MutableStateFlow(MethodOption.Key)
         override val did = MutableStateFlow("did:example:123456789abcdefghi")
         override val plainText = MutableStateFlow("")
         override val signOptions = SignOption.all()
         override val selectedSignOption = MutableStateFlow(SignOption.Plain)
-        override val signedOutput = MutableStateFlow("")
-        override val verifiedText = MutableStateFlow("")
+        override val signedOutput = MutableStateFlow("awdkjawklfjawklfjawf jaklfj")
+        override val verifiedText = MutableStateFlow("fawlkfjkalwjfalkfjkalwjflkawjf")
 
         override fun onKeyAlgorithmSelected(keyAlgorithmOption: KeyAlgorithmOption) = Unit
+        override fun onMethodOptionSelected(methodOption: MethodOption) = Unit
+        override fun onSignOptionSelected(signOption: SignOption) = Unit
+        override fun onPlainTextChanged(plainText: String) = Unit
         override fun onGenerateKeyClick() = Unit
         override fun onRetrievePublicKeyClick() = Unit
         override fun onGenerateDIDClick() = Unit
@@ -97,6 +103,18 @@ interface WalkthroughViewModel {
 
         override fun onKeyAlgorithmSelected(keyAlgorithmOption: KeyAlgorithmOption) {
             selectedKeyAlgorithm.update { keyAlgorithmOption }
+        }
+
+        override fun onMethodOptionSelected(methodOption: MethodOption) {
+            selectedMethod.update { methodOption    }
+        }
+
+        override fun onSignOptionSelected(signOption: SignOption) {
+            selectedSignOption.update { signOption }
+        }
+
+        override fun onPlainTextChanged(plainText: String) {
+            this.plainText.update { plainText }
         }
 
         // TODO handle case where user does not have lockscreen active
@@ -129,7 +147,7 @@ interface WalkthroughViewModel {
         }
 
         override fun onNextStepClick() {
-            viewModelScope.launch { _events.send(WalkthroughEvent.NavigateEvent.NavigateToStepTwo) }
+            viewModelScope.launch { _events.send(WalkthroughEvent.NavigateEvent.ToStepTwo) }
         }
 
     }
@@ -138,7 +156,11 @@ interface WalkthroughViewModel {
 
 sealed interface WalkthroughEvent {
     sealed interface NavigateEvent : WalkthroughEvent {
-        data object NavigateToStepTwo : NavigateEvent
+        data object ToStepTwo : NavigateEvent
+        data object ToStepThree : NavigateEvent
+        data object ToStepFour : NavigateEvent
+        data object ToStepFive : NavigateEvent
+        data object CompleteWalkthrough : NavigateEvent
     }
 }
 

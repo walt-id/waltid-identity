@@ -49,7 +49,7 @@ import id.walt.androidSample.app.navigation.NavigationItem
 import id.walt.androidSample.theme.WaltIdAndroidSampleTheme
 import id.walt.androidSample.ui.KeyTypeOptions
 import id.walt.androidSample.utils.ObserveAsEvents
-import id.walt.androidSample.utils.collectImmediatelyAsState
+import id.walt.androidSample.utils.collectImmediatelyAsStateWithLifecycle
 import id.walt.crypto.keys.KeyType
 
 @Composable
@@ -103,7 +103,7 @@ private fun MainUiContent(
     isBiometricsAvailable: Boolean,
 ) {
 
-    val plainText by viewModel.plainText.collectImmediatelyAsState()
+    val plainText by viewModel.plainText.collectImmediatelyAsStateWithLifecycle()
     val signature by viewModel.signature.collectAsState()
 
     val context = LocalContext.current
