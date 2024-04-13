@@ -3,8 +3,6 @@ package id.walt.androidSample.app.features.walkthrough
 import android.util.Base64
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.lifecycle.viewmodel.compose.viewModel
-import id.walt.androidSample.app.features.main.MainViewModel
 import id.walt.crypto.keys.AndroidKey
 import id.walt.crypto.keys.KeyType
 import id.walt.did.dids.DidService
@@ -222,21 +220,20 @@ interface WalkthroughViewModel {
         override fun onVerifyClick() {
             viewModelScope.launch {
                 key?.let { androidKey ->
-                    val res = when(selectedSignOption.value) {
+                    when(selectedSignOption.value) {
                         SignOption.Raw -> {
                             signedOutputByteArray?.let { byteArrayToVerify ->
-                                androidKey.verifyRaw(byteArrayToVerify, plainText.value.toByteArray())
+                                val result = androidKey.verifyRaw(byteArrayToVerify, plainText.value.toByteArray())
+                                if (result.isSuccess) {
+                                    _events.send(WalkthroughEvent.Verification.Success)
+                                } else {
+                                    _events.send(WalkthroughEvent.Verification.Failed)
+                                }
                             }
                         }
 
-                        SignOption.JWS -> {
-                            signedOutput.value?.let { jwsToVerify ->
-                                androidKey.verifyJws(jwsToVerify)
-                            }
-                        }
+                        SignOption.JWS -> _events.send(WalkthroughEvent.Verification.JWSNotAvailable)
                     }
-
-                    println("lekker res $res")
                 }
             }
         }
@@ -301,6 +298,11 @@ sealed interface WalkthroughEvent {
     sealed interface Biometrics : WalkthroughEvent {
         data object BiometricsUnavailable : Biometrics
         data object BiometricAuthenticationFailure : Biometrics
+    }
+    sealed interface Verification : WalkthroughEvent {
+        data object JWSNotAvailable : Verification
+        data object Success : Verification
+        data object Failed : Verification
     }
 }
 
