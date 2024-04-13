@@ -20,14 +20,15 @@ import id.walt.androidSample.theme.WaltIdAndroidSampleTheme
 fun WalkthroughStep(
     title: String,
     description: String,
+    modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Column(
-        Modifier
+        modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.surface)
             .padding(horizontal = 16.dp)
-            .padding(top = 32.dp, bottom = 12.dp),
+            .padding(top = 32.dp, bottom = 16.dp),
     ) {
         WaltLogo()
         Spacer(Modifier.height(32.dp))
