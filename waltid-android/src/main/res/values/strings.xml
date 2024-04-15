@@ -32,7 +32,7 @@
 
     <string name="signed_with_key">Signed plain text with key: %s</string>
 
-    <string name="verification_failed">The verification failed</string>
+    <string name="verification_failed">The verification failed, did you change the plain text in the previous step?</string>
     <string name="verification_success">Successfully verified!</string>
     <string name="verification_jws_not_available">JWS verification is not yet available</string>
 </resources>
