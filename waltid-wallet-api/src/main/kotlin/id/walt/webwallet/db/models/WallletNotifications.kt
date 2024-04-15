@@ -10,13 +10,14 @@ import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.jsonObject
 import kotlinx.uuid.exposed.KotlinxUUIDTable
 import kotlinx.uuid.exposed.kotlinxUUID
+import org.jetbrains.exposed.sql.ReferenceOption
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.javatime.timestamp
 
 object WalletNotifications : KotlinxUUIDTable("notifications") {
     //TODO: change to reference username
     val account = kotlinxUUID("account")
-    val wallet = reference("wallet", Wallets)
+    val wallet = reference("wallet", Wallets, onDelete = ReferenceOption.CASCADE)
     val isRead = bool("is_read").default(false)
     val type = varchar("type", 128)
     val addedOn = timestamp("added_on")

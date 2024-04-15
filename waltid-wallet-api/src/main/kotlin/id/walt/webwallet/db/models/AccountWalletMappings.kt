@@ -4,6 +4,7 @@ import kotlinx.datetime.Instant
 import kotlinx.serialization.Serializable
 import kotlinx.uuid.UUID
 import kotlinx.uuid.exposed.kotlinxUUID
+import org.jetbrains.exposed.sql.ReferenceOption
 import org.jetbrains.exposed.sql.Table
 import org.jetbrains.exposed.sql.javatime.timestamp
 
@@ -17,7 +18,7 @@ enum class AccountWalletPermissions(val power: Int) {
 object AccountWalletMappings : Table("account_wallet_mapping") {
     val tenant = varchar("tenant", 128).default("")
     val accountId = kotlinxUUID("id")
-    val wallet = reference("wallet", Wallets)
+    val wallet = reference("wallet", Wallets, onDelete = ReferenceOption.CASCADE)
 
     val addedOn = timestamp("added_on")
 
@@ -26,7 +27,7 @@ object AccountWalletMappings : Table("account_wallet_mapping") {
     override val primaryKey = PrimaryKey(tenant, accountId, wallet)
 
     init {
-        foreignKey(tenant, accountId, target = Accounts.primaryKey)
+        foreignKey(tenant, accountId, target = Accounts.primaryKey, onDelete = ReferenceOption.CASCADE)
     }
 }
 

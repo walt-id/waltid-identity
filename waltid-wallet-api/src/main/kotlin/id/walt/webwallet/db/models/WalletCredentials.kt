@@ -10,12 +10,13 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 import kotlinx.serialization.json.*
 import kotlinx.uuid.UUID
+import org.jetbrains.exposed.sql.ReferenceOption
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.Table
 import org.jetbrains.exposed.sql.javatime.timestamp
 
 object WalletCredentials : Table("credentials") {
-    val wallet = reference("wallet", Wallets)
+    val wallet = reference("wallet", Wallets, onDelete = ReferenceOption.CASCADE)
     val id = varchar("id", 256)
 
     val document = text("document")

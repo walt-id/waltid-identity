@@ -3,12 +3,13 @@ package id.walt.webwallet.db.models
 import kotlinx.datetime.Instant
 import kotlinx.datetime.toKotlinInstant
 import kotlinx.serialization.Serializable
+import org.jetbrains.exposed.sql.ReferenceOption
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.Table
 import org.jetbrains.exposed.sql.javatime.timestamp
 
 object WalletKeys : Table("wallet_keys") {
-    val wallet = reference("wallet", Wallets)
+    val wallet = reference("wallet", Wallets, onDelete = ReferenceOption.CASCADE)
     val keyId = varchar("kid", 512)
     val document = text("document")
 

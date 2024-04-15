@@ -13,19 +13,20 @@ import kotlinx.uuid.UUID
 import kotlinx.uuid.exposed.KotlinxUUIDTable
 import kotlinx.uuid.exposed.kotlinxUUID
 import kotlinx.uuid.generateUUID
+import org.jetbrains.exposed.sql.ReferenceOption
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.javatime.timestamp
 
 object WalletOperationHistories : KotlinxUUIDTable("wallet_operation_histories") {
     val tenant = varchar("tenant", 128).default("")
     val accountId = kotlinxUUID("accountId")
-    val wallet = reference("wallet", Wallets)
+    val wallet = reference("wallet", Wallets, onDelete = ReferenceOption.CASCADE)
     val timestamp = timestamp("timestamp")
     val operation = varchar("operation", 48)
     val data = text("data")
 
     init {
-        foreignKey(tenant, accountId, target = Accounts.primaryKey)
+        foreignKey(tenant, accountId, target = Accounts.primaryKey, onDelete = ReferenceOption.CASCADE)
         index(false, tenant, accountId, wallet)
     }
 }

@@ -32,7 +32,7 @@ data class DatasourceJsonConfiguration(
 
     init {
         if (jdbcUrl?.startsWith(Db.SQLITE_PREFIX) == true) {
-            val path = Path(jdbcUrl!!.removePrefix(Db.SQLITE_PREFIX))
+            val path = Path(jdbcUrl!!.removePrefix(Db.SQLITE_PREFIX).substringBeforeLast("?"))
             if (path.notExists()) {
                 log.info { "Creating directory for sqlite database: $path" }
                 path.createParentDirectories()

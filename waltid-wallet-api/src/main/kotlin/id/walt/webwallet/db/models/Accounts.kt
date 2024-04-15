@@ -27,7 +27,7 @@ object Accounts : Table("accounts") {
 
     /*
     init {
-        foreignKey(id, loginWeb3Wallet, target = Web3Wallets.primaryKey)
+        foreignKey(id, loginWeb3Wallet, target = Web3Wallets.primaryKey, onDelete = ReferenceOption.CASCADE)
 
         check {
             (email.isNotNull() and password.isNotNull()) or loginWeb3Wallet.isNotNull()

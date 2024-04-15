@@ -2,6 +2,7 @@ package id.walt.webwallet.db.models
 
 import kotlinx.uuid.exposed.kotlinxUUID
 import org.jetbrains.exposed.dao.id.IntIdTable
+import org.jetbrains.exposed.sql.ReferenceOption
 import org.jetbrains.exposed.sql.javatime.timestamp
 
 object Events : IntIdTable("events") {
@@ -17,7 +18,7 @@ object Events : IntIdTable("events") {
     val note = text("note").nullable()
 
     init {
-        foreignKey(tenant, account, target = Accounts.primaryKey)
+        foreignKey(tenant, account, target = Accounts.primaryKey, onDelete = ReferenceOption.CASCADE)
         index(false, tenant, account, wallet)
     }
 }
