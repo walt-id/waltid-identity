@@ -40,7 +40,6 @@ import io.kotest.matchers.string.shouldStartWith
 import io.kotest.matchers.types.shouldBeInstanceOf
 import io.ktor.client.*
 import io.ktor.client.call.*
-import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.logging.*
 import io.ktor.client.request.*
@@ -51,7 +50,6 @@ import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
 import io.ktor.server.engine.*
 import io.ktor.server.netty.*
-import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.request.*
 import io.ktor.server.routing.*
 import io.ktor.util.*
@@ -515,7 +513,7 @@ class CI_JVM_Test : AnnotationSpec() {
 
         // create issuance session and generate authorization code
         val authCodeResponse: AuthorizationCodeResponse = AuthorizationCodeResponse.success("test-code")
-        val redirectUri = authCodeResponse.toRedirectUri(authReq.redirectUri ?: TODO(), authReq.responseMode ?: ResponseMode.Query)
+        val redirectUri = authCodeResponse.toRedirectUri(authReq.redirectUri ?: TODO(), authReq.responseMode ?: ResponseMode.query)
         Url(redirectUri).let {
             it.parameters.names() shouldContain ResponseType.Code.name.lowercase()
             it.parameters.get(ResponseType.Code.name.lowercase()) shouldBe authCodeResponse.code
@@ -840,7 +838,7 @@ class CI_JVM_Test : AnnotationSpec() {
         println("// 1. send pushed authorization request with authorization details, containing info of credentials to be issued, receive session id")
         val implicitAuthReq = AuthorizationRequest(
             responseType = setOf(ResponseType.Token),
-            responseMode = ResponseMode.Fragment,
+            responseMode = ResponseMode.fragment,
             clientId = testCIClientConfig.clientID,
             redirectUri = credentialWallet.config.redirectUri,
             authorizationDetails = listOf(

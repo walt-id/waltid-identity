@@ -24,7 +24,7 @@ data class AuthorizationCodeIDTokenRequestResponse private constructor(
             clientId?.let { put("client_id", listOf(it)) }
             redirectUri?.let { put("redirect_uri", listOf(it)) }
             responseType?.let { put("response_type", listOf(it)) }
-            responseMode?.let { put("response_mode", listOf(it.value)) }
+            responseMode?.let { put("response_mode", listOf(it.name)) }
             scope.let { put("scope", it.toList())}
             nonce?.let { put("nonce", listOf(it)) }
             requestUri?.let { put("request_uri", listOf(it)) }

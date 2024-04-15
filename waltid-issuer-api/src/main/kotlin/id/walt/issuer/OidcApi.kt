@@ -1,7 +1,6 @@
 package id.walt.issuer
 
 
-import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.data.ResponseMode
 import id.walt.oid4vc.data.ResponseType
 import id.walt.oid4vc.errors.*
@@ -137,7 +136,7 @@ object OidcApi : CIProvider() {
                     call.response.apply {
                         status(HttpStatusCode.Found)
                         val defaultResponseMode =
-                            if (authReq.responseType.contains(ResponseType.Code)) ResponseMode.Query else ResponseMode.Fragment
+                            if (authReq.responseType.contains(ResponseType.Code)) ResponseMode.query else ResponseMode.fragment
                         header(
                             HttpHeaders.Location,
                             authResp.toRedirectUri(redirectUri, authReq.responseMode ?: defaultResponseMode)
@@ -182,11 +181,11 @@ object OidcApi : CIProvider() {
                         val resp = processDirectPost(state, payload!!)
 
                         // Get the redirect_uri from the Authorization Request Parameter
-                        logger.info{"direct_post redirectUri is:" + resp.toRedirectUri("openid://redirect", ResponseMode.Query)}
+                        logger.info{"direct_post redirectUri is:" + resp.toRedirectUri("openid://redirect", ResponseMode.query)}
 
                         call.response.apply {
                             status(HttpStatusCode.Found)
-                            header(HttpHeaders.Location, resp.toRedirectUri("openid://redirect", ResponseMode.Query))
+                            header(HttpHeaders.Location, resp.toRedirectUri("openid://redirect", ResponseMode.query))
                         }
 
                     } else {
