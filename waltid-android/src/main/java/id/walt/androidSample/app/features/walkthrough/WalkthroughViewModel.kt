@@ -142,6 +142,8 @@ interface WalkthroughViewModel {
             selectedKeyAlgorithm.update { currentAlgorithm ->
                 if (currentAlgorithm != keyAlgorithmOption) {
                     resetKey()
+                    resetDid()
+                    resetSignedResult()
                 }
 
                 keyAlgorithmOption
@@ -152,6 +154,7 @@ interface WalkthroughViewModel {
             selectedMethod.update { currentMethod ->
                 if (currentMethod != methodOption) {
                     resetDid()
+                    resetSignedResult()
                 }
 
                 methodOption
@@ -281,6 +284,7 @@ interface WalkthroughViewModel {
         private fun resetKey() {
             key = null
             generatedKey.update { null }
+            publicKey.update { null }
         }
 
         private fun resetDid() {

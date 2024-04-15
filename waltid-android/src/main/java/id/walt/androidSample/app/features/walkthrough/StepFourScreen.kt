@@ -121,6 +121,7 @@ fun StepFourScreen(
 
         WaltSecondaryButton(
             text = "Sign Input",
+            enabled = inputText.isNotBlank(),
             onClick = {
                 systemKeyboard?.hide()
                 authenticateWithBiometric(
