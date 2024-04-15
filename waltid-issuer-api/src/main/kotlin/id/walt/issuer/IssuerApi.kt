@@ -7,6 +7,7 @@ import id.walt.did.dids.DidService
 import id.walt.issuer.IssuanceExamples.batchExample
 import id.walt.issuer.IssuanceExamples.issuerOnboardingRequestDefaultExample
 import id.walt.issuer.IssuanceExamples.issuerOnboardingRequestOciExample
+import id.walt.issuer.IssuanceExamples.issuerOnboardingRequestDidWebExample
 import id.walt.issuer.IssuanceExamples.issuerOnboardingRequestTseExample
 import id.walt.issuer.IssuanceExamples.issuerOnboardingResponseDefaultExample
 import id.walt.issuer.IssuanceExamples.issuerOnboardingResponseOciExample
@@ -72,8 +73,12 @@ fun Application.issuerApi() {
                 request {
                     body<IssuerOnboardingRequest> {
                         description = "Issuer onboarding request (key & DID) config."
-                        example("Local key + ed25519 key (default)", issuerOnboardingRequestDefaultExample)
-                        example("Hashicorp Vault Transit Engine (TSE) key + RSA", issuerOnboardingRequestTseExample)
+                        example("did:jwk + JWK key (Ed25519)", issuerOnboardingRequestDefaultExample)
+                        example(
+                            "did:key + TSE (Hashicorp Vault Transit Engine key - RSA)",
+                            issuerOnboardingRequestTseExample
+                        )
+                        example("did:web + JWK key (Secp256k1)", issuerOnboardingRequestDidWebExample)
                         example("Oracle Cloud Infrastructure (OCI) key + secp256r1 ", issuerOnboardingRequestOciExample)
                         required = true
                     }
