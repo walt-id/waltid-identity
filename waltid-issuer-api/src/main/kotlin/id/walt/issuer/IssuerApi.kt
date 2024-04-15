@@ -31,6 +31,8 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.time.Duration.Companion.minutes
 
 private val logger = KotlinLogging.logger {}
@@ -105,7 +107,22 @@ fun Application.issuerApi() {
                 }
             }) {
                 val req = context.receive<OnboardingRequest>()
-                val key = KeyManager.createKey(req.keyGenerationRequest)
+
+                val keyConfig = req.keyGenerationRequest.config?.mapValues { (key, value) ->
+                    if (key == "signingKeyPem") {
+                        JsonPrimitive(value.jsonPrimitive.content.trimIndent().replace(" ", ""))
+
+                    } else {
+                        value
+                    }
+                }
+
+                val keyGenerationRequest = req.keyGenerationRequest.copy(
+                    config = keyConfig?.let { it1 -> JsonObject(it1) }
+                )
+
+
+                val key = KeyManager.createKey(keyGenerationRequest)
 
                 val did = DidService.registerDefaultDidMethodByKey(req.didMethod, key, req.didConfig).did
                 val serializedKey = KeySerialization.serializeKeyToJson(key)
