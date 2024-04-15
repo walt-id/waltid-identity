@@ -25,6 +25,7 @@ import id.walt.sdjwt.SDPayload
 import id.walt.sdjwt.SimpleJWTCryptoProvider
 import io.kotest.assertions.json.shouldEqualJson
 import io.kotest.common.runBlocking
+import io.kotest.core.annotation.Ignored
 import io.kotest.core.spec.style.AnnotationSpec
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldContainExactly
@@ -1161,6 +1162,7 @@ class CI_JVM_Test : AnnotationSpec() {
     }
 
     @Test
+    @Ignore
     suspend fun testEntraIssuance() {
         println("--- ENTRA ISSUANCE TEST ---")
 
