@@ -10,12 +10,4 @@ actual object TransactionService {
   ): SignedTransaction {
     TODO("Not yet implemented")
   }
-
-  actual fun getRecoveryId(
-    keyAlias: String,
-    data: ByteArray,
-    sig: ECDSASignature
-  ): Int {
-    TODO("Not yet implemented")
-  }
 }

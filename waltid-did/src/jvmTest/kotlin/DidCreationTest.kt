@@ -11,6 +11,7 @@ import id.walt.did.dids.registrar.local.key.DidKeyRegistrar
 import id.walt.did.dids.registrar.local.web.DidWebRegistrar
 import id.walt.did.utils.EbsiRPCUtils
 import id.walt.did.utils.randomUUID
+import id.walt.ebsi.eth.TransactionService
 import id.walt.ebsi.rpc.EbsiRpcRequests
 import id.walt.ebsi.rpc.JsonRpcResponse
 import id.walt.ebsi.rpc.UnsignedTransactionResponse
@@ -120,7 +121,7 @@ class DidCreationTest {
     }
 
     val CLIENT_MOCK_PORT = 5000
-    val CLIENT_MOCK_URL = "https://4af4-2001-871-25f-33ad-36fb-ea0a-cd2-5d0a.ngrok-free.app/client-mock"//"http://192.168.0.122:5000/client-mock"
+    val CLIENT_MOCK_URL = "https://505f-62-178-27-231.ngrok-free.app/client-mock"//"http://192.168.0.122:5000/client-mock"
     val CLIENT_MAIN_KEY = runBlocking { LocalKey.generate(KeyType.secp256k1) }
     val CLIENT_VCSIGN_KEY = runBlocking { LocalKey.generate(KeyType.secp256r1) }
     fun startClientMockServer() {
@@ -318,5 +319,7 @@ class DidCreationTest {
         val insertDidRpcResponse = Json.decodeFromString<UnsignedTransactionResponse>(insertDidHttpResponse.bodyAsText())
         assertEquals(1, insertDidRpcResponse.id)
 
+        // sign transaction
+        val signedTransaction = TransactionService.signTransaction(CLIENT_MAIN_KEY, insertDidRpcResponse.result)
     }
 }

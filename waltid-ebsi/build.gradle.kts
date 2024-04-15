@@ -17,6 +17,7 @@ version = "1.0.0-SNAPSHOT"
 repositories {
     mavenCentral()
     maven("https://jitpack.io")
+    maven("https://s01.oss.sonatype.org/content/repositories/snapshots/")
 }
 
 java {
@@ -116,8 +117,8 @@ kotlin {
                 implementation("io.github.erdtman:java-json-canonicalization:1.1")
 
                 // Ethereum
-                implementation("org.web3j:core:4.11.2") // 5.0.0 is older than 4.x (wrong release)
-                implementation("org.web3j:crypto:4.11.2")
+                implementation("org.web3j:core:4.10.2") // 5.0.0 is older than 4.x (wrong release)
+                implementation("org.web3j:crypto:4.10.2")
             }
         }
         val jvmTest by getting {

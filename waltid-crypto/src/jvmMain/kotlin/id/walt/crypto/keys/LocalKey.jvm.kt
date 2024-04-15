@@ -3,6 +3,7 @@ package id.walt.crypto.keys
 import com.nimbusds.jose.*
 import com.nimbusds.jose.crypto.*
 import com.nimbusds.jose.crypto.bc.BouncyCastleProviderSingleton
+import com.nimbusds.jose.crypto.impl.ECDSA
 import com.nimbusds.jose.jwk.*
 import com.nimbusds.jose.jwk.KeyType.*
 import com.nimbusds.jose.util.Base64URL
@@ -23,6 +24,7 @@ import org.bouncycastle.util.io.pem.PemObject
 import org.bouncycastle.util.io.pem.PemWriter
 import java.io.ByteArrayOutputStream
 import java.security.*
+import java.security.interfaces.ECPrivateKey
 import java.security.spec.PKCS8EncodedKeySpec
 import java.util.*
 import kotlin.js.ExperimentalJsExport
@@ -168,7 +170,19 @@ actual class LocalKey actual constructor(
     }
 
     actual override suspend fun signECDSA(plaintext: ByteArray): ECDSASignature {
-        TODO("Not yet implemented")
+        check(hasPrivateKey) { "No private key is attached to this key!" }
+        check(keyType == KeyType.secp256k1 || keyType == KeyType.secp256r1) { "Key is not an EC key" }
+        val jwsAlg = when(keyType) {
+            KeyType.secp256k1 -> JWSAlgorithm.ES256K
+            else -> JWSAlgorithm.ES256
+        }
+        return _internalSigner.sign(JWSHeader(jwsAlg), plaintext).let {
+            ECDSASignature.fromECDSAConcat(ECDSA.transcodeSignatureToConcat(it.decode(), ECDSA.getSignatureByteArrayLength(jwsAlg)))
+        }
+//        when (key.algorithm) {
+//            KeyAlgorithm.ECDSA_Secp256k1 -> return ECKeyPair.create(key.keyPair).sign(Hash.sha3(encodedTx))
+//            else -> throw IllegalArgumentException("Wrong key algorithm: secp256k1 is required.")
+//        }
     }
 
     actual override suspend fun verifyRaw(signed: ByteArray, detachedPlaintext: ByteArray?): Result<ByteArray> {

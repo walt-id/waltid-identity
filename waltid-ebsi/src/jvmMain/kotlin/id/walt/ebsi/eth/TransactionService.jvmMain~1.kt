@@ -3,15 +3,11 @@ package id.walt.ebsi.eth
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.utils.ECDSASignature
-import org.bouncycastle.jcajce.provider.digest.Keccak
-import org.bouncycastle.util.encoders.Hex
 import org.web3j.crypto.*
 import org.web3j.rlp.RlpEncoder
 import org.web3j.rlp.RlpList
 import org.web3j.utils.Numeric
 import java.math.BigInteger
-import java.security.interfaces.ECKey
-import java.security.interfaces.ECPublicKey
 import java.util.*
 
 actual object TransactionService {
@@ -58,16 +54,18 @@ actual object TransactionService {
     )
   }
 
-  private fun calculateEthereumAddress(key: Key): String {
-    val digest = Keccak.Digest256().digest(key.x.decode().copyOfRange(0, 32) + key.y.decode().copyOfRange(0, 32))
-    return String(Hex.encode(digest)).let { sha3_256hex ->
-      Keys.toChecksumAddress(sha3_256hex.substring(sha3_256hex.length - 40)) //.toLowerCase()
-    }
+  @OptIn(ExperimentalStdlibApi::class)
+  private suspend fun calculateEthereumAddress(key: Key): String {
+    return Keys.getAddress(key.getPublicKeyRepresentation()).toHexString().let { Keys.toChecksumAddress(it) }
+//    val digest = Keccak.Digest256().digest(key.x.decode().copyOfRange(0, 32) + key.y.decode().copyOfRange(0, 32))
+//    return String(Hex.encode(digest)).let { sha3_256hex ->
+//      Keys.toChecksumAddress(sha3_256hex.substring(sha3_256hex.length - 40)) //.toLowerCase()
+//    }
   }
 
-  private fun getRecoveryId(key: Key, data: ByteArray, sig: ECDSASignature): Int {
+  private suspend fun getRecoveryId(key: Key, data: ByteArray, sig: ECDSASignature): Int {
     for (i in 0..3) {
-      Sign.recoverFromSignature(i, org.web3j.crypto.ECDSASignature(BigInteger(sig.r), BigInteger(sig.s)), Hash.sha3(data))?.let {
+      Sign.recoverFromSignature(i, ECDSASignature(BigInteger(sig.r), BigInteger(sig.s)), Hash.sha3(data))?.let {
         val address = Numeric.prependHexPrefix(calculateEthereumAddress(key))
         val recoveredAddress = Keys.toChecksumAddress(Numeric.prependHexPrefix(Keys.getAddress(it)))
         if (address == recoveredAddress) return i
