@@ -30,7 +30,8 @@ export default defineStore("modal-store", {
             if (body) body.style.overflow = "hidden";
 
             // Assign them to our state
-            this.modalState = { component, props: props || {} };
+            this.modalState = { component: markRaw(component), props: props || {} };
+
         },
 
         closeModal() {
