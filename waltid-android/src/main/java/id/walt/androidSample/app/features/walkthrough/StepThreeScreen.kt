@@ -1,5 +1,6 @@
 package id.walt.androidSample.app.features.walkthrough
 
+import androidx.biometric.BiometricManager
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -20,9 +21,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
@@ -42,6 +45,12 @@ fun StepThreeScreen(
     val methodOptions = viewModel.methodOptions
     val selectedMethodOption by viewModel.selectedMethod.collectAsStateWithLifecycle()
     val generatedDID by viewModel.did.collectAsStateWithLifecycle()
+
+    val ctx = LocalContext.current
+
+    val biometricManager = remember { BiometricManager.from(ctx) }
+    val isBiometricsAvailable =
+        biometricManager.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.BIOMETRIC_WEAK) == BiometricManager.BIOMETRIC_SUCCESS
 
     WalkthroughStep(
         title = "Step 3 - Generate DID",
@@ -73,7 +82,13 @@ fun StepThreeScreen(
 
         WaltSecondaryButton(
             text = "Generate DID",
-            onClick = viewModel::onGenerateDIDClick,
+            onClick = {
+                authenticateWithBiometric(
+                    context = ctx as FragmentActivity,
+                    onAuthenticated = viewModel::onGenerateDIDClick,
+                    onFailure = viewModel::onBiometricsAuthFailure,
+                )
+            },
             modifier = Modifier.fillMaxWidth()
         )
         WaltPrimaryButton(
