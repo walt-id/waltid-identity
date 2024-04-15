@@ -406,10 +406,10 @@ object IssuanceExamples {
     val issuerOnboardingRequestDidWebExample = """
         {
           "key": {
-            "type": "jwk",
-            "algorithm": "secp256k1"
+            "backend": "jwk",
+            "keyType": "secp256k1"
           },
-          "key": {
+          "did": {
             "method": "web",
             "config": {
                 "domain": "example.com",
@@ -417,6 +417,24 @@ object IssuanceExamples {
             }
           }
         }
+    """.trimIndent()
+
+    // language=JSON
+    val issuerOnboardingResponseDidWebExample = """
+        {
+   "issuerKey":{
+      "type":"jwk",
+      "jwk": {
+              "kty": "EC",
+              "d": "sMjI1SVu4vKHLr3JwgUMu10Ihn5OL0sCaqjfZP8xpUU",
+              "crv": "secp256k1",
+              "kid": "Si07jIXqLsMKHy0vgyvPbcIvIPxdqL7Qs6STqrx1UC8",
+              "x": "q-LZDK-TZQSUczy_1K6TBFeVn60rMv4KjYvTePy2TGs",
+              "y": "qTbiSREfWRZtAKZsW-k-0BHIIYpAN0fhnjaqeMIU5OY"
+            }
+   },
+   "issuerDid":"did:web:example.com:optional-user-id-1234"
+}
     """.trimIndent()
 
     // language=JSON
