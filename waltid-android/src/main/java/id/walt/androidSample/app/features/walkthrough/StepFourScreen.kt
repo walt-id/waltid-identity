@@ -11,8 +11,10 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -102,7 +104,8 @@ fun StepFourScreen(
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier
                     .padding(vertical = 8.dp)
-                    .weight(1f),
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState()),
             )
         } else {
             Spacer(modifier = Modifier.weight(1f))
