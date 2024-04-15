@@ -7,7 +7,7 @@ import com.nimbusds.jose.crypto.bc.BouncyCastleProviderSingleton
 import com.nimbusds.jose.jwk.ECKey
 import id.walt.credentials.verification.policies.JwtSignaturePolicy
 import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.LocalKey
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.did.dids.DidService
 import id.walt.did.dids.registrar.dids.DidIonCreateOptions
 import id.walt.did.dids.registrar.dids.DidJwkCreateOptions
@@ -40,13 +40,18 @@ import io.kotest.matchers.string.shouldStartWith
 import io.kotest.matchers.types.shouldBeInstanceOf
 import io.ktor.client.*
 import io.ktor.client.call.*
-import io.ktor.client.plugins.contentnegotiation.*
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.logging.*
 import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
+import io.ktor.server.application.*
+import io.ktor.server.engine.*
+import io.ktor.server.netty.*
+import io.ktor.server.request.*
+import io.ktor.server.routing.*
 import io.ktor.util.*
 import kotlinx.serialization.json.*
 import java.io.File
@@ -411,7 +416,7 @@ class CI_JVM_Test : AnnotationSpec() {
         println(">>> Issued deferred credential: $deferredCredential")
 
         verifyIssuerAndSubjectId(
-            SDJwt.parse(deferredCredential).fullPayload.get("vc")?.jsonObject!!,
+            SDJwt.parse(deferredCredential).fullPayload["vc"]?.jsonObject!!,
             ciTestProvider.CI_ISSUER_DID, credentialWallet.TEST_DID
         )
         JwtSignaturePolicy().verify(deferredCredential, null, mapOf()).isSuccess shouldBe true
@@ -446,7 +451,7 @@ class CI_JVM_Test : AnnotationSpec() {
 
         val batchCred1 =
             batchResp.credentialResponses!![0].credential!!.jsonPrimitive.content
-        SDJwt.parse(batchCred1).fullPayload.get("vc")?.jsonObject!!["type"]?.jsonArray?.last()?.jsonPrimitive?.contentOrNull shouldBe "VerifiableId"
+        SDJwt.parse(batchCred1).fullPayload["vc"]?.jsonObject!!["type"]?.jsonArray?.last()?.jsonPrimitive?.contentOrNull shouldBe "VerifiableId"
         JwtSignaturePolicy().verify(batchCred1, null, mapOf()).isSuccess shouldBe true
         println("batchCred1: $batchCred1")
 
@@ -459,7 +464,7 @@ class CI_JVM_Test : AnnotationSpec() {
         batchResp2.isDeferred shouldBe false
         batchResp2.credential shouldNotBe null
         val batchCred2 = batchResp2.credential!!.jsonPrimitive.content
-        SDJwt.parse(batchCred2).fullPayload.get("vc")?.jsonObject!!["type"]?.jsonArray?.last()?.jsonPrimitive?.contentOrNull shouldBe "VerifiableDiploma"
+        SDJwt.parse(batchCred2).fullPayload["vc"]?.jsonObject!!["type"]?.jsonArray?.last()?.jsonPrimitive?.contentOrNull shouldBe "VerifiableDiploma"
         JwtSignaturePolicy().verify(batchCred2, null, mapOf()).isSuccess shouldBe true
     }
 
@@ -506,7 +511,7 @@ class CI_JVM_Test : AnnotationSpec() {
 
         // create issuance session and generate authorization code
         val authCodeResponse: AuthorizationCodeResponse = AuthorizationCodeResponse.success("test-code")
-        val redirectUri = authCodeResponse.toRedirectUri(authReq.redirectUri ?: TODO(), authReq.responseMode ?: ResponseMode.Query)
+        val redirectUri = authCodeResponse.toRedirectUri(authReq.redirectUri ?: TODO(), authReq.responseMode ?: ResponseMode.query)
         Url(redirectUri).let {
             it.parameters.names() shouldContain ResponseType.Code.name.lowercase()
             it.parameters.get(ResponseType.Code.name.lowercase()) shouldBe authCodeResponse.code
@@ -526,7 +531,9 @@ class CI_JVM_Test : AnnotationSpec() {
 
         // TODO: Validate authorization code
         // TODO: generate access token
-        val accessToken = ciTestProvider.signToken(TokenTarget.ACCESS, buildJsonObject {
+        val accessToken = ciTestProvider.signToken(
+            target = TokenTarget.ACCESS,
+            payload = buildJsonObject {
             put(JWTClaims.Payload.subject, "test-issuance-session")
             put(JWTClaims.Payload.issuer, ciTestProvider.baseUrl)
             put(JWTClaims.Payload.audience, TokenTarget.ACCESS.name)
@@ -543,7 +550,7 @@ class CI_JVM_Test : AnnotationSpec() {
         println("// receive credential")
         var nonce = tokenResponse.cNonce!!
         val holderDid = TEST_WALLET_DID_WEB1
-        val holderKey = runBlocking { LocalKey.importJWK(TEST_WALLET_KEY1) }.getOrThrow()
+        val holderKey = runBlocking { JWKKey.importJWK(TEST_WALLET_KEY1) }.getOrThrow()
         val holderKeyId = runBlocking { holderKey.getKeyId() }
         val proofKeyId = "$holderDid#$holderKeyId"
         val proofOfPossession = runBlocking {
@@ -668,7 +675,7 @@ class CI_JVM_Test : AnnotationSpec() {
 
         println("// receive credential")
         ciTestProvider.deferIssuance = false
-        var nonce = tokenResp.cNonce!!
+        val nonce = tokenResp.cNonce!!
 
         val credReq = CredentialRequest.forOfferedCredential(
             offeredCredential,
@@ -692,7 +699,7 @@ class CI_JVM_Test : AnnotationSpec() {
         val credential = credentialResp.credential!!.jsonPrimitive.content
         println(">>> Issued credential: $credential")
         verifyIssuerAndSubjectId(
-            SDJwt.parse(credential).fullPayload.get("vc")?.jsonObject!!,
+            SDJwt.parse(credential).fullPayload["vc"]?.jsonObject!!,
             ciTestProvider.CI_ISSUER_DID, credentialWallet.TEST_DID
         )
         JwtSignaturePolicy().verify(credential, null, mapOf()).isSuccess shouldBe true
@@ -788,7 +795,7 @@ class CI_JVM_Test : AnnotationSpec() {
 
         println("// receive credential")
         ciTestProvider.deferIssuance = false
-        var nonce = tokenResp.cNonce!!
+        val nonce = tokenResp.cNonce!!
 
         val credReq = CredentialRequest.forOfferedCredential(
             offeredCredential,
@@ -813,7 +820,7 @@ class CI_JVM_Test : AnnotationSpec() {
         println(">>> Issued credential: $credential")
 
         verifyIssuerAndSubjectId(
-            SDJwt.parse(credential).fullPayload.get("vc")?.jsonObject!!,
+            SDJwt.parse(credential).fullPayload["vc"]?.jsonObject!!,
             ciTestProvider.CI_ISSUER_DID, credentialWallet.TEST_DID
         )
         JwtSignaturePolicy().verify(credential, null, mapOf()).isSuccess shouldBe true
@@ -829,7 +836,7 @@ class CI_JVM_Test : AnnotationSpec() {
         println("// 1. send pushed authorization request with authorization details, containing info of credentials to be issued, receive session id")
         val implicitAuthReq = AuthorizationRequest(
             responseType = setOf(ResponseType.Token),
-            responseMode = ResponseMode.Fragment,
+            responseMode = ResponseMode.fragment,
             clientId = testCIClientConfig.clientID,
             redirectUri = credentialWallet.config.redirectUri,
             authorizationDetails = listOf(
@@ -897,7 +904,7 @@ class CI_JVM_Test : AnnotationSpec() {
         println(">>> Issued credential: $credential")
 
         verifyIssuerAndSubjectId(
-            SDJwt.parse(credential).fullPayload.get("vc")?.jsonObject!!,
+            SDJwt.parse(credential).fullPayload["vc"]?.jsonObject!!,
             ciTestProvider.CI_ISSUER_DID, credentialWallet.TEST_DID
         )
         JwtSignaturePolicy().verify(credential, null, mapOf()).isSuccess shouldBe true
@@ -924,7 +931,7 @@ class CI_JVM_Test : AnnotationSpec() {
         credOfferReq.credentialOffer!!.grants shouldContainKey GrantType.pre_authorized_code.value
 
         // make token request
-        var tokenReq = TokenRequest(
+        val tokenReq = TokenRequest(
             grantType = GrantType.pre_authorized_code,
             //clientId = testCIClientConfig.clientID,
             redirectUri = credentialWallet.config.redirectUri,
@@ -932,7 +939,7 @@ class CI_JVM_Test : AnnotationSpec() {
             txCode = null
         )
         println("tokenReq: $tokenReq")
-        var tokenResp = ktorClient.submitForm(
+        val tokenResp = ktorClient.submitForm(
             providerMetadata.tokenEndpoint!!, formParameters = parametersOf(tokenReq.toHttpParameters())
         ).body<JsonObject>().let { TokenResponse.fromJSON(it) }
         println("tokenResp: $tokenResp")
@@ -979,7 +986,7 @@ class CI_JVM_Test : AnnotationSpec() {
         credOfferReq.credentialOffer!!.grants shouldContainKey GrantType.pre_authorized_code.value
 
         // make token request
-        var tokenReq = TokenRequest(
+        val tokenReq = TokenRequest(
             grantType = GrantType.pre_authorized_code,
             clientId = testCIClientConfig.clientID,
             redirectUri = credentialWallet.config.redirectUri,
@@ -987,7 +994,7 @@ class CI_JVM_Test : AnnotationSpec() {
             txCode = null
         )
         println("tokenReq: ${tokenReq.toHttpQueryString()}")
-        var tokenResp = ktorClient.submitForm(
+        val tokenResp = ktorClient.submitForm(
             providerMetadata.tokenEndpoint!!, formParameters = parametersOf(tokenReq.toHttpParameters())
         ).body<JsonObject>().let { TokenResponse.fromJSON(it) }
         println("tokenResp: $tokenResp")
@@ -1033,7 +1040,7 @@ class CI_JVM_Test : AnnotationSpec() {
         println("offeredCredentials: $offeredCredentials")
 
         // make token request
-        var tokenReq = TokenRequest(
+        val tokenReq = TokenRequest(
             grantType = GrantType.pre_authorized_code,
             clientId = testCIClientConfig.clientID,
             redirectUri = credentialWallet.config.redirectUri,
@@ -1041,7 +1048,7 @@ class CI_JVM_Test : AnnotationSpec() {
             txCode = null
         )
         println("tokenReq: ${tokenReq.toHttpQueryString()}")
-        var tokenResp = ktorClient.submitForm(
+        val tokenResp = ktorClient.submitForm(
             providerMetadata.tokenEndpoint!!, formParameters = parametersOf(tokenReq.toHttpParameters())
         ).body<JsonObject>().let { TokenResponse.fromJSON(it) }
         println("tokenResp: $tokenResp")
@@ -1163,7 +1170,7 @@ class CI_JVM_Test : AnnotationSpec() {
 
         println("// receive credential")
         ciTestProvider.deferIssuance = false
-        var nonce = tokenResp.cNonce!!
+        val nonce = tokenResp.cNonce!!
 
         val credReq = CredentialRequest.forOfferedCredential(
             offeredCredential,
@@ -1187,7 +1194,7 @@ class CI_JVM_Test : AnnotationSpec() {
         val credential = credentialResp.credential!!.jsonPrimitive.content
         println(">>> Issued credential: $credential")
         verifyIssuerAndSubjectId(
-            SDJwt.parse(credential).fullPayload.get("vc")?.jsonObject!!,
+            SDJwt.parse(credential).fullPayload["vc"]?.jsonObject!!,
             ciTestProvider.CI_ISSUER_DID, credentialWallet.TEST_DID
         )
         JwtSignaturePolicy().verify(credential, null, mapOf()).isSuccess shouldBe true
@@ -1241,7 +1248,7 @@ class CI_JVM_Test : AnnotationSpec() {
 
     //@Test
     suspend fun createDidWebDoc() {
-        val pubKey = LocalKey.importJWK(TEST_WALLET_KEY).getOrThrow().getPublicKey()
+        val pubKey = JWKKey.importJWK(TEST_WALLET_KEY).getOrThrow().getPublicKey()
         val didWebResult = DidService.registerByKey(
             "web",
             pubKey,
@@ -1256,6 +1263,26 @@ class CI_JVM_Test : AnnotationSpec() {
         println(didKeyResult.did)
     }
 
+    val ENTRA_CALLBACK_PORT = 9002
+    val CALLBACK_COMPLETE = Object()
+    var ENTRA_STATUS: String = "none"
+    suspend fun startEntraCallbackServer() {
+        embeddedServer(Netty, port = ENTRA_CALLBACK_PORT) {
+            install(io.ktor.server.plugins.contentnegotiation.ContentNegotiation) {
+                json()
+            }
+            routing {
+                post("/callback") {
+                    println("ENTRA CALLBACK (Issuer)")
+                    val callbackBody = call.receiveText().also { println(it) }.let { Json.parseToJsonElement(it) }.jsonObject
+                    ENTRA_STATUS = callbackBody["requestStatus"]!!.jsonPrimitive.content
+                    if(ENTRA_STATUS == "issuance_successful")
+                        CALLBACK_COMPLETE.notifyAll()
+                }
+            }
+        }.start()
+    }
+
     @Test
     suspend fun testEntraIssuance() {
         println("--- ENTRA ISSUANCE TEST ---")
@@ -1267,11 +1294,12 @@ class CI_JVM_Test : AnnotationSpec() {
         println("> Doing Entra authorize...")
         val accessToken = entraAuthorize()
         println("> Using access token: $accessToken")
+        startEntraCallbackServer()
 
         val createIssuanceReq = "{\n" +
                 "    \"callback\": {\n" +
-                //"        \"url\": \"https://httpstat.us/200\",\n" +
-                "        \"url\": \"https://9ffd-62-178-27-231.ngrok-free.app\",\n" +
+                "        \"url\": \"https://httpstat.us/200\",\n" +
+                //"        \"url\": \"https://0fc7-2001-871-25f-66b3-9ea8-fc44-915d-107e.ngrok-free.app/callback\",\n" +
                 "        \"state\": \"1234\",\n" +
                 "        \"headers\": {\n" +
                 "            \"api-key\": \"1234\"\n" +
@@ -1324,7 +1352,7 @@ class CI_JVM_Test : AnnotationSpec() {
         println("\n============ Wallet ============")
 
         println("> Loading key: $TEST_WALLET_KEY")
-        val testWalletKey = LocalKey.importJWK(TEST_WALLET_KEY).getOrThrow()
+        val testWalletKey = JWKKey.importJWK(TEST_WALLET_KEY).getOrThrow()
         testWalletKey.hasPrivateKey shouldBe true
         println("> Private key loaded!")
 
@@ -1369,10 +1397,10 @@ class CI_JVM_Test : AnnotationSpec() {
 //        val responseToken = "eyJraWQiOiJkaWQ6aW9uOkVpRGgwRUw4d2c4b0YtN3JSaVJ6RVpWZnNKdmg0c1FYNEpvY2syS3A0al96eGc6ZXlKa1pXeDBZU0k2ZXlKd1lYUmphR1Z6SWpwYmV5SmhZM1JwYjI0aU9pSnlaWEJzWVdObElpd2laRzlqZFcxbGJuUWlPbnNpY0hWaWJHbGpTMlY1Y3lJNlczc2lhV1FpT2lJME9HUTRZVE0wTWpZelkyWTBPVEpoWVRkbVpqWXhZall4T0RObE9HSmpaaUlzSW5CMVlteHBZMHRsZVVwM2F5STZleUpqY25ZaU9pSnpaV053TWpVMmF6RWlMQ0pyYVdRaU9pSTBPR1E0WVRNME1qWXpZMlkwT1RKaFlUZG1aall4WWpZeE9ETmxPR0pqWmlJc0ltdDBlU0k2SWtWRElpd2lkWE5sSWpvaWMybG5JaXdpZUNJNklsUkxZVkUyYzBOdlkxUkVjMjExYWpsMFZGSTVPVFowUmxod1JXTlRNa1ZLVGkweFowOWhaR0ZDZG1zaUxDSjVJam9pTUZSeVNWbElZMlpET1ROV2NFVjFkbW90U0ZoVWJubExkREJ6Ym1GNVQwMTNSMU5LUVRGWWFVUllPQ0o5TENKd2RYSndiM05sY3lJNld5SmhkWFJvWlc1MGFXTmhkR2x2YmlKZExDSjBlWEJsSWpvaVJXTmtjMkZUWldOd01qVTJhekZXWlhKcFptbGpZWFJwYjI1TFpYa3lNREU1SW4xZGZYMWRMQ0oxY0dSaGRHVkRiMjF0YVhSdFpXNTBJam9pUldsQ1FubGtaMlI1V0haa1ZFUm9iM1pzV1dJdFFrVjJSM0V4UW5SMlRXSlNMVVJtYkRjdFNIZFpNVWhVWnlKOUxDSnpkV1ptYVhoRVlYUmhJanA3SW1SbGJIUmhTR0Z6YUNJNklrVnBSR0p4YTA1bGR6ZFVjRFUyY0VKRVQzcDZSRWM1YlRoUFpuZHhhbWxYUmpJM2JUZzJkMWszVFMxMU0xRWlMQ0p5WldOdmRtVnllVU52YlcxcGRHMWxiblFpT2lKRmFVRkdPWGt6Y0UxbFEyUlFTbVpSWWprMVpWVjVUVmxmYVVkQ1JrTXdka1F6ZUROS1ZUQjZWMFZqV1V0QkluMTkjNDhkOGEzNDI2M2NmNDkyYWE3ZmY2MWI2MTgzZThiY2YiLCJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NksifQ.eyJzdWIiOiJKb1I1T1hicGVldlRpeVM4S0Zma2NSN3NlMGMwSVhLbGU0REk1YlVXTncwIiwiYXVkIjoiaHR0cHM6Ly9iZXRhLmRpZC5tc2lkZW50aXR5LmNvbS92MS4wL3RlbmFudHMvM2MzMmVkNDAtOGExMC00NjViLThiYTQtMGIxZTg2ODgyNjY4L3ZlcmlmaWFibGVDcmVkZW50aWFscy9pc3N1ZSIsInN1Yl9qd2siOnsia3R5IjoiRUMiLCJraWQiOiI0OGQ4YTM0MjYzY2Y0OTJhYTdmZjYxYjYxODNlOGJjZiIsInVzZSI6InNpZyIsImNydiI6InNlY3AyNTZrMSIsIngiOiJUS2FRNnNDb2NURHNtdWo5dFRSOTk2dEZYcEVjUzJFSk4tMWdPYWRhQnZrIiwieSI6IjBUcklZSGNmQzkzVnBFdXZqLUhYVG55S3Qwc25heU9Nd0dTSkExWGlEWDgifSwiaWF0IjoxNzAzMTAzNDg4LCJleHAiOjE3MDMxMDcwNzIsImp0aSI6IjkwYjkzMThlLWVkMGEtNGMzZC1hMGJiLTg2OTYwOGE3OWYzNCIsImlzcyI6Imh0dHBzOi8vc2VsZi1pc3N1ZWQubWUiLCJwaW4iOiJTQ2NVaHo1MThscWZxbVFQVkpIVVdaOU9scTVVeUZPL2dQYmNOaW93cTNNPSIsImNvbnRyYWN0IjoiaHR0cHM6Ly92ZXJpZmllZGlkLmRpZC5tc2lkZW50aXR5LmNvbS92MS4wL3RlbmFudHMvM2MzMmVkNDAtOGExMC00NjViLThiYTQtMGIxZTg2ODgyNjY4L3ZlcmlmaWFibGVDcmVkZW50aWFscy9jb250cmFjdHMvMDVkN2JhNTctZjRlNi0yNjBjLWNjYjYtMGNkNzQxNzk3NzljL21hbmlmZXN0IiwiYXR0ZXN0YXRpb25zIjp7ImlkVG9rZW5zIjp7Imh0dHBzOi8vc2VsZi1pc3N1ZWQubWUiOiJleUpoYkdjaU9pSkZVekkxTmtzaUxDSnJhV1FpT2lKa2FXUTZkMlZpT21ScFpDNTNiMjlrWjNKdmRtVmtaVzF2TG1OdmJTTTVZMlZoTVRVeU5XWmtOV1kwWkRKak9URTROMlF6TXpBMU9HRTNaVFExT1haalUybG5ibWx1WjB0bGVTMDJaR1V3T1NJc0luUjVjQ0k2SWtwWFZDSjkuZXlKemRXSWlPaUozYkVOeGRYQnhaWGt3Y2xoeGNtdHVSbE5oVW1wQk56QkNNMHRUT1dST05WQllXVjluUXkxS2FuWmpJaXdpWVhWa0lqb2lhSFIwY0hNNkx5OWlaWFJoTG1ScFpDNXRjMmxrWlc1MGFYUjVMbU52YlM5Mk1TNHdMM1JsYm1GdWRITXZNMk16TW1Wa05EQXRPR0V4TUMwME5qVmlMVGhpWVRRdE1HSXhaVGcyT0RneU5qWTRMM1psY21sbWFXRmliR1ZEY21Wa1pXNTBhV0ZzY3k5cGMzTjFaU0lzSW01dmJtTmxJam9pU2tSRk5FVktOa1Y0WWpWQ1VFNDVOMm8zTVZWSFFUMDlJaXdpYzNWaVgycDNheUk2ZXlKamNuWWlPaUp6WldOd01qVTJhekVpTENKcmFXUWlPaUprYVdRNmQyVmlPbVJwWkM1M2IyOWtaM0p2ZG1Wa1pXMXZMbU52YlNNNVkyVmhNVFV5Tldaa05XWTBaREpqT1RFNE4yUXpNekExT0dFM1pUUTFPWFpqVTJsbmJtbHVaMHRsZVMwMlpHVXdPU0lzSW10MGVTSTZJa1ZESWl3aWVDSTZJa3RNYmpWRmFuZFlaazlxZVhkaVZIbzFiRU5hVVdGbFdWbDNObmxEUkROMFlURTNkak5ZVDNOaVJVa2lMQ0o1SWpvaVNFRkdjRlJYWDJNMWJGOUhaamhQVlhKelkzbGZabE5KUjFkUGVWbGxSMDFxZVVkU1lrbzJOemhZYXlKOUxDSmthV1FpT2lKa2FXUTZkMlZpT21ScFpDNTNiMjlrWjNKdmRtVmtaVzF2TG1OdmJTSXNJbVpwY25OMFRtRnRaU0k2SWsxaGRIUm9aWGNpTENKc1lYTjBUbUZ0WlNJNklrMXBZMmhoWld3aUxDSnpZMkZ1Ym1Wa1pHOWpJam9pVGxrZ1UzUmhkR1VnUkhKcGRtVnljeUJNYVdObGJuTmxJaXdpYzJWc1ptbGxJam9pVm1WeWFXWnBaV1FnVTJWc1ptbGxJaXdpZG1WeWFXWnBZMkYwYVc5dUlqb2lSblZzYkhrZ1ZtVnlhV1pwWldRaUxDSmhaR1J5WlhOeklqb2lNak0wTlNCQmJubDNhR1Z5WlNCVGRISmxaWFFzSUZsdmRYSWdRMmwwZVN3Z1Rsa2dNVEl6TkRVaUxDSmhaMlYyWlhKcFptbGxaQ0k2SWs5c1pHVnlJSFJvWVc0Z01qRWlMQ0pwYzNNaU9pSm9kSFJ3Y3pvdkwzTmxiR1l0YVhOemRXVmtMbTFsSWl3aWFXRjBJam94TnpBek1UQXpORFV5TENKcWRHa2lPaUpqWlRSaFpqRXpZeTAwWTJVeUxUUTBNbUV0WVROaVlTMDFaR0V3WVdOa056RmpZamNpTENKbGVIQWlPakUzTURNeE1ETTNOVElzSW5CcGJpSTZleUpzWlc1bmRHZ2lPalFzSW5SNWNHVWlPaUp1ZFcxbGNtbGpJaXdpWVd4bklqb2ljMmhoTWpVMklpd2lhWFJsY21GMGFXOXVjeUk2TVN3aWMyRnNkQ0k2SWpBNU1HTTRabVl6TVdKbU1qUTRaamc0T1RSaU5UaGxZemc0TlRnM1l6Z3dJaXdpYUdGemFDSTZJblZWUW5sNVJXWnpNVzFXYlRBMlZtaGhNelIwT1U5eU5tOVJXVEoyV0RWaGJrZFFiMDVuZGxselUwVTlJbjE5Ll9vUTR1TzVnVDJ2WmZRWGdpcm5YX1BEdG9POS1nZGF0dERqQlpSeEZVZklLUGpYbXJYRjU4RmlFdGNseWxpWHhGTHZ2dnNZeDBFeDhiNWQ3YzZ0ZWFBIn19LCJkaWQiOiJkaWQ6aW9uOkVpRGgwRUw4d2c4b0YtN3JSaVJ6RVpWZnNKdmg0c1FYNEpvY2syS3A0al96eGc6ZXlKa1pXeDBZU0k2ZXlKd1lYUmphR1Z6SWpwYmV5SmhZM1JwYjI0aU9pSnlaWEJzWVdObElpd2laRzlqZFcxbGJuUWlPbnNpY0hWaWJHbGpTMlY1Y3lJNlczc2lhV1FpT2lJME9HUTRZVE0wTWpZelkyWTBPVEpoWVRkbVpqWXhZall4T0RObE9HSmpaaUlzSW5CMVlteHBZMHRsZVVwM2F5STZleUpqY25ZaU9pSnpaV053TWpVMmF6RWlMQ0pyYVdRaU9pSTBPR1E0WVRNME1qWXpZMlkwT1RKaFlUZG1aall4WWpZeE9ETmxPR0pqWmlJc0ltdDBlU0k2SWtWRElpd2lkWE5sSWpvaWMybG5JaXdpZUNJNklsUkxZVkUyYzBOdlkxUkVjMjExYWpsMFZGSTVPVFowUmxod1JXTlRNa1ZLVGkweFowOWhaR0ZDZG1zaUxDSjVJam9pTUZSeVNWbElZMlpET1ROV2NFVjFkbW90U0ZoVWJubExkREJ6Ym1GNVQwMTNSMU5LUVRGWWFVUllPQ0o5TENKd2RYSndiM05sY3lJNld5SmhkWFJvWlc1MGFXTmhkR2x2YmlKZExDSjBlWEJsSWpvaVJXTmtjMkZUWldOd01qVTJhekZXWlhKcFptbGpZWFJwYjI1TFpYa3lNREU1SW4xZGZYMWRMQ0oxY0dSaGRHVkRiMjF0YVhSdFpXNTBJam9pUldsQ1FubGtaMlI1V0haa1ZFUm9iM1pzV1dJdFFrVjJSM0V4UW5SMlRXSlNMVVJtYkRjdFNIZFpNVWhVWnlKOUxDSnpkV1ptYVhoRVlYUmhJanA3SW1SbGJIUmhTR0Z6YUNJNklrVnBSR0p4YTA1bGR6ZFVjRFUyY0VKRVQzcDZSRWM1YlRoUFpuZHhhbWxYUmpJM2JUZzJkMWszVFMxMU0xRWlMQ0p5WldOdmRtVnllVU52YlcxcGRHMWxiblFpT2lKRmFVRkdPWGt6Y0UxbFEyUlFTbVpSWWprMVpWVjVUVmxmYVVkQ1JrTXdka1F6ZUROS1ZUQjZWMFZqV1V0QkluMTkifQ.RwwcxrVxu_S5V_tWGbBBq-09o8OeQ92ueA8tGJSPjkG7YsmKq1oXOKsL3-hsq0gl30c9tb7O-P4YyZegNoomOA"
 
         println("> Sending HTTP POST to: ${entraIssuanceRequest.issuerReturnAddress}")
-        val resp = http.post(entraIssuanceRequest.issuerReturnAddress, {
+        val resp = http.post(entraIssuanceRequest.issuerReturnAddress) {
             contentType(ContentType.Text.Plain)
             setBody(responseToken)
-        })
+        }
         println("> HTTP response: $resp")
         println("> Body: " + resp.bodyAsText())
         resp.status shouldBe HttpStatusCode.OK
@@ -1382,6 +1410,20 @@ class CI_JVM_Test : AnnotationSpec() {
         println("> VC is: $vc")
 
         println("> Success: " + CredentialResponse.Companion.success(CredentialFormat.jwt_vc_json, vc).credential?.toString())
+
+        entraIssuanceRequest.authorizationRequest.redirectUri?.let { redirectUri ->
+            http.post(redirectUri) {
+                contentType(ContentType.Application.Json)
+                setBody(EntraIssuanceCompletionResponse(EntraIssuanceCompletionCode.issuance_successful, entraIssuanceRequest.authorizationRequest.state!!))
+            }.also {
+                println("ENTRA redirect URI response: ${it.status}")
+                println(it.bodyAsText())
+            }
+        }?.status shouldBe HttpStatusCode.Accepted
+//        synchronized(CALLBACK_COMPLETE) {
+//            CALLBACK_COMPLETE.wait(1000)
+//            ENTRA_STATUS shouldBe "issuance_successful"
+//        }
     }
 
     //@Test
@@ -1393,7 +1435,7 @@ class CI_JVM_Test : AnnotationSpec() {
 
     //@Test
     suspend fun testCreateKey() {
-        val result = LocalKey.Companion.importJWK(File("/home/work/waltid/entra/keys/priv.jwk").readText().trimIndent())
+        val result = JWKKey.Companion.importJWK(File("/home/work/waltid/entra/keys/priv.jwk").readText().trimIndent())
         result.isSuccess shouldBe true
         val key = result.getOrNull()!!
         key.hasPrivateKey shouldBe true
@@ -1402,7 +1444,7 @@ class CI_JVM_Test : AnnotationSpec() {
 
     //@Test
     suspend fun testGenerateHolderDid2() {
-        val key = LocalKey.generate(KeyType.Ed25519)
+        val key = JWKKey.generate(KeyType.Ed25519)
         println("== Key ==")
         println(key.exportJWK())
         println("== DID ==")

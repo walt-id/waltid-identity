@@ -14,9 +14,9 @@ import kotlinx.serialization.json.*
 @Serializable
 data class ProofOfPossession @OptIn(ExperimentalSerializationApi::class) private constructor(
     @EncodeDefault @SerialName("proof_type") val proofType: ProofType,
-    val jwt: String?,
-    val cwt: String?,
-    val ldp_vp: JsonObject?,
+    val jwt: String? = null,
+    val cwt: String? = null,
+    val ldp_vp: JsonObject? = null,
     override val customParameters: Map<String, JsonElement> = mapOf()
 ) : JsonDataObject() {
     override fun toJSON() = Json.encodeToJsonElement(ProofOfPossessionSerializer, this).jsonObject
@@ -43,7 +43,7 @@ data class ProofOfPossession @OptIn(ExperimentalSerializationApi::class) private
     class JWTProofBuilder(private val issuerUrl: String, private val clientId: String?,
                           private val nonce: String?, private val keyId: String?,
                           private val keyJwk: JsonObject? = null, private val x5c: JsonArray? = null,
-                          private val trustChain: JsonArray? = null): ProofBuilder() {
+                          private val trustChain: JsonArray? = null, private val audience: String? = null): ProofBuilder() {
         val headers = buildJsonObject {
             put("typ", JWT_HEADER_TYPE)
             keyId?.let { put("kid", it) }
@@ -54,6 +54,7 @@ data class ProofOfPossession @OptIn(ExperimentalSerializationApi::class) private
         val payload = buildJsonObject {
             clientId?.let { put("iss", it) }
             put("aud", issuerUrl)
+            audience?.let { put("aud", it) }
             put("iat", Clock.System.now().epochSeconds)
             nonce?.let { put("nonce", it) }
         }

@@ -31,7 +31,7 @@ jobs:
 
       - name: Get changed files in the frontend
         id: frontend-changed-files
-        uses: tj-actions/changed-files@v41
+        uses: tj-actions/changed-files@v44
         with:
           files: |
             waltid-web-portal/**
@@ -43,5 +43,5 @@ jobs:
           MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
         with:
-          arguments: build publish --no-daemon
+          arguments: build --no-daemon
         if: ${{ steps.frontend-changed-files.outputs.any_changed == 'false' }}

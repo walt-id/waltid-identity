@@ -81,19 +81,20 @@ data class W3CVC(
     suspend fun signJws(
         issuerKey: Key,
         issuerDid: String,
+        issuerKid: String? = null,
         subjectDid: String,
         /** Set additional options in the JWT header */
         additionalJwtHeader: Map<String, String> = emptyMap(),
         /** Set additional options in the JWT payload */
         additionalJwtOptions: Map<String, JsonElement> = emptyMap()
     ): String {
+        val kid = issuerKid ?: issuerDid
+
         return JwsSignatureScheme().sign(
             data = this.toJsonObject(),
             key = issuerKey,
             jwtHeaders = mapOf(
-                // Why KeyID = issuerDid
-                // JwsHeader.KEY_ID to issuerDid,
-                JwsHeader.KEY_ID to (issuerDid+"#"+issuerDid.replaceRange(0..7, "")),
+                JwsHeader.KEY_ID to kid,
                 *(additionalJwtHeader.entries.map { it.toPair() }.toTypedArray())
             ),
             jwtOptions = mapOf(

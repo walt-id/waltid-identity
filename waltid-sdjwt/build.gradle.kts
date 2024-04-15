@@ -1,4 +1,3 @@
-import com.github.benmanes.gradle.versions.updates.DependencyUpdatesTask
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 
 plugins {
@@ -174,7 +173,7 @@ kotlin {
     publishing {
         repositories {
             maven {
-                url = uri("https://maven.walt.id/repository/waltid/")
+                url = uri("https://maven.waltid.dev/releases")
                 val envUsername = System.getenv("MAVEN_USERNAME")
                 val envPassword = System.getenv("MAVEN_PASSWORD")
 

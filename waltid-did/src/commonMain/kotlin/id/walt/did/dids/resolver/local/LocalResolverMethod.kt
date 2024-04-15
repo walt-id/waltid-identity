@@ -7,7 +7,7 @@ import love.forte.plugin.suspendtrans.annotation.JvmBlocking
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 
-@ExperimentalJsExport
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 abstract class LocalResolverMethod(val method: String) {
 

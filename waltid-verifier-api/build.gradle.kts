@@ -1,4 +1,3 @@
-import com.github.benmanes.gradle.versions.updates.DependencyUpdatesTask
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 object Versions {
@@ -14,7 +13,7 @@ plugins {
     kotlin("plugin.serialization") // Versions.KOTLIN_VERSION
 
     id("io.ktor.plugin") version "2.3.8" // Versions.KTOR_VERSION
-    id("org.owasp.dependencycheck") version "9.0.9"
+    id("org.owasp.dependencycheck") version "9.1.0"
     id("com.github.jk1.dependency-license-report") version "2.5"
     application
     `maven-publish`
@@ -28,7 +27,7 @@ repositories {
     mavenCentral()
     //jcenter()
     maven("https://jitpack.io")
-    maven("https://maven.walt.id/repository/waltid/")
+    maven("https://maven.waltid.dev/releases")
     maven("https://repo.danubetech.com/repository/maven-public/")
     maven("https://maven.walt.id/repository/waltid/id/walt/core-crypto/")
     maven("https://maven.walt.id/repository/waltid/id/walt/waltid-ssikit2")
@@ -172,7 +171,7 @@ publishing {
 
     repositories {
         maven {
-            url = uri("https://maven.walt.id/repository/waltid/")
+            url = uri("https://maven.waltid.dev/releases")
             val envUsername = System.getenv("MAVEN_USERNAME")
             val envPassword = System.getenv("MAVEN_PASSWORD")
 

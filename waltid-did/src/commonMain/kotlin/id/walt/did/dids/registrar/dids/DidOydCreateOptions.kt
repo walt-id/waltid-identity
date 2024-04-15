@@ -4,9 +4,9 @@ import kotlinx.serialization.json.JsonObject
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 
-@ExperimentalJsExport
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 class DidOydCreateOptions(document: JsonObject) : DidCreateOptions(
     method = "oyd",
-    options = mapOf("didDocument" to document)
+    config = mapOf("didDocument" to document)
 )

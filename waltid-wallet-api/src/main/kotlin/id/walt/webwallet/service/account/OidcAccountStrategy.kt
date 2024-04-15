@@ -2,7 +2,6 @@ package id.walt.webwallet.service.account
 
 import id.walt.webwallet.db.models.Accounts
 import id.walt.webwallet.db.models.OidcLogins
-import id.walt.webwallet.utils.JwkUtils
 import id.walt.webwallet.utils.JwkUtils.verifyToken
 import id.walt.webwallet.web.model.OidcAccountRequest
 import kotlinx.datetime.Clock
@@ -12,7 +11,7 @@ import kotlinx.uuid.generateUUID
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.transactions.transaction
 
-object OidcAccountStrategy : AccountStrategy<OidcAccountRequest>("oidc") {
+object OidcAccountStrategy : PasswordlessAccountStrategy<OidcAccountRequest>() {
     override suspend fun register(tenant: String, request: OidcAccountRequest): Result<RegistrationResult> {
         val jwt = verifyToken(request.token)
 
@@ -43,13 +42,14 @@ object OidcAccountStrategy : AccountStrategy<OidcAccountRequest>("oidc") {
 
 
     override suspend fun authenticate(tenant: String, request: OidcAccountRequest): AuthenticatedUser {
-        val jwt = JwkUtils.verifyToken(request.token)
+        val jwt = verifyToken(request.token)
 
         val registeredUserId = if (AccountsService.hasAccountOidcId(jwt.subject)) {
             AccountsService.getAccountByOidcId(jwt.subject)!!.id
         } else {
             AccountsService.register(tenant, request).getOrThrow().id
         }
-        return AuthenticatedUser(registeredUserId, jwt.subject)
+        // TODO: change id to wallet-id (also in the frontend)
+        return UsernameAuthenticatedUser(registeredUserId, jwt.subject)
     }
 }

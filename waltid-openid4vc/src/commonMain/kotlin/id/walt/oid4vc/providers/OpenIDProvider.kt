@@ -1,5 +1,6 @@
 package id.walt.oid4vc.providers
 
+import id.walt.crypto.keys.Key
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.definitions.JWTClaims
 import id.walt.oid4vc.errors.AuthorizationError
@@ -9,15 +10,14 @@ import id.walt.oid4vc.interfaces.ITokenProvider
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.requests.TokenRequest
 import id.walt.oid4vc.responses.*
+
 import io.ktor.http.*
 import kotlinx.datetime.Clock
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.put
+import kotlinx.serialization.json.*
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 import kotlinx.uuid.UUID
+import kotlin.js.ExperimentalJsExport
 
 abstract class OpenIDProvider<S : AuthorizationSession>(
     val baseUrl: String,
@@ -37,6 +37,7 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
         grantTypesSupported = setOf(GrantType.authorization_code, GrantType.pre_authorized_code),
         requestUriParameterSupported = true,
         subjectTypesSupported = setOf(SubjectType.public),
+        authorizationServer = baseUrl,
         credentialIssuer =  baseUrl, // (EBSI) this should be just "$baseUrl"  https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html#section-11.2.1
         responseTypesSupported = setOf(ResponseType.Code, ResponseType.VpToken, ResponseType.IdToken),  // (EBSI) this is required one  https://www.rfc-editor.org/rfc/rfc8414.html#section-2
         idTokenSigningAlgValuesSupported = setOf("ES256") // (EBSI) https://openid.net/specs/openid-connect-self-issued-v2-1_0.html#name-self-issued-openid-provider-
@@ -84,9 +85,73 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
         return verifyAndParseToken(code, TokenTarget.TOKEN)
     }
 
+    @OptIn(ExperimentalJsExport::class)
+    protected open fun verifyAndParseIdToken(token: String): JsonObject? {
+        // 1. Validate Header
+        val header = parseTokenHeader(token)
+        if (!header.keys.containsAll(setOf(
+                JWTClaims.Header.type,
+                JWTClaims.Header.keyID,
+                JWTClaims.Header.algorithm,
+            )
+            )){
+            throw IllegalStateException( "Invalid header in token")
+        }
+
+        // 2. Validate Payload
+        val payload = parseTokenPayload(token)
+        if (!payload.keys.containsAll(setOf(
+                JWTClaims.Payload.issuer,
+                JWTClaims.Payload.subject,
+                JWTClaims.Payload.audience,
+                JWTClaims.Payload.expirationTime,
+                JWTClaims.Payload.issuedAtTime,
+                JWTClaims.Payload.nonce,
+            )
+            )){
+            throw IllegalArgumentException("Invalid payload in token")
+        }
+
+        // 3. Verify iss = sub = did
+        val sub = payload[JWTClaims.Payload.subject]!!.jsonPrimitive.content
+        val iss = payload[JWTClaims.Payload.issuer]!!.jsonPrimitive.content
+        val kid = header[JWTClaims.Header.keyID]!!.jsonPrimitive.content
+        val did = kid.substringBefore("#")
+
+        if (iss != sub || iss != did || sub != did){
+            println("$sub $iss $did")
+            throw IllegalArgumentException("Invalid payload in token. sub != iss != did")
+        }
+
+        // 4. Verify Signature
+
+        // 4.a Resolve DID
+        // DidService.minimalInit()
+        // val didDocument = DidService.resolve(did.removeSurrounding("\"")
+        //)
+
+        // 4.b Get verification methods from DID Document
+        // val verificationMethods = didDocument.getOrNull()?.get("verificationMethod")
+
+        // 4.c Get the corresponding verification method
+        // val verificationMethod = verificationMethods?.jsonArray?.firstOrNull {
+        //    it.jsonObject["id"].toString() == kidFull.toString()
+        //} ?: throw IllegalArgumentException("Invalid verification method")
+
+        // 4.d Verify Token
+        // val key = DidService.resolveToKey(did).getOrThrow()
+        // key.verifyJws(token).isSuccess
+
+        if (!verifyTokenSignature(TokenTarget.TOKEN,token))
+            throw IllegalArgumentException("Invalid token - cannot verify signature")
+
+        return payload
+    }
+
     protected abstract fun validateAuthorizationRequest(authorizationRequest: AuthorizationRequest): Boolean
 
     abstract fun initializeAuthorization(authorizationRequest: AuthorizationRequest, expiresIn: Duration, idTokenRequestState: String? ): S
+
     open fun processCodeFlowAuthorization(authorizationRequest: AuthorizationRequest): AuthorizationCodeResponse {
         if (!authorizationRequest.responseType.contains(ResponseType.Code))
             throw AuthorizationError(
@@ -99,24 +164,27 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
         return AuthorizationCodeResponse.success(code)
     }
 
-    open fun processDirectPost(state: String) : AuthorizationCodeResponse {
-
-        println("Incoming State is $state")
+    open fun processDirectPost(state: String, tokenPayload: JsonObject) : AuthorizationCodeResponse {
         // here we get the initial session to retrieve the state of the initial authorization request
         val session = getSessionByIdTokenRequestState(state)
-        println("Session Id is: ${session?.id}")
-        println("Session Authorization Request State is: ${session?.authorizationRequest?.state}")
-        println("Session Id Token Request State is: ${session?.idTokenRequestState}")
+            ?: throw IllegalStateException( "No authentication request found for given state")
+
+        // Verify nonce - need to add Id token nonce session
+        // if (payload[JWTClaims.Payload.nonce] != session.)
 
         // Generate code and proceed as regular authorization request
-        val mappedState = mapOf("state" to listOf(session?.authorizationRequest?.state!!))
+        val mappedState = mapOf("state" to listOf(session.authorizationRequest?.state!!))
         val code = generateAuthorizationCodeFor(session)
+
         return AuthorizationCodeResponse.success(code, mappedState)
     }
 
-    open fun processCodeFlowAuthorizationEbsi(authorizationRequest: AuthorizationRequest): AuthorizationCodeIDTokenRequestResponse {
-        println("Ebsi Authorize Request")
+    // TO-DO: JAR OAuth2.0 specification https://www.rfc-editor.org/rfc/rfc9101.html
+    // open fun proccessJar(authorizationRequest: AuthorizationRequest, kid: String){
+    // }
 
+    // Create an ID Token request using JAR OAuth2.0 specification https://www.rfc-editor.org/rfc/rfc9101.html
+    open fun processCodeFlowAuthorizationWithIdTokenRequest(authorizationRequest: AuthorizationRequest, keyId: String, privKey: Key): AuthorizationCodeIDTokenRequestResponse {
         if (!authorizationRequest.responseType.contains(ResponseType.Code))
             throw AuthorizationError(
                 authorizationRequest,
@@ -124,25 +192,17 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
                 message = "Invalid response type ${authorizationRequest.responseType}, for authorization code flow."
             )
 
-        // Create ID Token Request
-
         // Bind authentication request with state
-        // @see https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest
-        // `state`: RECOMMENDED. Opaque value used to maintain state between the request and the
-        // callback. Typically, Cross-Site Request Forgery (CSRF, XSRF) mitigation is done by
-        // cryptographically binding the value of this parameter with a browser cookie.
         val idTokenRequestState = UUID().toString();
         val idTokenRequestNonce = UUID().toString();
-        val responseMode = ResponseMode.DirectPost
+        val responseMode = ResponseMode.direct_post
 
-        val clientId = this.metadata.issuer!! // :/
+        val clientId = this.metadata.issuer!!
         val redirectUri = this.metadata.issuer + "/direct_post"
         val responseType = "id_token"
-        val scope = setOf("openid") // How to put the array of scopes in the token above?
+        val scope = setOf("openid")
 
         // Create a jwt as request object as defined in JAR OAuth2.0 specification
-        // How to get the kid?
-        val kid = "did:key:z2dmzD81cgPx8Vki7JbuuMmFYrWPgYoytykUZ3eyqht1j9KbrJNL5rEcHRKkRBDnxzu2352jxSjTEFmM9hjTL2wMtzcTDjjDAQmPpQkaihjoAo8AygRr9M6yZsXHzWXnJRMNPzR3cCYbmvE9Q1sSQ1qzXHBo4iEc7Yb3MGu31ZAHKSd9Qx#z2dmzD81cgPx8Vki7JbuuMmFYrWPgYoytykUZ3eyqht1j9KbrJNL5rEcHRKkRBDnxzu2352jxSjTEFmM9hjTL2wMtzcTDjjDAQmPpQkaihjoAo8AygRr9M6yZsXHzWXnJRMNPzR3cCYbmvE9Q1sSQ1qzXHBo4iEc7Yb3MGu31ZAHKSd9Qx"
         val requestJar = signToken (
             TokenTarget.TOKEN,
             buildJsonObject {
@@ -154,22 +214,18 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
                 put("redirect_uri", redirectUri)
                 put("response_type", responseType)
                 put("response_mode", responseMode.name)
-                put("scope", "openid") // How can we put an array of scopes?
+                put("scope", "openid")
             }, buildJsonObject {
                 put(JWTClaims.Header.algorithm, "ES256")
-                put(JWTClaims.Header.keyID, kid)
-            }
+                put(JWTClaims.Header.keyID, keyId)
+                put(JWTClaims.Header.type, "jwt")
+            },
+            keyId,
+            privKey
         )
 
-        // Create a session with the state of id token request since it is needed in the direct_post endpoint
-        val authorizationSession = initializeAuthorization(authorizationRequest, 5.minutes, idTokenRequestState)
-
-        println("Authorization Session Id is: ${authorizationSession.id}")
-        println("Authorization State is: ${authorizationSession.authorizationRequest?.state}")
-        println("Authorization Id Token Request State is: ${authorizationSession.idTokenRequestState}")
-        println("Id Token Request State: $idTokenRequestState")
-        println("Id Token Request Nonce: $idTokenRequestNonce")
-        println("Id Token Request is: $requestJar")
+        // Create a session with the state of the ID Token request since it is needed in the direct_post endpoint
+        initializeAuthorization(authorizationRequest, 5.minutes, idTokenRequestState)
 
         return AuthorizationCodeIDTokenRequestResponse.success(idTokenRequestState, clientId, redirectUri, responseType, responseMode, scope, idTokenRequestNonce, null,  requestJar)
     }

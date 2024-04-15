@@ -1,6 +1,7 @@
 package id.walt.webwallet.web.controllers
 
 import id.walt.webwallet.db.models.WalletCredential
+import id.walt.webwallet.service.WalletServiceManager
 import id.walt.webwallet.service.credentials.CredentialFilterObject
 import id.walt.webwallet.web.parameter.CredentialRequestParameter
 import id.walt.webwallet.web.parameter.NoteRequestParameter
@@ -52,8 +53,8 @@ fun Application.credentials() = walletRoute {
             }
         }) {
             val categories = call.request.queryParameters.getAll("category")
-            val showDeleted = call.request.queryParameters["showDeleted"].toBoolean()
-            val showPending = call.request.queryParameters["showPending"].toBoolean()
+            val showDeleted = call.request.queryParameters["showDeleted"]?.toBooleanStrictOrNull()
+            val showPending = call.request.queryParameters["showPending"]?.toBooleanStrictOrNull()
             val sortBy = call.request.queryParameters["sortBy"] ?: "addedOn"
             val descending = call.request.queryParameters["descending"].toBoolean()
             context.respond(
@@ -145,7 +146,7 @@ fun Application.credentials() = walletRoute {
                     HttpStatusCode.Accepted to { description = "Credential accepted successfully" }
                     HttpStatusCode.BadRequest to { description = "Credential acceptance failed" }
                 }
-            }){
+            }) {
                 val credentialId = call.parameters.getOrFail("credentialId")
                 runCatching { getWalletService().acceptCredential(CredentialRequestParameter(credentialId)) }.onSuccess {
                     if (it) context.respond(HttpStatusCode.Accepted) else context.respond(HttpStatusCode.BadRequest)
@@ -177,6 +178,25 @@ fun Application.credentials() = walletRoute {
                     )
                 }.onSuccess {
                     if (it) context.respond(HttpStatusCode.Accepted) else context.respond(HttpStatusCode.BadRequest)
+                }.onFailure {
+                    context.respond(HttpStatusCode.BadRequest, it.localizedMessage)
+                }
+            }
+            get("status", {
+                summary = "Get credential status"
+                response {
+                    HttpStatusCode.OK to { body<String> { description = "Credential status" } }
+                    HttpStatusCode.BadRequest to {
+                        description =
+                            "Credential status could not be established or an error occured"
+                    }
+                }
+            }) {
+                runCatching {
+                    val credentialId = call.parameters.getOrFail("credentialId")
+                    WalletServiceManager.credentialStatusUseCase.get(getWalletId(), credentialId)
+                }.onSuccess {
+                    context.respond(it)
                 }.onFailure {
                     context.respond(HttpStatusCode.BadRequest, it.localizedMessage)
                 }

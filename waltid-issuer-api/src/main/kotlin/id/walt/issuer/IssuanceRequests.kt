@@ -8,7 +8,7 @@ import kotlinx.serialization.json.JsonObject
 
 @Serializable
 data class IssuanceRequest(
-    val issuanceKey: JsonObject,
+    val issuerKey: JsonObject,
     val issuerDid: String,
 
     val credentialConfigurationId: String,
@@ -19,10 +19,10 @@ data class IssuanceRequest(
 
 @Serializable
 data class IssuerOnboardingRequest(
-    val issuanceKeyConfig: JsonObject, val issuerDidConfig: JsonObject
+    val issuerKeyConfig: JsonObject, val issuerDidConfig: JsonObject
 )
 
 @Serializable
 data class IssuerOnboardingResponse(
-    val issuanceKey: JsonElement, val issuerDid: String
+    val issuerKey: JsonElement, val issuerDid: String
 )

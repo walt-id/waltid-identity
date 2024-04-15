@@ -7,7 +7,7 @@ import id.walt.credentials.CredentialBuilderType
 import id.walt.credentials.issuance.Issuer.baseIssue
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.LocalKey
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.did.dids.DidService
 import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.data.CredentialSupported
@@ -77,13 +77,13 @@ class CITestProvider : OpenIDCredentialIssuer(
     override fun removeSession(id: String) = authSessions.remove(id)
 
     // crypto operations and credential issuance
-    private val CI_TOKEN_KEY = runBlocking { LocalKey.generate(KeyType.RSA) }
-    private val CI_DID_KEY = runBlocking { LocalKey.generate(KeyType.Ed25519) }
+    private val CI_TOKEN_KEY = runBlocking { JWKKey.generate(KeyType.RSA) }
+    private val CI_DID_KEY = runBlocking { JWKKey.generate(KeyType.Ed25519) }
     val CI_ISSUER_DID = runBlocking { DidService.registerByKey("key", CI_DID_KEY).did }
     val deferredCredentialRequests = mutableMapOf<String, CredentialRequest>()
     var deferIssuance = false
 
-    override fun signToken(target: TokenTarget, payload: JsonObject, header: JsonObject?, keyId: String?) =
+    override fun signToken(target: TokenTarget, payload: JsonObject, header: JsonObject?, keyId: String?, privKey: Key?) =
         runBlocking { CI_TOKEN_KEY.signJws(payload.toString().toByteArray()) }
 
     fun getKeyFor(token: String): Key {
@@ -184,7 +184,7 @@ class CITestProvider : OpenIDCredentialIssuer(
                         call.response.apply {
                             status(HttpStatusCode.Found)
                             val defaultResponseMode =
-                                if (authReq.responseType.contains(ResponseType.Code)) ResponseMode.Query else ResponseMode.Fragment
+                                if (authReq.responseType.contains(ResponseType.Code)) ResponseMode.query else ResponseMode.fragment
                             header(
                                 HttpHeaders.Location,
                                 authResp.toRedirectUri(redirectUri, authReq.responseMode ?: defaultResponseMode)

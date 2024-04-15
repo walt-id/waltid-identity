@@ -147,7 +147,7 @@ fun Application.manifest() = walletRoute {
 }
 
 internal suspend fun callManifest(parameters: Parameters, method: suspend (Parameters) -> JsonObject?): JsonObject? {
-    val runtimeConfig = ConfigManager.getConfig<RuntimeConfig>()
+    val runtimeConfig by lazy { ConfigManager.getConfig<RuntimeConfig>() }
     return if (runtimeConfig.mock) {
         EntraMockManifestExtractor().extract("")
     } else {

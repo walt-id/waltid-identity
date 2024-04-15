@@ -24,7 +24,7 @@ data class AuthorizationCodeIDTokenRequestResponse private constructor(
             clientId?.let { put("client_id", listOf(it)) }
             redirectUri?.let { put("redirect_uri", listOf(it)) }
             responseType?.let { put("response_type", listOf(it)) }
-            responseMode?.let { put("response_mode", listOf(it.value)) }
+            responseMode?.let { put("response_mode", listOf(it.name)) }
             scope.let { put("scope", it.toList())}
             nonce?.let { put("nonce", listOf(it)) }
             requestUri?.let { put("request_uri", listOf(it)) }
@@ -41,7 +41,7 @@ data class AuthorizationCodeIDTokenRequestResponse private constructor(
                 parameters["client_id"]?.firstOrNull(),
                 parameters["redirect_uri"]?.firstOrNull(),
                 parameters["response_type"]?.firstOrNull(),
-                parameters["response_mode"]?.firstOrNull()?.let { ResponseMode.fromValue(it) },
+                parameters["response_mode"]?.firstOrNull()?.let { ResponseMode.valueOf(it) },
                 parameters["scope"]!!.toSet(),
                 parameters["nonce"]?.firstOrNull(),
                 parameters["request_uri"]?.firstOrNull(),

@@ -12,7 +12,7 @@ object IssuersService {
     }
 
     fun list(wallet: UUID): List<IssuerDataTransferObject> = transaction {
-        WalletIssuers.select { WalletIssuers.wallet eq wallet }.map {
+        WalletIssuers.selectAll().where { WalletIssuers.wallet eq wallet }.map {
             IssuerDataTransferObject(it)
         }
     }
@@ -28,9 +28,10 @@ object IssuersService {
     }
 
     private fun queryIssuer(wallet: UUID, name: String) =
-        WalletIssuers.select { WalletIssuers.wallet eq wallet and (WalletIssuers.name eq name) }.singleOrNull()?.let {
-            IssuerDataTransferObject(it)
-        }
+        WalletIssuers.selectAll().where { WalletIssuers.wallet eq wallet and (WalletIssuers.name eq name) }
+            .singleOrNull()?.let {
+                IssuerDataTransferObject(it)
+            }
 
     private fun addToWalletQuery(
         wallet: UUID,

@@ -116,7 +116,7 @@ class VP_JVM_Test : AnnotationSpec() {
                     )
                 )
             ),
-            responseMode = ResponseMode.Query,
+            responseMode = ResponseMode.query,
             responseTypes = setOf(ResponseType.VpToken),
             redirectOrResponseUri = "http://blank",
             nonce = null,
@@ -165,7 +165,7 @@ class VP_JVM_Test : AnnotationSpec() {
                         )
                     )
                 )
-            ), ResponseMode.Query, setOf(ResponseType.VpToken), "http://blank", UUID.generateUUID().toString(),
+            ), ResponseMode.query, setOf(ResponseType.VpToken), "http://blank", UUID.generateUUID().toString(),
             "test", setOf(), "test-verifier", ClientIdScheme.PreRegistered, ClientMetadataParameter.fromClientMetadata(
                 OpenIDClientMetadata(listOf(testWallet.baseUrl))
             )
@@ -180,7 +180,7 @@ class VP_JVM_Test : AnnotationSpec() {
         parsedPresentationRequest.presentationDefinition?.toJSON() shouldBe presentationReq.presentationDefinition?.toJSON()
         // Determine flow details (implicit flow, with vp_token response type, same-device flow with "query" response mode)
         parsedPresentationRequest.responseType shouldContain ResponseType.VpToken
-        parsedPresentationRequest.responseMode shouldBe ResponseMode.Query
+        parsedPresentationRequest.responseMode shouldBe ResponseMode.query
         // optional (code flow): code response (verifier <-- wallet), token endpoint (verifier -> wallet)
 
         // Generate token response
@@ -198,7 +198,7 @@ class VP_JVM_Test : AnnotationSpec() {
         )
         // Optional: respond to token request (code-flow, verifier <-- wallet), respond to authorization request (implicit flow, verifier <-- wallet)
         // Optional: post token response to response_uri of verifier (cross-device flow, verifier <-- wallet)
-        val responseUri = tokenResponse.toRedirectUri(presentationReq.redirectUri!!, ResponseMode.Query)
+        val responseUri = tokenResponse.toRedirectUri(presentationReq.redirectUri!!, ResponseMode.query)
 
         // ------------ VERIFIER ---------------------
 
@@ -236,7 +236,7 @@ class VP_JVM_Test : AnnotationSpec() {
                 }
             }
 
-            val url = tokenResponse.toRedirectUri("http://blank", ResponseMode.Query)
+            val url = tokenResponse.toRedirectUri("http://blank", ResponseMode.query)
             println(url)
             val parsedResponse = TokenResponse.fromHttpParameters(Url(url).parameters.toMap())
             parsedResponse.vpToken shouldNotBe null
@@ -262,7 +262,7 @@ class VP_JVM_Test : AnnotationSpec() {
         // parse verification request (QR code)
         val authReq = AuthorizationRequest.fromHttpQueryString(Url(mattrLaunchpadUrl).encodedQuery)
         println("Auth req: $authReq")
-        authReq.responseMode shouldBe ResponseMode.DirectPost
+        authReq.responseMode shouldBe ResponseMode.direct_post
         authReq.responseType shouldContain ResponseType.VpToken
         authReq.responseUri shouldNotBe null
         authReq.presentationDefinition shouldBe null
@@ -322,7 +322,7 @@ class VP_JVM_Test : AnnotationSpec() {
         // parse verification request (QR code)
         val authReq = AuthorizationRequest.fromHttpQueryString(Url(uniresUrl).encodedQuery)
         println("Auth req: $authReq")
-        authReq.responseMode shouldBe ResponseMode.DirectPost
+        authReq.responseMode shouldBe ResponseMode.direct_post
         authReq.responseType shouldContain ResponseType.VpToken
         authReq.responseUri shouldNotBe null
         //authReq.presentationDefinition shouldBe null
@@ -403,8 +403,8 @@ class VP_JVM_Test : AnnotationSpec() {
                 clientId = requestPayload["client_id"]!!.jsonPrimitive.content,
                 responseMode = requestPayload["response_mode"]!!.jsonPrimitive.content.let {
                     when (it) {
-                        "post" -> ResponseMode.DirectPost
-                        else -> ResponseMode.fromValue(it)
+                        "post" -> ResponseMode.direct_post
+                        else -> ResponseMode.valueOf(it)
                     }
                 },
                 redirectUri = requestPayload["redirect_uri"]?.jsonPrimitive?.contentOrNull,
@@ -447,7 +447,7 @@ class VP_JVM_Test : AnnotationSpec() {
 
 
         println("Auth req: $authReq")
-        authReq.responseMode shouldBe ResponseMode.DirectPost
+        authReq.responseMode shouldBe ResponseMode.direct_post
         //authReq.responseType shouldBe ResponseType.vp_token.name
         authReq.responseUri shouldNotBe null
         //authReq.presentationDefinition shouldBe null
@@ -507,7 +507,7 @@ class VP_JVM_Test : AnnotationSpec() {
                         )
                     )
                 )
-            ), responseMode = ResponseMode.DirectPost
+            ), responseMode = ResponseMode.direct_post
         )
         println("Verifier session: $verifierSession")
         verifierSession.authorizationRequest shouldNotBe null
@@ -531,7 +531,7 @@ class VP_JVM_Test : AnnotationSpec() {
     @Test
     suspend fun testWaltVerifierTestRequest() {
         val waltVerifierTestRequest = testVerifier.initializeAuthorization(
-            PresentationDefinition.fromJSONString(presentationDefinitionExample1), ResponseMode.DirectPost
+            PresentationDefinition.fromJSONString(presentationDefinitionExample1), ResponseMode.direct_post
         ).authorizationRequest!!.toHttpQueryString().let {
             "openid4vp://authorize?$it"
         }

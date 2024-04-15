@@ -1,4 +1,3 @@
-import com.github.benmanes.gradle.versions.updates.DependencyUpdatesTask
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
@@ -12,17 +11,16 @@ plugins {
 group = "id.walt"
 application {
     mainClass.set("id.walt.webwallet.MainKt")
-
+    applicationName = "waltid-wallet-api"
     val isDevelopment: Boolean = project.ext.has("development")
     applicationDefaultJvmArgs = listOf("-Dio.ktor.development=$isDevelopment")
 }
-
 
 repositories {
     mavenLocal()
     mavenCentral()
     maven("https://jitpack.io")
-    maven("https://maven.walt.id/repository/waltid/")
+    maven("https://maven.waltid.dev/releases")
     maven("https://maven.walt.id/repository/waltid-ssi-kit/")
 }
 
@@ -40,12 +38,7 @@ kotlin {
 }
 
 dependencies {
-    // nftkit
-    implementation("id.walt:waltid-nftkit:1.2311291144.0") {
-        exclude("com.sksamuel.hoplite", "hoplite-core")
-        exclude("com.sksamuel.hoplite", "hoplite-yaml")
-        exclude("com.sksamuel.hoplite", "hoplite-hikaricp")
-    }
+
 
     /* -- KTOR -- */
 
@@ -80,7 +73,6 @@ dependencies {
     implementation("io.ktor:ktor-client-json-jvm:$ktorVersion")
     implementation("io.ktor:ktor-client-cio-jvm:$ktorVersion")
     implementation("io.ktor:ktor-client-logging-jvm:$ktorVersion")
-    implementation("io.ktor:ktor-client-cio-jvm:$ktorVersion")
 
     /* -- Kotlin -- */
 
@@ -105,18 +97,18 @@ dependencies {
     implementation("de.mkammerer:argon2-jvm:2.11")
 
 
-    // waltid-did
-    implementation(project(":waltid-crypto"))
-    implementation(project(":waltid-did"))
-
     // OIDC
     implementation(project(":waltid-openid4vc"))
     implementation(project(":waltid-sdjwt"))
-    
+
+    implementation(project(":waltid-crypto"))
+    implementation(project(":waltid-did"))
+
     testImplementation(project(":waltid-issuer-api"))
     testImplementation(project(":waltid-verifier-api"))
-    
+
     implementation("com.nimbusds:nimbus-jose-jwt:9.37.3")
+
     implementation("io.ktor:ktor-client-java:$ktorVersion")
 
     /* -- Misc --*/
@@ -125,15 +117,15 @@ dependencies {
     implementation("io.github.reactivecircus.cache4k:cache4k:0.13.0")
 
     // Webauthn
-     implementation("com.webauthn4j:webauthn4j-core:0.22.1.RELEASE") {
-         exclude("ch.qos.logback")
-     }
+    implementation("com.webauthn4j:webauthn4j-core:0.22.1.RELEASE") {
+        exclude("ch.qos.logback")
+    }
 
     // DB
-    implementation("org.jetbrains.exposed:exposed-core:0.47.0")
+    implementation("org.jetbrains.exposed:exposed-core:0.49.0")
     implementation("org.jetbrains.exposed:exposed-jdbc:0.47.0")
-    implementation("org.jetbrains.exposed:exposed-dao:0.47.0")
-    implementation("org.jetbrains.exposed:exposed-java-time:0.47.0")
+    implementation("org.jetbrains.exposed:exposed-dao:0.49.0")
+    implementation("org.jetbrains.exposed:exposed-java-time:0.48.0")
     implementation("org.jetbrains.exposed:exposed-json:0.47.0")
     // drivers
     implementation("org.xerial:sqlite-jdbc:3.44.1.0")

@@ -14,7 +14,7 @@ plugins {
 
     //id("io.ktor.plugin") version "2.3.8" // Versions.KTOR_VERSION
     id("io.ktor.plugin") version "2.3.8" // Versions.KTOR_VERSION
-    id("org.owasp.dependencycheck") version "9.0.9"
+    id("org.owasp.dependencycheck") version "9.1.0"
     id("com.github.jk1.dependency-license-report") version "2.5"
     application
     `maven-publish`
@@ -29,7 +29,7 @@ repositories {
     mavenCentral()
     //jcenter()
     maven("https://jitpack.io")
-    maven("https://maven.walt.id/repository/waltid/")
+    maven("https://maven.waltid.dev/releases")
     mavenLocal()
 }
 
@@ -161,7 +161,7 @@ publishing {
 
     repositories {
         maven {
-            url = uri("https://maven.walt.id/repository/waltid/")
+            url = uri("https://maven.waltid.dev/releases")
             val envUsername = System.getenv("MAVEN_USERNAME")
             val envPassword = System.getenv("MAVEN_PASSWORD")
 

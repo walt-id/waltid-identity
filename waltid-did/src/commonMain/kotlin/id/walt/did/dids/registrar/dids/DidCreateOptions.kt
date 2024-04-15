@@ -10,16 +10,16 @@ import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 import kotlin.js.JsName
 
-@ExperimentalJsExport
+@OptIn(ExperimentalJsExport::class)
 @JsExport
-open class DidCreateOptions(val method: String, val options: JsonElement) {
+open class DidCreateOptions(val method: String, val config: JsonElement) {
 
     @JsName("secondaryConstructor")
-    constructor(method: String, options: Map<String, Any?>) : this(method, options.toJsonElement())
+    constructor(method: String, config: Map<String, Any?>) : this(method, config.toJsonElement())
 
     @JsExport.Ignore
     inline operator fun <reified T> get(name: String): T? =
-        options.jsonObject["options"]?.jsonObject?.get(name)?.jsonPrimitive?.content?.let {
+        config.jsonObject["config"]?.jsonObject?.get(name)?.jsonPrimitive?.content?.let {
             when (T::class) {
                 Boolean::class -> it.toBoolean()
                 Int::class -> it.toIntOrNull()
@@ -32,10 +32,10 @@ open class DidCreateOptions(val method: String, val options: JsonElement) {
         }
 }
 
-@ExperimentalJsExport
+@OptIn(ExperimentalJsExport::class)
 @JsExport
-internal fun options(options: Map<String, Any>, secret: Map<String, Any> = emptyMap()) = mapOf(
-    "options" to options,
+internal fun config(config: Map<String, Any>, secret: Map<String, Any> = emptyMap()) = mapOf(
+    "config" to config,
     "didDocument" to mapOf(
         "@context" to "https://www.w3.org/ns/did/v1",
         "authentication" to emptyList<Any>(),
@@ -44,6 +44,6 @@ internal fun options(options: Map<String, Any>, secret: Map<String, Any> = empty
     "secret" to secret
 )
 
-@ExperimentalJsExport
+@OptIn(ExperimentalJsExport::class)
 @JsExport
-internal fun options(vararg inlineOptions: Pair<String, Any>) = options(mapOf(*inlineOptions))
+internal fun config(vararg inlineConfig: Pair<String, Any>) = config(mapOf(*inlineConfig))

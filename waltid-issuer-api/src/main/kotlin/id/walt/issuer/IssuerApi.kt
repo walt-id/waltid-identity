@@ -1,10 +1,17 @@
 package id.walt.issuer
 
 import id.walt.credentials.vc.vcs.W3CVC
-import id.walt.crypto.keys.*
+import id.walt.crypto.keys.Key
+import id.walt.crypto.keys.KeySerialization
+import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto.keys.tse.TSEKey
+import id.walt.crypto.keys.tse.TSEKeyMetadata
 import id.walt.did.dids.DidService
+import id.walt.did.dids.registrar.dids.DidCreateOptions
 import id.walt.issuer.IssuanceExamples.batchExample
 import id.walt.issuer.IssuanceExamples.issuerOnboardingRequestDefaultExample
+import id.walt.issuer.IssuanceExamples.issuerOnboardingRequestDidWebExample
 import id.walt.issuer.IssuanceExamples.issuerOnboardingRequestTseExample
 import id.walt.issuer.IssuanceExamples.issuerOnboardingResponseDefaultExample
 import id.walt.issuer.IssuanceExamples.issuerOnboardingResponseTseExample
@@ -37,7 +44,7 @@ suspend fun createCredentialOfferUri(issuanceRequests: List<IssuanceRequest>): S
         credentialOfferBuilder = credentialOfferBuilder, expiresIn = 5.minutes, allowPreAuthorized = true
     )
     OidcApi.setIssuanceDataForIssuanceId(issuanceSession.id, issuanceRequests.map {
-        CIProvider.IssuanceSessionData(KeySerialization.deserializeKey(it.issuanceKey)
+        CIProvider.IssuanceSessionData(KeySerialization.deserializeKey(it.issuerKey)
             .onFailure { throw IllegalArgumentException("Invalid key was supplied, error occurred is: $it") }
             .getOrThrow(), it.issuerDid, it)
     })  // TODO: Hack as this is non stateless because of oidc4vc lib API
@@ -69,8 +76,12 @@ fun Application.issuerApi() {
                 request {
                     body<IssuerOnboardingRequest> {
                         description = "Issuer onboarding request (key & DID) config."
-                        example("Local key + ed25519 key (default)", issuerOnboardingRequestDefaultExample)
-                        example("Hashicorp Vault Transit Engine (TSE) key + RSA", issuerOnboardingRequestTseExample)
+                        example("did:jwk + JWK key (Ed25519)", issuerOnboardingRequestDefaultExample)
+                        example(
+                            "did:key + TSE (Hashicorp Vault Transit Engine key - RSA)",
+                            issuerOnboardingRequestTseExample
+                        )
+                        example("did:web + JWK key (Secp256k1)", issuerOnboardingRequestDidWebExample)
                         required = true
                     }
                 }
@@ -80,11 +91,11 @@ fun Application.issuerApi() {
                         description = "Issuer onboarding response"
                         body<IssuerOnboardingResponse> {
                             example(
-                                "Local secp256r1 key + did:jwk",
+                                "did:web + JWK key (Secp256r1)",
                                 issuerOnboardingResponseDefaultExample,
                             )
                             example(
-                                "Remote Ed25519 key + did:key",
+                                "did:key + TSE (Hashicorp Vault Transit Engine key - Ed25519)",
                                 issuerOnboardingResponseTseExample,
                             )
                         }
@@ -98,10 +109,10 @@ fun Application.issuerApi() {
                 // Generate key
 
                 val keyType = getParamOrThrow(
-                    req.issuanceKeyConfig["type"], "Mandatory issuanceKeyConfig param 'type' not provided"
+                    req.issuerKeyConfig["type"], "Mandatory issuerKeyConfig param 'type' not provided"
                 )
                 val keyAlgorithm = getParamOrThrow(
-                    req.issuanceKeyConfig["algorithm"], "Mandatory issuanceKeyConfig param 'algorithm' not provided"
+                    req.issuerKeyConfig["algorithm"], "Mandatory issuerKeyConfig param 'algorithm' not provided"
                 ).let { KeyType.valueOf(it) }
 
                 val (key, jsonKey) = generateJsonKey(keyType, keyAlgorithm, req)
@@ -113,12 +124,17 @@ fun Application.issuerApi() {
                 val didMethod = getParamOrThrow(
                     req.issuerDidConfig["method"], "Mandatory issuerDidConfig param 'method' not provided"
                 )
-                val did = DidService.registerByKey(didMethod, key).did
 
-                logger.debug { "DID created: $did" }
+                val didDoc = DidService.registerByKey(
+                    didMethod,
+                    key,
+                    DidCreateOptions(didMethod, req.issuerDidConfig as JsonElement)
+                )
+
+                logger.debug { "DID created: $didDoc" }
 
                 context.respond(
-                    HttpStatusCode.OK, IssuerOnboardingResponse(jsonKey, did)
+                    HttpStatusCode.OK, IssuerOnboardingResponse(jsonKey, didDoc.did)
                 )
             }
         }
@@ -138,7 +154,7 @@ fun Application.issuerApi() {
                                 description =
                                     "Supply a core-crypto key representation to use to issue the credential, " + "e.g. a local key (internal JWK) or a TSE key."
                                 example = mapOf(
-                                    "type" to "local", "jwk" to "{ ... }"
+                                    "type" to "jwk", "jwk" to "{ ... }"
                                 )
                                 required = true
                             }
@@ -317,7 +333,7 @@ fun Application.issuerApi() {
                                 description =
                                     "Supply a core-crypto key representation to use to issue the credential, " + "e.g. a local key (internal JWK) or a TSE key."
                                 example = mapOf(
-                                    "type" to "local", "jwk" to "{ ... }"
+                                    "type" to "jwk", "jwk" to "{ ... }"
                                 )
                                 required = false
                             }
@@ -348,20 +364,20 @@ private suspend fun generateJsonKey(
     keyType: String, keyAlgorithm: KeyType, req: IssuerOnboardingRequest
 ): Pair<Key, JsonElement> {
     val key = when (keyType) {
-        "local" -> LocalKey.generate(keyAlgorithm)
+        "jwk" -> JWKKey.generate(keyAlgorithm)
         "tse" -> TSEKey.generate(
             keyAlgorithm, TSEKeyMetadata(
                 getParamOrThrow(
-                    req.issuanceKeyConfig["tseServer"], "Mandatory issuanceKeyConfig param 'tseServer' not provided"
+                    req.issuerKeyConfig["tseServer"], "Mandatory issuerKeyConfig param 'tseServer' not provided"
                 ), getParamOrThrow(
-                    req.issuanceKeyConfig["tseAccessToken"],
-                    "Mandatory issuanceKeyConfig param 'tseAccessToken' not provided"
+                    req.issuerKeyConfig["tseAccessToken"],
+                    "Mandatory issuerKeyConfig param 'tseAccessToken' not provided"
                 )
             )
         )
 
         else -> {
-            LocalKey.generate(KeyType.Ed25519)
+            JWKKey.generate(KeyType.Ed25519)
         }
     }
 

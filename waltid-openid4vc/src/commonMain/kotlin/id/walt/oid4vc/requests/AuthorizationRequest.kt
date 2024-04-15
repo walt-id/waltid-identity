@@ -47,7 +47,7 @@ data class AuthorizationRequest(
         return buildMap {
             put("response_type", listOf(ResponseType.getResponseTypeString(responseType)))
             put("client_id", listOf(clientId))
-            responseMode?.let { put("response_mode", listOf(it.value)) }
+            responseMode?.let { put("response_mode", listOf(it.name)) }
             redirectUri?.let { put("redirect_uri", listOf(it)) }
             if (scope.isNotEmpty())
                 put("scope", listOf(scope.joinToString(" ")))
@@ -106,7 +106,7 @@ data class AuthorizationRequest(
      */
     fun getRedirectOrResponseUri(): String? {
         return when(responseMode) {
-            ResponseMode.DirectPost -> responseUri
+            ResponseMode.direct_post -> responseUri
             else -> redirectUri
         } ?: when(clientIdScheme) {
             ClientIdScheme.RedirectUri -> clientId
@@ -170,7 +170,7 @@ data class AuthorizationRequest(
             return AuthorizationRequest(
                 parameters["response_type"]!!.first().let { ResponseType.fromResponseTypeString(it) },
                 parameters["client_id"]!!.first(),
-                parameters["response_mode"]?.firstOrNull()?.let { ResponseMode.fromValue(it) },
+                parameters["response_mode"]?.firstOrNull()?.let { ResponseMode.valueOf(it) },
                 parameters["redirect_uri"]?.firstOrNull(),
                 parameters["scope"]?.flatMap { it.split(" ") }?.toSet() ?: setOf(),
                 parameters["state"]?.firstOrNull(),

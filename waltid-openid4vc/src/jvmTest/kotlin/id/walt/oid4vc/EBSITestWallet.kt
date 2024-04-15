@@ -5,7 +5,8 @@ import com.nimbusds.jose.crypto.ECDSASigner
 import com.nimbusds.jose.crypto.ECDSAVerifier
 import com.nimbusds.jose.jwk.ECKey
 import id.walt.credentials.PresentationBuilder
-import id.walt.crypto.keys.LocalKey
+import id.walt.crypto.keys.Key
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.did.dids.DidService
 import id.walt.oid4vc.data.OpenIDProviderMetadata
@@ -29,6 +30,7 @@ import id.walt.sdjwt.SDPayload
 import id.walt.sdjwt.SimpleJWTCryptoProvider
 import io.kotest.common.runBlocking
 import io.ktor.client.*
+//import io.ktor.client.engine.java.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.plugins.logging.*
 import io.ktor.client.request.*
@@ -64,7 +66,7 @@ class EBSITestWallet(
     }
 
     val TEST_DID = EBSI_WALLET_TEST_DID
-    val TEST_KEY = runBlocking { LocalKey.importJWK(EBSI_WALLET_TEST_KEY_JWK).getOrThrow() }
+    val TEST_KEY = runBlocking { JWKKey.importJWK(EBSI_WALLET_TEST_KEY_JWK).getOrThrow() }
 
     override fun resolveDID(did: String): String {
         val didObj = runBlocking { DidService.resolve(did) }.getOrThrow()
@@ -106,7 +108,7 @@ class EBSITestWallet(
         )
     }
 
-    override fun signToken(target: TokenTarget, payload: JsonObject, header: JsonObject?, keyId: String?) =
+    override fun signToken(target: TokenTarget, payload: JsonObject, header: JsonObject?, keyId: String?, privKey: Key?) =
         SDJwt.sign(SDPayload.createSDPayload(payload, SDMap.Companion.fromJSON("{}")), jwtCryptoProvider, keyId).jwt
 
     @OptIn(ExperimentalJsExport::class)

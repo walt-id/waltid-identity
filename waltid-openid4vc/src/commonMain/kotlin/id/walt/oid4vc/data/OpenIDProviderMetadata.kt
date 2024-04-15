@@ -72,8 +72,8 @@ data class OpenIDProviderMetadata @OptIn(ExperimentalSerializationApi::class) co
     @EncodeDefault @SerialName("scopes_supported") val scopesSupported: Set<String> = setOf("openid"),
     @SerialName("response_types_supported") val responseTypesSupported: Set<ResponseType>? = null,
     @EncodeDefault @SerialName("response_modes_supported") val responseModesSupported: Set<ResponseMode> = setOf(
-        ResponseMode.Query,
-        ResponseMode.Fragment
+        ResponseMode.query,
+        ResponseMode.fragment
     ),
     @EncodeDefault @SerialName("grant_types_supported") @Serializable(GrantTypeSetSerializer::class) val grantTypesSupported: Set<GrantType> = setOf(
         GrantType.authorization_code,
@@ -115,11 +115,11 @@ data class OpenIDProviderMetadata @OptIn(ExperimentalSerializationApi::class) co
     @SerialName("presentation_definition_uri_supported") val presentationDefinitionUriSupported: Boolean? = null,
     //@SerialName("vp_formats_supported") @Serializable(SupportedVPFormatMapSerializer::class) val vpFormatsSupported: Map<CredentialFormat, SupportedVPFormat>? = null,
     @SerialName("client_id_schemes_supported") val clientIdSchemesSupported: List<String>? = null,
+    @SerialName("authorization_server") val authorizationServer: String? = authorizationServers?.firstOrNull(), // Move here since if we have a null value for this parameter, the discovery fails
     override val customParameters: Map<String, JsonElement> = mapOf()
 ) : JsonDataObject() {
 
-    @SerialName("authorization_server")
-    @EncodeDefault val authorizationServer: String? = authorizationServers?.firstOrNull()
+
 
     @EncodeDefault @SerialName("credentials_supported") @Serializable(CredentialSupportedListSerializer::class)
     val credentialsSupported = credentialConfigurationsSupported?.values?.toList()

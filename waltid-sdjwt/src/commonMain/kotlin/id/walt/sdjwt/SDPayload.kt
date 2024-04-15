@@ -81,6 +81,7 @@ data class SDPayload internal constructor(
                 filterDisclosures(entry.value.jsonObject, sdMap[entry.key]!!.children!!)
             }.plus(
                 currPayloadObject[SDJwt.DIGESTS_KEY]?.jsonArray
+                    ?.asSequence()
                     ?.map { it.jsonPrimitive.content }
                     ?.filter { digest -> digestedDisclosures.containsKey(digest) }
                     ?.map { digest -> digestedDisclosures[digest]!! }
@@ -91,7 +92,8 @@ data class SDPayload internal constructor(
                                 filterDisclosures(sd.value, sdMap[sd.key]!!.children!!)
                             } else listOf()
                         )
-                    } ?: listOf()
+                    }
+                    ?.toList() ?: listOf()
             ).toSet()
     }
 
@@ -139,7 +141,7 @@ data class SDPayload internal constructor(
                 add(key)
                 add(value)
             }.toString().encodeToByteArray()).let { disclosure ->
-                SDisclosure(disclosure, salt, key, value)
+                SDisclosure(disclosure.trimEnd('='), salt, key, value)
             }
         }
 
@@ -187,7 +189,7 @@ data class SDPayload internal constructor(
             }.filterNotNull().toSet()
 
             if (digests.isNotEmpty()) {
-                sdPayload.put(SDJwt.DIGESTS_KEY, buildJsonArray {
+                sdPayload[SDJwt.DIGESTS_KEY] = buildJsonArray {
                     digests.forEach { add(it) }
                     if (sdMap.decoyMode != DecoyMode.NONE && sdMap.decoys > 0) {
                         val numDecoys = when (sdMap.decoyMode) {
@@ -200,7 +202,7 @@ data class SDPayload internal constructor(
                             add(digest(generateSalt()))
                         }
                     }
-                })
+                }
             }
             return JsonObject(sdPayload)
         }
@@ -250,7 +252,7 @@ data class SDPayload internal constructor(
          * Create SD payload based on full payload as JWT claims set and undisclosed payload.
          * **Not supported on JavaScript**, use _SDPayloadBuilder_ instead.
          * @param fullJWTClaimsSet Full payload containing all fields
-         * @param undisclosedPayload  Payload with selectively disclosable fields removed
+         * @param undisclosedJWTClaimsSet  Payload with selectively disclosable fields removed
          * @param decoyMode **For SD-JWT issuance:** Generate decoy digests for this hierarchical level randomly or fixed, set to NONE for parsed SD-JWTs, **for presentation:** _unused_
          * @param decoys  **For SD-JWT issuance:** Num (fixed mode) or max num (random mode) of decoy digests to add for this hierarchical level. 0 if NONE, **for presentation:** _unused_.
          */

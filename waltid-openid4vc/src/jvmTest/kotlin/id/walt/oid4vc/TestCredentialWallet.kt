@@ -6,7 +6,9 @@ import com.nimbusds.jose.crypto.ECDSAVerifier
 import com.nimbusds.jose.crypto.bc.BouncyCastleProviderSingleton
 import com.nimbusds.jose.jwk.ECKey
 import id.walt.credentials.PresentationBuilder
-import id.walt.crypto.keys.LocalKey
+import id.walt.crypto.keys.Key
+//import id.walt.crypto.keys.LocalKey
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.did.dids.DidService
 import id.walt.oid4vc.data.OpenIDProviderMetadata
@@ -36,6 +38,7 @@ import id.walt.sdjwt.SimpleJWTCryptoProvider
 import io.kotest.common.runBlocking
 import io.ktor.client.*
 import io.ktor.client.call.*
+//import io.ktor.client.engine.java.*
 import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
@@ -55,6 +58,7 @@ import kotlin.js.ExperimentalJsExport
 const val WALLET_PORT = 8001
 const val WALLET_BASE_URL = "http://localhost:${WALLET_PORT}"
 
+@OptIn(ExperimentalJsExport::class)
 class TestCredentialWallet(
     config: CredentialWalletConfig
 ) : OpenIDCredentialWallet<SIOPSession>(WALLET_BASE_URL, config) {
@@ -72,7 +76,7 @@ class TestCredentialWallet(
         expirationTimestamp: Instant
     ) = SIOPSession(id, authorizationRequest, expirationTimestamp)
 
-    override fun signToken(target: TokenTarget, payload: JsonObject, header: JsonObject?, keyId: String?) =
+    override fun signToken(target: TokenTarget, payload: JsonObject, header: JsonObject?, keyId: String?, privKey: Key?) =
         SDJwt.sign(SDPayload.createSDPayload(payload, SDMap.Companion.fromJSON("{}")), jwtCryptoProvider, keyId).jwt
 
     @OptIn(ExperimentalJsExport::class)
@@ -179,16 +183,15 @@ class TestCredentialWallet(
     val TEST_WALLET_DID_ION =
         "did:ion:EiDh0EL8wg8oF-7rRiRzEZVfsJvh4sQX4Jock2Kp4j_zxg:eyJkZWx0YSI6eyJwYXRjaGVzIjpbeyJhY3Rpb24iOiJyZXBsYWNlIiwiZG9jdW1lbnQiOnsicHVibGljS2V5cyI6W3siaWQiOiI0OGQ4YTM0MjYzY2Y0OTJhYTdmZjYxYjYxODNlOGJjZiIsInB1YmxpY0tleUp3ayI6eyJjcnYiOiJzZWNwMjU2azEiLCJraWQiOiI0OGQ4YTM0MjYzY2Y0OTJhYTdmZjYxYjYxODNlOGJjZiIsImt0eSI6IkVDIiwidXNlIjoic2lnIiwieCI6IlRLYVE2c0NvY1REc211ajl0VFI5OTZ0RlhwRWNTMkVKTi0xZ09hZGFCdmsiLCJ5IjoiMFRySVlIY2ZDOTNWcEV1dmotSFhUbnlLdDBzbmF5T013R1NKQTFYaURYOCJ9LCJwdXJwb3NlcyI6WyJhdXRoZW50aWNhdGlvbiJdLCJ0eXBlIjoiRWNkc2FTZWNwMjU2azFWZXJpZmljYXRpb25LZXkyMDE5In1dfX1dLCJ1cGRhdGVDb21taXRtZW50IjoiRWlCQnlkZ2R5WHZkVERob3ZsWWItQkV2R3ExQnR2TWJSLURmbDctSHdZMUhUZyJ9LCJzdWZmaXhEYXRhIjp7ImRlbHRhSGFzaCI6IkVpRGJxa05ldzdUcDU2cEJET3p6REc5bThPZndxamlXRjI3bTg2d1k3TS11M1EiLCJyZWNvdmVyeUNvbW1pdG1lbnQiOiJFaUFGOXkzcE1lQ2RQSmZRYjk1ZVV5TVlfaUdCRkMwdkQzeDNKVTB6V0VjWUtBIn19"
 
-    val TEST_WALLET_DID_WEB_KEY =
-        "{\"kty\":\"EC\",\"d\":\"uD-uxub011cplvr5Bd6MrIPSEUBsgLk-C1y3tnmfetQ\",\"use\":\"sig\",\"crv\":\"secp256k1\",\"kid\":\"48d8a34263cf492aa7ff61b6183e8bcf\",\"x\":\"TKaQ6sCocTDsmuj9tTR996tFXpEcS2EJN-1gOadaBvk\",\"y\":\"0TrIYHcfC93VpEuvj-HXTnyKt0snayOMwGSJA1XiDX8\"}"
-    /*val TEST_KEY = runBlocking { LocalKey.generate(KeyType.Ed25519) }
+    val TEST_WALLET_DID_WEB_KEY = "{\"kty\":\"EC\",\"d\":\"uD-uxub011cplvr5Bd6MrIPSEUBsgLk-C1y3tnmfetQ\",\"use\":\"sig\",\"crv\":\"secp256k1\",\"kid\":\"48d8a34263cf492aa7ff61b6183e8bcf\",\"x\":\"TKaQ6sCocTDsmuj9tTR996tFXpEcS2EJN-1gOadaBvk\",\"y\":\"0TrIYHcfC93VpEuvj-HXTnyKt0snayOMwGSJA1XiDX8\"}"
+    /*val TEST_KEY = runBlocking { JWKKey.generate(KeyType.Ed25519) }
     val TEST_DID: String = runBlocking {
         DidJwkRegistrar().registerByKey(TEST_KEY, DidJwkCreateOptions())
         //DidService.registerByKey("jwk", TEST_KEY)
     }.did*/
 
     // enable for Entra tests
-    val TEST_KEY = runBlocking { LocalKey.importJWK(TEST_WALLET_DID_WEB_KEY).getOrThrow() }
+    val TEST_KEY = runBlocking { JWKKey.importJWK(TEST_WALLET_DID_WEB_KEY).getOrThrow() }
     val TEST_DID: String = TEST_WALLET_DID_WEB
 
     val jwtCryptoProvider = runBlocking {
@@ -206,9 +209,9 @@ class TestCredentialWallet(
     override fun resolveDID(did: String): String {
         val didObj = runBlocking { DidService.resolve(did) }.getOrThrow()
         return (didObj["authentication"] ?: didObj["assertionMethod"] ?: didObj["verificationMethod"])?.jsonArray?.firstOrNull()?.let {
-            if (it is JsonObject) it.jsonObject?.get("id")?.jsonPrimitive?.content
-            else it.jsonPrimitive?.contentOrNull
-        } ?: did
+            if(it is JsonObject) it.jsonObject["id"]?.jsonPrimitive?.content
+            else it.jsonPrimitive.contentOrNull
+        }?: did
     }
 
     override fun getDidFor(session: SIOPSession): String {
@@ -250,7 +253,7 @@ class TestCredentialWallet(
                             )
                         }
                         val tokenResponse = processImplicitFlowAuthorization(authReq)
-                        val redirectLocation = if (authReq.responseMode == ResponseMode.DirectPost) {
+                        val redirectLocation = if (authReq.responseMode == ResponseMode.direct_post) {
                             ktorClient.submitForm(
                                 authReq.responseUri ?: throw AuthorizationError(
                                     authReq,
@@ -266,7 +269,7 @@ class TestCredentialWallet(
                                     AuthorizationErrorCode.invalid_request,
                                     "No redirect uri found on authorization request"
                                 ),
-                                authReq.responseMode ?: ResponseMode.Fragment
+                                authReq.responseMode ?: ResponseMode.fragment
                             )
                         }
                         if (!redirectLocation.isNullOrEmpty()) {

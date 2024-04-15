@@ -1,5 +1,6 @@
 package id.walt.webwallet
 
+import id.walt.did.helpers.WaltidServices
 import id.walt.webwallet.config.ConfigManager
 import id.walt.webwallet.config.WebConfig
 import id.walt.webwallet.db.Db
@@ -16,36 +17,46 @@ import org.bouncycastle.jce.provider.BouncyCastleProvider
 import java.security.Security
 import kotlin.io.path.Path
 import kotlin.io.path.absolutePathString
-import kotlin.io.path.createDirectories
 
 private val log = KotlinLogging.logger { }
 
-fun main(args: Array<String>) {
+suspend fun main(args: Array<String>) {
     log.info { "Starting walt.id wallet..." }
-    
+
     log.debug { "Running in path: ${Path(".").absolutePathString()}" }
-    
-    webWalletSetup()
-    
+
     log.info { "Reading configurations..." }
     ConfigManager.loadConfigs(args)
-    
+
+    webWalletSetup()
+    WaltidServices.minimalInit()
+
     Db.start()
-    
+
     val webConfig = ConfigManager.getConfig<WebConfig>()
-    log.info { "Starting web server (binding to ${webConfig.webHost}, listening on port ${webConfig.webPort})..." }
+    log.info { "Starting web server (binding to ${webConfig.webHost}, listening on port ${webConfig.webPort}) ..." }
+    // According class io.ktor.server.engine.ApplicationEngine the Ktor config will be determined by the number of available processors
+    log.debug { "Available Processors: ${Runtime.getRuntime().availableProcessors()}" }
+
+
     embeddedServer(
         CIO,
         port = webConfig.webPort,
         host = webConfig.webHost,
-        module = Application::webWalletModule
+        module = Application::webWalletModule,
+        configure = {
+//            connectionGroupSize = 10
+//            workerGroupSize = 5
+//            callGroupSize = 5
+            shutdownGracePeriod = 2000
+            shutdownTimeout = 3000
+        }
     ).start(wait = true)
 }
 
 fun webWalletSetup() {
     log.info { "Setting up..." }
     Security.addProvider(BouncyCastleProvider())
-    runCatching { Db.dataDirectoryPath.createDirectories() }
 }
 
 private fun Application.configurePlugins() {
@@ -64,11 +75,12 @@ fun Application.webWalletModule(withPlugins: Boolean = true) {
     if (withPlugins) {
         configurePlugins()
     }
-    
+    health()
+
     auth()
     push()
     notifications()
-    
+
     // Wallet routes
     accounts()
     keys()
@@ -77,7 +89,6 @@ fun Application.webWalletModule(withPlugins: Boolean = true) {
     exchange()
     history()
     web3accounts()
-    nfts()
     issuers()
     eventLogs()
     manifest()

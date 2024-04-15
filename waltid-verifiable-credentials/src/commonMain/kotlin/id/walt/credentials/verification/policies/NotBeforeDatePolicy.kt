@@ -11,6 +11,7 @@ import love.forte.plugin.suspendtrans.annotation.JvmBlocking
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 import kotlin.time.Duration.Companion.minutes
+
 @OptIn(ExperimentalJsExport::class)
 @JsExport
 class NotBeforeDatePolicy : CredentialWrapperValidatorPolicy(

@@ -1,6 +1,6 @@
 import id.walt.credentials.PresentationBuilder
 import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.LocalKey
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.crypto.utils.MultiBaseUtils
 import id.walt.did.dids.document.DidEbsiBaseDocument
@@ -66,7 +66,7 @@ class DidCreationTest {
 
     @Test
     fun checkDidDocumentIsValidJson() = runTest {
-        val result = registrar.register(DidWebCreateOptions("localhost", "/xyz/abc"))
+        val result = registrar.register(DidWebCreateOptions("localhost", "/xyz/abc").also { println(it.config) })
 
         val didDoc1 = result.didDocument.toJsonObject()
         val didDoc2 = Json.parseToJsonElement(
@@ -122,8 +122,8 @@ class DidCreationTest {
 
     val CLIENT_MOCK_PORT = 5000
     val CLIENT_MOCK_URL = "https://505f-62-178-27-231.ngrok-free.app/client-mock"//"http://192.168.0.122:5000/client-mock"
-    val CLIENT_MAIN_KEY = runBlocking { LocalKey.generate(KeyType.secp256k1) }
-    val CLIENT_VCSIGN_KEY = runBlocking { LocalKey.generate(KeyType.secp256r1) }
+    val CLIENT_MAIN_KEY = runBlocking { JWKKey.generate(KeyType.secp256k1) }
+    val CLIENT_VCSIGN_KEY = runBlocking { JWKKey.generate(KeyType.secp256r1) }
     fun startClientMockServer() {
         embeddedServer(Netty, port = CLIENT_MOCK_PORT) {
             install(ContentNegotiation) {
@@ -196,7 +196,7 @@ class DidCreationTest {
         }
         val idTokenReqUrl = httpResp.headers["location"]!!
         val idTokenReq = AuthorizationRequest.fromHttpParametersAuto(Url(idTokenReqUrl).parameters.toMap())
-        assertEquals(ResponseMode.DirectPost, idTokenReq.responseMode)
+        assertEquals(ResponseMode.direct_post, idTokenReq.responseMode)
         assertContains(idTokenReq.scope, "openid")
         assertContains(idTokenReq.responseType, ResponseType.IdToken)
         assertNotNull(idTokenReq.redirectUri)

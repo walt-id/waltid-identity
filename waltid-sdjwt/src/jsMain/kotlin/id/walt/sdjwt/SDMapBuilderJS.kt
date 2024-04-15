@@ -1,6 +1,5 @@
 package id.walt.sdjwt
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 @JsName("SDMapBuilder")
 class SDMapBuilderJS(
@@ -17,12 +16,16 @@ class SDMapBuilderJS(
         return this
     }
 
-    fun build(): dynamic {
+    fun buildAsJSON(): dynamic {
         return JSON.parse(
             SDMap(
                 fields, DecoyMode.valueOf(decoyMode), numDecoys
             ).toJSON().toString()
         )
+    }
+
+    fun build(): SDMap {
+        return SDMap(fields, DecoyMode.valueOf(decoyMode), numDecoys)
     }
 
     fun buildFromJsonPaths(jsonPaths: Array<String>): dynamic {

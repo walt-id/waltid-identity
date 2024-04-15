@@ -3,7 +3,7 @@ import kotlin.test.Test
 
 val didMethodsToTest = listOf("key", "jwk", "web") // cheqd removed for now, as it is timing out
 
-class LocalKeyAndDidManagementTest {
+class JWKKeyAndDidManagementTest {
     @Test
     fun localDidKeyTest() = runTest {
         testDidMethodsAndKeys(didMethodsToTest)

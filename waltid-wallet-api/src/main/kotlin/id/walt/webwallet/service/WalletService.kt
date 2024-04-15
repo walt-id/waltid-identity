@@ -1,7 +1,7 @@
 package id.walt.webwallet.service
 
+import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.oid4vc.data.CredentialOffer
-import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.requests.CredentialOfferRequest
 import id.walt.webwallet.db.models.WalletCategoryData
 import id.walt.webwallet.db.models.WalletCredential
@@ -10,8 +10,6 @@ import id.walt.webwallet.db.models.WalletOperationHistory
 import id.walt.webwallet.service.credentials.CredentialFilterObject
 import id.walt.webwallet.service.dto.LinkedWalletDataTransferObject
 import id.walt.webwallet.service.dto.WalletDataTransferObject
-import id.walt.webwallet.service.events.EventLogFilter
-import id.walt.webwallet.service.events.EventLogFilterResult
 import id.walt.webwallet.service.keys.SingleKeyResponse
 import id.walt.webwallet.service.report.ReportRequestParameter
 import id.walt.webwallet.service.settings.WalletSetting
@@ -36,15 +34,10 @@ abstract class WalletService(val tenant: String, val accountId: UUID, val wallet
     abstract suspend fun renameCategory(oldName: String, newName: String): Boolean
     abstract fun getCredentialsByIds(credentialIds: List<String>): List<WalletCredential>
 
-    abstract fun matchCredentialsByPresentationDefinition(presentationDefinition: PresentationDefinition): List<WalletCredential>
-
     // SIOP
     abstract suspend fun usePresentationRequest(parameter: PresentationRequestParameter): Result<String?>
 
     abstract suspend fun resolvePresentationRequest(request: String): String
-    abstract suspend fun useOfferRequest(
-        offer: String, did: String, requireUserInput: Boolean
-    ): List<WalletCredential>
     abstract suspend fun resolveCredentialOffer(offerRequest: CredentialOfferRequest): CredentialOffer
 
     // DIDs
@@ -56,18 +49,16 @@ abstract class WalletService(val tenant: String, val accountId: UUID, val wallet
 
     // Keys
     abstract suspend fun listKeys(): List<SingleKeyResponse>
-    abstract suspend fun generateKey(type: String): String
+    abstract suspend fun generateKey(request: KeyGenerationRequest = KeyGenerationRequest()): String
     abstract suspend fun exportKey(alias: String, format: String, private: Boolean): String
     abstract suspend fun loadKey(alias: String): JsonObject
+    abstract suspend fun getKeyMeta(alias: String): JsonObject
     abstract suspend fun importKey(jwkOrPem: String): String
     abstract suspend fun deleteKey(alias: String): Boolean
 
     // History
     abstract fun getHistory(limit: Int = 10, offset: Long = 0): List<WalletOperationHistory>
     abstract suspend fun addOperationHistory(operationHistory: WalletOperationHistory)
-
-    // EventLog
-    abstract fun filterEventLog(filter: EventLogFilter): EventLogFilterResult
 
     // Web3 wallets
     abstract suspend fun linkWallet(wallet: WalletDataTransferObject): LinkedWalletDataTransferObject

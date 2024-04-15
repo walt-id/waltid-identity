@@ -11,8 +11,8 @@
 </a>
 </div>
 
-
 ## Installation
+
 Add the crypto library as a dependency to your Kotlin or Java project.
 
 ### walt.id Repository
@@ -21,7 +21,7 @@ Add the Maven repository which hosts the walt.id libraries to your build.gradle 
 
 ```kotlin
 repositories {
-    maven { url = uri("https://maven.walt.id/repository/waltid/") }
+    maven { url = uri("https://maven.waltid.dev/releases") }
 } 
 ```
 
@@ -336,7 +336,6 @@ walt.id identity.
 | ECDSA | secp256k1 | ES256K  | ECDSA + SECG curve secp256k1 (Koblitz curve as used in Bitcoin) |
 |  RSA  |    RSA    |  RS256  | RSA                                                             |
 
-
 ### Available on platforms
 
 |  Platform   |           | Availability |
@@ -348,9 +347,6 @@ walt.id identity.
 |             |  OpenSSL  |   &cross;    |
 | WebAssembly |   WASM    |   &cross;    |
 
-
-
-
 ### JWS compatibility (recommended)
 
 | Algorithm | JVM provider |   JS provider / platform    |
@@ -360,24 +356,21 @@ walt.id identity.
 |  ES256K   | Nimbus JOSE  |       jose / Node.js        |
 |   RS256   | Nimbus JOSE  | jose / Node.js & Web Crypto |
 
-
 ## How to use it
 
 The library provides the following key entities to work with:
 
-- [LocalKey
-  ](https://github.com/walt-id/waltid-identity/blob/main/waltid-crypto/src/commonMain/kotlin/id/walt/crypto/keys/LocalKey.kt) -
+- [JWKKey](https://github.com/walt-id/waltid-identity/blob/main/waltid-crypto/src/commonMain/kotlin/id/walt/crypto/keys/JWKKey.kt) -
   an implementation of a local (in-memory) key (private / public)
-- [TSEKey
-  ](https://github.com/walt-id/waltid-identity/blob/main/waltid-crypto/src/commonMain/kotlin/id/walt/crypto/keys/TSEKey.kt) -
+- [TSEKey](https://github.com/walt-id/waltid-identity/blob/main/waltid-crypto/src/commonMain/kotlin/id/walt/crypto/keys/TSEKey.kt) -
   an implementation of a Hashicorp Vault Transit Secrets Engine key (private / public)
 
-### Working with LocalKey
+### Working with JWKKey
 
 **Create key**
 
 ```kotlin
-val key = LocalKey.generate(KeyType.Ed25519, LocalKeyMetadata())
+val key = JWKKey.generate(KeyType.Ed25519, JWKKeyMetadata())
 ```
 
 **Sign**
@@ -413,19 +406,19 @@ val verificationResult = key.getPublicKey().verifyRaw(signature as ByteArray)
 - jwk
 
 ```kotlin
-val keyResult = LocalKey.importJWK(jwkString)
+val keyResult = JWKKey.importJWK(jwkString)
 ```
 
 - pem
 
 ```kotlin
-val keyResult = LocalKey.importPEM(pemString)
+val keyResult = JWKKey.importPEM(pemString)
 ```
 
 - raw
 
 ```kotlin
-val key = LocalKey.importRawPublicKey(KeyType.Ed25519, bytes, LocalKeyMetadata())
+val key = JWKKey.importRawPublicKey(KeyType.Ed25519, bytes, JWKKeyMetadata())
 ```
 
 **Export public key**
@@ -543,4 +536,4 @@ vault secrets enable transit
 5. click 'Next', then 'Enable Engine'
 
 For usage examples on _create_, _sign_, _verify_, _import_ and _export_ functions see
-[Working with LocalKey](#working-with-localkey).
+[Working with JWKKey](#working-with-jwkKey).

@@ -61,12 +61,12 @@ data:
     clientSecret = "__DEFAULT_KEYCLOAK_CLIENT_SECRET__"
     keycloakUserApi = "https://keycloak.walt-test.cloud/admin/realms/waltid-keycloak-ktor/users"
     jwksCache = {
-      cacheSize = 10
-      cacheExpirationHours = 24
-      rateLimit: {
-        bucketSize: 10
-        refillRateMinutes: 1
-      }
+        cacheSize = 10
+        cacheExpirationHours = 24
+        rateLimit: {
+            bucketSize: 10
+            refillRateMinutes: 1
+        }
     }
 ---
 apiVersion: v1
@@ -76,11 +76,15 @@ metadata:
 data:
   marketplace.conf: |
     marketplaces = [
-      {chain = "ethereum", name = "OpenSea", url = "https://opensea.io/assets/ethereum/%s/%s"},
-      {chain = "polygon", name = "OpenSea", url = "https://opensea.io/assets/matic/%s/%s"},
-      {chain = "tezos", name = "Rarible", url = "https://rarible.com/token/tezos/%s/%s"},
-      {chain = "flow", name = "FlowVerse", url = "https://nft.flowverse.co/marketplace/%s/%s"},
-      {chain = "unique", name = "Unique", url = "https://unqnft.io/market/%s/%s"},
+        {
+            chain = "ethereum", name = "OpenSea", url = "https://opensea.io/assets/ethereum/%s/%s"
+        },
+        {chain = "polygon", name = "OpenSea", url = "https://opensea.io/assets/matic/%s/%s"},
+        {chain = "tezos", name = "Rarible", url = "https://rarible.com/token/tezos/%s/%s"},
+        {chain = "flow", name = "FlowVerse", url = "https://nft.flowverse.co/marketplace/%s/%s"},
+        {
+            chain = "unique", name = "Unique", url = "https://unqnft.io/market/%s/%s"
+        },
     ]
 ---
 apiVersion: v1
@@ -90,11 +94,13 @@ metadata:
 data:
   chainexplorer.conf: |
     explorers = [
-      {chain = "ethereum", url = "https://etherscan.io/address/%s"},
-      {chain = "polygon", url = "https://polygonscan.com/address/%s"},
-      {chain = "mumbai", url = "https://mumbai.polygonscan.com/address/%s"},
-      {chain = "tezos", url = "https://tzkt.io/%s/operations"},
-      {chain = "ghostnet", url = "https://ghostnet.tzkt.io/%s/operations"},
+        {chain = "ethereum", url = "https://etherscan.io/address/%s"},
+        {
+            chain = "polygon", url = "https://polygonscan.com/address/%s"
+        },
+        {chain = "mumbai", url = "https://mumbai.polygonscan.com/address/%s"},
+        {chain = "tezos", url = "https://tzkt.io/%s/operations"},
+        {chain = "ghostnet", url = "https://ghostnet.tzkt.io/%s/operations"},
     ]
 ---
 apiVersion: v1
@@ -104,10 +110,10 @@ metadata:
 data:
   rejectionreason.conf: |
     reasons = [
-      "Unknown sender",
-      "Not relevant to me",
-      "Unsure about accuracy",
-      "Need more details",
+        "Unknown sender",
+        "Not relevant to me",
+        "Unsure about accuracy",
+        "Need more details",
     ]
 ---
 apiVersion: v1
@@ -153,6 +159,7 @@ spec:
       containers:
         - name: wallet-api
           image: waltid/wallet-api:dev
+
           imagePullPolicy: Always
           volumeMounts:
             - name: wallet-db-config
@@ -199,6 +206,15 @@ spec:
               mountPath: "/waltid-wallet-api/config/logins.conf"
               subPath: "logins.conf"
               readOnly: true
+            - name: wallet-auth-secret
+              mountPath: "/waltid-wallet-api/config/auth.conf"
+              subPath: "auth.conf"
+              readOnly: true
+
+            - name: wallet-oci-secret
+              mountPath: "/waltid-wallet-api/config/oci.conf"
+              subPath: "oci.conf"
+              readOnly: true
             - name: wallet-nft-config
               mountPath: "/waltid-wallet-api/walt.yaml"
               subPath: "walt.yaml"
@@ -224,6 +240,7 @@ spec:
         - name: wallet-oidc-config
           configMap:
             name: wallet-oidc-config
+
         - name: wallet-marketplace-config
           configMap:
             name: wallet-marketplace-config
@@ -239,6 +256,12 @@ spec:
         - name: wallet-logins-config
           configMap:
             name: wallet-logins-config
+        - name: wallet-auth-secret
+          secret:
+            secretName: wallet-auth-secret
+        - name: wallet-oci-secret
+          secret:
+            secretName: wallet-oci-secret
         - name: wallet-push-config
           secret:
             secretName: wallet-push-config-secret
@@ -248,6 +271,7 @@ spec:
         - name: wallet-data
           persistentVolumeClaim:
             claimName: wallet-data-volume-claim
+
 ---
 kind: Service
 apiVersion: v1

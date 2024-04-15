@@ -1,4 +1,3 @@
-import com.github.benmanes.gradle.versions.updates.DependencyUpdatesTask
 import love.forte.plugin.suspendtrans.ClassInfo
 import love.forte.plugin.suspendtrans.SuspendTransformConfiguration
 import love.forte.plugin.suspendtrans.TargetPlatform
@@ -51,6 +50,7 @@ kotlin {
         }
     }
     js(IR) {
+        moduleName = "crypto"
         /*browser {
             commonWebpackConfig {
                 cssSupport {
@@ -59,11 +59,11 @@ kotlin {
             }
         }*/
         nodejs {
+            generateTypeScriptDefinitions()
             testTask {
                 useMocha()
             }
         }
-        generateTypeScriptDefinitions()
         binaries.library()
     }
 
@@ -78,14 +78,20 @@ kotlin {
                 implementation("io.ktor:ktor-client-serialization:2.3.8")
                 implementation("io.ktor:ktor-client-content-negotiation:2.3.8")
                 implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.8")
-                implementation("io.ktor:ktor-client-json:2.3.8")
+                implementation("io.ktor:ktor-client-json:2.3.9")
                 implementation("io.ktor:ktor-client-logging:2.3.8")
+
+                implementation(project.dependencies.platform("org.kotlincrypto.hash:bom:0.5.1"))
+                implementation("org.kotlincrypto.hash:sha2")
+
+                // Date
+                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.5.0")
 
                 // Coroutines
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
 
                 // Logging
-                implementation("io.github.oshai:kotlin-logging:6.0.3")
+                implementation("io.github.oshai:kotlin-logging:6.0.4")
             }
         }
         val commonTest by getting {
@@ -118,6 +124,10 @@ kotlin {
         }
         val jvmTest by getting {
             dependencies {
+                // Logging
+//                implementation("org.slf4j:slf4j-simple:2.0.12")
+
+                // Test
                 implementation(kotlin("test"))
 
                 implementation("org.junit.jupiter:junit-jupiter-api:5.10.2")
@@ -128,7 +138,7 @@ kotlin {
         val jsMain by getting {
             dependencies {
                 // JOSE
-                implementation(npm("jose", "4.14.4"))
+                implementation(npm("jose", "5.2.3"))
 
                 // Multibase
                 // implementation(npm("multiformats", "12.1.2"))
@@ -142,7 +152,7 @@ kotlin {
         publishing {
             repositories {
                 maven {
-                    url = uri("https://maven.walt.id/repository/waltid/")
+                    url = uri("https://maven.waltid.dev/releases")
                     val envUsername = System.getenv("MAVEN_USERNAME")
                     val envPassword = System.getenv("MAVEN_PASSWORD")
 

@@ -1,4 +1,4 @@
-import sdlib from "waltid-sd-jwt"
+import sdlib from "waltid-sd-jwt";
 
 const sharedSecret = "ef23f749-7238-481a-815c-f0c2157dfa8e"
 const cryptoProvider = new sdlib.id.walt.sdjwt.SimpleAsyncJWTCryptoProvider("HS256", new TextEncoder().encode(sharedSecret))

@@ -1,5 +1,3 @@
-import com.github.benmanes.gradle.versions.updates.DependencyUpdatesTask
-
 plugins {
     kotlin("multiplatform")
     kotlin("plugin.serialization")
@@ -46,7 +44,7 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.5.1")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
                 //implementation("org.jetbrains.kotlinx:kotlinx-serialization-cbor:1.5.1")
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.1")
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.4.0")
@@ -100,7 +98,7 @@ kotlin {
             val hasMavenAuth = secretMavenUsername.isNotEmpty() && secretMavenPassword.isNotEmpty()
             if (hasMavenAuth) {
                 maven {
-                    url = uri("https://maven.walt.id/repository/waltid/")
+                    url = uri("https://maven.waltid.dev/releases")
                     credentials {
                         username = secretMavenUsername
                         password = secretMavenPassword

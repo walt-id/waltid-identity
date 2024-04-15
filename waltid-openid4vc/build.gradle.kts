@@ -1,4 +1,3 @@
-import com.github.benmanes.gradle.versions.updates.DependencyUpdatesTask
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
@@ -14,7 +13,7 @@ group = "id.walt"
 
 repositories {
     mavenCentral()
-    maven("https://maven.walt.id/repository/waltid/") {
+    maven("https://maven.waltid.dev/releases") {
         content {
             includeGroup("id.walt")
         }
@@ -79,12 +78,14 @@ kotlin {
                 implementation("io.ktor:ktor-client-content-negotiation:$ktor_version")
                 implementation("io.ktor:ktor-serialization-kotlinx-json:$ktor_version")
 
+
                 // JSON
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
 
                 // walt.id
                 implementation(project(":waltid-crypto"))
                 implementation(project(":waltid-mdoc-credentials"))
+                implementation(project(":waltid-did"))
 
                 // -- Multiplatform --
                 // Multiplatform / UUID
@@ -105,7 +106,6 @@ kotlin {
                 implementation(project(":waltid-did"))
                 implementation(project(":waltid-verifiable-credentials"))
                 implementation("io.kotest:kotest-assertions-core:5.8.0")
-
                 implementation("io.kotest:kotest-assertions-json:5.8.0")
             }
         }
@@ -145,6 +145,8 @@ kotlin {
                 implementation("io.ktor:ktor-serialization-kotlinx-json:$ktor_version")
                 implementation("io.ktor:ktor-client-logging-jvm:$ktor_version")
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-slf4j:1.8.0")
+                implementation("io.ktor:ktor-client-okhttp:$ktor_version")
+
             }
         }
         val jsMain by getting {
@@ -172,7 +174,7 @@ kotlin {
             val hasMavenAuth = secretMavenUsername.isNotEmpty() && secretMavenPassword.isNotEmpty()
             if (hasMavenAuth) {
                 maven {
-                    url = uri("https://maven.walt.id/repository/waltid/")
+                    url = uri("https://maven.waltid.dev/releases")
                     credentials {
                         username = secretMavenUsername
                         password = secretMavenPassword

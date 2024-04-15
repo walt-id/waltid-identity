@@ -4,6 +4,7 @@ import id.walt.crypto.keys.Key
 import id.walt.did.dids.document.DidDocument
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.service.events.*
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.uuid.UUID
@@ -21,7 +22,7 @@ class EventUseCase(
         data: EventData,
         credentialId: String? = null,
         note: String? = null
-    ) = eventService.add(
+    ) = log(
         Event(
             action = action,
             tenant = tenant,
@@ -33,6 +34,8 @@ class EventUseCase(
             note = note,
         )
     )
+
+    fun log(vararg event: Event) = eventService.add(event.toList())
 
     fun count(walletId: UUID, dataFilter: Map<String, String>) = eventService.count(walletId, dataFilter)
 
@@ -46,6 +49,8 @@ class EventUseCase(
         dataFilter = parameter.logFilter.data
     )
 
+    fun delete(id: Int) = eventService.delete(id)
+
     fun credentialEventData(credential: WalletCredential, type: String?) = CredentialEventData(
         ecosystem = EventDataNotAvailable,
         issuerId = WalletCredential.parseIssuerDid(credential.parsedDocument, credential.parsedManifest)
@@ -56,8 +61,9 @@ class EventUseCase(
         issuerKeyId = EventDataNotAvailable,
         issuerKeyType = EventDataNotAvailable,
         subjectKeyType = EventDataNotAvailable,
-        credentialType = type ?: EventDataNotAvailable,
-        credentialFormat = "W3C",
+        credentialType = credential.parsedDocument?.jsonObject?.get("type")?.jsonArray?.last()?.jsonPrimitive?.content
+            ?: EventDataNotAvailable,
+        credentialFormat = type ?: EventDataNotAvailable,
         credentialProofType = EventDataNotAvailable,
         policies = emptyList(),
         protocol = "oid4vp",

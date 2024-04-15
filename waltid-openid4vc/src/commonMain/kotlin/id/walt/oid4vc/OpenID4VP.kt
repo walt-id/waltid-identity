@@ -33,7 +33,7 @@ object OpenID4VP {
      */
     fun createPresentationRequest(
         presentationDefinition: PresentationDefinitionParameter,
-        responseMode: ResponseMode = ResponseMode.DirectPost,
+        responseMode: ResponseMode = ResponseMode.direct_post,
         responseTypes: Set<ResponseType> = setOf(ResponseType.VpToken),
         redirectOrResponseUri: String?,
         nonce: String?,
@@ -48,11 +48,11 @@ object OpenID4VP {
             clientId = clientId,
             responseMode = responseMode,
             redirectUri = when (responseMode) {
-                ResponseMode.DirectPost -> null
+                ResponseMode.direct_post -> null
                 else -> redirectOrResponseUri
             },
             responseUri = when (responseMode) {
-                ResponseMode.DirectPost -> redirectOrResponseUri
+                ResponseMode.direct_post -> redirectOrResponseUri
                 else -> null
             },
             presentationDefinition = presentationDefinition.presentationDefinition,

@@ -21,9 +21,26 @@ class WaltIdCmdTest {
 
     @Test
     fun testMainHelp() = runTest {
-        val command = WaltIdCmd()
         assertFailsWith<PrintHelpMessage>(message = "Walt.id CLI usage") {
-            command.parse(listOf("--help"))
+            WaltIdCmd().parse(listOf("--help"))
         }
+    }
+
+    @Test
+    fun `should have 'key' subcommand`() {
+        val result = WaltIdCmd().test(listOf("--help"))
+        assertContains(result.stdout, "Commands:\n+.*key".toRegex(RegexOption.MULTILINE))
+    }
+
+    @Test
+    fun `should have 'did' subcommand`() {
+        val result = WaltIdCmd().test(listOf("--help"))
+        assertContains(result.stdout, "Commands:(\n+.*)+did".toRegex(RegexOption.MULTILINE))
+    }
+
+    @Test
+    fun `should have 'vc' subcommand`() {
+        val result = WaltIdCmd().test(listOf("--help"))
+        assertContains(result.stdout, "Commands:(\n+.*)+vc".toRegex(RegexOption.MULTILINE))
     }
 }

@@ -9,8 +9,9 @@ import id.walt.credentials.vc.vcs.W3CVC
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.LocalKey
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.did.dids.DidService
+import id.walt.did.dids.DidUtils
 import id.walt.issuer.IssuanceExamples.openBadgeCredentialExample
 import id.walt.issuer.base.config.ConfigManager
 import id.walt.issuer.base.config.OIDCIssuerServiceConfig
@@ -68,7 +69,16 @@ open class CIProvider : OpenIDCredentialIssuer(
         "UniversityDegree" to listOf("VerifiableCredential", "UniversityDegree"),
         "VerifiableId" to listOf("VerifiableCredential", "VerifiableAttestation", "VerifiableId"),
         "CTWalletSameAuthorisedInTime" to listOf("VerifiableCredential", "VerifiableAttestation", "CTWalletSameAuthorisedInTime"),
-        "CTWalletSameAuthorisedDeferred" to listOf("VerifiableCredential", "VerifiableAttestation", "CTWalletSameAuthorisedDeferred")
+        "CTWalletSameAuthorisedDeferred" to listOf("VerifiableCredential", "VerifiableAttestation", "CTWalletSameAuthorisedDeferred"),
+        "CTWalletSamePreAuthorisedInTime" to listOf("VerifiableCredential", "VerifiableAttestation", "CTWalletSamePreAuthorisedInTime"),
+        "CTWalletSamePreAuthorisedDeferred" to listOf("VerifiableCredential", "VerifiableAttestation", "CTWalletSamePreAuthorisedDeferred"),
+
+        "AlpsTourReservation" to listOf("VerifiableCredential", "VerifiableAttestation", "AlpsTourReservation"),
+        "EducationalID" to listOf("VerifiableCredential", "VerifiableAttestation", "EducationalID"),
+        "HotelReservation" to listOf("VerifiableCredential", "VerifiableAttestation", "HotelReservation"),
+        "Iso18013DriversLicenseCredential" to listOf("VerifiableCredential", "VerifiableAttestation", "Iso18013DriversLicenseCredential"),
+        "TaxReceipt" to listOf("VerifiableCredential", "VerifiableAttestation", "TaxReceipt"),
+        "VerifiablePortableDocumentA1" to listOf("VerifiableCredential", "VerifiableAttestation", "VerifiablePortableDocumentA1"),
     ).flatMap { entry ->
         CredentialFormat.values().map { format ->
             CredentialSupported(
@@ -82,12 +92,11 @@ open class CIProvider : OpenIDCredentialIssuer(
 ) {
     companion object {
 
-        val exampleIssuerKey by lazy { runBlocking { LocalKey.generate(KeyType.Ed25519) } }
+        val exampleIssuerKey by lazy { runBlocking { JWKKey.generate(KeyType.Ed25519) } }
         val exampleIssuerDid by lazy { runBlocking { DidService.registerByKey("jwk", exampleIssuerKey).did } }
 
 
-        private val CI_TOKEN_KEY by lazy { runBlocking { LocalKey.generate(KeyType.Ed25519) } }
-
+        private val CI_TOKEN_KEY by lazy { runBlocking { JWKKey.generate(KeyType.Ed25519) } }
     }
 
     // -------------------------------
@@ -107,7 +116,7 @@ open class CIProvider : OpenIDCredentialIssuer(
         var properSession: IssuanceSession? = null
         authSessions.forEach { entry ->
             print("${entry.key} : ${entry.value}")
-            val session = entry.value as IssuanceSession
+            val session = entry.value
             if (session.idTokenRequestState == idTokenRequestState) {
                 properSession = session
             }
@@ -129,18 +138,13 @@ open class CIProvider : OpenIDCredentialIssuer(
 
     // ------------------------------------------
     // Simple cryptographics operation interface implementations
-    override fun signToken(target: TokenTarget, payload: JsonObject, header: JsonObject? , keyId: String?) =
+    override fun signToken(target: TokenTarget, payload: JsonObject, header: JsonObject? , keyId: String?, privKey: Key?) =
         runBlocking {
             println("Signing JWS:   $payload")
             println("JWS Signature: target: $target, keyId: $keyId, header: $header")
-            if (header != null) {
-                val kid = "{\"keys\":[{\"kty\":\"EC\",\"x\":\"bo4FsmViF9au5-iCZbvEy-WZGaRes_eZdpIucmg4XH8\",\"y\":\"htYUXUmIc-IxyR6QMFPwXHXAgj__Fqw9kuSVtSyulhI\",\"crv\":\"P-256\",\"kid\":\"z2dmzD81cgPx8Vki7JbuuMmFYrWPgYoytykUZ3eyqht1j9KbrJNL5rEcHRKkRBDnxzu2352jxSjTEFmM9hjTL2wMtzcTDjjDAQmPpQkaihjoAo8AygRr9M6yZsXHzWXnJRMNPzR3cCYbmvE9Q1sSQ1qzXHBo4iEc7Yb3MGu31ZAHKSd9Qx\"}]}"
-
-                val myKey = LocalKey.importJWK("{\"kty\":\"EC\",\"x\":\"bo4FsmViF9au5-iCZbvEy-WZGaRes_eZdpIucmg4XH8\",\"y\":\"htYUXUmIc-IxyR6QMFPwXHXAgj__Fqw9kuSVtSyulhI\",\"crv\":\"P-256\",\"d\":\"UPzeJStN6Wg7zXULIlGVhYh4gG5RN-5knejePt6deqY\"}")
-                val headers = mapOf("alg" to "ES256", "type" to "jwt", "kid" to "z2dmzD81cgPx8Vki7JbuuMmFYrWPgYoytykUZ3eyqht1j9KbrJNL5rEcHRKkRBDnxzu2352jxSjTEFmM9hjTL2wMtzcTDjjDAQmPpQkaihjoAo8AygRr9M6yZsXHzWXnJRMNPzR3cCYbmvE9Q1sSQ1qzXHBo4iEc7Yb3MGu31ZAHKSd9Qx")
-
-                println( "JWK Key ID: " + myKey.getOrThrow().getKeyId() )
-                myKey.getOrThrow().signJws(payload.toString().toByteArray(),  headers).also {
+            if (header != null && keyId != null && privKey != null)  {
+                val headers = mapOf("alg" to "ES256", "type" to "jwt", "kid" to keyId)
+                privKey.signJws(payload.toString().toByteArray(), headers).also {
                     println("Signed JWS: >> $it")
                 }
 
@@ -149,8 +153,6 @@ open class CIProvider : OpenIDCredentialIssuer(
                     println("Signed JWS: >> $it")
                 }
             }
-
-
         }
 
     @OptIn(ExperimentalEncodingApi::class)
@@ -164,7 +166,7 @@ open class CIProvider : OpenIDCredentialIssuer(
             println("Resolving DID: $did")
             val key = DidService.resolveToKey(did).getOrThrow()
             println("Got key: $key")
-            key.verifyJws(token)
+            key.verifyJws(token).also { println("VERIFICATION IS: $it") }
         } else {
             CI_TOKEN_KEY.verifyJws(token)
         }
@@ -217,27 +219,33 @@ open class CIProvider : OpenIDCredentialIssuer(
         if (credentialRequest.format == CredentialFormat.mso_mdoc) throw CredentialError(
             credentialRequest, CredentialErrorCode.unsupported_credential_format
         )
+
         /*val types = credentialRequest.types ?: credentialRequest.credentialDefinition?.types ?: throw CredentialError(
             credentialRequest, CredentialErrorCode.unsupported_credential_type
-        )*/
+        )
         val proofHeader = credentialRequest.proof?.jwt?.let { parseTokenHeader(it) } ?: throw CredentialError(
             credentialRequest, CredentialErrorCode.invalid_or_missing_proof, message = "Proof must be JWT proof"
         )
+
+        val holderKid = proofHeader[JWTClaims.Header.keyID]?.jsonPrimitive?.content ?: throw CredentialError(
+            credentialRequest,
+            CredentialErrorCode.invalid_or_missing_proof,
+            message = "Proof JWT header must contain kid claim"
+        )*/
+
+        val proofPayload = credentialRequest.proof?.jwt?.let { parseTokenPayload(it) } ?: throw CredentialError(
+            credentialRequest, CredentialErrorCode.invalid_or_missing_proof, message = "Proof must be JWT proof"
+        )
+        val proofHeader = credentialRequest.proof?.jwt?.let { parseTokenHeader(it) } ?: throw CredentialError(
+            credentialRequest, CredentialErrorCode.invalid_or_missing_proof, message = "Proof must be JWT proof"
+        )
+
         val holderKid = proofHeader[JWTClaims.Header.keyID]?.jsonPrimitive?.content ?: throw CredentialError(
             credentialRequest,
             CredentialErrorCode.invalid_or_missing_proof,
             message = "Proof JWT header must contain kid claim"
         )
-
-        val proofPayload = credentialRequest.proof?.jwt?.let { parseTokenPayload(it) } ?: throw CredentialError(
-            credentialRequest, CredentialErrorCode.invalid_or_missing_proof, message = "Proof must be JWT proof"
-        )
-
-        val holderDid = proofPayload[JWTClaims.Payload.issuer]?.jsonPrimitive?.content ?: throw CredentialError(
-            credentialRequest,
-            CredentialErrorCode.invalid_or_missing_proof,
-            message = "Proof JWT payload must contain iss claim"
-        )
+        val holderDid = if(DidUtils.isDidUrl(holderKid)) holderKid.substringBefore("#") else holderKid
         //val vc = W3CVC(universityDegreeCredentialExample.toList().associate { it.first to it.second.toJsonElement() })
 
         val data: IssuanceSessionData = (if (subjectDid == null || nonce == null) {
@@ -262,17 +270,21 @@ open class CIProvider : OpenIDCredentialIssuer(
                 ?: throw IllegalArgumentException("The issuanceIdCredentialMapping does not contain a mapping for: $nonce!")
         }).first()
 
-//        println("IssuerDID: " + issuerKey)
         return CredentialResult(format = credentialRequest.format, credential = JsonPrimitive(runBlocking {
             val vc = data.request.credentialData
 
             data.run {
+                var issuerKid = issuerDid
+                if (issuerDid.startsWith("did:key") && issuerDid.length==186) // EBSI conformance corner case when issuer uses did:key instead of did:ebsi and no trust framework is defined
+                    issuerKid = issuerDid + "#" + issuerDid.removePrefix("did:key:")
+
+                if (issuerDid.startsWith("did:ebsi"))
+                    issuerKid = issuerDid + "#" + issuerKey.getKeyId()
+
                 when (credentialRequest.format) {
                     CredentialFormat.sd_jwt_vc -> vc.mergingSdJwtIssue(
                         issuerKey = issuerKey,
                         issuerDid = issuerDid,
-                        // Why DID=KID?
-                        // https://identity.foundation/jwt-vc-presentation-profile/#jwt-vc
                         subjectDid = holderDid,
                         mappings = request.mapping ?: JsonObject(emptyMap()),
                         additionalJwtHeader = emptyMap(),
@@ -285,12 +297,12 @@ open class CIProvider : OpenIDCredentialIssuer(
                     else -> vc.mergingJwtIssue(
                         issuerKey = issuerKey,
                         issuerDid = issuerDid,
+                        issuerKid = issuerKid,
                         subjectDid = holderDid,
                         mappings = request.mapping ?: JsonObject(emptyMap()),
                         additionalJwtHeader = emptyMap(),
                         additionalJwtOptions = emptyMap(),
                     )
-
                 }
             }.also { println("Respond VC: $it") }
         }))
@@ -321,7 +333,7 @@ open class CIProvider : OpenIDCredentialIssuer(
             throw IllegalArgumentException("More than one key id requested")
         }
 
-        val keyId = keyIdsDistinct.first()
+//        val keyId = keyIdsDistinct.first()
 
 
 
@@ -395,7 +407,7 @@ open class CIProvider : OpenIDCredentialIssuer(
     )
 
     // TODO: Hack as this is non stateless because of oidc4vc lib API
-    private val sessionCredentialPreMapping = HashMap<String, List<IssuanceSessionData>>() // session id -> VC
+    val sessionCredentialPreMapping = HashMap<String, List<IssuanceSessionData>>() // session id -> VC
 
     // TODO: Hack as this is non stateless because of oidc4vc lib API
     private val tokenCredentialMapping = HashMap<String, List<IssuanceSessionData>>() // token -> VC
@@ -410,6 +422,14 @@ open class CIProvider : OpenIDCredentialIssuer(
 
     // TODO: Hack as this is non stateless because of oidc4vc lib API
     fun mapSessionIdToToken(sessionId: String, token: String) {
+        println("MAPPING SESSION ID TO TOKEN: $sessionId -->> $token")
+        val premappedVc = sessionCredentialPreMapping.remove(sessionId)
+            ?: throw IllegalArgumentException("No credential pre-mapped with any such session id: $sessionId (for use with token: $token)")
+        println("SWAPPING PRE-MAPPED VC FROM SESSION ID TO NEW TOKEN: $token")
+        tokenCredentialMapping[token] = premappedVc
+    }
+
+    fun mapSessionIdToIdAuthRequestState(sessionId: String, token: String) {
         println("MAPPING SESSION ID TO TOKEN: $sessionId -->> $token")
         val premappedVc = sessionCredentialPreMapping.remove(sessionId)
             ?: throw IllegalArgumentException("No credential pre-mapped with any such session id: $sessionId (for use with token: $token)")

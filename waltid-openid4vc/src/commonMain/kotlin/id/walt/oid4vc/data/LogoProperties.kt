@@ -11,7 +11,7 @@ import kotlinx.serialization.json.jsonObject
  *  A JSON object with information about the logo of the Credential
  *  @param url OPTIONAL. URL where the Wallet can obtain a logo of the Credential from the Credential Issuer.
  *  @param altText OPTIONAL. String value of an alternative text of a logo image.
- *  @param otherProperties Other (custom) logo properties
+ *  @param customParameters Other (custom) logo properties
  */
 @Serializable
 data class LogoProperties(

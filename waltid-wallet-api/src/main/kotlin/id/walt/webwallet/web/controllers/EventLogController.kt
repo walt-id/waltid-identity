@@ -1,12 +1,16 @@
 package id.walt.webwallet.web.controllers
 
+import id.walt.webwallet.service.WalletServiceManager.eventFilterUseCase
+import id.walt.webwallet.service.WalletServiceManager.eventUseCase
 import id.walt.webwallet.service.events.EventLogFilter
 import id.walt.webwallet.service.events.EventLogFilterResult
+import io.github.smiley4.ktorswaggerui.dsl.delete
 import io.github.smiley4.ktorswaggerui.dsl.get
 import io.github.smiley4.ktorswaggerui.dsl.route
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.response.*
+import io.ktor.server.util.*
 
 fun Application.eventLogs() = walletRoute {
     route("eventlog", {
@@ -27,12 +31,12 @@ fun Application.eventLogs() = walletRoute {
                 }
                 queryParameter<String>("startingAfter") {
                     description = "Starting after page"
-                    example = "<hash>"
+                    example = ""
                     required = false
                 }
                 queryParameter<String>("sortBy") {
                     description = "The property to sort by"
-                    example = "tenant"
+                    example = ""
                     required = false
                 }
                 queryParameter<String>("sortOrder") {
@@ -49,16 +53,17 @@ fun Application.eventLogs() = walletRoute {
                 }
             }
         }) {
-            val wallet = getWalletService()
-            val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: -1
+            val limit = call.request.queryParameters["limit"]?.toIntOrNull()
             val data = call.request.queryParameters.getAll("filter")
                 ?.associate { it.substringBefore("=") to it.substringAfter("=") } ?: emptyMap()
             val startingAfter = call.request.queryParameters["startingAfter"]
             val sortBy = call.request.queryParameters["sortBy"]
             val sortOrder = call.request.queryParameters["sortOrder"]
             context.respond(
-                wallet.filterEventLog(
-                    EventLogFilter(
+                eventFilterUseCase.filter(
+                    accountId = getUserUUID(),
+                    walletId = getWalletId(),
+                    filter = EventLogFilter(
                         limit = limit,
                         startingAfter = startingAfter,
                         sortBy = sortBy,
@@ -67,6 +72,23 @@ fun Application.eventLogs() = walletRoute {
                     )
                 )
             )
+        }
+        delete("{id}", {
+            summary = "Delete event log"
+            request {
+                pathParameter<Int>("id") {
+                    required = true
+                    allowEmptyValue = false
+                    description = "Event log ID"
+                }
+            }
+            response {
+                HttpStatusCode.Accepted to { description = "Event log deleted" }
+                HttpStatusCode.BadRequest to { description = "Event log could not be deleted" }
+            }
+        }) {
+            val id = context.parameters.getOrFail("id").toInt()
+            context.respond(HttpStatusCode.Accepted, eventUseCase.delete(id))
         }
     }
 }

@@ -40,7 +40,7 @@ spec:
     spec:
       containers:
         - name: verifier
-          image: waltid/verifier-api:latest
+          image: waltid/verifier-api:__DEFAULT_IMAGE_TAG__
           volumeMounts:
             - name: verifier-web-config
               mountPath: "/waltid-verifier-api/config/"

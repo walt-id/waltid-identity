@@ -11,6 +11,8 @@ jobs:
   release:
     name: "Release"
     runs-on: ubuntu-latest
+    env:
+      IMAGE_TAG: ${{ inputs.release_version }}
     steps:
       - name: Free Disk Space (Ubuntu)
         uses: jlumbroso/free-disk-space@v1.3.1
@@ -106,7 +108,7 @@ jobs:
           include-compare: true
           semver: true
       - name: Create Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -114,34 +116,43 @@ jobs:
           body: |
             ${{ steps.changelog.outputs.changelog }}
           prerelease: ${{ steps.changelog.outputs.prerelease }}
-
+#      issuer-api
       - name: Prepare CD - issuer
-        run: sed "s/_DEFAULT_DEPLOYMENT_/$GITHUB_SHA/g" waltid-issuer-api/k8s/deployment-prod.yaml > waltid-issuer-api/k8s/deployment_mod.yaml
+        run: sed "s/_DEFAULT_DEPLOYMENT_/$GITHUB_SHA/g" waltid-issuer-api/k8s/deployment-prod.yaml |
+          sed "s/__DEFAULT_IMAGE_TAG__/$IMAGE_TAG/g" > waltid-issuer-api/k8s/deployment_mod.yaml
       - name: Continuous deployment - issuer
         uses: actions-hub/kubectl@master
         env:
           KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
         with:
           args: apply -n portals -f waltid-issuer-api/k8s/deployment_mod.yaml
+#      verifier-api
       - name: Prepare CD - verifier
-        run: sed "s/_DEFAULT_DEPLOYMENT_/$GITHUB_SHA/g" waltid-verifier-api/k8s/deployment-prod.yaml > waltid-verifier-api/k8s/deployment_mod.yaml
+        run: sed "s/_DEFAULT_DEPLOYMENT_/$GITHUB_SHA/g" waltid-verifier-api/k8s/deployment-prod.yaml |
+          sed "s/__DEFAULT_IMAGE_TAG__/$IMAGE_TAG/g" > waltid-verifier-api/k8s/deployment_mod.yaml
       - name: Continuous deployment - verifier
         uses: actions-hub/kubectl@master
         env:
           KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
         with:
           args: apply -n portals -f waltid-verifier-api/k8s/deployment_mod.yaml
+#      wallet-api
       - name: Prepare CD - wallet.walt.id
+        env:
+          PROD_KEYCLOAK_CLIENT_SECRET: ${{ secrets.PROD_KEYCLOAK_CLIENT_SECRET }}
         run: sed "s/_DEFAULT_DEPLOYMENT_/$GITHUB_SHA/g" waltid-wallet-api/k8s/deployment-prod.yaml |
-          sed "s/__DEFAULT_KEYCLOAK_CLIENT_SECRET__/$PROD_KEYCLOAK_CLIENT_SECRET/g" > waltid-wallet-api/k8s/deployment_mod.yaml
+          sed "s/__DEFAULT_KEYCLOAK_CLIENT_SECRET__/$PROD_KEYCLOAK_CLIENT_SECRET/g" |
+          sed "s/__DEFAULT_IMAGE_TAG__/$IMAGE_TAG/g" > waltid-wallet-api/k8s/deployment_mod.yaml
       - name: Continuous deployment - wallet.walt.id
         uses: actions-hub/kubectl@master
         env:
           KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
         with:
           args: apply -n default -f waltid-wallet-api/k8s/deployment_mod.yaml
+#     portal
       - name: Prepare CD - portal.walt.id
-        run: sed "s/_DEFAULT_DEPLOYMENT_/$GITHUB_SHA/g" waltid-web-portal/k8s/deployment-prod.yaml > waltid-web-portal/k8s/deployment_mod.yaml
+        run: sed "s/_DEFAULT_DEPLOYMENT_/$GITHUB_SHA/g" waltid-web-portal/k8s/deployment-prod.yaml |
+          sed "s/__DEFAULT_IMAGE_TAG__/$IMAGE_TAG/g" > waltid-web-portal/k8s/deployment_mod.yaml
       - name: Continuous deployment - portal.walt.id
         uses: actions-hub/kubectl@master
         env:

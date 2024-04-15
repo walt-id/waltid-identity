@@ -26,18 +26,19 @@ abstract class OpenIDCredentialVerifier(val config: CredentialVerifierConfig) :
 
     protected open fun prepareResponseOrRedirectUri(sessionID: String, responseMode: ResponseMode): String =
         when (responseMode) {
-            ResponseMode.Query, ResponseMode.Fragment, ResponseMode.FormPost -> config.redirectUri ?: config.clientId
+            ResponseMode.query, ResponseMode.fragment, ResponseMode.form_post -> config.redirectUri ?: config.clientId
             else -> config.responseUrl ?: config.clientId
         }
 
     open fun initializeAuthorization(
         presentationDefinition: PresentationDefinition,
-        responseMode: ResponseMode = ResponseMode.Fragment,
+        responseMode: ResponseMode = ResponseMode.fragment,
         scope: Set<String> = setOf(),
-        expiresIn: Duration = 60.seconds
+        expiresIn: Duration = 60.seconds,
+        sessionId: String? = null, // A calling party may provide a unique session Id
     ): PresentationSession {
         val session = PresentationSession(
-            id = ShortIdUtils.randomSessionId(),
+            id = sessionId ?: ShortIdUtils.randomSessionId(),
             authorizationRequest = null,
             expirationTimestamp = Clock.System.now().plus(expiresIn),
             presentationDefinition = presentationDefinition
@@ -53,15 +54,14 @@ abstract class OpenIDCredentialVerifier(val config: CredentialVerifierConfig) :
             },
             responseMode = responseMode,
             redirectUri = when (responseMode) {
-                ResponseMode.Query, ResponseMode.Fragment, ResponseMode.FormPost -> prepareResponseOrRedirectUri(
+                ResponseMode.query, ResponseMode.fragment, ResponseMode.form_post -> prepareResponseOrRedirectUri(
                     session.id,
                     responseMode
                 )
-
                 else -> null
             },
             responseUri = when (responseMode) {
-                ResponseMode.DirectPost -> prepareResponseOrRedirectUri(session.id, responseMode)
+                ResponseMode.direct_post -> prepareResponseOrRedirectUri(session.id, responseMode)
                 else -> null
             },
             presentationDefinitionUri = presentationDefinitionUri,

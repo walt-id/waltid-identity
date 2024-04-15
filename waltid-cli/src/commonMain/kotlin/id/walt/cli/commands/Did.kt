@@ -29,7 +29,7 @@ class Did : CliktCommand(help = "Run commands on DIDs") {
 
     companion object {
         internal fun initializeDidServices(serviceType: ServiceType) {
-            println("Initializing ${serviceType} services...")
+            println("Initializing $serviceType services...")
 
             runBlocking {
                 when (serviceType) {

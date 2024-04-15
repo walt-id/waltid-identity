@@ -1,5 +1,3 @@
-import com.github.benmanes.gradle.versions.updates.DependencyUpdatesTask
-
 plugins {
     kotlin("multiplatform")
     kotlin("plugin.serialization")
@@ -22,7 +20,7 @@ java {
 }
 
 kotlin {
-    jvmToolchain(15)
+    jvmToolchain(17)
 }
 
 kotlin {
@@ -45,8 +43,9 @@ kotlin {
                 api(project(":waltid-sdjwt"))
                 api(project(":waltid-openid4vc"))
 
-                // kotlinx-io
-                implementation("org.jetbrains.kotlinx:kotlinx-io-core:0.3.1")
+                implementation("org.jetbrains.kotlinx:kotlinx-io-core:0.3.2")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
+                implementation ("com.google.code.gson:gson:2.10.1")
 
                 // CLI
                 implementation("com.varabyte.kotter:kotter-jvm:1.1.2")
@@ -57,7 +56,7 @@ kotlin {
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
 
                 // Logging
-                implementation("io.github.oshai:kotlin-logging:6.0.3")
+                implementation("io.github.oshai:kotlin-logging:6.0.4")
             }
         }
         val commonTest by getting {
@@ -82,12 +81,14 @@ kotlin {
             dependencies {
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
                 implementation("com.wolpl.clikt-testkit:clikt-testkit:2.0.0")
+                // Spring Boot Test
+                implementation("org.springframework.boot:spring-boot-starter-test:3.2.3")
             }
         }
         /*publishing {
             repositories {
                 maven {
-                    url = uri("https://maven.walt.id/repository/waltid/")
+                    url = uri("https://maven.waltid.dev/releases")
                     val envUsername = System.getenv("MAVEN_USERNAME")
                     val envPassword = System.getenv("MAVEN_PASSWORD")
 
@@ -120,7 +121,7 @@ application {
     // Works with:
     //     ../gradlew run --args="--help"
     mainClass = "id.walt.cli.MainKt"
-
+    applicationName = "waltid"
 }
 
 tasks.test {

@@ -1,5 +1,3 @@
-import com.github.benmanes.gradle.versions.updates.DependencyUpdatesTask
-
 import love.forte.plugin.suspendtrans.ClassInfo
 import love.forte.plugin.suspendtrans.SuspendTransformConfiguration
 import love.forte.plugin.suspendtrans.TargetPlatform
@@ -21,8 +19,8 @@ repositories {
 }
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_17
-    targetCompatibility = JavaVersion.VERSION_17
+    sourceCompatibility = JavaVersion.VERSION_15
+    targetCompatibility = JavaVersion.VERSION_15
 }
 
 suspendTransform {
@@ -39,13 +37,13 @@ suspendTransform {
 
 
 kotlin {
-    jvmToolchain(17)
+    jvmToolchain(15)
 }
 
 kotlin {
     jvm {
         compilations.all {
-            kotlinOptions.jvmTarget = "17" // JVM got Ed25519 at version 15
+            kotlinOptions.jvmTarget = "15" // JVM got Ed25519 at version 15
         }
         withJava()
         tasks.withType<Test>().configureEach {
@@ -53,6 +51,7 @@ kotlin {
         }
     }
     js(IR) {
+        moduleName = "dids"
         /*browser {
             commonWebpackConfig {
                 cssSupport {
@@ -78,7 +77,7 @@ kotlin {
                 implementation("io.ktor:ktor-client-serialization:2.3.8")
                 implementation("io.ktor:ktor-client-content-negotiation:2.3.8")
                 implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.8")
-                implementation("io.ktor:ktor-client-json:2.3.8")
+                implementation("io.ktor:ktor-client-json:2.3.9")
                 implementation("io.ktor:ktor-client-logging:2.3.8")
 
                 // Coroutines
@@ -87,15 +86,18 @@ kotlin {
                 // Date
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.5.0")
 
+                // UUID
+                implementation("app.softwork:kotlinx-uuid-core:0.0.25")
+
                 // Crypto
                 api(project(":waltid-crypto"))
                 implementation("com.github.komputing.khash:keccak:1.1.3")
 
                 // Encodings
-                implementation("net.thauvin.erik.urlencoder:urlencoder-lib:1.4.0")
+                implementation("net.thauvin.erik.urlencoder:urlencoder-lib:1.5.0")
 
                 // Logging
-                implementation("io.github.oshai:kotlin-logging:6.0.3")
+                implementation("io.github.oshai:kotlin-logging:6.0.4")
 
                 //EBSI
                 implementation(project(":waltid-ebsi"))
@@ -144,7 +146,7 @@ kotlin {
         publishing {
             repositories {
                 maven {
-                    url = uri("https://maven.walt.id/repository/waltid/")
+                    url = uri("https://maven.waltid.dev/releases")
                     val envUsername = System.getenv("MAVEN_USERNAME")
                     val envPassword = System.getenv("MAVEN_PASSWORD")
 
