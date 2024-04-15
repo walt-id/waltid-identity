@@ -186,7 +186,7 @@ sealed interface SignOption {
 }
 
 
-private fun authenticateWithBiometric(
+fun authenticateWithBiometric(
     context: FragmentActivity,
     onAuthenticated: () -> Unit,
     onFailure: () -> Unit,
