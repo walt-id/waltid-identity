@@ -5,14 +5,14 @@ import id.walt.webwallet.service.SSIKit2WalletService
 import id.walt.webwallet.service.credentials.CredentialsService
 import id.walt.webwallet.service.events.EventType
 import id.walt.webwallet.service.exchange.IssuanceService
-import id.walt.webwallet.usecase.event.EventUseCase
+import id.walt.webwallet.usecase.event.EventLogUseCase
 import kotlinx.datetime.Clock
 import kotlinx.uuid.UUID
 
 class ExplicitClaimStrategy(
     private val issuanceService: IssuanceService,
     private val credentialService: CredentialsService,
-    private val eventUseCase: EventUseCase,
+    private val eventUseCase: EventLogUseCase,
 ) {
     suspend fun claim(
         tenant: String, account: UUID, wallet: UUID, did: String, offer: String, pending: Boolean = true
@@ -37,7 +37,12 @@ class ExplicitClaimStrategy(
                 tenant = tenant,
                 accountId = account,
                 walletId = wallet,
-                data = eventUseCase.credentialEventData(credential = credential, type = it.type),
+                data = eventUseCase.credentialEventData(
+                    credential = credential,
+                    subject = eventUseCase.subjectData(credential),
+                    organization = eventUseCase.issuerData(credential),
+                    type = it.type
+                ),
                 credentialId = credential.id,
             )
         }
