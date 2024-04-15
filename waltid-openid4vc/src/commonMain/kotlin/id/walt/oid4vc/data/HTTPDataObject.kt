@@ -15,8 +15,8 @@ interface IHTTPDataObject {
 
     fun toRedirectUri(redirectUri: String, responseMode: ResponseMode) = URLBuilder(redirectUri).apply {
         when (responseMode) {
-            ResponseMode.Query -> parameters.appendAll(parametersOf(toHttpParameters()))
-            ResponseMode.Fragment -> fragment = toHttpQueryString()
+            ResponseMode.query -> parameters.appendAll(parametersOf(toHttpParameters()))
+            ResponseMode.fragment -> fragment = toHttpQueryString()
             else -> throw Exception("For response via redirect_uri, response mode must be query or fragment")
         }
     }.buildString()

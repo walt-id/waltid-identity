@@ -3,7 +3,6 @@ package id.walt.oid4vc.providers
 import id.walt.oid4vc.OpenID4VCI
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.data.dif.PresentationDefinition
-import id.walt.oid4vc.definitions.JWTClaims
 import id.walt.oid4vc.errors.*
 import id.walt.oid4vc.interfaces.IHttpClient
 import id.walt.oid4vc.interfaces.ITokenProvider
@@ -443,7 +442,7 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
             authorizationRequest.customParameters["request"]?.let { AuthorizationJSONRequest.fromJSON(JwtUtils.parseJWTPayload(it.first())) }
                 ?: authorizationRequest
         }
-        if (authReq.responseMode != ResponseMode.DirectPost || !authReq.responseType.contains(ResponseType.IdToken) || authReq.redirectUri.isNullOrEmpty())
+        if (authReq.responseMode != ResponseMode.direct_post || !authReq.responseType.contains(ResponseType.IdToken) || authReq.redirectUri.isNullOrEmpty())
             throw AuthorizationError(
                 authReq,
                 AuthorizationErrorCode.server_error,

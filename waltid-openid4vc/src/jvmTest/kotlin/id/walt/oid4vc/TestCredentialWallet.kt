@@ -6,9 +6,7 @@ import com.nimbusds.jose.crypto.ECDSAVerifier
 import com.nimbusds.jose.crypto.bc.BouncyCastleProviderSingleton
 import com.nimbusds.jose.jwk.ECKey
 import id.walt.credentials.PresentationBuilder
-import id.walt.credentials.vc.vcs.W3CVC
 import id.walt.crypto.keys.Key
-import id.walt.crypto.keys.KeyType
 //import id.walt.crypto.keys.LocalKey
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.JwsUtils.decodeJws
@@ -55,7 +53,6 @@ import io.ktor.server.routing.*
 import io.ktor.util.*
 import kotlinx.datetime.Instant
 import kotlinx.serialization.json.*
-import java.io.File
 import kotlin.js.ExperimentalJsExport
 
 const val WALLET_PORT = 8001
@@ -256,7 +253,7 @@ class TestCredentialWallet(
                             )
                         }
                         val tokenResponse = processImplicitFlowAuthorization(authReq)
-                        val redirectLocation = if (authReq.responseMode == ResponseMode.DirectPost) {
+                        val redirectLocation = if (authReq.responseMode == ResponseMode.direct_post) {
                             ktorClient.submitForm(
                                 authReq.responseUri ?: throw AuthorizationError(
                                     authReq,
@@ -272,7 +269,7 @@ class TestCredentialWallet(
                                     AuthorizationErrorCode.invalid_request,
                                     "No redirect uri found on authorization request"
                                 ),
-                                authReq.responseMode ?: ResponseMode.Fragment
+                                authReq.responseMode ?: ResponseMode.fragment
                             )
                         }
                         if (!redirectLocation.isNullOrEmpty()) {

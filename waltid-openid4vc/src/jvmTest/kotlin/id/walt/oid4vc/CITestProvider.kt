@@ -184,7 +184,7 @@ class CITestProvider : OpenIDCredentialIssuer(
                         call.response.apply {
                             status(HttpStatusCode.Found)
                             val defaultResponseMode =
-                                if (authReq.responseType.contains(ResponseType.Code)) ResponseMode.Query else ResponseMode.Fragment
+                                if (authReq.responseType.contains(ResponseType.Code)) ResponseMode.query else ResponseMode.fragment
                             header(
                                 HttpHeaders.Location,
                                 authResp.toRedirectUri(redirectUri, authReq.responseMode ?: defaultResponseMode)

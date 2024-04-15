@@ -82,7 +82,7 @@ data class AuthorizationRequest(
      */
     fun getRedirectOrResponseUri(): String? {
         return when(responseMode) {
-            ResponseMode.DirectPost -> responseUri
+            ResponseMode.direct_post -> responseUri
             else -> redirectUri
         } ?: when(clientIdScheme) {
             ClientIdScheme.RedirectUri -> clientId

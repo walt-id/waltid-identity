@@ -1,7 +1,6 @@
 package id.walt.oid4vc.providers
 
 import id.walt.crypto.keys.Key
-import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.definitions.JWTClaims
 import id.walt.oid4vc.errors.AuthorizationError
@@ -11,7 +10,6 @@ import id.walt.oid4vc.interfaces.ITokenProvider
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.requests.TokenRequest
 import id.walt.oid4vc.responses.*
-import id.walt.did.dids.DidService
 
 import io.ktor.http.*
 import kotlinx.datetime.Clock
@@ -197,7 +195,7 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
         // Bind authentication request with state
         val idTokenRequestState = UUID().toString();
         val idTokenRequestNonce = UUID().toString();
-        val responseMode = ResponseMode.DirectPost
+        val responseMode = ResponseMode.direct_post
 
         val clientId = this.metadata.issuer!!
         val redirectUri = this.metadata.issuer + "/direct_post"
@@ -215,7 +213,7 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
                 put("client_id", clientId)
                 put("redirect_uri", redirectUri)
                 put("response_type", responseType)
-                put("response_mode", responseMode.value)
+                put("response_mode", responseMode.name)
                 put("scope", "openid")
             }, buildJsonObject {
                 put(JWTClaims.Header.algorithm, "ES256")
