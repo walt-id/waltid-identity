@@ -10,6 +10,7 @@ import id.walt.issuer.IssuanceExamples.issuerOnboardingRequestOciExample
 import id.walt.issuer.IssuanceExamples.issuerOnboardingRequestDidWebExample
 import id.walt.issuer.IssuanceExamples.issuerOnboardingRequestTseExample
 import id.walt.issuer.IssuanceExamples.issuerOnboardingResponseDefaultExample
+import id.walt.issuer.IssuanceExamples.issuerOnboardingResponseDidWebExample
 import id.walt.issuer.IssuanceExamples.issuerOnboardingResponseOciExample
 import id.walt.issuer.IssuanceExamples.issuerOnboardingResponseTseExample
 import id.walt.issuer.IssuanceExamples.openBadgeCredentialExampleJsonString
@@ -76,11 +77,11 @@ fun Application.issuerApi() {
                     body<IssuerOnboardingRequest> {
                         description = "Issuer onboarding request (key & DID) config."
                         example("did:jwk + JWK key (Ed25519)", issuerOnboardingRequestDefaultExample)
+                        example("did:web + JWK key (Secp256k1)", issuerOnboardingRequestDidWebExample)
                         example(
                             "did:key + TSE (Hashicorp Vault Transit Engine key - RSA)",
                             issuerOnboardingRequestTseExample
                         )
-                        example("did:web + JWK key (Secp256k1)", issuerOnboardingRequestDidWebExample)
                         example("Oracle Cloud Infrastructure (OCI) key + secp256r1 ", issuerOnboardingRequestOciExample)
                         required = true
                     }
@@ -95,11 +96,16 @@ fun Application.issuerApi() {
                                 issuerOnboardingResponseDefaultExample,
                             )
                             example(
-                                "Remote Ed25519 key + did:key",
-                                issuerOnboardingResponseTseExample,
+                                "did:web + JWK key (Secp256r1)",
+                                issuerOnboardingResponseDidWebExample,
                             )
                             example(
-                                "OCI key + did:jwk",
+                                "Remote Ed25519 key + did:key (TSE)",
+                                issuerOnboardingResponseTseExample,
+                            )
+
+                            example(
+                                "Remote Secp256r1 key + did:jwk (OCI)",
                                 issuerOnboardingResponseOciExample,
                             )
                         }
