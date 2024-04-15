@@ -3,13 +3,16 @@ package id.walt.androidSample.app.features.walkthrough.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -30,12 +33,18 @@ fun WalkthroughStep(
             .padding(horizontal = 16.dp)
             .padding(top = 32.dp, bottom = 16.dp),
     ) {
-        WaltLogo()
-        Spacer(Modifier.height(32.dp))
-        Text(
-            text = title,
-            style = MaterialTheme.typography.headlineMedium
-        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.headlineMedium,
+                maxLines = 2,
+                modifier = Modifier.weight(1f)
+            )
+            Spacer(Modifier.width(32.dp))
+            WaltLogo()
+        }
         Spacer(Modifier.height(32.dp))
         Text(
             text = description,
