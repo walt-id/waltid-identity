@@ -58,7 +58,7 @@ const keyId = route.params.keyId;
 const currentWallet = useCurrentWallet()
 
 async function loadExportedKey() {
-    const data = await $fetch(`/wallet-api/wallet/${currentWallet.value}/keys/export/${keyId}?format=${format}&loadPrivateKey=${loadPrivateKey}`);
+    const data = await $fetch(`/wallet-api/wallet/${currentWallet.value}/keys/${keyId}/export?format=${format}&loadPrivateKey=${loadPrivateKey}`);
 
     exportedKey.value = JSON.stringify(data);
 }

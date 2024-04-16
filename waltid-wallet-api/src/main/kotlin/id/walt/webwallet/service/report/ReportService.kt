@@ -31,7 +31,7 @@ interface ReportService<T> {
             sortOrder = "ASC",
             sortBy = "",
             dataFilter = mapOf(
-                "event" to action.type, "action" to action.toString()
+                "event" to listOf(action.type), "action" to listOf(action.toString())
             )
         )
     }

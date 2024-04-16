@@ -12,17 +12,16 @@ import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
 import com.nimbusds.jose.util.Base64URL
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.keys.jwk.JWKKeyCreator
-import id.walt.crypto.keys.jwk.JWKKeyMetadata
 import org.bouncycastle.jce.ECNamedCurveTable
 
 object JvmJWKKeyCreator : JWKKeyCreator {
 
-    override suspend fun generate(type: KeyType, metadata: JWKKeyMetadata): JWKKey {
+    override suspend fun generate(type: KeyType, metadata: JwkKeyMeta?): JWKKey {
         val keyGenerator: JWKGenerator<out JWK> = when (type) {
             KeyType.Ed25519 -> OctetKeyPairGenerator(Curve.Ed25519)
             KeyType.secp256r1 -> ECKeyGenerator(Curve.P_256)
             KeyType.secp256k1 -> ECKeyGenerator(Curve.SECP256K1)
-            KeyType.RSA -> RSAKeyGenerator(metadata.keySize ?: 2048)
+            KeyType.RSA -> RSAKeyGenerator(metadata?.keySize ?: 2048)
         }.run {
             if (type == KeyType.secp256k1) {
                 provider(BouncyCastleProviderSingleton.getInstance())
@@ -34,7 +33,7 @@ object JvmJWKKeyCreator : JWKKeyCreator {
         return JWKKey(jwk)
     }
 
-    override suspend fun importRawPublicKey(type: KeyType, rawPublicKey: ByteArray, metadata: JWKKeyMetadata): Key = JWKKey(
+    override suspend fun importRawPublicKey(type: KeyType, rawPublicKey: ByteArray, metadata: JwkKeyMeta?): Key = JWKKey(
         when (type) {
             KeyType.Ed25519 -> OctetKeyPair.Builder(Curve.Ed25519, Base64URL.encode(rawPublicKey)).build()
             KeyType.secp256k1 -> ecRawToJwk(rawPublicKey, Curve.SECP256K1)

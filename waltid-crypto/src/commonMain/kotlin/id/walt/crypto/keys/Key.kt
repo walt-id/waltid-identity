@@ -144,7 +144,13 @@ abstract class Key {
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    override fun toString() = "[${if (hasPrivateKey) "private" else "public"} $keyType key]"
+    abstract suspend fun getMeta(): KeyMeta
+
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
+    override fun toString() = "[walt.id CoreCrypto ${if (hasPrivateKey) "private" else "public"} $keyType key]"
 
     @JvmBlocking
     @JvmAsync

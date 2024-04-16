@@ -51,6 +51,7 @@ kotlin {
         }
     }
     js(IR) {
+        moduleName = "dids"
         /*browser {
             commonWebpackConfig {
                 cssSupport {
@@ -95,7 +96,7 @@ kotlin {
                 implementation("net.thauvin.erik.urlencoder:urlencoder-lib:1.5.0")
 
                 // Logging
-                implementation("io.github.oshai:kotlin-logging:6.0.3")
+                implementation("io.github.oshai:kotlin-logging:6.0.4")
 
             }
         }
@@ -139,7 +140,7 @@ kotlin {
         publishing {
             repositories {
                 maven {
-                    url = uri("https://maven.walt.id/repository/waltid/")
+                    url = uri("https://maven.waltid.dev/releases")
                     val envUsername = System.getenv("MAVEN_USERNAME")
                     val envPassword = System.getenv("MAVEN_PASSWORD")
 

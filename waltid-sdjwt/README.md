@@ -83,7 +83,7 @@ _Kotlin DSL_
 ```kotlin
 [...]
 repositories {
-    maven("https://maven.walt.id/repository/waltid/")
+    maven("https://maven.waltid.dev/releases")
 }
 [...]
 val sdJwtVersion = "1.2306071235.0"
@@ -346,8 +346,8 @@ const sharedSecret = "ef23f749-7238-481a-815c-f0c2157dfa8e"
 const cryptoProvider = new sdlib.id.walt.sdjwt.SimpleAsyncJWTCryptoProvider("HS256", new TextEncoder().encode(sharedSecret))
 
 const sdMap = new sdlib.id.walt.sdjwt.SDMapBuilder(sdlib.id.walt.sdjwt.DecoyMode.FIXED.name, 2).addField("sub", true,
-    new sdlib.id.walt.sdjwt.SDMapBuilder().addField("child", true).build()
-).build()
+    new sdlib.id.walt.sdjwt.SDMapBuilder().addField("child", true).buildAsJSON()
+).buildAsJSON()
 
 console.log(sdMap, JSON.stringify(sdMap))
 

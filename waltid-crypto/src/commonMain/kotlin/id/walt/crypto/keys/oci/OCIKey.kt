@@ -3,6 +3,7 @@ package id.walt.crypto.keys.oci
 import id.walt.crypto.keys.EccUtils
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.OciKeyMeta
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.base64Decode
 import id.walt.crypto.utils.Base64Utils.base64UrlDecode
@@ -56,6 +57,7 @@ class OCIKey(
     private var _keyType: KeyType? = null,
 ) : Key() {
 
+    // the OCID of the key (not the oci key-id)
     private val vaultKeyId = "${config.tenancyOcid}/${config.userOcid}/${config.fingerprint}"
 
     @Transient
@@ -258,6 +260,15 @@ class OCIKey(
     @JsPromise
     @JsExport.Ignore
     override suspend fun getPublicKeyRepresentation(): ByteArray = TODO("Not yet implemented")
+
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
+    override suspend fun getMeta(): OciKeyMeta = OciKeyMeta(
+        keyId = id,
+        keyVersion = getKeyVersion(id, vaultKeyId, config.managementEndpoint, config.signingKeyPem)
+    )
 
     companion object {
 

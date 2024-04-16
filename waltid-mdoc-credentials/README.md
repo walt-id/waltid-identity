@@ -60,7 +60,7 @@ _Kotlin DSL_
 ```kotlin
 [...]
 repositories {
-  maven("https://maven.walt.id/repository/waltid/")
+  maven("https://maven.waltid.dev/releases")
 }
 [...]
 val mdocVersion = "1.xxx.0"
