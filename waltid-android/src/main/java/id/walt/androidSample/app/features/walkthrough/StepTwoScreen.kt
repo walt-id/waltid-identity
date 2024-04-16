@@ -12,11 +12,13 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
+import id.walt.androidSample.R
 import id.walt.androidSample.app.features.walkthrough.components.WalkthroughStep
 import id.walt.androidSample.app.features.walkthrough.components.WaltPrimaryButton
 import id.walt.androidSample.app.features.walkthrough.components.WaltSecondaryButton
@@ -32,8 +34,8 @@ fun StepTwoScreen(
     val publicKey by viewModel.publicKey.collectAsStateWithLifecycle()
 
     WalkthroughStep(
-        title = "Step 2 - Retrieve Public Key",
-        description = "Retrieve the public key from the generated key pair.",
+        title = stringResource(R.string.label_step_2_title),
+        description = stringResource(R.string.description_step_2),
         modifier = modifier,
     ) {
 
@@ -52,12 +54,17 @@ fun StepTwoScreen(
         }
 
         WaltSecondaryButton(
-            text = "Retrieve Public Key",
+            text = stringResource(R.string.label_retrieve_public_key),
             onClick = viewModel::onRetrievePublicKeyClick,
             modifier = Modifier.fillMaxWidth()
         )
+        WaltSecondaryButton(
+            text = stringResource(R.string.label_go_back),
+            onClick = viewModel::onBackClick,
+            modifier = Modifier.fillMaxWidth()
+        )
         WaltPrimaryButton(
-            text = "Next Step",
+            text = stringResource(R.string.label_next_step),
             enabled = publicKey != null,
             onClick = viewModel::onGoToStepThreeClick,
             modifier = Modifier.fillMaxWidth()

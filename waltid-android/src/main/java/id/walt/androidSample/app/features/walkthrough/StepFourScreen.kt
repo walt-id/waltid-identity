@@ -27,6 +27,7 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -86,8 +87,8 @@ fun StepFourScreen(
     }
 
     WalkthroughStep(
-        title = "Step 4 - Sign Input",
-        description = "Sign the input using the generated key pair.",
+        title = stringResource(R.string.label_step_4_title),
+        description = stringResource(R.string.description_step_4),
         modifier = modifier,
     ) {
 
@@ -96,7 +97,7 @@ fun StepFourScreen(
         OutlinedTextField(
             value = inputText,
             onValueChange = viewModel::onPlainTextChanged,
-            label = { Text("Input text to sign here") },
+            label = { Text(stringResource(R.string.description_plain_text_hint)) },
         )
 
         if (signedText != null) {
@@ -122,7 +123,7 @@ fun StepFourScreen(
         Spacer(modifier = Modifier.height(16.dp))
 
         WaltSecondaryButton(
-            text = "Sign Input",
+            text = stringResource(R.string.label_sign_input),
             enabled = inputText.isNotBlank(),
             onClick = {
                 systemKeyboard?.hide()
@@ -134,8 +135,13 @@ fun StepFourScreen(
             },
             modifier = Modifier.fillMaxWidth()
         )
+        WaltSecondaryButton(
+            text = stringResource(R.string.label_go_back),
+            onClick = viewModel::onBackClick,
+            modifier = Modifier.fillMaxWidth()
+        )
         WaltPrimaryButton(
-            text = "Next Step",
+            text = stringResource(R.string.label_next_step),
             onClick = viewModel::onGoToStepFiveClick,
             enabled = signedText != null,
             modifier = Modifier.fillMaxWidth(),
