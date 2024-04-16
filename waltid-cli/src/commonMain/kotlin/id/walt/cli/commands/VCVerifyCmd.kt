@@ -18,14 +18,10 @@ import id.walt.credentials.verification.JsonSchemaVerificationException
 import id.walt.credentials.verification.NotBeforePolicyException
 import id.walt.credentials.verification.PolicyManager
 import id.walt.credentials.verification.models.PolicyResult
-import id.walt.credentials.verification.policies.ExpirationDatePolicy
-import id.walt.credentials.verification.policies.NotBeforeDatePolicy
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 import java.io.File
 
 class VCVerifyCmd : CliktCommand(
@@ -151,32 +147,8 @@ class VCVerifyCmd : CliktCommand(
     }
 
     private fun handleSuccess(it: PolicyResult) {
-        var details = ""
-
-        // val innerException = it.result.exceptionOrNull()
-        // if (innerException != null) {
-        //     details = innerException.message!!
-        // } else
-        // if (it.result.getOrNull() !is Unit &&
-
-        if ("policy_available" in it.result.getOrThrow() as JsonObject &&
-            !(it.result.getOrThrow() as JsonObject).get("policy_available")!!.equals(JsonPrimitive(true))
-        ) { // i.e. If policy_available == false
-
-            when (it.request.policy) {
-                is ExpirationDatePolicy -> {
-                    details =
-                        " [warning] The policy has not even been applied because neither 'exp', 'validUntil' nor 'expirationDate' were found."
-                }
-
-                is NotBeforeDatePolicy -> {
-                    details = "Not that much. Neither 'nbf' not 'iat' found. Is it a bug? ¯\\_(ツ)_/¯"
-                }
-            }
-        }
         print.dim("${it.request.policy.name}: ", false)
-        print.green("Success! ", false)
-        print.plain(details)
+        print.green("Success! ")
     }
 
     private fun checkAndLoadArguments(): MutableMap<String, JsonElement> {
