@@ -2,10 +2,7 @@ package id.walt.did.dids.resolver
 
 import id.walt.crypto.keys.Key
 import id.walt.did.dids.DidUtils.methodFromDid
-import id.walt.did.dids.resolver.local.DidJwkResolver
-import id.walt.did.dids.resolver.local.DidKeyResolver
-import id.walt.did.dids.resolver.local.DidWebResolver
-import id.walt.did.dids.resolver.local.LocalResolverMethod
+import id.walt.did.dids.resolver.local.*
 import io.ktor.client.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.serialization.kotlinx.json.*
@@ -28,6 +25,7 @@ class LocalResolver : DidResolver {
 
     private val resolvers = listOf(
         DidJwkResolver(),
+        DidEbsiResolver(http),
         DidWebResolver(http),
         DidKeyResolver()
     ).associateBy { it.method }.toMutableMap()
