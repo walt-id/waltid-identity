@@ -1,6 +1,6 @@
 package id.walt.webwallet.service.credentials
 
-import id.walt.webwallet.service.credentials.status.CredentialStatusTypes
+import id.walt.webwallet.utils.JsonUtils
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.serialization.json.JsonObject
@@ -12,14 +12,18 @@ class CredentialValidator {
         //TODO: should call verifier policy
         val now = Clock.System.now()
         val validFrom =
-            credential.jsonObject["validFrom"]?.jsonObject?.jsonPrimitive?.content?.let { Instant.parse(it) } ?: now
+            JsonUtils.tryGetData(credential, "validFrom")?.jsonObject?.jsonPrimitive?.content?.let { Instant.parse(it) } ?: now
         val validUntil =
-            credential.jsonObject["validUntil"]?.jsonObject?.jsonPrimitive?.content?.let { Instant.parse(it) } ?: now
+            JsonUtils.tryGetData(credential, "validUntil")?.jsonObject?.jsonPrimitive?.content?.let { Instant.parse(it) } ?: now
         //TODO: signature
         now in (validFrom..validUntil) && validateStatusPurpose(entryPurpose, subjectPurpose) && validateSubjectType(subjectType)
     }
 
-    private fun validateSubjectType(type: String) = type in CredentialStatusTypes.StatusList.type
+    private fun validateSubjectType(type: String) = type in listOf(
+        "BitstringStatusList",
+        "StatusList2021",
+        "RevocationList2021",
+    )
 
     private fun validateStatusPurpose(entryPurpose: String, subjectPurpose: String) =
         entryPurpose == subjectPurpose
