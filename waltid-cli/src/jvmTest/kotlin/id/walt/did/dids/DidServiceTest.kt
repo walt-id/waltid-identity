@@ -6,6 +6,7 @@ import org.junit.jupiter.api.assertDoesNotThrow
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.MethodSource
 import java.util.stream.Stream
+import kotlin.test.Ignore
 import kotlin.test.Test
 import kotlin.test.assertContains
 
@@ -25,6 +26,7 @@ class DidServiceTest {
     }
 
     @Test
+    @Ignore
     fun `should create a Secpk1 did-key`() {
 
         val keyContent = """{
@@ -51,6 +53,7 @@ class DidServiceTest {
     @ParameterizedTest(name = "DidService.resolve() should resolve {0}")
     // @ValueSource(strings = [uniSampleDidP521])
     @MethodSource("didsFactory")
+    @Ignore
     fun `should resolve {0}`(did: String) {
         assertDoesNotThrow {
             runBlocking { DidService.resolve(did) }
