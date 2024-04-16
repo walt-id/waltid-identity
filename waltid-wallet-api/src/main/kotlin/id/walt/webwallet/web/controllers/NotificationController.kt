@@ -9,6 +9,9 @@ import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.util.*
+import kotlinx.datetime.Clock
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
@@ -53,7 +56,7 @@ object NotificationController {
                         }
                         queryParameter<String>("addedOn") {
                             description = "Filter by date the notification was created"
-                            example = "2024-03-06T12:48:50.723Z"
+                            example = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date.toString()
                         }
                         queryParameter<Boolean>("isRead") {
                             description = "Filter by 'isRead' status"

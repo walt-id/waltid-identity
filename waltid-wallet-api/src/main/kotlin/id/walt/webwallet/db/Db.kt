@@ -70,6 +70,7 @@ object Db {
         OidcLogins,
         WalletSettings,
         WalletNotifications,
+        EntityNameResolutionCache,
     ).toTypedArray()
 
 
