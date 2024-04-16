@@ -6,7 +6,8 @@ sealed interface WalkthroughEvent {
         data object ToStepThree : NavigateEvent
         data object ToStepFour : NavigateEvent
         data object ToStepFive : NavigateEvent
-        data object CompleteWalkthrough : NavigateEvent
+        data object GoBack : NavigateEvent
+        data object RestartWalkthrough : NavigateEvent
     }
     sealed interface Biometrics : WalkthroughEvent {
         data object BiometricsUnavailable : Biometrics

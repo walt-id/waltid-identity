@@ -57,6 +57,7 @@ interface WalkthroughViewModel {
     fun onGenerateDIDClick()
     fun onSignTextClick()
     fun onVerifyClick()
+    fun onBackClick()
     fun onGoToStepTwoClick()
     fun onGoToStepThreeClick()
     fun onGoToStepFourClick()
@@ -94,14 +95,13 @@ interface WalkthroughViewModel {
         override fun onGoToStepThreeClick() = Unit
         override fun onGoToStepFourClick() = Unit
         override fun onGoToStepFiveClick() = Unit
+        override fun onBackClick() = Unit
         override fun onCompleteWalkthroughClick() = Unit
         override fun onBiometricsAuthFailure() = Unit
         override fun onBiometricsUnavailable() = Unit
     }
 
     class Default : ViewModel(), WalkthroughViewModel {
-
-        private var currentStep = 1
 
         private val _events = Channel<WalkthroughEvent>()
         override val events = _events.receiveAsFlow().shareIn(viewModelScope, started = SharingStarted.WhileSubscribed(5_000L))
@@ -255,8 +255,15 @@ interface WalkthroughViewModel {
             viewModelScope.launch { _events.send(WalkthroughEvent.NavigateEvent.ToStepFive) }
         }
 
+        override fun onBackClick() {
+            viewModelScope.launch { _events.send(WalkthroughEvent.NavigateEvent.GoBack) }
+        }
+
         override fun onCompleteWalkthroughClick() {
-            TODO("Not yet implemented")
+            resetKey()
+            resetDid()
+            resetSignedResult()
+            viewModelScope.launch { _events.send(WalkthroughEvent.NavigateEvent.RestartWalkthrough) }
         }
 
         override fun onBiometricsAuthFailure() {
