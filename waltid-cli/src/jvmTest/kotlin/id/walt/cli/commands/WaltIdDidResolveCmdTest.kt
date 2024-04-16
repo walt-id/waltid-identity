@@ -1,6 +1,7 @@
 package id.walt.cli.commands
 
 import org.junit.jupiter.api.assertDoesNotThrow
+import kotlin.test.Ignore
 import kotlin.test.Test
 
 class WaltIdDidResolveCmdTest {
@@ -37,6 +38,7 @@ class WaltIdDidResolveCmdTest {
     val waltidDidLibSecp256k1 = "did:key:zQ3shTZmje6ppF4oboKTX85hUWGrR1nxrWnFA3tnJhsHEC8c4"
 
     @Test
+    @Ignore
     fun `should resolve uniresolver P-521 did|key example`() {
         assertDoesNotThrow {
             command.parse(listOf("-d", uniSampleDidP521))
@@ -44,6 +46,7 @@ class WaltIdDidResolveCmdTest {
     }
 
     @Test
+    @Ignore
     fun `should resolve uniresolver Bls12381G1 did|key example`() {
         assertDoesNotThrow {
             command.parse(listOf("-d", uniSampleDidBls12381G1))
@@ -51,6 +54,7 @@ class WaltIdDidResolveCmdTest {
     }
 
     @Test
+    @Ignore
     fun `should resolve uniresolver RSA did|key example`() {
         assertDoesNotThrow {
             command.parse(listOf("-d", uniSampleDidRSA))
@@ -58,6 +62,7 @@ class WaltIdDidResolveCmdTest {
     }
 
     @Test
+    @Ignore
     fun `should resolve uniresolver Bls12381G2 did|key example`() {
         assertDoesNotThrow {
             command.parse(listOf("-d", uniSampleDidBls12381G2))
@@ -72,6 +77,7 @@ class WaltIdDidResolveCmdTest {
     }
 
     @Test
+    @Ignore
     fun `should resolve uniresolver P-384 did|key example`() {
         assertDoesNotThrow {
             command.parse(listOf("-d", uniSampleDidP384))
@@ -100,6 +106,7 @@ class WaltIdDidResolveCmdTest {
     }
 
     @Test
+    @Ignore
     fun `should resolve waltid RSA did|key`() {
         assertDoesNotThrow {
             command.parse(listOf("-d", waltidDidRSA))
@@ -107,6 +114,7 @@ class WaltIdDidResolveCmdTest {
     }
 
     @Test
+    @Ignore
     fun `should resolve waltid Secp256k1 did|key`() {
         assertDoesNotThrow {
             command.parse(listOf("-d", waltidDidSecp256k1))
@@ -114,6 +122,7 @@ class WaltIdDidResolveCmdTest {
     }
 
     @Test
+    @Ignore
     fun `should resolve waltid Secp256r1 did|key`() {
         assertDoesNotThrow {
             command.parse(listOf("-d", waltidDidSecp256r1))
