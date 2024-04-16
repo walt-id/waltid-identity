@@ -19,8 +19,8 @@ repositories {
 }
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_15
-    targetCompatibility = JavaVersion.VERSION_15
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
 }
 
 suspendTransform {
@@ -37,13 +37,13 @@ suspendTransform {
 
 
 kotlin {
-    jvmToolchain(15)
+    jvmToolchain(17)
 }
 
 kotlin {
     jvm {
         compilations.all {
-            kotlinOptions.jvmTarget = "15" // JVM got Ed25519 at version 15
+            kotlinOptions.jvmTarget = "17" // JVM got Ed25519 at version 15
         }
         withJava()
         tasks.withType<Test>().configureEach {

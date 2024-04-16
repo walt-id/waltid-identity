@@ -32,6 +32,8 @@ import org.bouncycastle.asn1.x509.AlgorithmIdentifier
 import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.bouncycastle.util.io.pem.PemObject
 import org.bouncycastle.util.io.pem.PemWriter
+import org.web3j.crypto.ECKeyPair
+import org.web3j.crypto.Hash
 import java.io.ByteArrayOutputStream
 import java.security.*
 import java.security.interfaces.ECPrivateKey
@@ -246,9 +248,12 @@ actual class JWKKey actual constructor(
             KeyType.secp256k1 -> JWSAlgorithm.ES256K
             else -> JWSAlgorithm.ES256
         }
-        return _internalSigner.sign(JWSHeader(jwsAlg), plaintext).let {
-            ECDSASignature.fromECDSAConcat(ECDSA.transcodeSignatureToConcat(it.decode(), ECDSA.getSignatureByteArrayLength(jwsAlg)))
-        }
+        val sig = ECKeyPair.create((getPrivateKey() as ECPrivateKey).s).sign(Hash.sha3(plaintext))
+        return ECDSASignature(sig.r.toByteArray(), sig.s.toByteArray())
+//        return _internalSigner.sign(JWSHeader(jwsAlg), plaintext).let {
+//            val sig = ECKeyPair.create((getPrivateKey() as ECPrivateKey).s).sign(Hash.sha3(plaintext))
+//            ECDSASignature.fromECDSAConcat(it.decode())
+//        }
 //        when (key.algorithm) {
 //            KeyAlgorithm.ECDSA_Secp256k1 -> return ECKeyPair.create(key.keyPair).sign(Hash.sha3(encodedTx))
 //            else -> throw IllegalArgumentException("Wrong key algorithm: secp256k1 is required.")

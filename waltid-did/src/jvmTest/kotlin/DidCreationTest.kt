@@ -121,7 +121,7 @@ class DidCreationTest {
     }
 
     val CLIENT_MOCK_PORT = 5000
-    val CLIENT_MOCK_URL = "https://505f-62-178-27-231.ngrok-free.app/client-mock"//"http://192.168.0.122:5000/client-mock"
+    val CLIENT_MOCK_URL = "https://3d89-62-178-27-231.ngrok-free.app/client-mock"//"http://192.168.0.122:5000/client-mock"
     val CLIENT_MAIN_KEY = runBlocking { JWKKey.generate(KeyType.secp256k1) }
     val CLIENT_VCSIGN_KEY = runBlocking { JWKKey.generate(KeyType.secp256r1) }
     fun startClientMockServer() {

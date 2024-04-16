@@ -120,6 +120,8 @@ kotlin {
 
                 // Multibase
 //                implementation("com.github.multiformats:java-multibase:v1.1.1")
+                // Ethereum
+                implementation("org.web3j:crypto:4.10.2")
             }
         }
         val jvmTest by getting {
