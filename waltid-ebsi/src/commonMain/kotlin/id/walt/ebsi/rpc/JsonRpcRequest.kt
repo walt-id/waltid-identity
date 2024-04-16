@@ -2,6 +2,8 @@ package id.walt.ebsi.rpc
 
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
+import id.walt.ebsi.eth.SignedTransaction
+import id.walt.ebsi.eth.UnsignedTransaction
 import id.walt.ebsi.eth.Utils
 import kotlinx.datetime.Clock
 import kotlinx.datetime.DateTimeUnit
@@ -47,4 +49,21 @@ object EbsiRpcRequests {
       }, notBefore.epochSeconds, notAfter.epochSeconds
     )),
     id = requestId)
+
+  suspend fun generateSendSignedTransactionRequest(
+    requestId: Int,
+    unsignedTransaction: UnsignedTransaction,
+    signedTransaction: SignedTransaction
+  ) = JsonRpcRequest(
+    method = EbsiRpcMethod.sendSignedTransaction,
+    params = listOf(SignedTransactionParams(
+      "eth",
+      unsignedTransaction,
+      signedTransaction.r,
+      signedTransaction.s,
+      signedTransaction.v,
+      signedTransaction.signedRawTransaction
+    )),
+    id = requestId
+  )
 }

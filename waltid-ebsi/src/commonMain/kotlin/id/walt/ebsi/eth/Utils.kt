@@ -18,7 +18,7 @@ object Utils {
 
   /**
    * Return concatenation of x,y coordinates on the elliptic curve of the public key
-   * getPublicKeyRepresentation() seems to return some other bytes first and then the 64 bytes of the concatenation of the x and y coordinates
+   * getPublicKeyRepresentation() returns some other bytes first (DER representation) and then the 64 bytes of the concatenation of the x and y coordinates
    */
   suspend fun getPublicKeyXYRepresentation(secp256k1Key: Key): ByteArray {
     if(secp256k1Key.keyType != KeyType.secp256k1)

@@ -1,19 +1,16 @@
 import id.walt.credentials.PresentationBuilder
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
-import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.crypto.utils.MultiBaseUtils
 import id.walt.did.dids.document.DidEbsiBaseDocument
-import id.walt.did.dids.document.DidEbsiDocument
 import id.walt.did.dids.registrar.dids.DidKeyCreateOptions
 import id.walt.did.dids.registrar.dids.DidWebCreateOptions
 import id.walt.did.dids.registrar.local.key.DidKeyRegistrar
 import id.walt.did.dids.registrar.local.web.DidWebRegistrar
-import id.walt.did.utils.EbsiRPCUtils
 import id.walt.did.utils.randomUUID
 import id.walt.ebsi.eth.TransactionService
 import id.walt.ebsi.rpc.EbsiRpcRequests
-import id.walt.ebsi.rpc.JsonRpcResponse
+import id.walt.ebsi.rpc.SignedTransactionResponse
 import id.walt.ebsi.rpc.UnsignedTransactionResponse
 import id.walt.oid4vc.OpenID4VCI
 import id.walt.oid4vc.OpenID4VP
@@ -21,13 +18,11 @@ import id.walt.oid4vc.data.*
 import id.walt.oid4vc.data.dif.DescriptorMapping
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.data.dif.PresentationSubmission
-import id.walt.oid4vc.data.dif.VCFormat
 import id.walt.oid4vc.interfaces.PresentationResult
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.requests.CredentialRequest
 import id.walt.oid4vc.requests.TokenRequest
 import id.walt.oid4vc.responses.AuthorizationCodeResponse
-import id.walt.oid4vc.responses.AuthorizationDirectPostResponse
 import id.walt.oid4vc.responses.CredentialResponse
 import id.walt.oid4vc.responses.TokenResponse
 import id.walt.oid4vc.util.http
@@ -40,21 +35,16 @@ import io.ktor.server.application.*
 import io.ktor.server.engine.*
 import io.ktor.server.netty.*
 import io.ktor.server.plugins.contentnegotiation.*
-import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.util.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.Clock
-import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.Instant
-import kotlinx.datetime.plus
 import kotlinx.serialization.json.*
-import org.komputing.khash.keccak.Keccak
-import org.komputing.khash.keccak.KeccakParameter
+import java.net.URLEncoder
 import java.nio.ByteBuffer
-import java.time.Duration
 import java.util.UUID
 import kotlin.test.*
 import kotlin.time.DurationUnit
@@ -121,7 +111,7 @@ class DidCreationTest {
     }
 
     val CLIENT_MOCK_PORT = 5000
-    val CLIENT_MOCK_URL = "https://3d89-62-178-27-231.ngrok-free.app/client-mock"//"http://192.168.0.122:5000/client-mock"
+    val CLIENT_MOCK_URL = "https://39a9-62-178-27-231.ngrok-free.app/client-mock"//"http://192.168.0.122:5000/client-mock"
     val CLIENT_MAIN_KEY = runBlocking { JWKKey.generate(KeyType.secp256k1) }
     val CLIENT_VCSIGN_KEY = runBlocking { JWKKey.generate(KeyType.secp256r1) }
     fun startClientMockServer() {
@@ -321,5 +311,23 @@ class DidCreationTest {
 
         // sign transaction
         val signedTransaction = TransactionService.signTransaction(CLIENT_MAIN_KEY, insertDidRpcResponse.result)
+        val sendSignedTransactionRequest = EbsiRpcRequests.generateSendSignedTransactionRequest(
+            1, insertDidRpcResponse.result, signedTransaction)
+        val sendSignedTransactionHttpResponse = http.post("https://api-conformance.ebsi.eu/did-registry/v5/jsonrpc") {
+            bearerAuth(accessTokenResponse.accessToken!!)
+            contentType(ContentType.Application.Json)
+            setBody(Json.encodeToJsonElement(sendSignedTransactionRequest).also {
+                println(it)
+            })
+        }
+        println(sendSignedTransactionHttpResponse.bodyAsText())
+        assertEquals(HttpStatusCode.OK, sendSignedTransactionHttpResponse.status)
+        val sendSignedTransactionRpcResponse = Json.decodeFromString<SignedTransactionResponse>(sendSignedTransactionHttpResponse.bodyAsText())
+        println(sendSignedTransactionRpcResponse.result)
+
+        Thread.sleep(2000)
+        val resolveDidHttpResponse = http.get("https://api-conformance.ebsi.eu/did-registry/v5/identifiers/${URLEncoder.encode(did)}")
+        assertEquals(HttpStatusCode.OK, resolveDidHttpResponse.status)
+        println(resolveDidHttpResponse.bodyAsText())
     }
 }
