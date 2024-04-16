@@ -1,5 +1,6 @@
 package id.walt.webwallet.service.credentials
 
+import id.walt.webwallet.service.credentials.status.CredentialStatusTypes
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.serialization.json.JsonObject
@@ -18,10 +19,7 @@ class CredentialValidator {
         now in (validFrom..validUntil) && validateStatusPurpose(entryPurpose, subjectPurpose) && validateSubjectType(subjectType)
     }
 
-    private fun validateSubjectType(type: String) = type in listOf(
-        "BitstringStatusList",
-        "StatusList2021",
-    )
+    private fun validateSubjectType(type: String) = type in CredentialStatusTypes.StatusList.type
 
     private fun validateStatusPurpose(entryPurpose: String, subjectPurpose: String) =
         entryPurpose == subjectPurpose
