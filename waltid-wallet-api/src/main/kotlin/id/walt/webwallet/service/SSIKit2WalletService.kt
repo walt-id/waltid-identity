@@ -269,7 +269,12 @@ class SSIKit2WalletService(
             }
         }
 
-        return if (resp.status.isSuccess()) {
+
+
+        return if (resp.status.value==302 && !resp.headers["location"].toString().contains("error")){
+            Result.success(if (isResponseRedirectUrl) httpResponseBody else null)
+        }
+        else if (resp.status.isSuccess()) {
             Result.success(if (isResponseRedirectUrl) httpResponseBody else null)
         } else {
             if (isResponseRedirectUrl) {

@@ -315,8 +315,8 @@ class TestCredentialWallet(
                     type,
                     session.presentationDefinition
                 ),//session.presentationDefinition?.inputDescriptors?.get(index)?.id,
-                format = VCFormat.jwt_vc_json,
-                path = "$.verifiableCredential[$index]",
+                format = VCFormat.jwt_vc_json, // jwt_vc_json
+                path = "$.verifiableCredential[$index]", //.vp.verifiableCredentials
             )
         )
     }
