@@ -2,6 +2,7 @@ package id.walt.webwallet.web.controllers
 
 import id.walt.webwallet.service.WalletServiceManager
 import id.walt.webwallet.service.push.PushManager
+import id.walt.webwallet.usecase.notification.NotificationDTO
 import id.walt.webwallet.usecase.notification.NotificationFilterParameter
 import io.github.smiley4.ktorswaggerui.dsl.*
 import io.ktor.http.*
@@ -74,7 +75,7 @@ object NotificationController {
                     response {
                         HttpStatusCode.OK to {
                             description = "Array of notification objects"
-                            body<List<JsonObject>>()
+                            body<List<NotificationDTO>>()
                         }
                     }
                 }) {
