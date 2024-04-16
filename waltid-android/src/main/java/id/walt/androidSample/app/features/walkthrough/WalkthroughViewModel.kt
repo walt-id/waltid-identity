@@ -3,6 +3,11 @@ package id.walt.androidSample.app.features.walkthrough
 import android.util.Base64
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import id.walt.androidSample.app.features.walkthrough.model.KeyAlgorithmOption
+import id.walt.androidSample.app.features.walkthrough.model.MethodOption
+import id.walt.androidSample.app.features.walkthrough.model.SignOption
+import id.walt.androidSample.app.features.walkthrough.model.VerificationResult
+import id.walt.androidSample.app.features.walkthrough.model.WalkthroughEvent
 import id.walt.crypto.keys.AndroidKey
 import id.walt.crypto.keys.KeyType
 import id.walt.did.dids.DidService
@@ -17,20 +22,6 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-
-sealed interface WalkthroughStep {
-    data object One : WalkthroughStep
-    data object Two : WalkthroughStep
-    data object Three : WalkthroughStep
-    data object Four : WalkthroughStep
-    data object Five : WalkthroughStep
-}
-
-sealed interface VerificationResult {
-    data object Failed: VerificationResult
-    data object Success: VerificationResult
-    data object JWSVerificationNotAvailable: VerificationResult
-}
 
 interface WalkthroughViewModel {
     val events: SharedFlow<WalkthroughEvent>
@@ -298,25 +289,3 @@ interface WalkthroughViewModel {
 }
 
 
-sealed interface WalkthroughEvent {
-    sealed interface NavigateEvent : WalkthroughEvent {
-        data object ToStepTwo : NavigateEvent
-        data object ToStepThree : NavigateEvent
-        data object ToStepFour : NavigateEvent
-        data object ToStepFive : NavigateEvent
-        data object CompleteWalkthrough : NavigateEvent
-    }
-    sealed interface Biometrics : WalkthroughEvent {
-        data object BiometricsUnavailable : Biometrics
-        data object BiometricAuthenticationFailure : Biometrics
-    }
-}
-
-sealed interface KeyAlgorithmOption {
-    data object RSA : KeyAlgorithmOption
-    data object Secp256r1 : KeyAlgorithmOption
-
-    companion object {
-        fun all(): List<KeyAlgorithmOption> = listOf(RSA, Secp256r1)
-    }
-}

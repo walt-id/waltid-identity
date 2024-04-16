@@ -16,9 +16,7 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -32,6 +30,8 @@ import androidx.navigation.compose.rememberNavController
 import id.walt.androidSample.app.features.walkthrough.components.WalkthroughStep
 import id.walt.androidSample.app.features.walkthrough.components.WaltPrimaryButton
 import id.walt.androidSample.app.features.walkthrough.components.WaltSecondaryButton
+import id.walt.androidSample.app.features.walkthrough.model.MethodOption
+import id.walt.androidSample.app.util.authenticateWithBiometric
 import id.walt.androidSample.theme.WaltIdAndroidSampleTheme
 
 
@@ -132,15 +132,6 @@ private fun MethodRadioGroup(
                 )
             }
         }
-    }
-}
-
-sealed interface MethodOption {
-    data object Key : MethodOption
-    data object JWK : MethodOption
-
-    companion object {
-        fun all() = listOf(Key, JWK)
     }
 }
 
