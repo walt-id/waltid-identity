@@ -49,7 +49,7 @@ import id.walt.webwallet.service.report.ReportRequestParameter
 import id.walt.webwallet.service.report.ReportService
 import id.walt.webwallet.service.settings.SettingsService
 import id.walt.webwallet.service.settings.WalletSetting
-import id.walt.webwallet.usecase.event.EventUseCase
+import id.walt.webwallet.usecase.event.EventLogUseCase
 import id.walt.webwallet.web.controllers.PresentationRequestParameter
 import id.walt.webwallet.web.parameter.CredentialRequestParameter
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -86,7 +86,7 @@ class SSIKit2WalletService(
     walletId: UUID,
     private val categoryService: CategoryService,
     private val settingsService: SettingsService,
-    private val eventUseCase: EventUseCase,
+    private val eventUseCase: EventLogUseCase,
     private val http: HttpClient
 ) : WalletService(tenant, accountId, walletId) {
     private val logger = KotlinLogging.logger { }
@@ -131,7 +131,7 @@ class SSIKit2WalletService(
                 tenant = tenant,
                 accountId = accountId,
                 walletId = walletId,
-                data = eventUseCase.credentialEventData(this, null),
+                data = eventUseCase.credentialEventData(this),
                 credentialId = this.id
             )
         }
@@ -258,11 +258,17 @@ class SSIKit2WalletService(
             credentialService.get(walletId, it)?.run {
                 eventUseCase.log(
                     action = EventType.Credential.Present,
-                    originator = presentationSession.presentationDefinition?.name ?: EventDataNotAvailable,
+                    originator = presentationSession.authorizationRequest.clientMetadata?.clientName
+                        ?: EventDataNotAvailable,
                     tenant = tenant,
                     accountId = accountId,
                     walletId = walletId,
-                    data = eventUseCase.credentialEventData(this, null),
+                    data = eventUseCase.credentialEventData(
+                        credential = this,
+                        subject = eventUseCase.subjectData(this),
+                        organization = eventUseCase.verifierData(authReq),
+                        type = null
+                    ),
                     credentialId = this.id,
                     note = parameter.note,
                 )

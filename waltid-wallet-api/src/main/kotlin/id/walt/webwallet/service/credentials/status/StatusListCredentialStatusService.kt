@@ -1,10 +1,10 @@
 package id.walt.webwallet.service.credentials.status
 
-import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.webwallet.service.BitStringValueParser
 import id.walt.webwallet.service.credentials.CredentialValidator
 import id.walt.webwallet.service.credentials.status.fetch.StatusListCredentialFetchFactory
 import id.walt.webwallet.usecase.credential.CredentialStatusResult
+import id.walt.webwallet.utils.JsonUtils
 import id.walt.webwallet.utils.hexToInt
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -12,7 +12,6 @@ import kotlinx.serialization.Transient
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.decodeFromJsonElement
-import kotlinx.serialization.json.jsonObject
 
 class StatusListCredentialStatusService(
     private val credentialFetchFactory: StatusListCredentialFetchFactory,
@@ -39,7 +38,7 @@ class StatusListCredentialStatusService(
         } ?: error("Error parsing status list entry")
 
     private fun extractCredentialSubject(credential: JsonObject): StatusListCredentialSubject? =
-        credential.jsonObject["credentialSubject"]?.toJsonElement()?.let {
+        JsonUtils.tryGetData(credential, "credentialSubject")?.let {
             json.decodeFromJsonElement(it)
         }
 
