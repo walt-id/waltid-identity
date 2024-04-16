@@ -113,7 +113,7 @@ kotlin {
         val jvmMain by getting {
             dependencies {
                 // Ktor client
-                implementation("io.ktor:ktor-client-cio:2.3.10")
+                //implementation("io.ktor:ktor-client-cio:2.3.8")
                 implementation("io.ktor:ktor-client-okhttp:2.3.10")
 
                 // Logging

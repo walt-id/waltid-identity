@@ -7,6 +7,8 @@ import id.walt.did.dids.registrar.dids.DidKeyCreateOptions
 import id.walt.did.dids.registrar.dids.DidWebCreateOptions
 import id.walt.did.dids.registrar.local.key.DidKeyRegistrar
 import id.walt.did.dids.registrar.local.web.DidWebRegistrar
+import id.walt.did.dids.resolver.DidResolver
+import id.walt.did.dids.resolver.local.DidEbsiResolver
 import id.walt.did.utils.randomUUID
 import id.walt.ebsi.eth.TransactionService
 import id.walt.ebsi.rpc.EbsiRpcRequests
@@ -329,5 +331,14 @@ class DidCreationTest {
         val resolveDidHttpResponse = http.get("https://api-conformance.ebsi.eu/did-registry/v5/identifiers/${URLEncoder.encode(did)}")
         assertEquals(HttpStatusCode.OK, resolveDidHttpResponse.status)
         println(resolveDidHttpResponse.bodyAsText())
+        val resolverResult = DidEbsiResolver().resolve(did)
+        assertEquals(true, resolverResult.isSuccess)
+        println(resolverResult.getOrNull()!!.toString())
+        // TODO:
+        //      register other key types for did?
+        //      VerifiableAccreditationToAttest
+        //      more steps from https://hub.ebsi.eu/conformance/build-solutions/accredit-and-authorise-functional-flows
+        //      Reorganize test code into production code!!
+
     }
 }
