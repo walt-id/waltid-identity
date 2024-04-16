@@ -27,6 +27,7 @@ import androidx.navigation.compose.rememberNavController
 import id.walt.androidSample.app.features.walkthrough.components.WalkthroughStep
 import id.walt.androidSample.app.features.walkthrough.components.WaltPrimaryButton
 import id.walt.androidSample.app.features.walkthrough.components.WaltSecondaryButton
+import id.walt.androidSample.app.features.walkthrough.model.KeyAlgorithmOption
 import id.walt.androidSample.theme.WaltIdAndroidSampleTheme
 
 @Composable

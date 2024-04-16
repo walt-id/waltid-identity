@@ -21,6 +21,7 @@ import id.walt.androidSample.R
 import id.walt.androidSample.app.features.walkthrough.components.WalkthroughStep
 import id.walt.androidSample.app.features.walkthrough.components.WaltPrimaryButton
 import id.walt.androidSample.app.features.walkthrough.components.WaltSecondaryButton
+import id.walt.androidSample.app.features.walkthrough.model.VerificationResult
 import id.walt.androidSample.theme.WaltIdAndroidSampleTheme
 
 

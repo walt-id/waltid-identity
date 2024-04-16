@@ -4,7 +4,6 @@ package id.walt.androidSample.app.features.walkthrough
 
 import android.widget.Toast
 import androidx.biometric.BiometricManager
-import androidx.biometric.BiometricPrompt
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -39,12 +38,15 @@ import id.walt.androidSample.R
 import id.walt.androidSample.app.features.walkthrough.components.WalkthroughStep
 import id.walt.androidSample.app.features.walkthrough.components.WaltPrimaryButton
 import id.walt.androidSample.app.features.walkthrough.components.WaltSecondaryButton
+import id.walt.androidSample.app.features.walkthrough.model.SignOption
+import id.walt.androidSample.app.features.walkthrough.model.WalkthroughEvent
+import id.walt.androidSample.app.util.authenticateWithBiometric
 import id.walt.androidSample.theme.WaltIdAndroidSampleTheme
 import id.walt.androidSample.utils.ObserveAsEvents
 import id.walt.androidSample.utils.collectImmediatelyAsStateWithLifecycle
 
 
-@OptIn(ExperimentalComposeUiApi::class)
+@OptIn(ExperimentalComposeUiApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun StepFourScreen(
     viewModel: WalkthroughViewModel,
@@ -174,47 +176,6 @@ private fun SignRadioGroup(
             }
         }
     }
-}
-
-sealed interface SignOption {
-    data object Raw : SignOption
-    data object JWS : SignOption
-
-    companion object {
-        fun all() = listOf(Raw, JWS)
-    }
-}
-
-
-fun authenticateWithBiometric(
-    context: FragmentActivity,
-    onAuthenticated: () -> Unit,
-    onFailure: () -> Unit,
-) {
-    val executor = context.mainExecutor
-    val biometricPrompt = BiometricPrompt(
-        context,
-        executor,
-        object : BiometricPrompt.AuthenticationCallback() {
-            override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
-                super.onAuthenticationSucceeded(result)
-                onAuthenticated()
-            }
-
-            override fun onAuthenticationFailed() {
-                super.onAuthenticationFailed()
-                onFailure()
-            }
-        }
-    )
-    val promptInfo = BiometricPrompt.PromptInfo.Builder()
-        .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.BIOMETRIC_WEAK)
-        .setTitle(context.getString(R.string.title_biometric_authentication))
-        .setSubtitle(context.getString(R.string.subtitle_biometric_authentication))
-        .setNegativeButtonText(context.getString(R.string.cancel))
-        .build()
-
-    biometricPrompt.authenticate(promptInfo)
 }
 
 @Preview

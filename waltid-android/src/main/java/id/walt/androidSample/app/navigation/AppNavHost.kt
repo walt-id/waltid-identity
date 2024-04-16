@@ -13,7 +13,7 @@ import id.walt.androidSample.app.features.walkthrough.StepFourScreen
 import id.walt.androidSample.app.features.walkthrough.StepOneScreen
 import id.walt.androidSample.app.features.walkthrough.StepThreeScreen
 import id.walt.androidSample.app.features.walkthrough.StepTwoScreen
-import id.walt.androidSample.app.features.walkthrough.WalkthroughEvent
+import id.walt.androidSample.app.features.walkthrough.model.WalkthroughEvent
 import id.walt.androidSample.app.features.walkthrough.WalkthroughViewModel
 import id.walt.androidSample.utils.ObserveAsEvents
 
