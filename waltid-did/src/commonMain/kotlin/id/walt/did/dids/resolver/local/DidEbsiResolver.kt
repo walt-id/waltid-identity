@@ -2,16 +2,16 @@ package id.walt.did.dids.resolver.local
 
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.jwk.JWKKey
-import id.walt.crypto.utils.JsonUtils.toJsonElement
-import id.walt.did.dids.DidUtils
-import id.walt.did.dids.document.DidCheqdDocument
 import id.walt.did.dids.document.DidDocument
-import id.walt.did.dids.document.DidEbsiDocument
-import id.walt.did.dids.document.DidEbsiBaseDocument
 import io.ktor.client.*
 import io.ktor.client.call.*
+import io.ktor.client.engine.okhttp.*
+import io.ktor.client.plugins.contentnegotiation.*
+import io.ktor.client.plugins.logging.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
+import io.ktor.http.*
+import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import love.forte.plugin.suspendtrans.annotation.JsPromise
@@ -22,15 +22,36 @@ import kotlin.js.JsExport
 
 @OptIn(ExperimentalJsExport::class)
 @JsExport
-class DidEbsiResolver(private val client: HttpClient) : LocalResolverMethod("ebsi") {
-    private val httpClient = HttpClient() //TODO: inject
+class DidEbsiResolver : LocalResolverMethod("ebsi") {
+
+    val httpLogging = false
 
     @JvmBlocking
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    override suspend fun resolve(did: String): Result<DidDocument> =  runCatching {
-        resolveDid(did)
+    override suspend fun resolve(did: String): Result<DidDocument> {
+        val url = "https://api-conformance.ebsi.eu/did-registry/v5/identifiers/${did}"
+
+        val httpClient = HttpClient(OkHttp) {
+            install(ContentNegotiation) {
+                json(Json { ignoreUnknownKeys = true })
+            }
+            if (httpLogging) {
+                install(Logging) {
+                    logger = Logger.SIMPLE
+                    level = LogLevel.HEADERS
+                }
+            }
+        }
+
+        val response = runCatching {
+            DidDocument(
+                jsonObject = httpClient.get(url).body<JsonObject>()
+            )
+        }
+
+        return response
     }
 
     @JvmBlocking
@@ -41,27 +62,27 @@ class DidEbsiResolver(private val client: HttpClient) : LocalResolverMethod("ebs
         val didDocumentResult = resolve(did)
         if (didDocumentResult.isFailure) return Result.failure(didDocumentResult.exceptionOrNull()!!)
 
-        val publicKeyJwks = didDocumentResult.getOrNull()!!["verificationMethod"]!!.jsonArray[1].toString()
+        val publicKeyJwks = didDocumentResult.getOrNull()!!["verificationMethod"]!!.jsonArray.map {
+            runCatching { // TODO: one layer up
+                val verificationMethod = it.jsonObject
+                val publicKeyJwk = verificationMethod["publicKeyJwk"]!!.jsonObject
+                // Todo base58
+                DidWebResolver.json.encodeToString(publicKeyJwk)
+            }
+        }.filter { it.isSuccess }.map { it.getOrThrow() }
 
-
-        return tryConvertAnyPublicKeyToKey(publicKeyJwks)
-
+        return tryConvertAnyPublicKeyJwkToKey(publicKeyJwks)
     }
 
-
-    private suspend fun resolveDid(did: String): DidDocument {
-        val response = httpClient.get("https://api-conformance.ebsi.eu/did-registry/v5/identifiers/${did}")
-        val responseText = response.bodyAsText()
-
-        val resolution = runCatching { Json.parseToJsonElement(responseText) }.getOrElse { throw RuntimeException("Illegal non-JSON response (${response.status}), body: >>$responseText<< (end of body), error: >>${it.stackTraceToString()}<<") }
-
-        return DidDocument( DidEbsiBaseDocument().let { Json.encodeToJsonElement(resolution) }.jsonObject.toMap())
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
+    suspend fun tryConvertAnyPublicKeyJwkToKey(publicKeyJwks: List<String>): Result<JWKKey> {
+        publicKeyJwks.forEach { publicKeyJwk ->
+            val result = JWKKey.importJWK(publicKeyJwk)
+            if (result.isSuccess) return result
+        }
+        return Result.failure(NoSuchElementException("No key could be imported"))
     }
 }
-
-suspend fun tryConvertAnyPublicKeyToKey(publicKeyJwks: String): Result<JWKKey> {
-    val result = JWKKey.importJWK(publicKeyJwks)
-    if (result.isSuccess) return result
-    return Result.failure(NoSuchElementException("No key could be imported"))
-}
-

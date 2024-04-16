@@ -73,12 +73,13 @@ kotlin {
                 implementation("io.github.optimumcode:json-schema-validator:0.0.8")
 
                 // Ktor client
-                implementation("io.ktor:ktor-client-core:2.3.8")
-                implementation("io.ktor:ktor-client-serialization:2.3.8")
-                implementation("io.ktor:ktor-client-content-negotiation:2.3.8")
-                implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.8")
-                implementation("io.ktor:ktor-client-json:2.3.9")
-                implementation("io.ktor:ktor-client-logging:2.3.8")
+                implementation("io.ktor:ktor-client-core:2.3.10")
+                implementation("io.ktor:ktor-client-serialization:2.3.10")
+                implementation("io.ktor:ktor-client-content-negotiation:2.3.10")
+                implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.10")
+                implementation("io.ktor:ktor-client-json:2.3.10")
+                implementation("io.ktor:ktor-client-logging:2.3.10")
+                implementation("io.ktor:ktor-client-okhttp-jvm:2.3.10")
 
                 // Coroutines
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")

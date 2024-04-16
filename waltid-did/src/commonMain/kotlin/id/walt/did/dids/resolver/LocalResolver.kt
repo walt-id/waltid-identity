@@ -25,7 +25,7 @@ class LocalResolver : DidResolver {
 
     private val resolvers = listOf(
         DidJwkResolver(),
-        DidEbsiResolver(http),
+        DidEbsiResolver(),
         DidWebResolver(http),
         DidKeyResolver()
     ).associateBy { it.method }.toMutableMap()
