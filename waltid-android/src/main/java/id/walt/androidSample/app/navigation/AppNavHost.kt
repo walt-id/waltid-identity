@@ -6,6 +6,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.navOptions
 import id.walt.androidSample.app.features.main.MainViewModel
 import id.walt.androidSample.app.features.result.ResultUi
 import id.walt.androidSample.app.features.walkthrough.StepFiveScreen
@@ -32,7 +33,14 @@ fun AppNavHost(
             WalkthroughEvent.NavigateEvent.ToStepThree -> navController.navigate(NavigationItem.WalkthroughStepThree.route)
             WalkthroughEvent.NavigateEvent.ToStepFour -> navController.navigate(NavigationItem.WalkthroughStepFour.route)
             WalkthroughEvent.NavigateEvent.ToStepFive -> navController.navigate(NavigationItem.WalkthroughStepFive.route)
-            WalkthroughEvent.NavigateEvent.CompleteWalkthrough -> { /* TODO */ }
+            WalkthroughEvent.NavigateEvent.GoBack -> navController.popBackStack()
+            WalkthroughEvent.NavigateEvent.RestartWalkthrough -> navController.navigate(
+                route = NavigationItem.WalkthroughStepOne.route,
+                navOptions = navOptions {
+                    popUpTo(NavigationItem.WalkthroughStepOne.route) { inclusive = true }
+                }
+            )
+
             is WalkthroughEvent.Biometrics -> {}
         }
     }
