@@ -95,7 +95,7 @@ object WalletServiceManager {
     val oidcConfig by lazy { ConfigManager.getConfig<OidcConfiguration>() }
     val issuerTrustValidationService by lazy { DefaultTrustValidationService(httpClient, trustConfig.issuersRecord) }
     val verifierTrustValidationService by lazy { DefaultTrustValidationService(httpClient, trustConfig.verifiersRecord) }
-    val notificationUseCase = NotificationUseCase(NotificationService)
+    val notificationUseCase = NotificationUseCase(NotificationService, notificationDataFormatter)
     val notificationFilterUseCase = NotificationFilterUseCase(NotificationService, credentialService, notificationDataFormatter)
     val matchPresentationDefinitionCredentialsUseCase = MatchPresentationDefinitionCredentialsUseCase(
         credentialService,
