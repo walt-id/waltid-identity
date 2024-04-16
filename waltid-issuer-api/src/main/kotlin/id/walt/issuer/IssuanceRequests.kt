@@ -38,5 +38,5 @@ data class IssuerOnboardingRequest(
 
 @Serializable
 data class IssuerOnboardingResponse(
-    val issuerKey: JsonElement, val issuerDidDoc: DidResult
+    val issuerKey: JsonElement, val issuerDid: String
 )
