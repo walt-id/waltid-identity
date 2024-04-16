@@ -79,7 +79,6 @@ kotlin {
                 implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.10")
                 implementation("io.ktor:ktor-client-json:2.3.10")
                 implementation("io.ktor:ktor-client-logging:2.3.10")
-                implementation("io.ktor:ktor-client-okhttp-jvm:2.3.10")
 
                 // Coroutines
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
@@ -114,7 +113,8 @@ kotlin {
         val jvmMain by getting {
             dependencies {
                 // Ktor client
-                implementation("io.ktor:ktor-client-cio:2.3.8")
+                implementation("io.ktor:ktor-client-cio:2.3.10")
+                implementation("io.ktor:ktor-client-okhttp:2.3.10")
 
                 // Logging
                 implementation("org.slf4j:slf4j-simple:2.0.12")

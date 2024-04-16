@@ -325,7 +325,7 @@ class DidCreationTest {
         val sendSignedTransactionRpcResponse = Json.decodeFromString<SignedTransactionResponse>(sendSignedTransactionHttpResponse.bodyAsText())
         println(sendSignedTransactionRpcResponse.result)
 
-        Thread.sleep(2000)
+        Thread.sleep(5000)
         val resolveDidHttpResponse = http.get("https://api-conformance.ebsi.eu/did-registry/v5/identifiers/${URLEncoder.encode(did)}")
         assertEquals(HttpStatusCode.OK, resolveDidHttpResponse.status)
         println(resolveDidHttpResponse.bodyAsText())

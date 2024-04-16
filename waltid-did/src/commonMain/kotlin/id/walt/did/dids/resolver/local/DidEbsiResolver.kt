@@ -5,7 +5,6 @@ import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.did.dids.document.DidDocument
 import io.ktor.client.*
 import io.ktor.client.call.*
-import io.ktor.client.engine.okhttp.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.plugins.logging.*
 import io.ktor.client.request.*
@@ -33,7 +32,7 @@ class DidEbsiResolver : LocalResolverMethod("ebsi") {
     override suspend fun resolve(did: String): Result<DidDocument> {
         val url = "https://api-conformance.ebsi.eu/did-registry/v5/identifiers/${did}"
 
-        val httpClient = HttpClient(OkHttp) {
+        val httpClient = HttpClient() {
             install(ContentNegotiation) {
                 json(Json { ignoreUnknownKeys = true })
             }
