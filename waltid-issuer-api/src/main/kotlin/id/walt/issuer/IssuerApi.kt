@@ -6,8 +6,8 @@ import id.walt.crypto.keys.KeySerialization
 import id.walt.did.dids.DidService
 import id.walt.issuer.IssuanceExamples.batchExample
 import id.walt.issuer.IssuanceExamples.issuerOnboardingRequestDefaultExample
-import id.walt.issuer.IssuanceExamples.issuerOnboardingRequestOciExample
 import id.walt.issuer.IssuanceExamples.issuerOnboardingRequestDidWebExample
+import id.walt.issuer.IssuanceExamples.issuerOnboardingRequestOciExample
 import id.walt.issuer.IssuanceExamples.issuerOnboardingRequestTseExample
 import id.walt.issuer.IssuanceExamples.issuerOnboardingResponseDefaultExample
 import id.walt.issuer.IssuanceExamples.issuerOnboardingResponseDidWebExample
@@ -79,10 +79,13 @@ fun Application.issuerApi() {
                         example("did:jwk + JWK key (Ed25519)", issuerOnboardingRequestDefaultExample)
                         example("did:web + JWK key (Secp256k1)", issuerOnboardingRequestDidWebExample)
                         example(
-                            "did:key + TSE (Hashicorp Vault Transit Engine key - RSA)",
+                            "did:key + TSE key (Hashicorp Vault Transit Engine - RSA)",
                             issuerOnboardingRequestTseExample
                         )
-                        example("Oracle Cloud Infrastructure (OCI) key + secp256r1 ", issuerOnboardingRequestOciExample)
+                        example(
+                            "did:jwk + OCI key (Oracle Cloud Infrastructure - Secp256r1)",
+                            issuerOnboardingRequestOciExample
+                        )
                         required = true
                     }
                 }
@@ -92,20 +95,19 @@ fun Application.issuerApi() {
                         description = "Issuer onboarding response"
                         body<IssuerOnboardingResponse> {
                             example(
-                                "Local secp256r1 key + did:jwk",
+                                "Local JWK key (Secp256r1) + did:jwk",
                                 issuerOnboardingResponseDefaultExample,
                             )
                             example(
-                                "did:web + JWK key (Secp256r1)",
+                                "Local JWK key (Secp256r1) + did:web",
                                 issuerOnboardingResponseDidWebExample,
                             )
                             example(
-                                "Remote Ed25519 key + did:key (TSE)",
+                                "Remote TSE Ed25519 key + did:key",
                                 issuerOnboardingResponseTseExample,
                             )
-
                             example(
-                                "Remote Secp256r1 key + did:jwk (OCI)",
+                                "Remote OCI Secp256r1 key + did:jwk",
                                 issuerOnboardingResponseOciExample,
                             )
                         }
@@ -123,9 +125,8 @@ fun Application.issuerApi() {
                     }
                 }
 
-                val keyGenerationRequest = req.keyGenerationRequest.copy(
-                    config = keyConfig?.let { it1 -> JsonObject(it1) }
-                )
+                val keyGenerationRequest =
+                    req.keyGenerationRequest.copy(config = keyConfig?.let { it1 -> JsonObject(it1) })
 
 
                 val key = KeyManager.createKey(keyGenerationRequest)
