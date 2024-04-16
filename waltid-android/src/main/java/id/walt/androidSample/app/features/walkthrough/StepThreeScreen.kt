@@ -20,6 +20,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -27,6 +28,7 @@ import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
+import id.walt.androidSample.R
 import id.walt.androidSample.app.features.walkthrough.components.WalkthroughStep
 import id.walt.androidSample.app.features.walkthrough.components.WaltPrimaryButton
 import id.walt.androidSample.app.features.walkthrough.components.WaltSecondaryButton
@@ -53,8 +55,8 @@ fun StepThreeScreen(
         biometricManager.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.BIOMETRIC_WEAK) == BiometricManager.BIOMETRIC_SUCCESS
 
     WalkthroughStep(
-        title = "Step 3 - Generate DID",
-        description = "Generate a DID using the generated key pair.",
+        title = stringResource(R.string.label_step_3_title),
+        description = stringResource(R.string.description_step_3),
         modifier = modifier,
     ) {
 
@@ -81,7 +83,7 @@ fun StepThreeScreen(
         Spacer(modifier = Modifier.height(16.dp))
 
         WaltSecondaryButton(
-            text = "Generate DID",
+            text = stringResource(R.string.label_generate_did),
             onClick = {
                 authenticateWithBiometric(
                     context = ctx as FragmentActivity,
@@ -91,8 +93,13 @@ fun StepThreeScreen(
             },
             modifier = Modifier.fillMaxWidth()
         )
+        WaltSecondaryButton(
+            text = stringResource(R.string.label_go_back),
+            onClick = viewModel::onBackClick,
+            modifier = Modifier.fillMaxWidth()
+        )
         WaltPrimaryButton(
-            text = "Next Step",
+            text = stringResource(R.string.label_next_step),
             onClick = viewModel::onGoToStepFourClick,
             enabled = generatedDID != null,
             modifier = Modifier.fillMaxWidth()

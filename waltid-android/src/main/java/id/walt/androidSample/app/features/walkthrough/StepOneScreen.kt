@@ -18,12 +18,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
+import id.walt.androidSample.R
 import id.walt.androidSample.app.features.walkthrough.components.WalkthroughStep
 import id.walt.androidSample.app.features.walkthrough.components.WaltPrimaryButton
 import id.walt.androidSample.app.features.walkthrough.components.WaltSecondaryButton
@@ -41,8 +43,8 @@ fun StepOneScreen(
     val generatedKey by viewModel.generatedKey.collectAsStateWithLifecycle()
 
     WalkthroughStep(
-        title = "Step 1 - Generate a Key",
-        description = "Choose between using either the RSA or ECDSA algorithm to generate a key pair.",
+        title = stringResource(R.string.label_step_1_title),
+        description = stringResource(R.string.description_step_1),
         modifier = modifier,
     ) {
         Spacer(modifier = Modifier.weight(1f))
@@ -57,12 +59,12 @@ fun StepOneScreen(
         Spacer(modifier = Modifier.height(8.dp))
 
         WaltSecondaryButton(
-            text = "Generate Key",
+            text = stringResource(R.string.label_generate_key),
             onClick = viewModel::onGenerateKeyClick,
             modifier = Modifier.fillMaxWidth()
         )
         WaltPrimaryButton(
-            text = "Next Step",
+            text = stringResource(R.string.label_next_step),
             onClick = viewModel::onGoToStepTwoClick,
             enabled = generatedKey != null,
             modifier = Modifier.fillMaxWidth()

@@ -37,8 +37,8 @@ fun StepFiveScreen(
     val verificationResult by viewModel.verificationResult.collectAsStateWithLifecycle()
 
     WalkthroughStep(
-        title = "Step 5 - Verify Signed Text",
-        description = "Verify the signed text using the generated key pair.",
+        title = stringResource(R.string.label_step_5_title),
+        description = stringResource(R.string.description_step_5),
         modifier = modifier,
     ) {
 
@@ -58,7 +58,7 @@ fun StepFiveScreen(
             }
             VerificationResult.Failed -> {
                 Text(
-                    text = stringResource(id = R.string.verification_failed),
+                    text = stringResource(id = R.string.description_verification_failed),
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.titleMedium,
                     textAlign = TextAlign.Center,
@@ -70,7 +70,7 @@ fun StepFiveScreen(
             }
             VerificationResult.JWSVerificationNotAvailable -> {
                 Text(
-                    text = stringResource(id = R.string.verification_jws_not_available),
+                    text = stringResource(id = R.string.description_verification_jws_not_available),
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.titleMedium,
                     textAlign = TextAlign.Center,
@@ -84,12 +84,17 @@ fun StepFiveScreen(
         }
 
         WaltSecondaryButton(
-            text = "Verify",
+            text = stringResource(R.string.label_verify),
             onClick = viewModel::onVerifyClick,
             modifier = Modifier.fillMaxWidth()
         )
+        WaltSecondaryButton(
+            text = stringResource(R.string.label_go_back),
+            onClick = viewModel::onBackClick,
+            modifier = Modifier.fillMaxWidth()
+        )
         WaltPrimaryButton(
-            text = "Complete Walkthrough",
+            text = stringResource(R.string.label_reset),
             onClick = viewModel::onCompleteWalkthroughClick,
             enabled = verificationResult != null,
             modifier = Modifier.fillMaxWidth()
