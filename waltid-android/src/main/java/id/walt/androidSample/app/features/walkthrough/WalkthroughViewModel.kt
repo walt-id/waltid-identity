@@ -79,16 +79,15 @@ interface WalkthroughViewModel {
         override val events = MutableSharedFlow<WalkthroughEvent>()
         override val keyAlgorithmOptions = KeyAlgorithmOption.all()
         override val selectedKeyAlgorithm = MutableStateFlow(KeyAlgorithmOption.RSA)
-        override val generatedKey =
-            MutableStateFlow("{\"kty\":\"RSA\",\"n\":\"ALzEWJVtxmkmYAeEStt8OSv73SbYL65IRMJ0MjgDt3wwj8KV+0mct3v\\/V3hMjqE2nMJBxj88+vNIRxoRIIzdqU\\/yl7BsV3AVib2qgCw5NybiBxTl3YGbPg4VLt2d5TCHfVpIrMDDUMZaHSlXRilGXLN98pae9IJ1MNuufVnId7iuwosvAMAoNhaD6Webglq88fYHGE0p7M+ISwiWVUjiPhK+YahPwKv5TM+q82dUOZ3eReR7NVCHrglLNOjyxqY7Qc7Kea7klOki0tzbcl7KH2kCfubeKirI4EZujjITaMrHahyAAER91Kv3PYJu2m9eR80IoNg0eKh62+XmlzYpBp8=\",\"e\":\"AQAB\"}")
-        override val publicKey = MutableStateFlow("dakwfjaklfjaklfjkalfk")
+        override val generatedKey = MutableStateFlow<String?>(null)
+        override val publicKey = MutableStateFlow("{\"kty\":\"RSA\",\"n\":\"ALzEWJVtxmkmYAeEStt8OSv73SbYL65IRMJ0MjgDt3wwj8KV+0mct3v\\/V3hMjqE2nMJBxj88+vNIRxoRIIzdqU\\/yl7BsV3AVib2qgCw5NybiBxTl3YGbPg4VLt2d5TCHfVpIrMDDUMZaHSlXRilGXLN98pae9IJ1MNuufVnId7iuwosvAMAoNhaD6Webglq88fYHGE0p7M+ISwiWVUjiPhK+YahPwKv5TM+q82dUOZ3eReR7NVCHrglLNOjyxqY7Qc7Kea7klOki0tzbcl7KH2kCfubeKirI4EZujjITaMrHahyAAER91Kv3PYJu2m9eR80IoNg0eKh62+XmlzYpBp8=\",\"e\":\"AQAB\"}")
         override val methodOptions = MethodOption.all()
         override val selectedMethod = MutableStateFlow(MethodOption.Key)
-        override val did = MutableStateFlow("did:example:123456789abcdefghi")
+        override val did = MutableStateFlow("did:jwk:eyJrdHkiOiJSU0EiLCJuIjoiQUpkMGFkOG54QkNoSG1KendLUndXSWRGVTE4ZGlHa1E4Y0s5aGVTeXg5RWtnSjE3S2xLK2dueUUyaWF0cDBNT01DUVA5Y1NLcUFkbnRtWTJPOW82MEtnWGswbmxTaUJEVVJsVUZ6aUxpNFhwbXhFVFdzYkhUU00xVU1YTVEraFwvOXBDNE10MGZQd09Vc2ZBNElZbTFIaXExWUNUeDQ4MzFmNFdScDVrbVlReG14YVV1UkxwcnZKS0lWVXlnRWhsRzh4bU1hTDdob2YrWkc3XC9QT21rOTNWZnlzSFFcL25SdzhOaE14NFJvT1lCeHVIXC9zRytKSlJiZzR1dzhkRTlKbmpIMGl2RFJHNHZpUjBURUxnb245R1wvOVwvRk1pRFZaelRLTFhGdThEaHNscjZacDI2bUhKenFxU1FUZWlZVjNNMGpGRmpNXC9aSUMzSUhqZW4rZTYrTTZiN009IiwiZSI6IkFRQUIifQ")
         override val plainText = MutableStateFlow("")
         override val signOptions = SignOption.all()
         override val selectedSignOption = MutableStateFlow(SignOption.Raw)
-        override val signedOutput = MutableStateFlow("awdkjawklfjawklfjawf jaklfj")
+        override val signedOutput = MutableStateFlow("QmhjUDl3NExjeGNOUUQ3U09iRzFYT2NPOEc5bHREQ3ZvYW9jWmdoSjZNRjl0dnpFcDBjZ1crTFNR")
         override val verificationResult = MutableStateFlow(VerificationResult.Success)
 
         override fun onKeyAlgorithmSelected(keyAlgorithmOption: KeyAlgorithmOption) = Unit
