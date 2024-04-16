@@ -41,7 +41,8 @@ Now, you can run:
 | `waltid did -h`                                                                                                                                       | Print WaltID CLI DID command usage message                                                                                                             |
 | `waltid did create -h`                                                                                                                                | Print WaltID CLI DID create command usage message                                                                                                      |
 | `waltid did create`                                                                                                                                   | Creates a new did:key                                                                                                                                  |
-| `waltid did create --key=./myRSAKey.json`                                                                                                             | Creates a new did:key with the key provided in the specified file.                                                                                     | 
+| `waltid did create -k src/jvmTest/resources/key/ed25519_by_waltid_pvt_key.jwk`                                                                        | Creates a new did:key with the key provided in the specified file.                                                                                     |
+| `waltid did resolve -d did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV`                                                                      | Resolves the DID specified.                                                                                                                            
 | `waltid vc sign --key=./myEd25519Key.json --subject=<your subject DID> --issuer=<your issuer DID> ./myCredential.json`                                | Signs a W3C Verifiable Credential (see [to be created first](#1-create-a-vc)). The issuer DID must be resolvable and associated with the provided key. |
 | `waltid vc sign --key=./myEd25519Key.json --subject=<your subject DID> ./myCredential.json`                                                           | Signs a W3C Verifiable Credential with a generated Issuer DID (did:key).                                                                               |
 | `waltid vc verify ./myCredential.signed.json`                                                                                                         | Verifies the signature of the provided VC.                                                                                                             |
@@ -158,6 +159,10 @@ Usage: waltid [<options>] <command> [<args>]...
   │    waltid did create                                                                                               │
   │    waltid did create -k myKey.json                                                                                 │
   │                                                                                                                    │
+  │    DID resolution                                                                                                  │
+  │    --------------                                                                                                  │
+  │    waltid did resolve -d did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV                                  │
+  │                                                                                                                    │
   │    VC signing                                                                                                      │
   │    -------------                                                                                                   │
   │    waltid vc sign --key=./myKey.json --subject=did:key:z6Mkjm2gaGsodGchfG4k8P6KwCHZsVEPZho5VuEbY94qiBB9 ./myVC.json│
@@ -173,7 +178,7 @@ Usage: waltid [<options>] <command> [<args>]...
   │    waltid vc verify --policy=schema --arg=schema=mySchema.json ./myVC.signed.json                                  │
   │    waltid vc verify --policy=signature --policy=schema --arg=schema=mySchema.json ./myVC.signed.json               │
   ╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-
+  
 Common Options:
   --verbose  Set verbose mode ON
 
@@ -260,6 +265,17 @@ Options:
   -m, --method=(KEY|JWK|WEB|EBSI|CHEQD|IOTA)  The DID method to be used.
   -k, --key=<path>                            The Subject's key to be used. If none is provided, a new one will be generated.
   -h, --help                                  Show this message and exit
+```
+
+## waltid did resolve
+
+```json
+Usage: waltid did resolve [<options>]
+
+Resolve the decentralized identity passed as an argument, i.e. it retrieves the sovereign identity document addressed by the given DID.
+
+Options: -d, -did=<text>  the did to be resolved
+-h, --help       Show this message and exit
 ```
 
 ## `waltid vc` command
@@ -492,6 +508,10 @@ This project is still a work in progress. As such, not all features are already 
 
 * Supported DID methods
   * KEY ✅
+    * RSA ❌
+    * Ed25519 ✅
+    * Secp256k1 ❌
+    * Secp256r1 ❌
   * JWK ❌
   * WEB ❌
   * EBSI ❌
