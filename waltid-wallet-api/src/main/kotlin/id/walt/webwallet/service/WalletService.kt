@@ -52,6 +52,7 @@ abstract class WalletService(val tenant: String, val accountId: UUID, val wallet
     abstract suspend fun generateKey(request: KeyGenerationRequest = KeyGenerationRequest()): String
     abstract suspend fun exportKey(alias: String, format: String, private: Boolean): String
     abstract suspend fun loadKey(alias: String): JsonObject
+    abstract suspend fun getKeyMeta(alias: String): JsonObject
     abstract suspend fun importKey(jwkOrPem: String): String
     abstract suspend fun deleteKey(alias: String): Boolean
 

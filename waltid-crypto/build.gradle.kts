@@ -50,6 +50,7 @@ kotlin {
         }
     }
     js(IR) {
+        moduleName = "crypto"
         /*browser {
             commonWebpackConfig {
                 cssSupport {
@@ -58,11 +59,11 @@ kotlin {
             }
         }*/
         nodejs {
+            generateTypeScriptDefinitions()
             testTask {
                 useMocha()
             }
         }
-        generateTypeScriptDefinitions()
         binaries.library()
     }
 
@@ -90,7 +91,7 @@ kotlin {
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
 
                 // Logging
-                implementation("io.github.oshai:kotlin-logging:6.0.3")
+                implementation("io.github.oshai:kotlin-logging:6.0.4")
             }
         }
         val commonTest by getting {
@@ -151,7 +152,7 @@ kotlin {
         publishing {
             repositories {
                 maven {
-                    url = uri("https://maven.walt.id/repository/waltid/")
+                    url = uri("https://maven.waltid.dev/releases")
                     val envUsername = System.getenv("MAVEN_USERNAME")
                     val envPassword = System.getenv("MAVEN_PASSWORD")
 

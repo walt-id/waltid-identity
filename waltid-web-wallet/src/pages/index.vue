@@ -134,7 +134,7 @@ if (process.client) {
         }
     }
 
-    initialiseState();
+    // initialiseState(); // DISABLED: notifications
 
     function subscribe() {
         navigator.serviceWorker.ready.then(function (serviceWorkerRegistration) {

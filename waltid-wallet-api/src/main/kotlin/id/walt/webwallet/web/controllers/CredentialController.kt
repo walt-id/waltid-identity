@@ -1,7 +1,9 @@
 package id.walt.webwallet.web.controllers
 
 import id.walt.webwallet.db.models.WalletCredential
+import id.walt.webwallet.service.WalletServiceManager
 import id.walt.webwallet.service.credentials.CredentialFilterObject
+import id.walt.webwallet.usecase.credential.CredentialStatusResult
 import id.walt.webwallet.web.parameter.CredentialRequestParameter
 import id.walt.webwallet.web.parameter.NoteRequestParameter
 import io.github.smiley4.ktorswaggerui.dsl.*
@@ -177,6 +179,28 @@ fun Application.credentials() = walletRoute {
                     )
                 }.onSuccess {
                     if (it) context.respond(HttpStatusCode.Accepted) else context.respond(HttpStatusCode.BadRequest)
+                }.onFailure {
+                    context.respond(HttpStatusCode.BadRequest, it.localizedMessage)
+                }
+            }
+            get("status", {
+                summary = "Get credential status"
+                response {
+                    HttpStatusCode.OK to {
+                        description = "List of credential statuses"
+                        body<List<CredentialStatusResult>>()
+                    }
+                    HttpStatusCode.BadRequest to {
+                        description =
+                            "Credential status could not be established or an error occured"
+                    }
+                }
+            }) {
+                runCatching {
+                    val credentialId = call.parameters.getOrFail("credentialId")
+                    WalletServiceManager.credentialStatusUseCase.get(getWalletId(), credentialId)
+                }.onSuccess {
+                    context.respond(it)
                 }.onFailure {
                     context.respond(HttpStatusCode.BadRequest, it.localizedMessage)
                 }

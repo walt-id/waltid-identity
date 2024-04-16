@@ -102,5 +102,7 @@ object JsonUtils {
             }
         )
 
-
+    fun stringToJsonPrimitive(value: String): JsonPrimitive {
+        return JsonPrimitive(value)
+    }
 }

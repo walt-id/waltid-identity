@@ -17,7 +17,4 @@ data class RegistrationDefaultsConfig(
 
     val didMethod = defaultDidConfig["method"]!!.jsonPrimitive.content
     val didConfig: Map<String, JsonPrimitive> = defaultDidConfig["config"]?.jsonObject?.mapValues { it.value.jsonPrimitive } ?: emptyMap()
-
-
-
 }
