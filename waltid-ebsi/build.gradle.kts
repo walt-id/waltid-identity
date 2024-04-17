@@ -91,6 +91,9 @@ kotlin {
                 api(project(":waltid-crypto"))
                 implementation("com.github.komputing.khash:keccak:1.1.3")
 
+                // openid4vc
+                api(project(":waltid-openid4vc"))
+
                 // Encodings
                 implementation("net.thauvin.erik.urlencoder:urlencoder-lib:1.4.0")
 

@@ -10,6 +10,7 @@ import id.walt.did.dids.registrar.local.web.DidWebRegistrar
 import id.walt.did.dids.resolver.DidResolver
 import id.walt.did.dids.resolver.local.DidEbsiResolver
 import id.walt.did.utils.randomUUID
+import id.walt.ebsi.did.DidEbsiService
 import id.walt.ebsi.eth.TransactionService
 import id.walt.ebsi.rpc.EbsiRpcRequests
 import id.walt.ebsi.rpc.SignedTransactionResponse
@@ -48,6 +49,7 @@ import kotlinx.serialization.json.*
 import java.net.URLEncoder
 import java.nio.ByteBuffer
 import java.util.UUID
+import kotlin.random.Random
 import kotlin.test.*
 import kotlin.time.DurationUnit
 import kotlin.time.toDuration
@@ -113,7 +115,7 @@ class DidCreationTest {
     }
 
     val CLIENT_MOCK_PORT = 5000
-    val CLIENT_MOCK_URL = "https://39a9-62-178-27-231.ngrok-free.app/client-mock"//"http://192.168.0.122:5000/client-mock"
+    val CLIENT_MOCK_URL = "https://616a-62-178-27-231.ngrok-free.app/client-mock"//"http://192.168.0.122:5000/client-mock"
     val CLIENT_MAIN_KEY = runBlocking { JWKKey.generate(KeyType.secp256k1) }
     val CLIENT_VCSIGN_KEY = runBlocking { JWKKey.generate(KeyType.secp256r1) }
     fun startClientMockServer() {
@@ -142,13 +144,7 @@ class DidCreationTest {
     @Test
     fun ebsiDidOnboarding() = runTest {
         startClientMockServer()
-        val didMSI = UUID.randomUUID().let { ByteBuffer.allocate(17)
-            .put(0x01)
-            .putLong(1, it.mostSignificantBits)
-            .putLong(9, it.leastSignificantBits).array()
-        }.let { MultiBaseUtils.encodeMultiBase58Btc(it) }
-        assertEquals('z', didMSI.first())
-        val did = "did:ebsi:$didMSI"
+        val did = DidEbsiService.generateRandomDid()
         val taoIssuer = "https://api-conformance.ebsi.eu/conformance/v3/issuer-mock"
         //val taoIssuer = "http://localhost:3000/conformance/v3/issuer-mock"
         val issuerMetadata = OpenID4VCI.resolveCIProviderMetadata(taoIssuer)
