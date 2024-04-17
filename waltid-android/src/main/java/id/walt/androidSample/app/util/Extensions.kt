@@ -29,30 +29,38 @@ fun Modifier.clickableWithoutRipple(
 fun authenticateWithBiometric(
     context: FragmentActivity,
     onAuthenticated: () -> Unit,
-    onFailure: () -> Unit,
+    onFailure: (msg: String?) -> Unit,
+    isBiometricsAvailable: Int,
 ) {
-    val executor = context.mainExecutor
-    val biometricPrompt = BiometricPrompt(
-        context,
-        executor,
-        object : BiometricPrompt.AuthenticationCallback() {
-            override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
-                super.onAuthenticationSucceeded(result)
-                onAuthenticated()
-            }
 
-            override fun onAuthenticationFailed() {
-                super.onAuthenticationFailed()
-                onFailure()
-            }
+    when (isBiometricsAvailable) {
+        BiometricManager.BIOMETRIC_SUCCESS -> {
+            val executor = context.mainExecutor
+            val biometricPrompt = BiometricPrompt(
+                context,
+                executor,
+                object : BiometricPrompt.AuthenticationCallback() {
+                    override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                        super.onAuthenticationSucceeded(result)
+                        onAuthenticated()
+                    }
+
+                    override fun onAuthenticationFailed() {
+                        super.onAuthenticationFailed()
+                        onFailure(null)
+                    }
+                }
+            )
+            val promptInfo = BiometricPrompt.PromptInfo.Builder()
+                .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.BIOMETRIC_WEAK)
+                .setTitle(context.getString(R.string.title_biometric_authentication))
+                .setSubtitle(context.getString(R.string.subtitle_biometric_authentication))
+                .setNegativeButtonText(context.getString(R.string.cancel))
+                .build()
+
+            biometricPrompt.authenticate(promptInfo)
         }
-    )
-    val promptInfo = BiometricPrompt.PromptInfo.Builder()
-        .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.BIOMETRIC_WEAK)
-        .setTitle(context.getString(R.string.title_biometric_authentication))
-        .setSubtitle(context.getString(R.string.subtitle_biometric_authentication))
-        .setNegativeButtonText(context.getString(R.string.cancel))
-        .build()
 
-    biometricPrompt.authenticate(promptInfo)
+        else -> onFailure(context.getString(R.string.biometric_error_general))
+    }
 }

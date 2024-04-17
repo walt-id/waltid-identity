@@ -1,6 +1,10 @@
 package id.walt.androidSample.app.features.walkthrough
 
+import android.content.Intent
+import android.hardware.biometrics.BiometricManager.Authenticators.DEVICE_CREDENTIAL
+import android.provider.Settings
 import androidx.biometric.BiometricManager
+import androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -11,12 +15,19 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -33,10 +44,14 @@ import id.walt.androidSample.app.features.walkthrough.components.WalkthroughStep
 import id.walt.androidSample.app.features.walkthrough.components.WaltPrimaryButton
 import id.walt.androidSample.app.features.walkthrough.components.WaltSecondaryButton
 import id.walt.androidSample.app.features.walkthrough.model.MethodOption
+import id.walt.androidSample.app.features.walkthrough.model.WalkthroughEvent
 import id.walt.androidSample.app.util.authenticateWithBiometric
 import id.walt.androidSample.theme.WaltIdAndroidSampleTheme
+import id.walt.androidSample.utils.ObserveAsEvents
+import kotlinx.coroutines.launch
 
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StepThreeScreen(
     viewModel: WalkthroughViewModel,
@@ -49,61 +64,94 @@ fun StepThreeScreen(
     val generatedDID by viewModel.did.collectAsStateWithLifecycle()
 
     val ctx = LocalContext.current
-
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
     val biometricManager = remember { BiometricManager.from(ctx) }
-    val isBiometricsAvailable =
-        biometricManager.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.BIOMETRIC_WEAK) == BiometricManager.BIOMETRIC_SUCCESS
 
-    WalkthroughStep(
-        title = stringResource(R.string.label_step_3_title),
-        description = stringResource(R.string.description_step_3),
-        modifier = modifier,
-    ) {
+    ObserveAsEvents(viewModel.events) { event ->
+        when (event) {
+            is WalkthroughEvent.Biometrics.BiometricError -> {
+                scope.launch {
+                    val snackbarResult = snackbarHostState.showSnackbar(
+                        message = event.msg,
+                        actionLabel = ctx.getString(R.string.label_enroll_now),
+                        withDismissAction = false,
+                        duration = SnackbarDuration.Short
+                    )
 
-        if (generatedDID != null) {
-            Text(
-                text = generatedDID.toString(),
-                color = MaterialTheme.colorScheme.primary,
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier
-                    .padding(vertical = 8.dp)
-                    .weight(1f)
-                    .verticalScroll(rememberScrollState()),
-            )
-        } else {
-            Spacer(modifier = Modifier.weight(1f))
+                    when (snackbarResult) {
+                        SnackbarResult.ActionPerformed -> {
+                            Intent(Settings.ACTION_SECURITY_SETTINGS).also {
+                                ctx.startActivity(it)
+                            }
+                        }
+
+                        SnackbarResult.Dismissed -> {}
+                    }
+                }
+            }
+
+            else -> {}
         }
+    }
 
-        MethodRadioGroup(
-            selectedOption = selectedMethodOption,
-            options = methodOptions,
-            onOptionSelected = viewModel::onMethodOptionSelected,
-        )
+    Scaffold(
+        modifier = modifier,
+        snackbarHost = { SnackbarHost(snackbarHostState) }
+    ) { innerPadding ->
+        WalkthroughStep(
+            title = stringResource(R.string.label_step_3_title),
+            description = stringResource(R.string.description_step_3),
+            modifier = Modifier.padding(innerPadding),
+        ) {
 
-        Spacer(modifier = Modifier.height(16.dp))
-
-        WaltSecondaryButton(
-            text = stringResource(R.string.label_generate_did),
-            onClick = {
-                authenticateWithBiometric(
-                    context = ctx as FragmentActivity,
-                    onAuthenticated = viewModel::onGenerateDIDClick,
-                    onFailure = viewModel::onBiometricsAuthFailure,
+            if (generatedDID != null) {
+                Text(
+                    text = generatedDID.toString(),
+                    color = MaterialTheme.colorScheme.primary,
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier
+                        .padding(vertical = 8.dp)
+                        .weight(1f)
+                        .verticalScroll(rememberScrollState()),
                 )
-            },
-            modifier = Modifier.fillMaxWidth()
-        )
-        WaltSecondaryButton(
-            text = stringResource(R.string.label_go_back),
-            onClick = viewModel::onBackClick,
-            modifier = Modifier.fillMaxWidth()
-        )
-        WaltPrimaryButton(
-            text = stringResource(R.string.label_next_step),
-            onClick = viewModel::onGoToStepFourClick,
-            enabled = generatedDID != null,
-            modifier = Modifier.fillMaxWidth()
-        )
+            } else {
+                Spacer(modifier = Modifier.weight(1f))
+            }
+
+            MethodRadioGroup(
+                selectedOption = selectedMethodOption,
+                options = methodOptions,
+                onOptionSelected = viewModel::onMethodOptionSelected,
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            WaltSecondaryButton(
+                text = stringResource(R.string.label_generate_did),
+                onClick = {
+                    val isBiometricAvailable = biometricManager.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.BIOMETRIC_WEAK)
+                    authenticateWithBiometric(
+                        context = ctx as FragmentActivity,
+                        onAuthenticated = viewModel::onGenerateDIDClick,
+                        onFailure = viewModel::onBiometricsAuthFailure,
+                        isBiometricsAvailable = isBiometricAvailable,
+                    )
+                },
+                modifier = Modifier.fillMaxWidth()
+            )
+            WaltSecondaryButton(
+                text = stringResource(R.string.label_go_back),
+                onClick = viewModel::onBackClick,
+                modifier = Modifier.fillMaxWidth()
+            )
+            WaltPrimaryButton(
+                text = stringResource(R.string.label_next_step),
+                onClick = viewModel::onGoToStepFourClick,
+                enabled = generatedDID != null,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
     }
 }
 

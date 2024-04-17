@@ -64,7 +64,7 @@ interface WalkthroughViewModel {
     fun onGoToStepFourClick()
     fun onGoToStepFiveClick()
     fun onCompleteWalkthroughClick()
-    fun onBiometricsAuthFailure()
+    fun onBiometricsAuthFailure(msg: String? = null)
     fun onBiometricsUnavailable()
 
 
@@ -100,7 +100,7 @@ interface WalkthroughViewModel {
         override fun onGoToStepFiveClick() = Unit
         override fun onBackClick() = Unit
         override fun onCompleteWalkthroughClick() = Unit
-        override fun onBiometricsAuthFailure() = Unit
+        override fun onBiometricsAuthFailure(msg: String?) = Unit
         override fun onBiometricsUnavailable() = Unit
     }
 
@@ -272,9 +272,13 @@ interface WalkthroughViewModel {
             viewModelScope.launch { _events.send(WalkthroughEvent.NavigateEvent.RestartWalkthrough) }
         }
 
-        override fun onBiometricsAuthFailure() {
+        override fun onBiometricsAuthFailure(msg: String?) {
             viewModelScope.launch {
-                _events.send(WalkthroughEvent.Biometrics.BiometricAuthenticationFailure)
+                if (msg != null) {
+                    _events.send(WalkthroughEvent.Biometrics.BiometricError(msg))
+                } else {
+                    _events.send(WalkthroughEvent.Biometrics.BiometricAuthenticationFailure)
+                }
             }
         }
 
