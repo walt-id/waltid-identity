@@ -9,6 +9,7 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
 
 abstract class BaseFilterPresentationDefinitionMatchStrategy<T> : PresentationDefinitionMatchStrategy<T> {
+    private val modifiersRegex = """(\$/[gmixsuXUAJn]*)""".toRegex()
     protected fun isMatching(credential: WalletCredential, fields: List<TypeFilter>) = fields.all { typeFilter ->
         val credField = JsonUtils.tryGetData(credential.parsedDocument, typeFilter.path) ?: return@all false
         when (credField) {
@@ -16,7 +17,7 @@ abstract class BaseFilterPresentationDefinitionMatchStrategy<T> : PresentationDe
             is JsonArray -> credField.jsonArray.last().jsonPrimitive.content
             else -> ""
         }.let {
-            typeFilter.pattern.toRegex().matches(it)
+            modifiersRegex.replace(typeFilter.pattern.removePrefix("/"), """\$""").toRegex().matches(it)
         }
     }
 }
