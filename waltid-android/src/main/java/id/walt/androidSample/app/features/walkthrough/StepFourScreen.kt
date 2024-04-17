@@ -2,6 +2,8 @@
 
 package id.walt.androidSample.app.features.walkthrough
 
+import android.content.Intent
+import android.provider.Settings
 import android.widget.Toast
 import androidx.biometric.BiometricManager
 import androidx.compose.foundation.layout.Column
@@ -20,10 +22,16 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
@@ -50,6 +58,7 @@ import id.walt.androidSample.app.util.authenticateWithBiometric
 import id.walt.androidSample.theme.WaltIdAndroidSampleTheme
 import id.walt.androidSample.utils.ObserveAsEvents
 import id.walt.androidSample.utils.collectImmediatelyAsStateWithLifecycle
+import kotlinx.coroutines.launch
 
 
 @OptIn(ExperimentalComposeUiApi::class, ExperimentalMaterial3Api::class)
@@ -70,8 +79,8 @@ fun StepFourScreen(
     val signedText by viewModel.signedOutput.collectAsStateWithLifecycle()
 
     val biometricManager = remember { BiometricManager.from(ctx) }
-    val isBiometricsAvailable =
-        biometricManager.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.BIOMETRIC_WEAK) == BiometricManager.BIOMETRIC_SUCCESS
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
 
     ObserveAsEvents(flow = viewModel.events) { event ->
         when (event) {
@@ -89,82 +98,111 @@ fun StepFourScreen(
                 Toast.LENGTH_SHORT
             ).show()
 
+            is WalkthroughEvent.Biometrics.BiometricError -> {
+                scope.launch {
+                    val snackbarResult = snackbarHostState.showSnackbar(
+                        message = event.msg,
+                        actionLabel = ctx.getString(R.string.label_enroll_now),
+                        withDismissAction = false,
+                        duration = SnackbarDuration.Short
+                    )
+
+                    when (snackbarResult) {
+                        SnackbarResult.ActionPerformed -> {
+                            Intent(Settings.ACTION_SECURITY_SETTINGS).also {
+                                ctx.startActivity(it)
+                            }
+                        }
+
+                        SnackbarResult.Dismissed -> {}
+                    }
+                }
+            }
+
             else -> {}
         }
     }
 
-    WalkthroughStep(
-        title = stringResource(R.string.label_step_4_title),
-        description = stringResource(R.string.description_step_4),
+    Scaffold(
         modifier = modifier,
-    ) {
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+    ) { innerPadding ->
+        WalkthroughStep(
+            title = stringResource(R.string.label_step_4_title),
+            description = stringResource(R.string.description_step_4),
+            modifier = Modifier.padding(innerPadding),
+        ) {
 
-        Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-        OutlinedTextField(
-            value = inputText,
-            onValueChange = viewModel::onPlainTextChanged,
-            label = { Text(stringResource(R.string.description_plain_text_hint)) },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(
-                keyboardType = KeyboardType.Text,
-                imeAction = ImeAction.Done
-            ),
-            keyboardActions = KeyboardActions(
-                onDone = {
-                    systemKeyboard?.hide()
-                    focus.clearFocus()
-                }
-            ),
-        )
-
-        if (signedText != null) {
-            Text(
-                text = signedText.toString(),
-                color = MaterialTheme.colorScheme.primary,
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier
-                    .padding(vertical = 8.dp)
-                    .weight(1f)
-                    .verticalScroll(rememberScrollState()),
+            OutlinedTextField(
+                value = inputText,
+                onValueChange = viewModel::onPlainTextChanged,
+                label = { Text(stringResource(R.string.description_plain_text_hint)) },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Text,
+                    imeAction = ImeAction.Done
+                ),
+                keyboardActions = KeyboardActions(
+                    onDone = {
+                        systemKeyboard?.hide()
+                        focus.clearFocus()
+                    }
+                ),
             )
-        } else {
-            Spacer(modifier = Modifier.weight(1f))
-        }
 
-        SignRadioGroup(
-            selectedOption = selectedSignOption,
-            options = signOptions,
-            onOptionSelected = viewModel::onSignOptionSelected,
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        WaltSecondaryButton(
-            text = stringResource(R.string.label_sign_input),
-            enabled = inputText.isNotBlank(),
-            onClick = {
-                systemKeyboard?.hide()
-                authenticateWithBiometric(
-                    context = ctx as FragmentActivity,
-                    onAuthenticated = viewModel::onSignTextClick,
-                    onFailure = viewModel::onBiometricsAuthFailure
+            if (signedText != null) {
+                Text(
+                    text = signedText.toString(),
+                    color = MaterialTheme.colorScheme.primary,
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier
+                        .padding(vertical = 8.dp)
+                        .weight(1f)
+                        .verticalScroll(rememberScrollState()),
                 )
-            },
-            modifier = Modifier.fillMaxWidth()
-        )
-        WaltSecondaryButton(
-            text = stringResource(R.string.label_go_back),
-            onClick = viewModel::onBackClick,
-            modifier = Modifier.fillMaxWidth()
-        )
-        WaltPrimaryButton(
-            text = stringResource(R.string.label_next_step),
-            onClick = viewModel::onGoToStepFiveClick,
-            enabled = signedText != null,
-            modifier = Modifier.fillMaxWidth(),
-        )
+            } else {
+                Spacer(modifier = Modifier.weight(1f))
+            }
+
+            SignRadioGroup(
+                selectedOption = selectedSignOption,
+                options = signOptions,
+                onOptionSelected = viewModel::onSignOptionSelected,
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            WaltSecondaryButton(
+                text = stringResource(R.string.label_sign_input),
+                enabled = inputText.isNotBlank(),
+                onClick = {
+                    systemKeyboard?.hide()
+                    val isBiometricAvailable =
+                        biometricManager.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.BIOMETRIC_WEAK)
+                    authenticateWithBiometric(
+                        context = ctx as FragmentActivity,
+                        onAuthenticated = viewModel::onSignTextClick,
+                        onFailure = viewModel::onBiometricsAuthFailure,
+                        isBiometricsAvailable = isBiometricAvailable,
+                    )
+                },
+                modifier = Modifier.fillMaxWidth()
+            )
+            WaltSecondaryButton(
+                text = stringResource(R.string.label_go_back),
+                onClick = viewModel::onBackClick,
+                modifier = Modifier.fillMaxWidth()
+            )
+            WaltPrimaryButton(
+                text = stringResource(R.string.label_next_step),
+                onClick = viewModel::onGoToStepFiveClick,
+                enabled = signedText != null,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
     }
 }
 
