@@ -1,0 +1,21 @@
+{
+    "type":
+    [
+        "VerifiableCredential",
+        "StatusList2021Credential"
+    ],
+    "credentialSubject":
+    {
+        "id": "urn:uuid:cca8bd0a-83c2-4ae1-9f43-e99943cdfa5c",
+        "type": "RevocationList2021",
+        "statusPurpose": "status",
+        "statusSize": 2,
+        "statusMessage": [
+            {"status":"0x0", "message":"valid"},
+            {"status":"0x1", "message":"invalid"},
+            {"status":"0x2", "message":"pending_review"},
+            {"status":"0x3", "message":"some_status"}
+        ],
+        "encodedList": "H4sIAAAAAAAA/zMwNABDAKb12i0IAAAA"
+    }
+}

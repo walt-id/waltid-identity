@@ -1,5 +1,6 @@
 package id.walt.webwallet.utils
 
+import java.util.zip.GZIPInputStream
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -43,5 +44,26 @@ class StreamUtilsTest {
                 bitSize = 9
             )
         }
+    }
+
+    @Test
+    fun `just print the entire bitstring`() {
+        val bitstring = "H4sIAAAAAAAAA-3BMREAAAgAoQ9ueCdLeECdCQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA4LMFiQj-p6hhAAA"
+        val list = mutableListOf<Int>()
+        var count = 0
+        GZIPInputStream(Base64Utils.urlDecode(bitstring).inputStream()).bufferedReader().use { buffer ->
+            var int = 0
+            while (int != -1) {
+                buffer.read().run {
+                    this.takeIf { it != -1 }?.run {
+                        list.add(this)
+                        count++
+                    }
+                    int = this
+                }
+            }
+        }
+        println(count)
+        println(list)
     }
 }
