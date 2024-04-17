@@ -12,5 +12,6 @@ sealed interface WalkthroughEvent {
     sealed interface Biometrics : WalkthroughEvent {
         data object BiometricsUnavailable : Biometrics
         data object BiometricAuthenticationFailure : Biometrics
+        data object SecureLockScreenNotEnabled: Biometrics
     }
 }

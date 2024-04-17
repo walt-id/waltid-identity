@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.security.InvalidAlgorithmParameterException
 
 interface WalkthroughViewModel {
     val events: SharedFlow<WalkthroughEvent>
@@ -72,10 +73,12 @@ interface WalkthroughViewModel {
         override val keyAlgorithmOptions = KeyAlgorithmOption.all()
         override val selectedKeyAlgorithm = MutableStateFlow(KeyAlgorithmOption.RSA)
         override val generatedKey = MutableStateFlow<String?>(null)
-        override val publicKey = MutableStateFlow("{\"kty\":\"RSA\",\"n\":\"ALzEWJVtxmkmYAeEStt8OSv73SbYL65IRMJ0MjgDt3wwj8KV+0mct3v\\/V3hMjqE2nMJBxj88+vNIRxoRIIzdqU\\/yl7BsV3AVib2qgCw5NybiBxTl3YGbPg4VLt2d5TCHfVpIrMDDUMZaHSlXRilGXLN98pae9IJ1MNuufVnId7iuwosvAMAoNhaD6Webglq88fYHGE0p7M+ISwiWVUjiPhK+YahPwKv5TM+q82dUOZ3eReR7NVCHrglLNOjyxqY7Qc7Kea7klOki0tzbcl7KH2kCfubeKirI4EZujjITaMrHahyAAER91Kv3PYJu2m9eR80IoNg0eKh62+XmlzYpBp8=\",\"e\":\"AQAB\"}")
+        override val publicKey =
+            MutableStateFlow("{\"kty\":\"RSA\",\"n\":\"ALzEWJVtxmkmYAeEStt8OSv73SbYL65IRMJ0MjgDt3wwj8KV+0mct3v\\/V3hMjqE2nMJBxj88+vNIRxoRIIzdqU\\/yl7BsV3AVib2qgCw5NybiBxTl3YGbPg4VLt2d5TCHfVpIrMDDUMZaHSlXRilGXLN98pae9IJ1MNuufVnId7iuwosvAMAoNhaD6Webglq88fYHGE0p7M+ISwiWVUjiPhK+YahPwKv5TM+q82dUOZ3eReR7NVCHrglLNOjyxqY7Qc7Kea7klOki0tzbcl7KH2kCfubeKirI4EZujjITaMrHahyAAER91Kv3PYJu2m9eR80IoNg0eKh62+XmlzYpBp8=\",\"e\":\"AQAB\"}")
         override val methodOptions = MethodOption.all()
         override val selectedMethod = MutableStateFlow(MethodOption.Key)
-        override val did = MutableStateFlow("did:jwk:eyJrdHkiOiJSU0EiLCJuIjoiQUpkMGFkOG54QkNoSG1KendLUndXSWRGVTE4ZGlHa1E4Y0s5aGVTeXg5RWtnSjE3S2xLK2dueUUyaWF0cDBNT01DUVA5Y1NLcUFkbnRtWTJPOW82MEtnWGswbmxTaUJEVVJsVUZ6aUxpNFhwbXhFVFdzYkhUU00xVU1YTVEraFwvOXBDNE10MGZQd09Vc2ZBNElZbTFIaXExWUNUeDQ4MzFmNFdScDVrbVlReG14YVV1UkxwcnZKS0lWVXlnRWhsRzh4bU1hTDdob2YrWkc3XC9QT21rOTNWZnlzSFFcL25SdzhOaE14NFJvT1lCeHVIXC9zRytKSlJiZzR1dzhkRTlKbmpIMGl2RFJHNHZpUjBURUxnb245R1wvOVwvRk1pRFZaelRLTFhGdThEaHNscjZacDI2bUhKenFxU1FUZWlZVjNNMGpGRmpNXC9aSUMzSUhqZW4rZTYrTTZiN009IiwiZSI6IkFRQUIifQ")
+        override val did =
+            MutableStateFlow("did:jwk:eyJrdHkiOiJSU0EiLCJuIjoiQUpkMGFkOG54QkNoSG1KendLUndXSWRGVTE4ZGlHa1E4Y0s5aGVTeXg5RWtnSjE3S2xLK2dueUUyaWF0cDBNT01DUVA5Y1NLcUFkbnRtWTJPOW82MEtnWGswbmxTaUJEVVJsVUZ6aUxpNFhwbXhFVFdzYkhUU00xVU1YTVEraFwvOXBDNE10MGZQd09Vc2ZBNElZbTFIaXExWUNUeDQ4MzFmNFdScDVrbVlReG14YVV1UkxwcnZKS0lWVXlnRWhsRzh4bU1hTDdob2YrWkc3XC9QT21rOTNWZnlzSFFcL25SdzhOaE14NFJvT1lCeHVIXC9zRytKSlJiZzR1dzhkRTlKbmpIMGl2RFJHNHZpUjBURUxnb245R1wvOVwvRk1pRFZaelRLTFhGdThEaHNscjZacDI2bUhKenFxU1FUZWlZVjNNMGpGRmpNXC9aSUMzSUhqZW4rZTYrTTZiN009IiwiZSI6IkFRQUIifQ")
         override val plainText = MutableStateFlow("")
         override val signOptions = SignOption.all()
         override val selectedSignOption = MutableStateFlow(SignOption.Raw)
@@ -165,16 +168,19 @@ interface WalkthroughViewModel {
             this.plainText.update { plainText }
         }
 
-        // TODO handle case where user does not have lockscreen active
-        //  Caused by: java.lang.IllegalStateException: Secure lock screen must be enabled to create keys requiring user authentication
         override fun onGenerateKeyClick() {
             viewModelScope.launch {
-                val androidKey = when (selectedKeyAlgorithm.value) {
-                    KeyAlgorithmOption.RSA -> AndroidKey.generate(KeyType.RSA)
-                    KeyAlgorithmOption.Secp256r1 -> AndroidKey.generate(KeyType.secp256r1)
+                try {
+                    val androidKey = when (selectedKeyAlgorithm.value) {
+                        KeyAlgorithmOption.RSA -> AndroidKey.generate(KeyType.RSA)
+                        KeyAlgorithmOption.Secp256r1 -> AndroidKey.generate(KeyType.secp256r1)
+                    }
+                    key = androidKey
+                    generatedKey.update { androidKey.exportJWK() }
+                } catch (e: InvalidAlgorithmParameterException) {
+                    println("Error generating key: ${e.message}")
+                    _events.send(WalkthroughEvent.Biometrics.SecureLockScreenNotEnabled)
                 }
-                key = androidKey
-                generatedKey.update { androidKey.exportJWK() }
             }
         }
 
@@ -221,7 +227,7 @@ interface WalkthroughViewModel {
         override fun onVerifyClick() {
             viewModelScope.launch {
                 key?.let { androidKey ->
-                    when(selectedSignOption.value) {
+                    when (selectedSignOption.value) {
                         SignOption.Raw -> {
                             signedOutputByteArray?.let { byteArrayToVerify ->
                                 val result = androidKey.verifyRaw(byteArrayToVerify, plainText.value.toByteArray())
