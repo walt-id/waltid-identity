@@ -30,12 +30,13 @@ object JsonUtils {
         var element: JsonElement? = json.toJsonElement()
         for (i in it) {
             element = when (element) {
-                is JsonObject -> element.get(i)
+                is JsonObject -> element[i]
                 is JsonArray -> element.firstOrNull {
                     it.jsonObject.containsKey(i)
                 }?.let {
                     it.jsonObject[i]
                 }
+
                 else -> element?.jsonPrimitive
             }
         }
