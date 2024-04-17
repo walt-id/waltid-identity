@@ -8,7 +8,6 @@ import kotlinx.uuid.UUID
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.javatime.date
-import org.jetbrains.exposed.sql.javatime.dateParam
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.time.LocalDate
 
@@ -21,17 +20,32 @@ class EventService {
         offset: Long,
         sortOrder: String,
         sortBy: String,
-        dataFilter: Map<String, String>
+        dataFilter: Map<String, List<String>>
     ) = transaction {
         let {
-            limit?.let { getFilterQueryLimited(accountId, walletId, sortOrder, sortBy, dataFilter, it, offset) }
-                ?: getFilterQueryUnlimited(accountId, walletId, sortOrder, sortBy, dataFilter)
+            limit?.let {
+                getFilterQueryLimited(
+                    accountId = accountId,
+                    walletId = walletId,
+                    sortOrder = sortOrder,
+                    sortBy = sortBy,
+                    dataFilter = dataFilter,
+                    limit = it,
+                    offset = offset
+                )
+            } ?: getFilterQueryUnlimited(
+                accountId = accountId,
+                walletId = walletId,
+                sortOrder = sortOrder,
+                sortBy = sortBy,
+                dataFilter = dataFilter
+            )
         }.map {
             Event(it)
         }
     }
 
-    fun count(walletId: UUID, dataFilter: Map<String, String>): Long = transaction {
+    fun count(walletId: UUID, dataFilter: Map<String, List<String>>): Long = transaction {
         Events.selectAll().where { Events.wallet eq walletId }.addWhereClause(dataFilter).count()
     }
 
@@ -55,19 +69,19 @@ class EventService {
         Events.deleteWhere { Events.id eq id }
     }
 
-    private fun Query.addWhereClause(dataFilter: Map<String, String>) = let {
+    private fun Query.addWhereClause(dataFilter: Map<String, List<String>>) = let {
         dataFilter.forEach {
             when (it.key.lowercase()) {
-                "event" -> this.andWhere { Events.event eq it.value }
-                "action" -> this.andWhere { Events.action eq it.value }
-                "tenant" -> this.andWhere { Events.tenant eq it.value }
-                "originator" -> this.andWhere { Events.originator eq it.value }
-                "credentialid" -> this.andWhere { Events.credentialId eq it.value }
+                "event" -> this.andWhere { Events.event inList it.value }
+                "action" -> this.andWhere { Events.action inList it.value }
+                "tenant" -> this.andWhere { Events.tenant inList it.value }
+                "originator" -> this.andWhere { Events.originator inList it.value }
+                "credentialid" -> this.andWhere { Events.credentialId inList it.value }
                 "timestamp", "addedon", "createdon" -> runCatching {
-                    LocalDate.parse(it.value)
+                    it.value.map { LocalDate.parse(it) }
                 }.getOrNull()?.let {
                     this.andWhere {
-                        Events.timestamp.date() eq dateParam(it)
+                        Events.timestamp.date() inList it
                     }
                 }
             }
@@ -80,17 +94,23 @@ class EventService {
         walletId: UUID,
         sortOrder: String,
         sortBy: String,
-        dataFilter: Map<String, String>,
+        dataFilter: Map<String, List<String>>,
         limit: Int,
         offset: Long,
-    ) = getFilterQueryUnlimited(accountId, walletId, sortBy, sortOrder, dataFilter).limit(n = limit, offset = offset)
+    ) = getFilterQueryUnlimited(
+        accountId = accountId,
+        walletId = walletId,
+        sortOrder = sortOrder,
+        sortBy = sortBy,
+        dataFilter = dataFilter
+    ).limit(n = limit, offset = offset)
 
     private fun getFilterQueryUnlimited(
         accountId: UUID,
         walletId: UUID,
         sortOrder: String,
         sortBy: String,
-        dataFilter: Map<String, String>,
+        dataFilter: Map<String, List<String>>,
     ) = Events.selectAll().where { Events.account eq accountId or (Events.wallet eq walletId) }
         .orderBy(getColumn(sortBy) ?: Events.timestamp,
             sortOrder.takeIf { it.uppercase() == "ASC" }?.let { SortOrder.ASC } ?: SortOrder.DESC)

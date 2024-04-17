@@ -29,6 +29,9 @@ class WaltIdCmd : CliktCommand(
         waltid key convert -h
         waltid did -h
         waltid did create -h
+        waltid vc -h
+        waltid vc sign -h
+        waltid vc verify -h
         
         Key generation
         ---------------
@@ -46,6 +49,10 @@ class WaltIdCmd : CliktCommand(
         waltid did create 
         waltid did create -k myKey.json
         
+        DID resolution
+        --------------
+        waltid did resolve -d did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV
+        
         VC signing
         -------------
         waltid vc sign --key=./myKey.json --subject=did:key:z6Mkjm2gaGsodGchfG4k8P6KwCHZsVEPZho5VuEbY94qiBB9 ./myVC.json
@@ -53,6 +60,13 @@ class WaltIdCmd : CliktCommand(
                        --subject=did:key:z6Mkjm2gaGsodGchfG4k8P6KwCHZsVEPZho5VuEbY94qiBB9\
                        --issuer=did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV\
                        ./myVC.json
+        
+        VC verification
+        ----------------
+        waltid vc verify ./myVC.signed.json
+        waltid vc verify --policy=signature ./myVC.signed.json
+        waltid vc verify --policy=schema --arg=schema=mySchema.json ./myVC.signed.json
+        waltid vc verify --policy=signature --policy=schema --arg=schema=mySchema.json ./myVC.signed.json
         """,
     printHelpOnEmptyArgs = true
 ) {

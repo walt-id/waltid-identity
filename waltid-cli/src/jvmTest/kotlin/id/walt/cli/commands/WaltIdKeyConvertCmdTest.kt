@@ -1,4 +1,4 @@
-package id.walt.cli
+package id.walt.cli.commands
 
 import com.github.ajalt.clikt.core.*
 import com.github.ajalt.clikt.testing.test
@@ -7,7 +7,6 @@ import com.github.ajalt.mordant.terminal.PrintRequest
 import com.github.ajalt.mordant.terminal.Terminal
 import com.github.ajalt.mordant.terminal.TerminalInfo
 import com.github.ajalt.mordant.terminal.TerminalInterface
-import id.walt.cli.commands.KeyConvertCmd
 import id.walt.cli.util.getResourcePath
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.test.runTest
@@ -75,8 +74,8 @@ class WaltIdKeyConvertCmdTest {
 
         // openssl genrsa -out src/jvmTest/resources/rsa_by_openssl_pvt_key.pem 3072
         // openssl rsa -in src/jvmTest/resources/rsa_by_openssl_pvt_key.pem -pubout -out src/jvmTest/resources/rsa_by_openssl_pub_key.pem
-        val inputFileName = "rsa_by_openssl_pvt_key.pem"
-        val outputFileName = "rsa_by_openssl_pvt_key.jwk"
+        val inputFileName = "key/rsa_by_openssl_pvt_key.pem"
+        val outputFileName = "key/rsa_by_openssl_pvt_key.jwk"
 
         val inputFilePath = getResourcePath(this, inputFileName)
         val outputFilePath = getOutputFilePath(inputFilePath, outputFileName)
@@ -104,10 +103,8 @@ class WaltIdKeyConvertCmdTest {
     fun `should fail with invalid input file`() {
 
         // Stored in src/jvmTest/resources
-        val inputFileName = "invalidKey.jwk"
+        val inputFileName = "key/invalidKey.jwk"
         var inputFilePath = getResourcePath(this, inputFileName)
-
-
 
         var result = KeyConvertCmd().test("--input=\"$inputFilePath\" --verbose")
         var expectedErrorMessage = ".*Invalid file format*".toRegex()
@@ -121,7 +118,7 @@ class WaltIdKeyConvertCmdTest {
     @Test
     fun `should prompt for overwrite confirmation when the output file already exists`() {
         // Stored in src/jvmTest/resources
-        val inputFileName = "rsa_by_openssl_pub_key.pem"
+        val inputFileName = "key/rsa_by_openssl_pub_key.pem"
         val outputFileName = "existingFile.jwk"
 
         val inputFilePath = getResourcePath(this, inputFileName)
@@ -141,8 +138,8 @@ class WaltIdKeyConvertCmdTest {
     fun `should convert JWT input file to PEM`() {
 
         // Stored in src/jvmTest/resources
-        val inputFileName = "ed25519_by_waltid_pvt_key.jwk"
-        val outputFileName = "ed25519_by_waltid_pvt_key.pem"
+        val inputFileName = "key/ed25519_by_waltid_pvt_key.jwk"
+        val outputFileName = "key/ed25519_by_waltid_pvt_key.pem"
 
         val inputFilePath = getResourcePath(this, inputFileName)
         val outputFilePath = getOutputFilePath(inputFilePath, outputFileName)
@@ -161,7 +158,7 @@ class WaltIdKeyConvertCmdTest {
     fun `should convert a PEM file to JWK`() {
 
         // Stored in src/jvmTest/resources
-        val inputFileName = "rsa_by_openssl_pub_key.pem"
+        val inputFileName = "key/rsa_by_openssl_pub_key.pem"
         val outputFileName = "rsa_by_openssl_pub_key.jwk"
 
         val inputFilePath = getResourcePath(this, inputFileName)
@@ -182,7 +179,7 @@ class WaltIdKeyConvertCmdTest {
     fun `should convert RSA public key PEM file to a valid JWK`() {
 
         // Stored in src/jvmTest/resources
-        val inputFileName = "rsa_by_openssl_pub_key.pem"
+        val inputFileName = "key/rsa_by_openssl_pub_key.pem"
         val outputFileName = "rsa_by_openssl_pub_key.jwk"
 
         // Assert output file content
@@ -206,7 +203,7 @@ class WaltIdKeyConvertCmdTest {
     fun `should convert RSA private key PEM file to a valid JWK`() {
 
         // Stored in src/jvmTest/resources
-        val inputFileName = "rsa_by_openssl_pvt_key.pem"
+        val inputFileName = "key/rsa_by_openssl_pvt_key.pem"
         val outputFileName = "rsa_by_openssl_pvt_key.jwk"
 
         // Assert output file content
@@ -229,8 +226,8 @@ class WaltIdKeyConvertCmdTest {
     @Test
     @Ignore
     fun `should ask for the passphrase if input PEM file is encrypted and no passphrase is provided`() = runTest {
-        val inputFileName = "rsa_encrypted_private_key.pem"
-        val outputFileName = "rsa_encrypted_private_key.jwk"
+        val inputFileName = "key/rsa_encrypted_private_key.pem"
+        val outputFileName = "key/rsa_encrypted_private_key.jwk"
 
         val inputFilePath = getResourcePath(this, inputFileName)
 
@@ -262,23 +259,13 @@ class WaltIdKeyConvertCmdTest {
             .test("--input=\"${inputFilePath}\"")
 
         println(result)
-
-        //
-        // KeyConvertCmd().testkit("--input", inputFilePath) {
-        //     expectOutput() // Reading key ...
-        //     assertContains(expectOutput(), ".*Key encrypted. Please, inform the passphrase to decipher it.*".toRegex())
-        //     provideInput("123123")
-        //     // expectOutput() // Converting key
-        //     // assertContains(expectOutput(), ".*Converted Key .JWK.*".toRegex())
-        //     // ignoreOutputs()
-        // }
     }
 
     @Test
     fun `should NOT ask for the passphrase if input PEM file is encrypted and --passphrase is provided`() {
 
         // openssl genrsa -aes256 -passout pass:123123 -out rsa_by_openssl_encrypted_pvt_key.pem 2048
-        val inputFileName = "rsa_by_openssl_encrypted_pvt_key.pem"
+        val inputFileName = "key/rsa_by_openssl_encrypted_pvt_key.pem"
         val outputFileName = "rsa_by_openssl_encrypted_pvt_key.jwk"
 
         val inputFilePath = getResourcePath(this, inputFileName)
@@ -298,7 +285,7 @@ class WaltIdKeyConvertCmdTest {
     fun `should convert RSA PEM public key extracted from an encrypted private key`() {
 
         // openssl rsa -in rsa_by_openssl_encrypted_pvt_key.pem -passin pass:123123 -pubout -out rsa_by_openssl_encrypted_pub_key.pem
-        val inputFileName = "rsa_by_openssl_encrypted_pub_key.pem"
+        val inputFileName = "key/rsa_by_openssl_encrypted_pub_key.pem"
         val outputFileName = "rsa_by_openssl_encrypted_pub_key.jwk"
 
         val inputFilePath = getResourcePath(this, inputFileName)
@@ -319,7 +306,7 @@ class WaltIdKeyConvertCmdTest {
     fun `should convert encrypted RSA private key PEM file to a valid JWK`() {
 
         // Stored in src/jvmTest/resources
-        val inputFileName = "rsa_by_openssl_encrypted_pvt_key.pem"
+        val inputFileName = "key/rsa_by_openssl_encrypted_pvt_key.pem"
         val outputFileName = "rsa_by_openssl_encrypted_pvt_key.jwk"
 
         // Assert output file content
@@ -346,16 +333,24 @@ class WaltIdKeyConvertCmdTest {
     fun `should fail when trying to convert Ed25519 PEM file`() {
 
         // ssh-keygen -t ed25519  -f ed25519_pvt_key_by_openssh.pem
-        testFailingConversion("ed25519_by_openssh_pvt_key.pem", "Invalid file format", false)
-        testFailingConversion("ed25519_by_openssh_pvt_key.pem", "unrecognised object: OPENSSH PRIVATE KEY", true)
+        testFailingConversion("key/ed25519_by_openssh_pvt_key.pem", "Invalid file format", false)
+        testFailingConversion("key/ed25519_by_openssh_pvt_key.pem", "unrecognised object: OPENSSH PRIVATE KEY", true)
 
         // openssl genpkey -algorithm ed25519 -out ed25519_pvt_key_by_openssl.pem
-        testFailingConversion("ed25519_by_openssl_pvt_key.pem", "Invalid file format", false)
-        testFailingConversion("ed25519_by_openssl_pvt_key.pem", "Missing PEM-encoded public key to construct JWK", true)
+        testFailingConversion("key/ed25519_by_openssl_pvt_key.pem", "Invalid file format", false)
+        testFailingConversion(
+            "key/ed25519_by_openssl_pvt_key.pem",
+            "Missing PEM-encoded public key to construct JWK",
+            true
+        )
 
         // openssl pkey -pubout -in src/jvmTest/resources/ed25519_pvt_key_by_openssl.pem -out src/jvmTest/resources/ed25519_pub_key_by_openssl.pem
-        testFailingConversion("ed25519_by_openssl_pub_key.pem", "Invalid file format", false)
-        testFailingConversion("ed25519_by_openssl_pub_key.pem", "Unsupported algorithm of PEM-encoded key: EdDSA", true)
+        testFailingConversion("key/ed25519_by_openssl_pub_key.pem", "Invalid file format", false)
+        testFailingConversion(
+            "key/ed25519_by_openssl_pub_key.pem",
+            "Unsupported algorithm of PEM-encoded key: EdDSA",
+            true
+        )
     }
 
     @Test
@@ -370,7 +365,7 @@ class WaltIdKeyConvertCmdTest {
     fun `should convert secp256k1 PEM file with public and private key inside to JWK`() {
 
         // openssl ecparam -genkey -name secp256k1 -out src/jvmTest/resources/secp256k1_by_openssl_pub_pvt_key.pem
-        val inputFileName = "secp256k1_by_openssl_pub_pvt_key.pem"
+        val inputFileName = "key/secp256k1_by_openssl_pub_pvt_key.pem"
         val outputFileName = "secp256k1_by_openssl_pub_pvt_key.jwk"
 
         // Assert output file content
@@ -391,8 +386,8 @@ class WaltIdKeyConvertCmdTest {
         // Doesn't work yet because BouncyCastle doesn't supoprt PEM object "BEGIN EC PUBLIC KEY"
 
         //  openssl pkey -in secp256k1_by_openssl_pvt_key.pem -pubout -out secp256k1_by_openssl_pub_key.pem
-        val inputFileName = "secp256k1_by_openssl_pub_key.pem"
-        val outputFileName = "secp256k1_by_openssl_pub_key.jwk"
+        val inputFileName = "key/secp256k1_by_openssl_pub_key.pem"
+        val outputFileName = "key/secp256k1_by_openssl_pub_key.jwk"
 
         // Assert output file content
         val expectedJWKFragments = listOf(
@@ -411,26 +406,26 @@ class WaltIdKeyConvertCmdTest {
         // ./waltid-cli.sh key generate -tsecp256k1 --output=src/jvmTest/resources/secp256k1_by_waltid_pvt_key.jwk
         // ./waltid-cli.sh key convert  --input=src/jvmTest/resources/secp256k1_by_waltid_pvt_key.jwk
         testFailingConversion(
-            "secp256k1_by_waltid_pvt_key.pem",
+            "key/secp256k1_by_waltid_pvt_key.pem",
             "incorrect format in file",
             false,
         )
 
         testFailingConversion(
-            "secp256k1_by_waltid_pvt_key.pem",
+            "key/secp256k1_by_waltid_pvt_key.pem",
             """the return value of "org.bouncycastle.openssl.PEMKeyPair.getPublicKeyInfo()" is null""",
             true,
         )
 
         // openssl storeutl -keys src/jvmTest/resources/secp256k1_by_openssl_pub_pvt_key.pem > src/jvmTest/resources/secp256k1_by_openssl_pvt_key.pem
         testFailingConversion(
-            "secp256k1_by_openssl_pvt_key.pem",
+            "key/secp256k1_by_openssl_pvt_key.pem",
             "Invalid file format",
             false,
         )
 
         testFailingConversion(
-            "secp256k1_by_openssl_pvt_key.pem",
+            "key/secp256k1_by_openssl_pvt_key.pem",
             "Missing PEM-encoded public key to construct JWK",
             true,
         )

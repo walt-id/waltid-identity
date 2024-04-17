@@ -7,27 +7,27 @@ import kotlin.test.assertNotNull
 
 class StreamUtilsTest {
 
-    private val bitString = "0123456789abcdef"
+    private val bitString = byteArrayOf(0, 1, 0, 1, 0, 1, 0, 1, 1, 0, 1, 0, 1, 0, 1, 0)
 
     @Test
     fun `test unit bitsize, no overflow`() {
-        val value = StreamUtils.getBitValue(inputStream = bitString.toByteArray().inputStream(), index = 4UL, bitSize = 1)
+        val value = StreamUtils.getBitValue(inputStream = bitString.inputStream(), index = 4UL, bitSize = 1)
         assertNotNull(value)
-        assertEquals(expected = "4", actual = value.joinToString(""))
+        assertEquals(expected = "0", actual = value.joinToString(""))
     }
 
     @Test
     fun `test non-unit bitsize, no overflow`() {
-        val value = StreamUtils.getBitValue(inputStream = bitString.toByteArray().inputStream(), index = 4UL, bitSize = 2)
+        val value = StreamUtils.getBitValue(inputStream = bitString.inputStream(), index = 4UL, bitSize = 2)
         assertNotNull(value)
-        assertEquals(expected = "89", actual = value.joinToString(""))
+        assertEquals(expected = "10", actual = value.joinToString(""))
     }
 
     @Test
     fun `test unit bitsize, with overflow`() {
         assertFailsWith<IllegalStateException> {
             StreamUtils.getBitValue(
-                inputStream = bitString.toByteArray().inputStream(),
+                inputStream = bitString.inputStream(),
                 index = 16UL,
                 bitSize = 1
             )
@@ -38,7 +38,7 @@ class StreamUtilsTest {
     fun `test non-unit bitsize, with overflow`() {
         assertFailsWith<IllegalStateException> {
             StreamUtils.getBitValue(
-                inputStream = bitString.toByteArray().inputStream(),
+                inputStream = bitString.inputStream(),
                 index = 1UL,
                 bitSize = 9
             )

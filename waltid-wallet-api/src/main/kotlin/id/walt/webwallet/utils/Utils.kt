@@ -6,7 +6,7 @@ import java.util.*
 
 fun hexToInt(hex: String) = Integer.parseInt(hex.startsWith("0x").takeIf { it }?.let {
     hex.substring(2)
-} ?: hex)
+} ?: hex, 2)
 
 object HttpUtils {
     fun parseQueryParam(query: String) = query.split("&").mapNotNull {
@@ -22,6 +22,7 @@ object HttpUtils {
 
 object Base64Utils {
     fun decode(base64: String): ByteArray = Base64.getDecoder().decode(base64)
+    fun urlDecode(base64Url: String): ByteArray = Base64.getUrlDecoder().decode(base64Url)
 }
 
 object StreamUtils {
@@ -37,7 +38,7 @@ object StreamUtils {
         val result = mutableListOf<Char>()
         while (count < index * bitSize + bitSize) {
             int = it.read().takeIf { it != -1 } ?: error("Reached end of stream")
-            result.add(int.toChar())
+            result.add(int.digitToChar())
             count += 1.toULong()
         }
         return result
