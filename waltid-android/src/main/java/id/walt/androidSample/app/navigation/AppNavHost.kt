@@ -1,12 +1,15 @@
 package id.walt.androidSample.app.navigation
 
+import android.widget.Toast
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navOptions
+import id.walt.androidSample.R
 import id.walt.androidSample.app.features.main.MainViewModel
 import id.walt.androidSample.app.features.result.ResultUi
 import id.walt.androidSample.app.features.walkthrough.StepFiveScreen
@@ -25,6 +28,7 @@ fun AppNavHost(
     startDestination: String = NavigationItem.WalkthroughStepOne.route,
 ) {
 
+    val ctx = LocalContext.current
     val walkthroughViewModel = viewModel<WalkthroughViewModel.Default>()
 
     ObserveAsEvents(flow = walkthroughViewModel.events) { event ->

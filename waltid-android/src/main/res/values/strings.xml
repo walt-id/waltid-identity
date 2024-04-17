@@ -53,4 +53,6 @@
     <string name="description_verification_success">Successfully verified!</string>
     <string name="description_verification_jws_not_available">JWS verification is not yet available</string>
     <string name="description_plain_text_hint">Input text to sign here</string>
+    <string name="secure_lock_screen_not_enabled">Secure lock screen needs to be enabled</string>
+    <string name="label_enable_now">Enable now</string>
 </resources>

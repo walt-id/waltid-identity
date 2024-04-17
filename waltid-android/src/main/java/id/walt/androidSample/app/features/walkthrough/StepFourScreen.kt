@@ -89,6 +89,7 @@ fun StepFourScreen(
                 Toast.LENGTH_SHORT
             ).show()
 
+            else -> {}
         }
     }
 
