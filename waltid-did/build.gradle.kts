@@ -109,7 +109,7 @@ kotlin {
         val jvmMain by getting {
             dependencies {
                 // Ktor client
-                implementation("io.ktor:ktor-client-cio:2.3.8")
+                implementation("io.ktor:ktor-client-okhttp:2.3.8")
 
                 // Logging
                 implementation("org.slf4j:slf4j-simple:2.0.12")
