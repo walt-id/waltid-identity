@@ -7,8 +7,8 @@ import org.jetbrains.exposed.sql.statements.UpdateStatement
 import org.jetbrains.exposed.sql.transactions.transaction
 
 object IssuersService {
-    fun get(wallet: UUID, name: String): IssuerDataTransferObject? = transaction {
-        queryIssuer(wallet, name)
+    fun get(wallet: UUID, did: String): IssuerDataTransferObject? = transaction {
+        queryIssuer(wallet, did)
     }
 
     fun list(wallet: UUID): List<IssuerDataTransferObject> = transaction {
@@ -17,8 +17,15 @@ object IssuersService {
         }
     }
 
-    fun add(wallet: UUID, name: String, description: String?, uiEndpoint: String, configurationEndpoint: String) = transaction {
-        addToWalletQuery(wallet, name, description, uiEndpoint, configurationEndpoint)
+    fun add(
+        wallet: UUID,
+        did: String,
+        description: String?,
+        uiEndpoint: String,
+        configurationEndpoint: String,
+        authorized: Boolean = false
+    ) = transaction {
+        addToWalletQuery(wallet, did, description, uiEndpoint, configurationEndpoint, authorized)
     }.insertedCount
 
     fun authorize(wallet: UUID, issuer: String) = transaction {
@@ -27,30 +34,32 @@ object IssuersService {
         }
     }
 
-    private fun queryIssuer(wallet: UUID, name: String) =
-        WalletIssuers.selectAll().where { WalletIssuers.wallet eq wallet and (WalletIssuers.name eq name) }
+    private fun queryIssuer(wallet: UUID, did: String) =
+        WalletIssuers.selectAll().where { WalletIssuers.wallet eq wallet and (WalletIssuers.did eq did) }
             .singleOrNull()?.let {
                 IssuerDataTransferObject(it)
             }
 
     private fun addToWalletQuery(
         wallet: UUID,
-        name: String,
+        did: String,
         description: String?,
         uiEndpoint: String,
         configurationEndpoint: String,
-        authorized: Boolean = false
+        authorized: Boolean,
     ) = WalletIssuers.upsert(
-        keys = arrayOf(WalletIssuers.wallet, WalletIssuers.name),
+        keys = arrayOf(WalletIssuers.wallet, WalletIssuers.did),
         onUpdate = listOf(
-            WalletIssuers.description to stringLiteral(description ?: ""),
+            description?.let { WalletIssuers.description to stringLiteral(it) },
             WalletIssuers.uiEndpoint to stringLiteral(uiEndpoint),
             WalletIssuers.configurationEndpoint to stringLiteral(configurationEndpoint),
             WalletIssuers.authorized to booleanLiteral(authorized)
-        )
+        ).mapNotNull {
+            it
+        }
     ) {
         it[this.wallet] = wallet
-        it[this.name] = name
+        it[this.did] = did
         it[this.description] = description
         it[this.uiEndpoint] = uiEndpoint
         it[this.configurationEndpoint] = configurationEndpoint
@@ -59,7 +68,7 @@ object IssuersService {
 
     //TODO: copied from CredentialsService
     private fun updateColumn(wallet: UUID, issuer: String, update: (statement: UpdateStatement) -> Unit): Int =
-        WalletIssuers.update({ WalletIssuers.wallet eq wallet and (WalletIssuers.name eq issuer) }) {
+        WalletIssuers.update({ WalletIssuers.wallet eq wallet and (WalletIssuers.did eq issuer) }) {
             update(it)
         }
 }

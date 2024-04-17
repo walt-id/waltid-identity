@@ -57,6 +57,7 @@ class OCIKey(
     private var _keyType: KeyType? = null,
 ) : Key() {
 
+    // the OCID of the key (not the oci key-id)
     private val vaultKeyId = "${config.tenancyOcid}/${config.userOcid}/${config.fingerprint}"
 
     @Transient
@@ -265,7 +266,7 @@ class OCIKey(
     @JsPromise
     @JsExport.Ignore
     override suspend fun getMeta(): OciKeyMeta = OciKeyMeta(
-        keyId = vaultKeyId,
+        keyId = id,
         keyVersion = getKeyVersion(id, vaultKeyId, config.managementEndpoint, config.signingKeyPem)
     )
 

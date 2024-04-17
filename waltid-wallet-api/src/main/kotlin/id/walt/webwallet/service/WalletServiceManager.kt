@@ -8,6 +8,7 @@ import id.walt.webwallet.db.models.AccountWalletPermissions
 import id.walt.webwallet.db.models.Wallets
 import id.walt.webwallet.seeker.DefaultCredentialTypeSeeker
 import id.walt.webwallet.service.account.AccountsService
+import id.walt.webwallet.service.cache.EntityNameResolutionCacheService
 import id.walt.webwallet.service.category.CategoryServiceImpl
 import id.walt.webwallet.service.credentials.CredentialStatusServiceFactory
 import id.walt.webwallet.service.credentials.CredentialValidator
@@ -21,16 +22,16 @@ import id.walt.webwallet.service.dids.DidsService
 import id.walt.webwallet.service.endpoint.EntraServiceEndpointProvider
 import id.walt.webwallet.service.events.EventService
 import id.walt.webwallet.service.exchange.IssuanceService
+import id.walt.webwallet.service.entity.DefaultNameResolutionService
 import id.walt.webwallet.service.issuers.IssuersService
 import id.walt.webwallet.service.notifications.NotificationService
 import id.walt.webwallet.service.settings.SettingsService
-import id.walt.webwallet.service.trust.DefaultIssuerNameResolveService
 import id.walt.webwallet.service.trust.DefaultTrustValidationService
 import id.walt.webwallet.usecase.claim.ExplicitClaimStrategy
 import id.walt.webwallet.usecase.claim.SilentClaimStrategy
 import id.walt.webwallet.usecase.credential.CredentialStatusUseCase
 import id.walt.webwallet.usecase.event.EventFilterUseCase
-import id.walt.webwallet.usecase.event.EventUseCase
+import id.walt.webwallet.usecase.event.EventLogUseCase
 import id.walt.webwallet.usecase.exchange.MatchPresentationDefinitionCredentialsUseCase
 import id.walt.webwallet.usecase.exchange.NoMatchPresentationDefinitionCredentialsUseCase
 import id.walt.webwallet.usecase.exchange.PresentationDefinitionFilterParser
@@ -38,7 +39,10 @@ import id.walt.webwallet.usecase.exchange.strategies.DescriptorNoMatchPresentati
 import id.walt.webwallet.usecase.exchange.strategies.DescriptorPresentationDefinitionMatchStrategy
 import id.walt.webwallet.usecase.exchange.strategies.FilterNoMatchPresentationDefinitionMatchStrategy
 import id.walt.webwallet.usecase.exchange.strategies.FilterPresentationDefinitionMatchStrategy
+import id.walt.webwallet.usecase.entity.EntityNameResolutionUseCase
 import id.walt.webwallet.usecase.issuer.IssuerUseCaseImpl
+import id.walt.webwallet.usecase.notification.NotificationDataFormatter
+import id.walt.webwallet.usecase.notification.NotificationDispatchUseCase
 import id.walt.webwallet.usecase.notification.NotificationFilterUseCase
 import id.walt.webwallet.usecase.notification.NotificationUseCase
 import id.walt.webwallet.utils.WalletHttpClients.getHttpClient
@@ -79,14 +83,20 @@ object WalletServiceManager {
             bitStringValueParser = BitStringValueParser(),
         ),
     )
-    val eventUseCase = EventUseCase(eventService)
-    val eventFilterUseCase = EventFilterUseCase(eventService)
-    val oidcConfig by lazy { ConfigManager.getConfig<OidcConfiguration>() }
+    private val issuerNameResolutionService = DefaultNameResolutionService(httpClient, trustConfig.issuersRecord)
+    private val verifierNameResolutionService = DefaultNameResolutionService(httpClient, trustConfig.verifiersRecord)
+    private val issuerNameResolutionUseCase = EntityNameResolutionUseCase(EntityNameResolutionCacheService, issuerNameResolutionService)
+    private val verifierNameResolutionUseCase = EntityNameResolutionUseCase(EntityNameResolutionCacheService, verifierNameResolutionService)
+    private val notificationDataFormatter = NotificationDataFormatter(issuerNameResolutionUseCase)
+    private val notificationDispatchUseCase = NotificationDispatchUseCase(httpClient, notificationDataFormatter)
     val issuerUseCase = IssuerUseCaseImpl(service = IssuersService, http = httpClient)
+    val eventUseCase = EventLogUseCase(eventService)
+    val eventFilterUseCase = EventFilterUseCase(eventService, issuerNameResolutionUseCase, verifierNameResolutionUseCase)
+    val oidcConfig by lazy { ConfigManager.getConfig<OidcConfiguration>() }
     val issuerTrustValidationService by lazy { DefaultTrustValidationService(httpClient, trustConfig.issuersRecord) }
     val verifierTrustValidationService by lazy { DefaultTrustValidationService(httpClient, trustConfig.verifiersRecord) }
-    val notificationUseCase = NotificationUseCase(NotificationService, httpClient)
-    val notificationFilterUseCase = NotificationFilterUseCase(NotificationService, credentialService)
+    val notificationUseCase = NotificationUseCase(NotificationService, notificationDataFormatter)
+    val notificationFilterUseCase = NotificationFilterUseCase(NotificationService, credentialService, notificationDataFormatter)
     val matchPresentationDefinitionCredentialsUseCase = MatchPresentationDefinitionCredentialsUseCase(
         credentialService,
         FilterPresentationDefinitionMatchStrategy(filterParser),
@@ -102,12 +112,12 @@ object WalletServiceManager {
             issuanceService = IssuanceService,
             credentialService = credentialService,
             issuerTrustValidationService = issuerTrustValidationService,
-            issuerNameResolveService = DefaultIssuerNameResolveService(httpClient, trustConfig.issuersRecord),
             accountService = AccountsService,
             didService = DidsService,
             issuerUseCase = issuerUseCase,
             eventUseCase = eventUseCase,
             notificationUseCase = notificationUseCase,
+            notificationDispatchUseCase = notificationDispatchUseCase,
             credentialTypeSeeker = credentialTypeSeeker,
         )
     }

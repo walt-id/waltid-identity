@@ -30,7 +30,6 @@ class DidResolveCmd : CliktCommand(
 
             print.green("Did resolved: ")
             print.box(prettyJsonString)
-//            print.plain(result.toString())
         }
     }
 }
