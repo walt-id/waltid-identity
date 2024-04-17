@@ -11,7 +11,7 @@ class ResourceUtilTest {
     @Test
     fun `should return the right path if there is whitespaces in the folder name hirearchy`() {
 
-        val filename = "ed25519_key_sample1.json"
+        val filename = "key/ed25519_key_sample1.json"
         val filepath = getResourcePath(this, filename)
 
         assertDoesNotThrow {
