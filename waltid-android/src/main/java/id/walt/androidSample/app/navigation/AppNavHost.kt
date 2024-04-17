@@ -10,8 +10,6 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navOptions
 import id.walt.androidSample.R
-import id.walt.androidSample.app.features.main.MainViewModel
-import id.walt.androidSample.app.features.result.ResultUi
 import id.walt.androidSample.app.features.walkthrough.StepFiveScreen
 import id.walt.androidSample.app.features.walkthrough.StepFourScreen
 import id.walt.androidSample.app.features.walkthrough.StepOneScreen
@@ -54,13 +52,6 @@ fun AppNavHost(
         navController = navController,
         startDestination = startDestination
     ) {
-        val sharedViewModel = MainViewModel.Default()
-        composable(NavigationItem.Main.route) {
-            StepOneScreen(viewModel = walkthroughViewModel, navController = navController)
-        }
-        composable(NavigationItem.Result.route) {
-            ResultUi(sharedViewModel, navController)
-        }
         composable(NavigationItem.WalkthroughStepOne.route) {
             StepOneScreen(viewModel = walkthroughViewModel, navController = navController)
         }
