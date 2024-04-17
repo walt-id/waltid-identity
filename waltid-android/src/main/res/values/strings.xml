@@ -31,4 +31,34 @@
     <string name="copied_to_clipboard">Copied to clipboard!</string>
 
     <string name="signed_with_key">Signed plain text with key: %s</string>
+
+    <!-- Walkthrough -->
+    <string name="label_step_1_title">Step 1 - Generate a Key</string>
+    <string name="label_step_2_title">Step 2 - Retrieve Public Key</string>
+    <string name="label_step_3_title">Step 3 - Generate DID</string>
+    <string name="label_step_5_title">Step 5 - Verify Signed Text</string>
+    <string name="label_step_4_title">Step 4 - Sign Input</string>
+    <string name="description_step_1">Choose between using either the RSA or ECDSA algorithm to generate a key pair.</string>
+    <string name="description_step_2">Retrieve the public key from the generated key pair.</string>
+    <string name="description_step_3">Generate a DID using the generated key pair.</string>
+    <string name="description_step_4">Sign the input using the generated key pair.</string>
+    <string name="description_step_5">Verify the signed text using the generated key pair.</string>
+    <string name="label_retrieve_public_key">Retrieve Public Key</string>
+    <string name="label_next_step">Next Step</string>
+    <string name="label_generate_key">Generate Key</string>
+    <string name="label_verify">Verify</string>
+    <string name="label_reset">Reset</string>
+    <string name="label_sign_input">Sign Input</string>
+    <string name="description_verification_failed">The verification failed, did you change the plain text in the previous step?</string>
+    <string name="description_verification_success">Successfully verified!</string>
+    <string name="description_verification_jws_not_available">JWS verification is not yet available</string>
+    <string name="description_plain_text_hint">Input text to sign here</string>
+
+    <!-- Biometric Error Messages -->
+    <string name="biometric_error_general">Biometrics unavailable, please enroll some</string>
+    <string name="secure_lock_screen_not_enabled">Secure lock screen needs to be enabled</string>
+    <string name="label_enable_now">Enable now</string>
+    <string name="label_enroll_now">Enroll now</string>
+
+
 </resources>
