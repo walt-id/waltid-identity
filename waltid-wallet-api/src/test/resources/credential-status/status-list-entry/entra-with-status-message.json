@@ -1,0 +1,7 @@
+{
+    "id": "urn:uuid:d9004251-f85e-4223-89f4-1254af20aa2e?bit-index=1137",
+    "type": "RevocationList2021Status",
+    "statusPurpose": "status",
+    "statusListIndex": 1137,
+    "statusListCredential": "did:ion:M3c1RWU3RC1kb2cixxxxxxxxxxxxDd_e:eyJrdHkiOiJFQxxxxxxxxxxxxxxxxxxx?service=IdentityHub&queries=W3sibWV0aG9kIjoiQ29sbGVjdGlvbnNRdWVyeSIsInNjaGVtYSI6Imh0dHBzOi8vdzNpZC5vcmcvdmMtc3RhdHVzLWxpc3QtMjAyMS92MSIsIm9iamVjdElkIjoiZDkwMDQyNTEtZjg1ZS00MjIzLTg5ZjQtMTI1NGFmMjBhYTJlIn1d"
+}
