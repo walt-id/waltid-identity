@@ -6,6 +6,7 @@ import kotlinx.uuid.UUID
 
 class NotificationUseCase(
     private val service: NotificationService,
+    private val notificationFormatter: NotificationDataFormatter,
 ) {
     fun add(vararg notification: Notification) = service.add(notification.toList())
     fun setStatus(vararg id: UUID, isRead: Boolean) = id.mapNotNull {
@@ -24,7 +25,9 @@ class NotificationUseCase(
         )
     }.size
 
-    fun findById(id: UUID) = service.get(id)
+    suspend fun findById(id: UUID) = service.get(id).fold(onSuccess = {
+        Result.success(notificationFormatter.format(it))
+    }, onFailure = { Result.failure(it) })
     fun deleteById(id: UUID) = service.delete(id)
     fun deleteAll(wallet: UUID) = service.list(wallet).mapNotNull { it.id?.let { UUID(it) } }.let {
         service.delete(*it.toTypedArray())

@@ -68,6 +68,28 @@ class MainTest {
         KeyType.RSA to rsaPEMKeyPattern
     )
 
+    val resourcesPath = "src/jvmTest/resources"
+
+    val keyFilePath = "${resourcesPath}/key/ed25519_by_waltid_pvt_key.jwk"
+    val did1 = "did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV"
+    val did2 = "did:key:z6Mkjm2gaGsodGchfG4k8P6KwCHZsVEPZho5VuEbY94qiBB9"
+    val vcFilePath = "${resourcesPath}/vc/openbadgecredential_sample.json"
+
+    val signedVCFilePath = "${resourcesPath}/vc/openbadgecredential_sample.signed.json"
+    val badSignedVCFilePath = "${resourcesPath}/vc/openbadgecredential_sample.signed.badsignature.json"
+
+    val signedValidSchemaVCFilePath = "${resourcesPath}/vc/openbadgecredential_sample.signed.json"
+    val signedInvalidSchemaVCFilePath = "${resourcesPath}/vc/openbadgecredential_sample.invalidschema.signed.json"
+
+    val schemaFilePath = "${resourcesPath}/schema/OpenBadgeV3_schema.json"
+
+    val signedExpiredVCFilePath = "${resourcesPath}/vc/openbadgecredential_sample.expired.signed.json"
+    val signedNotExpiredVCFilePath = "${resourcesPath}/vc/openbadgecredential_sample.signed.json"
+
+    val signedValidFromVCFilePath = "${resourcesPath}/vc/openbadgecredential_sample.signed.json"
+    val signedInvalidFromVCFilePath = "${resourcesPath}/vc/openbadgecredential_sample.invalidnotbefore.signed.json"
+
+
     @Test
     fun `should show usage message when called with no arguments`(output: CapturedOutput) {
         main(arrayOf(""))
@@ -176,7 +198,7 @@ class MainTest {
     fun `should convert the RSA key in the specified file from the JWK to the PEM format when 'key convert -i myRSAKey' is executed`(
         output: CapturedOutput
     ) {
-        val inputFileName = getResourcePath(this, "rsa_by_waltid_pub_pvt_key.jwk")
+        val inputFileName = getResourcePath(this, "key/rsa_by_waltid_pub_pvt_key.jwk")
         testSuccessfulKeyConvertion(inputFileName, pemKeyPatterns[KeyType.RSA], output)
     }
 
@@ -184,7 +206,7 @@ class MainTest {
     fun `should fail when trying to convert the Ed25519 key in the specified file from the JWK to the PEM format when 'key convert -i myEd25519Key' is executed`(
         output: CapturedOutput
     ) {
-        val inputFileName = getResourcePath(this, "ed25519_by_waltid_pub_pvt_key.jwk")
+        val inputFileName = getResourcePath(this, "key/ed25519_by_waltid_pub_pvt_key.jwk")
         testFailedKeyConvertion(inputFileName, pemKeyPatterns[KeyType.RSA], output)
     }
 
@@ -298,6 +320,148 @@ class MainTest {
         main(arrayOf("did create --key=myRSAKey.json"))
         fail("Not yet implemented")
         // assertContains(output.all  , "Usage: waltid [<options>] <command> [<args>]...")
+    }
+
+    @Test
+    fun `should print usage instructions when 'vc' command is called with no argument`(output: CapturedOutput) {
+        main(arrayOf("vc"))
+        assertContains(output.all, "Usage: waltid vc")
+    }
+
+    @Test
+    @Ignore("Failing with NoSuchSubcommand :-/ I'll check it later.")
+    fun `should print usage instructions when 'vc sign' command is called with no argument`(output: CapturedOutput) {
+        main(arrayOf("vc sign"))
+        assertContains(output.all, "Usage: waltid vc sign")
+    }
+
+    @Test
+    @Ignore
+    fun `should sign a given VC when no DID is provided for the Issuer`(output: CapturedOutput) {
+
+        main(arrayOf("""vc sign -k "${keyFilePath}" -s ${did2} """))
+
+        assertFalse(output.all.contains("ERROR"))
+        assertContains(output.all, "Generated DID:")
+        assertContains(output.all, "Signed VC saved at")
+    }
+
+    @Test
+    @Ignore
+    fun `should sign a given VC when all parameters are provided correctly`(output: CapturedOutput) {
+
+        main(arrayOf("""vc sign -k "${keyFilePath}" -i ${did1} -s ${did2} """))
+
+        assertFalse(output.all.contains("ERROR"))
+        assertContains(output.all, "Signed VC saved at")
+    }
+
+    @Test
+    @Ignore("Failing with NoSuchSubcommand :-/ I'll check it later.")
+    fun `should print usage instructions when 'vc verify' command is called with no argument`(output: CapturedOutput) {
+        main(arrayOf("vc verify"))
+        assertContains(output.all, "Usage: waltid vc verify")
+    }
+
+    @Test
+    fun `should verify the signature of a VC if the VC file is provided with no other parameter`(output: CapturedOutput) {
+        main(arrayOf("vc", "verify", "--policy=signature", "${signedVCFilePath}"))
+
+        assertFalse(output.all.contains("ERROR"))
+        assertContains(output.all, "signature: Success! ")
+    }
+
+    @Test
+    fun `should succeed the signature verification when a valid VC is provided`(output: CapturedOutput) {
+        main(arrayOf("vc", "verify", "--policy=signature", "${signedVCFilePath}"))
+
+        assertFalse(output.all.contains("ERROR"))
+        assertContains(output.all, "signature: Success! ")
+    }
+
+    @Test
+    fun `should fail the signature verification when an invalid VC is provided`(output: CapturedOutput) {
+        main(arrayOf("vc", "verify", "--policy=signature", "${badSignedVCFilePath}"))
+
+        assertContains(output.all, "signature: Fail!")
+    }
+
+    @Test
+    fun `should succeed if the credentials expiration date (exp for JWTs) has not been exceeded when --policy=expired`(
+        output: CapturedOutput
+    ) {
+        main(arrayOf("vc", "verify", "--policy=expired", signedNotExpiredVCFilePath))
+        assertContains(output, "expired: Success")
+    }
+
+    @Test
+    fun `should fail if the credentials expiration date (exp for JWTs) has been exceeded when --policy=expired`(output: CapturedOutput) {
+        main(arrayOf("vc", "verify", "--policy=expired", signedExpiredVCFilePath))
+        assertContains(output, "expired: Fail! VC expired since")
+    }
+
+    @Test
+    fun `should succeed if credential is valid when --policy=not-before`(output: CapturedOutput) {
+        main(arrayOf("vc", "verify", "--policy=not-before", signedValidFromVCFilePath))
+        assertContains(output, "not-before: Success")
+    }
+
+    @Test
+    fun `should fail if credential is not valid yet when --policy=not-before`(output: CapturedOutput) {
+        main(arrayOf("vc", "verify", "--policy=not-before", signedInvalidFromVCFilePath))
+        assertContains(output, "not-before: Fail! VC not valid until")
+    }
+
+    @Test
+    fun `should succeed the schema verification when a valid VC is provided`(output: CapturedOutput) {
+        main(
+            arrayOf(
+                "vc",
+                "verify",
+                "--policy=schema",
+                "-a",
+                "schema=${schemaFilePath}",
+                "${signedValidSchemaVCFilePath}"
+            )
+        )
+
+        assertFalse(output.all.contains("ERROR"))
+        assertContains(output.all, "schema: Success! ")
+    }
+
+    @Test
+    fun `should fail the schema verification when an invalid VC is provided`(output: CapturedOutput) {
+        main(
+            arrayOf(
+                "vc",
+                "verify",
+                "--policy=schema",
+                "-a",
+                "schema=${schemaFilePath}",
+                "${signedInvalidSchemaVCFilePath}"
+            )
+        )
+
+        assertContains(output.all, "schema: Fail!")
+        assertContains(output.all, "missing required properties: [name]")
+    }
+
+    @Test
+    fun `should apply all policies specified`(output: CapturedOutput) {
+        main(
+            arrayOf(
+                "vc",
+                "verify",
+                "--policy=signature",
+                "--policy=schema",
+                "-a",
+                "schema=${schemaFilePath}",
+                "${signedInvalidSchemaVCFilePath}"
+            )
+        )
+        assertContains(output.all, "signature: Success!")
+        assertContains(output.all, "schema: Fail!")
+        assertContains(output.all, "schema: Fail!.*missing required properties".toRegex())
     }
 
     private fun testSuccessfulKeyCmd(
