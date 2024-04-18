@@ -1,21 +1,15 @@
-package id.walt.credentials
+package id.walt.oid4vc.util
 
 import id.walt.crypto.keys.Key
 import id.walt.crypto.utils.JsonUtils.toJsonElement
-import id.walt.did.dids.DidService
 import kotlinx.datetime.Clock
-import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.Instant
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import kotlinx.uuid.UUID
 import kotlinx.uuid.generateUUID
-import love.forte.plugin.suspendtrans.annotation.JsPromise
-import love.forte.plugin.suspendtrans.annotation.JvmAsync
-import love.forte.plugin.suspendtrans.annotation.JvmBlocking
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
-import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.DurationUnit
 import kotlin.time.toDuration
@@ -83,27 +77,14 @@ class PresentationBuilder {
 
     fun buildPresentationJson() = buildPresentationMap().toJsonElement()
     fun buildPresentationJsonString() = Json.encodeToString(buildPresentationJson())
-    @JvmBlocking
-    @JvmAsync
-    @JsPromise
     @JsExport.Ignore
-    suspend fun buildAndSign(key: Key): String {
+    suspend fun buildAndSign(key: Key, didAuthenticationMethodId: String): String {
         return key.signJws(
             plaintext = buildPresentationJsonString().encodeToByteArray(),
             headers = mapOf(
-                "kid" to resolveDidAuthentication(did ?: throw IllegalStateException("No DID set in PresentationBuilder")),
+                "kid" to didAuthenticationMethodId,
                 "typ" to "JWT"
             )
         )
-    }
-
-    private suspend fun resolveDidAuthentication(did: String): String {
-        return DidService.resolve(did).getOrThrow()["authentication"]!!.jsonArray.first().let {
-            if (it is JsonObject) {
-                it.jsonObject["id"]!!.jsonPrimitive.content
-            } else {
-                it.jsonPrimitive.content
-            }
-        }
     }
 }

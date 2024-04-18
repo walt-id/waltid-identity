@@ -13,8 +13,8 @@ data class UnsignedTransaction(
   val gasPrice: String,
   val value: String
 ) {
-  fun sign(key: Key): SignedTransaction {
-    TODO()
+  suspend fun sign(key: Key): SignedTransaction {
+    return TransactionService.signTransaction(key, this)
   }
 }
 

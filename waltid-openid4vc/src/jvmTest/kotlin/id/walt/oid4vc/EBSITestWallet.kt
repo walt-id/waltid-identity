@@ -4,7 +4,6 @@ import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.crypto.ECDSASigner
 import com.nimbusds.jose.crypto.ECDSAVerifier
 import com.nimbusds.jose.jwk.ECKey
-import id.walt.credentials.PresentationBuilder
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.JwsUtils.decodeJws
@@ -24,6 +23,7 @@ import id.walt.oid4vc.providers.TokenTarget
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.requests.TokenRequest
 import id.walt.oid4vc.responses.TokenErrorCode
+import id.walt.oid4vc.util.PresentationBuilder
 import id.walt.sdjwt.SDJwt
 import id.walt.sdjwt.SDMap
 import id.walt.sdjwt.SDPayload
@@ -68,9 +68,9 @@ class EBSITestWallet(
     val TEST_DID = EBSI_WALLET_TEST_DID
     val TEST_KEY = runBlocking { JWKKey.importJWK(EBSI_WALLET_TEST_KEY_JWK).getOrThrow() }
 
-    override fun resolveDID(did: String): String {
+    override fun resolveDID(did: String, verificationMethod: String?): String {
         val didObj = runBlocking { DidService.resolve(did) }.getOrThrow()
-        return (didObj["authentication"] ?: didObj["assertionMethod"]
+        return (verificationMethod?.let { didObj[it] } ?: didObj["authentication"] ?: didObj["assertionMethod"]
         ?: didObj["verificationMethod"])?.jsonArray?.firstOrNull()?.jsonObject?.get("id")?.jsonPrimitive?.content ?: did
     }
 
@@ -216,7 +216,7 @@ class EBSITestWallet(
                 did = TEST_DID
                 nonce = session.nonce
                 addCredentials(listOf())
-            }.buildAndSign(TEST_KEY)
+            }.buildAndSign(TEST_KEY, resolveDID(TEST_DID))
         }
 
     private fun mapCredentialTypes(presentationDefinition: PresentationDefinition) =

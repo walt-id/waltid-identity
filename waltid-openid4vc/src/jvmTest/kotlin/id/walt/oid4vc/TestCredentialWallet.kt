@@ -5,7 +5,6 @@ import com.nimbusds.jose.crypto.ECDSASigner
 import com.nimbusds.jose.crypto.ECDSAVerifier
 import com.nimbusds.jose.crypto.bc.BouncyCastleProviderSingleton
 import com.nimbusds.jose.jwk.ECKey
-import id.walt.credentials.PresentationBuilder
 import id.walt.crypto.keys.Key
 //import id.walt.crypto.keys.LocalKey
 import id.walt.crypto.keys.jwk.JWKKey
@@ -31,6 +30,7 @@ import id.walt.oid4vc.requests.TokenRequest
 import id.walt.oid4vc.responses.AuthorizationDirectPostResponse
 import id.walt.oid4vc.responses.AuthorizationErrorCode
 import id.walt.oid4vc.responses.TokenErrorCode
+import id.walt.oid4vc.util.PresentationBuilder
 import id.walt.sdjwt.SDJwt
 import id.walt.sdjwt.SDMap
 import id.walt.sdjwt.SDPayload
@@ -138,7 +138,7 @@ class TestCredentialWallet(
                 nonce = session.nonce
                 audience = session.authorizationRequest?.clientId
                 addCredentials(credentialStore[filterString]?.let { listOf(JsonPrimitive(it)) } ?: listOf())
-            }.buildAndSign(TEST_KEY)
+            }.buildAndSign(TEST_KEY, resolveDID(TEST_DID))
         }
 
         println("================")
@@ -206,9 +206,9 @@ class TestCredentialWallet(
         })
     }
 
-    override fun resolveDID(did: String): String {
+    override fun resolveDID(did: String, verificationMethod: String?): String {
         val didObj = runBlocking { DidService.resolve(did) }.getOrThrow()
-        return (didObj["authentication"] ?: didObj["assertionMethod"] ?: didObj["verificationMethod"])?.jsonArray?.firstOrNull()?.let {
+        return (verificationMethod?.let { didObj[it] } ?: didObj["authentication"] ?: didObj["assertionMethod"] ?: didObj["verificationMethod"])?.jsonArray?.firstOrNull()?.let {
             if(it is JsonObject) it.jsonObject["id"]?.jsonPrimitive?.content
             else it.jsonPrimitive.contentOrNull
         }?: did

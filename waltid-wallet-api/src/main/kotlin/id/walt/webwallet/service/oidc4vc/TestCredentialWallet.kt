@@ -230,7 +230,7 @@ class TestCredentialWallet(
 
     // FIXME: USE DB INSTEAD OF KEY MAPPING
 
-    override fun resolveDID(did: String): String {
+    override fun resolveDID(did: String, verificationMethod: String?): String {
         val key = runBlocking { DidService.resolveToKey(did) }.getOrElse {
             throw IllegalArgumentException(
                 "Could not resolve DID in CredentialWallet: $did, error cause attached.",

@@ -1,4 +1,6 @@
-import id.walt.credentials.PresentationBuilder
+package id.walt.oid4vc
+
+import id.walt.oid4vc.util.PresentationBuilder
 import kotlin.test.Test
 
 class PresentationBuilderTest {

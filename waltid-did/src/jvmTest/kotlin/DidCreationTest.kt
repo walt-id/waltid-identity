@@ -1,10 +1,12 @@
-import id.walt.credentials.PresentationBuilder
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.MultiBaseUtils
 import id.walt.did.dids.document.DidEbsiBaseDocument
+import id.walt.did.dids.document.DidEbsiDocument
+import id.walt.did.dids.registrar.dids.DidEbsiCreateOptions
 import id.walt.did.dids.registrar.dids.DidKeyCreateOptions
 import id.walt.did.dids.registrar.dids.DidWebCreateOptions
+import id.walt.did.dids.registrar.local.ebsi.DidEbsiRegistrar
 import id.walt.did.dids.registrar.local.key.DidKeyRegistrar
 import id.walt.did.dids.registrar.local.web.DidWebRegistrar
 import id.walt.did.dids.resolver.DidResolver
@@ -28,6 +30,7 @@ import id.walt.oid4vc.requests.TokenRequest
 import id.walt.oid4vc.responses.AuthorizationCodeResponse
 import id.walt.oid4vc.responses.CredentialResponse
 import id.walt.oid4vc.responses.TokenResponse
+import id.walt.oid4vc.util.PresentationBuilder
 import id.walt.oid4vc.util.http
 import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
@@ -115,7 +118,7 @@ class DidCreationTest {
     }
 
     val CLIENT_MOCK_PORT = 5000
-    val CLIENT_MOCK_URL = "https://616a-62-178-27-231.ngrok-free.app/client-mock"//"http://192.168.0.122:5000/client-mock"
+    val CLIENT_MOCK_URL = "https://97e2-62-178-27-231.ngrok-free.app/client-mock"//"http://192.168.0.122:5000/client-mock"
     val CLIENT_MAIN_KEY = runBlocking { JWKKey.generate(KeyType.secp256k1) }
     val CLIENT_VCSIGN_KEY = runBlocking { JWKKey.generate(KeyType.secp256r1) }
     fun startClientMockServer() {
@@ -265,64 +268,11 @@ class DidCreationTest {
         //OpenID4VP.createPresentationRequest(PresentationDefinitionParameter.fromPresentationDefinitionScope("openid didr_invite"),
         //    clientId = CLIENT_MOCK_URL, clientIdScheme = ClientIdScheme.RedirectUri, )
 
-        val tokenResponse = OpenID4VP.generatePresentationResponse(
-            PresentationResult(listOf(JsonPrimitive(
-                PresentationBuilder().also {
-                    it.did = did
-                    it.addCredential(credResp.credential!!)
-                    it.nonce = tokenResp.cNonce
-                    it.audience = "https://api-conformance.ebsi.eu/authorisation/v4"
-                    it.jwtExpiration = Clock.System.now().plus(1.toDuration(DurationUnit.MINUTES))
-                }.buildPresentationJsonString().let {
-                    CLIENT_VCSIGN_KEY.signJws(
-                        it.encodeToByteArray(),
-                        headers = mapOf("kid" to "$did#${CLIENT_VCSIGN_KEY.getKeyId()}", "typ" to "JWT")
-                    )
-                }
-            )), PresentationSubmission(
-                presDef.id, presDef.id, presDef.inputDescriptors.mapIndexed { index, inputDescriptor ->
-                    DescriptorMapping(inputDescriptor.id, presDef.format!!.keys.first(), DescriptorMapping.vpPath(1,0),
-                        null) //DescriptorMapping("0", inputDescriptor.format!!.keys.first(), "${DescriptorMapping.vpPath(1,0)}.verifiableCredential[$index]"))
-                }
-            ).also { println(it.toJSONString()) }), grantType = GrantType.vp_token, scope = "openid didr_invite"
-        )
-        println(tokenResponse.vpToken.toString())
-        val accessTokenResponse = http.submitForm("https://api-conformance.ebsi.eu/authorisation/v4/token",
-            formParameters = parametersOf(tokenResponse.toHttpParameters())) {}.bodyAsText().let { TokenResponse.fromJSONString(it) }
-        assertNotNull(accessTokenResponse.accessToken)
-        println(accessTokenResponse.accessToken)
-
-        // insert DID document:
-        val insertDidRpcRequest = EbsiRpcRequests.generateInsertDidDocumentRequest(1, did, CLIENT_MAIN_KEY,
-            DidEbsiBaseDocument().let { Json.encodeToJsonElement(it) })
-        val insertDidHttpResponse = http.post("https://api-conformance.ebsi.eu/did-registry/v5/jsonrpc") {
-            bearerAuth(accessTokenResponse.accessToken!!)
-            contentType(ContentType.Application.Json)
-            setBody(Json.encodeToJsonElement(insertDidRpcRequest).also {
-                    println(it)
-            })
-        }
-        println(insertDidHttpResponse.bodyAsText())
-        assertEquals(HttpStatusCode.OK, insertDidHttpResponse.status)
-        val insertDidRpcResponse = Json.decodeFromString<UnsignedTransactionResponse>(insertDidHttpResponse.bodyAsText())
-        assertEquals(1, insertDidRpcResponse.id)
-
-        // sign transaction
-        val signedTransaction = TransactionService.signTransaction(CLIENT_MAIN_KEY, insertDidRpcResponse.result)
-        val sendSignedTransactionRequest = EbsiRpcRequests.generateSendSignedTransactionRequest(
-            1, insertDidRpcResponse.result, signedTransaction)
-        val sendSignedTransactionHttpResponse = http.post("https://api-conformance.ebsi.eu/did-registry/v5/jsonrpc") {
-            bearerAuth(accessTokenResponse.accessToken!!)
-            contentType(ContentType.Application.Json)
-            setBody(Json.encodeToJsonElement(sendSignedTransactionRequest).also {
-                println(it)
-            })
-        }
-        println(sendSignedTransactionHttpResponse.bodyAsText())
-        assertEquals(HttpStatusCode.OK, sendSignedTransactionHttpResponse.status)
-        val sendSignedTransactionRpcResponse = Json.decodeFromString<SignedTransactionResponse>(sendSignedTransactionHttpResponse.bodyAsText())
-        println(sendSignedTransactionRpcResponse.result)
-
+        val didResult = DidEbsiRegistrar().registerByKey(CLIENT_MAIN_KEY, DidEbsiCreateOptions(
+            5, credResp.credential!!, tokenResp.cNonce
+        ))
+        val didEbsiDoc = didResult.didDocument.let { Json.decodeFromJsonElement<DidEbsiDocument>(it.toJsonObject()) }
+        assertEquals("$did#${CLIENT_MAIN_KEY.getKeyId()}", didEbsiDoc.verificationMethod!!.first().id)
         Thread.sleep(5000)
         val resolveDidHttpResponse = http.get("https://api-conformance.ebsi.eu/did-registry/v5/identifiers/${URLEncoder.encode(did)}")
         assertEquals(HttpStatusCode.OK, resolveDidHttpResponse.status)

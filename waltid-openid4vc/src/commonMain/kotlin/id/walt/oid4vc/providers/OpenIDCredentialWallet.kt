@@ -36,9 +36,10 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
     /**
      * Resolve DID to key ID
      * @param did DID to resolve
+     * @param verificationMethod Verification method relationship to resolve (e.g. authentication, assertionMethod, etc.), if null, the first available verification method id is returned
      * @return Key ID of resolved DID, as resolvable by given crypto provider
      */
-    abstract fun resolveDID(did: String): String
+    abstract fun resolveDID(did: String, verificationMethod: String? = null): String
 
     /**
      * Get the DID to use for this session
