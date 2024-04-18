@@ -4,9 +4,11 @@ import java.io.BufferedReader
 import java.io.InputStream
 import java.util.*
 
-fun hexToInt(hex: String) = Integer.parseInt(hex.startsWith("0x").takeIf { it }?.let {
-    hex.substring(2)
-} ?: hex, 2)
+fun hexToInt(hex: String) = hex.startsWith("0x").takeIf { it }?.let {
+    Integer.parseInt(hex.substring(2))
+} ?: Integer.parseInt(hex)
+
+fun binToInt(bin: String) = Integer.parseInt(bin, 2)
 
 object HttpUtils {
     fun parseQueryParam(query: String) = query.split("&").mapNotNull {

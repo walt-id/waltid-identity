@@ -81,7 +81,7 @@ class CredentialStatusUseCaseTest {
     fun `given a credential having single status-list credential status, when getting status, then returns the status result`() =
         runTest {
             val service = mockk<CredentialStatusService>()
-            val status = CredentialStatusResult("revocation", false)
+            val status = CredentialStatusResult("revocation", false, message = "unset")
             every { statusFactoryMock.new(any()) } returns service
             coEvery { service.get(any()) } returns status
             every { credentialServiceMock.get(wallet, credentialId) } returns credentialSingleStatus
@@ -107,8 +107,8 @@ class CredentialStatusUseCaseTest {
                 statusListIndex = 23452UL,
                 statusListCredential = "https://example.com/credentials/status/4",
             )
-            val statusRevocation = CredentialStatusResult("revocation", false)
-            val statusSuspension = CredentialStatusResult("suspension", false)
+            val statusRevocation = CredentialStatusResult("revocation", false, message = "unset")
+            val statusSuspension = CredentialStatusResult("suspension", false, message = "unset")
             every { statusFactoryMock.new(any()) } returns service
             coEvery { service.get(statusListEntryRevocation) } returns statusRevocation
             coEvery { service.get(statusListEntrySuspension) } returns statusSuspension
