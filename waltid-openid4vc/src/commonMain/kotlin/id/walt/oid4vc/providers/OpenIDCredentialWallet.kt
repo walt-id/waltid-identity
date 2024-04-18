@@ -1,17 +1,16 @@
 package id.walt.oid4vc.providers
 
+import id.walt.oid4vc.OpenID4VCI
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.data.dif.PresentationDefinition
-import id.walt.oid4vc.definitions.JWTClaims
 import id.walt.oid4vc.errors.*
 import id.walt.oid4vc.interfaces.IHttpClient
 import id.walt.oid4vc.interfaces.ITokenProvider
 import id.walt.oid4vc.interfaces.IVPTokenProvider
 import id.walt.oid4vc.requests.*
 import id.walt.oid4vc.responses.*
+import id.walt.oid4vc.util.JwtUtils
 import id.walt.oid4vc.util.randomUUID
-import id.walt.oid4vc.util.sha256
-import id.walt.sdjwt.SDJwt
 import io.ktor.http.*
 import io.ktor.utils.io.charsets.*
 import io.ktor.utils.io.core.*
@@ -19,6 +18,7 @@ import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.*
+import org.kotlincrypto.hash.sha2.SHA256
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.time.Duration
@@ -53,18 +53,13 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
         nonce: String?,
         client: OpenIDClientConfig? = null
     ): ProofOfPossession {
+        // NOTE: This object/method is obsolete and will be removed or replaced
         val keyId = resolveDID(did)
-        return ProofOfPossession(
-            jwt = signToken(TokenTarget.PROOF_OF_POSSESSION, buildJsonObject {
-                client?.let { put(JWTClaims.Payload.issuer, it.clientID) }
-                put(JWTClaims.Payload.audience, issuerUrl)
-                put(JWTClaims.Payload.issuedAtTime, Clock.System.now().epochSeconds)
-                nonce?.let { put(JWTClaims.Payload.nonce, it) }
-            }, header = buildJsonObject {
-                put(JWTClaims.Header.keyID, keyId)
-                put(JWTClaims.Header.type, "openid4vci-proof+jwt")
-            }, keyId = keyId)
-        )
+        return ProofOfPossession.JWTProofBuilder(issuerUrl, client?.clientID, nonce, keyId).let { builder ->
+            builder.build(
+                signToken(TokenTarget.PROOF_OF_POSSESSION, builder.payload, builder.headers, keyId)
+            )
+        }
     }
 
     open fun getCIProviderMetadataUrl(baseUrl: String): String {
@@ -82,11 +77,11 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
     protected abstract fun isPresentationDefinitionSupported(presentationDefinition: PresentationDefinition): Boolean
 
     override fun validateAuthorizationRequest(authorizationRequest: AuthorizationRequest): Boolean {
-        return ((authorizationRequest.responseType.contains(ResponseType.vp_token.name) ||
-                    authorizationRequest.responseType.contains(ResponseType.id_token.name)) &&
-            authorizationRequest.presentationDefinition != null &&
-            isPresentationDefinitionSupported(authorizationRequest.presentationDefinition)
-            )
+        return ((authorizationRequest.responseType.contains(ResponseType.VpToken) ||
+                authorizationRequest.responseType.contains(ResponseType.IdToken)) &&
+                authorizationRequest.presentationDefinition != null &&
+                isPresentationDefinitionSupported(authorizationRequest.presentationDefinition)
+                )
     }
 
     protected open fun resolveVPAuthorizationParameters(authorizationRequest: AuthorizationRequest): AuthorizationRequest {
@@ -124,7 +119,8 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
 
     protected abstract fun createSIOPSession(id: String, authorizationRequest: AuthorizationRequest?, expirationTimestamp: Instant): S
 
-    override fun initializeAuthorization(authorizationRequest: AuthorizationRequest, expiresIn: Duration): S {
+    //the idTokenRequestState is added because of AuthorizationSession()
+    override fun initializeAuthorization(authorizationRequest: AuthorizationRequest, expiresIn: Duration, idTokenRequestState: String?): S {
         val resolvedAuthReq = resolveVPAuthorizationParameters(authorizationRequest)
         return if (validateAuthorizationRequest(resolvedAuthReq)) {
             createSIOPSession(
@@ -151,7 +147,7 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
         )
         val result = generatePresentationForVPToken(session, tokenRequest)
         val holderDid = getDidFor(session)
-        val idToken = if(session.authorizationRequest?.responseType?.contains("id_token") == true) {
+        val idToken = if (session.authorizationRequest?.responseType?.contains(ResponseType.IdToken) == true) {
             signToken(TokenTarget.TOKEN, buildJsonObject {
                 put("iss", "https://self-issued.me/v2/openid-vc")
                 put("sub", holderDid)
@@ -161,21 +157,21 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
                 put("state", session.id)
                 put("nonce", session.nonce)
                 put("_vp_token", buildJsonObject {
-                    put("presentation_submission",  result.presentationSubmission.toJSON())
+                    put("presentation_submission", result.presentationSubmission.toJSON())
                 })
             }, keyId = resolveDID(holderDid))
         } else null
         return if (result.presentations.size == 1) {
             TokenResponse.success(
-                result.presentations.first(),
-                if(idToken == null) result.presentationSubmission else null,
+                result.presentations.first().let { VpTokenParameter.fromJsonElement(it) },
+                if (idToken == null) result.presentationSubmission else null,
                 idToken = idToken,
                 state = session.authorizationRequest?.state
             )
         } else {
             TokenResponse.success(
-                JsonArray(result.presentations),
-                if(idToken == null) result.presentationSubmission else null,
+                JsonArray(result.presentations).let { VpTokenParameter.fromJsonElement(it) },
+                if (idToken == null) result.presentationSubmission else null,
                 idToken = idToken,
                 state = session.authorizationRequest?.state
             )
@@ -218,7 +214,7 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
         val authorizationServerMetadata = issuerMetadata.authorizationServer?.let { authServer ->
             httpGetAsJson(Url(getCommonProviderMetadataUrl(authServer)))?.jsonObject?.let { OpenIDProviderMetadata.fromJSON(it) }
         } ?: issuerMetadata
-        val offeredCredentials = credentialOffer.resolveOfferedCredentials(issuerMetadata)
+        val offeredCredentials = OpenID4VCI.resolveOfferedCredentials(credentialOffer, issuerMetadata)
 
         return executeAuthorizedIssuanceCodeFlow(
             authorizationServerMetadata, issuerMetadata, credentialOffer, GrantType.pre_authorized_code,
@@ -249,12 +245,14 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
         val authorizationServerMetadata = issuerMetadata.authorizationServer?.let { authServer ->
             httpGetAsJson(Url(getCommonProviderMetadataUrl(authServer)))?.jsonObject?.let { OpenIDProviderMetadata.fromJSON(it) }
         } ?: issuerMetadata
-        val offeredCredentials = credentialOffer.resolveOfferedCredentials(issuerMetadata)
+        val offeredCredentials = OpenID4VCI.resolveOfferedCredentials(credentialOffer, issuerMetadata)
         val codeVerifier = if (client.useCodeChallenge) randomUUID() else null
-        val codeChallenge = codeVerifier?.let { Base64.UrlSafe.encode(sha256(it.toByteArray(Charsets.UTF_8))).trimEnd('=') }
+
+        val codeChallenge =
+            codeVerifier?.let { Base64.UrlSafe.encode(SHA256().digest(it.toByteArray(Charsets.UTF_8))).trimEnd('=') }
 
         val authReq = AuthorizationRequest(
-            responseType = ResponseType.getResponseTypeString(ResponseType.code),
+            responseType = setOf(ResponseType.Code),
             clientId = client.clientID,
             redirectUri = config.redirectUri,
             scope = setOf("openid"),
@@ -285,7 +283,7 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
 
                 println("// 2. call authorize endpoint with request uri, receive HTTP redirect (302 Found) with Location header")
                 AuthorizationRequest(
-                    responseType = ResponseType.code.name,
+                    responseType = setOf(ResponseType.Code),
                     clientId = client.clientID,
                     requestUri = pushedAuthResp.requestUri
                 )
@@ -305,9 +303,9 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
         var location = Url(authResp.headers[HttpHeaders.Location]!!)
         println("location: $location")
         location =
-            if (location.parameters.contains("response_type") && location.parameters["response_type"] == ResponseType.id_token.name) {
+            if (location.parameters.contains("response_type") && location.parameters["response_type"] == ResponseType.IdToken.name) {
                 executeIdTokenAuthorization(location, holderDid, client)
-            } else if (location.parameters.contains("response_type") && location.parameters["response_type"] == ResponseType.vp_token.name) {
+            } else if (location.parameters.contains("response_type") && location.parameters["response_type"] == ResponseType.VpToken.name) {
                 executeVpTokenAuthorization(location, holderDid, client)
             } else location
 
@@ -440,11 +438,11 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
     }
 
     protected open fun executeIdTokenAuthorization(idTokenRequestUri: Url, holderDid: String, client: OpenIDClientConfig): Url {
-        val authReq = AuthorizationRequest.fromHttpQueryString(idTokenRequestUri.encodedQuery).let { authorizationRequest ->
-            authorizationRequest.customParameters["request"]?.let { AuthorizationJSONRequest.fromJSON(SDJwt.parse(it.first()).fullPayload) }
+        var authReq = AuthorizationRequest.fromHttpQueryString(idTokenRequestUri.encodedQuery).let { authorizationRequest ->
+            authorizationRequest.customParameters["request"]?.let { AuthorizationJSONRequest.fromJSON(JwtUtils.parseJWTPayload(it.first())) }
                 ?: authorizationRequest
         }
-        if (authReq.responseMode != ResponseMode.direct_post || authReq.responseType != ResponseType.id_token.name || authReq.redirectUri.isNullOrEmpty())
+        if (authReq.responseMode != ResponseMode.direct_post || !authReq.responseType.contains(ResponseType.IdToken) || authReq.redirectUri.isNullOrEmpty())
             throw AuthorizationError(
                 authReq,
                 AuthorizationErrorCode.server_error,

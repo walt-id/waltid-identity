@@ -14,7 +14,6 @@ class OidcTest {
         ConfigManager.loadConfigs(emptyArray())
         val ciTestProvider = CIProvider()
 
-
         // -------- CREDENTIAL ISSUER ----------
         // as CI provider, initialize credential offer for user
         val issuanceSession = ciTestProvider.initializeCredentialOffer(

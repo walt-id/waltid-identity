@@ -7,7 +7,7 @@ import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.interfaces.ISessionCache
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.responses.TokenResponse
-import id.walt.oid4vc.util.randomSessionId
+import id.walt.oid4vc.util.ShortIdUtils
 import kotlinx.datetime.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
@@ -38,7 +38,7 @@ abstract class OpenIDCredentialVerifier(val config: CredentialVerifierConfig) :
         sessionId: String? = null, // A calling party may provide a unique session Id
     ): PresentationSession {
         val session = PresentationSession(
-            id = sessionId ?: randomSessionId(),
+            id = sessionId ?: ShortIdUtils.randomSessionId(),
             authorizationRequest = null,
             expirationTimestamp = Clock.System.now().plus(expiresIn),
             presentationDefinition = presentationDefinition
@@ -47,9 +47,9 @@ abstract class OpenIDCredentialVerifier(val config: CredentialVerifierConfig) :
         }
         val presentationDefinitionUri = preparePresentationDefinitionUri(presentationDefinition, session.id)
         val authReq = AuthorizationRequest(
-            responseType = ResponseType.getResponseTypeString(ResponseType.vp_token),
+            responseType = setOf(ResponseType.VpToken),
             clientId = when(config.clientIdScheme) {
-                ClientIdScheme.redirect_uri -> ""
+                ClientIdScheme.RedirectUri -> ""
                 else -> config.clientId
             },
             responseMode = responseMode,
