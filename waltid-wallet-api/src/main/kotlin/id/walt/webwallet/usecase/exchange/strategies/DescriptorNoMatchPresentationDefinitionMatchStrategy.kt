@@ -4,6 +4,7 @@ import id.walt.oid4vc.data.dif.InputDescriptor
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.usecase.exchange.TypeFilter
+import id.walt.webwallet.utils.JsonUtils
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
 
@@ -16,8 +17,8 @@ class DescriptorNoMatchPresentationDefinitionMatchStrategy : PresentationDefinit
         credentialList: List<WalletCredential>, inputDescriptors: List<InputDescriptor>
     ) = inputDescriptors.filter { desc ->
         credentialList.none { cred ->
-            desc.name == cred.parsedDocument?.get("type")?.jsonArray?.last()?.jsonPrimitive?.content
-                    || desc.id == cred.parsedDocument?.get("type")?.jsonArray?.last()?.jsonPrimitive?.content
+            desc.name == JsonUtils.tryGetData(cred.parsedDocument, "type")?.jsonArray?.last()?.jsonPrimitive?.content
+                    || desc.id == JsonUtils.tryGetData(cred.parsedDocument, "type")?.jsonArray?.last()?.jsonPrimitive?.content
         }
     }.map {
         TypeFilter(path = "", pattern = it.name ?: it.id)
