@@ -16,7 +16,7 @@ class FilterPresentationDefinitionMatchStrategy(
     private fun match(
         credentialList: List<WalletCredential>, filters: List<List<TypeFilter>>
     ) = credentialList.filter { credential ->
-        filters.any { fields ->
+        filters.all { fields ->
             isMatching(credential, fields)
         }
     }
