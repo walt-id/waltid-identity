@@ -3,6 +3,7 @@ package id.walt.webwallet.web.controllers
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.service.WalletServiceManager
 import id.walt.webwallet.service.credentials.CredentialFilterObject
+import id.walt.webwallet.usecase.credential.CredentialStatusResult
 import id.walt.webwallet.web.parameter.CredentialRequestParameter
 import id.walt.webwallet.web.parameter.NoteRequestParameter
 import io.github.smiley4.ktorswaggerui.dsl.*
@@ -185,7 +186,10 @@ fun Application.credentials() = walletRoute {
             get("status", {
                 summary = "Get credential status"
                 response {
-                    HttpStatusCode.OK to { body<String> { description = "Credential status" } }
+                    HttpStatusCode.OK to {
+                        description = "List of credential statuses"
+                        body<List<CredentialStatusResult>>()
+                    }
                     HttpStatusCode.BadRequest to {
                         description =
                             "Credential status could not be established or an error occured"

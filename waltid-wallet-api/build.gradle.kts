@@ -11,11 +11,10 @@ plugins {
 group = "id.walt"
 application {
     mainClass.set("id.walt.webwallet.MainKt")
-
+    applicationName = "waltid-wallet-api"
     val isDevelopment: Boolean = project.ext.has("development")
     applicationDefaultJvmArgs = listOf("-Dio.ktor.development=$isDevelopment")
 }
-
 
 repositories {
     mavenLocal()
@@ -123,9 +122,9 @@ dependencies {
     }
 
     // DB
-    implementation("org.jetbrains.exposed:exposed-core:0.47.0")
+    implementation("org.jetbrains.exposed:exposed-core:0.49.0")
     implementation("org.jetbrains.exposed:exposed-jdbc:0.47.0")
-    implementation("org.jetbrains.exposed:exposed-dao:0.47.0")
+    implementation("org.jetbrains.exposed:exposed-dao:0.49.0")
     implementation("org.jetbrains.exposed:exposed-java-time:0.48.0")
     implementation("org.jetbrains.exposed:exposed-json:0.47.0")
     // drivers
@@ -148,7 +147,7 @@ dependencies {
     implementation("com.zaxxer:HikariCP:5.1.0")
 
     // Logging
-    implementation("io.github.oshai:kotlin-logging-jvm:6.0.3")
+    implementation("io.github.oshai:kotlin-logging-jvm:6.0.9")
     implementation("org.slf4j:slf4j-simple:2.0.12")
     implementation("org.slf4j:jul-to-slf4j:2.0.12")
 

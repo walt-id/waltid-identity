@@ -45,6 +45,7 @@ kotlin {
 
                 implementation("org.jetbrains.kotlinx:kotlinx-io-core:0.3.2")
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
+                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.0-RC.2")
                 implementation ("com.google.code.gson:gson:2.10.1")
 
                 // CLI
@@ -56,7 +57,7 @@ kotlin {
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
 
                 // Logging
-                implementation("io.github.oshai:kotlin-logging:6.0.3")
+                implementation("io.github.oshai:kotlin-logging:6.0.4")
             }
         }
         val commonTest by getting {

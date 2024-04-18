@@ -282,7 +282,7 @@
                     type="button"
                     @click="showCredentialJson = !showCredentialJson"
                 >
-                    View Credential In JSON
+                    View Credential
                 </button>
                 <button
                     v-if="manifest"
@@ -310,15 +310,14 @@
                     <p class="text-sm text-gray-500">Verifiable Credential data below:</p>
                 </div>
             </div>
-            <!-- <div class="p-3 shadow mt-3">
+            <div class="p-3 shadow mt-3">
                     <h3 class="font-semibold mb-2">QR code</h3>
-                    <div v-if="credential && credential.length">
-                        <qrcode-vue v-if="credential.length <= 4296" :value="credential" level="L" size="300"></qrcode-vue>
-                        <p v-else>Unfortunately, this Verifiable Credential is too big to be viewable as QR code (credential size is {{ credential.length }} characters, but the maximum a QR code
+                    <div v-if="credential && credential.document">
+                        <qrcode-vue v-if="credential.document && credential.document.length <= 4296" :value="credential.document" level="L" size="500" class="m-5++++++++++----------------------------------++++++++++++++++++++++++++++" />
+                        <p v-else>Unfortunately, this Verifiable Credential is too big to be viewable as QR code (credential size is {{ credential.document.length }} characters, but the maximum a QR code
                             can hold is 4296).</p>
                     </div>
-
-                </div>-->
+                </div>
             <div class="shadow p-3 mt-2 font-mono overflow-scroll">
                 <h3 class="font-semibold mb-2">JWT</h3>
                 <pre v-if="credential && credential?.document">{{
@@ -358,6 +357,7 @@ import { decodeBase64ToUtf8 } from "~/composables/base64";
 import VerifiableCredentialCard from "~/components/credentials/VerifiableCredentialCard.vue";
 import { parseDisclosures } from "~/composables/disclosures";
 import { JSONPath } from "jsonpath-plus";
+import QrcodeVue from 'qrcode.vue'
 
 const route = useRoute();
 const credentialId = route.params.credentialId as string;
@@ -377,9 +377,14 @@ const jwtJson = computed(() => {
         const decodedBase64 = decodeBase64ToUtf8(vcBase64).toString();
         console.log("Decoded: ", decodedBase64);
 
-        const parsed = JSON.parse(decodedBase64);
+        let parsed
+        try {
+            parsed = JSON.parse(decodedBase64);
+        } catch (e) {
+            console.log(e)
+        }
 
-        if (parsed.vc) return parsed.vc;
+        if (parsed?.vc) return parsed.vc;
         else return parsed;
     } else return null;
 });

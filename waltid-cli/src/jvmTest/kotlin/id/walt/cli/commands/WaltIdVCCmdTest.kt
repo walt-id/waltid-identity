@@ -1,8 +1,7 @@
-package id.walt.cli
+package id.walt.cli.commands
 
 import com.github.ajalt.clikt.core.PrintHelpMessage
 import com.github.ajalt.clikt.testing.test
-import id.walt.cli.commands.VCCmd
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertContains
@@ -37,5 +36,11 @@ class WaltIdVCCmdTest {
     fun `should have subcommand 'sign'`() {
         val result = command.test()
         assertContains(result.stdout, "sign")
+    }
+
+    @Test
+    fun `should have subcommand 'verify'`() {
+        val result = command.test()
+        assertContains(result.stdout, "verify")
     }
 }

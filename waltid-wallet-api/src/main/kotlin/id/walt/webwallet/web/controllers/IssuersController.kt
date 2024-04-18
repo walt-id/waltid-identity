@@ -46,7 +46,7 @@ fun Application.issuers() = walletRoute {
             WalletServiceManager.issuerUseCase.add(
                 IssuerDataTransferObject(
                     wallet = getWalletService().walletId,
-                    name = issuer.name,
+                    did = issuer.name,
                     description = issuer.description,
                     uiEndpoint = issuer.uiEndpoint,
                     configurationEndpoint = issuer.configurationEndpoint,

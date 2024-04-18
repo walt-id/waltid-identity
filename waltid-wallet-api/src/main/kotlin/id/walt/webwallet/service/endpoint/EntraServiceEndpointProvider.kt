@@ -3,6 +3,7 @@ package id.walt.webwallet.service.endpoint
 import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
+import io.ktor.http.*
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 import kotlinx.uuid.UUID
@@ -11,6 +12,7 @@ class EntraServiceEndpointProvider(
     private val http: HttpClient,
 ) : ServiceEndpointProvider {
     override suspend fun get(url: String, did: String, descriptor: JsonObject): String = http.post(url) {
+        contentType(ContentType.Application.Json)
         setBody(
             IdentityHubRequest(
                 requestId = UUID().toString(),
