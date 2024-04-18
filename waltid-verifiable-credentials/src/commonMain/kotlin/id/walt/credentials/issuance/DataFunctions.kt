@@ -22,6 +22,12 @@ val dataFunctions = mapOf<String, suspend (call: W3CDataMergeUtils.FunctionCall)
 
     "context" to { it.context[it.args!!]!! },
 
+    // Add this because clock.now returns millis and the timestamps for exp etc claims must be identical
+    "timestamp-ebsi" to { JsonPrimitive(Clock.System.now().toString().replaceRange(19..28, ""))},
+    "timestamp-ebsi-in" to { JsonPrimitive((Clock.System.now() + Duration.parse(it.args!!)).toString().replaceRange(19..28, "")) },
+
+    "timestamp" to { JsonPrimitive(Clock.System.now().toString()) },
+
     "timestamp" to { JsonPrimitive(Clock.System.now().toString()) },
     "timestamp-seconds" to { JsonPrimitive(Clock.System.now().epochSeconds) },
 

@@ -12,6 +12,7 @@ interface ISessionCache<T> {
      */
     fun putSession(id: String, session: T): T?
 
+    fun getSessionByIdTokenRequestState(idTokenRequestState: String): T?
     /**
      * Removes the specified session with the specified [id] from the session cache.
      * @return the previous value associated with the [id], or `null` if it was not present in the cache.

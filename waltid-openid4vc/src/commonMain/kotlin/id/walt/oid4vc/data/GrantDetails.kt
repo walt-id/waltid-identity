@@ -7,5 +7,7 @@ import kotlinx.serialization.Serializable
 data class GrantDetails(
     @SerialName("issuer_state") val issuerState: String? = null,
     @SerialName("pre-authorized_code") val preAuthorizedCode: String? = null,
-    @SerialName("user_pin_required") val userPinRequired: Boolean? = null
+    @SerialName("tx_code") val txCode: TxCode? = null,
+    @SerialName("authorization_server") val authorizationServer: String? = null,
+    @SerialName("interval") val interval: Int? = null
 )

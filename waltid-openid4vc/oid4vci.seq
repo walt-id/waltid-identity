@@ -1,0 +1,75 @@
+title OID4VCI
+
+participant "Service provider" as SP
+participant "waltid-openid4vc" as WID
+participant "User wallet" as UW
+SP-#red>WID: Generate credential offer
+activate WID #red
+WID--#red>SP: Credential offer object
+deactivate WID
+SP-#red>WID: Generate URL for issuance req.
+activate WID #red
+WID--#red>SP: Issuance req URL
+deactivate WID
+alt Cross-device
+SP->SP: Display issuance URL as QR code
+UW->UW: scan QR code
+else Same-device
+SP->UW: Call credential offer endpoint on wallet
+end
+UW-#red>WID: Parse/resolve credential offer from issuance req.
+activate WID #red
+WID--#red>UW: Credential offer object
+deactivate WID
+UW-#red>WID: Determine flow: \n* Implicit/Code flow \n* Same/Cross-device flow
+activate WID #red
+WID--#red>UW: Flow details
+deactivate WID
+UW-#red>WID: Fetch service provider metadata (well-known endpoints)
+activate WID #red
+WID--#red>UW: Provider metadata
+deactivate WID
+UW-#red>WID: Generate authorization request for issuer
+activate WID #red
+WID--#red>UW: Authorization request
+deactivate WID
+alt Code flow
+alt Pushed authorization req
+UW->SP: Push authorization request
+SP-->UW: Return request_uri
+end
+UW->SP: Call authorization endpoint (request_uri or full request parameters)
+SP-->UW: Return 302 Found, with location containing authorization code
+UW-#red>WID: Parse authorization response
+activate WID #red
+WID--#red>UW: Authorization code
+deactivate WID
+end
+UW-#red>WID: Generate token request (code or pre-authorized code + tx_code)
+activate WID #red
+WID--#red>UW: Token request
+deactivate WID
+UW->SP: Call token endpoint
+SP->SP: Generate access_token
+SP-->UW: Reply to **token request** with generated access_token
+UW-#red>WID: Parse token response
+activate WID #red
+WID--#red>UW: Token response object
+deactivate WID
+opt If required
+UW-#red>WID: Generate proof of possession
+activate WID #red
+WID--#red>UW: Proof
+deactivate WID
+end
+UW-#red>WID: Generate credential request
+activate WID #red
+WID--#red>UW: Credential request
+deactivate WID
+UW->SP: POST credential request on credential endpoint
+SP-#red>WID: Validate proof of possession
+activate WID #red
+WID--#red>SP: true/false
+deactivate WID
+SP->SP: Generate and sign credential (WID?)
+SP-->UW: Issued credential
