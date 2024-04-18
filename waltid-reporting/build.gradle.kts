@@ -45,7 +45,7 @@ kotlin {
                 implementation("io.ktor:ktor-client-content-negotiation:2.3.8")
                 implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.8")
                 implementation("io.ktor:ktor-client-json:2.3.9")
-                implementation("io.ktor:ktor-client-logging:2.3.8")
+                implementation("io.ktor:ktor-client-logging:2.3.10")
 
                 // Scheduler
                 /*implementation("it.justwrote:kjob-core:0.2.0")

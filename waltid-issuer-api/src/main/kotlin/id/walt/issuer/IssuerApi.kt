@@ -154,7 +154,7 @@ fun Application.issuerApi() {
                         request {
                             headerParameter<String>("walt-key") {
                                 description =
-                                    "Supply a core-crypto key representation to use to issue the credential, " + "e.g. a local key (internal JWK) or a TSE key."
+                                    "Supply a  key representation to use to issue the credential, " + "e.g. a local key (internal JWK) or a TSE key."
                                 example = mapOf(
                                     "type" to "jwk", "jwk" to "{ ... }"
                                 )
@@ -333,7 +333,7 @@ fun Application.issuerApi() {
                         request {
                             headerParameter<String>("walt-key") {
                                 description =
-                                    "Supply a core-crypto key representation to use to issue the credential, " + "e.g. a local key (internal JWK) or a TSE key."
+                                    "Supply a  key representation to use to issue the credential, " + "e.g. a local key (internal JWK) or a TSE key."
                                 example = mapOf(
                                     "type" to "jwk", "jwk" to "{ ... }"
                                 )

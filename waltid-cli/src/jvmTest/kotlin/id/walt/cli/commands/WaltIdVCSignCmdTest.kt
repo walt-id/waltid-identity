@@ -1,12 +1,9 @@
-package id.walt.cli
+package id.walt.cli.commands
 
-import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.MissingArgument
 import com.github.ajalt.clikt.core.MissingOption
 import com.github.ajalt.clikt.core.PrintHelpMessage
-import com.github.ajalt.clikt.testing.CliktCommandTestResult
 import com.github.ajalt.clikt.testing.test
-import id.walt.cli.commands.VCSignCmd
 import kotlinx.io.files.FileNotFoundException
 import org.junit.jupiter.api.assertDoesNotThrow
 import kotlin.test.*
@@ -17,7 +14,7 @@ class WaltIdVCSignCmdTest {
 
     val resourcesPath = "src/jvmTest/resources"
 
-    val keyFileName = "${resourcesPath}/ed25519_by_waltid_pvt_key.jwk"
+    val keyFileName = "${resourcesPath}/key/ed25519_by_waltid_pvt_key.jwk"
     val issuerDid = "did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV"
     val subjectDid = "did:key:z6Mkjm2gaGsodGchfG4k8P6KwCHZsVEPZho5VuEbY94qiBB9"
     val vcFilePath = "${resourcesPath}/vc/openbadgecredential_sample.json"
@@ -121,7 +118,7 @@ class WaltIdVCSignCmdTest {
         val weirdDid = "did:foo:bar"
         val result = command.test(arrayOf("-k", keyFileName, "-i", weirdDid, "-s", subjectDid, vcFilePath))
 
-        assertContains(result.output, "DID not supported")
+        assertContains(result.output, "DID can not be resolved")
     }
 
 
@@ -129,8 +126,6 @@ class WaltIdVCSignCmdTest {
     fun `should sign an existing VC when the issuer key and a subject DID is provided`() {
 
         val result = command.test("""-k "${keyFileName}" -i ${issuerDid} -s ${subjectDid} "${vcFilePath}" """)
-
-        val signedVCFile = getGeneratedFile(command, result)
 
         assertContains(result.stdout, "Signed VC saved at")
     }
@@ -146,9 +141,5 @@ class WaltIdVCSignCmdTest {
     @Test
     @Ignore
     fun `should fail if a non-JWK key file is provided`() = Unit
-
-    private fun getGeneratedFile(cmd: CliktCommand, result: CliktCommandTestResult): String {
-        return "unknown"
-    }
 
 }
