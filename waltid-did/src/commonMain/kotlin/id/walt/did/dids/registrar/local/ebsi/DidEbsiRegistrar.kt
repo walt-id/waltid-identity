@@ -59,6 +59,7 @@ class DidEbsiRegistrar : LocalRegistrarMethod("ebsi") {
   override suspend fun registerByKey(key: Key, options: DidCreateOptions): DidResult {
     val didRegistryVersion = options.get<Int>("version") ?: throw IllegalArgumentException("Option \"version\" not found.")
     val authVersion = didRegistryVersion - 1
+    // TODO: AuthorisationToOnboard must be fetched for the DID to be registered. Currently it gets created in the DidCreationTest, for another did that is generated there
     val authorisationToOnboard = options.get<String>("authorisationToOnboard") ?: throw IllegalArgumentException("Option \"authorisationToOnboardVP\" not found.")
     //val vcSigningKey = options.get<Key>("vcSigningKey") ?: throw IllegalArgumentException("Option \"vcSigningKey\" not found.")
     val nonce = options.get<String>("nonce") ?: throw IllegalArgumentException("Option \"nonce\" not found.")
