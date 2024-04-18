@@ -62,6 +62,7 @@ kotlin {
         }
     }
     js(IR) {
+        moduleName = "crypto"
         /*browser {
             commonWebpackConfig {
                 cssSupport {
@@ -70,11 +71,11 @@ kotlin {
             }
         }*/
         nodejs {
+            generateTypeScriptDefinitions()
             testTask {
                 useMocha()
             }
         }
-        generateTypeScriptDefinitions()
         binaries.library()
     }
 
@@ -109,7 +110,7 @@ kotlin {
                 implementation("io.ktor:ktor-client-content-negotiation:2.3.8")
                 implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.8")
                 implementation("io.ktor:ktor-client-json:2.3.9")
-                implementation("io.ktor:ktor-client-logging:2.3.8")
+                implementation("io.ktor:ktor-client-logging:2.3.10")
 
                 implementation(project.dependencies.platform("org.kotlincrypto.hash:bom:0.5.1"))
                 implementation("org.kotlincrypto.hash:sha2")
@@ -121,7 +122,7 @@ kotlin {
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
 
                 // Logging
-                implementation("io.github.oshai:kotlin-logging:6.0.3")
+                implementation("io.github.oshai:kotlin-logging:6.0.4")
             }
         }
         val commonTest by getting {

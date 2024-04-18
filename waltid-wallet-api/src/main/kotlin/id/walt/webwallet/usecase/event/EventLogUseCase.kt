@@ -2,15 +2,16 @@ package id.walt.webwallet.usecase.event
 
 import id.walt.crypto.keys.Key
 import id.walt.did.dids.document.DidDocument
+import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.service.events.*
+import id.walt.webwallet.utils.JsonUtils
 import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.uuid.UUID
 
-class EventUseCase(
-    private val eventService: EventService
+class EventLogUseCase(
+    private val eventService: EventService,
 ) {
 
     fun log(
@@ -37,7 +38,7 @@ class EventUseCase(
 
     fun log(vararg event: Event) = eventService.add(event.toList())
 
-    fun count(walletId: UUID, dataFilter: Map<String, String>) = eventService.count(walletId, dataFilter)
+    fun count(walletId: UUID, dataFilter: Map<String, List<String>>) = eventService.count(walletId, dataFilter)
 
     fun get(parameter: EventFilterParameter) = eventService.get(
         accountId = parameter.accountId,
@@ -51,23 +52,46 @@ class EventUseCase(
 
     fun delete(id: Int) = eventService.delete(id)
 
-    fun credentialEventData(credential: WalletCredential, type: String?) = CredentialEventData(
+    fun credentialEventData(
+        credential: WalletCredential,
+        subject: CredentialEventDataActor.Subject? = null,
+        organization: CredentialEventDataActor.Organization? = null,
+        type: String? = null,
+    ) = CredentialEventData(
         ecosystem = EventDataNotAvailable,
-        issuerId = WalletCredential.parseIssuerDid(credential.parsedDocument, credential.parsedManifest)
-            ?: EventDataNotAvailable,
-        subjectId = credential.parsedDocument?.jsonObject?.get("credentialSubject")?.jsonObject?.get(
-            "id"
-        )?.jsonPrimitive?.content ?: EventDataNotAvailable,
-        issuerKeyId = EventDataNotAvailable,
-        issuerKeyType = EventDataNotAvailable,
-        subjectKeyType = EventDataNotAvailable,
-        credentialType = credential.parsedDocument?.jsonObject?.get("type")?.jsonArray?.last()?.jsonPrimitive?.content
-            ?: EventDataNotAvailable,
-        credentialFormat = type ?: EventDataNotAvailable,
-        credentialProofType = EventDataNotAvailable,
-        policies = emptyList(),
+        type = credential.parsedDocument?.let {
+            JsonUtils.tryGetData(it, "type")?.jsonArray?.last()?.jsonPrimitive?.content
+        } ?: EventDataNotAvailable,
+        format = type ?: EventDataNotAvailable,
+        proofType = EventDataNotAvailable,
         protocol = "oid4vp",
         credentialId = credential.id,
+        //TODO: these calls are made multiple times (e.g. see notifications in [SilentClaimStrategy]
+        logo = WalletCredential.getManifestLogo(credential.parsedManifest),
+        subject = subject,
+        organization = organization,
+        //end TODO
+    )
+
+    fun subjectData(credential: WalletCredential) = CredentialEventDataActor.Subject(
+        subjectId = credential.parsedDocument?.let {
+            JsonUtils.tryGetData(it, "credentialSubject.id")?.jsonPrimitive?.content
+        } ?: EventDataNotAvailable,
+        subjectKeyType = EventDataNotAvailable,
+    )
+
+    fun issuerData(credential: WalletCredential) =
+        WalletCredential.parseIssuerDid(credential.parsedDocument, credential.parsedManifest).let {
+            CredentialEventDataActor.Organization.Issuer(
+                did = it ?: EventDataNotAvailable,
+                keyId = EventDataNotAvailable,
+                keyType = EventDataNotAvailable,
+            )
+        }
+
+    fun verifierData(request: AuthorizationRequest) = CredentialEventDataActor.Organization.Verifier(
+        did = request.clientId.takeIf { it.isNotEmpty() } ?: EventDataNotAvailable,
+        policies = emptyList(),//TODO: from input-descriptors?
     )
 
     fun didEventData(did: String, document: DidDocument) = didEventData(did, document.toString())
