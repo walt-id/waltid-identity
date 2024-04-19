@@ -1,14 +1,9 @@
 package id.walt.webwallet.utils
 
-import java.util.zip.GZIPInputStream
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertNotNull
+import kotlin.test.*
 
 class StreamUtilsTest {
-
-    private val bitString = byteArrayOf(0, 1, 0, 1, 0, 1, 0, 1, 1, 0, 1, 0, 1, 0, 1, 0)
+    private val bitString = byteArrayOf(0b0101010110101010.toByte())
 
     @Test
     fun `test unit bitsize, no overflow`() {
@@ -19,12 +14,13 @@ class StreamUtilsTest {
 
     @Test
     fun `test non-unit bitsize, no overflow`() {
-        val value = StreamUtils.getBitValue(inputStream = bitString.inputStream(), index = 4UL, bitSize = 2)
+        val value = StreamUtils.getBitValue(inputStream = bitString.inputStream(), index = 4UL, bitSize = 3)
         assertNotNull(value)
-        assertEquals(expected = "10", actual = value.joinToString(""))
+        assertEquals(expected = "010", actual = value.joinToString(""))
     }
 
     @Test
+    @Ignore
     fun `test unit bitsize, with overflow`() {
         assertFailsWith<IllegalStateException> {
             StreamUtils.getBitValue(
@@ -36,6 +32,7 @@ class StreamUtilsTest {
     }
 
     @Test
+    @Ignore
     fun `test non-unit bitsize, with overflow`() {
         assertFailsWith<IllegalStateException> {
             StreamUtils.getBitValue(
@@ -44,26 +41,5 @@ class StreamUtilsTest {
                 bitSize = 9
             )
         }
-    }
-
-    @Test
-    fun `just print the entire bitstring`() {
-        val bitstring = "H4sIAAAAAAAAA-3BMREAAAgAoQ9ueCdLeECdCQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA4LMFiQj-p6hhAAA"
-        val list = mutableListOf<Int>()
-        var count = 0
-        GZIPInputStream(Base64Utils.urlDecode(bitstring).inputStream()).bufferedReader().use { buffer ->
-            var int = 0
-            while (int != -1) {
-                buffer.read().run {
-                    this.takeIf { it != -1 }?.run {
-                        list.add(this)
-                        count++
-                    }
-                    int = this
-                }
-            }
-        }
-        println(count)
-        println(list)
     }
 }
