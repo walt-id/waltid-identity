@@ -5,6 +5,7 @@ import id.walt.credentials.verification.models.PolicyRequest.Companion.parsePoli
 import id.walt.credentials.verification.policies.JwtSignaturePolicy
 import id.walt.oid4vc.data.ResponseMode
 import id.walt.oid4vc.data.dif.PresentationDefinition
+import id.walt.oid4vc.providers.PresentationSession
 import id.walt.oid4vc.responses.TokenResponse
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
@@ -29,6 +30,7 @@ class VerificationUseCase(
         statusCallbackUri: String?,
         statusCallbackApiKey: String?,
         stateId: String?,
+        stateParamAuthorizeReqEbsi: String? = null,
     ) = let {
         val vpPolicies = vpPoliciesJson?.jsonArray?.parsePolicyRequests() ?: listOf(PolicyRequest(JwtSignaturePolicy()))
 
@@ -70,13 +72,19 @@ class VerificationUseCase(
             specificPolicies = specificPolicies,
             successRedirectUri = successRedirectUri,
             errorRedirectUri = errorRedirectUri,
+            stateParamAuthorizeReqEbsi = stateParamAuthorizeReqEbsi,
             statusCallback = statusCallbackUri?.let {
                 OIDCVerifierService.StatusCallback(
                     statusCallbackUri = it,
                     statusCallbackApiKey = statusCallbackApiKey,
                 )
-            })
+            }
+        )
         session
+    }
+
+    fun getSession(sessionId: String): PresentationSession {
+        return sessionId.let { OIDCVerifierService.getSession(it) }!!
     }
 
     fun verify(sessionId: String?, tokenResponseParameters: Map<String, List<String>>): Result<String> {
