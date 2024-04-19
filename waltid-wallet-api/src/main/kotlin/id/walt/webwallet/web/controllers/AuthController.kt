@@ -1,12 +1,11 @@
 package id.walt.webwallet.web.controllers
 
-import com.nimbusds.jose.JWSAlgorithm
-import com.nimbusds.jose.JWSHeader
-import com.nimbusds.jose.JWSObject
-import com.nimbusds.jose.Payload
+import com.nimbusds.jose.*
 import com.nimbusds.jose.crypto.MACSigner
 import com.nimbusds.jose.crypto.MACVerifier
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.JsonUtils.toJsonElement
+import id.walt.oid4vc.definitions.JWTClaims
 import id.walt.webwallet.config.AuthConfig
 import id.walt.webwallet.config.ConfigManager
 import id.walt.webwallet.config.WebConfig
@@ -17,6 +16,7 @@ import id.walt.webwallet.service.WalletServiceManager
 import id.walt.webwallet.service.WalletServiceManager.oidcConfig
 import id.walt.webwallet.service.account.AccountsService
 import id.walt.webwallet.service.account.KeycloakAccountStrategy
+import id.walt.webwallet.utils.JsonUtils.toJsonPrimitive
 import id.walt.webwallet.web.ForbiddenException
 import id.walt.webwallet.web.InsufficientPermissionsException
 import id.walt.webwallet.web.UnauthorizedException
@@ -448,29 +448,59 @@ fun Application.auth() {
  * @param token JWS token provided by user
  * @return user/account ID if token is valid
  */
-fun verifyToken(token: String): Result<String> {
+suspend fun verifyToken(token: String): Result<String> {
     val jwsObject = JWSObject.parse(token)
-    val verifier = MACVerifier(AuthKeys.tokenKey)
 
-    return runCatching { jwsObject.verify(verifier) }
-        .mapCatching { valid -> if (valid) jwsObject.payload.toString() else throw IllegalArgumentException("Token is not valid.") }
+    val key = JWKKey.importJWK(AuthKeys.tokenKey.decodeToString()).getOrNull()
+    if (key == null) {
+    // if (AuthKeys.tokenSignAlg == "HS256") {
+        val verifier = MACVerifier(AuthKeys.tokenKey)
+        return runCatching { jwsObject.verify(verifier) }
+            .mapCatching { valid -> if (valid) Json.parseToJsonElement(jwsObject.payload.toString()).jsonObject["sub"]?.jsonPrimitive?.content.toString() else throw IllegalArgumentException("Token is not valid.") }
+    } else {
+    // if (AuthKeys.tokenSignAlg == "RS256"){
+        val verified = JWKKey.importJWK(AuthKeys.tokenKey.decodeToString()).getOrThrow().verifyJws(token)
+        return runCatching { verified }
+            .mapCatching { if (verified.isSuccess) {
+                Json.parseToJsonElement(jwsObject.payload.toString()).jsonObject["sub"]?.jsonPrimitive?.content.toString()
+            }else throw IllegalArgumentException("Token is not valid.") }
+    }
+
 }
+
 
 suspend fun PipelineContext<Unit, ApplicationCall>.doLogin() {
     val reqBody = loginRequestJson.decodeFromString<AccountRequest>(call.receive())
     AccountsService.authenticate("", reqBody)
         .onSuccess { // FIXME -> TENANT HERE
-            // security token mapping was here
-            val token = JWSObject(JWSHeader(JWSAlgorithm.HS256), Payload(it.id.toString())).apply {
-                sign(MACSigner(AuthKeys.tokenKey))
-            }.serialize()
 
+            val tokenPayload = "{\"sub\":\"${it.id}\"}"
 
-            call.sessions.set(LoginTokenSession(token))
-            call.response.status(HttpStatusCode.OK)
-            call.respond(
-                Json.encodeToJsonElement(it).jsonObject.minus("type").plus(Pair("token", token.toJsonElement()))
-            )
+            val key = JWKKey.importJWK(AuthKeys.tokenKey.decodeToString()).getOrNull()
+            if (key == null) {
+            // if (AuthKeys.tokenSignAlg == "HS256") {
+                // security token mapping was here
+                val token = JWSObject(JWSHeader(JWSAlgorithm.HS256), Payload(tokenPayload)).apply {
+                    sign(MACSigner(AuthKeys.tokenKey))
+                }.serialize()
+
+                call.sessions.set(LoginTokenSession(token))
+                call.response.status(HttpStatusCode.OK)
+                call.respond(
+                    Json.encodeToJsonElement(it).jsonObject.minus("type").plus(Pair("token", token.toJsonElement()))
+                )
+            } else {
+            // if (AuthKeys.tokenSignAlg=="RS256"){
+                val rsaPrivKey = JWKKey.importJWK(AuthKeys.tokenKey.decodeToString()).getOrThrow()
+                val tokenHeaders = mapOf(JWTClaims.Header.keyID to rsaPrivKey.getPublicKey().getKeyId(), JWTClaims.Header.type to "JWT" )
+                val token = rsaPrivKey.signJws(tokenPayload.toByteArray(), tokenHeaders)
+
+                call.sessions.set(LoginTokenSession(token))
+                call.response.status(HttpStatusCode.OK)
+                call.respond(
+                    Json.encodeToJsonElement(it).jsonObject.minus("type").plus(Pair("token", token.toJsonPrimitive()))
+                )
+            }
         }
         .onFailure { call.respond(HttpStatusCode.BadRequest, it.localizedMessage) }
 }
