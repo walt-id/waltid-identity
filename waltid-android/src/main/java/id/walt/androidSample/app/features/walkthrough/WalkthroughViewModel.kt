@@ -283,9 +283,7 @@ interface WalkthroughViewModel {
         }
 
         override fun onCompleteWalkthroughClick() {
-            resetKey()
-            resetDid()
-            resetSignedResult()
+            resetWalkthrough()
             viewModelScope.launch { _events.send(WalkthroughEvent.NavigateEvent.RestartWalkthrough) }
         }
 
@@ -317,7 +315,15 @@ interface WalkthroughViewModel {
         }
 
         private fun resetSignedResult() {
+            verificationResult.update { null }
             signedOutput.update { null }
+        }
+
+        private fun resetWalkthrough() {
+            resetKey()
+            resetDid()
+            resetSignedResult()
+            plainText.update { "" }
         }
     }
 }
