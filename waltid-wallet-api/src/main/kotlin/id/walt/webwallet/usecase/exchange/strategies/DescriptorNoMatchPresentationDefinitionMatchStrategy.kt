@@ -21,6 +21,6 @@ class DescriptorNoMatchPresentationDefinitionMatchStrategy : PresentationDefinit
                     || desc.id == JsonUtils.tryGetData(cred.parsedDocument, "type")?.jsonArray?.last()?.jsonPrimitive?.content
         }
     }.map {
-        TypeFilter(path = "", pattern = it.name ?: it.id)
+        TypeFilter(path = emptyList(), pattern = it.name ?: it.id)
     }
 }

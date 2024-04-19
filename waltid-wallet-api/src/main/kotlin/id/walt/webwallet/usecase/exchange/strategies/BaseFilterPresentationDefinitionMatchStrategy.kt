@@ -11,12 +11,15 @@ import kotlinx.serialization.json.jsonPrimitive
 abstract class BaseFilterPresentationDefinitionMatchStrategy<T> : PresentationDefinitionMatchStrategy<T> {
     private val modifiersRegex = """(\$/[gmixsuXUAJn]*)""".toRegex()
     protected fun isMatching(credential: WalletCredential, fields: List<TypeFilter>) = fields.all { typeFilter ->
-        val credField = JsonUtils.tryGetData(credential.parsedDocument, typeFilter.path) ?: return@all false
-        when (credField) {
-            is JsonPrimitive -> credField.jsonPrimitive.content
-            is JsonArray -> credField.jsonArray.last().jsonPrimitive.content
-            else -> ""
-        }.let {
+        typeFilter.path.mapNotNull {
+            JsonUtils.tryGetData(credential.parsedDocument, it)?.let {
+                when (it) {
+                    is JsonPrimitive -> it.jsonPrimitive.content
+                    is JsonArray -> it.jsonArray.last().jsonPrimitive.content
+                    else -> ""
+                }
+            }
+        }.any {
             modifiersRegex.replace(typeFilter.pattern.removePrefix("/"), """\$""").toRegex().matches(it)
         }
     }

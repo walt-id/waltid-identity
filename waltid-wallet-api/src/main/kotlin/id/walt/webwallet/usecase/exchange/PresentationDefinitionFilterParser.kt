@@ -19,16 +19,16 @@ class PresentationDefinitionFilterParser {
     private fun getFilter(schemas: List<InputDescriptorSchema>?) = schemas?.map { schema -> createTypeFilter(schema) }
 
     private fun createTypeFilter(inputDescriptorField: InputDescriptorField) = let {
-        val path = inputDescriptorField.path.first().removePrefix("$.")
+        val paths = inputDescriptorField.path.map { it.removePrefix("$.") }
         val filterType = inputDescriptorField.filter?.get("type")?.jsonPrimitive?.content
         val filterPattern = inputDescriptorField.filter?.get("pattern")?.jsonPrimitive?.content
             ?: throw IllegalArgumentException("No filter pattern in presentation definition constraint")
-        TypeFilter(path, filterType, filterPattern)
+        TypeFilter(paths, filterType, filterPattern)
     }
 
     private fun createTypeFilter(inputDescriptorSchema: InputDescriptorSchema) =
-        TypeFilter("type", "string", inputDescriptorSchema.uri)
+        TypeFilter(listOf("type"), "string", inputDescriptorSchema.uri)
 }
 
 @Serializable
-data class TypeFilter(val path: String, val type: String? = null, val pattern: String)
+data class TypeFilter(val path: List<String>, val type: String? = null, val pattern: String)
