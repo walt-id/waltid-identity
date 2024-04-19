@@ -1,21 +1,21 @@
 [
     [
         {
-            "path": "type",
+            "path": ["type"],
             "type": "string",
             "pattern": "VerifiableCredential#1"
         }
     ],
     [
         {
-            "path": "type",
+            "path": ["type"],
             "type": "string",
             "pattern": "VerifiableCredential#2"
         }
     ],
     [
         {
-            "path": "credentialSubject.firstName",
+            "path": ["credentialSubject.firstName"],
             "type": "string",
             "pattern": "/^name$/gi"
         }

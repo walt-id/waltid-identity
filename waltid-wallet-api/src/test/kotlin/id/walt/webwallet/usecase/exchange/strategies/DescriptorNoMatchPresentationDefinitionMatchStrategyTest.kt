@@ -33,7 +33,7 @@ class DescriptorNoMatchPresentationDefinitionMatchStrategyTest {
         ),
     )
     private val expectedFilter =
-        listOf(element = TypeFilter(path = "", type = null, pattern = "VerifiableCredential#1"))
+        listOf(element = TypeFilter(path = emptyList(), type = null, pattern = "VerifiableCredential#1"))
 
     @Test
     fun match() {
