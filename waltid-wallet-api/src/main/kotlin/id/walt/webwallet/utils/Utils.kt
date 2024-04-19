@@ -28,10 +28,15 @@ object Base64Utils {
 }
 
 object StreamUtils {
-    fun getBitValue(inputStream: InputStream, index: ULong, bitSize: Int) =
-        inputStream.bufferedReader().use { buffer ->
-            buffer.skip((index * bitSize.toULong()).toLong())
-            extractBitValue(buffer, index, bitSize.toULong())
+    fun getBitValue(inputStream: InputStream, index: ULong, bitSize: Int): List<Char> =
+        inputStream.use { stream ->
+            val bitSet = BitSet.valueOf(stream.readAllBytes())//TODO: !!potential overflow (2GB limit)
+            val result = mutableListOf<Char>()
+            for (i in index.toInt()..<index.toInt() + bitSize) {
+                val c = bitSet[i].takeIf { it }?.let { 1 } ?: 0
+                result.add(c.digitToChar())
+            }
+            result
         }
 
     private fun extractBitValue(it: BufferedReader, index: ULong, bitSize: ULong): List<Char> {
