@@ -1,8 +1,15 @@
 package id.walt.verifier
 
 import id.walt.credentials.verification.PolicyManager
+import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.oid4vc.data.ResponseMode
+import id.walt.oid4vc.data.ResponseType
 import id.walt.oid4vc.data.dif.*
+import id.walt.oid4vc.definitions.JWTClaims
+import id.walt.oid4vc.errors.AuthorizationError
+import id.walt.oid4vc.providers.TokenTarget
+import id.walt.oid4vc.responses.AuthorizationErrorCode
 import id.walt.verifier.oidc.VerificationUseCase
 import io.github.smiley4.ktorswaggerui.dsl.get
 import io.github.smiley4.ktorswaggerui.dsl.post
@@ -18,10 +25,18 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.util.*
 import io.ktor.util.*
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
+import kotlinx.uuid.UUID
+import kotlin.concurrent.timer
+
+const val SERVER_URL = "https://311f-2a02-85f-e4ab-48cf-f676-61c2-63e9-fa9e.ngrok-free.app"
+private val SERVER_SIGNING_KEY by lazy { runBlocking { JWKKey.generate(KeyType.RSA) } }
+
+
 
 @Serializable
 data class DescriptorMappingFormParam(val id: String, val format: VCFormat, val path: String)
@@ -86,8 +101,43 @@ val verifiableIdPresentationDefinitionExample = JsonObject(
 private val verificationUseCase = VerificationUseCase(httpClient)
 
 
+
 fun Application.verfierApi() {
     routing {
+
+        get("/jwks") {
+            var jwks = buildJsonObject {
+                put("keys", buildJsonArray {
+                    val jwkWithKid = buildJsonObject {
+                        SERVER_SIGNING_KEY.getPublicKey().exportJWKObject().forEach {
+                            put(it.key, it.value)
+                        }
+                        put("kid", SERVER_SIGNING_KEY.getPublicKey().getKeyId())
+                    }
+                    add(jwkWithKid)
+                })
+            }
+
+            call.respond(HttpStatusCode.OK, jwks)
+        }
+
+        get("/.well-known/openid-configuration") {
+            val metadata = buildJsonObject{
+                put("token_endpoint", "$SERVER_URL/openid4vc/verify")
+                put("issuer", SERVER_URL)
+                put("jwks_uri", "$SERVER_URL/jwks")
+                put("response_types_supported", buildJsonArray {
+                    add("code")
+                    add("id_token")
+                    add("vp_token")
+                } )
+                put("subject_types_supported", buildJsonArray { add("public") })
+                put("id_token_signing_alg_values_supported", buildJsonArray { add("ES256") })
+                put("authorization_endpoint", "$SERVER_URL/openid4vc/verify")
+            }
+            call.respond(metadata)
+        }
+
 
         route("openid4vc", {
         }) {
@@ -173,6 +223,75 @@ fun Application.verfierApi() {
 
                 context.respond(authorizeBaseUrl.plus("?").plus(session.authorizationRequest!!.toHttpQueryString()))
             }
+            get("verify") {
+
+                val params = call.parameters.toMap()
+                println(params["scope"])
+//                if (params["scope"]=="ver_test")  //EBSI Conformance
+                println("ebsi verifier")
+
+                val fixedPresentationDef = Json.parseToJsonElement("{\"id\":\"any\",\"format\":{\"jwt_vp\":{\"alg\":[\"ES256\"]}},\"input_descriptors\":[{\"id\":\"any\",\"format\":{\"jwt_vc\":{\"alg\":[\"ES256\"]}},\"constraints\":{\"fields\":[{\"path\":[\"$.vc.type\"],\"filter\":{\"type\":\"array\",\"contains\":{\"const\":\"VerifiableAttestation\"}}}]}},{\"id\":\"any\",\"format\":{\"jwt_vc\":{\"alg\":[\"ES256\"]}},\"constraints\":{\"fields\":[{\"path\":[\"$.vc.type\"],\"filter\":{\"type\":\"array\",\"contains\":{\"const\":\"VerifiableAttestation\"}}}]}},{\"id\":\"any\",\"format\":{\"jwt_vc\":{\"alg\":[\"ES256\"]}},\"constraints\":{\"fields\":[{\"path\":[\"$.vc.type\"],\"filter\":{\"type\":\"array\",\"contains\":{\"const\":\"VerifiableAttestation\"}}}]}}]}")
+                val session = verificationUseCase.createSession(
+                    vpPoliciesJson = null,
+                    vcPoliciesJson = null,
+                    requestCredentialsJson = buildJsonArray {  },
+                    presentationDefinitionJson = fixedPresentationDef,
+                    responseMode = ResponseMode.direct_post,
+                    successRedirectUri = null,
+                    errorRedirectUri = null,
+                    statusCallbackUri = null,
+                    statusCallbackApiKey = null,
+                    stateId = "stateId",
+                    stateParamAuthorizeReqEbsi = params["state"]!![0]
+                )
+
+                // Create a jwt for the request parameter in response
+                // Bind authentication request with state
+//                val idTokenRequestState = UUID().toString();
+//                val idTokenRequestNonce = UUID().toString();
+                val responseMode = ResponseMode.direct_post
+                println("AAAAAAAAAAAAAAAAAAAAAAAAAAAAaa")
+                println("AAAAAAAAAAAAAAAAAAAAAAAAAAAAaa")
+                println(session)
+                println("AAAAAAAAAAAAAAAAAAAAAAAAAAAAaa")
+                println("AAAAAAAAAAAAAAAAAAAAAAAAAAAAaa")
+
+
+
+
+                val clientId = SERVER_URL
+                val redirectUri = session.authorizationRequest!!.responseUri
+                val responseType =  session.authorizationRequest!!.responseType
+                val scope = "openid ver_test:vp_token"
+
+                var response = session.authorizationRequest!!
+
+                // Create a jwt as request object as defined in JAR OAuth2.0 specification
+                val requestJwtPayload = buildJsonObject {
+                        put(JWTClaims.Payload.issuer, SERVER_URL )
+                        put(JWTClaims.Payload.audience, response.clientId)
+//                        put(JWTClaims.Payload.nonce, idTokenRequestNonce)
+//                        put("state", idTokenRequestState)
+                        put("client_id", SERVER_URL)
+                        put("redirect_uri", redirectUri)
+                        put("response_type", "vp_token")
+                        put("response_mode", responseMode.name)
+                        put("scope", scope)
+                        put("exp", 1776532276)
+                        put("presentation_definition", fixedPresentationDef)
+                    }
+
+                val requestJwtHeader = mapOf(JWTClaims.Header.keyID to SERVER_SIGNING_KEY.getPublicKey().getKeyId(), JWTClaims.Header.type to "JWT" )
+
+                val requestToken = SERVER_SIGNING_KEY.signJws(requestJwtPayload.toString().toByteArray(), requestJwtHeader).also {
+                    println("Signed JWS: >> $it")
+                }
+
+
+                context.respondRedirect("openid://".plus("?").plus(session.authorizationRequest!!.toHttpQueryString().replace("client_id=", "client_id=$SERVER_URL").replace("response_uri","redirect_uri").replace("presentation_definition_uri","request_uri").plus("&scope=openid ver_test:vp_token").plus("&request=$requestToken")))
+
+            }
+
             post("/verify/{state}", {
                 tags = listOf("OIDC")
                 summary = "Verify vp_token response, for a verification request identified by the state"
@@ -201,7 +320,15 @@ fun Application.verfierApi() {
                 val sessionId = call.parameters["state"]
                 verificationUseCase.verify(sessionId, context.request.call.receiveParameters().toMap())
                     .onSuccess {
-                        call.respond(HttpStatusCode.OK, it)
+                        val session = verificationUseCase.getSession(sessionId!!)
+                        println("BBBBBBBBBBBBBBBBBBBBBBBBBBBBBB")
+                        println("BBBBBBBBBBBBBBBBBBBBBBBBBBBBBB")
+                        println(session)
+                        println("BBBBBBBBBBBBBBBBBBBBBBBBBBBBBB")
+                        println("BBBBBBBBBBBBBBBBBBBBBBBBBBBBBB")
+
+                        context.respondRedirect("openid://".plus("?").plus("code=123123131123&state=state"))
+
                     }.onFailure {
                         call.respond(HttpStatusCode.BadRequest, it.localizedMessage)
                     }.also {

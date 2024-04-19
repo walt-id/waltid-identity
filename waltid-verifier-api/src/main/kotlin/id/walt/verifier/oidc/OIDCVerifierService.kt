@@ -38,6 +38,7 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
         val successRedirectUri: String?,
         val errorRedirectUri: String?,
         val statusCallback: StatusCallback? = null,
+        val stateParamAuthorizeReqEbsi: String? = null
     )
 
     data class StatusCallback(
