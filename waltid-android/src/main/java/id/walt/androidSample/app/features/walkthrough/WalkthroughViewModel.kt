@@ -127,6 +127,7 @@ interface WalkthroughViewModel {
         override val signOptions = SignOption.all()
         override val selectedSignOption = MutableStateFlow<SignOption>(SignOption.Raw)
         private var signedOutputByteArray: ByteArray? = null
+        private var signedOutputJWS: String? = null
         override val signedOutput = MutableStateFlow<String?>(null)
 
         override val verificationResult = MutableStateFlow<VerificationResult?>(null)
@@ -212,7 +213,14 @@ interface WalkthroughViewModel {
                 key?.let { androidKey ->
                     signedOutput.update {
                         when (selectedSignOption.value) {
-                            SignOption.JWS -> androidKey.signJws(plainText.value.toByteArray(), mapOf("kid" to androidKey.getKeyId()))
+                            SignOption.JWS -> {
+                                val signedOutput = androidKey.signJws(
+                                    plaintext = plainText.value.toByteArray(),
+                                    headers = mapOf("kid" to androidKey.getKeyId())
+                                )
+                                signedOutputJWS = signedOutput
+                                signedOutput
+                            }
                             SignOption.Raw -> {
                                 val signedByteArray = androidKey.signRaw(plainText.value.toByteArray())
                                 signedOutputByteArray = signedByteArray
@@ -239,7 +247,16 @@ interface WalkthroughViewModel {
                             }
                         }
 
-                        SignOption.JWS -> verificationResult.update { VerificationResult.JWSVerificationNotAvailable }
+                        SignOption.JWS -> {
+                            signedOutputJWS?.let { signedJWSToVerify ->
+                                val result = androidKey.verifyJws(signedJWSToVerify)
+                                if (result.isSuccess) {
+                                    verificationResult.update { VerificationResult.Success }
+                                } else {
+                                    verificationResult.update { VerificationResult.Failed }
+                                }
+                            }
+                        }
                     }
                 }
             }
