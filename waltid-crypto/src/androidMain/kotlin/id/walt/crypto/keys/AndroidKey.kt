@@ -2,7 +2,9 @@ package id.walt.crypto.keys
 
 import android.util.Base64
 import id.walt.crypto.keys.AndroidKeyGenerator.PUBLIC_KEY_ALIAS_PREFIX
+import id.walt.crypto.utils.JsonUtils.toJsonElement
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import org.json.JSONObject
 import java.security.KeyFactory
@@ -149,8 +151,33 @@ class AndroidKey() : Key() {
         }
     }
 
-    override suspend fun verifyJws(signedJws: String): Result<JsonObject> {
-        TODO("Not yet implemented")
+    override suspend fun verifyJws(signedJws: String): Result<JsonElement> {
+        return runCatching {
+            val splitJws = signedJws.split(".")
+            if (splitJws.size != 3) throw IllegalArgumentException("Invalid JWS format")
+
+            val header = String(android.util.Base64.decode(splitJws[0], android.util.Base64.URL_SAFE))
+            val payload = String(android.util.Base64.decode(splitJws[1], android.util.Base64.URL_SAFE))
+            val signature = android.util.Base64.decode(splitJws[2], android.util.Base64.NO_WRAP)
+
+            // Get the public key from the Android KeyStore
+            val publicKey = keyStore.getCertificate(internalKeyId).publicKey
+
+            // Create a Signature instance and initialize it with the public key
+            val sig = getSignature()
+            sig.initVerify(publicKey)
+
+            // Supply the Signature object the data to be signed
+            sig.update(payload.toByteArray())
+
+            // Verify the signature
+            val isVerified = sig.verify(signature)
+
+            if (!isVerified) throw Exception("Signature verification failed")
+
+            // If the signature is valid, parse the payload of the JWS into a JSON Element
+            payload.toJsonElement()
+        }
     }
 
     override suspend fun getPublicKey(): AndroidKey {
@@ -178,11 +205,15 @@ class AndroidKey() : Key() {
         TODO("Not yet implemented")
     }
 
-    private fun getSignature(): Signature = when (keyType) {
-        KeyType.secp256k1 -> Signature.getInstance("SHA256withECDSA", "BC")//Legacy SunEC curve disabled
-        KeyType.secp256r1 -> Signature.getInstance("SHA256withECDSA")
-        KeyType.Ed25519 -> Signature.getInstance("Ed25519")
-        KeyType.RSA -> Signature.getInstance("SHA256withRSA")
+    private fun getSignature(): Signature {
+        val sig = when (keyType) {
+            KeyType.secp256k1 -> Signature.getInstance("SHA256withECDSA", "BC")//Legacy SunEC curve disabled
+            KeyType.secp256r1 -> Signature.getInstance("SHA256withECDSA")
+            KeyType.Ed25519 -> Signature.getInstance("Ed25519")
+            KeyType.RSA -> Signature.getInstance("SHA256withRSA")
+        }
+        println("Signature instance created {algorithm: '${sig.algorithm}'}")
+        return sig
     }
 
     companion object : AndroidKeyCreator {
