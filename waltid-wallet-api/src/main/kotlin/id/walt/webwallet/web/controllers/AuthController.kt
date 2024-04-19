@@ -289,10 +289,12 @@ fun Application.auth() {
 
             authenticate("auth-session", "auth-bearer", "auth-bearer-alternative") {
                 get("user-info", { summary = "Return user ID if logged in" }) {
-                    getUsersSessionToken()?.split('.')?.getOrNull(1)?.run {
-                        val uuid = this.decodeBase64String()
+                    getUsersSessionToken()?.run {
+                        val jwsObject = JWSObject.parse(this)
+                        val uuid = Json.parseToJsonElement(jwsObject.payload.toString()).jsonObject["sub"]?.jsonPrimitive?.content.toString()
                         call.respond(AccountsService.get(UUID(uuid)))
-                    } ?: call.respond(HttpStatusCode.BadRequest)
+                    }
+                        ?: call.respond(HttpStatusCode.BadRequest)
                 }
                 get("session", { summary = "Return session ID if logged in" }) {
                     val token = getUsersSessionToken() ?: throw UnauthorizedException("Invalid session")
