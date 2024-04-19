@@ -68,18 +68,6 @@ fun StepFiveScreen(
                         .weight(1f),
                 )
             }
-            VerificationResult.JWSVerificationNotAvailable -> {
-                Text(
-                    text = stringResource(id = R.string.description_verification_jws_not_available),
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.titleMedium,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier
-                        .padding(vertical = 8.dp)
-                        .fillMaxWidth()
-                        .weight(1f),
-                )
-            }
             null ->  Spacer(modifier = Modifier.weight(1f))
         }
 
