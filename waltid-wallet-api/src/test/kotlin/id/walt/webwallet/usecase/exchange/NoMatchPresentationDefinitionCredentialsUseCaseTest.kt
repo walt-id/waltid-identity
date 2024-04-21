@@ -23,6 +23,8 @@ class NoMatchPresentationDefinitionCredentialsUseCaseTest {
         Json.decodeFromString<List<FilterData>>(TestUtils.loadResource("presentation-definition/filters/filter-vc1.json"))
     private val vc2Filter =
         Json.decodeFromString<List<FilterData>>(TestUtils.loadResource("presentation-definition/filters/filter-vc2.json"))
+    private val patternFilter =
+        Json.decodeFromString<List<FilterData>>(TestUtils.loadResource("presentation-definition/filters/filter-pattern.json"))
     private val presentationDefinition =
         PresentationDefinition.fromJSON(JsonObject(mapOf("input_descriptors" to emptyArray<String>().toJsonElement())))
     private val credentials = listOf(
@@ -55,15 +57,22 @@ class NoMatchPresentationDefinitionCredentialsUseCaseTest {
     }
 
     @Test
-    fun `given multiple match strategies with same output, when calling use-case, then the result contains no duplicates`() {
+    fun `given multiple match strategies with same credential output, when calling use-case, then the result contains is grouped by credential`() {
         val additionalMatchStrategy = mockk<PresentationDefinitionMatchStrategy<List<FilterData>>>()
-        val sut = NoMatchPresentationDefinitionCredentialsUseCase(credentialService, matchStrategy)
+        val expectedResult = listOf(
+            FilterData(
+                credential = "VerifiableCredential#1",
+                filters = (vc1Filter.map { it.filters } + patternFilter.map { it.filters }).flatten()
+            )
+        )
+        val sut =
+            NoMatchPresentationDefinitionCredentialsUseCase(credentialService, matchStrategy, additionalMatchStrategy)
         every { credentialService.list(wallet, any()) } returns credentials
         every { matchStrategy.match(credentials, presentationDefinition) } returns vc1Filter
-        every { additionalMatchStrategy.match(credentials, presentationDefinition) } returns vc1Filter
+        every { additionalMatchStrategy.match(credentials, presentationDefinition) } returns patternFilter
         val result = sut.find(wallet, presentationDefinition)
         assertEquals(expected = 1, actual = result.size)
-        assertEquals(expected = vc1Filter, actual = listOf(result[0]))
+        assertEquals(expected = expectedResult, actual = result)
     }
 
     @Test
