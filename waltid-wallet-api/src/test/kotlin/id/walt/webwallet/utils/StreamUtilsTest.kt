@@ -3,13 +3,14 @@ package id.walt.webwallet.utils
 import kotlin.test.*
 
 class StreamUtilsTest {
-    private val bitString = byteArrayOf(0b0101010110101010.toByte())
+    @OptIn(ExperimentalStdlibApi::class)
+    private val bitString = "5AA5".hexToByteArray(HexFormat.Default)//0b01011010_10100101
 
     @Test
     fun `test unit bitsize, no overflow`() {
-        val value = StreamUtils.getBitValue(inputStream = bitString.inputStream(), index = 4UL, bitSize = 1)
+        val value = StreamUtils.getBitValue(inputStream = bitString.inputStream(), index = 6UL, bitSize = 1)
         assertNotNull(value)
-        assertEquals(expected = "0", actual = value.joinToString(""))
+        assertEquals(expected = "1", actual = value.joinToString(""))
     }
 
     @Test

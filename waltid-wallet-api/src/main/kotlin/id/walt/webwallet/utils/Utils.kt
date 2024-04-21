@@ -1,6 +1,5 @@
 package id.walt.webwallet.utils
 
-import java.io.BufferedReader
 import java.io.InputStream
 import java.util.*
 
@@ -30,23 +29,27 @@ object Base64Utils {
 object StreamUtils {
     fun getBitValue(inputStream: InputStream, index: ULong, bitSize: Int): List<Char> =
         inputStream.use { stream ->
-            val bitSet = BitSet.valueOf(stream.readAllBytes())//TODO: !!potential overflow (2GB limit)
-            val result = mutableListOf<Char>()
-            for (i in index.toInt()..<index.toInt() + bitSize) {
-                val c = bitSet[i].takeIf { it }?.let { 1 } ?: 0
-                result.add(c.digitToChar())
-            }
-            result
+            //TODO: bitSize constraints
+            val bitStartPosition = index * bitSize.toUInt()
+            println("bitStartPosition: $bitStartPosition")
+            val byteStart = bitStartPosition / 8u
+            println("skipping: $byteStart bytes")
+            stream.skip(byteStart.toLong())
+            println("available: ${stream.available()} bytes")
+            val bytesToRead = (bitSize - 1) / 8 + 1
+            println("readingNext: $bytesToRead bytes")
+            extractBitValue(stream.readNBytes(bytesToRead), index, bitSize.toUInt())
         }
 
-    private fun extractBitValue(it: BufferedReader, index: ULong, bitSize: ULong): List<Char> {
-        var int = 0
-        var count = index * bitSize
+    private fun extractBitValue(bytes: ByteArray, index: ULong, bitSize: UInt): List<Char> {
+        val bitSet = BitSet.valueOf(bytes)
+        println("bits set: ${bitSet.length()}")
+        val bitStart = index * bitSize % 8u
+        println("startingFromBit: $bitStart")
         val result = mutableListOf<Char>()
-        while (count < index * bitSize + bitSize) {
-            int = it.read().takeIf { it != -1 } ?: error("Reached end of stream")
-            result.add(int.digitToChar())
-            count += 1.toULong()
+        for (i in bitStart..<bitStart + bitSize) {
+            val c = bitSet[i.toInt()].takeIf { it }?.let { 1 } ?: 0
+            result.add(c.digitToChar())
         }
         return result
     }
