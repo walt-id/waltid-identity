@@ -19,6 +19,13 @@ class NoMatchPresentationDefinitionCredentialsUseCase(
         logger.debug { "WalletCredential list is: ${credentialList.map { it.parsedDocument?.get("type")!!.jsonArray }}" }
         return matchStrategies.fold<PresentationDefinitionMatchStrategy<List<FilterData>>, List<FilterData>>(listOf()) { acc, i ->
             acc.plus(i.match(credentialList, presentationDefinition))
-        }.distinct()
+        }.groupBy {
+            it.credential
+        }.map {
+            FilterData(
+                credential = it.key,
+                filters = it.value.map { it.filters }.flatten()
+            )
+        }
     }
 }
