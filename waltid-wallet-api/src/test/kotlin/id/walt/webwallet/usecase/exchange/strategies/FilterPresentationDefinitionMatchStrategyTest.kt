@@ -4,8 +4,8 @@ import TestUtils
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.webwallet.db.models.WalletCredential
+import id.walt.webwallet.usecase.exchange.FilterData
 import id.walt.webwallet.usecase.exchange.PresentationDefinitionFilterParser
-import id.walt.webwallet.usecase.exchange.TypeFilter
 import id.walt.webwallet.utils.JsonUtils
 import io.mockk.every
 import io.mockk.mockk
@@ -25,8 +25,10 @@ class FilterPresentationDefinitionMatchStrategyTest {
     private val sut = FilterPresentationDefinitionMatchStrategy(filterParserMock)
     private val presentationDefinition =
         PresentationDefinition.fromJSON(JsonObject(mapOf("input_descriptors" to emptyArray<String>().toJsonElement())))
-    private val filters =
-        Json.decodeFromString<List<List<TypeFilter>>>(TestUtils.loadResource("presentation-definition/filters.json"))
+    private val vc1Filter =
+        Json.decodeFromString<List<FilterData>>(TestUtils.loadResource("presentation-definition/filters/filter-vc1.json"))
+    private val patternFilter =
+        Json.decodeFromString<List<FilterData>>(TestUtils.loadResource("presentation-definition/filters/filter-pattern.json"))
     private val credentials = listOf(
         WalletCredential(
             wallet = UUID(),
@@ -62,7 +64,7 @@ class FilterPresentationDefinitionMatchStrategyTest {
 
     @Test
     fun `match array type`() {
-        every { filterParserMock.parse(any()) } returns listOf(filters[0])
+        every { filterParserMock.parse(any()) } returns vc1Filter
         val result = sut.match(credentials = listOf(credentials[0]), presentationDefinition = presentationDefinition)
         assertEquals(expected = 1, actual = result.size)
         assertEquals(
@@ -73,7 +75,7 @@ class FilterPresentationDefinitionMatchStrategyTest {
 
     @Test
     fun `match primitive type`() {
-        every { filterParserMock.parse(any()) } returns listOf(filters[0])
+        every { filterParserMock.parse(any()) } returns vc1Filter
         val result = sut.match(credentials = listOf(credentials[1]), presentationDefinition = presentationDefinition)
         assertEquals(expected = 1, actual = result.size)
         assertEquals(
@@ -84,7 +86,7 @@ class FilterPresentationDefinitionMatchStrategyTest {
 
     @Test
     fun `match constraint primitive type`() {
-        every { filterParserMock.parse(any()) } returns listOf(filters[2])
+        every { filterParserMock.parse(any()) } returns patternFilter
         val result = sut.match(credentials = listOf(credentials[1]), presentationDefinition = presentationDefinition)
         assertEquals(expected = 1, actual = result.size)
         assertEquals(
