@@ -477,7 +477,7 @@ suspend fun PipelineContext<Unit, ApplicationCall>.doLogin() {
         .onSuccess {
 
             val tokenPayload = "{\"sub\":\"${it.id}\",\"iss\":\"https://walt.id/\",\"aud\":\"https://wallet.walt-test.cloud/\"}"
-            val tokenHeaders = mutableMapOf<String, String>()
+
 
             val key = JWKKey.importJWK(AuthKeys.tokenKey.decodeToString()).getOrNull()
             if (key == null) {
@@ -492,7 +492,7 @@ suspend fun PipelineContext<Unit, ApplicationCall>.doLogin() {
                 )
             } else {
                 val rsaPrivKey = JWKKey.importJWK(AuthKeys.tokenKey.decodeToString()).getOrThrow()
-
+                val tokenHeaders = mapOf(JWTClaims.Header.keyID to rsaPrivKey.getPublicKey().getKeyId(), JWTClaims.Header.type to "JWT" )
                 val token = rsaPrivKey.signJws(tokenPayload.toByteArray(), tokenHeaders)
 
                 call.sessions.set(LoginTokenSession(token))
