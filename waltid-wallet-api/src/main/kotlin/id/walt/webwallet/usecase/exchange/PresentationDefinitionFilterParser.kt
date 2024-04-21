@@ -1,17 +1,20 @@
 package id.walt.webwallet.usecase.exchange
 
-import id.walt.oid4vc.data.dif.InputDescriptorConstraints
-import id.walt.oid4vc.data.dif.InputDescriptorField
-import id.walt.oid4vc.data.dif.InputDescriptorSchema
-import id.walt.oid4vc.data.dif.PresentationDefinition
+import id.walt.oid4vc.data.dif.*
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.jsonPrimitive
 
 class PresentationDefinitionFilterParser {
-    fun parse(presentationDefinition: PresentationDefinition): List<List<TypeFilter>> =
-        presentationDefinition.inputDescriptors.mapNotNull { inputDescriptor ->
-            getFilter(inputDescriptor.constraints)?.plus(getFilter(inputDescriptor.schema) ?: listOf())
+    fun parse(presentationDefinition: PresentationDefinition): List<FilterData> =
+        presentationDefinition.inputDescriptors.map { inputDescriptor ->
+            FilterData(
+                credential = inputDescriptor.name ?: inputDescriptor.id,
+                filters = getFilters(inputDescriptor)
+            )
         }
+
+    private fun getFilters(inputDescriptor: InputDescriptor) =
+        getFilter(inputDescriptor.constraints)?.plus(getFilter(inputDescriptor.schema) ?: listOf()) ?: emptyList()
 
     private fun getFilter(inputDescriptor: InputDescriptorConstraints?) =
         inputDescriptor?.fields?.map { createTypeFilter(it) }
@@ -29,6 +32,12 @@ class PresentationDefinitionFilterParser {
     private fun createTypeFilter(inputDescriptorSchema: InputDescriptorSchema) =
         TypeFilter(listOf("type"), "string", inputDescriptorSchema.uri)
 }
+
+@Serializable
+data class FilterData(
+    val credential: String,
+    val filters: List<TypeFilter>,
+)
 
 @Serializable
 data class TypeFilter(val path: List<String>, val type: String? = null, val pattern: String)
