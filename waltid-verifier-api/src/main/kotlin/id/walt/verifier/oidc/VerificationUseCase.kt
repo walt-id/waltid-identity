@@ -53,7 +53,7 @@ class VerificationUseCase(
         logger.debug { "Presentation definition: " + presentationDefinition.toJSON() }
 
         val session = OIDCVerifierService.initializeAuthorization(
-            presentationDefinition, responseMode = responseMode, sessionId = stateId
+            presentationDefinition, responseMode = responseMode, sessionId = stateId, stateParamAuthorizeReqEbsi = stateParamAuthorizeReqEbsi
         )
 
         val specificPolicies = requestCredentialsArr.filterIsInstance<JsonObject>().associate {
@@ -65,6 +65,7 @@ class VerificationUseCase(
         logger.debug { "vpPolicies: $vpPolicies" }
         logger.debug { "vcPolicies: $vcPolicies" }
         logger.debug { "spPolicies: $specificPolicies" }
+        logger.debug { "stateParamAuthorizeReqEbsi: $stateParamAuthorizeReqEbsi" }
 
         OIDCVerifierService.sessionVerificationInfos[session.id] = OIDCVerifierService.SessionVerificationInformation(
             vpPolicies = vpPolicies,

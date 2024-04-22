@@ -4,12 +4,8 @@ import id.walt.credentials.verification.PolicyManager
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.oid4vc.data.ResponseMode
-import id.walt.oid4vc.data.ResponseType
 import id.walt.oid4vc.data.dif.*
 import id.walt.oid4vc.definitions.JWTClaims
-import id.walt.oid4vc.errors.AuthorizationError
-import id.walt.oid4vc.providers.TokenTarget
-import id.walt.oid4vc.responses.AuthorizationErrorCode
 import id.walt.verifier.oidc.VerificationUseCase
 import io.github.smiley4.ktorswaggerui.dsl.get
 import io.github.smiley4.ktorswaggerui.dsl.post
@@ -30,11 +26,9 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
-import kotlinx.uuid.UUID
-import kotlin.concurrent.timer
 
-const val SERVER_URL = "https://311f-2a02-85f-e4ab-48cf-f676-61c2-63e9-fa9e.ngrok-free.app"
-private val SERVER_SIGNING_KEY by lazy { runBlocking { JWKKey.generate(KeyType.RSA) } }
+const val SERVER_URL = "https://810d-2a02-85f-e4ab-48cf-7925-af4f-f290-1cc2.ngrok-free.app"
+private val SERVER_SIGNING_KEY by lazy { runBlocking { JWKKey.generate(KeyType.secp256r1) } }
 
 
 
@@ -227,6 +221,8 @@ fun Application.verfierApi() {
 
                 val params = call.parameters.toMap()
                 println(params["scope"])
+                println(params["state"])
+
 //                if (params["scope"]=="ver_test")  //EBSI Conformance
                 println("ebsi verifier")
 
@@ -244,20 +240,11 @@ fun Application.verfierApi() {
                     stateId = "stateId",
                     stateParamAuthorizeReqEbsi = params["state"]!![0]
                 )
-
                 // Create a jwt for the request parameter in response
                 // Bind authentication request with state
 //                val idTokenRequestState = UUID().toString();
 //                val idTokenRequestNonce = UUID().toString();
                 val responseMode = ResponseMode.direct_post
-                println("AAAAAAAAAAAAAAAAAAAAAAAAAAAAaa")
-                println("AAAAAAAAAAAAAAAAAAAAAAAAAAAAaa")
-                println(session)
-                println("AAAAAAAAAAAAAAAAAAAAAAAAAAAAaa")
-                println("AAAAAAAAAAAAAAAAAAAAAAAAAAAAaa")
-
-
-
 
                 val clientId = SERVER_URL
                 val redirectUri = session.authorizationRequest!!.responseUri
@@ -321,13 +308,9 @@ fun Application.verfierApi() {
                 verificationUseCase.verify(sessionId, context.request.call.receiveParameters().toMap())
                     .onSuccess {
                         val session = verificationUseCase.getSession(sessionId!!)
-                        println("BBBBBBBBBBBBBBBBBBBBBBBBBBBBBB")
-                        println("BBBBBBBBBBBBBBBBBBBBBBBBBBBBBB")
-                        println(session)
-                        println("BBBBBBBBBBBBBBBBBBBBBBBBBBBBBB")
-                        println("BBBBBBBBBBBBBBBBBBBBBBBBBBBBBB")
+                        val state = session.stateParamAuthorizeReqEbsi
 
-                        context.respondRedirect("openid://".plus("?").plus("code=123123131123&state=state"))
+                        context.respondRedirect("openid://".plus("?").plus("code=123123131123&state=$state"))
 
                     }.onFailure {
                         call.respond(HttpStatusCode.BadRequest, it.localizedMessage)
