@@ -79,7 +79,7 @@ class TestCredentialWallet(
             DidService.resolveToKey(keyId).getOrThrow().let { KeysService.get(it.getKeyId()) }
                 ?.let { KeySerialization.deserializeKey(it.document).getOrThrow() }
         } ?: error("Failed to retrieve the key")
-        println("KEY FOR SIGNING: $key")
+
 
         return runBlocking {
             val authKeyId = resolveDidAuthentication(did)
@@ -88,6 +88,8 @@ class TestCredentialWallet(
             key.signJws(payloadToSign, mapOf("typ" to "JWT", "kid" to authKeyId))
                 .also { signed ->
                     key.getPublicKey().verifyJws(signed).also {
+                        println("SIGNED TOKEN: $signed")
+                        println("KEY FOR SIGNING: ${key.getPublicKey().exportJWK()}")
                         println("RE-VERIFICATION: $it")
                     }
                 }
