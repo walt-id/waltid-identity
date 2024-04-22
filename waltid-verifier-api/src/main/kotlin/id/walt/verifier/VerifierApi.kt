@@ -230,7 +230,10 @@ fun Application.verfierApi() {
                 val fixedPresentationDef = Json.parseToJsonElement("{\"id\":\"any\",\"format\":{\"jwt_vp\":{\"alg\":[\"ES256\"]}},\"input_descriptors\":[{\"id\":\"any\",\"format\":{\"jwt_vc\":{\"alg\":[\"ES256\"]}},\"constraints\":{\"fields\":[{\"path\":[\"$.vc.type\"],\"filter\":{\"type\":\"array\",\"contains\":{\"const\":\"VerifiableAttestation\"}}}]}},{\"id\":\"any\",\"format\":{\"jwt_vc\":{\"alg\":[\"ES256\"]}},\"constraints\":{\"fields\":[{\"path\":[\"$.vc.type\"],\"filter\":{\"type\":\"array\",\"contains\":{\"const\":\"VerifiableAttestation\"}}}]}},{\"id\":\"any\",\"format\":{\"jwt_vc\":{\"alg\":[\"ES256\"]}},\"constraints\":{\"fields\":[{\"path\":[\"$.vc.type\"],\"filter\":{\"type\":\"array\",\"contains\":{\"const\":\"VerifiableAttestation\"}}}]}}]}")
                 val session = verificationUseCase.createSession(
                     vpPoliciesJson = null,
-                    vcPoliciesJson = null,
+                    vcPoliciesJson =  buildJsonArray {  add("signature")
+                                                        add("expired")
+                                                        add("not-before")
+                                                     },
                     requestCredentialsJson = buildJsonArray {  },
                     presentationDefinitionJson = fixedPresentationDef,
                     responseMode = ResponseMode.direct_post,
@@ -317,7 +320,21 @@ fun Application.verfierApi() {
                             call.respond(HttpStatusCode.OK, it)
                         }
                     }.onFailure {
-                        call.respond(HttpStatusCode.BadRequest, it.localizedMessage)
+                        var errorDescription: String = it.localizedMessage
+
+                        if (sessionId != null ) {
+                            val session = verificationUseCase.getSession(sessionId)
+                            if (session.stateParamAuthorizeReqEbsi != null) {
+                                val state = session.stateParamAuthorizeReqEbsi
+                                when (it.localizedMessage) {
+                                    "Verification policies did not succeed: expired" -> errorDescription = "<\$presentation_submission.descriptor_map[x].id> is expired"
+                                    "Verification policies did not succeed: not-before" -> errorDescription = "<\$presentation_submission.descriptor_map[x].id> is not yet valid"
+                                }
+                                context.respondRedirect("openid://?state=$state&error=invalid_request&error_description=$errorDescription")
+                            }
+                        } else {
+                                call.respond(HttpStatusCode.BadRequest, errorDescription)
+                        }
                     }.also {
                         sessionId?.run { verificationUseCase.notifySubscribers(this) }
                     }
