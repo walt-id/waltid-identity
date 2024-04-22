@@ -3,8 +3,8 @@ package id.walt.crypto.keys.oci
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class OCIsdkMetadata(
-    val vaultId: String,
-    val compartmentId: String,
+actual data class OCIsdkMetadata actual constructor(
+    actual val vaultId: String,
+    actual val compartmentId: String,
 
     )
