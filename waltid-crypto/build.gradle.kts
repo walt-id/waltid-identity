@@ -78,7 +78,7 @@ kotlin {
                 implementation("io.ktor:ktor-client-serialization:2.3.8")
                 implementation("io.ktor:ktor-client-content-negotiation:2.3.8")
                 implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.8")
-                implementation("io.ktor:ktor-client-json:2.3.9")
+                implementation("io.ktor:ktor-client-json:2.3.10")
                 implementation("io.ktor:ktor-client-logging:2.3.10")
 
                 implementation(project.dependencies.platform("org.kotlincrypto.hash:bom:0.5.1"))
