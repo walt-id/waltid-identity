@@ -1,12 +1,23 @@
 package id.walt.webwallet.utils
 
-import java.io.BufferedReader
+import io.github.oshai.kotlinlogging.KotlinLogging
 import java.io.InputStream
 import java.util.*
 
-fun hexToInt(hex: String) = Integer.parseInt(hex.startsWith("0x").takeIf { it }?.let {
-    hex.substring(2)
-} ?: hex, 2)
+object StringUtils {
+    fun hexToInt(hex: String) = Integer.parseInt(clean(hex), 16)
+
+    fun hexToByteArray(hex: String) =
+        clean(hex).let { h -> ByteArray(h.length / 2) { h.substring(it * 2, it * 2 + 2).toInt(16).toByte() } }
+
+    fun binToInt(bin: String) = Integer.parseInt(bin, 2)
+
+    private fun clean(hex: String) = hex.let {
+        it.startsWith("0x").takeIf { it }?.let {
+            hex.substring(2)
+        } ?: hex
+    }
+}
 
 object HttpUtils {
     fun parseQueryParam(query: String) = query.split("&").mapNotNull {
@@ -25,21 +36,31 @@ object Base64Utils {
     fun urlDecode(base64Url: String): ByteArray = Base64.getUrlDecoder().decode(base64Url)
 }
 
-object StreamUtils {
-    fun getBitValue(inputStream: InputStream, index: ULong, bitSize: Int) =
-        inputStream.bufferedReader().use { buffer ->
-            buffer.skip((index * bitSize.toULong()).toLong())
-            extractBitValue(buffer, index, bitSize.toULong())
+object BitstringUtils {
+    private val logger = KotlinLogging.logger {}
+    fun getBitValue(inputStream: InputStream, index: ULong, bitSize: Int): List<Char> =
+        inputStream.use { stream ->
+            //TODO: bitSize constraints
+            val bitStartPosition = index * bitSize.toUInt()
+            logger.debug { "bitStartPosition: $bitStartPosition" }
+            val byteStart = bitStartPosition / 8u
+            logger.debug { "skipping: $byteStart bytes" }
+            stream.skip(byteStart.toLong())
+            logger.debug { "available: ${stream.available()} bytes" }
+            val bytesToRead = (bitSize - 1) / 8 + 1
+            logger.debug { "readingNext: $bytesToRead bytes" }
+            extractBitValue(stream.readNBytes(bytesToRead), index, bitSize.toUInt())
         }
 
-    private fun extractBitValue(it: BufferedReader, index: ULong, bitSize: ULong): List<Char> {
-        var int = 0
-        var count = index * bitSize
+    private fun extractBitValue(bytes: ByteArray, index: ULong, bitSize: UInt): List<Char> {
+        val bitSet = BitSet.valueOf(bytes)
+        logger.debug { "bits set: ${bitSet.length()}" }
+        val bitStart = index * bitSize % 8u
+        logger.debug { "startingFromBit: $bitStart" }
         val result = mutableListOf<Char>()
-        while (count < index * bitSize + bitSize) {
-            int = it.read().takeIf { it != -1 } ?: error("Reached end of stream")
-            result.add(int.digitToChar())
-            count += 1.toULong()
+        for (i in bitStart..<bitStart + bitSize) {
+            val b = bitSet[i.toInt()].takeIf { it }?.let { 1 } ?: 0
+            result.add(b.digitToChar())
         }
         return result
     }

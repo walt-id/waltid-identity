@@ -2,12 +2,13 @@ package id.walt.oid4vc.requests
 
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.data.dif.PresentationDefinition
-import id.walt.oid4vc.util.httpGet
-import id.walt.sdjwt.SDJwt
+import id.walt.oid4vc.util.JwtUtils
+import io.ktor.client.request.*
+import io.ktor.client.statement.*
 import kotlinx.serialization.json.*
 
 interface IAuthorizationRequest {
-    val responseType: String
+    val responseType: Set<ResponseType>
     val clientId: String
     val responseMode: ResponseMode?
     val redirectUri: String?
@@ -17,7 +18,7 @@ interface IAuthorizationRequest {
 }
 
 data class AuthorizationRequest(
-    override val responseType: String = ResponseType.getResponseTypeString(ResponseType.code),
+    override val responseType: Set<ResponseType> = setOf(ResponseType.Code),
     override val clientId: String,
     override val responseMode: ResponseMode? = null,
     override val redirectUri: String? = null,
@@ -44,7 +45,7 @@ data class AuthorizationRequest(
     val isReferenceToPAR get() = requestUri?.startsWith("urn:ietf:params:oauth:request_uri:") ?: false
     override fun toHttpParameters(): Map<String, List<String>> {
         return buildMap {
-            put("response_type", listOf(responseType))
+            put("response_type", listOf(ResponseType.getResponseTypeString(responseType)))
             put("client_id", listOf(clientId))
             responseMode?.let { put("response_mode", listOf(it.name)) }
             redirectUri?.let { put("redirect_uri", listOf(it)) }
@@ -72,6 +73,20 @@ data class AuthorizationRequest(
             codeChallengeMethod?.let { put("code_challenge_method", listOf(it)) }
             idTokenHint?.let { put("id_token_hint", listOf(it)) }
             putAll(customParameters)
+        }
+    }
+
+    /**
+     * If response_mode is "direct_post", the response_uri parameter must be used and the redirect_uri parameter must be empty.
+     * If response_uri and redirect_uri are empty and client_id_scheme is "redirect_uri", the response_uri or redirect_uri (depending on the response_mode) are taken from the client_id parameter
+     */
+    fun getRedirectOrResponseUri(): String? {
+        return when(responseMode) {
+            ResponseMode.direct_post -> responseUri
+            else -> redirectUri
+        } ?: when(clientIdScheme) {
+            ClientIdScheme.RedirectUri -> clientId
+            else -> null
         }
     }
 
@@ -104,12 +119,12 @@ data class AuthorizationRequest(
 
         suspend fun fromRequestObjectByReference(requestUri: String): AuthorizationRequest {
             println("Request object by reference: $requestUri")
-            return fromRequestObject(httpGet(requestUri))
+            return fromRequestObject(id.walt.oid4vc.util.http.get(requestUri).bodyAsText())
         }
 
         fun fromRequestObject(request: String): AuthorizationRequest {
             return fromHttpParameters(
-                SDJwt.parse(request).fullPayload.mapValues { e ->
+                JwtUtils.parseJWTPayload(request).mapValues { e ->
                     when (e.value) {
                         is JsonArray -> e.value.jsonArray.map { it.toString() }.toList()
                         is JsonPrimitive -> listOf(e.value.jsonPrimitive.content)
@@ -130,7 +145,7 @@ data class AuthorizationRequest(
 
         override fun fromHttpParameters(parameters: Map<String, List<String>>): AuthorizationRequest {
             return AuthorizationRequest(
-                parameters["response_type"]!!.first(),
+                parameters["response_type"]!!.first().let { ResponseType.fromResponseTypeString(it) },
                 parameters["client_id"]!!.first(),
                 parameters["response_mode"]?.firstOrNull()?.let { ResponseMode.valueOf(it) },
                 parameters["redirect_uri"]?.firstOrNull(),

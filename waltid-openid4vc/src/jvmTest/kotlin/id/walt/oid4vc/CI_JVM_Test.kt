@@ -14,11 +14,14 @@ import id.walt.did.dids.registrar.dids.DidJwkCreateOptions
 import id.walt.did.dids.registrar.dids.DidKeyCreateOptions
 import id.walt.did.dids.registrar.dids.DidWebCreateOptions
 import id.walt.oid4vc.data.*
+import id.walt.oid4vc.definitions.JWTClaims
 import id.walt.oid4vc.definitions.OPENID_CREDENTIAL_AUTHORIZATION_TYPE
 import id.walt.oid4vc.providers.CredentialWalletConfig
 import id.walt.oid4vc.providers.OpenIDClientConfig
+import id.walt.oid4vc.providers.TokenTarget
 import id.walt.oid4vc.requests.*
 import id.walt.oid4vc.responses.*
+import id.walt.oid4vc.util.JwtUtils
 import id.walt.sdjwt.SDJwt
 import id.walt.sdjwt.SDMap
 import id.walt.sdjwt.SDPayload
@@ -35,12 +38,9 @@ import io.kotest.matchers.shouldNot
 import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.string.beEmpty
 import io.kotest.matchers.string.shouldStartWith
-import io.kotest.matchers.types.instanceOf
 import io.kotest.matchers.types.shouldBeInstanceOf
 import io.ktor.client.*
 import io.ktor.client.call.*
-import io.ktor.client.engine.java.*
-import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.logging.*
 import io.ktor.client.request.*
@@ -51,7 +51,6 @@ import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
 import io.ktor.server.engine.*
 import io.ktor.server.netty.*
-import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.request.*
 import io.ktor.server.routing.*
 import io.ktor.util.*
@@ -63,9 +62,10 @@ class CI_JVM_Test : AnnotationSpec() {
 
     var testMetadata = OpenIDProviderMetadata(
         authorizationEndpoint = "https://localhost/oidc",
-        credentialsSupported = listOf(
+        credentialConfigurationsSupported = listOf(
             CredentialSupported(
-                CredentialFormat.jwt_vc_json, "jwt_vc_json_fmt", setOf("did"), setOf("ES256K"),
+                "UniversityDegreeCredential_jwt_vc_json",
+                CredentialFormat.jwt_vc_json, setOf("did"), setOf("ES256K"),
                 listOf(
                     DisplayProperties(
                         "University Credential",
@@ -96,7 +96,8 @@ class CI_JVM_Test : AnnotationSpec() {
                 )
             ),
             CredentialSupported(
-                CredentialFormat.ldp_vc, "ldp_vc_1", setOf("did"), setOf("ES256K"),
+                "VerifiableId_ldp_vc",
+                CredentialFormat.ldp_vc, setOf("did"), setOf("ES256K"),
                 listOf(DisplayProperties("Verifiable ID")),
                 types = listOf("VerifiableCredential", "VerifiableId"),
                 context = listOf(
@@ -104,10 +105,10 @@ class CI_JVM_Test : AnnotationSpec() {
                     JsonObject(mapOf("@version" to JsonPrimitive(1.1)))
                 )
             )
-        )
+        ).associateBy { it.id }
     )
 
-    val ktorClient = HttpClient(Java) {
+    val ktorClient = HttpClient() {
         install(ContentNegotiation) {
             json()
         }
@@ -255,7 +256,7 @@ class CI_JVM_Test : AnnotationSpec() {
 
         // 1. send pushed authorization request with authorization details, containing info of credentials to be issued, receive session id
         val authReq = AuthorizationRequest(
-            responseType = ResponseType.getResponseTypeString(ResponseType.code),
+            responseType = setOf(ResponseType.Code),
             clientId = testCIClientConfig.clientID,
             redirectUri = credentialWallet.config.redirectUri,
             authorizationDetails = listOf(
@@ -289,7 +290,7 @@ class CI_JVM_Test : AnnotationSpec() {
 
         println("// 1. send pushed authorization request with authorization details, containing info of credentials to be issued, receive session id")
         val pushedAuthReq = AuthorizationRequest(
-            responseType = ResponseType.getResponseTypeString(ResponseType.code),
+            responseType = setOf(ResponseType.Code),
             clientId = testCIClientConfig.clientID,
             redirectUri = credentialWallet.config.redirectUri,
             authorizationDetails = listOf(
@@ -318,7 +319,7 @@ class CI_JVM_Test : AnnotationSpec() {
         println("// 2. call authorize endpoint with request uri, receive HTTP redirect (302 Found) with Location header")
         providerMetadata.authorizationEndpoint shouldNotBe null
         val authReq = AuthorizationRequest(
-            responseType = ResponseType.code.name,
+            responseType = setOf(ResponseType.Code),
             clientId = testCIClientConfig.clientID,
             requestUri = pushedAuthResp.requestUri
         )
@@ -330,11 +331,11 @@ class CI_JVM_Test : AnnotationSpec() {
         }
         println("authResp: $authResp")
         authResp.status shouldBe HttpStatusCode.Found
-        authResp.headers.names() shouldContain HttpHeaders.Location.lowercase()
+        authResp.headers.names() shouldContain HttpHeaders.Location
         val location = Url(authResp.headers[HttpHeaders.Location]!!)
         println("location: $location")
         location.toString() shouldStartWith credentialWallet.config.redirectUri!!
-        location.parameters.names() shouldContain ResponseType.code.name
+        location.parameters.names() shouldContain ResponseType.Code.name.lowercase()
 
         println("// 3. Parse code response parameter from authorization redirect URI")
         providerMetadata.tokenEndpoint shouldNotBe null
@@ -471,6 +472,130 @@ class CI_JVM_Test : AnnotationSpec() {
     }
 
     @Test
+    fun testCredentialIssuanceIsolatedFunctions() {
+        // TODO: consider re-implementing CITestProvider, making use of new lib functions
+        println("// -------- CREDENTIAL ISSUER ----------")
+        // init credential offer for full authorization code flow
+        val credOffer = CredentialOffer.Builder(ciTestProvider.baseUrl)
+            .addOfferedCredential("VerifiableId")
+            .addAuthorizationCodeGrant("test-state")
+            .build()
+        val issueReqUrl = OpenID4VCI.getCredentialOfferRequestUrl(credOffer)
+
+        // Show credential offer request as QR code
+        println(issueReqUrl)
+
+        println("// -------- WALLET ----------")
+        val parsedCredOffer = runBlocking { OpenID4VCI.parseAndResolveCredentialOfferRequestUrl(issueReqUrl) }
+        parsedCredOffer.toJSONString() shouldBe credOffer.toJSONString()
+
+        val providerMetadata = runBlocking { OpenID4VCI.resolveCIProviderMetadata(parsedCredOffer) }
+        providerMetadata.credentialIssuer shouldBe parsedCredOffer.credentialIssuer
+
+        println("// resolve offered credentials")
+        val offeredCredentials = OpenID4VCI.resolveOfferedCredentials(parsedCredOffer, providerMetadata)
+        println("offeredCredentials: $offeredCredentials")
+        offeredCredentials.size shouldBe 1
+        offeredCredentials.first().format shouldBe CredentialFormat.jwt_vc_json
+        offeredCredentials.first().types?.last() shouldBe "VerifiableId"
+        val offeredCredential = offeredCredentials.first()
+        println("offeredCredentials[0]: $offeredCredential")
+
+        println("// go through full authorization code flow to receive offered credential")
+        println("// auth request (short-cut, without pushed authorization request)")
+        val authReq = AuthorizationRequest(
+            setOf(ResponseType.Code), testCIClientConfig.clientID,
+            redirectUri = credentialWallet.config.redirectUri,
+            issuerState = parsedCredOffer.grants[GrantType.authorization_code.value]!!.issuerState
+        )
+        println("authReq: $authReq")
+
+        println("// -------- CREDENTIAL ISSUER ----------")
+
+        // create issuance session and generate authorization code
+        val authCodeResponse: AuthorizationCodeResponse = AuthorizationCodeResponse.success("test-code")
+        val redirectUri = authCodeResponse.toRedirectUri(authReq.redirectUri ?: TODO(), authReq.responseMode ?: ResponseMode.query)
+        Url(redirectUri).let {
+            it.parameters.names() shouldContain ResponseType.Code.name.lowercase()
+            it.parameters.get(ResponseType.Code.name.lowercase()) shouldBe authCodeResponse.code
+        }
+
+        println("// -------- WALLET ----------")
+        println("// token req")
+        val tokenReq =
+            TokenRequest(
+                GrantType.authorization_code,
+                testCIClientConfig.clientID,
+                code = authCodeResponse.code!!
+            )
+        println("tokenReq: $tokenReq")
+
+        println("// -------- CREDENTIAL ISSUER ----------")
+
+        // TODO: Validate authorization code
+        // TODO: generate access token
+        val accessToken = ciTestProvider.signToken(
+            target = TokenTarget.ACCESS,
+            payload = buildJsonObject {
+            put(JWTClaims.Payload.subject, "test-issuance-session")
+            put(JWTClaims.Payload.issuer, ciTestProvider.baseUrl)
+            put(JWTClaims.Payload.audience, TokenTarget.ACCESS.name)
+            put(JWTClaims.Payload.jwtID, "token-id")
+        })
+        val cNonce = "pop-nonce"
+        val tokenResponse: TokenResponse = TokenResponse.success(accessToken, "bearer", cNonce = cNonce)
+
+        println("// -------- WALLET ----------")
+        tokenResponse.isSuccess shouldBe true
+        tokenResponse.accessToken shouldNotBe null
+        tokenResponse.cNonce shouldNotBe null
+
+        println("// receive credential")
+        var nonce = tokenResponse.cNonce!!
+        val holderDid = TEST_WALLET_DID_WEB1
+        val holderKey = runBlocking { JWKKey.importJWK(TEST_WALLET_KEY1) }.getOrThrow()
+        val holderKeyId = runBlocking { holderKey.getKeyId() }
+        val proofKeyId = "$holderDid#$holderKeyId"
+        val proofOfPossession = runBlocking {
+            ProofOfPossession.JWTProofBuilder(ciTestProvider.baseUrl, null, nonce, proofKeyId).build(holderKey)
+        }
+
+        val credReq = CredentialRequest.forOfferedCredential(offeredCredential, proofOfPossession)
+        println("credReq: $credReq")
+
+        println("// -------- CREDENTIAL ISSUER ----------")
+        val parsedHolderKeyId = credReq.proof?.jwt?.let { JwtUtils.parseJWTHeader(it) }?.get("kid")?.jsonPrimitive?.content
+        parsedHolderKeyId shouldNotBe null
+        parsedHolderKeyId shouldStartWith "did:"
+        val parsedHolderDid = parsedHolderKeyId!!.substringBefore("#")
+        val resolvedKeyForHolderDid = runBlocking { DidService.resolveToKey(parsedHolderDid) }.getOrThrow()
+
+        val validPoP = runBlocking {
+            credReq.proof?.validateJwtProof(resolvedKeyForHolderDid, ciTestProvider.baseUrl,null, nonce, parsedHolderKeyId)
+        }
+        validPoP shouldBe true
+
+        val generatedCredential = ciTestProvider.generateCredential(credReq).credential
+        generatedCredential shouldNotBe null
+        val credentialResponse: CredentialResponse = CredentialResponse.success(credReq.format, generatedCredential!!)
+
+        println("// -------- WALLET ----------")
+        credentialResponse.isSuccess shouldBe true
+        credentialResponse.isDeferred shouldBe false
+        credentialResponse.format!! shouldBe CredentialFormat.jwt_vc_json
+        credentialResponse.credential.shouldBeInstanceOf<JsonPrimitive>()
+
+        println("// parse and verify credential")
+        val credential = credentialResponse.credential!!.jsonPrimitive.content
+        println(">>> Issued credential: $credential")
+        verifyIssuerAndSubjectId(
+            SDJwt.parse(credential).fullPayload.get("vc")?.jsonObject!!,
+            ciTestProvider.CI_ISSUER_DID, credentialWallet.TEST_DID
+        )
+        runBlocking{ JwtSignaturePolicy().verify(credential, null, mapOf()) }.isSuccess shouldBe true
+    }
+
+    @Test
     suspend fun testCredentialOfferFullAuth() {
         println("// -------- CREDENTIAL ISSUER ----------")
         println("// as CI provider, initialize credential offer for user")
@@ -503,7 +628,7 @@ class CI_JVM_Test : AnnotationSpec() {
         providerMetadata.credentialsSupported shouldNotBe null
 
         println("// resolve offered credentials")
-        val offeredCredentials = parsedOfferReq.credentialOffer!!.resolveOfferedCredentials(providerMetadata)
+        val offeredCredentials = OpenID4VCI.resolveOfferedCredentials(parsedOfferReq.credentialOffer!!, providerMetadata)
         println("offeredCredentials: $offeredCredentials")
 
         offeredCredentials.size shouldBe 1
@@ -515,7 +640,7 @@ class CI_JVM_Test : AnnotationSpec() {
         println("// go through full authorization code flow to receive offered credential")
         println("// auth request (short-cut, without pushed authorization request)")
         val authReq = AuthorizationRequest(
-            ResponseType.code.name, testCIClientConfig.clientID,
+            setOf(ResponseType.Code), testCIClientConfig.clientID,
             redirectUri = credentialWallet.config.redirectUri,
             issuerState = parsedOfferReq.credentialOffer!!.grants[GrantType.authorization_code.value]!!.issuerState
         )
@@ -530,14 +655,14 @@ class CI_JVM_Test : AnnotationSpec() {
 
         authResp.status shouldBe HttpStatusCode.Found
         val location = Url(authResp.headers[HttpHeaders.Location]!!)
-        location.parameters.names() shouldContain ResponseType.code.name
+        location.parameters.names() shouldContain ResponseType.Code.name.lowercase()
 
         println("// token req")
         val tokenReq =
             TokenRequest(
                 GrantType.authorization_code,
                 testCIClientConfig.clientID,
-                code = location.parameters[ResponseType.code.name]!!
+                code = location.parameters[ResponseType.Code.name]!!
             )
         println("tokenReq: $tokenReq")
 
@@ -589,13 +714,13 @@ class CI_JVM_Test : AnnotationSpec() {
         println("// as CI provider, initialize credential offer for user, this time providing full offered credential object, and allowing pre-authorized code flow with user pin")
         val issuanceSession = ciTestProvider.initializeCredentialOffer(
             CredentialOffer.Builder(ciTestProvider.baseUrl)
-                .addOfferedCredential(OfferedCredential.fromProviderMetadata(ciTestProvider.metadata.credentialsSupported!!.first())),
-            5.minutes, allowPreAuthorized = true, preAuthUserPin = "1234"
+                .addOfferedCredential(ciTestProvider.metadata.credentialsSupported!!.first().id!!),
+            5.minutes, allowPreAuthorized = true, txCode = TxCode(TxInputMode.numeric), txCodeValue = "1234"
         )
         println("issuanceSession: $issuanceSession")
 
         issuanceSession.credentialOffer shouldNotBe null
-        issuanceSession.credentialOffer!!.credentials.first() shouldBe instanceOf<JsonObject>()
+        issuanceSession.credentialOffer!!.credentialConfigurationIds.first() shouldBe ciTestProvider.metadata.credentialsSupported!!.first().id!!
 
         val offerRequest = CredentialOfferRequest(issuanceSession.credentialOffer!!)
         println("offerRequest: $offerRequest")
@@ -614,7 +739,7 @@ class CI_JVM_Test : AnnotationSpec() {
         parsedOfferReq.credentialOffer!!.credentialIssuer shouldNotBe null
         parsedOfferReq.credentialOffer!!.grants.keys shouldContain GrantType.pre_authorized_code.value
         parsedOfferReq.credentialOffer!!.grants[GrantType.pre_authorized_code.value]?.preAuthorizedCode shouldNotBe null
-        parsedOfferReq.credentialOffer!!.grants[GrantType.pre_authorized_code.value]?.userPinRequired shouldBe true
+        parsedOfferReq.credentialOffer!!.grants[GrantType.pre_authorized_code.value]?.txCode shouldNotBe null
 
         println("// get issuer metadata")
         val providerMetadataUri =
@@ -625,7 +750,7 @@ class CI_JVM_Test : AnnotationSpec() {
         providerMetadata.credentialsSupported shouldNotBe null
 
         println("// resolve offered credentials")
-        val offeredCredentials = parsedOfferReq.credentialOffer!!.resolveOfferedCredentials(providerMetadata)
+        val offeredCredentials = OpenID4VCI.resolveOfferedCredentials(parsedOfferReq.credentialOffer!!, providerMetadata)
         println("offeredCredentials: $offeredCredentials")
         offeredCredentials.size shouldBe 1
         offeredCredentials.first().format shouldBe CredentialFormat.jwt_vc_json
@@ -640,7 +765,7 @@ class CI_JVM_Test : AnnotationSpec() {
             //clientId = testCIClientConfig.clientID,
             redirectUri = credentialWallet.config.redirectUri,
             preAuthorizedCode = parsedOfferReq.credentialOffer!!.grants[GrantType.pre_authorized_code.value]!!.preAuthorizedCode,
-            userPin = null
+            txCode = null
         )
         println("tokenReq: $tokenReq")
 
@@ -658,7 +783,7 @@ class CI_JVM_Test : AnnotationSpec() {
             clientId = testCIClientConfig.clientID,
             redirectUri = credentialWallet.config.redirectUri,
             preAuthorizedCode = parsedOfferReq.credentialOffer!!.grants[GrantType.pre_authorized_code.value]!!.preAuthorizedCode,
-            userPin = issuanceSession.preAuthUserPin
+            txCode = issuanceSession.txCodeValue
         )
         println("tokenReq: $tokenReq")
 
@@ -713,7 +838,7 @@ class CI_JVM_Test : AnnotationSpec() {
 
         println("// 1. send pushed authorization request with authorization details, containing info of credentials to be issued, receive session id")
         val implicitAuthReq = AuthorizationRequest(
-            responseType = ResponseType.getResponseTypeString(ResponseType.token),
+            responseType = setOf(ResponseType.Token),
             responseMode = ResponseMode.fragment,
             clientId = testCIClientConfig.clientID,
             redirectUri = credentialWallet.config.redirectUri,
@@ -741,7 +866,7 @@ class CI_JVM_Test : AnnotationSpec() {
         println("authResp: $authResp")
 
         authResp.status shouldBe HttpStatusCode.Found
-        authResp.headers.names() shouldContain HttpHeaders.Location.lowercase()
+        authResp.headers.names() shouldContain HttpHeaders.Location
 
         val location = Url(authResp.headers[HttpHeaders.Location]!!)
         println("location: $location")
@@ -802,7 +927,7 @@ class CI_JVM_Test : AnnotationSpec() {
         println("providerMetadata: $providerMetadata")
         providerMetadata.authorizationEndpoint shouldNotBe null
         println("// resolve offered credentials")
-        val offeredCredentials = credOfferReq.credentialOffer!!.resolveOfferedCredentials(providerMetadata)
+        val offeredCredentials = OpenID4VCI.resolveOfferedCredentials(credOfferReq.credentialOffer!!, providerMetadata)
         println("offeredCredentials: $offeredCredentials")
 
         providerMetadata.grantTypesSupported shouldContain GrantType.pre_authorized_code
@@ -814,7 +939,7 @@ class CI_JVM_Test : AnnotationSpec() {
             //clientId = testCIClientConfig.clientID,
             redirectUri = credentialWallet.config.redirectUri,
             preAuthorizedCode = credOfferReq.credentialOffer!!.grants[GrantType.pre_authorized_code.value]!!.preAuthorizedCode,
-            userPin = null
+            txCode = null
         )
         println("tokenReq: $tokenReq")
         val tokenResp = ktorClient.submitForm(
@@ -857,7 +982,7 @@ class CI_JVM_Test : AnnotationSpec() {
         println("providerMetadata: $providerMetadata")
         providerMetadata.authorizationEndpoint shouldNotBe null
         println("// resolve offered credentials")
-        val offeredCredentials = credOfferReq.credentialOffer!!.resolveOfferedCredentials(providerMetadata)
+        val offeredCredentials = OpenID4VCI.resolveOfferedCredentials(credOfferReq.credentialOffer!!, providerMetadata)
         println("offeredCredentials: $offeredCredentials")
 
         providerMetadata.grantTypesSupported shouldContain GrantType.pre_authorized_code
@@ -869,7 +994,7 @@ class CI_JVM_Test : AnnotationSpec() {
             clientId = testCIClientConfig.clientID,
             redirectUri = credentialWallet.config.redirectUri,
             preAuthorizedCode = credOfferReq.credentialOffer!!.grants[GrantType.pre_authorized_code.value]!!.preAuthorizedCode,
-            userPin = null
+            txCode = null
         )
         println("tokenReq: ${tokenReq.toHttpQueryString()}")
         val tokenResp = ktorClient.submitForm(
@@ -914,7 +1039,7 @@ class CI_JVM_Test : AnnotationSpec() {
         providerMetadata.tokenEndpoint shouldNotBe null
         providerMetadata.credentialEndpoint shouldNotBe null
         println("// resolve offered credentials")
-        val offeredCredentials = credOfferReq.credentialOffer!!.resolveOfferedCredentials(providerMetadata)
+        val offeredCredentials = OpenID4VCI.resolveOfferedCredentials(credOfferReq.credentialOffer!!, providerMetadata)
         println("offeredCredentials: $offeredCredentials")
 
         // make token request
@@ -923,7 +1048,7 @@ class CI_JVM_Test : AnnotationSpec() {
             clientId = testCIClientConfig.clientID,
             redirectUri = credentialWallet.config.redirectUri,
             preAuthorizedCode = credOfferReq.credentialOffer!!.grants[GrantType.pre_authorized_code.value]!!.preAuthorizedCode,
-            userPin = null
+            txCode = null
         )
         println("tokenReq: ${tokenReq.toHttpQueryString()}")
         val tokenResp = ktorClient.submitForm(
@@ -962,13 +1087,13 @@ class CI_JVM_Test : AnnotationSpec() {
         println("// as CI provider, initialize credential offer for user, this time providing full offered credential object, and allowing pre-authorized code flow with user pin")
         val issuanceSession = ciTestProvider.initializeCredentialOffer(
             CredentialOffer.Builder(ciTestProvider.baseUrl)
-                .addOfferedCredential(OfferedCredential.fromProviderMetadata(ciTestProvider.metadata.credentialsSupported!!.first())),
-            5.minutes, allowPreAuthorized = true, preAuthUserPin = "1234"
+                .addOfferedCredential(ciTestProvider.metadata.credentialsSupported!!.first().id!!),
+            5.minutes, allowPreAuthorized = true, TxCode(TxInputMode.numeric), txCodeValue = "1234"
         )
         println("issuanceSession: $issuanceSession")
 
         issuanceSession.credentialOffer shouldNotBe null
-        issuanceSession.credentialOffer!!.credentials.first() shouldBe instanceOf<JsonObject>()
+        issuanceSession.credentialOffer!!.credentialConfigurationIds.first() shouldBe ciTestProvider.metadata.credentialsSupported!!.first().id!!
 
         val offerRequest = ciTestProvider.getCredentialOfferRequest(issuanceSession, byReference = true)
         println("offerRequest: $offerRequest")
@@ -989,7 +1114,7 @@ class CI_JVM_Test : AnnotationSpec() {
         credentialOffer.credentialIssuer shouldNotBe null
         credentialOffer.grants.keys shouldContain GrantType.pre_authorized_code.value
         credentialOffer.grants[GrantType.pre_authorized_code.value]?.preAuthorizedCode shouldNotBe null
-        credentialOffer.grants[GrantType.pre_authorized_code.value]?.userPinRequired shouldBe true
+        credentialOffer.grants[GrantType.pre_authorized_code.value]?.txCode shouldNotBe null
 
         println("// get issuer metadata")
         val providerMetadataUri =
@@ -1000,7 +1125,7 @@ class CI_JVM_Test : AnnotationSpec() {
         providerMetadata.credentialsSupported shouldNotBe null
 
         println("// resolve offered credentials")
-        val offeredCredentials = credentialOffer.resolveOfferedCredentials(providerMetadata)
+        val offeredCredentials = OpenID4VCI.resolveOfferedCredentials(credentialOffer, providerMetadata)
         println("offeredCredentials: $offeredCredentials")
         offeredCredentials.size shouldBe 1
         offeredCredentials.first().format shouldBe CredentialFormat.jwt_vc_json
@@ -1015,7 +1140,7 @@ class CI_JVM_Test : AnnotationSpec() {
             //clientId = testCIClientConfig.clientID,
             redirectUri = credentialWallet.config.redirectUri,
             preAuthorizedCode = credentialOffer.grants[GrantType.pre_authorized_code.value]!!.preAuthorizedCode,
-            userPin = null
+            txCode = null
         )
         println("tokenReq: $tokenReq")
 
@@ -1033,7 +1158,7 @@ class CI_JVM_Test : AnnotationSpec() {
             clientId = testCIClientConfig.clientID,
             redirectUri = credentialWallet.config.redirectUri,
             preAuthorizedCode = credentialOffer.grants[GrantType.pre_authorized_code.value]!!.preAuthorizedCode,
-            userPin = issuanceSession.preAuthUserPin
+            txCode = issuanceSession.txCodeValue
         )
         println("tokenReq: $tokenReq")
 
@@ -1079,7 +1204,7 @@ class CI_JVM_Test : AnnotationSpec() {
     }
 
 
-    val http = HttpClient(Java) {
+    val http = HttpClient() {
         install(ContentNegotiation) {
             json()
         }
@@ -1177,8 +1302,8 @@ class CI_JVM_Test : AnnotationSpec() {
 
         val createIssuanceReq = "{\n" +
                 "    \"callback\": {\n" +
-                //"        \"url\": \"https://httpstat.us/200\",\n" +
-                "        \"url\": \"https://0fc7-2001-871-25f-66b3-9ea8-fc44-915d-107e.ngrok-free.app/callback\",\n" +
+                "        \"url\": \"https://httpstat.us/200\",\n" +
+                //"        \"url\": \"https://0fc7-2001-871-25f-66b3-9ea8-fc44-915d-107e.ngrok-free.app/callback\",\n" +
                 "        \"state\": \"1234\",\n" +
                 "        \"headers\": {\n" +
                 "            \"api-key\": \"1234\"\n" +
@@ -1224,7 +1349,7 @@ class CI_JVM_Test : AnnotationSpec() {
         //val url = "openid-vc://?request_uri=https://verifiedid.did.msidentity.com/v1.0/tenants/37a99dab-212b-44d9-9b49-7756cb4dd915/verifiableCredentials/issuanceRequests/67e271be-be8b-42f8-9cb9-1b57ee010e41"
         println(">>>> URL from response: $url")
 
-        //return
+        return
         //val url = "openid-vc://?request_uri=https://verifiedid.did.msidentity.com/v1.0/tenants/3c32ed40-8a10-465b-8ba4-0b1e86882668/verifiableCredentials/issuanceRequests/a7e5db5b-2fba-4d02-bc0d-21ee82191386"
 
 

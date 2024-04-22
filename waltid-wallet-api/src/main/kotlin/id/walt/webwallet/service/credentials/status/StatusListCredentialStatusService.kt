@@ -5,7 +5,8 @@ import id.walt.webwallet.service.credentials.CredentialValidator
 import id.walt.webwallet.service.credentials.status.fetch.StatusListCredentialFetchFactory
 import id.walt.webwallet.usecase.credential.CredentialStatusResult
 import id.walt.webwallet.utils.JsonUtils
-import id.walt.webwallet.utils.hexToInt
+import id.walt.webwallet.utils.StringUtils.binToInt
+import id.walt.webwallet.utils.StringUtils.hexToInt
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
@@ -19,11 +20,13 @@ class StatusListCredentialStatusService(
     private val bitStringValueParser: BitStringValueParser,
 ) : CredentialStatusService {
     private val json = Json { ignoreUnknownKeys = true }
+    private val unsetStatusMessage = "unset"
+    private val setStatusMessage = "set"
     override suspend fun get(statusEntry: CredentialStatusEntry): CredentialStatusResult =
         (statusEntry as? StatusListEntry)?.let { entry ->
             val credential = credentialFetchFactory.new(entry.statusListCredential).fetch(entry.statusListCredential)
             val subject =
-                extractCredentialSubject(credential) ?: error("Failed to prase status list credential subject")
+                extractCredentialSubject(credential) ?: error("STATUS_RETRIEVAL_ERROR (-128)")
             credentialValidator.validate(entry.statusPurpose, subject.statusPurpose, subject.type, credential)
                 .takeIf { it }?.let {
                     getStatusBit(subject.encodedList, entry.statusListIndex, subject.statusSize)?.let {
@@ -34,7 +37,7 @@ class StatusListCredentialStatusService(
                             message = getStatusMessage(bit, subject.statusMessage)
                         )
                     } ?: error("Failed to retrieve bit value")
-                } ?: error("Failed to validate status list credential")
+                } ?: error("STATUS_VERIFICATION_ERROR (-129)")
         } ?: error("Error parsing status list entry")
 
     private fun extractCredentialSubject(credential: JsonObject): StatusListCredentialSubject? =
@@ -45,11 +48,13 @@ class StatusListCredentialStatusService(
     private fun getStatusBit(bitstring: String, idx: ULong, bitSize: Int) =
         bitStringValueParser.get(bitstring, idx, bitSize)
 
-    private fun getStatusResult(bit: String) = hexToInt(bit) != 0
+    private fun getStatusResult(bit: String) = binToInt(bit) != 0
 
-    private fun getStatusMessage(bit: String, statusMessages: List<StatusMessage>?) = statusMessages?.firstOrNull {
-        hexToInt(it.status) == hexToInt(bit)
-    }?.message
+    private fun getStatusMessage(bit: String, statusMessages: List<StatusMessage>?) = binToInt(bit).let { value ->
+        statusMessages?.firstOrNull {
+            hexToInt(it.status) == value
+        }?.message ?: let { value.takeIf { it == 0 }?.let { unsetStatusMessage } }
+    } ?: setStatusMessage
 
     @Serializable
     private data class StatusListCredentialSubject(
