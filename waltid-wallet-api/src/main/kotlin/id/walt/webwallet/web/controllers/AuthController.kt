@@ -68,6 +68,9 @@ object AuthKeys {
     val signKey: ByteArray = config.signKey.encodeToByteArray()
 
     val tokenKey: ByteArray = config.tokenKey.encodeToByteArray()
+    val issTokenClaim: String = config.issTokenClaim
+    val audTokenClaim: String = config.audTokenClaim
+
 }
 
 fun Application.configureSecurity() {
@@ -474,14 +477,14 @@ suspend fun verifyToken(token: String): Result<String> {
 suspend fun PipelineContext<Unit, ApplicationCall>.doLogin() {
     val reqBody = loginRequestJson.decodeFromString<AccountRequest>(call.receive())
     AccountsService.authenticate("", reqBody)
-        .onSuccess { // FIXME -> TENANT HERE
+        .onSuccess {
 
-            val tokenPayload = "{\"sub\":\"${it.id}\"}"
+            val iss = AuthKeys.issTokenClaim
+            val aud = AuthKeys.audTokenClaim
+            val tokenPayload = "{\"sub\":\"${it.id}\",\"iss\":\"$iss\",\"aud\":\"$aud\"}"
 
             val key = JWKKey.importJWK(AuthKeys.tokenKey.decodeToString()).getOrNull()
             if (key == null) {
-            // if (AuthKeys.tokenSignAlg == "HS256") {
-                // security token mapping was here
                 val token = JWSObject(JWSHeader(JWSAlgorithm.HS256), Payload(tokenPayload)).apply {
                     sign(MACSigner(AuthKeys.tokenKey))
                 }.serialize()
@@ -492,7 +495,6 @@ suspend fun PipelineContext<Unit, ApplicationCall>.doLogin() {
                     Json.encodeToJsonElement(it).jsonObject.minus("type").plus(Pair("token", token.toJsonElement()))
                 )
             } else {
-            // if (AuthKeys.tokenSignAlg=="RS256"){
                 val rsaPrivKey = JWKKey.importJWK(AuthKeys.tokenKey.decodeToString()).getOrThrow()
                 val tokenHeaders = mapOf(JWTClaims.Header.keyID to rsaPrivKey.getPublicKey().getKeyId(), JWTClaims.Header.type to "JWT" )
                 val token = rsaPrivKey.signJws(tokenPayload.toByteArray(), tokenHeaders)
@@ -506,7 +508,6 @@ suspend fun PipelineContext<Unit, ApplicationCall>.doLogin() {
         }
         .onFailure { call.respond(HttpStatusCode.BadRequest, it.localizedMessage) }
 }
-
 private fun PipelineContext<Unit, ApplicationCall>.clearUserSession() {
     call.sessions.get<LoginTokenSession>()?.let {
         logger.debug { "Clearing login token session" }
