@@ -36,12 +36,14 @@ abstract class OpenIDCredentialVerifier(val config: CredentialVerifierConfig) :
         scope: Set<String> = setOf(),
         expiresIn: Duration = 60.seconds,
         sessionId: String? = null, // A calling party may provide a unique session Id
+        stateParamAuthorizeReqEbsi: String? = null
     ): PresentationSession {
         val session = PresentationSession(
             id = sessionId ?: ShortIdUtils.randomSessionId(),
             authorizationRequest = null,
             expirationTimestamp = Clock.System.now().plus(expiresIn),
-            presentationDefinition = presentationDefinition
+            presentationDefinition = presentationDefinition,
+            stateParamAuthorizeReqEbsi = stateParamAuthorizeReqEbsi
         ).also {
             putSession(it.id, it)
         }
