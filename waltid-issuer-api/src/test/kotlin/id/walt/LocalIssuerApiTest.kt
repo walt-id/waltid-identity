@@ -1,8 +1,7 @@
 package id.walt
 
 import id.walt.credentials.vc.vcs.W3CVC
-import id.walt.issuer.JwtIssuanceRequest
-import id.walt.issuer.SdJwtIssuanceRequest
+import id.walt.issuer.*
 import id.walt.issuer.base.config.ConfigManager
 import id.walt.issuer.createCredentialOfferUri
 import id.walt.sdjwt.SDMapBuilder
@@ -92,7 +91,7 @@ class IssuerApiTest {
         val w3cVc = W3CVC(jsonVCObj.toMap())
         val jsonMappingObj = Json.decodeFromString<JsonObject>(TEST_MAPPING)
 
-        val issueRequest = JwtIssuanceRequest(jsonKeyObj, TEST_ISSUER_DID, w3cVc, jsonMappingObj)
+        val issueRequest = IssuanceRequest(jsonKeyObj, TEST_ISSUER_DID, "OpenBadgeCredential", w3cVc, jsonMappingObj)
 
         ConfigManager.loadConfigs(emptyArray())
         val offerUri = createCredentialOfferUri(listOf(issueRequest))
@@ -109,8 +108,7 @@ class IssuerApiTest {
         val jsonMappingObj = Json.decodeFromString<JsonObject>(TEST_MAPPING)
 
         val selectiveDisclosureMap = SDMapBuilder().addField("sd", true).build()
-        val issueRequest =
-            SdJwtIssuanceRequest(jsonKeyObj, TEST_ISSUER_DID, w3cVc, jsonMappingObj, selectiveDisclosureMap)
+        val issueRequest = IssuanceRequest(jsonKeyObj, TEST_ISSUER_DID, "OpenBadgeCredential", w3cVc, jsonMappingObj, selectiveDisclosureMap)
 
         ConfigManager.loadConfigs(emptyArray())
         val offerUri = createCredentialOfferUri(listOf(issueRequest))

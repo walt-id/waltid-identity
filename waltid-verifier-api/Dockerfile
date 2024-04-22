@@ -8,6 +8,7 @@ COPY waltid-did/build.gradle.kts /work/waltid-did/
 COPY waltid-openid4vc/build.gradle.kts /work/waltid-openid4vc/
 COPY waltid-verifier-api/build.gradle.kts /work/waltid-verifier-api/
 COPY waltid-sdjwt/build.gradle.kts /work/waltid-sdjwt/
+COPY waltid-mdoc-credentials/build.gradle.kts /work/waltid-mdoc-credentials/
 
 WORKDIR /work/waltid-verifier-api/
 RUN gradle build || return 0
@@ -18,6 +19,7 @@ COPY waltid-did/. /work/waltid-did
 COPY waltid-openid4vc/. /work/waltid-openid4vc
 COPY waltid-verifier-api/. /work/waltid-verifier-api
 COPY waltid-sdjwt/. /work/waltid-sdjwt
+COPY waltid-mdoc-credentials/. /work/waltid-mdoc-credentials
 
 RUN gradle clean installDist
 

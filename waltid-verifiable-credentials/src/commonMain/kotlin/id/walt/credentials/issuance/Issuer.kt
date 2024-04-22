@@ -57,6 +57,7 @@ object Issuer {
     suspend fun W3CVC.mergingJwtIssue(
         issuerKey: Key,
         issuerDid: String,
+        issuerKid: String? = null,
         subjectDid: String,
 
         mappings: JsonObject,
@@ -74,6 +75,7 @@ object Issuer {
         w3cVc.signJws(
             issuerKey = issuerKey,
             issuerDid = issuerDid,
+            issuerKid = issuerKid,
             subjectDid = subjectDid,
             additionalJwtHeader = additionalJwtHeader.toMutableMap().apply {
                 put("typ", "JWT")
