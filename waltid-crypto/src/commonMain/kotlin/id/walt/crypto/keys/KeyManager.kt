@@ -2,6 +2,7 @@ package id.walt.crypto.keys
 
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.keys.oci.OCIKey
+import id.walt.crypto.keys.oci.OCIKeyRestApi
 import id.walt.crypto.keys.tse.TSEKey
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.json.*
@@ -24,9 +25,15 @@ object KeyManager {
                 Json.decodeFromJsonElement(generateRequest.config!!)
             )
         }
-        register<OCIKey>("oci") { generateRequest: KeyGenerationRequest ->
-            OCIKey.generateKey(
+        register<OCIKeyRestApi>("oci-rest-api") { generateRequest: KeyGenerationRequest ->
+            OCIKeyRestApi.generateKey(
                 generateRequest.keyType,
+                Json.decodeFromJsonElement(generateRequest.config!!)
+            )
+        }
+
+        register <OCIKey>("oci") { generateRequest: KeyGenerationRequest ->
+            OCIKey.generateKey(
                 Json.decodeFromJsonElement(generateRequest.config!!)
             )
         }

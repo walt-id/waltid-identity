@@ -12,17 +12,17 @@ import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.OciKeyMeta
 import id.walt.crypto.keys.jwk.JWKKey
-import id.walt.crypto.keys.oci.oci.Companion.getVault
 import id.walt.crypto.utils.Base64Utils.base64UrlDecode
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto.utils.JwsUtils.jwsAlg
-import kotlinx.serialization.Transient
-import kotlinx.serialization.encodeToString
+import kotlinx.serialization.*
 import kotlinx.serialization.json.*
 import java.lang.Thread.sleep
+import kotlin.js.ExperimentalJsExport
 
-
-class oci(
+@Serializable
+@SerialName("oci")
+class OCIKey(
     val id: String,
     val config: OCIsdkMetadata,
     /** public key as JWK */
@@ -51,21 +51,22 @@ class oci(
     val configurationFilePath: String = "~/.oci/config"
     val profile: String = "DEFAULT"
 
-    private val configFile: ConfigFileReader.ConfigFile = ConfigFileReader.parseDefault()
-
-    private val provider: AuthenticationDetailsProvider =
-        ConfigFileAuthenticationDetailsProvider(configFile)
+    @Transient
+    private val configFile = ConfigFileReader.parseDefault()
+    @Transient
+    private val provider = ConfigFileAuthenticationDetailsProvider(configFile)
 
 
     // Create KMS clients
+    @Transient
     private var kmsVaultClient: KmsVaultClient = KmsVaultClient.builder().build(provider)
-
+    @Transient
     private var vault: Vault = getVault(kmsVaultClient, config.vaultId)
-
+    @Transient
     private var kmsManagementClient: KmsManagementClient =
         KmsManagementClient.builder().endpoint(vault.managementEndpoint).build(provider)
 
-
+    @Transient
     private var kmsCryptoClient: KmsCryptoClient =
         KmsCryptoClient.builder().endpoint(vault.cryptoEndpoint).build(provider)
 
@@ -198,7 +199,7 @@ class oci(
             else -> throw IllegalArgumentException("Not supported: $type")
         }
 
-        suspend fun generateKey(config: OCIsdkMetadata): oci {
+        suspend fun generateKey(config: OCIsdkMetadata): OCIKey {
             val configurationFilePath: String = "~/.oci/config"
             val profile: String = "DEFAULT"
 
@@ -236,7 +237,7 @@ class oci(
             val publicKey = getOCIPublicKey(kmsManagementClient, keyVersionId, keyId)
 
             println("Public Key: ${publicKey.exportJWK()}")
-            return oci(
+            return OCIKey(
                 keyId,
                 config,
                 publicKey.exportJWK(),
@@ -286,7 +287,7 @@ suspend fun main() {
 
     val config = OCIsdkMetadata(vaultId, compartmentId)
     // val Testkey = oci.generateKey( config)
-    val Testkey = oci(
+    val Testkey = OCIKey(
         "ocid1.key.oc1.eu-frankfurt-1.entbf645aabf2.abtheljrk2redsqsmbln4e6z543bmv4emabdmtveh3owzglt6ovo6dpnd6fa",
         config,
         _keyType = KeyType.secp256r1
