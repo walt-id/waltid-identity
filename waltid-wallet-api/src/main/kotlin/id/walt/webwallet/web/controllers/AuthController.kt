@@ -68,6 +68,9 @@ object AuthKeys {
     val signKey: ByteArray = config.signKey.encodeToByteArray()
 
     val tokenKey: ByteArray = config.tokenKey.encodeToByteArray()
+    val issTokenClaim: String = config.issTokenClaim
+    val audTokenClaim: String = config.audTokenClaim
+
 }
 
 fun Application.configureSecurity() {
@@ -476,8 +479,9 @@ suspend fun PipelineContext<Unit, ApplicationCall>.doLogin() {
     AccountsService.authenticate("", reqBody)
         .onSuccess {
 
-            val tokenPayload = "{\"sub\":\"${it.id}\",\"iss\":\"https://walt.id/\",\"aud\":\"https://wallet.walt-test.cloud/\"}"
-
+            val iss = AuthKeys.issTokenClaim
+            val aud = AuthKeys.audTokenClaim
+            val tokenPayload = "{\"sub\":\"${it.id}\",\"iss\":\"$iss\",\"aud\":\"$aud\"}"
 
             val key = JWKKey.importJWK(AuthKeys.tokenKey.decodeToString()).getOrNull()
             if (key == null) {
