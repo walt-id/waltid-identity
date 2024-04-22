@@ -114,10 +114,17 @@ const options = ref([
     "config": ["server", "accessKey"]
   },
   {
-    "keyGenerationRequest": ["OCI", "oci"],
+    "keyGenerationRequest": ["OCI REST API", "oci-rest-api"],
     "keyType": [["ECDSA_Secp256r1", "secp256r1"], ["RSA", "RSA"]],
     "config": ["tenancyOcid", "userOcid", "fingerprint", "cryptoEndpoint", "managementEndpoint", "signingKeyPem"]
   }
+,
+  {
+    "keyGenerationRequest": ["OCI", "oci"],
+    "keyType": [["ECDSA_Secp256r1", "secp256r1"]],
+    "config": ["vaultId", "compartmentId"]
+  }
+
 ])
 
 

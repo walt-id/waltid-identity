@@ -47,8 +47,8 @@ private val log = KotlinLogging.logger { }
 @JsExport
 @Suppress("TRANSIENT_IS_REDUNDANT")
 @Serializable
-@SerialName("oci")
-class OCIKey(
+@SerialName("oci-rest-api")
+class OCIKeyRestApi(
     val config: OCIKeyMetadata,
     val id: String,
 
@@ -289,7 +289,7 @@ class OCIKey(
         @JvmAsync
         @JsPromise
         @JsExport.Ignore
-        suspend fun generateKey(type: KeyType, config: OCIKeyMetadata): OCIKey {
+        suspend fun generateKey(type: KeyType, config: OCIKeyMetadata): OCIKeyRestApi {
             return retry {
                 val keyType = keyTypeToOciKeyMapping(type)
                 val vaultKeyId = "${config.tenancyOcid}/${config.userOcid}/${config.fingerprint}"
@@ -333,7 +333,7 @@ class OCIKey(
                 val OCIDkeyId = keyData["id"]?.jsonPrimitive?.content ?: ""
 
                 val publicKey = getOCIPublicKey(OCIDkeyId, vaultKeyId, host, keyVersion, config.signingKeyPem)
-                OCIKey(config, OCIDkeyId, publicKey.exportJWK(), ociKeyToKeyTypeMapping(keyType))
+                OCIKeyRestApi(config, OCIDkeyId, publicKey.exportJWK(), ociKeyToKeyTypeMapping(keyType))
             }
         }
 
