@@ -26,6 +26,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
+import kotlinx.uuid.UUID
 
 const val SERVER_URL = "https://810d-2a02-85f-e4ab-48cf-7925-af4f-f290-1cc2.ngrok-free.app"
 private val SERVER_SIGNING_KEY by lazy { runBlocking { JWKKey.generate(KeyType.secp256r1) } }
@@ -308,10 +309,13 @@ fun Application.verfierApi() {
                 verificationUseCase.verify(sessionId, context.request.call.receiveParameters().toMap())
                     .onSuccess {
                         val session = verificationUseCase.getSession(sessionId!!)
-                        val state = session.stateParamAuthorizeReqEbsi
-
-                        context.respondRedirect("openid://".plus("?").plus("code=123123131123&state=$state"))
-
+                        if (session.stateParamAuthorizeReqEbsi != null) {
+                            val state = session.stateParamAuthorizeReqEbsi
+                            val code = UUID().toString();
+                            context.respondRedirect("openid://?code=$code&state=$state")
+                        } else {
+                            call.respond(HttpStatusCode.OK, it)
+                        }
                     }.onFailure {
                         call.respond(HttpStatusCode.BadRequest, it.localizedMessage)
                     }.also {
