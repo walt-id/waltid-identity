@@ -14,12 +14,13 @@ class PresentationDefinitionFilterParser {
         }
 
     private fun getFilters(inputDescriptor: InputDescriptor) =
-        getFilter(inputDescriptor.constraints)?.plus(getFilter(inputDescriptor.schema) ?: listOf()) ?: emptyList()
+        getFilter(inputDescriptor.constraints) + getFilter(inputDescriptor.schema)
 
     private fun getFilter(inputDescriptor: InputDescriptorConstraints?) =
-        inputDescriptor?.fields?.map { createTypeFilter(it) }
+        inputDescriptor?.fields?.map { createTypeFilter(it) } ?: emptyList()
 
-    private fun getFilter(schemas: List<InputDescriptorSchema>?) = schemas?.map { schema -> createTypeFilter(schema) }
+    private fun getFilter(schemas: List<InputDescriptorSchema>?) =
+        schemas?.map { schema -> createTypeFilter(schema) } ?: emptyList()
 
     private fun createTypeFilter(inputDescriptorField: InputDescriptorField) = let {
         val paths = inputDescriptorField.path.map { it.removePrefix("$.") }
