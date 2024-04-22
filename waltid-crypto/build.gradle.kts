@@ -5,7 +5,6 @@ import love.forte.plugin.suspendtrans.gradle.SuspendTransformGradleExtension
 
 plugins {
     kotlin("multiplatform")
-    id("com.android.library")
     kotlin("plugin.serialization")
     id("maven-publish")
     id("com.github.ben-manes.versions")
@@ -31,10 +30,6 @@ suspendTransform {
     useJsDefault()
 }
 
-tasks.withType<org.gradle.language.jvm.tasks.ProcessResources> {
-    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-}
-
 java {
     sourceCompatibility = JavaVersion.VERSION_15
     targetCompatibility = JavaVersion.VERSION_15
@@ -45,18 +40,11 @@ kotlin {
 }
 
 kotlin {
-    androidTarget {
-        compilations.all {
-            kotlinOptions {
-                jvmTarget = "1.8"
-            }
-        }
-    }
-
     jvm {
         compilations.all {
             kotlinOptions.jvmTarget = "15" // JVM got Ed25519 at version 15
         }
+        withJava()
         tasks.withType<Test>().configureEach {
             useJUnitPlatform()
         }
@@ -80,25 +68,6 @@ kotlin {
     }
 
     sourceSets {
-        val androidMain by getting {
-            dependencies { /* Add dependencies here */ }
-        }
-        val androidInstrumentedTest by getting {
-            dependencies {
-                implementation(kotlin("test"))
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
-                implementation("androidx.test.ext:junit:1.1.5")
-                implementation("androidx.test:runner:1.5.2")
-                implementation("androidx.test:rules:1.5.0")
-            }
-        }
-        val androidUnitTest by getting {
-            dependencies {
-                implementation(kotlin("test"))
-                implementation("org.junit.jupiter:junit-jupiter-api:5.10.1")
-                implementation("org.junit.jupiter:junit-jupiter-params:5.10.1")
-            }
-        }
         val commonMain by getting {
             dependencies {
                 // JSON
@@ -219,20 +188,4 @@ extensions.getByType<SuspendTransformGradleExtension>().apply {
             )
         )
     )
-}
-
-android {
-    namespace = "id.walt.crypto"
-    compileSdk = 34
-    sourceSets["main"].manifest.srcFile("src/androidMain/AndroidManifest.xml")
-
-    defaultConfig {
-        minSdk = 28
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-    }
-
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
-    }
 }
