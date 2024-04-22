@@ -62,7 +62,7 @@ class oci(
 
     private var vault: Vault = getVault(kmsVaultClient, config.vaultId)
 
-    var kmsManagementClient: KmsManagementClient =
+    private var kmsManagementClient: KmsManagementClient =
         KmsManagementClient.builder().endpoint(vault.managementEndpoint).build(provider)
 
 
@@ -198,7 +198,24 @@ class oci(
             else -> throw IllegalArgumentException("Not supported: $type")
         }
 
-        suspend fun generateKey(kmsManagementClient: KmsManagementClient, config: OCIsdkMetadata): oci {
+        suspend fun generateKey(config: OCIsdkMetadata): oci {
+            val configurationFilePath: String = "~/.oci/config"
+            val profile: String = "DEFAULT"
+
+             val configFile: ConfigFileReader.ConfigFile = ConfigFileReader.parseDefault()
+
+             val provider: AuthenticationDetailsProvider =
+                ConfigFileAuthenticationDetailsProvider(configFile)
+
+
+            // Create KMS clients
+             val kmsVaultClient: KmsVaultClient = KmsVaultClient.builder().build(provider)
+
+             val vault: Vault = getVault(kmsVaultClient, config.vaultId)
+
+             val kmsManagementClient: KmsManagementClient =
+                KmsManagementClient.builder().endpoint(vault.managementEndpoint).build(provider)
+
             println("CreateKey Test")
             val createKeyDetails =
                 CreateKeyDetails.builder()
@@ -266,26 +283,14 @@ suspend fun main() {
     val vaultId: String =
         "ocid1.vault.oc1.eu-frankfurt-1.entbf645aabf2.abtheljshkb6dsuldqf324kitneb63vkz3dfd74dtqvkd5j2l2cxwyvmefeq"
 
-    val configurationFilePath: String = "~/.oci/config"
-    val profile: String = "DEFAULT"
-
-    val configFile: ConfigFileReader.ConfigFile = ConfigFileReader.parseDefault()
-
-    val provider: AuthenticationDetailsProvider =
-        ConfigFileAuthenticationDetailsProvider(configFile)
-
-
-    // Create KMS clients
-    val kmsVaultClient: KmsVaultClient = KmsVaultClient.builder().build(provider)
-
-    val vault: Vault = getVault(kmsVaultClient, vaultId)
-
-    val kmsManagementClient: KmsManagementClient =
-        KmsManagementClient.builder().endpoint(vault.managementEndpoint).build(provider)
 
     val config = OCIsdkMetadata(vaultId, compartmentId)
-
-    val Testkey = oci.generateKey(kmsManagementClient, config)
+    // val Testkey = oci.generateKey( config)
+    val Testkey = oci(
+        "ocid1.key.oc1.eu-frankfurt-1.entbf645aabf2.abtheljrk2redsqsmbln4e6z543bmv4emabdmtveh3owzglt6ovo6dpnd6fa",
+        config,
+        _keyType = KeyType.secp256r1
+    )
 
     println("Key ID: ${Testkey.id}")
     println("Key Type: ${Testkey.keyType}")
@@ -321,6 +326,5 @@ suspend fun main() {
 
     val verifyJws = Testkey.verifyJws(signJws)
     println("Verify JWS with TestKey: $verifyJws")
-
 
 }
