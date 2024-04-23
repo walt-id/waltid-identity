@@ -1,0 +1,25 @@
+{
+    "input_descriptors":
+    [
+        {
+            "id": "VerifiableCredential#1",
+            "constraints":
+            {
+                "fields":
+                [
+                    {
+                        "path":
+                        [
+                            "$.credentialSubject.property"
+                        ],
+                        "filter":
+                        {
+                            "type": "string",
+                            "pattern": "value"
+                        }
+                    }
+                ]
+            }
+        }
+    ]
+}

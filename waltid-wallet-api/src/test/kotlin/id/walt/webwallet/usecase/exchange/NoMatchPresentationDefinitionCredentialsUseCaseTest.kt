@@ -18,9 +18,13 @@ import kotlin.test.assertEquals
 class NoMatchPresentationDefinitionCredentialsUseCaseTest {
 
     private val credentialService = mockk<CredentialsService>()
-    private val matchStrategy = mockk<PresentationDefinitionMatchStrategy<List<TypeFilter>>>()
-    private val filters =
-        Json.decodeFromString<List<List<TypeFilter>>>(TestUtils.loadResource("presentation-definition/filters.json"))
+    private val matchStrategy = mockk<PresentationDefinitionMatchStrategy<List<FilterData>>>()
+    private val vc1Filter =
+        Json.decodeFromString<List<FilterData>>(TestUtils.loadResource("presentation-definition/filters/filter-vc1.json"))
+    private val vc2Filter =
+        Json.decodeFromString<List<FilterData>>(TestUtils.loadResource("presentation-definition/filters/filter-vc2.json"))
+    private val patternFilter =
+        Json.decodeFromString<List<FilterData>>(TestUtils.loadResource("presentation-definition/filters/filter-pattern.json"))
     private val presentationDefinition =
         PresentationDefinition.fromJSON(JsonObject(mapOf("input_descriptors" to emptyArray<String>().toJsonElement())))
     private val credentials = listOf(
@@ -46,35 +50,42 @@ class NoMatchPresentationDefinitionCredentialsUseCaseTest {
     fun `given single match strategy, when calling use-case, then the result is returned`() {
         val sut = NoMatchPresentationDefinitionCredentialsUseCase(credentialService, matchStrategy)
         every { credentialService.list(wallet, any()) } returns credentials
-        every { matchStrategy.match(credentials, presentationDefinition) } returns filters[0]
+        every { matchStrategy.match(credentials, presentationDefinition) } returns vc1Filter
         val result = sut.find(wallet, presentationDefinition)
         assertEquals(expected = 1, actual = result.size)
-        assertEquals(expected = filters[0], actual = listOf(result[0]))
+        assertEquals(expected = vc1Filter, actual = listOf(result[0]))
     }
 
     @Test
-    fun `given multiple match strategies with same output, when calling use-case, then the result contains no duplicates`() {
-        val additionalMatchStrategy = mockk<PresentationDefinitionMatchStrategy<List<TypeFilter>>>()
-        val sut = NoMatchPresentationDefinitionCredentialsUseCase(credentialService, matchStrategy)
+    fun `given multiple match strategies with same credential output, when calling use-case, then the result contains is grouped by credential`() {
+        val additionalMatchStrategy = mockk<PresentationDefinitionMatchStrategy<List<FilterData>>>()
+        val expectedResult = listOf(
+            FilterData(
+                credential = "VerifiableCredential#1",
+                filters = (vc1Filter.map { it.filters } + patternFilter.map { it.filters }).flatten()
+            )
+        )
+        val sut =
+            NoMatchPresentationDefinitionCredentialsUseCase(credentialService, matchStrategy, additionalMatchStrategy)
         every { credentialService.list(wallet, any()) } returns credentials
-        every { matchStrategy.match(credentials, presentationDefinition) } returns filters[0]
-        every { additionalMatchStrategy.match(credentials, presentationDefinition) } returns filters[0]
+        every { matchStrategy.match(credentials, presentationDefinition) } returns vc1Filter
+        every { additionalMatchStrategy.match(credentials, presentationDefinition) } returns patternFilter
         val result = sut.find(wallet, presentationDefinition)
         assertEquals(expected = 1, actual = result.size)
-        assertEquals(expected = filters[0], actual = listOf(result[0]))
+        assertEquals(expected = expectedResult, actual = result)
     }
 
     @Test
     fun `given multiple match strategies with different output, when calling use-case, then the result contains both`() {
-        val additionalMatchStrategy = mockk<PresentationDefinitionMatchStrategy<List<TypeFilter>>>()
+        val additionalMatchStrategy = mockk<PresentationDefinitionMatchStrategy<List<FilterData>>>()
         val sut =
             NoMatchPresentationDefinitionCredentialsUseCase(credentialService, matchStrategy, additionalMatchStrategy)
         every { credentialService.list(wallet, any()) } returns credentials
-        every { matchStrategy.match(credentials, presentationDefinition) } returns filters[0]
-        every { additionalMatchStrategy.match(credentials, presentationDefinition) } returns filters[1]
+        every { matchStrategy.match(credentials, presentationDefinition) } returns vc1Filter
+        every { additionalMatchStrategy.match(credentials, presentationDefinition) } returns vc2Filter
         val result = sut.find(wallet, presentationDefinition)
         assertEquals(expected = 2, actual = result.size)
-        assertEquals(expected = filters[0], actual = listOf(result[0]))
-        assertEquals(expected = filters[1], actual = listOf(result[1]))
+        assertEquals(expected = vc1Filter, actual = listOf(result[0]))
+        assertEquals(expected = vc2Filter, actual = listOf(result[1]))
     }
 }
