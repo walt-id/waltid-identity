@@ -76,7 +76,7 @@ object AuthKeys {
 
     val tokenKey: ByteArray = config.tokenKey.encodeToByteArray()
     val issTokenClaim: String = config.issTokenClaim
-    val audTokenClaim: String = config.audTokenClaim
+    val audTokenClaim: String? = config.audTokenClaim
     val tokenLifetime: Long = config.tokenLifetime.toLongOrNull() ?: 1
 
 }
@@ -491,7 +491,7 @@ suspend fun PipelineContext<Unit, ApplicationCall>.doLogin() {
                 jti = UUID.generateUUID().toString(),
                 sub = it.id.toString(),
                 iss = AuthKeys.issTokenClaim,
-                aud = AuthKeys.audTokenClaim.takeIf { it.isNotEmpty() }
+                aud = AuthKeys.audTokenClaim.takeIf { !it.isNullOrEmpty() }
                     ?: let { call.request.headers["Origin"] ?: "n/a" },
                 iat = now.epochSecond,
                 nbf = now.epochSecond,
