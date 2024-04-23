@@ -169,6 +169,21 @@ object Verifier {
                 verifiableCredentialJwts.forEach { credentialJwt ->
                     val credentialType = credentialJwt.decodeJws().payload.getW3CType()
                     val vcIdx = addResultEntryFor(credentialType)
+//                    val statusListCredentialStatusService = StatusListCredentialStatusService(
+//                        credentialFetchFactory = statusListCredentialFetchFactory,
+//                        credentialValidator = CredentialValidator(),
+//                        bitStringValueParser = BitStringValueParser(),
+//                    )
+
+//                    val ee = statusListCredentialStatusService.get()
+                    val vc = credentialJwt.decodeJws().payload["vc"]
+                    val credentialStatus: JsonObject? = vc?.jsonObject?.get("credentialStatus")?.jsonObject
+                    if (credentialStatus != null) {
+                        println("credential Status is:")
+                        println(credentialStatus)
+                        // 1. Get the jwt from statusListCredential url
+                        // 2. Get the encodedlist from credentialSubject of jwt
+                    }
 
                     /* Global VC Policies */
                     runPolicyRequests(vcIdx, credentialJwt, globalVcPolicies)

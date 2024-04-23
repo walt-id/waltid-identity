@@ -3,6 +3,8 @@ package id.walt.verifier
 import id.walt.credentials.verification.PolicyManager
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto.utils.JsonUtils.toJsonElement
+import id.walt.crypto.utils.JsonUtils.toJsonObject
 import id.walt.oid4vc.data.ResponseMode
 import id.walt.oid4vc.data.dif.*
 import id.walt.oid4vc.definitions.JWTClaims
@@ -219,31 +221,43 @@ fun Application.verfierApi() {
                 context.respond(authorizeBaseUrl.plus("?").plus(session.authorizationRequest!!.toHttpQueryString()))
             }
             get("verify") {
+                val params = call.parameters.toMap().toJsonObject()
 
-                val params = call.parameters.toMap()
-                println(params["scope"])
-                println(params["state"])
+                println("paramass")
+                println("paramass")
+                println(params)
+                println("paramass")
+                println("paramass")
 
-//                if (params["scope"]=="ver_test")  //EBSI Conformance
-                println("ebsi verifier")
+                val stateParamAuthorizeReqEbsi = params["state"]?.jsonArray?.get(0)?.jsonPrimitive?.content
+                var scope = params["scope"]?.jsonArray.toString().replace("\"", "").replace("[","").replace("]", "")
+                var presentationDefinitionJson: JsonElement? = null
+                var responseType = "vp_token"
+                if (scope.contains("openid ver_test:vp_token"))  //EBSI Conformance tests
+                    presentationDefinitionJson = Json.parseToJsonElement("{\"id\":\"any\",\"format\":{\"jwt_vp\":{\"alg\":[\"ES256\"]}},\"input_descriptors\":[{\"id\":\"any\",\"format\":{\"jwt_vc\":{\"alg\":[\"ES256\"]}},\"constraints\":{\"fields\":[{\"path\":[\"$.vc.type\"],\"filter\":{\"type\":\"array\",\"contains\":{\"const\":\"VerifiableAttestation\"}}}]}},{\"id\":\"any\",\"format\":{\"jwt_vc\":{\"alg\":[\"ES256\"]}},\"constraints\":{\"fields\":[{\"path\":[\"$.vc.type\"],\"filter\":{\"type\":\"array\",\"contains\":{\"const\":\"VerifiableAttestation\"}}}]}},{\"id\":\"any\",\"format\":{\"jwt_vc\":{\"alg\":[\"ES256\"]}},\"constraints\":{\"fields\":[{\"path\":[\"$.vc.type\"],\"filter\":{\"type\":\"array\",\"contains\":{\"const\":\"VerifiableAttestation\"}}}]}}]}")
+                if (scope.contains("openid ver_test:id_token"))  //EBSI Conformance tests
+                    responseType = "id_token"
+                    scope= "openid"
 
-                val fixedPresentationDef = Json.parseToJsonElement("{\"id\":\"any\",\"format\":{\"jwt_vp\":{\"alg\":[\"ES256\"]}},\"input_descriptors\":[{\"id\":\"any\",\"format\":{\"jwt_vc\":{\"alg\":[\"ES256\"]}},\"constraints\":{\"fields\":[{\"path\":[\"$.vc.type\"],\"filter\":{\"type\":\"array\",\"contains\":{\"const\":\"VerifiableAttestation\"}}}]}},{\"id\":\"any\",\"format\":{\"jwt_vc\":{\"alg\":[\"ES256\"]}},\"constraints\":{\"fields\":[{\"path\":[\"$.vc.type\"],\"filter\":{\"type\":\"array\",\"contains\":{\"const\":\"VerifiableAttestation\"}}}]}},{\"id\":\"any\",\"format\":{\"jwt_vc\":{\"alg\":[\"ES256\"]}},\"constraints\":{\"fields\":[{\"path\":[\"$.vc.type\"],\"filter\":{\"type\":\"array\",\"contains\":{\"const\":\"VerifiableAttestation\"}}}]}}]}")
+                val stateId = UUID().toString();
+
                 val session = verificationUseCase.createSession(
                     vpPoliciesJson = null,
-                    vcPoliciesJson =  buildJsonArray {  add("signature")
-                                                        add("expired")
-                                                        add("not-before")
-                                                     },
-                    requestCredentialsJson = buildJsonArray {  },
-                    presentationDefinitionJson = fixedPresentationDef,
+                    vcPoliciesJson =  buildJsonArray{add("signature")
+                                                     add("expired")
+                                                     add("not-before")
+                                                    },
+                    requestCredentialsJson = buildJsonArray{},
+                    presentationDefinitionJson = presentationDefinitionJson,
                     responseMode = ResponseMode.direct_post,
                     successRedirectUri = null,
                     errorRedirectUri = null,
                     statusCallbackUri = null,
                     statusCallbackApiKey = null,
-                    stateId = "stateId",
-                    stateParamAuthorizeReqEbsi = params["state"]!![0]
+                    stateId = stateId,
+                    stateParamAuthorizeReqEbsi = stateParamAuthorizeReqEbsi
                 )
+
                 // Create a jwt for the request parameter in response
                 // Bind authentication request with state
 //                val idTokenRequestState = UUID().toString();
@@ -252,24 +266,23 @@ fun Application.verfierApi() {
 
                 val clientId = SERVER_URL
                 val redirectUri = session.authorizationRequest!!.responseUri
-                val responseType =  session.authorizationRequest!!.responseType
-                val scope = "openid ver_test:vp_token"
 
                 var response = session.authorizationRequest!!
 
                 // Create a jwt as request object as defined in JAR OAuth2.0 specification
                 val requestJwtPayload = buildJsonObject {
-                        put(JWTClaims.Payload.issuer, SERVER_URL )
+                        put(JWTClaims.Payload.issuer, clientId )
                         put(JWTClaims.Payload.audience, response.clientId)
 //                        put(JWTClaims.Payload.nonce, idTokenRequestNonce)
 //                        put("state", idTokenRequestState)
-                        put("client_id", SERVER_URL)
+                        put("client_id", clientId)
                         put("redirect_uri", redirectUri)
-                        put("response_type", "vp_token")
+                        put("response_type", responseType)
                         put("response_mode", responseMode.name)
                         put("scope", scope)
                         put("exp", 1776532276)
-                        put("presentation_definition", fixedPresentationDef)
+                        if (presentationDefinitionJson!=null)
+                            put("presentation_definition", presentationDefinitionJson)
                     }
 
                 val requestJwtHeader = mapOf(JWTClaims.Header.keyID to SERVER_SIGNING_KEY.getPublicKey().getKeyId(), JWTClaims.Header.type to "JWT" )
@@ -278,9 +291,15 @@ fun Application.verfierApi() {
                     println("Signed JWS: >> $it")
                 }
 
+                var responseQueryString = response.toHttpQueryString()
+                responseQueryString = responseQueryString.replace("client_id=", "client_id=$clientId")
+                responseQueryString = responseQueryString.replace("response_uri","redirect_uri")
+                responseQueryString = responseQueryString.replace("presentation_definition_uri","request_uri")
+                responseQueryString = responseQueryString.replace("response_type=vp_token", "response_type=$responseType")
+                responseQueryString = responseQueryString.plus("&scope=$scope")
+                responseQueryString = responseQueryString.plus("&request=$requestToken")
 
-                context.respondRedirect("openid://".plus("?").plus(session.authorizationRequest!!.toHttpQueryString().replace("client_id=", "client_id=$SERVER_URL").replace("response_uri","redirect_uri").replace("presentation_definition_uri","request_uri").plus("&scope=openid ver_test:vp_token").plus("&request=$requestToken")))
-
+                context.respondRedirect("openid://?$responseQueryString")
             }
 
             post("/verify/{state}", {
