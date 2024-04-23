@@ -14,6 +14,7 @@ import id.walt.crypto.keys.OciKeyMeta
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.base64UrlDecode
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
+import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.crypto.utils.JwsUtils.jwsAlg
 import io.ktor.util.*
 import kotlinx.serialization.*
@@ -117,13 +118,13 @@ actual class OCIKey actual constructor(
         var rawSignature = signRaw("$header.$payload".encodeToByteArray())
 
         val signatureBase64Url = rawSignature.encodeToBase64Url()
-
-        return "$header.$payload.$signatureBase64Url"
+        val jws ="$header.$payload.$signatureBase64Url"
+        return jws
     }
 
     actual  override suspend fun verifyRaw(signed: ByteArray, detachedPlaintext: ByteArray?): Result<ByteArray> {
         check(detachedPlaintext != null) { "An detached plaintext is needed." }
-
+        println("detachedPlaintext: ${detachedPlaintext.decodeToString()}")
         val verifyDataDetails =
             VerifyDataDetails.builder()
                 .keyId(id)
@@ -137,7 +138,7 @@ actual class OCIKey actual constructor(
             VerifyRequest.builder().verifyDataDetails(verifyDataDetails).build()
         val response = kmsCryptoClient.verify(verifyRequest)
         return response.verifiedData.isSignatureValid.let {
-            if (it) Result.success(signed)
+            if (it) Result.success(detachedPlaintext)
             else Result.failure(Exception("Signature verification failed!"))
         }
     }
@@ -157,13 +158,16 @@ actual class OCIKey actual constructor(
 
         val signature = parts[2].base64UrlDecode()
 
+        println("the f signable is: $header.$payload")
 
         val signable = "$header.$payload".encodeToByteArray()
 
 
+
         return verifyRaw(signature.decodeToString().toByteArray(), signable).map {
 
-           it.decodeToString().let { Json.parseToJsonElement(it) }
+            val verifiedPayload = it.decodeToString().substringAfter(".").base64UrlDecode().decodeToString()
+            Json.parseToJsonElement(verifiedPayload)
 
         }
     }
@@ -289,34 +293,34 @@ suspend fun main() {
 
     val compartmentId: String = "ocid1.compartment.oc1..aaaaaaaawirugoz35riiybcxsvf7bmelqsxo3sajaav5w3i2vqowcwqrllxa"
     val vaultId: String =
-        "ocid1.vault.oc1.eu-frankfurt-1.entbf645aabf2.abtheljshkb6dsuldqf324kitneb63vkz3dfd74dtqvkd5j2l2cxwyvmefeq"
+        "ocid1.vault.oc1.eu-frankfurt-1.entaeh2zaafiy.abtheljss64qlgv6cxm7t4fi5dvfntfbval2ldt6yja3s4niix2hf36defua"
 
 
     val config = OCIsdkMetadata(vaultId, compartmentId)
     // val Testkey = oci.generateKey( config)
     val Testkey = OCIKey(
-        "ocid1.key.oc1.eu-frankfurt-1.entbf645aabf2.abtheljrk2redsqsmbln4e6z543bmv4emabdmtveh3owzglt6ovo6dpnd6fa",
+        "ocid1.key.oc1.eu-frankfurt-1.entaeh2zaafiy.abtheljtpq4ytkmzqr3iwkx7dkvrcxsz6ydnsatq6ynfgqdzx2c34d7d3n4a",
         config=config,
         _keyType = KeyType.secp256r1,
         _publicKey = null
     )
 
-    println("Key ID: ${Testkey.id}")
-    println("Key Type: ${Testkey.keyType}")
-
-    println("key version: ${Testkey.getMeta().keyVersion}")
-
-
-    println("public key: ${Testkey.getPublicKey().exportJWK()}")
-    println("public key: ${Testkey.getPublicKey().exportPEM()}")
-
-    val payload = JsonObject(
-        mapOf(
-            "sub" to JsonPrimitive("16bb17e0-e733-4622-9384-122bc2fc6290"),
-            "iss" to JsonPrimitive("http://localhost:3000"),
-            "aud" to JsonPrimitive("TOKEN"),
-        )
-    ).toString()
+//    println("Key ID: ${Testkey.id}")
+//    println("Key Type: ${Testkey.keyType}")
+//
+//    println("key version: ${Testkey.getMeta().keyVersion}")
+//
+//
+//    println("public key: ${Testkey.getPublicKey().exportJWK()}")
+//    println("public key: ${Testkey.getPublicKey().exportPEM()}")
+//
+//    val payload = JsonObject(
+//        mapOf(
+//            "sub" to JsonPrimitive("16bb17e0-e733-4622-9384-122bc2fc6290"),
+//            "iss" to JsonPrimitive("http://localhost:3000"),
+//            "aud" to JsonPrimitive("TOKEN"),
+//        )
+//    ).toString()
     val text = "lqfijrrwgnbizwbfxfvbubnasnltaqku"
     val sign = Testkey.signRaw(text.encodeToByteArray())
 
@@ -325,23 +329,18 @@ suspend fun main() {
     println("Signature with TestKey: ${sign.decodeToString()}")
 
     val verify = Testkey.verifyRaw(sign, text.encodeToByteArray())
-    println("Verify with TestKey: ${
-        if (verify.isSuccess) "Success"
-        else "Failed"
-    }")
+    println("Verify with TestKey: ${verify.isSuccess}")
+//
+//    println("key for sign JWS: ${Testkey.getPublicKey()}")
+//    val signJws = Testkey.signJws(
+//        payload.encodeToByteArray()
+//    )
+//    println("Sign JWS with TestKey: $signJws")
 
-    println("key for sign JWS: ${Testkey.getPublicKey()}")
-    val signJws = Testkey.signJws(
-        payload.encodeToByteArray()
-    )
-    println("Sign JWS with TestKey: $signJws")
+    val jws = "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImRpZDpqd2s6ZXlKcmRIa2lPaUpGUXlJc0ltTnlkaUk2SWxBdE1qVTJJaXdpZUNJNklscElSSEJtT1dwSVowMTNkM0ZIU0VSMmNYVnpNbGcxY2t0NWJrbFlRWHBLY25Wek4wcFdjMFYwT0RBaUxDSjVJam9pUVVRd1R6UmtVMEl0UjJORFdVTjJXRmxJVDFjM1JXYzJOVU55Y0dvd2JWOURTSGR1VTFaWmNEZzRNQ0o5IzAifQ.eyJhdWQiOiJodHRwczovL2lzc3Vlci5wb3J0YWwud2FsdC10ZXN0LmNsb3VkIiwiaWF0IjoxNzEzODA1NjM1LCJub25jZSI6IjQwNGU4NjExLTI2ZjgtNGY4Mi05ZDk1LTBkYmUwYmQ4NTUxYyJ9.TUVVQ0lEVmV2NGtMVER5bytKUXdxZGVqUlFCWTBsUkphVDErQzZXVERxWlcyb1k4QWlFQS9TcHp2RU80ODZISGc1MWpOa1BvV1pxWXV3cEtSeC82SEcvUXRXWFJDTHM9"
 
-    val verifyJws = Testkey.verifyJws(signJws)
+    val verifyJws = Testkey.verifyJws(jws)
     println("Verify JWS with TestKey: ${if (verifyJws.isSuccess) "Success" else "Failed"}")
 
-    val localKey = JWKKey.generate(KeyType.secp256r1)
-   val verif = localKey.verifyJws(signJws)
-
-    println("Verify JWS with localKey: ${if (verif.isSuccess) "Success" else "Failed"}")
 
 }
