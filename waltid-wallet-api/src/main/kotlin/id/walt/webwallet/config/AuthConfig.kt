@@ -6,4 +6,5 @@ data class AuthConfig(
     val tokenKey: String,
     val issTokenClaim: String,
     val audTokenClaim: String,
+    val tokenLifetime: String,
 ) : WalletConfig
