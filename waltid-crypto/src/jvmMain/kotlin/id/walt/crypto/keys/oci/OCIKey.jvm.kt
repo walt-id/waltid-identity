@@ -1,5 +1,9 @@
 package id.walt.crypto.keys.oci
 
+import com.nimbusds.jose.JWSAlgorithm
+import com.nimbusds.jose.JWSHeader
+import com.nimbusds.jose.JWSObject
+import com.nimbusds.jose.Payload
 import com.oracle.bmc.ConfigFileReader
 import com.oracle.bmc.auth.AuthenticationDetailsProvider
 import com.oracle.bmc.auth.ConfigFileAuthenticationDetailsProvider
@@ -8,6 +12,7 @@ import com.oracle.bmc.keymanagement.KmsManagementClient
 import com.oracle.bmc.keymanagement.KmsVaultClient
 import com.oracle.bmc.keymanagement.model.*
 import com.oracle.bmc.keymanagement.requests.*
+import id.walt.crypto.keys.EccUtils
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.OciKeyMeta
@@ -15,9 +20,14 @@ import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.base64UrlDecode
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto.utils.JwsUtils.jwsAlg
+import io.ktor.util.*
 import kotlinx.serialization.*
 import kotlinx.serialization.json.*
+import org.bouncycastle.asn1.ASN1Integer
+import org.bouncycastle.asn1.ASN1Sequence
 import java.lang.Thread.sleep
+import kotlin.math.max
+import kotlin.math.min
 
 @Serializable
 @SerialName("oci")
@@ -89,7 +99,6 @@ actual class OCIKey actual constructor(
 
 
     actual  override suspend fun signRaw(plaintext: ByteArray): ByteArray {
-
         val signDataDetails =
             SignDataDetails.builder()
                 .keyId(id)
@@ -102,22 +111,109 @@ actual class OCIKey actual constructor(
         val signRequest =
             SignRequest.builder().signDataDetails(signDataDetails).build()
         val response = kmsCryptoClient.sign(signRequest)
+
         return response.signedData.signature.encodeToByteArray()
     }
 
-    actual override suspend fun signJws(plaintext: ByteArray, headers: Map<String, String>): String {
-        val appendedHeader = HashMap(headers).apply {
-            put("alg", "ES256")
+    private val _internalJwsAlgorithm by lazy {
+        when (keyType) {
+            KeyType.Ed25519 -> JWSAlgorithm.EdDSA
+            KeyType.secp256k1 -> JWSAlgorithm.ES256K
+            KeyType.secp256r1 -> JWSAlgorithm.ES256
+            KeyType.RSA -> JWSAlgorithm.RS256 // TODO: RS384 RS512
         }
+    }
 
-        val header = Json.encodeToString(appendedHeader).encodeToByteArray().encodeToBase64Url()
-        val payload = plaintext.encodeToBase64Url()
+    actual override suspend fun signJws(plaintext: ByteArray, headers: Map<String, String>): String {
+//        val appendedHeader = HashMap(headers).apply {
+//            put("alg", "ES256")
+//        }
+//
+//        val header = Json.encodeToString(appendedHeader).encodeToByteArray().encodeToBase64Url()
+//        val payload = plaintext.encodeToBase64Url()
+//
+//        var rawSignature = signRaw("$header.$payload".encodeToByteArray())
 
-        var rawSignature = signRaw("$header.$payload".encodeToByteArray())
+//        if (keyType in listOf(KeyType.secp256r1, KeyType.secp256k1)) {
+//            println( "Converted DER to IEEE P1363 signature.")
+//            rawSignature = EccUtils.convertDERtoIEEEP1363(rawSignature)
+//        } else {
+//            println( "Did not convert DER to IEEE P1363 signature." )
+//        }
 
-        val signatureBase64Url = rawSignature.encodeToBase64Url()
 
-        return "$header.$payload.$signatureBase64Url"
+        println("OCI SIGN WJS IS CALLED")
+        println("OCI SIGN WJS IS CALLED")
+        println("OCI SIGN WJS IS CALLED")
+        println("OCI SIGN WJS IS CALLED")
+        println("OCI SIGN WJS IS CALLED")
+        println("OCI SIGN WJS IS CALLED")
+        println("OCI SIGN WJS IS CALLED")
+
+//        val signatureBase64Url = rawSignature.toString()
+
+        // Nimbus signature:
+        val jwsObject = JWSObject(
+            JWSHeader.Builder(_internalJwsAlgorithm).customParams(headers).build(),
+            Payload(plaintext)
+        )
+        /*jwsObject.sign(_internalSigner)
+
+        val nimbusJws = jwsObject.serialize()*/
+
+        // TODO for Custom signature: check if JSON encoding of JsonObject for header & payload is correct (or 1 space is missing?)
+        // Custom signature:
+        /*val appendedHeader = HashMap(headers).apply {
+            put("alg", _internalJwsAlgorithm.name)
+        }*/
+
+        val payloadToSign = jwsObject.header.toBase64URL().toString() + '.' + jwsObject.payload.toBase64URL().toString()
+        var signed = signRaw(payloadToSign.encodeToByteArray())
+
+//        if (keyType in listOf(KeyType.secp256r1, KeyType.secp256k1)) { // Convert DER to IEEE P1363
+//            signed = EccUtils.convertDERtoIEEEP1363(signed)
+//        }
+
+        println(signed)
+        println(signed)
+        println(signed)
+        println(signed)
+        println(signed)
+
+
+        val customJws = "$payloadToSign.${signed.encodeToBase64Url()}"
+
+        println(customJws)
+        println(customJws)
+        println(customJws)
+        println(customJws)
+        println(customJws)
+        println(customJws)
+
+        return customJws
+
+    }
+
+    private fun convertToJWSFormat(signature: ByteArray): ByteArray {
+        val derSignature = ASN1Sequence.getInstance(signature)
+        val r = (derSignature.getObjectAt(0) as ASN1Integer).value
+        val s = (derSignature.getObjectAt(1) as ASN1Integer).value
+
+        val rBytes = r.toByteArray()
+        val sBytes = s.toByteArray()
+        val jwsSignature = ByteArray(64)
+
+        // Pad the R and S components to 32 bytes each
+        System.arraycopy(rBytes, max(0, rBytes.size - 32), jwsSignature, max(0, 32 - rBytes.size), min(32, rBytes.size))
+        System.arraycopy(
+            sBytes,
+            max(0, sBytes.size - 32),
+            jwsSignature,
+            32 + max(0, 32 - sBytes.size),
+            min(32, sBytes.size)
+        )
+
+        return jwsSignature
     }
 
     actual  override suspend fun verifyRaw(signed: ByteArray, detachedPlaintext: ByteArray?): Result<ByteArray> {
@@ -139,6 +235,17 @@ actual class OCIKey actual constructor(
         val parts = signedJws.split(".")
         check(parts.size == 3) { "Invalid JWT part count: ${parts.size} instead of 3" }
 
+
+        println("OCI Verify WJS IS CALLED")
+        println("OCI Verify WJS IS CALLED")
+        println("OCI Verify WJS IS CALLED")
+        println("OCI Verify WJS IS CALLED")
+        println("OCI Verify WJS IS CALLED")
+        println("OCI Verify WJS IS CALLED")
+
+
+
+
         val header = parts[0]
         val headers: Map<String, JsonElement> = Json.decodeFromString(header.base64UrlDecode().decodeToString())
         headers["alg"]?.let {
@@ -153,7 +260,11 @@ actual class OCIKey actual constructor(
 
         val signable = "$header.$payload".encodeToByteArray()
 
-
+        println("OCI Verify WJS IS CALLED")
+        println("OCI Verify WJS IS CALLED")
+        println("OCI Verify WJS IS CALLED")
+        println("OCI Verify WJS IS CALLED")
+        println()
         return verifyRaw(signature.decodeToString().toByteArray(), signable).map {
 
             Json.decodeFromString(it.decodeToString())
