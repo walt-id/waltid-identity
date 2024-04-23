@@ -1,6 +1,9 @@
 package id.walt.webwallet.web.controllers
 
-import com.nimbusds.jose.*
+import com.nimbusds.jose.JWSAlgorithm
+import com.nimbusds.jose.JWSHeader
+import com.nimbusds.jose.JWSObject
+import com.nimbusds.jose.Payload
 import com.nimbusds.jose.crypto.MACSigner
 import com.nimbusds.jose.crypto.MACVerifier
 import id.walt.crypto.keys.jwk.JWKKey
@@ -16,7 +19,6 @@ import id.walt.webwallet.service.WalletServiceManager
 import id.walt.webwallet.service.WalletServiceManager.oidcConfig
 import id.walt.webwallet.service.account.AccountsService
 import id.walt.webwallet.service.account.KeycloakAccountStrategy
-import id.walt.webwallet.utils.JsonUtils.toJsonPrimitive
 import id.walt.webwallet.web.ForbiddenException
 import id.walt.webwallet.web.InsufficientPermissionsException
 import id.walt.webwallet.web.UnauthorizedException
@@ -37,13 +39,18 @@ import io.ktor.server.plugins.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.sessions.*
-import io.ktor.util.*
 import io.ktor.util.pipeline.*
+import kotlinx.datetime.Clock
+import kotlinx.datetime.toJavaInstant
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import kotlinx.uuid.UUID
+import kotlinx.uuid.generateUUID
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
+import java.time.temporal.ChronoUnit
 import kotlin.collections.set
 import kotlin.time.Duration.Companion.days
 
@@ -69,7 +76,8 @@ object AuthKeys {
 
     val tokenKey: ByteArray = config.tokenKey.encodeToByteArray()
     val issTokenClaim: String = config.issTokenClaim
-    val audTokenClaim: String = config.audTokenClaim
+    val audTokenClaim: String? = config.audTokenClaim
+    val tokenLifetime: Long = config.tokenLifetime.toLongOrNull() ?: 1
 
 }
 
@@ -476,38 +484,32 @@ suspend fun verifyToken(token: String): Result<String> {
 
 suspend fun PipelineContext<Unit, ApplicationCall>.doLogin() {
     val reqBody = loginRequestJson.decodeFromString<AccountRequest>(call.receive())
-    AccountsService.authenticate("", reqBody)
-        .onSuccess {
+    AccountsService.authenticate("", reqBody).onSuccess {
+        val now = Clock.System.now().toJavaInstant()
+        val tokenPayload = Json.encodeToString(
+            AuthTokenPayload(
+                jti = UUID.generateUUID().toString(),
+                sub = it.id.toString(),
+                iss = AuthKeys.issTokenClaim,
+                aud = AuthKeys.audTokenClaim.takeIf { !it.isNullOrEmpty() }
+                    ?: let { call.request.headers["Origin"] ?: "n/a" },
+                iat = now.epochSecond,
+                nbf = now.epochSecond,
+                exp = now.plus(AuthKeys.tokenLifetime, ChronoUnit.DAYS).epochSecond,
+            )
+        )
 
-            val iss = AuthKeys.issTokenClaim
-            val aud = AuthKeys.audTokenClaim
-            val tokenPayload = "{\"sub\":\"${it.id}\",\"iss\":\"$iss\",\"aud\":\"$aud\"}"
-
-            val key = JWKKey.importJWK(AuthKeys.tokenKey.decodeToString()).getOrNull()
-            if (key == null) {
-                val token = JWSObject(JWSHeader(JWSAlgorithm.HS256), Payload(tokenPayload)).apply {
-                    sign(MACSigner(AuthKeys.tokenKey))
-                }.serialize()
-
-                call.sessions.set(LoginTokenSession(token))
-                call.response.status(HttpStatusCode.OK)
-                call.respond(
-                    Json.encodeToJsonElement(it).jsonObject.minus("type").plus(Pair("token", token.toJsonElement()))
-                )
-            } else {
-                val rsaPrivKey = JWKKey.importJWK(AuthKeys.tokenKey.decodeToString()).getOrThrow()
-                val tokenHeaders = mapOf(JWTClaims.Header.keyID to rsaPrivKey.getPublicKey().getKeyId(), JWTClaims.Header.type to "JWT" )
-                val token = rsaPrivKey.signJws(tokenPayload.toByteArray(), tokenHeaders)
-
-                call.sessions.set(LoginTokenSession(token))
-                call.response.status(HttpStatusCode.OK)
-                call.respond(
-                    Json.encodeToJsonElement(it).jsonObject.minus("type").plus(Pair("token", token.toJsonPrimitive()))
-                )
-            }
-        }
-        .onFailure { call.respond(HttpStatusCode.BadRequest, it.localizedMessage) }
+        val token = JWKKey.importJWK(AuthKeys.tokenKey.decodeToString()).getOrNull()?.let {
+            createRsaToken(it, tokenPayload)
+        } ?: createHS256Token(tokenPayload)
+        call.sessions.set(LoginTokenSession(token))
+        call.response.status(HttpStatusCode.OK)
+        call.respond(
+            Json.encodeToJsonElement(it).jsonObject.minus("type").plus(Pair("token", token.toJsonElement()))
+        )
+    }.onFailure { call.respond(HttpStatusCode.BadRequest, it.localizedMessage) }
 }
+
 private fun PipelineContext<Unit, ApplicationCall>.clearUserSession() {
     call.sessions.get<LoginTokenSession>()?.let {
         logger.debug { "Clearing login token session" }
@@ -571,3 +573,24 @@ fun PipelineContext<Unit, ApplicationCall>.ensurePermissionsForWallet(
         throw InsufficientPermissionsException(minimumRequired = required, current = permissions)
     }
 }
+
+private fun createHS256Token(tokenPayload: String) = JWSObject(JWSHeader(JWSAlgorithm.HS256), Payload(tokenPayload)).apply {
+    sign(MACSigner(AuthKeys.tokenKey))
+}.serialize()
+
+private suspend fun createRsaToken(key: JWKKey, tokenPayload: String) =
+    mapOf(JWTClaims.Header.keyID to key.getPublicKey().getKeyId(), JWTClaims.Header.type to "JWT").let {
+        key.signJws(tokenPayload.toByteArray(), it)
+    }
+
+
+@Serializable
+private data class AuthTokenPayload<T>(
+    val nbf: Long,
+    val exp: Long,
+    val iat: Long,
+    val jti: String,
+    val iss: String,
+    val aud: String,
+    val sub: T
+)
