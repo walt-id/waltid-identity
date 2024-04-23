@@ -2,7 +2,13 @@
 
 package id.walt.issuer
 
-
+import com.nimbusds.jose.*
+import com.nimbusds.jose.crypto.ECDSASigner
+import com.nimbusds.jose.crypto.ECDSAVerifier
+import com.nimbusds.jose.jwk.Curve
+import com.nimbusds.jose.jwk.ECKey
+import com.nimbusds.jose.jwk.JWK
+import com.nimbusds.jose.jwk.gen.ECKeyGenerator
 import id.walt.credentials.issuance.Issuer.mergingJwtIssue
 import id.walt.credentials.issuance.Issuer.mergingSdJwtIssue
 import id.walt.credentials.vc.vcs.W3CVC
@@ -10,6 +16,8 @@ import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto.utils.Base64Utils.base64UrlDecode
+import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.did.dids.DidService
 import id.walt.did.dids.DidUtils
 import id.walt.issuer.IssuanceExamples.openBadgeCredentialExample
@@ -38,6 +46,7 @@ import kotlinx.serialization.json.*
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.time.Duration.Companion.minutes
+
 
 /**
  * OIDC for Verifiable Credential Issuance service provider, implementing abstract service provider from OIDC4VC library.
@@ -166,8 +175,162 @@ open class CIProvider : OpenIDCredentialIssuer(
             val did = tokenHeader["kid"]!!.jsonPrimitive.content.split("#")[0]
             println("Resolving DID: $did")
             val key = DidService.resolveToKey(did).getOrThrow()
-            println("Got key: $key")
+
+//            val keey = KeySerialization.deserializeKey(key.exportJWK())
+//            println("THE aaaaa KEY: $keey")
+
+            // FIXME
+            val keyType = KeySerialization.deserializeKey("{\"type\":\"oci\",\"id\":\"ocid1.key.oc1.eu-frankfurt-1.entaeh2zaafiy.abtheljt3pcqtfx6ocny5pixjz44l2ivsk54onlkxwu27aiiwcccq573qc5a\",\"config\":{\"vaultId\":\"ocid1.vault.oc1.eu-frankfurt-1.entaeh2zaafiy.abtheljss64qlgv6cxm7t4fi5dvfntfbval2ldt6yja3s4niix2hf36defua\",\"compartmentId\":\"ocid1.compartment.oc1..aaaaaaaawirugoz35riiybcxsvf7bmelqsxo3sajaav5w3i2vqowcwqrllxa\"},\"_publicKey\":\"{\\\"kty\\\":\\\"EC\\\",\\\"crv\\\":\\\"P-256\\\",\\\"x\\\":\\\"xQSmPdlqkh78nlJO63GLoV3VKixe9TrGnisK2Qt5Ytw\\\",\\\"y\\\":\\\"w6v87TDXCu_JAZ1wXdZEu81vkA4rhf7HE8Y95X34UsI\\\"}\",\"_keyType\":\"secp256r1\"}\n").getOrThrow()
+
+//            println("Got key: $key")
+//            println("THE NEW KEY: $keyType")
+
+            // Generate an EC key pair
+            val ecJWK = ECKeyGenerator(Curve.P_256)
+                .keyID("did:jwk:eyJrdHkiOiJFQyIsImNydiI6IlAtMjU2IiwieCI6InhRU21QZGxxa2g3OG5sSk82M0dMb1YzVktpeGU5VHJHbmlzSzJRdDVZdHciLCJ5IjoidzZ2ODdURFhDdV9KQVoxd1hkWkV1ODF2a0E0cmhmN0hFOFk5NVgzNFVzSSJ9#0")
+                .generate()
+            val ecPublicJWK = ecJWK.toPublicJWK()
+
+
+            // Create the EC signer
+            val signer: JWSSigner = ECDSASigner(ecJWK)
+
+
+            // Creates the JWS object with payload
+            val jwsObject1 = JWSObject(
+                JWSHeader.Builder(JWSAlgorithm.ES256).keyID(ecJWK.keyID).build(),
+                Payload("Elliptic cure")
+            )
+
+            // Compute the EC signature
+            jwsObject1.sign(signer)
+
+            println("ecPublicJWK")
+            println(ecPublicJWK)
+            println("ecPublicJWK")
+
+            // Serialize the JWS to compact form
+            val s = jwsObject1.serialize()
+
+            // The recipient creates a verifier with the public EC key
+            val verifier1: JWSVerifier = ECDSAVerifier(ecPublicJWK)
+
+            try {
+                if (jwsObject1.verify(verifier1)) {
+                    println("NIMBUS ITS VERIFIED")
+                    println("NIMBUSITS VERIFIED")
+                    println(s)
+                    println("NIMBUSITS VERIFIED")
+                    println("NIMBUSITS VERIFIED")
+                } else {
+                    println("NIMBUS ITS NOT VERIFIED")
+                    println("NIMBUSITS NOT VERIFIED")
+                    println("NIMBUSITS NOT VERIFIED")
+                    println("NIMBUSITS NOT VERIFIED")
+                    println("NIMBUSITS NOT VERIFIED")
+                }
+            } catch (e: JOSEException) {
+                throw IllegalArgumentException(e)
+            }
+
+
+
+            println(key.exportJWK())
+            println(key.getPublicKey().exportJWK())
+            println("{\"kty\":\"EC\",\"crv\":\"P-256\",\"x\":\"xQSmPdlqkh78nlJO63GLoV3VKixe9TrGnisK2Qt5Ytw\",\"y\":\"w6v87TDXCu_JAZ1wXdZEu81vkA4rhf7HE8Y95X34UsI\",\"kid\":\"${key.getPublicKey().getKeyId()}\"}")
+            var jwsObject = JWSObject.parse(token)
+            jwsObject.serialize()
+            println(jwsObject.signature)
+
+//            val keynimbus = JWK.parse(key.exportJWK().plus(""))
+            val keynimbus = JWK.parse("{\"kty\":\"EC\",\"crv\":\"P-256\",\"x\":\"xQSmPdlqkh78nlJO63GLoV3VKixe9TrGnisK2Qt5Ytw\",\"y\":\"w6v87TDXCu_JAZ1wXdZEu81vkA4rhf7HE8Y95X34UsI\",\"kid\":\"${key.getPublicKey().getKeyId()}\"}")
+
+            var verifier: JWSVerifier? = ECDSAVerifier(keynimbus as ECKey)
+            jwsObject.verify(verifier)
+
+
+            try {
+                if (jwsObject.verify(verifier)) {
+                    println("ITS VERIFIED")
+                    println("ITS VERIFIED")
+                    println( jwsObject.serialize())
+                    println("ITS VERIFIED")
+                    println("ITS VERIFIED")
+                } else {
+                    println("ITS NOT VERIFIED")
+                    println("ITS NOT VERIFIED")
+                    println("ITS NOT VERIFIED")
+                    println( jwsObject.serialize())
+
+                    println("ITS NOT VERIFIED")
+                    println("ITS NOT VERIFIED")
+                }
+            } catch (e: JOSEException) {
+                throw IllegalArgumentException(e)
+            }
+
+//            keyType.verifyJws(token).also { println("VERIFICATION IS: $it") }
+
+
+//            val objectElements = jwsObject.payload.toJSONObject()
+//                .mapValues { it.value.toJsonElement() }
+
+//            Result.success(JsonObject(objectElements))
+
+//            val parts = token.split(".")
+//
+//            val header = parts[0]
+//
+//            val payload = parts[1]
+//
+//            val signature = parts[2].base64UrlDecode()
+//
+//
+//            val signable = "$header.$payload".encodeToByteArray()
+//
+//            key.verifyRaw(signature.decodeToString().toByteArray(), signable).map {
+//
+//                Json.decodeFromString(it.decodeToString())
+//
+//            }
+
+//            key.verifyJws(token).also { println("VERIFICATION IS: $it") }
+
+            val parts = token.split(".")
+            val parts2 = jwsObject1.serialize().split(".")
+
+            check(parts.size == 3) { "Invalid JWT part count: ${parts.size} instead of 3" }
+
+//
+//            println("OCI Verify WJS IS CALLED")
+//            println("OCI Verify WJS IS CALLED")
+//            println("OCI Verify WJS IS CALLED")
+//            println("OCI Verify WJS IS CALLED")
+//            println("OCI Verify WJS IS CALLED")
+//            println("OCI Verify WJS IS CALLED")
+//
+            val header = parts[0]
+            val headers: Map<String, JsonElement> = Json.decodeFromString(header.base64UrlDecode().decodeToString())
+            headers["alg"]?.let {
+                val algValue = it.jsonPrimitive.content
+                check(algValue == "ES256") { "Invalid key algorithm for JWS: JWS has $algValue, key is ES256!" }
+            }
+
+            val payload = parts[1]
+
+            val signature = parts[2].base64UrlDecode()
+
+            val signable = "$header.$payload"
+
+            println(signature.size)
+            println(parts2[2].base64UrlDecode().size)
+            println(s)
+            println(signable)
             key.verifyJws(token).also { println("VERIFICATION IS: $it") }
+            key.verifyRaw(token.toByteArray(), signable.toByteArray()).also { println("VERIFICATION IS: $it") }
+            key.verifyRaw(token.toByteArray(), token.toByteArray()).also { println("VERIFICATION IS: $it") }
+
+
         } else {
             CI_TOKEN_KEY.verifyJws(token)
         }

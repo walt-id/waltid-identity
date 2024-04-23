@@ -74,11 +74,37 @@ class TestCredentialWallet(
 
         keyId ?: throw IllegalArgumentException("No keyId provided for signToken ${debugStateMsg()}")
 
+        println("KEYID FOR SIGNING: $keyId")
+        println("KEYID FOR SIGNING: $keyId")
+        println("KEYID FOR SIGNING: $keyId")
+        println("KEYID FOR SIGNING: $keyId")
+        println("KEYID FOR SIGNING: $keyId")
+
+
 //        val key = runBlocking { walletService.getKeyByDid(keyId) }
         val key = runBlocking {
             DidService.resolveToKey(keyId).getOrThrow().let { KeysService.get(it.getKeyId()) }
-                ?.let { KeySerialization.deserializeKey(it.document).getOrThrow() }
+                ?.let {
+                    println("IT IS: ")
+                    println("IT IS: ")
+                    println("IT IS: ")
+                    println(it)
+                    println(it.document)
+                    println("IT IS: ")
+                    println("IT IS: ")
+                    println("IT IS: ")
+
+                    KeySerialization.deserializeKey(it.document).getOrThrow()
+                }
         } ?: error("Failed to retrieve the key")
+        println("KEY FOR SIGNING: $key")
+        println("KEY FOR SIGNING: $key")
+        println("KEY FOR SIGNING: $key")
+        println("KEY FOR SIGNING: $key")
+        println("KEY FOR SIGNING: $key")
+        println("KEY FOR SIGNING: $key")
+        println("KEY FOR SIGNING: $key")
+        println("KEY FOR SIGNING: $key")
         println("KEY FOR SIGNING: $key")
 
         return runBlocking {
@@ -87,7 +113,7 @@ class TestCredentialWallet(
             val payloadToSign = Json.encodeToString(payload).encodeToByteArray()
             key.signJws(payloadToSign, mapOf("typ" to "JWT", "kid" to authKeyId))
                 .also { signed ->
-                    key.getPublicKey().verifyJws(signed).also {
+                    key.verifyJws(signed).also {
                         println("RE-VERIFICATION: $it")
                     }
                 }
