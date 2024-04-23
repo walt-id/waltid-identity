@@ -48,6 +48,10 @@ class StatusListCredentialStatusServiceTest {
             every { bitParserMock.get(any(), any(), any()) } returns bitValue
             // when
             val result = sut.get(statusEntry)
+            println("result")
+            println(result)
+            println("result")
+
             // then
             assertEquals(
                 expected = CredentialStatusResult(
