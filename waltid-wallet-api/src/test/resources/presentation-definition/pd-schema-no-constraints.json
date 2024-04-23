@@ -1,0 +1,14 @@
+{
+    "input_descriptors":
+    [
+        {
+            "id": "VerifiableCredential#1",
+            "schema":
+            [
+                {
+                    "uri": "VerifiableCredential#1"
+                }
+            ]
+        }
+    ]
+}
