@@ -6,6 +6,7 @@ import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.db.models.WalletOperationHistory
 import id.walt.webwallet.service.SSIKit2WalletService
 import id.walt.webwallet.service.WalletServiceManager
+import id.walt.webwallet.usecase.exchange.FilterData
 import io.github.smiley4.ktorswaggerui.dsl.post
 import io.github.smiley4.ktorswaggerui.dsl.route
 import io.ktor.http.*
@@ -101,8 +102,8 @@ fun Application.exchange() = walletRoute {
             }
             response {
                 HttpStatusCode.OK to {
-                    body<List<String>> {
-                        description = "Credentials types that are missing to fulfill the presentation definition"
+                    body<List<FilterData>> {
+                        description = "Filters that failed to fulfill the presentation definition"
                     }
                 }
             }
