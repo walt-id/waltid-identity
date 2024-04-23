@@ -83,9 +83,9 @@ class DidCheqdRegistrar : LocalRegistrarMethod("cheqd") {
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    override suspend fun registerByKey(key: Key, options: DidCreateOptions): DidResult =
-        createDid(key, options.get<String>("network") ?: "testnet").let {
-            DidResult(it.id, id.walt.did.dids.document.DidDocument(DidCheqdDocument(it, key.exportJWKObject()).toMap()))
+    override suspend fun registerByKey(mainKey: Key, options: DidCreateOptions, vcSigningKey: Key): DidResult =
+        createDid(mainKey, options.get<String>("network") ?: "testnet").let {
+            DidResult(it.id, id.walt.did.dids.document.DidDocument(DidCheqdDocument(it, mainKey.exportJWKObject()).toMap()))
         }
 
     @OptIn(ExperimentalStdlibApi::class)

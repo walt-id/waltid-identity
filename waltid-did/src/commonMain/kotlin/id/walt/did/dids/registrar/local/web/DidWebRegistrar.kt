@@ -33,7 +33,7 @@ class DidWebRegistrar : LocalRegistrarMethod("web") {
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    override suspend fun registerByKey(key: Key, options: DidCreateOptions): DidResult {
+    override suspend fun registerByKey(mainKey: Key, options: DidCreateOptions, vcSigningKey: Key): DidResult {
         println("Domain: " + options.get<String>("domain"))
         return options.get<String>("domain")?.takeIf { it.isNotEmpty() }?.let {
             val domain = UrlEncoderUtil.encode(it)
@@ -44,7 +44,7 @@ class DidWebRegistrar : LocalRegistrarMethod("web") {
             DidResult(
                 "did:web:$domain$path", DidDocument(
                     DidWebDocument(
-                        did = "did:web:$domain$path", keyId = key.getKeyId(), didKey = key.getPublicKey().exportJWKObject()
+                        did = "did:web:$domain$path", keyId = mainKey.getKeyId(), didKey = mainKey.getPublicKey().exportJWKObject()
                     ).toMap()
                 )
             )

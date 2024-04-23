@@ -5,6 +5,7 @@ import id.walt.crypto.keys.KeyType
 import id.walt.ebsi.eth.SignedTransaction
 import id.walt.ebsi.eth.UnsignedTransaction
 import id.walt.ebsi.eth.Utils
+import io.ktor.utils.io.core.*
 import kotlinx.datetime.Clock
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.Instant
@@ -35,13 +36,13 @@ object EbsiRpcRequests {
 
   suspend fun generateInsertDidDocumentRequest(
     requestId: Int,
-    did: String, secp256k1Key: Key,
+    did: String, from: String, secp256k1Key: Key,
     baseDocument: JsonElement,
     notBefore: Instant = Clock.System.now(), notAfter: Instant = notBefore.plus(365*24, DateTimeUnit.HOUR)
   ) = JsonRpcRequest(
     method = EbsiRpcMethod.insertDidDocument,
     params = listOf(InsertDidDocumentParams(
-      Utils.toEthereumAddress(secp256k1Key), did,
+      from, did,
       baseDocument.toString(), secp256k1Key.getThumbprint(),
       Utils.getPublicKeyXYRepresentation(secp256k1Key).toHexString().let { "0x04$it" },
       (secp256k1Key.keyType == KeyType.secp256k1).also {
@@ -66,4 +67,30 @@ object EbsiRpcRequests {
     )),
     id = requestId
   )
+
+  suspend fun generateAddVerificationMethodRequest(
+    requestId: Int,
+    did: String, from: String, secp256Key: Key
+  ) = JsonRpcRequest(
+    method = EbsiRpcMethod.addVerificationMethod,
+    params = listOf(AddVerificationMethodParams(
+      from, did,
+      secp256Key.getThumbprint(), secp256Key.keyType == KeyType.secp256k1,
+      when(secp256Key.keyType) {
+        KeyType.secp256k1 -> Utils.getPublicKeyXYRepresentation(secp256Key).toHexString().let { "0x04$it" }
+        else -> secp256Key.exportJWK().toByteArray().toHexString()
+      }
+    )),
+    id = requestId)
+
+  fun generateAddVerificationRelationshipRequest(
+    requestId: Int,
+    did: String, from: String, name: String, vMethodId: String,
+    notBefore: Instant = Clock.System.now(), notAfter: Instant = notBefore.plus(365*24, DateTimeUnit.HOUR)
+  ) = JsonRpcRequest(
+    method = EbsiRpcMethod.addVerificationRelationship,
+    params = listOf(AddVerificationRelationshipParams(
+      from, did, name, vMethodId, notBefore.epochSeconds, notAfter.epochSeconds
+    )),
+    id = requestId)
 }

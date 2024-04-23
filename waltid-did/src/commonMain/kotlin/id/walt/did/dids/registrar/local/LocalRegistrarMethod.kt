@@ -22,6 +22,6 @@ abstract class LocalRegistrarMethod(val method: String) {
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    abstract suspend fun registerByKey(key: Key, options: DidCreateOptions): DidResult
+    abstract suspend fun registerByKey(mainKey: Key, options: DidCreateOptions, vcSigningKey: Key = mainKey): DidResult
 
 }

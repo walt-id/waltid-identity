@@ -36,8 +36,8 @@ class DidKeyRegistrar : LocalRegistrarMethod("key") {
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    override suspend fun registerByKey(key: Key, options: DidCreateOptions): DidResult = options.let {
-        val pubKey = key.getPublicKey()
+    override suspend fun registerByKey(mainKey: Key, options: DidCreateOptions, vcSigningKey: Key): DidResult = options.let {
+        val pubKey = mainKey.getPublicKey()
         val identifierComponents = getIdentifierComponents(pubKey, it)
         val identifier = convertRawKeyToMultiBase58Btc(identifierComponents.pubKeyBytes, identifierComponents.multiCodecKeyCode)
         createDid(identifier, pubKey.exportJWKObject())

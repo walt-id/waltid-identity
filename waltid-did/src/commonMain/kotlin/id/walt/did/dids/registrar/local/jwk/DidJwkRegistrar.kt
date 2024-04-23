@@ -31,11 +31,11 @@ class DidJwkRegistrar : LocalRegistrarMethod("jwk") {
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    override suspend fun registerByKey(key: Key, options: DidCreateOptions): DidResult {
-        val did = "did:jwk:${key.getPublicKey().exportJWK().toByteArray().encodeToBase64Url()}"
+    override suspend fun registerByKey(mainKey: Key, options: DidCreateOptions, vcSigningKey: Key): DidResult {
+        val did = "did:jwk:${mainKey.getPublicKey().exportJWK().toByteArray().encodeToBase64Url()}"
 
         val didDocument = DidDocument(
-            DidJwkDocument(did, key.getPublicKey().exportJWKObject())
+            DidJwkDocument(did, mainKey.getPublicKey().exportJWKObject())
                 .toMap()
         )
 

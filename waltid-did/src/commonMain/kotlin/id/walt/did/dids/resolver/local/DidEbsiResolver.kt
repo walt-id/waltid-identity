@@ -3,6 +3,7 @@ package id.walt.did.dids.resolver.local
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.did.dids.document.DidDocument
+import id.walt.ebsi.EbsiEnvironment
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.plugins.contentnegotiation.*
@@ -21,7 +22,7 @@ import kotlin.js.JsExport
 
 @OptIn(ExperimentalJsExport::class)
 @JsExport
-class DidEbsiResolver : LocalResolverMethod("ebsi") {
+class DidEbsiResolver(val ebsiEnvironment: EbsiEnvironment, val didRegistryApiVersion: Int = 4) : LocalResolverMethod("ebsi") {
 
     val httpLogging = false
 
@@ -30,7 +31,7 @@ class DidEbsiResolver : LocalResolverMethod("ebsi") {
     @JsPromise
     @JsExport.Ignore
     override suspend fun resolve(did: String): Result<DidDocument> {
-        val url = "https://api-conformance.ebsi.eu/did-registry/v5/identifiers/${did}"
+        val url = "https://api-${ebsiEnvironment.name}.ebsi.eu/did-registry/v${didRegistryApiVersion}/identifiers/${did}"
 
         val httpClient = HttpClient() {
             install(ContentNegotiation) {

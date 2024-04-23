@@ -35,3 +35,20 @@ data class SignedTransactionParams(
   val v: String,
   val signedRawTransaction: String
 ) : JsonRpcParams()
+
+data class AddVerificationMethodParams(
+  val from: String,
+  val did: String,
+  val vMethodId: String,
+  val isSecp256k1: Boolean,
+  val publicKey: String
+) : JsonRpcParams()
+
+data class AddVerificationRelationshipParams(
+  val from: String,
+  val did: String,
+  val name: String,
+  val vMethodId: String,
+  val notBefore: Long,
+  val notAfter: Long
+) : JsonRpcParams()

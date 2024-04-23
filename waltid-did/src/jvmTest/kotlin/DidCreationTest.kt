@@ -12,6 +12,7 @@ import id.walt.did.dids.registrar.local.web.DidWebRegistrar
 import id.walt.did.dids.resolver.DidResolver
 import id.walt.did.dids.resolver.local.DidEbsiResolver
 import id.walt.did.utils.randomUUID
+import id.walt.ebsi.EbsiEnvironment
 import id.walt.ebsi.accreditation.AccreditationClient
 import id.walt.ebsi.did.DidEbsiService
 import id.walt.ebsi.eth.TransactionService
@@ -119,7 +120,7 @@ class DidCreationTest {
     }
 
     val CLIENT_MOCK_PORT = 5000
-    val CLIENT_MOCK_URL = "https://21b4-62-178-27-231.ngrok-free.app/client-mock"//"http://192.168.0.122:5000/client-mock"
+    val CLIENT_MOCK_URL = "https://5e6b-2001-871-25f-403-da4-9f87-84a4-ee5f.ngrok-free.app/client-mock"//"http://192.168.0.122:5000/client-mock"
     val CLIENT_MAIN_KEY = runBlocking { JWKKey.generate(KeyType.secp256k1) }
     val CLIENT_VCSIGN_KEY = runBlocking { JWKKey.generate(KeyType.secp256r1) }
     fun startClientMockServer() {
@@ -148,36 +149,19 @@ class DidCreationTest {
     @Test
     fun ebsiDidOnboarding() = runTest {
         startClientMockServer()
-        val did = DidEbsiService.generateRandomDid()
         val taoIssuer = "https://api-conformance.ebsi.eu/conformance/v3/issuer-mock"
 
-        // TODO: reorganize this code into DidEbsiRegistrar, accreditation client parameters needed in did registration options
-        val accreditationClient = AccreditationClient(CLIENT_MOCK_URL, did, CLIENT_VCSIGN_KEY, taoIssuer)
-        val authToOnboardRes = accreditationClient.getAuthorisationToOnboard()
-
-        println(authToOnboardRes.credential)
-
-        val presDefResp = http.get("https://api-conformance.ebsi.eu/authorisation/v4/presentation-definitions") {
-            parameter("scope", "openid didr_invite")
-        }
-        println(presDefResp.bodyAsText())
-        val presDef = PresentationDefinition.fromJSONString(presDefResp.bodyAsText())
-
-        //OpenID4VP.createPresentationRequest(PresentationDefinitionParameter.fromPresentationDefinitionScope("openid didr_invite"),
-        //    clientId = CLIENT_MOCK_URL, clientIdScheme = ClientIdScheme.RedirectUri, )
-
-        val didResult = DidEbsiRegistrar().registerByKey(CLIENT_MAIN_KEY, DidEbsiCreateOptions(
-            5, authToOnboardRes.credential!!, authToOnboardRes.cNonce
-        ))
+        val didResult = DidEbsiRegistrar().registerByKey(CLIENT_MAIN_KEY, DidEbsiCreateOptions(CLIENT_MOCK_URL, taoIssuer, EbsiEnvironment.conformance, didRegistryApiVersion = 5), CLIENT_VCSIGN_KEY)
         val didEbsiDoc = didResult.didDocument.let { Json.decodeFromJsonElement<DidEbsiDocument>(it.toJsonObject()) }
-        assertEquals("$did#${CLIENT_MAIN_KEY.getKeyId()}", didEbsiDoc.verificationMethod!!.first().id)
-        Thread.sleep(5000)
-        val resolveDidHttpResponse = http.get("https://api-conformance.ebsi.eu/did-registry/v5/identifiers/${URLEncoder.encode(did)}")
-        assertEquals(HttpStatusCode.OK, resolveDidHttpResponse.status)
-        println(resolveDidHttpResponse.bodyAsText())
-        val resolverResult = DidEbsiResolver().resolve(did)
+        assertEquals("${didResult.did}#${CLIENT_MAIN_KEY.getKeyId()}", didEbsiDoc.verificationMethod!!.first().id)
+        Thread.sleep(6000)
+        val resolverResult = DidEbsiResolver(EbsiEnvironment.conformance, 5).resolve(didResult.did)
         assertEquals(true, resolverResult.isSuccess)
         println(resolverResult.getOrNull()!!.toString())
+        val didEbsiDocument = Json.decodeFromJsonElement<DidEbsiDocument>(resolverResult.getOrNull()!!.toJsonObject())
+        assertEquals("${didResult.did}#${CLIENT_MAIN_KEY.getKeyId()}", didEbsiDocument.capabilityInvocation?.first())
+        assertEquals("${didResult.did}#${CLIENT_VCSIGN_KEY.getKeyId()}", didEbsiDocument.authentication?.first())
+        assertEquals("${didResult.did}#${CLIENT_VCSIGN_KEY.getKeyId()}", didEbsiDocument.assertionMethod?.last())
         // TODO:
         //      register other key types for did?
         //      VerifiableAccreditationToAttest

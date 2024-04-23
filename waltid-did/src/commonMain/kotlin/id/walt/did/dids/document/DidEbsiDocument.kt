@@ -25,13 +25,13 @@ class DidEbsiBaseDocument(
 data class DidEbsiDocument(
     @EncodeDefault @SerialName("@context")  val context: List<String> = DEFAULT_CONTEXT,
     val id: String, // did:ebsi:
-
+    val controller: Set<String>? = null,
     val verificationMethod: List<VerificationMethod>?,
-    val assertionMethod: List<String>?,
-    val authentication: List<String>?,
-    val capabilityInvocation: List<String>?,
-    val capabilityDelegation: List<String>?,
-    val keyAgreement: List<String>?
+    val assertionMethod: List<String>? = null,
+    val authentication: List<String>? = null,
+    val capabilityInvocation: List<String>? = null,
+    val capabilityDelegation: List<String>? = null,
+    val keyAgreement: List<String>? = null
 ) {
     companion object {
         public val DEFAULT_CONTEXT =

@@ -53,8 +53,8 @@ class AccreditationClient(
 
     // #### Discovery ####
     val ciMetadata = OpenID4VCI.resolveCIProviderMetadata(trustedIssuer)
-    val authorisationServer = ciMetadata.authorizationServer ?: throw Exception("No authorization server found for given trusted issuer")
-    val credentialMetadata = ciMetadata.credentialsSupported?.find { it.types?.last()?.equals(credentialType) ?: false } ?: throw Exception("Credential type not supported by given trusted issuer")
+    val authorisationServer = ciMetadata.authorizationServer ?: throw AccreditationException("No authorization server found for given trusted issuer")
+    val credentialMetadata = ciMetadata.credentialsSupported?.find { it.types?.last()?.equals(credentialType) ?: false } ?: throw AccreditationException("Credential type not supported by given trusted issuer")
     val authMetadata = OpenID4VCI.resolveAuthProviderMetadata(authorisationServer)
 
     // #### Authorise and Authenticate ####
@@ -92,13 +92,13 @@ class AccreditationClient(
 
     if(ResponseMode.direct_post != idTokenReq.responseMode || !idTokenReq.scope.contains("openid") ||
         !idTokenReq.responseType.contains(ResponseType.IdToken) || idTokenReq.redirectUri.isNullOrEmpty()) {
-      throw Exception("Invalid id_token request received")
+      throw AccreditationException("Invalid id_token request received")
     }
 
     val idToken = getIdTokenFor(idTokenReq, authorisationServer)
     val authResp = http.submitForm(idTokenReq.redirectUri!!, parametersOf(
       TokenResponse.success(idToken = idToken, state = idTokenReq.state).toHttpParameters()))
-    if(authResp.status.value != 302) throw Exception("Invalid auth response status")
+    if(authResp.status.value != 302) throw AccreditationException("Invalid auth response status")
     val codeResp = AuthorizationCodeResponse.fromHttpQueryString(Url(authResp.headers["Location"]!!).encodedQuery)
 
     val tokenReq = TokenRequest(
@@ -122,9 +122,9 @@ class AccreditationClient(
       )
     )
     val tokenRespRaw = http.submitForm(authMetadata.tokenEndpoint!!, parametersOf(tokenReq.toHttpParameters()))
-    if(tokenRespRaw.status != HttpStatusCode.OK) throw Exception("Invalid token response status")
+    if(tokenRespRaw.status != HttpStatusCode.OK) throw AccreditationException("Invalid token response status")
     val tokenResp = TokenResponse.fromJSONString(tokenRespRaw.bodyAsText())
-    val accessToken = tokenResp.accessToken ?: throw Exception("No access_token received")
+    val accessToken = tokenResp.accessToken ?: throw AccreditationException("No access_token received")
 
     val jwtProof = ProofOfPossession.JWTProofBuilder(
       ciMetadata.credentialIssuer!!,
@@ -144,7 +144,7 @@ class AccreditationClient(
       setBody(credReq.toJSONString())
     }
     println(credRespRaw.bodyAsText())
-    if(credRespRaw.status != HttpStatusCode.OK) throw Exception("Invalid credential response status")
+    if(credRespRaw.status != HttpStatusCode.OK) throw AccreditationException("Invalid credential response status")
     return CredentialResponse.fromJSONString(credRespRaw.bodyAsText())
   }
 
