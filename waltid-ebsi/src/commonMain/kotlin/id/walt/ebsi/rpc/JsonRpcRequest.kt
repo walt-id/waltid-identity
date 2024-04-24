@@ -78,7 +78,7 @@ object EbsiRpcRequests {
       secp256Key.getThumbprint(), secp256Key.keyType == KeyType.secp256k1,
       when(secp256Key.keyType) {
         KeyType.secp256k1 -> Utils.getPublicKeyXYRepresentation(secp256Key).toHexString().let { "0x04$it" }
-        else -> secp256Key.exportJWK().toByteArray().toHexString()
+        else -> secp256Key.getPublicKey().exportJWK().toByteArray().toHexString().let { "0x$it" }
       }
     )),
     id = requestId)

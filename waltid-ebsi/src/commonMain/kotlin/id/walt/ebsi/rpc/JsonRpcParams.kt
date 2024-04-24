@@ -36,6 +36,7 @@ data class SignedTransactionParams(
   val signedRawTransaction: String
 ) : JsonRpcParams()
 
+@Serializable
 data class AddVerificationMethodParams(
   val from: String,
   val did: String,
@@ -44,6 +45,7 @@ data class AddVerificationMethodParams(
   val publicKey: String
 ) : JsonRpcParams()
 
+@Serializable
 data class AddVerificationRelationshipParams(
   val from: String,
   val did: String,

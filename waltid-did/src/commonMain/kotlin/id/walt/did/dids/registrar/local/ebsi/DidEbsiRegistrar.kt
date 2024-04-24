@@ -36,6 +36,8 @@ import love.forte.plugin.suspendtrans.annotation.JvmAsync
 import love.forte.plugin.suspendtrans.annotation.JvmBlocking
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
+import kotlin.random.Random
+import kotlin.random.nextUInt
 import kotlin.time.DurationUnit
 import kotlin.time.toDuration
 
@@ -137,26 +139,25 @@ class DidEbsiRegistrar : LocalRegistrarMethod("ebsi") {
           DescriptorMapping(inputDescriptor.id, presDef.format!!.keys.first(), DescriptorMapping.vpPath(1,0),
             null)
         }
-      ).also { println(it.toJSONString()) }), grantType = GrantType.vp_token, scope = "openid ${TrustedRegistryScope.didr_invite.name}"
+      ).also { println(it.toJSONString()) }), grantType = GrantType.vp_token, scope = "openid ${TrustedRegistryScope.didr_write.name}"
     )
     println(tokenResponse.vpToken.toString())
 
     val accessToken = TrustedRegistryService.getAccessToken(TrustedRegistryScope.didr_write, tokenResponse, ebsiEnvironment, authApiVersion)
 
     // #### Add verification method and verification relationships to DID document ####
-    val id = SecureRandom.nextInt()
     // --- add verification method ---
     val addVMResult = TrustedRegistryService.signAndExecuteRPCRequest(
-      EbsiRpcRequests.generateAddVerificationMethodRequest(id, did, Utils.toEthereumAddress(capabilityInvocationKey), verificationMethodKey),
+      EbsiRpcRequests.generateAddVerificationMethodRequest(Random.nextInt(), did, Utils.toEthereumAddress(capabilityInvocationKey), verificationMethodKey),
       capabilityInvocationKey, accessToken, ebsiEnvironment, didRegistryVersion)
-    println("Add VM result: $addVMResult")
+    println("Add-VM result: $addVMResult")
 
     // --- add verification relationships ---
     for (relationShip in verificationRelationShips) {
       val addRelResult = TrustedRegistryService.signAndExecuteRPCRequest(
-        EbsiRpcRequests.generateAddVerificationRelationshipRequest(id, did, Utils.toEthereumAddress(capabilityInvocationKey), relationShip, "$did#${verificationMethodKey.getKeyId()}"),
+        EbsiRpcRequests.generateAddVerificationRelationshipRequest(Random.nextInt(), did, Utils.toEthereumAddress(capabilityInvocationKey), relationShip, "$did#${verificationMethodKey.getKeyId()}"),
         capabilityInvocationKey, accessToken, ebsiEnvironment, didRegistryVersion)
-      println("Add $relationShip relationship result: $addRelResult")
+      println("Add-$relationShip relationship result: $addRelResult")
     }
   }
 

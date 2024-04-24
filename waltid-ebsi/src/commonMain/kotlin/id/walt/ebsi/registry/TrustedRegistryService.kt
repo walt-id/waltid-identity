@@ -51,6 +51,6 @@ object TrustedRegistryService {
       rpcRequest, accessToken, ebsiEnvironment, registryApiVersion).let { Json.decodeFromString<UnsignedTransactionResponse>(it).result }
     val signedTransaction = unsignedTransaction.sign(capabilityInvocationKey)
     return executeRPCRequest(
-      EbsiRpcRequests.generateSendSignedTransactionRequest(rpcRequest.id, unsignedTransaction, signedTransaction), accessToken, ebsiEnvironment, registryApiVersion)
+      EbsiRpcRequests.generateSendSignedTransactionRequest(Random.nextInt(), unsignedTransaction, signedTransaction), accessToken, ebsiEnvironment, registryApiVersion)
   }
 }
