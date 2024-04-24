@@ -112,11 +112,6 @@ class TestCredentialWallet(
 
             val payloadToSign = Json.encodeToString(payload).encodeToByteArray()
             key.signJws(payloadToSign, mapOf("typ" to "JWT", "kid" to authKeyId))
-                .also { signed ->
-                    key.verifyJws(signed).also {
-                        println("RE-VERIFICATION: $it")
-                    }
-                }
         }
 
         //JwtService.getService().sign(payload, keyId)

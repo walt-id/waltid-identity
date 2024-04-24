@@ -13,8 +13,8 @@ import kotlinx.serialization.json.JsonObject
 expect class OCIKey(
     id: String,
     config: OCIsdkMetadata,
-    _publicKey: String?,
-    _keyType: KeyType?
+    _publicKey: String? = null,
+    _keyType: KeyType? = null
 ) : Key {
     override var keyType: KeyType
     override val hasPrivateKey: Boolean

@@ -75,6 +75,22 @@ class JwsSignatureScheme : SignatureScheme {
 //        println("Issuer: $issuerDid")
 //        println("Subject: $subjectDid")
 
+
+        println("TRYING TO VERIFY SIGNATURE")
+        println("TRYING TO VERIFY SIGNATURE")
+        println("TRYING TO VERIFY SIGNATURE")
+        println(issuerDid)
+        println("TRYING TO VERIFY SIGNATURE")
+        println("TRYING TO VERIFY SIGNATURE")
+
+        val issuerKey = DidService.resolveToKey(issuerDid)
+        println("issuerKey")
+        println(issuerKey)
+        println(issuerKey.getOrThrow().exportJWK())
+        println(data)
+        println(data.split("~")[0])
+        println("issuerKey")
+
         DidService.resolveToKey(issuerDid).getOrThrow()
             .verifyJws(data.split("~")[0]).getOrThrow()
     }
