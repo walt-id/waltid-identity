@@ -90,6 +90,14 @@ data class W3CVC(
     ): String {
         val kid = issuerKid ?: issuerDid
 
+        println("going to sign credentials with")
+        println("going to sign credentials with")
+        println(issuerKey.getPublicKey().exportPEM())
+        println(issuerKey.getPublicKey().exportJWKObject())
+        println(issuerDid)
+        println("going to sign credentials with")
+        println("going to sign credentials with")
+
         return JwsSignatureScheme().sign(
             data = this.toJsonObject(),
             key = issuerKey,
