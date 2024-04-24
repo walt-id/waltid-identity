@@ -10,7 +10,7 @@
                     {
                         "path":
                         [
-                            "$.vc.credentialSubject.property"
+                            "$.credentialSubject.property"
                         ],
                         "filter":
                         {
