@@ -17,24 +17,21 @@ import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.OciKeyMeta
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto.utils.Base64Utils.base64Decode
 import id.walt.crypto.utils.Base64Utils.base64UrlDecode
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
+import id.walt.crypto.utils.JvmEccUtils
 import id.walt.crypto.utils.JwsUtils.jwsAlg
+import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.util.*
-import kotlinx.serialization.*
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 import kotlinx.serialization.json.*
-import org.bouncycastle.asn1.ASN1EncodableVector
-import org.bouncycastle.asn1.ASN1Integer
-import org.bouncycastle.asn1.ASN1Sequence
-import org.bouncycastle.asn1.DERSequence
 import org.kotlincrypto.hash.sha2.SHA256
-import java.io.IOException
 import java.lang.Thread.sleep
-import java.math.BigInteger
-import java.util.*
-import kotlin.math.max
-import kotlin.math.min
 
+private val log = KotlinLogging.logger { }
 
 @Serializable
 @SerialName("oci")
@@ -42,20 +39,18 @@ actual class OCIKey actual constructor(
     actual val id: String,
     actual val config: OCIsdkMetadata,
 
-    @Suppress("CanBeParameter", "RedundantSuppression")
-    private  var _publicKey: String?,
+    @Suppress("CanBeParameter", "RedundantSuppression") private var _publicKey: String?,
     private var _keyType: KeyType?,
-
-    ) : Key() {
+) : Key() {
 
     @Transient
-   actual override var keyType: KeyType
+    actual override var keyType: KeyType
         get() = _keyType!!
         set(value) {
             _keyType = value
         }
 
- actual   override val hasPrivateKey: Boolean
+    actual override val hasPrivateKey: Boolean
         get() = false
 
     private suspend fun retrievePublicKey(): Key {
@@ -70,6 +65,7 @@ actual class OCIKey actual constructor(
 
     @Transient
     private val configFile = ConfigFileReader.parseDefault()
+
     @Transient
     private val provider = ConfigFileAuthenticationDetailsProvider(configFile)
 
@@ -77,24 +73,24 @@ actual class OCIKey actual constructor(
     // Create KMS clients
     @Transient
     private var kmsVaultClient: KmsVaultClient = KmsVaultClient.builder().build(provider)
+
     @Transient
     private var vault: Vault = getVault(kmsVaultClient, config.vaultId)
-    @Transient
-    private var kmsManagementClient: KmsManagementClient =
-        KmsManagementClient.builder().endpoint(vault.managementEndpoint).build(provider)
 
     @Transient
-    private var kmsCryptoClient: KmsCryptoClient =
-        KmsCryptoClient.builder().endpoint(vault.cryptoEndpoint).build(provider)
+    private var kmsManagementClient: KmsManagementClient = KmsManagementClient.builder().endpoint(vault.managementEndpoint).build(provider)
+
+    @Transient
+    private var kmsCryptoClient: KmsCryptoClient = KmsCryptoClient.builder().endpoint(vault.cryptoEndpoint).build(provider)
 
 
-    actual  override fun toString(): String = "[OCI ${keyType.name} key @ ${config.vaultId}]"
+    actual override fun toString(): String = "[OCI ${keyType.name} key @ ${config.vaultId}]"
 
 
-    actual  override suspend fun getKeyId(): String = getPublicKey().getKeyId()
+    actual override suspend fun getKeyId(): String = getPublicKey().getKeyId()
 
 
-    actual   override suspend fun getThumbprint(): String {
+    actual override suspend fun getThumbprint(): String {
         TODO("Not yet implemented")
     }
 
@@ -105,23 +101,16 @@ actual class OCIKey actual constructor(
     actual override suspend fun exportPEM(): String = throw NotImplementedError("PEM export is not available for remote keys.")
 
 
-    actual  override suspend fun signRaw(plaintext: ByteArray): ByteArray {
+    actual override suspend fun signRaw(plaintext: ByteArray): ByteArray {
         val encodedMessage: String = SHA256().digest(plaintext).encodeBase64()
 
-        val signDataDetails =
-            SignDataDetails.builder()
-                .keyId(id)
-                .message(encodedMessage)
-                .messageType(SignDataDetails.MessageType.Digest)
-                .signingAlgorithm(SignDataDetails.SigningAlgorithm.EcdsaSha256)
-                .keyVersionId(getKeyVersion(kmsManagementClient, id))
-                .build()
+        val signDataDetails = SignDataDetails.builder().keyId(id).message(encodedMessage).messageType(SignDataDetails.MessageType.Digest)
+            .signingAlgorithm(SignDataDetails.SigningAlgorithm.EcdsaSha256).keyVersionId(getKeyVersion(kmsManagementClient, id)).build()
 
-        val signRequest =
-            SignRequest.builder().signDataDetails(signDataDetails).build()
+        val signRequest = SignRequest.builder().signDataDetails(signDataDetails).build()
         val response = kmsCryptoClient.sign(signRequest)
 
-        return response.signedData.signature.decodeBase64Bytes()
+        return response.signedData.signature.base64Decode()
     }
 
     private val _internalJwsAlgorithm by lazy {
@@ -133,11 +122,11 @@ actual class OCIKey actual constructor(
         }
     }
 
+    @OptIn(ExperimentalStdlibApi::class)
     actual override suspend fun signJws(plaintext: ByteArray, headers: Map<String, String>): String {
         // Nimbus signature:
         val jwsObject = JWSObject(
-            JWSHeader.Builder(_internalJwsAlgorithm).customParams(headers).build(),
-            Payload(plaintext)
+            JWSHeader.Builder(_internalJwsAlgorithm).customParams(headers).build(), Payload(plaintext)
         )
 
         val payloadToSign = jwsObject.header.toBase64URL().toString() + '.' + jwsObject.payload.toBase64URL().toString()
@@ -145,10 +134,19 @@ actual class OCIKey actual constructor(
 
 
         if (keyType in listOf(KeyType.secp256r1, KeyType.secp256k1)) {
-            println{ "Converted DER to IEEE P1363 signature." }
-            signed = EccUtils.convertDERtoIEEEP1363(signed)
+            log.trace { "Converted DER to IEEE P1363 signature." }
+            val originalSigned = signed
+
+            log.trace { "ORIGINAL (DER) SIGNATURE: ${signed.toHexString()}" }
+
+            signed = EccUtils.convertDERtoIEEEP1363(originalSigned)
+            log.trace { "CONVERTED SIGNATURE 1: ${signed.toHexString()}" }
+
+            signed = JvmEccUtils.convertDERtoIEEEP1363BouncyCastle(originalSigned)
+//            signed = EccUtils.convertDERtoIEEEP1363HandleExtra(originalSigned)
+            log.trace { "CONVERTED SIGNATURE 2: ${signed.toHexString()}" }
         } else {
-            println { "Did not convert DER to IEEE P1363 signature." }
+            log.trace { "Did not convert DER to IEEE P1363 signature." }
         }
 
         val encodedSignature = signed.encodeToBase64Url()
@@ -236,17 +234,12 @@ actual class OCIKey actual constructor(
 //        return jwsSignature
 //    }
 
-    actual  override suspend fun verifyRaw(signed: ByteArray, detachedPlaintext: ByteArray?): Result<ByteArray> {
+    actual override suspend fun verifyRaw(signed: ByteArray, detachedPlaintext: ByteArray?): Result<ByteArray> {
 
         val verifyDataDetails =
-            VerifyDataDetails.builder()
-                .keyId(id)
-                .message(detachedPlaintext?.encodeToBase64Url())
-                .signature(signed.decodeToString())
-                .signingAlgorithm(VerifyDataDetails.SigningAlgorithm.EcdsaSha256)
-                .build()
-        val verifyRequest =
-            VerifyRequest.builder().verifyDataDetails(verifyDataDetails).build()
+            VerifyDataDetails.builder().keyId(id).message(detachedPlaintext?.encodeToBase64Url()).signature(signed.decodeToString())
+                .signingAlgorithm(VerifyDataDetails.SigningAlgorithm.EcdsaSha256).build()
+        val verifyRequest = VerifyRequest.builder().verifyDataDetails(verifyDataDetails).build()
         val response = kmsCryptoClient.verify(verifyRequest)
         return Result.success(response.verifiedData.isSignatureValid.toString().toByteArray())
     }
@@ -272,14 +265,13 @@ actual class OCIKey actual constructor(
         return verifyRaw(signature.decodeToString().toByteArray(), signable).map {
 
             Json.decodeFromString(it.decodeToString())
-
         }
     }
 
     @Transient
     private var backedKey: Key? = null
 
-    actual  override suspend fun getPublicKey(): Key = backedKey ?: when {
+    actual override suspend fun getPublicKey(): Key = backedKey ?: when {
         _publicKey != null -> _publicKey!!.let { JWKKey.importJWK(it).getOrThrow() }
         else -> retrievePublicKey()
     }.also { newBackedKey -> backedKey = newBackedKey }
@@ -293,13 +285,13 @@ actual class OCIKey actual constructor(
     )
 
 
-    actual  companion object {
+    actual companion object {
 
         actual val DEFAULT_KEY_LENGTH: Int = 32
         // The KeyShape used for testing
 
-        val TEST_KEY_SHAPE: KeyShape = KeyShape.builder().algorithm(KeyShape.Algorithm.Ecdsa).length(DEFAULT_KEY_LENGTH)
-            .curveId(KeyShape.CurveId.NistP256).build()
+        val TEST_KEY_SHAPE: KeyShape =
+            KeyShape.builder().algorithm(KeyShape.Algorithm.Ecdsa).length(DEFAULT_KEY_LENGTH).curveId(KeyShape.CurveId.NistP256).build()
 
         private fun keyTypeToOciKeyMapping(type: KeyType) = when (type) {
             KeyType.secp256r1 -> "ECDSA"
@@ -314,34 +306,27 @@ actual class OCIKey actual constructor(
             else -> throw IllegalArgumentException("Not supported: $type")
         }
 
-        actual   suspend fun generateKey(config: OCIsdkMetadata): OCIKey {
+        actual suspend fun generateKey(config: OCIsdkMetadata): OCIKey {
             val configurationFilePath: String = "~/.oci/config"
             val profile: String = "DEFAULT"
 
-             val configFile: ConfigFileReader.ConfigFile = ConfigFileReader.parseDefault()
+            val configFile: ConfigFileReader.ConfigFile = ConfigFileReader.parseDefault()
 
-             val provider: AuthenticationDetailsProvider =
-                ConfigFileAuthenticationDetailsProvider(configFile)
+            val provider: AuthenticationDetailsProvider = ConfigFileAuthenticationDetailsProvider(configFile)
 
 
             // Create KMS clients
-             val kmsVaultClient: KmsVaultClient = KmsVaultClient.builder().build(provider)
+            val kmsVaultClient: KmsVaultClient = KmsVaultClient.builder().build(provider)
 
-             val vault: Vault = getVault(kmsVaultClient, config.vaultId)
+            val vault: Vault = getVault(kmsVaultClient, config.vaultId)
 
-             val kmsManagementClient: KmsManagementClient =
-                KmsManagementClient.builder().endpoint(vault.managementEndpoint).build(provider)
+            val kmsManagementClient: KmsManagementClient = KmsManagementClient.builder().endpoint(vault.managementEndpoint).build(provider)
 
             println("CreateKey Test")
             val createKeyDetails =
-                CreateKeyDetails.builder()
-                    .keyShape(TEST_KEY_SHAPE)
-                    .protectionMode(CreateKeyDetails.ProtectionMode.Software)
-                    .compartmentId(config.compartmentId)
-                    .displayName("WaltKey")
-                    .build()
-            val createKeyRequest =
-                CreateKeyRequest.builder().createKeyDetails(createKeyDetails).build()
+                CreateKeyDetails.builder().keyShape(TEST_KEY_SHAPE).protectionMode(CreateKeyDetails.ProtectionMode.Software)
+                    .compartmentId(config.compartmentId).displayName("WaltKey").build()
+            val createKeyRequest = CreateKeyRequest.builder().createKeyDetails(createKeyDetails).build()
             val response = kmsManagementClient.createKey(createKeyRequest)
             println("Key created: ${response.key}")
             val keyId = response.key.id
@@ -353,24 +338,18 @@ actual class OCIKey actual constructor(
 
             println("Public Key: ${publicKey.exportJWK()}")
             return OCIKey(
-                keyId,
-                config,
-                publicKey.exportJWK(),
-                ociKeyToKeyTypeMapping(response.key.keyShape.algorithm.toString().uppercase())
+                keyId, config, publicKey.exportJWK(), ociKeyToKeyTypeMapping(response.key.keyShape.algorithm.toString().uppercase())
             )
         }
 
 
         suspend fun getOCIPublicKey(
-            kmsManagementClient: KmsManagementClient,
-            keyVersionId: String,
-            keyId: String
+            kmsManagementClient: KmsManagementClient, keyVersionId: String, keyId: String
         ): Key {
             val getKeyRequest = GetKeyVersionRequest.builder().keyVersionId(keyVersionId).keyId(keyId).build()
             val response = kmsManagementClient.getKeyVersion(getKeyRequest)
             val publicKeyPem = response.keyVersion.publicKey
-            return JWKKey.importPEM(publicKeyPem)
-                .getOrThrow()
+            return JWKKey.importPEM(publicKeyPem).getOrThrow()
         }
 
 
