@@ -16,7 +16,7 @@ suspend fun main(args: Array<String>) {
     log.debug { "issuer CLI starting ..." }
 
     log.debug { "Init walt services..." }
-    WaltidServices.init()
+    WaltidServices.minimalInit()
 
     log.info { "Reading configurations..." }
     ConfigManager.loadConfigs(args)
