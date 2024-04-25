@@ -215,6 +215,10 @@ spec:
               mountPath: "/waltid-wallet-api/config/oci.conf"
               subPath: "oci.conf"
               readOnly: true
+            - name: wallet-oci-rest-api-secret
+              mountPath: "/waltid-wallet-api/config/oci-rest-api.conf"
+              subPath: "oci.conf"
+              readOnly: true
             - name: wallet-nft-config
               mountPath: "/waltid-wallet-api/walt.yaml"
               subPath: "walt.yaml"
@@ -262,6 +266,9 @@ spec:
         - name: wallet-oci-secret
           secret:
             secretName: wallet-oci-secret
+        - name: wallet-oci-rest-api-secret
+          secret:
+            secretName: wallet-oci-rest-api-secret
         - name: wallet-push-config
           secret:
             secretName: wallet-push-config-secret

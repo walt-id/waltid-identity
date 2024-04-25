@@ -143,8 +143,9 @@ object ConfigManager {
         registerConfig("rejectionreason", RejectionReasonConfig::class)
         registerConfig("registration-defaults", RegistrationDefaultsConfig::class)
 
-        registerConfig("oci", OciKeyConfig::class)
+        registerConfig("oci-rest-api", OciRestApiKeyConfig::class)
         registerConfig("notification", NotificationConfig::class)
+        registerConfig("oci", OciKeyConfig::class)
     }
 
     fun loadConfigs(args: Array<String>) {
