@@ -149,4 +149,6 @@ class AccreditationClient(
   }
 
   suspend fun getAuthorisationToOnboard() = getTrustedCredential("VerifiableAuthorisationToOnboard")
+
+  suspend fun getAccreditationToAttest() = getTrustedCredential("VerifiableAccreditationToAttest")
 }

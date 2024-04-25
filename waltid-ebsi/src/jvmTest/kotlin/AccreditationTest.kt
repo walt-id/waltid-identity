@@ -2,6 +2,7 @@ import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.ebsi.Delay
 import id.walt.ebsi.EbsiEnvironment
+import id.walt.ebsi.accreditation.AccreditationClient
 import id.walt.ebsi.did.DidEbsiService
 import id.walt.ebsi.did.DidRegistrationOptions
 import io.ktor.serialization.kotlinx.json.*
@@ -25,6 +26,11 @@ class AccreditationTest {
   val CLIENT_MOCK_URL = "https://bb3c-62-178-27-231.ngrok-free.app/client-mock"//"http://192.168.0.122:5000/client-mock"
   val CLIENT_MAIN_KEY = runBlocking { JWKKey.generate(KeyType.secp256k1) }
   val CLIENT_VCSIGN_KEY = runBlocking { JWKKey.generate(KeyType.secp256r1) }
+  val TAO_ISSUER = "https://api-conformance.ebsi.eu/conformance/v3/issuer-mock"
+  val EBSI_ENVIRONMENT = EbsiEnvironment.conformance
+  val DID_REGISTRY_VERSION = 5
+  val accreditationClient = AccreditationClient(CLIENT_MOCK_URL, DidEbsiService.generateRandomDid(), CLIENT_VCSIGN_KEY, TAO_ISSUER)
+
   fun startClientMockServer() {
     embeddedServer(Netty, port = CLIENT_MOCK_PORT) {
       install(ContentNegotiation) {
@@ -56,7 +62,7 @@ class AccreditationTest {
 
     // #### Get accredited as a Trusted Issuer ####
     // TODO: get accredited
-
+    trustedIssuerAccreditation()
 
     // #### Issue & revoke ####
     // TODO: test issuing and revoking
@@ -69,16 +75,15 @@ class AccreditationTest {
 
   suspend fun ebsiDidOnboarding(): String {
     startClientMockServer()
-    val taoIssuer = "https://api-conformance.ebsi.eu/conformance/v3/issuer-mock"
 
     val didResult = assertDoesNotThrow {
-      DidEbsiService.generateAndRegisterDid(CLIENT_MAIN_KEY, CLIENT_VCSIGN_KEY,
-      DidRegistrationOptions(CLIENT_MOCK_URL, taoIssuer, ebsiEnvironment = EbsiEnvironment.conformance, didRegistryVersion = 5))
+      DidEbsiService.generateAndRegisterDid(accreditationClient, CLIENT_MAIN_KEY, CLIENT_VCSIGN_KEY,
+      DidRegistrationOptions(ebsiEnvironment = EBSI_ENVIRONMENT, didRegistryVersion = DID_REGISTRY_VERSION))
     }
 
     var resolverResult: Result<JsonObject>? = null
     for (i in 1..10) {
-      resolverResult = kotlin.runCatching { DidEbsiService.resolve(didResult, EbsiEnvironment.conformance, 5) }
+      resolverResult = kotlin.runCatching { DidEbsiService.resolveDid(didResult, EbsiEnvironment.conformance, 5) }
       if(!resolverResult.isSuccess || resolverResult.getOrNull()?.get("assertionMethod") == null)
       {
         println("Waiting for assertionMethod to become visible in DID document...")
@@ -98,5 +103,12 @@ class AccreditationTest {
     assertContains(didEbsiDocument.get("assertionMethod")!!.jsonArray.map { it.jsonPrimitive.content }, "${didResult}#${CLIENT_VCSIGN_KEY.getKeyId()}")
 
     return didResult
+  }
+
+  suspend fun trustedIssuerAccreditation() {
+    assertDoesNotThrow {
+      DidEbsiService.getTrustedIssuerAccreditation(accreditationClient, CLIENT_MAIN_KEY, CLIENT_VCSIGN_KEY,
+        DidRegistrationOptions(ebsiEnvironment = EBSI_ENVIRONMENT, didRegistryVersion = DID_REGISTRY_VERSION))
+    }
   }
 }

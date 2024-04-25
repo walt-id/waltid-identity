@@ -3,17 +3,8 @@ package id.walt.did.dids.resolver.local
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.did.dids.document.DidDocument
-import id.walt.did.dids.resolver.DidResolutionException
 import id.walt.ebsi.EbsiEnvironment
 import id.walt.ebsi.did.DidEbsiService
-import io.ktor.client.*
-import io.ktor.client.call.*
-import io.ktor.client.plugins.contentnegotiation.*
-import io.ktor.client.plugins.logging.*
-import io.ktor.client.request.*
-import io.ktor.client.statement.*
-import io.ktor.http.*
-import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import love.forte.plugin.suspendtrans.annotation.JsPromise
@@ -35,7 +26,7 @@ class DidEbsiResolver(val ebsiEnvironment: EbsiEnvironment, val didRegistryApiVe
     override suspend fun resolve(did: String): Result<DidDocument> {
         val response = runCatching {
             DidDocument(
-                jsonObject = DidEbsiService.resolve(did, ebsiEnvironment, didRegistryApiVersion)
+                jsonObject = DidEbsiService.resolveDid(did, ebsiEnvironment, didRegistryApiVersion)
             )
         }
 

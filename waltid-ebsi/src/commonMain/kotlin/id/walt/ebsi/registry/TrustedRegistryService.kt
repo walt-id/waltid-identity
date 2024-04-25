@@ -20,7 +20,11 @@ import kotlin.random.Random
 
 object TrustedRegistryService {
   fun getAuthorisationUri(ebsiEnvironment: EbsiEnvironment, authApiVersion: Int = 3) = "https://api-$ebsiEnvironment.ebsi.eu/authorisation/v$authApiVersion"
-  fun getDidRegistryUri(ebsiEnvironment: EbsiEnvironment, registryApiVersion: Int = 4) = "https://api-$ebsiEnvironment.ebsi.eu/did-registry/v$registryApiVersion"
+  private fun toRegistrySubPath(registry: TrustedRegistryType) = when(registry) {
+    TrustedRegistryType.didr -> "did-registry"
+    else -> "trusted-issuers-registry"
+  }
+  fun getTrustedRegistryUri(registry: TrustedRegistryType, ebsiEnvironment: EbsiEnvironment, registryApiVersion: Int = 5) = "https://api-$ebsiEnvironment.ebsi.eu/${toRegistrySubPath(registry)}/v$registryApiVersion"
 
   suspend fun getPresentationDefinition(scope: TrustedRegistryScope, ebsiEnvironment: EbsiEnvironment = EbsiEnvironment.conformance, authApiVersion: Int = 3): PresentationDefinition {
     val presDefResp = http.get("${getAuthorisationUri(ebsiEnvironment, authApiVersion)}/presentation-definitions") {
@@ -36,8 +40,8 @@ object TrustedRegistryService {
     return accessTokenResponse.accessToken ?: throw Exception("No access_token received: ${accessTokenResponse.error}, ${accessTokenResponse.errorDescription}")
   }
 
-  suspend fun executeRPCRequest(rpcRequest: JsonRpcRequest, accessToken: String, ebsiEnvironment: EbsiEnvironment, registryApiVersion: Int = 4): String {
-    val response = http.post("${getDidRegistryUri(ebsiEnvironment, registryApiVersion)}/jsonrpc") {
+  suspend fun executeRPCRequest(rpcRequest: JsonRpcRequest, accessToken: String, registry: TrustedRegistryType, ebsiEnvironment: EbsiEnvironment, registryApiVersion: Int = 4): String {
+    val response = http.post("${getTrustedRegistryUri(registry, ebsiEnvironment, registryApiVersion)}/jsonrpc") {
       bearerAuth(accessToken)
       contentType(ContentType.Application.Json)
       setBody(Json.encodeToJsonElement(rpcRequest).also {
@@ -47,17 +51,17 @@ object TrustedRegistryService {
     return response.bodyAsText()
   }
 
-  suspend fun signAndExecuteRPCRequest(rpcRequest: JsonRpcRequest, capabilityInvocationKey: Key, accessToken: String, previousTransactionResult: TransactionResult?, ebsiEnvironment: EbsiEnvironment, registryApiVersion: Int = 4): TransactionResult {
+  suspend fun signAndExecuteRPCRequest(rpcRequest: JsonRpcRequest, capabilityInvocationKey: Key, accessToken: String, previousTransactionResult: TransactionResult?, registry: TrustedRegistryType, ebsiEnvironment: EbsiEnvironment, registryApiVersion: Int = 4): TransactionResult {
     val unsignedTransaction = executeRPCRequest(
-      rpcRequest, accessToken, ebsiEnvironment, registryApiVersion).let { Json.decodeFromString<UnsignedTransactionResponse>(it).result }
+      rpcRequest, accessToken, registry, ebsiEnvironment, registryApiVersion).let { Json.decodeFromString<UnsignedTransactionResponse>(it).result }
     if(previousTransactionResult != null && unsignedTransaction.nonce == previousTransactionResult.nonce) {
       id.walt.ebsi.Delay.delay(2000)
-      return signAndExecuteRPCRequest(rpcRequest, capabilityInvocationKey, accessToken, previousTransactionResult, ebsiEnvironment, registryApiVersion)
+      return signAndExecuteRPCRequest(rpcRequest, capabilityInvocationKey, accessToken, previousTransactionResult, registry, ebsiEnvironment, registryApiVersion)
     }
     val signedTransaction = unsignedTransaction.sign(capabilityInvocationKey)
     return TransactionResult(
     executeRPCRequest(
-      EbsiRpcRequests.generateSendSignedTransactionRequest(Random.nextInt(), unsignedTransaction, signedTransaction), accessToken, ebsiEnvironment, registryApiVersion),
+      EbsiRpcRequests.generateSendSignedTransactionRequest(Random.nextInt(), unsignedTransaction, signedTransaction), accessToken, registry, ebsiEnvironment, registryApiVersion),
       unsignedTransaction.nonce)
   }
 }

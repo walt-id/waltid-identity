@@ -25,7 +25,8 @@ enum class EbsiRpcMethod {
   revokeVerificationMethod,
   expireVerificationMethod,
   rollVerificationMethod,
-  sendSignedTransaction
+  sendSignedTransaction,
+  setAttributeData
 }
 
 @Serializable
@@ -93,4 +94,14 @@ object EbsiRpcRequests {
       from, did, name, vMethodId, notBefore.epochSeconds, notAfter.epochSeconds
     )),
     id = requestId)
+
+  fun generateTirSetAttributeDataRequest(
+    requestId: Int,
+    from: String, did: String, attributeId: String, attributeData: String
+  ) = JsonRpcRequest(
+      method = EbsiRpcMethod.setAttributeData,
+      params = listOf(SetAttributeDataParams(
+        from, did, attributeId, attributeData
+      )), id = requestId
+  )
 }

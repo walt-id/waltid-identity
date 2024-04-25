@@ -54,3 +54,11 @@ data class AddVerificationRelationshipParams(
   val notBefore: Long,
   val notAfter: Long
 ) : JsonRpcParams()
+
+@Serializable
+data class SetAttributeDataParams(
+  val from: String,
+  val did: String,
+  val attributeId: String,
+  val attributeData: String
+) : JsonRpcParams()
