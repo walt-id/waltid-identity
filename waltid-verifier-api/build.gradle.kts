@@ -118,7 +118,9 @@ dependencies {
     // implementation("id.walt:waltid-ssikit2:1.0.8-SNAPSHOT")
     // implementation("id.walt:core-crypto:1.0.7-SNAPSHOT")
 }
-
+tasks.withType<org.gradle.api.tasks.bundling.Zip> {
+    isZip64 = true
+}
 tasks.withType<Test> {
     useJUnitPlatform()
 

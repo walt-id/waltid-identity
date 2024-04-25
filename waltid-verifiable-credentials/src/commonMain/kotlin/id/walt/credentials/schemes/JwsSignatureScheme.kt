@@ -3,6 +3,7 @@ package id.walt.credentials.schemes
 import id.walt.crypto.keys.Key
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.did.dids.DidService
+import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
@@ -13,6 +14,8 @@ import love.forte.plugin.suspendtrans.annotation.JvmAsync
 import love.forte.plugin.suspendtrans.annotation.JvmBlocking
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
+
+private val log = KotlinLogging.logger {  }
 
 @OptIn(ExperimentalJsExport::class)
 @JsExport
@@ -70,12 +73,17 @@ class JwsSignatureScheme : SignatureScheme {
         val payload = jws.payload
 
         val issuerDid = (payload[JwsOption.ISSUER] ?: header[JwsHeader.KEY_ID])!!.jsonPrimitive.content
+        log.trace { "Verifying with issuer did: $issuerDid" }
 
 //        val subjectDid = payload["sub"]!!.jsonPrimitive.content
 //        println("Issuer: $issuerDid")
 //        println("Subject: $subjectDid")
 
-        DidService.resolveToKey(issuerDid).getOrThrow()
-            .verifyJws(data.split("~")[0]).getOrThrow()
+        DidService.resolveToKey(issuerDid)
+            .also { log.trace ( "Imported key: $it from did: $issuerDid, public is: ${it.getOrNull()?.getPublicKey()?.exportJWK()}" ) }
+            .getOrThrow()
+            .verifyJws(data.split("~")[0])
+            .also { log.trace { "Verification result: $it" } }
+            .getOrThrow()
     }
 }
