@@ -9,8 +9,8 @@ import kotlinx.datetime.plus
 data class DidRegistrationOptions(
   val clientUri: String,
   val taoIssuerUri: String,
-  val clientJwksUri: String,
-  val clientRedirectUri: String,
+  val clientJwksUri: String = "$clientUri/jwks",
+  val clientRedirectUri: String = "$clientUri/code-cb",
   val clientId: String = clientUri,
   val ebsiEnvironment: EbsiEnvironment = EbsiEnvironment.conformance,
   val didRegistryVersion: Int = 5,
