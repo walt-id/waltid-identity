@@ -246,8 +246,6 @@ actual class OCIKey actual constructor(
 
             val keyVersionId = response.key.currentKeyVersion
 
-            sleep(2000)
-
             val publicKey = getOCIPublicKey(kmsManagementClient, keyVersionId, keyId)
 
 
