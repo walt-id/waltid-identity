@@ -29,6 +29,8 @@ class FilterPresentationDefinitionMatchStrategyTest {
         Json.decodeFromString<List<FilterData>>(TestUtils.loadResource("presentation-definition/filters/filter-vc1.json"))
     private val patternFilter =
         Json.decodeFromString<List<FilterData>>(TestUtils.loadResource("presentation-definition/filters/filter-pattern.json"))
+    private val compositeFilter =
+        Json.decodeFromString<List<FilterData>>(TestUtils.loadResource("presentation-definition/filters/filter-composite.json"))
     private val credentials = listOf(
         WalletCredential(
             wallet = UUID(),
@@ -54,6 +56,18 @@ class FilterPresentationDefinitionMatchStrategyTest {
                     "credentialSubject": {
                         "firstName": "name"
                     }
+                }
+            """.trimIndent(),
+            disclosures = null,
+            addedOn = Clock.System.now(),
+            deletedOn = null,
+        ),
+        WalletCredential(
+            wallet = UUID(),
+            id = "primitive-type",
+            document = """
+                {
+                    "type": "VerifiableCredential#2"
                 }
             """.trimIndent(),
             disclosures = null,
@@ -99,6 +113,31 @@ class FilterPresentationDefinitionMatchStrategyTest {
                 result[0].parsedDocument!!,
                 "credentialSubject.firstName"
             )!!.jsonPrimitive.content
+        )
+    }
+
+    @Test
+    fun `given presentation-definition with multiple input-descriptors, when matching credentials, then all matching credentials are returned`() {
+        every { filterParserMock.parse(any()) } returns compositeFilter
+        val result = sut.match(
+            credentials = listOf(credentials[1], credentials[2]),
+            presentationDefinition = presentationDefinition
+        )
+        assertEquals(expected = 2, actual = result.size)
+        assertEquals(
+            expected = "VerifiableCredential#1",
+            actual = JsonUtils.tryGetData(result[0].parsedDocument!!, "type")!!.jsonPrimitive.content
+        )
+        assertEquals(
+            expected = "name",
+            actual = JsonUtils.tryGetData(
+                result[0].parsedDocument!!,
+                "credentialSubject.firstName"
+            )!!.jsonPrimitive.content
+        )
+        assertEquals(
+            expected = "VerifiableCredential#2",
+            actual = JsonUtils.tryGetData(result[1].parsedDocument!!, "type")!!.jsonPrimitive.content
         )
     }
 }
