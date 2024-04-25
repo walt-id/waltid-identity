@@ -266,7 +266,8 @@ object IssuanceExamples {
             "jwk": "{\"kty\":\"OKP\",\"d\":\"mDhpwaH6JYSrD2Bq7Cs-pzmsjlLj4EOhxyI-9DM1mFI\",\"crv\":\"Ed25519\",\"kid\":\"Vzx7l5fh56F3Pf9aR3DECU5BwfrY6ZJe05aiWYWzan8\",\"x\":\"T3T4-u1Xz3vAV2JwPNxWfs4pik_JLiArz_WTCvrCFUM\"}"
           },
           "issuerDid": "did:key:z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp",
-          "vc": {
+          "credentialConfigurationId": "OpenBadgeCredential_vc+sd-jwt",
+          "credentialData": {
             "@context": [
               "https://www.w3.org/2018/credentials/v1",
               "https://purl.imsglobal.org/spec/ob/v3p0/context.json"
