@@ -115,6 +115,9 @@ kotlin {
                 // Logging
                 implementation("org.slf4j:slf4j-simple:2.0.12")
 
+                // Coroutines
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:1.8.0")
+
                 // JOSE
                 implementation("com.nimbusds:nimbus-jose-jwt:9.37.3")
 
