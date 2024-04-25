@@ -24,7 +24,6 @@ import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto.utils.JvmEccUtils
 import id.walt.crypto.utils.JwsUtils.jwsAlg
 import io.github.oshai.kotlinlogging.KotlinLogging
-import io.ktor.network.sockets.*
 import io.ktor.util.*
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -32,7 +31,6 @@ import kotlinx.serialization.Transient
 import kotlinx.serialization.json.*
 import org.kotlincrypto.hash.sha2.SHA256
 import java.lang.Thread.sleep
-import java.net.ConnectException
 
 private val log = KotlinLogging.logger { }
 
@@ -70,6 +68,7 @@ actual class OCIKey actual constructor(
 
 
 
+    // Create KMS clients
     @Transient
     private var kmsVaultClient: KmsVaultClient = KmsVaultClient.builder().build(provider)
 
@@ -234,6 +233,7 @@ actual class OCIKey actual constructor(
 
 
 
+
             val createKeyDetails =
                 CreateKeyDetails.builder().keyShape(TEST_KEY_SHAPE).protectionMode(CreateKeyDetails.ProtectionMode.Software)
                     .compartmentId(config.compartmentId).displayName("WaltKey").build()
@@ -245,6 +245,7 @@ actual class OCIKey actual constructor(
             val keyVersionId = response.key.currentKeyVersion
 
             sleep(2000)
+
             val publicKey = getOCIPublicKey(kmsManagementClient, keyVersionId, keyId)
 
 
