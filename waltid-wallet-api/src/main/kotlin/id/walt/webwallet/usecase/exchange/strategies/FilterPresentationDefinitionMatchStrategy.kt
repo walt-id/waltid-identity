@@ -15,9 +15,11 @@ class FilterPresentationDefinitionMatchStrategy(
 
     private fun match(
         credentialList: List<WalletCredential>, filters: List<FilterData>
-    ) = credentialList.filter { credential ->
-        filters.isNotEmpty() && filters.all { fields ->
-            isMatching(credential, fields.filters)
+    ) = filters.isNotEmpty().takeIf { it }?.let {
+        credentialList.filter { credential ->
+            filters.any { fields ->
+                isMatching(credential, fields.filters)
+            }
         }
-    }
+    } ?: emptyList()
 }
