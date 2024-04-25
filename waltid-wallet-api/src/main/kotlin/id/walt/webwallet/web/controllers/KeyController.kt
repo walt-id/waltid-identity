@@ -50,7 +50,7 @@ fun Application.keys() = walletRoute {
                                     )
                                     put(
                                         "compartmentOcid",
-                                        JsonPrimitive("ocid1.compartment.oc1..aaaaaaaaxjkkfjqxdqk7ldfjrxjmacmbi7sci73rbfiwpioehikavpbtqx5q")
+                                        JsonPrimitive("ocid1.tenancy.oc1..aaaaaaaaiijfupfvsqwqwgupzdy5yclfzcccmie4ktp2wlgslftv5j7xpk6q")
                                     )
                                     put(
                                         "userOcid",
@@ -59,11 +59,11 @@ fun Application.keys() = walletRoute {
                                     put("fingerprint", JsonPrimitive("bb:d4:4b:0c:c8:3a:49:15:7f:87:55:d5:2b:7e:dd:bc"))
                                     put(
                                         "cryptoEndpoint",
-                                        JsonPrimitive("ens7pgl2aaam2-crypto.kms.eu-frankfurt-1.oraclecloud.com")
+                                        JsonPrimitive("entcvrlraabc4-crypto.kms.eu-frankfurt-1.oraclecloud.com")
                                     )
                                     put(
                                         "managementEndpoint",
-                                        JsonPrimitive("ens7pgl2aaam2-management.kms.eu-frankfurt-1.oraclecloud.com")
+                                        JsonPrimitive("entcvrlraabc4-management.kms.eu-frankfurt-1.oraclecloud.com")
                                     )
                                     put("signingKeyPem", JsonPrimitive("privateKey"))
                                 }
