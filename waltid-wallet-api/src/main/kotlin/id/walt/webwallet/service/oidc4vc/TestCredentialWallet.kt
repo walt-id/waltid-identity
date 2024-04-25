@@ -70,42 +70,16 @@ class TestCredentialWallet(
 
     override fun signToken(target: TokenTarget, payload: JsonObject, header: JsonObject?, keyId: String?, privKey: Key?): String {
         fun debugStateMsg() = "(target: $target, payload: $payload, header: $header, keyId: $keyId)"
-        println("SIGNING TOKEN: ${debugStateMsg()}")
 
         keyId ?: throw IllegalArgumentException("No keyId provided for signToken ${debugStateMsg()}")
-
-        println("KEYID FOR SIGNING: $keyId")
-        println("KEYID FOR SIGNING: $keyId")
-        println("KEYID FOR SIGNING: $keyId")
-        println("KEYID FOR SIGNING: $keyId")
-        println("KEYID FOR SIGNING: $keyId")
-
 
 //        val key = runBlocking { walletService.getKeyByDid(keyId) }
         val key = runBlocking {
             DidService.resolveToKey(keyId).getOrThrow().let { KeysService.get(it.getKeyId()) }
                 ?.let {
-                    println("IT IS: ")
-                    println("IT IS: ")
-                    println("IT IS: ")
-                    println(it)
-                    println(it.document)
-                    println("IT IS: ")
-                    println("IT IS: ")
-                    println("IT IS: ")
-
                     KeySerialization.deserializeKey(it.document).getOrThrow()
                 }
         } ?: error("Failed to retrieve the key")
-        println("KEY FOR SIGNING: $key")
-        println("KEY FOR SIGNING: $key")
-        println("KEY FOR SIGNING: $key")
-        println("KEY FOR SIGNING: $key")
-        println("KEY FOR SIGNING: $key")
-        println("KEY FOR SIGNING: $key")
-        println("KEY FOR SIGNING: $key")
-        println("KEY FOR SIGNING: $key")
-        println("KEY FOR SIGNING: $key")
 
         return runBlocking {
             val authKeyId = resolveDidAuthentication(did)

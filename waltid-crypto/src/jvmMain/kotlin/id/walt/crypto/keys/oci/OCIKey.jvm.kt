@@ -322,21 +322,16 @@ actual class OCIKey actual constructor(
 
             val kmsManagementClient: KmsManagementClient = KmsManagementClient.builder().endpoint(vault.managementEndpoint).build(provider)
 
-            println("CreateKey Test")
             val createKeyDetails =
                 CreateKeyDetails.builder().keyShape(TEST_KEY_SHAPE).protectionMode(CreateKeyDetails.ProtectionMode.Software)
                     .compartmentId(config.compartmentId).displayName("WaltKey").build()
             val createKeyRequest = CreateKeyRequest.builder().createKeyDetails(createKeyDetails).build()
             val response = kmsManagementClient.createKey(createKeyRequest)
-            println("Key created: ${response.key}")
             val keyId = response.key.id
-            println("Key ID: $keyId")
             val keyVersionId = response.key.currentKeyVersion
-            println("Key Version ID: $keyVersionId")
-            sleep(5000)
+
             val publicKey = getOCIPublicKey(kmsManagementClient, keyVersionId, keyId)
 
-            println("Public Key: ${publicKey.exportJWK()}")
             return OCIKey(
                 keyId, config, publicKey.exportJWK(), ociKeyToKeyTypeMapping(response.key.keyShape.algorithm.toString().uppercase())
             )
@@ -363,8 +358,6 @@ actual class OCIKey actual constructor(
 
             val getVaultRequest = GetVaultRequest.builder().vaultId(vaultId).build()
             val response = kmsVaultClient.getVault(getVaultRequest)
-
-            println("retreive vault: ${response.vault}")
 
             return response.vault
         }
