@@ -1,6 +1,7 @@
 package id.walt.did.dids.document
 
 import id.walt.crypto.keys.Key
+import id.walt.ebsi.did.DidEbsiBaseDocument
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
@@ -13,17 +14,12 @@ import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 import kotlin.js.JsName
 
-@Serializable
-class DidEbsiBaseDocument(
-    @EncodeDefault @SerialName("@context")  val context: List<String> = DidEbsiDocument.DEFAULT_CONTEXT
-)
-
 @ExperimentalJsExport
 @JsExport
 @OptIn(ExperimentalSerializationApi::class)
 @Serializable
 data class DidEbsiDocument(
-    @EncodeDefault @SerialName("@context")  val context: List<String> = DEFAULT_CONTEXT,
+    @EncodeDefault @SerialName("@context")  val context: List<String> = DidEbsiBaseDocument.DEFAULT_CONTEXT,
     val id: String, // did:ebsi:
     val controller: Set<String>? = null,
     val verificationMethod: List<VerificationMethod>?,
@@ -33,11 +29,6 @@ data class DidEbsiDocument(
     val capabilityDelegation: List<String>? = null,
     val keyAgreement: List<String>? = null
 ) {
-    companion object {
-        public val DEFAULT_CONTEXT =
-            listOf("https://www.w3.org/ns/did/v1", "https://w3id.org/security/suites/jws-2020/v1")
-    }
-
     @Serializable
     data class VerificationMethod(
         val id: String, // did:ebsi:<identifier>#<keyID>
@@ -50,7 +41,7 @@ data class DidEbsiDocument(
 
     @JsName("secondaryConstructor")
     constructor(did: String, identifier: String, didKey: JsonObject) : this(
-        context = DEFAULT_CONTEXT,
+        context = DidEbsiBaseDocument.DEFAULT_CONTEXT,
         id = did,
         verificationMethod = listOf(VerificationMethod("$did#$identifier", "JsonWebKey2020", did, didKey)),
 

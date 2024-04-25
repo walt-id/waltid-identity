@@ -1,8 +1,6 @@
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
-import id.walt.crypto.utils.MultiBaseUtils
 import id.walt.did.dids.document.DidDocument
-import id.walt.did.dids.document.DidEbsiBaseDocument
 import id.walt.did.dids.document.DidEbsiDocument
 import id.walt.did.dids.registrar.dids.DidEbsiCreateOptions
 import id.walt.did.dids.registrar.dids.DidKeyCreateOptions
@@ -10,36 +8,9 @@ import id.walt.did.dids.registrar.dids.DidWebCreateOptions
 import id.walt.did.dids.registrar.local.ebsi.DidEbsiRegistrar
 import id.walt.did.dids.registrar.local.key.DidKeyRegistrar
 import id.walt.did.dids.registrar.local.web.DidWebRegistrar
-import id.walt.did.dids.resolver.DidResolver
 import id.walt.did.dids.resolver.local.DidEbsiResolver
-import id.walt.did.utils.randomUUID
 import id.walt.ebsi.Delay
 import id.walt.ebsi.EbsiEnvironment
-import id.walt.ebsi.accreditation.AccreditationClient
-import id.walt.ebsi.did.DidEbsiService
-import id.walt.ebsi.eth.TransactionService
-import id.walt.ebsi.rpc.EbsiRpcRequests
-import id.walt.ebsi.rpc.SignedTransactionResponse
-import id.walt.ebsi.rpc.UnsignedTransactionResponse
-import id.walt.oid4vc.OpenID4VCI
-import id.walt.oid4vc.OpenID4VP
-import id.walt.oid4vc.data.*
-import id.walt.oid4vc.data.dif.DescriptorMapping
-import id.walt.oid4vc.data.dif.PresentationDefinition
-import id.walt.oid4vc.data.dif.PresentationSubmission
-import id.walt.oid4vc.interfaces.PresentationResult
-import id.walt.oid4vc.requests.AuthorizationRequest
-import id.walt.oid4vc.requests.CredentialRequest
-import id.walt.oid4vc.requests.TokenRequest
-import id.walt.oid4vc.responses.AuthorizationCodeResponse
-import id.walt.oid4vc.responses.CredentialResponse
-import id.walt.oid4vc.responses.TokenResponse
-import id.walt.oid4vc.util.PresentationBuilder
-import id.walt.oid4vc.util.http
-import io.ktor.client.request.*
-import io.ktor.client.request.forms.*
-import io.ktor.client.statement.*
-import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
 import io.ktor.server.engine.*
@@ -47,19 +18,10 @@ import io.ktor.server.netty.*
 import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
-import io.ktor.util.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
 import kotlinx.serialization.json.*
-import java.net.URLEncoder
-import java.nio.ByteBuffer
-import java.util.UUID
-import kotlin.random.Random
 import kotlin.test.*
-import kotlin.time.DurationUnit
-import kotlin.time.toDuration
 
 class DidCreationTest {
 
@@ -176,7 +138,6 @@ class DidCreationTest {
         assertContains(didEbsiDocument.authentication!!, "${didResult.did}#${CLIENT_VCSIGN_KEY.getKeyId()}")
         assertContains(didEbsiDocument.assertionMethod!!, "${didResult.did}#${CLIENT_VCSIGN_KEY.getKeyId()}")
         // TODO:
-        //      register other key types for did?
         //      VerifiableAccreditationToAttest
         //      more steps from https://hub.ebsi.eu/conformance/build-solutions/accredit-and-authorise-functional-flows
         //      Reorganize test code into production code!!

@@ -5,6 +5,7 @@ import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.did.dids.document.DidDocument
 import id.walt.did.dids.resolver.DidResolutionException
 import id.walt.ebsi.EbsiEnvironment
+import id.walt.ebsi.did.DidEbsiService
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.plugins.contentnegotiation.*
@@ -32,25 +33,9 @@ class DidEbsiResolver(val ebsiEnvironment: EbsiEnvironment, val didRegistryApiVe
     @JsPromise
     @JsExport.Ignore
     override suspend fun resolve(did: String): Result<DidDocument> {
-        val url = "https://api-${ebsiEnvironment.name}.ebsi.eu/did-registry/v${didRegistryApiVersion}/identifiers/${did}"
-
-        val httpClient = HttpClient() {
-            install(ContentNegotiation) {
-                json(Json { ignoreUnknownKeys = true })
-            }
-            if (httpLogging) {
-                install(Logging) {
-                    logger = Logger.SIMPLE
-                    level = LogLevel.HEADERS
-                }
-            }
-        }
-
         val response = runCatching {
-            val httpResp = httpClient.get(url)
-            if(httpResp.status != HttpStatusCode.OK) { throw DidResolutionException("Received HTTP status ${httpResp.status}") }
             DidDocument(
-                jsonObject = httpResp.body<JsonObject>()
+                jsonObject = DidEbsiService.resolve(did, ebsiEnvironment, didRegistryApiVersion)
             )
         }
 
