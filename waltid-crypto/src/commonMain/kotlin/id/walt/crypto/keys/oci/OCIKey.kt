@@ -18,8 +18,6 @@ expect class OCIKey(
 ) : Key {
     override var keyType: KeyType
     override val hasPrivateKey: Boolean
-    val configurationFilePath: String
-    val profile: String
     override fun toString(): String
     override suspend fun getKeyId(): String
     override suspend fun getThumbprint(): String

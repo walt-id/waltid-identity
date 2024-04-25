@@ -25,10 +25,7 @@ actual class OCIKey actual constructor(
         set(value) {}
     actual override val hasPrivateKey: Boolean
         get() = TODO("Not yet implemented")
-    actual val configurationFilePath: String
-        get() = TODO("Not yet implemented")
-    actual val profile: String
-        get() = TODO("Not yet implemented")
+
 
     actual override fun toString(): String {
         TODO("Not yet implemented")
