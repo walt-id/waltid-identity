@@ -5,6 +5,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.jsonPrimitive
 
 class PresentationDefinitionFilterParser {
+    private val prefixRegex = "^(\\$\\.(vc\\.)?)".toRegex()
     fun parse(presentationDefinition: PresentationDefinition): List<FilterData> =
         presentationDefinition.inputDescriptors.map { inputDescriptor ->
             FilterData(
@@ -23,7 +24,7 @@ class PresentationDefinitionFilterParser {
         schemas?.map { schema -> createTypeFilter(schema) } ?: emptyList()
 
     private fun createTypeFilter(inputDescriptorField: InputDescriptorField) = let {
-        val paths = inputDescriptorField.path.map { it.removePrefix("$.") }
+        val paths = inputDescriptorField.path.map { prefixRegex.replace(it, "") }
         val filterType = inputDescriptorField.filter?.get("type")?.jsonPrimitive?.content
         val filterPattern = inputDescriptorField.filter?.get("pattern")?.jsonPrimitive?.content
             ?: throw IllegalArgumentException("No filter pattern in presentation definition constraint")
