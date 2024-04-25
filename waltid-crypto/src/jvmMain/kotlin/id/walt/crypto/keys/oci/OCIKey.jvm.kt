@@ -4,9 +4,6 @@ import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.JWSHeader
 import com.nimbusds.jose.JWSObject
 import com.nimbusds.jose.Payload
-import com.oracle.bmc.ConfigFileReader
-import com.oracle.bmc.auth.AuthenticationDetailsProvider
-import com.oracle.bmc.auth.ConfigFileAuthenticationDetailsProvider
 import com.oracle.bmc.auth.InstancePrincipalsAuthenticationDetailsProvider
 import com.oracle.bmc.keymanagement.KmsCryptoClient
 import com.oracle.bmc.keymanagement.KmsManagementClient
@@ -62,10 +59,8 @@ actual class OCIKey actual constructor(
     }
 
 
-
     @Transient
     private val provider = InstancePrincipalsAuthenticationDetailsProvider.builder().build()
-
 
 
     // Create KMS clients
@@ -76,10 +71,12 @@ actual class OCIKey actual constructor(
     private var vault: Vault = getVault(kmsVaultClient, config.vaultId)
 
     @Transient
-    private var kmsManagementClient: KmsManagementClient = KmsManagementClient.builder().endpoint(vault.managementEndpoint).build(provider)
+    private var kmsManagementClient: KmsManagementClient =
+        KmsManagementClient.builder().endpoint(vault.managementEndpoint).build(provider)
 
     @Transient
-    private var kmsCryptoClient: KmsCryptoClient = KmsCryptoClient.builder().endpoint(vault.cryptoEndpoint).build(provider)
+    private var kmsCryptoClient: KmsCryptoClient =
+        KmsCryptoClient.builder().endpoint(vault.cryptoEndpoint).build(provider)
 
 
     actual override fun toString(): String = "[OCI ${keyType.name} key @ ${config.vaultId}]"
@@ -92,18 +89,22 @@ actual class OCIKey actual constructor(
         TODO("Not yet implemented")
     }
 
-    actual override suspend fun exportJWK(): String = throw NotImplementedError("JWK export is not available for remote keys.")
+    actual override suspend fun exportJWK(): String =
+        throw NotImplementedError("JWK export is not available for remote keys.")
 
     actual override suspend fun exportJWKObject(): JsonObject = Json.parseToJsonElement(_publicKey!!).jsonObject
 
-    actual override suspend fun exportPEM(): String = throw NotImplementedError("PEM export is not available for remote keys.")
+    actual override suspend fun exportPEM(): String =
+        throw NotImplementedError("PEM export is not available for remote keys.")
 
 
     actual override suspend fun signRaw(plaintext: ByteArray): ByteArray {
         val encodedMessage: String = SHA256().digest(plaintext).encodeBase64()
 
-        val signDataDetails = SignDataDetails.builder().keyId(id).message(encodedMessage).messageType(SignDataDetails.MessageType.Digest)
-            .signingAlgorithm(SignDataDetails.SigningAlgorithm.EcdsaSha256).keyVersionId(getKeyVersion(kmsManagementClient, id)).build()
+        val signDataDetails =
+            SignDataDetails.builder().keyId(id).message(encodedMessage).messageType(SignDataDetails.MessageType.Digest)
+                .signingAlgorithm(SignDataDetails.SigningAlgorithm.EcdsaSha256)
+                .keyVersionId(getKeyVersion(kmsManagementClient, id)).build()
 
         val signRequest = SignRequest.builder().signDataDetails(signDataDetails).build()
         val response = kmsCryptoClient.sign(signRequest)
@@ -156,7 +157,8 @@ actual class OCIKey actual constructor(
     actual override suspend fun verifyRaw(signed: ByteArray, detachedPlaintext: ByteArray?): Result<ByteArray> {
 
         val verifyDataDetails =
-            VerifyDataDetails.builder().keyId(id).message(detachedPlaintext?.encodeToBase64Url()).signature(signed.decodeToString())
+            VerifyDataDetails.builder().keyId(id).message(detachedPlaintext?.encodeToBase64Url())
+                .signature(signed.decodeToString())
                 .signingAlgorithm(VerifyDataDetails.SigningAlgorithm.EcdsaSha256).build()
         val verifyRequest = VerifyRequest.builder().verifyDataDetails(verifyDataDetails).build()
         val response = kmsCryptoClient.verify(verifyRequest)
@@ -210,7 +212,8 @@ actual class OCIKey actual constructor(
 
 
         val TEST_KEY_SHAPE: KeyShape =
-            KeyShape.builder().algorithm(KeyShape.Algorithm.Ecdsa).length(DEFAULT_KEY_LENGTH).curveId(KeyShape.CurveId.NistP256).build()
+            KeyShape.builder().algorithm(KeyShape.Algorithm.Ecdsa).length(DEFAULT_KEY_LENGTH)
+                .curveId(KeyShape.CurveId.NistP256).build()
 
         private fun keyTypeToOciKeyMapping(type: KeyType) = when (type) {
             KeyType.secp256r1 -> "ECDSA"
@@ -232,10 +235,9 @@ actual class OCIKey actual constructor(
             val kmsManagementClient = KmsManagementClient.builder().endpoint(vault.managementEndpoint).build(provider)
 
 
-
-
             val createKeyDetails =
-                CreateKeyDetails.builder().keyShape(TEST_KEY_SHAPE).protectionMode(CreateKeyDetails.ProtectionMode.Software)
+                CreateKeyDetails.builder().keyShape(TEST_KEY_SHAPE)
+                    .protectionMode(CreateKeyDetails.ProtectionMode.Software)
                     .compartmentId(config.compartmentId).displayName("WaltKey").build()
             val createKeyRequest = CreateKeyRequest.builder().createKeyDetails(createKeyDetails).build()
             val response = kmsManagementClient.createKey(createKeyRequest)
@@ -250,7 +252,10 @@ actual class OCIKey actual constructor(
 
 
             return OCIKey(
-                keyId, config, publicKey.exportJWK(), ociKeyToKeyTypeMapping(response.key.keyShape.algorithm.toString().uppercase())
+                keyId,
+                config,
+                publicKey.exportJWK(),
+                ociKeyToKeyTypeMapping(response.key.keyShape.algorithm.toString().uppercase())
             )
         }
 
@@ -265,7 +270,7 @@ actual class OCIKey actual constructor(
         }
 
 
-         fun getKeyVersion(kmsManagementClient: KmsManagementClient, keyId: String): String {
+        fun getKeyVersion(kmsManagementClient: KmsManagementClient, keyId: String): String {
             val getKeyRequest = GetKeyRequest.builder().keyId(keyId).build()
             val response = kmsManagementClient.getKey(getKeyRequest)
             return response.key.currentKeyVersion
