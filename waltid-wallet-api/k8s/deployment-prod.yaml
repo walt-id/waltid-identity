@@ -299,6 +299,9 @@ spec:
         - name: wallet-oci-secret
           secret:
             secretName: wallet-oci-secret
+        - name: wallet-oci-rest-api-secret
+          secret:
+            secretName: wallet-oci-rest-api-secret
         - name: wallet-push-config
           secret:
             secretName: wallet-push-config-secret
