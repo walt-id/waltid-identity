@@ -2,13 +2,6 @@
 
 package id.walt.issuer
 
-import com.nimbusds.jose.*
-import com.nimbusds.jose.crypto.ECDSASigner
-import com.nimbusds.jose.crypto.ECDSAVerifier
-import com.nimbusds.jose.jwk.Curve
-import com.nimbusds.jose.jwk.ECKey
-import com.nimbusds.jose.jwk.JWK
-import com.nimbusds.jose.jwk.gen.ECKeyGenerator
 import id.walt.credentials.issuance.Issuer.mergingJwtIssue
 import id.walt.credentials.issuance.Issuer.mergingSdJwtIssue
 import id.walt.credentials.vc.vcs.W3CVC
@@ -16,8 +9,6 @@ import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
-import id.walt.crypto.utils.Base64Utils.base64UrlDecode
-import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.did.dids.DidService
 import id.walt.did.dids.DidUtils
 import id.walt.issuer.IssuanceExamples.openBadgeCredentialExample
@@ -77,17 +68,41 @@ open class CIProvider : OpenIDCredentialIssuer(
         "WalletHolderCredential" to listOf("VerifiableCredential", "WalletHolderCredential"),
         "UniversityDegree" to listOf("VerifiableCredential", "UniversityDegree"),
         "VerifiableId" to listOf("VerifiableCredential", "VerifiableAttestation", "VerifiableId"),
-        "CTWalletSameAuthorisedInTime" to listOf("VerifiableCredential", "VerifiableAttestation", "CTWalletSameAuthorisedInTime"),
-        "CTWalletSameAuthorisedDeferred" to listOf("VerifiableCredential", "VerifiableAttestation", "CTWalletSameAuthorisedDeferred"),
-        "CTWalletSamePreAuthorisedInTime" to listOf("VerifiableCredential", "VerifiableAttestation", "CTWalletSamePreAuthorisedInTime"),
-        "CTWalletSamePreAuthorisedDeferred" to listOf("VerifiableCredential", "VerifiableAttestation", "CTWalletSamePreAuthorisedDeferred"),
+        "CTWalletSameAuthorisedInTime" to listOf(
+            "VerifiableCredential",
+            "VerifiableAttestation",
+            "CTWalletSameAuthorisedInTime"
+        ),
+        "CTWalletSameAuthorisedDeferred" to listOf(
+            "VerifiableCredential",
+            "VerifiableAttestation",
+            "CTWalletSameAuthorisedDeferred"
+        ),
+        "CTWalletSamePreAuthorisedInTime" to listOf(
+            "VerifiableCredential",
+            "VerifiableAttestation",
+            "CTWalletSamePreAuthorisedInTime"
+        ),
+        "CTWalletSamePreAuthorisedDeferred" to listOf(
+            "VerifiableCredential",
+            "VerifiableAttestation",
+            "CTWalletSamePreAuthorisedDeferred"
+        ),
 
         "AlpsTourReservation" to listOf("VerifiableCredential", "VerifiableAttestation", "AlpsTourReservation"),
         "EducationalID" to listOf("VerifiableCredential", "VerifiableAttestation", "EducationalID"),
         "HotelReservation" to listOf("VerifiableCredential", "VerifiableAttestation", "HotelReservation"),
-        "Iso18013DriversLicenseCredential" to listOf("VerifiableCredential", "VerifiableAttestation", "Iso18013DriversLicenseCredential"),
+        "Iso18013DriversLicenseCredential" to listOf(
+            "VerifiableCredential",
+            "VerifiableAttestation",
+            "Iso18013DriversLicenseCredential"
+        ),
         "TaxReceipt" to listOf("VerifiableCredential", "VerifiableAttestation", "TaxReceipt"),
-        "VerifiablePortableDocumentA1" to listOf("VerifiableCredential", "VerifiableAttestation", "VerifiablePortableDocumentA1"),
+        "VerifiablePortableDocumentA1" to listOf(
+            "VerifiableCredential",
+            "VerifiableAttestation",
+            "VerifiablePortableDocumentA1"
+        ),
     ).flatMap { entry ->
         CredentialFormat.values().map { format ->
             CredentialSupported(
@@ -121,7 +136,7 @@ open class CIProvider : OpenIDCredentialIssuer(
         return authSessions[id]
     }
 
-   override fun getSessionByIdTokenRequestState(idTokenRequestState: String): IssuanceSession? {
+    override fun getSessionByIdTokenRequestState(idTokenRequestState: String): IssuanceSession? {
         println("RETRIEVING CI AUTH SESSION by idTokenRequestState: $idTokenRequestState")
         var properSession: IssuanceSession? = null
         authSessions.forEach { entry ->
@@ -148,11 +163,17 @@ open class CIProvider : OpenIDCredentialIssuer(
 
     // ------------------------------------------
     // Simple cryptographics operation interface implementations
-    override fun signToken(target: TokenTarget, payload: JsonObject, header: JsonObject? , keyId: String?, privKey: Key?) =
+    override fun signToken(
+        target: TokenTarget,
+        payload: JsonObject,
+        header: JsonObject?,
+        keyId: String?,
+        privKey: Key?
+    ) =
         runBlocking {
             println("Signing JWS:   $payload")
             println("JWS Signature: target: $target, keyId: $keyId, header: $header")
-            if (header != null && keyId != null && privKey != null)  {
+            if (header != null && keyId != null && privKey != null) {
                 val headers = mapOf("alg" to "ES256", "type" to "jwt", "kid" to keyId)
                 privKey.signJws(payload.toString().toByteArray(), headers).also {
                     println("Signed JWS: >> $it")
@@ -254,7 +275,7 @@ open class CIProvider : OpenIDCredentialIssuer(
             CredentialErrorCode.invalid_or_missing_proof,
             message = "Proof JWT header must contain kid claim"
         )
-        val holderDid = if(DidUtils.isDidUrl(holderKid)) holderKid.substringBefore("#") else holderKid
+        val holderDid = if (DidUtils.isDidUrl(holderKid)) holderKid.substringBefore("#") else holderKid
         //val vc = W3CVC(universityDegreeCredentialExample.toList().associate { it.first to it.second.toJsonElement() })
 
         val data: IssuanceSessionData = (if (subjectDid == null || nonce == null) {
@@ -284,7 +305,7 @@ open class CIProvider : OpenIDCredentialIssuer(
 
             data.run {
                 var issuerKid = issuerDid
-                if (issuerDid.startsWith("did:key") && issuerDid.length==186) // EBSI conformance corner case when issuer uses did:key instead of did:ebsi and no trust framework is defined
+                if (issuerDid.startsWith("did:key") && issuerDid.length == 186) // EBSI conformance corner case when issuer uses did:key instead of did:ebsi and no trust framework is defined
                     issuerKid = issuerDid + "#" + issuerDid.removePrefix("did:key:")
 
                 if (issuerDid.startsWith("did:ebsi"))
@@ -303,6 +324,7 @@ open class CIProvider : OpenIDCredentialIssuer(
                             JsonObject(emptyMap())
                         )
                     )
+
                     else -> vc.mergingJwtIssue(
                         issuerKey = issuerKey,
                         issuerDid = issuerDid,
@@ -343,8 +365,6 @@ open class CIProvider : OpenIDCredentialIssuer(
         }
 
 //        val keyId = keyIdsDistinct.first()
-
-
 
 
         batchCredentialRequest.credentialRequests.first().let { credentialRequest ->
@@ -390,6 +410,7 @@ open class CIProvider : OpenIDCredentialIssuer(
                                                 JsonObject(emptyMap())
                                             )
                                     )
+
                                     else -> vc.mergingJwtIssue(
                                         issuerKey = issuerKey,
                                         issuerDid = issuerDid,
