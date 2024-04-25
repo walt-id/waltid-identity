@@ -65,11 +65,3 @@ object KeyManager {
 
 
 }
-
-suspend fun main() {
-    val json = """
-        {"type":"jwk","jwk":"{\"kty\":\"OKP\",\"d\":\"QGZKvxF4fSqfUwRqr1hkJMVwm1BfoWQ384Kf60r6siE\",\"crv\":\"Ed25519\",\"kid\":\"bckxNDji3G0ur99XHOzWlAXWozK2D4O_scVR86UDod8\",\"x\":\"kyFWzURUCEp4wUhde3WrdrzHQfeg4ObGFTeoIqRPe0c\"}"}
-    """.trimIndent()
-
-    println(KeyManager.resolveSerializedKey(json))
-}
