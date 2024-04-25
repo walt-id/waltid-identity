@@ -1,6 +1,7 @@
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.MultiBaseUtils
+import id.walt.did.dids.document.DidDocument
 import id.walt.did.dids.document.DidEbsiBaseDocument
 import id.walt.did.dids.document.DidEbsiDocument
 import id.walt.did.dids.registrar.dids.DidEbsiCreateOptions
@@ -12,6 +13,7 @@ import id.walt.did.dids.registrar.local.web.DidWebRegistrar
 import id.walt.did.dids.resolver.DidResolver
 import id.walt.did.dids.resolver.local.DidEbsiResolver
 import id.walt.did.utils.randomUUID
+import id.walt.ebsi.Delay
 import id.walt.ebsi.EbsiEnvironment
 import id.walt.ebsi.accreditation.AccreditationClient
 import id.walt.ebsi.did.DidEbsiService
@@ -120,7 +122,7 @@ class DidCreationTest {
     }
 
     val CLIENT_MOCK_PORT = 5000
-    val CLIENT_MOCK_URL = "https://7f7c-62-178-27-231.ngrok-free.app/client-mock"//"http://192.168.0.122:5000/client-mock"
+    val CLIENT_MOCK_URL = "https://7ac8-2001-871-25f-eb8b-609c-61f7-9b2b-1fd0.ngrok-free.app/client-mock"//"http://192.168.0.122:5000/client-mock"
     val CLIENT_MAIN_KEY = runBlocking { JWKKey.generate(KeyType.secp256k1) }
     val CLIENT_VCSIGN_KEY = runBlocking { JWKKey.generate(KeyType.secp256r1) }
     fun startClientMockServer() {
@@ -154,14 +156,25 @@ class DidCreationTest {
         val didResult = DidEbsiRegistrar().registerByKey(CLIENT_MAIN_KEY, DidEbsiCreateOptions(CLIENT_MOCK_URL, taoIssuer, EbsiEnvironment.conformance, didRegistryApiVersion = 5), CLIENT_VCSIGN_KEY)
         val didEbsiDoc = didResult.didDocument.let { Json.decodeFromJsonElement<DidEbsiDocument>(it.toJsonObject()) }
         assertEquals("${didResult.did}#${CLIENT_MAIN_KEY.getKeyId()}", didEbsiDoc.verificationMethod!!.first().id)
-        Thread.sleep(6000)
-        val resolverResult = DidEbsiResolver(EbsiEnvironment.conformance, 5).resolve(didResult.did)
+        var resolverResult: Result<DidDocument>? = null
+        for (i in 1..10) {
+            resolverResult = DidEbsiResolver(EbsiEnvironment.conformance, 5).resolve(didResult.did)
+            if(!resolverResult.isSuccess || resolverResult.getOrNull()?.toJsonObject()?.get("assertionMethod") == null)
+            {
+                println("Waiting for assertionMethod to become visible in DID document...")
+                Delay.delay(2000)
+            } else break
+        }
+        assertNotNull(resolverResult)
         assertEquals(true, resolverResult.isSuccess)
         println(resolverResult.getOrNull()!!.toString())
         val didEbsiDocument = Json.decodeFromJsonElement<DidEbsiDocument>(resolverResult.getOrNull()!!.toJsonObject())
-        assertEquals("${didResult.did}#${CLIENT_MAIN_KEY.getKeyId()}", didEbsiDocument.capabilityInvocation?.first())
-        assertEquals("${didResult.did}#${CLIENT_VCSIGN_KEY.getKeyId()}", didEbsiDocument.authentication?.first())
-        assertEquals("${didResult.did}#${CLIENT_VCSIGN_KEY.getKeyId()}", didEbsiDocument.assertionMethod?.last())
+        assertNotNull(didEbsiDocument.capabilityInvocation)
+        assertNotNull(didEbsiDocument.authentication)
+        assertNotNull(didEbsiDocument.assertionMethod)
+        assertContains(didEbsiDocument.capabilityInvocation!!, "${didResult.did}#${CLIENT_MAIN_KEY.getKeyId()}")
+        assertContains(didEbsiDocument.authentication!!, "${didResult.did}#${CLIENT_VCSIGN_KEY.getKeyId()}")
+        assertContains(didEbsiDocument.assertionMethod!!, "${didResult.did}#${CLIENT_VCSIGN_KEY.getKeyId()}")
         // TODO:
         //      register other key types for did?
         //      VerifiableAccreditationToAttest

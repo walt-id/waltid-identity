@@ -13,6 +13,7 @@ import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
+import kotlinx.coroutines.Delay
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlin.random.Random
@@ -46,11 +47,17 @@ object TrustedRegistryService {
     return response.bodyAsText()
   }
 
-  suspend fun signAndExecuteRPCRequest(rpcRequest: JsonRpcRequest, capabilityInvocationKey: Key, accessToken: String, ebsiEnvironment: EbsiEnvironment, registryApiVersion: Int = 4): String {
+  suspend fun signAndExecuteRPCRequest(rpcRequest: JsonRpcRequest, capabilityInvocationKey: Key, accessToken: String, previousTransactionResult: TransactionResult?, ebsiEnvironment: EbsiEnvironment, registryApiVersion: Int = 4): TransactionResult {
     val unsignedTransaction = executeRPCRequest(
       rpcRequest, accessToken, ebsiEnvironment, registryApiVersion).let { Json.decodeFromString<UnsignedTransactionResponse>(it).result }
+    if(previousTransactionResult != null && unsignedTransaction.nonce == previousTransactionResult.nonce) {
+      id.walt.ebsi.Delay.delay(2000)
+      return signAndExecuteRPCRequest(rpcRequest, capabilityInvocationKey, accessToken, previousTransactionResult, ebsiEnvironment, registryApiVersion)
+    }
     val signedTransaction = unsignedTransaction.sign(capabilityInvocationKey)
-    return executeRPCRequest(
-      EbsiRpcRequests.generateSendSignedTransactionRequest(Random.nextInt(), unsignedTransaction, signedTransaction), accessToken, ebsiEnvironment, registryApiVersion)
+    return TransactionResult(
+    executeRPCRequest(
+      EbsiRpcRequests.generateSendSignedTransactionRequest(Random.nextInt(), unsignedTransaction, signedTransaction), accessToken, ebsiEnvironment, registryApiVersion),
+      unsignedTransaction.nonce)
   }
 }

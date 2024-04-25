@@ -10,6 +10,8 @@ import id.walt.did.dids.registrar.DidRegistrationException
 import id.walt.did.dids.registrar.DidResult
 import id.walt.did.dids.registrar.dids.DidCreateOptions
 import id.walt.did.dids.registrar.local.LocalRegistrarMethod
+import id.walt.did.dids.resolver.local.DidEbsiResolver
+import id.walt.ebsi.Delay
 import id.walt.ebsi.EbsiEnvironment
 import id.walt.ebsi.accreditation.AccreditationClient
 import id.walt.ebsi.did.DidEbsiService
@@ -25,6 +27,9 @@ import id.walt.oid4vc.data.dif.PresentationSubmission
 import id.walt.oid4vc.interfaces.PresentationResult
 import id.walt.oid4vc.util.PresentationBuilder
 import id.walt.oid4vc.util.randomUUID
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.internal.ThreadSafeHeap
+import kotlinx.coroutines.internal.synchronized
 import kotlinx.datetime.Clock
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.Instant
@@ -100,7 +105,7 @@ class DidEbsiRegistrar : LocalRegistrarMethod("ebsi") {
     val rpcResult = TrustedRegistryService.signAndExecuteRPCRequest(
       EbsiRpcRequests.generateInsertDidDocumentRequest(id, did, Utils.toEthereumAddress(mainKey), mainKey,
         DidEbsiBaseDocument().let { Json.encodeToJsonElement(it) }, notBefore, notAfter
-      ), mainKey, accessToken, ebsiEnvironment, didRegistryVersion)
+      ), mainKey, accessToken, null, ebsiEnvironment, didRegistryVersion)
     println("InsertDidDocument result: $rpcResult")
 
     addVerificationMethod(mainKey, did, vcSigningKey, setOf("authentication", "assertionMethod"), ebsiEnvironment, didRegistryVersion, authApiVersion)
@@ -143,22 +148,29 @@ class DidEbsiRegistrar : LocalRegistrarMethod("ebsi") {
     )
     println(tokenResponse.vpToken.toString())
 
+    waitForDidRegistration(did, ebsiEnvironment, didRegistryVersion)
     val accessToken = TrustedRegistryService.getAccessToken(TrustedRegistryScope.didr_write, tokenResponse, ebsiEnvironment, authApiVersion)
 
     // #### Add verification method and verification relationships to DID document ####
     // --- add verification method ---
-    val addVMResult = TrustedRegistryService.signAndExecuteRPCRequest(
+    var txResult = TrustedRegistryService.signAndExecuteRPCRequest(
       EbsiRpcRequests.generateAddVerificationMethodRequest(Random.nextInt(), did, Utils.toEthereumAddress(capabilityInvocationKey), verificationMethodKey),
-      capabilityInvocationKey, accessToken, ebsiEnvironment, didRegistryVersion)
-    println("Add-VM result: $addVMResult")
+      capabilityInvocationKey, accessToken, null, ebsiEnvironment, didRegistryVersion)
+    println("Add-VM result: ${txResult.result}")
 
     // --- add verification relationships ---
     for (relationShip in verificationRelationShips) {
-      val addRelResult = TrustedRegistryService.signAndExecuteRPCRequest(
-        EbsiRpcRequests.generateAddVerificationRelationshipRequest(Random.nextInt(), did, Utils.toEthereumAddress(capabilityInvocationKey), relationShip, "$did#${verificationMethodKey.getKeyId()}"),
-        capabilityInvocationKey, accessToken, ebsiEnvironment, didRegistryVersion)
-      println("Add-$relationShip relationship result: $addRelResult")
+      txResult = TrustedRegistryService.signAndExecuteRPCRequest(
+        EbsiRpcRequests.generateAddVerificationRelationshipRequest(Random.nextInt(), did, Utils.toEthereumAddress(capabilityInvocationKey), relationShip, verificationMethodKey.getKeyId()),
+        capabilityInvocationKey, accessToken, txResult, ebsiEnvironment, didRegistryVersion)
+      println("Add-$relationShip relationship result: ${txResult.result}")
     }
   }
 
+  private suspend fun waitForDidRegistration(did: String, ebsiEnvironment: EbsiEnvironment, didRegistryVersion: Int) {
+    while(!DidEbsiResolver(ebsiEnvironment, didRegistryVersion).resolve(did).isSuccess.also { println("Did registration succeeded: ${it}") }) {
+      println("Waiting for DID registration...")
+      Delay.delay(1000)
+    }
+  }
 }

@@ -3,6 +3,7 @@ package id.walt.did.dids.resolver.local
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.did.dids.document.DidDocument
+import id.walt.did.dids.resolver.DidResolutionException
 import id.walt.ebsi.EbsiEnvironment
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -46,8 +47,10 @@ class DidEbsiResolver(val ebsiEnvironment: EbsiEnvironment, val didRegistryApiVe
         }
 
         val response = runCatching {
+            val httpResp = httpClient.get(url)
+            if(httpResp.status != HttpStatusCode.OK) { throw DidResolutionException("Received HTTP status ${httpResp.status}") }
             DidDocument(
-                jsonObject = httpClient.get(url).body<JsonObject>()
+                jsonObject = httpResp.body<JsonObject>()
             )
         }
 

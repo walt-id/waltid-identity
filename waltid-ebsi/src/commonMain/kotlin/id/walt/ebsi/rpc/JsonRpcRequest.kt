@@ -75,7 +75,7 @@ object EbsiRpcRequests {
     method = EbsiRpcMethod.addVerificationMethod,
     params = listOf(AddVerificationMethodParams(
       from, did,
-      secp256Key.getThumbprint(), secp256Key.keyType == KeyType.secp256k1,
+      secp256Key.getKeyId(), secp256Key.keyType == KeyType.secp256k1,
       when(secp256Key.keyType) {
         KeyType.secp256k1 -> Utils.getPublicKeyXYRepresentation(secp256Key).toHexString().let { "0x04$it" }
         else -> secp256Key.getPublicKey().exportJWK().toByteArray().toHexString().let { "0x$it" }
