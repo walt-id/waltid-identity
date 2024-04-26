@@ -35,7 +35,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-
       - name: Gradle wrapper validation
-        uses: gradle/wrapper-validation-action@v1
+        uses: gradle/wrapper-validation-action@v3
       - name: Running gradle build
         uses: eskatos/gradle-command-action@v3.3.1
         env:
