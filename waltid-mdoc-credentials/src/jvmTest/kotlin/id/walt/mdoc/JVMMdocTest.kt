@@ -8,19 +8,16 @@ import id.walt.mdoc.cose.COSESign1Serializer
 import id.walt.mdoc.dataelement.*
 import id.walt.mdoc.dataretrieval.DeviceRequest
 import id.walt.mdoc.dataretrieval.DeviceResponse
-import id.walt.mdoc.doc.*
+import id.walt.mdoc.doc.MDocBuilder
+import id.walt.mdoc.doc.MDocVerificationParams
+import id.walt.mdoc.doc.VerificationType
+import id.walt.mdoc.doc.and
 import id.walt.mdoc.docrequest.MDocRequestBuilder
 import id.walt.mdoc.docrequest.MDocRequestVerificationParams
 import id.walt.mdoc.mdocauth.DeviceAuthentication
 import id.walt.mdoc.mso.DeviceKeyInfo
 import id.walt.mdoc.mso.ValidityInfo
 import id.walt.mdoc.readerauth.ReaderAuthentication
-import io.kotest.core.spec.style.AnnotationSpec
-import io.kotest.matchers.collections.shouldContainExactly
-import io.kotest.matchers.collections.shouldHaveSize
-import io.kotest.matchers.maps.shouldContainKey
-import io.kotest.matchers.shouldBe
-import io.kotest.matchers.shouldNotBe
 import korlibs.crypto.encoding.Hex
 import kotlinx.datetime.Clock
 import kotlinx.datetime.DateTimeUnit
@@ -29,42 +26,27 @@ import kotlinx.datetime.plus
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.decodeFromHexString
 import kotlinx.serialization.encodeToHexString
-import org.bouncycastle.asn1.pkcs.PrivateKeyInfo
-import org.bouncycastle.asn1.sec.ECPrivateKey
-import org.bouncycastle.asn1.sec.SECNamedCurves
 import org.bouncycastle.asn1.x500.X500Name
 import org.bouncycastle.asn1.x509.BasicConstraints
 import org.bouncycastle.asn1.x509.Extension
 import org.bouncycastle.asn1.x509.KeyUsage
 import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo
-import org.bouncycastle.asn1.x9.X9ECParameters
 import org.bouncycastle.cert.X509v3CertificateBuilder
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter
-import org.bouncycastle.crypto.params.ECDomainParameters
-import org.bouncycastle.crypto.params.ECPrivateKeyParameters
-import org.bouncycastle.crypto.params.ECPublicKeyParameters
-import org.bouncycastle.jcajce.provider.asymmetric.ec.IESCipher.ECIESwithSHA256
-import org.bouncycastle.jcajce.provider.asymmetric.ec.KeyFactorySpi.ECDSA
 import org.bouncycastle.jce.provider.BouncyCastleProvider
-import org.bouncycastle.jce.spec.ECKeySpec
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder
 import java.io.ByteArrayInputStream
 import java.math.BigInteger
-import java.security.KeyFactory
 import java.security.KeyPair
 import java.security.KeyPairGenerator
 import java.security.SecureRandom
 import java.security.Security
 import java.security.cert.CertificateFactory
 import java.security.cert.X509Certificate
-import java.security.spec.ECParameterSpec
-import java.security.spec.ECPrivateKeySpec
-import java.security.spec.EllipticCurve
-import java.security.spec.PKCS8EncodedKeySpec
-import java.security.spec.X509EncodedKeySpec
 import java.util.*
+import kotlin.test.*
 
-class JVMMdocTest: AnnotationSpec() {
+class JVMMdocTest {
 
   val ISSUER_KEY_ID = "ISSUER_KEY"
   val DEVICE_KEY_ID = "DEVICE_KEY"
@@ -80,7 +62,7 @@ class JVMMdocTest: AnnotationSpec() {
   lateinit var issuerCertificate: X509Certificate
   lateinit var intermIssuerCertificate: X509Certificate
 
-  @BeforeAll
+  @BeforeTest//TODO:before-all
   fun initializeIssuerKeys() {
     Security.addProvider(BouncyCastleProvider())
     val kpg = KeyPairGenerator.getInstance("EC")
@@ -194,22 +176,22 @@ class JVMMdocTest: AnnotationSpec() {
     println("SIGNED MDOC (mDL):")
     println(Cbor.encodeToHexString(mdoc))
 
-    mdoc.MSO shouldNotBe null
-    mdoc.MSO!!.digestAlgorithm.value shouldBe "SHA-256"
+    assertNotEquals(illegal = null, actual = mdoc.MSO)
+    assertEquals(expected = "SHA-256", actual = mdoc.MSO!!.digestAlgorithm.value)
     val signedItems = mdoc.getIssuerSignedItems("org.iso.18013.5.1")
-    signedItems shouldHaveSize 3
-    signedItems.first().digestID.value shouldBe 0
-    mdoc.MSO!!.valueDigests.value shouldContainKey MapKey("org.iso.18013.5.1")
-    OneKey(CBORObject.DecodeFromBytes(mdoc.MSO!!.deviceKeyInfo.deviceKey.toCBOR())).AsPublicKey().encoded shouldBe deviceKeyPair.public.encoded
-    mdoc.verify(MDocVerificationParams(VerificationType.forIssuance, ISSUER_KEY_ID), cryptoProvider) shouldBe true
+    assertEquals(expected = 3, actual = signedItems.size)
+    assertEquals(expected = 0L, actual = signedItems.first().digestID.value)
+    assertContains(map = mdoc.MSO!!.valueDigests.value, key = MapKey("org.iso.18013.5.1"))
+    assertContentEquals(expected = deviceKeyPair.public.encoded, actual = OneKey(CBORObject.DecodeFromBytes(mdoc.MSO!!.deviceKeyInfo.deviceKey.toCBOR())).AsPublicKey().encoded)
+    assertEquals(expected = true, actual = mdoc.verify(MDocVerificationParams(VerificationType.forIssuance, ISSUER_KEY_ID), cryptoProvider))
 
     val mdocTampered = MDocBuilder("org.iso.18013.5.1.mDL")
       .addItemToSign("org.iso.18013.5.1", "family_name", "Foe".toDE())
       .build(mdoc.issuerSigned.issuerAuth)
     // MSO is valid, signature check should succeed
-    cryptoProvider.verify1(mdocTampered.issuerSigned.issuerAuth!!, ISSUER_KEY_ID) shouldBe true
+    assertEquals(expected = true, actual = cryptoProvider.verify1(mdocTampered.issuerSigned.issuerAuth!!, ISSUER_KEY_ID))
     // signed item was tampered, overall verification should fail
-    mdocTampered.verify(MDocVerificationParams(VerificationType.forIssuance, ISSUER_KEY_ID), cryptoProvider) shouldBe false
+    assertEquals(expected = false, actual = mdocTampered.verify(MDocVerificationParams(VerificationType.forIssuance, ISSUER_KEY_ID), cryptoProvider))
 
     // test presentation with device signature
     val ephemeralReaderKey = OneKey.generateKey(AlgorithmID.ECDSA_256)
@@ -223,7 +205,7 @@ class JVMMdocTest: AnnotationSpec() {
 
     val presentedDoc = mdoc.presentWithDeviceSignature(mdocRequest, deviceAuthentication, cryptoProvider, DEVICE_KEY_ID)
 
-    presentedDoc.verify(
+    assertEquals(expected = true, actual = presentedDoc.verify(
       MDocVerificationParams(
         VerificationType.forPresentation,
         ISSUER_KEY_ID, DEVICE_KEY_ID,
@@ -231,7 +213,7 @@ class JVMMdocTest: AnnotationSpec() {
         mDocRequest =  mdocRequest
       ),
       cryptoProvider
-    ) shouldBe true
+    ))
   }
 
   @Test
@@ -247,9 +229,9 @@ class JVMMdocTest: AnnotationSpec() {
     val cryptoProvider = SimpleCOSECryptoProvider(listOf(
       COSECryptoProviderKeyInfo(ISSUER_KEY_ID, AlgorithmID.ECDSA_256, cert.publicKey, null, listOf(cert))
     ))
-    mdoc.documents[0].verifySignature(cryptoProvider, ISSUER_KEY_ID) shouldBe true
+    assertEquals(expected = true, actual = mdoc.documents[0].verifySignature(cryptoProvider, ISSUER_KEY_ID))
     // CA certificate of example not trusted
-    //mdoc.documents[0].verifyCertificate(cryptoProvider) shouldBe true
+    //assertEquals(expected = true, actual = mdoc.documents[0].verifyCertificate(cryptoProvider))
   }
 
   @Test
@@ -302,7 +284,7 @@ class JVMMdocTest: AnnotationSpec() {
     val readerAuthenticationBytes = Hex.decode("d8185902ee837452656164657241757468656e7469636174696f6e83d8185858a20063312e30018201d818584ba4010220012158205a88d182bce5f42efa59943f33359d2e8a968ff289d93e5fa444b624343167fe225820b16e8cf858ddc7690407ba61d4c338237a8cfcf3de6aa672fc60a557aa32fc67d818584ba40102200121582060e3392385041f51403051f2415531cb56dd3f999c71687013aac6768bc8187e225820e58deb8fdbe907f7dd5368245551a34796f7d2215c440c339bb0f7b67beccdfa8258c391020f487315d10209616301013001046d646f631a200c016170706c69636174696f6e2f766e642e626c7565746f6f74682e6c652e6f6f6230081b28128b37282801021c015c1e580469736f2e6f72673a31383031333a646576696365656e676167656d656e746d646f63a20063312e30018201d818584ba4010220012158205a88d182bce5f42efa59943f33359d2e8a968ff289d93e5fa444b624343167fe225820b16e8cf858ddc7690407ba61d4c338237a8cfcf3de6aa672fc60a557aa32fc6758cd91022548721591020263720102110204616301013000110206616301036e6663005102046163010157001a201e016170706c69636174696f6e2f766e642e626c7565746f6f74682e6c652e6f6f6230081b28078080bf2801021c021107c832fff6d26fa0beb34dfcd555d4823a1c11010369736f2e6f72673a31383031333a6e66636e6663015a172b016170706c69636174696f6e2f766e642e7766612e6e616e57030101032302001324fec9a70b97ac9684a4e326176ef5b981c5e8533e5f00298cfccbc35e700a6b020414d8185893a267646f6354797065756f72672e69736f2e31383031332e352e312e6d444c6a6e616d65537061636573a1716f72672e69736f2e31383031332e352e31a66b66616d696c795f6e616d65f56f646f63756d656e745f6e756d626572f57264726976696e675f70726976696c65676573f56a69737375655f64617465f56b6578706972795f64617465f568706f727472616974f4")
 
     val readerAuthentication = EncodedCBORElement.fromEncodedCBORElementData(readerAuthenticationBytes).decode<ReaderAuthentication>()
-    (readerAuthentication.data[0] as? StringElement)?.value shouldBe "ReaderAuthentication"
+    assertEquals(expected = "ReaderAuthentication", actual = (readerAuthentication.data[0] as? StringElement)?.value)
 
     val certificateDER = devRequest.docRequests[0].readerAuth!!.x5Chain
     val cert = CertificateFactory.getInstance("X509").generateCertificate(ByteArrayInputStream(certificateDER)) as X509Certificate
@@ -311,20 +293,20 @@ class JVMMdocTest: AnnotationSpec() {
     ))
 
     // test with all fields allowed to retain
-    devRequest.docRequests[0].verify(
+    assertEquals(expected = true, actual = devRequest.docRequests[0].verify(
       MDocRequestVerificationParams(
         true, READER_KEY_ID, allowedToRetain = mapOf(
           "org.iso.18013.5.1" to setOf("family_name", "document_number", "driving_privileges", "issue_date", "expiry_date")
         ), readerAuthentication
-      ), cryptoProvider) shouldBe true
+      ), cryptoProvider))
 
     // test with restricted fields allowed to retain
-    devRequest.docRequests[0].verify(
+    assertEquals(expected = false, actual = devRequest.docRequests[0].verify(
       MDocRequestVerificationParams(
         true, READER_KEY_ID, allowedToRetain = mapOf(
           "org.iso.18013.5.1" to setOf("family_name")
         ), readerAuthentication
-      ), cryptoProvider) shouldBe false
+      ), cryptoProvider))
   }
 
   @Test
@@ -353,10 +335,12 @@ class JVMMdocTest: AnnotationSpec() {
         println("- ${issuerSignedItem.elementIdentifier.value}: ${issuerSignedItem.elementValue.value.toString()}")
       }
     }
-    presentedMdoc.nameSpaces shouldContainExactly setOf("org.iso.18013.5.1")
-    presentedMdoc.getIssuerSignedItems("org.iso.18013.5.1").map {
-      it.elementIdentifier.value
-    } shouldContainExactly setOf("family_name", "document_number")
+    assertEquals(expected = setOf("org.iso.18013.5.1"), actual = presentedMdoc.nameSpaces)
+    assertContentEquals(
+        expected = setOf("family_name", "document_number"),
+        actual = presentedMdoc.getIssuerSignedItems("org.iso.18013.5.1").map {
+            it.elementIdentifier.value
+        })
 
     // validate issuer signature, tamper check and device mac
     val certificateDER = mdoc.issuerSigned.issuerAuth!!.x5Chain!!
@@ -373,7 +357,7 @@ class JVMMdocTest: AnnotationSpec() {
       mDocRequest = mdocRequest
     ), cryptoProvider)
     println("Verified: $mdocVerified")
-    mdocVerified shouldBe true
+    assertEquals(expected = true, actual = mdocVerified)
   }
 
   @Test
@@ -418,14 +402,20 @@ class JVMMdocTest: AnnotationSpec() {
     println("SIGNED MDOC (mobile eID):")
     println(Cbor.encodeToHexString(mdoc))
 
-    mdoc.MSO shouldNotBe null
-    mdoc.MSO!!.digestAlgorithm.value shouldBe "SHA-256"
-    val signedItems = mdoc.getIssuerSignedItems("org.iso.23220.1")
-    signedItems shouldHaveSize 10
-    signedItems.first().digestID.value shouldBe 0
-    mdoc.MSO!!.valueDigests.value shouldContainKey MapKey("org.iso.23220.1")
-    OneKey(CBORObject.DecodeFromBytes(mdoc.MSO!!.deviceKeyInfo.deviceKey.toCBOR())).AsPublicKey().encoded shouldBe deviceKeyPair.public.encoded
-    mdoc.verify(MDocVerificationParams(VerificationType.forIssuance, ISSUER_KEY_ID), cryptoProvider) shouldBe true
+      assertNotEquals(illegal = null, actual = mdoc.MSO)
+      assertEquals(expected = "SHA-256", actual = mdoc.MSO!!.digestAlgorithm.value)
+      val signedItems = mdoc.getIssuerSignedItems("org.iso.23220.1")
+      assertEquals(expected = 10, actual = signedItems.size)
+      assertEquals(expected = 0L, actual = signedItems.first().digestID.value)
+      assertContains(map = mdoc.MSO!!.valueDigests.value, key = MapKey("org.iso.23220.1"))
+      assertContentEquals(
+          expected = deviceKeyPair.public.encoded,
+          actual = OneKey(CBORObject.DecodeFromBytes(mdoc.MSO!!.deviceKeyInfo.deviceKey.toCBOR())).AsPublicKey().encoded
+      )
+      assertEquals(
+          expected = true,
+          actual = mdoc.verify(MDocVerificationParams(VerificationType.forIssuance, ISSUER_KEY_ID), cryptoProvider)
+      )
 
 
     // test presentation with device signature
@@ -457,15 +447,18 @@ class JVMMdocTest: AnnotationSpec() {
 
     val presentedMdoc = mdoc.presentWithDeviceSignature(mdocRequest, deviceAuthentication, cryptoProvider, DEVICE_KEY_ID)
 
-    presentedMdoc.verify(
-      MDocVerificationParams(
-        VerificationType.forPresentation,
-        ISSUER_KEY_ID, DEVICE_KEY_ID,
-        deviceAuthentication = deviceAuthentication,
-        mDocRequest =  mdocRequest
-      ),
-      cryptoProvider
-    ) shouldBe true
+      assertEquals(
+          expected = true,
+          actual = presentedMdoc.verify(
+              MDocVerificationParams(
+                  VerificationType.forPresentation,
+                  ISSUER_KEY_ID, DEVICE_KEY_ID,
+                  deviceAuthentication = deviceAuthentication,
+                  mDocRequest = mdocRequest
+              ),
+              cryptoProvider
+          )
+      )
 
     presentedMdoc.nameSpaces.forEach { ns ->
       println("Presented mobile eID ($ns)")
@@ -479,7 +472,7 @@ class JVMMdocTest: AnnotationSpec() {
   fun testDeserializeJSCoseResult() {
     val jsCoseResult = "d28443a10126a1044d4953535545525f4b45595f4944d84859016ed818590169a66776657273696f6e63312e306f646967657374416c676f726974686d675348412d3235366c76616c756544696765737473a1716f72672e69736f2e31383031332e352e31a3005820973d5016a63d3949c90bfeb1c82249ebb2b3aab57c945d7e52d8ffd61ce2f18c0158206c63e9f9237e5bcd7ea8096615c2d1ce07be9250fc1ad70cee6a32ea34d6ec74025820d30704f179d44947eaa445165f19aebfbe46193d1163b20ffccc9ed844bbf5986d6465766963654b6579496e666fa1696465766963654b6579a1616b643132333467646f6354797065756f72672e69736f2e31383031332e352e312e6d444c6c76616c6964697479496e666fa3667369676e6564c07818323032332d31312d33305431353a35323a33392e3934395a6976616c696446726f6dc07818323032332d31312d33305431353a35323a33392e3934395a6a76616c6964556e74696cc07818323032342d31312d32395431353a35323a33392e3934395a5840640ef0805702cc6972bcb24a325fd71073caa3952ffd5e38cd6847169deb02908e94629ffbaecee02ab556d4d4af1ae0cc779c0f46f1721ad830f0badf942ee5"
     val coseSign1 = Cbor.decodeFromByteArray(COSESign1Serializer, Hex.decode(jsCoseResult))
-    coseSign1.algorithm shouldBe AlgorithmID.ECDSA_256
+      assertEquals(expected = AlgorithmID.ECDSA_256, actual = AlgorithmID.valueOf(coseSign1.algorithm.toString()))
   }
 
   /*@Test
