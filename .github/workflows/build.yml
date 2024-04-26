@@ -27,7 +27,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-
       - name: Gradle wrapper validation
-        uses: gradle/wrapper-validation-action@v1
+        uses: gradle/wrapper-validation-action@v3
 
       - name: Get changed files in the frontend
         id: frontend-changed-files
