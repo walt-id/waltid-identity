@@ -100,6 +100,7 @@ private val fixedPresentationDefinitionForEbsiConformanceTest = "{\"id\":\"any\"
 
 private val verificationUseCase = VerificationUseCase(httpClient)
 
+private val logger = KotlinLogging.logger { }
 
 
 fun Application.verfierApi() {
@@ -226,11 +227,11 @@ fun Application.verfierApi() {
             get("verify") {
                 val params = call.parameters.toMap().toJsonObject()
 
-                println("paramass")
-                println("paramass")
-                println(params)
-                println("paramass")
-                println("paramass")
+                logger.info { "paramass" }
+                logger.info { "paramass" }
+                logger.info {params.toString()}
+                logger.info { "paramass" }
+                logger.info { "paramass" }
 
                 val stateParamAuthorizeReqEbsi = params["state"]?.jsonArray?.get(0)?.jsonPrimitive?.content
                 var scope = params["scope"]?.jsonArray.toString().replace("\"", "").replace("[","").replace("]", "")
@@ -291,7 +292,7 @@ fun Application.verfierApi() {
                 val requestJwtHeader = mapOf(JWTClaims.Header.keyID to SERVER_SIGNING_KEY.getPublicKey().getKeyId(), JWTClaims.Header.type to "JWT" )
 
                 val requestToken = SERVER_SIGNING_KEY.signJws(requestJwtPayload.toString().toByteArray(), requestJwtHeader).also {
-                    println("Signed JWS: >> $it")
+                    logger.info{"Signed JWS: >> $it"}
                 }
 
                 var responseQueryString = response.toHttpQueryString()
