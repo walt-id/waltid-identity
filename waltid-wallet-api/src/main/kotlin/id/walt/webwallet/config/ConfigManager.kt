@@ -3,11 +3,15 @@ package id.walt.webwallet.config
 import com.sksamuel.hoplite.*
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.server.plugins.*
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.encodeToJsonElement
 import java.util.concurrent.ConcurrentLinkedQueue
 import kotlin.reflect.KClass
 import kotlin.reflect.jvm.jvmName
 
-interface WalletConfig
+@Serializable
+sealed class WalletConfig
 
 object ConfigManager {
 
@@ -95,6 +99,8 @@ object ConfigManager {
                 }
         }
 
+    fun WalletConfig.asJsonObject() = Json.encodeToJsonElement(this)
+
     fun registerConfig(
         id: String,
         type: KClass<out WalletConfig>,
@@ -124,7 +130,6 @@ object ConfigManager {
             val dbConfigFile = (it as DatabaseConfiguration).database
 
             registerRequiredConfig(dbConfigFile, multiple = true, type = DatasourceJsonConfiguration::class)
-            registerRequiredConfig(dbConfigFile, multiple = true, type = DatasourceConfiguration::class)
         }
         registerRequiredConfig("web", WebConfig::class)
         registerRequiredConfig("logins", LoginMethodsConfig::class)

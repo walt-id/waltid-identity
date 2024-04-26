@@ -1,8 +1,10 @@
 package id.walt.webwallet.config
 
 import id.walt.crypto.keys.KeyGenerationRequest
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 
+@Serializable
 data class RegistrationDefaultsConfig(
     private val defaultKeyConfig: JsonObject = buildJsonObject {
         put("backend", JsonPrimitive("jwk"))
@@ -12,7 +14,7 @@ data class RegistrationDefaultsConfig(
     private val defaultDidConfig: JsonObject = buildJsonObject {
         put("method", JsonPrimitive("jwk"))
     }
-) : WalletConfig {
+) : WalletConfig() {
     val keyGenerationRequest = Json.decodeFromJsonElement<KeyGenerationRequest>(defaultKeyConfig)
 
     val didMethod = defaultDidConfig["method"]!!.jsonPrimitive.content
