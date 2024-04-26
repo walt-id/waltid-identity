@@ -1,6 +1,5 @@
 package id.walt.webwallet.config
 
-import com.zaxxer.hikari.HikariDataSource
 import id.walt.webwallet.db.Db
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.Serializable
