@@ -9,6 +9,7 @@ import id.walt.oid4vc.data.ResponseMode
 import id.walt.oid4vc.data.dif.*
 import id.walt.oid4vc.definitions.JWTClaims
 import id.walt.verifier.oidc.VerificationUseCase
+import io.github.oshai.kotlinlogging.KotlinLogging
 import io.github.smiley4.ktorswaggerui.dsl.get
 import io.github.smiley4.ktorswaggerui.dsl.post
 import io.github.smiley4.ktorswaggerui.dsl.route
