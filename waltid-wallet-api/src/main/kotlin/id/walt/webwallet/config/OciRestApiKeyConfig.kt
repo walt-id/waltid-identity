@@ -11,4 +11,4 @@ data class OciRestApiKeyConfig(
     val managementEndpoint: String,
     val cryptoEndpoint: String,
     val signingKeyPem: String? = null
-) : WalletConfig
+) : WalletConfig()
