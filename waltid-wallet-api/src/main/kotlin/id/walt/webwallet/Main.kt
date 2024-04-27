@@ -78,11 +78,11 @@ fun Application.webWalletModule(withPlugins: Boolean = true) {
     health()
 
     auth()
+    accounts()
     push()
     notifications()
 
     // Wallet routes
-    accounts()
     keys()
     dids()
     credentials()
