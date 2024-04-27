@@ -2,6 +2,7 @@ import id.walt.issuer.base.config.OIDCIssuerServiceConfig
 import id.walt.issuer.issuerModule
 import id.walt.verifier.verifierModule
 import id.walt.webwallet.config.DatasourceJsonConfiguration
+import id.walt.webwallet.config.RegistrationDefaultsConfig
 import id.walt.webwallet.db.Db
 import id.walt.webwallet.db.models.AccountWalletListing
 import id.walt.webwallet.utils.WalletHttpClients
@@ -51,6 +52,7 @@ class E2EWalletTestLocal : E2EWalletTestBase() {
 
 
             WalletConfigManager.preloadConfig("web", WalletWebConfig())
+            WalletConfigManager.preloadConfig("registration-defaults", RegistrationDefaultsConfig())
             webWalletSetup()
             WalletConfigManager.loadConfigs(emptyArray())
         }
