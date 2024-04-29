@@ -22,11 +22,18 @@ import id.walt.crypto.utils.JvmEccUtils
 import id.walt.crypto.utils.JwsUtils.jwsAlg
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.util.*
+import kotlinx.coroutines.delay
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 import kotlinx.serialization.json.*
 import org.kotlincrypto.hash.sha2.SHA256
+import java.time.Duration
+import kotlin.time.ExperimentalTime
+import kotlin.time.measureTime
+import kotlin.time.toJavaDuration
+import kotlin.time.toKotlinDuration
+
 
 private val log = KotlinLogging.logger { }
 
@@ -227,6 +234,7 @@ actual class OCIKey actual constructor(
             else -> throw IllegalArgumentException("Not supported: $type")
         }
 
+        @OptIn(ExperimentalTime::class)
         actual suspend fun generateKey(config: OCIsdkMetadata): OCIKey {
             return retry {
                 val provider = InstancePrincipalsAuthenticationDetailsProvider.builder().build()
@@ -288,17 +296,31 @@ actual class OCIKey actual constructor(
 }
 
 
-private suspend fun <T> retry(retriesLeft: Int = 3, currentTry: Int = 1, block: suspend () -> T): T =
-    runCatching { block.invoke() }.fold(
-        onSuccess = { it },
-        onFailure = { error ->
-            when {
-                retriesLeft <= 0 -> throw IllegalStateException(
-                    "Failed after $currentTry retries: ${error.message}",
-                    error
-                )
+@ExperimentalTime
+private suspend fun <T> retry(
+    maxDuration: Duration = Duration.ofSeconds(2),
+    retryInterval: Duration = Duration.ofMillis(100),
+    block: suspend () -> T
+): T {
+    var result: Result<T>
+    var totalDuration = Duration.ZERO
 
-                else -> retry(retriesLeft - 1, currentTry + 1, block)
+    while (totalDuration < maxDuration) {
+        val elapsedTime = measureTime {
+            result = runCatching { block() }
+        }
+
+        if (result.isSuccess) {
+            println("Success after $elapsedTime: ${result.getOrThrow()}")
+            return result.getOrThrow()
+        } else {
+            totalDuration += elapsedTime.toJavaDuration()
+            if (totalDuration >= maxDuration) {
+                throw IllegalStateException("Failed after total duration of $totalDuration: ${result.exceptionOrNull()?.message}")
             }
-        })
+            delay(retryInterval.toKotlinDuration())
+        }
+    }
+    throw IllegalStateException("Failed after total duration of $totalDuration: Retry time limit exceeded.")
+}
 
