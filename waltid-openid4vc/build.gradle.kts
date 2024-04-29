@@ -147,6 +147,8 @@ kotlin {
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-slf4j:1.8.0")
                 implementation("io.ktor:ktor-client-okhttp:$ktor_version")
 
+                implementation("com.augustcellars.cose:cose-java:1.1.0")
+
             }
         }
         val jsMain by getting {
