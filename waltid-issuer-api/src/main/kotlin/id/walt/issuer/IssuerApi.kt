@@ -8,10 +8,12 @@ import id.walt.issuer.IssuanceExamples.batchExample
 import id.walt.issuer.IssuanceExamples.issuerOnboardingRequestDefaultExample
 import id.walt.issuer.IssuanceExamples.issuerOnboardingRequestDidWebExample
 import id.walt.issuer.IssuanceExamples.issuerOnboardingRequestOciExample
+import id.walt.issuer.IssuanceExamples.issuerOnboardingRequestOciRestApiExample
 import id.walt.issuer.IssuanceExamples.issuerOnboardingRequestTseExample
 import id.walt.issuer.IssuanceExamples.issuerOnboardingResponseDefaultExample
 import id.walt.issuer.IssuanceExamples.issuerOnboardingResponseDidWebExample
 import id.walt.issuer.IssuanceExamples.issuerOnboardingResponseOciExample
+import id.walt.issuer.IssuanceExamples.issuerOnboardingResponseOciRestApiExample
 import id.walt.issuer.IssuanceExamples.issuerOnboardingResponseTseExample
 import id.walt.issuer.IssuanceExamples.openBadgeCredentialExampleJsonString
 import id.walt.issuer.IssuanceExamples.sdJwtExample
@@ -87,6 +89,10 @@ fun Application.issuerApi() {
                             "did:jwk + OCI key (Oracle Cloud Infrastructure - Secp256r1)",
                             issuerOnboardingRequestOciExample
                         )
+                        example(
+                            "did:jwk + OCI REST API key  (Oracle Cloud Infrastructure - Secp256r1)",
+                            issuerOnboardingRequestOciRestApiExample
+                        )
                         required = true
                     }
                 }
@@ -110,6 +116,10 @@ fun Application.issuerApi() {
                             example(
                                 "Remote OCI Secp256r1 key + did:jwk",
                                 issuerOnboardingResponseOciExample,
+                            )
+                            example(
+                                "Remote OCI REST API Secp256r1 key + did:jwk",
+                                issuerOnboardingResponseOciRestApiExample,
                             )
                         }
                     }
