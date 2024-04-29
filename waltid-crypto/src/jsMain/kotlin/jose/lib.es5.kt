@@ -6,6 +6,7 @@ import org.khronos.webgl.ArrayBuffer
 import org.khronos.webgl.Uint8Array
 import kotlin.js.Date
 
+@Suppress("DEPRECATION")
 external interface DateConstructor {
     @nativeInvoke
     operator fun invoke(): String

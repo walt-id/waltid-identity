@@ -27,10 +27,7 @@ import kotlinx.datetime.Clock
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.plus
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.Transient
-import kotlinx.serialization.encodeToString
+import kotlinx.serialization.*
 import kotlinx.serialization.json.*
 import love.forte.plugin.suspendtrans.annotation.JsPromise
 import love.forte.plugin.suspendtrans.annotation.JvmAsync
@@ -285,6 +282,7 @@ class OCIKeyRestApi(
             else -> throw IllegalArgumentException("Not supported: $type")
         }
 
+        @OptIn(ExperimentalSerializationApi::class)
         @JvmBlocking
         @JvmAsync
         @JsPromise

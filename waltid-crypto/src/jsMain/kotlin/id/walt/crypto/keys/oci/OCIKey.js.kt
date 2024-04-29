@@ -10,6 +10,7 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import love.forte.plugin.suspendtrans.annotation.JsPromise
 
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 @Serializable
 @SerialName("oci")
