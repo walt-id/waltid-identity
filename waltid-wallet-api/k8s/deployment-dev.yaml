@@ -130,6 +130,15 @@ data:
     ]
 ---
 apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wallet-oci-config
+data:
+  oci.conf: |
+    vaultId = "ocid1.vault.oc1.eu-frankfurt-1.entcvrlraabc4.abtheljrpyimqvzheblr6ce4bqt2snnz36i4etlgtg32n4du5dbrnpgagf6q"
+    compartmentId = "ocid1.compartment.oc1..aaaaaaaawirugoz35riiybcxsvf7bmelqsxo3sajaav5w3i2vqowcwqrllxa"
+---
+apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: wallet-data-volume-claim
@@ -211,9 +220,13 @@ spec:
               subPath: "auth.conf"
               readOnly: true
 
-            - name: wallet-oci-secret
+            - name: wallet-oci-config
               mountPath: "/waltid-wallet-api/config/oci.conf"
               subPath: "oci.conf"
+              readOnly: true
+            - name: wallet-oci-rest-api-secret
+              mountPath: "/waltid-wallet-api/config/oci-rest-api.conf"
+              subPath: "oci-rest-api.conf"
               readOnly: true
             - name: wallet-nft-config
               mountPath: "/waltid-wallet-api/walt.yaml"
@@ -240,7 +253,6 @@ spec:
         - name: wallet-oidc-config
           configMap:
             name: wallet-oidc-config
-
         - name: wallet-marketplace-config
           configMap:
             name: wallet-marketplace-config
@@ -256,12 +268,15 @@ spec:
         - name: wallet-logins-config
           configMap:
             name: wallet-logins-config
+        - name: wallet-oci-config
+          configMap:
+            name: wallet-oci-config
         - name: wallet-auth-secret
           secret:
             secretName: wallet-auth-secret
-        - name: wallet-oci-secret
+        - name: wallet-oci-rest-api-secret
           secret:
-            secretName: wallet-oci-secret
+            secretName: wallet-oci-rest-api-secret
         - name: wallet-push-config
           secret:
             secretName: wallet-push-config-secret

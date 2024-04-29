@@ -11,12 +11,7 @@ import id.walt.did.dids.registrar.dids.DidKeyCreateOptions
 import id.walt.did.dids.registrar.dids.DidWebCreateOptions
 import id.walt.did.dids.resolver.LocalResolver
 import id.walt.did.utils.EnumUtils.enumValueIgnoreCase
-import id.walt.oid4vc.OpenID4VCI
-import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.data.CredentialOffer
-import id.walt.oid4vc.data.GrantType
-import id.walt.oid4vc.data.OpenIDProviderMetadata
-import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.errors.AuthorizationError
 import id.walt.oid4vc.providers.CredentialWalletConfig
 import id.walt.oid4vc.providers.OpenIDClientConfig
@@ -25,11 +20,7 @@ import id.walt.oid4vc.requests.CredentialOfferRequest
 import id.walt.oid4vc.responses.AuthorizationErrorCode
 import id.walt.webwallet.config.ConfigManager
 import id.walt.webwallet.config.OciKeyConfig
-import id.walt.oid4vc.providers.TokenTarget
-import id.walt.oid4vc.requests.*
-import id.walt.oid4vc.responses.BatchCredentialResponse
-import id.walt.oid4vc.responses.CredentialResponse
-import id.walt.oid4vc.responses.TokenResponse
+import id.walt.webwallet.config.OciRestApiKeyConfig
 import id.walt.webwallet.db.models.WalletCategoryData
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.db.models.WalletOperationHistories
@@ -40,7 +31,9 @@ import id.walt.webwallet.service.credentials.CredentialsService
 import id.walt.webwallet.service.dids.DidsService
 import id.walt.webwallet.service.dto.LinkedWalletDataTransferObject
 import id.walt.webwallet.service.dto.WalletDataTransferObject
-import id.walt.webwallet.service.events.*
+import id.walt.webwallet.service.events.EventDataNotAvailable
+import id.walt.webwallet.service.events.EventService
+import id.walt.webwallet.service.events.EventType
 import id.walt.webwallet.service.exchange.IssuanceService
 import id.walt.webwallet.service.keys.KeysService
 import id.walt.webwallet.service.keys.SingleKeyResponse
@@ -54,15 +47,8 @@ import id.walt.webwallet.web.controllers.PresentationRequestParameter
 import id.walt.webwallet.web.parameter.CredentialRequestParameter
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
-import io.ktor.client.call.*
-import io.ktor.client.engine.cio.*
-import io.ktor.client.engine.java.*
-import io.ktor.client.plugins.contentnegotiation.*
-import io.ktor.client.plugins.logging.*
-import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
-import io.ktor.client.utils.EmptyContent.contentType
 import io.ktor.http.*
 import io.ktor.util.*
 import kotlinx.coroutines.runBlocking
@@ -75,7 +61,6 @@ import kotlinx.uuid.UUID
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
-import org.slf4j.LoggerFactory
 import java.net.URLDecoder
 import kotlin.collections.set
 import kotlin.time.Duration.Companion.seconds
@@ -455,8 +440,8 @@ class SSIKit2WalletService(
             )
         }
 
-    private val ociKeyMetadata by lazy {
-        ConfigManager.getConfig<OciKeyConfig>().let {
+    private val ociRestApiKeyMetadata by lazy {
+        ConfigManager.getConfig<OciRestApiKeyConfig>().let {
             mapOf(
                 "tenancyOcid" to it.tenancyOcid,
                 "compartmentOcid" to it.compartmentOcid,
@@ -469,10 +454,25 @@ class SSIKit2WalletService(
         }
     }
 
+
+    private val ociKeyMetadata by lazy {
+        ConfigManager.getConfig<OciKeyConfig>().let {
+            mapOf(
+                "compartmentId" to it.compartmentId,
+                "vaultId" to it.vaultId
+            ).toJsonObject()
+        }
+    }
+
     override suspend fun generateKey(request: KeyGenerationRequest): String = let {
+        if (request.backend == "oci-rest-api" && request.config == null) {
+            request.config = ociRestApiKeyMetadata
+        }
         if (request.backend == "oci" && request.config == null) {
             request.config = ociKeyMetadata
         }
+
+
 
         KeyManager.createKey(request)
             .also {
