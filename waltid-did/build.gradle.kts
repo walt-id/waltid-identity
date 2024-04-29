@@ -26,13 +26,7 @@ java {
 suspendTransform {
     enabled = true
     includeRuntime = true
-    /*jvm {
-
-    }
-    js {
-
-    }*/
-    useJsDefault()
+    useDefault()
 }
 
 
