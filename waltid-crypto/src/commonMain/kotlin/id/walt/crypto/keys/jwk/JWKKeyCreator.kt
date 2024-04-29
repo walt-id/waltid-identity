@@ -25,7 +25,7 @@ interface JWKKeyCreator {
     suspend fun importRawPublicKey(
         type: KeyType,
         rawPublicKey: ByteArray,
-        metadata: JwkKeyMeta?
+        metadata: JwkKeyMeta? = null
     ): Key
 
     @JvmBlocking
