@@ -21,13 +21,7 @@ repositories {
 suspendTransform {
     enabled = true
     includeRuntime = true
-    /*jvm {
-
-    }
-    js {
-
-    }*/
-    useJsDefault()
+    useDefault()
 }
 
 java {
@@ -113,7 +107,7 @@ kotlin {
                 implementation("io.ktor:ktor-client-cio:2.3.10")
 
                 // Logging
-                implementation("org.slf4j:slf4j-simple:2.0.12")
+                implementation("org.slf4j:slf4j-simple:2.0.13")
 
                 // Coroutines
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:1.8.0")
@@ -130,7 +124,7 @@ kotlin {
         val jvmTest by getting {
             dependencies {
                 // Logging
-//                implementation("org.slf4j:slf4j-simple:2.0.12")
+//                implementation("org.slf4j:slf4j-simple:2.0.13")
 
                 // Test
                 implementation(kotlin("test"))

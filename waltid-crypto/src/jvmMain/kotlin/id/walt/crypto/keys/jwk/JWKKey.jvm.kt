@@ -20,6 +20,8 @@ import kotlinx.serialization.Transient
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import love.forte.plugin.suspendtrans.annotation.JvmAsync
+import love.forte.plugin.suspendtrans.annotation.JvmBlocking
 import org.bouncycastle.asn1.ASN1BitString
 import org.bouncycastle.asn1.ASN1Integer
 import org.bouncycastle.asn1.ASN1Sequence
@@ -390,11 +392,21 @@ actual class JWKKey actual constructor(
 
 //        val prettyJson = Json { prettyPrint = true }
 
+        @JvmBlocking
+        @JvmAsync
         actual override suspend fun generate(type: KeyType, metadata: JwkKeyMeta?): JWKKey =
             JvmJWKKeyCreator.generate(type, metadata)
 
+        @JvmBlocking
+        @JvmAsync
         actual override suspend fun importJWK(jwk: String): Result<JWKKey> = JvmJWKKeyCreator.importJWK(jwk)
+
+        @JvmBlocking
+        @JvmAsync
         actual override suspend fun importPEM(pem: String): Result<JWKKey> = JvmJWKKeyCreator.importPEM(pem)
+
+        @JvmBlocking
+        @JvmAsync
         actual override suspend fun importRawPublicKey(
             type: KeyType,
             rawPublicKey: ByteArray,
