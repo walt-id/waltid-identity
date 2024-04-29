@@ -13,6 +13,7 @@ import kotlin.js.JsName
 // 0xe7 secp256k1-pub
 // 0xeb51 jwk_jcs-pub
 
+@Suppress("NON_EXPORTABLE_TYPE")
 @OptIn(ExperimentalJsExport::class)
 @JsExport
 object MultiCodecUtils {

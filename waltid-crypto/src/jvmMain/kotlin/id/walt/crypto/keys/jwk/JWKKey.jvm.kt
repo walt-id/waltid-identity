@@ -72,7 +72,6 @@ actual class JWKKey actual constructor(
         KeyType.Ed25519 -> _internalJwk.toOctetKeyPair().decodedX
         KeyType.RSA -> getRsaPublicKeyBytes(_internalJwk.toRSAKey().toPublicKey())
         KeyType.secp256k1, KeyType.secp256r1 -> _internalJwk.toECKey().toPublicKey().encoded
-        else -> TODO("Not yet implemented for: $keyType")
     }
 
     actual override suspend fun getMeta(): JwkKeyMeta = JwkKeyMeta(getKeyId())

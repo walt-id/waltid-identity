@@ -7,6 +7,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlin.js.Promise
 
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 class SDJwtJS(
     sdJwt: SDJwt

@@ -24,6 +24,14 @@ kotlin {
 }
 
 kotlin {
+    targets.configureEach {
+        compilations.configureEach {
+            compilerOptions.configure {
+                freeCompilerArgs.add("-Xexpect-actual-classes")
+            }
+        }
+    }
+
     jvm {
         compilations.all {
             kotlinOptions.jvmTarget = "15" // JVM got Ed25519 at version 15

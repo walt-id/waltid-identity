@@ -35,6 +35,7 @@ object KeySerialization {
     }
 
     fun serializeKey(key: Key): String = keySerializationJson.encodeToString(key)
+    @Suppress("NON_EXPORTABLE_TYPE")
     fun serializeKeyToJson(key: Key): JsonElement = keySerializationJson.encodeToJsonElement(key)
 
     @JvmBlocking
