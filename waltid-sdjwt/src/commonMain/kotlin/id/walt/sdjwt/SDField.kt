@@ -11,6 +11,7 @@ import kotlin.js.JsExport
  * @param children    Not null, if field is an object. Contains SDMap for the properties of the object
  * @see SDMap
  */
+@Suppress("NON_EXPORTABLE_TYPE")
 @OptIn(ExperimentalJsExport::class)
 @JsExport
 @Serializable

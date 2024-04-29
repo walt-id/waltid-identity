@@ -10,6 +10,7 @@ import kotlin.js.JsName
 /**
  * SD-JWT object, providing signed JWT token, header and payload with disclosures, as well as optional holder binding
  */
+@Suppress("NON_EXPORTABLE_TYPE")
 @OptIn(ExperimentalJsExport::class)
 @JsExport
 open class SDJwt internal constructor(
