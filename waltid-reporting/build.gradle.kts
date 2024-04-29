@@ -75,7 +75,7 @@ kotlin {
                 implementation("io.ktor:ktor-client-cio:2.3.10")
 
                 // Logging
-                implementation("org.slf4j:slf4j-simple:2.0.12")
+                implementation("org.slf4j:slf4j-simple:2.0.13")
 
                 // JOSE
                 implementation("com.nimbusds:nimbus-jose-jwt:9.37.3")
