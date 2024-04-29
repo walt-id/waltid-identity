@@ -27,7 +27,6 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 import kotlinx.serialization.json.*
 import org.kotlincrypto.hash.sha2.SHA256
-import java.lang.Thread.sleep
 
 private val log = KotlinLogging.logger { }
 
@@ -229,34 +228,35 @@ actual class OCIKey actual constructor(
         }
 
         actual suspend fun generateKey(config: OCIsdkMetadata): OCIKey {
-            val provider = InstancePrincipalsAuthenticationDetailsProvider.builder().build()
-            val kmsVaultClient = KmsVaultClient.builder().build(provider)
-            val vault = getVault(kmsVaultClient, config.vaultId)
-            val kmsManagementClient = KmsManagementClient.builder().endpoint(vault.managementEndpoint).build(provider)
+            return retry {
+                val provider = InstancePrincipalsAuthenticationDetailsProvider.builder().build()
+                val kmsVaultClient = KmsVaultClient.builder().build(provider)
+                val vault = getVault(kmsVaultClient, config.vaultId)
+                val kmsManagementClient =
+                    KmsManagementClient.builder().endpoint(vault.managementEndpoint).build(provider)
 
 
-            val createKeyDetails =
-                CreateKeyDetails.builder().keyShape(TEST_KEY_SHAPE)
-                    .protectionMode(CreateKeyDetails.ProtectionMode.Software)
-                    .compartmentId(config.compartmentId).displayName("WaltKey").build()
-            val createKeyRequest = CreateKeyRequest.builder().createKeyDetails(createKeyDetails).build()
-            val response = kmsManagementClient.createKey(createKeyRequest)
+                val createKeyDetails =
+                    CreateKeyDetails.builder().keyShape(TEST_KEY_SHAPE)
+                        .protectionMode(CreateKeyDetails.ProtectionMode.Software)
+                        .compartmentId(config.compartmentId).displayName("WaltKey").build()
+                val createKeyRequest = CreateKeyRequest.builder().createKeyDetails(createKeyDetails).build()
+                val response = kmsManagementClient.createKey(createKeyRequest)
 
-            val keyId = response.key.id
+                val keyId = response.key.id
 
-            val keyVersionId = response.key.currentKeyVersion
+                val keyVersionId = response.key.currentKeyVersion
 
-            sleep(2000)
-
-            val publicKey = getOCIPublicKey(kmsManagementClient, keyVersionId, keyId)
+                val publicKey = getOCIPublicKey(kmsManagementClient, keyVersionId, keyId)
 
 
-            return OCIKey(
-                keyId,
-                config,
-                publicKey.exportJWK(),
-                ociKeyToKeyTypeMapping(response.key.keyShape.algorithm.toString().uppercase())
-            )
+                OCIKey(
+                    keyId,
+                    config,
+                    publicKey.exportJWK(),
+                    ociKeyToKeyTypeMapping(response.key.keyShape.algorithm.toString().uppercase())
+                )
+            }
         }
 
 
@@ -287,4 +287,18 @@ actual class OCIKey actual constructor(
 
 }
 
+
+private suspend fun <T> retry(retriesLeft: Int = 3, currentTry: Int = 1, block: suspend () -> T): T =
+    runCatching { block.invoke() }.fold(
+        onSuccess = { it },
+        onFailure = { error ->
+            when {
+                retriesLeft <= 0 -> throw IllegalStateException(
+                    "Failed after $currentTry retries: ${error.message}",
+                    error
+                )
+
+                else -> retry(retriesLeft - 1, currentTry + 1, block)
+            }
+        })
 

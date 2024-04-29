@@ -36,7 +36,27 @@ fun Application.keys() = walletRoute {
             request {
                 body<KeyGenerationRequest> {
                     description = "Key configuration (JSON)"
+                    example(
+                        "OCI key generation request",
+                        buildJsonObject {
+                            put("backend", JsonPrimitive("oci"))
+                            put(
+                                "config",
+                                buildJsonObject {
+                                    put(
+                                        "vaultId",
+                                        JsonPrimitive("ocid1.vault.oc1.eu-frankfurt-1.entbf645aabf2.abtheljshkb6dsuldqf324kitneb63vkz3dfd74dtqvkd5j2l2cxwyvmefeq")
+                                    )
+                                    put(
+                                        "compartmentId",
+                                        JsonPrimitive("ocid1.compartment.oc1..aaaaaaaawirugoz35riiybcxsvf7bmelqsxo3sajaav5w3i2vqowcwqrllxa")
+                                    )
 
+                                }
+                            )
+                            put("keyType", JsonPrimitive("secp256r1"))
+                        }
+                            .toString())
                     example(
                         "OCI API key generation request",
                         buildJsonObject {
@@ -79,27 +99,6 @@ fun Application.keys() = walletRoute {
                         }
                             .toString()
                     )
-                    example(
-                        "OCI key generation request",
-                        buildJsonObject {
-                            put("backend", JsonPrimitive("oci"))
-                            put(
-                                "config",
-                                buildJsonObject {
-                                    put(
-                                        "vaultId",
-                                        JsonPrimitive("ocid1.vault.oc1.eu-frankfurt-1.entbf645aabf2.abtheljshkb6dsuldqf324kitneb63vkz3dfd74dtqvkd5j2l2cxwyvmefeq")
-                                    )
-                                    put(
-                                        "compartmentId",
-                                        JsonPrimitive("ocid1.compartment.oc1..aaaaaaaawirugoz35riiybcxsvf7bmelqsxo3sajaav5w3i2vqowcwqrllxa")
-                                    )
-
-                                }
-                            )
-                            put("keyType", JsonPrimitive("secp256r1"))
-                        }
-                            .toString())
                     example(
                         "TSE key generation request",
                         buildJsonObject {
