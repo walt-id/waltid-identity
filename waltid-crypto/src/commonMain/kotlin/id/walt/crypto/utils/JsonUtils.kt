@@ -5,11 +5,12 @@ import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 import kotlin.js.JsName
 
+@Suppress("NON_EXPORTABLE_TYPE")
 @OptIn(ExperimentalJsExport::class)
 @JsExport
 object JsonUtils {
 
-    val prettyJson by lazy { Json { prettyPrint = true } }
+    internal val prettyJson by lazy { Json { prettyPrint = true } }
 
     fun Any?.toJsonElement(): JsonElement =
         when (this) {
@@ -32,6 +33,8 @@ object JsonUtils {
             else -> throw IllegalArgumentException("Unknown type: ${this::class.simpleName}, was: $this")
         }
 
+    fun javaToJsonElement(any: Any?) = any.toJsonElement()
+
     @JsName("listToJsonElement")
     fun List<*>.toJsonElement(): JsonElement {
         return JsonArray(map { it.toJsonElement() })
@@ -47,6 +50,7 @@ object JsonUtils {
     }
 
     fun Map<*, *>.toJsonObject() = this.toJsonElement().jsonObject
+    fun javaToJsonObject(map: Map<*, *>) = map.toJsonObject()
 
     private fun toHexChar(i: Int): Char {
         val d = i and 0xf

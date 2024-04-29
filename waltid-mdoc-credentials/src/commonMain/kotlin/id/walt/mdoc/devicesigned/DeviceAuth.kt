@@ -1,8 +1,11 @@
+@file:OptIn(ExperimentalSerializationApi::class)
+
 package id.walt.mdoc.devicesigned
 
 import id.walt.mdoc.cose.COSEMac0
 import id.walt.mdoc.cose.COSESign1
 import id.walt.mdoc.dataelement.*
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Serializer
