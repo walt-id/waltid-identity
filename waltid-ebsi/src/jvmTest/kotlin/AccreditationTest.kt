@@ -23,7 +23,7 @@ import kotlin.test.assertNotNull
 
 class AccreditationTest {
   val CLIENT_MOCK_PORT = 5000
-  val CLIENT_MOCK_URL = "https://bb3c-62-178-27-231.ngrok-free.app/client-mock"//"http://192.168.0.122:5000/client-mock"
+  val CLIENT_MOCK_URL = "https://7bf6-62-178-27-231.ngrok-free.app/client-mock"//"http://192.168.0.122:5000/client-mock"
   val CLIENT_MAIN_KEY = runBlocking { JWKKey.generate(KeyType.secp256k1) }
   val CLIENT_VCSIGN_KEY = runBlocking { JWKKey.generate(KeyType.secp256r1) }
   val TAO_ISSUER = "https://api-conformance.ebsi.eu/conformance/v3/issuer-mock"

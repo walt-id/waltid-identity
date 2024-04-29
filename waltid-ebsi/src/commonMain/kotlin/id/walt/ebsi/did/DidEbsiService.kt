@@ -46,7 +46,9 @@ object DidEbsiService {
     return MultiBaseUtils.encodeMultiBase58Btc(
       Random.nextBytes(17).also { it[0] = 1 }
     ).let {
-      "did:ebsi:$it"
+      "did:ebsi:$it".also {
+        println("DID generated: $it")
+      }
     }
   }
 
@@ -199,7 +201,7 @@ object DidEbsiService {
       EbsiRpcRequests.generateTirSetAttributeDataRequest(Random.nextInt(),
         Utils.toEthereumAddress(capabilityInvocationKey), accreditationClient.did,
         getReservedAttributeId(accreditationToAttestResp.credential!!) ?: throw AccreditationException("No reservedAttributeId found in VerifiableAccreditationToAttest"),
-        accreditationToAttestResp.credential!!.toString().toByteArray().toHexString().let { "0x$it" }
+        accreditationToAttestResp.credential!!.jsonPrimitive.content.toByteArray().toHexString().let { "0x$it" }
       ), capabilityInvocationKey, accessToken, null, TrustedRegistryType.tir, didRegistrationOptions.ebsiEnvironment, didRegistrationOptions.didRegistryVersion
     )
     println("TIR registration result: ${txResult.result}")
