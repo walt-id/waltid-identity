@@ -251,6 +251,7 @@ fun Application.verfierApi() {
                     vcPoliciesJson =  buildJsonArray{add("signature")
                                                      add("expired")
                                                      add("not-before")
+                                                     add("revoked")
                                                     },
                     requestCredentialsJson = buildJsonArray{},
                     presentationDefinitionJson = presentationDefinitionJson,
@@ -353,6 +354,7 @@ fun Application.verfierApi() {
                                 when (it.localizedMessage) {
                                     "Verification policies did not succeed: expired" -> errorDescription = "<\$presentation_submission.descriptor_map[x].id> is expired"
                                     "Verification policies did not succeed: not-before" -> errorDescription = "<\$presentation_submission.descriptor_map[x].id> is not yet valid"
+                                    "Verification policies did not succeed: revoked" -> errorDescription = "<\$presentation_submission.descriptor_map[x].id> is revoked"
                                 }
                                 context.respondRedirect("openid://?state=$state&error=invalid_request&error_description=$errorDescription")
                             }

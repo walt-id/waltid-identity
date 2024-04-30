@@ -8,7 +8,7 @@ interface StatusListCredentialFetchStrategy {
 
 class StatusListCredentialFetchFactory(
     private val defaultStrategy: DefaultStatusListCredentialFetchStrategy,
-    private val entraStrategy: EntraStatusListCredentialFetchStrategy,
+    private val entraStrategy: EntraStatusListCredentialFetchStrategy? = null,
 ) {
     private val didPattern = "^did:([^:]+):(.+)"
     private val urlPattern =

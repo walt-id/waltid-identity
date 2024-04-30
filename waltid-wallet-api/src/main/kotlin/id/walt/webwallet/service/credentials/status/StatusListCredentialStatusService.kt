@@ -21,9 +21,9 @@ class StatusListCredentialStatusService(
     private val json = Json { ignoreUnknownKeys = true }
     override suspend fun get(statusEntry: CredentialStatusEntry): CredentialStatusResult =
         (statusEntry as? StatusListEntry)?.let { entry ->
-            val credential = credentialFetchFactory.new(entry.statusListCredential).fetch(entry.statusListCredential)
+            val credential = credentialFetchFactory.new(entry.statusListCredential)?.fetch(entry.statusListCredential)
             val subject =
-                extractCredentialSubject(credential) ?: error("Failed to prase status list credential subject")
+                extractCredentialSubject(credential!!) ?: error("Failed to prase status list credential subject")
             credentialValidator.validate(entry.statusPurpose, subject.statusPurpose, subject.type, credential)
                 .takeIf { it }?.let {
                     getStatusBit(subject.encodedList, entry.statusListIndex, subject.statusSize)?.let {
