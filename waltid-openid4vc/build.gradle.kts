@@ -148,6 +148,7 @@ kotlin {
                 implementation("io.ktor:ktor-client-okhttp:$ktor_version")
 
                 implementation("com.augustcellars.cose:cose-java:1.1.0")
+                implementation("com.soywiz.korlibs.krypto:krypto:4.0.10")
 
             }
         }
