@@ -4,32 +4,32 @@
 }
 
 # Wallet API
-:7001 {
-    reverse_proxy http://wallet-api:7001
+:{$WALLET_BACKEND_PORT} {
+    reverse_proxy http://wallet-api:{$WALLET_BACKEND_PORT}
 }
 
 # Issuer API
-:7002 {
-    reverse_proxy http://issuer-api:7002
+:{$ISSUER_API_PORT} {
+    reverse_proxy http://issuer-api:{$ISSUER_API_PORT}
 }
 
 # Verifier API
-:7003 {
-    reverse_proxy http://verifier-api:7003
+:{$VERIFIER_API_PORT} {
+    reverse_proxy http://verifier-api:{$VERIFIER_API_PORT}
 }
 
 # Web Wallet Frontend
-:7101 {
-    reverse_proxy http://waltid-web-wallet:7101 # frontend
-    reverse_proxy /wallet-api/* http://wallet-api:7001 # backend
+:{$WALLET_FRONTEND_PORT} {
+    reverse_proxy http://waltid-web-wallet:{$WALLET_FRONTEND_PORT} # frontend
+    reverse_proxy /wallet-api/* http://wallet-api:{$WALLET_BACKEND_PORT} # backend
 }
 
 # Web Portal
-:7102 {
-    reverse_proxy http://web-portal:7102
+:{$WEB_PORTAL_PORT} {
+    reverse_proxy http://web-portal:{$WEB_PORTAL_PORT}
 }
 
 # VC Repo
-:7103 {
-    reverse_proxy http://vc-repo:7103
+:{$VC_REPO_PORT} {
+    reverse_proxy http://vc-repo:{$VC_REPO_PORT}
 }

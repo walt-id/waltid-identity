@@ -5,6 +5,7 @@ services:
   #     POSTGRES_PASSWORD: secret
   wallet-api:
     image: waltid/wallet-api:${VERSION_TAG:-latest}
+    pull_policy: always
     build:
       context: ../
       dockerfile: waltid-wallet-api/Dockerfile
@@ -16,17 +17,20 @@ services:
   issuer-api:
     platform: linux/x86_64
     image: waltid/issuer-api:${VERSION_TAG:-latest}
+    pull_policy: always
     volumes:
       - ./issuer-api/config:/waltid-issuer-api/config
 
   verifier-api:
     platform: linux/x86_64
     image: waltid/verifier-api:${VERSION_TAG:-latest}
+    pull_policy: always
     volumes:
       - ./verifier-api/config:/waltid-verifier-api/config
 
   waltid-web-wallet:
     image: waltid/waltid-web-wallet:${VERSION_TAG:-latest}
+    pull_policy: always
     environment:
       NUXT_PUBLIC_ISSUER_CALLBACK_URL: "http://localhost:$WALLET_FRONTEND_PORT"
       PORT: $WALLET_FRONTEND_PORT
@@ -34,6 +38,7 @@ services:
   web-portal:
     platform: linux/x86_64
     image: waltid/portal:${VERSION_TAG:-latest}
+    pull_policy: always
     environment:
       NEXT_PUBLIC_VC_REPO: "http://localhost:$VC_REPO_PORT"
       NEXT_PUBLIC_ISSUER: "http://localhost:$ISSUER_API_PORT"
@@ -44,12 +49,15 @@ services:
   vc-repo:
     platform: linux/x86_64
     image: waltid/vc-repository:latest
+    pull_policy: always
     environment:
       PORT: $VC_REPO_PORT
 
   caddy:
     image: caddy:2
     restart: unless-stopped
+    env_file:
+        - .env
     cap_add:
       - NET_ADMIN
     ports:
