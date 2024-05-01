@@ -1,4 +1,6 @@
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+val ktorVersion: String by project
+val logbackVersion: String by project
 
 plugins {
     kotlin("jvm")
@@ -152,8 +154,8 @@ dependencies {
 
     // Logging
     implementation("io.github.oshai:kotlin-logging-jvm:6.0.9")
-    implementation("org.slf4j:slf4j-simple:2.0.13")
-    implementation("org.slf4j:jul-to-slf4j:2.0.12")
+    implementation("org.slf4j:slf4j-api:2.0.12")
+//    implementation("ch.qos.logback:logback-classic:$logbackVersion")
 
     // Test
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit:1.9.23")

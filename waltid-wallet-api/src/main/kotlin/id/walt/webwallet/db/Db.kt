@@ -19,7 +19,6 @@ import org.jetbrains.exposed.sql.StdOutSqlLogger
 import org.jetbrains.exposed.sql.addLogger
 import org.jetbrains.exposed.sql.transactions.TransactionManager
 import org.jetbrains.exposed.sql.transactions.transaction
-import org.slf4j.bridge.SLF4JBridgeHandler
 import java.sql.Connection
 import kotlin.io.path.Path
 import kotlin.io.path.absolutePathString
@@ -107,9 +106,6 @@ object Db {
 
     fun start() {
         connect()
-
-        SLF4JBridgeHandler.removeHandlersForRootLogger()
-        SLF4JBridgeHandler.install()
 
         if (datasourceConfig.recreateDatabaseOnStart) {
             recreateDatabase()
