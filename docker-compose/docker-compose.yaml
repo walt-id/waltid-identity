@@ -5,8 +5,7 @@ services:
     build:
       context: ../
       dockerfile: waltid-wallet-api/Dockerfile
-    links:
-      - postgres
+    links: [ $COMPOSE_PROFILES ]
     volumes:
       - ./wallet-api/config:/waltid-wallet-api/config
       - ./wallet-api/walt.yaml:/waltid-wallet-api/walt.yaml
@@ -50,6 +49,7 @@ services:
     pull_policy: always
     environment:
       PORT: $VC_REPO_PORT
+
   postgres:
     image: postgres:alpine
     profiles:
@@ -79,6 +79,21 @@ services:
     volumes:
       - pgadmin:/waltid-wallet-api/data/pgadmin
     restart: always
+
+  mssql:
+    image: mcr.microsoft.com/azure-sql-edge
+    profiles:
+      - mssql
+    healthcheck:
+      test: [ "CMD-SHELL", "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P p@ssw0rd -Q 'SELECT 1' || exit 1" ]
+      interval: 5s
+      timeout: 1s
+      retries: 2
+    restart: always
+    env_file:
+      - ./mssql.env
+    ports:
+      - $MSSQL_DB_PORT:$MSSQL_DB_PORT
 
   caddy:
     image: docker.io/caddy:2
