@@ -73,7 +73,7 @@ object ConfigManager {
     private fun registerConfigurations() {
         registerConfig("web", WebConfig::class)
         registerConfig("issuer-service", OIDCIssuerServiceConfig::class)
-        registerConfig("credential-type", CredentialTypeConfig::class)
+        registerConfig("credential-issuer-metadata", CredentialTypeConfig::class)
     }
 
     fun loadConfigs(args: Array<String>) {
