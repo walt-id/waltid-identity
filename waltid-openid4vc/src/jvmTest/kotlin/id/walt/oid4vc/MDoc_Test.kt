@@ -5,17 +5,19 @@ import COSE.OneKey
 import cbor.Cbor
 import com.nimbusds.jose.util.Base64
 import com.nimbusds.jose.util.Base64URL
+import id.walt.crypto.keys.KeyGenerationRequest
+import id.walt.crypto.keys.KeyManager
+import id.walt.crypto.keys.KeyType
 import id.walt.mdoc.COSECryptoProviderKeyInfo
 import id.walt.mdoc.SimpleCOSECryptoProvider
-import id.walt.mdoc.dataelement.DataElement
-import id.walt.mdoc.dataelement.FullDateElement
-import id.walt.mdoc.dataelement.toDE
+import id.walt.mdoc.dataelement.*
 import id.walt.mdoc.dataretrieval.DeviceResponse
 import id.walt.mdoc.doc.MDoc
 import id.walt.mdoc.doc.MDocBuilder
 import id.walt.mdoc.doc.MDocVerificationParams
 import id.walt.mdoc.doc.VerificationType
 import id.walt.mdoc.docrequest.MDocRequestBuilder
+import id.walt.mdoc.mdocauth.DeviceAuthentication
 import id.walt.mdoc.mso.DeviceKeyInfo
 import id.walt.mdoc.mso.ValidityInfo
 import id.walt.oid4vc.data.*
@@ -29,13 +31,12 @@ import kotlinx.datetime.Clock
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.plus
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.encodeToHexString
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.*
 import kotlinx.uuid.UUID
 import kotlinx.uuid.generateUUID
+import kotlinx.uuid.randomUUID
 import org.bouncycastle.asn1.x500.X500Name
 import org.bouncycastle.asn1.x509.BasicConstraints
 import org.bouncycastle.asn1.x509.Extension
@@ -60,6 +61,7 @@ import java.security.spec.X509EncodedKeySpec
 import java.util.*
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 
 class MDoc_Test: AnnotationSpec() {
@@ -147,7 +149,7 @@ class MDoc_Test: AnnotationSpec() {
       }
     // create issuer certificate
     val issuerCertificate = X509v3CertificateBuilder(X500Name("CN=MDOC ROOT CA"), BigInteger.valueOf(SecureRandom().nextLong()),
-      Date(), Date(System.currentTimeMillis() + 24L * 3600 * 1000), X500Name("CN=MDOC Test Issuer"),
+      Date(), Date(System.currentTimeMillis() + 365L * 24L * 3600 * 1000), X500Name("CN=MDOC Test Issuer"),
       SubjectPublicKeyInfo.getInstance(issuerKeyPair.public.encoded)
     ) .addExtension(Extension.basicConstraints, true, BasicConstraints(false))
       .addExtension(Extension.keyUsage, true, KeyUsage(KeyUsage.digitalSignature))
@@ -186,6 +188,7 @@ class MDoc_Test: AnnotationSpec() {
     return COSECryptoProviderKeyInfo(ISSUER_KEY_ID, AlgorithmID.ECDSA_256, issuerPub, issuerPriv, listOf(issuerCert), listOf(rootCaCert))
   }
 
+  @OptIn(ExperimentalSerializationApi::class)
   @Test
   fun testLSPPotentialTrack3() {
     val kpg = KeyPairGenerator.getInstance("EC")
@@ -211,6 +214,8 @@ class MDoc_Test: AnnotationSpec() {
     // nothing to do in this test case
 
     // 3) Create OID4VP presentation request (Verifier)
+    // NOTE: ephemeral key may actually not be required (?)
+    val ephemeralReaderKey = runBlocking { KeyManager.createKey(KeyGenerationRequest(keyType = KeyType.secp256r1)) }
     val presReq = OpenID4VP.createPresentationRequest(
       PresentationDefinitionParameter.fromPresentationDefinition(
         PresentationDefinition(
@@ -241,7 +246,15 @@ class MDoc_Test: AnnotationSpec() {
       ), responseMode = ResponseMode.direct_post, responseTypes = setOf(ResponseType.VpToken), redirectOrResponseUri = "http://blank",
       nonce = UUID.generateUUID().toString(), state = "test", clientId = "test-verifier", clientIdScheme = ClientIdScheme.PreRegistered,
       clientMetadataParameter = ClientMetadataParameter.fromClientMetadata(
-        OpenIDClientMetadata(listOf("http://localhost"))
+        OpenIDClientMetadata(listOf("http://localhost"),
+          jwks = buildJsonObject {
+//            The mdoc reader shall set the use JWK parameter (public key use) to the static JSON String value enc
+//                and set the alg JWK parameter to the static JSON String value ECDH-ES to indicate which JWK in the
+//            jwks Authorization Request parameter can be used for key agreement to encrypt the response (see [7]). [ISO-18013-7_240312]
+            put("keys", JsonArray(listOf(runBlocking { ephemeralReaderKey.exportJWKObject().let {
+              JsonObject(it + ("use" to JsonPrimitive("enc")) + ("alg" to JsonPrimitive("ECDH-ES")))
+            } })))
+          })
       )
     )
     val authUrl = OpenID4VP.getAuthorizationUrl(presReq, "mdoc-openid4vp://") // ISO-18013-7 page 20 (B.3.1.3.1)
@@ -251,43 +264,56 @@ class MDoc_Test: AnnotationSpec() {
     val parsedPresReq = runBlocking { OpenID4VP.parsePresentationRequestFromUrl(authUrl) }
     assertEquals(presReq, parsedPresReq)
     assertEquals(parsedPresReq.presentationDefinition?.inputDescriptors?.get(0)?.format?.keys?.first(), VCFormat.mso_mdoc)
+    val parsedReaderKey = parsedPresReq.clientMetadata?.jwks?.get("keys")?.jsonArray?.first {
+      it.jsonObject.containsKey("use") && it.jsonObject.containsKey("alg") &&
+          it.jsonObject["use"]!!.jsonPrimitive.content == "enc" &&
+          it.jsonObject["alg"]!!.jsonPrimitive.content == "ECDH-ES"
+    } ?: throw Exception("No ephemeral reader key found")
 
     // 5) Create OID4VP presentation response (Wallet)
-    val deviceResponse: DeviceResponse= TODO("Complete device response") // DeviceResponse(listOf(mdoc.presentWithDeviceSignature(MDocRequestBuilder(mdoc.docType.value).also {
-//      parsedPresReq.presentationDefinition!!.inputDescriptors!!.forEach { inputDescriptor ->
-//        inputDescriptor.constraints!!.fields!!.forEach { field ->
-//          field.addToMdocRequest(it)
-//        }
-//      }
-//    }.build(SimpleCOSECryptoProvider(listOf(
-//      COSECryptoProviderKeyInfo(DEVICE_KEY_ID, AlgorithmID.ECDSA_256, deviceKeyPair.public,
-//        deviceKeyPair.private)))))))
-    val response = OpenID4VP.generatePresentationResponse(PresentationResult(
+    val presentedMdoc = mdoc.presentWithDeviceSignature(MDocRequestBuilder(mdoc.docType.value).also {
+      parsedPresReq.presentationDefinition!!.inputDescriptors.forEach { inputDescriptor ->
+        inputDescriptor.constraints!!.fields!!.forEach { field ->
+          field.addToMdocRequest(it)
+        }
+      }
+    }.build(), DeviceAuthentication(sessionTranscript = ListElement(listOf(
+      NullElement(),
+      NullElement(),
+      OpenID4VP.generateMDocOID4VPHandover(parsedPresReq, UUID.generateUUID().toString())
+    )), mdoc.docType.value, EncodedCBORElement(MapElement(mapOf()))),
+      SimpleCOSECryptoProvider(listOf(
+        COSECryptoProviderKeyInfo(DEVICE_KEY_ID, AlgorithmID.ECDSA_256, deviceKeyPair.public, deviceKeyPair.private))), DEVICE_KEY_ID)
+
+    val deviceResponse = DeviceResponse(listOf(presentedMdoc))
+
+    val oid4vpResponse = OpenID4VP.generatePresentationResponse(PresentationResult(
       presentations = listOf(JsonPrimitive(deviceResponse.toCBORBase64URL())),
       presentationSubmission = PresentationSubmission(
         "response_1", "request_1",
         listOf(DescriptorMapping(mdoc.docType.value, VCFormat.mso_mdoc, "$"))
       )
     ))
-    assertNotNull(response.vpToken)
+    assertNotNull(oid4vpResponse.vpToken)
     // post as form parameters
-    val formParams = response.toHttpParameters()
+    val formParams = oid4vpResponse.toHttpParameters()
 
     // 6) Parse presentation response (Verifier)
     // load from form parameters
     val parsedResponse = TokenResponse.fromHttpParameters(formParams)
-    assertEquals(expected = response.vpToken, actual = parsedResponse.vpToken)
+    assertEquals(expected = oid4vpResponse.vpToken, actual = parsedResponse.vpToken)
     assertNotNull(parsedResponse.presentationSubmission)
 
     // 7) Verify presentation response (Verifier)
     val parsedDeviceResponse = DeviceResponse.fromCBORBase64URL(parsedResponse.vpToken!!.jsonPrimitive.content)
     assertEquals(1, parsedDeviceResponse.documents.size)
     val parsedMdoc = parsedDeviceResponse.documents[0]
-    parsedMdoc.verify(MDocVerificationParams(
+    val verified = parsedMdoc.verify(MDocVerificationParams(
       VerificationType.forPresentation,
       issuerKeyID = ISSUER_KEY_ID, deviceKeyID = DEVICE_KEY_ID
     ), SimpleCOSECryptoProvider(
       listOf(issuerProviderKeyInfo, COSECryptoProviderKeyInfo(DEVICE_KEY_ID, AlgorithmID.ECDSA_256, deviceKeyPair.public, deviceKeyPair.private))
     ))
+    assertTrue(verified)
   }
 }

@@ -112,6 +112,7 @@ kotlin {
         val jvmMain by getting {
             dependencies {
                 implementation("io.ktor:ktor-client-cio:$ktor_version")
+                implementation("com.nfeld.jsonpathkt:jsonpathkt:2.0.1")
             }
         }
         val jvmTest by getting {

@@ -1,5 +1,8 @@
 package id.walt.oid4vc
 
+import id.walt.mdoc.dataelement.ByteStringElement
+import id.walt.mdoc.dataelement.ListElement
+import id.walt.mdoc.dataelement.StringElement
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.errors.AuthorizationError
@@ -14,6 +17,7 @@ import io.ktor.http.*
 import io.ktor.util.*
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
+import org.kotlincrypto.hash.sha2.SHA256
 
 object OpenID4VP {
 
@@ -150,4 +154,23 @@ object OpenID4VP {
     fun parsePresentationResponseFromUrl(url: String): TokenResponse = TokenResponse.fromHttpParameters(
         Url(url).parameters.toMap()
     )
+
+    /**
+     * Generate OID4VPHandover for session transcript of MDoc device authentication, as defined in ISO-18013-7 Annex B, B.4.4
+     * @param authorizationRequest OpenID4VP presentation request
+     * @param mdocNonce MDoc generated random nonce
+     */
+    fun generateMDocOID4VPHandover(authorizationRequest: AuthorizationRequest, mdocNonce: String): ListElement {
+        val clientIdToHash = ListElement(listOf(StringElement(authorizationRequest.clientId), StringElement(mdocNonce)))
+        val responseUriToHash = ListElement(listOf(
+            StringElement(authorizationRequest.responseUri ?: throw AuthorizationError(authorizationRequest, AuthorizationErrorCode.invalid_request, "Authorization request has no response_uri, which is required for generating MDoc-OID4VPHandover")),
+            StringElement(mdocNonce)
+        ))
+
+        return ListElement(listOf(
+            ByteStringElement(SHA256().digest(clientIdToHash.toCBOR())),
+            ByteStringElement(SHA256().digest(responseUriToHash.toCBOR())),
+            StringElement(authorizationRequest.nonce ?: throw AuthorizationError(authorizationRequest, AuthorizationErrorCode.invalid_request, "Authorization request has no nonce, which is required for generating MDoc-OID4VPHandover"))
+        ))
+    }
 }
