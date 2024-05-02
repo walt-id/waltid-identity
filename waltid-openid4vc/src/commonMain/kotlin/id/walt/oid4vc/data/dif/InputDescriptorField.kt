@@ -27,9 +27,12 @@ data class InputDescriptorField(
         TODO("Not yet implemented")
     }
 
-    fun addToMdocRequest(mDocRequestBuilder: MDocRequestBuilder): MDocRequestBuilder {
-        TODO("Not yet implemented")
-        //mDocRequestBuilder.addDataElementRequest()
+    fun addToMdocRequest(mDocRequestBuilder: MDocRequestBuilder, intentToRetain: Boolean = false): MDocRequestBuilder {
+        path.firstOrNull()?.trimStart('$')?.replace("['", "")?.replace("']", ".")?.trimEnd('.')?.split('.')
+            ?.also { pathSegments ->
+            mDocRequestBuilder.addDataElementRequest(pathSegments.first(), pathSegments.last(), intentToRetain)
+        }
+        return mDocRequestBuilder
     }
 }
 
