@@ -40,8 +40,8 @@ import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.time.Duration.Companion.minutes
 
-val configInput = ConfigManager.getConfig<CredentialTypeConfig>().configJsonString
-val jsonMappingObjArray = Json.decodeFromString<JsonArray>(configInput)
+val supportedCredentialTypes = ConfigManager.getConfig<CredentialTypeConfig>().supportedCredentialTypes
+val jsonMappingObjArray = Json.decodeFromString<JsonArray>(supportedCredentialTypes)
 val tempMap = mutableMapOf<String, List<String>>()
 val credentialConfigurationsSupportedTestTable = jsonMappingObjArray?.forEach {
     var tempListOfTypes = ArrayList<String>()
