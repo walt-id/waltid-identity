@@ -9,10 +9,12 @@ import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.did.dids.DidService
 import id.walt.did.dids.DidUtils
 import id.walt.issuer.IssuanceExamples.openBadgeCredentialExample
 import id.walt.issuer.base.config.ConfigManager
+import id.walt.issuer.base.config.CredentialTypeConfig
 import id.walt.issuer.base.config.OIDCIssuerServiceConfig
 import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.data.CredentialSupported
@@ -38,6 +40,12 @@ import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.time.Duration.Companion.minutes
 
+val configInput = ConfigManager.getConfig<CredentialTypeConfig>().configJsonString
+val jsonMappingObjArray = Json.decodeFromString<JsonArray>(configInput)
+val tempMap = mutableMapOf<String, List<String>>()
+val credentialConfigurationsSupportedTestTable = jsonMappingObjArray?.forEach {
+    var tempListOfTypes = ArrayList<String>()
+    tempMap.put ( it.jsonObject["id"].toJsonElement().jsonPrimitive.content, it.jsonObject["type"]?.jsonArray?.forEach{ tempListOfTypes.add(it.jsonPrimitive.content) }.let { tempListOfTypes }) }
 
 /**
  * OIDC for Verifiable Credential Issuance service provider, implementing abstract service provider from OIDC4VC library.
@@ -45,65 +53,7 @@ import kotlin.time.Duration.Companion.minutes
 open class CIProvider : OpenIDCredentialIssuer(
     baseUrl = let {
         ConfigManager.getConfig<OIDCIssuerServiceConfig>().baseUrl
-    }, config = CredentialIssuerConfig(credentialConfigurationsSupported = mapOf(
-//        "VerifiableCredential" to listOf("VerifiableCredential"),
-        "BankId" to listOf("VerifiableCredential", "BankId"),
-        "KycChecksCredential" to listOf("VerifiableCredential", "VerifiableAttestation", "KycChecksCredential"),
-        "KycDataCredential" to listOf("VerifiableCredential", "VerifiableAttestation", "KycDataCredential"),
-        "PassportCh" to listOf("VerifiableCredential", "VerifiableAttestation", "VerifiableId", "PassportCh"),
-        "PND91Credential" to listOf("VerifiableCredential", "PND91Credential"),
-        "MortgageEligibility" to listOf(
-            "VerifiableCredential",
-            "VerifiableAttestation",
-            "VerifiableId",
-            "MortgageEligibility"
-        ),
-        "PortableDocumentA1" to listOf("VerifiableCredential", "VerifiableAttestation", "PortableDocumentA1"),
-        "OpenBadgeCredential" to listOf("VerifiableCredential", "OpenBadgeCredential"),
-        "VaccinationCertificate" to listOf(
-            "VerifiableCredential",
-            "VerifiableAttestation",
-            "VaccinationCertificate"
-        ),
-        "WalletHolderCredential" to listOf("VerifiableCredential", "WalletHolderCredential"),
-        "UniversityDegree" to listOf("VerifiableCredential", "UniversityDegree"),
-        "VerifiableId" to listOf("VerifiableCredential", "VerifiableAttestation", "VerifiableId"),
-        "CTWalletSameAuthorisedInTime" to listOf(
-            "VerifiableCredential",
-            "VerifiableAttestation",
-            "CTWalletSameAuthorisedInTime"
-        ),
-        "CTWalletSameAuthorisedDeferred" to listOf(
-            "VerifiableCredential",
-            "VerifiableAttestation",
-            "CTWalletSameAuthorisedDeferred"
-        ),
-        "CTWalletSamePreAuthorisedInTime" to listOf(
-            "VerifiableCredential",
-            "VerifiableAttestation",
-            "CTWalletSamePreAuthorisedInTime"
-        ),
-        "CTWalletSamePreAuthorisedDeferred" to listOf(
-            "VerifiableCredential",
-            "VerifiableAttestation",
-            "CTWalletSamePreAuthorisedDeferred"
-        ),
-
-        "AlpsTourReservation" to listOf("VerifiableCredential", "VerifiableAttestation", "AlpsTourReservation"),
-        "EducationalID" to listOf("VerifiableCredential", "VerifiableAttestation", "EducationalID"),
-        "HotelReservation" to listOf("VerifiableCredential", "VerifiableAttestation", "HotelReservation"),
-        "Iso18013DriversLicenseCredential" to listOf(
-            "VerifiableCredential",
-            "VerifiableAttestation",
-            "Iso18013DriversLicenseCredential"
-        ),
-        "TaxReceipt" to listOf("VerifiableCredential", "VerifiableAttestation", "TaxReceipt"),
-        "VerifiablePortableDocumentA1" to listOf(
-            "VerifiableCredential",
-            "VerifiableAttestation",
-            "VerifiablePortableDocumentA1"
-        ),
-    ).flatMap { entry ->
+    }, config = CredentialIssuerConfig(credentialConfigurationsSupported = tempMap.flatMap { entry ->
         CredentialFormat.values().map { format ->
             CredentialSupported(
                 id = "${entry.key}_${format.value}",
