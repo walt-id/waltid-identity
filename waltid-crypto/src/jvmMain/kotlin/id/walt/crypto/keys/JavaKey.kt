@@ -35,14 +35,14 @@ abstract class JavaKey : Key() {
     abstract fun javaSignJws(plaintext: ByteArray, headers: Map<String, String>): String
     override suspend fun signJws(plaintext: ByteArray, headers: Map<String, String>): String = javaSignJws(plaintext, headers)
 
-    abstract fun javaVerifyRaw(): ByteArray
+    abstract fun javaVerifyRaw(signed: ByteArray, detachedPlaintext: ByteArray?): ByteArray
     override suspend fun verifyRaw(signed: ByteArray, detachedPlaintext: ByteArray?): Result<ByteArray> =
-        runBlocking { runCatching { javaVerifyRaw() } }
+        runBlocking { runCatching { javaVerifyRaw(signed, detachedPlaintext) } }
 
 
-    abstract fun javaVerifyJws(): JsonElement
+    abstract fun javaVerifyJws(signedJws: String): JsonElement
     override suspend fun verifyJws(signedJws: String): Result<JsonElement> =
-        runBlocking { runCatching { javaVerifyJws() } }
+        runBlocking { runCatching { javaVerifyJws(signedJws) } }
 
     abstract fun javaGetPublicKey(): Key
     override suspend fun getPublicKey(): Key = runBlocking { javaGetPublicKey() }
