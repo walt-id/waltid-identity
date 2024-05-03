@@ -1,10 +1,14 @@
 package id.walt.oid4vc.responses
 
+import id.walt.crypto.keys.Key
+import id.walt.crypto.utils.JweUtils
+import id.walt.crypto.utils.JwsUtils
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.data.dif.PresentationSubmission
 import id.walt.oid4vc.data.dif.PresentationSubmissionSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -36,6 +40,7 @@ data class TokenResponse private constructor(
     val error: String? = null,
     @SerialName("error_description") val errorDescription: String? = null,
     @SerialName("error_uri") val errorUri: String? = null,
+    @Transient val jwsParts: JwsUtils.JwsParts? = null,
     override val customParameters: Map<String, JsonElement> = mapOf()
 ) : JsonDataObject(), IHTTPDataObject {
     val isSuccess get() = accessToken != null || (vpToken != null && presentationSubmission != null)
@@ -79,6 +84,7 @@ data class TokenResponse private constructor(
         )
 
         fun fromHttpParameters(parameters: Map<String, List<String>>): TokenResponse {
+            if(isDirectPostJWT(parameters)) throw IllegalArgumentException("The given POST parameters are in direct_post.jwt format, use fromDirectPostJwt instead")
             return TokenResponse(
                 parameters["access_token"]?.firstOrNull(),
                 parameters["token_type"]?.firstOrNull(),
@@ -96,9 +102,21 @@ data class TokenResponse private constructor(
                 parameters["error"]?.firstOrNull(),
                 parameters["error_description"]?.firstOrNull(),
                 parameters["error_uri"]?.firstOrNull(),
+                null,
                 parameters.filter { !knownKeys.contains(it.key) && it.value.isNotEmpty() }
                     .mapValues { Json.parseToJsonElement(it.value.first()) }
             )
+        }
+
+        fun isDirectPostJWT(parameters: Map<String, List<String>>) = parameters.containsKey("response")
+
+        fun fromDirectPostJWT(parameters: Map<String, List<String>>, encKeyJwk: JsonObject): TokenResponse {
+            if(!isDirectPostJWT(parameters)) throw IllegalArgumentException("The given parameters are not in direct_post.jwt format, use fromHttpParameters instead")
+
+            val response = parameters["response"]!!.first()
+            return JweUtils.parseJWE(response, encKeyJwk.toString()).let {
+                fromJSON(it.payload).copy(jwsParts = it)
+            }
         }
     }
 
@@ -122,6 +140,16 @@ data class TokenResponse private constructor(
             errorUri?.let { put("error_uri", listOf(it)) }
             putAll(customParameters.mapValues { listOf(it.value.toString()) })
         }
+    }
+
+    /**
+     * Converts the token response to a direct_post.jwt response, where currently only a JWE-only response is supported.
+     */
+    fun toDirecPostJWTParameters(encKeyJwk: JsonObject, alg: String = "ECDH-ES", enc: String = "A256GCM",
+                                 headerParams: Map<String, JsonElement> = mapOf()): Map<String, List<String>> {
+        return mapOf(
+            "response" to listOf(JweUtils.toJWE(toJSON(), encKeyJwk.toString(), alg, enc, headerParams))
+        )
     }
 }
 
