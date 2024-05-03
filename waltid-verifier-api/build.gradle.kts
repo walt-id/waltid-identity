@@ -94,6 +94,10 @@ dependencies {
     implementation("org.slf4j:jul-to-slf4j:2.0.12")
     implementation("io.ktor:ktor-client-okhttp-jvm:${Versions.KTOR_VERSION}")
 
+    // Crypto
+    implementation("com.augustcellars.cose:cose-java:1.1.0")
+    implementation("com.nimbusds:nimbus-jose-jwt:9.37.3")
+
     // Test
     testImplementation(kotlin("test"))
     //testImplementation("org.jetbrains.kotlin:kotlin-test-junit:${Versions.KOTLIN_VERSION}")

@@ -1,8 +1,29 @@
 package id.walt.verifier
 
+import COSE.AlgorithmID
+import COSE.OneKey
+import cbor.Cbor
+import com.auth0.jwk.Jwk
+import com.nimbusds.jose.jwk.Curve
+import com.nimbusds.jose.jwk.JWK
+import com.nimbusds.jose.jwk.gen.ECKeyGenerator
 import id.walt.credentials.verification.PolicyManager
+import id.walt.crypto.keys.Key
+import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto.keys.jwk.JWKKeyCreator
+import id.walt.crypto.utils.JsonUtils.toJsonElement
+import id.walt.mdoc.COSECryptoProviderKeyInfo
+import id.walt.mdoc.SimpleCOSECryptoProvider
+import id.walt.mdoc.dataelement.DataElement
+import id.walt.mdoc.dataelement.FullDateElement
+import id.walt.mdoc.dataelement.MapElement
+import id.walt.mdoc.dataelement.toDE
+import id.walt.mdoc.doc.MDocBuilder
+import id.walt.mdoc.mso.DeviceKeyInfo
+import id.walt.mdoc.mso.ValidityInfo
 import id.walt.oid4vc.data.ResponseMode
 import id.walt.oid4vc.data.dif.*
+import id.walt.verifier.oidc.LspPotentialInteropEvent
 import id.walt.verifier.oidc.VerificationUseCase
 import io.github.smiley4.ktorswaggerui.dsl.get
 import io.github.smiley4.ktorswaggerui.dsl.post
@@ -10,7 +31,9 @@ import io.github.smiley4.ktorswaggerui.dsl.route
 import io.ktor.client.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.plugins.logging.*
+import io.ktor.client.request.forms.*
 import io.ktor.http.*
+import io.ktor.http.content.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
@@ -18,10 +41,26 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.util.*
 import io.ktor.util.*
+import kotlinx.datetime.Clock
+import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.plus
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToHexString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
+import java.io.File
+import java.io.FileInputStream
+import java.nio.charset.Charset
+import java.security.KeyFactory
+import java.security.PublicKey
+import java.security.cert.CertificateFactory
+import java.security.cert.X509Certificate
+import java.security.interfaces.ECKey
+import java.security.spec.PKCS8EncodedKeySpec
+import java.security.spec.X509EncodedKeySpec
+import java.util.*
 
 @Serializable
 data class DescriptorMappingFormParam(val id: String, val format: VCFormat, val path: String)
@@ -35,6 +74,10 @@ data class PresentationSubmissionFormParam(
 data class TokenResponseFormParam(
     val vp_token: JsonElement,
     val presentation_submission: PresentationSubmissionFormParam
+)
+
+data class LSPPotentialIssueFormDataParam(
+    val jwk: JsonObject
 )
 
 @Serializable
@@ -260,5 +303,43 @@ fun Application.verfierApi() {
                 call.respond(PolicyManager.listPolicyDescriptions())
             }
         }
+
+        route("lsp-potential") {
+            post("issueMdl", {
+                tags = listOf("LSP POTENTIAL Interop Event")
+                summary = "Issue MDL for given device key, using internal issuer keys"
+                description = "Give device public key JWK in form body."
+                request {
+                    body<LSPPotentialIssueFormDataParam> {
+                        mediaType(ContentType.Application.FormUrlEncoded)
+                        example("jwk", LSPPotentialIssueFormDataParam(
+                            Json.parseToJsonElement(ECKeyGenerator(Curve.P_256).generate().toPublicJWK().toString().also {
+                                println(it)
+                            }).jsonObject
+                        ))
+                    }
+                }
+            }) {
+                val deviceJwk = context.request.call.receiveParameters().toMap().get("jwk")
+                val devicePubKey = JWK.parse(deviceJwk!!.first()).toECKey().toPublicKey()
+
+                val mdoc = MDocBuilder("org.iso.18013.5.1.mDL")
+                    .addItemToSign("org.iso.18013.5.1", "family_name", "Doe".toDE())
+                    .addItemToSign("org.iso.18013.5.1", "given_name", "John".toDE())
+                    .addItemToSign("org.iso.18013.5.1", "birth_date", FullDateElement(LocalDate(1990, 1, 15)))
+                    .sign(
+                        ValidityInfo(Clock.System.now(), Clock.System.now(), Clock.System.now().plus(365*24, DateTimeUnit.HOUR)),
+                        DeviceKeyInfo(DataElement.fromCBOR(OneKey(devicePubKey, null).AsCBOR().EncodeToBytes())),
+                        SimpleCOSECryptoProvider(listOf(
+                        LspPotentialInteropEvent.POTENTIAL_ISSUER_CRYPTO_PROVIDER_INFO)), LspPotentialInteropEvent.POTENTIAL_ISSUER_KEY_ID
+                    )
+                println("SIGNED MDOC (mDL):")
+                println(Cbor.encodeToHexString(mdoc))
+                call.respond(mdoc.toCBORHex())
+            }
+        }
     }
 }
+
+
+

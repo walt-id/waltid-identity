@@ -333,7 +333,7 @@ class MDoc_Test: AnnotationSpec() {
       deviceAuthentication = DeviceAuthentication(ListElement(listOf(NullElement(), NullElement(), mdocHandoverRestored)),
         presReq.presentationDefinition?.inputDescriptors?.first()?.id!!, EncodedCBORElement(MapElement(mapOf())))
     ), SimpleCOSECryptoProvider(
-      listOf(issuerProviderKeyInfo, COSECryptoProviderKeyInfo(DEVICE_KEY_ID, AlgorithmID.ECDSA_256, deviceKeyPair.public, deviceKeyPair.private))
+      listOf(issuerProviderKeyInfo, COSECryptoProviderKeyInfo(DEVICE_KEY_ID, AlgorithmID.ECDSA_256, deviceKeyPair.public, null))
     ))
     assertTrue(verified)
   }
