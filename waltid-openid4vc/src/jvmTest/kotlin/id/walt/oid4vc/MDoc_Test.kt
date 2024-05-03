@@ -3,11 +3,15 @@ package id.walt.oid4vc
 import COSE.AlgorithmID
 import COSE.OneKey
 import cbor.Cbor
+import com.nimbusds.jose.jwk.JWK
+import com.nimbusds.jose.jwk.KeyUse
 import com.nimbusds.jose.util.Base64
 import com.nimbusds.jose.util.Base64URL
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto.utils.JweUtils
 import id.walt.mdoc.COSECryptoProviderKeyInfo
 import id.walt.mdoc.SimpleCOSECryptoProvider
 import id.walt.mdoc.dataelement.*
@@ -221,6 +225,7 @@ class MDoc_Test: AnnotationSpec() {
         PresentationDefinition(
           inputDescriptors = listOf(
             InputDescriptor(
+              id = mdoc.docType.value,
               format = mapOf(VCFormat.mso_mdoc to VCFormatDefinition(setOf("EdDSA", "ES256"))),
               constraints = InputDescriptorConstraints(
                 limitDisclosure = DisclosureLimitation.required,
@@ -254,7 +259,8 @@ class MDoc_Test: AnnotationSpec() {
             put("keys", JsonArray(listOf(runBlocking { ephemeralReaderKey.exportJWKObject().let {
               JsonObject(it + ("use" to JsonPrimitive("enc")) + ("alg" to JsonPrimitive("ECDH-ES")))
             } })))
-          })
+          },
+          authorizationEncryptedResponseAlg = "ECDH-ES", authorizationEncryptedResponseEnc = "A256GCM")
       )
     )
     val authUrl = OpenID4VP.getAuthorizationUrl(presReq, "mdoc-openid4vp://") // ISO-18013-7 page 20 (B.3.1.3.1)
@@ -267,10 +273,11 @@ class MDoc_Test: AnnotationSpec() {
     val parsedReaderKey = parsedPresReq.clientMetadata?.jwks?.get("keys")?.jsonArray?.first {
       it.jsonObject.containsKey("use") && it.jsonObject.containsKey("alg") &&
           it.jsonObject["use"]!!.jsonPrimitive.content == "enc" &&
-          it.jsonObject["alg"]!!.jsonPrimitive.content == "ECDH-ES"
+          it.jsonObject["alg"]!!.jsonPrimitive.content == parsedPresReq.clientMetadata?.authorizationEncryptedResponseAlg
     } ?: throw Exception("No ephemeral reader key found")
 
     // 5) Create OID4VP presentation response (Wallet)
+    val mdocNonce = UUID.generateUUID().toString()
     val presentedMdoc = mdoc.presentWithDeviceSignature(MDocRequestBuilder(mdoc.docType.value).also {
       parsedPresReq.presentationDefinition!!.inputDescriptors.forEach { inputDescriptor ->
         inputDescriptor.constraints!!.fields!!.forEach { field ->
@@ -278,9 +285,8 @@ class MDoc_Test: AnnotationSpec() {
         }
       }
     }.build(), DeviceAuthentication(sessionTranscript = ListElement(listOf(
-      NullElement(),
-      NullElement(),
-      OpenID4VP.generateMDocOID4VPHandover(parsedPresReq, UUID.generateUUID().toString())
+      NullElement(), NullElement(),
+      OpenID4VP.generateMDocOID4VPHandover(parsedPresReq, mdocNonce)
     )), mdoc.docType.value, EncodedCBORElement(MapElement(mapOf()))),
       SimpleCOSECryptoProvider(listOf(
         COSECryptoProviderKeyInfo(DEVICE_KEY_ID, AlgorithmID.ECDSA_256, deviceKeyPair.public, deviceKeyPair.private))), DEVICE_KEY_ID)
@@ -295,22 +301,39 @@ class MDoc_Test: AnnotationSpec() {
       )
     ))
     assertNotNull(oid4vpResponse.vpToken)
-    // post as form parameters
-    val formParams = oid4vpResponse.toHttpParameters()
+    // post as form parameters in direct_post.jwt mode (Wallet)
+    val ephemeralWalletKey = runBlocking { KeyManager.createKey(KeyGenerationRequest(keyType = KeyType.secp256r1)) }
+    val encKey = parsedPresReq.clientMetadata?.jwks?.get("keys")?.jsonArray?.first {
+      jwk -> JWK.parse(jwk.toString()).keyUse?.equals(KeyUse.ENCRYPTION) ?: false }?.jsonObject ?: throw Exception("No ephemeral reader key found")
+
+    val formParams = oid4vpResponse.toDirecPostJWTParameters(encKey,
+      alg = parsedPresReq.clientMetadata?.authorizationEncryptedResponseAlg ?: "ECDH-ES",
+      enc = parsedPresReq.clientMetadata?.authorizationEncryptedResponseEnc ?: "A256GCM",
+      mapOf(
+        "epk" to runBlocking{ ephemeralWalletKey.getPublicKey().exportJWKObject() },
+        "apu" to JsonPrimitive(Base64URL.encode(mdocNonce).toString()),
+        "apv" to JsonPrimitive(Base64URL.encode(parsedPresReq.nonce!!).toString())
+      )
+    )
 
     // 6) Parse presentation response (Verifier)
     // load from form parameters
-    val parsedResponse = TokenResponse.fromHttpParameters(formParams)
+    assertTrue(TokenResponse.isDirectPostJWT(formParams))
+    val parsedResponse = TokenResponse.fromDirectPostJWT(formParams, runBlocking{ ephemeralReaderKey.exportJWKObject() })
     assertEquals(expected = oid4vpResponse.vpToken, actual = parsedResponse.vpToken)
     assertNotNull(parsedResponse.presentationSubmission)
+    assertNotNull(parsedResponse.jwsParts)
 
     // 7) Verify presentation response (Verifier)
+    val mdocHandoverRestored = OpenID4VP.generateMDocOID4VPHandover(presReq, Base64URL.from(parsedResponse.jwsParts!!.header["apu"]!!.jsonPrimitive.content).decodeToString())
     val parsedDeviceResponse = DeviceResponse.fromCBORBase64URL(parsedResponse.vpToken!!.jsonPrimitive.content)
     assertEquals(1, parsedDeviceResponse.documents.size)
     val parsedMdoc = parsedDeviceResponse.documents[0]
     val verified = parsedMdoc.verify(MDocVerificationParams(
       VerificationType.forPresentation,
-      issuerKeyID = ISSUER_KEY_ID, deviceKeyID = DEVICE_KEY_ID
+      issuerKeyID = ISSUER_KEY_ID, deviceKeyID = DEVICE_KEY_ID,
+      deviceAuthentication = DeviceAuthentication(ListElement(listOf(NullElement(), NullElement(), mdocHandoverRestored)),
+        presReq.presentationDefinition?.inputDescriptors?.first()?.id!!, EncodedCBORElement(MapElement(mapOf())))
     ), SimpleCOSECryptoProvider(
       listOf(issuerProviderKeyInfo, COSECryptoProviderKeyInfo(DEVICE_KEY_ID, AlgorithmID.ECDSA_256, deviceKeyPair.public, deviceKeyPair.private))
     ))
