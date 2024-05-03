@@ -2,6 +2,9 @@
 
 package id.walt.verifier.oidc
 
+import COSE.AlgorithmID
+import COSE.OneKey
+import com.upokecenter.cbor.CBORObject
 import id.walt.credentials.verification.Verifier
 import id.walt.credentials.verification.models.PolicyRequest
 import id.walt.credentials.verification.models.PresentationVerificationResponse
@@ -133,19 +136,20 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
         val mdocHandoverRestored = OpenID4VP.generateMDocOID4VPHandover(session.authorizationRequest!!, Base64.getUrlDecoder().decode(tokenResponse.jwsParts!!.header["apu"]!!.jsonPrimitive.content).decodeToString())
         val parsedDeviceResponse = DeviceResponse.fromCBORBase64URL(tokenResponse.vpToken!!.jsonPrimitive.content)
         val parsedMdoc = parsedDeviceResponse.documents[0]
-        TODO("Find issuer key and device key")
-//        return parsedMdoc.verify(
-//            MDocVerificationParams(
-//            VerificationType.forPresentation,
-//            issuerKeyID = ISSUER_KEY_ID, deviceKeyID = DEVICE_KEY_ID,
-//            deviceAuthentication = DeviceAuthentication(
-//                ListElement(listOf(NullElement(), NullElement(), mdocHandoverRestored)),
-//                presReq.presentationDefinition?.inputDescriptors?.first()?.id!!, EncodedCBORElement(MapElement(mapOf()))
-//            )
-//        ), SimpleCOSECryptoProvider(
-//            listOf(issuerProviderKeyInfo, COSECryptoProviderKeyInfo(DEVICE_KEY_ID, AlgorithmID.ECDSA_256, deviceKeyPair.public, deviceKeyPair.private))
-//        )
-//        )
+        val deviceKey = OneKey(CBORObject.DecodeFromBytes(parsedMdoc.MSO!!.deviceKeyInfo.deviceKey.toCBOR()))
+        //TODO("Find issuer key and device key")
+        return parsedMdoc.verify(
+            MDocVerificationParams(
+            VerificationType.forPresentation,
+            issuerKeyID = LspPotentialInteropEvent.POTENTIAL_ISSUER_KEY_ID, deviceKeyID = "DEVICE_KEY_ID",
+            deviceAuthentication = DeviceAuthentication(
+                ListElement(listOf(NullElement(), NullElement(), mdocHandoverRestored)),
+                session.authorizationRequest!!.presentationDefinition?.inputDescriptors?.first()?.id!!, EncodedCBORElement(MapElement(mapOf()))
+            )
+        ), SimpleCOSECryptoProvider(
+            listOf(LspPotentialInteropEvent.POTENTIAL_ISSUER_CRYPTO_PROVIDER_INFO,
+            COSECryptoProviderKeyInfo("DEVICE_KEY_ID", AlgorithmID.ECDSA_256, deviceKey.AsPublicKey(), null))
+        ))
     }
 
     override fun initializeAuthorization(
