@@ -39,21 +39,44 @@ data class PresentationDefinition(
 
         fun primitiveGenerationFromVcTypes(types: List<String>): PresentationDefinition {
             return PresentationDefinition(inputDescriptors = types.map { type ->
-                InputDescriptor(
-                    id = type,
-                    format = mapOf(VCFormat.jwt_vc_json to VCFormatDefinition(alg = setOf("EdDSA"))),
-                    constraints = InputDescriptorConstraints(
-                        listOf(
-                            InputDescriptorField(
-                                path = listOf("$.type"), filter = JsonObject(
-                                    mapOf(
-                                        "type" to JsonPrimitive("string"), "pattern" to JsonPrimitive(type)
+                when(type) {
+                    "org.iso.18013.5.1.mDL" -> InputDescriptor(
+                        id = type,
+                        format = mapOf(VCFormat.mso_mdoc to VCFormatDefinition(setOf("EdDSA", "ES256"))),
+                        constraints = InputDescriptorConstraints(
+                            limitDisclosure = DisclosureLimitation.required,
+                            fields = listOf(
+                                InputDescriptorField(
+                                    path = listOf("$['org.iso.18013.5.1']['family_name']"),
+                                    intentToRetain = false
+                                ),
+                                InputDescriptorField(
+                                    path = listOf("$['org.iso.18013.5.1']['given_name']"),
+                                    intentToRetain = false
+                                ),
+                                InputDescriptorField(
+                                    path = listOf("$['org.iso.18013.5.1']['birth_date']"),
+                                    intentToRetain = false
+                                )
+                            )
+                        )
+                    )
+                    else -> InputDescriptor(
+                        id = type,
+                        format = mapOf(VCFormat.jwt_vc_json to VCFormatDefinition(alg = setOf("EdDSA"))),
+                        constraints = InputDescriptorConstraints(
+                            listOf(
+                                InputDescriptorField(
+                                    path = listOf("$.type"), filter = JsonObject(
+                                        mapOf(
+                                            "type" to JsonPrimitive("string"), "pattern" to JsonPrimitive(type)
+                                        )
                                     )
                                 )
                             )
                         )
                     )
-                )
+                }
             })
         }
 

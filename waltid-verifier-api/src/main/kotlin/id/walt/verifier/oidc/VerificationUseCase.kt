@@ -3,6 +3,9 @@ package id.walt.verifier.oidc
 import id.walt.credentials.verification.models.PolicyRequest
 import id.walt.credentials.verification.models.PolicyRequest.Companion.parsePolicyRequests
 import id.walt.credentials.verification.policies.JwtSignaturePolicy
+import id.walt.crypto.keys.KeyGenerationRequest
+import id.walt.crypto.keys.KeyManager
+import id.walt.crypto.keys.KeyType
 import id.walt.oid4vc.data.ResponseMode
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.responses.TokenResponse
@@ -10,6 +13,7 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.http.*
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import kotlin.collections.set
@@ -51,7 +55,11 @@ class VerificationUseCase(
         logger.debug { "Presentation definition: " + presentationDefinition.toJSON() }
 
         val session = OIDCVerifierService.initializeAuthorization(
-            presentationDefinition, responseMode = responseMode, sessionId = stateId
+            presentationDefinition, responseMode = responseMode, sessionId = stateId,
+            ephemeralEncKey = when(responseMode) {
+                ResponseMode.direct_post_jwt -> runBlocking { KeyManager.createKey(KeyGenerationRequest(keyType = KeyType.secp256r1)) }
+                else -> null
+            }
         )
 
         val specificPolicies = requestCredentialsArr.filterIsInstance<JsonObject>().associate {
@@ -83,7 +91,10 @@ class VerificationUseCase(
         logger.debug { "Verifying session $sessionId" }
         val session = sessionId?.let { OIDCVerifierService.getSession(it) }
             ?: return Result.failure(Exception("State parameter doesn't refer to an existing session, or session expired"))
-        val tokenResponse = TokenResponse.fromHttpParameters(tokenResponseParameters)
+        val tokenResponse = when(TokenResponse.isDirectPostJWT(tokenResponseParameters)) {
+            true -> TokenResponse.fromDirectPostJWT(tokenResponseParameters, runBlocking { session.ephemeralEncKey?.exportJWKObject() } ?: throw IllegalArgumentException("No ephemeral reader key found on session") )
+            else -> TokenResponse.fromHttpParameters(tokenResponseParameters)
+        }
         val sessionVerificationInfo = OIDCVerifierService.sessionVerificationInfos[session.id] ?: return Result.failure(
             IllegalStateException("No session verification information found for session id!")
         )

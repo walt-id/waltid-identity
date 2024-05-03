@@ -5,6 +5,7 @@ import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.util.JwtUtils
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
+import io.ktor.http.*
 import kotlinx.serialization.json.*
 
 interface IAuthorizationRequest {
@@ -47,7 +48,7 @@ data class AuthorizationRequest(
         return buildMap {
             put("response_type", listOf(ResponseType.getResponseTypeString(responseType)))
             put("client_id", listOf(clientId))
-            responseMode?.let { put("response_mode", listOf(it.name)) }
+            responseMode?.let { put("response_mode", listOf(it.toString())) }
             redirectUri?.let { put("redirect_uri", listOf(it)) }
             if (scope.isNotEmpty())
                 put("scope", listOf(scope.joinToString(" ")))
@@ -147,7 +148,7 @@ data class AuthorizationRequest(
             return AuthorizationRequest(
                 parameters["response_type"]!!.first().let { ResponseType.fromResponseTypeString(it) },
                 parameters["client_id"]!!.first(),
-                parameters["response_mode"]?.firstOrNull()?.let { ResponseMode.valueOf(it) },
+                parameters["response_mode"]?.firstOrNull()?.let { ResponseMode.fromString(it) },
                 parameters["redirect_uri"]?.firstOrNull(),
                 parameters["scope"]?.flatMap { it.split(" ") }?.toSet() ?: setOf(),
                 parameters["state"]?.firstOrNull(),

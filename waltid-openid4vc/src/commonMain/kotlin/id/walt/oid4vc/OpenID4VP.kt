@@ -53,10 +53,12 @@ object OpenID4VP {
             responseMode = responseMode,
             redirectUri = when (responseMode) {
                 ResponseMode.direct_post -> null
+                ResponseMode.direct_post_jwt -> null
                 else -> redirectOrResponseUri
             },
             responseUri = when (responseMode) {
                 ResponseMode.direct_post -> redirectOrResponseUri
+                ResponseMode.direct_post_jwt -> redirectOrResponseUri
                 else -> null
             },
             presentationDefinition = presentationDefinition.presentationDefinition,
