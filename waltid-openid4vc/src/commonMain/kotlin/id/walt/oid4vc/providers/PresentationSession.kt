@@ -1,5 +1,6 @@
 package id.walt.oid4vc.providers
 
+import id.walt.crypto.keys.Key
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.responses.TokenResponse
@@ -13,5 +14,6 @@ data class PresentationSession(
     val presentationDefinition: PresentationDefinition,
     val tokenResponse: TokenResponse? = null,
     val verificationResult: Boolean? = null,
-    val customParameters: Map<String, Any>? = null
+    val customParameters: Map<String, Any>? = null,
+    val ephemeralEncKey: Key? = null
 ) : AuthorizationSession()

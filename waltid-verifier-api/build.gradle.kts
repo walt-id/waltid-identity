@@ -115,6 +115,7 @@ dependencies {
     api(project(":waltid-crypto"))
     api(project(":waltid-verifiable-credentials"))
     api(project(":waltid-did"))
+    api(project(":waltid-mdoc-credentials"))
     // implementation("id.walt:waltid-ssikit2:1.0.8-SNAPSHOT")
     // implementation("id.walt:core-crypto:1.0.7-SNAPSHOT")
 }

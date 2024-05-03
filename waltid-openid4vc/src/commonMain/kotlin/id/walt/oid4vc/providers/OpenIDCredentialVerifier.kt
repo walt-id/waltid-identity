@@ -1,14 +1,26 @@
 package id.walt.oid4vc.providers
 
+import id.walt.crypto.keys.Key
+import id.walt.crypto.keys.KeyGenerationRequest
+import id.walt.crypto.keys.KeyManager
+import id.walt.crypto.keys.KeyType
 import id.walt.oid4vc.data.ClientIdScheme
+import id.walt.oid4vc.data.OpenIDClientMetadata
 import id.walt.oid4vc.data.ResponseMode
 import id.walt.oid4vc.data.ResponseType
 import id.walt.oid4vc.data.dif.PresentationDefinition
+import id.walt.oid4vc.data.dif.VCFormat
 import id.walt.oid4vc.interfaces.ISessionCache
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.responses.TokenResponse
 import id.walt.oid4vc.util.ShortIdUtils
 import kotlinx.datetime.Clock
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.uuid.UUID
+import kotlinx.uuid.generateUUID
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
@@ -36,12 +48,14 @@ abstract class OpenIDCredentialVerifier(val config: CredentialVerifierConfig) :
         scope: Set<String> = setOf(),
         expiresIn: Duration = 60.seconds,
         sessionId: String? = null, // A calling party may provide a unique session Id
+        ephemeralEncKey: Key? = null
     ): PresentationSession {
         val session = PresentationSession(
             id = sessionId ?: ShortIdUtils.randomSessionId(),
             authorizationRequest = null,
             expirationTimestamp = Clock.System.now().plus(expiresIn),
-            presentationDefinition = presentationDefinition
+            presentationDefinition = presentationDefinition,
+            ephemeralEncKey = ephemeralEncKey
         ).also {
             putSession(it.id, it)
         }
@@ -61,7 +75,7 @@ abstract class OpenIDCredentialVerifier(val config: CredentialVerifierConfig) :
                 else -> null
             },
             responseUri = when (responseMode) {
-                ResponseMode.direct_post -> prepareResponseOrRedirectUri(session.id, responseMode)
+                ResponseMode.direct_post, ResponseMode.direct_post_jwt -> prepareResponseOrRedirectUri(session.id, responseMode)
                 else -> null
             },
             presentationDefinitionUri = presentationDefinitionUri,
@@ -71,7 +85,8 @@ abstract class OpenIDCredentialVerifier(val config: CredentialVerifierConfig) :
             },
             scope = scope,
             state = session.id,
-            clientIdScheme = config.clientIdScheme
+            clientIdScheme = config.clientIdScheme,
+            nonce = UUID.generateUUID().toString()
         )
         return session.copy(authorizationRequest = authReq).also {
             putSession(session.id, it)

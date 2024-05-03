@@ -218,7 +218,6 @@ class MDoc_Test: AnnotationSpec() {
     // nothing to do in this test case
 
     // 3) Create OID4VP presentation request (Verifier)
-    // NOTE: ephemeral key may actually not be required (?)
     val ephemeralReaderKey = runBlocking { KeyManager.createKey(KeyGenerationRequest(keyType = KeyType.secp256r1)) }
     val presReq = OpenID4VP.createPresentationRequest(
       PresentationDefinitionParameter.fromPresentationDefinition(
@@ -247,8 +246,7 @@ class MDoc_Test: AnnotationSpec() {
             )
           )
         )
-        // TODO: set URLs ?
-      ), responseMode = ResponseMode.direct_post, responseTypes = setOf(ResponseType.VpToken), redirectOrResponseUri = "http://blank",
+      ), responseMode = ResponseMode.direct_post_jwt, responseTypes = setOf(ResponseType.VpToken), redirectOrResponseUri = "http://blank",
       nonce = UUID.generateUUID().toString(), state = "test", clientId = "test-verifier", clientIdScheme = ClientIdScheme.PreRegistered,
       clientMetadataParameter = ClientMetadataParameter.fromClientMetadata(
         OpenIDClientMetadata(listOf("http://localhost"),
@@ -256,7 +254,7 @@ class MDoc_Test: AnnotationSpec() {
 //            The mdoc reader shall set the use JWK parameter (public key use) to the static JSON String value enc
 //                and set the alg JWK parameter to the static JSON String value ECDH-ES to indicate which JWK in the
 //            jwks Authorization Request parameter can be used for key agreement to encrypt the response (see [7]). [ISO-18013-7_240312]
-            put("keys", JsonArray(listOf(runBlocking { ephemeralReaderKey.exportJWKObject().let {
+            put("keys", JsonArray(listOf(runBlocking { ephemeralReaderKey.getPublicKey().exportJWKObject().let {
               JsonObject(it + ("use" to JsonPrimitive("enc")) + ("alg" to JsonPrimitive("ECDH-ES")))
             } })))
           },
