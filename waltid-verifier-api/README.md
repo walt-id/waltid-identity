@@ -100,7 +100,7 @@ docker run -p 7003:7003 waltid/verifier-api --webHost=0.0.0.0 --webPort=7003 --b
 https://verifier.portal.walt-test.cloud/swagger/index.html
 
 - Get mDL from our temporary issuer:
-  - https://verifier.portal.walt-test.cloud/swagger/index.html[#/LSP POTENTIAL Interop Event/post_lsp_potential_issueMdl](http://0.0.0.0:7003/swagger/index.html#/LSP%20POTENTIAL%20Interop%20Event/post_lsp_potential_issueMdl)
+  - https://verifier.portal.walt-test.cloud/swagger/index.html#/LSP%20POTENTIAL%20Interop%20Event/post_lsp_potential_issueMdl
   - Put a device key (holder key) in JWK format in the POST body. E.g.:
 
     ```jsx
@@ -112,7 +112,7 @@ https://verifier.portal.walt-test.cloud/swagger/index.html
 
 - Save mDL to your wallet
 - Use the verifier API to create a openid4vc verification request:
-  - https://verifier.portal.walt-test.cloud/swagger/index.html[#/Credential Verification/post_openid4vc_verify](http://0.0.0.0:7003/swagger/index.html#/Credential%20Verification/post_openid4vc_verify)
+  - https://verifier.portal.walt-test.cloud/swagger/index.html#/Credential%20Verification/post_openid4vc_verify
   - Use these arguments:
     - authorizeBaseUrl: mdoc-openid4vp://
     - responseMode: direct_post_jwt 
