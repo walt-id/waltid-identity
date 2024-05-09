@@ -34,6 +34,6 @@ include(
     "waltid-reporting",
 
     // Samples
-    "waltid-android"
+    //"waltid-android"
 )
 
