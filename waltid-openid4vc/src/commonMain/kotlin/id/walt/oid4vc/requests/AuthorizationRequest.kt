@@ -1,8 +1,12 @@
 package id.walt.oid4vc.requests
 
+import id.walt.crypto.keys.Key
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.util.JwtUtils
+import id.walt.sdjwt.JWTCryptoProvider
+import id.walt.sdjwt.SDJwt
+import id.walt.sdjwt.SDPayload
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
@@ -89,6 +93,62 @@ data class AuthorizationRequest(
             ClientIdScheme.RedirectUri -> clientId
             else -> null
         }
+    }
+
+    fun toRequestObject(cryptoProvider: JWTCryptoProvider, keyId: String): String {
+        return cryptoProvider.sign(toJSON(), keyId)
+    }
+
+    fun toRequestObjectHttpParameters(requestObjectJWT: String): Map<String, List<String>> {
+        return mapOf(
+            "client_id" to listOf(clientId),
+            "request" to listOf(requestObjectJWT)
+        )
+    }
+
+    fun toRequestObjectByReferenceHttpParameters(requestUri: String): Map<String, List<String>> {
+        return mapOf(
+            "client_id" to listOf(clientId),
+            "request_uri" to listOf(requestUri)
+        )
+    }
+
+    fun toJSON(): JsonObject {
+        return JsonObject(buildMap {
+            put("response_type", JsonArray(listOf(ResponseType.getResponseTypeString(responseType).let { JsonPrimitive(it) })))
+            put("client_id", JsonPrimitive(clientId))
+            responseMode?.let { put("response_mode", JsonPrimitive(it.toString())) }
+            redirectUri?.let { put("redirect_uri", JsonPrimitive(it)) }
+            if (scope.isNotEmpty())
+                put("scope", JsonPrimitive(scope.joinToString(" ")))
+            state?.let { put("state", JsonPrimitive(it)) }
+            authorizationDetails?.let {
+                put(
+                    "authorization_details",
+                    JsonArray(authorizationDetails.map { it.toJSON() })
+                )
+            }
+            walletIssuer?.let { put("wallet_issuer", JsonPrimitive(it)) }
+            userHint?.let { put("user_hint", JsonPrimitive(it)) }
+            issuerState?.let { put("issuer_state", JsonPrimitive(it)) }
+            requestUri?.let { put("request_uri", JsonPrimitive(it)) }
+            presentationDefinition?.let { put("presentation_definition", it.toJSON()) }
+            presentationDefinitionUri?.let { put("presentation_definition_uri", JsonPrimitive(it)) }
+            clientIdScheme?.let { put("client_id_scheme", JsonPrimitive(it.value)) }
+            clientMetadata?.let { put("client_metadata", it.toJSON()) }
+            clientMetadataUri?.let { put("client_metadata_uri", JsonPrimitive(it)) }
+            nonce?.let { put("nonce", JsonPrimitive(it)) }
+            responseUri?.let { put("response_uri", JsonPrimitive(it)) }
+            codeChallenge?.let { put("code_challenge", JsonPrimitive(it)) }
+            codeChallengeMethod?.let { put("code_challenge_method", JsonPrimitive(it)) }
+            idTokenHint?.let { put("id_token_hint", JsonPrimitive(it)) }
+            customParameters.forEach { (key, value) ->
+                when(value.size) {
+                    1 -> put(key, JsonPrimitive(value.first()))
+                    else -> put(key, JsonArray(value.map { JsonPrimitive(it) }))
+                }
+            }
+        })
     }
 
     companion object : HTTPDataObjectFactory<AuthorizationRequest>() {
