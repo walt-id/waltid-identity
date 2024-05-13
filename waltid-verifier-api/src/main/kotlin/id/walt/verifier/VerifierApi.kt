@@ -298,6 +298,7 @@ fun Application.verfierApi() {
                         put("exp", 1776532276)
                         if (presentationDefinitionJson!=null)
                             put("presentation_definition", presentationDefinitionJson)
+//                            put("presentation_definition_uri", response.presentationDefinitionUri)
                     }
 
                 val requestJwtHeader = mapOf(JWTClaims.Header.keyID to SERVER_SIGNING_KEY.getPublicKey().getKeyId(), JWTClaims.Header.type to "JWT" )
@@ -309,11 +310,14 @@ fun Application.verfierApi() {
                 var responseQueryString = response.toHttpQueryString()
                 responseQueryString = responseQueryString.replace("client_id=", "client_id=$clientId")
                 responseQueryString = responseQueryString.replace("response_uri","redirect_uri")
-                responseQueryString = responseQueryString.replace("presentation_definition_uri","request_uri")
+                val presentationDefinitionUri = URLEncoder.encode(response.presentationDefinitionUri!!, "UTF-8")
+                responseQueryString = responseQueryString.replace("&presentation_definition_uri=","")
+                responseQueryString = responseQueryString.replace(presentationDefinitionUri,"")
                 responseQueryString = responseQueryString.replace("response_type=vp_token", "response_type=$responseType")
                 responseQueryString = responseQueryString.plus("&scope=$scope")
                 responseQueryString = responseQueryString.plus("&request=$requestToken")
 
+                logger.info { "openid://?$responseQueryString" }
                 context.respondRedirect("openid://?$responseQueryString")
             }
 
