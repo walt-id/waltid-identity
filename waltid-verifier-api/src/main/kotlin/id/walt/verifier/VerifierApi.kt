@@ -8,6 +8,8 @@ import id.walt.crypto.utils.JsonUtils.toJsonObject
 import id.walt.oid4vc.data.ResponseMode
 import id.walt.oid4vc.data.dif.*
 import id.walt.oid4vc.definitions.JWTClaims
+import id.walt.verifier.base.config.ConfigManager
+import id.walt.verifier.base.config.OIDCVerifierServiceConfig
 import id.walt.verifier.oidc.VerificationUseCase
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.github.smiley4.ktorswaggerui.dsl.get
@@ -31,7 +33,14 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import kotlinx.uuid.UUID
 
-const val SERVER_URL = "https://810d-2a02-85f-e4ab-48cf-7925-af4f-f290-1cc2.ngrok-free.app"
+
+private val SERVER_URL by lazy {
+    runBlocking {
+        ConfigManager.loadConfigs(arrayOf())
+        ConfigManager.getConfig<OIDCVerifierServiceConfig>().baseUrl
+    }
+}
+
 private val SERVER_SIGNING_KEY by lazy { runBlocking { JWKKey.generate(KeyType.secp256r1) } }
 
 
@@ -108,7 +117,7 @@ fun Application.verfierApi() {
     routing {
 
         get("/jwks") {
-            var jwks = buildJsonObject {
+            val jwks = buildJsonObject {
                 put("keys", buildJsonArray {
                     val jwkWithKid = buildJsonObject {
                         SERVER_SIGNING_KEY.getPublicKey().exportJWKObject().forEach {
@@ -244,7 +253,7 @@ fun Application.verfierApi() {
                     responseType = "id_token"
                     scope= "openid"
 
-                val stateId = UUID().toString();
+                val stateId = UUID().toString()
 
                 val session = verificationUseCase.createSession(
                     vpPoliciesJson = null,
@@ -273,7 +282,7 @@ fun Application.verfierApi() {
                 val clientId = SERVER_URL
                 val redirectUri = session.authorizationRequest!!.responseUri
 
-                var response = session.authorizationRequest!!
+                val response = session.authorizationRequest!!
 
                 // Create a jwt as request object as defined in JAR OAuth2.0 specification
                 val requestJwtPayload = buildJsonObject {
@@ -339,7 +348,7 @@ fun Application.verfierApi() {
                         val session = verificationUseCase.getSession(sessionId!!)
                         if (session.stateParamAuthorizeReqEbsi != null) {
                             val state = session.stateParamAuthorizeReqEbsi
-                            val code = UUID().toString();
+                            val code = UUID().toString()
                             context.respondRedirect("openid://?code=$code&state=$state")
                         } else {
                             call.respond(HttpStatusCode.OK, it)
