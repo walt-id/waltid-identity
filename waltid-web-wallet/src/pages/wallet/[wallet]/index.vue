@@ -15,12 +15,20 @@
             <LoadingIndicator v-else-if="pending">Loading credentials...</LoadingIndicator>
 
             <div v-else class="text-center">
-                <h3 class="text-2xl font-bold text-[#01337D]">No Credentials Yet!</h3>
-                <p class="mt-2 text-md text-[#002159]">Start by scanning a <br />credential offer.</p>
+                <h3 class="text-2xl font-bold text-[#01337D]">Wallet is Inactive</h3>
+                <p class="mt-2 text-md text-[#616E7C]">To activate your wallet, please verify your identity by
+                    clicking the button below.</p>
+                <NuxtLink :to="``">
+                    <button
+                        class="mt-8 px-4 py-2 text-white bg-[#01337D] rounded-lg shadow-lg hover:bg-[#002159] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#002159]">
+                        Complete Identity Check
+                    </button>
+                </NuxtLink>
             </div>
         </div>
     </div>
-    <div class="fixed bottom-20 right-5 lg:hidden">
+
+    <div v-if="credentials && credentials.length > 0" class="fixed bottom-20 right-5 lg:hidden">
         <NuxtLink :to="`/wallet/${walletId}/scan`">
             <button
                 class="flex items-center justify-center h-14 w-14 rounded-full bg-black text-white shadow-lg hover:bg-blue-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">
