@@ -63,7 +63,7 @@ abstract class OpenIDCredentialVerifier(val config: CredentialVerifierConfig) :
         val authReq = AuthorizationRequest(
             responseType = setOf(ResponseType.VpToken),
             clientId = when(config.clientIdScheme) {
-                ClientIdScheme.RedirectUri -> ""
+                ClientIdScheme.RedirectUri -> config.redirectUri
                 else -> config.clientId
             },
             responseMode = responseMode,
