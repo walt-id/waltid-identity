@@ -32,6 +32,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import kotlinx.uuid.UUID
+import java.net.URLEncoder
 
 
 private val SERVER_URL by lazy {
