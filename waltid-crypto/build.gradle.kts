@@ -126,7 +126,7 @@ kotlin {
                 // Multibase
 //                implementation("com.github.multiformats:java-multibase:v1.1.1")
 
-                implementation("com.oracle.oci.sdk:oci-java-sdk-shaded-full:3.39.1")
+                implementation("com.oracle.oci.sdk:oci-java-sdk-shaded-full:3.41.0")
             }
         }
         val jvmTest by getting {
