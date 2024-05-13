@@ -121,7 +121,7 @@ try {
 }
 
 console.log("Issuer host:", issuerHost);
-const credential_issuer = await $fetch(`https://issuer.portal.walt-test.cloud/.well-known/openid-credential-issuer`)
+const credential_issuer = await $fetch(`${issuer}/.well-known/openid-credential-issuer`)
 const credentialList = [credential_issuer.credential_configurations_supported[Object.keys(credential_issuer.credential_configurations_supported).find(key => credentialOffer.credential_configuration_ids.includes(key))]];
 
 let credentialTypes: String[] = [];
