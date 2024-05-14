@@ -6,7 +6,7 @@ import id.walt.crypto.keys.KeyType
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 
-actual class JWKKey actual constructor(jwk: String?) : Key() {
+class AndroidJWKKey constructor(jwk: String?) : Key() {
 
     /*
     /**
@@ -24,23 +24,23 @@ actual class JWKKey actual constructor(jwk: String?) : Key() {
      */
     override suspend fun decrypt(encrypted: ByteArray): Result<ByteArray>
      */
-    actual override suspend fun getKeyId(): String {
+    override suspend fun getKeyId(): String {
         TODO("Not yet implemented")
     }
 
-    actual override suspend fun getThumbprint(): String {
+    override suspend fun getThumbprint(): String {
         TODO("Not yet implemented")
     }
 
-    actual override suspend fun exportJWK(): String {
+    override suspend fun exportJWK(): String {
         TODO("Not yet implemented")
     }
 
-    actual override suspend fun exportJWKObject(): JsonObject {
+    override suspend fun exportJWKObject(): JsonObject {
         TODO("Not yet implemented")
     }
 
-    actual override suspend fun exportPEM(): String {
+    override suspend fun exportPEM(): String {
         TODO("Not yet implemented")
     }
 
@@ -50,11 +50,11 @@ actual class JWKKey actual constructor(jwk: String?) : Key() {
      * @param plaintext data to be signed
      * @return signed (JWS)
      */
-    actual override suspend fun signRaw(plaintext: ByteArray): ByteArray {
+    override suspend fun signRaw(plaintext: ByteArray): ByteArray {
         TODO("Not yet implemented")
     }
 
-    actual override suspend fun signJws(plaintext: ByteArray, headers: Map<String, String>): String {
+    override suspend fun signJws(plaintext: ByteArray, headers: Map<String, String>): String {
         TODO("Not yet implemented")
     }
 
@@ -63,41 +63,41 @@ actual class JWKKey actual constructor(jwk: String?) : Key() {
      * @param signed signed
      * @return Result wrapping the plaintext; Result failure when the signature fails
      */
-    actual override suspend fun verifyRaw(signed: ByteArray, detachedPlaintext: ByteArray?): Result<ByteArray> {
+    override suspend fun verifyRaw(signed: ByteArray, detachedPlaintext: ByteArray?): Result<ByteArray> {
         TODO("Not yet implemented")
     }
 
-    actual override suspend fun verifyJws(signedJws: String): Result<JsonElement> {
+    override suspend fun verifyJws(signedJws: String): Result<JsonElement> {
         TODO("Not yet implemented")
     }
 
-    actual override suspend fun getPublicKey(): JWKKey {
+    override suspend fun getPublicKey(): JWKKey {
         TODO("Not yet implemented")
     }
 
-    actual override suspend fun getPublicKeyRepresentation(): ByteArray {
+    override suspend fun getPublicKeyRepresentation(): ByteArray {
         TODO("Not yet implemented")
     }
 
-    actual override suspend fun getMeta(): JwkKeyMeta {
+    override suspend fun getMeta(): JwkKeyMeta {
         TODO("Not yet implemented")
     }
 
     override val keyType: KeyType
         get() = TODO("Not yet implemented")
 
-    actual override val hasPrivateKey: Boolean
+    override val hasPrivateKey: Boolean
         get() = TODO("Not yet implemented")
 
-    actual companion object : JWKKeyCreator {
-        actual override suspend fun generate(
+    companion object : JWKKeyCreator {
+        override suspend fun generate(
             type: KeyType,
             metadata: JwkKeyMeta?
         ): JWKKey {
             TODO("Not yet implemented")
         }
 
-        actual override suspend fun importRawPublicKey(
+        override suspend fun importRawPublicKey(
             type: KeyType,
             rawPublicKey: ByteArray,
             metadata: JwkKeyMeta?
@@ -105,11 +105,11 @@ actual class JWKKey actual constructor(jwk: String?) : Key() {
             TODO("Not yet implemented")
         }
 
-        actual override suspend fun importJWK(jwk: String): Result<JWKKey> {
+        override suspend fun importJWK(jwk: String): Result<JWKKey> {
             TODO("Not yet implemented")
         }
 
-        actual override suspend fun importPEM(pem: String): Result<JWKKey> {
+        override suspend fun importPEM(pem: String): Result<JWKKey> {
             TODO("Not yet implemented")
         }
 
