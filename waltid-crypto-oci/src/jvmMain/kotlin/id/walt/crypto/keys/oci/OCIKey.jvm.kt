@@ -21,7 +21,6 @@ import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto.utils.JvmEccUtils
 import id.walt.crypto.utils.JwsUtils.jwsAlg
 import io.github.oshai.kotlinlogging.KotlinLogging
-import io.ktor.util.*
 import kotlinx.coroutines.delay
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -29,6 +28,8 @@ import kotlinx.serialization.Transient
 import kotlinx.serialization.json.*
 import org.kotlincrypto.hash.sha2.SHA256
 import java.time.Duration
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.time.ExperimentalTime
 import kotlin.time.measureTime
 import kotlin.time.toJavaDuration
@@ -104,8 +105,9 @@ actual class OCIKey actual constructor(
         throw NotImplementedError("PEM export is not available for remote keys.")
 
 
+    @OptIn(ExperimentalEncodingApi::class)
     actual override suspend fun signRaw(plaintext: ByteArray): ByteArray {
-        val encodedMessage: String = SHA256().digest(plaintext).encodeBase64()
+        val encodedMessage: String = Base64.encode(SHA256().digest(plaintext))
 
         val signDataDetails =
             SignDataDetails.builder().keyId(id).message(encodedMessage).messageType(SignDataDetails.MessageType.Digest)
@@ -269,7 +271,7 @@ actual class OCIKey actual constructor(
 
 
         suspend fun getOCIPublicKey(
-            kmsManagementClient: KmsManagementClient, keyVersionId: String, keyId: String
+            kmsManagementClient: KmsManagementClient, keyVersionId: String, keyId: String,
         ): Key {
             val getKeyRequest = GetKeyVersionRequest.builder().keyVersionId(keyVersionId).keyId(keyId).build()
             val response = kmsManagementClient.getKeyVersion(getKeyRequest)
@@ -300,7 +302,7 @@ actual class OCIKey actual constructor(
 private suspend fun <T> retry(
     maxDuration: Duration = Duration.ofSeconds(2),
     retryInterval: Duration = Duration.ofMillis(100),
-    block: suspend () -> T
+    block: suspend () -> T,
 ): T {
     var result: Result<T>
     var totalDuration = Duration.ZERO

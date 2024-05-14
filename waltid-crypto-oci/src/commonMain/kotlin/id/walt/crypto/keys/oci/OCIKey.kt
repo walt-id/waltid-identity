@@ -9,7 +9,7 @@ import kotlinx.serialization.Transient
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 
-
+@SerialName("oci")
 expect class OCIKey(
     id: String,
     config: OCIsdkMetadata,
