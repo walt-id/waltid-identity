@@ -3,6 +3,7 @@ package id.walt.issuer
 import id.walt.credentials.vc.vcs.W3CVC
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeySerialization
+import id.walt.crypto.utils.JsonUtils.toJsonObject
 import id.walt.did.dids.DidService
 import id.walt.issuer.IssuanceExamples.batchExample
 import id.walt.issuer.IssuanceExamples.issuerOnboardingRequestDefaultExample
@@ -47,7 +48,9 @@ suspend fun createCredentialOfferUri(issuanceRequests: List<IssuanceRequest>): S
         credentialOfferBuilder = credentialOfferBuilder, expiresIn = 5.minutes, allowPreAuthorized = true
     )
     OidcApi.setIssuanceDataForIssuanceId(issuanceSession.id, issuanceRequests.map {
-        CIProvider.IssuanceSessionData(KeySerialization.deserializeKey(it.issuerKey)
+
+        CIProvider.IssuanceSessionData(
+            KeySerialization.deserializeKey(it.issuerKey.toJsonObject())
             .onFailure { throw IllegalArgumentException("Invalid key was supplied, error occurred is: $it") }
             .getOrThrow(), it.issuerDid, it)
     })  // TODO: Hack as this is non stateless because of oidc4vc lib API
