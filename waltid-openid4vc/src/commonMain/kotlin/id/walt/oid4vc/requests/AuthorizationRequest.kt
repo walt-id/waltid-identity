@@ -113,6 +113,10 @@ data class AuthorizationRequest(
         )
     }
 
+    fun toRequestObjectByReferenceHttpQueryString(requestUri: String): String {
+        return IHTTPDataObject.toHttpQueryString(toRequestObjectByReferenceHttpParameters(requestUri))
+    }
+
     fun toJSON(): JsonObject {
         return JsonObject(buildMap {
             put("response_type", JsonArray(listOf(ResponseType.getResponseTypeString(responseType).let { JsonPrimitive(it) })))

@@ -38,8 +38,8 @@ abstract class OpenIDCredentialVerifier(val config: CredentialVerifierConfig) :
 
     protected open fun prepareResponseOrRedirectUri(sessionID: String, responseMode: ResponseMode): String =
         when (responseMode) {
-            ResponseMode.query, ResponseMode.fragment, ResponseMode.form_post -> config.redirectUri ?: config.clientId
-            else -> config.responseUrl ?: config.clientId
+            ResponseMode.query, ResponseMode.fragment, ResponseMode.form_post -> config.redirectUri
+            else -> config.responseUrl ?: config.redirectUri
         }
 
     open fun initializeAuthorization(
@@ -48,7 +48,8 @@ abstract class OpenIDCredentialVerifier(val config: CredentialVerifierConfig) :
         scope: Set<String> = setOf(),
         expiresIn: Duration = 60.seconds,
         sessionId: String? = null, // A calling party may provide a unique session Id
-        ephemeralEncKey: Key? = null
+        ephemeralEncKey: Key? = null,
+        clientIdScheme: ClientIdScheme = config.defaultClientIdScheme
     ): PresentationSession {
         val session = PresentationSession(
             id = sessionId ?: ShortIdUtils.randomSessionId(),
@@ -62,9 +63,9 @@ abstract class OpenIDCredentialVerifier(val config: CredentialVerifierConfig) :
         val presentationDefinitionUri = preparePresentationDefinitionUri(presentationDefinition, session.id)
         val authReq = AuthorizationRequest(
             responseType = setOf(ResponseType.VpToken),
-            clientId = when(config.clientIdScheme) {
+            clientId = when(clientIdScheme) {
                 ClientIdScheme.RedirectUri -> config.redirectUri
-                else -> config.clientId
+                else -> config.clientIdMap[clientIdScheme] ?: config.defaultClientId
             },
             responseMode = responseMode,
             redirectUri = when (responseMode) {
@@ -85,7 +86,7 @@ abstract class OpenIDCredentialVerifier(val config: CredentialVerifierConfig) :
             },
             scope = scope,
             state = session.id,
-            clientIdScheme = config.clientIdScheme,
+            clientIdScheme = clientIdScheme,
             nonce = UUID.generateUUID().toString()
         )
         return session.copy(authorizationRequest = authReq).also {

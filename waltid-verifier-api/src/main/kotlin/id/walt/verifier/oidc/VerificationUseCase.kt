@@ -9,9 +9,11 @@ import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeyType
 import id.walt.mdoc.COSECryptoProviderKeyInfo
 import id.walt.mdoc.SimpleCOSECryptoProvider
+import id.walt.oid4vc.data.ClientIdScheme
 import id.walt.oid4vc.data.ResponseMode
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.responses.TokenResponse
+import id.walt.sdjwt.JWTCryptoProvider
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
 import io.ktor.client.request.*
@@ -28,7 +30,7 @@ import java.util.*
 import kotlin.collections.set
 
 class VerificationUseCase(
-    val http: HttpClient,
+    val http: HttpClient, cryptoProvider: JWTCryptoProvider
 ) {
     private val logger = KotlinLogging.logger {}
     fun createSession(
@@ -42,6 +44,7 @@ class VerificationUseCase(
         statusCallbackUri: String?,
         statusCallbackApiKey: String?,
         stateId: String?,
+        authorizeBaseUrl: String
     ) = let {
         val vpPolicies = vpPoliciesJson?.jsonArray?.parsePolicyRequests() ?: listOf(PolicyRequest(JwtSignaturePolicy()))
 
@@ -68,7 +71,8 @@ class VerificationUseCase(
             ephemeralEncKey = when(responseMode) {
                 ResponseMode.direct_post_jwt -> runBlocking { KeyManager.createKey(KeyGenerationRequest(keyType = KeyType.secp256r1)) }
                 else -> null
-            }
+            },
+            clientIdScheme = this.getClientIdScheme(authorizeBaseUrl, OIDCVerifierService.config.defaultClientIdScheme)
         )
 
         val specificPolicies = requestCredentialsArr.filterIsInstance<JsonObject>().associate {
@@ -156,6 +160,11 @@ class VerificationUseCase(
             Result.success(it)
         } ?: Result.failure(error("Invalid id provided (expired?): $sessionId"))
 
+    fun getSignedAuthorizationRequestObject(sessionId: String): Result<String> =
+        OIDCVerifierService.getSession(sessionId)?.authorizationRequest?.let {
+            Result.success(it.toRequestObject(RequestSigningCryptoProvider, RequestSigningCryptoProvider.signingKey?.keyID.orEmpty()))
+        } ?: Result.failure(error("Invalid id provided (expired?): $sessionId"))
+
     suspend fun notifySubscribers(sessionId: String) = runCatching {
         OIDCVerifierService.sessionVerificationInfos[sessionId]?.statusCallback?.let {
             http.post(it.statusCallbackUri) {
@@ -166,6 +175,13 @@ class VerificationUseCase(
                 logger.debug { "status callback: ${it.status}" }
             }
         }
+    }
+
+    fun getClientIdScheme(authorizeBaseUrl: String, defaultClientIdScheme: ClientIdScheme): ClientIdScheme {
+        return if(authorizeBaseUrl.startsWith("mdoc-openid4vp://"))
+            ClientIdScheme.X509SanDns
+        else
+            defaultClientIdScheme
     }
 }
 

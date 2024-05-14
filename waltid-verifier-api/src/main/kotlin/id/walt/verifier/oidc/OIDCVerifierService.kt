@@ -21,6 +21,7 @@ import id.walt.mdoc.doc.MDocVerificationParams
 import id.walt.mdoc.doc.VerificationType
 import id.walt.mdoc.mdocauth.DeviceAuthentication
 import id.walt.oid4vc.OpenID4VP
+import id.walt.oid4vc.data.ClientIdScheme
 import id.walt.oid4vc.data.OpenIDClientMetadata
 import id.walt.oid4vc.data.ResponseMode
 import id.walt.oid4vc.data.dif.PresentationDefinition
@@ -41,7 +42,8 @@ import kotlin.time.Duration
  * OIDC for Verifiable Presentations service provider, implementing abstract base provider from OIDC4VC library.
  */
 object OIDCVerifierService : OpenIDCredentialVerifier(
-    config = CredentialVerifierConfig(ConfigManager.getConfig<OIDCVerifierServiceConfig>().baseUrl.let { "$it/openid4vc/verify" })
+    config = CredentialVerifierConfig(ConfigManager.getConfig<OIDCVerifierServiceConfig>().baseUrl.let { "$it/openid4vc/verify" },
+        clientIdMap = ConfigManager.getConfig<OIDCVerifierServiceConfig>().x509SanDnsClientId?.let { mapOf(ClientIdScheme.X509SanDns to it) } ?: emptyMap())
 ) {
     private val logger = KotlinLogging.logger {}
 
@@ -158,7 +160,8 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
         scope: Set<String>,
         expiresIn: Duration,
         sessionId: String?,
-        ephemeralEncKey: Key?
+        ephemeralEncKey: Key?,
+        clientIdScheme: ClientIdScheme
     ): PresentationSession {
         val presentationSession = super.initializeAuthorization(
             presentationDefinition,
@@ -166,7 +169,8 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
             scope,
             expiresIn,
             sessionId,
-            ephemeralEncKey
+            ephemeralEncKey,
+            clientIdScheme
         )
         return presentationSession.copy(
             authorizationRequest = presentationSession.authorizationRequest!!.copy(
