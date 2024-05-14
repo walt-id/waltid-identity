@@ -3,7 +3,6 @@ package id.walt.verifier
 import id.walt.credentials.verification.PolicyManager
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
-import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.crypto.utils.JsonUtils.toJsonObject
 import id.walt.oid4vc.data.ResponseMode
 import id.walt.oid4vc.data.dif.*
@@ -117,40 +116,6 @@ private val logger = KotlinLogging.logger { }
 fun Application.verfierApi() {
     routing {
 
-        get("/jwks") {
-            val jwks = buildJsonObject {
-                put("keys", buildJsonArray {
-                    val jwkWithKid = buildJsonObject {
-                        SERVER_SIGNING_KEY.getPublicKey().exportJWKObject().forEach {
-                            put(it.key, it.value)
-                        }
-                        put("kid", SERVER_SIGNING_KEY.getPublicKey().getKeyId())
-                    }
-                    add(jwkWithKid)
-                })
-            }
-
-            call.respond(HttpStatusCode.OK, jwks)
-        }
-
-        get("/.well-known/openid-configuration") {
-            val metadata = buildJsonObject{
-                put("token_endpoint", "$SERVER_URL/openid4vc/verify")
-                put("issuer", SERVER_URL)
-                put("jwks_uri", "$SERVER_URL/jwks")
-                put("response_types_supported", buildJsonArray {
-                    add("code")
-                    add("id_token")
-                    add("vp_token")
-                } )
-                put("subject_types_supported", buildJsonArray { add("public") })
-                put("id_token_signing_alg_values_supported", buildJsonArray { add("ES256") })
-                put("authorization_endpoint", "$SERVER_URL/openid4vc/verify")
-            }
-            call.respond(metadata)
-        }
-
-
         route("openid4vc", {
         }) {
             post("verify", {
@@ -234,92 +199,6 @@ fun Application.verfierApi() {
                 )
 
                 context.respond(authorizeBaseUrl.plus("?").plus(session.authorizationRequest!!.toHttpQueryString()))
-            }
-            get("verify") {
-                val params = call.parameters.toMap().toJsonObject()
-
-                logger.info { "paramass" }
-                logger.info { "paramass" }
-                logger.info {params.toString()}
-                logger.info { "paramass" }
-                logger.info { "paramass" }
-
-                val stateParamAuthorizeReqEbsi = params["state"]?.jsonArray?.get(0)?.jsonPrimitive?.content
-                var scope = params["scope"]?.jsonArray.toString().replace("\"", "").replace("[","").replace("]", "")
-                var presentationDefinitionJson: JsonElement? = null
-                var responseType = "vp_token"
-                if (scope.contains("openid ver_test:vp_token"))  //EBSI Conformance tests
-                    presentationDefinitionJson = Json.parseToJsonElement(fixedPresentationDefinitionForEbsiConformanceTest)
-                if (scope.contains("openid ver_test:id_token"))  //EBSI Conformance tests
-                    responseType = "id_token"
-                    scope= "openid"
-
-                val stateId = UUID().toString()
-
-                val session = verificationUseCase.createSession(
-                    vpPoliciesJson = null,
-                    vcPoliciesJson =  buildJsonArray{add("signature")
-                                                     add("expired")
-                                                     add("not-before")
-                                                     add("revoked")
-                                                    },
-                    requestCredentialsJson = buildJsonArray{},
-                    presentationDefinitionJson = presentationDefinitionJson,
-                    responseMode = ResponseMode.direct_post,
-                    successRedirectUri = null,
-                    errorRedirectUri = null,
-                    statusCallbackUri = null,
-                    statusCallbackApiKey = null,
-                    stateId = stateId,
-                    stateParamAuthorizeReqEbsi = stateParamAuthorizeReqEbsi
-                )
-
-                // Create a jwt for the request parameter in response
-                // Bind authentication request with state
-//                val idTokenRequestState = UUID().toString();
-//                val idTokenRequestNonce = UUID().toString();
-                val responseMode = ResponseMode.direct_post
-
-                val clientId = SERVER_URL
-                val redirectUri = session.authorizationRequest!!.responseUri
-
-                val response = session.authorizationRequest!!
-
-                // Create a jwt as request object as defined in JAR OAuth2.0 specification
-                val requestJwtPayload = buildJsonObject {
-                        put(JWTClaims.Payload.issuer, clientId )
-                        put(JWTClaims.Payload.audience, response.clientId)
-//                        put(JWTClaims.Payload.nonce, idTokenRequestNonce)
-//                        put("state", idTokenRequestState)
-                        put("client_id", clientId)
-                        put("redirect_uri", redirectUri)
-                        put("response_type", responseType)
-                        put("response_mode", responseMode.name)
-                        put("scope", scope)
-                        put("exp", 1776532276)
-                        if (presentationDefinitionJson!=null)
-                            put("presentation_definition", presentationDefinitionJson)
-//                            put("presentation_definition_uri", response.presentationDefinitionUri)
-                    }
-
-                val requestJwtHeader = mapOf(JWTClaims.Header.keyID to SERVER_SIGNING_KEY.getPublicKey().getKeyId(), JWTClaims.Header.type to "JWT" )
-
-                val requestToken = SERVER_SIGNING_KEY.signJws(requestJwtPayload.toString().toByteArray(), requestJwtHeader).also {
-                    logger.info{"Signed JWS: >> $it"}
-                }
-
-                var responseQueryString = response.toHttpQueryString()
-                responseQueryString = responseQueryString.replace("client_id=", "client_id=$clientId")
-                responseQueryString = responseQueryString.replace("response_uri","redirect_uri")
-                val presentationDefinitionUri = URLEncoder.encode(response.presentationDefinitionUri!!, "UTF-8")
-                responseQueryString = responseQueryString.replace("&presentation_definition_uri=","")
-                responseQueryString = responseQueryString.replace(presentationDefinitionUri,"")
-                responseQueryString = responseQueryString.replace("response_type=vp_token", "response_type=$responseType")
-                responseQueryString = responseQueryString.plus("&scope=$scope")
-                responseQueryString = responseQueryString.plus("&request=$requestToken")
-
-                logger.info { "openid://?$responseQueryString" }
-                context.respondRedirect("openid://?$responseQueryString")
             }
 
             post("/verify/{state}", {
@@ -431,5 +310,134 @@ fun Application.verfierApi() {
                 call.respond(PolicyManager.listPolicyDescriptions())
             }
         }
+
+        get("/.well-known/openid-configuration", {tags= listOf("Ebsi") }) {
+            val metadata = buildJsonObject {
+                put("token_endpoint", "$SERVER_URL/token")
+                put("issuer", SERVER_URL)
+                put("jwks_uri", "$SERVER_URL/jwks")
+                put("response_types_supported", buildJsonArray {
+                    add("code")
+                    add("id_token")
+                    add("vp_token")
+                })
+                put("subject_types_supported", buildJsonArray { add("public") })
+                put("id_token_signing_alg_values_supported", buildJsonArray { add("ES256") })
+                put("authorization_endpoint", "$SERVER_URL/authorize")
+            }
+            call.respond(metadata)
+        }
+
+        get("/jwks", {tags= listOf("Ebsi") }) {
+            val jwks = buildJsonObject {
+                put("keys", buildJsonArray {
+                    val jwkWithKid = buildJsonObject {
+                        SERVER_SIGNING_KEY.getPublicKey().exportJWKObject().forEach {
+                            put(it.key, it.value)
+                        }
+                        put("kid", SERVER_SIGNING_KEY.getPublicKey().getKeyId())
+                    }
+                    add(jwkWithKid)
+                })
+            }
+
+            call.respond(HttpStatusCode.OK, jwks)
+        }
+
+        get("authorize", {tags= listOf("Ebsi") }) {
+            val params = call.parameters.toMap().toJsonObject()
+
+            val stateParamAuthorizeReqEbsi = params["state"]?.jsonArray?.get(0)?.jsonPrimitive?.content
+            var scope = params["scope"]?.jsonArray.toString().replace("\"", "").replace("[", "").replace("]", "")
+            var presentationDefinitionJson: JsonElement? = null
+            var responseType = "id_token"
+            var isRedirectResponse = false// make if redirect_uri  = "openid://"
+            if (scope.contains("openid ver_test:vp_token")) { //EBSI Conformance tests
+                presentationDefinitionJson = Json.parseToJsonElement(fixedPresentationDefinitionForEbsiConformanceTest)
+                responseType = "vp_token"
+                isRedirectResponse = true
+            }
+            if (scope.contains("openid ver_test:id_token")) {//EBSI Conformance tests
+                responseType = "id_token"
+                isRedirectResponse= true
+}
+            scope = "openid"
+
+            val stateId = UUID().toString()
+
+            val session = verificationUseCase.createSession(
+                vpPoliciesJson = null,
+                vcPoliciesJson = buildJsonArray {
+                    add("signature")
+                    add("expired")
+                    add("not-before")
+                    add("revoked")
+                },
+                requestCredentialsJson = buildJsonArray {},
+                presentationDefinitionJson = presentationDefinitionJson,
+                responseMode = ResponseMode.direct_post,
+                successRedirectUri = null,
+                errorRedirectUri = null,
+                statusCallbackUri = null,
+                statusCallbackApiKey = null,
+                stateId = stateId,
+                stateParamAuthorizeReqEbsi = stateParamAuthorizeReqEbsi
+            )
+
+            // Create a jwt for the request parameter in response
+            // Bind authentication request with state
+            //                val idTokenRequestState = UUID().toString();
+            //                val idTokenRequestNonce = UUID().toString();
+            val responseMode = ResponseMode.direct_post
+
+            val clientId = SERVER_URL
+            val redirectUri = session.authorizationRequest!!.responseUri
+
+            val response = session.authorizationRequest!!
+
+            // Create a jwt as request object as defined in JAR OAuth2.0 specification
+            val requestJwtPayload = buildJsonObject {
+                put(JWTClaims.Payload.issuer, clientId)
+                put(JWTClaims.Payload.audience, response.clientId)
+                //                        put(JWTClaims.Payload.nonce, idTokenRequestNonce)
+                //                        put("state", idTokenRequestState)
+                put("client_id", clientId)
+                put("redirect_uri", redirectUri)
+                put("response_type", responseType)
+                put("response_mode", responseMode.name)
+                put("scope", scope)
+                put("exp", 1776532276)
+                if (presentationDefinitionJson != null) // if null, then it is IdToken
+                    put("presentation_definition", presentationDefinitionJson)
+                //                            put("presentation_definition_uri", response.presentationDefinitionUri)
+            }
+
+            val requestJwtHeader = mapOf(
+                JWTClaims.Header.keyID to SERVER_SIGNING_KEY.getPublicKey().getKeyId(),
+                JWTClaims.Header.type to "JWT"
+            )
+
+            val requestToken =
+                SERVER_SIGNING_KEY.signJws(requestJwtPayload.toString().toByteArray(), requestJwtHeader).also {
+                    logger.info { "Signed JWS: >> $it" }
+                }
+
+            var responseQueryString = response.toHttpQueryString()
+            responseQueryString = responseQueryString.replace("client_id=", "client_id=$clientId")
+            responseQueryString = responseQueryString.replace("response_uri", "redirect_uri")
+            val presentationDefinitionUri = URLEncoder.encode(response.presentationDefinitionUri!!, "UTF-8")
+            responseQueryString = responseQueryString.replace("&presentation_definition_uri=", "")
+            responseQueryString = responseQueryString.replace(presentationDefinitionUri, "")
+            responseQueryString = responseQueryString.replace("response_type=vp_token", "response_type=$responseType")
+            responseQueryString = responseQueryString.plus("&scope=$scope")
+            responseQueryString = responseQueryString.plus("&request=$requestToken")
+
+            logger.info { "openid://?$responseQueryString" }
+            if (isRedirectResponse)
+                context.respondRedirect("openid://?$responseQueryString")
+            else
+                context.respond("openid://?$responseQueryString")
+        }
+
     }
 }
