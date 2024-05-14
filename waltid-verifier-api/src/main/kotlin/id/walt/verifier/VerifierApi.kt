@@ -4,6 +4,7 @@ import COSE.AlgorithmID
 import COSE.OneKey
 import cbor.Cbor
 import com.auth0.jwk.Jwk
+import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.Curve
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.jwk.gen.ECKeyGenerator
@@ -21,8 +22,13 @@ import id.walt.mdoc.dataelement.toDE
 import id.walt.mdoc.doc.MDocBuilder
 import id.walt.mdoc.mso.DeviceKeyInfo
 import id.walt.mdoc.mso.ValidityInfo
+import id.walt.oid4vc.data.ClientIdScheme
+import id.walt.oid4vc.data.HTTPDataObject
 import id.walt.oid4vc.data.ResponseMode
 import id.walt.oid4vc.data.dif.*
+import id.walt.sdjwt.SimpleJWTCryptoProvider
+import id.walt.verifier.base.config.ConfigManager
+import id.walt.verifier.base.config.OIDCVerifierServiceConfig
 import id.walt.verifier.oidc.LspPotentialInteropEvent
 import id.walt.verifier.oidc.VerificationUseCase
 import io.github.smiley4.ktorswaggerui.dsl.get
@@ -126,7 +132,7 @@ val verifiableIdPresentationDefinitionExample = JsonObject(
     )
 ).let { prettyJson.encodeToString(it) }
 
-private val verificationUseCase = VerificationUseCase(httpClient)
+private val verificationUseCase = VerificationUseCase(httpClient, SimpleJWTCryptoProvider(JWSAlgorithm.EdDSA, null, null))
 
 
 fun Application.verfierApi() {
@@ -212,9 +218,15 @@ fun Application.verfierApi() {
                     statusCallbackUri = statusCallbackUri,
                     statusCallbackApiKey = statusCallbackApiKey,
                     stateId = stateId,
+                    authorizeBaseUrl = authorizeBaseUrl
                 )
 
-                context.respond(authorizeBaseUrl.plus("?").plus(session.authorizationRequest!!.toHttpQueryString()))
+                context.respond(authorizeBaseUrl.plus("?").plus(
+                    when(session.authorizationRequest!!.clientIdScheme) {
+                        ClientIdScheme.X509SanDns -> session.authorizationRequest!!.toRequestObjectByReferenceHttpQueryString(ConfigManager.getConfig<OIDCVerifierServiceConfig>().baseUrl.let { "$it/openid4vc/request/${session.id}" })
+                        else -> session.authorizationRequest!!.toHttpQueryString()
+                    })
+                )
             }
             post("/verify/{state}", {
                 tags = listOf("OIDC")
@@ -301,6 +313,24 @@ fun Application.verfierApi() {
                 response { HttpStatusCode.OK to { body<Map<String, String?>>() } }
             }) {
                 call.respond(PolicyManager.listPolicyDescriptions())
+            }
+            get("/request/{id}", {
+                tags = listOf("OIDC")
+                summary = "Get request object for session by session id"
+                description = "Gets the signed request object for the session given by the session id parameter"
+                request {
+                    pathParameter<String>("id") {
+                        description = "ID of the presentation session"
+                        required = true
+                    }
+                }
+            }) {
+                val id = call.parameters.getOrFail("id")
+                verificationUseCase.getSignedAuthorizationRequestObject(id).onSuccess {
+                    call.respondText(it, ContentType.parse("application/oauth-authz-req+jwt"), HttpStatusCode.OK)
+                }.onFailure {
+                    call.respond(HttpStatusCode.BadRequest, it.localizedMessage)
+                }
             }
         }
 

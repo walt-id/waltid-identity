@@ -247,7 +247,7 @@ class MDoc_Test: AnnotationSpec() {
           )
         )
       ), responseMode = ResponseMode.direct_post_jwt, responseTypes = setOf(ResponseType.VpToken), redirectOrResponseUri = "http://blank",
-      nonce = UUID.generateUUID().toString(), state = "test", clientId = "test-verifier", clientIdScheme = ClientIdScheme.PreRegistered,
+      nonce = UUID.generateUUID().toString(), state = "test", clientId = "walt.id", clientIdScheme = ClientIdScheme.X509SanDns,
       clientMetadataParameter = ClientMetadataParameter.fromClientMetadata(
         OpenIDClientMetadata(listOf("http://localhost"),
           jwks = buildJsonObject {
