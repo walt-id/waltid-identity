@@ -83,14 +83,13 @@ kotlin {
                 implementation("com.nimbusds:nimbus-jose-jwt:9.37.3")
 
                 // BouncyCastle for PEM import
-                implementation("org.bouncycastle:bcpkix-lts8on:2.73.4")
+                implementation("org.bouncycastle:bcpkix-lts8on:2.73.6")
             }
         }
         val jvmTest by getting {
             dependencies {
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
                 implementation("com.wolpl.clikt-testkit:clikt-testkit:2.0.0")
-                // Spring Boot Test
                 implementation("org.springframework.boot:spring-boot-starter-test:3.2.3")
             }
         }
