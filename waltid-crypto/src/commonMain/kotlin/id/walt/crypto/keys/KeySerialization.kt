@@ -1,7 +1,6 @@
 package id.walt.crypto.keys
 
 import id.walt.crypto.keys.jwk.JWKKey
-import id.walt.crypto.keys.oci.OCIKey
 import id.walt.crypto.keys.oci.OCIKeyRestApi
 import id.walt.crypto.keys.tse.TSEKey
 import kotlinx.serialization.encodeToString
@@ -15,6 +14,7 @@ import love.forte.plugin.suspendtrans.annotation.JvmBlocking
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 
+// TODO: Deprecate this in favour of KeyManager
 
 @OptIn(ExperimentalJsExport::class)
 @JsExport
@@ -25,7 +25,6 @@ object KeySerialization {
             subclass(JWKKey::class)
             subclass(TSEKey::class)
             subclass(OCIKeyRestApi::class)
-            subclass(OCIKey::class)
         }
     }
 
