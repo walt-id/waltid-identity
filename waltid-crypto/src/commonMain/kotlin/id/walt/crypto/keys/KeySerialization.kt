@@ -53,6 +53,15 @@ object KeySerialization {
     @JsExport.Ignore
     suspend fun deserializeKey(json: JsonObject): Result<Key> =
         runCatching {
+            keySerializationJson.decodeFromJsonElement<Key>(json).apply { init() }
+        }
+
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
+    suspend fun deserializeJWTKey(json: JsonObject): Result<Key> =
+        runCatching {
             keySerializationJson.decodeFromJsonElement<Key>(json.mapValues {
                 if (it.value is JsonPrimitive) it.value.jsonPrimitive.content else it.value.toString()
             }.toJsonElement()).apply { init() }
