@@ -33,7 +33,13 @@ include(
     // Reporting
     "waltid-reporting",
 
-    // Samples
-    //"waltid-android"
+    // OCI extension for waltid-crypto
+    "waltid-crypto-oci",
+
+    // Android - uncomment to enable build:
+    /*
+    "waltid-crypto-android",
+    "waltid-android"
+    */
 )
 
