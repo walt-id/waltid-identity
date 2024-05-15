@@ -4,6 +4,7 @@ import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.keys.oci.OCIKey
 import id.walt.crypto.keys.oci.OCIKeyRestApi
 import id.walt.crypto.keys.tse.TSEKey
+import id.walt.crypto.utils.JsonUtils.toJsonElement
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import kotlinx.serialization.modules.SerializersModule
@@ -35,6 +36,7 @@ object KeySerialization {
     }
 
     fun serializeKey(key: Key): String = keySerializationJson.encodeToString(key)
+
     @Suppress("NON_EXPORTABLE_TYPE")
     fun serializeKeyToJson(key: Key): JsonElement = keySerializationJson.encodeToJsonElement(key)
 
@@ -50,5 +52,18 @@ object KeySerialization {
     @JsPromise
     @JsExport.Ignore
     suspend fun deserializeKey(json: JsonObject): Result<Key> =
-        runCatching { keySerializationJson.decodeFromJsonElement<Key>(json).apply { init() } }
+        runCatching {
+            keySerializationJson.decodeFromJsonElement<Key>(json).apply { init() }
+        }
+
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
+    suspend fun deserializeJWTKey(json: JsonObject): Result<Key> =
+        runCatching {
+            keySerializationJson.decodeFromJsonElement<Key>(json.mapValues {
+                if (it.value is JsonPrimitive) it.value.jsonPrimitive.content else it.value.toString()
+            }.toJsonElement()).apply { init() }
+        }
 }
