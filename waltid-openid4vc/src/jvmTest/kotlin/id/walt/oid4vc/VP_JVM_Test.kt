@@ -699,7 +699,7 @@ class VP_JVM_Test : AnnotationSpec() {
         "{\"id\":\"vp token example\",\"input_descriptors\":[{\"id\":\"OpenBadgeCredential\",\"format\":{\"jwt_vc_json\":{\"alg\":[\"EdDSA\"]}},\"constraints\":{\"fields\":[{\"path\":[\"\$.type\"],\"filter\":{\"type\":\"string\",\"pattern\":\"OpenBadgeCredential\"}}]}}]}"
 
 
-    val ONLINE_TEST: Boolean = true
+    val ONLINE_TEST: Boolean = false
 
     @Test
     suspend fun testRequestByReference() {

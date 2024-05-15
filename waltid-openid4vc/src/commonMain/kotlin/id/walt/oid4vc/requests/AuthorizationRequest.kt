@@ -119,7 +119,7 @@ data class AuthorizationRequest(
 
     fun toJSON(): JsonObject {
         return JsonObject(buildMap {
-            put("response_type", JsonArray(listOf(ResponseType.getResponseTypeString(responseType).let { JsonPrimitive(it) })))
+            put("response_type", JsonPrimitive(ResponseType.getResponseTypeString(responseType)))
             put("client_id", JsonPrimitive(clientId))
             responseMode?.let { put("response_mode", JsonPrimitive(it.toString())) }
             redirectUri?.let { put("redirect_uri", JsonPrimitive(it)) }
@@ -188,15 +188,17 @@ data class AuthorizationRequest(
         }
 
         fun fromRequestObject(request: String): AuthorizationRequest {
-            return fromHttpParameters(
-                JwtUtils.parseJWTPayload(request).mapValues { e ->
-                    when (e.value) {
-                        is JsonArray -> e.value.jsonArray.map { it.toString() }.toList()
-                        is JsonPrimitive -> listOf(e.value.jsonPrimitive.content)
-                        else -> listOf(e.value.jsonObject.toString())
-                    }
+            return fromJSON(JwtUtils.parseJWTPayload(request))
+        }
+
+        fun fromJSON(requestObj: JsonObject): AuthorizationRequest {
+            return fromHttpParameters(requestObj.mapValues { e ->
+                when (e.value) {
+                    is JsonArray -> e.value.jsonArray.map { it.toString() }.toList()
+                    is JsonPrimitive -> listOf(e.value.jsonPrimitive.content)
+                    else -> listOf(e.value.jsonObject.toString())
                 }
-            )
+            })
         }
 
         suspend fun fromHttpParametersAuto(parameters: Map<String, List<String>>): AuthorizationRequest {
