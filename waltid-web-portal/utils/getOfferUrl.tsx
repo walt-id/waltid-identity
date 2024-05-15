@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { v4 as uuidv4 } from 'uuid';
-import { AvailableCredential } from '@/types/credentials';
+import { AvailableCredential, DIDMethodsConfig } from '@/types/credentials';
 
 const getOfferUrl = async (credentials: Array<AvailableCredential>, NEXT_PUBLIC_VC_REPO: string, NEXT_PUBLIC_ISSUER: string) => {
   const data = await fetch(`${NEXT_PUBLIC_ISSUER}/.well-known/openid-credential-issuer`).then(data => {
@@ -18,14 +18,14 @@ const getOfferUrl = async (credentials: Array<AvailableCredential>, NEXT_PUBLIC_
 
     let payload: {
       'issuerDid': string,
-      'issuerKey': { "type": "jwk", "jwk": string },
+      'issuerKey': { "type": string, "jwk": string },
       credentialConfigurationId: string,
       credentialData: any,
       mapping?: any,
       selectiveDisclosure?: any
     } = {
-      'issuerDid': 'did:ebsi:zf39qHTXaLrr6iy3tQhT3UZ',
-      'issuerKey': { "type": "jwk", "jwk": "{\"kty\":\"EC\",\"x\":\"SgfOvOk1TL5yiXhK5Nq7OwKfn_RUkDizlIhAf8qd2wE\",\"y\":\"u_y5JZOsw3SrnNPydzJkoaiqb8raSdCNE_nPovt1fNI\",\"crv\":\"P-256\",\"d\":\"UqSi2MbJmPczfRmwRDeOJrdivoEy-qk4OEDjFwJYlUI\"}"},
+      'issuerDid': DIDMethodsConfig[c.selectedDID as keyof typeof DIDMethodsConfig].issuerDid,
+      'issuerKey': DIDMethodsConfig[c.selectedDID as keyof typeof DIDMethodsConfig].issuerKey,
       credentialConfigurationId: Object.keys(credential_configurations_supported).find(key => key === c.id + "_jwt_vc_json") as string,
       credentialData: offer
     }
