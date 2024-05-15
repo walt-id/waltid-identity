@@ -10,13 +10,10 @@ import com.nimbusds.jose.util.Base64URL
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.jwk.JWKKey
-import id.walt.crypto.utils.JweUtils
 import id.walt.mdoc.COSECryptoProviderKeyInfo
 import id.walt.mdoc.SimpleCOSECryptoProvider
 import id.walt.mdoc.dataelement.*
 import id.walt.mdoc.dataretrieval.DeviceResponse
-import id.walt.mdoc.doc.MDoc
 import id.walt.mdoc.doc.MDocBuilder
 import id.walt.mdoc.doc.MDocVerificationParams
 import id.walt.mdoc.doc.VerificationType
@@ -27,9 +24,9 @@ import id.walt.mdoc.mso.ValidityInfo
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.data.dif.*
 import id.walt.oid4vc.interfaces.PresentationResult
+import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.responses.TokenResponse
 import io.kotest.core.spec.style.AnnotationSpec
-import io.netty.handler.codec.base64.Base64Decoder
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Clock
 import kotlinx.datetime.DateTimeUnit
@@ -40,7 +37,6 @@ import kotlinx.serialization.encodeToHexString
 import kotlinx.serialization.json.*
 import kotlinx.uuid.UUID
 import kotlinx.uuid.generateUUID
-import kotlinx.uuid.randomUUID
 import org.bouncycastle.asn1.x500.X500Name
 import org.bouncycastle.asn1.x509.BasicConstraints
 import org.bouncycastle.asn1.x509.Extension
@@ -55,11 +51,9 @@ import java.io.FileInputStream
 import java.io.FileWriter
 import java.math.BigInteger
 import java.nio.charset.Charset
-import java.nio.file.Files
 import java.security.*
 import java.security.cert.CertificateFactory
 import java.security.cert.X509Certificate
-import java.security.spec.ECPrivateKeySpec
 import java.security.spec.PKCS8EncodedKeySpec
 import java.security.spec.X509EncodedKeySpec
 import java.util.*
@@ -336,5 +330,27 @@ class MDoc_Test: AnnotationSpec() {
       listOf(issuerProviderKeyInfo, COSECryptoProviderKeyInfo(DEVICE_KEY_ID, AlgorithmID.ECDSA_256, deviceKeyPair.public, null))
     ))
     assertTrue(verified)
+  }
+
+  @Test
+  fun testResponseTypeSerialization() {
+    val testResponseType = setOf(ResponseType.VpToken, ResponseType.IdToken)
+    val presReq = OpenID4VP.createPresentationRequest(
+      PresentationDefinitionParameter.fromPresentationDefinitionScope("test"),
+      responseTypes = testResponseType,
+      clientId = "test",
+      clientIdScheme = ClientIdScheme.PreRegistered,
+      clientMetadataParameter = null,
+      nonce = "test",
+      redirectOrResponseUri = "http://test",
+      state = "test"
+      )
+    val jsonReq = presReq.toJSON()
+    assertTrue(jsonReq.keys.contains("response_type"))
+    assertTrue(jsonReq["response_type"] is JsonPrimitive)
+    assertEquals(ResponseType.getResponseTypeString(testResponseType), jsonReq["response_type"]!!.jsonPrimitive.content)
+
+    val parsedPresReq = AuthorizationRequest.fromJSON(jsonReq)
+    assertEquals(testResponseType, parsedPresReq.responseType)
   }
 }
