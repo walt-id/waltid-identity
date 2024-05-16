@@ -10,6 +10,7 @@ import id.walt.crypto.keys.KeyType
 import id.walt.mdoc.COSECryptoProviderKeyInfo
 import id.walt.mdoc.SimpleCOSECryptoProvider
 import id.walt.oid4vc.data.ClientIdScheme
+import id.walt.oid4vc.data.OpenId4VPProfile
 import id.walt.oid4vc.data.ResponseMode
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.responses.TokenResponse
@@ -72,7 +73,8 @@ class VerificationUseCase(
                 ResponseMode.direct_post_jwt -> runBlocking { KeyManager.createKey(KeyGenerationRequest(keyType = KeyType.secp256r1)) }
                 else -> null
             },
-            clientIdScheme = this.getClientIdScheme(authorizeBaseUrl, OIDCVerifierService.config.defaultClientIdScheme)
+            clientIdScheme = this.getClientIdScheme(authorizeBaseUrl, OIDCVerifierService.config.defaultClientIdScheme),
+            openId4VPProfile = OpenId4VPProfile.fromAuthorizeBaseURL(authorizeBaseUrl)
         )
 
         val specificPolicies = requestCredentialsArr.filterIsInstance<JsonObject>().associate {

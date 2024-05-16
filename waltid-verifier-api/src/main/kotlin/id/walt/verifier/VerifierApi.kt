@@ -78,8 +78,9 @@ data class PresentationSubmissionFormParam(
 
 @Serializable
 data class TokenResponseFormParam(
-    val vp_token: JsonElement,
-    val presentation_submission: PresentationSubmissionFormParam
+    val vp_token: JsonElement?,
+    val presentation_submission: PresentationSubmissionFormParam?,
+    val response: String?
 )
 
 data class LSPPotentialIssueFormDataParam(
@@ -247,9 +248,12 @@ fun Application.verfierApi() {
                                     "1", "1", listOf(
                                         DescriptorMappingFormParam("1", VCFormat.jwt_vc_json, "$.type")
                                     )
-                                )
+                                ), null
                             )
                         )
+                        example("direct_post.jwt response", TokenResponseFormParam(
+                            null, null, "ey..."
+                        ))
                     }
                 }
             }) {

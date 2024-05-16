@@ -23,6 +23,7 @@ import id.walt.mdoc.mdocauth.DeviceAuthentication
 import id.walt.oid4vc.OpenID4VP
 import id.walt.oid4vc.data.ClientIdScheme
 import id.walt.oid4vc.data.OpenIDClientMetadata
+import id.walt.oid4vc.data.OpenId4VPProfile
 import id.walt.oid4vc.data.ResponseMode
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.data.dif.VCFormat
@@ -113,7 +114,7 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
 
         logger.debug { "VP token: $vpToken" }
 
-        if(session.presentationDefinition.format?.containsKey(VCFormat.mso_mdoc) == true)
+        if(session.openId4VPProfile == OpenId4VPProfile.ISO_18013_7_MDOC)
             return verifyMdoc(tokenResponse, session)
         else {
             val results = runBlocking {
@@ -161,7 +162,8 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
         expiresIn: Duration,
         sessionId: String?,
         ephemeralEncKey: Key?,
-        clientIdScheme: ClientIdScheme
+        clientIdScheme: ClientIdScheme,
+        openId4VPProfile: OpenId4VPProfile
     ): PresentationSession {
         val presentationSession = super.initializeAuthorization(
             presentationDefinition,
@@ -170,7 +172,8 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
             expiresIn,
             sessionId,
             ephemeralEncKey,
-            clientIdScheme
+            clientIdScheme,
+            openId4VPProfile
         )
         return presentationSession.copy(
             authorizationRequest = presentationSession.authorizationRequest!!.copy(
@@ -186,6 +189,8 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
                     authorizationEncryptedResponseAlg = "ECDH-ES"  // TODO: configurable?
                 )
             )
-        )
+        ).also {
+            putSession(it.id, it)
+        }
     }
 }
