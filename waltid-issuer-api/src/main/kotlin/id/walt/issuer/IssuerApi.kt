@@ -5,7 +5,8 @@ import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.did.dids.DidService
-import id.walt.issuer.IssuanceExamples.batchExample
+import id.walt.issuer.IssuanceExamples.batchExampleJwt
+import id.walt.issuer.IssuanceExamples.batchExampleSdJwt
 import id.walt.issuer.IssuanceExamples.issuerOnboardingRequestDefaultExample
 import id.walt.issuer.IssuanceExamples.issuerOnboardingRequestDidWebExample
 import id.walt.issuer.IssuanceExamples.issuerOnboardingRequestOciExample
@@ -252,7 +253,7 @@ fun Application.issuerApi() {
                             body<List<IssuanceRequest>> {
                                 description =
                                     "Pass the unsigned credential that you intend to issue as the body of the request."
-                                example("Batch example", batchExample)
+                                example("Batch example", batchExampleJwt)
                                 required = true
                             }
                         }
@@ -310,6 +311,43 @@ fun Application.issuerApi() {
                         val sdJwtIssuanceRequest = context.receive<IssuanceRequest>()
 
                         val offerUri = createCredentialOfferUri(listOf(sdJwtIssuanceRequest))
+
+                        context.respond(
+                            HttpStatusCode.OK, offerUri
+                        )
+                    }
+
+                    post("issueBatch", {
+                        summary = "Signs a list of credentials with SD and starts an OIDC credential exchange flow."
+                        description =
+                            "This endpoint issues a list W3C Verifiable Credentials, and returns an issuance URL "
+
+                        request {
+                            body<List<IssuanceRequest>> {
+                                description =
+                                    "Pass the unsigned credential that you intend to issue as the body of the request."
+                                example("Batch example", batchExampleSdJwt)
+                                required = true
+                            }
+                        }
+
+                        response {
+                            "200" to {
+                                description = "Credential signed (with the *proof* attribute added)"
+                                body<String> {
+                                    example(
+                                        "Issuance URL URL",
+                                        "openid-credential-offer://localhost/?credential_offer=%7B%22credential_issuer%22%3A%22http%3A%2F%2Flocalhost%3A8000%22%2C%22credentials%22%3A%5B%22VerifiableId%22%5D%2C%22grants%22%3A%7B%22authorization_code%22%3A%7B%22issuer_state%22%3A%22501414a4-c461-43f0-84b2-c628730c7c02%22%7D%7D%7D"
+                                    )
+                                }
+                            }
+                        }
+                    }) {
+
+
+                        val issuanceRequests = context.receive<List<IssuanceRequest>>()
+                        val offerUri = createCredentialOfferUri(issuanceRequests)
+                        logger.debug { "Offer URI: $offerUri" }
 
                         context.respond(
                             HttpStatusCode.OK, offerUri
