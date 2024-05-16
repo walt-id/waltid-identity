@@ -19,8 +19,8 @@ data:
     webPort = 3000
   verifier-service.conf: |
     baseUrl = "https://verifier.portal.walt-test.cloud"
-    requestSigningKeyFile = "/waltid-verifier-api/tls-secret/tls.key"
-    requestSigningCertFile = "/waltid-verifier-api/tls-secret/tls.crt"
+    requestSigningKeyFile = "/waltid-verifier-api/request-signing-secret/ec.key"
+    requestSigningCertFile = "/waltid-verifier-api/request-signing-secret/ec.crt"
     x509SanDnsClientId = "verifier.portal.walt-test.cloud"
   entra.conf: |
     callbackUrl = "https://verifier.portal.walt-test.cloud/entra/verification-callback/"
@@ -51,8 +51,8 @@ spec:
               readOnly: true
             - name: verifier-data
               mountPath: "/waltid-verifier-api/data/"
-            - name: verifier-tls-secret
-              mountPath: "/waltid-verifier-api/tls-secret/"
+            - name: verifier-request-signing
+              mountPath: "/waltid-verifier-api/request-signing-secret/"
           ports:
             - containerPort: 3000
               name: http-api
@@ -63,9 +63,9 @@ spec:
         - name: verifier-web-config
           configMap:
             name: verifier-web-config
-        - name: verifier-tls-secret
+        - name: verifier-request-signing
           secret:
-            secretName: verifier-tls-secret
+            secretName: verifier-request-signing
 ---
 kind: Service
 apiVersion: v1
