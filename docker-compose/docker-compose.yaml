@@ -1,11 +1,48 @@
 services:
+<<<<<<< HEAD
   wallet-api:
     image: docker.io/waltid/wallet-api:${VERSION_TAG:-latest}
+=======
+  wallet-api-sqlite:
+    image: waltid/wallet-api:${VERSION_TAG:-latest}
+>>>>>>> 690f9b30 (fix for wallet-api compose profiles)
     pull_policy: always
+    profiles:
+        -   sqlite
     build:
       context: ../
       dockerfile: waltid-wallet-api/Dockerfile
-    links: [ $COMPOSE_PROFILES ]
+    volumes:
+      - ./wallet-api/config:/waltid-wallet-api/config
+      - ./wallet-api/walt.yaml:/waltid-wallet-api/walt.yaml
+      - ./wallet-api/data:/waltid-wallet-api/data
+
+  wallet-api-postgres:
+    image: waltid/wallet-api:${VERSION_TAG:-latest}
+    pull_policy: always
+    profiles:
+        -   postgres
+    build:
+      context: ../
+      dockerfile: waltid-wallet-api/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./wallet-api/config:/waltid-wallet-api/config
+      - ./wallet-api/walt.yaml:/waltid-wallet-api/walt.yaml
+      - ./wallet-api/data:/waltid-wallet-api/data
+
+  wallet-api-mssql:
+    image: waltid/wallet-api:${VERSION_TAG:-latest}
+    pull_policy: always
+    profiles:
+        -   mssql
+    build:
+      context: ../
+      dockerfile: waltid-wallet-api/Dockerfile
+    depends_on:
+      - mssql
     volumes:
       - ./wallet-api/config:/waltid-wallet-api/config
       - ./wallet-api/walt.yaml:/waltid-wallet-api/walt.yaml
@@ -72,7 +109,7 @@ services:
     image: dpage/pgadmin4
     profiles:
       - postgres
-    links:
+    depends_on:
       - postgres
     env_file:
       - ./pgadmin.env
