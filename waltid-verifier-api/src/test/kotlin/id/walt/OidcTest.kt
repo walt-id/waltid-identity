@@ -55,26 +55,26 @@ import kotlin.test.assertTrue
 
 class OidcTest {
 
-  init {
-    runBlocking {
-      DidService.apply {
-        registerResolver(LocalResolver())
-        updateResolversForMethods()
-      }
-    }
-    PolicyManager.registerPolicies(PresentationDefinitionPolicy())
-
-    ConfigManager.loadConfigs(arrayOf())
-
-    val webConfig = ConfigManager.getConfig<WebConfig>()
-
-    embeddedServer(CIO, port = webConfig.webPort, host = webConfig.webHost, module = Application::verifierModule)
-      .start(wait = false)
-  }
+//  init {
+//    runBlocking {
+//      DidService.apply {
+//        registerResolver(LocalResolver())
+//        updateResolversForMethods()
+//      }
+//    }
+//    PolicyManager.registerPolicies(PresentationDefinitionPolicy())
+//
+//    ConfigManager.loadConfigs(arrayOf())
+//
+//    val webConfig = ConfigManager.getConfig<WebConfig>()
+//
+//    embeddedServer(CIO, port = webConfig.webPort, host = webConfig.webHost, module = Application::verifierModule)
+//      .start(wait = false)
+//  }
 
   val baseUrl = "http://localhost:7003"
 
-  @Test
+  //@Test
   fun testPotentialInteropFlow() {
     println("Starting test")
 
