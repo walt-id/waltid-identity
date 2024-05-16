@@ -1,48 +1,12 @@
 services:
-<<<<<<< HEAD
   wallet-api:
     image: docker.io/waltid/wallet-api:${VERSION_TAG:-latest}
-=======
-  wallet-api-sqlite:
-    image: waltid/wallet-api:${VERSION_TAG:-latest}
->>>>>>> 690f9b30 (fix for wallet-api compose profiles)
     pull_policy: always
-    profiles:
-        -   sqlite
-    build:
-      context: ../
-      dockerfile: waltid-wallet-api/Dockerfile
-    volumes:
-      - ./wallet-api/config:/waltid-wallet-api/config
-      - ./wallet-api/walt.yaml:/waltid-wallet-api/walt.yaml
-      - ./wallet-api/data:/waltid-wallet-api/data
-
-  wallet-api-postgres:
-    image: waltid/wallet-api:${VERSION_TAG:-latest}
-    pull_policy: always
-    profiles:
-        -   postgres
     build:
       context: ../
       dockerfile: waltid-wallet-api/Dockerfile
     depends_on:
-      postgres:
-        condition: service_healthy
-    volumes:
-      - ./wallet-api/config:/waltid-wallet-api/config
-      - ./wallet-api/walt.yaml:/waltid-wallet-api/walt.yaml
-      - ./wallet-api/data:/waltid-wallet-api/data
-
-  wallet-api-mssql:
-    image: waltid/wallet-api:${VERSION_TAG:-latest}
-    pull_policy: always
-    profiles:
-        -   mssql
-    build:
-      context: ../
-      dockerfile: waltid-wallet-api/Dockerfile
-    depends_on:
-      - mssql
+      - "$DATABASE_ENGINE"
     volumes:
       - ./wallet-api/config:/waltid-wallet-api/config
       - ./wallet-api/walt.yaml:/waltid-wallet-api/walt.yaml
@@ -87,7 +51,14 @@ services:
     environment:
       PORT: $VC_REPO_PORT
 
-  postgres:
+  # sqlite fake service
+  sqlite:
+    image: alpine
+    profiles:
+        -   sqlite
+    entrypoint: [ "/bin/sh", "-c", "exit 0" ]
+
+  postgres-engine:
     image: postgres:alpine
     profiles:
       - postgres
@@ -95,7 +66,7 @@ services:
       test: [ "CMD", "pg_isready", "-q", "-U", "postgres" ]
       interval: 5s
       timeout: 1s
-      retries: 2
+      retries: 5
     restart: always
     env_file:
       - ./postgres.env
@@ -104,6 +75,16 @@ services:
       - ./postgres-db-init.sh:/docker-entrypoint-initdb.d/postgres-db-init.sh
     ports:
       - $POSTGRES_DB_PORT:$POSTGRES_DB_PORT #TODO: tcp/udp proxy with caddy
+
+  # postgres-proxy-service
+  postgres:
+    image: alpine
+    profiles:
+        -   postgres
+    entrypoint: [ "/bin/sh", "-c", "exit 0" ]
+    depends_on:
+      postgres-engine:
+        condition: "service_healthy"
 
   phpmyadmin:
     image: dpage/pgadmin4
@@ -117,7 +98,7 @@ services:
       - pgadmin:/waltid-wallet-api/data/pgadmin
     restart: always
 
-  mssql:
+  mssql-engine:
     image: mcr.microsoft.com/azure-sql-edge
     profiles:
       - mssql
@@ -125,12 +106,22 @@ services:
       test: [ "CMD-SHELL", "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P p@ssw0rd -Q 'SELECT 1' || exit 1" ]
       interval: 5s
       timeout: 1s
-      retries: 2
+      retries: 5
     restart: always
     env_file:
       - ./mssql.env
     ports:
       - $MSSQL_DB_PORT:$MSSQL_DB_PORT
+
+  # mssql-proxy-service
+  mssql:
+    image: alpine
+    profiles:
+        -   mssql
+    entrypoint: [ "/bin/sh", "-c", "exit 0" ]
+    depends_on:
+      mssql-engine:
+        condition: "service_healthy"
 
   caddy:
     image: docker.io/caddy:2
