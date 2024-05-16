@@ -17,9 +17,9 @@ import id.walt.issuer.IssuanceExamples.issuerOnboardingResponseOciExample
 import id.walt.issuer.IssuanceExamples.issuerOnboardingResponseOciRestApiExample
 import id.walt.issuer.IssuanceExamples.issuerOnboardingResponseTseExample
 import id.walt.issuer.IssuanceExamples.openBadgeCredentialExampleJsonString
+import id.walt.issuer.IssuanceExamples.openBadgeCredentialSignExampleJsonString
 import id.walt.issuer.IssuanceExamples.sdJwtExample
 import id.walt.issuer.IssuanceExamples.universityDegreeCredential
-import id.walt.issuer.IssuanceExamples.universityDegreeCredentialExample2
 import id.walt.issuer.IssuanceExamples.universityDegreeCredentialSignedExample
 import id.walt.oid4vc.definitions.CROSS_DEVICE_CREDENTIAL_OFFER_URL
 import id.walt.oid4vc.requests.CredentialOfferRequest
@@ -33,10 +33,7 @@ import io.ktor.server.plugins.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.*
 import kotlin.time.Duration.Companion.minutes
 
 private val logger = KotlinLogging.logger {}
@@ -169,31 +166,11 @@ fun Application.issuerApi() {
                             "This endpoint issues (signs) an Verifiable Credential, but does not utilize an credential exchange " + "mechanism flow like OIDC or DIDComm to adapt and send the signed credential to an user. This means, that the " + "caller will have to utilize such an credential exchange mechanism themselves."
 
                         request {
-                            headerParameter<String>("walt-key") {
-                                description =
-                                    "Supply a  key representation to use to issue the credential, " + "e.g. a local key (internal JWK) or a TSE key."
-                                example = mapOf(
-                                    "type" to "jwk", "jwk" to "{ ... }"
-                                )
-                                required = true
-                            }
-                            headerParameter<String>("walt-issuerDid") {
-                                description =
-                                    "Optionally, supply a DID to use in the proof. If no DID is passed, " + "a did:key of the supplied key will be used."
-                                example = "did:ebsi:..."
-                                required = false
-                            }
-                            headerParameter<String>("walt-subjectDid") {
-                                description = "Supply the DID of the subject that will receive the credential"
-                                example = "did:key:..."
-                                required = true
-                            }
 
                             body<JsonObject> {
                                 description =
                                     "Pass the unsigned credential that you intend to sign as the body of the request."
-                                example("OpenBadgeCredential example", openBadgeCredentialExampleJsonString)
-                                example("UniversityDegreeCredential example", universityDegreeCredentialExample2)
+                                example("OpenBadgeCredential example", openBadgeCredentialSignExampleJsonString)
                                 required = true
                             }
                         }
@@ -210,17 +187,14 @@ fun Application.issuerApi() {
                             }
                         }
                     }) {
-                        val keyJson =
-                            context.request.header("walt-key") ?: throw IllegalArgumentException("No key was passed.")
-                        val subjectDid = context.request.header("walt-subjectDid")
-                            ?: throw IllegalArgumentException("No subjectDid was passed.")
-
-                        val key = KeySerialization.deserializeKey(keyJson).getOrThrow()
-
-                        val issuerDid =
-                            context.request.header("walt-issuerDid") ?: DidService.registerByKey("key", key).did
 
                         val body = context.receive<Map<String, JsonElement>>()
+
+                        val keyJson = body["issuerKey"] ?: throw IllegalArgumentException("No key was passed.")
+                        val key = KeySerialization.deserializeJWTKey(keyJson.jsonObject).getOrThrow()
+                        val issuerDid = body["issuerDid"]?.toString() ?: DidService.registerByKey("key", key).did
+                        val subjectDid = body["subjectDid"]?.toString()
+                            ?: throw IllegalArgumentException("No subjectDid was passed.")
 
                         val vc = W3CVC(body)
 
