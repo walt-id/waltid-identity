@@ -9,6 +9,8 @@ services:
     build:
       context: ../
       dockerfile: waltid-wallet-api/Dockerfile
+    links:
+      - db
     volumes:
       - ./wallet-api/config:/waltid-wallet-api/config
       - ./wallet-api/walt.yaml:/waltid-wallet-api/walt.yaml
@@ -52,6 +54,32 @@ services:
     pull_policy: always
     environment:
       PORT: $VC_REPO_PORT
+  db:
+    image: postgres:alpine
+    healthcheck:
+      test: [ "CMD", "pg_isready", "-q", "-U", "postgres" ]
+      interval: 5s
+      timeout: 1s
+      retries: 2
+    restart: always
+    env_file:
+      - ./postgres.env
+    volumes:
+      - wallet-api-db:/waltid-wallet-api/data/postgresql
+      - ./db-init.sh:/docker-entrypoint-initdb.d/db-init.sh
+    ports:
+      - '5432:5432'
+  phpmyadmin:
+    image: dpage/pgadmin4
+    links:
+      - db
+    env_file:
+      - ./pgadmin.env
+    volumes:
+      - pgadmin:/waltid-wallet-api/data/pgadmin
+    restart: always
+    ports:
+      - 8081:80
 
   caddy:
     image: docker.io/caddy:2
@@ -62,35 +90,44 @@ services:
       - NET_ADMIN
     ports:
 
-      - target: $WALLET_BACKEND_PORT
+      - target: "$WALLET_BACKEND_PORT"
         published: $WALLET_BACKEND_PORT # wallet-api
         protocol: tcp
         mode: host
 
-      - target: $ISSUER_API_PORT
+      - target: "$ISSUER_API_PORT"
         published: $ISSUER_API_PORT # issuer-api
         protocol: tcp
         mode: host
 
-      - target: $VERIFIER_API_PORT
+      - target: "$VERIFIER_API_PORT"
         published: $VERIFIER_API_PORT # verifier-api
         protocol: tcp
         mode: host
 
-      - target: $WALLET_FRONTEND_PORT
+      - target: "$WALLET_FRONTEND_PORT"
         published: $WALLET_FRONTEND_PORT # waltid-web-wallet
         protocol: tcp
         mode: host
 
-      - target: $WEB_PORTAL_PORT
+      - target: "$WEB_PORTAL_PORT"
         published: $WEB_PORTAL_PORT # web-portal
         protocol: tcp
         mode: host
 
-      - target: $VC_REPO_PORT
+      - target: "$VC_REPO_PORT"
         published: $VC_REPO_PORT # vc-repo
+        protocol: tcp
+        mode: host
+
+      - target: "$PG_ADMIN_PORT"
+        published: "80" # pg-admin
         protocol: tcp
         mode: host
 
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile
+volumes:
+    wallet-api-db:
+    pgadmin:
+
