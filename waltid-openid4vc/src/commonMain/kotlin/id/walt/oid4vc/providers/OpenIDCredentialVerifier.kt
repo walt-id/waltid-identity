@@ -4,10 +4,7 @@ import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeyType
-import id.walt.oid4vc.data.ClientIdScheme
-import id.walt.oid4vc.data.OpenIDClientMetadata
-import id.walt.oid4vc.data.ResponseMode
-import id.walt.oid4vc.data.ResponseType
+import id.walt.oid4vc.data.*
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.data.dif.VCFormat
 import id.walt.oid4vc.interfaces.ISessionCache
@@ -49,18 +46,23 @@ abstract class OpenIDCredentialVerifier(val config: CredentialVerifierConfig) :
         expiresIn: Duration = 60.seconds,
         sessionId: String? = null, // A calling party may provide a unique session Id
         ephemeralEncKey: Key? = null,
-        clientIdScheme: ClientIdScheme = config.defaultClientIdScheme
+        clientIdScheme: ClientIdScheme = config.defaultClientIdScheme,
+        openId4VPProfile: OpenId4VPProfile = OpenId4VPProfile.Default
     ): PresentationSession {
         val session = PresentationSession(
             id = sessionId ?: ShortIdUtils.randomSessionId(),
             authorizationRequest = null,
             expirationTimestamp = Clock.System.now().plus(expiresIn),
             presentationDefinition = presentationDefinition,
-            ephemeralEncKey = ephemeralEncKey
+            ephemeralEncKey = ephemeralEncKey,
+            openId4VPProfile = openId4VPProfile
         ).also {
             putSession(it.id, it)
         }
-        val presentationDefinitionUri = preparePresentationDefinitionUri(presentationDefinition, session.id)
+        val presentationDefinitionUri = when(openId4VPProfile) {
+            OpenId4VPProfile.ISO_18013_7_MDOC -> null
+            else -> preparePresentationDefinitionUri(presentationDefinition, session.id)
+        }
         val authReq = AuthorizationRequest(
             responseType = setOf(ResponseType.VpToken),
             clientId = when(clientIdScheme) {
