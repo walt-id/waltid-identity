@@ -5,7 +5,7 @@
 
 # Wallet API
 :{$WALLET_BACKEND_PORT} {
-    reverse_proxy http://wallet-api-{$DATABASE_ENGINE}:{$WALLET_BACKEND_PORT}
+    reverse_proxy http://wallet-api:{$WALLET_BACKEND_PORT}
 }
 
 # Issuer API
@@ -21,7 +21,7 @@
 # Web Wallet Frontend
 :{$WALLET_FRONTEND_PORT} {
     reverse_proxy http://waltid-web-wallet:{$WALLET_FRONTEND_PORT} # frontend
-    reverse_proxy /wallet-api/* http://wallet-api-{$DATABASE_ENGINE}:{$WALLET_BACKEND_PORT} # backend
+    reverse_proxy /wallet-api/* http://wallet-api:{$WALLET_BACKEND_PORT} # backend
 }
 
 # Web Portal
