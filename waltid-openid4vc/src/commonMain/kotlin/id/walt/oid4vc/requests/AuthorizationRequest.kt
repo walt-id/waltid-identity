@@ -90,6 +90,21 @@ data class AuthorizationRequest(
         }
     }
 
+    fun toEbsiRequestObjectByReferenceHttpParameters(requestUri: String): Map<String, List<String>> {
+        return mapOf(
+            "client_id" to listOf(clientId),
+            "response_type" to listOf(ResponseType.getResponseTypeString(responseType)),
+            "scope" to this.scope.toList(),
+            "redirect_uri" to listOf(this.redirectUri!!),
+            "presentation_definition_url" to listOf(this.presentationDefinitionUri!!),
+            "request_uri" to listOf(requestUri)
+        )
+    }
+
+    fun toEbsiRequestObjectByReferenceHttpQueryString(requestUri: String): String {
+        return IHTTPDataObject.toHttpQueryString(toEbsiRequestObjectByReferenceHttpParameters(requestUri))
+    }
+
     fun toJSON(): JsonObject {
         return JsonObject(buildMap {
             put("response_type", JsonPrimitive(ResponseType.getResponseTypeString(responseType)))
