@@ -9,6 +9,7 @@ import id.walt.oid4vc.data.dif.*
 import id.walt.oid4vc.definitions.JWTClaims
 import id.walt.verifier.base.config.ConfigManager
 import id.walt.verifier.base.config.OIDCVerifierServiceConfig
+import id.walt.verifier.oidc.RequestSigningCryptoProvider
 import id.walt.verifier.oidc.VerificationUseCase
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.github.smiley4.ktorswaggerui.dsl.get
@@ -307,6 +308,24 @@ fun Application.verfierApi() {
                     call.respond(it.toJSON())
                 }.onFailure {
                     call.respond(HttpStatusCode.NotFound)
+                }
+            }
+            get("/request/{id}", {
+                tags = listOf("OIDC")
+                summary = "Get request object for session by session id"
+                description = "Gets the signed request object for the session given by the session id parameter"
+                request {
+                    pathParameter<String>("id") {
+                        description = "ID of the presentation session"
+                        required = true
+                    }
+                }
+            }) {
+                val id = call.parameters.getOrFail("id")
+                verificationUseCase.getSignedAuthorizationRequestObject(id).onSuccess {
+                    call.respond(HttpStatusCode.OK, it)
+                }.onFailure {
+                    call.respond(HttpStatusCode.BadRequest, it.localizedMessage)
                 }
             }
             get("policy-list", {

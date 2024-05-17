@@ -146,6 +146,12 @@ class VerificationUseCase(
             Result.success(it)
         } ?: Result.failure(error("Invalid id provided (expired?): $sessionId"))
 
+    suspend fun getSignedAuthorizationRequestObject(sessionId: String): Result<String> =
+        OIDCVerifierService.getSession(sessionId)?.authorizationRequest?.let {
+            Result.success(RequestSigningCryptoProvider.signWithLocalKeyAndHeader(payload = it.toJSON(), headers = mapOf("typ" to "JWT", "kid" to RequestSigningCryptoProvider.signingKey.getPublicKey().getKeyId())))
+        } ?: Result.failure(error("Invalid id provided (expired?): $sessionId"))
+
+
     suspend fun notifySubscribers(sessionId: String) = runCatching {
         OIDCVerifierService.sessionVerificationInfos[sessionId]?.statusCallback?.let {
             http.post(it.statusCallbackUri) {
