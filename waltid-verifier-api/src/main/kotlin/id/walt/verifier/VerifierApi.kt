@@ -42,10 +42,6 @@ private val SERVER_URL by lazy {
     }
 }
 
-private val SERVER_SIGNING_KEY by lazy { runBlocking { JWKKey.generate(KeyType.secp256r1) } }
-
-
-
 @Serializable
 data class DescriptorMappingFormParam(val id: String, val format: VCFormat, val path: String)
 
@@ -363,10 +359,10 @@ fun Application.verfierApi() {
             val jwks = buildJsonObject {
                 put("keys", buildJsonArray {
                     val jwkWithKid = buildJsonObject {
-                        SERVER_SIGNING_KEY.getPublicKey().exportJWKObject().forEach {
+                        RequestSigningCryptoProvider.signingKey.getPublicKey().exportJWKObject().forEach {
                             put(it.key, it.value)
                         }
-                        put("kid", SERVER_SIGNING_KEY.getPublicKey().getKeyId())
+                        put("kid", RequestSigningCryptoProvider.signingKey.getPublicKey().getKeyId())
                     }
                     add(jwkWithKid)
                 })
@@ -444,12 +440,12 @@ fun Application.verfierApi() {
             }
 
             val requestJwtHeader = mapOf(
-                JWTClaims.Header.keyID to SERVER_SIGNING_KEY.getPublicKey().getKeyId(),
+                JWTClaims.Header.keyID to RequestSigningCryptoProvider.signingKey.getPublicKey().getKeyId(),
                 JWTClaims.Header.type to "JWT"
             )
 
             val requestToken =
-                SERVER_SIGNING_KEY.signJws(requestJwtPayload.toString().toByteArray(), requestJwtHeader).also {
+                RequestSigningCryptoProvider.signingKey.signJws(requestJwtPayload.toString().toByteArray(), requestJwtHeader).also {
                     logger.info { "Signed JWS: >> $it" }
                 }
 
