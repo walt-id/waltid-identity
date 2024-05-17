@@ -206,7 +206,12 @@ fun Application.verfierApi() {
                     useEbsiCTv3 = useEbsiCTv3
                 )
 
-                context.respond(authorizeBaseUrl.plus("?").plus(session.authorizationRequest!!.toHttpQueryString()))
+                context.respond(authorizeBaseUrl.plus("?").plus(
+                    when(useEbsiCTv3) {
+                        true -> session.authorizationRequest!!.toEbsiRequestObjectByReferenceHttpQueryString(SERVER_URL.let { "$it/openid4vc/request/${session.id}"})
+                        else -> session.authorizationRequest!!.toHttpQueryString()
+                    })
+                )
             }
 
             post("/verify/{state}", {
