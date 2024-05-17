@@ -31,6 +31,7 @@ class VerificationUseCase(
         statusCallbackApiKey: String?,
         stateId: String?,
         stateParamAuthorizeReqEbsi: String? = null,
+        useEbsiCTv3: Boolean? = null,
     ) = let {
         val vpPolicies = vpPoliciesJson?.jsonArray?.parsePolicyRequests() ?: listOf(PolicyRequest(JwtSignaturePolicy()))
 
@@ -53,7 +54,7 @@ class VerificationUseCase(
         logger.debug { "Presentation definition: " + presentationDefinition.toJSON() }
 
         val session = OIDCVerifierService.initializeAuthorization(
-            presentationDefinition, responseMode = responseMode, sessionId = stateId, stateParamAuthorizeReqEbsi = stateParamAuthorizeReqEbsi
+            presentationDefinition, responseMode = responseMode, sessionId = stateId, stateParamAuthorizeReqEbsi = stateParamAuthorizeReqEbsi, useEbsiCTv3 = useEbsiCTv3
         )
 
         val specificPolicies = requestCredentialsArr.filterIsInstance<JsonObject>().associate {
