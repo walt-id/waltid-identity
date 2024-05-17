@@ -54,6 +54,11 @@ abstract class OpenIDCredentialVerifier(val config: CredentialVerifierConfig) :
             clientId = when(config.clientIdScheme) {
                 ClientIdScheme.RedirectUri -> ""
                 else -> config.clientId
+            }.let{
+                when(useEbsiCTv3) {
+                    true -> it.replace(it, config.clientId.replace("/openid4vc/verify", ""))
+                    else -> it
+                }
             },
             responseMode = responseMode,
             redirectUri = when (responseMode) {
@@ -62,17 +67,33 @@ abstract class OpenIDCredentialVerifier(val config: CredentialVerifierConfig) :
                     responseMode
                 )
                 else -> null
+            }.let{
+                when(useEbsiCTv3) {
+                    true -> when (responseMode) {
+                        ResponseMode.direct_post -> prepareResponseOrRedirectUri(session.id, responseMode)
+                        else -> null
+                    }
+                    else -> it
+                }
             },
             responseUri = when (responseMode) {
                 ResponseMode.direct_post -> prepareResponseOrRedirectUri(session.id, responseMode)
                 else -> null
+            }.let{
+                when(useEbsiCTv3) {
+                    true -> null
+                    else -> it
+                }
             },
             presentationDefinitionUri = presentationDefinitionUri,
             presentationDefinition = when (presentationDefinitionUri) {
                 null -> presentationDefinition
                 else -> null
             },
-            scope = scope,
+            scope = when (useEbsiCTv3) {
+                true -> setOf("openid")
+                else -> scope
+            },
             state = session.id,
             clientIdScheme = config.clientIdScheme
         )
