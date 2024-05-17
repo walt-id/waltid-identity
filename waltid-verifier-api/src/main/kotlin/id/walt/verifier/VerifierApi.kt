@@ -159,6 +159,11 @@ fun Application.verfierApi() {
                         example = ""
                         required = false
                     }
+                    headerParameter<Boolean?>("useEbsiCTv3.2") {
+                        description = "Set to true to get EBSI CT v3.2 compliant VP_TOKEN request"
+                        example = ""
+                        required = false
+                    }
                     body<JsonObject> {
                         description =
                             "Presentation definition, describing the presentation requirement for this verification session. ID of the presentation definition is automatically assigned randomly."
@@ -183,6 +188,7 @@ fun Application.verfierApi() {
                 val statusCallbackUri = context.request.header("statusCallbackUri")
                 val statusCallbackApiKey = context.request.header("statusCallbackApiKey")
                 val stateId = context.request.header("stateId")
+                val useEbsiCTv3 = context.request.header("useEbsiCTv3.2")?.toBoolean() ?: false
                 val body = context.receive<JsonObject>()
 
                 val session = verificationUseCase.createSession(
@@ -196,6 +202,7 @@ fun Application.verfierApi() {
                     statusCallbackUri = statusCallbackUri,
                     statusCallbackApiKey = statusCallbackApiKey,
                     stateId = stateId,
+                    useEbsiCTv3 = useEbsiCTv3
                 )
 
                 context.respond(authorizeBaseUrl.plus("?").plus(session.authorizationRequest!!.toHttpQueryString()))
