@@ -126,9 +126,6 @@ kotlin {
         val commonTest by getting {
             dependencies {
                 implementation(kotlin("test"))
-                implementation("io.kotest:kotest-assertions-core:5.8.0")
-
-                implementation("io.kotest:kotest-assertions-json:5.8.0")
             }
         }
         val jvmMain by getting {
@@ -139,10 +136,6 @@ kotlin {
         val jvmTest by getting {
             dependencies {
 //              implementation("io.mockk:mockk:1.13.2")
-
-                implementation("io.kotest:kotest-runner-junit5:5.8.0")
-                implementation("io.kotest:kotest-assertions-core:5.8.0")
-                implementation("io.kotest:kotest-assertions-json:5.8.0")
             }
         }
         val jsMain by getting {
