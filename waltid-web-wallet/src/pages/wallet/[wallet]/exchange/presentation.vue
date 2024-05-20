@@ -106,8 +106,8 @@ const matchedCredentials = await $fetch<Array<Object>>(`/wallet-api/wallet/${cur
 const selection = ref({});
 const selectedCredentialIds = computed(() => Object.entries(selection.value).filter((it) => it[1]).map((it) => it[0]))
 
-if (matchedCredentials.length == 1) {
-    selection.value[matchedCredentials[0].id] = true
+for (let credential of matchedCredentials) {
+    selection.value[credential.id] = true
 }
 
 /*if (matchedCredentials.value.length == 1) {
