@@ -72,7 +72,7 @@ kotlin {
 //        isMingwX64 -> mingwX64("native")
 //        else -> throw GradleException("Host OS is not supported in Kotlin/Native.")
 //    }
-    val ktor_version = "2.3.10"
+    val ktor_version = "2.3.11"
     val HOPLITE_VERSION = "2.8.0.RC3"
 
     sourceSets {
