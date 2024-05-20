@@ -7,6 +7,7 @@ services:
       dockerfile: waltid-wallet-api/Dockerfile
     depends_on:
       - "$DATABASE_ENGINE"
+      - caddy
     volumes:
       - ./wallet-api/config:/waltid-wallet-api/config
       - ./wallet-api/walt.yaml:/waltid-wallet-api/walt.yaml
@@ -16,6 +17,8 @@ services:
     platform: linux/x86_64
     image: docker.io/waltid/issuer-api:${VERSION_TAG:-latest}
     pull_policy: always
+    depends_on:
+      - caddy
     volumes:
       - ./issuer-api/config:/waltid-issuer-api/config
 
@@ -23,12 +26,17 @@ services:
     platform: linux/x86_64
     image: docker.io/waltid/verifier-api:${VERSION_TAG:-latest}
     pull_policy: always
+    depends_on:
+      - caddy
     volumes:
       - ./verifier-api/config:/waltid-verifier-api/config
 
   waltid-web-wallet:
     image: docker.io/waltid/waltid-web-wallet:${VERSION_TAG:-latest}
     pull_policy: always
+    depends_on:
+      - wallet-api
+      - caddy
     environment:
       NUXT_PUBLIC_ISSUER_CALLBACK_URL: "http://localhost:$WALLET_FRONTEND_PORT"
       PORT: $WALLET_FRONTEND_PORT
@@ -37,6 +45,8 @@ services:
     platform: linux/x86_64
     image: docker.io/waltid/portal:${VERSION_TAG:-latest}
     pull_policy: always
+    depends_on:
+      - caddy
     environment:
       NEXT_PUBLIC_VC_REPO: "http://localhost:$VC_REPO_PORT"
       NEXT_PUBLIC_ISSUER: "http://localhost:$ISSUER_API_PORT"
@@ -48,6 +58,8 @@ services:
     platform: linux/x86_64
     image: docker.io/waltid/vc-repository:latest
     pull_policy: always
+    depends_on:
+      - caddy
     environment:
       PORT: $VC_REPO_PORT
 
@@ -92,6 +104,7 @@ services:
       - postgres
     depends_on:
       - postgres
+      - caddy
     env_file:
       - ./pgadmin.env
     volumes:
