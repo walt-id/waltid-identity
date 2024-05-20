@@ -1,6 +1,7 @@
 package id.walt
 
 import id.walt.credentials.vc.vcs.W3CVC
+import id.walt.crypto.keys.KeySerialization
 import id.walt.issuer.IssuanceRequest
 import id.walt.issuer.base.config.ConfigManager
 import id.walt.issuer.createCredentialOfferUri
@@ -76,6 +77,10 @@ class IssuerApiTest {
    }
     """
 
+
+    val TEST_SUBJECT_DID =
+        "did:jwk:eyJrdHkiOiJPS1AiLCJjcnYiOiJFZDI1NTE5Iiwia2lkIjoiMW1lTUJuX3EtVklTQzd5Yk42UnExX0FISkxwSHZKVG83N3V6Nk44UkdDQSIsIngiOiJQdEV1YlB1MWlrRzR5emZsYUF2dnNmTWIwOXR3NzlIcTFsVnJRX1c0ZnVjIn0"
+
     val TEST_MAPPING = """
      {
         "id": "<uuid>",
@@ -115,11 +120,35 @@ class IssuerApiTest {
         val jsonMappingObj = Json.decodeFromString<JsonObject>(TEST_MAPPING)
 
         val selectiveDisclosureMap = SDMapBuilder().addField("sd", true).build()
-        val issueRequest = IssuanceRequest(jsonKeyObj, TEST_ISSUER_DID, "OpenBadgeCredential", w3cVc, jsonMappingObj, selectiveDisclosureMap)
+        val issueRequest = IssuanceRequest(
+            jsonKeyObj,
+            TEST_ISSUER_DID,
+            "OpenBadgeCredential",
+            w3cVc,
+            jsonMappingObj,
+            selectiveDisclosureMap
+        )
 
         ConfigManager.loadConfigs(emptyArray())
         val offerUri = createCredentialOfferUri(listOf(issueRequest))
 
         assertEquals(true, offerUri.contains("//localhost:7002/?credential_offer"))
+    }
+
+    @Test
+    fun testSign() = runTest {
+        val jsonKeyObj = Json.decodeFromString<JsonObject>(TEST_KEY)
+        val key = KeySerialization.deserializeJWTKey(jsonKeyObj).getOrThrow()
+        val jsonVCObj = Json.decodeFromString<JsonObject>(TEST_W3VC)
+
+        val subjectDid = TEST_SUBJECT_DID
+
+        val w3cVc = W3CVC(jsonVCObj.toMap())
+
+        val sign = w3cVc.signJws(
+            issuerKey = key, issuerDid = TEST_ISSUER_DID, subjectDid = subjectDid
+        )
+
+        assertEquals(true, sign.isNotEmpty())
     }
 }
