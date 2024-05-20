@@ -18,7 +18,8 @@
                 <h3 class="text-2xl font-bold text-[#01337D]">Wallet is Inactive</h3>
                 <p class="mt-2 text-md text-[#616E7C]">To activate your wallet, please verify your identity by
                     clicking the button below.</p>
-                <NuxtLink :to="``">
+                <NuxtLink
+                    :to="`https://t4.on.joget.cloud/jw/web/userview/lpr/userView/_/loyaltyProgReg?refNo=${random}`">
                     <button
                         class="mt-8 px-4 py-2 text-white bg-[#01337D] rounded-lg shadow-lg hover:bg-[#002159] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#002159]">
                         Complete Identity Check
@@ -44,6 +45,8 @@ import scannerSVG from "~/public/svg/scanner.svg";
 
 const route = useRoute();
 const walletId = route.params.wallet;
+
+const random = btoa("REF-" + Math.floor(Math.random() * 1000000))
 
 const { data: credentials, pending, refresh, error } = await useLazyFetch(`/wallet-api/wallet/${walletId}/credentials?showDeleted=false&showPending=false`);
 refreshNuxtData();
