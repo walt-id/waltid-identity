@@ -58,7 +58,7 @@ kotlin {
 
                 // CLI
                 implementation("com.varabyte.kotter:kotter-jvm:1.1.2")
-                implementation("com.github.ajalt.mordant:mordant:2.3.0")
+                implementation("com.github.ajalt.mordant:mordant:2.6.0")
                 implementation("com.github.ajalt.clikt:clikt:4.2.2")
 
                 // Coroutines
