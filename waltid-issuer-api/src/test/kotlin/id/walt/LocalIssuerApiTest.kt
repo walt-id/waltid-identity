@@ -77,6 +77,40 @@ class IssuerApiTest {
    }
     """
 
+    val TEST_W3VC2 = """
+    {
+         "@context":[
+            "https://www.w3.org/2018/credentials/v1"
+         ],
+         "type":[
+            "VerifiableCredential",
+            "BankId"
+         ],
+         "credentialSubject":{
+            "accountId":"1234567890",
+            "IBAN":"DE99123456789012345678",
+            "BIC":"DEUTDEDBBER",
+            "birthDate":"1958-08-17",
+            "familyName":"DOE",
+            "givenName":"JOHN",
+            "id":"identity#bankId"
+         },
+         "id":"identity#BankId#3add94f4-28ec-42a1-8704-4e4aa51006b4",
+         "issued":"2021-08-31T00:00:00Z",
+         "issuer":{
+            "id":"did:key:z6MkrHKzgsahxBLyNAbLQyB1pcWNYC9GmywiWPgkrvntAZcj",
+            "image":{
+               "id":"https://images.squarespace-cdn.com/content/v1/609c0ddf94bcc0278a7cbdb4/1660296169313-K159K9WX8J8PPJE005HV/Walt+Bot_Logo.png?format=100w",
+               "type":"Image"
+            },
+            "name":"CH Authority",
+            "type":"Profile",
+            "url":"https://images.squarespace-cdn.com/content/v1/609c0ddf94bcc0278a7cbdb4/1660296169313-K159K9WX8J8PPJE005HV/Walt+Bot_Logo.png?format=100w"
+         },
+         "validFrom":"2021-08-31T00:00:00Z",
+         "issuanceDate":"2021-08-31T00:00:00Z"
+     }
+    """
 
     val TEST_SUBJECT_DID =
         "did:jwk:eyJrdHkiOiJPS1AiLCJjcnYiOiJFZDI1NTE5Iiwia2lkIjoiMW1lTUJuX3EtVklTQzd5Yk42UnExX0FISkxwSHZKVG83N3V6Nk44UkdDQSIsIngiOiJQdEV1YlB1MWlrRzR5emZsYUF2dnNmTWIwOXR3NzlIcTFsVnJRX1c0ZnVjIn0"
@@ -151,4 +185,29 @@ class IssuerApiTest {
 
         assertEquals(true, sign.isNotEmpty())
     }
+
+    @Test
+    fun testBatchIssuanceJwt() = runTest {
+        val jsonKeyObj = Json.decodeFromString<JsonObject>(TEST_KEY)
+        val jsonVCObj1 = Json.decodeFromString<JsonObject>(TEST_W3VC)
+        val jsonVCObj2 = Json.decodeFromString<JsonObject>(TEST_W3VC2)
+        val w3cVc1 = W3CVC(jsonVCObj1.toMap())
+        val w3cVc2 = W3CVC(jsonVCObj2.toMap())
+        val jsonMappingObj = Json.decodeFromString<JsonObject>(TEST_MAPPING)
+
+        val issueRequest1 =
+            IssuanceRequest(jsonKeyObj, TEST_ISSUER_DID, "OpenBadgeCredential_jwt_vc_json", w3cVc1, jsonMappingObj)
+        val issueRequest2 =
+            IssuanceRequest(jsonKeyObj, TEST_ISSUER_DID, "BankId_jwt_vc_json", w3cVc2, jsonMappingObj)
+
+        val issuanceRequests = listOf(issueRequest1, issueRequest2)
+
+        ConfigManager.loadConfigs(emptyArray())
+        val offerUri = createCredentialOfferUri(issuanceRequests)
+
+        assertEquals(true, offerUri.contains("//localhost:7002/?credential_offer"))
+
+    }
+
+
 }
