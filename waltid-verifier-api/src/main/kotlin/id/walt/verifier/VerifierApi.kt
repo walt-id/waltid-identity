@@ -340,17 +340,17 @@ fun Application.verfierApi() {
 
         get("/.well-known/openid-configuration", {tags= listOf("Ebsi") }) {
             val metadata = buildJsonObject {
+                put("authorization_endpoint", "$SERVER_URL/authorize")
                 put("token_endpoint", "$SERVER_URL/token")
                 put("issuer", SERVER_URL)
                 put("jwks_uri", "$SERVER_URL/jwks")
                 put("response_types_supported", buildJsonArray {
-                    add("code")
-                    add("id_token")
-                    add("vp_token")
+                    add(ResponseType.Code.name)
+                    add(ResponseType.IdToken.name)
+                    add(ResponseType.VpToken.name)
                 })
                 put("subject_types_supported", buildJsonArray { add("public") })
                 put("id_token_signing_alg_values_supported", buildJsonArray { add("ES256") })
-                put("authorization_endpoint", "$SERVER_URL/authorize")
             }
             call.respond(metadata)
         }
