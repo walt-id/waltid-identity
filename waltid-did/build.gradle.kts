@@ -142,7 +142,9 @@ kotlin {
         publishing {
             repositories {
                 maven {
-                    url = uri("https://maven.waltid.dev/releases")
+                    val releasesRepoUrl = uri("https://maven.waltid.dev/releases")
+                    val snapshotsRepoUrl = uri("https://maven.waltid.dev/snapshots")
+                    url = uri(if (version.toString().endsWith("SNAPSHOT")) snapshotsRepoUrl else releasesRepoUrl)
                     val envUsername = System.getenv("MAVEN_USERNAME")
                     val envPassword = System.getenv("MAVEN_PASSWORD")
 
