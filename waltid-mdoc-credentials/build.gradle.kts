@@ -62,9 +62,6 @@ kotlin {
         val commonTest by getting {
             dependencies {
                 implementation(kotlin("test"))
-                implementation("io.kotest:kotest-assertions-core:5.5.5")
-
-                implementation("io.kotest:kotest-assertions-json:5.5.5")
             }
         }
         val jvmMain by getting {
@@ -78,9 +75,6 @@ kotlin {
                 implementation("org.bouncycastle:bcpkix-lts8on:2.73.4")
                 implementation("io.mockk:mockk:1.13.2")
 
-                implementation("io.kotest:kotest-runner-junit5:5.5.5")
-                implementation("io.kotest:kotest-assertions-core:5.5.5")
-                implementation("io.kotest:kotest-assertions-json:5.5.5")
                 implementation(kotlin("reflect"))
             }
         }
