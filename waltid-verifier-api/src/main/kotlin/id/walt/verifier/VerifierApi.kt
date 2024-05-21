@@ -1,18 +1,14 @@
 package id.walt.verifier
 
 import id.walt.credentials.verification.PolicyManager
-import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.JsonUtils.toJsonObject
 import id.walt.oid4vc.data.ResponseMode
 import id.walt.oid4vc.data.ResponseType
 import id.walt.oid4vc.data.dif.*
-import id.walt.oid4vc.definitions.JWTClaims
 import id.walt.verifier.base.config.ConfigManager
 import id.walt.verifier.base.config.OIDCVerifierServiceConfig
 import id.walt.verifier.oidc.RequestSigningCryptoProvider
 import id.walt.verifier.oidc.VerificationUseCase
-import io.github.oshai.kotlinlogging.KotlinLogging
 import io.github.smiley4.ktorswaggerui.dsl.get
 import io.github.smiley4.ktorswaggerui.dsl.post
 import io.github.smiley4.ktorswaggerui.dsl.route
@@ -106,9 +102,6 @@ private val fixedPresentationDefinitionForEbsiConformanceTest = "{\"id\":\"any\"
 
 private val verificationUseCase = VerificationUseCase(httpClient)
 
-private val logger = KotlinLogging.logger { }
-
-
 fun Application.verfierApi() {
     routing {
 
@@ -155,7 +148,7 @@ fun Application.verfierApi() {
                         example = ""
                         required = false
                     }
-                    headerParameter<Boolean?>("useEbsiCTv3.2") {
+                    headerParameter<Boolean?>("useEbsiCTv3") {
                         description = "Set to true to get EBSI CT v3.2 compliant VP_TOKEN request"
                         example = ""
                         required = false
@@ -185,7 +178,7 @@ fun Application.verfierApi() {
                 val statusCallbackUri = context.request.header("statusCallbackUri")
                 val statusCallbackApiKey = context.request.header("statusCallbackApiKey")
                 val stateId = context.request.header("stateId")
-                val useEbsiCTv3 = context.request.header("useEbsiCTv3.2")?.toBoolean() ?: false
+                val useEbsiCTv3 = context.request.header("useEbsiCTv3")?.toBoolean() ?: false
                 val body = context.receive<JsonObject>()
 
                 val session = verificationUseCase.createSession(
@@ -411,7 +404,5 @@ fun Application.verfierApi() {
             )
             context.respondRedirect("openid://?${session.authorizationRequest!!.toEbsiRequestObjectByReferenceHttpQueryString(SERVER_URL.let { "$it/openid4vc/request/${session.id}"})}")
         }
-
-
     }
 }
