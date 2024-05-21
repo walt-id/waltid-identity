@@ -245,7 +245,7 @@ fun Application.verfierApi() {
                             call.respond(HttpStatusCode.OK, it)
                         }
                     }.onFailure {
-                        var errorDescription: String = it.localizedMessage
+                        var errorDescription = it.localizedMessage
 
                         if (sessionId != null ) {
                             val session = verificationUseCase.getSession(sessionId)
@@ -254,7 +254,7 @@ fun Application.verfierApi() {
                                 when (it.localizedMessage) {
                                     "Verification policies did not succeed: expired" -> errorDescription = "<\$presentation_submission.descriptor_map[x].id> is expired"
                                     "Verification policies did not succeed: not-before" -> errorDescription = "<\$presentation_submission.descriptor_map[x].id> is not yet valid"
-                                    "Verification policies did not succeed: revoked" -> errorDescription = "<\$presentation_submission.descriptor_map[x].id> is revoked"
+                                    "Verification policies did not succeed: revoked_status_list" -> errorDescription = "<\$presentation_submission.descriptor_map[x].id> is revoked"
                                 }
                                 context.respondRedirect("openid://?state=$state&error=invalid_request&error_description=$errorDescription")
                             }
@@ -397,6 +397,10 @@ fun Application.verfierApi() {
                 stateId = stateId,
                 useEbsiCTv3 = true,
                 stateParamAuthorizeReqEbsi = stateParamAuthorizeReqEbsi,
+                responseType = when(scope.contains("openid ver_test:id_token")){
+                    true -> ResponseType.IdToken
+                    else -> ResponseType.VpToken
+                },
             )
             context.respondRedirect("openid://?${session.authorizationRequest!!.toEbsiRequestObjectByReferenceHttpQueryString(SERVER_URL.let { "$it/openid4vc/request/${session.id}"})}")
         }
