@@ -782,4 +782,13 @@ class VP_JVM_Test : AnnotationSpec() {
         val responseObj = response.body<JsonObject>()
         return responseObj["url"]?.jsonPrimitive?.content
     }
+
+    @Test
+    fun testPresentationDefinitionSerialization() {
+        val presDef = PresentationDefinition.fromJSONString(presentationDefinitionExample1)
+        presDef.toJSON().keys shouldContain "id"
+
+        val presDefDefaultId = PresentationDefinition(inputDescriptors = presDef.inputDescriptors)
+        presDefDefaultId.toJSON().keys shouldContain "id"
+    }
 }
