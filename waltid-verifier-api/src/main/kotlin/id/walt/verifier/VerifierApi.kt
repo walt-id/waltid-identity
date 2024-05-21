@@ -32,8 +32,6 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import kotlinx.uuid.UUID
-import java.net.URLEncoder
-
 
 private val SERVER_URL by lazy {
     runBlocking {
@@ -375,23 +373,9 @@ fun Application.verfierApi() {
             val params = call.parameters.toMap().toJsonObject()
 
             val stateParamAuthorizeReqEbsi = params["state"]?.jsonArray?.get(0)?.jsonPrimitive?.content
-            var scope = params["scope"]?.jsonArray.toString().replace("\"", "").replace("[", "").replace("]", "")
-            var presentationDefinitionJson: JsonElement? = null
-            var responseType = "id_token"
-            var isRedirectResponse = false// make if redirect_uri  = "openid://"
-            if (scope.contains("openid ver_test:vp_token")) { //EBSI Conformance tests
-                presentationDefinitionJson = Json.parseToJsonElement(fixedPresentationDefinitionForEbsiConformanceTest)
-                responseType = "vp_token"
-                isRedirectResponse = true
-            }
-            if (scope.contains("openid ver_test:id_token")) {//EBSI Conformance tests
-                responseType = "id_token"
-                isRedirectResponse= true
-}
-            scope = "openid"
+            val scope = params["scope"]?.jsonArray.toString().replace("\"", "").replace("[", "").replace("]", "")
 
             val stateId = UUID().toString()
-
             val session = verificationUseCase.createSession(
                 vpPoliciesJson = null,
                 vcPoliciesJson = buildJsonArray {
@@ -401,26 +385,18 @@ fun Application.verfierApi() {
                     add("revoked")
                 },
                 requestCredentialsJson = buildJsonArray {},
-                presentationDefinitionJson = presentationDefinitionJson,
+                presentationDefinitionJson = when(scope.contains("openid ver_test:vp_token")){
+                    true -> Json.parseToJsonElement(fixedPresentationDefinitionForEbsiConformanceTest)
+                    else -> null
+                },
                 responseMode = ResponseMode.direct_post,
                 successRedirectUri = null,
                 errorRedirectUri = null,
                 statusCallbackUri = null,
                 statusCallbackApiKey = null,
                 stateId = stateId,
-                stateParamAuthorizeReqEbsi = stateParamAuthorizeReqEbsi
-            )
-
-            // Create a jwt for the request parameter in response
-            // Bind authentication request with state
-            //                val idTokenRequestState = UUID().toString();
-            //                val idTokenRequestNonce = UUID().toString();
-            val responseMode = ResponseMode.direct_post
-
-            val clientId = SERVER_URL
-            val redirectUri = session.authorizationRequest!!.responseUri
-
-            val response = session.authorizationRequest!!
+                useEbsiCTv3 = true,
+                stateParamAuthorizeReqEbsi = stateParamAuthorizeReqEbsi,
 
             // Create a jwt as request object as defined in JAR OAuth2.0 specification
             val requestJwtPayload = buildJsonObject {
@@ -443,11 +419,8 @@ fun Application.verfierApi() {
                 JWTClaims.Header.keyID to RequestSigningCryptoProvider.signingKey.getPublicKey().getKeyId(),
                 JWTClaims.Header.type to "JWT"
             )
-
-            val requestToken =
-                RequestSigningCryptoProvider.signingKey.signJws(requestJwtPayload.toString().toByteArray(), requestJwtHeader).also {
-                    logger.info { "Signed JWS: >> $it" }
-                }
+            context.respondRedirect("openid://?${session.authorizationRequest!!.toEbsiRequestObjectByReferenceHttpQueryString(SERVER_URL.let { "$it/openid4vc/request/${session.id}"})}")
+        }
 
             var responseQueryString = response.toHttpQueryString()
             responseQueryString = responseQueryString.replace("client_id=", "client_id=$clientId")
