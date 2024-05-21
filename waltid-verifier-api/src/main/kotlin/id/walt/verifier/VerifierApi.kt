@@ -397,47 +397,10 @@ fun Application.verfierApi() {
                 stateId = stateId,
                 useEbsiCTv3 = true,
                 stateParamAuthorizeReqEbsi = stateParamAuthorizeReqEbsi,
-
-            // Create a jwt as request object as defined in JAR OAuth2.0 specification
-            val requestJwtPayload = buildJsonObject {
-                put(JWTClaims.Payload.issuer, clientId)
-                put(JWTClaims.Payload.audience, response.clientId)
-                //                        put(JWTClaims.Payload.nonce, idTokenRequestNonce)
-                //                        put("state", idTokenRequestState)
-                put("client_id", clientId)
-                put("redirect_uri", redirectUri)
-                put("response_type", responseType)
-                put("response_mode", responseMode.name)
-                put("scope", scope)
-                put("exp", 1776532276)
-                if (presentationDefinitionJson != null) // if null, then it is IdToken
-                    put("presentation_definition", presentationDefinitionJson)
-                //                            put("presentation_definition_uri", response.presentationDefinitionUri)
-            }
-
-            val requestJwtHeader = mapOf(
-                JWTClaims.Header.keyID to RequestSigningCryptoProvider.signingKey.getPublicKey().getKeyId(),
-                JWTClaims.Header.type to "JWT"
             )
             context.respondRedirect("openid://?${session.authorizationRequest!!.toEbsiRequestObjectByReferenceHttpQueryString(SERVER_URL.let { "$it/openid4vc/request/${session.id}"})}")
         }
 
-            var responseQueryString = response.toHttpQueryString()
-            responseQueryString = responseQueryString.replace("client_id=", "client_id=$clientId")
-            responseQueryString = responseQueryString.replace("response_uri", "redirect_uri")
-            val presentationDefinitionUri = URLEncoder.encode(response.presentationDefinitionUri!!, "UTF-8")
-            responseQueryString = responseQueryString.replace("&presentation_definition_uri=", "")
-            responseQueryString = responseQueryString.replace(presentationDefinitionUri, "")
-            responseQueryString = responseQueryString.replace("response_type=vp_token", "response_type=$responseType")
-            responseQueryString = responseQueryString.plus("&scope=$scope")
-            responseQueryString = responseQueryString.plus("&request=$requestToken")
-
-            logger.info { "openid://?$responseQueryString" }
-            if (isRedirectResponse)
-                context.respondRedirect("openid://?$responseQueryString")
-            else
-                context.respond("openid://?$responseQueryString")
-        }
 
     }
 }
