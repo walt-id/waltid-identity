@@ -4,7 +4,7 @@ import id.walt.credentials.verification.CredentialWrapperValidatorPolicy
 import kotlinx.serialization.json.*
 
 abstract class RevocationPolicyMp : CredentialWrapperValidatorPolicy(
-    "revoked", "Verifies Credential Status"
+    "revoked_status_list", "Verifies Credential Status"
 )  {
     abstract override suspend fun verify(data: JsonElement, args: Any?, context: Map<String, Any>): Result<Any>
 }
