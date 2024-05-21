@@ -94,9 +94,10 @@ data class AuthorizationRequest(
         return mapOf(
             "client_id" to listOf(clientId),
             "response_type" to listOf(ResponseType.getResponseTypeString(responseType)),
+            "response_mode" to listOf(this.responseMode!!.name),
             "scope" to this.scope.toList(),
             "redirect_uri" to listOf(this.redirectUri!!),
-            "presentation_definition_url" to listOf(this.presentationDefinitionUri!!),
+            "presentation_definition_uri" to listOf(this.presentationDefinitionUri!!),
             "request_uri" to listOf(requestUri)
         )
     }
