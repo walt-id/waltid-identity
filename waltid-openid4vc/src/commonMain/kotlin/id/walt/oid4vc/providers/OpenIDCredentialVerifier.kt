@@ -89,7 +89,10 @@ abstract class OpenIDCredentialVerifier(val config: CredentialVerifierConfig) :
             presentationDefinitionUri = presentationDefinitionUri,
             presentationDefinition = when (presentationDefinitionUri) {
                 null -> presentationDefinition
-                else -> null
+                else -> when (useEbsiCTv3) { // some wallets support presentation_definition only, even ebsiconformancetest wallet
+                    true -> presentationDefinition
+                    else -> null
+                }
             },
             scope = when (useEbsiCTv3) {
                 true -> setOf("openid")
