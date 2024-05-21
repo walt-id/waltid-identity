@@ -130,16 +130,15 @@ object Verifier {
     ): PresentationVerificationResponse {
         val providedJws = vpTokenJwt.decodeJws() // usually VP
         val payload = providedJws.payload
-        val isVpToken = payload.contains("vp") // else is IdToken
+        val vpType = when (payload.contains("vp")) {
+            true -> payload.getW3CType()
+            else -> "" // else is IdToken
+        }
 
-        var verifiableCredentialJwts: List<String> = emptyList()
-        var vpType = ""
-
-        if (isVpToken) {
-            verifiableCredentialJwts = (payload["vp"]?.jsonObject?.get("verifiableCredential") ?: payload["verifiableCredential"]
-            ?: TODO("Provided data does not have `verifiableCredential` array.")).jsonArray.map { it.jsonPrimitive.content }
-
-            vpType = payload.getW3CType()
+        val verifiableCredentialJwts = when (payload.contains("vp")){
+            true -> (payload["vp"]?.jsonObject?.get("verifiableCredential") ?: payload["verifiableCredential"]
+                ?: TODO("Provided data does not have `verifiableCredential` array.")).jsonArray.map { it.jsonPrimitive.content }
+            else -> emptyList()
         }
 
         val results = ArrayList<PresentationResultEntry>()
@@ -168,13 +167,16 @@ object Verifier {
                     })
 
                 /* VP Policies */
-                if (isVpToken) {
-                    val vpIdx = addResultEntryFor(vpType)
-                    runPolicyRequests(vpIdx, vpTokenJwt, vpPolicies)
-                } else {
-                    val vpIdx = 0
-                    results.add(PresentationResultEntry(vpTokenJwt))
-                    runPolicyRequests(vpIdx, vpTokenJwt, vpPolicies)
+                when(payload.contains("vp")){
+                    true -> {
+                        val vpIdx = addResultEntryFor(vpType)
+                        runPolicyRequests(vpIdx, vpTokenJwt, vpPolicies)
+                    }
+                    else -> {
+                        val vpIdx = 0
+                        results.add(PresentationResultEntry(vpTokenJwt))
+                        runPolicyRequests(vpIdx, vpTokenJwt, vpPolicies)
+                    }
                 }
 
                 // VCs
