@@ -12,9 +12,12 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.http.*
+import kotlinx.datetime.Clock
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import kotlin.collections.set
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.days
 
 class VerificationUseCase(
     val http: HttpClient,
@@ -143,9 +146,27 @@ class VerificationUseCase(
             Result.success(it)
         } ?: Result.failure(error("Invalid id provided (expired?): $sessionId"))
 
+    fun JsonObject.addUpdateJsoObject(updateJsonObject: JsonObject): JsonObject {
+        return JsonObject(
+            toMutableMap()
+                .apply {
+                    updateJsonObject.forEach { (key, je) ->
+                        put(key, je)
+                    }
+                }
+        )
+    }
+
     suspend fun getSignedAuthorizationRequestObject(sessionId: String): Result<String> =
         OIDCVerifierService.getSession(sessionId)?.authorizationRequest?.let {
-            Result.success(RequestSigningCryptoProvider.signWithLocalKeyAndHeader(payload = it.toJSON(), headers = mapOf("typ" to "JWT", "kid" to RequestSigningCryptoProvider.signingKey.getPublicKey().getKeyId())))
+            val payload = it.toJSON().addUpdateJsoObject(
+                buildJsonObject {
+                    put("iss", it.clientId)
+                    put("aud", "")
+                    put("exp", (Clock.System.now() + Duration.parse(1.days.toString())).epochSeconds)
+                }
+            )
+            Result.success(RequestSigningCryptoProvider.signWithLocalKeyAndHeader(payload = payload, headers = mapOf("typ" to "JWT", "kid" to RequestSigningCryptoProvider.signingKey.getPublicKey().getKeyId())))
         } ?: Result.failure(error("Invalid id provided (expired?): $sessionId"))
 
 
