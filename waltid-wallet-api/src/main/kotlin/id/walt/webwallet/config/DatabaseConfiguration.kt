@@ -15,14 +15,30 @@ data class DatabaseConfiguration(
     val database: String
 ) : WalletConfig()
 
-//@Serializable
+@Serializable
 data class DatasourceJsonConfiguration(
     val hikariDataSource: JsonObject,
     val recreateDatabaseOnStart: Boolean = false
 ) : WalletConfig() {
 
     companion object {
-        private val log = KotlinLogging.logger {  }
+        private val log = KotlinLogging.logger { }
+        const val JdbcUrl = "jdbcUrl"
+        const val DriveClassName = "driverClassName"
+        const val Username = "username"
+        const val Password = "password"
+        const val TransactionIsolation = "transactionIsolation"
+        const val MaximumPoolSize = "maximumPoolSize"
+        const val MinimumIdle = "minimumIdle"
+        const val MaxLifetime = "maxLifetime"
+        const val AutoCommit = "autoCommit"
+    }
+
+    enum class DataSource(val value: String) {
+        JournalMode("journalMode"),
+        FullColumnNames("fullColumnNames");
+
+        fun fullName() = "dataSource.$value"
     }
 
     val jdbcUrl by lazy { hikariDataSource.jsonObject["jdbcUrl"]?.jsonPrimitive?.content }

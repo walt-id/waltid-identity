@@ -39,12 +39,12 @@ class E2EWalletTestLocal : E2EWalletTestBase() {
             WalletConfigManager.preloadConfig(
                 "db.sqlite", DatasourceJsonConfiguration(
                     hikariDataSource = buildJsonObject {
-                        put("jdbcUrl", "jdbc:sqlite:data/wallet.db")
-                        put("driverClassName", "org.sqlite.JDBC")
-                        put("username", "")
-                        put("password", "")
-                        put("transactionIsolation", "TRANSACTION_SERIALIZABLE")
-                        put("isAutoCommit", true)
+                        put(DatasourceJsonConfiguration.JdbcUrl, "jdbc:sqlite:data/wallet.db")
+                        put(DatasourceJsonConfiguration.DriveClassName, "org.sqlite.JDBC")
+                        put(DatasourceJsonConfiguration.Username, "")
+                        put(DatasourceJsonConfiguration.Password, "")
+                        put(DatasourceJsonConfiguration.TransactionIsolation, "TRANSACTION_SERIALIZABLE")
+                        put(DatasourceJsonConfiguration.AutoCommit, true)
                     },
                     recreateDatabaseOnStart = true
                 )
