@@ -10,7 +10,9 @@
                         <div class="min-w-0">
                             <div class="flex items-start gap-x-3">
                                 <p class="text-sm font-semibold leading-6 text-gray-900">{{ wallet.name }}</p>
-                                <p class="rounded-md whitespace-nowrap mt-0.5 px-1.5 py-0.5 text-xs font-medium ring-1 ring-inset">{{ wallet.permission }}</p>
+                                <p
+                                    class="rounded-md whitespace-nowrap mt-0.5 px-1.5 py-0.5 text-xs font-medium ring-1 ring-inset">
+                                    {{ wallet.permission }}</p>
                             </div>
                             <div class="mt-1 flex items-center gap-x-2 text-xs leading-5 text-gray-500">
                                 <p class="whitespace-nowrap">
@@ -25,10 +27,8 @@
                             </div>
                         </div>
                         <div class="flex flex-none items-center gap-x-4">
-                            <button
-                                @click="setWallet(wallet.id)"
-                                class="rounded-md bg-white px-2.5 py-1.5 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
-                            >
+                            <button @click="setWallet(wallet.id)"
+                                class="rounded-md bg-white px-2.5 py-1.5 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">
                                 View wallet
                             </button>
                         </div>
@@ -46,13 +46,17 @@ import LoadingIndicator from "~/components/loading/LoadingIndicator.vue";
 import CenterMain from "~/components/CenterMain.vue";
 import { listWallets } from "~/composables/accountWallet";
 
+const wallets = (await listWallets())?.value?.wallets;
+if (wallets) {
+    setWallet(wallets[0].id);
+    navigateTo(`/wallet/${wallets[0].id}`);
+}
+
 const config = useRuntimeConfig();
 
 useHead({
     title: "Wallet selection - walt.id",
 });
-
-const wallets = await listWallets();
 
 if (process.client) {
     //const worker = new Worker()
