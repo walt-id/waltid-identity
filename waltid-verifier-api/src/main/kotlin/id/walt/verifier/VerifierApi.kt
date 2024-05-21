@@ -173,6 +173,7 @@ fun Application.verfierApi() {
                             VerifierApiExamples.maxExample
                         )
                         example("Example with presentation definition policy", VerifierApiExamples.presentationDefinitionPolicy)
+                        example("Example with EBSI PDA1 Presentation Definition", VerifierApiExamples.EbsiVerifiablePDA1)
                     }
                 }
             }) {
@@ -370,7 +371,12 @@ fun Application.verfierApi() {
             call.respond(HttpStatusCode.OK, jwks)
         }
 
-        get("authorize", {tags= listOf("Ebsi") }) {
+        get("authorize", {
+            tags= listOf("Ebsi")
+            description = "Authorize endpoint of OAuth Server as defined in EBSI Conformance Testing specifications. \nResponse is a 302 redirect with VP_TOKEN or ID_TOKEN request. \n" +
+                    "Use the /oidc4vp/verify endpoint with header useEBSIv3=true to get an EBSI-compliant VP_TOKEN request without redirects."
+            })
+        {
             val params = call.parameters.toMap().toJsonObject()
 
             val stateParamAuthorizeReqEbsi = params["state"]?.jsonArray?.get(0)?.jsonPrimitive?.content
