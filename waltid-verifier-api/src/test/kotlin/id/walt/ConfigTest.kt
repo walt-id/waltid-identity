@@ -14,6 +14,6 @@ class ConfigTest {
   fun testConfig() {
     ConfigManager.loadConfigs(arrayOf())
     ConfigManager.getConfig<OIDCVerifierServiceConfig>()
-    assertEquals("verifier.portal.walt-test.cloud", OIDCVerifierService.config.clientIdMap[ClientIdScheme.X509SanDns])
+    assertEquals("verifier.potential.walt-test.cloud", OIDCVerifierService.config.clientIdMap[ClientIdScheme.X509SanDns])
   }
 }

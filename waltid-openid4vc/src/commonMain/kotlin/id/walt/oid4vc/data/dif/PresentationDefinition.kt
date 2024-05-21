@@ -3,13 +3,14 @@ package id.walt.oid4vc.data.dif
 import id.walt.oid4vc.data.JsonDataObject
 import id.walt.oid4vc.data.JsonDataObjectFactory
 import id.walt.oid4vc.data.JsonDataObjectSerializer
+import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 
 @Serializable
 data class PresentationDefinition(
-    val id: String = "1",
+    @EncodeDefault val id: String = "1",
     @SerialName("input_descriptors") @Serializable(InputDescriptorListSerializer::class) val inputDescriptors: List<InputDescriptor>,
     val name: String? = null,
     val purpose: String? = null,
