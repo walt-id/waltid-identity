@@ -33,6 +33,7 @@ abstract class OpenIDCredentialVerifier(val config: CredentialVerifierConfig) :
     open fun initializeAuthorization(
         presentationDefinition: PresentationDefinition,
         responseMode: ResponseMode = ResponseMode.fragment,
+        responseType: ResponseType? = ResponseType.VpToken,
         scope: Set<String> = setOf(),
         expiresIn: Duration = 60.seconds,
         sessionId: String? = null, // A calling party may provide a unique session Id
@@ -50,7 +51,7 @@ abstract class OpenIDCredentialVerifier(val config: CredentialVerifierConfig) :
         }
         val presentationDefinitionUri = preparePresentationDefinitionUri(presentationDefinition, session.id)
         val authReq = AuthorizationRequest(
-            responseType = setOf(ResponseType.VpToken),
+            responseType = setOf(responseType!!),
             clientId = when(config.clientIdScheme) {
                 ClientIdScheme.RedirectUri -> ""
                 else -> config.clientId

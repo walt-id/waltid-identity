@@ -4,6 +4,7 @@ import id.walt.credentials.verification.models.PolicyRequest
 import id.walt.credentials.verification.models.PolicyRequest.Companion.parsePolicyRequests
 import id.walt.credentials.verification.policies.JwtSignaturePolicy
 import id.walt.oid4vc.data.ResponseMode
+import id.walt.oid4vc.data.ResponseType
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.providers.PresentationSession
 import id.walt.oid4vc.responses.TokenResponse
@@ -25,6 +26,7 @@ class VerificationUseCase(
         requestCredentialsJson: JsonElement,
         presentationDefinitionJson: JsonElement?,
         responseMode: ResponseMode,
+        responseType: ResponseType? = ResponseType.VpToken,
         successRedirectUri: String?,
         errorRedirectUri: String?,
         statusCallbackUri: String?,
@@ -54,7 +56,7 @@ class VerificationUseCase(
         logger.debug { "Presentation definition: " + presentationDefinition.toJSON() }
 
         val session = OIDCVerifierService.initializeAuthorization(
-            presentationDefinition, responseMode = responseMode, sessionId = stateId, stateParamAuthorizeReqEbsi = stateParamAuthorizeReqEbsi, useEbsiCTv3 = useEbsiCTv3
+            presentationDefinition, responseMode = responseMode, responseType = responseType, sessionId = stateId, stateParamAuthorizeReqEbsi = stateParamAuthorizeReqEbsi, useEbsiCTv3 = useEbsiCTv3
         )
 
         val specificPolicies = requestCredentialsArr.filterIsInstance<JsonObject>().associate {
