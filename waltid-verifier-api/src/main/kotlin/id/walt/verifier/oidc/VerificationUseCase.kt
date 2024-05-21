@@ -65,11 +65,6 @@ class VerificationUseCase(
                 ?: throw IllegalArgumentException("No `policies` supplied, in `request_credentials`.")).jsonArray.parsePolicyRequests()
         }
 
-        logger.debug { "vpPolicies: $vpPolicies" }
-        logger.debug { "vcPolicies: $vcPolicies" }
-        logger.debug { "spPolicies: $specificPolicies" }
-        logger.debug { "stateParamAuthorizeReqEbsi: $stateParamAuthorizeReqEbsi" }
-
         OIDCVerifierService.sessionVerificationInfos[session.id] = OIDCVerifierService.SessionVerificationInformation(
             vpPolicies = vpPolicies,
             vcPolicies = vcPolicies,
