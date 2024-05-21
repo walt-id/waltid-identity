@@ -382,7 +382,7 @@ fun Application.verfierApi() {
                     add("signature")
                     add("expired")
                     add("not-before")
-                    add("revoked")
+                    add("revoked_status_list")
                 },
                 requestCredentialsJson = buildJsonArray {},
                 presentationDefinitionJson = when(scope.contains("openid ver_test:vp_token")){
