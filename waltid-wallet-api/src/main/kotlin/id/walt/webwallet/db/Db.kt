@@ -133,22 +133,22 @@ object Db {
     }
 
     private fun createHikariDataSource(json: JsonObject) = HikariDataSource(HikariConfig().apply {
-        jdbcUrl = JsonUtils.tryGetData(json, "jdbcUrl")!!.jsonPrimitive.content
+        jdbcUrl = JsonUtils.tryGetData(json, DatasourceJsonConfiguration.JdbcUrl)!!.jsonPrimitive.content
         driverClassName =
-            JsonUtils.tryGetData(json, "driverClassName")!!.jsonPrimitive.content
-        username = JsonUtils.tryGetData(json, "username")!!.jsonPrimitive.content
-        password = JsonUtils.tryGetData(json, "password")!!.jsonPrimitive.content
-        JsonUtils.tryGetData(json, "transactionIsolation")?.jsonPrimitive?.content?.let { transactionIsolation = it }
-        JsonUtils.tryGetData(json, "maximumPoolSize")?.jsonPrimitive?.content?.toIntOrNull()
+            JsonUtils.tryGetData(json, DatasourceJsonConfiguration.DriveClassName)!!.jsonPrimitive.content
+        username = JsonUtils.tryGetData(json, DatasourceJsonConfiguration.Username)!!.jsonPrimitive.content
+        password = JsonUtils.tryGetData(json, DatasourceJsonConfiguration.Password)!!.jsonPrimitive.content
+        JsonUtils.tryGetData(json, DatasourceJsonConfiguration.TransactionIsolation)?.jsonPrimitive?.content?.let { transactionIsolation = it }
+        JsonUtils.tryGetData(json, DatasourceJsonConfiguration.MaximumPoolSize)?.jsonPrimitive?.content?.toIntOrNull()
             ?.let { maximumPoolSize = it }
-        JsonUtils.tryGetData(json, "minimumIdle")?.jsonPrimitive?.content?.toIntOrNull()?.let { minimumIdle = it }
-        JsonUtils.tryGetData(json, "maxLifetime")?.jsonPrimitive?.content?.toLongOrNull()?.let { maxLifetime = it }
-        JsonUtils.tryGetData(json, "autoCommit")?.jsonPrimitive?.content?.toBoolean()?.let { isAutoCommit = it }
-        JsonUtils.tryGetData(json, "dataSource.journalMode")?.jsonPrimitive?.content?.let {
-            dataSourceProperties.setProperty("journalMode", it)
+        JsonUtils.tryGetData(json, DatasourceJsonConfiguration.MinimumIdle)?.jsonPrimitive?.content?.toIntOrNull()?.let { minimumIdle = it }
+        JsonUtils.tryGetData(json, DatasourceJsonConfiguration.MaxLifetime)?.jsonPrimitive?.content?.toLongOrNull()?.let { maxLifetime = it }
+        JsonUtils.tryGetData(json, DatasourceJsonConfiguration.AutoCommit)?.jsonPrimitive?.content?.toBoolean()?.let { isAutoCommit = it }
+        JsonUtils.tryGetData(json, DatasourceJsonConfiguration.DataSource.JournalMode.fullName())?.jsonPrimitive?.content?.let {
+            dataSourceProperties.setProperty(DatasourceJsonConfiguration.DataSource.JournalMode.value, it)
         }
-        JsonUtils.tryGetData(json, "dataSource.fullColumnNames")?.jsonPrimitive?.content?.let {
-            dataSourceProperties.setProperty("fullColumnNames", it)
+        JsonUtils.tryGetData(json, DatasourceJsonConfiguration.DataSource.FullColumnNames.fullName())?.jsonPrimitive?.content?.let {
+            dataSourceProperties.setProperty(DatasourceJsonConfiguration.DataSource.FullColumnNames.value, it)
         }
     })
 }
