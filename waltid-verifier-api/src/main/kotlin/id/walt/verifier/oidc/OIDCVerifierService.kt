@@ -78,11 +78,8 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
         val policies = sessionVerificationInfos[session.id]
             ?: throw IllegalArgumentException("Could not find policy listing for session: ${session.id}")
 
-        var vpToken: String
-        if (tokenResponse.idToken != null) {
-            vpToken = tokenResponse.idToken.toString()
-        } else {
-            vpToken = when (tokenResponse.vpToken) {
+        val vpToken = when(tokenResponse.idToken) {
+            null -> when (tokenResponse.vpToken) {
                 is JsonObject -> tokenResponse.vpToken.toString()
                 is JsonPrimitive -> tokenResponse.vpToken!!.jsonPrimitive.content
                 null -> {
@@ -91,6 +88,7 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
                 }
                 else -> throw IllegalArgumentException("Illegal tokenResponse.vpToken: ${tokenResponse.vpToken}")
             }
+            else ->tokenResponse.idToken.toString()
         }
 
         if (tokenResponse.vpToken is JsonObject) TODO("Token response is jsonobject - not yet handled")
