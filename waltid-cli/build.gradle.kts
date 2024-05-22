@@ -24,6 +24,14 @@ kotlin {
 }
 
 kotlin {
+    targets.configureEach {
+        compilations.configureEach {
+            compilerOptions.configure {
+                freeCompilerArgs.add("-Xexpect-actual-classes")
+            }
+        }
+    }
+
     jvm {
         compilations.all {
             kotlinOptions.jvmTarget = "15" // JVM got Ed25519 at version 15
@@ -43,14 +51,14 @@ kotlin {
                 api(project(":waltid-sdjwt"))
                 api(project(":waltid-openid4vc"))
 
-                implementation("org.jetbrains.kotlinx:kotlinx-io-core:0.3.2")
+                implementation("org.jetbrains.kotlinx:kotlinx-io-core:0.3.3")
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.0-RC.2")
                 implementation ("com.google.code.gson:gson:2.10.1")
 
                 // CLI
                 implementation("com.varabyte.kotter:kotter-jvm:1.1.2")
-                implementation("com.github.ajalt.mordant:mordant:2.3.0")
+                implementation("com.github.ajalt.mordant:mordant:2.6.0")
                 implementation("com.github.ajalt.clikt:clikt:4.2.2")
 
                 // Coroutines

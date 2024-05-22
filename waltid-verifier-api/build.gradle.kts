@@ -14,7 +14,7 @@ plugins {
 
     id("io.ktor.plugin") version "2.3.8" // Versions.KTOR_VERSION
     id("org.owasp.dependencycheck") version "9.1.0"
-    id("com.github.jk1.dependency-license-report") version "2.5"
+    id("com.github.jk1.dependency-license-report") version "2.7"
     application
     `maven-publish`
 
@@ -178,7 +178,9 @@ publishing {
 
     repositories {
         maven {
-            url = uri("https://maven.waltid.dev/releases")
+            val releasesRepoUrl = uri("https://maven.waltid.dev/releases")
+            val snapshotsRepoUrl = uri("https://maven.waltid.dev/snapshots")
+            url = uri(if (version.toString().endsWith("SNAPSHOT")) snapshotsRepoUrl else releasesRepoUrl)
             val envUsername = System.getenv("MAVEN_USERNAME")
             val envPassword = System.getenv("MAVEN_PASSWORD")
 

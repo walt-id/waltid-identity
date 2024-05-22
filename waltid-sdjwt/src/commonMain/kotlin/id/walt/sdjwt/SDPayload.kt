@@ -14,6 +14,7 @@ import kotlin.js.JsExport
  * @param undisclosedPayload  Undisclosed payload JSON object, as contained in the JWT body
  * @param digestedDisclosures Map of digests to parsed disclosures, which are appended to the JWT token
  */
+@Suppress("NON_EXPORTABLE_TYPE")
 @OptIn(ExperimentalJsExport::class)
 @JsExport
 data class SDPayload internal constructor(

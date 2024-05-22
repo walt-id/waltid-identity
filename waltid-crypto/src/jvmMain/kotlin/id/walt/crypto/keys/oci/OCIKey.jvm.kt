@@ -22,12 +22,18 @@ import id.walt.crypto.utils.JvmEccUtils
 import id.walt.crypto.utils.JwsUtils.jwsAlg
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.util.*
+import kotlinx.coroutines.delay
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 import kotlinx.serialization.json.*
 import org.kotlincrypto.hash.sha2.SHA256
-import java.lang.Thread.sleep
+import java.time.Duration
+import kotlin.time.ExperimentalTime
+import kotlin.time.measureTime
+import kotlin.time.toJavaDuration
+import kotlin.time.toKotlinDuration
+
 
 private val log = KotlinLogging.logger { }
 
@@ -228,35 +234,37 @@ actual class OCIKey actual constructor(
             else -> throw IllegalArgumentException("Not supported: $type")
         }
 
+        @OptIn(ExperimentalTime::class)
         actual suspend fun generateKey(config: OCIsdkMetadata): OCIKey {
-            val provider = InstancePrincipalsAuthenticationDetailsProvider.builder().build()
-            val kmsVaultClient = KmsVaultClient.builder().build(provider)
-            val vault = getVault(kmsVaultClient, config.vaultId)
-            val kmsManagementClient = KmsManagementClient.builder().endpoint(vault.managementEndpoint).build(provider)
+            return retry {
+                val provider = InstancePrincipalsAuthenticationDetailsProvider.builder().build()
+                val kmsVaultClient = KmsVaultClient.builder().build(provider)
+                val vault = getVault(kmsVaultClient, config.vaultId)
+                val kmsManagementClient =
+                    KmsManagementClient.builder().endpoint(vault.managementEndpoint).build(provider)
 
 
-            val createKeyDetails =
-                CreateKeyDetails.builder().keyShape(TEST_KEY_SHAPE)
-                    .protectionMode(CreateKeyDetails.ProtectionMode.Software)
-                    .compartmentId(config.compartmentId).displayName("WaltKey").build()
-            val createKeyRequest = CreateKeyRequest.builder().createKeyDetails(createKeyDetails).build()
-            val response = kmsManagementClient.createKey(createKeyRequest)
+                val createKeyDetails =
+                    CreateKeyDetails.builder().keyShape(TEST_KEY_SHAPE)
+                        .protectionMode(CreateKeyDetails.ProtectionMode.Software)
+                        .compartmentId(config.compartmentId).displayName("WaltKey").build()
+                val createKeyRequest = CreateKeyRequest.builder().createKeyDetails(createKeyDetails).build()
+                val response = kmsManagementClient.createKey(createKeyRequest)
 
-            val keyId = response.key.id
+                val keyId = response.key.id
 
-            val keyVersionId = response.key.currentKeyVersion
+                val keyVersionId = response.key.currentKeyVersion
 
-            sleep(2000)
-
-            val publicKey = getOCIPublicKey(kmsManagementClient, keyVersionId, keyId)
+                val publicKey = getOCIPublicKey(kmsManagementClient, keyVersionId, keyId)
 
 
-            return OCIKey(
-                keyId,
-                config,
-                publicKey.exportJWK(),
-                ociKeyToKeyTypeMapping(response.key.keyShape.algorithm.toString().uppercase())
-            )
+                OCIKey(
+                    keyId,
+                    config,
+                    publicKey.exportJWK(),
+                    ociKeyToKeyTypeMapping(response.key.keyShape.algorithm.toString().uppercase())
+                )
+            }
         }
 
 
@@ -287,4 +295,32 @@ actual class OCIKey actual constructor(
 
 }
 
+
+@ExperimentalTime
+private suspend fun <T> retry(
+    maxDuration: Duration = Duration.ofSeconds(2),
+    retryInterval: Duration = Duration.ofMillis(100),
+    block: suspend () -> T
+): T {
+    var result: Result<T>
+    var totalDuration = Duration.ZERO
+
+    while (totalDuration < maxDuration) {
+        val elapsedTime = measureTime {
+            result = runCatching { block() }
+        }
+
+        if (result.isSuccess) {
+            println("Success after $elapsedTime: ${result.getOrThrow()}")
+            return result.getOrThrow()
+        } else {
+            totalDuration += elapsedTime.toJavaDuration()
+            if (totalDuration >= maxDuration) {
+                throw IllegalStateException("Failed after total duration of $totalDuration: ${result.exceptionOrNull()?.message}")
+            }
+            delay(retryInterval.toKotlinDuration())
+        }
+    }
+    throw IllegalStateException("Failed after total duration of $totalDuration: Retry time limit exceeded.")
+}
 

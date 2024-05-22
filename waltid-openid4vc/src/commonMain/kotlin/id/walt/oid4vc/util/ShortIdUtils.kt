@@ -6,11 +6,5 @@ object ShortIdUtils {
 
     private val squids = Sqids()
 
-    fun randomSessionId(): String {
-        return squids.encode(
-            listOf(
-                SecureRandom.nextLong(0, Long.MAX_VALUE)
-            )
-        )
-    }
+    fun randomSessionId(): String = squids.encode(listOf(SecureRandom.nextLong(0, Long.MAX_VALUE)))
 }

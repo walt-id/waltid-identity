@@ -22,6 +22,7 @@ external interface `T$0` {
         set(value) = definedExternally
 }
 
+@Suppress("DEPRECATION")
 external interface JWK {
     var alg: String?
         get() = definedExternally
