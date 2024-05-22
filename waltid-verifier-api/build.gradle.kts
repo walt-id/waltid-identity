@@ -90,8 +90,11 @@ dependencies {
 
     // Logging
     implementation("io.github.oshai:kotlin-logging-jvm:6.0.9")
-    implementation("org.slf4j:slf4j-simple:2.0.13")
-    implementation("org.slf4j:jul-to-slf4j:2.0.12")
+//    implementation("org.slf4j:slf4j-simple:2.0.13")
+    implementation("org.slf4j:jul-to-slf4j:2.0.13")
+    implementation("io.klogging:klogging-jvm:0.5.13")
+    implementation("io.klogging:slf4j-klogging:0.5.13")
+
     implementation("io.ktor:ktor-client-okhttp-jvm:${Versions.KTOR_VERSION}")
 
     // Test

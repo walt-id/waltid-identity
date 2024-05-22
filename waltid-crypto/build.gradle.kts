@@ -115,7 +115,7 @@ kotlin {
                 implementation("io.ktor:ktor-client-cio:2.3.11")
 
                 // Logging
-                implementation("org.slf4j:slf4j-simple:2.0.13")
+                // implementation("org.slf4j:slf4j-simple:2.0.13")
 
                 // Coroutines
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:1.8.0")
@@ -132,7 +132,7 @@ kotlin {
         val jvmTest by getting {
             dependencies {
                 // Logging
-//                implementation("org.slf4j:slf4j-simple:2.0.13")
+                implementation("org.slf4j:slf4j-simple:2.0.13")
 
                 // Test
                 implementation(kotlin("test"))
