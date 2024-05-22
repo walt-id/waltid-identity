@@ -3,15 +3,18 @@ package id.walt.issuer
 import id.walt.credentials.vc.vcs.W3CVC
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeySerialization
+import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.did.dids.DidService
 import id.walt.issuer.IssuanceExamples.batchExample
 import id.walt.issuer.IssuanceExamples.issuerOnboardingRequestDefaultExample
 import id.walt.issuer.IssuanceExamples.issuerOnboardingRequestDidWebExample
 import id.walt.issuer.IssuanceExamples.issuerOnboardingRequestOciExample
+import id.walt.issuer.IssuanceExamples.issuerOnboardingRequestOciRestApiExample
 import id.walt.issuer.IssuanceExamples.issuerOnboardingRequestTseExample
 import id.walt.issuer.IssuanceExamples.issuerOnboardingResponseDefaultExample
 import id.walt.issuer.IssuanceExamples.issuerOnboardingResponseDidWebExample
 import id.walt.issuer.IssuanceExamples.issuerOnboardingResponseOciExample
+import id.walt.issuer.IssuanceExamples.issuerOnboardingResponseOciRestApiExample
 import id.walt.issuer.IssuanceExamples.issuerOnboardingResponseTseExample
 import id.walt.issuer.IssuanceExamples.openBadgeCredentialExampleJsonString
 import id.walt.issuer.IssuanceExamples.sdJwtExample
@@ -45,9 +48,15 @@ suspend fun createCredentialOfferUri(issuanceRequests: List<IssuanceRequest>): S
         credentialOfferBuilder = credentialOfferBuilder, expiresIn = 5.minutes, allowPreAuthorized = true
     )
     OidcApi.setIssuanceDataForIssuanceId(issuanceSession.id, issuanceRequests.map {
-        CIProvider.IssuanceSessionData(KeySerialization.deserializeKey(it.issuerKey)
-            .onFailure { throw IllegalArgumentException("Invalid key was supplied, error occurred is: $it") }
-            .getOrThrow(), it.issuerDid, it)
+        val key = if (it.issuerKey["type"].toJsonElement().jsonPrimitive.content == "jwk") {
+            KeySerialization.deserializeJWTKey(it.issuerKey).getOrThrow()
+        } else {
+            KeySerialization.deserializeKey(it.issuerKey).getOrThrow()
+        }
+
+        CIProvider.IssuanceSessionData(
+            key, it.issuerDid, it
+        )
     })  // TODO: Hack as this is non stateless because of oidc4vc lib API
 
     logger.debug { "issuanceSession: $issuanceSession" }
@@ -87,6 +96,10 @@ fun Application.issuerApi() {
                             "did:jwk + OCI key (Oracle Cloud Infrastructure - Secp256r1)",
                             issuerOnboardingRequestOciExample
                         )
+                        example(
+                            "did:jwk + OCI REST API key  (Oracle Cloud Infrastructure - Secp256r1)",
+                            issuerOnboardingRequestOciRestApiExample
+                        )
                         required = true
                     }
                 }
@@ -110,6 +123,10 @@ fun Application.issuerApi() {
                             example(
                                 "Remote OCI Secp256r1 key + did:jwk",
                                 issuerOnboardingResponseOciExample,
+                            )
+                            example(
+                                "Remote OCI REST API Secp256r1 key + did:jwk",
+                                issuerOnboardingResponseOciRestApiExample,
                             )
                         }
                     }

@@ -9,10 +9,10 @@ import kotlin.js.JsExport
 @JsExport
 object Base64Utils {
 
-    fun String.base64toBase64Url() = this.replace("+", "-").replace("/", "_").dropLastWhile { it == '=' }
+    fun String.base64toBase64Url() = this.replace("+", "-").replace("/", "_").trimEnd('=')
     fun String.base64UrlToBase64() = this.replace("-", "+").replace("_", "/")
 
-    fun ByteArray.encodeToBase64Url() = Base64.UrlSafe.encode(this).dropLastWhile { it == '=' }
+    fun ByteArray.encodeToBase64Url() = Base64.UrlSafe.encode(this).trimEnd('=')
 
     fun String.base64UrlDecode() = Base64.UrlSafe.decode(this)
 

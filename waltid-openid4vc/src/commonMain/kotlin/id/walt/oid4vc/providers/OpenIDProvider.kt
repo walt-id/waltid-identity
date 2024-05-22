@@ -232,7 +232,8 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
 
     open fun processImplicitFlowAuthorization(authorizationRequest: AuthorizationRequest): TokenResponse {
         println("> processImplicitFlowAuthorization for $authorizationRequest")
-        if (!authorizationRequest.responseType.contains(ResponseType.Token) && !authorizationRequest.responseType.contains(ResponseType.VpToken))
+        if (!authorizationRequest.responseType.contains(ResponseType.Token) && !authorizationRequest.responseType.contains(ResponseType.VpToken)
+            && !authorizationRequest.responseType.contains(ResponseType.IdToken))
             throw AuthorizationError(
                 authorizationRequest,
                 AuthorizationErrorCode.invalid_request,

@@ -6,7 +6,7 @@ import kotlinx.serialization.json.JsonObject
 @Serializable
 data class KeyGenerationRequest(
     val backend: String = "jwk",
-    var config: JsonObject? = null,
-
     val keyType: KeyType = KeyType.Ed25519,
+
+    var config: JsonObject? = null,
 )

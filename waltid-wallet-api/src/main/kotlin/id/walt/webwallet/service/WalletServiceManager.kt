@@ -20,9 +20,9 @@ import id.walt.webwallet.service.credentials.status.fetch.StatusListCredentialFe
 import id.walt.webwallet.service.dids.DidResolverService
 import id.walt.webwallet.service.dids.DidsService
 import id.walt.webwallet.service.endpoint.EntraServiceEndpointProvider
+import id.walt.webwallet.service.entity.DefaultNameResolutionService
 import id.walt.webwallet.service.events.EventService
 import id.walt.webwallet.service.exchange.IssuanceService
-import id.walt.webwallet.service.entity.DefaultNameResolutionService
 import id.walt.webwallet.service.issuers.IssuersService
 import id.walt.webwallet.service.notifications.NotificationService
 import id.walt.webwallet.service.settings.SettingsService
@@ -30,6 +30,7 @@ import id.walt.webwallet.service.trust.DefaultTrustValidationService
 import id.walt.webwallet.usecase.claim.ExplicitClaimStrategy
 import id.walt.webwallet.usecase.claim.SilentClaimStrategy
 import id.walt.webwallet.usecase.credential.CredentialStatusUseCase
+import id.walt.webwallet.usecase.entity.EntityNameResolutionUseCase
 import id.walt.webwallet.usecase.event.EventFilterUseCase
 import id.walt.webwallet.usecase.event.EventLogUseCase
 import id.walt.webwallet.usecase.exchange.MatchPresentationDefinitionCredentialsUseCase
@@ -39,7 +40,6 @@ import id.walt.webwallet.usecase.exchange.strategies.DescriptorNoMatchPresentati
 import id.walt.webwallet.usecase.exchange.strategies.DescriptorPresentationDefinitionMatchStrategy
 import id.walt.webwallet.usecase.exchange.strategies.FilterNoMatchPresentationDefinitionMatchStrategy
 import id.walt.webwallet.usecase.exchange.strategies.FilterPresentationDefinitionMatchStrategy
-import id.walt.webwallet.usecase.entity.EntityNameResolutionUseCase
 import id.walt.webwallet.usecase.issuer.IssuerUseCaseImpl
 import id.walt.webwallet.usecase.notification.NotificationDataFormatter
 import id.walt.webwallet.usecase.notification.NotificationDispatchUseCase

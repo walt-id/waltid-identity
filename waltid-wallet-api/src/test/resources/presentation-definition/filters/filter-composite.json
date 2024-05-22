@@ -1,0 +1,26 @@
+[
+    {
+        "credential": "VerifiableCredential#1",
+        "filters": [
+            {
+                "path": [
+                    "credentialSubject.firstName"
+                ],
+                "type": "string",
+                "pattern": "/^name$/gi"
+            }
+        ]
+    },
+    {
+        "credential": "VerifiableCredential#2",
+        "filters": [
+            {
+                "path": [
+                    "type"
+                ],
+                "type": "string",
+                "pattern": "VerifiableCredential#2"
+            }
+        ]
+    }
+]

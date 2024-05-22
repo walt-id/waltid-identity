@@ -12,6 +12,7 @@ import kotlin.coroutines.suspendCoroutine
  * Implemented in platform specific modules
  * @see JWTCryptoProvider
  */
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 open class SimpleAsyncJWTCryptoProvider(
     private val algorithm: String,
