@@ -27,8 +27,8 @@ fun main() {
     val privateKey = decodedKeyPair.take(32).toByteArray()
     val publicKey = decodedKeyPair.drop(32).toByteArray()
 
-    val privateKeyBase64Url = Base64.UrlSafe.encode(privateKey).dropLastWhile { it == '=' }
-    val publicKeyBase64Url = Base64.UrlSafe.encode(publicKey).dropLastWhile { it == '=' }
+    val privateKeyBase64Url = Base64.UrlSafe.encode(privateKey).trimEnd('=')
+    val publicKeyBase64Url = Base64.UrlSafe.encode(publicKey).trimEnd('=')
 
     val jwk =
         """{"kty":"OKP","d":"$privateKeyBase64Url","use":"sig","crv":"Ed25519","kid":"k1","x":"$publicKeyBase64Url","alg":"EdDSA"}""".trimIndent()

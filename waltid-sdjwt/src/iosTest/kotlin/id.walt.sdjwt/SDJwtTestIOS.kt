@@ -1,16 +1,11 @@
 package id.walt.sdjwt
 
-import io.kotest.assertions.json.shouldMatchJson
-import io.kotest.matchers.collections.shouldHaveSize
-import io.kotest.matchers.maps.shouldContainKey
-import io.kotest.matchers.maps.shouldNotContainKey
-import io.kotest.matchers.shouldBe
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
-import kotlin.test.Test
+import kotlin.test.*
 
 class SDJwtTestIOS {
     private val sharedSecret = "ef23f749-7238-481a-815c-f0c2157dfa8e"
@@ -41,14 +36,14 @@ class SDJwtTestIOS {
         // Print SD-JWT
         println(sdJwt)
 
-        sdJwt.undisclosedPayload shouldNotContainKey "sub"
-        sdJwt.undisclosedPayload shouldContainKey SDJwt.DIGESTS_KEY
-        sdJwt.undisclosedPayload shouldContainKey "aud"
-        sdJwt.disclosures shouldHaveSize 1
-        sdJwt.digestedDisclosures[sdJwt.undisclosedPayload[SDJwt.DIGESTS_KEY]!!.jsonArray[0].jsonPrimitive.content]!!.key shouldBe "sub"
-        sdJwt.fullPayload.toString() shouldMatchJson originalClaimsSet.toString()
+        assertFalse(actual = sdJwt.undisclosedPayload.containsKey("sub"))
+        assertContains(map = sdJwt.undisclosedPayload, key = SDJwt.DIGESTS_KEY)
+        assertContains(map = sdJwt.undisclosedPayload, key = "aud")
+        assertEquals(expected = 1, actual = sdJwt.disclosures.size)
+        assertEquals(expected = "sub", actual = sdJwt.digestedDisclosures[sdJwt.undisclosedPayload[SDJwt.DIGESTS_KEY]!!.jsonArray[0].jsonPrimitive.content]!!.key)
+        assertEquals(expected = originalClaimsSet, actual = Json.parseToJsonElement(sdJwt.fullPayload.toString()).jsonObject)
 
-        sdJwt.verify(cryptoProvider).verified shouldBe true
+        assertTrue(actual = assersdJwt.verify(cryptoProvider).verified)
     }
 
     @Test

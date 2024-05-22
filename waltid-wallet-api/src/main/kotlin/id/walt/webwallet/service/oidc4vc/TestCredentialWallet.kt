@@ -70,27 +70,22 @@ class TestCredentialWallet(
 
     override fun signToken(target: TokenTarget, payload: JsonObject, header: JsonObject?, keyId: String?, privKey: Key?): String {
         fun debugStateMsg() = "(target: $target, payload: $payload, header: $header, keyId: $keyId)"
-        println("SIGNING TOKEN: ${debugStateMsg()}")
 
         keyId ?: throw IllegalArgumentException("No keyId provided for signToken ${debugStateMsg()}")
 
 //        val key = runBlocking { walletService.getKeyByDid(keyId) }
         val key = runBlocking {
             DidService.resolveToKey(keyId).getOrThrow().let { KeysService.get(it.getKeyId()) }
-                ?.let { KeySerialization.deserializeKey(it.document).getOrThrow() }
+                ?.let {
+                    KeySerialization.deserializeKey(it.document).getOrThrow()
+                }
         } ?: error("Failed to retrieve the key")
-        println("KEY FOR SIGNING: $key")
 
         return runBlocking {
             val authKeyId = resolveDidAuthentication(did)
 
             val payloadToSign = Json.encodeToString(payload).encodeToByteArray()
             key.signJws(payloadToSign, mapOf("typ" to "JWT", "kid" to authKeyId))
-                .also { signed ->
-                    key.getPublicKey().verifyJws(signed).also {
-                        println("RE-VERIFICATION: $it")
-                    }
-                }
         }
 
         //JwtService.getService().sign(payload, keyId)

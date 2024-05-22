@@ -14,7 +14,7 @@ plugins {
 
     id("io.ktor.plugin") version "2.3.8" // Versions.KTOR_VERSION
     id("org.owasp.dependencycheck") version "9.1.0"
-    id("com.github.jk1.dependency-license-report") version "2.5"
+    id("com.github.jk1.dependency-license-report") version "2.7"
     application
     `maven-publish`
 
@@ -57,7 +57,7 @@ dependencies {
     implementation("io.ktor:ktor-server-cio-jvm:${Versions.KTOR_VERSION}")
 
     // Ktor server external libs
-    implementation("io.github.smiley4:ktor-swagger-ui:2.7.4")
+    implementation("io.github.smiley4:ktor-swagger-ui:2.8.0")
 
     // Ktor client
     implementation("io.ktor:ktor-client-core-jvm:${Versions.KTOR_VERSION}")
@@ -90,7 +90,7 @@ dependencies {
 
     // Logging
     implementation("io.github.oshai:kotlin-logging-jvm:6.0.9")
-    implementation("org.slf4j:slf4j-simple:2.0.12")
+    implementation("org.slf4j:slf4j-simple:2.0.13")
     implementation("org.slf4j:jul-to-slf4j:2.0.12")
     implementation("io.ktor:ktor-client-okhttp-jvm:${Versions.KTOR_VERSION}")
 
@@ -118,7 +118,9 @@ dependencies {
     // implementation("id.walt:waltid-ssikit2:1.0.8-SNAPSHOT")
     // implementation("id.walt:core-crypto:1.0.7-SNAPSHOT")
 }
-
+tasks.withType<org.gradle.api.tasks.bundling.Zip> {
+    isZip64 = true
+}
 tasks.withType<Test> {
     useJUnitPlatform()
 
@@ -171,7 +173,9 @@ publishing {
 
     repositories {
         maven {
-            url = uri("https://maven.waltid.dev/releases")
+            val releasesRepoUrl = uri("https://maven.waltid.dev/releases")
+            val snapshotsRepoUrl = uri("https://maven.waltid.dev/snapshots")
+            url = uri(if (version.toString().endsWith("SNAPSHOT")) snapshotsRepoUrl else releasesRepoUrl)
             val envUsername = System.getenv("MAVEN_USERNAME")
             val envPassword = System.getenv("MAVEN_PASSWORD")
 

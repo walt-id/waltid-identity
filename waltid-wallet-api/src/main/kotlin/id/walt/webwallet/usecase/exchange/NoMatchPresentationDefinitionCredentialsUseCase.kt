@@ -10,15 +10,22 @@ import kotlinx.uuid.UUID
 
 class NoMatchPresentationDefinitionCredentialsUseCase(
     private val credentialService: CredentialsService,
-    private vararg val matchStrategies: PresentationDefinitionMatchStrategy<List<TypeFilter>>
+    private vararg val matchStrategies: PresentationDefinitionMatchStrategy<List<FilterData>>
 ) {
     private val logger = KotlinLogging.logger { }
 
-    fun find(wallet: UUID, presentationDefinition: PresentationDefinition): List<TypeFilter> {
+    fun find(wallet: UUID, presentationDefinition: PresentationDefinition): List<FilterData> {
         val credentialList = credentialService.list(wallet, CredentialFilterObject.default)
         logger.debug { "WalletCredential list is: ${credentialList.map { it.parsedDocument?.get("type")!!.jsonArray }}" }
-        return matchStrategies.fold<PresentationDefinitionMatchStrategy<List<TypeFilter>>, List<TypeFilter>>(listOf()) { acc, i ->
+        return matchStrategies.fold<PresentationDefinitionMatchStrategy<List<FilterData>>, List<FilterData>>(listOf()) { acc, i ->
             acc.plus(i.match(credentialList, presentationDefinition))
-        }.distinct()
+        }.groupBy {
+            it.credential
+        }.map {
+            FilterData(
+                credential = it.key,
+                filters = it.value.map { it.filters }.flatten()
+            )
+        }
     }
 }

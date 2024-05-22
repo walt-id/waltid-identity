@@ -10,6 +10,7 @@ class NotificationDataFormatter(
     private val issuerNameResolutionUseCase: EntityNameResolutionUseCase,
 ) {
     private val message = "%s has issued a new credential to you (%s)"//TODO: make configurable
+    private val versionRegex = "(V\\d+)\\)$".toRegex()
 
     suspend fun format(notification: Notification) = when (notification.data) {
         is CredentialIssuanceData -> NotificationDTO(
@@ -28,6 +29,6 @@ class NotificationDataFormatter(
 
     private suspend fun credentialIssuanceDetails(data: CredentialIssuanceData) =
         issuerNameResolutionUseCase.resolve(data.issuer).let {
-            String.format(message, it, data.credentialType)
+            versionRegex.replace(String.format(message, it, data.credentialType), ")")
         }
 }

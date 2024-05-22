@@ -6,7 +6,9 @@ import com.nimbusds.jose.JWSObject
 import com.nimbusds.jose.Payload
 import com.nimbusds.jose.crypto.MACSigner
 import com.nimbusds.jose.crypto.MACVerifier
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.JsonUtils.toJsonElement
+import id.walt.oid4vc.definitions.JWTClaims
 import id.walt.webwallet.config.AuthConfig
 import id.walt.webwallet.config.ConfigManager
 import id.walt.webwallet.config.WebConfig
@@ -37,13 +39,18 @@ import io.ktor.server.plugins.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.sessions.*
-import io.ktor.util.*
 import io.ktor.util.pipeline.*
+import kotlinx.datetime.Clock
+import kotlinx.datetime.toJavaInstant
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import kotlinx.uuid.UUID
+import kotlinx.uuid.generateUUID
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
+import java.time.temporal.ChronoUnit
 import kotlin.collections.set
 import kotlin.time.Duration.Companion.days
 
@@ -52,7 +59,7 @@ private val logger = KotlinLogging.logger {}
 @Suppress("ArrayInDataClass")
 data class ByteLoginRequest(val username: String, val password: ByteArray) {
     constructor(
-        loginRequest: EmailAccountRequest
+        loginRequest: EmailAccountRequest,
     ) : this(loginRequest.email, loginRequest.password.toByteArray())
 
     override fun toString() = "[LOGIN REQUEST FOR: $username]"
@@ -68,6 +75,10 @@ object AuthKeys {
     val signKey: ByteArray = config.signKey.encodeToByteArray()
 
     val tokenKey: ByteArray = config.tokenKey.encodeToByteArray()
+    val issTokenClaim: String = config.issTokenClaim
+    val audTokenClaim: String? = config.audTokenClaim
+    val tokenLifetime: Long = config.tokenLifetime.toLongOrNull() ?: 1
+
 }
 
 fun Application.configureSecurity() {
@@ -289,10 +300,13 @@ fun Application.auth() {
 
             authenticate("auth-session", "auth-bearer", "auth-bearer-alternative") {
                 get("user-info", { summary = "Return user ID if logged in" }) {
-                    getUsersSessionToken()?.split('.')?.getOrNull(1)?.run {
-                        val uuid = this.decodeBase64String()
+                    getUsersSessionToken()?.run {
+                        val jwsObject = JWSObject.parse(this)
+                        val uuid =
+                            Json.parseToJsonElement(jwsObject.payload.toString()).jsonObject["sub"]?.jsonPrimitive?.content.toString()
                         call.respond(AccountsService.get(UUID(uuid)))
-                    } ?: call.respond(HttpStatusCode.BadRequest)
+                    }
+                        ?: call.respond(HttpStatusCode.BadRequest)
                 }
                 get("session", { summary = "Return session ID if logged in" }) {
                     val token = getUsersSessionToken() ?: throw UnauthorizedException("Invalid session")
@@ -448,31 +462,59 @@ fun Application.auth() {
  * @param token JWS token provided by user
  * @return user/account ID if token is valid
  */
-fun verifyToken(token: String): Result<String> {
+suspend fun verifyToken(token: String): Result<String> {
     val jwsObject = JWSObject.parse(token)
-    val verifier = MACVerifier(AuthKeys.tokenKey)
 
-    return runCatching { jwsObject.verify(verifier) }
-        .mapCatching { valid -> if (valid) jwsObject.payload.toString() else throw IllegalArgumentException("Token is not valid.") }
+    val key = JWKKey.importJWK(AuthKeys.tokenKey.decodeToString()).getOrNull()
+    if (key == null) {
+        // if (AuthKeys.tokenSignAlg == "HS256") {
+        val verifier = MACVerifier(AuthKeys.tokenKey)
+        return runCatching { jwsObject.verify(verifier) }
+            .mapCatching { valid ->
+                if (valid) Json.parseToJsonElement(jwsObject.payload.toString()).jsonObject["sub"]?.jsonPrimitive?.content.toString() else throw IllegalArgumentException(
+                    "Token is not valid."
+                )
+            }
+    } else {
+        // if (AuthKeys.tokenSignAlg == "RS256"){
+        val verified = JWKKey.importJWK(AuthKeys.tokenKey.decodeToString()).getOrThrow().verifyJws(token)
+        return runCatching { verified }
+            .mapCatching {
+                if (verified.isSuccess) {
+                    Json.parseToJsonElement(jwsObject.payload.toString()).jsonObject["sub"]?.jsonPrimitive?.content.toString()
+                } else throw IllegalArgumentException("Token is not valid.")
+            }
+    }
+
 }
+
 
 suspend fun PipelineContext<Unit, ApplicationCall>.doLogin() {
     val reqBody = loginRequestJson.decodeFromString<AccountRequest>(call.receive())
-    AccountsService.authenticate("", reqBody)
-        .onSuccess { // FIXME -> TENANT HERE
-            // security token mapping was here
-            val token = JWSObject(JWSHeader(JWSAlgorithm.HS256), Payload(it.id.toString())).apply {
-                sign(MACSigner(AuthKeys.tokenKey))
-            }.serialize()
-
-
-            call.sessions.set(LoginTokenSession(token))
-            call.response.status(HttpStatusCode.OK)
-            call.respond(
-                Json.encodeToJsonElement(it).jsonObject.minus("type").plus(Pair("token", token.toJsonElement()))
+    AccountsService.authenticate("", reqBody).onSuccess {
+        val now = Clock.System.now().toJavaInstant()
+        val tokenPayload = Json.encodeToString(
+            AuthTokenPayload(
+                jti = UUID.generateUUID().toString(),
+                sub = it.id.toString(),
+                iss = AuthKeys.issTokenClaim,
+                aud = AuthKeys.audTokenClaim.takeIf { !it.isNullOrEmpty() }
+                    ?: let { call.request.headers["Origin"] ?: "n/a" },
+                iat = now.epochSecond,
+                nbf = now.epochSecond,
+                exp = now.plus(AuthKeys.tokenLifetime, ChronoUnit.DAYS).epochSecond,
             )
-        }
-        .onFailure { call.respond(HttpStatusCode.BadRequest, it.localizedMessage) }
+        )
+
+        val token = JWKKey.importJWK(AuthKeys.tokenKey.decodeToString()).getOrNull()?.let {
+            createRsaToken(it, tokenPayload)
+        } ?: createHS256Token(tokenPayload)
+        call.sessions.set(LoginTokenSession(token))
+        call.response.status(HttpStatusCode.OK)
+        call.respond(
+            Json.encodeToJsonElement(it).jsonObject.minus("type").plus(Pair("token", token.toJsonElement()))
+        )
+    }.onFailure { call.respond(HttpStatusCode.BadRequest, it.localizedMessage) }
 }
 
 private fun PipelineContext<Unit, ApplicationCall>.clearUserSession() {
@@ -501,8 +543,10 @@ fun PipelineContext<Unit, ApplicationCall>.getUserUUID() =
 fun PipelineContext<Unit, ApplicationCall>.getWalletId() =
     runCatching {
         UUID(call.parameters["wallet"] ?: throw IllegalArgumentException("No wallet ID provided"))
-    }
-        .getOrElse { throw IllegalArgumentException("Invalid wallet ID provided: ${it.message}") }
+    }.getOrElse { throw IllegalArgumentException("Invalid wallet ID provided: ${it.message}") }
+        .also {
+            ensurePermissionsForWallet(AccountWalletPermissions.READ_ONLY, walletId = it)
+        }
 
 fun PipelineContext<Unit, ApplicationCall>.getWalletService(walletId: UUID) =
     WalletServiceManager.getWalletService("", getUserUUID(), walletId) // FIXME -> TENANT HERE
@@ -515,18 +559,20 @@ fun PipelineContext<Unit, ApplicationCall>.getUsersSessionToken(): String? =
         ?: call.request.authorization()?.removePrefix("Bearer ")
 
 fun PipelineContext<Unit, ApplicationCall>.ensurePermissionsForWallet(
-    required: AccountWalletPermissions
+    required: AccountWalletPermissions,
+
+    userId: UUID = getUserUUID(),
+    walletId: UUID = getWalletId(),
 ): Boolean {
-    val userId = getUserUUID()
-    val walletId = getWalletId()
+
 
     val permissions = transaction {
         (AccountWalletMappings.selectAll()
             .where {
-                (AccountWalletMappings.tenant eq "") and
+                (AccountWalletMappings.tenant eq "") and // FIXME -> TENANT HERE
                         (AccountWalletMappings.accountId eq userId) and
                         (AccountWalletMappings.wallet eq walletId)
-            } // FIXME -> TENANT HERE
+            }
             .firstOrNull()
             ?: throw ForbiddenException("This account does not have access to the specified wallet."))[
             AccountWalletMappings.permissions]
@@ -538,3 +584,24 @@ fun PipelineContext<Unit, ApplicationCall>.ensurePermissionsForWallet(
         throw InsufficientPermissionsException(minimumRequired = required, current = permissions)
     }
 }
+
+private fun createHS256Token(tokenPayload: String) = JWSObject(JWSHeader(JWSAlgorithm.HS256), Payload(tokenPayload)).apply {
+    sign(MACSigner(AuthKeys.tokenKey))
+}.serialize()
+
+private suspend fun createRsaToken(key: JWKKey, tokenPayload: String) =
+    mapOf(JWTClaims.Header.keyID to key.getPublicKey().getKeyId(), JWTClaims.Header.type to "JWT").let {
+        key.signJws(tokenPayload.toByteArray(), it)
+    }
+
+
+@Serializable
+private data class AuthTokenPayload<T>(
+    val nbf: Long,
+    val exp: Long,
+    val iat: Long,
+    val jti: String,
+    val iss: String,
+    val aud: String,
+    val sub: T,
+)
