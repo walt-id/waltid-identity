@@ -118,7 +118,7 @@ services:
     profiles:
       - mssql
     healthcheck:
-      test: [ "CMD-SHELL", "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P $MSSQL_SA_PASSWORD -Q 'SELECT 1' || exit 1" ]
+      test: [ "CMD-SHELL", "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P $MSSQL_DB_PWD -Q 'SELECT 1' || exit 1" ]
       interval: 5s
       timeout: 1s
       retries: 5
@@ -130,13 +130,21 @@ services:
 
   # mssql-proxy-service
   mssql:
-    image: alpine
+    image: mcr.microsoft.com/azure-sql-edge
     profiles:
-        -   mssql
-    entrypoint: [ "/bin/sh", "-c", "exit 0" ]
+      - mssql
+    volumes:
+      - ./mssql-db-init.sql:/docker-entrypoint-initdb.d/mssql-db-init.sql
+    env_file:
+      - .env
     depends_on:
       mssql-engine:
         condition: "service_healthy"
+    command: >
+      bash -c '
+      /opt/mssql-tools/bin/sqlcmd -S mssql-engine -U sa -P $$MSSQL_DB_PWD -i /docker-entrypoint-initdb.d/mssql-db-init.sql;
+      echo "Configuration complete";
+      '
 
   caddy:
     image: docker.io/caddy:2
