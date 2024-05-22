@@ -11,8 +11,6 @@ import id.walt.webwallet.db.models.AccountWalletListing
 import id.walt.webwallet.utils.WalletHttpClients
 import id.walt.webwallet.webWalletModule
 import id.walt.webwallet.webWalletSetup
-import io.klogging.config.ANSI_CONSOLE
-import io.klogging.config.loggingConfiguration
 import io.ktor.client.*
 import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.*
@@ -21,7 +19,6 @@ import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.testing.*
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.jsonObject
@@ -44,10 +41,6 @@ class E2EWalletTestLocal : E2EWalletTestBase() {
 
     companion object {
         init {
-            runBlocking {
-                loggingConfiguration { ANSI_CONSOLE() }
-            }
-
             WalletConfigManager.preloadConfig(
                 "db.sqlite", DatasourceJsonConfiguration(
                     hikariDataSource = mapOf(
