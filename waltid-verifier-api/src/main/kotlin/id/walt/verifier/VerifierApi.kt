@@ -337,12 +337,13 @@ fun Application.verfierApi() {
                 }
             }
         }
-
+// ###### can be removed when LSP-Potential interop event is over ####
         route("lsp-potential") {
             post("issueMdl", {
                 tags = listOf("LSP POTENTIAL Interop Event")
                 summary = "Issue MDL for given device key, using internal issuer keys"
                 description = "Give device public key JWK in form body."
+                hidden = true
                 request {
                     body<LSPPotentialIssueFormDataParam> {
                         mediaType(ContentType.Application.FormUrlEncoded)
