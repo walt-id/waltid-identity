@@ -2,7 +2,7 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
     kotlin("jvm")
-    id("io.ktor.plugin") version "2.3.8"
+    id("io.ktor.plugin") version "2.3.11"
     kotlin("plugin.serialization")
 
     id("com.github.ben-manes.versions") version "0.49.0"
@@ -67,7 +67,7 @@ dependencies {
     implementation("io.ktor:ktor-server-method-override:$ktor_version")
 
     // Ktor server external libs
-    implementation("io.github.smiley4:ktor-swagger-ui:2.8.0")
+    implementation("io.github.smiley4:ktor-swagger-ui:2.10.0")
     //implementation("io.github.microutils:kotlin-logging-jvm:2.1.23")
 
     // Ktor client
@@ -84,14 +84,14 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
 
     // Date
-    implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.5.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.0")
 
     // Coroutines
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
 
     // UUID
-    implementation("app.softwork:kotlinx-uuid-core:0.0.22")
-    implementation("app.softwork:kotlinx-uuid-exposed:0.0.22")
+    implementation("app.softwork:kotlinx-uuid-core:0.0.25")
+    implementation("app.softwork:kotlinx-uuid-exposed:0.0.25")
 
     /* -- Security -- */
     // Bouncy Castle
@@ -111,7 +111,7 @@ dependencies {
     testImplementation(project(":waltid-issuer-api"))
     testImplementation(project(":waltid-verifier-api"))
 
-    implementation("com.nimbusds:nimbus-jose-jwt:9.37.3")
+    implementation("com.nimbusds:nimbus-jose-jwt:9.39.1")
 
     implementation("io.ktor:ktor-client-java:$ktor_version")
 
@@ -121,19 +121,19 @@ dependencies {
     implementation("io.github.reactivecircus.cache4k:cache4k:0.13.0")
 
     // Webauthn
-    implementation("com.webauthn4j:webauthn4j-core:0.22.1.RELEASE") {
+    implementation("com.webauthn4j:webauthn4j-core:0.24.0.RELEASE") {
         exclude("ch.qos.logback")
     }
 
     // DB
-    implementation("org.jetbrains.exposed:exposed-core:0.49.0")
-    implementation("org.jetbrains.exposed:exposed-jdbc:0.47.0")
-    implementation("org.jetbrains.exposed:exposed-dao:0.49.0")
-    implementation("org.jetbrains.exposed:exposed-java-time:0.48.0")
+    implementation("org.jetbrains.exposed:exposed-core:0.50.1")
+    implementation("org.jetbrains.exposed:exposed-jdbc:0.50.1")
+    implementation("org.jetbrains.exposed:exposed-dao:0.50.1")
+    implementation("org.jetbrains.exposed:exposed-java-time:0.50.1")
     implementation("org.jetbrains.exposed:exposed-json:0.50.1")
     // drivers
-    implementation("org.xerial:sqlite-jdbc:3.44.1.0")
-    implementation("org.postgresql:postgresql:42.7.2")
+    implementation("org.xerial:sqlite-jdbc:3.45.3.0")
+    implementation("org.postgresql:postgresql:42.7.3")
     implementation("mysql:mysql-connector-java:8.0.33")
     implementation("com.microsoft.sqlserver:mssql-jdbc:9.4.1.jre8")
     // migration
@@ -141,7 +141,7 @@ dependencies {
 
     // Web push
     // implementation("dev.blanke.webpush:webpush:6.1.1") // alternative
-    implementation("com.interaso:webpush:1.1.1")
+    implementation("com.interaso:webpush:1.2.0")
 
     // Config
     implementation("com.sksamuel.hoplite:hoplite-core:2.8.0.RC3")
@@ -152,13 +152,16 @@ dependencies {
 
     // Logging
     implementation("io.github.oshai:kotlin-logging-jvm:6.0.9")
-    implementation("org.slf4j:slf4j-simple:2.0.13")
-    implementation("org.slf4j:jul-to-slf4j:2.0.12")
+//    implementation("org.slf4j:slf4j-simple:2.0.13")
+    implementation("org.slf4j:jul-to-slf4j:2.0.13")
+    implementation("io.klogging:klogging-jvm:0.5.13")
+    implementation("io.klogging:slf4j-klogging:0.5.13")
 
     // Test
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit:1.9.23")
     testImplementation(kotlin("test"))
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.0")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
     testImplementation("io.ktor:ktor-server-tests-jvm:$ktor_version")
-    testImplementation("io.mockk:mockk:1.13.10")
+    testImplementation("io.mockk:mockk:1.13.11")
+    testImplementation("io.klogging:klogging-jvm:0.5.13")
 }

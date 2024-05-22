@@ -6,14 +6,19 @@ import id.walt.issuer.base.config.ConfigManager
 import id.walt.issuer.base.config.WebConfig
 import id.walt.issuer.base.web.plugins.*
 import io.github.oshai.kotlinlogging.KotlinLogging
+import io.klogging.config.ANSI_CONSOLE
+import io.klogging.config.loggingConfiguration
 import io.ktor.server.application.*
 import io.ktor.server.cio.*
 import io.ktor.server.engine.*
+import kotlinx.coroutines.delay
 
 private val log = KotlinLogging.logger { }
 
 suspend fun main(args: Array<String>) {
-    log.debug { "issuer CLI starting ..." }
+    loggingConfiguration { ANSI_CONSOLE() }
+
+    log.info { "Starting walt.id issuer..." }
 
     log.debug { "Init walt services..." }
     WaltidServices.minimalInit()
@@ -29,6 +34,9 @@ suspend fun main(args: Array<String>) {
         host = webConfig.webHost,
         module = Application::issuerModule
     ).start(wait = true)
+
+    delay(50)
+    log.info { "Issuer stopped." }
 }
 
 fun Application.configurePlugins() {

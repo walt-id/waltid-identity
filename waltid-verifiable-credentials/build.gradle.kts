@@ -110,7 +110,7 @@ kotlin {
                 implementation("io.ktor:ktor-client-cio:2.3.11")
 
                 // Logging
-                implementation("org.slf4j:slf4j-simple:2.0.13")
+                // implementation("org.slf4j:slf4j-simple:2.0.13")
 
                 // Json canonicalization
                 implementation("io.github.erdtman:java-json-canonicalization:1.1")
