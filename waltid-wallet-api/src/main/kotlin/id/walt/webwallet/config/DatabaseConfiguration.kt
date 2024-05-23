@@ -1,6 +1,5 @@
 package id.walt.webwallet.config
 
-import id.walt.webwallet.config.WalletConfig.Companion.fixEnvVars
 import id.walt.webwallet.db.Db
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.Serializable
@@ -23,7 +22,7 @@ data class DatasourceJsonConfiguration(
         private val log = KotlinLogging.logger { }
     }
 
-    val jdbcUrl by lazy { hikariDataSource.jdbcUrl?.let { fixEnvVars(it) } }
+    val jdbcUrl by lazy { hikariDataSource.jdbcUrl }
 
     init {
         if (jdbcUrl?.startsWith(Db.SQLITE_PREFIX) == true) {
