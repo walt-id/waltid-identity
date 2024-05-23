@@ -8,11 +8,11 @@ import id.walt.webwallet.db.models.*
 import id.walt.webwallet.service.account.AccountsService
 import id.walt.webwallet.service.credentials.CredentialsService
 import id.walt.webwallet.utils.IssuanceExamples
-import id.walt.webwallet.utils.JsonUtils
 import id.walt.webwallet.web.model.EmailAccountRequest
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Clock
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.uuid.UUID
@@ -132,23 +132,38 @@ object Db {
         else -> Connection.TRANSACTION_SERIALIZABLE
     }
 
-    private fun createHikariDataSource(json: JsonObject) = HikariDataSource(HikariConfig().apply {
-        jdbcUrl = JsonUtils.tryGetData(json, DatasourceJsonConfiguration.JdbcUrl)!!.jsonPrimitive.content
-        driverClassName =
-            JsonUtils.tryGetData(json, DatasourceJsonConfiguration.DriveClassName)!!.jsonPrimitive.content
-        username = JsonUtils.tryGetData(json, DatasourceJsonConfiguration.Username)!!.jsonPrimitive.content
-        password = JsonUtils.tryGetData(json, DatasourceJsonConfiguration.Password)!!.jsonPrimitive.content
-        JsonUtils.tryGetData(json, DatasourceJsonConfiguration.TransactionIsolation)?.jsonPrimitive?.content?.let { transactionIsolation = it }
-        JsonUtils.tryGetData(json, DatasourceJsonConfiguration.MaximumPoolSize)?.jsonPrimitive?.content?.toIntOrNull()
-            ?.let { maximumPoolSize = it }
-        JsonUtils.tryGetData(json, DatasourceJsonConfiguration.MinimumIdle)?.jsonPrimitive?.content?.toIntOrNull()?.let { minimumIdle = it }
-        JsonUtils.tryGetData(json, DatasourceJsonConfiguration.MaxLifetime)?.jsonPrimitive?.content?.toLongOrNull()?.let { maxLifetime = it }
-        JsonUtils.tryGetData(json, DatasourceJsonConfiguration.AutoCommit)?.jsonPrimitive?.content?.toBoolean()?.let { isAutoCommit = it }
-        JsonUtils.tryGetData(json, DatasourceJsonConfiguration.DataSource.JournalMode.fullName())?.jsonPrimitive?.content?.let {
-            dataSourceProperties.setProperty(DatasourceJsonConfiguration.DataSource.JournalMode.value, it)
+    @Serializable
+    data class SerializableHikariConfiguration(
+        val jdbcUrl: String? = null,
+        val driverClassName: String? = null,
+        val username: String? = null,
+        val password: String? = null,
+        val transactionIsolation: String? = null,
+        val maximumPoolSize: Int? = null,
+        val maxLifetime: Long? = null,
+        val isAutoCommit: Boolean? = null,
+
+        val dataSourceProperties: JsonObject? = null,
+    ) {
+        fun applyToHikariConfig(hikari: HikariConfig) {
+            hikari.jdbcUrl = jdbcUrl
+            hikari.driverClassName = driverClassName
+            hikari.username = username
+            hikari.password = password
+
+            transactionIsolation?.let { hikari.transactionIsolation = it }
+            maximumPoolSize?.let { hikari.maximumPoolSize = it }
+            maxLifetime?.let { hikari.maxLifetime = it }
+            isAutoCommit?.let { hikari.isAutoCommit = it }
+
+            dataSourceProperties?.entries?.forEach { (key, value) ->
+                hikari.addDataSourceProperty(key, value.jsonPrimitive.content)
+            }
         }
-        JsonUtils.tryGetData(json, DatasourceJsonConfiguration.DataSource.FullColumnNames.fullName())?.jsonPrimitive?.content?.let {
-            dataSourceProperties.setProperty(DatasourceJsonConfiguration.DataSource.FullColumnNames.value, it)
-        }
-    })
+    }
+
+    private fun createHikariDataSource(config: SerializableHikariConfiguration) =
+        HikariDataSource(HikariConfig().apply {
+            config.applyToHikariConfig(this)
+        })
 }

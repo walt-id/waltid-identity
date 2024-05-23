@@ -17,7 +17,9 @@ import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.testing.*
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.*
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.uuid.UUID
 import kotlin.io.path.Path
 import kotlin.io.path.absolutePathString
@@ -38,14 +40,14 @@ class E2EWalletTestLocal : E2EWalletTestBase() {
         init {
             WalletConfigManager.preloadConfig(
                 "db.sqlite", DatasourceJsonConfiguration(
-                    hikariDataSource = buildJsonObject {
-                        put(DatasourceJsonConfiguration.JdbcUrl, "jdbc:sqlite:data/wallet.db")
-                        put(DatasourceJsonConfiguration.DriveClassName, "org.sqlite.JDBC")
-                        put(DatasourceJsonConfiguration.Username, "")
-                        put(DatasourceJsonConfiguration.Password, "")
-                        put(DatasourceJsonConfiguration.TransactionIsolation, "TRANSACTION_SERIALIZABLE")
-                        put(DatasourceJsonConfiguration.AutoCommit, true)
-                    },
+                    hikariDataSource = Db.SerializableHikariConfiguration(
+                        jdbcUrl = "jdbc:sqlite:data/wallet.db",
+                        driverClassName = "org.sqlite.JDBC",
+                        username = "",
+                        password = "",
+                        transactionIsolation = "TRANSACTION_SERIALIZABLE",
+                        isAutoCommit = true
+                    ),
                     recreateDatabaseOnStart = true
                 )
             )
