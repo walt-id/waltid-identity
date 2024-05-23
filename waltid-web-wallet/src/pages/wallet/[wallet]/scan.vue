@@ -3,7 +3,7 @@
         <div class="absolute top-3 left-3 cursor-pointer bg-gray-100 rounded-full w-8 h-8 flex items-center justify-center text-black text-xs font-bold"
             @click="navigateTo({ path: `/wallet/${walletId}` })">X</div>
         <div class="flex flex-col justify-center items-center h-[100vh]">
-            <QrCodeScanner v-if="qrCodeDisplay" @qrCode="startRequest" />
+            <QrCodeScanner v-if="qrCodeDisplay" @request="startRequest" />
             <ManualRequestEntry v-else @request="startRequest" />
             <toggle class="mt-10" @update:option1-selected="qrCodeDisplay = $event" :options="['QR Code', 'Manual']" />
         </div>
