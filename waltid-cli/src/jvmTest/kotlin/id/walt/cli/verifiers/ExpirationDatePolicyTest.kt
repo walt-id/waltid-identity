@@ -48,7 +48,7 @@ class ExpirationDatePolicyTest {
     }
 
     @Test
-    fun `should NOT fail with a valid signed VC and data = jws-payload("vc)"`() {
+    fun `should NOT fail with a valid signed VC and data = jws-payload('vc')`() {
 
         val data = notExpiredJws.decodeJws().payload["vc"]!!
 
@@ -59,7 +59,7 @@ class ExpirationDatePolicyTest {
     }
 
     @Test
-    fun `should NOT fail with a valid NOT signed VC and data = jwt"`() {
+    fun `should NOT fail with a valid NOT signed VC and data = jwt`() {
 
         val data = Json.parseToJsonElement(notExpiredJwt)
 
@@ -70,7 +70,7 @@ class ExpirationDatePolicyTest {
     }
 
     @Test
-    fun `should fail ExpirationDatePolicy + jws-payload("vc")`() {
+    fun `should fail ExpirationDatePolicy + jws-payload('vc')`() {
 
         val data = expiredJws.decodeJws().payload["vc"]!!
 

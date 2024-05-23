@@ -57,7 +57,7 @@ services:
     image: docker.io/caddy:2
     restart: unless-stopped
     env_file:
-        - .env
+      - .env
     cap_add:
       - NET_ADMIN
     ports:
