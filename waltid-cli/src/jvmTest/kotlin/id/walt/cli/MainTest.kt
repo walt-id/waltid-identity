@@ -1,11 +1,27 @@
 package id.walt.cli
 
-import com.github.stefanbirkner.systemlambda.SystemLambda.tapSystemOut
 import id.walt.cli.util.getResourcePath
 import id.walt.crypto.keys.KeyType
 import org.junit.jupiter.api.Disabled
+import java.io.ByteArrayOutputStream
 import java.io.File
+import java.io.PrintStream
 import kotlin.test.*
+
+private fun tapSystemOut(block: () -> Unit): String {
+    val stdoutCaptureStream = ByteArrayOutputStream()
+
+    val originalOut = System.out
+    System.setOut(PrintStream(stdoutCaptureStream))
+
+    try {
+        block.invoke()
+
+        return stdoutCaptureStream.toString()
+    } finally {
+        System.setOut(originalOut)
+    }
+}
 
 class MainTest {
 
