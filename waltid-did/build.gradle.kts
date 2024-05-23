@@ -67,6 +67,7 @@ kotlin {
         binaries.library()
     }
 
+    val ktor_version = "2.3.11"
     sourceSets {
         val commonMain by getting {
             dependencies {
@@ -75,12 +76,12 @@ kotlin {
                 implementation("io.github.optimumcode:json-schema-validator:0.0.8")
 
                 // Ktor client
-                implementation("io.ktor:ktor-client-core:2.3.11")
-                implementation("io.ktor:ktor-client-serialization:2.3.8")
-                implementation("io.ktor:ktor-client-content-negotiation:2.3.11")
-                implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.11")
-                implementation("io.ktor:ktor-client-json:2.3.10")
-                implementation("io.ktor:ktor-client-logging:2.3.10")
+                implementation("io.ktor:ktor-client-core:$ktor_version")
+                implementation("io.ktor:ktor-client-serialization:$ktor_version")
+                implementation("io.ktor:ktor-client-content-negotiation:$ktor_version")
+                implementation("io.ktor:ktor-serialization-kotlinx-json:$ktor_version")
+                implementation("io.ktor:ktor-client-json:$ktor_version")
+                implementation("io.ktor:ktor-client-logging:$ktor_version")
 
                 // Coroutines
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
@@ -111,7 +112,7 @@ kotlin {
         val jvmMain by getting {
             dependencies {
                 // Ktor client
-                implementation("io.ktor:ktor-client-okhttp:2.3.11")
+                implementation("io.ktor:ktor-client-okhttp:$ktor_version")
 
                 // Logging
                 implementation("org.slf4j:slf4j-simple:2.0.13")
@@ -128,8 +129,8 @@ kotlin {
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
                 implementation(kotlin("test"))
                 implementation("org.junit.jupiter:junit-jupiter-params:5.10.2")
-                implementation("io.ktor:ktor-server-test-host:2.3.8")
-                implementation("io.ktor:ktor-server-content-negotiation:2.3.11")
+                implementation("io.ktor:ktor-server-test-host:$ktor_version")
+                implementation("io.ktor:ktor-server-content-negotiation:$ktor_version")
                 implementation("io.ktor:ktor-server-netty:2.3.8")
             }
         }
