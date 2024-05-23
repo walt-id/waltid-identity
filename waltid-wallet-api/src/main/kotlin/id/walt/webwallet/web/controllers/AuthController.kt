@@ -130,7 +130,7 @@ fun Application.configureSecurity() {
             verifier(OidcLoginService.jwkProvider)
 
             validate { credential -> JWTPrincipal(credential.payload) }
-            challenge { defaultScheme, realm ->
+            challenge { _, _ ->
                 call.respond(HttpStatusCode.Unauthorized, "Token is not valid or has expired")
             }
         }
