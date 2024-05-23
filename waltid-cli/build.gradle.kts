@@ -90,8 +90,8 @@ kotlin {
             dependencies {
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
                 implementation("com.wolpl.clikt-testkit:clikt-testkit:2.0.0")
-                // Spring Boot Test
-                implementation("org.springframework.boot:spring-boot-starter-test:3.2.3")
+
+                implementation("org.junit.jupiter:junit-jupiter-params:5.10.2")
             }
         }
         /*publishing {
