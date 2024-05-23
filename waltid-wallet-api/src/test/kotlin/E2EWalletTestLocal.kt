@@ -1,10 +1,6 @@
-import com.zaxxer.hikari.HikariConfig
-import com.zaxxer.hikari.HikariDataSource
-import id.walt.crypto.utils.JsonUtils.toJsonObject
 import id.walt.issuer.base.config.OIDCIssuerServiceConfig
 import id.walt.issuer.issuerModule
 import id.walt.verifier.verifierModule
-import id.walt.webwallet.config.DatasourceConfiguration
 import id.walt.webwallet.config.DatasourceJsonConfiguration
 import id.walt.webwallet.db.Db
 import id.walt.webwallet.db.models.AccountWalletListing
@@ -20,9 +16,7 @@ import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.testing.*
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.*
 import kotlinx.uuid.UUID
 import kotlin.io.path.Path
 import kotlin.io.path.absolutePathString
@@ -43,23 +37,14 @@ class E2EWalletTestLocal : E2EWalletTestBase() {
         init {
             WalletConfigManager.preloadConfig(
                 "db.sqlite", DatasourceJsonConfiguration(
-                    hikariDataSource = mapOf(
-                        "jdbcUrl" to "jdbc:sqlite:data/wallet.db"
-                    ).toJsonObject(),
-                    recreateDatabaseOnStart = true
-                )
-            )
-
-            WalletConfigManager.preloadConfig(
-                "db.sqlite", DatasourceConfiguration(
-                    hikariDataSource = HikariDataSource(HikariConfig().apply {
-                        jdbcUrl = "jdbc:sqlite:data/wallet.db"
-                        driverClassName = "org.sqlite.JDBC"
-                        username = ""
-                        password = ""
-                        transactionIsolation = "TRANSACTION_SERIALIZABLE"
-                        isAutoCommit = true
-                    }),
+                    hikariDataSource = buildJsonObject {
+                        put("jdbcUrl", "jdbc:sqlite:data/wallet.db")
+                        put("driverClassName", "org.sqlite.JDBC")
+                        put("username", "")
+                        put("password", "")
+                        put("transactionIsolation", "TRANSACTION_SERIALIZABLE")
+                        put("isAutoCommit", true)
+                    },
                     recreateDatabaseOnStart = true
                 )
             )
