@@ -10,7 +10,7 @@ import kotlinx.serialization.json.jsonObject
 
 @Serializable
 data class AuthorizationJSONRequest(
-    @SerialName("response_type") override val responseType: String = ResponseType.getResponseTypeString(ResponseType.code),
+    @SerialName("response_type") override val responseType: Set<ResponseType> = setOf(ResponseType.Code),
     @SerialName("client_id") override val clientId: String,
     @SerialName("response_mode") override val responseMode: ResponseMode? = null,
     @SerialName("redirect_uri") override val redirectUri: String? = null,

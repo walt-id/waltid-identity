@@ -34,7 +34,6 @@ class DidWebRegistrar : LocalRegistrarMethod("web") {
     @JsPromise
     @JsExport.Ignore
     override suspend fun registerByKey(key: Key, options: DidCreateOptions): DidResult {
-        println("Domain: " + options.get<String>("domain"))
         return options.get<String>("domain")?.takeIf { it.isNotEmpty() }?.let {
             val domain = UrlEncoderUtil.encode(it)
             val path = options.get<String>("path")?.takeIf { it.isNotEmpty() }?.let {

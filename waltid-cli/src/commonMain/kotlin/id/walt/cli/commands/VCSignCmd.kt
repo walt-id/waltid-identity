@@ -11,6 +11,7 @@ import com.github.ajalt.clikt.parameters.options.required
 import com.github.ajalt.clikt.parameters.types.file
 import com.github.ajalt.mordant.terminal.YesNoPrompt
 import id.walt.cli.util.*
+import id.walt.crypto.keys.jwk.JWKKey
 import kotlinx.coroutines.runBlocking
 import java.io.File
 import kotlin.io.path.Path
@@ -24,8 +25,7 @@ class VCSignCmd : CliktCommand(
     val print: PrettyPrinter = PrettyPrinter(this)
 
     private val keyFile by option("-k", "--key")
-        // .help("The Subject's key to be used. If none is provided, a new one will be generated.")
-        .help("A core-crypto key representation to sign the credential (required)")
+        .help("Key to be used to sign the credential (required)")
         .file()
         .required()
 
@@ -47,17 +47,12 @@ class VCSignCmd : CliktCommand(
         val key = runBlocking { KeyUtil().getKey(keyFile) }
         val issuerDid = issuerDid ?: runBlocking { DidUtil.createDid(DidMethod.KEY, key) }
 
-        // Check if it's a valid DID
-        try {
-            DidUtil.resolveDid(issuerDid)
-        } catch (e: IllegalArgumentException) {
-            throw BadParameterValue("DID not supported: ${issuerDid}")
-        }
+        validateIssuerKey(issuerDid, key)
 
         val payload = vc.readText()
 
         val signedVC = runBlocking {
-            VCUtil().sign(key, issuerDid, subjectDid, payload)
+            VCUtil.sign(key, issuerDid, subjectDid, payload)
         }
 
         val savedSignedVCFilePath = saveSignedVC(signedVC)
@@ -76,6 +71,26 @@ class VCSignCmd : CliktCommand(
         print.dim("--------------")
         print.dim(signedVC)
         print.dim("--------------")
+    }
+
+    private fun validateIssuerKey(issuerDid: String, key: JWKKey) = runBlocking {
+
+        // Check if it's a valid DID
+        val didKey = try {
+            DidUtil.resolveToKey(issuerDid)
+        } catch (e: IllegalArgumentException) {
+            e.printStackTrace()
+            throw BadParameterValue("DID can not be resolved: ${issuerDid}")
+        }
+
+        // Check the key belongs to the issuer DID
+        if (key.getPublicKey().getThumbprint().isEmpty()) {
+            throw BadParameterValue("Missing thumbprint from key ${key.getKeyId()}")
+        }
+        if (key.getPublicKey().getThumbprint() != didKey?.getPublicKey()?.getThumbprint()) {
+            throw BadParameterValue("Key ${key.getKeyId()} not associated with issuer DID ${issuerDid}")
+        }
+
     }
 
     private fun saveSignedVC(signedVC: String): String? {

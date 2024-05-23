@@ -5,10 +5,8 @@ import id.walt.webwallet.config.RegistrationDefaultsConfig
 import id.walt.webwallet.db.models.*
 import id.walt.webwallet.service.WalletServiceManager
 import id.walt.webwallet.service.events.AccountEventData
-import id.walt.webwallet.service.events.EventService
 import id.walt.webwallet.service.events.EventType
-import id.walt.webwallet.service.issuers.IssuersService
-import id.walt.webwallet.usecase.event.EventUseCase
+import id.walt.webwallet.service.issuers.IssuerDataTransferObject
 import id.walt.webwallet.web.model.*
 import kotlinx.datetime.toKotlinInstant
 import kotlinx.serialization.Serializable
@@ -20,7 +18,6 @@ import org.jetbrains.exposed.sql.transactions.transaction
 
 object AccountsService {
 
-    private val eventUseCase = EventUseCase(EventService())
     fun registerAuthenticationMethods() {
 //        val loginMethods = ConfigManager.getConfig<LoginMethodsConfig>().enabledLoginMethods
     }
@@ -41,17 +38,11 @@ object AccountsService {
             WalletServiceManager.createWallet(tenant, registeredUserId)
         }.also { walletId ->
             //TODO: inject
-            IssuersService.add(
-                wallet = walletId,
-                name = "walt.id",
-                description = "walt.id issuer portal",
-                uiEndpoint = "https://portal.walt.id/credentials?ids=",
-                configurationEndpoint = "https://issuer.portal.walt.id/.well-known/openid-credential-issuer"
-            )
+            WalletServiceManager.issuerUseCase.add(IssuerDataTransferObject.default(walletId))
         }
 
         val walletService = WalletServiceManager.getWalletService(tenant, registeredUserId, createdInitialWalletId)
-        eventUseCase.log(
+        WalletServiceManager.eventUseCase.log(
             action = EventType.Account.Create,
             originator = "wallet",
             tenant = tenant,
@@ -85,7 +76,7 @@ object AccountsService {
 
         }
     }.fold(onSuccess = {
-        eventUseCase.log(
+        WalletServiceManager.eventUseCase.log(
             action = EventType.Account.Login,
             tenant = tenant,
             originator = "wallet",

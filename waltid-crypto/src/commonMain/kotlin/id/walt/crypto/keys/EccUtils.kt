@@ -2,12 +2,6 @@ package id.walt.crypto.keys
 
 object EccUtils {
 
-    private fun ByteArray.padStart(length: Int): ByteArray {
-        if (this.size >= length) return this
-        val padded = ByteArray(length)
-        this.copyInto(padded, length - this.size)
-        return padded
-    }
 
     /**
      * Primitive helper function to convert DER encoded
@@ -46,7 +40,6 @@ object EccUtils {
         // Concatenate r and s
         return fixedLengthR + fixedLengthS
     }
-
 
     fun convertDERtoIEEEP1363HandleExtra(derSignature: ByteArray): ByteArray {
         fun parseLength(bytes: ByteArray, indexAccessor: () -> Int): Int {

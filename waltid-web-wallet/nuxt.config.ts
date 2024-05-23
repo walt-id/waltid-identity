@@ -29,6 +29,9 @@ export default defineNuxtConfig({
 
         provider: {
             type: "local",
+            token: {
+                maxAgeInSeconds: 60 * 60 * 24 * 365 // 1 year
+            },
 
             pages: {
                 login: "/login"

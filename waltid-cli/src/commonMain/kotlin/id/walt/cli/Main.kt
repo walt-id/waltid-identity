@@ -23,7 +23,6 @@ fun main(args: Array<String>) {
         handleMultiUsageError(cmd, e)
     } catch (e: NoSuchOption) {
         handleNoSuchOption(cmd, e)
-
     } catch (e: CliktError) {
         handleCliktError(cmd, e)
     } catch (e: Exception) {

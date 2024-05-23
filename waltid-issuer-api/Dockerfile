@@ -8,6 +8,7 @@ COPY waltid-did/build.gradle.kts /work/waltid-did/
 COPY waltid-openid4vc/build.gradle.kts /work/waltid-openid4vc/
 COPY waltid-issuer-api/build.gradle.kts /work/waltid-issuer-api/
 COPY waltid-sdjwt/build.gradle.kts /work/waltid-sdjwt/
+COPY waltid-mdoc-credentials/build.gradle.kts /work/waltid-mdoc-credentials/
 
 WORKDIR /work/waltid-issuer-api/
 RUN gradle build || return 0
@@ -18,6 +19,7 @@ COPY waltid-did/. /work/waltid-did
 COPY waltid-openid4vc/. /work/waltid-openid4vc
 COPY waltid-issuer-api/. /work/waltid-issuer-api
 COPY waltid-sdjwt/. /work/waltid-sdjwt
+COPY waltid-mdoc-credentials/. /work/waltid-mdoc-credentials
 
 RUN gradle clean installDist
 

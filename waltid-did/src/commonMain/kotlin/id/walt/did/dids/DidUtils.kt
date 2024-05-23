@@ -16,4 +16,6 @@ object DidUtils {
     fun pathFromDid(did: String): String? = PATTERN.toRegex().find(did)?.let {
         it.groups[2]!!.value
     }
+
+    fun isDidUrl(did: String): Boolean = PATTERN.toRegex().matches(did)
 }

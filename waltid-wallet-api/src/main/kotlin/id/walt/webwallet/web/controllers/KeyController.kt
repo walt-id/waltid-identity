@@ -37,10 +37,49 @@ fun Application.keys() = walletRoute {
                 body<KeyGenerationRequest> {
                     description = "Key configuration (JSON)"
 
-                    example(
-                        "OCI key generation request",
+                    example("JWK key generation request",
+                        buildJsonObject {
+                            put("backend", JsonPrimitive("jwk"))
+                            put("keyType", JsonPrimitive("Ed25519"))
+                        }.toString()
+                    )
+
+                    example("TSE key generation request",
+                        buildJsonObject {
+                            put("backend", JsonPrimitive("tse"))
+                            put("config",
+                                buildJsonObject {
+                                    put("server", JsonPrimitive("http://0.0.0.0:8200/v1/transit"))
+                                    put("accessKey", JsonPrimitive("dev-only-token"))
+                                })
+                            put("keyType", JsonPrimitive("Ed25519"))
+                        }.toString()
+                    )
+
+                    example("OCI key generation request",
                         buildJsonObject {
                             put("backend", JsonPrimitive("oci"))
+                            put(
+                                "config",
+                                buildJsonObject {
+                                    put(
+                                        "vaultId",
+                                        JsonPrimitive("ocid1.vault.oc1.eu-frankfurt-1.entbf645aabf2.abtheljshkb6dsuldqf324kitneb63vkz3dfd74dtqvkd5j2l2cxwyvmefeq")
+                                    )
+                                    put(
+                                        "compartmentId",
+                                        JsonPrimitive("ocid1.compartment.oc1..aaaaaaaawirugoz35riiybcxsvf7bmelqsxo3sajaav5w3i2vqowcwqrllxa")
+                                    )
+
+                                }
+                            )
+                            put("keyType", JsonPrimitive("secp256r1"))
+                        }.toString()
+                    )
+                    example(
+                        "OCI API key generation request",
+                        buildJsonObject {
+                            put("backend", JsonPrimitive("oci-rest-api"))
                             put(
                                 "config",
                                 buildJsonObject {
@@ -50,7 +89,7 @@ fun Application.keys() = walletRoute {
                                     )
                                     put(
                                         "compartmentOcid",
-                                        JsonPrimitive("ocid1.compartment.oc1..aaaaaaaaxjkkfjqxdqk7ldfjrxjmacmbi7sci73rbfiwpioehikavpbtqx5q")
+                                        JsonPrimitive("ocid1.tenancy.oc1..aaaaaaaaiijfupfvsqwqwgupzdy5yclfzcccmie4ktp2wlgslftv5j7xpk6q")
                                     )
                                     put(
                                         "userOcid",
@@ -59,37 +98,16 @@ fun Application.keys() = walletRoute {
                                     put("fingerprint", JsonPrimitive("bb:d4:4b:0c:c8:3a:49:15:7f:87:55:d5:2b:7e:dd:bc"))
                                     put(
                                         "cryptoEndpoint",
-                                        JsonPrimitive("ens7pgl2aaam2-crypto.kms.eu-frankfurt-1.oraclecloud.com")
+                                        JsonPrimitive("entcvrlraabc4-crypto.kms.eu-frankfurt-1.oraclecloud.com")
                                     )
                                     put(
                                         "managementEndpoint",
-                                        JsonPrimitive("ens7pgl2aaam2-management.kms.eu-frankfurt-1.oraclecloud.com")
+                                        JsonPrimitive("entcvrlraabc4-management.kms.eu-frankfurt-1.oraclecloud.com")
                                     )
                                     put("signingKeyPem", JsonPrimitive("privateKey"))
                                 }
                             )
                             put("keyType", JsonPrimitive("secp256r1"))
-                        }
-                            .toString())
-                    example(
-                        "JWK key generation request",
-                        buildJsonObject {
-                            put("backend", JsonPrimitive("jwk"))
-                            put("keyType", JsonPrimitive("Ed25519"))
-                        }
-                            .toString()
-                    )
-                    example(
-                        "TSE key generation request",
-                        buildJsonObject {
-                            put("backend", JsonPrimitive("tse"))
-                            put("config",
-                                buildJsonObject {
-                                    put("server", JsonPrimitive("http://0.0.0.0:8200/v1/transit"))
-                                    put("accessKey", JsonPrimitive("dev-only-token"))
-                                })
-                            put("keyType", JsonPrimitive("Ed25519"))
-
                         }.toString()
                     )
                 }

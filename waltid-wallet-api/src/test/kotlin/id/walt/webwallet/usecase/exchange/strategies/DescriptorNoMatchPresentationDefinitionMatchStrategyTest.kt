@@ -3,6 +3,7 @@ package id.walt.webwallet.usecase.exchange.strategies
 import TestUtils
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.webwallet.db.models.WalletCredential
+import id.walt.webwallet.usecase.exchange.FilterData
 import id.walt.webwallet.usecase.exchange.TypeFilter
 import kotlinx.datetime.Clock
 import kotlinx.serialization.json.Json
@@ -32,13 +33,18 @@ class DescriptorNoMatchPresentationDefinitionMatchStrategyTest {
             deletedOn = null,
         ),
     )
-    private val expectedFilter =
-        listOf(element = TypeFilter(path = "", type = null, pattern = "VerifiableCredential#1"))
+    private val expectedFilterData =
+        listOf(
+            element = FilterData(
+                credential = "VerifiableCredential#1",
+                filters = listOf(TypeFilter(path = emptyList(), type = null, pattern = "VerifiableCredential#1"))
+            )
+        )
 
     @Test
     fun match() {
         val result = sut.match(credentials, presentationDefinition)
         assertEquals(expected = 1, actual = result.size)
-        assertEquals(expected = expectedFilter, actual = result)
+        assertEquals(expected = expectedFilterData, actual = result)
     }
 }

@@ -20,6 +20,7 @@ import id.walt.oid4vc.requests.CredentialOfferRequest
 import id.walt.oid4vc.responses.AuthorizationErrorCode
 import id.walt.webwallet.config.ConfigManager
 import id.walt.webwallet.config.OciKeyConfig
+import id.walt.webwallet.config.OciRestApiKeyConfig
 import id.walt.webwallet.db.models.WalletCategoryData
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.db.models.WalletOperationHistories
@@ -33,6 +34,7 @@ import id.walt.webwallet.service.dto.WalletDataTransferObject
 import id.walt.webwallet.service.events.EventDataNotAvailable
 import id.walt.webwallet.service.events.EventService
 import id.walt.webwallet.service.events.EventType
+import id.walt.webwallet.service.exchange.IssuanceService
 import id.walt.webwallet.service.keys.KeysService
 import id.walt.webwallet.service.keys.SingleKeyResponse
 import id.walt.webwallet.service.oidc4vc.TestCredentialWallet
@@ -40,7 +42,7 @@ import id.walt.webwallet.service.report.ReportRequestParameter
 import id.walt.webwallet.service.report.ReportService
 import id.walt.webwallet.service.settings.SettingsService
 import id.walt.webwallet.service.settings.WalletSetting
-import id.walt.webwallet.usecase.event.EventUseCase
+import id.walt.webwallet.usecase.event.EventLogUseCase
 import id.walt.webwallet.web.controllers.PresentationRequestParameter
 import id.walt.webwallet.web.parameter.CredentialRequestParameter
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -50,6 +52,7 @@ import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.util.*
 import kotlinx.coroutines.runBlocking
+import kotlinx.datetime.Clock
 import kotlinx.datetime.toJavaInstant
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
@@ -68,7 +71,7 @@ class SSIKit2WalletService(
     walletId: UUID,
     private val categoryService: CategoryService,
     private val settingsService: SettingsService,
-    private val eventUseCase: EventUseCase,
+    private val eventUseCase: EventLogUseCase,
     private val http: HttpClient
 ) : WalletService(tenant, accountId, walletId) {
     private val logger = KotlinLogging.logger { }
@@ -113,7 +116,7 @@ class SSIKit2WalletService(
                 tenant = tenant,
                 accountId = accountId,
                 walletId = walletId,
-                data = eventUseCase.credentialEventData(this, null),
+                data = eventUseCase.credentialEventData(this),
                 credentialId = this.id
             )
         }
@@ -240,18 +243,29 @@ class SSIKit2WalletService(
             credentialService.get(walletId, it)?.run {
                 eventUseCase.log(
                     action = EventType.Credential.Present,
-                    originator = presentationSession.presentationDefinition?.name ?: EventDataNotAvailable,
+                    originator = presentationSession.authorizationRequest.clientMetadata?.clientName
+                        ?: EventDataNotAvailable,
                     tenant = tenant,
                     accountId = accountId,
                     walletId = walletId,
-                    data = eventUseCase.credentialEventData(this, null),
+                    data = eventUseCase.credentialEventData(
+                        credential = this,
+                        subject = eventUseCase.subjectData(this),
+                        organization = eventUseCase.verifierData(authReq),
+                        type = null
+                    ),
                     credentialId = this.id,
                     note = parameter.note,
                 )
             }
         }
 
-        return if (resp.status.isSuccess()) {
+
+
+        return if (resp.status.value==302 && !resp.headers["location"].toString().contains("error")){
+            Result.success(if (isResponseRedirectUrl) httpResponseBody else null)
+        }
+        else if (resp.status.isSuccess()) {
             Result.success(if (isResponseRedirectUrl) httpResponseBody else null)
         } else {
             if (isResponseRedirectUrl) {
@@ -286,6 +300,38 @@ class SSIKit2WalletService(
 
     private fun getAnyCredentialWallet() =
         credentialWallets.values.firstOrNull() ?: getCredentialWallet("did:test:test")
+
+        suspend fun useOfferRequest(
+        offer: String, did: String, requireUserInput: Boolean
+    ): List<WalletCredential> {
+        val addableCredentials =
+            IssuanceService.useOfferRequest(offer, getCredentialWallet(did), testCIClientConfig.clientID).map {
+                WalletCredential(
+                    wallet = walletId,
+                    id = it.id,
+                    document = it.document,
+                    disclosures = it.disclosures,
+                    addedOn = Clock.System.now(),
+                    manifest = it.manifest,
+                    deletedOn = null,
+                    pending = requireUserInput,
+                ).also { credential ->
+                    eventUseCase.log(
+                        action = EventType.Credential.Receive,
+                        originator = "", //parsedOfferReq.credentialOffer!!.credentialIssuer,
+                        tenant = tenant,
+                        accountId = accountId,
+                        walletId = walletId,
+                        data = eventUseCase.credentialEventData(credential = credential, type = it.type),
+                        credentialId = credential.id,
+                    )
+                }
+            }
+        credentialService.add(
+            wallet = walletId, credentials = addableCredentials.toTypedArray()
+        )
+        return addableCredentials
+    }
 
     override suspend fun resolveCredentialOffer(
         offerRequest: CredentialOfferRequest
@@ -394,8 +440,8 @@ class SSIKit2WalletService(
             )
         }
 
-    private val ociKeyMetadata by lazy {
-        ConfigManager.getConfig<OciKeyConfig>().let {
+    private val ociRestApiKeyMetadata by lazy {
+        ConfigManager.getConfig<OciRestApiKeyConfig>().let {
             mapOf(
                 "tenancyOcid" to it.tenancyOcid,
                 "compartmentOcid" to it.compartmentOcid,
@@ -408,13 +454,29 @@ class SSIKit2WalletService(
         }
     }
 
+
+    private val ociKeyMetadata by lazy {
+        ConfigManager.getConfig<OciKeyConfig>().let {
+            mapOf(
+                "compartmentId" to it.compartmentId,
+                "vaultId" to it.vaultId
+            ).toJsonObject()
+        }
+    }
+
     override suspend fun generateKey(request: KeyGenerationRequest): String = let {
+        if (request.backend == "oci-rest-api" && request.config == null) {
+            request.config = ociRestApiKeyMetadata
+        }
         if (request.backend == "oci" && request.config == null) {
             request.config = ociKeyMetadata
         }
 
+
+
         KeyManager.createKey(request)
             .also {
+                println("Generated key: $it")
                 KeysService.add(walletId, it.getKeyId(), KeySerialization.serializeKey(it))
                 eventUseCase.log(
                     action = EventType.Key.Create,
@@ -425,6 +487,8 @@ class SSIKit2WalletService(
                     data = eventUseCase.keyEventData(it, "jwk")
                 )
             }.getKeyId()
+
+
     }
 
     override suspend fun importKey(jwkOrPem: String): String {

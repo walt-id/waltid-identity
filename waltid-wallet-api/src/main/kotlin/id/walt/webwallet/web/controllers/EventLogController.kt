@@ -55,7 +55,7 @@ fun Application.eventLogs() = walletRoute {
         }) {
             val limit = call.request.queryParameters["limit"]?.toIntOrNull()
             val data = call.request.queryParameters.getAll("filter")
-                ?.associate { it.substringBefore("=") to it.substringAfter("=") } ?: emptyMap()
+                ?.groupBy({ it.substringBefore("=") }, { it.substringAfter("=") }) ?: emptyMap()
             val startingAfter = call.request.queryParameters["startingAfter"]
             val sortBy = call.request.queryParameters["sortBy"]
             val sortOrder = call.request.queryParameters["sortOrder"]
