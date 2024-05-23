@@ -1,6 +1,7 @@
 package id.walt.webwallet.config
 
 import com.sksamuel.hoplite.*
+import id.walt.did.utils.ExtensionMethods.ensurePrefix
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.server.plugins.*
 import kotlinx.serialization.Serializable
@@ -12,7 +13,22 @@ import kotlin.reflect.KClass
 import kotlin.reflect.jvm.jvmName
 
 @Serializable
-sealed interface WalletConfig
+sealed interface WalletConfig {
+    companion object {
+        private const val envVarRegex = "\\$[\\d\\w]+"
+        fun fixEnvVars(input: String) = envVarRegex.toRegex().findAll(input).fold(input) { acc, i ->
+            runCatching { System.getenv(i.value.removePrefix("$")) }.getOrNull()?.let {
+                acc.replace(i.value, it)
+            } ?: acc
+        }
+
+        fun fixEnvVar(input: String) = envVarRegex.ensurePrefix("^").toRegex().find(input)?.let { i ->
+            runCatching { System.getenv(i.value.removePrefix("$")) }.getOrNull()?.let {
+                input.replaceFirst(i.value, it)
+            }
+        } ?: input
+    }
+}
 
 object ConfigManager {
 
@@ -128,7 +144,7 @@ object ConfigManager {
     /** All configurations registered in this function will be loaded on startup */
     private fun registerConfigurations() {
         registerRequiredConfig("db", DatabaseConfiguration::class) {
-            val dbConfigFile = (it as DatabaseConfiguration).database
+            val dbConfigFile = WalletConfig.fixEnvVars((it as DatabaseConfiguration).database)
 
             registerRequiredConfig(dbConfigFile, multiple = true, type = DatasourceJsonConfiguration::class)
         }

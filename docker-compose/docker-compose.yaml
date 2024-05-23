@@ -8,6 +8,8 @@ services:
     depends_on:
       - "$DATABASE_ENGINE"
       - caddy
+    env_file:
+      - .env
     volumes:
       - ./wallet-api/config:/waltid-wallet-api/config
       - ./wallet-api/walt.yaml:/waltid-wallet-api/walt.yaml
@@ -116,7 +118,7 @@ services:
     profiles:
       - mssql
     healthcheck:
-      test: [ "CMD-SHELL", "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P p@ssw0rd -Q 'SELECT 1' || exit 1" ]
+      test: [ "CMD-SHELL", "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P $MSSQL_SA_PASSWORD -Q 'SELECT 1' || exit 1" ]
       interval: 5s
       timeout: 1s
       retries: 5
