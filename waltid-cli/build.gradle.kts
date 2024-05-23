@@ -58,7 +58,7 @@ kotlin {
 
                 // CLI
                 implementation("com.varabyte.kotter:kotter-jvm:1.1.2")
-                implementation("com.github.ajalt.mordant:mordant:2.3.0")
+                implementation("com.github.ajalt.mordant:mordant:2.6.0")
                 implementation("com.github.ajalt.clikt:clikt:4.2.2")
 
                 // Coroutines
@@ -90,7 +90,8 @@ kotlin {
             dependencies {
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
                 implementation("com.wolpl.clikt-testkit:clikt-testkit:2.0.0")
-                implementation("org.springframework.boot:spring-boot-starter-test:3.2.3")
+
+                implementation("org.junit.jupiter:junit-jupiter-params:5.10.2")
             }
         }
         /*publishing {

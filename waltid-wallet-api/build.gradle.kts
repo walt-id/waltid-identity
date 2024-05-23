@@ -46,7 +46,7 @@ dependencies {
 
     /* -- KTOR -- */
 
-    val ktor_version = "2.3.10"
+    val ktor_version = "2.3.11"
     // Ktor server
     implementation("io.ktor:ktor-server-core-jvm:$ktor_version")
     implementation("io.ktor:ktor-server-auth-jvm:$ktor_version")
@@ -131,7 +131,7 @@ dependencies {
     implementation("org.jetbrains.exposed:exposed-jdbc:0.47.0")
     implementation("org.jetbrains.exposed:exposed-dao:0.49.0")
     implementation("org.jetbrains.exposed:exposed-java-time:0.48.0")
-    implementation("org.jetbrains.exposed:exposed-json:0.47.0")
+    implementation("org.jetbrains.exposed:exposed-json:0.50.1")
     // drivers
     implementation("org.xerial:sqlite-jdbc:3.44.1.0")
     implementation("org.postgresql:postgresql:42.7.2")

@@ -1,6 +1,5 @@
 package id.walt.oid4vc
 
-//import id.walt.crypto.keys.LocalKey
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.did.utils.randomUUID
@@ -12,6 +11,7 @@ import id.walt.oid4vc.requests.TokenRequest
 import id.walt.oid4vc.responses.AuthorizationCodeResponse
 import id.walt.oid4vc.responses.TokenResponse
 import io.ktor.client.*
+import io.ktor.client.engine.okhttp.*
 import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
@@ -30,11 +30,11 @@ import kotlinx.datetime.Instant
 import kotlinx.serialization.json.*
 import org.kotlincrypto.hash.sha2.SHA256
 import kotlin.io.encoding.Base64
-import io.ktor.client.engine.okhttp.*
-
 import kotlin.io.encoding.ExperimentalEncodingApi
-import kotlin.test.*
-import kotlin.text.toByteArray
+import kotlin.test.Test
+import kotlin.test.assertContains
+import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 
 const val ISSUER_MOCK_PORT = 7018
 const val ISSUER_MOCK_URL = "http://localhost:$ISSUER_MOCK_PORT"

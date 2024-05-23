@@ -150,10 +150,12 @@ data:
     issuersRecord: {
         baseUrl = "<url>"
         trustRecordPath = "<path>"
+        governanceRecordPath = "<path>"
     }
     verifiersRecord: {
         baseUrl = "<url>"
         trustRecordPath = "<path>"
+        governanceRecordPath = "<path>"
     }
 ---
 apiVersion: v1
@@ -257,10 +259,10 @@ spec:
               mountPath: "/waltid-wallet-api/config/auth.conf"
               subPath: "auth.conf"
               readOnly: true
-            - name: wallet-oci-rest-api-secret
-              mountPath: "/waltid-wallet-api/config/oci-rest-api.conf"
-              subPath: "oci-rest-api.conf"
-              readOnly: true
+#            - name: wallet-oci-rest-api-secret
+#              mountPath: "/waltid-wallet-api/config/oci-rest-api.conf"
+#              subPath: "oci-rest-api.conf"
+#              readOnly: true
             - name: wallet-nft-config
               mountPath: "/waltid-wallet-api/walt.yaml"
               subPath: "walt.yaml"
@@ -304,9 +306,9 @@ spec:
         - name: wallet-auth-secret
           secret:
             secretName: wallet-auth-secret
-        - name: wallet-oci-rest-api-secret
-          secret:
-            secretName: wallet-oci-rest-api-secret
+#        - name: wallet-oci-rest-api-secret
+#          secret:
+#            secretName: wallet-oci-rest-api-secret
         - name: wallet-push-config
           secret:
             secretName: wallet-push-config-secret
