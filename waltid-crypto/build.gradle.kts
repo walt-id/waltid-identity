@@ -8,6 +8,7 @@ plugins {
     kotlin("plugin.serialization")
     id("maven-publish")
     id("com.github.ben-manes.versions")
+//    id("com.android.library")
     id("love.forte.plugin.suspend-transform") version "0.6.0"
 }
 
@@ -24,6 +25,10 @@ suspendTransform {
     useDefault()
 }
 
+tasks.withType<org.gradle.language.jvm.tasks.ProcessResources> {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
 java {
     sourceCompatibility = JavaVersion.VERSION_15
     targetCompatibility = JavaVersion.VERSION_15
@@ -32,6 +37,11 @@ java {
 kotlin {
     jvmToolchain(15)
 }
+
+/*android {
+    namespace = "id.walt.crypto"
+    compileSdk = 34
+}*/
 
 kotlin {
     targets.configureEach {
@@ -46,7 +56,6 @@ kotlin {
         compilations.all {
             kotlinOptions.jvmTarget = "15" // JVM got Ed25519 at version 15
         }
-        withJava()
         tasks.withType<Test>().configureEach {
             useJUnitPlatform()
         }
@@ -68,6 +77,7 @@ kotlin {
         }
         binaries.library()
     }
+//    androidTarget()
 
     val ktor_version = "2.3.11"
     sourceSets {
@@ -94,7 +104,7 @@ kotlin {
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
 
                 // Logging
-                implementation("io.github.oshai:kotlin-logging:6.0.4")
+                implementation("io.github.oshai:kotlin-logging:6.0.9")
             }
         }
         val commonTest by getting {
@@ -110,7 +120,7 @@ kotlin {
                 implementation("com.google.crypto.tink:tink:1.12.0") // for JOSE using Ed25519
 
                 implementation("org.bouncycastle:bcprov-lts8on:2.73.6") // for secp256k1 (which was removed with Java 17)
-                implementation("org.bouncycastle:bcpkix-lts8on:2.73.4") // PEM import
+                implementation("org.bouncycastle:bcpkix-lts8on:2.73.6") // PEM import
 
                 // Ktor client
                 implementation("io.ktor:ktor-client-cio:$ktor_version")
@@ -126,8 +136,6 @@ kotlin {
 
                 // Multibase
 //                implementation("com.github.multiformats:java-multibase:v1.1.1")
-
-                implementation("com.oracle.oci.sdk:oci-java-sdk-shaded-full:3.41.0")
             }
         }
         val jvmTest by getting {
@@ -157,6 +165,16 @@ kotlin {
                 implementation(kotlin("test-js"))
             }
         }
+//        val androidMain by getting {
+//            dependencies {
+//                implementation("io.ktor:ktor-client-android:2.3.10")
+//            }
+//        }
+//        val androidUnitTest by getting {
+//            dependencies {
+//                implementation(kotlin("test"))
+//            }
+//        }
         publishing {
             repositories {
                 maven {

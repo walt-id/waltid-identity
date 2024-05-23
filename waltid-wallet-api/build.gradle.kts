@@ -106,6 +106,7 @@ dependencies {
     implementation(project(":waltid-sdjwt"))
 
     implementation(project(":waltid-crypto"))
+    implementation(project(":waltid-crypto-oci"))
     implementation(project(":waltid-did"))
 
     testImplementation(project(":waltid-issuer-api"))
