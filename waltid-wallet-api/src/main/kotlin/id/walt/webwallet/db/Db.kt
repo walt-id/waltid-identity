@@ -138,11 +138,12 @@ object Db {
             JsonUtils.tryGetData(json, "driverClassName")!!.jsonPrimitive.content
         username = JsonUtils.tryGetData(json, "username")!!.jsonPrimitive.content
         password = JsonUtils.tryGetData(json, "password")!!.jsonPrimitive.content
-        transactionIsolation = JsonUtils.tryGetData(json, "transactionIsolation")!!.jsonPrimitive.content
-        maximumPoolSize = JsonUtils.tryGetData(json, "maximumPoolSize")!!.jsonPrimitive.content.toInt()
+        JsonUtils.tryGetData(json, "transactionIsolation")?.jsonPrimitive?.content?.let { transactionIsolation = it }
+        JsonUtils.tryGetData(json, "maximumPoolSize")?.jsonPrimitive?.content?.toIntOrNull()
+            ?.let { maximumPoolSize = it }
         JsonUtils.tryGetData(json, "minimumIdle")?.jsonPrimitive?.content?.toIntOrNull()?.let { minimumIdle = it }
         JsonUtils.tryGetData(json, "maxLifetime")?.jsonPrimitive?.content?.toLongOrNull()?.let { maxLifetime = it }
-        isAutoCommit = JsonUtils.tryGetData(json, "autoCommit")!!.jsonPrimitive.content.toBoolean()
+        JsonUtils.tryGetData(json, "autoCommit")?.jsonPrimitive?.content?.toBoolean()?.let { isAutoCommit = it }
         JsonUtils.tryGetData(json, "dataSource.journalMode")?.jsonPrimitive?.content?.let {
             dataSourceProperties.setProperty("journalMode", it)
         }
