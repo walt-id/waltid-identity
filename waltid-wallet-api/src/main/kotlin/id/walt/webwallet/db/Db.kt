@@ -2,6 +2,7 @@ package id.walt.webwallet.db
 
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
+import id.walt.did.utils.ExtensionMethods.ensurePrefix
 import id.walt.webwallet.config.ConfigManager
 import id.walt.webwallet.config.DatasourceJsonConfiguration
 import id.walt.webwallet.db.models.*
@@ -166,4 +167,16 @@ object Db {
         HikariDataSource(HikariConfig().apply {
             config.applyToHikariConfig(this)
         })
+
+    private const val envVarRegex = "\\$[\\d\\w]+"
+    private fun fixEnvVars(input: String) = envVarRegex.toRegex().findAll(input).fold(input) { acc, i ->
+        runCatching { System.getenv(i.value.removePrefix("$")) }.getOrNull()?.let {
+            acc.replace(i.value, it)
+        } ?: acc
+    }
+    private fun fixEnvVar(input: String) = envVarRegex.ensurePrefix("^").toRegex().find(input)?.let { i ->
+        runCatching { System.getenv(i.value.removePrefix("$")) }.getOrNull()?.let {
+            input.replaceFirst(i.value, it)
+        }
+    } ?: input
 }

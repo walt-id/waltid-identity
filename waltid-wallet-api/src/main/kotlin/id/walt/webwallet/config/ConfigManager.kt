@@ -12,16 +12,7 @@ import kotlin.reflect.KClass
 import kotlin.reflect.jvm.jvmName
 
 @Serializable
-sealed interface WalletConfig {
-    companion object {
-        private val envVarRegex = "\\$[\\d\\w]+".toRegex()
-        fun fixEnvVars(input: String) = envVarRegex.findAll(input).fold(input) { acc, i ->
-            runCatching { System.getenv(i.value.removePrefix("$")) }.getOrNull()?.let {
-                acc.replace(i.value, it)
-            } ?: acc
-        }
-    }
-}
+sealed interface WalletConfig
 
 object ConfigManager {
 
