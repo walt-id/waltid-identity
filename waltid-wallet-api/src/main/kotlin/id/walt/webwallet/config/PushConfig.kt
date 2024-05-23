@@ -14,7 +14,7 @@ data class PushConfig(
     val pushPublicKey: String,
     @Serializable(with = MaskedSerializer::class) val pushPrivateKey: Masked,
     val pushSubject: String
-) : WalletConfig()
+) : WalletConfig
 
 object MaskedSerializer : KSerializer<Masked> {
     override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("pushPrivateKey", PrimitiveKind.STRING)

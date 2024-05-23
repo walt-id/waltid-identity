@@ -237,6 +237,7 @@ class E2EWalletTestLocal : E2EWalletTestBase() {
 
         // list all Dids for this user and set default for credential issuance
         val availableDids = listAllDids()
+        println("Available DIDs: ${availableDids.map { it.did }}")
 
         val issuanceUri = issueJwtCredential()
         println("Issuance Offer uri = $issuanceUri")
