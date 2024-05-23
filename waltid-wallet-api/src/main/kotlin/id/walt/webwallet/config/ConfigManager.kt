@@ -12,7 +12,7 @@ import kotlin.reflect.KClass
 import kotlin.reflect.jvm.jvmName
 
 @Serializable
-sealed class WalletConfig
+sealed interface WalletConfig
 
 object ConfigManager {
 

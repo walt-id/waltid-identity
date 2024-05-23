@@ -5,7 +5,7 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class ChainExplorerConfiguration(
     val explorers: List<Explorer>
-) : WalletConfig() {
+) : WalletConfig {
     @Serializable
     data class Explorer(
         val chain: String,

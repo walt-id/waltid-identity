@@ -6,4 +6,4 @@ import kotlinx.serialization.Serializable
 data class NotificationConfig(
     val url: String,
     val apiKey: String? = null,
-) : WalletConfig()
+) : WalletConfig

@@ -14,7 +14,7 @@ data class RegistrationDefaultsConfig(
     private val defaultDidConfig: JsonObject = buildJsonObject {
         put("method", JsonPrimitive("jwk"))
     }
-) : WalletConfig() {
+) : WalletConfig {
     val keyGenerationRequest = Json.decodeFromJsonElement<KeyGenerationRequest>(defaultKeyConfig)
 
     val didMethod = defaultDidConfig["method"]!!.jsonPrimitive.content
