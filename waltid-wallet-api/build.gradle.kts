@@ -75,7 +75,7 @@ dependencies {
     implementation("io.ktor:ktor-client-serialization-jvm:$ktor_version")
     implementation("io.ktor:ktor-client-content-negotiation:$ktor_version")
     implementation("io.ktor:ktor-client-json-jvm:$ktor_version")
-    implementation("io.ktor:ktor-client-cio-jvm:$ktor_version")
+    implementation("io.ktor:ktor-client-okhttp-jvm:$ktor_version")
     implementation("io.ktor:ktor-client-logging-jvm:$ktor_version")
 
     /* -- Kotlin -- */

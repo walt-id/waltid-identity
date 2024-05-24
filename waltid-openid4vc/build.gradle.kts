@@ -118,7 +118,7 @@ kotlin {
         }
         val jvmMain by getting {
             dependencies {
-                implementation("io.ktor:ktor-client-cio:$ktor_version")
+                implementation("io.ktor:ktor-client-okhttp:$ktor_version")
             }
         }
         val jvmTest by getting {
