@@ -18,6 +18,8 @@ spec:
           env:
             - name: NUXT_PUBLIC_ISSUER_CALLBACK_URL
               value: "https://wallet.demo.walt.id"
+            - name: NUXT_PUBLIC_CREDENTIALS_REPOSITORY_URL
+              value: "https://credentials.walt.id"
           ports:
             - containerPort: 7101
               name: http
