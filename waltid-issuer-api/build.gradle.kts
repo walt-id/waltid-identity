@@ -63,7 +63,7 @@ dependencies {
     implementation("io.ktor:ktor-client-serialization-jvm:${Versions.KTOR_VERSION}")
     implementation("io.ktor:ktor-client-content-negotiation:${Versions.KTOR_VERSION}")
     implementation("io.ktor:ktor-client-json-jvm:${Versions.KTOR_VERSION}")
-    implementation("io.ktor:ktor-client-cio-jvm:${Versions.KTOR_VERSION}")
+    implementation("io.ktor:ktor-client-okhttp-jvm:${Versions.KTOR_VERSION}")
     implementation("io.ktor:ktor-client-logging-jvm:${Versions.KTOR_VERSION}")
 
 
