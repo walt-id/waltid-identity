@@ -23,14 +23,13 @@ import kotlinx.uuid.generateUUID
 import java.io.FileReader
 
 object RequestSigningCryptoProvider: JWTCryptoProvider {
-  val signingKey: ECKey? = ConfigManager.getConfig<OIDCVerifierServiceConfig>().requestSigningKeyFile?.let { runBlocking { ECKey.parseFromPEMEncodedObjects(FileReader(it).readText()).toECKey() } }
+  val signingKey: ECKey = ConfigManager.getConfig<OIDCVerifierServiceConfig>().requestSigningKeyFile?.let { runBlocking { ECKey.parseFromPEMEncodedObjects(FileReader(it).readText()).toECKey() } }
+    ?: ECKeyGenerator(Curve.P_256).keyUse(KeyUse.SIGNATURE).keyID(UUID.generateUUID().toString()).generate()
   val certificateChain: String? = ConfigManager.getConfig<OIDCVerifierServiceConfig>().requestSigningCertFile?.let { FileReader(it).readText() }
-  val defaultSigningKey = ECKeyGenerator(Curve.P_256).keyUse(KeyUse.SIGNATURE).keyID(UUID.generateUUID().toString()).generate()
 
   override fun sign(payload: JsonObject, keyID: String?, typ: String): String {
-    val key = signingKey ?: defaultSigningKey
     return SignedJWT(
-      JWSHeader.Builder(JWSAlgorithm.ES256).keyID(key.keyID).type(JOSEObjectType.JWT).also {
+      JWSHeader.Builder(JWSAlgorithm.ES256).keyID(signingKey.keyID).type(JOSEObjectType.JWT).also {
         if(certificateChain != null) {
           it.x509CertChain(
             X509CertChainUtils.parse(certificateChain).map { Base64.encode(it.encoded) }
@@ -38,7 +37,7 @@ object RequestSigningCryptoProvider: JWTCryptoProvider {
         }
       }.build(),
       JWTClaimsSet.parse(payload.toString())
-    ).also { it.sign(ECDSASigner(key)) }.serialize()
+    ).also { it.sign(ECDSASigner(signingKey)) }.serialize()
   }
 
   override fun verify(jwt: String): JwtVerificationResult {
