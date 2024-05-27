@@ -38,8 +38,6 @@ spec:
             - name: verifier-web-config
               mountPath: "/waltid-verifier-api/config/"
               readOnly: true
-            - name: verifier-data
-              mountPath: "/waltid-verifier-api/data/"
             - name: verifier-request-signing
               mountPath: "/waltid-verifier-api/request-signing-secret/"
           ports:
