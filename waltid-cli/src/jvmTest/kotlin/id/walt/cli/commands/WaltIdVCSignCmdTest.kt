@@ -109,7 +109,12 @@ class WaltIdVCSignCmdTest {
             command.parse(arrayOf("-k", invalidKeyFilePath, "-i", issuerDid, "-s", subjectDid, vcFilePath))
         }
 
-        failure.message?.let { assertContains(it, "${invalidKeyFilePath} (No such file or directory)") }
+        //unix: No such file or directory
+        //winos: The system cannot find the file specified
+        val fileNotFoundMessage = "The system cannot find the file specified".takeIf {
+            System.getProperty("os.name").contains(Regex("^windows", setOf(RegexOption.IGNORE_CASE)))
+        } ?: "No such file or directory"
+        failure.message?.let { assertContains(it, "$invalidKeyFilePath ($fileNotFoundMessage)") }
     }
 
     @Test

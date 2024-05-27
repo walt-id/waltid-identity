@@ -1,6 +1,4 @@
 import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.oci.OCIKey
-import id.walt.crypto.keys.oci.OCIsdkMetadata
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 

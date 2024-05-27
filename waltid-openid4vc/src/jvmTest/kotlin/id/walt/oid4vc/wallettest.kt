@@ -13,11 +13,6 @@ import id.walt.oid4vc.requests.CredentialRequest
 import id.walt.oid4vc.requests.TokenRequest
 import id.walt.oid4vc.responses.CredentialResponse
 import id.walt.oid4vc.responses.TokenResponse
-import io.kotest.core.spec.style.AnnotationSpec
-import io.kotest.matchers.collections.shouldContain
-import io.kotest.matchers.shouldBe
-import io.kotest.matchers.shouldNotBe
-import io.kotest.matchers.types.shouldBeInstanceOf
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.plugins.contentnegotiation.*
@@ -26,11 +21,13 @@ import io.ktor.client.request.forms.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.util.*
+import io.ktor.util.reflect.*
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonPrimitive
+import kotlin.test.*
 
-class wallettest : AnnotationSpec() {
+class wallettest {
 
     /*
      * Instructions to use:
@@ -105,10 +102,13 @@ class wallettest : AnnotationSpec() {
         val parsedOfferReq = CredentialOfferRequest.fromHttpParameters(Url(offerUri).parameters.toMap())
         println("parsedOfferReq: $parsedOfferReq")
 
-        parsedOfferReq.credentialOffer shouldNotBe null
-        parsedOfferReq.credentialOffer!!.credentialIssuer shouldNotBe null
-        parsedOfferReq.credentialOffer!!.grants.keys shouldContain GrantType.pre_authorized_code.value
-        parsedOfferReq.credentialOffer!!.grants[GrantType.pre_authorized_code.value]?.preAuthorizedCode shouldNotBe null
+        assertNotNull(actual = parsedOfferReq.credentialOffer)
+        assertNotNull(actual = parsedOfferReq.credentialOffer!!.credentialIssuer)
+        assertContains(
+            iterable = parsedOfferReq.credentialOffer!!.grants.keys,
+            element = GrantType.pre_authorized_code.value
+        )
+        assertNotNull(actual = parsedOfferReq.credentialOffer!!.grants[GrantType.pre_authorized_code.value]?.preAuthorizedCode)
 
         println("// get issuer metadata")
         val providerMetadataUri =
@@ -116,13 +116,13 @@ class wallettest : AnnotationSpec() {
         val providerMetadata = ktorClient.get(providerMetadataUri).call.body<OpenIDProviderMetadata>()
         println("providerMetadata: $providerMetadata")
 
-        providerMetadata.credentialsSupported shouldNotBe null
+        assertNotNull(actual = providerMetadata.credentialsSupported)
 
         println("// resolve offered credentials")
         val offeredCredentials = OpenID4VCI.resolveOfferedCredentials(parsedOfferReq.credentialOffer!!, providerMetadata)
         println("offeredCredentials: $offeredCredentials")
-        offeredCredentials.size shouldBe 1
-        offeredCredentials.first().format shouldBe CredentialFormat.jwt_vc_json
+        assertEquals(expected = 1, actual = offeredCredentials.size)
+        assertEquals(expected = CredentialFormat.jwt_vc_json, actual = offeredCredentials.first().format)
         val offeredCredential = offeredCredentials.first()
         println("offeredCredentials[0]: $offeredCredential")
 
@@ -142,9 +142,9 @@ class wallettest : AnnotationSpec() {
         println("tokenResp: $tokenResp")
 
         println(">>> Token response = success: ${tokenResp.isSuccess}")
-        tokenResp.isSuccess shouldBe true
-        tokenResp.accessToken shouldNotBe null
-        tokenResp.cNonce shouldNotBe null
+        assertTrue(actual = tokenResp.isSuccess)
+        assertNotNull(actual = tokenResp.accessToken)
+        assertNotNull(actual = tokenResp.cNonce)
 
         println("// receive credential")
         ciTestProvider.deferIssuance = false
@@ -163,15 +163,15 @@ class wallettest : AnnotationSpec() {
         }.body<JsonObject>().let { CredentialResponse.fromJSON(it) }
         println("credentialResp: $credentialResp")
 
-        credentialResp.isSuccess shouldBe true
-        credentialResp.isDeferred shouldBe false
-        credentialResp.format!! shouldBe CredentialFormat.jwt_vc_json
-        credentialResp.credential.shouldBeInstanceOf<JsonPrimitive>()
+        assertTrue(actual = credentialResp.isSuccess)
+        assertFalse(actual = credentialResp.isDeferred)
+        assertEquals(expected = CredentialFormat.jwt_vc_json, actual = credentialResp.format!!)
+        assertTrue(actual = credentialResp.credential!!.instanceOf(JsonPrimitive::class))
 
         println("// parse and verify credential")
         val credential = credentialResp.credential!!.jsonPrimitive.content
         println(">>> Issued credential: $credential")
-        JwtSignaturePolicy().verify(credential, null, mapOf()).isSuccess shouldBe true
+        assertTrue(actual = JwtSignaturePolicy().verify(credential, null, mapOf()).isSuccess)
     }
 
 }

@@ -2,17 +2,19 @@ package id.walt.webwallet.utils
 
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
+import org.intellij.lang.annotations.Language
 
 object IssuanceExamples {
     //language=json
     val universityDegreeCredential = """
 {
-  "issuanceKey": {
+  "issuerKey": {
     "type": "jwk",
     "jwk": "{\"kty\":\"OKP\",\"d\":\"mDhpwaH6JYSrD2Bq7Cs-pzmsjlLj4EOhxyI-9DM1mFI\",\"crv\":\"Ed25519\",\"kid\":\"Vzx7l5fh56F3Pf9aR3DECU5BwfrY6ZJe05aiWYWzan8\",\"x\":\"T3T4-u1Xz3vAV2JwPNxWfs4pik_JLiArz_WTCvrCFUM\"}"
   },
   "issuerDid": "did:key:z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp",
-  "vc": {
+  "credentialConfigurationId": "OpenBadgeCredential_jwt_vc_json",
+  "credentialData": {
     "@context": [
       "https://www.w3.org/2018/credentials/v1",
       "https://www.w3.org/2018/credentials/examples/v1"
@@ -51,12 +53,13 @@ object IssuanceExamples {
     //language=json
     val openBadgeCredentialExampleJsonString = """
 {
-  "issuanceKey": {
+  "issuerKey": {
     "type": "jwk",
     "jwk": "{\"kty\":\"OKP\",\"d\":\"mDhpwaH6JYSrD2Bq7Cs-pzmsjlLj4EOhxyI-9DM1mFI\",\"crv\":\"Ed25519\",\"kid\":\"Vzx7l5fh56F3Pf9aR3DECU5BwfrY6ZJe05aiWYWzan8\",\"x\":\"T3T4-u1Xz3vAV2JwPNxWfs4pik_JLiArz_WTCvrCFUM\"}"
   },
   "issuerDid": "did:key:z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp",
-  "vc": {
+  "credentialConfigurationId": "OpenBadgeCredential_jwt_vc_json",
+  "credentialData": {
     "@context": [
       "https://www.w3.org/2018/credentials/v1",
       "https://purl.imsglobal.org/spec/ob/v3p0/context.json"
@@ -116,16 +119,17 @@ object IssuanceExamples {
 """.trimIndent()
     val openBadgeCredentialExample = Json.parseToJsonElement(openBadgeCredentialExampleJsonString).jsonObject.toMap()
 
-
+    @Language("JSON")
     val testCredential =
         """
             {
-              "issuanceKey": {
+              "issuerKey": {
                 "type": "jwk",
                 "jwk": "{\"kty\":\"OKP\",\"d\":\"mDhpwaH6JYSrD2Bq7Cs-pzmsjlLj4EOhxyI-9DM1mFI\",\"crv\":\"Ed25519\",\"kid\":\"Vzx7l5fh56F3Pf9aR3DECU5BwfrY6ZJe05aiWYWzan8\",\"x\":\"T3T4-u1Xz3vAV2JwPNxWfs4pik_JLiArz_WTCvrCFUM\"}"
               },
               "issuerDid": "did:key:z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp",
-              "vc": {
+              "credentialConfigurationId": "OpenBadgeCredential_jwt_vc_json",
+              "credentialData": {
                 "@context": [
                   "https://www.w3.org/2018/credentials/v1",
                   "https://purl.imsglobal.org/spec/ob/v3p0/context.json"
@@ -220,12 +224,13 @@ object IssuanceExamples {
     val batchExample = """
         [
           {
-            "issuanceKey": {
+            "issuerKey": {
               "type": "jwk",
               "jwk": "{\"kty\":\"OKP\",\"d\":\"mDhpwaH6JYSrD2Bq7Cs-pzmsjlLj4EOhxyI-9DM1mFI\",\"crv\":\"Ed25519\",\"kid\":\"Vzx7l5fh56F3Pf9aR3DECU5BwfrY6ZJe05aiWYWzan8\",\"x\":\"T3T4-u1Xz3vAV2JwPNxWfs4pik_JLiArz_WTCvrCFUM\"}"
             },
             "issuerDid": "did:key:z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp",
-            "vc": {
+            "credentialConfigurationId": "OpenBadgeCredential_jwt_vc_json",
+            "credentialData": {
               "@context": [
                 "https://www.w3.org/2018/credentials/v1",
                 "https://www.w3.org/2018/credentials/examples/v1"
@@ -260,12 +265,12 @@ object IssuanceExamples {
             }
           },
           {
-            "issuanceKey": {
+            "issuerKey": {
               "type": "jwk",
               "jwk": "{\"kty\":\"OKP\",\"d\":\"mDhpwaH6JYSrD2Bq7Cs-pzmsjlLj4EOhxyI-9DM1mFI\",\"crv\":\"Ed25519\",\"kid\":\"Vzx7l5fh56F3Pf9aR3DECU5BwfrY6ZJe05aiWYWzan8\",\"x\":\"T3T4-u1Xz3vAV2JwPNxWfs4pik_JLiArz_WTCvrCFUM\"}"
             },
             "issuerDid": "did:key:z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp",
-            "vc": {
+            "credentialData": {
               "@context": [
                 "https://www.w3.org/2018/credentials/v1",
                 "https://purl.imsglobal.org/spec/ob/v3p0/context.json"
@@ -328,12 +333,13 @@ object IssuanceExamples {
     //language=JSON
     val sdJwtExample = """
         {
-          "issuanceKey": {
+          "issuerKey": {
             "type": "jwk",
             "jwk": "{\"kty\":\"OKP\",\"d\":\"mDhpwaH6JYSrD2Bq7Cs-pzmsjlLj4EOhxyI-9DM1mFI\",\"crv\":\"Ed25519\",\"kid\":\"Vzx7l5fh56F3Pf9aR3DECU5BwfrY6ZJe05aiWYWzan8\",\"x\":\"T3T4-u1Xz3vAV2JwPNxWfs4pik_JLiArz_WTCvrCFUM\"}"
           },
           "issuerDid": "did:key:z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp",
-          "vc": {
+          "credentialConfigurationId": "OpenBadgeCredential_jwt_vc_json",
+          "credentialData": {
             "@context": [
               "https://www.w3.org/2018/credentials/v1",
               "https://purl.imsglobal.org/spec/ob/v3p0/context.json"

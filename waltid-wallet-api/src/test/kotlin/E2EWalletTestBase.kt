@@ -148,7 +148,7 @@ abstract class E2EWalletTestBase {
         println("> Response JSON body token: $token")
     }
 
-    protected suspend fun listAllWalletsForUser() {
+    protected suspend fun listAllWalletsForUser(): List<AccountWalletListing.WalletListing> {
         println("\nUse Case -> List Wallets for Account\n")
         val endpoint = "$walletUrl/wallet-api/wallet/accounts/wallets"
         println("GET($endpoint)")
@@ -160,6 +160,8 @@ abstract class E2EWalletTestBase {
         val availableWallets = walletListing.wallets
         assertTrue { availableWallets.isNotEmpty() }
         walletId = availableWallets.first().id
+
+        return availableWallets
     }
 
     protected suspend fun createDid(didType: String): String {

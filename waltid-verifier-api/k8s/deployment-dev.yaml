@@ -1,15 +1,4 @@
 apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: verifier-data-volume-claim
-spec:
-  accessModes:
-    - ReadWriteMany
-  resources:
-    requests:
-      storage: 100Mi
----
-apiVersion: v1
 kind: ConfigMap
 metadata:
   name: verifier-web-config
@@ -46,15 +35,10 @@ spec:
             - name: verifier-web-config
               mountPath: "/waltid-verifier-api/config/"
               readOnly: true
-            - name: verifier-data
-              mountPath: "/waltid-verifier-api/data/"
           ports:
             - containerPort: 3000
               name: http-api
       volumes:
-        - name: verifier-data
-          persistentVolumeClaim:
-            claimName: verifier-data-volume-claim
         - name: verifier-web-config
           configMap:
             name: verifier-web-config

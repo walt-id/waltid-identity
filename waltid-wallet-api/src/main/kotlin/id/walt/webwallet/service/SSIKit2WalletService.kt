@@ -2,7 +2,6 @@ package id.walt.webwallet.service
 
 import id.walt.crypto.keys.*
 import id.walt.crypto.keys.jwk.JWKKey
-import id.walt.crypto.utils.JsonUtils.toJsonObject
 import id.walt.did.dids.DidService
 import id.walt.did.dids.registrar.LocalRegistrar
 import id.walt.did.dids.registrar.dids.DidCheqdCreateOptions
@@ -19,6 +18,7 @@ import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.requests.CredentialOfferRequest
 import id.walt.oid4vc.responses.AuthorizationErrorCode
 import id.walt.webwallet.config.ConfigManager
+import id.walt.webwallet.config.ConfigManager.asJsonObject
 import id.walt.webwallet.config.OciKeyConfig
 import id.walt.webwallet.config.OciRestApiKeyConfig
 import id.walt.webwallet.db.models.WalletCategoryData
@@ -440,39 +440,13 @@ class SSIKit2WalletService(
             )
         }
 
-    private val ociRestApiKeyMetadata by lazy {
-        ConfigManager.getConfig<OciRestApiKeyConfig>().let {
-            mapOf(
-                "tenancyOcid" to it.tenancyOcid,
-                "compartmentOcid" to it.compartmentOcid,
-                "userOcid" to it.userOcid,
-                "fingerprint" to it.fingerprint,
-                "managementEndpoint" to it.managementEndpoint,
-                "cryptoEndpoint" to it.cryptoEndpoint,
-                "signingKeyPem" to (it.signingKeyPem?.trimIndent() ?: ""),
-            ).toJsonObject()
-        }
-    }
-
-
-    private val ociKeyMetadata by lazy {
-        ConfigManager.getConfig<OciKeyConfig>().let {
-            mapOf(
-                "compartmentId" to it.compartmentId,
-                "vaultId" to it.vaultId
-            ).toJsonObject()
-        }
-    }
-
     override suspend fun generateKey(request: KeyGenerationRequest): String = let {
         if (request.backend == "oci-rest-api" && request.config == null) {
-            request.config = ociRestApiKeyMetadata
+            request.config = ConfigManager.getConfig<OciRestApiKeyConfig>().asJsonObject()
         }
         if (request.backend == "oci" && request.config == null) {
-            request.config = ociKeyMetadata
+            request.config = ConfigManager.getConfig<OciKeyConfig>().asJsonObject()
         }
-
-
 
         KeyManager.createKey(request)
             .also {
@@ -487,8 +461,6 @@ class SSIKit2WalletService(
                     data = eventUseCase.keyEventData(it, "jwk")
                 )
             }.getKeyId()
-
-
     }
 
     override suspend fun importKey(jwkOrPem: String): String {

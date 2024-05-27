@@ -63,7 +63,7 @@ dependencies {
     implementation("io.ktor:ktor-client-serialization-jvm:${Versions.KTOR_VERSION}")
     implementation("io.ktor:ktor-client-content-negotiation:${Versions.KTOR_VERSION}")
     implementation("io.ktor:ktor-client-json-jvm:${Versions.KTOR_VERSION}")
-    implementation("io.ktor:ktor-client-cio-jvm:${Versions.KTOR_VERSION}")
+    implementation("io.ktor:ktor-client-okhttp-jvm:${Versions.KTOR_VERSION}")
     implementation("io.ktor:ktor-client-logging-jvm:${Versions.KTOR_VERSION}")
 
 
@@ -163,7 +163,9 @@ publishing {
 
     repositories {
         maven {
-            url = uri("https://maven.waltid.dev/releases")
+            val releasesRepoUrl = uri("https://maven.waltid.dev/releases")
+            val snapshotsRepoUrl = uri("https://maven.waltid.dev/snapshots")
+            url = uri(if (version.toString().endsWith("SNAPSHOT")) snapshotsRepoUrl else releasesRepoUrl)
             val envUsername = System.getenv("MAVEN_USERNAME")
             val envPassword = System.getenv("MAVEN_PASSWORD")
 

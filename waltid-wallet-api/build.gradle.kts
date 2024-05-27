@@ -46,7 +46,7 @@ dependencies {
 
     /* -- KTOR -- */
 
-    val ktor_version = "2.3.10"
+    val ktor_version = "2.3.11"
     // Ktor server
     implementation("io.ktor:ktor-server-core-jvm:$ktor_version")
     implementation("io.ktor:ktor-server-auth-jvm:$ktor_version")
@@ -75,7 +75,7 @@ dependencies {
     implementation("io.ktor:ktor-client-serialization-jvm:$ktor_version")
     implementation("io.ktor:ktor-client-content-negotiation:$ktor_version")
     implementation("io.ktor:ktor-client-json-jvm:$ktor_version")
-    implementation("io.ktor:ktor-client-cio-jvm:$ktor_version")
+    implementation("io.ktor:ktor-client-okhttp-jvm:$ktor_version")
     implementation("io.ktor:ktor-client-logging-jvm:$ktor_version")
 
     /* -- Kotlin -- */
@@ -106,6 +106,7 @@ dependencies {
     implementation(project(":waltid-sdjwt"))
 
     implementation(project(":waltid-crypto"))
+    implementation(project(":waltid-crypto-oci"))
     implementation(project(":waltid-did"))
 
     testImplementation(project(":waltid-issuer-api"))

@@ -12,6 +12,6 @@
   "dependencies": {
     "cose-js": "^0.9.0",
     "jose": "^4.15.5",
-    "waltid-mdoc": "^1.2311211421.0"
+    "waltid-mdoc": "^1.2312081100.0"
   }
 }

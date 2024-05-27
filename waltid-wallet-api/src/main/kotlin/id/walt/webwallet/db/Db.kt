@@ -1,7 +1,8 @@
 package id.walt.webwallet.db
 
+import com.zaxxer.hikari.HikariConfig
+import com.zaxxer.hikari.HikariDataSource
 import id.walt.webwallet.config.ConfigManager
-import id.walt.webwallet.config.DatasourceConfiguration
 import id.walt.webwallet.config.DatasourceJsonConfiguration
 import id.walt.webwallet.db.models.*
 import id.walt.webwallet.service.account.AccountsService
@@ -11,6 +12,9 @@ import id.walt.webwallet.web.model.EmailAccountRequest
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Clock
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.uuid.UUID
 import kotlinx.uuid.generateUUID
 import org.jetbrains.exposed.sql.Database
@@ -27,24 +31,22 @@ import kotlin.random.Random
 
 object Db {
 
+    private lateinit var datasourceConfig: DatasourceJsonConfiguration
     private val log = KotlinLogging.logger { }
-
-    lateinit var datasourceConfig: DatasourceConfiguration
 
     internal const val SQLITE_PREFIX = "jdbc:sqlite:"
 
     private fun connect() {
-        val jdbcUrl = ConfigManager.getConfig<DatasourceJsonConfiguration>().jdbcUrl
+        datasourceConfig = ConfigManager.getConfig<DatasourceJsonConfiguration>()
 
-        if (jdbcUrl?.contains("sqlite") == true) {
-            log.info { "Will use sqlite database (${jdbcUrl}), working directory: ${Path(".").absolutePathString()}" }
+        if (datasourceConfig.jdbcUrl?.contains("sqlite") == true) {
+            log.info { "Will use sqlite database (${datasourceConfig.jdbcUrl}), working directory: ${Path(".").absolutePathString()}" }
         }
 
-        datasourceConfig = ConfigManager.getConfig<DatasourceConfiguration>()
-        val hikariDataSourceConfig = datasourceConfig.hikariDataSource
+        val hikariDataSourceConfig = createHikariDataSource(datasourceConfig.hikariDataSource)
 
         // connect
-        log.info { "Connecting to database at \"${hikariDataSourceConfig.jdbcUrl}\"..." }
+        log.info { "Connecting to database at \"${datasourceConfig.jdbcUrl}\"..." }
 
         Database.connect(hikariDataSourceConfig)
         TransactionManager.manager.defaultIsolationLevel =
@@ -129,4 +131,39 @@ object Db {
         "TRANSACTION_SERIALIZABLE" -> Connection.TRANSACTION_SERIALIZABLE
         else -> Connection.TRANSACTION_SERIALIZABLE
     }
+
+    @Serializable
+    data class SerializableHikariConfiguration(
+        val jdbcUrl: String? = null,
+        val driverClassName: String? = null,
+        val username: String? = null,
+        val password: String? = null,
+        val transactionIsolation: String? = null,
+        val maximumPoolSize: Int? = null,
+        val maxLifetime: Long? = null,
+        val isAutoCommit: Boolean? = null,
+
+        val dataSourceProperties: JsonObject? = null,
+    ) {
+        fun applyToHikariConfig(hikari: HikariConfig) {
+            hikari.jdbcUrl = jdbcUrl
+            hikari.driverClassName = driverClassName
+            hikari.username = username
+            hikari.password = password
+
+            transactionIsolation?.let { hikari.transactionIsolation = it }
+            maximumPoolSize?.let { hikari.maximumPoolSize = it }
+            maxLifetime?.let { hikari.maxLifetime = it }
+            isAutoCommit?.let { hikari.isAutoCommit = it }
+
+            dataSourceProperties?.entries?.forEach { (key, value) ->
+                hikari.addDataSourceProperty(key, value.jsonPrimitive.content)
+            }
+        }
+    }
+
+    private fun createHikariDataSource(config: SerializableHikariConfiguration) =
+        HikariDataSource(HikariConfig().apply {
+            config.applyToHikariConfig(this)
+        })
 }
