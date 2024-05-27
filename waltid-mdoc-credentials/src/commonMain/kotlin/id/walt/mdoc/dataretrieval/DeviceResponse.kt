@@ -3,10 +3,14 @@ package id.walt.mdoc.dataretrieval
 import cbor.Cbor
 import id.walt.mdoc.doc.MDoc
 import id.walt.mdoc.dataelement.*
+import korlibs.crypto.encoding.base64Url
+import korlibs.crypto.encoding.toBase64
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.decodeFromHexString
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 
 /**
  * Device response data structure containing MDocs presented by device
@@ -41,6 +45,12 @@ class DeviceResponse(
      */
     fun toCBORHex() = toMapElement().toCBORHex()
 
+    /**
+     * Serialize to CBOR base64 url-encoded string
+     */
+    @OptIn(ExperimentalEncodingApi::class)
+    fun toCBORBase64URL() = Base64.UrlSafe.encode(toCBOR())
+
     companion object {
         /**
          * Deserialize from CBOR data
@@ -52,5 +62,8 @@ class DeviceResponse(
          */
         @OptIn(ExperimentalSerializationApi::class)
         fun fromCBORHex(cbor: String) = Cbor.decodeFromHexString<DeviceResponse>(cbor)
+
+        @OptIn(ExperimentalEncodingApi::class)
+        fun fromCBORBase64URL(cbor: String) = fromCBOR(Base64.UrlSafe.decode(cbor))
     }
 }
