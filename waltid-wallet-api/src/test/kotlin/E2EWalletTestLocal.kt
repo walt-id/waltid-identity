@@ -1,12 +1,10 @@
-import com.zaxxer.hikari.HikariConfig
-import com.zaxxer.hikari.HikariDataSource
-import id.walt.crypto.utils.JsonUtils.toJsonObject
 import id.walt.issuer.base.config.OIDCIssuerServiceConfig
 import id.walt.issuer.issuerModule
 import id.walt.verifier.verifierModule
-import id.walt.webwallet.config.DatasourceConfiguration
 import id.walt.webwallet.config.DatasourceJsonConfiguration
+import id.walt.webwallet.config.RegistrationDefaultsConfig
 import id.walt.webwallet.db.Db
+import id.walt.webwallet.db.models.AccountWalletListing
 import id.walt.webwallet.utils.WalletHttpClients
 import id.walt.webwallet.webWalletModule
 import id.walt.webwallet.webWalletSetup
@@ -20,9 +18,9 @@ import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.testing.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.uuid.UUID
 import kotlin.io.path.Path
 import kotlin.io.path.absolutePathString
 import kotlin.test.Test
@@ -40,29 +38,23 @@ class E2EWalletTestLocal : E2EWalletTestBase() {
 
     companion object {
         init {
-            WalletConfigManager.preloadConfig("db.sqlite", DatasourceJsonConfiguration(
-                hikariDataSource = mapOf(
-                    "jdbcUrl" to "jdbc:sqlite:data/wallet.db"
-                ).toJsonObject(),
-                recreateDatabaseOnStart = true
-            ))
-
             WalletConfigManager.preloadConfig(
-                "db.sqlite", DatasourceConfiguration(
-                    hikariDataSource = HikariDataSource(HikariConfig().apply {
-                        jdbcUrl = "jdbc:sqlite:data/wallet.db"
-                        driverClassName = "org.sqlite.JDBC"
-                        username = ""
-                        password = ""
-                        transactionIsolation = "TRANSACTION_SERIALIZABLE"
+                "db.sqlite", DatasourceJsonConfiguration(
+                    hikariDataSource = Db.SerializableHikariConfiguration(
+                        jdbcUrl = "jdbc:sqlite:data/wallet.db",
+                        driverClassName = "org.sqlite.JDBC",
+                        username = "",
+                        password = "",
+                        transactionIsolation = "TRANSACTION_SERIALIZABLE",
                         isAutoCommit = true
-                    }),
+                    ),
                     recreateDatabaseOnStart = true
                 )
             )
 
 
             WalletConfigManager.preloadConfig("web", WalletWebConfig())
+            WalletConfigManager.preloadConfig("registration-defaults", RegistrationDefaultsConfig())
             webWalletSetup()
             WalletConfigManager.loadConfigs(emptyArray())
         }
@@ -137,6 +129,43 @@ class E2EWalletTestLocal : E2EWalletTestBase() {
     }
 
     @Test
+    fun e2eTestPermissions() = testApplication {
+        runApplication()
+
+        val user1 = User(name = "tester", email = "tester@email.com", password = "password", accountType = "email")
+        val user2 = User(name = "tester2", email = "tester2@email.com", password = "password", accountType = "email")
+
+        testCreateUser(user1)
+        getTokenFor(user1)
+        localWalletClient = newClient(token)
+
+        fun List<AccountWalletListing.WalletListing>.getUserWallet(): UUID {
+            check(this.isNotEmpty()) { "No wallet found" }
+            return this.first().id
+        }
+
+        val user1Wallets = listAllWalletsForUser()
+        println("User1: $user1Wallets")
+        val user1Wallet = user1Wallets.getUserWallet()
+
+
+        testCreateUser(user2)
+        getTokenFor(user2)
+        localWalletClient = newClient(token)
+
+        val user2Wallets = listAllWalletsForUser()
+        println("User2: $user2Wallets")
+        val user2Wallet = user2Wallets.getUserWallet()
+
+        println("Check accessing own wallet...")
+        check(localWalletClient.get("/wallet-api/wallet/$user2Wallet/credentials").status == HttpStatusCode.OK) { "Accessing own wallet does not work" }
+
+
+        println("Check accessing strangers wallet...")
+        check(localWalletClient.get("/wallet-api/wallet/$user1Wallet/credentials").status == HttpStatusCode.Forbidden) { "Accessing strangers wallet should not work" }
+    }
+
+    @Test
     fun e2eTestKeys() = testApplication {
         runApplication()
         login()
@@ -195,7 +224,7 @@ class E2EWalletTestLocal : E2EWalletTestBase() {
         deleteCredential(id)
     }
 
-    //    @Test(temporary disabled due to failure caused by ktor client)
+    @Test
     fun e2eTestIssuance() = testApplication {
         runApplication()
         login()
@@ -208,12 +237,14 @@ class E2EWalletTestLocal : E2EWalletTestBase() {
 
         // list all Dids for this user and set default for credential issuance
         val availableDids = listAllDids()
+        println("Available DIDs: ${availableDids.map { it.did }}")
 
         val issuanceUri = issueJwtCredential()
         println("Issuance Offer uri = $issuanceUri")
+        check(issuanceUri.startsWith("openid-credential-offer://")) { "Issuance offer URI is invalid!" }
 
         // Request credential and store in wallet
-        requestCredential(issuanceUri, availableDids.first().did)
+        // FIXME: requestCredential(issuanceUri, availableDids.first().did) // WaltId-MikeRichardson: temporarily disabled due to failure caused by ktor client
     }
 
     override var walletClient: HttpClient

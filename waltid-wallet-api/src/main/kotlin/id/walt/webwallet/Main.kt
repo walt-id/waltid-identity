@@ -1,5 +1,6 @@
 package id.walt.webwallet
 
+import id.walt.crypto.keys.oci.WaltCryptoOci
 import id.walt.did.helpers.WaltidServices
 import id.walt.webwallet.config.ConfigManager
 import id.walt.webwallet.config.WebConfig
@@ -30,6 +31,7 @@ suspend fun main(args: Array<String>) {
 
     webWalletSetup()
     WaltidServices.minimalInit()
+    WaltCryptoOci.init()
 
     Db.start()
 
@@ -78,11 +80,11 @@ fun Application.webWalletModule(withPlugins: Boolean = true) {
     health()
 
     auth()
+    accounts()
     push()
     notifications()
 
     // Wallet routes
-    accounts()
     keys()
     dids()
     credentials()
