@@ -8,16 +8,10 @@ plugins {
     kotlin("plugin.serialization")
     id("maven-publish")
     id("com.github.ben-manes.versions")
-//    id("com.android.library")
     id("love.forte.plugin.suspend-transform") version "0.6.0"
 }
 
 group = "id.walt.crypto"
-
-repositories {
-    mavenCentral()
-    maven("https://jitpack.io")
-}
 
 suspendTransform {
     enabled = true
@@ -28,20 +22,6 @@ suspendTransform {
 tasks.withType<org.gradle.language.jvm.tasks.ProcessResources> {
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
-
-java {
-    sourceCompatibility = JavaVersion.VERSION_15
-    targetCompatibility = JavaVersion.VERSION_15
-}
-
-kotlin {
-    jvmToolchain(15)
-}
-
-/*android {
-    namespace = "id.walt.crypto"
-    compileSdk = 34
-}*/
 
 kotlin {
     targets.configureEach {

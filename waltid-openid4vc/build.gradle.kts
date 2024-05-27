@@ -11,23 +11,9 @@ plugins {
 
 group = "id.walt"
 
-repositories {
-    mavenCentral()
-    maven("https://maven.waltid.dev/releases") {
-        content {
-            includeGroup("id.walt")
-        }
-    }
-    mavenLocal()
-}
-
 val targetVersion = JavaVersion.VERSION_1_8
 val toolingRuntime = JavaVersion.VERSION_21
 
-java {
-    sourceCompatibility = targetVersion
-    targetCompatibility = targetVersion
-}
 
 tasks.withType(KotlinCompile::class.java) {
     compilerOptions {

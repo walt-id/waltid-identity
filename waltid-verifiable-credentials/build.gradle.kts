@@ -14,24 +14,10 @@ plugins {
 
 group = "id.walt.credentials"
 
-repositories {
-    mavenCentral()
-    maven("https://jitpack.io")
-}
-
 suspendTransform {
     enabled = true
     includeRuntime = true
     useDefault()
-}
-
-java {
-    sourceCompatibility = JavaVersion.VERSION_15
-    targetCompatibility = JavaVersion.VERSION_15
-}
-
-kotlin {
-    jvmToolchain(15)
 }
 
 kotlin {
@@ -44,9 +30,6 @@ kotlin {
     }
 
     jvm {
-        compilations.all {
-            kotlinOptions.jvmTarget = "15" // JVM got Ed25519 at version 15
-        }
         withJava()
         tasks.withType<Test>().configureEach {
             useJUnitPlatform()

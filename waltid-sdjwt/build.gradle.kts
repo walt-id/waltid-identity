@@ -12,10 +12,6 @@ plugins {
 
 group = "id.walt"
 
-repositories {
-    mavenCentral()
-}
-
 @OptIn(org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi::class)
 kotlin {
     targets.configureEach {
@@ -27,7 +23,7 @@ kotlin {
     }
 
     jvm {
-        jvmToolchain(15) // 16 possible?
+//        jvmToolchain(15) // 16 possible?
         withJava()
         testRuns["test"].executionTask.configure {
             useJUnitPlatform()

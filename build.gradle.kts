@@ -1,4 +1,6 @@
 import com.github.benmanes.gradle.versions.updates.DependencyUpdatesTask
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 allprojects {
 
@@ -7,10 +9,16 @@ allprojects {
     repositories {
         google()
         mavenCentral()
-        maven(url = "https://maven.walt.id/repository/waltid/")
+        maven("https://maven.waltid.dev/releases") {
+            content {
+                includeGroup("id.walt")
+            }
+        }
         maven(url = "https://jitpack.io")
     }
 }
+val targetVersion = JavaVersion.VERSION_1_8
+val toolingRuntime = JavaVersion.VERSION_21
 
 plugins {
     val kotlinVersion = "1.9.24"
@@ -30,8 +38,17 @@ dependencies {
 repositories {
     mavenCentral()
 }
+tasks.withType(KotlinCompile::class.java) {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.fromTarget(targetVersion.toString()))
+    }
+}
 kotlin {
-    jvmToolchain(8)
+    jvmToolchain(toolingRuntime.majorVersion.toInt())
+}
+java {
+    sourceCompatibility = targetVersion
+    targetCompatibility = targetVersion
 }
 
 allprojects {

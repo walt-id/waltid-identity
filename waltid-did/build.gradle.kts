@@ -13,25 +13,10 @@ plugins {
 
 group = "id.walt.did"
 
-repositories {
-    mavenCentral()
-    maven("https://jitpack.io")
-}
-
-java {
-    sourceCompatibility = JavaVersion.VERSION_15
-    targetCompatibility = JavaVersion.VERSION_15
-}
-
 suspendTransform {
     enabled = true
     includeRuntime = true
     useDefault()
-}
-
-
-kotlin {
-    jvmToolchain(15)
 }
 
 kotlin {
