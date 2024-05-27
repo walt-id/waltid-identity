@@ -5,13 +5,7 @@ import io.ktor.util.*
 
 interface IHTTPDataObject {
     fun toHttpParameters(): Map<String, List<String>>
-    fun toHttpQueryString() = URLBuilder().apply {
-        toHttpParameters()
-            .flatMap { param -> param.value.map { Pair(param.key, it) } }
-            .forEach { param ->
-                parameters.append(param.first, param.second)
-            }
-    }.build().encodedQuery
+    fun toHttpQueryString() = Companion.toHttpQueryString(toHttpParameters())
 
     fun toRedirectUri(redirectUri: String, responseMode: ResponseMode) = URLBuilder(redirectUri).apply {
         when (responseMode) {
@@ -20,6 +14,16 @@ interface IHTTPDataObject {
             else -> throw Exception("For response via redirect_uri, response mode must be query or fragment")
         }
     }.buildString()
+
+    companion object {
+        fun toHttpQueryString(params: Map<String, List<String>>) = URLBuilder().apply {
+            params
+                .flatMap { param -> param.value.map { Pair(param.key, it) } }
+                .forEach { param ->
+                    parameters.append(param.first, param.second)
+                }
+        }.build().encodedQuery
+    }
 }
 
 abstract class HTTPDataObject : IHTTPDataObject {
