@@ -24,6 +24,7 @@ import id.walt.mdoc.mso.DeviceKeyInfo
 import id.walt.mdoc.mso.ValidityInfo
 import id.walt.oid4vc.data.ClientIdScheme
 import id.walt.oid4vc.data.HTTPDataObject
+import id.walt.oid4vc.data.OpenId4VPProfile
 import id.walt.oid4vc.data.ResponseMode
 import id.walt.oid4vc.data.dif.*
 import id.walt.sdjwt.SimpleJWTCryptoProvider
@@ -219,7 +220,7 @@ fun Application.verfierApi() {
                     statusCallbackUri = statusCallbackUri,
                     statusCallbackApiKey = statusCallbackApiKey,
                     stateId = stateId,
-                    authorizeBaseUrl = authorizeBaseUrl
+                    openId4VPProfile = OpenId4VPProfile.fromAuthorizeBaseURL(authorizeBaseUrl) ?: OpenId4VPProfile.Default
                 )
 
                 context.respond(authorizeBaseUrl.plus("?").plus(

@@ -45,7 +45,7 @@ class VerificationUseCase(
         statusCallbackUri: String?,
         statusCallbackApiKey: String?,
         stateId: String?,
-        authorizeBaseUrl: String
+        openId4VPProfile: OpenId4VPProfile = OpenId4VPProfile.Default
     ) = let {
         val vpPolicies = vpPoliciesJson?.jsonArray?.parsePolicyRequests() ?: listOf(PolicyRequest(JwtSignaturePolicy()))
 
@@ -73,8 +73,8 @@ class VerificationUseCase(
                 ResponseMode.direct_post_jwt -> runBlocking { KeyManager.createKey(KeyGenerationRequest(keyType = KeyType.secp256r1)) }
                 else -> null
             },
-            clientIdScheme = this.getClientIdScheme(authorizeBaseUrl, OIDCVerifierService.config.defaultClientIdScheme),
-            openId4VPProfile = OpenId4VPProfile.fromAuthorizeBaseURL(authorizeBaseUrl)
+            clientIdScheme = this.getClientIdScheme(openId4VPProfile, OIDCVerifierService.config.defaultClientIdScheme),
+            openId4VPProfile = openId4VPProfile
         )
 
         val specificPolicies = requestCredentialsArr.filterIsInstance<JsonObject>().associate {
@@ -179,11 +179,11 @@ class VerificationUseCase(
         }
     }
 
-    fun getClientIdScheme(authorizeBaseUrl: String, defaultClientIdScheme: ClientIdScheme): ClientIdScheme {
-        return if(authorizeBaseUrl.startsWith("mdoc-openid4vp://"))
-            ClientIdScheme.X509SanDns
-        else
-            defaultClientIdScheme
+    fun getClientIdScheme(openId4VPProfile: OpenId4VPProfile, defaultClientIdScheme: ClientIdScheme): ClientIdScheme {
+        return when(openId4VPProfile) {
+            OpenId4VPProfile.ISO_18013_7_MDOC -> ClientIdScheme.X509SanDns
+            else -> defaultClientIdScheme
+        }
     }
 }
 
