@@ -1,11 +1,8 @@
-import com.zaxxer.hikari.HikariConfig
-import com.zaxxer.hikari.HikariDataSource
-import id.walt.crypto.utils.JsonUtils.toJsonObject
 import id.walt.issuer.base.config.OIDCIssuerServiceConfig
 import id.walt.issuer.issuerModule
 import id.walt.verifier.verifierModule
-import id.walt.webwallet.config.DatasourceConfiguration
 import id.walt.webwallet.config.DatasourceJsonConfiguration
+import id.walt.webwallet.config.RegistrationDefaultsConfig
 import id.walt.webwallet.db.Db
 import id.walt.webwallet.db.models.AccountWalletListing
 import id.walt.webwallet.utils.WalletHttpClients
@@ -43,29 +40,21 @@ class E2EWalletTestLocal : E2EWalletTestBase() {
         init {
             WalletConfigManager.preloadConfig(
                 "db.sqlite", DatasourceJsonConfiguration(
-                    hikariDataSource = mapOf(
-                        "jdbcUrl" to "jdbc:sqlite:data/wallet.db"
-                    ).toJsonObject(),
-                    recreateDatabaseOnStart = true
-                )
-            )
-
-            WalletConfigManager.preloadConfig(
-                "db.sqlite", DatasourceConfiguration(
-                    hikariDataSource = HikariDataSource(HikariConfig().apply {
-                        jdbcUrl = "jdbc:sqlite:data/wallet.db"
-                        driverClassName = "org.sqlite.JDBC"
-                        username = ""
-                        password = ""
-                        transactionIsolation = "TRANSACTION_SERIALIZABLE"
+                    hikariDataSource = Db.SerializableHikariConfiguration(
+                        jdbcUrl = "jdbc:sqlite:data/wallet.db",
+                        driverClassName = "org.sqlite.JDBC",
+                        username = "",
+                        password = "",
+                        transactionIsolation = "TRANSACTION_SERIALIZABLE",
                         isAutoCommit = true
-                    }),
+                    ),
                     recreateDatabaseOnStart = true
                 )
             )
 
 
             WalletConfigManager.preloadConfig("web", WalletWebConfig())
+            WalletConfigManager.preloadConfig("registration-defaults", RegistrationDefaultsConfig())
             webWalletSetup()
             WalletConfigManager.loadConfigs(emptyArray())
         }
@@ -248,6 +237,7 @@ class E2EWalletTestLocal : E2EWalletTestBase() {
 
         // list all Dids for this user and set default for credential issuance
         val availableDids = listAllDids()
+        println("Available DIDs: ${availableDids.map { it.did }}")
 
         val issuanceUri = issueJwtCredential()
         println("Issuance Offer uri = $issuanceUri")

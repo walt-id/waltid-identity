@@ -1,15 +1,4 @@
 apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: verifier-data-volume-claim
-spec:
-  accessModes:
-    - ReadWriteMany
-  resources:
-    requests:
-      storage: 100Mi
----
-apiVersion: v1
 kind: ConfigMap
 metadata:
   name: verifier-web-config
@@ -19,6 +8,9 @@ data:
     webPort = 3000
   verifier-service.conf: |
     baseUrl = "https://verifier.portal.walt-test.cloud"
+    requestSigningKeyFile = "/waltid-verifier-api/request-signing-secret/ec.key"
+    requestSigningCertFile = "/waltid-verifier-api/request-signing-secret/ec.crt"
+    x509SanDnsClientId = "verifier.portal.walt-test.cloud"
   entra.conf: |
     callbackUrl = "https://verifier.portal.walt-test.cloud/entra/verification-callback/"
 ---
@@ -46,18 +38,18 @@ spec:
             - name: verifier-web-config
               mountPath: "/waltid-verifier-api/config/"
               readOnly: true
-            - name: verifier-data
-              mountPath: "/waltid-verifier-api/data/"
+            - name: verifier-request-signing
+              mountPath: "/waltid-verifier-api/request-signing-secret/"
           ports:
             - containerPort: 3000
               name: http-api
       volumes:
-        - name: verifier-data
-          persistentVolumeClaim:
-            claimName: verifier-data-volume-claim
         - name: verifier-web-config
           configMap:
             name: verifier-web-config
+        - name: verifier-request-signing
+          secret:
+            secretName: verifier-request-signing
 ---
 kind: Service
 apiVersion: v1

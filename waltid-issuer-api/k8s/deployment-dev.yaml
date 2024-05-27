@@ -1,15 +1,4 @@
 apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: issuer-data-volume-claim
-spec:
-  accessModes:
-    - ReadWriteMany
-  resources:
-    requests:
-      storage: 100Mi
----
-apiVersion: v1
 kind: ConfigMap
 metadata:
   name: issuer-web-config
@@ -254,15 +243,10 @@ spec:
             - name: issuer-web-config
               mountPath: "/waltid-issuer-api/config/"
               readOnly: true
-            - name: issuer-data
-              mountPath: "/waltid-issuer-api/data/"
           ports:
             - containerPort: 3000
               name: http-api
       volumes:
-        - name: issuer-data
-          persistentVolumeClaim:
-            claimName: issuer-data-volume-claim
         - name: issuer-web-config
           configMap:
             name: issuer-web-config
