@@ -94,6 +94,10 @@ dependencies {
     implementation("org.slf4j:jul-to-slf4j:2.0.12")
     implementation("io.ktor:ktor-client-okhttp-jvm:${Versions.KTOR_VERSION}")
 
+    // Crypto
+    implementation("com.augustcellars.cose:cose-java:1.1.0")
+    implementation("com.nimbusds:nimbus-jose-jwt:9.37.3")
+
     // Test
     testImplementation(kotlin("test"))
     //testImplementation("org.jetbrains.kotlin:kotlin-test-junit:${Versions.KOTLIN_VERSION}")
@@ -115,6 +119,7 @@ dependencies {
     api(project(":waltid-crypto"))
     api(project(":waltid-verifiable-credentials"))
     api(project(":waltid-did"))
+    api(project(":waltid-mdoc-credentials"))
     // implementation("id.walt:waltid-ssikit2:1.0.8-SNAPSHOT")
     // implementation("id.walt:core-crypto:1.0.7-SNAPSHOT")
 }

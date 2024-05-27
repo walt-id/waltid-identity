@@ -1,4 +1,15 @@
 apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: verifier-data-volume-claim
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 100Mi
+---
+apiVersion: v1
 kind: ConfigMap
 metadata:
   name: verifier-web-config
@@ -7,12 +18,12 @@ data:
     webHost = "0.0.0.0"
     webPort = 3000
   verifier-service.conf: |
-    baseUrl = "https://verifier.portal.walt-test.cloud"
+    baseUrl = "https://verifier.potential.walt-test.cloud"
     requestSigningKeyFile = "/waltid-verifier-api/request-signing-secret/ec.key"
     requestSigningCertFile = "/waltid-verifier-api/request-signing-secret/ec.crt"
-    x509SanDnsClientId = "verifier.portal.walt-test.cloud"
+    x509SanDnsClientId = "verifier.potential.walt-test.cloud"
   entra.conf: |
-    callbackUrl = "https://verifier.portal.walt-test.cloud/entra/verification-callback/"
+    callbackUrl = "https://verifier.potential.walt-test.cloud/entra/verification-callback/"
 ---
 kind: Deployment
 apiVersion: apps/v1
@@ -32,18 +43,23 @@ spec:
     spec:
       containers:
         - name: verifier
-          image: waltid/verifier-api:dev
+          image: waltid/verifier-api:potential
           imagePullPolicy: Always
           volumeMounts:
             - name: verifier-web-config
               mountPath: "/waltid-verifier-api/config/"
               readOnly: true
+            - name: verifier-data
+              mountPath: "/waltid-verifier-api/data/"
             - name: verifier-request-signing
               mountPath: "/waltid-verifier-api/request-signing-secret/"
           ports:
             - containerPort: 3000
               name: http-api
       volumes:
+        - name: verifier-data
+          persistentVolumeClaim:
+            claimName: verifier-data-volume-claim
         - name: verifier-web-config
           configMap:
             name: verifier-web-config
@@ -74,10 +90,10 @@ metadata:
 spec:
   tls:
     - hosts:
-        - verifier.portal.walt-test.cloud
+        - verifier.potential.walt-test.cloud
       secretName: verifier-tls-secret
   rules:
-    - host: verifier.portal.walt-test.cloud
+    - host: verifier.potential.walt-test.cloud
       http:
         paths:
           - path: /

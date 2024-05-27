@@ -9,6 +9,7 @@ import id.walt.oid4vc.interfaces.PresentationResult
 import id.walt.oid4vc.providers.CredentialWalletConfig
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.responses.TokenResponse
+import io.kotest.matchers.collections.shouldContain
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.plugins.contentnegotiation.*
@@ -729,7 +730,7 @@ class VP_JVM_Test {
         "{\"id\":\"vp token example\",\"input_descriptors\":[{\"id\":\"OpenBadgeCredential\",\"format\":{\"jwt_vc_json\":{\"alg\":[\"EdDSA\"]}},\"constraints\":{\"fields\":[{\"path\":[\"\$.type\"],\"filter\":{\"type\":\"string\",\"pattern\":\"OpenBadgeCredential\"}}]}}]}"
 
 
-    val ONLINE_TEST: Boolean = true
+    val ONLINE_TEST: Boolean = false
 
     @Test
     fun testRequestByReference() = runTest {
@@ -811,5 +812,14 @@ class VP_JVM_Test {
         assertEquals(expected = HttpStatusCode.Created, actual = response.status)
         val responseObj = response.body<JsonObject>()
         return responseObj["url"]?.jsonPrimitive?.content
+    }
+
+    @Test
+    fun testPresentationDefinitionSerialization() {
+        val presDef = PresentationDefinition.fromJSONString(presentationDefinitionExample1)
+        presDef.toJSON().keys shouldContain "id"
+
+        val presDefDefaultId = PresentationDefinition(inputDescriptors = presDef.inputDescriptors)
+        presDefDefaultId.toJSON().keys shouldContain "id"
     }
 }
