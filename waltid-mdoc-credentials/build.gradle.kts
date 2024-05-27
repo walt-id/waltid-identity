@@ -12,6 +12,14 @@ repositories {
 }
 
 kotlin {
+    targets.configureEach {
+        compilations.configureEach {
+            compilerOptions.configure {
+                freeCompilerArgs.add("-Xexpect-actual-classes")
+            }
+        }
+    }
+
     jvm {
         jvmToolchain(16)
         withJava()
@@ -54,9 +62,6 @@ kotlin {
         val commonTest by getting {
             dependencies {
                 implementation(kotlin("test"))
-                implementation("io.kotest:kotest-assertions-core:5.5.5")
-
-                implementation("io.kotest:kotest-assertions-json:5.5.5")
             }
         }
         val jvmMain by getting {
@@ -66,13 +71,10 @@ kotlin {
         }
         val jvmTest by getting {
             dependencies {
-                implementation("org.bouncycastle:bcprov-lts8on:2.73.4")
-                implementation("org.bouncycastle:bcpkix-lts8on:2.73.4")
+                implementation("org.bouncycastle:bcprov-lts8on:2.73.6")
+                implementation("org.bouncycastle:bcpkix-lts8on:2.73.6")
                 implementation("io.mockk:mockk:1.13.2")
 
-                implementation("io.kotest:kotest-runner-junit5:5.5.5")
-                implementation("io.kotest:kotest-assertions-core:5.5.5")
-                implementation("io.kotest:kotest-assertions-json:5.5.5")
                 implementation(kotlin("reflect"))
             }
         }
@@ -98,7 +100,9 @@ kotlin {
             val hasMavenAuth = secretMavenUsername.isNotEmpty() && secretMavenPassword.isNotEmpty()
             if (hasMavenAuth) {
                 maven {
-                    url = uri("https://maven.waltid.dev/releases")
+                    val releasesRepoUrl = uri("https://maven.waltid.dev/releases")
+                    val snapshotsRepoUrl = uri("https://maven.waltid.dev/snapshots")
+                    url = uri(if (version.toString().endsWith("SNAPSHOT")) snapshotsRepoUrl else releasesRepoUrl)
                     credentials {
                         username = secretMavenUsername
                         password = secretMavenPassword

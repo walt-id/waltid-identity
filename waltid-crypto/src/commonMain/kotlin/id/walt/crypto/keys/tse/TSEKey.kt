@@ -55,10 +55,12 @@ class TSEKey(
         //retrieveKeyType()
     }
 
+    @Suppress("NON_EXPORTABLE_TYPE")
     @Transient
     //val retrievedKeyType = lazySuspended { retrieveKeyType() }
     val retrievedKeyType = lazySuspended { retrieveKeyType() }
 
+    @Suppress("NON_EXPORTABLE_TYPE")
     @Transient
     val retrievedPublicKey = lazySuspended { retrievePublicKey() }
 

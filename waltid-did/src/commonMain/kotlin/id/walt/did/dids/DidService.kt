@@ -21,7 +21,7 @@ import love.forte.plugin.suspendtrans.annotation.JvmBlocking
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 
-@Suppress("OPT_IN_USAGE")
+@Suppress("OPT_IN_USAGE", "NON_EXPORTABLE_TYPE")
 @OptIn(ExperimentalJsExport::class)
 @JsExport
 object DidService {
@@ -158,13 +158,20 @@ object DidService {
     suspend fun register(options: DidCreateOptions) =
         getRegistrarForMethod(options.method).create(options)
 
-    @JvmBlocking
-    @JvmAsync
+    //    @JvmBlocking
+//    @JvmAsync
     @JsPromise
     @JsExport.Ignore
     suspend fun registerByKey(
         method: String, key: Key, options: DidCreateOptions = DidCreateOptions(method, emptyMap())
     ): DidResult = getRegistrarForMethod(method).createByKey(key, options)
+
+    @JvmBlocking
+    @JvmAsync
+    @JsExport.Ignore
+    suspend fun javaRegisterByKey(
+        method: String, key: Key, options: DidCreateOptions
+    ): DidResult = registerByKey(method, key, options)
 
     private fun getDidOptions(method: String, args: Map<String, JsonPrimitive>) =
         when (method.lowercase()) {

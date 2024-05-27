@@ -10,6 +10,7 @@ import kotlin.js.JsExport
  * Default implementations exist for some platforms.
  * @see id.walt.sdjwt.SimpleJWTCryptoProvider
  */
+@Suppress("NON_EXPORTABLE_TYPE")
 @OptIn(ExperimentalJsExport::class)
 @JsExport
 interface JWTCryptoProvider {
