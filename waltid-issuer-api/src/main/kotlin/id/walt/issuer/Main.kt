@@ -1,5 +1,6 @@
 package id.walt.issuer
 
+import healthApi
 import id.walt.did.helpers.WaltidServices
 import id.walt.issuer.OidcApi.oidcApi
 import id.walt.issuer.base.config.ConfigManager
@@ -13,21 +14,18 @@ import io.ktor.server.engine.*
 private val log = KotlinLogging.logger { }
 
 suspend fun main(args: Array<String>) {
-    log.debug { "issuer CLI starting ..." }
+    log.debug { "Issuer CLI starting ..." }
 
-    log.debug { "Init walt services..." }
+    log.debug { "Init walt services ..." }
     WaltidServices.minimalInit()
 
-    log.info { "Reading configurations..." }
+    log.info { "Reading configurations ..." }
     ConfigManager.loadConfigs(args)
 
     val webConfig = ConfigManager.getConfig<WebConfig>()
     log.info { "Starting web server (binding to ${webConfig.webHost}, listening on port ${webConfig.webPort})..." }
     embeddedServer(
-        CIO,
-        port = webConfig.webPort,
-        host = webConfig.webHost,
-        module = Application::issuerModule
+        CIO, port = webConfig.webPort, host = webConfig.webHost, module = Application::issuerModule
     ).start(wait = true)
 }
 
@@ -44,6 +42,7 @@ fun Application.issuerModule(withPlugins: Boolean = true) {
     if (withPlugins) {
         configurePlugins()
     }
+    healthApi()
     oidcApi()
     issuerApi()
     entraIssuance()

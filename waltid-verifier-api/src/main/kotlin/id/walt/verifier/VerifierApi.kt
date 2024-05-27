@@ -33,26 +33,22 @@ data class PresentationSubmissionFormParam(
 
 @Serializable
 data class TokenResponseFormParam(
-    val vp_token: JsonElement,
-    val presentation_submission: PresentationSubmissionFormParam
+    val vp_token: JsonElement, val presentation_submission: PresentationSubmissionFormParam
 )
 
 @Serializable
 data class CredentialVerificationRequest(
-    @SerialName("vp_policies")
-    val vpPolicies: List<JsonElement>,
+    @SerialName("vp_policies") val vpPolicies: List<JsonElement>,
 
-    @SerialName("vc_policies")
-    val vcPolicies: List<JsonElement>,
+    @SerialName("vc_policies") val vcPolicies: List<JsonElement>,
 
-    @SerialName("request_credentials")
-    val requestCredentials: List<JsonElement>
+    @SerialName("request_credentials") val requestCredentials: List<JsonElement>
 )
 
 const val defaultAuthorizeBaseUrl = "openid4vp://authorize"
 
 private val prettyJson = Json { prettyPrint = true }
-private val httpClient = HttpClient() {
+private val httpClient = HttpClient {
     install(ContentNegotiation) {
         json()
     }
@@ -65,21 +61,20 @@ private val httpClient = HttpClient() {
 val verifiableIdPresentationDefinitionExample = JsonObject(
     mapOf(
         "policies" to JsonArray(listOf(JsonPrimitive("signature"))),
-        "presentation_definition" to
-                PresentationDefinition(
-                    "<automatically assigned>", listOf(
-                        InputDescriptor(
-                            "VerifiableId",
-                            format = mapOf(VCFormat.jwt_vc_json to VCFormatDefinition(alg = setOf("EdDSA"))),
-                            constraints = InputDescriptorConstraints(
-                                fields = listOf(InputDescriptorField(path = listOf("$.type"), filter = buildJsonObject {
-                                    put("type", JsonPrimitive("string"))
-                                    put("pattern", JsonPrimitive("VerifiableId"))
-                                }))
-                            )
-                        )
+        "presentation_definition" to PresentationDefinition(
+            "<automatically assigned>", listOf(
+                InputDescriptor(
+                    "VerifiableId",
+                    format = mapOf(VCFormat.jwt_vc_json to VCFormatDefinition(alg = setOf("EdDSA"))),
+                    constraints = InputDescriptorConstraints(
+                        fields = listOf(InputDescriptorField(path = listOf("$.type"), filter = buildJsonObject {
+                            put("type", JsonPrimitive("string"))
+                            put("pattern", JsonPrimitive("VerifiableId"))
+                        }))
                     )
-                ).toJSON(),
+                )
+            )
+        ).toJSON(),
     )
 ).let { prettyJson.encodeToString(it) }
 
@@ -89,8 +84,7 @@ private val verificationUseCase = VerificationUseCase(httpClient)
 fun Application.verfierApi() {
     routing {
 
-        route("openid4vc", {
-        }) {
+        route("openid4vc", {}) {
             post("verify", {
                 tags = listOf("Credential Verification")
                 summary = "Initialize OIDC presentation session"
@@ -108,12 +102,14 @@ fun Application.verfierApi() {
                         required = false
                     }
                     headerParameter<String>("successRedirectUri") {
-                        description = "Redirect URI to return when all policies passed. \"\$id\" will be replaced with the session id."
+                        description =
+                            "Redirect URI to return when all policies passed. \"\$id\" will be replaced with the session id."
                         example = ""
                         required = false
                     }
                     headerParameter<String>("errorRedirectUri") {
-                        description = "Redirect URI to return when a policy failed. \"\$id\" will be replaced with the session id."
+                        description =
+                            "Redirect URI to return when a policy failed. \"\$id\" will be replaced with the session id."
                         example = ""
                         required = false
                     }
@@ -139,12 +135,18 @@ fun Application.verfierApi() {
                         example("Minimal example", VerifierApiExamples.minimal)
                         example("Example with VP policies", VerifierApiExamples.vpPolicies)
                         example("Example with VP & global VC policies", VerifierApiExamples.vpGlobalVcPolicies)
-                        example("Example with VP, VC & specific credential policies", VerifierApiExamples.vcVpIndividualPolicies)
+                        example(
+                            "Example with VP, VC & specific credential policies",
+                            VerifierApiExamples.vcVpIndividualPolicies
+                        )
                         example(
                             "Example with VP, VC & specific policies, and explicit presentation_definition  (maximum example)",
                             VerifierApiExamples.maxExample
                         )
-                        example("Example with presentation definition policy", VerifierApiExamples.presentationDefinitionPolicy)
+                        example(
+                            "Example with presentation definition policy",
+                            VerifierApiExamples.presentationDefinitionPolicy
+                        )
                     }
                 }
             }) {
@@ -199,8 +201,7 @@ fun Application.verfierApi() {
                 }
             }) {
                 val sessionId = call.parameters["state"]
-                verificationUseCase.verify(sessionId, context.request.call.receiveParameters().toMap())
-                    .onSuccess {
+                verificationUseCase.verify(sessionId, context.request.call.receiveParameters().toMap()).onSuccess {
                         call.respond(HttpStatusCode.OK, it)
                     }.onFailure {
                         call.respond(HttpStatusCode.BadRequest, it.localizedMessage)

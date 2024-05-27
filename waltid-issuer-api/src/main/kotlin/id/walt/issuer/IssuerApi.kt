@@ -41,8 +41,7 @@ import kotlin.time.Duration.Companion.minutes
 
 private val logger = KotlinLogging.logger {}
 suspend fun createCredentialOfferUri(issuanceRequests: List<IssuanceRequest>): String {
-    val credentialOfferBuilder =
-        OidcIssuance.issuanceRequestsToCredentialOfferBuilder(issuanceRequests)
+    val credentialOfferBuilder = OidcIssuance.issuanceRequestsToCredentialOfferBuilder(issuanceRequests)
 
     val issuanceSession = OidcApi.initializeCredentialOffer(
         credentialOfferBuilder = credentialOfferBuilder, expiresIn = 5.minutes, allowPreAuthorized = true
@@ -75,7 +74,6 @@ suspend fun createCredentialOfferUri(issuanceRequests: List<IssuanceRequest>): S
 
 fun Application.issuerApi() {
     routing {
-
         route("onboard", {
             tags = listOf("Issuer onboarding")
         }) {
