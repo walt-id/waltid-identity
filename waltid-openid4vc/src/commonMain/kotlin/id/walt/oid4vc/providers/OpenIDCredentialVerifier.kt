@@ -60,7 +60,7 @@ abstract class OpenIDCredentialVerifier(val config: CredentialVerifierConfig) :
             putSession(it.id, it)
         }
         val presentationDefinitionUri = when(openId4VPProfile) {
-            OpenId4VPProfile.ISO_18013_7_MDOC -> null
+            OpenId4VPProfile.ISO_18013_7_MDOC, OpenId4VPProfile.HAIP -> null
             else -> preparePresentationDefinitionUri(presentationDefinition, session.id)
         }
         val authReq = AuthorizationRequest(

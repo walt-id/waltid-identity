@@ -1,6 +1,7 @@
 package id.walt.credentials
 
 import id.walt.crypto.keys.Key
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.did.dids.DidService
 import kotlinx.datetime.Clock
@@ -24,6 +25,7 @@ class PresentationBuilder {
      * VP subject/issuer
      */
     var did: String? = null
+    var holderPubKeyJwk: JsonObject? = null
 
     /**
      * the timestamp after which the JWT shall be considered valid
@@ -59,18 +61,19 @@ class PresentationBuilder {
     fun addCredentials(credentials: Collection<JsonElement>) = verifiableCredentials.addAll(credentials)
 
     fun buildPresentationMap() = mapOf(
-        "sub" to did,
+        "sub" to (did ?: holderPubKeyJwk?.get("kid")?.jsonPrimitive?.content),
         "nbf" to jwtNotBefore?.epochSeconds,
         "iat" to jwtIssuedAt?.epochSeconds,
         "jti" to presentationId,
-        "iss" to did,
+        "iss" to (did ?: holderPubKeyJwk?.get("kid")?.jsonPrimitive?.content),
         "nonce" to (nonce ?: ""),
         "aud" to (audience ?: ""),
         "vp" to mapOf(
             "@context" to vpContext,
             "type" to vpType,
             "id" to presentationId,
-            "holder" to did,
+            "holder" to (did ?: holderPubKeyJwk?.get("kid")?.jsonPrimitive?.content),
+            "cnf" to holderPubKeyJwk,
             "verifiableCredential" to verifiableCredentials
         )
     )
@@ -85,7 +88,7 @@ class PresentationBuilder {
         return key.signJws(
             plaintext = buildPresentationJsonString().encodeToByteArray(),
             headers = mapOf(
-                "kid" to resolveDidAuthentication(did ?: throw IllegalStateException("No DID set in PresentationBuilder")),
+                "kid" to (did?.let { resolveDidAuthentication(it) } ?: key.getKeyId()),
                 "typ" to "JWT"
             )
         )

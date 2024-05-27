@@ -1,6 +1,10 @@
 package id.walt.verifier.oidc
 
 import COSE.AlgorithmID
+import com.nimbusds.jose.JWSAlgorithm
+import com.nimbusds.jose.crypto.ECDSASigner
+import com.nimbusds.jose.crypto.ECDSAVerifier
+import com.nimbusds.jose.jwk.ECKey
 import id.walt.credentials.verification.models.PolicyRequest
 import id.walt.credentials.verification.models.PolicyRequest.Companion.parsePolicyRequests
 import id.walt.credentials.verification.policies.JwtSignaturePolicy
@@ -15,6 +19,7 @@ import id.walt.oid4vc.data.ResponseMode
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.responses.TokenResponse
 import id.walt.sdjwt.JWTCryptoProvider
+import id.walt.sdjwt.SimpleJWTCryptoProvider
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
 import io.ktor.client.request.*
@@ -208,6 +213,8 @@ object LspPotentialInteropEvent {
         "-----END PRIVATE KEY-----\n"
     val POTENTIAL_ISSUER_KEY_ID = "potential-lsp-issuer-key-01"
     val POTENTIAL_ISSUER_CRYPTO_PROVIDER_INFO = loadPotentialIssuerKeys()
+    val POTENTIAL_JWT_CRYPTO_PROVIDER = SimpleJWTCryptoProvider(JWSAlgorithm.ES256,
+        ECDSASigner(ECKey.parseFromPEMEncodedObjects(POTENTIAL_ISSUER_PRIV + POTENTIAL_ISSUER_PUB).toECKey()), ECDSAVerifier(ECKey.parseFromPEMEncodedObjects(POTENTIAL_ISSUER_PUB).toECKey()))
 
     fun readKeySpec(pem: String): ByteArray {
         val publicKeyPEM = pem

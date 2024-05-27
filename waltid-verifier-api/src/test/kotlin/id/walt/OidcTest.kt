@@ -1,11 +1,16 @@
 package id.walt
 
 import COSE.AlgorithmID
+import com.nimbusds.jose.JWSAlgorithm
+import com.nimbusds.jose.crypto.ECDSASigner
+import com.nimbusds.jose.crypto.ECDSAVerifier
 import com.nimbusds.jose.jwk.ECKey
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.jwk.KeyUse
 import com.nimbusds.jose.util.Base64URL
+import id.walt.credentials.PresentationBuilder
 import id.walt.credentials.verification.PolicyManager
+import id.walt.credentials.verification.Verifier
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeyType
@@ -31,11 +36,14 @@ import id.walt.oid4vc.data.dif.VCFormat
 import id.walt.oid4vc.interfaces.PresentationResult
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.util.http
+import id.walt.sdjwt.*
 import id.walt.verifier.base.config.ConfigManager
 import id.walt.verifier.base.config.WebConfig
 import id.walt.verifier.oidc.LspPotentialInteropEvent
+import id.walt.verifier.oidc.VerificationUseCase
 import id.walt.verifier.policies.PresentationDefinitionPolicy
 import id.walt.verifier.verifierModule
+import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
@@ -44,6 +52,7 @@ import io.ktor.server.application.*
 import io.ktor.server.cio.*
 import io.ktor.server.engine.*
 import io.ktor.util.*
+import io.ktor.util.reflect.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.*
 import kotlinx.uuid.UUID
@@ -55,26 +64,26 @@ import kotlin.test.assertTrue
 
 class OidcTest {
 
-//  init {
-//    runBlocking {
-//      DidService.apply {
-//        registerResolver(LocalResolver())
-//        updateResolversForMethods()
-//      }
-//    }
-//    PolicyManager.registerPolicies(PresentationDefinitionPolicy())
-//
-//    ConfigManager.loadConfigs(arrayOf())
-//
-//    val webConfig = ConfigManager.getConfig<WebConfig>()
-//
-//    embeddedServer(CIO, port = webConfig.webPort, host = webConfig.webHost, module = Application::verifierModule)
-//      .start(wait = false)
-//  }
+  init {
+    runBlocking {
+      DidService.apply {
+        registerResolver(LocalResolver())
+        updateResolversForMethods()
+      }
+    }
+    PolicyManager.registerPolicies(PresentationDefinitionPolicy())
+
+    ConfigManager.loadConfigs(arrayOf())
+
+    val webConfig = ConfigManager.getConfig<WebConfig>()
+
+    embeddedServer(CIO, port = webConfig.webPort, host = webConfig.webHost, module = Application::verifierModule)
+      .start(wait = false)
+  }
 
   val baseUrl = "http://localhost:7003"
 
-  //@Test
+  @Test
   fun testPotentialInteropFlow() {
     println("Starting test")
 
@@ -177,6 +186,116 @@ class OidcTest {
       )
       val presResponse = http.submitForm(presReq.responseUri!!, parametersOf(formParams))
       assertEquals(200, presResponse.status.value)
+    }
+  }
+
+  @Test
+  fun testPotentialInteropTrack4() {
+//    val testVC = "eyJhbGciOiAiRVMyNTYiLCAidHlwIjogInZjK3NkLWp3dCIsICJraWQiOiAiZG9jLXNp" +
+//        "Z25lci0wNS0yNS0yMDIyIn0.eyJfc2QiOiBbIjA5dktySk1PbHlUV00wc2pwdV9wZE9C" +
+//        "VkJRMk0xeTNLaHBINTE1blhrcFkiLCAiMnJzakdiYUMwa3k4bVQwcEpyUGlvV1RxMF9k" +
+//        "YXcxc1g3NnBvVWxnQ3diSSIsICJFa084ZGhXMGRIRUpidlVIbEVfVkNldUM5dVJFTE9p" +
+//        "ZUxaaGg3WGJVVHRBIiwgIklsRHpJS2VpWmREd3BxcEs2WmZieXBoRnZ6NUZnbldhLXNO" +
+//        "NndxUVhDaXciLCAiSnpZakg0c3ZsaUgwUjNQeUVNZmVadTZKdDY5dTVxZWhabzdGN0VQ" +
+//        "WWxTRSIsICJQb3JGYnBLdVZ1Nnh5bUphZ3ZrRnNGWEFiUm9jMkpHbEFVQTJCQTRvN2NJ" +
+//        "IiwgIlRHZjRvTGJnd2Q1SlFhSHlLVlFaVTlVZEdFMHc1cnREc3JaemZVYW9tTG8iLCAi" +
+//        "amRyVEU4WWNiWTRFaWZ1Z2loaUFlX0JQZWt4SlFaSUNlaVVRd1k5UXF4SSIsICJqc3U5" +
+//        "eVZ1bHdRUWxoRmxNXzNKbHpNYVNGemdsaFFHMERwZmF5UXdMVUs0Il0sICJpc3MiOiAi" +
+//        "aHR0cHM6Ly9leGFtcGxlLmNvbS9pc3N1ZXIiLCAiaWF0IjogMTY4MzAwMDAwMCwgImV4" +
+//        "cCI6IDE4ODMwMDAwMDAsICJ2Y3QiOiAiaHR0cHM6Ly9jcmVkZW50aWFscy5leGFtcGxl" +
+//        "LmNvbS9pZGVudGl0eV9jcmVkZW50aWFsIiwgIl9zZF9hbGciOiAic2hhLTI1NiIsICJj" +
+//        "bmYiOiB7Imp3ayI6IHsia3R5IjogIkVDIiwgImNydiI6ICJQLTI1NiIsICJ4IjogIlRD" +
+//        "QUVSMTladnUzT0hGNGo0VzR2ZlNWb0hJUDFJTGlsRGxzN3ZDZUdlbWMiLCAieSI6ICJa" +
+//        "eGppV1diWk1RR0hWV0tWUTRoYlNJaXJzVmZ1ZWNDRTZ0NGpUOUYySFpRIn19fQ.D43eE" +
+//        "W1ae2yAzhzriJuBz-_cgX1wwNJIgNMjsdO28QE0fU8KC8ugjTPaylIp48HMVS0xV2wDQ" +
+//        "9bl1zFzlbDULg~WyIyR0xDNDJzS1F2ZUNmR2ZyeU5STjl3IiwgImdpdmVuX25hbWUiLC" +
+//        "AiSm9obiJd~WyJlbHVWNU9nM2dTTklJOEVZbnN4QV9BIiwgImZhbWlseV9uYW1lIiwgI" +
+//        "kRvZSJd~WyI2SWo3dE0tYTVpVlBHYm9TNXRtdlZBIiwgImVtYWlsIiwgImpvaG5kb2VA" +
+//        "ZXhhbXBsZS5jb20iXQ~WyJlSThaV205UW5LUHBOUGVOZW5IZGhRIiwgInBob25lX251b" +
+//        "WJlciIsICIrMS0yMDItNTU1LTAxMDEiXQ~WyJRZ19PNjR6cUF4ZTQxMmExMDhpcm9BIi" +
+//        "wgImFkZHJlc3MiLCB7InN0cmVldF9hZGRyZXNzIjogIjEyMyBNYWluIFN0IiwgImxvY2" +
+//        "FsaXR5IjogIkFueXRvd24iLCAicmVnaW9uIjogIkFueXN0YXRlIiwgImNvdW50cnkiOi" +
+//        "AiVVMifV0~WyJBSngtMDk1VlBycFR0TjRRTU9xUk9BIiwgImJpcnRoZGF0ZSIsICIxOT" +
+//        "QwLTAxLTAxIl0~WyJQYzMzSk0yTGNoY1VfbEhnZ3ZfdWZRIiwgImlzX292ZXJfMTgiLC" +
+//        "B0cnVlXQ~WyJHMDJOU3JRZmpGWFE3SW8wOXN5YWpBIiwgImlzX292ZXJfMjEiLCB0cnV" +
+//        "lXQ~WyJsa2x4RjVqTVlsR1RQVW92TU5JdkNBIiwgImlzX292ZXJfNjUiLCB0cnVlXQ~"
+
+    runBlocking {
+      // 1. holder key
+      val holderKey = KeyManager.createKey(KeyGenerationRequest(keyType = KeyType.secp256r1))
+      assertEquals(KeyType.secp256r1, holderKey.getPublicKey().keyType)
+      assertTrue(holderKey.hasPrivateKey)
+      val holderKeyPubJwk = holderKey.getPublicKey().exportJWK()
+
+      // 2. create sd-jwt (issuer)
+      val testVCSdJwt = SDJwt.sign(SDPayload.createSDPayload(Json.parseToJsonElement("""
+        {
+          "vct": "urn:eu.europa.ec.eudi:pid:1",
+          "iss": "https://example.com/your-issuer-path",
+          "cnf": {
+            "jwk": $holderKeyPubJwk 
+          },
+          "exp": 1717070950,
+          "iat": 1715861350,
+          "given_name": "ERIKA",
+          "family_name": "MUSTERMANN",
+          "birthdate": "1964-08-12",
+          "issuing_authority": "DE",
+          "issuing_country": "DE",
+          "age_equal_or_over": {
+          "18": true
+          },
+          "place_of_birth": {
+          "locality": "BERLIN"
+          },
+          "address": {
+          "formatted": "HEIDESTRASSE 17 51147 KÖLN"
+          }
+        }
+      """.trimIndent()).jsonObject, SDMap.Companion.generateSDMap(setOf("age_equal_or_over.18", "place_of_birth.locality", "address.formatted"))),
+        LspPotentialInteropEvent.POTENTIAL_JWT_CRYPTO_PROVIDER)
+
+      // 3. make presentation request (verifier)
+      val createReqResponse = http.post("$baseUrl/openid4vc/verify") {
+        header("authorizeBaseUrl", "haip://")
+        header("responseMode", "direct_post")
+        contentType(ContentType.Application.Json)
+        setBody(
+          buildJsonObject {
+            put("request_credentials", JsonArray(listOf(JsonPrimitive("urn:eu.europa.ec.eudi:pid:1"))))
+          })
+      }
+      assertEquals(200, createReqResponse.status.value)
+      val presReqUrl = createReqResponse.bodyAsText()
+      assertTrue(presReqUrl.startsWith("haip://"))
+      val presReq = AuthorizationRequest.fromHttpParametersAuto(parseQueryString(Url(presReqUrl).encodedQuery).toMap())
+      assertNotNull(presReq.presentationDefinition)
+      assertNotNull(presReq.responseUri)
+
+      // 4. present (wallet)
+      val vp_token = PresentationBuilder().apply {
+        did = null
+        holderPubKeyJwk = holderKey.getPublicKey().exportJWKObject()
+        addCredential(JsonPrimitive(testVCSdJwt.present(true).toString()))
+        nonce = presReq.nonce
+      }.buildAndSign(holderKey)
+
+      println(vp_token)
+
+      val tokenResp = OpenID4VP.generatePresentationResponse(PresentationResult(
+        listOf(JsonPrimitive(vp_token)),
+        PresentationSubmission("presentation_1", presReq.presentationDefinition!!.id, listOf(
+          DescriptorMapping(presReq.presentationDefinition!!.id, VCFormat.jwt_vp, path = "$",
+            pathNested = DescriptorMapping(presReq.presentationDefinition!!.inputDescriptors.first().id, VCFormat.sd_jwt_vc, path = "$.vp.verifiableCredential[0]")
+          )
+        ))
+      ))
+      println(tokenResp)
+
+      val httpResp = http.submitForm(presReq.responseUri!!, parametersOf(tokenResp.toHttpParameters()))
+      assertEquals(200, httpResp.status.value)
+      val respBody = Json.parseToJsonElement(httpResp.bodyAsText())
+      assertTrue(respBody.instanceOf(JsonObject::class))
     }
   }
 

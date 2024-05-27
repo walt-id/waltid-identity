@@ -3,6 +3,7 @@ package id.walt.credentials.schemes
 import id.walt.crypto.keys.Key
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.did.dids.DidService
+import id.walt.did.dids.DidUtils
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -73,17 +74,27 @@ class JwsSignatureScheme : SignatureScheme {
         val payload = jws.payload
 
         val issuerDid = (payload[JwsOption.ISSUER] ?: header[JwsHeader.KEY_ID])!!.jsonPrimitive.content
-        log.trace { "Verifying with issuer did: $issuerDid" }
+        if (DidUtils.isDidUrl(issuerDid)) {
+            log.trace { "Verifying with issuer did: $issuerDid" }
 
 //        val subjectDid = payload["sub"]!!.jsonPrimitive.content
 //        println("Issuer: $issuerDid")
 //        println("Subject: $subjectDid")
 
-        DidService.resolveToKey(issuerDid)
-            .also { log.trace ( "Imported key: $it from did: $issuerDid, public is: ${it.getOrNull()?.getPublicKey()?.exportJWK()}" ) }
-            .getOrThrow()
-            .verifyJws(data.split("~")[0])
-            .also { log.trace { "Verification result: $it" } }
-            .getOrThrow()
+            DidService.resolveToKey(issuerDid)
+                .also {
+                    log.trace(
+                        "Imported key: $it from did: $issuerDid, public is: ${
+                            it.getOrNull()?.getPublicKey()?.exportJWK()
+                        }"
+                    )
+                }
+                .getOrThrow()
+                .verifyJws(data.split("~")[0])
+                .also { log.trace { "Verification result: $it" } }
+                .getOrThrow()
+        } else {
+            TODO()
+        }
     }
 }
