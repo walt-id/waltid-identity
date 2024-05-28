@@ -35,8 +35,8 @@ export const DIDMethodsConfig = {
     'issuerKey': { "type": "jwk", "jwk": "{\"kty\":\"EC\",\"d\":\"8jH4vwtvCw6tcBzdxQ6V7FY2L215lBGm-x3flgENx4Y\",\"crv\":\"P-256\",\"kid\":\"3YNd9Fnx9JlyPVYwgWFE37E3GwI0eGlCK8wFlWxGfpM\",\"x\":\"FovY21LAAOTlg-m-NeKWhZEL5aFrnR0ucJjD5TKpGug\",\"y\":\"CrFJfGTdP29JJccpQXuyMO3ohtzrTqPzBPBITYj0ogA\"}" }
   },
   'did:web': {
-    'issuerDid': '',
-    'issuerKey': { "type": "", "jwk": "" }
+    'issuerDid': 'did:web:wallet.walt.id:wallet-api:registry:portal',
+    'issuerKey': { "type": "jwk", "jwk": "{\"kty\":\"EC\",\"d\":\"6rVNEWMQzVdPgin7ER_ptWlSnkozGwOWYlSDcQHMRZw\",\"crv\":\"secp256k1\",\"kid\":\"hxKurYDplZbY3PgDdXNtz1CwaG6CJ9dyslsyJY11rQs\",\"x\":\"fTlAxVt3AHGX4LfqStS8MRIWjBrNYbcdHwW95FKZTiU\",\"y\":\"SqeitQcdT7lZg4z2JgCCD8JabsZvE_6W8dbMlVNxXeo\"}" }
   },
   'did:cheqd': {
     'issuerDid': 'did:cheqd:testnet:16047c9a-8f6f-4258-b35e-73098c6981e0',
