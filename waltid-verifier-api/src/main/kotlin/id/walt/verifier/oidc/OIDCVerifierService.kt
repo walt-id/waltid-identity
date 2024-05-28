@@ -21,10 +21,7 @@ import id.walt.mdoc.doc.MDocVerificationParams
 import id.walt.mdoc.doc.VerificationType
 import id.walt.mdoc.mdocauth.DeviceAuthentication
 import id.walt.oid4vc.OpenID4VP
-import id.walt.oid4vc.data.ClientIdScheme
-import id.walt.oid4vc.data.OpenIDClientMetadata
-import id.walt.oid4vc.data.OpenId4VPProfile
-import id.walt.oid4vc.data.ResponseMode
+import id.walt.oid4vc.data.*
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.data.dif.VCFormat
 import id.walt.oid4vc.providers.CredentialVerifierConfig
@@ -160,22 +157,28 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
     override fun initializeAuthorization(
         presentationDefinition: PresentationDefinition,
         responseMode: ResponseMode,
+        responseType: ResponseType?,
         scope: Set<String>,
         expiresIn: Duration,
         sessionId: String?,
         ephemeralEncKey: Key?,
         clientIdScheme: ClientIdScheme,
-        openId4VPProfile: OpenId4VPProfile
+        openId4VPProfile: OpenId4VPProfile,
+        stateParamAuthorizeReqEbsi: String?,
+        useEbsiCTv3: Boolean?
     ): PresentationSession {
         val presentationSession = super.initializeAuthorization(
-            presentationDefinition,
-            responseMode,
-            scope,
-            expiresIn,
-            sessionId,
-            ephemeralEncKey,
-            clientIdScheme,
-            openId4VPProfile
+            presentationDefinition = presentationDefinition,
+            responseMode = responseMode,
+            responseType = responseType,
+            scope = scope,
+            expiresIn = expiresIn,
+            sessionId = sessionId,
+            ephemeralEncKey = ephemeralEncKey,
+            clientIdScheme = clientIdScheme,
+            openId4VPProfile = openId4VPProfile,
+            stateParamAuthorizeReqEbsi = stateParamAuthorizeReqEbsi,
+            useEbsiCTv3 = useEbsiCTv3
         )
         return presentationSession.copy(
             authorizationRequest = presentationSession.authorizationRequest!!.copy(

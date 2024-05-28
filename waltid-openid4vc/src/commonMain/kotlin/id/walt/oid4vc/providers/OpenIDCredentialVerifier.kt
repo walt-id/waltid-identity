@@ -75,7 +75,7 @@ abstract class OpenIDCredentialVerifier(val config: CredentialVerifierConfig) :
                 else -> config.clientIdMap[clientIdScheme] ?: config.defaultClientId
             }.let{
                 when(useEbsiCTv3) {
-                    true -> it.replace(it, config.clientId.replace("/openid4vc/verify", ""))
+                    true -> it.replace(it, config.defaultClientId.replace("/openid4vc/verify", ""))
                     else -> it
                 }
             },

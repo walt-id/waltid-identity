@@ -33,8 +33,6 @@ import id.walt.verifier.base.config.ConfigManager
 import id.walt.verifier.base.config.OIDCVerifierServiceConfig
 import id.walt.verifier.oidc.RequestSigningCryptoProvider
 import id.walt.sdjwt.SimpleJWTCryptoProvider
-import id.walt.verifier.base.config.ConfigManager
-import id.walt.verifier.base.config.OIDCVerifierServiceConfig
 import id.walt.verifier.oidc.LspPotentialInteropEvent
 import id.walt.verifier.oidc.VerificationUseCase
 import io.github.smiley4.ktorswaggerui.dsl.get
@@ -65,12 +63,6 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import kotlinx.uuid.UUID
 
-private val SERVER_URL by lazy {
-    runBlocking {
-        ConfigManager.loadConfigs(arrayOf())
-        ConfigManager.getConfig<OIDCVerifierServiceConfig>().baseUrl
-    }
-}
 import java.io.File
 import java.io.FileInputStream
 import java.nio.charset.Charset
@@ -82,6 +74,14 @@ import java.security.interfaces.ECKey
 import java.security.spec.PKCS8EncodedKeySpec
 import java.security.spec.X509EncodedKeySpec
 import java.util.*
+
+private val SERVER_URL by lazy {
+    runBlocking {
+        ConfigManager.loadConfigs(arrayOf())
+        ConfigManager.getConfig<OIDCVerifierServiceConfig>().baseUrl
+    }
+}
+
 
 @Serializable
 data class DescriptorMappingFormParam(val id: String, val format: VCFormat, val path: String)
@@ -244,7 +244,7 @@ fun Application.verfierApi() {
                     statusCallbackUri = statusCallbackUri,
                     statusCallbackApiKey = statusCallbackApiKey,
                     stateId = stateId,
-                    openId4VPProfile = OpenId4VPProfile.fromAuthorizeBaseURL(authorizeBaseUrl) ?: OpenId4VPProfile.Default
+                    openId4VPProfile = OpenId4VPProfile.fromAuthorizeBaseURL(authorizeBaseUrl) ?: OpenId4VPProfile.Default,
                     useEbsiCTv3 = useEbsiCTv3
                 )
 
@@ -410,6 +410,80 @@ fun Application.verfierApi() {
                 }
             }
         }
+
+        get("/.well-known/openid-configuration", {tags= listOf("Ebsi") }) {
+            val metadata = buildJsonObject {
+                put("authorization_endpoint", "$SERVER_URL/authorize")
+                put("token_endpoint", "$SERVER_URL/token")
+                put("issuer", SERVER_URL)
+                put("jwks_uri", "$SERVER_URL/jwks")
+                put("response_types_supported", buildJsonArray {
+                    add(ResponseType.Code.name)
+                    add(ResponseType.IdToken.name)
+                    add(ResponseType.VpToken.name)
+                })
+                put("subject_types_supported", buildJsonArray { add("public") })
+                put("id_token_signing_alg_values_supported", buildJsonArray { add("ES256") })
+            }
+            call.respond(metadata)
+        }
+
+        get("/jwks", {tags= listOf("Ebsi") }) {
+            val jwks = buildJsonObject {
+//                put("keys", buildJsonArray {
+//                    val jwkWithKid = buildJsonObject {
+//                        RequestSigningCryptoProvider.signingKey.getPublicKey().exportJWKObject().forEach {
+//                            put(it.key, it.value)
+//                        }
+//                        put("kid", RequestSigningCryptoProvider.signingKey.getPublicKey().getKeyId())
+//                    }
+//                    add(jwkWithKid)
+//                })
+            }
+
+            call.respond(HttpStatusCode.OK, jwks)
+        }
+
+        get("authorize", {
+            tags= listOf("Ebsi")
+            description = "Authorize endpoint of OAuth Server as defined in EBSI Conformance Testing specifications. \nResponse is a 302 redirect with VP_TOKEN or ID_TOKEN request. \n" +
+                    "Use the /oidc4vp/verify endpoint with header useEBSIv3=true to get an EBSI-compliant VP_TOKEN request without redirects."
+        })
+        {
+            val params = call.parameters.toMap().toJsonObject()
+
+            val stateParamAuthorizeReqEbsi = params["state"]?.jsonArray?.get(0)?.jsonPrimitive?.content
+            val scope = params["scope"]?.jsonArray.toString().replace("\"", "").replace("[", "").replace("]", "")
+
+            val stateId = UUID().toString()
+            val session = verificationUseCase.createSession(
+                vpPoliciesJson = null,
+                vcPoliciesJson = buildJsonArray {
+                    add("signature")
+                    add("expired")
+                    add("not-before")
+                    add("revoked_status_list")
+                },
+                requestCredentialsJson = buildJsonArray {},
+                presentationDefinitionJson = when(scope.contains("openid ver_test:vp_token")){
+                    true -> Json.parseToJsonElement(fixedPresentationDefinitionForEbsiConformanceTest)
+                    else -> null
+                },
+                responseMode = ResponseMode.direct_post,
+                successRedirectUri = null,
+                errorRedirectUri = null,
+                statusCallbackUri = null,
+                statusCallbackApiKey = null,
+                stateId = stateId,
+                useEbsiCTv3 = true,
+                stateParamAuthorizeReqEbsi = stateParamAuthorizeReqEbsi,
+                responseType = when(scope.contains("openid ver_test:id_token")){
+                    true -> ResponseType.IdToken
+                    else -> ResponseType.VpToken
+                },
+            )
+            context.respondRedirect("openid://?${session.authorizationRequest!!.toEbsiRequestObjectByReferenceHttpQueryString(SERVER_URL.let { "$it/openid4vc/request/${session.id}"})}")
+        }
 // ###### can be removed when LSP-Potential interop event is over ####
         route("lsp-potential") {
             post("issueMdl", {
@@ -445,86 +519,6 @@ fun Application.verfierApi() {
                 println(Cbor.encodeToHexString(mdoc))
                 call.respond(mdoc.toCBORHex())
             }
-        }
-    }
-}
-
-
-
-        }
-
-        get("/.well-known/openid-configuration", {tags= listOf("Ebsi") }) {
-            val metadata = buildJsonObject {
-                put("authorization_endpoint", "$SERVER_URL/authorize")
-                put("token_endpoint", "$SERVER_URL/token")
-                put("issuer", SERVER_URL)
-                put("jwks_uri", "$SERVER_URL/jwks")
-                put("response_types_supported", buildJsonArray {
-                    add(ResponseType.Code.name)
-                    add(ResponseType.IdToken.name)
-                    add(ResponseType.VpToken.name)
-                })
-                put("subject_types_supported", buildJsonArray { add("public") })
-                put("id_token_signing_alg_values_supported", buildJsonArray { add("ES256") })
-            }
-            call.respond(metadata)
-        }
-
-        get("/jwks", {tags= listOf("Ebsi") }) {
-            val jwks = buildJsonObject {
-                put("keys", buildJsonArray {
-                    val jwkWithKid = buildJsonObject {
-                        RequestSigningCryptoProvider.signingKey.getPublicKey().exportJWKObject().forEach {
-                            put(it.key, it.value)
-                        }
-                        put("kid", RequestSigningCryptoProvider.signingKey.getPublicKey().getKeyId())
-                    }
-                    add(jwkWithKid)
-                })
-            }
-
-            call.respond(HttpStatusCode.OK, jwks)
-        }
-
-        get("authorize", {
-            tags= listOf("Ebsi")
-            description = "Authorize endpoint of OAuth Server as defined in EBSI Conformance Testing specifications. \nResponse is a 302 redirect with VP_TOKEN or ID_TOKEN request. \n" +
-                    "Use the /oidc4vp/verify endpoint with header useEBSIv3=true to get an EBSI-compliant VP_TOKEN request without redirects."
-            })
-        {
-            val params = call.parameters.toMap().toJsonObject()
-
-            val stateParamAuthorizeReqEbsi = params["state"]?.jsonArray?.get(0)?.jsonPrimitive?.content
-            val scope = params["scope"]?.jsonArray.toString().replace("\"", "").replace("[", "").replace("]", "")
-
-            val stateId = UUID().toString()
-            val session = verificationUseCase.createSession(
-                vpPoliciesJson = null,
-                vcPoliciesJson = buildJsonArray {
-                    add("signature")
-                    add("expired")
-                    add("not-before")
-                    add("revoked_status_list")
-                },
-                requestCredentialsJson = buildJsonArray {},
-                presentationDefinitionJson = when(scope.contains("openid ver_test:vp_token")){
-                    true -> Json.parseToJsonElement(fixedPresentationDefinitionForEbsiConformanceTest)
-                    else -> null
-                },
-                responseMode = ResponseMode.direct_post,
-                successRedirectUri = null,
-                errorRedirectUri = null,
-                statusCallbackUri = null,
-                statusCallbackApiKey = null,
-                stateId = stateId,
-                useEbsiCTv3 = true,
-                stateParamAuthorizeReqEbsi = stateParamAuthorizeReqEbsi,
-                responseType = when(scope.contains("openid ver_test:id_token")){
-                    true -> ResponseType.IdToken
-                    else -> ResponseType.VpToken
-                },
-            )
-            context.respondRedirect("openid://?${session.authorizationRequest!!.toEbsiRequestObjectByReferenceHttpQueryString(SERVER_URL.let { "$it/openid4vc/request/${session.id}"})}")
         }
     }
 }
