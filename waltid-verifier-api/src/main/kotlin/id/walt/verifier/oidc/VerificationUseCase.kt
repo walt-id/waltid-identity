@@ -193,7 +193,8 @@ class VerificationUseCase(
                     put("exp", (Clock.System.now() + Duration.parse(1.days.toString())).epochSeconds)
                 }
             )
-            Result.success(RequestSigningCryptoProvider.signWithLocalKeyAndHeader(payload = payload, headers = mapOf("typ" to "JWT", "kid" to RequestSigningCryptoProvider.signingKey.getPublicKey().getKeyId())))
+//            Result.success(RequestSigningCryptoProvider.signWithLocalKeyAndHeader(payload = payload, headers = mapOf("typ" to "JWT", "kid" to RequestSigningCryptoProvider.signingKey.getPublicKey().getKeyId())))
+            Result.success("")
         } ?: Result.failure(error("Invalid id provided (expired?): $sessionId"))
 
 
