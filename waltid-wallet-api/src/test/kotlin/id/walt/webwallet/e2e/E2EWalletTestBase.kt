@@ -2,12 +2,18 @@ package id.walt.webwallet.e2e
 
 import id.walt.issuer.IssuanceExamples.issuerOnboardingRequestDefaultExample
 import id.walt.issuer.IssuerOnboardingResponse
+import id.walt.webwallet.config.ConfigManager
+import id.walt.webwallet.config.DatasourceJsonConfiguration
+import id.walt.webwallet.config.RegistrationDefaultsConfig
+import id.walt.webwallet.config.WebConfig
+import id.walt.webwallet.db.Db
 import id.walt.webwallet.db.models.AccountWalletListing
 import id.walt.webwallet.db.models.WalletDid
 import id.walt.webwallet.utils.IssuanceExamples
 import id.walt.webwallet.web.model.AccountRequest
 import id.walt.webwallet.web.model.EmailAccountRequest
 import id.walt.webwallet.web.model.loginRequestJson
+import id.walt.webwallet.webWalletSetup
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
@@ -33,7 +39,25 @@ abstract class E2EWalletTestBase {
 
     companion object {
         init {
+            ConfigManager.preloadConfig(
+                "db.sqlite", DatasourceJsonConfiguration(
+                    hikariDataSource = Db.SerializableHikariConfiguration(
+                        jdbcUrl = "jdbc:sqlite:data/wallet.db",
+                        driverClassName = "org.sqlite.JDBC",
+                        username = "",
+                        password = "",
+                        transactionIsolation = "TRANSACTION_SERIALIZABLE",
+                        isAutoCommit = true
+                    ),
+                    recreateDatabaseOnStart = true
+                )
+            )
 
+
+            ConfigManager.preloadConfig("web", WebConfig())
+            ConfigManager.preloadConfig("registration-defaults", RegistrationDefaultsConfig())
+            webWalletSetup()
+            ConfigManager.loadConfigs(emptyArray())
         }
     }
 

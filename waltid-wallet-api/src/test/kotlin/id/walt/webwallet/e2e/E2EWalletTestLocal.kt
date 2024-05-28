@@ -39,34 +39,6 @@ open class E2EWalletTestLocal : E2EWalletTestBase() {
     private var localIssuerUrl: String = ""
     private var localVerifierUrl: String = ""
 
-//    companion object {
-//        init {
-//            Files.createDirectories(Paths.get("./data"))
-//            assertTrue(File("./data").exists())
-//            val config = DatasourceConfiguration(
-//                hikariDataSource = HikariDataSource(HikariConfig().apply {
-//                    jdbcUrl = "jdbc:sqlite:data/wallet.db"
-//                    driverClassName = "org.sqlite.JDBC"
-//                    username = ""
-//                    password = ""
-//                    transactionIsolation = "TRANSACTION_SERIALIZABLE"
-//                    isAutoCommit = true
-//                }),
-//                recreateDatabaseOnStart = true
-//            )
-//
-//            WalletConfigManager.preloadConfig(
-//                "db.sqlite", config
-//            )
-//
-//            WalletConfigManager.preloadConfig(
-//                "web", WalletWebConfig()
-//            )
-//            webWalletSetup()
-//            WalletConfigManager.loadConfigs(emptyArray())
-//        }
-//    }
-
     private fun ApplicationTestBuilder.newClient(token: String? = null) = createClient {
         install(ContentNegotiation) {
             json()
