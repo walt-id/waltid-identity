@@ -79,6 +79,7 @@ open class E2EWalletTestLocal : E2EWalletTestBase() {
         }
         getUserToken()
         localWalletClient = newClient(token)
+        configureApis()
 
         // list all wallets for this user (sets wallet id)
         listAllWalletsSetWalletId()
@@ -185,13 +186,13 @@ open class E2EWalletTestLocal : E2EWalletTestBase() {
     fun e2eDeleteWalletCredentials() = testApplication {
         runApplication()
         var response: JsonArray = listCredentials()
-        assertNotEquals(response.size, 0)
+        assertNotEquals(0, response.size)
         response.forEach {
             val id = it.jsonObject["id"]?.jsonPrimitive?.content ?: error("No credentials found")
             deleteCredential(id)
         }
         val resp: JsonArray = listCredentials()
-        assertEquals(resp.size, 0)
+        assertEquals(0, resp.size)
     }
 
     // Issuer Tests

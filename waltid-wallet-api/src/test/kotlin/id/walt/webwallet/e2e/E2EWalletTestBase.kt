@@ -1,5 +1,7 @@
 package id.walt.webwallet.e2e
 
+import id.walt.crypto.keys.KeyGenerationRequest
+import id.walt.crypto.keys.KeyType
 import id.walt.issuer.IssuanceExamples.issuerOnboardingRequestDefaultExample
 import id.walt.issuer.IssuerOnboardingResponse
 import id.walt.webwallet.config.ConfigManager
@@ -9,6 +11,7 @@ import id.walt.webwallet.config.WebConfig
 import id.walt.webwallet.db.Db
 import id.walt.webwallet.db.models.AccountWalletListing
 import id.walt.webwallet.db.models.WalletDid
+import id.walt.webwallet.e2e.api.KeyApi
 import id.walt.webwallet.utils.IssuanceExamples
 import id.walt.webwallet.web.model.AccountRequest
 import id.walt.webwallet.web.model.EmailAccountRequest
@@ -36,6 +39,7 @@ abstract class E2EWalletTestBase {
     protected lateinit var token: String
     protected lateinit var walletId: UUID
     private lateinit var firstDid: String
+    private lateinit var keyApi: KeyApi
 
     companion object {
         init {
@@ -334,21 +338,15 @@ abstract class E2EWalletTestBase {
     }
 
     protected suspend fun testCreateRSAKey() {
-        println("\nUse Case -> Generate new key of type RSA\n")
-        val endpoint = "$walletUrl/wallet-api/wallet/$walletId/keys/generate?type=RSA"
-        println("POST $endpoint")
-        assertEquals(HttpStatusCode.OK, walletClient.post(endpoint).status)
+        keyApi.testGenerateKey(walletId, KeyGenerationRequest(keyType = KeyType.RSA))
     }
 
     protected suspend fun deleteKeys() {
         println("\nUse Case -> Delete Keys\n")
         listAllKeys().let { keys ->
             keys.forEach{
-                val keyId = it.jsonObject["keyId"]?.jsonObject?.get("id")?.jsonPrimitive?.content
-                val endpoint = "$walletUrl/wallet-api/wallet/$walletId/keys/$keyId"
-                println("DELETE $endpoint")
-                walletClient.delete(endpoint).let { response ->
-                    assertEquals(HttpStatusCode.Accepted, response.status)
+                it.jsonObject["keyId"]?.jsonObject?.get("id")?.jsonPrimitive?.content?.let{
+                    keyApi.testDeleteKey(walletId, it)
                     println("Key deleted!")
                 }
             }
@@ -457,5 +455,9 @@ abstract class E2EWalletTestBase {
         }.let { response ->
             assertEquals(HttpStatusCode.OK, response.status)
         }
+    }
+
+    protected fun configureApis(){
+        keyApi = KeyApi(walletUrl, walletClient)
     }
 }

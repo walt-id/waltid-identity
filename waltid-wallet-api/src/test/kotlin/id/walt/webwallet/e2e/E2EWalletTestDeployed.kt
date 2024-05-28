@@ -29,6 +29,7 @@ class E2EWalletTestDeployed : E2EWalletTestBase() {
         deployedClient = newClient()
         getUserToken()
         deployedClient = newClient(token)
+        configureApis()
     }
     
     private fun newClient(token: String? = null) = HttpClient {
