@@ -21,6 +21,8 @@ services:
     pull_policy: always
     depends_on:
       - caddy
+    env_file:
+      - .env
     volumes:
       - ./issuer-api/config:/waltid-issuer-api/config
 
@@ -30,6 +32,8 @@ services:
     pull_policy: always
     depends_on:
       - caddy
+    env_file:
+      - .env
     volumes:
       - ./verifier-api/config:/waltid-verifier-api/config
 
