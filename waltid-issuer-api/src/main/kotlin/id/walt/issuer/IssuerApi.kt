@@ -367,7 +367,7 @@ fun Application.issuerApi() {
                         queryParameter<String>("id") { required = true }
                     }
                 }) {
-                    val sessionId = call.parameters.get("id") ?: throw BadRequestException("Missing parameter \"id\"")
+                    val sessionId = call.parameters["id"] ?: throw BadRequestException("Missing parameter \"id\"")
                     val issuanceSession = OidcApi.getSession(sessionId)
                         ?: throw NotFoundException("No active issuance session found by the given id")
                     val credentialOffer = issuanceSession.credentialOffer

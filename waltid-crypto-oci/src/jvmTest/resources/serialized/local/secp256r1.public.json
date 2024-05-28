@@ -1,0 +1,4 @@
+{
+  "type": "jwk",
+  "jwk": "{\"kty\":\"EC\",\"use\":\"sig\",\"crv\":\"P-256\",\"kid\":\"LtObdob_k1-dw59-MwdA7auJUJCsqGQ7x2-ufXcB6gY\",\"x\":\"uo896Ho570UP24xyyNt7dE3U6qHlDNJth0Hc_u_uJ2E\",\"y\":\"9Pu4EciCxyTh9eVExa0FnJiJZ58zQKZTPnfKXpWMCto\",\"alg\":\"ES256\"}"
+}

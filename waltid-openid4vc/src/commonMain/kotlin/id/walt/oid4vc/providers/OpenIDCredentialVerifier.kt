@@ -1,14 +1,23 @@
 package id.walt.oid4vc.providers
 
-import id.walt.oid4vc.data.ClientIdScheme
-import id.walt.oid4vc.data.ResponseMode
-import id.walt.oid4vc.data.ResponseType
+import id.walt.crypto.keys.Key
+import id.walt.crypto.keys.KeyGenerationRequest
+import id.walt.crypto.keys.KeyManager
+import id.walt.crypto.keys.KeyType
+import id.walt.oid4vc.data.*
 import id.walt.oid4vc.data.dif.PresentationDefinition
+import id.walt.oid4vc.data.dif.VCFormat
 import id.walt.oid4vc.interfaces.ISessionCache
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.responses.TokenResponse
 import id.walt.oid4vc.util.ShortIdUtils
 import kotlinx.datetime.Clock
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.uuid.UUID
+import kotlinx.uuid.generateUUID
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
@@ -26,8 +35,8 @@ abstract class OpenIDCredentialVerifier(val config: CredentialVerifierConfig) :
 
     protected open fun prepareResponseOrRedirectUri(sessionID: String, responseMode: ResponseMode): String =
         when (responseMode) {
-            ResponseMode.query, ResponseMode.fragment, ResponseMode.form_post -> config.redirectUri ?: config.clientId
-            else -> config.responseUrl ?: config.clientId
+            ResponseMode.query, ResponseMode.fragment, ResponseMode.form_post -> config.redirectUri
+            else -> config.responseUrl ?: config.redirectUri
         }
 
     open fun initializeAuthorization(
@@ -37,6 +46,9 @@ abstract class OpenIDCredentialVerifier(val config: CredentialVerifierConfig) :
         scope: Set<String> = setOf(),
         expiresIn: Duration = 60.seconds,
         sessionId: String? = null, // A calling party may provide a unique session Id
+        ephemeralEncKey: Key? = null,
+        clientIdScheme: ClientIdScheme = config.defaultClientIdScheme,
+        openId4VPProfile: OpenId4VPProfile = OpenId4VPProfile.Default,
         stateParamAuthorizeReqEbsi: String? = null,
         useEbsiCTv3: Boolean? = false
     ): PresentationSession {
@@ -45,16 +57,22 @@ abstract class OpenIDCredentialVerifier(val config: CredentialVerifierConfig) :
             authorizationRequest = null,
             expirationTimestamp = Clock.System.now().plus(expiresIn),
             presentationDefinition = presentationDefinition,
-            stateParamAuthorizeReqEbsi = stateParamAuthorizeReqEbsi
+            stateParamAuthorizeReqEbsi = stateParamAuthorizeReqEbsi,
+            ephemeralEncKey = ephemeralEncKey,
+            openId4VPProfile = openId4VPProfile
         ).also {
             putSession(it.id, it)
         }
-        val presentationDefinitionUri = preparePresentationDefinitionUri(presentationDefinition, session.id)
+        val presentationDefinitionUri = when(openId4VPProfile) {
+            OpenId4VPProfile.ISO_18013_7_MDOC -> null
+            else -> preparePresentationDefinitionUri(presentationDefinition, session.id)
+        }
         val authReq = AuthorizationRequest(
+            // here add VpToken if response type is null
             responseType = setOf(responseType!!),
-            clientId = when(config.clientIdScheme) {
-                ClientIdScheme.RedirectUri -> ""
-                else -> config.clientId
+            clientId = when(clientIdScheme) {
+                ClientIdScheme.RedirectUri -> config.redirectUri
+                else -> config.clientIdMap[clientIdScheme] ?: config.defaultClientId
             }.let{
                 when(useEbsiCTv3) {
                     true -> it.replace(it, config.clientId.replace("/openid4vc/verify", ""))
@@ -78,7 +96,7 @@ abstract class OpenIDCredentialVerifier(val config: CredentialVerifierConfig) :
                 }
             },
             responseUri = when (responseMode) {
-                ResponseMode.direct_post -> prepareResponseOrRedirectUri(session.id, responseMode)
+                ResponseMode.direct_post, ResponseMode.direct_post_jwt -> prepareResponseOrRedirectUri(session.id, responseMode)
                 else -> null
             }.let{
                 when(useEbsiCTv3) {
@@ -99,7 +117,8 @@ abstract class OpenIDCredentialVerifier(val config: CredentialVerifierConfig) :
                 else -> scope
             },
             state = session.id,
-            clientIdScheme = config.clientIdScheme
+            clientIdScheme = clientIdScheme,
+            nonce = UUID.generateUUID().toString()
         )
         return session.copy(authorizationRequest = authReq).also {
             putSession(session.id, it)

@@ -1,5 +1,7 @@
 package id.walt.oid4vc.providers
 
+import id.walt.crypto.keys.Key
+import id.walt.oid4vc.data.OpenId4VPProfile
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.responses.TokenResponse
@@ -13,6 +15,8 @@ data class PresentationSession(
     val presentationDefinition: PresentationDefinition,
     val tokenResponse: TokenResponse? = null,
     val verificationResult: Boolean? = null,
+    val stateParamAuthorizeReqEbsi: String? = null,
     val customParameters: Map<String, Any>? = null,
-    val stateParamAuthorizeReqEbsi: String? = null
+    val ephemeralEncKey: Key? = null,
+    val openId4VPProfile: OpenId4VPProfile = OpenId4VPProfile.Default
 ) : AuthorizationSession()

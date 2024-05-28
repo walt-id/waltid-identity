@@ -1,26 +1,42 @@
 package id.walt.verifier.oidc
 
+import COSE.AlgorithmID
 import id.walt.credentials.verification.models.PolicyRequest
 import id.walt.credentials.verification.models.PolicyRequest.Companion.parsePolicyRequests
 import id.walt.credentials.verification.policies.JwtSignaturePolicy
+import id.walt.crypto.keys.KeyGenerationRequest
+import id.walt.crypto.keys.KeyManager
+import id.walt.crypto.keys.KeyType
+import id.walt.mdoc.COSECryptoProviderKeyInfo
+import id.walt.mdoc.SimpleCOSECryptoProvider
+import id.walt.oid4vc.data.ClientIdScheme
+import id.walt.oid4vc.data.OpenId4VPProfile
 import id.walt.oid4vc.data.ResponseMode
 import id.walt.oid4vc.data.ResponseType
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.providers.PresentationSession
 import id.walt.oid4vc.responses.TokenResponse
+import id.walt.sdjwt.JWTCryptoProvider
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.http.*
 import kotlinx.datetime.Clock
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
+import java.security.KeyFactory
+import java.security.cert.CertificateFactory
+import java.security.cert.X509Certificate
+import java.security.spec.PKCS8EncodedKeySpec
+import java.security.spec.X509EncodedKeySpec
+import java.util.*
 import kotlin.collections.set
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
 
 class VerificationUseCase(
-    val http: HttpClient,
+    val http: HttpClient, cryptoProvider: JWTCryptoProvider
 ) {
     private val logger = KotlinLogging.logger {}
     fun createSession(
@@ -37,6 +53,7 @@ class VerificationUseCase(
         stateId: String?,
         stateParamAuthorizeReqEbsi: String? = null,
         useEbsiCTv3: Boolean? = null,
+        openId4VPProfile: OpenId4VPProfile = OpenId4VPProfile.Default
     ) = let {
         val vpPolicies = vpPoliciesJson?.jsonArray?.parsePolicyRequests() ?: listOf(PolicyRequest(JwtSignaturePolicy()))
 
@@ -59,7 +76,14 @@ class VerificationUseCase(
         logger.debug { "Presentation definition: " + presentationDefinition.toJSON() }
 
         val session = OIDCVerifierService.initializeAuthorization(
-            presentationDefinition, responseMode = responseMode, responseType = responseType, sessionId = stateId, stateParamAuthorizeReqEbsi = stateParamAuthorizeReqEbsi, useEbsiCTv3 = useEbsiCTv3
+            presentationDefinition, responseMode = responseMode, sessionId = stateId,
+            ephemeralEncKey = when(responseMode) {
+                ResponseMode.direct_post_jwt -> runBlocking { KeyManager.createKey(KeyGenerationRequest(keyType = KeyType.secp256r1)) }
+                else -> null
+            },
+            clientIdScheme = this.getClientIdScheme(openId4VPProfile, OIDCVerifierService.config.defaultClientIdScheme),
+            openId4VPProfile = openId4VPProfile,
+            stateParamAuthorizeReqEbsi = stateParamAuthorizeReqEbsi, useEbsiCTv3 = useEbsiCTv3
         )
 
         val specificPolicies = requestCredentialsArr.filterIsInstance<JsonObject>().associate {
@@ -93,7 +117,10 @@ class VerificationUseCase(
         logger.debug { "Verifying session $sessionId" }
         val session = sessionId?.let { OIDCVerifierService.getSession(it) }
             ?: return Result.failure(Exception("State parameter doesn't refer to an existing session, or session expired"))
-        val tokenResponse = TokenResponse.fromHttpParameters(tokenResponseParameters)
+        val tokenResponse = when(TokenResponse.isDirectPostJWT(tokenResponseParameters)) {
+            true -> TokenResponse.fromDirectPostJWT(tokenResponseParameters, runBlocking { session.ephemeralEncKey?.exportJWKObject() } ?: throw IllegalArgumentException("No ephemeral reader key found on session") )
+            else -> TokenResponse.fromHttpParameters(tokenResponseParameters)
+        }
         val sessionVerificationInfo = OIDCVerifierService.sessionVerificationInfos[session.id] ?: return Result.failure(
             IllegalStateException("No session verification information found for session id!")
         )
@@ -157,7 +184,7 @@ class VerificationUseCase(
         )
     }
 
-    suspend fun getSignedAuthorizationRequestObject(sessionId: String): Result<String> =
+    suspend fun getSignedAuthorizationRequestObjectEBSI(sessionId: String): Result<String> =
         OIDCVerifierService.getSession(sessionId)?.authorizationRequest?.let {
             val payload = it.toJSON().addUpdateJsoObject(
                 buildJsonObject {
@@ -170,6 +197,11 @@ class VerificationUseCase(
         } ?: Result.failure(error("Invalid id provided (expired?): $sessionId"))
 
 
+    fun getSignedAuthorizationRequestObject(sessionId: String): Result<String> =
+        OIDCVerifierService.getSession(sessionId)?.authorizationRequest?.let {
+            Result.success(it.toRequestObject(RequestSigningCryptoProvider, RequestSigningCryptoProvider.signingKey?.keyID.orEmpty()))
+        } ?: Result.failure(error("Invalid id provided (expired?): $sessionId"))
+
     suspend fun notifySubscribers(sessionId: String) = runCatching {
         OIDCVerifierService.sessionVerificationInfos[sessionId]?.statusCallback?.let {
             http.post(it.statusCallbackUri) {
@@ -180,5 +212,55 @@ class VerificationUseCase(
                 logger.debug { "status callback: ${it.status}" }
             }
         }
+    }
+
+    fun getClientIdScheme(openId4VPProfile: OpenId4VPProfile, defaultClientIdScheme: ClientIdScheme): ClientIdScheme {
+        return when(openId4VPProfile) {
+            OpenId4VPProfile.ISO_18013_7_MDOC -> ClientIdScheme.X509SanDns
+            else -> defaultClientIdScheme
+        }
+    }
+}
+
+object LspPotentialInteropEvent {
+    val POTENTIAL_ROOT_CA_CERT = "-----BEGIN CERTIFICATE-----\n" +
+        "MIIBQzCB66ADAgECAgjbHnT+6LsrbDAKBggqhkjOPQQDAjAYMRYwFAYDVQQDDA1NRE9DIFJPT1QgQ1NQMB4XDTI0MDUwMjEzMTMzMFoXDTI0MDUwMzEzMTMzMFowFzEVMBMGA1UEAwwMTURPQyBST09UIENBMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEWP0sG+CkjItZ9KfM3sLF+rLGb8HYCfnlsIH/NWJjiXkTx57ryDLYfTU6QXYukVKHSq6MEebvQPqTJT1blZ/xeKMgMB4wDAYDVR0TAQH/BAIwADAOBgNVHQ8BAf8EBAMCAQYwCgYIKoZIzj0EAwIDRwAwRAIgWM+JtnhdqbTzFD1S3byTvle0n/6EVALbkKCbdYGLn8cCICOoSETqwk1oPnJEEPjUbdR4txiNqkHQih8HKAQoe8t5\n" +
+        "-----END CERTIFICATE-----\n"
+    val POTENTIAL_ROOT_CA_PRIV = "-----BEGIN PRIVATE KEY-----\n" +
+        "MEECAQAwEwYHKoZIzj0CAQYIKoZIzj0DAQcEJzAlAgEBBCBXPx4eVTypvm0pQkFdqVXlORn+YIFNb+Hs5xvmG3EM8g==\n" +
+        "-----END PRIVATE KEY-----\n"
+    val POTENTIAL_ROOT_CA_PUB = "-----BEGIN PUBLIC KEY-----\n" +
+        "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEWP0sG+CkjItZ9KfM3sLF+rLGb8HYCfnlsIH/NWJjiXkTx57ryDLYfTU6QXYukVKHSq6MEebvQPqTJT1blZ/xeA==\n" +
+        "-----END PUBLIC KEY-----\n"
+    val POTENTIAL_ISSUER_CERT = "-----BEGIN CERTIFICATE-----\n" +
+        "MIIBRzCB7qADAgECAgg57ch6mnj5KjAKBggqhkjOPQQDAjAXMRUwEwYDVQQDDAxNRE9DIFJPT1QgQ0EwHhcNMjQwNTAyMTMxMzMwWhcNMjUwNTAyMTMxMzMwWjAbMRkwFwYDVQQDDBBNRE9DIFRlc3QgSXNzdWVyMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEG0RINBiF+oQUD3d5DGnegQuXenI29JDaMGoMvioKRBN53d4UazakS2unu8BnsEtxutS2kqRhYBPYk9RAriU3gaMgMB4wDAYDVR0TAQH/BAIwADAOBgNVHQ8BAf8EBAMCB4AwCgYIKoZIzj0EAwIDSAAwRQIhAI5wBBAA3ewqIwslhuzFn4rNFW9dkz2TY7xeImO7CraYAiAYhai1NzJ6abAiYg8HxcRdYpO4bu2Sej8E6CzFHK34Yw==\n" +
+        "-----END CERTIFICATE-----"
+    val POTENTIAL_ISSUER_PUB = "-----BEGIN PUBLIC KEY-----\n" +
+        "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEG0RINBiF+oQUD3d5DGnegQuXenI29JDaMGoMvioKRBN53d4UazakS2unu8BnsEtxutS2kqRhYBPYk9RAriU3gQ==\n" +
+        "-----END PUBLIC KEY-----\n"
+    val POTENTIAL_ISSUER_PRIV = "-----BEGIN PRIVATE KEY-----\n" +
+        "MEECAQAwEwYHKoZIzj0CAQYIKoZIzj0DAQcEJzAlAgEBBCAoniTdVyXlKP0x+rius1cGbYyg+hjf8CT88hH8SCwWFA==\n" +
+        "-----END PRIVATE KEY-----\n"
+    val POTENTIAL_ISSUER_KEY_ID = "potential-lsp-issuer-key-01"
+    val POTENTIAL_ISSUER_CRYPTO_PROVIDER_INFO = loadPotentialIssuerKeys()
+
+    fun readKeySpec(pem: String): ByteArray {
+        val publicKeyPEM = pem
+            .replace("-----BEGIN PUBLIC KEY-----", "")
+            .replace("-----BEGIN PRIVATE KEY-----", "")
+            .replace(System.lineSeparator().toRegex(), "")
+            .replace("-----END PUBLIC KEY-----", "")
+            .replace("-----END PRIVATE KEY-----", "")
+
+        return Base64.getDecoder().decode(publicKeyPEM)
+    }
+
+    fun loadPotentialIssuerKeys(): COSECryptoProviderKeyInfo {
+        val factory = CertificateFactory.getInstance("X.509")
+        val rootCaCert = (factory.generateCertificate(POTENTIAL_ROOT_CA_CERT.byteInputStream())) as X509Certificate
+        val issuerCert = (factory.generateCertificate(POTENTIAL_ISSUER_CERT.byteInputStream())) as X509Certificate
+        val issuerPub = KeyFactory.getInstance("EC").generatePublic(X509EncodedKeySpec(readKeySpec(POTENTIAL_ISSUER_PUB)))
+        val issuerPriv = KeyFactory.getInstance("EC").generatePrivate(PKCS8EncodedKeySpec(readKeySpec(POTENTIAL_ISSUER_PRIV)))
+        return COSECryptoProviderKeyInfo(POTENTIAL_ISSUER_KEY_ID, AlgorithmID.ECDSA_256, issuerPub, issuerPriv, listOf(issuerCert), listOf(rootCaCert))
     }
 }
