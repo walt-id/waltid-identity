@@ -94,6 +94,7 @@ kotlin {
                 implementation(project(":waltid-crypto"))
                 implementation(project(":waltid-mdoc-credentials"))
                 implementation(project(":waltid-did"))
+                implementation(project(":waltid-sdjwt"))
 
                 // -- Multiplatform --
                 // Multiplatform / UUID
@@ -118,13 +119,17 @@ kotlin {
         }
         val jvmMain by getting {
             dependencies {
-                implementation("io.ktor:ktor-client-cio:$ktor_version")
+                implementation("com.nfeld.jsonpathkt:jsonpathkt:2.0.1")
+                implementation("io.ktor:ktor-client-okhttp:$ktor_version")
             }
         }
         val jvmTest by getting {
             dependencies {
                 //implementation("io.mockk:mockk:1.13.2")
                 implementation("com.nimbusds:nimbus-jose-jwt:9.37.3")
+                implementation("io.kotest:kotest-runner-junit5:5.8.0")
+                implementation("io.kotest:kotest-assertions-core:5.8.0")
+                implementation("io.kotest:kotest-assertions-json:5.8.0")
                 implementation("org.junit.jupiter:junit-jupiter-params:5.10.2")
                 implementation("com.google.crypto.tink:tink:1.12.0") // for JOSE using Ed25519
                 // Multibase
@@ -135,7 +140,7 @@ kotlin {
                 //    exclude(module = "waltid-sd-jwt-jvm")
                 //}
                 implementation("org.bouncycastle:bcprov-lts8on:2.73.6") // for secp256k1 (which was removed with Java 17)
-                implementation("org.bouncycastle:bcpkix-lts8on:2.73.4") // PEM import
+                implementation("org.bouncycastle:bcpkix-lts8on:2.73.6") // PEM import
                 implementation("io.github.oshai:kotlin-logging-jvm:6.0.9")
 
                 implementation("io.ktor:ktor-server-core-jvm:$ktor_version")
@@ -151,6 +156,9 @@ kotlin {
                 implementation("io.ktor:ktor-client-logging-jvm:$ktor_version")
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-slf4j:1.8.0")
                 implementation("io.ktor:ktor-client-okhttp:$ktor_version")
+
+                implementation("com.augustcellars.cose:cose-java:1.1.0")
+                implementation("com.soywiz.korlibs.krypto:krypto:4.0.10")
 
             }
         }

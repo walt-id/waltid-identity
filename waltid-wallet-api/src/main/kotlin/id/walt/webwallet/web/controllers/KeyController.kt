@@ -36,8 +36,27 @@ fun Application.keys() = walletRoute {
             request {
                 body<KeyGenerationRequest> {
                     description = "Key configuration (JSON)"
-                    example(
-                        "OCI key generation request",
+
+                    example("JWK key generation request",
+                        buildJsonObject {
+                            put("backend", JsonPrimitive("jwk"))
+                            put("keyType", JsonPrimitive("Ed25519"))
+                        }.toString()
+                    )
+
+                    example("TSE key generation request",
+                        buildJsonObject {
+                            put("backend", JsonPrimitive("tse"))
+                            put("config",
+                                buildJsonObject {
+                                    put("server", JsonPrimitive("http://0.0.0.0:8200/v1/transit"))
+                                    put("accessKey", JsonPrimitive("dev-only-token"))
+                                })
+                            put("keyType", JsonPrimitive("Ed25519"))
+                        }.toString()
+                    )
+
+                    example("OCI key generation request",
                         buildJsonObject {
                             put("backend", JsonPrimitive("oci"))
                             put(
@@ -55,8 +74,8 @@ fun Application.keys() = walletRoute {
                                 }
                             )
                             put("keyType", JsonPrimitive("secp256r1"))
-                        }
-                            .toString())
+                        }.toString()
+                    )
                     example(
                         "OCI API key generation request",
                         buildJsonObject {
@@ -89,27 +108,6 @@ fun Application.keys() = walletRoute {
                                 }
                             )
                             put("keyType", JsonPrimitive("secp256r1"))
-                        }
-                            .toString())
-                    example(
-                        "JWK key generation request",
-                        buildJsonObject {
-                            put("backend", JsonPrimitive("jwk"))
-                            put("keyType", JsonPrimitive("Ed25519"))
-                        }
-                            .toString()
-                    )
-                    example(
-                        "TSE key generation request",
-                        buildJsonObject {
-                            put("backend", JsonPrimitive("tse"))
-                            put("config",
-                                buildJsonObject {
-                                    put("server", JsonPrimitive("http://0.0.0.0:8200/v1/transit"))
-                                    put("accessKey", JsonPrimitive("dev-only-token"))
-                                })
-                            put("keyType", JsonPrimitive("Ed25519"))
-
                         }.toString()
                     )
                 }
