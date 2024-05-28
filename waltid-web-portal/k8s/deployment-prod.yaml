@@ -29,7 +29,7 @@ spec:
     spec:
       containers:
         - name: web-portal
-          image: waltid/portal:latest
+          image: waltid/portal:__DEFAULT_IMAGE_TAG__
           env:
             - name: NEXT_PUBLIC_VC_REPO
               value: "https://credentials.walt.id"

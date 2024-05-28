@@ -1,5 +1,3 @@
-import com.github.benmanes.gradle.versions.updates.DependencyUpdatesTask
-
 plugins {
     kotlin("multiplatform")
     kotlin("plugin.serialization")
@@ -14,6 +12,14 @@ repositories {
 }
 
 kotlin {
+    targets.configureEach {
+        compilations.configureEach {
+            compilerOptions.configure {
+                freeCompilerArgs.add("-Xexpect-actual-classes")
+            }
+        }
+    }
+
     jvm {
         jvmToolchain(16)
         withJava()
@@ -48,7 +54,7 @@ kotlin {
             dependencies {
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
                 //implementation("org.jetbrains.kotlinx:kotlinx-serialization-cbor:1.5.1")
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.1")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.4.0")
                 implementation("com.soywiz.korlibs.krypto:krypto:4.0.10")
             }
@@ -56,9 +62,6 @@ kotlin {
         val commonTest by getting {
             dependencies {
                 implementation(kotlin("test"))
-                implementation("io.kotest:kotest-assertions-core:5.5.5")
-
-                implementation("io.kotest:kotest-assertions-json:5.5.5")
             }
         }
         val jvmMain by getting {
@@ -68,13 +71,10 @@ kotlin {
         }
         val jvmTest by getting {
             dependencies {
-                implementation("org.bouncycastle:bcprov-lts8on:2.73.4")
-                implementation("org.bouncycastle:bcpkix-lts8on:2.73.4")
+                implementation("org.bouncycastle:bcprov-lts8on:2.73.6")
+                implementation("org.bouncycastle:bcpkix-lts8on:2.73.6")
                 implementation("io.mockk:mockk:1.13.2")
 
-                implementation("io.kotest:kotest-runner-junit5:5.5.5")
-                implementation("io.kotest:kotest-assertions-core:5.5.5")
-                implementation("io.kotest:kotest-assertions-json:5.5.5")
                 implementation(kotlin("reflect"))
             }
         }
@@ -100,7 +100,9 @@ kotlin {
             val hasMavenAuth = secretMavenUsername.isNotEmpty() && secretMavenPassword.isNotEmpty()
             if (hasMavenAuth) {
                 maven {
-                    url = uri("https://maven.walt.id/repository/waltid/")
+                    val releasesRepoUrl = uri("https://maven.waltid.dev/releases")
+                    val snapshotsRepoUrl = uri("https://maven.waltid.dev/snapshots")
+                    url = uri(if (version.toString().endsWith("SNAPSHOT")) snapshotsRepoUrl else releasesRepoUrl)
                     credentials {
                         username = secretMavenUsername
                         password = secretMavenPassword

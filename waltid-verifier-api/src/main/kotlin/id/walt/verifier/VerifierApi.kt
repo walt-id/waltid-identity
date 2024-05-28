@@ -1,27 +1,73 @@
 package id.walt.verifier
 
+import COSE.AlgorithmID
+import COSE.OneKey
+import cbor.Cbor
+import com.auth0.jwk.Jwk
+import com.nimbusds.jose.JWSAlgorithm
+import com.nimbusds.jose.jwk.Curve
+import com.nimbusds.jose.jwk.JWK
+import com.nimbusds.jose.jwk.gen.ECKeyGenerator
 import id.walt.credentials.verification.PolicyManager
-import id.walt.credentials.verification.models.PolicyRequest
-import id.walt.credentials.verification.models.PolicyRequest.Companion.parsePolicyRequests
-import id.walt.credentials.verification.policies.JwtSignaturePolicy
+import id.walt.crypto.keys.Key
+import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto.keys.jwk.JWKKeyCreator
+import id.walt.crypto.utils.JsonUtils.toJsonElement
+import id.walt.mdoc.COSECryptoProviderKeyInfo
+import id.walt.mdoc.SimpleCOSECryptoProvider
+import id.walt.mdoc.dataelement.DataElement
+import id.walt.mdoc.dataelement.FullDateElement
+import id.walt.mdoc.dataelement.MapElement
+import id.walt.mdoc.dataelement.toDE
+import id.walt.mdoc.doc.MDocBuilder
+import id.walt.mdoc.mso.DeviceKeyInfo
+import id.walt.mdoc.mso.ValidityInfo
+import id.walt.oid4vc.data.ClientIdScheme
+import id.walt.oid4vc.data.HTTPDataObject
+import id.walt.oid4vc.data.OpenId4VPProfile
 import id.walt.oid4vc.data.ResponseMode
 import id.walt.oid4vc.data.dif.*
-import id.walt.oid4vc.responses.TokenResponse
-import id.walt.verifier.oidc.OIDCVerifierService
-import id.walt.verifier.oidc.PresentationSessionInfo
+import id.walt.sdjwt.SimpleJWTCryptoProvider
+import id.walt.verifier.base.config.ConfigManager
+import id.walt.verifier.base.config.OIDCVerifierServiceConfig
+import id.walt.verifier.oidc.LspPotentialInteropEvent
+import id.walt.verifier.oidc.VerificationUseCase
 import io.github.smiley4.ktorswaggerui.dsl.get
 import io.github.smiley4.ktorswaggerui.dsl.post
 import io.github.smiley4.ktorswaggerui.dsl.route
+import io.ktor.client.*
+import io.ktor.client.plugins.contentnegotiation.*
+import io.ktor.client.plugins.logging.*
+import io.ktor.client.request.forms.*
 import io.ktor.http.*
+import io.ktor.http.content.*
+import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import io.ktor.server.util.*
 import io.ktor.util.*
+import kotlinx.datetime.Clock
+import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.plus
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToHexString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
+import java.io.File
+import java.io.FileInputStream
+import java.nio.charset.Charset
+import java.security.KeyFactory
+import java.security.PublicKey
+import java.security.cert.CertificateFactory
+import java.security.cert.X509Certificate
+import java.security.interfaces.ECKey
+import java.security.spec.PKCS8EncodedKeySpec
+import java.security.spec.X509EncodedKeySpec
+import java.util.*
 
 @Serializable
 data class DescriptorMappingFormParam(val id: String, val format: VCFormat, val path: String)
@@ -33,8 +79,13 @@ data class PresentationSubmissionFormParam(
 
 @Serializable
 data class TokenResponseFormParam(
-    val vp_token: JsonElement,
-    val presentation_submission: PresentationSubmissionFormParam
+    val vp_token: JsonElement?,
+    val presentation_submission: PresentationSubmissionFormParam?,
+    val response: String?
+)
+
+data class LSPPotentialIssueFormDataParam(
+    val jwk: JsonObject
 )
 
 @Serializable
@@ -52,6 +103,15 @@ data class CredentialVerificationRequest(
 const val defaultAuthorizeBaseUrl = "openid4vp://authorize"
 
 private val prettyJson = Json { prettyPrint = true }
+private val httpClient = HttpClient() {
+    install(ContentNegotiation) {
+        json()
+    }
+    install(Logging) {
+        logger = Logger.SIMPLE
+        level = LogLevel.ALL
+    }
+}
 
 val verifiableIdPresentationDefinitionExample = JsonObject(
     mapOf(
@@ -73,6 +133,8 @@ val verifiableIdPresentationDefinitionExample = JsonObject(
                 ).toJSON(),
     )
 ).let { prettyJson.encodeToString(it) }
+
+private val verificationUseCase = VerificationUseCase(httpClient, SimpleJWTCryptoProvider(JWSAlgorithm.EdDSA, null, null))
 
 
 fun Application.verfierApi() {
@@ -106,6 +168,21 @@ fun Application.verfierApi() {
                         example = ""
                         required = false
                     }
+                    headerParameter<String>("statusCallbackUri") {
+                        description = "Callback to push state changes of the presentation process to"
+                        example = ""
+                        required = false
+                    }
+                    headerParameter<String>("statusCallbackApiKey") {
+                        description = ""
+                        example = ""
+                        required = false
+                    }
+                    headerParameter<String>("stateId") {
+                        description = ""
+                        example = ""
+                        required = false
+                    }
                     body<JsonObject> {
                         description =
                             "Presentation definition, describing the presentation requirement for this verification session. ID of the presentation definition is automatically assigned randomly."
@@ -127,61 +204,31 @@ fun Application.verfierApi() {
                     context.request.header("responseMode")?.let { ResponseMode.valueOf(it) } ?: ResponseMode.direct_post
                 val successRedirectUri = context.request.header("successRedirectUri")
                 val errorRedirectUri = context.request.header("errorRedirectUri")
-
-
+                val statusCallbackUri = context.request.header("statusCallbackUri")
+                val statusCallbackApiKey = context.request.header("statusCallbackApiKey")
+                val stateId = context.request.header("stateId")
                 val body = context.receive<JsonObject>()
 
-                /*val presentationDefinition = (body["presentation_definition"]
-                    ?: throw IllegalArgumentException("No `presentation_definition` supplied!"))
-                    .let { PresentationDefinition.fromJSON(it.jsonObject) }*/
+                val session = verificationUseCase.createSession(
+                    vpPoliciesJson = body["vp_policies"],
+                    vcPoliciesJson = body["vc_policies"],
+                    requestCredentialsJson = body["request_credentials"]!!,
+                    presentationDefinitionJson = body["presentation_definition"],
+                    responseMode = responseMode,
+                    successRedirectUri = successRedirectUri,
+                    errorRedirectUri = errorRedirectUri,
+                    statusCallbackUri = statusCallbackUri,
+                    statusCallbackApiKey = statusCallbackApiKey,
+                    stateId = stateId,
+                    openId4VPProfile = OpenId4VPProfile.fromAuthorizeBaseURL(authorizeBaseUrl) ?: OpenId4VPProfile.Default
+                )
 
-                val vpPolicies = body["vp_policies"]?.jsonArray?.parsePolicyRequests()
-                    ?: listOf(PolicyRequest(JwtSignaturePolicy()))
-
-                val vcPolicies = body["vc_policies"]?.jsonArray?.parsePolicyRequests()
-                    ?: listOf(PolicyRequest(JwtSignaturePolicy()))
-
-                val requestCredentialsArr = body["request_credentials"]!!.jsonArray
-
-                val requestedTypes = requestCredentialsArr.map {
-                    when (it) {
-                        is JsonPrimitive -> it.contentOrNull
-                        is JsonObject -> it["credential"]?.jsonPrimitive?.contentOrNull
-                        else -> throw IllegalArgumentException("Invalid JSON type for requested credential: $it")
-                    } ?: throw IllegalArgumentException("Invalid VC type for requested credential: $it")
-                }
-
-                val presentationDefinition = (body["presentation_definition"]?.let { PresentationDefinition.fromJSON(it.jsonObject) })
-                    ?: PresentationDefinition.primitiveGenerationFromVcTypes(requestedTypes)
-                println("Presentation definition: " + presentationDefinition.toJSON())
-
-                val session =
-                    OIDCVerifierService.initializeAuthorization(presentationDefinition, responseMode = responseMode)
-
-                val specificPolicies = requestCredentialsArr
-                    .filterIsInstance<JsonObject>()
-                    .associate {
-                        (it["credential"] ?: throw IllegalArgumentException("No `credential` name supplied, in `request_credentials`."))
-                            .jsonPrimitive.content to (it["policies"]
-                            ?: throw IllegalArgumentException("No `policies` supplied, in `request_credentials`."))
-                            .jsonArray.parsePolicyRequests()
-                    }
-
-                println("vpPolicies: $vpPolicies")
-                println("vcPolicies: $vcPolicies")
-                println("spPolicies: $specificPolicies")
-
-
-                OIDCVerifierService.sessionVerificationInfos[session.id] =
-                    OIDCVerifierService.SessionVerificationInformation(
-                        vpPolicies = vpPolicies,
-                        vcPolicies = vcPolicies,
-                        specificPolicies = specificPolicies,
-                        successRedirectUri = successRedirectUri,
-                        errorRedirectUri = errorRedirectUri
-                    )
-
-                context.respond(authorizeBaseUrl.plus("?").plus(session.authorizationRequest!!.toHttpQueryString()))
+                context.respond(authorizeBaseUrl.plus("?").plus(
+                    when(session.authorizationRequest!!.clientIdScheme) {
+                        ClientIdScheme.X509SanDns -> session.authorizationRequest!!.toRequestObjectByReferenceHttpQueryString(ConfigManager.getConfig<OIDCVerifierServiceConfig>().baseUrl.let { "$it/openid4vc/request/${session.id}" })
+                        else -> session.authorizationRequest!!.toHttpQueryString()
+                    })
+                )
             }
             post("/verify/{state}", {
                 tags = listOf("OIDC")
@@ -202,51 +249,24 @@ fun Application.verfierApi() {
                                     "1", "1", listOf(
                                         DescriptorMappingFormParam("1", VCFormat.jwt_vc_json, "$.type")
                                     )
-                                )
+                                ), null
                             )
                         )
+                        example("direct_post.jwt response", TokenResponseFormParam(
+                            null, null, "ey..."
+                        ))
                     }
                 }
             }) {
-                val session = call.parameters["state"]?.let { OIDCVerifierService.getSession(it) }
-                    ?: return@post call.respond(
-                        HttpStatusCode.BadRequest,
-                        "State parameter doesn't refer to an existing session, or session expired"
-                    )
-
-                val tokenResponse = TokenResponse.fromHttpParameters(context.request.call.receiveParameters().toMap())
-                val sessionVerificationInfo = OIDCVerifierService.sessionVerificationInfos[session.id]
-                    ?: throw IllegalStateException("No session verification information found for session id!")
-
-                val maybePresentationSessionResult = runCatching { OIDCVerifierService.verify(tokenResponse, session) }
-
-                if (maybePresentationSessionResult.getOrNull() != null) {
-                    val presentationSession = maybePresentationSessionResult.getOrThrow()
-                    if (presentationSession.verificationResult == true) {
-                        val redirectUri = sessionVerificationInfo.successRedirectUri?.replace("\$id", session.id) ?: ""
-                        call.respond(HttpStatusCode.OK, redirectUri)
-                    } else {
-                        val policyResults = OIDCVerifierService.policyResults[session.id]
-                        val redirectUri = sessionVerificationInfo.errorRedirectUri?.replace("\$id", session.id)
-
-                        if (redirectUri != null) {
-                            call.respond(HttpStatusCode.BadRequest, redirectUri)
-                        } else {
-                            if (policyResults == null) {
-                                call.respond(HttpStatusCode.BadRequest, "Verification policies did not succeed")
-                            } else {
-                                val failedPolicies =
-                                    policyResults.results.flatMap { it.policyResults.map { it } }.filter { it.result.isFailure }
-                                call.respond(
-                                    HttpStatusCode.BadRequest,
-                                    "Verification policies did not succeed: ${failedPolicies.joinToString { it.request.policy.name }}"
-                                )
-                            }
-                        }
+                val sessionId = call.parameters["state"]
+                verificationUseCase.verify(sessionId, context.request.call.receiveParameters().toMap())
+                    .onSuccess {
+                        call.respond(HttpStatusCode.OK, it)
+                    }.onFailure {
+                        call.respond(HttpStatusCode.BadRequest, it.localizedMessage)
+                    }.also {
+                        sessionId?.run { verificationUseCase.notifySubscribers(this) }
                     }
-                } else {
-                    call.respond(HttpStatusCode.BadRequest, "Verification failed")
-                }
             }
             get("/session/{id}", {
                 tags = listOf("Credential Verification")
@@ -265,21 +285,12 @@ fun Application.verfierApi() {
                     }
                 }
             }) {
-                val id = call.parameters["id"] ?: throw IllegalArgumentException("No id provided!")
-                val session = OIDCVerifierService.getSession(id)
-                    ?: throw IllegalArgumentException("Invalid id provided (expired?): $id")
-
-                val policyResults = OIDCVerifierService.policyResults[session.id]
-                //?: throw IllegalStateException("No policy results found for id")
-
-                call.respond(
-                    Json { prettyPrint = true }.encodeToString(
-                        PresentationSessionInfo.fromPresentationSession(
-                            session,
-                            policyResults?.toJson()
-                        )
-                    )
-                )
+                val id = call.parameters.getOrFail("id")
+                verificationUseCase.getResult(id).onSuccess {
+                    call.respond(HttpStatusCode.OK, it)
+                }.onFailure {
+                    call.respond(HttpStatusCode.BadRequest, it.localizedMessage)
+                }
             }
             get("/pd/{id}", {
                 tags = listOf("OIDC")
@@ -294,10 +305,10 @@ fun Application.verfierApi() {
                 }
             }) {
                 val id = call.parameters["id"]
-                val pd = id?.let { OIDCVerifierService.getSession(it)?.presentationDefinition }
-                if (pd != null) {
-                    call.respond(pd.toJSON())
-                } else {
+
+                verificationUseCase.getPresentationDefinition(id ?: "").onSuccess {
+                    call.respond(it.toJSON())
+                }.onFailure {
                     call.respond(HttpStatusCode.NotFound)
                 }
             }
@@ -308,6 +319,63 @@ fun Application.verfierApi() {
             }) {
                 call.respond(PolicyManager.listPolicyDescriptions())
             }
+            get("/request/{id}", {
+                tags = listOf("OIDC")
+                summary = "Get request object for session by session id"
+                description = "Gets the signed request object for the session given by the session id parameter"
+                request {
+                    pathParameter<String>("id") {
+                        description = "ID of the presentation session"
+                        required = true
+                    }
+                }
+            }) {
+                val id = call.parameters.getOrFail("id")
+                verificationUseCase.getSignedAuthorizationRequestObject(id).onSuccess {
+                    call.respondText(it, ContentType.parse("application/oauth-authz-req+jwt"), HttpStatusCode.OK)
+                }.onFailure {
+                    call.respond(HttpStatusCode.BadRequest, it.localizedMessage)
+                }
+            }
+        }
+// ###### can be removed when LSP-Potential interop event is over ####
+        route("lsp-potential") {
+            post("issueMdl", {
+                tags = listOf("LSP POTENTIAL Interop Event")
+                summary = "Issue MDL for given device key, using internal issuer keys"
+                description = "Give device public key JWK in form body."
+                hidden = true
+                request {
+                    body<LSPPotentialIssueFormDataParam> {
+                        mediaType(ContentType.Application.FormUrlEncoded)
+                        example("jwk", LSPPotentialIssueFormDataParam(
+                            Json.parseToJsonElement(ECKeyGenerator(Curve.P_256).generate().toPublicJWK().toString().also {
+                                println(it)
+                            }).jsonObject
+                        ))
+                    }
+                }
+            }) {
+                val deviceJwk = context.request.call.receiveParameters().toMap().get("jwk")
+                val devicePubKey = JWK.parse(deviceJwk!!.first()).toECKey().toPublicKey()
+
+                val mdoc = MDocBuilder("org.iso.18013.5.1.mDL")
+                    .addItemToSign("org.iso.18013.5.1", "family_name", "Doe".toDE())
+                    .addItemToSign("org.iso.18013.5.1", "given_name", "John".toDE())
+                    .addItemToSign("org.iso.18013.5.1", "birth_date", FullDateElement(LocalDate(1990, 1, 15)))
+                    .sign(
+                        ValidityInfo(Clock.System.now(), Clock.System.now(), Clock.System.now().plus(365*24, DateTimeUnit.HOUR)),
+                        DeviceKeyInfo(DataElement.fromCBOR(OneKey(devicePubKey, null).AsCBOR().EncodeToBytes())),
+                        SimpleCOSECryptoProvider(listOf(
+                        LspPotentialInteropEvent.POTENTIAL_ISSUER_CRYPTO_PROVIDER_INFO)), LspPotentialInteropEvent.POTENTIAL_ISSUER_KEY_ID
+                    )
+                println("SIGNED MDOC (mDL):")
+                println(Cbor.encodeToHexString(mdoc))
+                call.respond(mdoc.toCBORHex())
+            }
         }
     }
 }
+
+
+

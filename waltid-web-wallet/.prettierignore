@@ -1,5 +1,4 @@
 .github
-.idea
 .nuxt
 node_modules
 *.log

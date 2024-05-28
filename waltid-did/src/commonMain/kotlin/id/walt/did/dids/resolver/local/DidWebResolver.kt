@@ -1,15 +1,14 @@
 package id.walt.did.dids.resolver.local
 
 import id.walt.crypto.keys.Key
-import id.walt.crypto.keys.LocalKey
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.did.dids.DidUtils
 import id.walt.did.dids.document.DidDocument
 import io.ktor.client.*
-import io.ktor.client.call.*
 import io.ktor.client.request.*
+import io.ktor.client.statement.*
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import love.forte.plugin.suspendtrans.annotation.JsPromise
@@ -18,7 +17,7 @@ import love.forte.plugin.suspendtrans.annotation.JvmBlocking
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 
-@ExperimentalJsExport
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 class DidWebResolver(private val client: HttpClient) : LocalResolverMethod("web") {
 
@@ -30,9 +29,9 @@ class DidWebResolver(private val client: HttpClient) : LocalResolverMethod("web"
         val url = resolveDidToUrl(did)
 
         val response = runCatching {
-            DidDocument(
-                jsonObject = client.get(url).body<JsonObject>()
-            )
+            client.get(url).bodyAsText().let {
+                DidDocument(jsonObject = Json.parseToJsonElement(it).jsonObject)
+            }
         }
 
         return response
@@ -77,9 +76,9 @@ class DidWebResolver(private val client: HttpClient) : LocalResolverMethod("web"
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    suspend fun tryConvertAnyPublicKeyJwkToKey(publicKeyJwks: List<String>): Result<LocalKey> {
+    suspend fun tryConvertAnyPublicKeyJwkToKey(publicKeyJwks: List<String>): Result<JWKKey> {
         publicKeyJwks.forEach { publicKeyJwk ->
-            val result = LocalKey.importJWK(publicKeyJwk)
+            val result = JWKKey.importJWK(publicKeyJwk)
             if (result.isSuccess) return result
         }
         return Result.failure(NoSuchElementException("No key could be imported"))

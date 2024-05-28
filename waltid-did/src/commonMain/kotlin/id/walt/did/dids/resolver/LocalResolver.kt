@@ -5,6 +5,7 @@ import id.walt.did.dids.DidUtils.methodFromDid
 import id.walt.did.dids.resolver.local.DidJwkResolver
 import id.walt.did.dids.resolver.local.DidKeyResolver
 import id.walt.did.dids.resolver.local.DidWebResolver
+import id.walt.did.dids.resolver.local.DidEbsiResolver
 import id.walt.did.dids.resolver.local.LocalResolverMethod
 import io.ktor.client.*
 import io.ktor.client.plugins.contentnegotiation.*
@@ -16,11 +17,11 @@ import love.forte.plugin.suspendtrans.annotation.JvmBlocking
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 
-@ExperimentalJsExport
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 class LocalResolver : DidResolver {
     override val name = "walt.id local resolver"
-    private val http = HttpClient() {
+    private val http = HttpClient {
         install(ContentNegotiation) {
             json(DidWebResolver.json)
         }
@@ -29,7 +30,8 @@ class LocalResolver : DidResolver {
     private val resolvers = listOf(
         DidJwkResolver(),
         DidWebResolver(http),
-        DidKeyResolver()
+        DidKeyResolver(),
+        DidEbsiResolver()
     ).associateBy { it.method }.toMutableMap()
 
     fun deactivateMethod(method: String) {

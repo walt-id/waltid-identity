@@ -9,9 +9,9 @@ import kotlin.js.JsExport
  * _useJwkJcsPub_ is set to `true` the EBSI implementation (jwk_jcs-pub encoding) according
  * https://hub.ebsi.eu/tools/libraries/key-did-resolver is performed.
  */
-@ExperimentalJsExport
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 class DidKeyCreateOptions(keyType: KeyType = KeyType.Ed25519, useJwkJcsPub: Boolean = false) : DidCreateOptions(
     method = "key",
-    options = options("keyType" to keyType.name.lowercase(), "useJwkJcsPub" to useJwkJcsPub)
+    config = config("keyType" to keyType.name.lowercase(), "useJwkJcsPub" to useJwkJcsPub)
 )

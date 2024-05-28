@@ -14,8 +14,8 @@ plugins {
 
     //id("io.ktor.plugin") version "2.3.8" // Versions.KTOR_VERSION
     id("io.ktor.plugin") version "2.3.8" // Versions.KTOR_VERSION
-    id("org.owasp.dependencycheck") version "9.0.9"
-    id("com.github.jk1.dependency-license-report") version "2.5"
+    id("org.owasp.dependencycheck") version "9.1.0"
+    id("com.github.jk1.dependency-license-report") version "2.7"
     application
     `maven-publish`
 
@@ -29,7 +29,7 @@ repositories {
     mavenCentral()
     //jcenter()
     maven("https://jitpack.io")
-    maven("https://maven.walt.id/repository/waltid/")
+    maven("https://maven.waltid.dev/releases")
     mavenLocal()
 }
 
@@ -56,14 +56,14 @@ dependencies {
     implementation("io.ktor:ktor-server-cio-jvm:${Versions.KTOR_VERSION}")
 
     // Ktor server external libs
-    implementation("io.github.smiley4:ktor-swagger-ui:2.7.4")
+    implementation("io.github.smiley4:ktor-swagger-ui:2.8.0")
 
     // Ktor client
     implementation("io.ktor:ktor-client-core-jvm:${Versions.KTOR_VERSION}")
     implementation("io.ktor:ktor-client-serialization-jvm:${Versions.KTOR_VERSION}")
     implementation("io.ktor:ktor-client-content-negotiation:${Versions.KTOR_VERSION}")
     implementation("io.ktor:ktor-client-json-jvm:${Versions.KTOR_VERSION}")
-    implementation("io.ktor:ktor-client-cio-jvm:${Versions.KTOR_VERSION}")
+    implementation("io.ktor:ktor-client-okhttp-jvm:${Versions.KTOR_VERSION}")
     implementation("io.ktor:ktor-client-logging-jvm:${Versions.KTOR_VERSION}")
 
 
@@ -85,9 +85,9 @@ dependencies {
     implementation("com.sksamuel.hoplite:hoplite-hocon:${Versions.HOPLITE_VERSION}")
 
     // Logging
-    implementation("io.github.oshai:kotlin-logging-jvm:6.0.3")
-    implementation("org.slf4j:slf4j-simple:2.0.12")
-    implementation("org.slf4j:jul-to-slf4j:2.0.12")
+    implementation("io.github.oshai:kotlin-logging-jvm:6.0.9")
+    implementation("org.slf4j:slf4j-simple:2.0.13")
+    implementation("org.slf4j:jul-to-slf4j:2.0.13")
 
     // Test
     testImplementation(kotlin("test"))
@@ -128,7 +128,9 @@ java {
 tasks.withType<KotlinCompile> {
     kotlinOptions.jvmTarget = "17"
 }
-
+tasks.withType<org.gradle.api.tasks.bundling.Zip> {
+    isZip64 = true
+}
 tasks.named<CreateStartScripts>("startScripts") {
     doLast {
         windowsScript.writeText(
@@ -161,7 +163,9 @@ publishing {
 
     repositories {
         maven {
-            url = uri("https://maven.walt.id/repository/waltid/")
+            val releasesRepoUrl = uri("https://maven.waltid.dev/releases")
+            val snapshotsRepoUrl = uri("https://maven.waltid.dev/snapshots")
+            url = uri(if (version.toString().endsWith("SNAPSHOT")) snapshotsRepoUrl else releasesRepoUrl)
             val envUsername = System.getenv("MAVEN_USERNAME")
             val envPassword = System.getenv("MAVEN_PASSWORD")
 

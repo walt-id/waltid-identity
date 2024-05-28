@@ -3,6 +3,7 @@ package id.walt.webwallet.db.models
 import kotlinx.datetime.Instant
 import kotlinx.datetime.toKotlinInstant
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 import kotlinx.uuid.UUID
 import kotlinx.uuid.exposed.kotlinxUUID
 import org.jetbrains.exposed.sql.ResultRow
@@ -24,13 +25,14 @@ object Accounts : Table("accounts") {
 
     override val primaryKey = PrimaryKey(tenant, id)
 
+    /*
     init {
-        //foreignKey(id, loginWeb3Wallet, target = Web3Wallets.primaryKey)
+        foreignKey(id, loginWeb3Wallet, target = Web3Wallets.primaryKey)
 
-        /*check {
+        check {
             (email.isNotNull() and password.isNotNull()) or loginWeb3Wallet.isNotNull()
-        }*/
-    }
+        }
+    }*/
 }
 
 @Serializable
@@ -39,6 +41,7 @@ data class Account(
     val id: UUID,
     val name: String? = null,
     val email: String? = null,
+    @Transient
     val updatePasswordTo: String? = null,
     //val loginWeb3Wallet: UUID? = null,
     val createdOn: Instant

@@ -2,6 +2,7 @@ package id.walt.webwallet.db.models
 
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.webwallet.manifest.provider.ManifestProvider
+import id.walt.webwallet.utils.JsonUtils
 import kotlinx.datetime.Instant
 import kotlinx.datetime.toKotlinInstant
 import kotlinx.serialization.SerialName
@@ -76,6 +77,12 @@ data class WalletCredential(
                 if (it is JsonObject) it.jsonObject["id"]?.jsonPrimitive?.content
                 else it.jsonPrimitive.content
             } ?: manifest?.jsonObject?.get("input")?.jsonObject?.get("issuer")?.jsonPrimitive?.content
+
+        fun getManifestLogo(manifest: JsonObject?) =
+            manifest?.let { JsonUtils.tryGetData(it, "display.card.logo.uri")?.jsonPrimitive?.content }
+
+        fun getManifestIssuerName(manifest: JsonObject?) =
+            manifest?.let { JsonUtils.tryGetData(it, "display.card.issuedBy")?.jsonPrimitive?.content }
     }
 
 

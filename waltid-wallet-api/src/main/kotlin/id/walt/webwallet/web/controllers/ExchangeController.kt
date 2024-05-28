@@ -4,31 +4,18 @@ import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.requests.CredentialOfferRequest
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.db.models.WalletOperationHistory
-import id.walt.webwallet.seeker.DefaultCredentialTypeSeeker
-import id.walt.webwallet.seeker.DefaultDidSeeker
 import id.walt.webwallet.service.SSIKit2WalletService
 import id.walt.webwallet.service.WalletServiceManager
-import id.walt.webwallet.service.credentials.CredentialsService
-import id.walt.webwallet.service.dids.DidsService
-import id.walt.webwallet.service.events.EventType
-import id.walt.webwallet.service.exchange.IssuanceService
-import id.walt.webwallet.service.issuers.IssuersService
-import id.walt.webwallet.usecase.issuer.IssuerUseCaseImpl
-import id.walt.webwallet.web.WebBaseRoutes.webWalletRoute
+import id.walt.webwallet.usecase.exchange.FilterData
 import io.github.smiley4.ktorswaggerui.dsl.post
 import io.github.smiley4.ktorswaggerui.dsl.route
-import io.ktor.client.*
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
-import io.ktor.server.util.*
 import io.ktor.util.*
-import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
-import kotlinx.uuid.UUID
-import kotlinx.uuid.generateUUID
 
 fun Application.exchange() = walletRoute {
     route("exchange", {
@@ -61,22 +48,29 @@ fun Application.exchange() = walletRoute {
             val offer = call.receiveText()
 
             runCatching {
-                wallet.useOfferRequest(offer = offer, did = did, requireUserInput = requireUserInput)
-                    .also {
-                        wallet.addOperationHistory(
-                            WalletOperationHistory.new(
-                                tenant = wallet.tenant,
-                                wallet = wallet,
-                                "useOfferRequest",
-                                mapOf("did" to did, "offer" to offer)
-                            )
+                WalletServiceManager.explicitClaimStrategy.claim(
+                    tenant = wallet.tenant,
+                    account = getUserUUID(),
+                    wallet = wallet.walletId,
+                    did = did,
+                    offer = offer,
+                    pending = requireUserInput
+                ).also {
+                    wallet.addOperationHistory(
+                        WalletOperationHistory.new(
+                            tenant = wallet.tenant,
+                            wallet = wallet,
+                            "useOfferRequest",
+                            mapOf("did" to did, "offer" to offer)
                         )
-                    }
+                    )
+                }
             }.onSuccess {
                 context.respond(HttpStatusCode.OK, it)
-            }.onFailure {  error ->
-                println("wallet exception: $error")
-                context.respond(HttpStatusCode.BadRequest, error.localizedMessage) }
+            }.onFailure { error ->
+                error.printStackTrace()
+                context.respond(HttpStatusCode.BadRequest, error.localizedMessage)
+            }
         }
 
         post("matchCredentialsForPresentationDefinition", {
@@ -94,11 +88,31 @@ fun Application.exchange() = walletRoute {
             }
         }) {
             val presentationDefinition = PresentationDefinition.fromJSON(context.receive<JsonObject>())
-
-            val wallet = getWalletService()
-            val matchedCredentials = wallet.matchCredentialsByPresentationDefinition(presentationDefinition)
-
+            val matchedCredentials = WalletServiceManager.matchPresentationDefinitionCredentialsUseCase.match(
+                getWalletId(), presentationDefinition
+            )
             context.respond(matchedCredentials)
+        }
+        post("unmatchedCredentialsForPresentationDefinition", {
+            summary =
+                "Returns the credentials that are required by the presentation definition but not found in the wallet"
+
+            request {
+                body<PresentationDefinition> { description = "Presentation definition" }
+            }
+            response {
+                HttpStatusCode.OK to {
+                    body<List<FilterData>> {
+                        description = "Filters that failed to fulfill the presentation definition"
+                    }
+                }
+            }
+        }) {
+            val presentationDefinition = PresentationDefinition.fromJSON(context.receive<JsonObject>())
+            val unmatchedCredentialTypes = WalletServiceManager.unmatchedPresentationDefinitionCredentialsUseCase.find(
+                getWalletId(), presentationDefinition
+            )
+            context.respond(unmatchedCredentialTypes)
         }
 
         post("usePresentationRequest", {
@@ -224,80 +238,6 @@ fun Application.exchange() = walletRoute {
             val reqParams = Url(request).parameters.toMap()
             val parsedOffer = wallet.resolveCredentialOffer(CredentialOfferRequest.fromHttpParameters(reqParams))
             context.respond(parsedOffer)
-        }
-    }
-}
-
-fun Application.silentExchange() = webWalletRoute {
-    route("api", {
-        tags = listOf("WalletCredential Exchange")
-    }) {
-        post("useOfferRequest/{did}", {
-            summary = "Silently claim credentials"
-            request {
-                pathParameter<String>("did") { description = "The DID to issue the credential(s) to" }
-                body<String> {
-                    description = "The offer request to use"
-                }
-            }
-        }) {
-            val did = call.parameters.getOrFail("did")
-            val offer = call.receiveText()
-            val issuerUseCase = IssuerUseCaseImpl(
-                service = IssuersService, http = HttpClient()
-            )
-            val credentialService = CredentialsService()
-            // claim offer
-            val credentials = IssuanceService.useOfferRequest(
-                offer = offer,
-                credentialWallet = SSIKit2WalletService.getCredentialWallet(did),
-                clientId = SSIKit2WalletService.testCIClientConfig.clientID
-            ).mapNotNull {
-                val manifest = WalletCredential.tryParseManifest(it.manifest) ?: JsonObject(emptyMap())
-                val credential = WalletCredential.parseDocument(it.document, it.id) ?: JsonObject(emptyMap())
-                if (WalletServiceManager.issuerTrustValidationService.validate(
-                        did = DefaultDidSeeker().get(manifest),
-                        type = DefaultCredentialTypeSeeker().get(credential),
-                        egfUri = "test"
-                    )
-                ) {
-                    DidsService.getWalletsForDid(did).map { wallet ->
-                        WalletCredential(
-                            wallet = wallet,
-                            id = it.id,
-                            document = it.document,
-                            disclosures = it.disclosures,
-                            addedOn = Clock.System.now(),
-                            manifest = it.manifest,
-                            deletedOn = null,
-                            pending = issuerUseCase.get(
-                                wallet = wallet, name = WalletCredential.parseIssuerDid(credential, manifest) ?: ""
-                            ).getOrNull()?.authorized ?: true,
-                        ).also { credential ->
-                            WalletServiceManager.eventUseCase.log(
-                                action = EventType.Credential.Receive,
-                                originator = "",
-                                tenant = "global",//TODO
-                                accountId = UUID.generateUUID(),//TODO: getUserUUID(),
-                                walletId = wallet,
-                                data = WalletServiceManager.eventUseCase.credentialEventData(
-                                    credential = credential, type = it.type
-                                ),
-                                credentialId = credential.id,
-                            )
-                        }
-                    }
-                } else null
-            }.flatten()
-            // store credentials
-            val result = credentials.groupBy {
-                it.wallet
-            }.flatMap {
-                credentialService.add(
-                    wallet = it.key, credentials = it.value.toTypedArray()
-                )
-            }
-            context.respond(HttpStatusCode.Accepted, result.size)
         }
     }
 }

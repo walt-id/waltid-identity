@@ -3,23 +3,15 @@ package id.walt.oid4vc
 import id.walt.credentials.verification.policies.JwtSignaturePolicy
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.did.dids.DidService
-import id.walt.oid4vc.data.ClientIdScheme
-import id.walt.oid4vc.data.OpenIDClientMetadata
-import id.walt.oid4vc.data.ResponseMode
-import id.walt.oid4vc.data.ResponseType
+import id.walt.oid4vc.data.*
 import id.walt.oid4vc.data.dif.*
+import id.walt.oid4vc.interfaces.PresentationResult
 import id.walt.oid4vc.providers.CredentialWalletConfig
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.responses.TokenResponse
-import io.kotest.common.runBlocking
-import io.kotest.core.spec.style.AnnotationSpec
 import io.kotest.matchers.collections.shouldContain
-import io.kotest.matchers.collections.shouldContainExactly
-import io.kotest.matchers.shouldBe
-import io.kotest.matchers.shouldNotBe
 import io.ktor.client.*
 import io.ktor.client.call.*
-import io.ktor.client.engine.java.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.plugins.logging.*
 import io.ktor.client.request.*
@@ -28,16 +20,19 @@ import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.util.*
+import io.ktor.util.reflect.*
+import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
+import kotlinx.uuid.UUID
+import kotlinx.uuid.generateUUID
+import org.junit.jupiter.api.BeforeAll
+import kotlin.test.*
 import kotlin.time.Duration.Companion.minutes
 
-class VP_JVM_Test : AnnotationSpec() {
+class VP_JVM_Test {
 
-    private lateinit var testWallet: TestCredentialWallet
-    private lateinit var testVerifier: VPTestVerifier
-
-    val http = HttpClient(Java) {
+    val http = HttpClient() {
         install(ContentNegotiation) {
             json()
         }
@@ -47,17 +42,21 @@ class VP_JVM_Test : AnnotationSpec() {
         }
         followRedirects = false
     }
+    companion object {
+        private lateinit var testWallet: TestCredentialWallet
+        private lateinit var testVerifier: VPTestVerifier
+        @BeforeAll
+        @JvmStatic
+        fun init() = runTest {
+            DidService.minimalInit()
+            assertContains(DidService.resolverMethods.keys, "jwk")
+            assertContains(DidService.registrarMethods.keys, "web")
+            testWallet = TestCredentialWallet(CredentialWalletConfig(WALLET_BASE_URL))
+            testWallet.start()
 
-    @BeforeAll
-    fun init() {
-        runBlocking { DidService.minimalInit() }
-        DidService.resolverMethods.keys shouldContain "jwk"
-        DidService.registrarMethods.keys shouldContain "web"
-        testWallet = TestCredentialWallet(CredentialWalletConfig(WALLET_BASE_URL))
-        testWallet.start()
-
-        testVerifier = VPTestVerifier()
-        testVerifier.start()
+            testVerifier = VPTestVerifier()
+            testVerifier.start()
+        }
     }
 
     @Test
@@ -65,73 +64,193 @@ class VP_JVM_Test : AnnotationSpec() {
         // parse example 1
         val pd1 = PresentationDefinition.fromJSONString(presentationDefinitionExample1)
         println("pd1: $pd1")
-        pd1.id shouldBe "vp token example"
-        pd1.inputDescriptors.size shouldBe 1
-        pd1.inputDescriptors.first().id shouldBe "id card credential"
-        pd1.inputDescriptors.first().format!![VCFormat.ldp_vc]!!.proof_type!! shouldContainExactly setOf("Ed25519Signature2018")
-        pd1.inputDescriptors.first().constraints!!.fields!!.first().path shouldContainExactly listOf("\$.type")
+        assertEquals(expected = "vp token example", actual = pd1.id)
+        assertEquals(expected = 1, actual = pd1.inputDescriptors.size)
+        assertEquals(expected = "id card credential", actual = pd1.inputDescriptors.first().id)
+        assertContentEquals(
+            expected = setOf("Ed25519Signature2018"),
+            actual = pd1.inputDescriptors.first().format!![VCFormat.ldp_vc]!!.proof_type!!.asIterable()
+        )
+        assertContentEquals(
+            expected = listOf("\$.type"),
+            actual = pd1.inputDescriptors.first().constraints!!.fields!!.first().path
+        )
         // parse example 2
         val pd2 = PresentationDefinition.fromJSONString(presentationDefinitionExample2)
         println("pd2: $pd2")
-        pd2.id shouldBe "example with selective disclosure"
-        pd2.inputDescriptors.first().constraints!!.limitDisclosure shouldBe DisclosureLimitation.required
-        pd2.inputDescriptors.first().constraints!!.fields!!.size shouldBe 4
-        pd2.inputDescriptors.first().constraints!!.fields!!.flatMap { it.path } shouldContainExactly listOf(
+        assertEquals(expected = "example with selective disclosure", actual = pd2.id)
+        assertEquals(expected = DisclosureLimitation.required, actual = pd2.inputDescriptors.first().constraints!!.limitDisclosure)
+        assertEquals(expected = 4, actual = pd2.inputDescriptors.first().constraints!!.fields!!.size)
+        assertContentEquals(expected = listOf(
             "\$.type",
             "\$.credentialSubject.given_name",
             "\$.credentialSubject.family_name",
             "\$.credentialSubject.birthdate"
-        )
+        ), actual = pd2.inputDescriptors.first().constraints!!.fields!!.flatMap { it.path })
         // parse example 3
         val pd3 = PresentationDefinition.fromJSONString(presentationDefinitionExample3)
         println("pd3: $pd3")
-        pd3.id shouldBe "alternative credentials"
-        pd3.submissionRequirements shouldNotBe null
-        pd3.submissionRequirements!!.size shouldBe 1
-        pd3.submissionRequirements!!.first().name shouldBe "Citizenship Information"
-        pd3.submissionRequirements!!.first().rule shouldBe SubmissionRequirementRule.pick
-        pd3.submissionRequirements!!.first().count shouldBe 1
-        pd3.submissionRequirements!!.first().from shouldBe "A"
+        assertEquals(expected = "alternative credentials", actual = pd3.id)
+        assertNotNull(actual = pd3.submissionRequirements)
+        assertEquals(expected = 1, actual = pd3.submissionRequirements!!.size)
+        assertEquals(expected = "Citizenship Information", actual = pd3.submissionRequirements!!.first().name)
+        assertEquals(expected = SubmissionRequirementRule.pick, actual = pd3.submissionRequirements!!.first().rule)
+        assertEquals(expected = 1, actual = pd3.submissionRequirements!!.first().count)
+        assertEquals(expected = "A", actual = pd3.submissionRequirements!!.first().from)
     }
 
     @Test
-    suspend fun testVPAuthorization() {
-        val authReq = AuthorizationRequest(
-            responseType = ResponseType.vp_token.name,
-            clientId = "test-verifier",
-            responseMode = ResponseMode.query,
-            redirectUri = "http://blank",
-            presentationDefinition = PresentationDefinition(
-                inputDescriptors = listOf(
-                    InputDescriptor(
-                        format = mapOf(VCFormat.jwt_vc_json to VCFormatDefinition(setOf("EdDSA"))),
-                        constraints = InputDescriptorConstraints(
-                            fields = listOf(
-                                InputDescriptorField(listOf("$.type"), filter = buildJsonObject {
-                                    put("type", "string")
-                                    put("const", "VerifiableId")
-                                })
+    fun testVPAuthorization() = runTest {
+        val authReq = OpenID4VP.createPresentationRequest(
+            PresentationDefinitionParameter.fromPresentationDefinition(
+                PresentationDefinition(
+                    inputDescriptors = listOf(
+                        InputDescriptor(
+                            format = mapOf(VCFormat.jwt_vc_json to VCFormatDefinition(setOf("EdDSA"))),
+                            constraints = InputDescriptorConstraints(
+                                fields = listOf(
+                                    InputDescriptorField(listOf("$.type"), filter = buildJsonObject {
+                                        put("type", "string")
+                                        put("const", "VerifiableId")
+                                    })
+                                )
                             )
                         )
                     )
                 )
             ),
-            clientMetadata = OpenIDClientMetadata(listOf(testWallet.baseUrl))
+            responseMode = ResponseMode.query,
+            responseTypes = setOf(ResponseType.VpToken),
+            redirectOrResponseUri = "http://blank",
+            nonce = null,
+            state = null,
+            scopes = setOf(),
+            clientId = "test-verifier",
+            clientIdScheme = ClientIdScheme.PreRegistered,
+            clientMetadataParameter = ClientMetadataParameter.fromClientMetadata(
+                OpenIDClientMetadata(listOf(testWallet.baseUrl))
+            )
         )
+
         println("Auth req: $authReq")
         val authResp = http.get(testWallet.metadata.authorizationEndpoint!!) {
             url { parameters.appendAll(parametersOf(authReq.toHttpParameters())) }
         }
         println("Auth resp: $authReq")
-        authResp.status shouldBe HttpStatusCode.Found
-        authResp.headers.names() shouldContain HttpHeaders.Location.lowercase()
+        assertEquals(expected = HttpStatusCode.Found, actual = authResp.status)
+        assertContains(iterable = authResp.headers.names(), element = HttpHeaders.Location)
         val redirectUrl = Url(authResp.headers[HttpHeaders.Location]!!)
         val tokenResponse = TokenResponse.fromHttpParameters(redirectUrl.parameters.toMap())
-        tokenResponse.vpToken shouldNotBe null
+        assertNotNull(actual = tokenResponse.vpToken)
 
         // vpToken is NOT a string, but JSON ELEMENT
         // this will break without .content(): (if JsonPrimitive and not JsonArray!)
-        JwtSignaturePolicy().verify(tokenResponse.vpToken!!.jsonPrimitive.content, null, mapOf()).isSuccess shouldBe true
+        assertTrue(actual = JwtSignaturePolicy().verify(tokenResponse.vpToken!!.jsonPrimitive.content, null, mapOf()).isSuccess)
+    }
+
+    @Test
+    fun testOID4VPFlow() = runTest {
+        //------- VERIFIER ---------
+        val presentationReq = OpenID4VP.createPresentationRequest(
+            PresentationDefinitionParameter.fromPresentationDefinition(
+                PresentationDefinition(
+                    inputDescriptors = listOf(
+                        InputDescriptor(
+                            format = mapOf(VCFormat.jwt_vc_json to VCFormatDefinition(setOf("EdDSA"))),
+                            constraints = InputDescriptorConstraints(
+                                fields = listOf(
+                                    InputDescriptorField(listOf("$.type"), filter = buildJsonObject {
+                                        put("type", "string")
+                                        put("const", "VerifiableId")
+                                    })
+                                )
+                            )
+                        )
+                    )
+                )
+            ), ResponseMode.query, setOf(ResponseType.VpToken), "http://blank", UUID.generateUUID().toString(),
+            "test", setOf(), "test-verifier", ClientIdScheme.PreRegistered, ClientMetadataParameter.fromClientMetadata(
+                OpenIDClientMetadata(listOf(testWallet.baseUrl))
+            )
+        )
+        // get authorization URL to be rendered as QR code, or called on wallet authorization endpoint, for same-device flow
+        val authUrl = OpenID4VP.getAuthorizationUrl(presentationReq)
+
+        // ----------- WALLET -------------------
+
+        // parse authorization/presentation request
+        val parsedPresentationRequest = AuthorizationRequest.fromHttpParametersAuto(Url(authUrl).parameters.toMap())
+        assertEquals(
+            expected = presentationReq.presentationDefinition?.toJSON(),
+            actual = parsedPresentationRequest.presentationDefinition?.toJSON()
+        )
+        // Determine flow details (implicit flow, with vp_token response type, same-device flow with "query" response mode)
+        assertContains(iterable = parsedPresentationRequest.responseType, element = ResponseType.VpToken)
+        assertEquals(expected = ResponseMode.query, actual = parsedPresentationRequest.responseMode)
+        // optional (code flow): code response (verifier <-- wallet), token endpoint (verifier -> wallet)
+
+        // Generate token response
+        val testVP =
+            "eyJhbGciOiJFUzI1NksiLCJ0eXAiOiJKV1QiLCJraWQiOiJkaWQ6d2ViOmVudHJhLndhbHQuaWQ6aG9sZGVyIzQ4ZDhhMzQyNjNjZjQ5MmFhN2ZmNjFiNjE4M2U4YmNmIn0.eyJzdWIiOiJkaWQ6d2ViOmVudHJhLndhbHQuaWQ6aG9sZGVyIiwibmJmIjoxNzA4OTUzOTI0LCJpYXQiOjE3MDg5NTM5ODQsImp0aSI6IjEiLCJpc3MiOiJkaWQ6d2ViOmVudHJhLndhbHQuaWQ6aG9sZGVyIiwibm9uY2UiOiIiLCJhdWQiOiJ0ZXN0LXZlcmlmaWVyIiwidnAiOnsiQGNvbnRleHQiOlsiaHR0cHM6Ly93d3cudzMub3JnLzIwMTgvY3JlZGVudGlhbHMvdjEiXSwidHlwZSI6WyJWZXJpZmlhYmxlUHJlc2VudGF0aW9uIl0sImlkIjoiMSIsImhvbGRlciI6ImRpZDp3ZWI6ZW50cmEud2FsdC5pZDpob2xkZXIiLCJ2ZXJpZmlhYmxlQ3JlZGVudGlhbCI6W119fQ.hgGTCeYGGE9qhlSqeBQmY7WnAts6aBSH378-z5WtNDAB8LaQwXKeoOLAURoE5utacYhX-hDZJwBpGg9Zf1ZkgA"
+        val tokenResponse = OpenID4VP.generatePresentationResponse(
+            PresentationResult(
+                listOf(JsonPrimitive(testVP)),
+                PresentationSubmission(
+                    "presentation_1", "definition_1", listOf(
+                        DescriptorMapping("Test descriptor", VCFormat.jwt_vc_json, DescriptorMapping.vpPath(1, 0))
+                    )
+                )
+            )
+        )
+        // Optional: respond to token request (code-flow, verifier <-- wallet), respond to authorization request (implicit flow, verifier <-- wallet)
+        // Optional: post token response to response_uri of verifier (cross-device flow, verifier <-- wallet)
+        val responseUri = tokenResponse.toRedirectUri(presentationReq.redirectUri!!, ResponseMode.query)
+
+        // ------------ VERIFIER ---------------------
+
+        // Parse token response
+        val parsedTokenResponse = OpenID4VP.parsePresentationResponseFromUrl(responseUri)
+        assertEquals(expected = testVP, actual = parsedTokenResponse.vpToken?.jsonPrimitive?.content)
+        assertEquals(expected = 1, actual = parsedTokenResponse.presentationSubmission?.descriptorMap?.size)
+    }
+
+    @Test
+    fun testVpTokenParamSerializationAndDeserialization() = runTest {
+        val presObj = Json.parseToJsonElement("{\"test\": \"bla\"}").jsonObject
+        val presStr1 = "eyJ.eyJpc3M.ft_Eq4"
+        val presStr2 = "eyJ.eyJpc3M.ft_Eq5"
+        val presParams = listOf(
+            VpTokenParameter(presStr1), VpTokenParameter(presObj), VpTokenParameter(setOf(presStr1), listOf(presObj)),
+            VpTokenParameter(setOf(presStr1, presStr2)), VpTokenParameter(listOf(presObj, presObj))
+        )
+        presParams.forEach { param ->
+            val tokenResponse = TokenResponse.success(param, null, null, null)
+
+            if (param.vpTokenObjects.plus(param.vpTokenStrings).size == 1) {
+                assertFalse(actual = tokenResponse.vpToken!!.instanceOf(JsonArray::class))
+                if (param.vpTokenObjects.size == 1)
+                    assertTrue(actual = tokenResponse.vpToken!!.instanceOf(JsonObject::class))
+                else {
+                    assertTrue(tokenResponse.vpToken!!.instanceOf(JsonPrimitive::class))
+                    assertFalse(actual = tokenResponse.vpToken!!.jsonPrimitive.isString) // should be an unquoted string if vp_token is a single string
+                }
+            } else {
+                assertTrue(actual = tokenResponse.vpToken!!.instanceOf(JsonArray::class))
+                tokenResponse.vpToken!!.jsonArray.forEach {
+                    if (it is JsonPrimitive)
+                        assertTrue(actual = it.isString) // string elements in the array must be quoted strings
+                    else assertTrue(actual = it.instanceOf(JsonObject::class))
+                }
+            }
+
+            val url = tokenResponse.toRedirectUri("http://blank", ResponseMode.query)
+            println(url)
+            val parsedResponse = TokenResponse.fromHttpParameters(Url(url).parameters.toMap())
+            assertNotNull(actual = parsedResponse.vpToken)
+            val parsedVpTokenParam = VpTokenParameter.fromJsonElement(parsedResponse.vpToken!!)
+            assertEquals(expected = param.vpTokenStrings, actual = parsedVpTokenParam.vpTokenStrings)
+            assertContentEquals(expected = param.vpTokenObjects, actual = parsedVpTokenParam.vpTokenObjects)
+        }
     }
 
     //@Test
@@ -150,27 +269,39 @@ class VP_JVM_Test : AnnotationSpec() {
         // parse verification request (QR code)
         val authReq = AuthorizationRequest.fromHttpQueryString(Url(mattrLaunchpadUrl).encodedQuery)
         println("Auth req: $authReq")
-        authReq.responseMode shouldBe ResponseMode.direct_post
-        authReq.responseType shouldBe ResponseType.vp_token.name
-        authReq.responseUri shouldNotBe null
-        authReq.presentationDefinition shouldBe null
-        authReq.presentationDefinitionUri shouldNotBe null
+        assertEquals(expected = ResponseMode.direct_post, actual = authReq.responseMode)
+        assertContains(iterable = authReq.responseType, element = ResponseType.VpToken)
+        assertNotNull(actual = authReq.responseUri)
+        assertNull(actual = authReq.presentationDefinition)
+        assertNotNull(actual = authReq.presentationDefinitionUri)
 
         val presentationDefinition = PresentationDefinition.fromJSONString(mattrLaunchpadPresentationDefinitionData)
-        presentationDefinition.id shouldBe "vp token example"
-        presentationDefinition.inputDescriptors.size shouldBe 1
-        presentationDefinition.inputDescriptors[0].id shouldBe "OpenBadgeCredential"
-        presentationDefinition.inputDescriptors[0].format!!.keys shouldContain VCFormat.jwt_vc_json
-        presentationDefinition.inputDescriptors[0].format!![VCFormat.jwt_vc_json]!!.alg!! shouldContain "EdDSA"
-        presentationDefinition.inputDescriptors[0].constraints?.fields?.first()?.path?.first() shouldBe "$.type"
-        presentationDefinition.inputDescriptors[0].constraints?.fields?.first()?.filter?.get("pattern")?.jsonPrimitive?.content shouldBe "OpenBadgeCredential"
+        assertEquals(expected = "vp token example", actual = presentationDefinition.id)
+        assertEquals(expected = 1, actual = presentationDefinition.inputDescriptors.size)
+        assertEquals(expected = "OpenBadgeCredential", actual = presentationDefinition.inputDescriptors[0].id)
+        assertContains(
+            iterable = presentationDefinition.inputDescriptors[0].format!!.keys,
+            element = VCFormat.jwt_vc_json
+        )
+        assertContains(
+            iterable = presentationDefinition.inputDescriptors[0].format!![VCFormat.jwt_vc_json]!!.alg!!,
+            element = "EdDSA"
+        )
+        assertEquals(
+            expected = "$.type",
+            actual = presentationDefinition.inputDescriptors[0].constraints?.fields?.first()?.path?.first()
+        )
+        assertEquals(
+            expected = "OpenBadgeCredential",
+            actual = presentationDefinition.inputDescriptors[0].constraints?.fields?.first()?.filter?.get("pattern")?.jsonPrimitive?.content
+        )
 
-        val siopSession = testWallet.initializeAuthorization(authReq, 5.minutes)
-        siopSession.authorizationRequest?.presentationDefinition shouldNotBe null
+        val siopSession = testWallet.initializeAuthorization(authReq, 5.minutes, null)
+        assertNotNull(actual = siopSession.authorizationRequest?.presentationDefinition)
         val tokenResponse = testWallet.processImplicitFlowAuthorization(siopSession.authorizationRequest!!)
         println("tokenResponse vpToken: ${tokenResponse.vpToken}")
-        tokenResponse.vpToken shouldNotBe null
-        tokenResponse.presentationSubmission shouldNotBe null
+        assertNotNull(actual = tokenResponse.vpToken)
+        assertNotNull(actual = tokenResponse.presentationSubmission)
 
         println("Got token response: $tokenResponse")
 
@@ -189,13 +320,13 @@ class VP_JVM_Test : AnnotationSpec() {
                     appendAll(entry.key, entry.value)
                 }
             })
-        resp.status shouldBe HttpStatusCode.OK
+        assertEquals(expected = HttpStatusCode.OK, actual = resp.status)
 
         val mattrLaunchpadResult = http.post("https://launchpad.mattrlabs.com/api/vp/poll-results") {
             contentType(ContentType.Application.Json)
             setBody("""{"state":"${authReq.state}"}""")
         }.body<JsonObject>()
-        mattrLaunchpadResult["vcVerification"]!!.jsonArray[0].jsonObject["verified"]!!.jsonPrimitive.boolean shouldBe true
+        assertTrue(actual = mattrLaunchpadResult["vcVerification"]!!.jsonArray[0].jsonObject["verified"]!!.jsonPrimitive.boolean)
 
     }
 
@@ -210,18 +341,18 @@ class VP_JVM_Test : AnnotationSpec() {
         // parse verification request (QR code)
         val authReq = AuthorizationRequest.fromHttpQueryString(Url(uniresUrl).encodedQuery)
         println("Auth req: $authReq")
-        authReq.responseMode shouldBe ResponseMode.direct_post
-        authReq.responseType shouldBe ResponseType.vp_token.name
-        authReq.responseUri shouldNotBe null
+        assertEquals(expected = ResponseMode.direct_post, actual = authReq.responseMode)
+        assertContains(iterable = authReq.responseType, element = ResponseType.VpToken)
+        assertNotNull(actual = authReq.responseUri)
         //authReq.presentationDefinition shouldBe null
         //authReq.presentationDefinitionUri shouldNotBe null
 
-        val siopSession = testWallet.initializeAuthorization(authReq, 5.minutes)
-        siopSession.authorizationRequest?.presentationDefinition shouldNotBe null
+        val siopSession = testWallet.initializeAuthorization(authReq, 5.minutes, null)
+        assertNotNull(actual = siopSession.authorizationRequest?.presentationDefinition)
         val tokenResponse = testWallet.processImplicitFlowAuthorization(siopSession.authorizationRequest!!)
         println("tokenResponse vpToken: ${tokenResponse.vpToken}")
-        tokenResponse.vpToken shouldNotBe null
-        tokenResponse.presentationSubmission shouldNotBe null
+        assertNotNull(actual = tokenResponse.vpToken)
+        assertNotNull(actual = tokenResponse.presentationSubmission)
 
         println("Got token response: $tokenResponse")
 
@@ -240,7 +371,7 @@ class VP_JVM_Test : AnnotationSpec() {
                     appendAll(entry.key, entry.value)
                 }
             })
-        resp.status shouldBe HttpStatusCode.OK
+        assertEquals(expected = HttpStatusCode.OK, actual = resp.status)
     }
 
     //@Test
@@ -287,7 +418,7 @@ class VP_JVM_Test : AnnotationSpec() {
             val requestPayload = requestJwt.decodeJws().payload
 
             AuthorizationRequest(
-                responseType = requestPayload["response_type"]!!.jsonPrimitive.content,
+                responseType = ResponseType.fromResponseTypeString(requestPayload["response_type"]!!.jsonPrimitive.content),
                 clientId = requestPayload["client_id"]!!.jsonPrimitive.content,
                 responseMode = requestPayload["response_mode"]!!.jsonPrimitive.content.let {
                     when (it) {
@@ -335,27 +466,39 @@ class VP_JVM_Test : AnnotationSpec() {
 
 
         println("Auth req: $authReq")
-        authReq.responseMode shouldBe ResponseMode.direct_post
+        assertEquals(expected = ResponseMode.direct_post, actual = authReq.responseMode)
         //authReq.responseType shouldBe ResponseType.vp_token.name
-        authReq.responseUri shouldNotBe null
+        assertNotNull(actual = authReq.responseUri)
         //authReq.presentationDefinition shouldBe null
         //authReq.presentationDefinitionUri shouldNotBe null
 
         val presentationDefinition = PresentationDefinition.fromJSONString(mattrLaunchpadPresentationDefinitionData)
-        presentationDefinition.id shouldBe "vp token example"
-        presentationDefinition.inputDescriptors.size shouldBe 1
-        presentationDefinition.inputDescriptors[0].id shouldBe "OpenBadgeCredential"
-        presentationDefinition.inputDescriptors[0].format!!.keys shouldContain VCFormat.jwt_vc_json
-        presentationDefinition.inputDescriptors[0].format!![VCFormat.jwt_vc_json]!!.alg!! shouldContain "EdDSA"
-        presentationDefinition.inputDescriptors[0].constraints?.fields?.first()?.path?.first() shouldBe "$.type"
-        presentationDefinition.inputDescriptors[0].constraints?.fields?.first()?.filter?.get("pattern")?.jsonPrimitive?.content shouldBe "OpenBadgeCredential"
+        assertEquals(expected = "vp token example", actual = presentationDefinition.id)
+        assertEquals(expected = 1, actual = presentationDefinition.inputDescriptors.size)
+        assertEquals(expected = "OpenBadgeCredential", actual = presentationDefinition.inputDescriptors[0].id)
+        assertContains(
+            iterable = presentationDefinition.inputDescriptors[0].format!!.keys,
+            element = VCFormat.jwt_vc_json
+        )
+        assertContains(
+            iterable = presentationDefinition.inputDescriptors[0].format!![VCFormat.jwt_vc_json]!!.alg!!,
+            element = "EdDSA"
+        )
+        assertEquals(
+            expected = "$.type",
+            actual = presentationDefinition.inputDescriptors[0].constraints?.fields?.first()?.path?.first()
+        )
+        assertEquals(
+            expected = "OpenBadgeCredential",
+            actual = presentationDefinition.inputDescriptors[0].constraints?.fields?.first()?.filter?.get("pattern")?.jsonPrimitive?.content
+        )
 
-        val siopSession = testWallet.initializeAuthorization(authReq, 5.minutes)
-        siopSession.authorizationRequest?.presentationDefinition shouldNotBe null
+        val siopSession = testWallet.initializeAuthorization(authReq, 5.minutes, null)
+        assertNotNull(actual = siopSession.authorizationRequest?.presentationDefinition)
         val tokenResponse = testWallet.processImplicitFlowAuthorization(siopSession.authorizationRequest!!)
         println("tokenResponse vpToken: ${tokenResponse.vpToken}")
-        tokenResponse.vpToken shouldNotBe null
-        tokenResponse.presentationSubmission shouldNotBe null
+        assertNotNull(actual = tokenResponse.vpToken)
+        assertNotNull(tokenResponse.presentationSubmission)
 
         println("Got token response: $tokenResponse")
 
@@ -374,11 +517,11 @@ class VP_JVM_Test : AnnotationSpec() {
                     appendAll(entry.key, entry.value)
                 }
             })
-        resp.status shouldBe HttpStatusCode.OK
+        assertEquals(expected = HttpStatusCode.OK, actual = resp.status)
     }
 
     @Test
-    suspend fun testInitializeVerifierSession() {
+    fun testInitializeVerifierSession() = runTest {
         val verifierSession = testVerifier.initializeAuthorization(
             PresentationDefinition(
                 inputDescriptors = listOf(
@@ -398,13 +541,13 @@ class VP_JVM_Test : AnnotationSpec() {
             ), responseMode = ResponseMode.direct_post
         )
         println("Verifier session: $verifierSession")
-        verifierSession.authorizationRequest shouldNotBe null
+        assertNotNull(actual = verifierSession.authorizationRequest)
 
-        val walletSession = testWallet.initializeAuthorization(verifierSession.authorizationRequest!!, 1.minutes)
+        val walletSession = testWallet.initializeAuthorization(verifierSession.authorizationRequest!!, 1.minutes, null)
         println("Wallet session: $walletSession")
         val tokenResponse = testWallet.processImplicitFlowAuthorization(walletSession.authorizationRequest!!)
-        tokenResponse.vpToken shouldNotBe null
-        tokenResponse.presentationSubmission shouldNotBe null
+        assertNotNull(actual = tokenResponse.vpToken)
+        assertNotNull(actual = tokenResponse.presentationSubmission)
 
         val resp = http.submitForm(walletSession.authorizationRequest!!.responseUri!!,
             parameters {
@@ -413,11 +556,11 @@ class VP_JVM_Test : AnnotationSpec() {
                 }
             })
         println("Resp: $resp")
-        resp.status shouldBe HttpStatusCode.OK
+        assertEquals(expected = HttpStatusCode.OK, actual = resp.status)
     }
 
     @Test
-    suspend fun testWaltVerifierTestRequest() {
+    fun testWaltVerifierTestRequest() = runTest {
         val waltVerifierTestRequest = testVerifier.initializeAuthorization(
             PresentationDefinition.fromJSONString(presentationDefinitionExample1), ResponseMode.direct_post
         ).authorizationRequest!!.toHttpQueryString().let {
@@ -425,12 +568,12 @@ class VP_JVM_Test : AnnotationSpec() {
         }
         val authReq = AuthorizationRequest.fromHttpQueryString(Url(waltVerifierTestRequest).encodedQuery)
         println("Auth req: $authReq")
-        val walletSession = testWallet.initializeAuthorization(authReq, 1.minutes)
-        walletSession.authorizationRequest!!.presentationDefinition shouldNotBe null
+        val walletSession = testWallet.initializeAuthorization(authReq, 1.minutes, null)
+        assertNotNull(actual = walletSession.authorizationRequest!!.presentationDefinition)
         println("Resolved presentation definition: ${walletSession.authorizationRequest!!.presentationDefinition!!.toJSONString()}")
         val tokenResponse = testWallet.processImplicitFlowAuthorization(walletSession.authorizationRequest!!)
-        tokenResponse.vpToken shouldNotBe null
-        tokenResponse.presentationSubmission shouldNotBe null
+        assertNotNull(actual = tokenResponse.vpToken)
+        assertNotNull(actual = tokenResponse.presentationSubmission)
         val resp = http.submitForm(walletSession.authorizationRequest!!.responseUri!!,
             parameters {
                 tokenResponse.toHttpParameters().forEach { entry ->
@@ -438,7 +581,7 @@ class VP_JVM_Test : AnnotationSpec() {
                 }
             })
         println("Resp: $resp")
-        resp.status shouldBe HttpStatusCode.OK
+        assertEquals(expected = HttpStatusCode.OK, actual = resp.status)
     }
 
     val presentationDefinitionExample1 = "{\n" +
@@ -587,27 +730,25 @@ class VP_JVM_Test : AnnotationSpec() {
         "{\"id\":\"vp token example\",\"input_descriptors\":[{\"id\":\"OpenBadgeCredential\",\"format\":{\"jwt_vc_json\":{\"alg\":[\"EdDSA\"]}},\"constraints\":{\"fields\":[{\"path\":[\"\$.type\"],\"filter\":{\"type\":\"string\",\"pattern\":\"OpenBadgeCredential\"}}]}}]}"
 
 
-    val ONLINE_TEST: Boolean = true
+    val ONLINE_TEST: Boolean = false
 
     @Test
-    suspend fun testRequestByReference() {
+    fun testRequestByReference() = runTest {
         val reqUri = when (ONLINE_TEST) {
             true -> testCreateEntraPresentationRequest()
             else -> "openid-vc://?request_uri=$VP_VERIFIER_BASE_URL/req/6af1f46f-8d91-4eaa-b0c0-f042b7a621f8"
         }
-        reqUri shouldNotBe null
+        assertNotNull(actual = reqUri)
 
 
         println("REQUEST URI: $reqUri")
 
-        return
+        return@runTest
         //testVerifier.start(wait = true)
 
 
-
-
         val authReq = AuthorizationRequest.fromHttpParametersAuto(parseQueryString(Url(reqUri!!).encodedQuery).toMap())
-        authReq.clientId shouldBe "did:web:entra.walt.id"
+        assertEquals(expected = "did:web:entra.walt.id", actual = authReq.clientId)
 
         val tokenResponse = testWallet.processImplicitFlowAuthorization(authReq)
         val resp =
@@ -619,7 +760,7 @@ class VP_JVM_Test : AnnotationSpec() {
                     //append("id_token", ms_id_token) // <--
                 })
         println("Resp: $resp")
-        resp.status shouldBe HttpStatusCode.OK
+        assertEquals(expected = HttpStatusCode.OK, actual = resp.status)
     }
 
     suspend fun entraAuthorize(): String {
@@ -642,34 +783,43 @@ class VP_JVM_Test : AnnotationSpec() {
     suspend fun testCreateEntraPresentationRequest(): String? {
         val accessToken = entraAuthorize()
         val createPresentationRequestBody = "{\n" +
-            "    \"authority\": \"did:web:entra.walt.id\",\n" +
-            "    \"callback\": {\n" +
-            "        \"headers\": {\n" +
-            "            \"api-key\": \"1234\"\n" +
-            "        },\n" +
-            "        \"state\": \"1234\",\n" +
-            "        \"url\": \"https://httpstat.us/200\"\n" +
-            "    },\n" +
-            "    \"registration\": {\n" +
-            "        \"clientName\": \"verifiable-credentials-app\"\n" +
-            "    },\n" +
-            "    \"requestedCredentials\": [\n" +
-            "        {\n" +
-            "            \"acceptedIssuers\": [\n" +
-            "                \"did:web:entra.walt.id\"\n" +
-            "            ],\n" +
-            "            \"purpose\": \"TEST\",\n" +
-            "            \"type\": \"MyID\"\n" +
-            "        }\n" +
-            "    ]\n" +
-            "}"
+                "    \"authority\": \"did:web:entra.walt.id\",\n" +
+                "    \"callback\": {\n" +
+                "        \"headers\": {\n" +
+                "            \"api-key\": \"1234\"\n" +
+                "        },\n" +
+                "        \"state\": \"1234\",\n" +
+                "        \"url\": \"https://httpstat.us/200\"\n" +
+                "    },\n" +
+                "    \"registration\": {\n" +
+                "        \"clientName\": \"verifiable-credentials-app\"\n" +
+                "    },\n" +
+                "    \"requestedCredentials\": [\n" +
+                "        {\n" +
+                "            \"acceptedIssuers\": [\n" +
+                "                \"did:web:entra.walt.id\"\n" +
+                "            ],\n" +
+                "            \"purpose\": \"TEST\",\n" +
+                "            \"type\": \"MyID\"\n" +
+                "        }\n" +
+                "    ]\n" +
+                "}"
         val response = http.post("https://verifiedid.did.msidentity.com/v1.0/verifiableCredentials/createPresentationRequest") {
             header(HttpHeaders.Authorization, accessToken)
             contentType(ContentType.Application.Json)
             setBody(createPresentationRequestBody)
         }
-        response.status shouldBe HttpStatusCode.Created
+        assertEquals(expected = HttpStatusCode.Created, actual = response.status)
         val responseObj = response.body<JsonObject>()
         return responseObj["url"]?.jsonPrimitive?.content
+    }
+
+    @Test
+    fun testPresentationDefinitionSerialization() {
+        val presDef = PresentationDefinition.fromJSONString(presentationDefinitionExample1)
+        presDef.toJSON().keys shouldContain "id"
+
+        val presDefDefaultId = PresentationDefinition(inputDescriptors = presDef.inputDescriptors)
+        presDefDefaultId.toJSON().keys shouldContain "id"
     }
 }

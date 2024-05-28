@@ -5,7 +5,8 @@ import com.nimbusds.jose.crypto.ECDSASigner
 import com.nimbusds.jose.crypto.ECDSAVerifier
 import com.nimbusds.jose.jwk.ECKey
 import id.walt.credentials.PresentationBuilder
-import id.walt.crypto.keys.LocalKey
+import id.walt.crypto.keys.Key
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.did.dids.DidService
 import id.walt.oid4vc.data.OpenIDProviderMetadata
@@ -27,9 +28,7 @@ import id.walt.sdjwt.SDJwt
 import id.walt.sdjwt.SDMap
 import id.walt.sdjwt.SDPayload
 import id.walt.sdjwt.SimpleJWTCryptoProvider
-import io.kotest.common.runBlocking
 import io.ktor.client.*
-import io.ktor.client.engine.java.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.plugins.logging.*
 import io.ktor.client.request.*
@@ -37,6 +36,7 @@ import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
+import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Instant
 import kotlinx.serialization.json.*
 import java.util.*
@@ -53,7 +53,7 @@ class EBSITestWallet(
     config: CredentialWalletConfig
 ) : OpenIDCredentialWallet<SIOPSession>(EBSI_WALLET_BASE_URL, config) {
     private val sessionCache = mutableMapOf<String, SIOPSession>()
-    private val ktorClient = HttpClient(Java) {
+    private val ktorClient = HttpClient() {
         install(ContentNegotiation) {
             json()
         }
@@ -65,11 +65,12 @@ class EBSITestWallet(
     }
 
     val TEST_DID = EBSI_WALLET_TEST_DID
-    val TEST_KEY = runBlocking { LocalKey.importJWK(EBSI_WALLET_TEST_KEY_JWK).getOrThrow() }
+    val TEST_KEY = runBlocking { JWKKey.importJWK(EBSI_WALLET_TEST_KEY_JWK).getOrThrow() }
 
     override fun resolveDID(did: String): String {
         val didObj = runBlocking { DidService.resolve(did) }.getOrThrow()
-        return (didObj["authentication"] ?: didObj["assertionMethod"] ?: didObj["verificationMethod"])?.jsonArray?.firstOrNull()?.jsonObject?.get("id")?.jsonPrimitive?.content ?: did
+        return (didObj["authentication"] ?: didObj["assertionMethod"]
+        ?: didObj["verificationMethod"])?.jsonArray?.firstOrNull()?.jsonObject?.get("id")?.jsonPrimitive?.content ?: did
     }
 
     override fun getDidFor(session: SIOPSession): String {
@@ -90,15 +91,23 @@ class EBSITestWallet(
         get() = createDefaultProviderMetadata()
 
     override fun getSession(id: String): SIOPSession? = sessionCache[id]
+    override fun getSessionByIdTokenRequestState(idTokenRequestState: String): SIOPSession? {
+        TODO("Not yet implemented")
+    }
 
     override fun removeSession(id: String): SIOPSession? = sessionCache.remove(id)
 
     val jwtCryptoProvider = runBlocking {
-        SimpleJWTCryptoProvider(JWSAlgorithm.ES256, ECDSASigner(ECKey.parse(EBSI_WALLET_TEST_KEY_JWK)), ECDSAVerifier(ECKey.parse(
-            EBSI_WALLET_TEST_KEY_JWK)))
+        SimpleJWTCryptoProvider(
+            JWSAlgorithm.ES256, ECDSASigner(ECKey.parse(EBSI_WALLET_TEST_KEY_JWK)), ECDSAVerifier(
+                ECKey.parse(
+                    EBSI_WALLET_TEST_KEY_JWK
+                )
+            )
+        )
     }
 
-    override fun signToken(target: TokenTarget, payload: JsonObject, header: JsonObject?, keyId: String?) =
+    override fun signToken(target: TokenTarget, payload: JsonObject, header: JsonObject?, keyId: String?, privKey: Key?) =
         SDJwt.sign(SDPayload.createSDPayload(payload, SDMap.Companion.fromJSON("{}")), jwtCryptoProvider, keyId).jwt
 
     @OptIn(ExperimentalJsExport::class)

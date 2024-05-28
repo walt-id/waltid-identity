@@ -3,15 +3,14 @@ package id.walt.webwallet.service.exchange
 import id.walt.crypto.utils.JwsUtils
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.did.dids.DidService
+import id.walt.oid4vc.OpenID4VCI
 import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.data.CredentialOffer
 import id.walt.oid4vc.data.GrantType
 import id.walt.oid4vc.data.OpenIDProviderMetadata
 import id.walt.oid4vc.providers.TokenTarget
 import id.walt.oid4vc.requests.*
-import id.walt.oid4vc.responses.BatchCredentialResponse
-import id.walt.oid4vc.responses.CredentialResponse
-import id.walt.oid4vc.responses.TokenResponse
+import id.walt.oid4vc.responses.*
 import id.walt.oid4vc.util.randomUUID
 import id.walt.webwallet.manifest.extractor.EntraManifestExtractor
 import id.walt.webwallet.service.oidc4vc.TestCredentialWallet
@@ -22,13 +21,14 @@ import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.util.*
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.slf4j.LoggerFactory
 
-object  IssuanceService {
+object IssuanceService {
 
     private val http = WalletHttpClients.getHttpClient()
     private val logger = LoggerFactory.getLogger(this::class.java)
@@ -88,7 +88,7 @@ object  IssuanceService {
         logger.debug("providerMetadata: {}", providerMetadata)
 
         logger.debug("// resolve offered credentials")
-        val offeredCredentials = credentialOffer.resolveOfferedCredentials(providerMetadata)
+        val offeredCredentials = OpenID4VCI.resolveOfferedCredentials(credentialOffer, providerMetadata)
         logger.debug("offeredCredentials: {}", offeredCredentials)
 
         //val offeredCredential = offeredCredentials.first()
@@ -100,7 +100,7 @@ object  IssuanceService {
             clientId = clientId,
             redirectUri = credentialWallet.config.redirectUri,
             preAuthorizedCode = credentialOffer.grants[GrantType.pre_authorized_code.value]!!.preAuthorizedCode,
-            userPin = null
+            txCode = null
         )
 //        logger.debug("tokenReq: {}", tokenReq)
 
@@ -193,9 +193,28 @@ object  IssuanceService {
         logger.debug(responseBody)
         val vc =
             runCatching { Json.parseToJsonElement(responseBody).jsonObject["vc"]!!.jsonPrimitive.content }.getOrElse {
+                msEntraSendIssuanceCompletionCB(entraIssuanceRequest, EntraIssuanceCompletionCode.issuance_failed, EntraIssuanceCompletionErrorDetails.unspecified_error)
                 throw IllegalArgumentException("Could not get Verifiable Credential from response: $responseBody")
             }
+        msEntraSendIssuanceCompletionCB(entraIssuanceRequest, EntraIssuanceCompletionCode.issuance_successful)
         return listOf(CredentialResponse.Companion.success(CredentialFormat.jwt_vc_json, vc))
+    }
+
+    private suspend fun msEntraSendIssuanceCompletionCB(entraIssuanceRequest: EntraIssuanceRequest,
+                                                        code: EntraIssuanceCompletionCode,
+                                                        errorDetails: EntraIssuanceCompletionErrorDetails? = null) {
+        if(!entraIssuanceRequest.authorizationRequest.state.isNullOrEmpty() &&
+           !entraIssuanceRequest.authorizationRequest.redirectUri.isNullOrEmpty()) {
+            val issuanceCompletionResponse = EntraIssuanceCompletionResponse(
+                code, entraIssuanceRequest.authorizationRequest.state!!, errorDetails)
+            logger.debug("Sending Entra issuance completion response: $issuanceCompletionResponse")
+            http.post(entraIssuanceRequest.authorizationRequest.redirectUri!!) {
+                contentType(ContentType.Application.Json)
+                setBody(issuanceCompletionResponse)
+            }.also {
+                logger.debug("Entra issuance completion callback response: ${it.status}: ${it.bodyAsText()}")
+            }
+        } else logger.debug("No authorization request state or redirectUri found in Entra issuance request, skipping completion response callback")
     }
 
     private fun getCredentialData(
@@ -211,7 +230,6 @@ object  IssuanceService {
         }
     }
 
-    //TODO: move to related entity
     private fun parseJwtCredentialResponse(
         credentialJwt: JwsUtils.JwsParts, document: String, manifest: JsonObject?, type: String
     ) = let {
@@ -229,7 +247,6 @@ object  IssuanceService {
         )
     }
 
-    //TODO: move to related entity
     private fun parseSdJwtCredentialResponse(
         credentialJwt: JwsUtils.JwsParts, document: String, manifest: JsonObject?, type: String
     ) = let {
@@ -254,6 +271,7 @@ object  IssuanceService {
         )
     }
 
+    @Serializable
     data class CredentialDataResult(
         val id: String,
         val document: String,

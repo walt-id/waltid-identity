@@ -12,6 +12,7 @@ enum class CredentialFormat(val value: String) {
     jwt_vc_json("jwt_vc_json"),
     jwt_vc_json_ld("jwt_vc_json-ld"),
     ldp_vc("ldp_vc"),
+    sd_jwt_vc("vc+sd-jwt"),
     mso_mdoc("mso_mdoc"),
     jwt_vp_json("jwt_vp_json"),
     jwt_vp_json_ld("jwt_vp_json-ld"),
@@ -21,7 +22,7 @@ enum class CredentialFormat(val value: String) {
 
     companion object {
         fun fromValue(value: String): CredentialFormat? {
-            return CredentialFormat.values().find { it.value == value }
+            return entries.find { it.value == value }
         }
     }
 }

@@ -7,12 +7,11 @@ import com.github.ajalt.clikt.parameters.options.help
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.required
 import com.github.ajalt.clikt.parameters.types.file
-import com.github.ajalt.mordant.markdown.Markdown
-import com.github.ajalt.mordant.rendering.TextColors
-import com.github.ajalt.mordant.rendering.TextStyles
 import com.github.ajalt.mordant.terminal.YesNoPrompt
+import id.walt.cli.util.PrettyPrinter
+import id.walt.cli.util.getNormalizedPath
 import id.walt.crypto.keys.Key
-import id.walt.crypto.keys.LocalKey
+import id.walt.crypto.keys.jwk.JWKKey
 import kotlinx.coroutines.runBlocking
 import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.bouncycastle.openssl.PEMEncryptedKeyPair
@@ -26,9 +25,8 @@ import java.io.File
 import java.io.FileReader
 import java.security.PrivateKey
 import java.security.Security
-import java.util.*
+import java.util.Base64
 import kotlin.io.path.useLines
-import kotlin.js.ExperimentalJsExport
 
 
 enum class KeyFileFormat {
@@ -39,10 +37,11 @@ enum class KeyFileFormat {
     }
 }
 
-@OptIn(ExperimentalJsExport::class)
 class KeyConvertCmd : CliktCommand(
     name = "convert", help = "Convert key files between PEM and JWK formats.", printHelpOnEmptyArgs = true
 ) {
+
+    val print: PrettyPrinter = PrettyPrinter(this)
 
     private val input by option("-i", "--input").help("The input file path. Accepted formats are: JWK and PEM")
         .file(mustExist = true, canBeFile = true, canBeDir = false, mustBeReadable = true).required()
@@ -66,36 +65,29 @@ class KeyConvertCmd : CliktCommand(
 
     override fun run() {
         // Read the source key from the input file
-        echo(TextStyles.dim("Reading key \"${input.absolutePath}\"..."))
+        print.dim("Reading key \"${input.absolutePath}\"...")
         val inputKey = runBlocking { getKey(input) }
 
-        echo(TextStyles.dim("Converting key \"${input.absolutePath}\"..."))
+        print.dim("Converting key \"${input.absolutePath}\"...")
         val outputContent = runBlocking { convertKey(inputKey, targetKeyType) }
 
-        echo(TextColors.green("Converted Key (${targetKeyType}):"))
-        terminal.println(
-            Markdown(
-                """
-                |```${if (targetKeyType == KeyFileFormat.JWK) "json" else ""}
-                |$outputContent
-                |```
-            """.trimMargin()
-            )
-        )
+        print.green("Converted Key (${targetKeyType}):")
+        print.box(outputContent)
 
         if (output.exists()
             && YesNoPrompt(
-                "The file \"${output.absolutePath}\" already exists, do you want to overwrite it?",
+                "The file \"${getNormalizedPath(output.absolutePath)}\" already exists, do you want to overwrite it?",
                 terminal
             ).ask() == false
         ) {
-            echo("Will not overwrite output file.")
+            print.plain("Will not overwrite output file.")
             return
         }
 
         output.writeText(outputContent)
 
-        echo("${TextColors.brightGreen("Done.")} Converted \"${input.absolutePath}\" to \"${output.absolutePath}\".")
+        print.greenb("Done. ", false)
+        print.plain("Converted \"${getNormalizedPath(input.absolutePath)}\" to \"${getNormalizedPath(output.absolutePath)}\".")
     }
 
     private operator fun Regex.contains(text: CharSequence?): Boolean = this.matches(text ?: "")
@@ -114,18 +106,18 @@ class KeyConvertCmd : CliktCommand(
         }
     }
 
-    private suspend fun getKey(input: File, keyType: KeyFileFormat = getKeyType(input)): LocalKey {
+    private suspend fun getKey(input: File, keyType: KeyFileFormat = getKeyType(input)): JWKKey {
         val inputContent = input.readText()
         try {
-            return runCatching {
+            return run {
                 when (keyType) {
-                    KeyFileFormat.JWK -> LocalKey.importJWK(inputContent).getOrThrow()
-                    KeyFileFormat.PEM -> LocalKey.importPEM(inputContent).getOrThrow()
-                    KeyFileFormat.ENCRYPTED_PEM -> LocalKey.importPEM(decrypt(input).getOrThrow()).getOrThrow()
+                    KeyFileFormat.JWK -> JWKKey.importJWK(inputContent).getOrThrow()
+                    KeyFileFormat.PEM -> JWKKey.importPEM(inputContent).getOrThrow()
+                    KeyFileFormat.ENCRYPTED_PEM -> JWKKey.importPEM(decrypt(input).getOrThrow()).getOrThrow()
                 }
-            }.getOrThrow()
+            }
         } catch (e: Throwable) {
-            var mainMsg = "Invalid file format."
+            val mainMsg = "Invalid file format."
             var complementaryMsg = "Use the --verbose flag to get more details."
 
             if (this.commonOptions.verbose) {

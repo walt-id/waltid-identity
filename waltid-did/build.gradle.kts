@@ -1,5 +1,3 @@
-import com.github.benmanes.gradle.versions.updates.DependencyUpdatesTask
-
 import love.forte.plugin.suspendtrans.ClassInfo
 import love.forte.plugin.suspendtrans.SuspendTransformConfiguration
 import love.forte.plugin.suspendtrans.TargetPlatform
@@ -28,13 +26,7 @@ java {
 suspendTransform {
     enabled = true
     includeRuntime = true
-    /*jvm {
-
-    }
-    js {
-
-    }*/
-    useJsDefault()
+    useDefault()
 }
 
 
@@ -43,6 +35,14 @@ kotlin {
 }
 
 kotlin {
+    targets.configureEach {
+        compilations.configureEach {
+            compilerOptions.configure {
+                freeCompilerArgs.add("-Xexpect-actual-classes")
+            }
+        }
+    }
+
     jvm {
         compilations.all {
             kotlinOptions.jvmTarget = "15" // JVM got Ed25519 at version 15
@@ -53,6 +53,7 @@ kotlin {
         }
     }
     js(IR) {
+        moduleName = "dids"
         /*browser {
             commonWebpackConfig {
                 cssSupport {
@@ -66,6 +67,7 @@ kotlin {
         binaries.library()
     }
 
+    val ktor_version = "2.3.11"
     sourceSets {
         val commonMain by getting {
             dependencies {
@@ -74,12 +76,12 @@ kotlin {
                 implementation("io.github.optimumcode:json-schema-validator:0.0.8")
 
                 // Ktor client
-                implementation("io.ktor:ktor-client-core:2.3.8")
-                implementation("io.ktor:ktor-client-serialization:2.3.8")
-                implementation("io.ktor:ktor-client-content-negotiation:2.3.8")
-                implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.8")
-                implementation("io.ktor:ktor-client-json:2.3.8")
-                implementation("io.ktor:ktor-client-logging:2.3.8")
+                implementation("io.ktor:ktor-client-core:$ktor_version")
+                implementation("io.ktor:ktor-client-serialization:$ktor_version")
+                implementation("io.ktor:ktor-client-content-negotiation:$ktor_version")
+                implementation("io.ktor:ktor-serialization-kotlinx-json:$ktor_version")
+                implementation("io.ktor:ktor-client-json:$ktor_version")
+                implementation("io.ktor:ktor-client-logging:$ktor_version")
 
                 // Coroutines
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
@@ -87,14 +89,17 @@ kotlin {
                 // Date
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.5.0")
 
+                // UUID
+                implementation("app.softwork:kotlinx-uuid-core:0.0.25")
+
                 // Crypto
                 api(project(":waltid-crypto"))
 
                 // Encodings
-                implementation("net.thauvin.erik.urlencoder:urlencoder-lib:1.4.0")
+                implementation("net.thauvin.erik.urlencoder:urlencoder-lib:1.5.0")
 
                 // Logging
-                implementation("io.github.oshai:kotlin-logging:6.0.3")
+                implementation("io.github.oshai:kotlin-logging:6.0.4")
 
             }
         }
@@ -107,10 +112,10 @@ kotlin {
         val jvmMain by getting {
             dependencies {
                 // Ktor client
-                implementation("io.ktor:ktor-client-cio:2.3.8")
+                implementation("io.ktor:ktor-client-okhttp:$ktor_version")
 
                 // Logging
-                implementation("org.slf4j:slf4j-simple:2.0.12")
+                implementation("org.slf4j:slf4j-simple:2.0.13")
 
                 // Json canonicalization
                 implementation("io.github.erdtman:java-json-canonicalization:1.1")
@@ -124,8 +129,8 @@ kotlin {
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
                 implementation(kotlin("test"))
                 implementation("org.junit.jupiter:junit-jupiter-params:5.10.2")
-                implementation("io.ktor:ktor-server-test-host:2.3.8")
-                implementation("io.ktor:ktor-server-content-negotiation:2.3.8")
+                implementation("io.ktor:ktor-server-test-host:$ktor_version")
+                implementation("io.ktor:ktor-server-content-negotiation:$ktor_version")
                 implementation("io.ktor:ktor-server-netty:2.3.8")
             }
         }
@@ -138,7 +143,9 @@ kotlin {
         publishing {
             repositories {
                 maven {
-                    url = uri("https://maven.walt.id/repository/waltid/")
+                    val releasesRepoUrl = uri("https://maven.waltid.dev/releases")
+                    val snapshotsRepoUrl = uri("https://maven.waltid.dev/snapshots")
+                    url = uri(if (version.toString().endsWith("SNAPSHOT")) snapshotsRepoUrl else releasesRepoUrl)
                     val envUsername = System.getenv("MAVEN_USERNAME")
                     val envPassword = System.getenv("MAVEN_PASSWORD")
 

@@ -1,13 +1,19 @@
 package id.walt.oid4vc.requests
 
+import id.walt.crypto.keys.Key
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.data.dif.PresentationDefinition
-import id.walt.oid4vc.util.httpGet
+import id.walt.oid4vc.util.JwtUtils
+import id.walt.sdjwt.JWTCryptoProvider
 import id.walt.sdjwt.SDJwt
+import id.walt.sdjwt.SDPayload
+import io.ktor.client.request.*
+import io.ktor.client.statement.*
+import io.ktor.http.*
 import kotlinx.serialization.json.*
 
 interface IAuthorizationRequest {
-    val responseType: String
+    val responseType: Set<ResponseType>
     val clientId: String
     val responseMode: ResponseMode?
     val redirectUri: String?
@@ -17,7 +23,7 @@ interface IAuthorizationRequest {
 }
 
 data class AuthorizationRequest(
-    override val responseType: String = ResponseType.getResponseTypeString(ResponseType.code),
+    override val responseType: Set<ResponseType> = setOf(ResponseType.Code),
     override val clientId: String,
     override val responseMode: ResponseMode? = null,
     override val redirectUri: String? = null,
@@ -44,9 +50,9 @@ data class AuthorizationRequest(
     val isReferenceToPAR get() = requestUri?.startsWith("urn:ietf:params:oauth:request_uri:") ?: false
     override fun toHttpParameters(): Map<String, List<String>> {
         return buildMap {
-            put("response_type", listOf(responseType))
+            put("response_type", listOf(ResponseType.getResponseTypeString(responseType)))
             put("client_id", listOf(clientId))
-            responseMode?.let { put("response_mode", listOf(it.name)) }
+            responseMode?.let { put("response_mode", listOf(it.toString())) }
             redirectUri?.let { put("redirect_uri", listOf(it)) }
             if (scope.isNotEmpty())
                 put("scope", listOf(scope.joinToString(" ")))
@@ -73,6 +79,80 @@ data class AuthorizationRequest(
             idTokenHint?.let { put("id_token_hint", listOf(it)) }
             putAll(customParameters)
         }
+    }
+
+    /**
+     * If response_mode is "direct_post", the response_uri parameter must be used and the redirect_uri parameter must be empty.
+     * If response_uri and redirect_uri are empty and client_id_scheme is "redirect_uri", the response_uri or redirect_uri (depending on the response_mode) are taken from the client_id parameter
+     */
+    fun getRedirectOrResponseUri(): String? {
+        return when(responseMode) {
+            ResponseMode.direct_post -> responseUri
+            else -> redirectUri
+        } ?: when(clientIdScheme) {
+            ClientIdScheme.RedirectUri -> clientId
+            else -> null
+        }
+    }
+
+    fun toRequestObject(cryptoProvider: JWTCryptoProvider, keyId: String): String {
+        return cryptoProvider.sign(toJSON(), keyId)
+    }
+
+    fun toRequestObjectHttpParameters(requestObjectJWT: String): Map<String, List<String>> {
+        return mapOf(
+            "client_id" to listOf(clientId),
+            "request" to listOf(requestObjectJWT)
+        )
+    }
+
+    fun toRequestObjectByReferenceHttpParameters(requestUri: String): Map<String, List<String>> {
+        return mapOf(
+            "client_id" to listOf(clientId),
+            "request_uri" to listOf(requestUri)
+        )
+    }
+
+    fun toRequestObjectByReferenceHttpQueryString(requestUri: String): String {
+        return IHTTPDataObject.toHttpQueryString(toRequestObjectByReferenceHttpParameters(requestUri))
+    }
+
+    fun toJSON(): JsonObject {
+        return JsonObject(buildMap {
+            put("response_type", JsonPrimitive(ResponseType.getResponseTypeString(responseType)))
+            put("client_id", JsonPrimitive(clientId))
+            responseMode?.let { put("response_mode", JsonPrimitive(it.toString())) }
+            redirectUri?.let { put("redirect_uri", JsonPrimitive(it)) }
+            if (scope.isNotEmpty())
+                put("scope", JsonPrimitive(scope.joinToString(" ")))
+            state?.let { put("state", JsonPrimitive(it)) }
+            authorizationDetails?.let {
+                put(
+                    "authorization_details",
+                    JsonArray(authorizationDetails.map { it.toJSON() })
+                )
+            }
+            walletIssuer?.let { put("wallet_issuer", JsonPrimitive(it)) }
+            userHint?.let { put("user_hint", JsonPrimitive(it)) }
+            issuerState?.let { put("issuer_state", JsonPrimitive(it)) }
+            requestUri?.let { put("request_uri", JsonPrimitive(it)) }
+            presentationDefinition?.let { put("presentation_definition", it.toJSON()) }
+            presentationDefinitionUri?.let { put("presentation_definition_uri", JsonPrimitive(it)) }
+            clientIdScheme?.let { put("client_id_scheme", JsonPrimitive(it.value)) }
+            clientMetadata?.let { put("client_metadata", it.toJSON()) }
+            clientMetadataUri?.let { put("client_metadata_uri", JsonPrimitive(it)) }
+            nonce?.let { put("nonce", JsonPrimitive(it)) }
+            responseUri?.let { put("response_uri", JsonPrimitive(it)) }
+            codeChallenge?.let { put("code_challenge", JsonPrimitive(it)) }
+            codeChallengeMethod?.let { put("code_challenge_method", JsonPrimitive(it)) }
+            idTokenHint?.let { put("id_token_hint", JsonPrimitive(it)) }
+            customParameters.forEach { (key, value) ->
+                when(value.size) {
+                    1 -> put(key, JsonPrimitive(value.first()))
+                    else -> put(key, JsonArray(value.map { JsonPrimitive(it) }))
+                }
+            }
+        })
     }
 
     companion object : HTTPDataObjectFactory<AuthorizationRequest>() {
@@ -104,19 +184,21 @@ data class AuthorizationRequest(
 
         suspend fun fromRequestObjectByReference(requestUri: String): AuthorizationRequest {
             println("Request object by reference: $requestUri")
-            return fromRequestObject(httpGet(requestUri))
+            return fromRequestObject(id.walt.oid4vc.util.http.get(requestUri).bodyAsText())
         }
 
         fun fromRequestObject(request: String): AuthorizationRequest {
-            return fromHttpParameters(
-                SDJwt.parse(request).fullPayload.mapValues { e ->
-                    when (e.value) {
-                        is JsonArray -> e.value.jsonArray.map { it.toString() }.toList()
-                        is JsonPrimitive -> listOf(e.value.jsonPrimitive.content)
-                        else -> listOf(e.value.jsonObject.toString())
-                    }
+            return fromJSON(JwtUtils.parseJWTPayload(request))
+        }
+
+        fun fromJSON(requestObj: JsonObject): AuthorizationRequest {
+            return fromHttpParameters(requestObj.mapValues { e ->
+                when (e.value) {
+                    is JsonArray -> e.value.jsonArray.map { it.toString() }.toList()
+                    is JsonPrimitive -> listOf(e.value.jsonPrimitive.content)
+                    else -> listOf(e.value.jsonObject.toString())
                 }
-            )
+            })
         }
 
         suspend fun fromHttpParametersAuto(parameters: Map<String, List<String>>): AuthorizationRequest {
@@ -130,9 +212,9 @@ data class AuthorizationRequest(
 
         override fun fromHttpParameters(parameters: Map<String, List<String>>): AuthorizationRequest {
             return AuthorizationRequest(
-                parameters["response_type"]!!.first(),
+                parameters["response_type"]!!.first().let { ResponseType.fromResponseTypeString(it) },
                 parameters["client_id"]!!.first(),
-                parameters["response_mode"]?.firstOrNull()?.let { ResponseMode.valueOf(it) },
+                parameters["response_mode"]?.firstOrNull()?.let { ResponseMode.fromString(it) },
                 parameters["redirect_uri"]?.firstOrNull(),
                 parameters["scope"]?.flatMap { it.split(" ") }?.toSet() ?: setOf(),
                 parameters["state"]?.firstOrNull(),

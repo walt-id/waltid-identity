@@ -1,4 +1,3 @@
-import com.github.benmanes.gradle.versions.updates.DependencyUpdatesTask
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 
 plugins {
@@ -19,6 +18,14 @@ repositories {
 
 @OptIn(org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi::class)
 kotlin {
+    targets.configureEach {
+        compilations.configureEach {
+            compilerOptions.configure {
+                freeCompilerArgs.add("-Xexpect-actual-classes")
+            }
+        }
+    }
+
     jvm {
         jvmToolchain(15) // 16 possible?
         withJava()
@@ -119,9 +126,6 @@ kotlin {
         val commonTest by getting {
             dependencies {
                 implementation(kotlin("test"))
-                implementation("io.kotest:kotest-assertions-core:5.8.0")
-
-                implementation("io.kotest:kotest-assertions-json:5.8.0")
             }
         }
         val jvmMain by getting {
@@ -132,10 +136,6 @@ kotlin {
         val jvmTest by getting {
             dependencies {
 //              implementation("io.mockk:mockk:1.13.2")
-
-                implementation("io.kotest:kotest-runner-junit5:5.8.0")
-                implementation("io.kotest:kotest-assertions-core:5.8.0")
-                implementation("io.kotest:kotest-assertions-json:5.8.0")
             }
         }
         val jsMain by getting {
@@ -174,7 +174,9 @@ kotlin {
     publishing {
         repositories {
             maven {
-                url = uri("https://maven.walt.id/repository/waltid/")
+                val releasesRepoUrl = uri("https://maven.waltid.dev/releases")
+                val snapshotsRepoUrl = uri("https://maven.waltid.dev/snapshots")
+                url = uri(if (version.toString().endsWith("SNAPSHOT")) snapshotsRepoUrl else releasesRepoUrl)
                 val envUsername = System.getenv("MAVEN_USERNAME")
                 val envPassword = System.getenv("MAVEN_PASSWORD")
 

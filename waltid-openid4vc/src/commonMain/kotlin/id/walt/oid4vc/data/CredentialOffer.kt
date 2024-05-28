@@ -7,47 +7,29 @@ import kotlinx.serialization.json.*
 @Serializable
 data class CredentialOffer private constructor(
     @SerialName("credential_issuer") val credentialIssuer: String,
-    val credentials: List<JsonElement>,
+    @SerialName("credential_configuration_ids") val credentialConfigurationIds: Set<String>,
     val grants: Map<String, GrantDetails>,
     override val customParameters: Map<String, JsonElement> = mapOf()
 ) : JsonDataObject() {
     override fun toJSON() = Json.encodeToJsonElement(CredentialOfferSerializer, this).jsonObject
 
-    fun resolveOfferedCredentials(providerMetadata: OpenIDProviderMetadata): List<OfferedCredential> {
-        val supportedCredentials =
-            providerMetadata.credentialsSupported?.filter { !it.id.isNullOrEmpty() }?.associateBy { it.id!! } ?: mapOf()
-        return credentials.mapNotNull { c ->
-            if (c is JsonObject) {
-                OfferedCredential.fromJSON(c)
-            } else if (c is JsonPrimitive && c.isString) {
-                supportedCredentials[c.content]?.let {
-                    OfferedCredential.fromProviderMetadata(it)
-                }
-            } else null
-        }
-    }
-
     class Builder(private val credentialIssuer: String) {
-        private val credentials = mutableListOf<JsonElement>()
+        private val supportedCredentialIds = mutableSetOf<String>()
         private val grants = mutableMapOf<String, GrantDetails>()
         fun addOfferedCredential(supportedCredentialId: String) = this.also {
-            credentials.add(JsonPrimitive(supportedCredentialId))
+            supportedCredentialIds.add(supportedCredentialId)
         }
 
-        fun addOfferedCredential(offeredCredential: OfferedCredential) = this.also {
-            credentials.add(offeredCredential.toJSON())
+        fun addAuthorizationCodeGrant(issuerState: String? = null, authorizationServer: String? = null) = this.also {
+            grants[GrantType.authorization_code.value] = GrantDetails(issuerState = issuerState, authorizationServer = authorizationServer)
         }
 
-        fun addAuthorizationCodeGrant(issuerState: String) = this.also {
-            grants[GrantType.authorization_code.value] = GrantDetails(issuerState)
-        }
-
-        fun addPreAuthorizedCodeGrant(preAuthCode: String, userPinRequired: Boolean? = null) = this.also {
+        fun addPreAuthorizedCodeGrant(preAuthCode: String, txCode: TxCode? = null, interval: Int? = null, authorizationServer: String? = null) = this.also {
             grants[GrantType.pre_authorized_code.value] =
-                GrantDetails(preAuthorizedCode = preAuthCode, userPinRequired = userPinRequired)
+                GrantDetails(preAuthorizedCode = preAuthCode, txCode = txCode, interval = interval, authorizationServer = authorizationServer)
         }
 
-        fun build() = CredentialOffer(credentialIssuer, credentials, grants)
+        fun build() = CredentialOffer(credentialIssuer, supportedCredentialIds, grants)
     }
 
     companion object : JsonDataObjectFactory<CredentialOffer>() {

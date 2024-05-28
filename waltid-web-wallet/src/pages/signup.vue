@@ -26,7 +26,7 @@
                                         autofocus
                                         class="block w-full rounded-md border-0 py-1.5 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6 px-2 text-gray-600"
                                         name="email"
-                                        required=""
+                                        required="true"
                                         type="text"
                                     />
                                 </div>
@@ -47,7 +47,7 @@
                                         autocomplete="email"
                                         class="block w-full rounded-md border-0 py-1.5 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6 px-2 text-gray-600"
                                         name="email"
-                                        required=""
+                                        required="true"
                                         type="email"
                                     />
                                 </div>
@@ -67,7 +67,7 @@
                                         autocomplete="current-password"
                                         class="block w-full rounded-md border-0 py-1.5 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6 px-2 text-gray-600"
                                         name="password"
-                                        required=""
+                                        required="true"
                                         type="password"
                                     />
                                 </div>
@@ -87,7 +87,7 @@
                                         autocomplete="off"
                                         class="block w-full rounded-md border-0 py-1.5 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6 px-2 text-gray-600"
                                         name="confirmPassword"
-                                        required=""
+                                        required="true"
                                         type="password"
                                     />
                                 </div>
@@ -127,7 +127,7 @@
             />
         </div>
 
-        <div v-if="showWaltidLoadingSpinner" :class="[isProgress ? 'animate-spin' : '']" :style="cardStyle" class="absolute bottom-3.5 right-3.5 w-10 lg:w-16 h-10 lg:h-16 overflow-hidden">
+        <div v-if="showWaltidLoadingSpinner" :class="[isProgress ? 'animate-spin' : '']"  class="absolute bottom-3.5 right-3.5 w-10 lg:w-16 h-10 lg:h-16 overflow-hidden">
             <img class="overflow-hidden" src="/svg/walt-s.svg" />
         </div>
     </div>
@@ -162,10 +162,11 @@ async function register() {
                 title: "Error",
                 message: "Passwords don't match",
                 isError: true,
+
             },
         });
     } else {
-        submit();
+        await submit();
     }
 }
 
@@ -185,21 +186,23 @@ async function submit() {
         .then((response) => {
             isProgress.value = false;
 
-            store.openModal({
-                component: ActionResultModal,
-                props: {
-                    title: "Account registered",
-                    message: "Welcome, " + nameInput + "! You can now login with your email address " + emailInput + " and your chosen password.",
-                    isError: false,
-                },
-            });
+          store.openModal({
+            component: ActionResultModal,
+            props: {
+              title: "Account registered",
+              message: "Welcome, " + nameInput + "! You can now login with your email address " + emailInput + " and your chosen password.",
+              isError: false,
+              open: true,
+              callback: () => {
+                navigateTo("/");
+              }
+
+            },
+          });
+
 
             // wait for modal close, then navigate
-            nextTick(() => {
-                watch(store.$state, () => {
-                    navigateTo("/");
-                });
-            });
+
         })
         .catch((err) => {
             isProgress.value = false;
@@ -209,6 +212,10 @@ async function submit() {
                     title: "Error",
                     message: err.data,
                     isError: true,
+                     open: true,
+                  callback: () => {
+                    navigateTo("/");
+                  }
                 },
             });
         });
@@ -256,6 +263,6 @@ useHead({
 
 .zoom-out {
     animation: zoom-out 0.5s normal forwards;
-    //animation: none;
+
 }
 </style>

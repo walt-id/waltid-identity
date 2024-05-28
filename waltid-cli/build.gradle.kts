@@ -1,5 +1,3 @@
-import com.github.benmanes.gradle.versions.updates.DependencyUpdatesTask
-
 plugins {
     kotlin("multiplatform")
     kotlin("plugin.serialization")
@@ -22,10 +20,18 @@ java {
 }
 
 kotlin {
-    jvmToolchain(15)
+    jvmToolchain(17)
 }
 
 kotlin {
+    targets.configureEach {
+        compilations.configureEach {
+            compilerOptions.configure {
+                freeCompilerArgs.add("-Xexpect-actual-classes")
+            }
+        }
+    }
+
     jvm {
         compilations.all {
             kotlinOptions.jvmTarget = "15" // JVM got Ed25519 at version 15
@@ -45,19 +51,21 @@ kotlin {
                 api(project(":waltid-sdjwt"))
                 api(project(":waltid-openid4vc"))
 
-                // kotlinx-io
-                implementation("org.jetbrains.kotlinx:kotlinx-io-core:0.3.1")
+                implementation("org.jetbrains.kotlinx:kotlinx-io-core:0.3.3")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
+                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.0-RC.2")
+                implementation ("com.google.code.gson:gson:2.10.1")
 
                 // CLI
                 implementation("com.varabyte.kotter:kotter-jvm:1.1.2")
-                implementation("com.github.ajalt.mordant:mordant:2.3.0")
+                implementation("com.github.ajalt.mordant:mordant:2.6.0")
                 implementation("com.github.ajalt.clikt:clikt:4.2.2")
 
                 // Coroutines
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
 
                 // Logging
-                implementation("io.github.oshai:kotlin-logging:6.0.3")
+                implementation("io.github.oshai:kotlin-logging:6.0.4")
             }
         }
         val commonTest by getting {
@@ -69,25 +77,27 @@ kotlin {
         val jvmMain by getting {
             dependencies {
                 // Logging
-                implementation("org.slf4j:slf4j-simple:2.0.12")
+                implementation("org.slf4j:slf4j-simple:2.0.13")
 
                 // JOSE
                 implementation("com.nimbusds:nimbus-jose-jwt:9.37.3")
 
                 // BouncyCastle for PEM import
-                implementation("org.bouncycastle:bcpkix-lts8on:2.73.4")
+                implementation("org.bouncycastle:bcpkix-lts8on:2.73.6")
             }
         }
         val jvmTest by getting {
             dependencies {
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
                 implementation("com.wolpl.clikt-testkit:clikt-testkit:2.0.0")
+
+                implementation("org.junit.jupiter:junit-jupiter-params:5.10.2")
             }
         }
         /*publishing {
             repositories {
                 maven {
-                    url = uri("https://maven.walt.id/repository/waltid/")
+                    url = uri("https://maven.waltid.dev/releases")
                     val envUsername = System.getenv("MAVEN_USERNAME")
                     val envPassword = System.getenv("MAVEN_PASSWORD")
 
@@ -120,7 +130,7 @@ application {
     // Works with:
     //     ../gradlew run --args="--help"
     mainClass = "id.walt.cli.MainKt"
-
+    applicationName = "waltid"
 }
 
 tasks.test {

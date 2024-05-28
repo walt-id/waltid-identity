@@ -2,17 +2,19 @@ package id.walt.webwallet.utils
 
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
+import org.intellij.lang.annotations.Language
 
 object IssuanceExamples {
     //language=json
     val universityDegreeCredential = """
 {
-  "issuanceKey": {
-    "type": "local",
+  "issuerKey": {
+    "type": "jwk",
     "jwk": "{\"kty\":\"OKP\",\"d\":\"mDhpwaH6JYSrD2Bq7Cs-pzmsjlLj4EOhxyI-9DM1mFI\",\"crv\":\"Ed25519\",\"kid\":\"Vzx7l5fh56F3Pf9aR3DECU5BwfrY6ZJe05aiWYWzan8\",\"x\":\"T3T4-u1Xz3vAV2JwPNxWfs4pik_JLiArz_WTCvrCFUM\"}"
   },
   "issuerDid": "did:key:z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp",
-  "vc": {
+  "credentialConfigurationId": "OpenBadgeCredential_jwt_vc_json",
+  "credentialData": {
     "@context": [
       "https://www.w3.org/2018/credentials/v1",
       "https://www.w3.org/2018/credentials/examples/v1"
@@ -47,16 +49,17 @@ object IssuanceExamples {
   }
 }
 """.trimIndent()
-    
+
     //language=json
     val openBadgeCredentialExampleJsonString = """
 {
-  "issuanceKey": {
-    "type": "local",
+  "issuerKey": {
+    "type": "jwk",
     "jwk": "{\"kty\":\"OKP\",\"d\":\"mDhpwaH6JYSrD2Bq7Cs-pzmsjlLj4EOhxyI-9DM1mFI\",\"crv\":\"Ed25519\",\"kid\":\"Vzx7l5fh56F3Pf9aR3DECU5BwfrY6ZJe05aiWYWzan8\",\"x\":\"T3T4-u1Xz3vAV2JwPNxWfs4pik_JLiArz_WTCvrCFUM\"}"
   },
   "issuerDid": "did:key:z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp",
-  
+  "credentialConfigurationId": "OpenBadgeCredential_jwt_vc_json",
+  "credentialData": {
     "@context": [
       "https://www.w3.org/2018/credentials/v1",
       "https://purl.imsglobal.org/spec/ob/v3p0/context.json"
@@ -99,7 +102,7 @@ object IssuanceExamples {
           "type": "Image"
         }
       }
-    
+    }
   },
   "mapping": {
     "id": "\u003cuuid\u003e",
@@ -115,17 +118,18 @@ object IssuanceExamples {
 }
 """.trimIndent()
     val openBadgeCredentialExample = Json.parseToJsonElement(openBadgeCredentialExampleJsonString).jsonObject.toMap()
-    
-    
+
+    @Language("JSON")
     val testCredential =
         """
             {
-              "issuanceKey": {
-                "type": "local",
+              "issuerKey": {
+                "type": "jwk",
                 "jwk": "{\"kty\":\"OKP\",\"d\":\"mDhpwaH6JYSrD2Bq7Cs-pzmsjlLj4EOhxyI-9DM1mFI\",\"crv\":\"Ed25519\",\"kid\":\"Vzx7l5fh56F3Pf9aR3DECU5BwfrY6ZJe05aiWYWzan8\",\"x\":\"T3T4-u1Xz3vAV2JwPNxWfs4pik_JLiArz_WTCvrCFUM\"}"
               },
               "issuerDid": "did:key:z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp",
-              "vc": {
+              "credentialConfigurationId": "OpenBadgeCredential_jwt_vc_json",
+              "credentialData": {
                 "@context": [
                   "https://www.w3.org/2018/credentials/v1",
                   "https://purl.imsglobal.org/spec/ob/v3p0/context.json"
@@ -183,7 +187,7 @@ object IssuanceExamples {
               }
             }
             """.trimIndent()
-    
+
     val universityDegreeCredentialExample2 = mapOf(
         "@context" to listOf(
             "https://www.w3.org/2018/credentials/v1", "https://www.w3.org/2018/credentials/examples/v1"
@@ -203,7 +207,7 @@ object IssuanceExamples {
             )
         ),
     )
-    
+
     val universityDegreeCredentialSignedExample = universityDegreeCredentialExample2.plus(
         mapOf(
             "proof" to mapOf(
@@ -215,17 +219,18 @@ object IssuanceExamples {
             )
         )
     )
-    
+
     //language=JSON
     val batchExample = """
         [
           {
-            "issuanceKey": {
-              "type": "local",
+            "issuerKey": {
+              "type": "jwk",
               "jwk": "{\"kty\":\"OKP\",\"d\":\"mDhpwaH6JYSrD2Bq7Cs-pzmsjlLj4EOhxyI-9DM1mFI\",\"crv\":\"Ed25519\",\"kid\":\"Vzx7l5fh56F3Pf9aR3DECU5BwfrY6ZJe05aiWYWzan8\",\"x\":\"T3T4-u1Xz3vAV2JwPNxWfs4pik_JLiArz_WTCvrCFUM\"}"
             },
             "issuerDid": "did:key:z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp",
-            "vc": {
+            "credentialConfigurationId": "OpenBadgeCredential_jwt_vc_json",
+            "credentialData": {
               "@context": [
                 "https://www.w3.org/2018/credentials/v1",
                 "https://www.w3.org/2018/credentials/examples/v1"
@@ -260,12 +265,12 @@ object IssuanceExamples {
             }
           },
           {
-            "issuanceKey": {
-              "type": "local",
+            "issuerKey": {
+              "type": "jwk",
               "jwk": "{\"kty\":\"OKP\",\"d\":\"mDhpwaH6JYSrD2Bq7Cs-pzmsjlLj4EOhxyI-9DM1mFI\",\"crv\":\"Ed25519\",\"kid\":\"Vzx7l5fh56F3Pf9aR3DECU5BwfrY6ZJe05aiWYWzan8\",\"x\":\"T3T4-u1Xz3vAV2JwPNxWfs4pik_JLiArz_WTCvrCFUM\"}"
             },
             "issuerDid": "did:key:z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp",
-            "vc": {
+            "credentialData": {
               "@context": [
                 "https://www.w3.org/2018/credentials/v1",
                 "https://purl.imsglobal.org/spec/ob/v3p0/context.json"
@@ -324,16 +329,17 @@ object IssuanceExamples {
           }
         ]
     """.trimIndent()
-    
+
     //language=JSON
     val sdJwtExample = """
         {
-          "issuanceKey": {
-            "type": "local",
+          "issuerKey": {
+            "type": "jwk",
             "jwk": "{\"kty\":\"OKP\",\"d\":\"mDhpwaH6JYSrD2Bq7Cs-pzmsjlLj4EOhxyI-9DM1mFI\",\"crv\":\"Ed25519\",\"kid\":\"Vzx7l5fh56F3Pf9aR3DECU5BwfrY6ZJe05aiWYWzan8\",\"x\":\"T3T4-u1Xz3vAV2JwPNxWfs4pik_JLiArz_WTCvrCFUM\"}"
           },
           "issuerDid": "did:key:z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp",
-          "vc": {
+          "credentialConfigurationId": "OpenBadgeCredential_jwt_vc_json",
+          "credentialData": {
             "@context": [
               "https://www.w3.org/2018/credentials/v1",
               "https://purl.imsglobal.org/spec/ob/v3p0/context.json"

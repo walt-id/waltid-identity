@@ -4,6 +4,7 @@ import id.walt.crypto.keys.Key
 import id.walt.did.dids.document.DidCheqdDocument
 import id.walt.did.dids.document.DidDocument
 import io.ktor.client.*
+import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import kotlinx.serialization.json.Json
@@ -16,7 +17,7 @@ import love.forte.plugin.suspendtrans.annotation.JvmBlocking
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 
-@ExperimentalJsExport
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 class DidCheqdResolver : LocalResolverMethod("cheqd") {
     private val httpClient = HttpClient() //TODO: inject
@@ -40,15 +41,17 @@ class DidCheqdResolver : LocalResolverMethod("cheqd") {
         // (no functionality provided by crypto, only multibase58btc available)
     }
 
-    private val json = Json() { ignoreUnknownKeys = true }
+    private val json = Json { ignoreUnknownKeys = true }
 
     private suspend fun resolveDid(did: String): DidDocument {
         val response = httpClient.get("https://resolver.cheqd.net/1.0/identifiers/${did}") {
                 headers {
                     append("contentType", "application/did+ld+json")
                 }
-            }.bodyAsText()
-        val resolution = Json.decodeFromString<JsonObject>(response)
+            }
+        val responseText = response.bodyAsText()
+
+        val resolution = runCatching { Json.parseToJsonElement(responseText) }.getOrElse { throw RuntimeException("Illegal non-JSON response (${response.status}), body: >>$responseText<< (end of body), error: >>${it.stackTraceToString()}<<") }
 
         val didDocument = resolution.jsonObject["didResolutionMetadata"]?.jsonObject?.get("error")?.let {
             throw IllegalArgumentException("Could not resolve did:cheqd, resolver responded: ${it.jsonPrimitive.content}")

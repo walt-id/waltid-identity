@@ -3,7 +3,8 @@
         <BackButton />
         <div>
             <h2 class="text-lg font-semibold leading-7 text-gray-900">Export key: {{ keyId }}</h2>
-            <p class="mt-1 max-w-2xl text-sm leading-6 text-gray-600">We allow you to export your keypair, however, make sure you keep it safe, so that you cannot be impersonated.</p>
+            <p class="mt-1 max-w-2xl text-sm leading-6 text-gray-600">We allow you to export your keypair, however, make
+                sure you keep it safe, so that you cannot be impersonated.</p>
             Be careful of what information of this page you share.
         </div>
 
@@ -12,8 +13,7 @@
 
             <button
                 class="bg-yellow-500 hover:bg-yellow-400 focus-visible:outline-yellow-600 inline-flex justify-center rounded-md px-3 py-2 text-sm font-semibold text-white shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
-                @click="loadExportedKey"
-            >
+                @click="loadExportedKey">
                 <span class="inline-flex place-items-center gap-1">
                     <ExclamationTriangleIcon class="w-5 h-5" />
                     Export private key
@@ -31,7 +31,8 @@
 
             <qrcode-vue v-if="exportedKey.length <= 4296" :value="exportedKey" level="L" size="300"></qrcode-vue>
             <p v-else>
-                Unfortunately, this Verifiable Credential is too big to be viewable as QR code (credential size is {{ exportedKey.length }} characters, but the maximum a QR code can hold is 4296).
+                Unfortunately, this Verifiable Credential is too big to be viewable as QR code (credential size is {{
+                    exportedKey.length }} characters, but the maximum a QR code can hold is 4296).
             </p>
 
             <span v-if="loadPrivateKey" class="font-bold text-red-600">NEVER SHARE YOUR PRIVATE KEY.</span>
@@ -57,7 +58,7 @@ const keyId = route.params.keyId;
 const currentWallet = useCurrentWallet()
 
 async function loadExportedKey() {
-    const data = await $fetch(`/wallet-api/wallet/${currentWallet.value}/keys/load/${keyId}?format=${format}&loadPrivateKey=${loadPrivateKey}`);
+    const data = await $fetch(`/wallet-api/wallet/${currentWallet.value}/keys/${keyId}/export?format=${format}&loadPrivateKey=${loadPrivateKey}`);
 
     exportedKey.value = JSON.stringify(data);
 }

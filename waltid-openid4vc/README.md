@@ -22,7 +22,7 @@ Add the Maven repository which hosts the walt.id libraries to your build.gradle 
 
 ```kotlin
 repositories {
-    maven { url = uri("https://maven.walt.id/repository/waltid/") }
+    maven { url = uri("https://maven.waltid.dev/releases") }
 } 
 ```
 

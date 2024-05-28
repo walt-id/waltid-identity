@@ -60,7 +60,9 @@ export default function VerificationSection() {
 
     const params = new URLSearchParams();
     params.append('ids', idsToIssue.join(','));
-    params.append('vps', vps.join(','));
+    if (vps.length) {
+      params.append('vps', vps.join(','));
+    }
 
     router.push(`/verify?${params.toString()}`);
   }

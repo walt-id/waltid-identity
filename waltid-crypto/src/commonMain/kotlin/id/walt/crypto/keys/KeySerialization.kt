@@ -1,5 +1,9 @@
 package id.walt.crypto.keys
 
+import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto.keys.oci.OCIKeyRestApi
+import id.walt.crypto.keys.tse.TSEKey
+import id.walt.crypto.utils.JsonUtils.toJsonElement
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import kotlinx.serialization.modules.SerializersModule
@@ -11,6 +15,7 @@ import love.forte.plugin.suspendtrans.annotation.JvmBlocking
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 
+// TODO: Deprecate this in favour of KeyManager
 
 @OptIn(ExperimentalJsExport::class)
 @JsExport
@@ -18,8 +23,9 @@ object KeySerialization {
 
     private val keySerializationModule = SerializersModule {
         polymorphic(Key::class) {
-            subclass(LocalKey::class)
+            subclass(JWKKey::class)
             subclass(TSEKey::class)
+            subclass(OCIKeyRestApi::class)
         }
     }
 
@@ -29,15 +35,34 @@ object KeySerialization {
     }
 
     fun serializeKey(key: Key): String = keySerializationJson.encodeToString(key)
+
+    @Suppress("NON_EXPORTABLE_TYPE")
     fun serializeKeyToJson(key: Key): JsonElement = keySerializationJson.encodeToJsonElement(key)
+
     @JvmBlocking
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    suspend fun deserializeKey(json: String): Result<Key> = runCatching { keySerializationJson.decodeFromString<Key>(json).apply { init() } }
+    suspend fun deserializeKey(json: String): Result<Key> =
+        runCatching { keySerializationJson.decodeFromString<Key>(json).apply { init() } }
+
     @JvmBlocking
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    suspend fun deserializeKey(json: JsonObject): Result<Key> = runCatching { keySerializationJson.decodeFromJsonElement<Key>(json).apply { init() } }
+    suspend fun deserializeKey(json: JsonObject): Result<Key> =
+        runCatching {
+            keySerializationJson.decodeFromJsonElement<Key>(json).apply { init() }
+        }
+
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
+    suspend fun deserializeJWTKey(json: JsonObject): Result<Key> =
+        runCatching {
+            keySerializationJson.decodeFromJsonElement<Key>(json.mapValues {
+                if (it.value is JsonPrimitive) it.value.jsonPrimitive.content else it.value.toString()
+            }.toJsonElement()).apply { init() }
+        }
 }

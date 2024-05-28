@@ -27,21 +27,21 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-
       - name: Gradle wrapper validation
-        uses: gradle/wrapper-validation-action@v1
+        uses: gradle/wrapper-validation-action@v3
 
       - name: Get changed files in the frontend
         id: frontend-changed-files
-        uses: tj-actions/changed-files@v41
+        uses: tj-actions/changed-files@v44
         with:
           files: |
             waltid-web-portal/**
             waltid-web-wallet/web/**
 
       - name: Running gradle build
-        uses: eskatos/gradle-command-action@v1.3.3
+        uses: eskatos/gradle-command-action@v3.3.2
         env:
           MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
         with:
-          arguments: build publish --no-daemon
+          arguments: build --no-daemon
         if: ${{ steps.frontend-changed-files.outputs.any_changed == 'false' }}

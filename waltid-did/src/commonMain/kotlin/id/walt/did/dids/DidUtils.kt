@@ -3,10 +3,10 @@ package id.walt.did.dids
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 
-@ExperimentalJsExport
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 object DidUtils {
-    private const val PATTERN = "^did:([a-z]+):(.+)"
+    private const val PATTERN = "^did:([^:]+):(.+)"
     fun methodFromDid(did: String) = did.removePrefix("did:").substringBefore(":")
 
     fun identifierFromDid(did: String): String? = pathFromDid(did)?.substringBefore('#')
@@ -16,4 +16,6 @@ object DidUtils {
     fun pathFromDid(did: String): String? = PATTERN.toRegex().find(did)?.let {
         it.groups[2]!!.value
     }
+
+    fun isDidUrl(did: String): Boolean = PATTERN.toRegex().matches(did)
 }

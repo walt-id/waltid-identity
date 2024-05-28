@@ -10,7 +10,7 @@ interface BaseConfig
 
 object ConfigManager {
 
-    val log = KotlinLogging.logger { }
+    private val log = KotlinLogging.logger { }
 
     val registeredConfigurations = ArrayList<Pair<String, KClass<out BaseConfig>>>()
     val loadedConfigurations = HashMap<String, BaseConfig>()
@@ -73,6 +73,7 @@ object ConfigManager {
     private fun registerConfigurations() {
         registerConfig("web", WebConfig::class)
         registerConfig("issuer-service", OIDCIssuerServiceConfig::class)
+        registerConfig("credential-issuer-metadata", CredentialTypeConfig::class)
     }
 
     fun loadConfigs(args: Array<String>) {

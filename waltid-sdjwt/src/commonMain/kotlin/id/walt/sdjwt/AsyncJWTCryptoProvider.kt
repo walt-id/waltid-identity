@@ -9,7 +9,7 @@ import kotlin.js.JsExport
  * Can be implemented by library user, to integrate their own or custom JWT crypto library
  * Default implementations exist for some platforms.
  * **Note for JavaScript**: Implement _JSAsyncJWTCryptoProvider_ instead.
- * @see SimpleJWTCryptoProvider
+ * @see id.walt.sdjwt.SimpleJWTCryptoProvider
  */
 @OptIn(ExperimentalJsExport::class)
 @JsExport.Ignore

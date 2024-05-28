@@ -2,7 +2,7 @@ package id.walt.did.dids.registrar.local.key
 
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.LocalKey
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.JsonCanonicalizationUtils
 import id.walt.crypto.utils.MultiBaseUtils.convertRawKeyToMultiBase58Btc
 import id.walt.crypto.utils.MultiCodecUtils
@@ -20,7 +20,7 @@ import love.forte.plugin.suspendtrans.annotation.JvmBlocking
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 
-@ExperimentalJsExport
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 class DidKeyRegistrar : LocalRegistrarMethod("key") {
 
@@ -29,21 +29,14 @@ class DidKeyRegistrar : LocalRegistrarMethod("key") {
     @JsPromise
     @JsExport.Ignore
     override suspend fun register(options: DidCreateOptions): DidResult = options.get<KeyType>("keyType")?.let {
-        registerByKey(LocalKey.generate(it), options)
-    } ?: throw IllegalArgumentException("KeyType option not found.")
+        registerByKey(JWKKey.generate(it), options)
+    } ?: throw IllegalArgumentException("Option \"keyType\" not found.")
 
     @JvmBlocking
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
     override suspend fun registerByKey(key: Key, options: DidCreateOptions): DidResult = options.let {
-        if (key.keyType !in setOf(
-                KeyType.Ed25519,
-                KeyType.RSA,//TODO: ??is it supposed to be supported for did:key (uni-registrar doesn't)
-                KeyType.secp256k1,
-                KeyType.secp256r1
-            )
-        ) throw IllegalArgumentException("did:key can not be created with a ${key.keyType} key.")
         val pubKey = key.getPublicKey()
         val identifierComponents = getIdentifierComponents(pubKey, it)
         val identifier = convertRawKeyToMultiBase58Btc(identifierComponents.pubKeyBytes, identifierComponents.multiCodecKeyCode)

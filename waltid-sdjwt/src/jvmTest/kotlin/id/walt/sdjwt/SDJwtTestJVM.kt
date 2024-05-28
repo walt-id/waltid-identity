@@ -4,14 +4,11 @@ import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.crypto.MACSigner
 import com.nimbusds.jose.crypto.MACVerifier
 import com.nimbusds.jwt.JWTClaimsSet
-import io.kotest.assertions.json.shouldEqualJson
-import io.kotest.matchers.collections.shouldHaveSize
-import io.kotest.matchers.maps.shouldContainKey
-import io.kotest.matchers.maps.shouldNotContainKey
-import io.kotest.matchers.shouldBe
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import kotlin.test.Test
+import kotlin.test.*
 
 class SDJwtTestJVM {
     // Generate shared secret for HMAC crypto algorithm
@@ -42,14 +39,17 @@ class SDJwtTestJVM {
         // Print SD-JWT
         println(sdJwt)
 
-        sdJwt.undisclosedPayload shouldNotContainKey "sub"
-        sdJwt.undisclosedPayload shouldContainKey SDJwt.DIGESTS_KEY
-        sdJwt.undisclosedPayload shouldContainKey "aud"
-        sdJwt.disclosures shouldHaveSize 1
-        sdJwt.digestedDisclosures[sdJwt.undisclosedPayload[SDJwt.DIGESTS_KEY]!!.jsonArray[0].jsonPrimitive.content]!!.key shouldBe "sub"
-        sdJwt.fullPayload.toString() shouldEqualJson originalClaimsSet.toString()
+        assertFalse(actual = sdJwt.undisclosedPayload.containsKey("sub"))
+        assertContains(map = sdJwt.undisclosedPayload, key = SDJwt.DIGESTS_KEY)
+        assertContains(map = sdJwt.undisclosedPayload, key = "aud")
+        assertEquals(expected = 1, actual = sdJwt.disclosures.size)
+        assertEquals(expected = "sub", actual = sdJwt.digestedDisclosures[sdJwt.undisclosedPayload[SDJwt.DIGESTS_KEY]!!.jsonArray[0].jsonPrimitive.content]!!.key)
+        assertContentEquals(
+            expected = Json.parseToJsonElement(originalClaimsSet.toString()).jsonObject.toSortedMap().asIterable(),
+            actual = sdJwt.fullPayload.toSortedMap().asIterable()
+        )
 
-        sdJwt.verify(cryptoProvider).verified shouldBe true
+        assertTrue(actual = sdJwt.verify(cryptoProvider).verified)
     }
 
     @Test
@@ -60,19 +60,19 @@ class SDJwtTestJVM {
 
         // present without disclosing SD fields
         val presentedUndisclosedJwt = sdJwt.present(discloseAll = false)
-        println("present without disclosing SD fields: " + presentedUndisclosedJwt)
+        println("present without disclosing SD fields: $presentedUndisclosedJwt")
 
         // present disclosing all SD fields
         val presentedDisclosedJwt = sdJwt.present(discloseAll = true)
-        println("present disclosing all SD fields: " + presentedDisclosedJwt)
+        println("present disclosing all SD fields: $presentedDisclosedJwt")
 
         // present disclosing selective fields, using SDMap
         val presentedSelectiveJwt = sdJwt.present(SDMapBuilder().addField("sub", true).build())
-        println("present disclosing selective fields, using SDMap: " + presentedSelectiveJwt)
+        println("present disclosing selective fields, using SDMap: $presentedSelectiveJwt")
 
         // present disclosing fields, using JSON paths
         val presentedSelectiveJwt2 = sdJwt.present(SDMap.generateSDMap(listOf("sub")))
-        println("present disclosing fields, using JSON paths: " + presentedSelectiveJwt2)
+        println("present disclosing fields, using JSON paths: $presentedSelectiveJwt2")
 
     }
 

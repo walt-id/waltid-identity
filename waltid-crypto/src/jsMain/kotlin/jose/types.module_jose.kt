@@ -22,6 +22,7 @@ external interface `T$0` {
         set(value) = definedExternally
 }
 
+@Suppress("DEPRECATION")
 external interface JWK {
     var alg: String?
         get() = definedExternally
@@ -86,14 +87,17 @@ external interface JWK {
     var x5t: String?
         get() = definedExternally
         set(value) = definedExternally
+
     /*var `x5t#S256`: String?
         get() = definedExternally
         set(value) = definedExternally*/
     var x5u: String?
         get() = definedExternally
         set(value) = definedExternally
+
     @nativeGetter
     operator fun get(propName: String): Any?
+
     @nativeSetter
     operator fun set(propName: String, value: Any)
 }
@@ -170,8 +174,10 @@ external interface JWSHeaderParameters : JoseHeaderParameters {
     var crit: Array<String>?
         get() = definedExternally
         set(value) = definedExternally
+
     @nativeGetter
     operator fun get(propName: String): Any?
+
     @nativeSetter
     operator fun set(propName: String, value: Any)
 }
@@ -235,8 +241,10 @@ external interface JWEHeaderParameters : JoseHeaderParameters {
     var zip: String?
         get() = definedExternally
         set(value) = definedExternally
+
     @nativeGetter
     operator fun get(propName: String): Any?
+
     @nativeSetter
     operator fun set(propName: String, value: Any)
 }
@@ -244,6 +252,7 @@ external interface JWEHeaderParameters : JoseHeaderParameters {
 external interface `T$1` {
     @nativeGetter
     operator fun get(propName: String): Boolean?
+
     @nativeSetter
     operator fun set(propName: String, value: Boolean)
 }
@@ -334,8 +343,10 @@ external interface JWTPayload {
     var iat: Number?
         get() = definedExternally
         set(value) = definedExternally
+
     @nativeGetter
     operator fun get(propName: String): Any?
+
     @nativeSetter
     operator fun set(propName: String, value: Any)
 }

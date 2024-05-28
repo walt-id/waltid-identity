@@ -60,8 +60,8 @@ const manifest = props.credential?.manifest != "{}" ? props.credential?.manifest
 const manifestDisplay = manifest ? (typeof manifest === 'string' ? JSON.parse(manifest) : manifest)?.display : null;
 const manifestCard = manifestDisplay?.card;
 
-const title = manifestDisplay?.title ?? credential.type?.at(-1);
-const titleTitelized = manifestDisplay?.title ?? credential.type.at(-1).replace(/([a-z0-9])([A-Z])/g, "$1 $2");
+const title = manifestDisplay?.title ?? credential?.type?.at(-1);
+const titleTitelized = manifestDisplay?.title ?? credential?.type?.at(-1).replace(/([a-z0-9])([A-Z])/g, "$1 $2");
 const credentialSubtitle = manifestCard?.description ?? credential?.name;
 
 const credentialImageUrl = manifestCard?.logo?.uri ?? credential.issuer?.image?.id ?? credential.issuer?.image;

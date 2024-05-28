@@ -21,7 +21,7 @@ Add the Maven repository which hosts the walt.id libraries to your build.gradle 
 
 ```kotlin
 repositories {
-    maven { url = uri("https://maven.walt.id/repository/waltid/") }
+    maven { url = uri("https://maven.waltid.dev/releases") }
 } 
 ```
 
@@ -75,7 +75,7 @@ val didResult = DidService.register(options = options)
 Register the DID with a given key:
 
 ```kotlin
-val key = LocalKey.generate(KeyType.Ed25519)
+val key = JWKKey.generate(KeyType.Ed25519)
 val options = DidKeyCreateOptions(
     useJwkJcsPub = true
 )

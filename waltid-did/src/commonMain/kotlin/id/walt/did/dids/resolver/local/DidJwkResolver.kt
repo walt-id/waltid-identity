@@ -1,7 +1,7 @@
 package id.walt.did.dids.resolver.local
 
 import id.walt.crypto.keys.Key
-import id.walt.crypto.keys.LocalKey
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.base64UrlDecode
 import id.walt.did.dids.DidUtils
 import id.walt.did.dids.document.DidDocument
@@ -12,7 +12,7 @@ import love.forte.plugin.suspendtrans.annotation.JvmBlocking
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 
-@ExperimentalJsExport
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 class DidJwkResolver : LocalResolverMethod("jwk") {
     @JvmBlocking
@@ -35,5 +35,5 @@ class DidJwkResolver : LocalResolverMethod("jwk") {
     @JsPromise
     @JsExport.Ignore
     override suspend fun resolveToKey(did: String): Result<Key> =
-        LocalKey.importJWK(DidUtils.pathFromDid(did)!!.base64UrlDecode().decodeToString())
+        JWKKey.importJWK(DidUtils.pathFromDid(did)!!.base64UrlDecode().decodeToString())
 }

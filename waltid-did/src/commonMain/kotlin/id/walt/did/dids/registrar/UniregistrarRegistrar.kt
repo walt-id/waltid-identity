@@ -18,7 +18,7 @@ import love.forte.plugin.suspendtrans.annotation.JvmBlocking
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 
-@ExperimentalJsExport
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 class UniregistrarRegistrar : DidRegistrar {
 
@@ -60,7 +60,7 @@ class UniregistrarRegistrar : DidRegistrar {
     @JsExport.Ignore
     override suspend fun create(options: DidCreateOptions): DidResult {
         return DidResult("TODO" /* TODO */, http.post("$registrarUrl/create?method=${options.method}") {
-            setBody(options.options)
+            setBody(options.config)
         }.body())
     }
 

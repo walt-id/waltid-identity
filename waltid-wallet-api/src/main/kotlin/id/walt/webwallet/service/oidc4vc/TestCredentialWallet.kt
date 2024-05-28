@@ -20,9 +20,9 @@ import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.requests.TokenRequest
 import id.walt.webwallet.service.SessionAttributes.HACK_outsideMappedSelectedCredentialsPerSession
 import id.walt.webwallet.service.SessionAttributes.HACK_outsideMappedSelectedDisclosuresPerSession
-import id.walt.webwallet.utils.WalletHttpClients.getHttpClient
 import id.walt.webwallet.service.credentials.CredentialsService
 import id.walt.webwallet.service.keys.KeysService
+import id.walt.webwallet.utils.WalletHttpClients.getHttpClient
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
@@ -68,23 +68,24 @@ class TestCredentialWallet(
         }
     }
 
-    override fun signToken(target: TokenTarget, payload: JsonObject, header: JsonObject?, keyId: String?): String {
+    override fun signToken(target: TokenTarget, payload: JsonObject, header: JsonObject?, keyId: String?, privKey: Key?): String {
         fun debugStateMsg() = "(target: $target, payload: $payload, header: $header, keyId: $keyId)"
-        println("SIGNING TOKEN: ${debugStateMsg()}")
 
         keyId ?: throw IllegalArgumentException("No keyId provided for signToken ${debugStateMsg()}")
 
 //        val key = runBlocking { walletService.getKeyByDid(keyId) }
         val key = runBlocking {
             DidService.resolveToKey(keyId).getOrThrow().let { KeysService.get(it.getKeyId()) }
-                ?.let { KeySerialization.deserializeKey(it.document).getOrThrow() }
+                ?.let {
+                    KeySerialization.deserializeKey(it.document).getOrThrow()
+                }
         } ?: error("Failed to retrieve the key")
-        println("KEY FOR SIGNING: $key")
 
         return runBlocking {
             val authKeyId = resolveDidAuthentication(did)
 
-            key.signJws(Json.encodeToString(payload).encodeToByteArray(), mapOf("typ" to "JWT", "kid" to authKeyId))
+            val payloadToSign = Json.encodeToString(payload).encodeToByteArray()
+            key.signJws(payloadToSign, mapOf("typ" to "JWT", "kid" to authKeyId))
         }
 
         //JwtService.getService().sign(payload, keyId)
@@ -149,7 +150,7 @@ class TestCredentialWallet(
 
         val credentialsPresented = matchedCredentials.map {
             if (selectedDisclosures?.containsKey(it.id) == true) {
-                it.document + "~${selectedDisclosures[it.id]!!.joinToString("~") }"
+                it.document + "~${selectedDisclosures[it.id]!!.joinToString("~")}"
             } else {
                 it.document
             }
@@ -273,6 +274,10 @@ class TestCredentialWallet(
     }
 
     override fun getSession(id: String) = sessionCache[id]
+    override fun getSessionByIdTokenRequestState(idTokenRequestState: String): VPresentationSession? {
+        TODO("Not yet implemented")
+    }
+
     override fun putSession(id: String, session: VPresentationSession) = sessionCache.put(id, session)
     override fun removeSession(id: String) = sessionCache.remove(id)
 
@@ -286,7 +291,7 @@ class TestCredentialWallet(
         expiresIn: Duration,
         selectedCredentials: Set<String>
     ): VPresentationSession {
-        return super.initializeAuthorization(authorizationRequest, expiresIn).copy(selectedCredentialIds = selectedCredentials).also {
+        return super.initializeAuthorization(authorizationRequest, expiresIn, null).copy(selectedCredentialIds = selectedCredentials).also {
             putSession(it.id, it)
         }
     }
@@ -303,9 +308,12 @@ class TestCredentialWallet(
             format = VCFormat.jwt_vp,  // jwt_vp_json
             path = "$",
             pathNested = DescriptorMapping(
-                id = getDescriptorId(type, session.presentationDefinition),//session.presentationDefinition?.inputDescriptors?.get(index)?.id,
-                format = VCFormat.jwt_vc_json,
-                path = "$.verifiableCredential[$index]",
+                id = getDescriptorId(
+                    type,
+                    session.presentationDefinition
+                ),//session.presentationDefinition?.inputDescriptors?.get(index)?.id,
+                format = VCFormat.jwt_vc_json, // jwt_vc_json
+                path = "$.verifiableCredential[$index]", //.vp.verifiableCredentials
             )
         )
     }
