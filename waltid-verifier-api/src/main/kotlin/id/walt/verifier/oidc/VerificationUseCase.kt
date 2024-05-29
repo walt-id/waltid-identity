@@ -8,7 +8,6 @@ import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeyType
 import id.walt.mdoc.COSECryptoProviderKeyInfo
-import id.walt.mdoc.SimpleCOSECryptoProvider
 import id.walt.oid4vc.data.ClientIdScheme
 import id.walt.oid4vc.data.OpenId4VPProfile
 import id.walt.oid4vc.data.ResponseMode
@@ -21,7 +20,6 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.http.*
-import kotlinx.datetime.Clock
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
@@ -32,8 +30,6 @@ import java.security.spec.PKCS8EncodedKeySpec
 import java.security.spec.X509EncodedKeySpec
 import java.util.*
 import kotlin.collections.set
-import kotlin.time.Duration
-import kotlin.time.Duration.Companion.days
 
 class VerificationUseCase(
     val http: HttpClient, cryptoProvider: JWTCryptoProvider
