@@ -53,3 +53,5 @@ secret*
 **/.nuxt
 **/.output
 **/node_modules
+
+.kotlin
