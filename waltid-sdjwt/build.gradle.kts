@@ -26,8 +26,8 @@ kotlin {
         }
     }
 
+    jvmToolchain(15) // 16 possible?
     jvm {
-        jvmToolchain(15) // 16 possible?
         withJava()
         testRuns["test"].executionTask.configure {
             useJUnitPlatform()
@@ -55,7 +55,7 @@ kotlin {
                     ).entries.firstOrNull { hasProgram(it.key) }
                     if (testEngine == null) println("No web test engine installed, please install chromium or firefox or chrome.")
                     else {
-                        println("Using web test engine: ${testEngine.key}")
+//                        println("Using web test engine: ${testEngine.key}")
                         testEngine.value.invoke()
                     }
                 }
@@ -117,9 +117,9 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                implementation("dev.whyoleg.cryptography:cryptography-random:0.3.0")
+                implementation("dev.whyoleg.cryptography:cryptography-random:0.3.1")
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
                 implementation("com.soywiz.korlibs.krypto:krypto:4.0.10")
             }
         }
@@ -130,7 +130,7 @@ kotlin {
         }
         val jvmMain by getting {
             dependencies {
-                implementation("com.nimbusds:nimbus-jose-jwt:9.37.3")
+                implementation("com.nimbusds:nimbus-jose-jwt:9.39.1")
             }
         }
         val jvmTest by getting {
