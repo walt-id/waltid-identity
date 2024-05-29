@@ -98,10 +98,10 @@ kotlin {
                 implementation("org.kotlincrypto.hash:sha2")
 
                 // Date
-                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.5.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.0")
 
                 // Coroutines
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
 
                 // Logging
                 implementation("io.github.oshai:kotlin-logging:6.0.9")
@@ -111,13 +111,13 @@ kotlin {
             dependencies {
                 implementation(kotlin("test-common"))
                 implementation(kotlin("test-annotations-common"))
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
             }
         }
         val jvmMain by getting {
             dependencies {
                 //implementation("dev.whyoleg.cryptography:cryptography-jdk:0.1.0")
-                implementation("com.google.crypto.tink:tink:1.12.0") // for JOSE using Ed25519
+                implementation("com.google.crypto.tink:tink:1.13.0") // for JOSE using Ed25519
 
                 implementation("org.bouncycastle:bcprov-lts8on:2.73.6") // for secp256k1 (which was removed with Java 17)
                 implementation("org.bouncycastle:bcpkix-lts8on:2.73.6") // PEM import
@@ -129,10 +129,10 @@ kotlin {
                 // implementation("org.slf4j:slf4j-simple:2.0.13")
 
                 // Coroutines
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:1.8.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:1.8.1")
 
                 // JOSE
-                implementation("com.nimbusds:nimbus-jose-jwt:9.37.3")
+                implementation("com.nimbusds:nimbus-jose-jwt:9.39.1")
 
                 // Multibase
 //                implementation("com.github.multiformats:java-multibase:v1.1.1")
