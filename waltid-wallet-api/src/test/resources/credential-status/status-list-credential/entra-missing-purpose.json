@@ -6,8 +6,8 @@
     ],
     "credentialSubject":
     {
-        "id": "did:key:z2dmzD81cgPx8Vki7JbuuMmFYrWPgYoytykUZ3eyqht1j9Kboj7g9PfXJxbbs4KYegyr7ELnFVnpDMzbJJDDNZjavX6jvtDmALMbXAGW67pdTgFea2FrGGSFs8Ejxi96oFLGHcL4P6bjLDPBJEvRRHSrG4LsPne52fczt2MWjHLLJBvhAC",
-        "type": "StatusList2021Entry",
-        "encodedList": "H4sIAAAAAAAAA+3BIQEAAAACIP1/2hkWoAEAAAAAAAAAAAAAAAAAAADeBjn7xTYAQAAA"
+        "id": "urn:uuid:cca8bd0a-83c2-4ae1-9f43-e99943cdfa5c",
+        "type": "RevocationList2021",
+        "encodedList": "H4sIAAAAAAAA/zMwNABDAKb12i0IAAAA"
     }
 }
