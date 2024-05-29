@@ -18,5 +18,5 @@ data class PresentationSession(
     val stateParamAuthorizeReqEbsi: String? = null,
     val customParameters: Map<String, Any>? = null,
     val ephemeralEncKey: Key? = null,
-    val openId4VPProfile: OpenId4VPProfile = OpenId4VPProfile.Default
+    val openId4VPProfile: OpenId4VPProfile = OpenId4VPProfile.DEFAULT
 ) : AuthorizationSession()

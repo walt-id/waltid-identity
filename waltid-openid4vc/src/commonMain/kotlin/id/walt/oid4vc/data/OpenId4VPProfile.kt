@@ -1,8 +1,9 @@
 package id.walt.oid4vc.data
 
 enum class OpenId4VPProfile {
-  Default,
-  ISO_18013_7_MDOC;
+  DEFAULT,
+  ISO_18013_7_MDOC,
+  EBSIV3;
 
   companion object {
     fun fromAuthorizeBaseURL(baseURL: String?): OpenId4VPProfile? {

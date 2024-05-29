@@ -48,9 +48,8 @@ abstract class OpenIDCredentialVerifier(val config: CredentialVerifierConfig) :
         sessionId: String? = null, // A calling party may provide a unique session Id
         ephemeralEncKey: Key? = null,
         clientIdScheme: ClientIdScheme = config.defaultClientIdScheme,
-        openId4VPProfile: OpenId4VPProfile = OpenId4VPProfile.Default,
+        openId4VPProfile: OpenId4VPProfile = OpenId4VPProfile.DEFAULT,
         stateParamAuthorizeReqEbsi: String? = null,
-        useEbsiCTv3: Boolean? = false
     ): PresentationSession {
         val session = PresentationSession(
             id = sessionId ?: ShortIdUtils.randomSessionId(),
@@ -70,50 +69,40 @@ abstract class OpenIDCredentialVerifier(val config: CredentialVerifierConfig) :
         val authReq = AuthorizationRequest(
             // here add VpToken if response type is null
             responseType = setOf(responseType!!),
-            clientId = when(clientIdScheme) {
-                ClientIdScheme.RedirectUri -> config.redirectUri
+            clientId = when(openId4VPProfile) {
+                OpenId4VPProfile.DEFAULT -> config.redirectUri
+                OpenId4VPProfile.ISO_18013_7_MDOC -> config.redirectUri
+                OpenId4VPProfile.EBSIV3 -> config.redirectUri.replace("/openid4vc/verify", "")
                 else -> config.clientIdMap[clientIdScheme] ?: config.defaultClientId
-            }.let{
-                when(useEbsiCTv3) {
-                    true -> it.replace(it, config.defaultClientId.replace("/openid4vc/verify", ""))
-                    else -> it
-                }
             },
             responseMode = responseMode,
-            redirectUri = when (responseMode) {
-                ResponseMode.query, ResponseMode.fragment, ResponseMode.form_post -> prepareResponseOrRedirectUri(
-                    session.id,
-                    responseMode
-                )
-                else -> null
-            }.let{
-                when(useEbsiCTv3) {
-                    true -> when (responseMode) {
-                        ResponseMode.direct_post -> prepareResponseOrRedirectUri(session.id, responseMode)
-                        else -> null
-                    }
-                    else -> it
-                }
-            },
-            responseUri = when (responseMode) {
-                ResponseMode.direct_post, ResponseMode.direct_post_jwt -> prepareResponseOrRedirectUri(session.id, responseMode)
-                else -> null
-            }.let{
-                when(useEbsiCTv3) {
-                    true -> null
-                    else -> it
-                }
-            },
-            presentationDefinitionUri = presentationDefinitionUri,
-            presentationDefinition = when (presentationDefinitionUri) {
-                null -> presentationDefinition
-                else -> when (useEbsiCTv3) { // some wallets support presentation_definition only, even ebsiconformancetest wallet
-                    true -> presentationDefinition
+            redirectUri = when(openId4VPProfile) {
+                OpenId4VPProfile.EBSIV3 -> prepareResponseOrRedirectUri(session.id, responseMode)
+                else -> when (responseMode) {
+                    ResponseMode.query, ResponseMode.fragment, ResponseMode.form_post -> prepareResponseOrRedirectUri(
+                        session.id,
+                        responseMode
+                    )
                     else -> null
                 }
             },
-            scope = when (useEbsiCTv3) {
-                true -> setOf("openid")
+            responseUri = when(openId4VPProfile) {
+                OpenId4VPProfile.EBSIV3 -> null
+                else -> when (responseMode) {
+                    ResponseMode.direct_post, ResponseMode.direct_post_jwt -> prepareResponseOrRedirectUri(session.id, responseMode)
+                    else -> null
+                }
+            },
+            presentationDefinitionUri = presentationDefinitionUri,
+            presentationDefinition =  when(openId4VPProfile) {
+                OpenId4VPProfile.EBSIV3 -> presentationDefinition // some wallets support presentation_definition only, even ebsiconformancetest wallet
+                else -> when (presentationDefinitionUri) {
+                    null -> presentationDefinition
+                    else -> null
+                }
+            },
+            scope =  when(openId4VPProfile) {
+                OpenId4VPProfile.EBSIV3 -> setOf("openid")
                 else -> scope
             },
             state = session.id,
