@@ -48,7 +48,7 @@ kotlin {
 }
 java {
     sourceCompatibility = targetVersion
-    targetCompatibility = targetVersion
+    targetCompatibility = toolingRuntime
 }
 
 allprojects {
