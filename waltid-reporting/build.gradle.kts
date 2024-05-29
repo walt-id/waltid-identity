@@ -62,19 +62,19 @@ kotlin {
                 implementation("it.justwrote:kjob-kron:0.2.0")*/
 
                 // Coroutines
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
 
                 // datetime
-                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.5.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.0")
 
                 // Logging
-                implementation("io.github.oshai:kotlin-logging:6.0.4")
+                implementation("io.github.oshai:kotlin-logging:6.0.9")
             }
         }
         val commonTest by getting {
             dependencies {
                 implementation(kotlin("test"))
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
                 implementation("org.junit.jupiter:junit-jupiter-api:5.10.2")
             }
         }
@@ -87,7 +87,7 @@ kotlin {
                 implementation("org.slf4j:slf4j-simple:2.0.13")
 
                 // JOSE
-                implementation("com.nimbusds:nimbus-jose-jwt:9.37.3")
+                implementation("com.nimbusds:nimbus-jose-jwt:9.39.1")
             }
         }
         val jvmTest by getting {
