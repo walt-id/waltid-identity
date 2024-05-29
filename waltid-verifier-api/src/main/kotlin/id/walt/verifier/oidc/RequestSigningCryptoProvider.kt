@@ -21,11 +21,20 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.uuid.UUID
 import kotlinx.uuid.generateUUID
 import java.io.FileReader
+import java.io.File
 
 object RequestSigningCryptoProvider: JWTCryptoProvider {
-  val signingKey: ECKey = ConfigManager.getConfig<OIDCVerifierServiceConfig>().requestSigningKeyFile?.let { runBlocking { ECKey.parseFromPEMEncodedObjects(FileReader(it).readText()).toECKey() } }
+    val signingKey: ECKey = ConfigManager.getConfig<OIDCVerifierServiceConfig>().requestSigningKeyFile?.let {
+      runBlocking {
+        if (File(it).exists())
+          ECKey.parseFromPEMEncodedObjects(FileReader(it).readText()).toECKey()
+        else
+          null
+      }
+    }
     ?: ECKeyGenerator(Curve.P_256).keyUse(KeyUse.SIGNATURE).keyID(UUID.generateUUID().toString()).generate()
-  val certificateChain: String? = ConfigManager.getConfig<OIDCVerifierServiceConfig>().requestSigningCertFile?.let { FileReader(it).readText() }
+
+  val certificateChain: String? = ConfigManager.getConfig<OIDCVerifierServiceConfig>().requestSigningCertFile?.let{ runBlocking { if (File(it).exists()) FileReader(it).readText() else null } }
 
   override fun sign(payload: JsonObject, keyID: String?, typ: String): String {
     return SignedJWT(

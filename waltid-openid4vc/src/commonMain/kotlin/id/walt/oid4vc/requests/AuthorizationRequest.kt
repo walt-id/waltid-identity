@@ -9,7 +9,10 @@ import id.walt.sdjwt.SDPayload
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
+import kotlinx.datetime.Clock
 import kotlinx.serialization.json.*
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.days
 
 interface IAuthorizationRequest {
     val responseType: Set<ResponseType>
@@ -149,7 +152,24 @@ data class AuthorizationRequest(
     }
 
     fun toRequestObject(cryptoProvider: JWTCryptoProvider, keyId: String): String {
-        return cryptoProvider.sign(toJSON(), keyId)
+        return cryptoProvider.sign(toJSON().addUpdateJsoObject(
+            buildJsonObject {
+                put("iss", clientId)
+                put("aud", "")
+                put("exp", (Clock.System.now() + Duration.parse(1.days.toString())).epochSeconds)
+            }
+        ), keyId)
+    }
+
+    fun JsonObject.addUpdateJsoObject(updateJsonObject: JsonObject): JsonObject {
+        return JsonObject(
+            toMutableMap()
+                .apply {
+                    updateJsonObject.forEach { (key, je) ->
+                        put(key, je)
+                    }
+                }
+        )
     }
 
     fun toRequestObjectHttpParameters(requestObjectJWT: String): Map<String, List<String>> {
