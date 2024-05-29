@@ -70,7 +70,7 @@ kotlin {
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
 
                 // Coroutines
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
 
                 // Crypto
                 implementation(project.dependencies.platform("org.kotlincrypto.hash:bom:0.5.1"))
@@ -87,19 +87,19 @@ kotlin {
             dependencies {
                 implementation(kotlin("test-common"))
                 implementation(kotlin("test-annotations-common"))
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
             }
         }
         val jvmMain by getting {
             dependencies {
                 // Coroutines
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:1.8.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:1.8.1")
 
                 // OCI
-                implementation("com.oracle.oci.sdk:oci-java-sdk-shaded-full:3.41.0")
+                implementation("com.oracle.oci.sdk:oci-java-sdk-shaded-full:3.42.0")
 
                 // JOSE
-                implementation("com.nimbusds:nimbus-jose-jwt:9.37.3")
+                implementation("com.nimbusds:nimbus-jose-jwt:9.39.1")
 
                 // walt.id
                 api(project(":waltid-crypto"))
