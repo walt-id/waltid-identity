@@ -7,16 +7,21 @@ plugins {
     application
 }
 
-group = "id.walt.cli"
+group = "id.walt"
 
 repositories {
     mavenCentral()
+    maven("https://maven.waltid.dev/releases") {
+        content {
+            includeGroup("id.walt")
+        }
+    }
     maven("https://jitpack.io")
 }
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_15
-    targetCompatibility = JavaVersion.VERSION_15
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
 }
 
 kotlin {
@@ -34,7 +39,7 @@ kotlin {
 
     jvm {
         compilations.all {
-            kotlinOptions.jvmTarget = "15" // JVM got Ed25519 at version 15
+            kotlinOptions.jvmTarget = "17" // JVM got Ed25519 at version 15
         }
         withJava()
         tasks.withType<Test>().configureEach {
