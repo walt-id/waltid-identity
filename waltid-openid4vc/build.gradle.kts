@@ -72,7 +72,7 @@ kotlin {
 //        isMingwX64 -> mingwX64("native")
 //        else -> throw GradleException("Host OS is not supported in Kotlin/Native.")
 //    }
-    val ktor_version = "2.3.10"
+    val ktor_version = "2.3.11"
     val HOPLITE_VERSION = "2.8.0.RC3"
 
     sourceSets {
@@ -94,6 +94,7 @@ kotlin {
                 implementation(project(":waltid-crypto"))
                 implementation(project(":waltid-mdoc-credentials"))
                 implementation(project(":waltid-did"))
+                implementation(project(":waltid-sdjwt"))
 
                 // -- Multiplatform --
                 // Multiplatform / UUID
@@ -113,13 +114,13 @@ kotlin {
                 implementation(project(":waltid-crypto"))
                 implementation(project(":waltid-did"))
                 implementation(project(":waltid-verifiable-credentials"))
-                implementation("io.kotest:kotest-assertions-core:5.8.0")
-                implementation("io.kotest:kotest-assertions-json:5.8.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.0")
             }
         }
         val jvmMain by getting {
             dependencies {
-                implementation("io.ktor:ktor-client-cio:$ktor_version")
+                implementation("com.nfeld.jsonpathkt:jsonpathkt:2.0.1")
+                implementation("io.ktor:ktor-client-okhttp:$ktor_version")
             }
         }
         val jvmTest by getting {
@@ -129,6 +130,7 @@ kotlin {
                 implementation("io.kotest:kotest-runner-junit5:5.8.0")
                 implementation("io.kotest:kotest-assertions-core:5.8.0")
                 implementation("io.kotest:kotest-assertions-json:5.8.0")
+                implementation("org.junit.jupiter:junit-jupiter-params:5.10.2")
                 implementation("com.google.crypto.tink:tink:1.12.0") // for JOSE using Ed25519
                 // Multibase
                 // implementation("com.github.multiformats:java-multibase:v1.1.1")
@@ -138,7 +140,7 @@ kotlin {
                 //    exclude(module = "waltid-sd-jwt-jvm")
                 //}
                 implementation("org.bouncycastle:bcprov-lts8on:2.73.6") // for secp256k1 (which was removed with Java 17)
-                implementation("org.bouncycastle:bcpkix-lts8on:2.73.4") // PEM import
+                implementation("org.bouncycastle:bcpkix-lts8on:2.73.6") // PEM import
                 implementation("io.github.oshai:kotlin-logging-jvm:6.0.9")
 
                 implementation("io.ktor:ktor-server-core-jvm:$ktor_version")
@@ -154,6 +156,9 @@ kotlin {
                 implementation("io.ktor:ktor-client-logging-jvm:$ktor_version")
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-slf4j:1.8.0")
                 implementation("io.ktor:ktor-client-okhttp:$ktor_version")
+
+                implementation("com.augustcellars.cose:cose-java:1.1.0")
+                implementation("com.soywiz.korlibs.krypto:krypto:4.0.10")
 
             }
         }
@@ -182,7 +187,9 @@ kotlin {
             val hasMavenAuth = secretMavenUsername.isNotEmpty() && secretMavenPassword.isNotEmpty()
             if (hasMavenAuth) {
                 maven {
-                    url = uri("https://maven.waltid.dev/releases")
+                    val releasesRepoUrl = uri("https://maven.waltid.dev/releases")
+                    val snapshotsRepoUrl = uri("https://maven.waltid.dev/snapshots")
+                    url = uri(if (version.toString().endsWith("SNAPSHOT")) snapshotsRepoUrl else releasesRepoUrl)
                     credentials {
                         username = secretMavenUsername
                         password = secretMavenPassword
