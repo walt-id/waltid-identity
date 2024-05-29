@@ -67,7 +67,7 @@ dependencies {
     implementation("io.ktor:ktor-server-method-override:$ktor_version")
 
     // Ktor server external libs
-    implementation("io.github.smiley4:ktor-swagger-ui:2.8.0")
+    implementation("io.github.smiley4:ktor-swagger-ui:2.10.0")
     //implementation("io.github.microutils:kotlin-logging-jvm:2.1.23")
 
     // Ktor client
