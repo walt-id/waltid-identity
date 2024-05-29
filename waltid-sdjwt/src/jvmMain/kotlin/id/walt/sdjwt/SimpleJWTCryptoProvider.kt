@@ -16,7 +16,7 @@ class SimpleJWTCryptoProvider(
             throw Exception("No signer available")
         }
         return SignedJWT(
-            JWSHeader.Builder(jwsAlgorithm).type(JOSEObjectType.JWT).keyID(keyID).customParams(headers).build(),
+            JWSHeader.Builder(jwsAlgorithm).type(JOSEObjectType(typ)).keyID(keyID).customParams(headers).build(),
             JWTClaimsSet.parse(payload.toString())
         ).also {
             it.sign(jwsSigner)
