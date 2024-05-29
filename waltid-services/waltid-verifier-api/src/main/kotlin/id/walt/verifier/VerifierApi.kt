@@ -21,6 +21,9 @@ import id.walt.oid4vc.data.OpenId4VPProfile
 import id.walt.oid4vc.data.ResponseMode
 import id.walt.oid4vc.data.ResponseType
 import id.walt.oid4vc.data.dif.*
+import id.walt.sdjwt.SDJwtVC
+import id.walt.sdjwt.SDMapBuilder
+import id.walt.sdjwt.SDPayload
 import id.walt.sdjwt.SimpleJWTCryptoProvider
 import id.walt.verifier.config.OIDCVerifierServiceConfig
 import id.walt.verifier.oidc.LspPotentialInteropEvent
@@ -463,7 +466,7 @@ fun Application.verfierApi() {
                 tags = listOf("LSP POTENTIAL Interop Event")
                 summary = "Issue MDL for given device key, using internal issuer keys"
                 description = "Give device public key JWK in form body."
-                hidden = true
+                hidden = false
                 request {
                     body<LSPPotentialIssueFormDataParam> {
                         mediaTypes = listOf(ContentType.Application.FormUrlEncoded)
@@ -494,6 +497,39 @@ fun Application.verfierApi() {
                 println("SIGNED MDOC (mDL):")
                 println(Cbor.encodeToHexString(mdoc))
                 call.respond(mdoc.toCBORHex())
+            }
+            post("issueSdJwtVC", {
+                tags = listOf("LSP POTENTIAL Interop Event")
+                summary = "Issue SD-JWT-VC for given holder key, using internal issuer keys"
+                description = "Give holder public key JWK in form body."
+                hidden = false
+                request {
+                    body<LSPPotentialIssueFormDataParam> {
+                        mediaType(ContentType.Application.FormUrlEncoded)
+                        example("jwk", LSPPotentialIssueFormDataParam(
+                            Json.parseToJsonElement(ECKeyGenerator(Curve.P_256).generate().toPublicJWK().toString().also {
+                                println(it)
+                            }).jsonObject
+                        ))
+                    }
+                }
+            }) {
+                val holderJwk = context.request.call.receiveParameters().toMap().get("jwk")!!.first()
+
+                val sdJwtVc = SDJwtVC.sign(
+                    SDPayload.Companion.createSDPayload(buildJsonObject {
+                        put("family_name", "Doe")
+                        put("given_name", "John")
+                        put("birthdate", "1940-01-01")
+                    }, SDMapBuilder().addField("family_name", true).addField("given_name", true).addField("birthdate", true).build()),
+                    LspPotentialInteropEvent.POTENTIAL_JWT_CRYPTO_PROVIDER, LspPotentialInteropEvent.POTENTIAL_ISSUER_KEY_ID,
+                    Json.parseToJsonElement(holderJwk).jsonObject, LspPotentialInteropEvent.POTENTIAL_ISSUER_KEY_ID,
+                    vct = "https://credentials.example.com/identity_credential"
+                )
+
+                println("SIGNED SD-JWT-VC:")
+                println(sdJwtVc.toString(false))
+                call.respond(sdJwtVc.toString(false))
             }
         }
     }
