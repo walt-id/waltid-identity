@@ -82,7 +82,7 @@ kotlin {
 
                 // Ktor client
                 implementation("io.ktor:ktor-client-core:2.3.10")
-                implementation("io.ktor:ktor-client-serialization:2.3.8")
+                implementation("io.ktor:ktor-client-serialization:2.3.11")
                 implementation("io.ktor:ktor-client-content-negotiation:2.3.10")
                 implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.10")
                 implementation("io.ktor:ktor-client-json:2.3.10")
@@ -92,20 +92,20 @@ kotlin {
                 implementation("org.kotlincrypto.hash:sha2")
 
                 // Date
-                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.5.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.0")
 
                 // Coroutines
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
 
                 // Logging
-                implementation("io.github.oshai:kotlin-logging:6.0.4")
+                implementation("io.github.oshai:kotlin-logging:6.0.9")
             }
         }
         val commonTest by getting {
             dependencies {
                 implementation(kotlin("test-common"))
                 implementation(kotlin("test-annotations-common"))
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
             }
         }*/
 
@@ -134,46 +134,6 @@ kotlin {
                 implementation("org.junit.jupiter:junit-jupiter-params:5.10.1")
             }
         }
-
-        /*val jvmMain by getting {
-            dependencies {
-                //implementation("dev.whyoleg.cryptography:cryptography-jdk:0.1.0")
-                implementation("com.google.crypto.tink:tink:1.12.0") // for JOSE using Ed25519
-
-                implementation("org.bouncycastle:bcprov-lts8on:2.73.6") // for secp256k1 (which was removed with Java 17)
-                implementation("org.bouncycastle:bcpkix-lts8on:2.73.6") // PEM import
-
-                // Ktor client
-                implementation("io.ktor:ktor-client-cio:2.3.10")
-
-                // Logging
-                implementation("org.slf4j:slf4j-simple:2.0.13")
-
-                // Coroutines
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:1.8.0")
-
-                // JOSE
-                implementation("com.nimbusds:nimbus-jose-jwt:9.37.3")
-
-                // Multibase
-//                implementation("com.github.multiformats:java-multibase:v1.1.1")
-
-                implementation("com.oracle.oci.sdk:oci-java-sdk-shaded-full:3.41.0")
-            }
-        }
-        val jvmTest by getting {
-            dependencies {
-                // Logging
-//                implementation("org.slf4j:slf4j-simple:2.0.13")
-
-                // Test
-                implementation(kotlin("test"))
-
-                implementation("org.junit.jupiter:junit-jupiter-api:5.10.2")
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
-                implementation("org.junit.jupiter:junit-jupiter-params:5.10.2")
-            }
-        }*/
         publishing {
             repositories {
                 maven {
