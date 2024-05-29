@@ -73,7 +73,7 @@ kotlin {
             dependencies {
                 // JSON
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
-                implementation("io.github.optimumcode:json-schema-validator:0.0.8")
+                implementation("io.github.optimumcode:json-schema-validator:0.0.15")
 
                 // Ktor client
                 implementation("io.ktor:ktor-client-core:$ktor_version")
@@ -84,14 +84,14 @@ kotlin {
                 implementation("io.ktor:ktor-client-logging:$ktor_version")
 
                 // Coroutines
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
 
                 // Kotlinx
-                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.5.0")
-                implementation("app.softwork:kotlinx-uuid-core:0.0.22")
+                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.0")
+                implementation("app.softwork:kotlinx-uuid-core:0.0.25")
 
                 // Loggin
-                implementation("io.github.oshai:kotlin-logging:6.0.4")
+                implementation("io.github.oshai:kotlin-logging:6.0.9")
 
                 // walt.id
                 api(project(":waltid-crypto"))
@@ -102,7 +102,7 @@ kotlin {
         val commonTest by getting {
             dependencies {
                 implementation(kotlin("test"))
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
             }
         }
         val jvmMain by getting {
