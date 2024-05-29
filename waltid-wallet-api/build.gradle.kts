@@ -136,7 +136,7 @@ dependencies {
     implementation("org.xerial:sqlite-jdbc:3.44.1.0")
     implementation("org.postgresql:postgresql:42.7.2")
     implementation("mysql:mysql-connector-java:8.0.33")
-    implementation("com.microsoft.sqlserver:mssql-jdbc:9.4.1.jre8")
+    implementation("com.microsoft.sqlserver:mssql-jdbc:12.7.0.jre8-preview")
     // migration
     //implementation("org.flywaydb:flyway-core:9.22.2")
 
