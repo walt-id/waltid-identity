@@ -29,9 +29,9 @@ kotlin {
     }
 
     jvm {
-        compilations.all {
-            kotlinOptions.jvmTarget = "15" // JVM got Ed25519 at version 15
-        }
+//        compilations.all {
+//            kotlinOptions.jvmTarget = "15" // JVM got Ed25519 at version 15
+//        }
         withJava()
         tasks.withType<Test>().configureEach {
             useJUnitPlatform()
