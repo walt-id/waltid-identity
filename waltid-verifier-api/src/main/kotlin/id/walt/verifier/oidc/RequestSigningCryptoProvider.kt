@@ -27,7 +27,10 @@ object RequestSigningCryptoProvider: JWTCryptoProvider {
     val signingKey: ECKey = ConfigManager.getConfig<OIDCVerifierServiceConfig>().requestSigningKeyFile?.let {
       runBlocking {
         if (File(it).exists())
-          ECKey.parseFromPEMEncodedObjects(FileReader(it).readText()).toECKey()
+          ECKey.Builder(Curve.P_256, (ECKey.parseFromPEMEncodedObjects(FileReader(it).readText()).toECKey().toECPublicKey()))
+          .privateKey(ECKey.parseFromPEMEncodedObjects(FileReader(it).readText()).toECKey().toECPrivateKey())
+          .keyID(UUID.generateUUID().toString())
+          .build()
         else
           null
       }
