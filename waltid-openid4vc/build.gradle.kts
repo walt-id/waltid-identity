@@ -44,8 +44,8 @@ kotlin {
         }
     }
 
+    jvmToolchain(toolingRuntime.majorVersion.toInt())
     jvm {
-        jvmToolchain(toolingRuntime.majorVersion.toInt())
         withJava()
         testRuns["test"].executionTask.configure {
             useJUnitPlatform()
@@ -79,13 +79,14 @@ kotlin {
         val commonMain by getting {
             dependencies {
                 // Coroutines
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
 
                 // HTTP
                 implementation("io.ktor:ktor-client-core:$ktor_version")
                 implementation("io.ktor:ktor-client-content-negotiation:$ktor_version")
                 implementation("io.ktor:ktor-serialization-kotlinx-json:$ktor_version")
 
+                implementation("io.github.oshai:kotlin-logging:6.0.9")
 
                 // JSON
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
@@ -98,13 +99,13 @@ kotlin {
 
                 // -- Multiplatform --
                 // Multiplatform / UUID
-                implementation("app.softwork:kotlinx-uuid-core:0.0.22")
+                implementation("app.softwork:kotlinx-uuid-core:0.0.25")
 
                 // Multiplatform / Date & time
-                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.5.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.0")
 
                 // Multiplatform / Hashes
-                implementation(project.dependencies.platform("org.kotlincrypto.hash:bom:0.4.0"))
+                implementation(project.dependencies.platform("org.kotlincrypto.hash:bom:0.5.1"))
                 implementation("org.kotlincrypto.hash:sha2")
             }
         }
@@ -114,7 +115,7 @@ kotlin {
                 implementation(project(":waltid-crypto"))
                 implementation(project(":waltid-did"))
                 implementation(project(":waltid-verifiable-credentials"))
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
             }
         }
         val jvmMain by getting {
@@ -126,12 +127,12 @@ kotlin {
         val jvmTest by getting {
             dependencies {
                 //implementation("io.mockk:mockk:1.13.2")
-                implementation("com.nimbusds:nimbus-jose-jwt:9.37.3")
-                implementation("io.kotest:kotest-runner-junit5:5.8.0")
-                implementation("io.kotest:kotest-assertions-core:5.8.0")
-                implementation("io.kotest:kotest-assertions-json:5.8.0")
+                implementation("com.nimbusds:nimbus-jose-jwt:9.39.1")
+                implementation("io.kotest:kotest-runner-junit5:5.9.0")
+                implementation("io.kotest:kotest-assertions-core:5.9.0")
+                implementation("io.kotest:kotest-assertions-json:5.9.0")
                 implementation("org.junit.jupiter:junit-jupiter-params:5.10.2")
-                implementation("com.google.crypto.tink:tink:1.12.0") // for JOSE using Ed25519
+                implementation("com.google.crypto.tink:tink:1.13.0") // for JOSE using Ed25519
                 // Multibase
                 // implementation("com.github.multiformats:java-multibase:v1.1.1")
                 // TODO: current version implementation("id.walt:waltid-ssikit:1.2311131043.0")
@@ -141,7 +142,6 @@ kotlin {
                 //}
                 implementation("org.bouncycastle:bcprov-lts8on:2.73.6") // for secp256k1 (which was removed with Java 17)
                 implementation("org.bouncycastle:bcpkix-lts8on:2.73.6") // PEM import
-                implementation("io.github.oshai:kotlin-logging-jvm:6.0.9")
 
                 implementation("io.ktor:ktor-server-core-jvm:$ktor_version")
                 implementation("io.ktor:ktor-server-netty-jvm:$ktor_version")
@@ -154,7 +154,7 @@ kotlin {
                 implementation("io.ktor:ktor-client-content-negotiation:$ktor_version")
                 implementation("io.ktor:ktor-serialization-kotlinx-json:$ktor_version")
                 implementation("io.ktor:ktor-client-logging-jvm:$ktor_version")
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-slf4j:1.8.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-slf4j:1.8.1")
                 implementation("io.ktor:ktor-client-okhttp:$ktor_version")
 
                 implementation("com.augustcellars.cose:cose-java:1.1.0")
