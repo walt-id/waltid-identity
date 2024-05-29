@@ -51,7 +51,7 @@ kotlin {
                 api(project(":waltid-sdjwt"))
                 api(project(":waltid-openid4vc"))
 
-                implementation("org.jetbrains.kotlinx:kotlinx-io-core:0.3.3")
+//                implementation("org.jetbrains.kotlinx:kotlinx-io-core:0.3.5")
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.0-RC.2")
                 implementation ("com.google.code.gson:gson:2.10.1")
@@ -59,19 +59,19 @@ kotlin {
                 // CLI
                 implementation("com.varabyte.kotter:kotter-jvm:1.1.2")
                 implementation("com.github.ajalt.mordant:mordant:2.6.0")
-                implementation("com.github.ajalt.clikt:clikt:4.2.2")
+                implementation("com.github.ajalt.clikt:clikt:4.4.0")
 
                 // Coroutines
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
 
                 // Logging
-                implementation("io.github.oshai:kotlin-logging:6.0.4")
+                implementation("io.github.oshai:kotlin-logging:6.0.9")
             }
         }
         val commonTest by getting {
             dependencies {
                 implementation(kotlin("test"))
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
             }
         }
         val jvmMain by getting {
@@ -80,7 +80,7 @@ kotlin {
                 implementation("org.slf4j:slf4j-simple:2.0.13")
 
                 // JOSE
-                implementation("com.nimbusds:nimbus-jose-jwt:9.37.3")
+                implementation("com.nimbusds:nimbus-jose-jwt:9.39.1")
 
                 // BouncyCastle for PEM import
                 implementation("org.bouncycastle:bcpkix-lts8on:2.73.6")
