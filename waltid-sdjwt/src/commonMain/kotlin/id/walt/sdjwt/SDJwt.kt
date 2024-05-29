@@ -143,8 +143,8 @@ open class SDJwt internal constructor(
      * Verify the SD-JWT by checking the signature, using the given JWT crypto provider, and matching the disclosures against the digests in the JWT payload
      * @param jwtCryptoProvider JWT crypto provider, that implements standard JWT token verification on the target platform
      */
-    fun verify(jwtCryptoProvider: JWTCryptoProvider): VerificationResult<SDJwt> {
-        return jwtCryptoProvider.verify(jwt).let {
+    fun verify(jwtCryptoProvider: JWTCryptoProvider, keyID: String? = null): VerificationResult<SDJwt> {
+        return jwtCryptoProvider.verify(jwt, keyID).let {
             VerificationResult(
                 sdJwt = this,
                 signatureVerified = it.verified,
@@ -192,7 +192,8 @@ open class SDJwt internal constructor(
                     matchedGroups["body"]!!.value,
                     disclosures
                 ),
-                matchedGroups["kbjwt"]?.value?.let { KeyBindingJwt.parse(it) }
+                matchedGroups["kbjwt"]?.value?.let { KeyBindingJwt.parse(it) },
+                matchedGroups["kbjwt"] != null || sdJwt.endsWith("~")
             )
         }
 
@@ -221,7 +222,8 @@ open class SDJwt internal constructor(
                 jwt = sdJwt.jwt,
                 header = sdJwt.header,
                 sdPayload = sdPayload,
-                keyBindingJwt = withKBJwt
+                keyBindingJwt = withKBJwt,
+                sdJwt.isPresentation || withKBJwt != null
             )
         }
 

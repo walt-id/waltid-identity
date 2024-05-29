@@ -401,7 +401,7 @@ fun Application.verfierApi() {
                     }, SDMapBuilder().addField("family_name", true).addField("given_name", true).addField("birthdate", true).build()),
                     LspPotentialInteropEvent.POTENTIAL_JWT_CRYPTO_PROVIDER, LspPotentialInteropEvent.POTENTIAL_ISSUER_KEY_ID,
                     Json.parseToJsonElement(holderJwk).jsonObject, LspPotentialInteropEvent.POTENTIAL_ISSUER_KEY_ID,
-                    vct = "https://credentials.example.com/identity_credential"
+                    vct = "urn:eu.europa.ec.eudi:pid:1"
                 )
 
                 println("SIGNED SD-JWT-VC:")

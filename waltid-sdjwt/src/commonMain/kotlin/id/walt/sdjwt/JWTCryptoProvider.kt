@@ -24,5 +24,5 @@ interface JWTCryptoProvider {
      * Interface method for verifying a JWT signature
      * @param jwt A signed JWT token to be verified
      */
-    fun verify(jwt: String): JwtVerificationResult
+    fun verify(jwt: String, keyID: String? = null): JwtVerificationResult
 }

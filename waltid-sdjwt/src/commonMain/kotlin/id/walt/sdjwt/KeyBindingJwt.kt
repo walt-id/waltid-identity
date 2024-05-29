@@ -21,10 +21,10 @@ class KeyBindingJwt(jwt: String, header: JsonObject, payload: SDPayload): SDJwt(
     get() = fullPayload["sd_hash"]!!.jsonPrimitive.content
 
   // TODO: make use of Key interface from waltid-crypto lib instead or also?
-  fun verifyKB(jwtCryptoProvider: JWTCryptoProvider, reqAudience: String, reqNonce: String, sdJwt: SDJwt): Boolean {
+  fun verifyKB(jwtCryptoProvider: JWTCryptoProvider, reqAudience: String, reqNonce: String, sdJwt: SDJwt, keyId: String? = null): Boolean {
     return type == KB_JWT_TYPE && audience == reqAudience && nonce == reqNonce && sdJwt.isPresentation &&
         getSdHash(sdJwt.toString(formatForPresentation = true, withKBJwt = false)) == sdHash &&
-        verify(jwtCryptoProvider).verified
+        verify(jwtCryptoProvider, keyId).verified
   }
 
   companion object {
