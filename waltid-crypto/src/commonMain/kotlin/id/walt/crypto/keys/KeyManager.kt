@@ -1,7 +1,6 @@
 package id.walt.crypto.keys
 
 import id.walt.crypto.keys.jwk.JWKKey
-import id.walt.crypto.keys.oci.OCIKey
 import id.walt.crypto.keys.oci.OCIKeyRestApi
 import id.walt.crypto.keys.tse.TSEKey
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -12,8 +11,11 @@ import kotlin.reflect.typeOf
 
 object KeyManager {
     private val log = KotlinLogging.logger { }
-    private val types = HashMap<String, KType>()
-    private val keyTypeGeneration = HashMap<String, suspend (KeyGenerationRequest) -> Key>()
+
+    fun keyManagerLogger() = log
+
+    val types = HashMap<String, KType>()
+    val keyTypeGeneration = HashMap<String, suspend (KeyGenerationRequest) -> Key>()
 
     fun getRegisteredKeyType(type: String): KType = types[type] ?: error("Unknown key type: $type")
 
@@ -31,16 +33,10 @@ object KeyManager {
                 Json.decodeFromJsonElement(generateRequest.config!!)
             )
         }
-
-        register <OCIKey>("oci") { generateRequest: KeyGenerationRequest ->
-            OCIKey.generateKey(
-                Json.decodeFromJsonElement(generateRequest.config!!)
-            )
-        }
     }
 
-    private inline fun <reified T : Key> register(typeId: String, noinline createFunction: suspend (KeyGenerationRequest) -> T) {
-        log.trace { "Registering key type \"$typeId\" to ${T::class.simpleName}..." }
+    inline fun <reified T : Key> register(typeId: String, noinline createFunction: suspend (KeyGenerationRequest) -> T) {
+        keyManagerLogger().trace { "Registering key type \"$typeId\" to ${T::class.simpleName}..." }
         val type = typeOf<T>()
         types[typeId] = type
         keyTypeGeneration[typeId] = createFunction

@@ -1,5 +1,8 @@
 package id.walt.webwallet.config
 
+import kotlinx.serialization.Serializable
+
+@Serializable
 data class OidcConfiguration(
     val enableOidcLogin: Boolean,
     val providerName: String,
@@ -14,11 +17,13 @@ data class OidcConfiguration(
     val clientSecret: String,
     val keycloakUserApi: String
 ) : WalletConfig {
+    @Serializable
     data class OidcJwksCacheConfiguration(
         val cacheSize: Int,
         val cacheExpirationHours: Int,
         val rateLimit: JwksRateLimit
     ) {
+        @Serializable
         data class JwksRateLimit(val bucketSize: Int, val refillRateMinutes: Int)
     }
 }

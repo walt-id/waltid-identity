@@ -46,7 +46,7 @@ dependencies {
 
     /* -- KTOR -- */
 
-    val ktor_version = "2.3.10"
+    val ktor_version = "2.3.11"
     // Ktor server
     implementation("io.ktor:ktor-server-core-jvm:$ktor_version")
     implementation("io.ktor:ktor-server-auth-jvm:$ktor_version")
@@ -75,7 +75,7 @@ dependencies {
     implementation("io.ktor:ktor-client-serialization-jvm:$ktor_version")
     implementation("io.ktor:ktor-client-content-negotiation:$ktor_version")
     implementation("io.ktor:ktor-client-json-jvm:$ktor_version")
-    implementation("io.ktor:ktor-client-cio-jvm:$ktor_version")
+    implementation("io.ktor:ktor-client-okhttp-jvm:$ktor_version")
     implementation("io.ktor:ktor-client-logging-jvm:$ktor_version")
 
     /* -- Kotlin -- */
@@ -106,6 +106,7 @@ dependencies {
     implementation(project(":waltid-sdjwt"))
 
     implementation(project(":waltid-crypto"))
+    implementation(project(":waltid-crypto-oci"))
     implementation(project(":waltid-did"))
 
     testImplementation(project(":waltid-issuer-api"))
@@ -129,7 +130,7 @@ dependencies {
     implementation("org.jetbrains.exposed:exposed-core:0.49.0")
     implementation("org.jetbrains.exposed:exposed-jdbc:0.47.0")
     implementation("org.jetbrains.exposed:exposed-dao:0.49.0")
-    implementation("org.jetbrains.exposed:exposed-java-time:0.48.0")
+    implementation("org.jetbrains.exposed:exposed-java-time:0.50.1")
     implementation("org.jetbrains.exposed:exposed-json:0.50.1")
     // drivers
     implementation("org.xerial:sqlite-jdbc:3.44.1.0")
@@ -153,7 +154,7 @@ dependencies {
     // Logging
     implementation("io.github.oshai:kotlin-logging-jvm:6.0.9")
     implementation("org.slf4j:slf4j-simple:2.0.13")
-    implementation("org.slf4j:jul-to-slf4j:2.0.12")
+    implementation("org.slf4j:jul-to-slf4j:2.0.13")
 
     // Test
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit:1.9.23")
