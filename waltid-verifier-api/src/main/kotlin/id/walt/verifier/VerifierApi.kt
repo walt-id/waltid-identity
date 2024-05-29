@@ -406,15 +406,15 @@ fun Application.verfierApi() {
 
         get("/jwks", {tags= listOf("Ebsi") }) {
             val jwks = buildJsonObject {
-//                put("keys", buildJsonArray {
-//                    val jwkWithKid = buildJsonObject {
-//                        RequestSigningCryptoProvider.signingKey.getPublicKey().exportJWKObject().forEach {
-//                            put(it.key, it.value)
-//                        }
-//                        put("kid", RequestSigningCryptoProvider.signingKey.getPublicKey().getKeyId())
-//                    }
-//                    add(jwkWithKid)
-//                })
+                put("keys", buildJsonArray {
+                    val jwkWithKid = buildJsonObject {
+                        RequestSigningCryptoProvider.signingKey.toPublicJWK().toJSONObject().forEach {
+                            put(it.key, it.value.toJsonElement())
+                        }
+                        put("kid", RequestSigningCryptoProvider.signingKey.keyID)
+                    }
+                    add(jwkWithKid)
+                })
             }
 
             call.respond(HttpStatusCode.OK, jwks)
