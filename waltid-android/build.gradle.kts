@@ -77,7 +77,7 @@ dependencies {
 
     // Testing
     testImplementation(kotlin("test"))
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.0")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
     testImplementation("junit:junit:4.13.2")
     testImplementation("androidx.test.ext:junit:1.1.5")
     testImplementation("androidx.test.espresso:espresso-core:3.5.1")
