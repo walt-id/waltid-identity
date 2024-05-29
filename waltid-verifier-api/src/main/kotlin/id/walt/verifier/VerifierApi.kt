@@ -200,8 +200,8 @@ fun Application.verfierApi() {
                         example = ""
                         required = false
                     }
-                    headerParameter<Boolean?>("useEbsiCTv3") {
-                        description = "Set to true to get EBSI CT v3.2 compliant VP_TOKEN request"
+                    headerParameter<String?>("openId4VPProfile") {
+                        description = "Optional header to set the profile of the VP request " + "Available Profiles: DEFAULT: For W3C OpenID4VP, ISO_18013_7_MDOC: For MDOC OpenID4VP, EBSI: For EBSI V3 Compliant VP. " + "Defaults to DEFAULT"
                         example = ""
                         required = false
                     }
@@ -230,7 +230,7 @@ fun Application.verfierApi() {
                 val statusCallbackUri = context.request.header("statusCallbackUri")
                 val statusCallbackApiKey = context.request.header("statusCallbackApiKey")
                 val stateId = context.request.header("stateId")
-                val useEbsiCTv3 = context.request.header("useEbsiCTv3")?.toBoolean() ?: false
+                val openId4VPProfile = context.request.header("openId4VPProfile")?.let{OpenId4VPProfile.valueOf(it)} ?: OpenId4VPProfile.fromAuthorizeBaseURL(authorizeBaseUrl) ?: OpenId4VPProfile.DEFAULT
                 val body = context.receive<JsonObject>()
 
                 val session = verificationUseCase.createSession(
@@ -244,22 +244,16 @@ fun Application.verfierApi() {
                     statusCallbackUri = statusCallbackUri,
                     statusCallbackApiKey = statusCallbackApiKey,
                     stateId = stateId,
-                    openId4VPProfile = OpenId4VPProfile.fromAuthorizeBaseURL(authorizeBaseUrl) ?: OpenId4VPProfile.Default,
-                    useEbsiCTv3 = useEbsiCTv3
+                    openId4VPProfile = openId4VPProfile
                 )
 
                 context.respond(authorizeBaseUrl.plus("?").plus(
-                    when(session.authorizationRequest!!.clientIdScheme) {
-                        ClientIdScheme.X509SanDns -> session.authorizationRequest!!.toRequestObjectByReferenceHttpQueryString(ConfigManager.getConfig<OIDCVerifierServiceConfig>().baseUrl.let { "$it/openid4vc/request/${session.id}" })
+                    when(openId4VPProfile) {
+                        OpenId4VPProfile.ISO_18013_7_MDOC -> session.authorizationRequest!!.toRequestObjectByReferenceHttpQueryString(ConfigManager.getConfig<OIDCVerifierServiceConfig>().baseUrl.let { "$it/openid4vc/request/${session.id}" })
+                        OpenId4VPProfile.EBSIV3 -> session.authorizationRequest!!.toEbsiRequestObjectByReferenceHttpQueryString(SERVER_URL.let { "$it/openid4vc/request/${session.id}"})
                         else -> session.authorizationRequest!!.toHttpQueryString()
-                    })
-                )
-                context.respond(authorizeBaseUrl.plus("?").plus(
-                    when(useEbsiCTv3) {
-                        true -> session.authorizationRequest!!.toEbsiRequestObjectByReferenceHttpQueryString(SERVER_URL.let { "$it/openid4vc/request/${session.id}"})
-                        else -> session.authorizationRequest!!.toHttpQueryString()
-                    })
-                )
+                    }
+                ))
             }
 
             post("/verify/{state}", {
@@ -366,24 +360,6 @@ fun Application.verfierApi() {
                     call.respond(HttpStatusCode.NotFound)
                 }
             }
-            get("/request/{id}", {
-                tags = listOf("OIDC")
-                summary = "Get request object for session by session id"
-                description = "Gets the signed request object for the session given by the session id parameter"
-                request {
-                    pathParameter<String>("id") {
-                        description = "ID of the presentation session"
-                        required = true
-                    }
-                }
-            }) {
-                val id = call.parameters.getOrFail("id")
-                verificationUseCase.getSignedAuthorizationRequestObject(id).onSuccess {
-                    call.respond(HttpStatusCode.OK, it)
-                }.onFailure {
-                    call.respond(HttpStatusCode.BadRequest, it.localizedMessage)
-                }
-            }
             get("policy-list", {
                 tags = listOf("Credential Verification")
                 summary = "List registered policies"
@@ -447,7 +423,7 @@ fun Application.verfierApi() {
         get("authorize", {
             tags= listOf("Ebsi")
             description = "Authorize endpoint of OAuth Server as defined in EBSI Conformance Testing specifications. \nResponse is a 302 redirect with VP_TOKEN or ID_TOKEN request. \n" +
-                    "Use the /oidc4vp/verify endpoint with header useEBSIv3=true to get an EBSI-compliant VP_TOKEN request without redirects."
+                    "Use the /oidc4vp/verify endpoint using the header openId4VPProfile to get an EBSI-compliant VP_TOKEN request without redirects."
         })
         {
             val params = call.parameters.toMap().toJsonObject()
@@ -475,12 +451,12 @@ fun Application.verfierApi() {
                 statusCallbackUri = null,
                 statusCallbackApiKey = null,
                 stateId = stateId,
-                useEbsiCTv3 = true,
                 stateParamAuthorizeReqEbsi = stateParamAuthorizeReqEbsi,
                 responseType = when(scope.contains("openid ver_test:id_token")){
                     true -> ResponseType.IdToken
                     else -> ResponseType.VpToken
                 },
+                openId4VPProfile = OpenId4VPProfile.EBSIV3
             )
             context.respondRedirect("openid://?${session.authorizationRequest!!.toEbsiRequestObjectByReferenceHttpQueryString(SERVER_URL.let { "$it/openid4vc/request/${session.id}"})}")
         }

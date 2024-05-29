@@ -52,8 +52,7 @@ class VerificationUseCase(
         statusCallbackApiKey: String?,
         stateId: String?,
         stateParamAuthorizeReqEbsi: String? = null,
-        useEbsiCTv3: Boolean? = null,
-        openId4VPProfile: OpenId4VPProfile = OpenId4VPProfile.Default
+        openId4VPProfile: OpenId4VPProfile = OpenId4VPProfile.DEFAULT
     ) = let {
         val vpPolicies = vpPoliciesJson?.jsonArray?.parsePolicyRequests() ?: listOf(PolicyRequest(JwtSignaturePolicy()))
 
@@ -83,7 +82,8 @@ class VerificationUseCase(
             },
             clientIdScheme = this.getClientIdScheme(openId4VPProfile, OIDCVerifierService.config.defaultClientIdScheme),
             openId4VPProfile = openId4VPProfile,
-            stateParamAuthorizeReqEbsi = stateParamAuthorizeReqEbsi, useEbsiCTv3 = useEbsiCTv3
+            stateParamAuthorizeReqEbsi = stateParamAuthorizeReqEbsi,
+            responseType = responseType
         )
 
         val specificPolicies = requestCredentialsArr.filterIsInstance<JsonObject>().associate {
