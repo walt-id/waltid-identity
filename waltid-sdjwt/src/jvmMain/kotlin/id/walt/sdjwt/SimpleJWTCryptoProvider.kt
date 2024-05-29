@@ -11,12 +11,12 @@ class SimpleJWTCryptoProvider(
     private val jwsVerifier: JWSVerifier?
 ) : JWTCryptoProvider {
 
-    override fun sign(payload: JsonObject, keyID: String?, typ: String): String {
+    override fun sign(payload: JsonObject, keyID: String?, typ: String, headers: Map<String, Any>): String {
         if (jwsSigner == null) {
             throw Exception("No signer available")
         }
         return SignedJWT(
-            JWSHeader.Builder(jwsAlgorithm).type(JOSEObjectType.JWT).keyID(keyID).build(),
+            JWSHeader.Builder(jwsAlgorithm).type(JOSEObjectType.JWT).keyID(keyID).customParams(headers).build(),
             JWTClaimsSet.parse(payload.toString())
         ).also {
             it.sign(jwsSigner)
@@ -31,5 +31,18 @@ class SimpleJWTCryptoProvider(
             SignedJWT.parse(jwt).verify(jwsVerifier)
         )
     }
+}
+
+class SimpleMultiKeyJWTCryptoProvider(
+    val providerMap: Map<String, JWTCryptoProvider>
+): JWTCryptoProvider {
+    override fun sign(payload: JsonObject, keyID: String?, typ: String, headers: Map<String, Any>): String {
+        return (providerMap[keyID] ?: throw Exception("No key ID defined")).sign(payload, keyID, typ, headers)
+    }
+
+    override fun verify(jwt: String): JwtVerificationResult {
+        return (providerMap[SignedJWT.parse(jwt).header.keyID] ?: throw Exception("No key ID defined")).verify(jwt)
+    }
+
 }
 

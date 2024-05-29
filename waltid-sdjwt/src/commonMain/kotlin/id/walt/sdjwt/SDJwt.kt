@@ -9,17 +9,18 @@ import kotlin.js.JsName
 
 /**
  * SD-JWT object, providing signed JWT token, header and payload with disclosures, as well as optional holder binding
+ * @param keyBindingJwt adds the provided key binding JWT as a holder key proof-of-possession the presented SD-JWT token
  */
 @OptIn(ExperimentalJsExport::class)
 @JsExport
 open class SDJwt internal constructor(
     val jwt: String,
-    protected val header: JsonObject,
-    protected val sdPayload: SDPayload,
-    val holderJwt: String? = null,
-    protected val isPresentation: Boolean = false
+    val header: JsonObject,
+    val sdPayload: SDPayload,
+    val keyBindingJwt: KeyBindingJwt? = null,
+    val isPresentation: Boolean = false
 ) {
-    internal constructor(sdJwt: SDJwt) : this(sdJwt.jwt, sdJwt.header, sdJwt.sdPayload, sdJwt.holderJwt, sdJwt.isPresentation)
+    internal constructor(sdJwt: SDJwt) : this(sdJwt.jwt, sdJwt.header, sdJwt.sdPayload, sdJwt.keyBindingJwt, sdJwt.isPresentation)
 
     /**
      * Encoded disclosures, included in this SD-JWT
@@ -66,37 +67,41 @@ open class SDJwt internal constructor(
     val jwk
         get() = header["jwk"]?.jsonPrimitive?.contentOrNull
 
+    val type
+        get() = header["typ"]?.jsonPrimitive?.contentOrNull
+
     override fun toString() = toString(isPresentation)
 
     @JsName("toFormattedString")
-    open fun toString(formatForPresentation: Boolean): String {
+    open fun toString(formatForPresentation: Boolean, withKBJwt: Boolean = true): String {
         return listOf(jwt)
             .plus(disclosures)
-            .plus(holderJwt?.let { listOf(it) } ?: (if (formatForPresentation) listOf("") else listOf()))
+            .plus((if(withKBJwt) keyBindingJwt else null)?.let { listOf(it) }
+                ?: (if (formatForPresentation) listOf("") else listOf()))
             .joinToString(SEPARATOR_STR)
     }
 
     /**
      * Present SD-JWT with selection of disclosures
      * @param sdMap Selective disclosure map, indicating for each field (recursively) whether it should be disclosed or undisclosed in the presentation
-     * @param withHolderJwt Optionally, adds the provided JWT as holder binding to the presented SD-JWT token
+     * @param withKBJwt Optionally, adds the provided key binding JWT as a holder key proof-of-possession the presented SD-JWT token
      */
     @JsName("present")
-    fun present(sdMap: SDMap?, withHolderJwt: String? = null): SDJwt {
+    fun present(sdMap: SDMap?, withKBJwt: KeyBindingJwt? = null): SDJwt {
         return SDJwt(
             jwt,
             header,
             sdMap?.let { sdPayload.withSelectiveDisclosures(it) } ?: sdPayload.withoutDisclosures(),
-            withHolderJwt ?: holderJwt, isPresentation = true)
+            withKBJwt ?: keyBindingJwt, isPresentation = true)
     }
 
     /**
      * Shortcut to presenting the SD-JWT, with all disclosures selected or unselected
      * @param discloseAll true: disclose all selective disclosures, false: all selective disclosures remain undisclosed
-     * @param withHolderJwt Optionally, adds the provided JWT as holder binding to the presented SD-JWT token
+     * @param withKBJwt Optionally, adds the provided key binding JWT as a holder key proof-of-possession to the presented SD-JWT token
      */
     @JsName("presentAll")
-    fun present(discloseAll: Boolean, withHolderJwt: String? = null): SDJwt {
+    fun present(discloseAll: Boolean, withKBJwt: KeyBindingJwt? = null): SDJwt {
         return SDJwt(
             jwt,
             header,
@@ -105,11 +110,36 @@ open class SDJwt internal constructor(
             } else {
                 sdPayload.withoutDisclosures()
             },
-            withHolderJwt ?: holderJwt, isPresentation = true
+            withKBJwt ?: keyBindingJwt, isPresentation = true
         )
     }
 
     /**
+     * Present SD-JWT with selection of disclosures
+     * @param sdMap Selective disclosure map, indicating for each field (recursively) whether it should be disclosed or undisclosed in the presentation
+     * @param audience  Audience to set in required "aud" property of the key binding jwt body
+     * @param nonce   Nonce value for the required "nonce" property of the key binding jwt body
+     * @param kbCryptoProvider  Crypto provider to sign the JWT with the given holder key
+     * @param kbKeyId Optional key ID of the key to be used for signature, if required by crypto provider
+     */
+    @JsName("presentWithKB")
+    fun present(sdMap: SDMap?, audience: String, nonce: String, kbCryptoProvider: JWTCryptoProvider, kbKeyId: String? = null) =
+        present(sdMap, KeyBindingJwt.sign(present(sdMap).toString(), audience, nonce, kbCryptoProvider, kbKeyId))
+
+    /**
+     * Shortcut to presenting the SD-JWT, with all disclosures selected or unselected
+     * @param discloseAll true: disclose all selective disclosures, false: all selective disclosures remain undisclosed
+     * @param audience  Audience to set in required "aud" property of the key binding jwt body
+     * @param nonce   Nonce value for the required "nonce" property of the key binding jwt body
+     * @param kbCryptoProvider  Crypto provider to sign the JWT with the given holder key
+     * @param kbKeyId Optional key ID of the key to be used for signature, if required by crypto provider
+     */
+    @JsName("presentAllWithKB")
+    fun present(discloseAll: Boolean, audience: String, nonce: String, kbCryptoProvider: JWTCryptoProvider, kbKeyId: String? = null) =
+        present(discloseAll, KeyBindingJwt.sign(present(discloseAll).toString(), audience, nonce, kbCryptoProvider, kbKeyId))
+
+    /**
+     * TODO: make use of Key interface from waltid-crypto lib instead or also?
      * Verify the SD-JWT by checking the signature, using the given JWT crypto provider, and matching the disclosures against the digests in the JWT payload
      * @param jwtCryptoProvider JWT crypto provider, that implements standard JWT token verification on the target platform
      */
@@ -145,7 +175,7 @@ open class SDJwt internal constructor(
         const val SEPARATOR = '~'
         const val SEPARATOR_STR = SEPARATOR.toString()
         const val SD_JWT_PATTERN =
-            "^(?<sdjwt>(?<header>[A-Za-z0-9-_]+)\\.(?<body>[A-Za-z0-9-_]+)\\.(?<signature>[A-Za-z0-9-_]+))(?<disclosures>(~([A-Za-z0-9-_]+))+)?(~(?<holderjwt>([A-Za-z0-9-_]+)\\.([A-Za-z0-9-_]+)\\.([A-Za-z0-9-_]+))?)?\$"
+            "^(?<sdjwt>(?<header>[A-Za-z0-9-_]+)\\.(?<body>[A-Za-z0-9-_]+)\\.(?<signature>[A-Za-z0-9-_]+))(?<disclosures>(~([A-Za-z0-9-_]+))+)?(~(?<kbjwt>([A-Za-z0-9-_]+)\\.([A-Za-z0-9-_]+)\\.([A-Za-z0-9-_]+))?)?\$"
 
         /**
          * Parse SD-JWT from a token string
@@ -162,7 +192,7 @@ open class SDJwt internal constructor(
                     matchedGroups["body"]!!.value,
                     disclosures
                 ),
-                matchedGroups["holderjwt"]?.value
+                matchedGroups["kbjwt"]?.value?.let { KeyBindingJwt.parse(it) }
             )
         }
 
@@ -185,13 +215,13 @@ open class SDJwt internal constructor(
             return parse(sdJwt).verifyAsync(jwtCryptoProvider)
         }
 
-        fun createFromSignedJwt(signedJwt: String, sdPayload: SDPayload, withHolderJwt: String? = null): SDJwt {
+        fun createFromSignedJwt(signedJwt: String, sdPayload: SDPayload, withKBJwt: KeyBindingJwt? = null): SDJwt {
             val sdJwt = parse(signedJwt)
             return SDJwt(
                 jwt = sdJwt.jwt,
                 header = sdJwt.header,
                 sdPayload = sdPayload,
-                holderJwt = withHolderJwt
+                keyBindingJwt = withKBJwt
             )
         }
 
@@ -200,17 +230,16 @@ open class SDJwt internal constructor(
          * @param sdPayload Payload with selective disclosures to be signed
          * @param jwtCryptoProvider Crypto provider implementation, that supports JWT creation on the target platform
          * @param keyID Optional key ID, if the crypto provider implementation requires it
-         * @param withHolderJwt Optionally, append the given holder binding JWT to the signed SD-JWT token
          * @return  The signed SDJwt object
          */
         fun sign(
             sdPayload: SDPayload,
             jwtCryptoProvider: JWTCryptoProvider,
             keyID: String? = null,
-            withHolderJwt: String? = null,
-            typ: String = "JWT"
+            typ: String = "JWT",
+            additionalHeaders: Map<String, Any> = mapOf()
         ): SDJwt = createFromSignedJwt(
-            jwtCryptoProvider.sign(sdPayload.undisclosedPayload, keyID, typ), sdPayload, withHolderJwt
+            jwtCryptoProvider.sign(sdPayload.undisclosedPayload, keyID, typ, additionalHeaders), sdPayload
         )
 
         /**
@@ -218,17 +247,16 @@ open class SDJwt internal constructor(
          * @param sdPayload Payload with selective disclosures to be signed
          * @param jwtCryptoProvider Crypto provider implementation, that supports JWT creation on the target platform
          * @param keyID Optional key ID, if the crypto provider implementation requires it
-         * @param withHolderJwt Optionally, append the given holder binding JWT to the signed SD-JWT token
+         * @param withKBJwt Optionally, append the given holder binding JWT to the signed SD-JWT token
          * @return  The signed SDJwt object
          */
         @JsExport.Ignore
         suspend fun signAsync(
             sdPayload: SDPayload,
             jwtCryptoProvider: AsyncJWTCryptoProvider,
-            keyID: String? = null,
-            withHolderJwt: String? = null
+            keyID: String? = null
         ): SDJwt = createFromSignedJwt(
-            jwtCryptoProvider.sign(sdPayload.undisclosedPayload, keyID), sdPayload, withHolderJwt
+            jwtCryptoProvider.sign(sdPayload.undisclosedPayload, keyID), sdPayload
         )
 
         /**

@@ -48,24 +48,25 @@ class SDJwtJS(
     }
 
     @OptIn(DelicateCoroutinesApi::class)
-    fun presentAllAsync(discloseAll: Boolean, withHolderJwt: String? = null): Promise<SDJwtJS> = GlobalScope.promise {
+    fun presentAllAsync(discloseAll: Boolean, withKBJwt: KeyBindingJwt? = null): Promise<SDJwtJS> = GlobalScope.promise {
         SDJwtJS(
-            present(discloseAll, withHolderJwt)
+            present(discloseAll, withKBJwt)
         )
     }
 
     @OptIn(DelicateCoroutinesApi::class)
-    fun presentAsync(sdMap: dynamic, withHolderJwt: String? = null): Promise<SDJwtJS> = GlobalScope.promise {
+    fun presentAsync(sdMap: dynamic, withKBJwt: KeyBindingJwt? = null): Promise<SDJwtJS> = GlobalScope.promise {
         SDJwtJS(
-            present(SDMap.fromJSON(JSON.stringify(sdMap)), withHolderJwt)
+            present(SDMap.fromJSON(JSON.stringify(sdMap)), withKBJwt)
         )
     }
 
-    override fun toString(formatForPresentation: Boolean): String {
+    override fun toString(formatForPresentation: Boolean, withKBJwt: Boolean): String {
         println("Formatting SD_JWT: ${disclosuresJS.joinToString(",")}")
         return listOf(jwt)
             .plus(disclosuresJS)
-            .plus(holderJwt?.let { listOf(it) } ?: (if (formatForPresentation) listOf("") else listOf()))
+            .plus((if(withKBJwt) keyBindingJwt else null)?.let { listOf(it) }
+                ?: (if (formatForPresentation) listOf("") else listOf()))
             .joinToString(SEPARATOR_STR)
     }
 
@@ -82,8 +83,7 @@ class SDJwtJS(
         fun signAsync(
             sdPayload: SDPayload,
             jwtCryptoProvider: JSAsyncJWTCryptoProvider,
-            keyID: String? = null,
-            withHolderJwt: String? = null
+            keyID: String? = null
         ): Promise<SDJwtJS> = GlobalScope.promise {
             SDJwtJS(
                 SDJwt.signAsync(sdPayload, jwtCryptoProvider)
