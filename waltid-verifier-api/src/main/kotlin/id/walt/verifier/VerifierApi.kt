@@ -178,7 +178,7 @@ fun Application.verfierApi() {
                         required = false
                     }
                     headerParameter<String?>("openId4VPProfile") {
-                        description = "Optional header to set the profile of the VP request " + "Available Profiles: DEFAULT: For W3C OpenID4VP, ISO_18013_7_MDOC: For MDOC OpenID4VP, EBSI: For EBSI V3 Compliant VP. " + "Defaults to DEFAULT"
+                        description = "Optional header to set the profile of the VP request " + "Available Profiles: DEFAULT: For W3C OpenID4VP, ISO_18013_7_MDOC: For MDOC OpenID4VP, EBSIV3: For EBSI V3 Compliant VP. " + "Defaults to DEFAULT"
                         example = ""
                         required = false
                     }
