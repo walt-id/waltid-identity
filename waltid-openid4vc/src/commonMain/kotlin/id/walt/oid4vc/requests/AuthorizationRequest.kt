@@ -4,11 +4,8 @@ import id.walt.oid4vc.data.*
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.util.JwtUtils
 import id.walt.sdjwt.JWTCryptoProvider
-import id.walt.sdjwt.SDJwt
-import id.walt.sdjwt.SDPayload
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
-import io.ktor.http.*
 import kotlinx.datetime.Clock
 import kotlinx.serialization.json.*
 import kotlin.time.Duration

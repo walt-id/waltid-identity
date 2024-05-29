@@ -1,21 +1,14 @@
 package id.walt.oid4vc.providers
 
 import id.walt.crypto.keys.Key
-import id.walt.crypto.keys.KeyGenerationRequest
-import id.walt.crypto.keys.KeyManager
-import id.walt.crypto.keys.KeyType
+
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.data.dif.PresentationDefinition
-import id.walt.oid4vc.data.dif.VCFormat
 import id.walt.oid4vc.interfaces.ISessionCache
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.responses.TokenResponse
 import id.walt.oid4vc.util.ShortIdUtils
 import kotlinx.datetime.Clock
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonObject
 import kotlinx.uuid.UUID
 import kotlinx.uuid.generateUUID
 import kotlin.time.Duration
