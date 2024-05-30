@@ -15,15 +15,14 @@ Note: If you are facing issues with the containers, try running the following co
 docker-compose down
 ```
 
-## Services Exposed
-port mapping below
+## Port mapping
 
+### Services
 - Wallet API: [http://localhost:7001](http://localhost:7001)
 - Issuer API: [http://localhost:7002](http://localhost:7002)
 - Verifier API: [http://localhost:7003](http://localhost:7003)
 
-## Apps
-port mapping below
+### Apps
 
 - Web Wallet: [http://localhost:7101](http://localhost:7101)
 - Web Portal: [http://localhost:7102](http://localhost:7102)
@@ -32,13 +31,54 @@ port mapping below
 
 ## Configurations
 
-Config locations:
+- wallet API:
+  - `wallet-api/config` - wallet configuration
+  - `wallet-api/walt.yaml` - nft configuration
+- issuer API:
+  - `issuer-api/config`
+- verifier API:
+  - `verifier-api/config`
+- ingress:
+  - `Caddyfile`
 
-- wallet API: `wallet-backend`
-- issuer API: `issuer-api/config`
-- verifier API: `verifier-api/config`
-- ingress: `Caddyfile`
-- environment: `.env`
+## Environment
+
+- main:
+  - `.env` - stores the common environment variables, such as port numbers,
+    version-tag, database-engine selection, etc.
+- postgres:
+  - `postgres/postgres.env` - stores postgres specific variables, e.g. admin user, etc.
+  - `pgadmin.env` - stores pgAdmin specific variables, e.g. admin user, etc.
+- microsoft sql-server:
+  - `mssql/mssql.env` - stores mssql specific variables, e.g. sql-server edition, etc. 
+
+Variables from `.env` are propagated automatically down to reverse proxy configurations
+(Caddyfile) and also api configurations (wallet, issuer, verifier).
+
+## How to
+
+### Select a database engine
+
+- browse `.env` file
+- set `DATABASE_ENGINE` to one of:
+  - sqlite
+  - postgres
+  - mssql
+
+This value will be used also by compose profile so only the required services are started.
+
+### Update port number
+
+- browse `.env` file
+- update the desired port number
+
+This value will be used by reverse proxy (and services configs, if any).
+
+### Select an identity stack version
+
+- browse `.env` file
+- update `VERSION_TAG` to a specific image version (e.g. a release version)
+  - if not set, `latest` tag is used
 
 ## Troubleshooting
 
@@ -52,11 +92,13 @@ We are working on fixing this issue.
 #### Updating ports doesn't work
 
 Make sure the ports are also updated in:
-- ingress.conf
-- walletkit/config
-  - issuer-config.json
-  - verifier-config.json
-  - wallet-config.json
-- wallet-backend/config
-  - wallet.conf
+- Caddyfile
+- issuer-api/config
+  - issuer-service.conf
   - web.conf
+- verifier-api/config
+  - verifier-service.conf
+  - web.conf
+- wallet-api/config
+  - web.conf
+  - db.<database-engine>.conf

@@ -33,3 +33,8 @@
 :{$VC_REPO_PORT} {
     reverse_proxy http://vc-repo:{$VC_REPO_PORT}
 }
+
+# pgAdmin
+:{$PG_ADMIN_PORT} {
+    reverse_proxy http://phpmyadmin:{$PG_ADMIN_PORT}
+}
