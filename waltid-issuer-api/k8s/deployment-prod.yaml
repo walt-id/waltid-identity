@@ -215,6 +215,14 @@ data:
            "VerifiableAttestation",
            "eID"
          ]
+       },
+       {
+         "id": "NaturalPersonVerifiableID",
+         "type": [
+           "VerifiableCredential",
+           "VerifiableAttestation",
+           "NaturalPersonVerifiableID"
+         ]
        }
      ]
      """
