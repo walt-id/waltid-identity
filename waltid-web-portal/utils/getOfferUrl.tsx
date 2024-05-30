@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { v4 as uuidv4 } from 'uuid';
-import { AvailableCredential } from '@/types/credentials';
+import { AvailableCredential, DIDMethodsConfig } from '@/types/credentials';
 
 const getOfferUrl = async (credentials: Array<AvailableCredential>, NEXT_PUBLIC_VC_REPO: string, NEXT_PUBLIC_ISSUER: string) => {
   const data = await fetch(`${NEXT_PUBLIC_ISSUER}/.well-known/openid-credential-issuer`).then(data => {
@@ -18,14 +18,14 @@ const getOfferUrl = async (credentials: Array<AvailableCredential>, NEXT_PUBLIC_
 
     let payload: {
       'issuerDid': string,
-      'issuerKey': { "type": "jwk", "jwk": string },
+      'issuerKey': { "type": string, "jwk": string },
       credentialConfigurationId: string,
       credentialData: any,
       mapping?: any,
       selectiveDisclosure?: any
     } = {
-      'issuerDid': 'did:jwk:eyJrdHkiOiJFQyIsImNydiI6IlAtMjU2Iiwia2lkIjoiY1lIZjdrekcta2tvZkRaV1BQUVpKc3VLQU5YdUZ3UjViSkJKV0NCbkNhQSIsIngiOiJjZjU1b0h3WFhDZUJsR0pnYjFFS0dQdlBySGlWZlFZWlJCbVMzVG9CbDNVIiwieSI6ImFXMFAtVVI2WnhXaE9DVl9hYWkxT21iOHNQRmVsV1F6RUZQYjVXemo1cTAifQ',
-      'issuerKey': { "type": "jwk", "jwk": "{\"kty\":\"EC\",\"d\":\"cexqfMJ6ZS9SX9_ogHxkXxUOBX-biKpqYRd6-QcDsHs\",\"crv\":\"P-256\",\"kid\":\"cYHf7kzG-kkofDZWPPQZJsuKANXuFwR5bJBJWCBnCaA\",\"x\":\"cf55oHwXXCeBlGJgb1EKGPvPrHiVfQYZRBmS3ToBl3U\",\"y\":\"aW0P-UR6ZxWhOCV_aai1Omb8sPFelWQzEFPb5Wzj5q0\"}" },
+      'issuerDid': DIDMethodsConfig[c.selectedDID as keyof typeof DIDMethodsConfig].issuerDid,
+      'issuerKey': DIDMethodsConfig[c.selectedDID as keyof typeof DIDMethodsConfig].issuerKey,
       credentialConfigurationId: Object.keys(credential_configurations_supported).find(key => key === c.id + "_jwt_vc_json") as string,
       credentialData: offer
     }
