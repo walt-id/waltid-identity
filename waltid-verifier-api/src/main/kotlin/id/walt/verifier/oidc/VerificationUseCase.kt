@@ -66,7 +66,7 @@ class VerificationUseCase(
 
         val presentationDefinition =
             (presentationDefinitionJson?.let { PresentationDefinition.fromJSON(it.jsonObject) })
-                ?: PresentationDefinition.primitiveGenerationFromVcTypes(requestedTypes)
+                ?: PresentationDefinition.primitiveGenerationFromVcTypes(requestedTypes, openId4VPProfile)
 
         logger.debug { "Presentation definition: " + presentationDefinition.toJSON() }
 
