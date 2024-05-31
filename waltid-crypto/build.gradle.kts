@@ -123,7 +123,7 @@ kotlin {
                 implementation("org.bouncycastle:bcpkix-lts8on:2.73.6") // PEM import
 
                 // Ktor client
-                implementation("io.ktor:ktor-client-cio:$ktor_version")
+                implementation("io.ktor:ktor-client-okhttp:$ktor_version")
 
                 // Logging
                 implementation("org.slf4j:slf4j-simple:2.0.13")

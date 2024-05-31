@@ -56,14 +56,14 @@ dependencies {
     implementation("io.ktor:ktor-server-cio-jvm:${Versions.KTOR_VERSION}")
 
     // Ktor server external libs
-    implementation("io.github.smiley4:ktor-swagger-ui:2.8.0")
+    implementation("io.github.smiley4:ktor-swagger-ui:2.10.0")
 
     // Ktor client
     implementation("io.ktor:ktor-client-core-jvm:${Versions.KTOR_VERSION}")
     implementation("io.ktor:ktor-client-serialization-jvm:${Versions.KTOR_VERSION}")
     implementation("io.ktor:ktor-client-content-negotiation:${Versions.KTOR_VERSION}")
     implementation("io.ktor:ktor-client-json-jvm:${Versions.KTOR_VERSION}")
-    implementation("io.ktor:ktor-client-cio-jvm:${Versions.KTOR_VERSION}")
+    implementation("io.ktor:ktor-client-okhttp-jvm:${Versions.KTOR_VERSION}")
     implementation("io.ktor:ktor-client-logging-jvm:${Versions.KTOR_VERSION}")
 
 
@@ -87,7 +87,7 @@ dependencies {
     // Logging
     implementation("io.github.oshai:kotlin-logging-jvm:6.0.9")
     implementation("org.slf4j:slf4j-simple:2.0.13")
-    implementation("org.slf4j:jul-to-slf4j:2.0.12")
+    implementation("org.slf4j:jul-to-slf4j:2.0.13")
 
     // Test
     testImplementation(kotlin("test"))

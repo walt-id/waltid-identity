@@ -34,6 +34,8 @@ data class OpenIDClientMetadata(
     @SerialName("request_object_encryption_enc") val requestObjectEncryptionEnc: String? = null,
     @SerialName("token_endpoint_auth_method") val tokenEndpointAuthMethod: String? = null,
     @SerialName("token_endpoint_auth_signing_alg") val tokenEndpointAuthSigningAlg: String? = null,
+    @SerialName("authorization_encrypted_response_alg") val authorizationEncryptedResponseAlg: String? = null,
+    @SerialName("authorization_encrypted_response_enc") val authorizationEncryptedResponseEnc: String? = null,
     @SerialName("default_max_age") val defaultMaxAge: Long? = null,
     @SerialName("require_auth_time") val requireAuthTime: Boolean? = null,
     @SerialName("default_acr_values") val defaultAcrValues: List<String>? = null,
