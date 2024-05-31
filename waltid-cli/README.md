@@ -4,6 +4,7 @@ Manage keys, DIDs, issue W3C Verifiable Credentials, and verify them using the W
 
 # How to use
 
+waltid did resolve -d did:web:wallet.walt.id:wallet-api:registry:portal
 ## In development
 
 * `git clone https://github.com/walt-id/waltid-identity.git`

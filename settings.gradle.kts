@@ -36,10 +36,12 @@ include(
     // OCI extension for waltid-crypto
     "waltid-crypto-oci",
 
+    // PKCS#11 extension for waltid-crypto
+    "waltid-crypto-pkcs11"
+
     // Android - uncomment to enable build:
     /*
     "waltid-crypto-android",
     "waltid-android"
     */
 )
-
