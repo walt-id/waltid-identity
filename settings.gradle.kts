@@ -1,5 +1,6 @@
 pluginManagement {
     repositories {
+        google()
         mavenCentral()
         gradlePluginPortal()
     }
@@ -30,6 +31,15 @@ include(
     "waltid-cli",
 
     // Reporting
-    "waltid-reporting"
+    "waltid-reporting",
+
+    // OCI extension for waltid-crypto
+    "waltid-crypto-oci",
+
+    // Android - uncomment to enable build:
+    /*
+    "waltid-crypto-android",
+    "waltid-android"
+    */
 )
 
