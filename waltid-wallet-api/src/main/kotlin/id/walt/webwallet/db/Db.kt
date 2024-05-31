@@ -113,7 +113,6 @@ object Db {
             recreateDatabase()
         } else {
             transaction {
-                SchemaUtils.drop(WalletCredentialCategoryMap, WalletCategory, WalletIssuers)// migration
                 SchemaUtils.createMissingTablesAndColumns(*tables)
             }
         }
