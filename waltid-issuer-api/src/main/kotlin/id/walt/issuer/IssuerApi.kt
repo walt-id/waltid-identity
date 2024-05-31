@@ -154,21 +154,17 @@ fun Application.issuerApi() {
 
 
                 val issuanceKey = if (req.keyGenerationRequest.backend == "jwk") {
-                    val jsonObject = Json.parseToJsonElement(serializedKey.toString()).jsonObject
-
-                    val jwkString = jsonObject["jwk"]?.jsonPrimitive?.content ?: throw IllegalArgumentException(
+                    val jsonObject = serializedKey.jsonObject
+                    val jwkObject = jsonObject["jwk"] ?: throw IllegalArgumentException(
                         "No JWK key found in serialized key."
                     )
-                    val jwkJsonObject = Json.parseToJsonElement(jwkString.toString()).jsonObject
-
                     val finalJsonObject = jsonObject.toMutableMap().apply {
-                        this["jwk"] = jwkJsonObject
+                        this["jwk"] = Json.parseToJsonElement(jwkObject.jsonPrimitive.content).jsonObject
                     }
                     JsonObject(finalJsonObject)
                 } else {
                     serializedKey
                 }
-
                 context.respond(
                     HttpStatusCode.OK, IssuerOnboardingResponse(issuanceKey, did)
                 )
