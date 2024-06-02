@@ -15,7 +15,7 @@
   },
   "dependencies": {
     "@github/webauthn-json": "^2.1.1",
-    "@headlessui/vue": "1.7.20",
+    "@headlessui/vue": "1.7.22",
     "@heroicons/vue": "^2.1.3",
     "@julr/unocss-preset-forms": "^0.1.0",
     "@pinia/nuxt": "^0.5.1",
