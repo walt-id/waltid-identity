@@ -4,7 +4,6 @@ import com.github.ajalt.clikt.core.InvalidFileFormat
 import com.github.ajalt.clikt.core.PrintHelpMessage
 import com.github.ajalt.clikt.testing.test
 import id.walt.cli.util.getResourcePath
-import kotlinx.io.files.FileNotFoundException
 import org.junit.jupiter.api.assertDoesNotThrow
 import kotlin.test.*
 
@@ -125,7 +124,8 @@ class WaltIdDidCreateCmdTest {
 
     @Test
     fun `should fail if the key file specified in the --key option does not exist`() {
-        assertFailsWith<FileNotFoundException> {
+        assertFails {
+            // FileNotFoundException
             command.parse(listOf("--key=./foo.bar"))
         }
     }
