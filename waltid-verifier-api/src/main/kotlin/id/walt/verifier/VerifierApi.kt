@@ -1,34 +1,25 @@
 package id.walt.verifier
 
-import COSE.AlgorithmID
 import COSE.OneKey
 import cbor.Cbor
-import com.auth0.jwk.Jwk
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.Curve
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.jwk.gen.ECKeyGenerator
+import id.walt.config.ConfigManager
 import id.walt.credentials.verification.PolicyManager
-import id.walt.crypto.keys.Key
-import id.walt.crypto.keys.jwk.JWKKey
-import id.walt.crypto.keys.jwk.JWKKeyCreator
-import id.walt.crypto.utils.JsonUtils.toJsonElement
-import id.walt.mdoc.COSECryptoProviderKeyInfo
 import id.walt.mdoc.SimpleCOSECryptoProvider
 import id.walt.mdoc.dataelement.DataElement
 import id.walt.mdoc.dataelement.FullDateElement
-import id.walt.mdoc.dataelement.MapElement
 import id.walt.mdoc.dataelement.toDE
 import id.walt.mdoc.doc.MDocBuilder
 import id.walt.mdoc.mso.DeviceKeyInfo
 import id.walt.mdoc.mso.ValidityInfo
 import id.walt.oid4vc.data.ClientIdScheme
-import id.walt.oid4vc.data.HTTPDataObject
 import id.walt.oid4vc.data.OpenId4VPProfile
 import id.walt.oid4vc.data.ResponseMode
 import id.walt.oid4vc.data.dif.*
 import id.walt.sdjwt.SimpleJWTCryptoProvider
-import id.walt.verifier.base.config.ConfigManager
 import id.walt.verifier.base.config.OIDCVerifierServiceConfig
 import id.walt.verifier.oidc.LspPotentialInteropEvent
 import id.walt.verifier.oidc.VerificationUseCase
@@ -38,9 +29,7 @@ import io.github.smiley4.ktorswaggerui.dsl.route
 import io.ktor.client.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.plugins.logging.*
-import io.ktor.client.request.forms.*
 import io.ktor.http.*
-import io.ktor.http.content.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
@@ -57,17 +46,6 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToHexString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
-import java.io.File
-import java.io.FileInputStream
-import java.nio.charset.Charset
-import java.security.KeyFactory
-import java.security.PublicKey
-import java.security.cert.CertificateFactory
-import java.security.cert.X509Certificate
-import java.security.interfaces.ECKey
-import java.security.spec.PKCS8EncodedKeySpec
-import java.security.spec.X509EncodedKeySpec
-import java.util.*
 
 @Serializable
 data class DescriptorMappingFormParam(val id: String, val format: VCFormat, val path: String)
@@ -349,9 +327,7 @@ fun Application.verfierApi() {
                     body<LSPPotentialIssueFormDataParam> {
                         mediaType(ContentType.Application.FormUrlEncoded)
                         example("jwk", LSPPotentialIssueFormDataParam(
-                            Json.parseToJsonElement(ECKeyGenerator(Curve.P_256).generate().toPublicJWK().toString().also {
-                                println(it)
-                            }).jsonObject
+                            Json.parseToJsonElement(ECKeyGenerator(Curve.P_256).generate().toPublicJWK().toString()).jsonObject
                         ))
                     }
                 }
