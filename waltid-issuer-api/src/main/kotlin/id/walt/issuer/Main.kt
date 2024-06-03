@@ -1,42 +1,35 @@
 package id.walt.issuer
 
+import id.walt.ConfigurationsList
+import id.walt.ServiceConfiguration
+import id.walt.ServiceInitialization
+import id.walt.ServiceMain
 import id.walt.did.helpers.WaltidServices
 import id.walt.issuer.OidcApi.oidcApi
-import id.walt.issuer.base.config.ConfigManager
-import id.walt.issuer.base.config.WebConfig
+import id.walt.issuer.base.config.CredentialTypeConfig
+import id.walt.issuer.base.config.OIDCIssuerServiceConfig
 import id.walt.issuer.base.web.plugins.*
+import id.walt.web.WebService
 import io.github.oshai.kotlinlogging.KotlinLogging
-import io.klogging.config.ANSI_CONSOLE
-import io.klogging.config.loggingConfiguration
 import io.ktor.server.application.*
-import io.ktor.server.cio.*
-import io.ktor.server.engine.*
-import kotlinx.coroutines.delay
 
 private val log = KotlinLogging.logger { }
 
 suspend fun main(args: Array<String>) {
-    loggingConfiguration { ANSI_CONSOLE() }
-
-    log.info { "Starting walt.id issuer..." }
-
-    log.debug { "Init walt services..." }
-    WaltidServices.minimalInit()
-
-    log.info { "Reading configurations..." }
-    ConfigManager.loadConfigs(args)
-
-    val webConfig = ConfigManager.getConfig<WebConfig>()
-    log.info { "Starting web server (binding to ${webConfig.webHost}, listening on port ${webConfig.webPort})..." }
-    embeddedServer(
-        CIO,
-        port = webConfig.webPort,
-        host = webConfig.webHost,
-        module = Application::issuerModule
-    ).start(wait = true)
-
-    delay(50)
-    log.info { "Issuer stopped." }
+    ServiceMain(
+        ServiceConfiguration("issuer"), ServiceInitialization(
+            configs = ConfigurationsList(
+                mandatory = listOf(
+                    "issuer-service" to OIDCIssuerServiceConfig::class,
+                    "credential-issuer-metadata" to CredentialTypeConfig::class
+                )
+            ),
+            init = {
+                WaltidServices.minimalInit()
+            },
+            run = WebService(Application::issuerModule).run()
+        )
+    ).main(args)
 }
 
 fun Application.configurePlugins() {
