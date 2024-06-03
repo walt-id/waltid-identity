@@ -30,6 +30,7 @@ include(
     "waltid-cli",
 
     // Reporting
-    "waltid-reporting"
-)
+    "waltid-reporting",
 
+    "waltid-credentials-base"
+)
