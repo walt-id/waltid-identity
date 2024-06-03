@@ -1,5 +1,6 @@
 package id.walt.webwallet.config
 
+/*
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -11,4 +12,5 @@ data class OciRestApiKeyConfig(
     val managementEndpoint: String,
     val cryptoEndpoint: String,
     val signingKeyPem: String? = null
-) : WalletConfig
+) : WalletConfig()
+*/
