@@ -22,6 +22,9 @@ include(
     // Protocols
     "waltid-openid4vc",
 
+    // Commons
+    "waltid-service-commons",
+
     // Services based on libs
     "waltid-issuer-api",
     "waltid-verifier-api",
@@ -42,4 +45,5 @@ include(
     "waltid-android"
     */
 )
-
+include("waltid-commons")
+include("waltid-service-commons")
