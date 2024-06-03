@@ -2,7 +2,7 @@ package id.walt.webwallet.service.nft
 
 import id.walt.nftkit.services.*
 import id.walt.webwallet.config.ChainExplorerConfiguration
-import id.walt.webwallet.config.ConfigManager
+import id.walt.config.ConfigManager
 import id.walt.webwallet.config.MarketPlaceConfiguration
 import id.walt.webwallet.db.models.Web3Wallets
 import id.walt.webwallet.service.dto.*
