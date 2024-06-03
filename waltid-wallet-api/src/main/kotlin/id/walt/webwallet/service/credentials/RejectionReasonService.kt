@@ -1,6 +1,6 @@
 package id.walt.webwallet.service.credentials
 
-import id.walt.webwallet.config.ConfigManager
+import id.walt.config.ConfigManager
 import id.walt.webwallet.config.RejectionReasonConfig
 
 class RejectionReasonService {

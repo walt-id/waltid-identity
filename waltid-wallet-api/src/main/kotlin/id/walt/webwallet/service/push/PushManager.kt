@@ -2,7 +2,7 @@ package id.walt.webwallet.service.push
 
 import com.interaso.webpush.VapidKeys
 import com.interaso.webpush.WebPushService
-import id.walt.webwallet.config.ConfigManager
+import id.walt.config.ConfigManager
 import id.walt.webwallet.config.PushConfig
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.encodeToString
