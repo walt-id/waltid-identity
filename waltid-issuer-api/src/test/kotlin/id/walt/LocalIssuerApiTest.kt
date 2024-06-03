@@ -1,8 +1,8 @@
 package id.walt
 
+import id.walt.config.ConfigManager
 import id.walt.credentials.vc.vcs.W3CVC
 import id.walt.issuer.IssuanceRequest
-import id.walt.issuer.base.config.ConfigManager
 import id.walt.issuer.createCredentialOfferUri
 import id.walt.sdjwt.SDMapBuilder
 import kotlinx.coroutines.test.runTest
@@ -100,7 +100,7 @@ class IssuerApiTest {
         val issueRequest =
             IssuanceRequest(jsonKeyObj, TEST_ISSUER_DID, "OpenBadgeCredential_jwt_vc_json", w3cVc, jsonMappingObj)
 
-        ConfigManager.loadConfigs(emptyArray())
+        ConfigManager.testWithConfigs(testConfigs)
         val offerUri = createCredentialOfferUri(listOf(issueRequest))
 
         assertEquals(true, offerUri.contains("//localhost:7002/?credential_offer"))
@@ -115,9 +115,10 @@ class IssuerApiTest {
         val jsonMappingObj = Json.decodeFromString<JsonObject>(TEST_MAPPING)
 
         val selectiveDisclosureMap = SDMapBuilder().addField("sd", true).build()
-        val issueRequest = IssuanceRequest(jsonKeyObj, TEST_ISSUER_DID, "OpenBadgeCredential", w3cVc, jsonMappingObj, selectiveDisclosureMap)
+        val issueRequest =
+            IssuanceRequest(jsonKeyObj, TEST_ISSUER_DID, "OpenBadgeCredential", w3cVc, jsonMappingObj, selectiveDisclosureMap)
 
-        ConfigManager.loadConfigs(emptyArray())
+        ConfigManager.testWithConfigs(testConfigs)
         val offerUri = createCredentialOfferUri(listOf(issueRequest))
 
         assertEquals(true, offerUri.contains("//localhost:7002/?credential_offer"))

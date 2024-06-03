@@ -2,6 +2,7 @@
 
 package id.walt.issuer
 
+import id.walt.config.ConfigManager
 import id.walt.credentials.issuance.Issuer.mergingJwtIssue
 import id.walt.credentials.issuance.Issuer.mergingSdJwtIssue
 import id.walt.credentials.vc.vcs.W3CVC
@@ -13,7 +14,6 @@ import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.did.dids.DidService
 import id.walt.did.dids.DidUtils
 import id.walt.issuer.IssuanceExamples.openBadgeCredentialExample
-import id.walt.issuer.base.config.ConfigManager
 import id.walt.issuer.base.config.CredentialTypeConfig
 import id.walt.issuer.base.config.OIDCIssuerServiceConfig
 import id.walt.oid4vc.data.CredentialFormat
@@ -33,6 +33,7 @@ import id.walt.oid4vc.responses.CredentialErrorCode
 import id.walt.oid4vc.responses.CredentialResponse
 import id.walt.oid4vc.util.randomUUID
 import id.walt.sdjwt.SDMap
+import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
@@ -65,6 +66,8 @@ open class CIProvider : OpenIDCredentialIssuer(
         }
     }.associateBy { it.id })
 ) {
+    private val log = KotlinLogging.logger {  }
+
     companion object {
 
         val exampleIssuerKey by lazy { runBlocking { JWKKey.generate(KeyType.Ed25519) } }
@@ -82,12 +85,12 @@ open class CIProvider : OpenIDCredentialIssuer(
     var deferIssuance = false
     val deferredCredentialRequests = mutableMapOf<String, CredentialRequest>()
     override fun getSession(id: String): IssuanceSession? {
-        println("RETRIEVING CI AUTH SESSION: $id")
+        log.debug { "RETRIEVING CI AUTH SESSION: $id" }
         return authSessions[id]
     }
 
     override fun getSessionByIdTokenRequestState(idTokenRequestState: String): IssuanceSession? {
-        println("RETRIEVING CI AUTH SESSION by idTokenRequestState: $idTokenRequestState")
+        log.debug { "RETRIEVING CI AUTH SESSION by idTokenRequestState: $idTokenRequestState" }
         var properSession: IssuanceSession? = null
         authSessions.forEach { entry ->
             print("${entry.key} : ${entry.value}")
@@ -101,12 +104,12 @@ open class CIProvider : OpenIDCredentialIssuer(
 
 
     override fun putSession(id: String, session: IssuanceSession): IssuanceSession? {
-        println("SETTING CI AUTH SESSION: $id = $session")
+        log.debug { "SETTING CI AUTH SESSION: $id = $session" }
         return authSessions.put(id, session)
     }
 
     override fun removeSession(id: String): IssuanceSession? {
-        println("REMOVING CI AUTH SESSION: $id")
+        log.debug { "REMOVING CI AUTH SESSION: $id" }
         return authSessions.remove(id)
     }
 
@@ -121,32 +124,32 @@ open class CIProvider : OpenIDCredentialIssuer(
         privKey: Key?
     ) =
         runBlocking {
-            println("Signing JWS:   $payload")
-            println("JWS Signature: target: $target, keyId: $keyId, header: $header")
+            log.debug { "Signing JWS:   $payload" }
+            log.debug { "JWS Signature: target: $target, keyId: $keyId, header: $header" }
             if (header != null && keyId != null && privKey != null) {
                 val headers = mapOf("alg" to "ES256", "type" to "jwt", "kid" to keyId)
                 privKey.signJws(payload.toString().toByteArray(), headers).also {
-                    println("Signed JWS: >> $it")
+                    log.debug { "Signed JWS: >> $it" }
                 }
 
             } else {
                 CI_TOKEN_KEY.signJws(payload.toString().toByteArray()).also {
-                    println("Signed JWS: >> $it")
+                    log.debug { "Signed JWS: >> $it" }
                 }
             }
         }
 
     @OptIn(ExperimentalEncodingApi::class)
     override fun verifyTokenSignature(target: TokenTarget, token: String) = runBlocking {
-        println("Verifying JWS: $token")
-        println("JWS Verification: target: $target")
+        log.debug { "Verifying JWS: $token" }
+        log.debug { "JWS Verification: target: $target" }
 
         val tokenHeader = Json.parseToJsonElement(Base64.decode(token.split(".")[0]).decodeToString()).jsonObject
         if (tokenHeader["kid"] != null) {
             val did = tokenHeader["kid"]!!.jsonPrimitive.content.split("#")[0]
-            println("Resolving DID: $did")
+            log.debug { "Resolving DID: $did" }
             val key = DidService.resolveToKey(did).getOrThrow()
-            key.verifyJws(token).also { println("VERIFICATION IS: $it") }
+            key.verifyJws(token).also { log.debug { "VERIFICATION IS: $it" } }
         } else {
             CI_TOKEN_KEY.verifyJws(token)
         }
@@ -156,10 +159,10 @@ open class CIProvider : OpenIDCredentialIssuer(
     // Implementation of abstract issuer service provider interface
     @OptIn(ExperimentalEncodingApi::class)
     override fun generateCredential(credentialRequest: CredentialRequest): CredentialResult {
-        println("GENERATING CREDENTIAL:")
-        println("Credential request: $credentialRequest")
-        println("CREDENTIAL REQUEST JSON -------:")
-        println(Json.encodeToString(credentialRequest))
+        log.debug { "GENERATING CREDENTIAL:" }
+        log.debug { "Credential request: $credentialRequest" }
+        log.debug { "CREDENTIAL REQUEST JSON -------:" }
+        log.debug { Json.encodeToString(credentialRequest) }
 
         val jwt = credentialRequest.proof?.jwt ?: throw IllegalArgumentException("No proof.jwt in credential request!")
         val jwtParts = jwt.split(".")
@@ -230,7 +233,7 @@ open class CIProvider : OpenIDCredentialIssuer(
 
         val data: IssuanceSessionData = (if (subjectDid == null || nonce == null) {
             repeat(10) {
-                println("WARNING: RETURNING DEMO/EXAMPLE (= BOGUS) CREDENTIAL: subjectDid or nonce is null (was deferred issuance tried?)")
+                log.debug { "WARNING: RETURNING DEMO/EXAMPLE (= BOGUS) CREDENTIAL: subjectDid or nonce is null (was deferred issuance tried?)" }
             }
             listOf(
                 IssuanceSessionData(
@@ -245,7 +248,7 @@ open class CIProvider : OpenIDCredentialIssuer(
                 )
             )
         } else {
-            println("RETRIEVING VC FROM TOKEN MAPPING: $nonce")
+            log.debug { "RETRIEVING VC FROM TOKEN MAPPING: $nonce" }
             tokenCredentialMapping[nonce]
                 ?: throw IllegalArgumentException("The issuanceIdCredentialMapping does not contain a mapping for: $nonce!")
         }).first()
@@ -285,7 +288,7 @@ open class CIProvider : OpenIDCredentialIssuer(
                         additionalJwtOptions = emptyMap(),
                     )
                 }
-            }.also { println("Respond VC: $it") }
+            }.also { log.debug { "Respond VC: $it" } }
         }))
     }
 
@@ -334,7 +337,7 @@ open class CIProvider : OpenIDCredentialIssuer(
             val nonce = payload["nonce"]?.jsonPrimitive?.contentOrNull
                 ?: throw IllegalArgumentException("No nonce in proof.jwt payload!")
 
-            println("RETRIEVING VC FROM TOKEN MAPPING: $nonce")
+            log.debug { "RETRIEVING VC FROM TOKEN MAPPING: $nonce" }
             val issuanceSessionData = tokenCredentialMapping[nonce]
                 ?: throw IllegalArgumentException("The issuanceIdCredentialMapping does not contain a mapping for: $nonce!")
 
@@ -371,7 +374,7 @@ open class CIProvider : OpenIDCredentialIssuer(
                                     )
                                 }
 
-                            }.also { println("Respond VC: $it") }
+                            }.also { log.debug { "Respond VC: $it" } }
                         }
                     )
                 )
@@ -396,24 +399,24 @@ open class CIProvider : OpenIDCredentialIssuer(
 
     // TODO: Hack as this is non stateless because of oidc4vc lib API
     fun setIssuanceDataForIssuanceId(issuanceId: String, data: List<IssuanceSessionData>) {
-        println("DEPOSITED CREDENTIAL FOR ISSUANCE ID: $issuanceId")
+        log.debug { "DEPOSITED CREDENTIAL FOR ISSUANCE ID: $issuanceId" }
         sessionCredentialPreMapping[issuanceId] = data
     }
 
     // TODO: Hack as this is non stateless because of oidc4vc lib API
     fun mapSessionIdToToken(sessionId: String, token: String) {
-        println("MAPPING SESSION ID TO TOKEN: $sessionId -->> $token")
+        log.debug { "MAPPING SESSION ID TO TOKEN: $sessionId -->> $token" }
         val premappedVc = sessionCredentialPreMapping.remove(sessionId)
             ?: throw IllegalArgumentException("No credential pre-mapped with any such session id: $sessionId (for use with token: $token)")
-        println("SWAPPING PRE-MAPPED VC FROM SESSION ID TO NEW TOKEN: $token")
+        log.debug { "SWAPPING PRE-MAPPED VC FROM SESSION ID TO NEW TOKEN: $token" }
         tokenCredentialMapping[token] = premappedVc
     }
 
     fun mapSessionIdToIdAuthRequestState(sessionId: String, token: String) {
-        println("MAPPING SESSION ID TO TOKEN: $sessionId -->> $token")
+        log.debug { "MAPPING SESSION ID TO TOKEN: $sessionId -->> $token" }
         val premappedVc = sessionCredentialPreMapping.remove(sessionId)
             ?: throw IllegalArgumentException("No credential pre-mapped with any such session id: $sessionId (for use with token: $token)")
-        println("SWAPPING PRE-MAPPED VC FROM SESSION ID TO NEW TOKEN: $token")
+        log.debug { "SWAPPING PRE-MAPPED VC FROM SESSION ID TO NEW TOKEN: $token" }
         tokenCredentialMapping[token] = premappedVc
     }
 }

@@ -1,7 +1,7 @@
 package id.walt
 
+import id.walt.config.ConfigManager
 import id.walt.issuer.CIProvider
-import id.walt.issuer.base.config.ConfigManager
 import id.walt.oid4vc.data.CredentialOffer
 import id.walt.oid4vc.requests.CredentialOfferRequest
 import kotlin.test.Test
@@ -11,7 +11,7 @@ class OidcTest {
 
     @Test
     fun testInitCredentialOffer() {
-        ConfigManager.loadConfigs(emptyArray())
+        ConfigManager.testWithConfigs(testConfigs)
         val ciTestProvider = CIProvider()
 
         // -------- CREDENTIAL ISSUER ----------
