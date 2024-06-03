@@ -1,10 +1,10 @@
 package id.walt.verifier.entra
 
+import id.walt.config.ConfigManager
 import id.walt.credentials.verification.Verifier.runPolicyRequest
 import id.walt.credentials.verification.models.PolicyRequest
 import id.walt.credentials.verification.models.PolicyRequest.Companion.parsePolicyRequests
 import id.walt.credentials.verification.models.PolicyResult
-import id.walt.verifier.base.config.ConfigManager
 import io.github.smiley4.ktorswaggerui.dsl.get
 import io.github.smiley4.ktorswaggerui.dsl.post
 import io.github.smiley4.ktorswaggerui.dsl.route
