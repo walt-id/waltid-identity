@@ -4,19 +4,11 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import java.io.InputStream
 import java.util.*
 
+@OptIn(ExperimentalStdlibApi::class)
 object StringUtils {
-    fun hexToInt(hex: String) = Integer.parseInt(clean(hex), 16)
-
-    fun hexToByteArray(hex: String) =
-        clean(hex).let { h -> ByteArray(h.length / 2) { h.substring(it * 2, it * 2 + 2).toInt(16).toByte() } }
-
-    fun binToInt(bin: String) = Integer.parseInt(bin, 2)
-
-    private fun clean(hex: String) = hex.let {
-        it.startsWith("0x").takeIf { it }?.let {
-            hex.substring(2)
-        } ?: hex
-    }
+    fun hexToInt(hex: String) = hex.removePrefix("0x").hexToInt()
+    fun hexToByteArray(hex: String) = hex.removePrefix("0x").hexToByteArray()
+    fun binToInt(bin: String) = bin.toInt(2)
 }
 
 object HttpUtils {
