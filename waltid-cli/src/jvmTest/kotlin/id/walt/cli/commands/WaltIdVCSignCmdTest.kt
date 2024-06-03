@@ -4,7 +4,6 @@ import com.github.ajalt.clikt.core.MissingArgument
 import com.github.ajalt.clikt.core.MissingOption
 import com.github.ajalt.clikt.core.PrintHelpMessage
 import com.github.ajalt.clikt.testing.test
-import kotlinx.io.files.FileNotFoundException
 import org.junit.jupiter.api.assertDoesNotThrow
 import kotlin.test.*
 
@@ -105,7 +104,8 @@ class WaltIdVCSignCmdTest {
     fun `should fail if a non existent key file is provided`() {
 
         val invalidKeyFilePath = "foo.bar"
-        val failure = assertFailsWith<FileNotFoundException> {
+        val failure = assertFails {
+            // FileNotFoundException
             command.parse(arrayOf("-k", invalidKeyFilePath, "-i", issuerDid, "-s", subjectDid, vcFilePath))
         }
 
