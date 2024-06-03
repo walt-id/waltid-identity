@@ -1,13 +1,12 @@
-name: CI/CD Pipeline
+name: Docker compose test
 
 on:
   schedule:
     - cron: "0 0 * * *"
 
 jobs:
-  build-and-test:
+  test:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
