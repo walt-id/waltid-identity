@@ -32,6 +32,8 @@ class DidWebResolver(private val client: HttpClient) : LocalResolverMethod("web"
             client.get(url).bodyAsText().let {
                 DidDocument(jsonObject = Json.parseToJsonElement(it).jsonObject)
             }
+        }.onFailure { err ->
+            throw IllegalStateException("Could not resolve DID document: $did", err)
         }
 
         return response
