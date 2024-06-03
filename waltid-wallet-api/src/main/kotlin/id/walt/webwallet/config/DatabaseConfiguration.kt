@@ -10,19 +10,19 @@ import kotlin.io.path.notExists
 @Serializable
 data class DatabaseConfiguration(
     val database: String
-) : WalletConfig
+) : WalletConfig()
 
 @Serializable
 data class DatasourceJsonConfiguration(
-    val hikariDataSource: Db.SerializableHikariConfiguration,
+    val dataSource: Db.SerializableHikariConfiguration,
     val recreateDatabaseOnStart: Boolean = false
-) : WalletConfig {
+) : WalletConfig() {
 
     companion object {
         private val log = KotlinLogging.logger { }
     }
 
-    val jdbcUrl by lazy { hikariDataSource.jdbcUrl }
+    val jdbcUrl by lazy { dataSource.jdbcUrl }
 
     init {
         if (jdbcUrl?.startsWith(Db.SQLITE_PREFIX) == true) {
