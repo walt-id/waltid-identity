@@ -2,7 +2,7 @@ package id.walt.webwallet.db
 
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
-import id.walt.webwallet.config.ConfigManager
+import id.walt.config.ConfigManager
 import id.walt.webwallet.config.DatasourceJsonConfiguration
 import id.walt.webwallet.db.models.*
 import id.walt.webwallet.service.account.AccountsService
