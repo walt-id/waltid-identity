@@ -1,14 +1,8 @@
 package id.walt.issuer.base.config
 
-import com.sksamuel.hoplite.*
-import io.github.oshai.kotlinlogging.KotlinLogging
-import io.ktor.server.plugins.*
-import kotlin.reflect.KClass
-import kotlin.reflect.jvm.jvmName
-
 interface BaseConfig
 
-object ConfigManager {
+/*object ConfigManager {
 
     private val log = KotlinLogging.logger { }
 
@@ -67,9 +61,9 @@ object ConfigManager {
         registeredConfigurations.add(Pair(name, config))
     }
 
-    /**
+    *//**
      * All configurations registered in this function will be loaded on startup
-     */
+     *//*
     private fun registerConfigurations() {
         registerConfig("web", WebConfig::class)
         registerConfig("issuer-service", OIDCIssuerServiceConfig::class)
@@ -85,4 +79,4 @@ object ConfigManager {
             loadConfig(it, args)
         }
     }
-}
+}*/
