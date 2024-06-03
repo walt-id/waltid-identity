@@ -1,6 +1,6 @@
 package id.walt.webwallet.web.controllers
 
-import id.walt.webwallet.config.ConfigManager
+import id.walt.config.ConfigManager
 import id.walt.webwallet.config.RuntimeConfig
 import id.walt.webwallet.manifest.extractor.EntraMockManifestExtractor
 import id.walt.webwallet.manifest.extractor.ManifestExtractor

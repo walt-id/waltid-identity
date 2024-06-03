@@ -1,6 +1,6 @@
 package id.walt.webwallet.usecase.notification
 
-import id.walt.webwallet.config.ConfigManager
+import id.walt.config.ConfigManager
 import id.walt.webwallet.config.NotificationConfig
 import id.walt.webwallet.db.models.Notification
 import io.github.oshai.kotlinlogging.KotlinLogging
