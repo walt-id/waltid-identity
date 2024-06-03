@@ -7,14 +7,16 @@ import java.net.URL
 import java.util.concurrent.TimeUnit
 
 object OidcLoginService {
-    val jwkProvider: JwkProvider = JwkProviderBuilder(URL(oidcConfig.oidcJwks))
-        .cached(oidcConfig.jwksCache.cacheSize.toLong(), oidcConfig.jwksCache.cacheExpirationHours.toLong(), TimeUnit.HOURS)
-        .rateLimited(
-            oidcConfig.jwksCache.rateLimit.bucketSize.toLong(),
-            oidcConfig.jwksCache.rateLimit.refillRateMinutes.toLong(),
-            TimeUnit.MINUTES
-        )
-        .build()
-    val oidcRealm = oidcConfig.oidcRealm
+    val jwkProvider: JwkProvider by lazy {
+        JwkProviderBuilder(URL(oidcConfig.oidcJwks))
+            .cached(oidcConfig.jwksCache.cacheSize.toLong(), oidcConfig.jwksCache.cacheExpirationHours.toLong(), TimeUnit.HOURS)
+            .rateLimited(
+                oidcConfig.jwksCache.rateLimit.bucketSize.toLong(),
+                oidcConfig.jwksCache.rateLimit.refillRateMinutes.toLong(),
+                TimeUnit.MINUTES
+            )
+            .build()
+    }
+    val oidcRealm by lazy { oidcConfig.oidcRealm }
 
 }
