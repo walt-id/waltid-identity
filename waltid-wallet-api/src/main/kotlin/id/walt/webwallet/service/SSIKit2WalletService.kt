@@ -1,5 +1,6 @@
 package id.walt.webwallet.service
 
+import id.walt.config.ConfigManager
 import id.walt.crypto.keys.*
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.did.dids.DidService
