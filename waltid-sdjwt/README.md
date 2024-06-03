@@ -28,7 +28,9 @@ Checkout the [documentation regarding SD-JWTs](https://docs.walt.id/v/ssikit/con
 ## What is the SD-JWT library?
 
 This library implements the **Selective Disclosure JWT (SD-JWT)**
-specification:  [draft-ietf-oauth-selective-disclosure-jwt-04](https://datatracker.ietf.org/doc/draft-ietf-oauth-selective-disclosure-jwt/04/).
+specification:  [draft-ietf-oauth-selective-disclosure-jwt-04](https://datatracker.ietf.org/doc/draft-ietf-oauth-selective-disclosure-jwt/04/) and also provides support for creating, presenting and verifying
+verifiable credentials according to the **SD-JWT-VC** specification: 
+[SD-JWT-based Verifiable Credentials (SD-JWT VC)](https://www.ietf.org/archive/id/draft-ietf-oauth-sd-jwt-vc-03.html).
 
 ### Features
 
@@ -45,6 +47,8 @@ specification:  [draft-ietf-oauth-selective-disclosure-jwt-04](https://datatrack
 * **Verify** SD-JWT token
     * Signature verification
     * Hash comparison and tamper check of the appended disclosures
+* **SD-JWT-VC** Create, parse, present and verify verifiable credentials according to the SD-JWT-VC specification:
+  * https://www.ietf.org/archive/id/draft-ietf-oauth-sd-jwt-vc-03.html
 * Support for **integration** with various crypto libraries and frameworks, to perform the cryptographic operations and key management
 * **Multiplatform support**:
     * Java/JVM
