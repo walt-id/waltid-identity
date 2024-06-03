@@ -55,7 +55,7 @@ kotlin {
 }
 
 dependencies {
-
+    implementation(project(":waltid-service-commons"))
 
     /* -- KTOR -- */
 
