@@ -1,45 +1,46 @@
 package id.walt.verifier
 
+import id.walt.ConfigurationsList
+import id.walt.ServiceConfiguration
+import id.walt.ServiceInitialization
+import id.walt.ServiceMain
 import id.walt.credentials.verification.PolicyManager
 import id.walt.did.dids.DidService
 import id.walt.did.dids.resolver.LocalResolver
-import id.walt.verifier.base.config.ConfigManager
-import id.walt.verifier.base.config.WebConfig
+import id.walt.verifier.base.config.OIDCVerifierServiceConfig
 import id.walt.verifier.base.web.plugins.*
+import id.walt.verifier.entra.EntraConfig
 import id.walt.verifier.entra.entraVerifierApi
 import id.walt.verifier.policies.PresentationDefinitionPolicy
+import id.walt.web.WebService
 import io.github.oshai.kotlinlogging.KotlinLogging
-import io.klogging.config.ANSI_CONSOLE
-import io.klogging.config.loggingConfiguration
 import io.ktor.server.application.*
-import io.ktor.server.cio.*
-import io.ktor.server.engine.*
 
 private val log = KotlinLogging.logger { }
 
 suspend fun main(args: Array<String>) {
-    loggingConfiguration { ANSI_CONSOLE() }
+    ServiceMain(
+        ServiceConfiguration("verifier"), ServiceInitialization(
+            configs = ConfigurationsList(
+                mandatory = listOf(
+                    "verifier-service" to OIDCVerifierServiceConfig::class,
+                ),
+                optional = listOf(
+                    "entra" to EntraConfig::class
+                )
+            ),
+            init = {
+                //WaltidServices.init()
+                DidService.apply {
+                    registerResolver(LocalResolver())
+                    updateResolversForMethods()
+                }
 
-    log.info { "Starting walt.id verifier..." }
-
-    log.debug { "Init walt services..." }
-    //WaltidServices.init()
-    DidService.apply {
-        registerResolver(LocalResolver())
-        updateResolversForMethods()
-    }
-    PolicyManager.registerPolicies(PresentationDefinitionPolicy())
-
-    //ServiceMatrix("service-matrix.properties")
-
-    log.info { "Reading configurations..." }
-    ConfigManager.loadConfigs(args)
-
-    val webConfig = ConfigManager.getConfig<WebConfig>()
-
-    log.info { "Starting web server (binding to ${webConfig.webHost}, listening on port ${webConfig.webPort})..." }
-    embeddedServer(CIO, port = webConfig.webPort, host = webConfig.webHost, module = Application::verifierModule)
-        .start(wait = true)
+                PolicyManager.registerPolicies(PresentationDefinitionPolicy())
+            },
+            run = WebService( Application::verifierModule).run()
+        )
+    ).main(args)
 }
 
 fun Application.configurePlugins() {
