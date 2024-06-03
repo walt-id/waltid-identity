@@ -10,6 +10,7 @@ import id.walt.oid4vc.interfaces.ICredentialProvider
 import id.walt.oid4vc.requests.*
 import id.walt.oid4vc.responses.*
 import id.walt.oid4vc.util.randomUUID
+import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.http.*
 import kotlinx.datetime.Clock
 import kotlinx.serialization.json.JsonObject
@@ -24,6 +25,8 @@ abstract class OpenIDCredentialIssuer(
     baseUrl: String,
     override val config: CredentialIssuerConfig
 ) : OpenIDProvider<IssuanceSession>(baseUrl), ICredentialProvider {
+
+    private val log = KotlinLogging.logger {  }
 
     override val metadata
         get() = createDefaultProviderMetadata().copy(
@@ -194,7 +197,7 @@ abstract class OpenIDCredentialIssuer(
             CredentialErrorCode.invalid_request,
             "Session invalid"
         )
-        println("Credential request to validate: $credentialRequest")
+        log.debug { "Credential request to validate: $credentialRequest" }
         if (credentialRequest.proof == null || !validateProofOfPossession(credentialRequest, nonce)) {
             throw createCredentialError(
                 credentialRequest,
@@ -318,10 +321,10 @@ abstract class OpenIDCredentialIssuer(
     }
 
     private fun validateProofOfPossession(credentialRequest: CredentialRequest, nonce: String): Boolean {
-        println("VALIDATING: ${credentialRequest.proof} with nonce $nonce")
+        log.debug { "VALIDATING: ${credentialRequest.proof} with nonce $nonce" }
         if (credentialRequest.proof?.proofType != ProofType.jwt || credentialRequest.proof.jwt == null)
             return false
-        println("VERIFYING ITS SIGNATURE")
+        log.debug { "VERIFYING ITS SIGNATURE" }
         return verifyTokenSignature(TokenTarget.PROOF_OF_POSSESSION, credentialRequest.proof.jwt) &&
                 credentialRequest.proof.jwt.let {
                     parseTokenPayload(it)
@@ -342,7 +345,7 @@ abstract class OpenIDCredentialIssuer(
             parameters.appendAll(parametersOf(offerRequest.toHttpParameters()))
         }.buildString()
 
-        println("CREATED URL: $url")
+        log.debug { "CREATED URL: $url" }
 
         return url
     }
