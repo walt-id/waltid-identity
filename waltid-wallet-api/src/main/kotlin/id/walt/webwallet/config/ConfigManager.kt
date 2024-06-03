@@ -1,20 +1,12 @@
 package id.walt.webwallet.config
 
-import com.sksamuel.hoplite.*
-import io.github.oshai.kotlinlogging.KotlinLogging
-import io.ktor.server.plugins.*
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.encodeToJsonElement
-import kotlinx.serialization.json.jsonObject
-import java.util.concurrent.ConcurrentLinkedQueue
-import kotlin.reflect.KClass
-import kotlin.reflect.jvm.jvmName
+import id.walt.config.WaltConfig
 
-@Serializable
-sealed interface WalletConfig
+//@Serializable
+//sealed interface WalletConfig
+typealias WalletConfig = WaltConfig
 
-object ConfigManager {
+/*object ConfigManager {
 
     private val log = KotlinLogging.logger {}
 
@@ -125,13 +117,14 @@ object ConfigManager {
         registeredConfigurations.add(data)
     }
 
-    /** All configurations registered in this function will be loaded on startup */
+    *//** All configurations registered in this function will be loaded on startup *//*
     private fun registerConfigurations() {
-        registerRequiredConfig("db", DatabaseConfiguration::class) {
+        *//*registerRequiredConfig("db", DatabaseConfiguration::class) {
             val dbConfigFile = (it as DatabaseConfiguration).database
 
             registerRequiredConfig(dbConfigFile, multiple = true, type = DatasourceJsonConfiguration::class)
-        }
+        }*//*
+        registerRequiredConfig("db", DatasourceJsonConfiguration::class)
         registerRequiredConfig("web", WebConfig::class)
         registerRequiredConfig("logins", LoginMethodsConfig::class)
         registerRequiredConfig("auth", AuthConfig::class)
@@ -165,10 +158,10 @@ object ConfigManager {
     data class ConfigData(
         val id: String,
         val type: KClass<out WalletConfig>,
-        /** is this configuration mandatory or optional? */
+        *//** is this configuration mandatory or optional? *//*
         val required: Boolean = false,
-        /** are multiple configurations of the same name allowed? */
+        *//** are multiple configurations of the same name allowed? *//*
         val multiple: Boolean = false,
         val onLoad: ((WalletConfig) -> Unit)? = null,
     )
-}
+}*/
