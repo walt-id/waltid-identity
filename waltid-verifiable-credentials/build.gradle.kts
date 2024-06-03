@@ -91,7 +91,7 @@ kotlin {
                 implementation("app.softwork:kotlinx-uuid-core:0.0.22")
 
                 // Loggin
-                implementation("io.github.oshai:kotlin-logging:6.0.4")
+                implementation("io.github.oshai:kotlin-logging:6.0.9")
 
                 // walt.id
                 api(project(":waltid-crypto"))
