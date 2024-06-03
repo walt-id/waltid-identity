@@ -10,8 +10,8 @@ import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.oid4vc.definitions.JWTClaims
 import id.walt.webwallet.config.AuthConfig
-import id.walt.webwallet.config.ConfigManager
-import id.walt.webwallet.config.WebConfig
+import id.walt.config.ConfigManager
+import id.walt.config.list.WebConfig
 import id.walt.webwallet.db.models.AccountWalletMappings
 import id.walt.webwallet.db.models.AccountWalletPermissions
 import id.walt.webwallet.service.OidcLoginService
