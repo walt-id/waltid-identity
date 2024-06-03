@@ -52,6 +52,7 @@ class VerificationUseCase(
         stateId: String?,
         authorizeBaseUrl: String
     ) = let {
+        val openId4VPProfile = OpenId4VPProfile.fromAuthorizeBaseURL(authorizeBaseUrl)
         val vpPolicies = vpPoliciesJson?.jsonArray?.parsePolicyRequests() ?: listOf(PolicyRequest(JwtSignaturePolicy()))
 
         val vcPolicies = vcPoliciesJson?.jsonArray?.parsePolicyRequests() ?: listOf(PolicyRequest(JwtSignaturePolicy()))
@@ -68,7 +69,7 @@ class VerificationUseCase(
 
         val presentationDefinition =
             (presentationDefinitionJson?.let { PresentationDefinition.fromJSON(it.jsonObject) })
-                ?: PresentationDefinition.primitiveGenerationFromVcTypes(requestedTypes)
+                ?: PresentationDefinition.primitiveGenerationFromVcTypes(requestedTypes, openId4VPProfile)
 
         logger.debug { "Presentation definition: " + presentationDefinition.toJSON() }
 
@@ -79,7 +80,7 @@ class VerificationUseCase(
                 else -> null
             },
             clientIdScheme = this.getClientIdScheme(authorizeBaseUrl, OIDCVerifierService.config.defaultClientIdScheme),
-            openId4VPProfile = OpenId4VPProfile.fromAuthorizeBaseURL(authorizeBaseUrl)
+            openId4VPProfile = openId4VPProfile
         )
 
         val specificPolicies = requestCredentialsArr.filterIsInstance<JsonObject>().associate {

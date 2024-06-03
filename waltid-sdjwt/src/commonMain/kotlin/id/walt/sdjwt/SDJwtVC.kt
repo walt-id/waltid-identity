@@ -109,5 +109,7 @@ class SDJwtVC(sdJwt: SDJwt): SDJwt(sdJwt.jwt, sdJwt.header, sdJwt.sdPayload, sdJ
       val sdPayload = SDPayload(undisclosedPayload, sdPayload.digestedDisclosures)
       return SDJwtVC(sign(sdPayload, jwtCryptoProvider, issuerKeyId, typ = "vc+sd-jwt", additionalJwtHeader))
     }
+
+    fun isSdJwtVCPresentation(token: String): Boolean = parse(token).isPresentation
   }
 }
