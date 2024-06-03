@@ -1,4 +1,5 @@
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+import java.util.Properties
 
 plugins {
     kotlin("jvm")
@@ -28,8 +29,20 @@ tasks.withType<KotlinCompile> {
     kotlinOptions.jvmTarget = "17"
 }
 
-tasks.withType<org.gradle.api.tasks.bundling.Zip> {
+tasks.withType<Zip> {
     isZip64 = true
+}
+
+tasks.withType<ProcessResources> {
+    doLast {
+        layout.buildDirectory.get().file("resources/main/version.properties").asFile.run {
+            parentFile.mkdirs()
+            Properties().run {
+                setProperty("version", rootProject.version.toString())
+                writer().use { store(it, "walt.id version store") }
+            }
+        }
+    }
 }
 
 /*java {
