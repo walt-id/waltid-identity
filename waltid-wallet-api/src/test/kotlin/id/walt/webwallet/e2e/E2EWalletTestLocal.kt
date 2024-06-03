@@ -82,7 +82,7 @@ open class E2EWalletTestLocal : E2EWalletTestBase() {
         configureApis()
 
         // list all wallets for this user (sets wallet id)
-        listAllWalletsSetWalletId()
+        listAllWalletsAndSetWalletId()
     }
 
     private fun setupTestWebWallet() {
@@ -131,7 +131,7 @@ open class E2EWalletTestLocal : E2EWalletTestBase() {
             return this.first().id
         }
 
-        listAllWalletsSetWalletId()
+        listAllWalletsAndSetWalletId()
         println("User1: $walletId")
         val user1Wallet = walletId
 
@@ -140,7 +140,7 @@ open class E2EWalletTestLocal : E2EWalletTestBase() {
         getUserToken(user2)
         localWalletClient = newClient(token)
 
-        listAllWalletsSetWalletId()
+        listAllWalletsAndSetWalletId()
         println("User2: $walletId")
         val user2Wallet = walletId
 
@@ -155,9 +155,7 @@ open class E2EWalletTestLocal : E2EWalletTestBase() {
     @Test
     fun e2eTestKeys() = testApplication {
         runApplication()
-        deleteKeys()
-        testCreateRSAKey()
-        testKeys()
+        runKeyTests()
     }
 
     @Test

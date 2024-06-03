@@ -12,6 +12,7 @@ import id.walt.webwallet.db.Db
 import id.walt.webwallet.db.models.AccountWalletListing
 import id.walt.webwallet.db.models.WalletDid
 import id.walt.webwallet.e2e.api.KeyApi
+import id.walt.webwallet.e2e.cases.KeyCases
 import id.walt.webwallet.utils.IssuanceExamples
 import id.walt.webwallet.web.model.AccountRequest
 import id.walt.webwallet.web.model.EmailAccountRequest
@@ -76,6 +77,13 @@ abstract class E2EWalletTestBase {
     abstract var issuerUrl: String
     abstract var verifierUrl: String
 
+    protected suspend fun runKeyTests(){
+        val cases = KeyCases(walletId, keyApi)
+        cases.deleteKeys()
+        cases.testCreateRSAKey()
+        cases.testKeys()
+    }
+
     protected fun deleteAllCredentials() = runBlocking {
         val response: JsonArray = listCredentials()
         response.forEach {
@@ -122,7 +130,7 @@ abstract class E2EWalletTestBase {
             )
         }
     }
-    
+
     protected suspend fun matchCredentialByPresentationDefinition(presentationDefinition: String): JsonArray {
         println("\nUse Case -> Match Credentials for Presentation Definition\n")
 
@@ -132,7 +140,7 @@ abstract class E2EWalletTestBase {
         return walletClient.post(endpoint) {
             contentType(ContentType.Application.Json)
             setBody(
-               presentationDefinition
+                presentationDefinition
             )
         }.let { response ->
             assertEquals(HttpStatusCode.OK, response.status)
@@ -229,7 +237,7 @@ abstract class E2EWalletTestBase {
         println("> Response JSON body token: $token")
     }
 
-    protected suspend fun listAllWalletsSetWalletId() {
+    protected suspend fun listAllWalletsAndSetWalletId() {
         println("\nUse Case -> List Wallets for Account\n")
         val endpoint = "$walletUrl/wallet-api/wallet/accounts/wallets"
         println("GET($endpoint)")
@@ -265,14 +273,14 @@ abstract class E2EWalletTestBase {
         println("\nUse Case -> User Info\n")
         val endpoint = "$walletUrl/wallet-api/auth/user-info"
         println("GET ($endpoint)")
-        assertEquals(HttpStatusCode.OK, walletClient.get(endpoint){}.status)
+        assertEquals(HttpStatusCode.OK, walletClient.get(endpoint) {}.status)
     }
 
     protected suspend fun testUserSession() {
         println("\nUse Case -> Session\n")
         val endpoint = "$walletUrl/wallet-api/auth/session"
         println("GET ($endpoint")
-        assertEquals(HttpStatusCode.OK, walletClient.get(endpoint){}.status)
+        assertEquals(HttpStatusCode.OK, walletClient.get(endpoint) {}.status)
     }
 
     protected suspend fun deleteCredential(credentialId: String) {
@@ -337,44 +345,6 @@ abstract class E2EWalletTestBase {
         }
     }
 
-    protected suspend fun testCreateRSAKey() {
-        keyApi.testGenerateKey(walletId, KeyGenerationRequest(keyType = KeyType.RSA))
-    }
-
-    protected suspend fun deleteKeys() {
-        println("\nUse Case -> Delete Keys\n")
-        listAllKeys().let { keys ->
-            keys.forEach{
-                it.jsonObject["keyId"]?.jsonObject?.get("id")?.jsonPrimitive?.content?.let{
-                    keyApi.testDeleteKey(walletId, it)
-                    println("Key deleted!")
-                }
-            }
-        }
-    }
-
-    private suspend fun listAllKeys(): JsonArray {
-        println("\nUse Case -> List Keys\n")
-        val endpoint = "$walletUrl/wallet-api/wallet/$walletId/keys"
-        println("GET $endpoint")
-        return walletClient.get(endpoint).let { response ->
-            assertEquals(HttpStatusCode.OK, response.status)
-            response.body<JsonArray>()
-        }
-    }
-
-    protected suspend fun testKeys() {
-        println("\nUse Case -> List Keys\n")
-        val endpoint = "$walletUrl/wallet-api/wallet/$walletId/keys"
-        println("GET $endpoint")
-        val keys = walletClient.get(endpoint).let { response ->
-            assertEquals(HttpStatusCode.OK, response.status)
-            response.body<JsonArray>()[0].jsonObject
-        }
-        val algorithm = keys["algorithm"]?.jsonPrimitive?.content
-        assertEquals("RSA", algorithm)
-    }
-
     suspend fun testDefaultDid() {
         println("\nUse Case -> Delete DIDs\n")
         listAllDids().let { dids ->
@@ -390,6 +360,7 @@ abstract class E2EWalletTestBase {
             }
         }
     }
+
     // Verifier Tests
     protected suspend fun testPolicyList(): JsonObject = run {
         println("\nUse Case -> List Verification Policies\n")
@@ -457,7 +428,7 @@ abstract class E2EWalletTestBase {
         }
     }
 
-    protected fun configureApis(){
+    protected fun configureApis() {
         keyApi = KeyApi(walletUrl, walletClient)
     }
 }

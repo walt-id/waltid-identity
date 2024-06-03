@@ -182,7 +182,7 @@ open class E2EWalletTestVerifier : E2EWalletTestBase() {
         localWalletClient = newClient(token)
         
         // list all wallets for this user (sets wallet id)
-        listAllWalletsSetWalletId()
+        listAllWalletsAndSetWalletId()
         val parsedRequest = resolvePresentationRequest(url)
         println("Parsed Request = $parsedRequest")
     }
@@ -194,7 +194,7 @@ open class E2EWalletTestVerifier : E2EWalletTestBase() {
         localWalletClient = newClient(token)
         
         // list all wallets for this user (sets wallet id)
-        listAllWalletsSetWalletId()
+        listAllWalletsAndSetWalletId()
         var matchedCredentials = matchCredentialByPresentationDefinition(presentationDefinitionExample1)
         assertEquals(1, matchedCredentials.size)
         
@@ -219,7 +219,7 @@ open class E2EWalletTestVerifier : E2EWalletTestBase() {
             // list all wallets for this user (sets wallet id)
 
 
-            listAllWalletsSetWalletId()
+            listAllWalletsAndSetWalletId()
             deleteAllCredentials()
             issueNewCredential()
             
