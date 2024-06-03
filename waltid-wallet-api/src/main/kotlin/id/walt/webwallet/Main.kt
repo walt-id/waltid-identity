@@ -1,9 +1,14 @@
 package id.walt.webwallet
 
+import id.walt.ConfigurationsList
+import id.walt.ServiceConfiguration
+import id.walt.ServiceInitialization
+import id.walt.ServiceMain
+import id.walt.config.ConfigManager
+import id.walt.config.list.WebConfig
 import id.walt.crypto.keys.oci.WaltCryptoOci
 import id.walt.did.helpers.WaltidServices
-import id.walt.webwallet.config.ConfigManager
-import id.walt.webwallet.config.WebConfig
+import id.walt.webwallet.config.*
 import id.walt.webwallet.db.Db
 import id.walt.webwallet.web.Administration.configureAdministration
 import id.walt.webwallet.web.controllers.*
@@ -16,44 +21,46 @@ import io.ktor.server.cio.*
 import io.ktor.server.engine.*
 import org.bouncycastle.jce.provider.BouncyCastleProvider
 import java.security.Security
-import kotlin.io.path.Path
-import kotlin.io.path.absolutePathString
 
 private val log = KotlinLogging.logger { }
 
 suspend fun main(args: Array<String>) {
-    log.info { "Starting walt.id wallet..." }
+    ServiceMain(ServiceConfiguration("wallet"), ServiceInitialization(
+        configs = ConfigurationsList(
+            mandatory = listOf(
+                "db" to DatasourceJsonConfiguration::class,
+                "logins" to LoginMethodsConfig::class,
+                "auth" to AuthConfig::class
+            ),
+            optional = listOf(
+                "oidc" to OidcConfiguration::class
+                // TODO: add remaining
+            )
+        ),
+        init = {
+            log.info { "Reading configurations..." }
+            ConfigManager.loadConfigs(args)
+            webWalletSetup()
+            WaltidServices.minimalInit()
+            WaltCryptoOci.init()
+            Db.start()
+        },
+        run = {
+            val webConfig = ConfigManager.getConfig<WebConfig>()
+            log.info { "Starting web server (binding to ${webConfig.webHost}, listening on port ${webConfig.webPort}) ..." }
 
-    log.debug { "Running in path: ${Path(".").absolutePathString()}" }
-
-    log.info { "Reading configurations..." }
-    ConfigManager.loadConfigs(args)
-
-    webWalletSetup()
-    WaltidServices.minimalInit()
-    WaltCryptoOci.init()
-
-    Db.start()
-
-    val webConfig = ConfigManager.getConfig<WebConfig>()
-    log.info { "Starting web server (binding to ${webConfig.webHost}, listening on port ${webConfig.webPort}) ..." }
-    // According class io.ktor.server.engine.ApplicationEngine the Ktor config will be determined by the number of available processors
-    log.debug { "Available Processors: ${Runtime.getRuntime().availableProcessors()}" }
-
-
-    embeddedServer(
-        CIO,
-        port = webConfig.webPort,
-        host = webConfig.webHost,
-        module = Application::webWalletModule,
-        configure = {
-//            connectionGroupSize = 10
-//            workerGroupSize = 5
-//            callGroupSize = 5
-            shutdownGracePeriod = 2000
-            shutdownTimeout = 3000
+            embeddedServer(
+                CIO,
+                port = webConfig.webPort,
+                host = webConfig.webHost,
+                module = Application::webWalletModule,
+                configure = {
+                    shutdownGracePeriod = 2000
+                    shutdownTimeout = 3000
+                }
+            ).start(wait = true)
         }
-    ).start(wait = true)
+    )).main(args)
 }
 
 fun webWalletSetup() {
