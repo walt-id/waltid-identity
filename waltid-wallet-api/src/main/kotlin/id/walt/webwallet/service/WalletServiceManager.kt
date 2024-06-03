@@ -1,6 +1,6 @@
 package id.walt.webwallet.service
 
-import id.walt.webwallet.config.ConfigManager
+import id.walt.config.ConfigManager
 import id.walt.webwallet.config.OidcConfiguration
 import id.walt.webwallet.config.TrustConfig
 import id.walt.webwallet.db.models.AccountWalletMappings
@@ -83,20 +83,30 @@ object WalletServiceManager {
             bitStringValueParser = BitStringValueParser(),
         ),
     )
-    private val issuerNameResolutionService = DefaultNameResolutionService(httpClient, trustConfig.issuersRecord)
-    private val verifierNameResolutionService = DefaultNameResolutionService(httpClient, trustConfig.verifiersRecord)
-    private val issuerNameResolutionUseCase = EntityNameResolutionUseCase(EntityNameResolutionCacheService, issuerNameResolutionService)
-    private val verifierNameResolutionUseCase = EntityNameResolutionUseCase(EntityNameResolutionCacheService, verifierNameResolutionService)
-    private val notificationDataFormatter = NotificationDataFormatter(issuerNameResolutionUseCase)
-    private val notificationDispatchUseCase = NotificationDispatchUseCase(httpClient, notificationDataFormatter)
-    val issuerUseCase = IssuerUseCaseImpl(service = IssuersService, http = httpClient)
-    val eventUseCase = EventLogUseCase(eventService)
-    val eventFilterUseCase = EventFilterUseCase(eventService, issuerNameResolutionUseCase, verifierNameResolutionUseCase)
+    private val issuerNameResolutionService by lazy { DefaultNameResolutionService(httpClient, trustConfig.issuersRecord) }
+    private val verifierNameResolutionService by lazy { DefaultNameResolutionService(httpClient, trustConfig.verifiersRecord) }
+    private val issuerNameResolutionUseCase by lazy {
+        EntityNameResolutionUseCase(
+            EntityNameResolutionCacheService,
+            issuerNameResolutionService
+        )
+    }
+    private val verifierNameResolutionUseCase by lazy {
+        EntityNameResolutionUseCase(
+            EntityNameResolutionCacheService,
+            verifierNameResolutionService
+        )
+    }
+    private val notificationDataFormatter by lazy { NotificationDataFormatter(issuerNameResolutionUseCase) }
+    private val notificationDispatchUseCase by lazy { NotificationDispatchUseCase(httpClient, notificationDataFormatter) }
+    val issuerUseCase by lazy { IssuerUseCaseImpl(service = IssuersService, http = httpClient) }
+    val eventUseCase by lazy { EventLogUseCase(eventService) }
+    val eventFilterUseCase by lazy { EventFilterUseCase(eventService, issuerNameResolutionUseCase, verifierNameResolutionUseCase) }
     val oidcConfig by lazy { ConfigManager.getConfig<OidcConfiguration>() }
     val issuerTrustValidationService by lazy { DefaultTrustValidationService(httpClient, trustConfig.issuersRecord) }
     val verifierTrustValidationService by lazy { DefaultTrustValidationService(httpClient, trustConfig.verifiersRecord) }
-    val notificationUseCase = NotificationUseCase(NotificationService, notificationDataFormatter)
-    val notificationFilterUseCase = NotificationFilterUseCase(NotificationService, credentialService, notificationDataFormatter)
+    val notificationUseCase by lazy { NotificationUseCase(NotificationService, notificationDataFormatter) }
+    val notificationFilterUseCase by lazy { NotificationFilterUseCase(NotificationService, credentialService, notificationDataFormatter) }
     val matchPresentationDefinitionCredentialsUseCase = MatchPresentationDefinitionCredentialsUseCase(
         credentialService,
         FilterPresentationDefinitionMatchStrategy(filterParser),
