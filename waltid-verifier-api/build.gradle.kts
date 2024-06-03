@@ -1,4 +1,5 @@
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+import java.util.Properties
 
 object Versions {
     const val KOTLIN_VERSION = "1.9.22" // also change 2 plugins
@@ -137,6 +138,18 @@ tasks.withType<Test> {
     // > gradle build -PrunIntegrationTests
     if (!project.hasProperty("runIntegrationTests")) {
         exclude("id/walt/test/integration/**")
+    }
+}
+
+tasks.withType<ProcessResources> {
+    doLast {
+        layout.buildDirectory.get().file("resources/main/version.properties").asFile.run {
+            parentFile.mkdirs()
+            Properties().run {
+                setProperty("version", rootProject.version.toString())
+                writer().use { store(it, "walt.id version store") }
+            }
+        }
     }
 }
 
