@@ -1,7 +1,6 @@
 package id.walt.webwallet.utils
 
 import id.walt.crypto.utils.JsonUtils.toJsonElement
-import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.*
 
 object JsonUtils {
@@ -11,12 +10,11 @@ object JsonUtils {
     }
 
     fun Any?.toJsonPrimitive() =
-        @OptIn(ExperimentalSerializationApi::class)
         when (this) {
             is Boolean -> JsonPrimitive(this)
             is Number -> JsonPrimitive(this)
             is String -> JsonPrimitive(this)
-            null -> JsonPrimitive(null)
+            null -> JsonNull
             else -> throw IllegalArgumentException("Unknown type for: $this")
         }
 
