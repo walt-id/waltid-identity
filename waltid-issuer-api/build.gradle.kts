@@ -35,6 +35,7 @@ repositories {
 
 
 dependencies {
+    api(project(":waltid-service-commons"))
 
     /* -- KTOR -- */
 
