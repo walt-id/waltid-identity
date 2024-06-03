@@ -17,10 +17,7 @@ import id.walt.oid4vc.providers.OpenIDClientConfig
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.requests.CredentialOfferRequest
 import id.walt.oid4vc.responses.AuthorizationErrorCode
-import id.walt.webwallet.config.ConfigManager
-import id.walt.webwallet.config.ConfigManager.asJsonObject
-import id.walt.webwallet.config.OciKeyConfig
-import id.walt.webwallet.config.OciRestApiKeyConfig
+import id.walt.webwallet.config.KeyGenerationDefaults
 import id.walt.webwallet.db.models.WalletCategoryData
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.db.models.WalletOperationHistories
@@ -441,12 +438,18 @@ class SSIKit2WalletService(
         }
 
     override suspend fun generateKey(request: KeyGenerationRequest): String = let {
-        if (request.backend == "oci-rest-api" && request.config == null) {
+        if (request.config == null) {
+            ConfigManager.getConfig<KeyGenerationDefaults>().getConfigForBackend(request.backend)?.let {
+                request.config = it
+            }
+        }
+
+        /*if (request.backend == "oci-rest-api" && request.config == null) {
             request.config = ConfigManager.getConfig<OciRestApiKeyConfig>().asJsonObject()
         }
         if (request.backend == "oci" && request.config == null) {
             request.config = ConfigManager.getConfig<OciKeyConfig>().asJsonObject()
-        }
+        }*/
 
         KeyManager.createKey(request)
             .also {
