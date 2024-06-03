@@ -19,6 +19,11 @@ object ConfigManager {
 
     val configLoaders = HashMap<String, ConfigLoader>()
 
+    fun preloadAndRegisterConfig(id: String, config: WaltConfig) {
+        registerConfig(id, config::class)
+        preloadConfig(id, config)
+    }
+
     fun preloadConfig(id: String, config: WaltConfig) {
         preloadedConfigurations[Pair(id, config::class)] = config
     }
