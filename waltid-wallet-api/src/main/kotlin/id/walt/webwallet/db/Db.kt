@@ -43,7 +43,7 @@ object Db {
             log.info { "Will use sqlite database (${datasourceConfig.jdbcUrl}), working directory: ${Path(".").absolutePathString()}" }
         }
 
-        val hikariDataSourceConfig = createHikariDataSource(datasourceConfig.hikariDataSource)
+        val hikariDataSourceConfig = createHikariDataSource(datasourceConfig.dataSource)
 
         // connect
         log.info { "Connecting to database at \"${datasourceConfig.jdbcUrl}\"..." }
