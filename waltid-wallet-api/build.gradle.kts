@@ -157,7 +157,7 @@ dependencies {
     implementation("org.slf4j:jul-to-slf4j:2.0.13")
 
     // Test
-    testImplementation("org.jetbrains.kotlin:kotlin-test-junit:1.9.23")
+    testImplementation("org.jetbrains.kotlin:kotlin-test-junit:2.0.0")
     testImplementation(kotlin("test"))
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.0")
     testImplementation("io.ktor:ktor-server-tests-jvm:$ktor_version")
