@@ -121,7 +121,7 @@ fun Application.configureSecurity() {
                     defaultScopes = oidcConfig.oidcScopes
                 )
             }
-            urlProvider = { "${webConfig.publicBaseUrl}/wallet-api/auth/oidc-session" }
+            urlProvider = { "${oidcConfig.publicBaseUrl}/wallet-api/auth/oidc-session" }
         }
 
         jwt("auth-oauth-jwt") {
@@ -326,9 +326,8 @@ fun Application.auth() {
             }
 
             get("logout-oidc", { description = "Logout via OIDC provider" }) {
-                val webConfig = ConfigManager.getConfig<WebConfig>()
                 call.respondRedirect(
-                    "${oidcConfig.logoutUrl}?post_logout_redirect_uri=${webConfig.publicBaseUrl}&client_id=${oidcConfig.clientId}"
+                    "${oidcConfig.logoutUrl}?post_logout_redirect_uri=${oidcConfig.publicBaseUrl}&client_id=${oidcConfig.clientId}"
                 )
             }
         }
