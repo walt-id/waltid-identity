@@ -5,7 +5,7 @@ plugins {
     id("io.ktor.plugin") version "2.3.11"
     kotlin("plugin.serialization")
 
-    id("com.github.ben-manes.versions") version "0.49.0"
+    id("com.github.ben-manes.versions")
 }
 
 group = "id.walt"
@@ -133,7 +133,7 @@ dependencies {
     implementation("org.jetbrains.exposed:exposed-java-time:0.50.1")
     implementation("org.jetbrains.exposed:exposed-json:0.50.1")
     // drivers
-    implementation("org.xerial:sqlite-jdbc:3.45.3.0")
+    implementation("org.xerial:sqlite-jdbc:3.46.0.0")
     implementation("org.postgresql:postgresql:42.7.3")
     implementation("mysql:mysql-connector-java:8.0.33")
     implementation("com.microsoft.sqlserver:mssql-jdbc:9.4.1.jre8")
@@ -159,7 +159,7 @@ dependencies {
     implementation("io.klogging:slf4j-klogging:0.5.13")
 
     // Test
-    testImplementation("org.jetbrains.kotlin:kotlin-test-junit:1.9.23")
+    testImplementation("org.jetbrains.kotlin:kotlin-test-junit:1.9.24")
     testImplementation(kotlin("test"))
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
     testImplementation("io.ktor:ktor-server-tests-jvm:$ktor_version")
