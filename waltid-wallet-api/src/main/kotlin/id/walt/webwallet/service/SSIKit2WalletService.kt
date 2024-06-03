@@ -70,7 +70,7 @@ class SSIKit2WalletService(
     private val categoryService: CategoryService,
     private val settingsService: SettingsService,
     private val eventUseCase: EventLogUseCase,
-    private val http: HttpClient
+    private val http: HttpClient,
 ) : WalletService(tenant, accountId, walletId) {
     private val logger = KotlinLogging.logger { }
     private val credentialService = CredentialsService()
@@ -179,7 +179,7 @@ class SSIKit2WalletService(
         val id_token: String?,
         val state: String?,
         val fulfilled: Boolean,
-        val rp_response: String?
+        val rp_response: String?,
     )
 
     @Serializable
@@ -187,7 +187,7 @@ class SSIKit2WalletService(
         val vp_token: String,
         val presentation_submission: String,
         val id_token: String?,
-        val state: String?
+        val state: String?,
     )
 
     data class PresentationError(override val message: String, val redirectUri: String?) :
@@ -260,10 +260,9 @@ class SSIKit2WalletService(
 
 
 
-        return if (resp.status.value==302 && !resp.headers["location"].toString().contains("error")){
+        return if (resp.status.value == 302 && !resp.headers["location"].toString().contains("error")) {
             Result.success(if (isResponseRedirectUrl) httpResponseBody else null)
-        }
-        else if (resp.status.isSuccess()) {
+        } else if (resp.status.isSuccess()) {
             Result.success(if (isResponseRedirectUrl) httpResponseBody else null)
         } else {
             if (isResponseRedirectUrl) {
@@ -299,8 +298,8 @@ class SSIKit2WalletService(
     private fun getAnyCredentialWallet() =
         credentialWallets.values.firstOrNull() ?: getCredentialWallet("did:test:test")
 
-        suspend fun useOfferRequest(
-        offer: String, did: String, requireUserInput: Boolean
+    suspend fun useOfferRequest(
+        offer: String, did: String, requireUserInput: Boolean,
     ): List<WalletCredential> {
         val addableCredentials =
             IssuanceService.useOfferRequest(offer, getCredentialWallet(did), testCIClientConfig.clientID).map {
@@ -332,7 +331,7 @@ class SSIKit2WalletService(
     }
 
     override suspend fun resolveCredentialOffer(
-        offerRequest: CredentialOfferRequest
+        offerRequest: CredentialOfferRequest,
     ): CredentialOffer {
         return getAnyCredentialWallet().resolveCredentialOffer(offerRequest)
     }
@@ -543,7 +542,7 @@ class SSIKit2WalletService(
     }
 
     override suspend fun linkWallet(
-        wallet: WalletDataTransferObject
+        wallet: WalletDataTransferObject,
     ): LinkedWalletDataTransferObject = Web3WalletService.link(tenant, walletId, wallet)
 
     override suspend fun unlinkWallet(wallet: UUID) =
