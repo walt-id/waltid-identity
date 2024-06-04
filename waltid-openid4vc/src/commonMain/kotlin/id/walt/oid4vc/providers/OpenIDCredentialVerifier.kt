@@ -42,14 +42,14 @@ abstract class OpenIDCredentialVerifier(val config: CredentialVerifierConfig) :
         ephemeralEncKey: Key? = null,
         clientIdScheme: ClientIdScheme = config.defaultClientIdScheme,
         openId4VPProfile: OpenId4VPProfile = OpenId4VPProfile.DEFAULT,
-        stateParamAuthorizeReqEbsi: String? = null,
+        walletInitiatedAuthState: String? = null,
     ): PresentationSession {
         val session = PresentationSession(
             id = sessionId ?: ShortIdUtils.randomSessionId(),
             authorizationRequest = null,
             expirationTimestamp = Clock.System.now().plus(expiresIn),
             presentationDefinition = presentationDefinition,
-            stateParamAuthorizeReqEbsi = stateParamAuthorizeReqEbsi,
+            walletInitiatedAuthState = walletInitiatedAuthState,
             ephemeralEncKey = ephemeralEncKey,
             openId4VPProfile = openId4VPProfile
         ).also {
