@@ -130,11 +130,16 @@ object Verifier {
     ): PresentationVerificationResponse {
         val providedJws = vpTokenJwt.decodeJws() // usually VP
         val payload = providedJws.payload
-        val vpType = payload.getW3CType()
+        val vpType = when (payload.contains("vp")) {
+            true -> payload.getW3CType()
+            else -> "" // else is IdToken
+        }
 
-        val verifiableCredentialJwts = (payload["vp"]?.jsonObject?.get("verifiableCredential") ?: payload["verifiableCredential"]
-        ?: TODO("Provided data does not have `verifiableCredential` array.")).jsonArray.map { it.jsonPrimitive.content }
-
+        val verifiableCredentialJwts = when (payload.contains("vp")){
+            true -> (payload["vp"]?.jsonObject?.get("verifiableCredential") ?: payload["verifiableCredential"]
+                ?: TODO("Provided data does not have `verifiableCredential` array.")).jsonArray.map { it.jsonPrimitive.content }
+            else -> emptyList()
+        }
 
         val results = ArrayList<PresentationResultEntry>()
 
@@ -162,8 +167,17 @@ object Verifier {
                     })
 
                 /* VP Policies */
-                val vpIdx = addResultEntryFor(vpType)
-                runPolicyRequests(vpIdx, vpTokenJwt, vpPolicies)
+                when(payload.contains("vp")){
+                    true -> {
+                        val vpIdx = addResultEntryFor(vpType)
+                        runPolicyRequests(vpIdx, vpTokenJwt, vpPolicies)
+                    }
+                    else -> {
+                        val vpIdx = 0
+                        results.add(PresentationResultEntry(vpTokenJwt))
+                        runPolicyRequests(vpIdx, vpTokenJwt, vpPolicies)
+                    }
+                }
 
                 // VCs
                 verifiableCredentialJwts.forEach { credentialJwt ->
