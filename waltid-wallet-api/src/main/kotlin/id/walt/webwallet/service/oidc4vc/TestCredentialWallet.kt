@@ -45,7 +45,7 @@ const val WALLET_BASE_URL = "http://localhost:$WALLET_PORT"
 
 class TestCredentialWallet(
     config: CredentialWalletConfig,
-    val did: String
+    val did: String,
 ) : OpenIDCredentialWallet<VPresentationSession>(WALLET_BASE_URL, config) {
 
     private val sessionCache = mutableMapOf<String, VPresentationSession>() // TODO not stateless because of oidc4vc library
@@ -75,11 +75,13 @@ class TestCredentialWallet(
 
 //        val key = runBlocking { walletService.getKeyByDid(keyId) }
         val key = runBlocking {
-            DidService.resolveToKey(keyId).getOrThrow().let { KeysService.get(it.getKeyId()) }
-                ?.let {
-                    KeySerialization.deserializeKey(it.document).getOrThrow()
-                }
-        } ?: error("Failed to retrieve the key")
+            runCatching {
+                DidService.resolveToKey(keyId).getOrThrow().let { KeysService.get(it.getKeyId()) }?.let {
+                        KeySerialization.deserializeKey(it.document).getOrThrow()
+                    }
+            }.getOrElse { throw IllegalArgumentException("Could not resolve key to sign token", it) }
+                ?: error("No key was resolved when trying to resolve key to sign token")
+        }
 
         return runBlocking {
             val authKeyId = resolveDidAuthentication(did)
@@ -98,16 +100,15 @@ class TestCredentialWallet(
             Json.parseToJsonElement(Base64.UrlSafe.decode(token.split(".")[0]).decodeToString()).jsonObject
         }.getOrElse {
             throw IllegalArgumentException(
-                "Could not verify token signature, as JWT header could not be coded for token: $token, cause attached.",
-                it
+                "Could not verify token signature, as JWT header could not be coded for token: $token, cause attached.", it
             )
         }
 
         val kid = jwtHeader["kid"]?.jsonPrimitive?.contentOrNull
             ?: throw IllegalArgumentException("Could not verify token signature, as no kid in jwtHeader")
 
-        val key = keyMapping[kid]
-            ?: throw IllegalStateException("Could not verify token signature, as Key with keyId $kid has not been mapped")
+        val key =
+            keyMapping[kid] ?: throw IllegalStateException("Could not verify token signature, as Key with keyId $kid has not been mapped")
 
         val result = runBlocking { key.verifyJws(token) }
         return result.isSuccess
@@ -180,32 +181,30 @@ class TestCredentialWallet(
 
 //        val key = runBlocking { walletService.getKeyByDid(this@TestCredentialWallet.did) }
         val key = runBlocking {
-            DidService.resolveToKey(did).getOrThrow().let { KeysService.get(it.getKeyId()) }
-                ?.let { KeySerialization.deserializeKey(it.document).getOrThrow() }
-        } ?: error("Failed to retrieve the key")
+            runCatching {
+                DidService.resolveToKey(did).getOrThrow().let { KeysService.get(it.getKeyId()) }
+                    ?.let { KeySerialization.deserializeKey(it.document).getOrThrow() }
+            }
+        }.getOrElse {
+            throw IllegalArgumentException("Could not resolve key to sign JWS to generate presentation for vp_token", it)
+        } ?: error("No key was resolved when trying to resolve key to sign JWS to generate presentation for vp_token")
         val signed = runBlocking {
             val authKeyId = resolveDidAuthentication(this@TestCredentialWallet.did)
 
             key.signJws(
                 vp.toByteArray(), mapOf(
-                    "kid" to authKeyId,
-                    "typ" to "JWT"
+                    "kid" to authKeyId, "typ" to "JWT"
                 )
             )
         }
 
         println("GENERATED VP: $signed")
 
-        return PresentationResult(
-            listOf(JsonPrimitive(signed)), PresentationSubmission(
-                id = presentationId,
-                definitionId = presentationId,
-                descriptorMap = matchedCredentials.map { it.document }.mapIndexed { index, vcJwsStr ->
-                    buildDescriptorMapping(session, index, vcJwsStr)
-                }
-            )
-        )
-        /*val presentation: String = Custodian.getService()
+        return PresentationResult(listOf(JsonPrimitive(signed)), PresentationSubmission(id = presentationId,
+            definitionId = presentationId,
+            descriptorMap = matchedCredentials.map { it.document }.mapIndexed { index, vcJwsStr ->
+                buildDescriptorMapping(session, index, vcJwsStr)
+            }))/*val presentation: String = Custodian.getService()
             .createPresentation(Custodian.getService().listCredentials().map { PresentableCredential(it) }, TEST_DID)
         return PresentationResult(
             listOf(Json.parseToJsonElement(presentation)), PresentationSubmission(
@@ -228,8 +227,7 @@ class TestCredentialWallet(
     override fun resolveDID(did: String): String {
         val key = runBlocking { DidService.resolveToKey(did) }.getOrElse {
             throw IllegalArgumentException(
-                "Could not resolve DID in CredentialWallet: $did, error cause attached.",
-                it
+                "Could not resolve DID in CredentialWallet: $did, error cause attached.", it
             )
         }
         val keyId = runBlocking { key.getKeyId() }
@@ -266,7 +264,7 @@ class TestCredentialWallet(
     override fun createSIOPSession(
         id: String,
         authorizationRequest: AuthorizationRequest?,
-        expirationTimestamp: Instant
+        expirationTimestamp: Instant,
     ) = VPresentationSession(id, authorizationRequest, expirationTimestamp, setOf())
 
     override fun getDidFor(session: VPresentationSession): String {
@@ -289,26 +287,25 @@ class TestCredentialWallet(
     fun initializeAuthorization(
         authorizationRequest: AuthorizationRequest,
         expiresIn: Duration,
-        selectedCredentials: Set<String>
+        selectedCredentials: Set<String>,
     ): VPresentationSession {
         return super.initializeAuthorization(authorizationRequest, expiresIn, null).copy(selectedCredentialIds = selectedCredentials).also {
-            putSession(it.id, it)
-        }
+                putSession(it.id, it)
+            }
     }
 
     private fun buildDescriptorMapping(session: VPresentationSession, index: Int, vcJwsStr: String) = let {
         val vcJws = vcJwsStr.base64UrlToBase64().decodeJws()
-        val type = vcJws.payload["vc"]?.jsonObject?.get("type")?.jsonArray?.last()?.jsonPrimitive?.contentOrNull
-            ?: "VerifiableCredential"
+        val type = vcJws.payload["vc"]?.jsonObject?.get("type")?.jsonArray?.last()?.jsonPrimitive?.contentOrNull ?: "VerifiableCredential"
 
         DescriptorMapping(
-            id = getDescriptorId(type, session.presentationDefinition),//session.presentationDefinition?.inputDescriptors?.get(index)?.id,
+            id = getDescriptorId(
+                type, session.presentationDefinition
+            ),//session.presentationDefinition?.inputDescriptors?.get(index)?.id,
             format = VCFormat.jwt_vp,  // jwt_vp_json
-            path = "$",
-            pathNested = DescriptorMapping(
+            path = "$", pathNested = DescriptorMapping(
                 id = getDescriptorId(
-                    type,
-                    session.presentationDefinition
+                    type, session.presentationDefinition
                 ),//session.presentationDefinition?.inputDescriptors?.get(index)?.id,
                 format = VCFormat.jwt_vc_json, // jwt_vc_json
                 path = "$.verifiableCredential[$index]", //.vp.verifiableCredentials
