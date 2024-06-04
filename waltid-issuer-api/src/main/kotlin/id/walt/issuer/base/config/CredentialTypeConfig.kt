@@ -1,5 +1,5 @@
 package id.walt.issuer.base.config
 
 data class CredentialTypeConfig(
-    val supportedCredentialTypes: String
+    val supportedCredentialTypes: Map<String, List<String>>
 ) : BaseConfig
