@@ -36,6 +36,7 @@ import io.ktor.server.application.*
 import io.ktor.server.auth.*
 import io.ktor.server.auth.jwt.*
 import io.ktor.server.plugins.*
+import io.ktor.server.plugins.ratelimit.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.sessions.*
@@ -53,6 +54,7 @@ import org.jetbrains.exposed.sql.transactions.transaction
 import java.time.temporal.ChronoUnit
 import kotlin.collections.set
 import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.seconds
 
 private val logger = KotlinLogging.logger {}
 
@@ -179,6 +181,16 @@ fun Application.configureSecurity() {
             }
         }
     }
+
+    install(RateLimit) {
+        register(RateLimitName("login")) {
+            rateLimiter(limit = 30, refillPeriod = 60.seconds) // allows 30 requests per minute
+            /*            requestKey { applicationCall ->
+                            println(applicationCall)
+                            // TODO: get username applicationCall.request.queryParameters["login"]!!
+                        }*/
+        }
+    }
 }
 
 fun Application.auth() {
@@ -212,45 +224,47 @@ fun Application.auth() {
                 call.respond(oidcSession.token)
             }
 
-            post(
-                "login",
-                {
-                    summary =
-                        "Login with [email + password] or [wallet address + ecosystem] or [oidc session]"
-                    request {
-                        body<EmailAccountRequest> {
-                            example(
-                                "E-mail + password",
-                                buildJsonObject {
-                                    put("type", JsonPrimitive("email"))
-                                    put("email", JsonPrimitive("user@email.com"))
-                                    put("password", JsonPrimitive("password"))
-                                }
-                                    .toString())
-                            example(
-                                "Wallet address + ecosystem",
-                                buildJsonObject {
-                                    put("type", JsonPrimitive("address"))
-                                    put("address", JsonPrimitive("0xABC"))
-                                    put("ecosystem", JsonPrimitive("ecosystem"))
-                                }
-                                    .toString())
-                            example(
-                                "OIDC token",
-                                buildJsonObject {
-                                    put("type", JsonPrimitive("oidc"))
-                                    put("token", JsonPrimitive("oidc token"))
-                                }
-                                    .toString())
+            rateLimit(RateLimitName("login")) {
+                post(
+                    "login",
+                    {
+                        summary =
+                            "Login with [email + password] or [wallet address + ecosystem] or [oidc session]"
+                        request {
+                            body<EmailAccountRequest> {
+                                example(
+                                    "E-mail + password",
+                                    buildJsonObject {
+                                        put("type", JsonPrimitive("email"))
+                                        put("email", JsonPrimitive("user@email.com"))
+                                        put("password", JsonPrimitive("password"))
+                                    }
+                                        .toString())
+                                example(
+                                    "Wallet address + ecosystem",
+                                    buildJsonObject {
+                                        put("type", JsonPrimitive("address"))
+                                        put("address", JsonPrimitive("0xABC"))
+                                        put("ecosystem", JsonPrimitive("ecosystem"))
+                                    }
+                                        .toString())
+                                example(
+                                    "OIDC token",
+                                    buildJsonObject {
+                                        put("type", JsonPrimitive("oidc"))
+                                        put("token", JsonPrimitive("oidc token"))
+                                    }
+                                        .toString())
+                            }
                         }
-                    }
-                    response {
-                        HttpStatusCode.OK to { description = "Login successful" }
-                        HttpStatusCode.Unauthorized to { description = "Login failed" }
-                        HttpStatusCode.BadRequest to { description = "Login failed" }
-                    }
-                }) {
-                doLogin()
+                        response {
+                            HttpStatusCode.OK to { description = "Login successful" }
+                            HttpStatusCode.Unauthorized to { description = "Login failed" }
+                            HttpStatusCode.BadRequest to { description = "Login failed" }
+                        }
+                    }) {
+                    doLogin()
+                }
             }
 
             post(
@@ -385,45 +399,47 @@ fun Application.auth() {
             }
 
             // Login a Keycloak user
-            post("login", {
-                summary = "Keycloak login with [username + password]"
-                description = "Login of a user managed by Keycloak."
-                request {
-                    body<KeycloakAccountRequest> {
-                        example(
-                            "Keycloak username + password",
-                            buildJsonObject {
-                                put("type", JsonPrimitive("keycloak"))
-                                put("username", JsonPrimitive("Max_Mustermann"))
-                                put("password", JsonPrimitive("password"))
-                            }
-                                .toString())
-                        example(
-                            "Keycloak username + Access Token ",
-                            buildJsonObject {
-                                put("type", JsonPrimitive("keycloak"))
-                                put("username", JsonPrimitive("Max_Mustermann"))
-                                put("token", JsonPrimitive("eyJhb..."))
-                            }
-                                .toString())
+            rateLimit(RateLimitName("login")) {
+                post("login", {
+                    summary = "Keycloak login with [username + password]"
+                    description = "Login of a user managed by Keycloak."
+                    request {
+                        body<KeycloakAccountRequest> {
+                            example(
+                                "Keycloak username + password",
+                                buildJsonObject {
+                                    put("type", JsonPrimitive("keycloak"))
+                                    put("username", JsonPrimitive("Max_Mustermann"))
+                                    put("password", JsonPrimitive("password"))
+                                }
+                                    .toString())
+                            example(
+                                "Keycloak username + Access Token ",
+                                buildJsonObject {
+                                    put("type", JsonPrimitive("keycloak"))
+                                    put("username", JsonPrimitive("Max_Mustermann"))
+                                    put("token", JsonPrimitive("eyJhb..."))
+                                }
+                                    .toString())
 
-                        example(
-                            "Keycloak user Access Token ",
-                            buildJsonObject {
-                                put("type", JsonPrimitive("keycloak"))
-                                put("token", JsonPrimitive("eyJhb..."))
-                            }
-                                .toString())
+                            example(
+                                "Keycloak user Access Token ",
+                                buildJsonObject {
+                                    put("type", JsonPrimitive("keycloak"))
+                                    put("token", JsonPrimitive("eyJhb..."))
+                                }
+                                    .toString())
+                        }
                     }
-                }
 
-                response {
-                    HttpStatusCode.OK to { description = "Login successful" }
-                    HttpStatusCode.Unauthorized to { description = "Unauthorized" }
-                    HttpStatusCode.BadRequest to { description = "Bad request" }
+                    response {
+                        HttpStatusCode.OK to { description = "Login successful" }
+                        HttpStatusCode.Unauthorized to { description = "Unauthorized" }
+                        HttpStatusCode.BadRequest to { description = "Bad request" }
+                    }
+                }) {
+                    doLogin()
                 }
-            }) {
-                doLogin()
             }
 
             // Terminate Keycloak session
