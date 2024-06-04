@@ -67,7 +67,7 @@ dependencies {
     implementation("io.ktor:ktor-server-method-override:$ktor_version")
 
     // Ktor server external libs
-    implementation("io.github.smiley4:ktor-swagger-ui:2.8.0")
+    implementation("io.github.smiley4:ktor-swagger-ui:2.10.0")
     //implementation("io.github.microutils:kotlin-logging-jvm:2.1.23")
 
     // Ktor client
@@ -128,7 +128,7 @@ dependencies {
 
     // DB
     implementation("org.jetbrains.exposed:exposed-core:0.49.0")
-    implementation("org.jetbrains.exposed:exposed-jdbc:0.47.0")
+    implementation("org.jetbrains.exposed:exposed-jdbc:0.50.1")
     implementation("org.jetbrains.exposed:exposed-dao:0.49.0")
     implementation("org.jetbrains.exposed:exposed-java-time:0.50.1")
     implementation("org.jetbrains.exposed:exposed-json:0.50.1")
@@ -136,7 +136,7 @@ dependencies {
     implementation("org.xerial:sqlite-jdbc:3.44.1.0")
     implementation("org.postgresql:postgresql:42.7.2")
     implementation("mysql:mysql-connector-java:8.0.33")
-    implementation("com.microsoft.sqlserver:mssql-jdbc:9.4.1.jre8")
+    implementation("com.microsoft.sqlserver:mssql-jdbc:12.7.0.jre8-preview")
     // migration
     //implementation("org.flywaydb:flyway-core:9.22.2")
 
