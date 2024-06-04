@@ -4,6 +4,7 @@ import id.walt.verifier.verifierModule
 import id.walt.webwallet.config.DatasourceJsonConfiguration
 import id.walt.webwallet.config.RegistrationDefaultsConfig
 import id.walt.webwallet.db.Db
+import id.walt.webwallet.db.SerializableHikariConfiguration
 import id.walt.webwallet.db.models.AccountWalletListing
 import id.walt.webwallet.utils.WalletHttpClients
 import id.walt.webwallet.webWalletModule
@@ -40,7 +41,7 @@ class E2EWalletTestLocal : E2EWalletTestBase() {
         init {
             WalletConfigManager.preloadConfig(
                 "db.sqlite", DatasourceJsonConfiguration(
-                    hikariDataSource = Db.SerializableHikariConfiguration(
+                    hikariDataSource = SerializableHikariConfiguration(
                         jdbcUrl = "jdbc:sqlite:data/wallet.db",
                         driverClassName = "org.sqlite.JDBC",
                         username = "",

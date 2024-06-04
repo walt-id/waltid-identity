@@ -1,14 +1,15 @@
 services:
-  # postgresdb:  # Uncomment to connect a Postgres DB
-  #   image: postgres
-  #   environment:
-  #     POSTGRES_PASSWORD: secret
   wallet-api:
     image: docker.io/waltid/wallet-api:${VERSION_TAG:-latest}
     pull_policy: always
     build:
       context: ../
       dockerfile: waltid-wallet-api/Dockerfile
+    depends_on:
+      - "$DATABASE_ENGINE"
+      - caddy
+    env_file:
+      - .env
     volumes:
       - ./wallet-api/config:/waltid-wallet-api/config
       - ./wallet-api/walt.yaml:/waltid-wallet-api/walt.yaml
@@ -18,6 +19,10 @@ services:
     platform: linux/x86_64
     image: docker.io/waltid/issuer-api:${VERSION_TAG:-latest}
     pull_policy: always
+    depends_on:
+      - caddy
+    env_file:
+      - .env
     volumes:
       - ./issuer-api/config:/waltid-issuer-api/config
 
@@ -25,12 +30,19 @@ services:
     platform: linux/x86_64
     image: docker.io/waltid/verifier-api:${VERSION_TAG:-latest}
     pull_policy: always
+    depends_on:
+      - caddy
+    env_file:
+      - .env
     volumes:
       - ./verifier-api/config:/waltid-verifier-api/config
 
   waltid-web-wallet:
     image: docker.io/waltid/waltid-web-wallet:${VERSION_TAG:-latest}
     pull_policy: always
+    depends_on:
+      - wallet-api
+      - caddy
     environment:
       NUXT_PUBLIC_ISSUER_CALLBACK_URL: "http://localhost:$WALLET_FRONTEND_PORT"
       PORT: $WALLET_FRONTEND_PORT
@@ -39,6 +51,8 @@ services:
     platform: linux/x86_64
     image: docker.io/waltid/portal:${VERSION_TAG:-latest}
     pull_policy: always
+    depends_on:
+      - caddy
     environment:
       NEXT_PUBLIC_VC_REPO: "http://localhost:$VC_REPO_PORT"
       NEXT_PUBLIC_ISSUER: "http://localhost:$ISSUER_API_PORT"
@@ -50,8 +64,92 @@ services:
     platform: linux/x86_64
     image: docker.io/waltid/vc-repository:latest
     pull_policy: always
+    depends_on:
+      - caddy
     environment:
       PORT: $VC_REPO_PORT
+
+  # sqlite fake service
+  sqlite:
+    image: alpine
+    profiles:
+        -   sqlite
+    entrypoint: [ "/bin/sh", "-c", "exit 0" ]
+
+  postgres-engine:
+    image: postgres:alpine
+    profiles:
+      - postgres
+    healthcheck:
+      test: [ "CMD", "pg_isready", "-q", "-U", "$POSTGRES_DB_USR" ]
+      interval: 5s
+      timeout: 1s
+      retries: 5
+    restart: always
+    env_file:
+      - ./postgres/postgres.env
+    volumes:
+      - wallet-api-db:/waltid-wallet-api/data
+      - ./postgres/postgres-db-init.sh:/docker-entrypoint-initdb.d/postgres-db-init.sh
+    ports:
+      - $POSTGRES_DB_PORT:$POSTGRES_DB_PORT #TODO: tcp/udp proxy with caddy
+
+  # postgres-proxy-service
+  postgres:
+    image: alpine
+    profiles:
+        -   postgres
+    entrypoint: [ "/bin/sh", "-c", "exit 0" ]
+    depends_on:
+      postgres-engine:
+        condition: "service_healthy"
+
+  phpmyadmin:
+    image: dpage/pgadmin4
+    profiles:
+      - postgres
+    depends_on:
+      - postgres
+      - caddy
+    env_file:
+      - ./postgres/pgadmin.env
+    volumes:
+      - pgadmin:/waltid-wallet-api/data/pgadmin
+    restart: always
+
+  mssql-engine:
+    image: mcr.microsoft.com/azure-sql-edge
+    profiles:
+      - mssql
+    healthcheck:
+      test: [ "CMD-SHELL", "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P $MSSQL_SA_PWD -Q 'SELECT 1' || exit 1" ]
+      interval: 5s
+      timeout: 1s
+      retries: 5
+    restart: always
+    env_file:
+      - ./mssql/mssql.env
+    ports:
+      - $MSSQL_DB_PORT:$MSSQL_DB_PORT
+
+  # mssql-proxy-service
+  mssql:
+    image: mcr.microsoft.com/azure-sql-edge
+    profiles:
+      - mssql
+    volumes:
+      - ./mssql/mssql-db-init.sql:/docker-entrypoint-initdb.d/mssql-db-init.sql
+    env_file:
+      - ./mssql/mssql.env
+      - .env
+    depends_on:
+      mssql-engine:
+        condition: "service_healthy"
+    command: >
+      bash -c '
+      /opt/mssql-tools/bin/sqlcmd -S mssql-engine -U sa -P $MSSQL_SA_PWD -i /docker-entrypoint-initdb.d/mssql-db-init.sql;
+      echo "Configuration complete";
+      '
 
   caddy:
     image: docker.io/caddy:2
@@ -62,35 +160,43 @@ services:
       - NET_ADMIN
     ports:
 
-      - target: $WALLET_BACKEND_PORT
+      - target: "$WALLET_BACKEND_PORT"
         published: $WALLET_BACKEND_PORT # wallet-api
         protocol: tcp
         mode: host
 
-      - target: $ISSUER_API_PORT
+      - target: "$ISSUER_API_PORT"
         published: $ISSUER_API_PORT # issuer-api
         protocol: tcp
         mode: host
 
-      - target: $VERIFIER_API_PORT
+      - target: "$VERIFIER_API_PORT"
         published: $VERIFIER_API_PORT # verifier-api
         protocol: tcp
         mode: host
 
-      - target: $WALLET_FRONTEND_PORT
+      - target: "$WALLET_FRONTEND_PORT"
         published: $WALLET_FRONTEND_PORT # waltid-web-wallet
         protocol: tcp
         mode: host
 
-      - target: $WEB_PORTAL_PORT
+      - target: "$WEB_PORTAL_PORT"
         published: $WEB_PORTAL_PORT # web-portal
         protocol: tcp
         mode: host
 
-      - target: $VC_REPO_PORT
+      - target: "$VC_REPO_PORT"
         published: $VC_REPO_PORT # vc-repo
+        protocol: tcp
+        mode: host
+
+      - target: "$PG_ADMIN_PORT"
+        published: $PG_ADMIN_PORT # pg-admin
         protocol: tcp
         mode: host
 
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile
+volumes:
+  wallet-api-db:
+  pgadmin:
