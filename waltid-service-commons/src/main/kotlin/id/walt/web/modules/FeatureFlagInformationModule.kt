@@ -10,12 +10,12 @@ object FeatureFlagInformationModule {
 
     @Serializable
     data class FeatureFlagInformation(
-        val enabled: Map<String, String>,
+        val enabled: Map<String?, String?>,
         val total: Int
     ) {
         companion object {
             fun createCurrent(): FeatureFlagInformation {
-                val enabled = FeatureManager.enabledFeatures.values.associate { it.name to it.description }
+                val enabled = FeatureManager.enabledFeatures.values.associate { it?.name to it?.description }
                 return FeatureFlagInformation(enabled, enabled.size)
             }
         }
