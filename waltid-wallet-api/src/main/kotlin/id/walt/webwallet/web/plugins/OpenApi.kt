@@ -5,9 +5,11 @@ import io.github.smiley4.ktorswaggerui.data.AuthKeyLocation
 import io.github.smiley4.ktorswaggerui.data.AuthScheme
 import io.github.smiley4.ktorswaggerui.data.AuthType
 import io.ktor.server.application.*
+import io.ktor.server.plugins.ratelimit.*
 
 fun Application.configureOpenApi() {
     install(SwaggerUI) {
+        ignoredRouteSelectors += RateLimitRouteSelector::class
         swagger {
             swaggerUrl = "swagger"
             forwardRoot = true

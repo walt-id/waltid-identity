@@ -10,7 +10,6 @@ import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
-import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.did.dids.DidService
 import id.walt.did.dids.DidUtils
 import id.walt.issuer.IssuanceExamples.openBadgeCredentialExample
@@ -42,20 +41,14 @@ import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.time.Duration.Companion.minutes
 
 val supportedCredentialTypes = ConfigManager.getConfig<CredentialTypeConfig>().supportedCredentialTypes
-val jsonMappingObjArray = Json.decodeFromString<JsonArray>(supportedCredentialTypes)
-val tempMap = mutableMapOf<String, List<String>>()
-val credentialConfigurationsSupportedTestTable = jsonMappingObjArray?.forEach {
-    var tempListOfTypes = ArrayList<String>()
-    tempMap.put ( it.jsonObject["id"].toJsonElement().jsonPrimitive.content, it.jsonObject["type"]?.jsonArray?.forEach{ tempListOfTypes.add(it.jsonPrimitive.content) }.let { tempListOfTypes }) }
-
 /**
  * OIDC for Verifiable Credential Issuance service provider, implementing abstract service provider from OIDC4VC library.
  */
 open class CIProvider : OpenIDCredentialIssuer(
     baseUrl = let {
         ConfigManager.getConfig<OIDCIssuerServiceConfig>().baseUrl
-    }, config = CredentialIssuerConfig(credentialConfigurationsSupported = tempMap.flatMap { entry ->
-        CredentialFormat.values().map { format ->
+    }, config = CredentialIssuerConfig(credentialConfigurationsSupported = supportedCredentialTypes.flatMap { entry ->
+        CredentialFormat.entries.map { format ->
             CredentialSupported(
                 id = "${entry.key}_${format.value}",
                 format = format,

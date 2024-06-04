@@ -78,6 +78,7 @@ dependencies {
     implementation("io.ktor:ktor-serialization-kotlinx-json:$ktor_version")
     implementation("io.ktor:ktor-server-cio-jvm:$ktor_version")
     implementation("io.ktor:ktor-server-method-override:$ktor_version")
+    implementation("io.ktor:ktor-server-rate-limit:$ktor_version")
 
     // Ktor server external libs
     implementation("io.github.smiley4:ktor-swagger-ui:2.10.0")
@@ -149,7 +150,7 @@ dependencies {
     implementation("org.xerial:sqlite-jdbc:3.46.0.0")
     implementation("org.postgresql:postgresql:42.7.3")
     implementation("mysql:mysql-connector-java:8.0.33")
-    implementation("com.microsoft.sqlserver:mssql-jdbc:9.4.1.jre8")
+    implementation("com.microsoft.sqlserver:mssql-jdbc:12.7.0.jre8-preview")
     // migration
     //implementation("org.flywaydb:flyway-core:9.22.2")
 

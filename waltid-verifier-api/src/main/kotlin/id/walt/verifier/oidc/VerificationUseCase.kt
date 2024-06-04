@@ -8,11 +8,12 @@ import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeyType
 import id.walt.mdoc.COSECryptoProviderKeyInfo
-import id.walt.mdoc.SimpleCOSECryptoProvider
 import id.walt.oid4vc.data.ClientIdScheme
 import id.walt.oid4vc.data.OpenId4VPProfile
 import id.walt.oid4vc.data.ResponseMode
+import id.walt.oid4vc.data.ResponseType
 import id.walt.oid4vc.data.dif.PresentationDefinition
+import id.walt.oid4vc.providers.PresentationSession
 import id.walt.oid4vc.responses.TokenResponse
 import id.walt.sdjwt.JWTCryptoProvider
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -40,12 +41,14 @@ class VerificationUseCase(
         requestCredentialsJson: JsonElement,
         presentationDefinitionJson: JsonElement?,
         responseMode: ResponseMode,
+        responseType: ResponseType? = ResponseType.VpToken,
         successRedirectUri: String?,
         errorRedirectUri: String?,
         statusCallbackUri: String?,
         statusCallbackApiKey: String?,
         stateId: String?,
-        openId4VPProfile: OpenId4VPProfile = OpenId4VPProfile.Default
+        walletInitiatedAuthState: String? = null,
+        openId4VPProfile: OpenId4VPProfile = OpenId4VPProfile.DEFAULT
     ) = let {
         val vpPolicies = vpPoliciesJson?.jsonArray?.parsePolicyRequests() ?: listOf(PolicyRequest(JwtSignaturePolicy()))
 
@@ -63,7 +66,7 @@ class VerificationUseCase(
 
         val presentationDefinition =
             (presentationDefinitionJson?.let { PresentationDefinition.fromJSON(it.jsonObject) })
-                ?: PresentationDefinition.primitiveGenerationFromVcTypes(requestedTypes)
+                ?: PresentationDefinition.primitiveGenerationFromVcTypes(requestedTypes, openId4VPProfile)
 
         logger.debug { "Presentation definition: " + presentationDefinition.toJSON() }
 
@@ -74,7 +77,9 @@ class VerificationUseCase(
                 else -> null
             },
             clientIdScheme = this.getClientIdScheme(openId4VPProfile, OIDCVerifierService.config.defaultClientIdScheme),
-            openId4VPProfile = openId4VPProfile
+            openId4VPProfile = openId4VPProfile,
+            walletInitiatedAuthState = walletInitiatedAuthState,
+            responseType = responseType
         )
 
         val specificPolicies = requestCredentialsArr.filterIsInstance<JsonObject>().associate {
@@ -83,23 +88,25 @@ class VerificationUseCase(
                 ?: throw IllegalArgumentException("No `policies` supplied, in `request_credentials`.")).jsonArray.parsePolicyRequests()
         }
 
-        logger.debug { "vpPolicies: $vpPolicies" }
-        logger.debug { "vcPolicies: $vcPolicies" }
-        logger.debug { "spPolicies: $specificPolicies" }
-
         OIDCVerifierService.sessionVerificationInfos[session.id] = OIDCVerifierService.SessionVerificationInformation(
             vpPolicies = vpPolicies,
             vcPolicies = vcPolicies,
             specificPolicies = specificPolicies,
             successRedirectUri = successRedirectUri,
             errorRedirectUri = errorRedirectUri,
+            walletInitiatedAuthState = walletInitiatedAuthState,
             statusCallback = statusCallbackUri?.let {
                 OIDCVerifierService.StatusCallback(
                     statusCallbackUri = it,
                     statusCallbackApiKey = statusCallbackApiKey,
                 )
-            })
+            }
+        )
         session
+    }
+
+    fun getSession(sessionId: String): PresentationSession {
+        return sessionId.let { OIDCVerifierService.getSession(it) }!!
     }
 
     fun verify(sessionId: String?, tokenResponseParameters: Map<String, List<String>>): Result<String> {
@@ -164,7 +171,7 @@ class VerificationUseCase(
 
     fun getSignedAuthorizationRequestObject(sessionId: String): Result<String> =
         OIDCVerifierService.getSession(sessionId)?.authorizationRequest?.let {
-            Result.success(it.toRequestObject(RequestSigningCryptoProvider, RequestSigningCryptoProvider.signingKey?.keyID.orEmpty()))
+            Result.success(it.toRequestObject(RequestSigningCryptoProvider, RequestSigningCryptoProvider.signingKey.keyID.orEmpty()))
         } ?: Result.failure(error("Invalid id provided (expired?): $sessionId"))
 
     suspend fun notifySubscribers(sessionId: String) = runCatching {

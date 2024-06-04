@@ -21,10 +21,7 @@ import id.walt.mdoc.doc.MDocVerificationParams
 import id.walt.mdoc.doc.VerificationType
 import id.walt.mdoc.mdocauth.DeviceAuthentication
 import id.walt.oid4vc.OpenID4VP
-import id.walt.oid4vc.data.ClientIdScheme
-import id.walt.oid4vc.data.OpenIDClientMetadata
-import id.walt.oid4vc.data.OpenId4VPProfile
-import id.walt.oid4vc.data.ResponseMode
+import id.walt.oid4vc.data.*
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.providers.CredentialVerifierConfig
 import id.walt.oid4vc.providers.OpenIDCredentialVerifier
@@ -58,6 +55,7 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
         val successRedirectUri: String?,
         val errorRedirectUri: String?,
         val statusCallback: StatusCallback? = null,
+        val walletInitiatedAuthState: String? = null
     )
 
     data class StatusCallback(
@@ -97,17 +95,18 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
         val policies = sessionVerificationInfos[session.id]
             ?: throw IllegalArgumentException("Could not find policy listing for session: ${session.id}")
 
-        val vpToken = when (tokenResponse.vpToken) {
-            is JsonObject -> tokenResponse.vpToken.toString()
-            is JsonPrimitive -> tokenResponse.vpToken!!.jsonPrimitive.content
-            null -> {
-                logger.debug { "Null in tokenResponse.vpToken!" }
-                return false
+        val vpToken = when(tokenResponse.idToken) {
+            null -> when (tokenResponse.vpToken) {
+                is JsonObject -> tokenResponse.vpToken.toString()
+                is JsonPrimitive -> tokenResponse.vpToken!!.jsonPrimitive.content
+                null -> {
+                    logger.debug { "Null in tokenResponse.vpToken!" }
+                    return false
+                }
+                else -> throw IllegalArgumentException("Illegal tokenResponse.vpToken: ${tokenResponse.vpToken}")
             }
-
-            else -> throw IllegalArgumentException("Illegal tokenResponse.vpToken: ${tokenResponse.vpToken}")
+            else ->tokenResponse.idToken.toString()
         }
-
 
         if (tokenResponse.vpToken is JsonObject) TODO("Token response is jsonobject - not yet handled")
 
@@ -157,22 +156,26 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
     override fun initializeAuthorization(
         presentationDefinition: PresentationDefinition,
         responseMode: ResponseMode,
+        responseType: ResponseType?,
         scope: Set<String>,
         expiresIn: Duration,
         sessionId: String?,
         ephemeralEncKey: Key?,
         clientIdScheme: ClientIdScheme,
-        openId4VPProfile: OpenId4VPProfile
+        openId4VPProfile: OpenId4VPProfile,
+        walletInitiatedAuthState: String?,
     ): PresentationSession {
         val presentationSession = super.initializeAuthorization(
-            presentationDefinition,
-            responseMode,
-            scope,
-            expiresIn,
-            sessionId,
-            ephemeralEncKey,
-            clientIdScheme,
-            openId4VPProfile
+            presentationDefinition = presentationDefinition,
+            responseMode = responseMode,
+            responseType = responseType,
+            scope = scope,
+            expiresIn = expiresIn,
+            sessionId = sessionId,
+            ephemeralEncKey = ephemeralEncKey,
+            clientIdScheme = clientIdScheme,
+            openId4VPProfile = openId4VPProfile,
+            walletInitiatedAuthState = walletInitiatedAuthState
         )
         return presentationSession.copy(
             authorizationRequest = presentationSession.authorizationRequest!!.copy(
