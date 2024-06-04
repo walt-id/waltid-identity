@@ -1,6 +1,5 @@
 package id.walt.verifier.base.config
 
-import id.walt.oid4vc.data.ClientIdScheme
 import kotlinx.serialization.Serializable
 
 @Serializable

@@ -48,6 +48,10 @@ class StatusListCredentialStatusServiceTest {
             } returns true
             // when
             val result = sut.get(statusEntry)
+            println("result")
+            println(result)
+            println("result")
+
             // then
             assertEquals(
                 expected = CredentialStatusResult(type = "revocation", result = false, message = "unset"),

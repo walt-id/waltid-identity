@@ -202,5 +202,52 @@ object VerifierApiExamples {
 }
 """.trimIndent()
 
-
+    val EbsiVerifiablePDA1 = """
+    {
+      "vc_policies": [
+        "signature",
+        "revoked_status_list",
+        "expired",
+        "not-before"
+      ],
+      "request_credentials": [
+        "VerifiablePortableDocumentA1"
+      ],
+      "presentation_definition": {
+        "id": "70fc7fab-89c0-4838-ba77-4886f47c3761",
+        "input_descriptors": [
+          {
+            "id": "e3d700aa-0988-4eb6-b9c9-e00f4b27f1d8",
+            "constraints": {
+              "fields": [
+                {
+                  "path": [
+                    "${'$'}.type"
+                  ],
+                  "filter": {
+                    "contains": {
+                      "const": "VerifiablePortableDocumentA1"
+                    },
+                    "type": "array"
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "format": {
+          "jwt_vc": {
+            "alg": [
+              "ES256"
+            ]
+          },
+          "jwt_vp": {
+            "alg": [
+              "ES256"
+            ]
+          }
+        }
+      }
+    }
+    """.trimIndent()
 }
