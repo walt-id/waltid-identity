@@ -47,7 +47,7 @@ class VerificationUseCase(
         statusCallbackUri: String?,
         statusCallbackApiKey: String?,
         stateId: String?,
-        stateParamAuthorizeReqEbsi: String? = null,
+        walletInitiatedAuthState: String? = null,
         openId4VPProfile: OpenId4VPProfile = OpenId4VPProfile.DEFAULT
     ) = let {
         val vpPolicies = vpPoliciesJson?.jsonArray?.parsePolicyRequests() ?: listOf(PolicyRequest(JwtSignaturePolicy()))
@@ -78,7 +78,7 @@ class VerificationUseCase(
             },
             clientIdScheme = this.getClientIdScheme(openId4VPProfile, OIDCVerifierService.config.defaultClientIdScheme),
             openId4VPProfile = openId4VPProfile,
-            stateParamAuthorizeReqEbsi = stateParamAuthorizeReqEbsi,
+            walletInitiatedAuthState = walletInitiatedAuthState,
             responseType = responseType
         )
 
@@ -94,7 +94,7 @@ class VerificationUseCase(
             specificPolicies = specificPolicies,
             successRedirectUri = successRedirectUri,
             errorRedirectUri = errorRedirectUri,
-            stateParamAuthorizeReqEbsi = stateParamAuthorizeReqEbsi,
+            walletInitiatedAuthState = walletInitiatedAuthState,
             statusCallback = statusCallbackUri?.let {
                 OIDCVerifierService.StatusCallback(
                     statusCallbackUri = it,

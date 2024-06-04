@@ -54,7 +54,7 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
         val successRedirectUri: String?,
         val errorRedirectUri: String?,
         val statusCallback: StatusCallback? = null,
-        val stateParamAuthorizeReqEbsi: String? = null
+        val walletInitiatedAuthState: String? = null
     )
 
     data class StatusCallback(
@@ -162,7 +162,7 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
         ephemeralEncKey: Key?,
         clientIdScheme: ClientIdScheme,
         openId4VPProfile: OpenId4VPProfile,
-        stateParamAuthorizeReqEbsi: String?,
+        walletInitiatedAuthState: String?,
     ): PresentationSession {
         val presentationSession = super.initializeAuthorization(
             presentationDefinition = presentationDefinition,
@@ -174,7 +174,7 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
             ephemeralEncKey = ephemeralEncKey,
             clientIdScheme = clientIdScheme,
             openId4VPProfile = openId4VPProfile,
-            stateParamAuthorizeReqEbsi = stateParamAuthorizeReqEbsi
+            walletInitiatedAuthState = walletInitiatedAuthState
         )
         return presentationSession.copy(
             authorizationRequest = presentationSession.authorizationRequest!!.copy(

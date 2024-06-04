@@ -265,8 +265,8 @@ fun Application.verfierApi() {
                 verificationUseCase.verify(sessionId, context.request.call.receiveParameters().toMap())
                     .onSuccess {
                         val session = verificationUseCase.getSession(sessionId!!)
-                        if (session.stateParamAuthorizeReqEbsi != null) {
-                            val state = session.stateParamAuthorizeReqEbsi
+                        if (session.walletInitiatedAuthState != null) {
+                            val state = session.walletInitiatedAuthState
                             val code = UUID().toString()
                             context.respondRedirect("openid://?code=$code&state=$state")
                         } else {
@@ -277,8 +277,8 @@ fun Application.verfierApi() {
 
                         if (sessionId != null ) {
                             val session = verificationUseCase.getSession(sessionId)
-                            if (session.stateParamAuthorizeReqEbsi != null) {
-                                val state = session.stateParamAuthorizeReqEbsi
+                            if (session.walletInitiatedAuthState != null) {
+                                val state = session.walletInitiatedAuthState
                                 when (it.localizedMessage) {
                                     "Verification policies did not succeed: expired" -> errorDescription = "<\$presentation_submission.descriptor_map[x].id> is expired"
                                     "Verification policies did not succeed: not-before" -> errorDescription = "<\$presentation_submission.descriptor_map[x].id> is not yet valid"
@@ -405,7 +405,7 @@ fun Application.verfierApi() {
         {
             val params = call.parameters.toMap().toJsonObject()
 
-            val stateParamAuthorizeReqEbsi = params["state"]?.jsonArray?.get(0)?.jsonPrimitive?.content
+            val walletInitiatedAuthState = params["state"]?.jsonArray?.get(0)?.jsonPrimitive?.content
             val scope = params["scope"]?.jsonArray.toString().replace("\"", "").replace("[", "").replace("]", "")
 
             val stateId = UUID().toString()
@@ -428,7 +428,7 @@ fun Application.verfierApi() {
                 statusCallbackUri = null,
                 statusCallbackApiKey = null,
                 stateId = stateId,
-                stateParamAuthorizeReqEbsi = stateParamAuthorizeReqEbsi,
+                walletInitiatedAuthState = walletInitiatedAuthState,
                 responseType = when(scope.contains("openid ver_test:id_token")){
                     true -> ResponseType.IdToken
                     else -> ResponseType.VpToken
