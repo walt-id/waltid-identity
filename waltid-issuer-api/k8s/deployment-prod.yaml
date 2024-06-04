@@ -223,6 +223,14 @@ data:
            "VerifiableAttestation",
            "NaturalPersonVerifiableID"
          ]
+       },
+       {
+         "id": "BoardingPass",
+         "type": [
+           "VerifiableCredential",
+           "VerifiableAttestation",
+           "BoardingPass"
+         ]
        }
      ]
      """
