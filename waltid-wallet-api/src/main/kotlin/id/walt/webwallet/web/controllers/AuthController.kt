@@ -185,10 +185,21 @@ fun Application.configureSecurity() {
     install(RateLimit) {
         register(RateLimitName("login")) {
             rateLimiter(limit = 30, refillPeriod = 60.seconds) // allows 30 requests per minute
-            /*            requestKey { applicationCall ->
-                            println(applicationCall)
-                            // TODO: get username applicationCall.request.queryParameters["login"]!!
-                        }*/
+            requestWeight { call, key ->
+                val req = call.getLoginRequest()
+                if (req is EmailAccountRequest) 1 else 0
+            }
+            requestKey { call ->
+                val req = call.getLoginRequest()
+                if (req is EmailAccountRequest) req.email else Unit
+            }
+        }
+        register(RateLimitName("login-keycloak")) {
+            rateLimiter(limit = 30, refillPeriod = 60.seconds) // allows 30 requests per minute
+            requestKey { call ->
+                val req = call.receive<KeycloakAccountRequest>()
+                req.username ?: Unit
+            }
         }
     }
 }
@@ -225,6 +236,7 @@ fun Application.auth() {
             }
 
             rateLimit(RateLimitName("login")) {
+
                 post(
                     "login",
                     {
@@ -399,7 +411,7 @@ fun Application.auth() {
             }
 
             // Login a Keycloak user
-            rateLimit(RateLimitName("login")) {
+            rateLimit(RateLimitName("login-keycloak")) {
                 post("login", {
                     summary = "Keycloak login with [username + password]"
                     description = "Login of a user managed by Keycloak."
@@ -505,8 +517,10 @@ suspend fun verifyToken(token: String): Result<String> {
 }
 
 
+suspend fun ApplicationCall.getLoginRequest() = loginRequestJson.decodeFromString<AccountRequest>(receive())
+
 suspend fun PipelineContext<Unit, ApplicationCall>.doLogin() {
-    val reqBody = loginRequestJson.decodeFromString<AccountRequest>(call.receive())
+    val reqBody = call.getLoginRequest()
     AccountsService.authenticate("", reqBody).onSuccess {
         val now = Clock.System.now().toJavaInstant()
         val tokenPayload = Json.encodeToString(
