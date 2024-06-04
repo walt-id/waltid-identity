@@ -2,6 +2,7 @@ package id.walt.web
 
 import id.walt.config.ConfigManager
 import id.walt.config.list.WebConfig
+import id.walt.web.modules.FeatureFlagInformationModule
 import id.walt.web.modules.ServiceHealthChecksDebugModule
 import io.klogging.logger
 import io.ktor.server.application.*
@@ -15,6 +16,7 @@ data class WebService(
 
     private val webServiceModule: Application.() -> Unit = {
         ServiceHealthChecksDebugModule.run { enable() }
+        FeatureFlagInformationModule.run { enable() }
 
         module.invoke(this)
     }
