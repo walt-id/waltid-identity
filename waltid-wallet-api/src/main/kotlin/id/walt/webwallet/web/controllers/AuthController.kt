@@ -187,18 +187,15 @@ fun Application.configureSecurity() {
             rateLimiter(limit = 30, refillPeriod = 60.seconds) // allows 30 requests per minute
             requestWeight { call, key ->
                 val req = call.getLoginRequest()
-                if (req is EmailAccountRequest) 1 else 0
+                if (req is EmailAccountRequest || req is KeycloakAccountRequest) 1 else 0
             }
             requestKey { call ->
                 val req = call.getLoginRequest()
-                if (req is EmailAccountRequest) req.email else Unit
-            }
-        }
-        register(RateLimitName("login-keycloak")) {
-            rateLimiter(limit = 30, refillPeriod = 60.seconds) // allows 30 requests per minute
-            requestKey { call ->
-                val req = call.receive<KeycloakAccountRequest>()
-                req.username ?: Unit
+                when (req) {
+                    is EmailAccountRequest -> req.email
+                    is KeycloakAccountRequest -> req.username ?: Unit
+                    else -> Unit
+                }
             }
         }
     }
@@ -411,7 +408,7 @@ fun Application.auth() {
             }
 
             // Login a Keycloak user
-            rateLimit(RateLimitName("login-keycloak")) {
+            rateLimit(RateLimitName("login")) {
                 post("login", {
                     summary = "Keycloak login with [username + password]"
                     description = "Login of a user managed by Keycloak."
