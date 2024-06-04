@@ -5,6 +5,7 @@ import id.walt.ServiceConfiguration
 import id.walt.ServiceInitialization
 import id.walt.ServiceMain
 import id.walt.did.helpers.WaltidServices
+import id.walt.featureflag.FeatureManager.whenFeature
 import id.walt.issuer.OidcApi.oidcApi
 import id.walt.issuer.base.config.CredentialTypeConfig
 import id.walt.issuer.base.config.OIDCIssuerServiceConfig
@@ -46,6 +47,8 @@ fun Application.issuerModule(withPlugins: Boolean = true) {
         configurePlugins()
     }
     oidcApi()
-    issuerApi()
-    entraIssuance()
+    issuerApi();
+
+    { entraIssuance() } whenFeature FeatureCatalog.entra
 }
+
