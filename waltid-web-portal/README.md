@@ -18,12 +18,14 @@
 First, run the development server:
 
 ```bash
+pnpm install
 pnpm dev
 ```
 
 Build for production
 
 ```bash
+pnpm install
 pnpm build
 ```
 
