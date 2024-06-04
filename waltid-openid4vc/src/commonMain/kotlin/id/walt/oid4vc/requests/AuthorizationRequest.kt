@@ -1,16 +1,15 @@
 package id.walt.oid4vc.requests
 
-import id.walt.crypto.keys.Key
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.util.JwtUtils
 import id.walt.sdjwt.JWTCryptoProvider
-import id.walt.sdjwt.SDJwt
-import id.walt.sdjwt.SDPayload
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
-import io.ktor.http.*
+import kotlinx.datetime.Clock
 import kotlinx.serialization.json.*
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.days
 
 interface IAuthorizationRequest {
     val responseType: Set<ResponseType>
@@ -95,26 +94,20 @@ data class AuthorizationRequest(
         }
     }
 
-    fun toRequestObject(cryptoProvider: JWTCryptoProvider, keyId: String): String {
-        return cryptoProvider.sign(toJSON(), keyId)
-    }
-
-    fun toRequestObjectHttpParameters(requestObjectJWT: String): Map<String, List<String>> {
+    fun toEbsiRequestObjectByReferenceHttpParameters(requestUri: String): Map<String, List<String>> {
         return mapOf(
             "client_id" to listOf(clientId),
-            "request" to listOf(requestObjectJWT)
-        )
-    }
-
-    fun toRequestObjectByReferenceHttpParameters(requestUri: String): Map<String, List<String>> {
-        return mapOf(
-            "client_id" to listOf(clientId),
+            "response_type" to listOf(ResponseType.getResponseTypeString(responseType)),
+            "response_mode" to listOf(this.responseMode!!.name),
+            "scope" to this.scope.toList(),
+            "redirect_uri" to listOf(this.redirectUri!!),
+            "presentation_definition_uri" to listOf(this.presentationDefinitionUri!!),
             "request_uri" to listOf(requestUri)
         )
     }
 
-    fun toRequestObjectByReferenceHttpQueryString(requestUri: String): String {
-        return IHTTPDataObject.toHttpQueryString(toRequestObjectByReferenceHttpParameters(requestUri))
+    fun toEbsiRequestObjectByReferenceHttpQueryString(requestUri: String): String {
+        return IHTTPDataObject.toHttpQueryString(toEbsiRequestObjectByReferenceHttpParameters(requestUri))
     }
 
     fun toJSON(): JsonObject {
@@ -153,6 +146,45 @@ data class AuthorizationRequest(
                 }
             }
         })
+    }
+
+    fun toRequestObject(cryptoProvider: JWTCryptoProvider, keyId: String): String {
+        return cryptoProvider.sign(toJSON().addUpdateJsoObject(
+            buildJsonObject {
+                put("iss", clientId)
+                put("aud", "")
+                put("exp", (Clock.System.now() + Duration.parse(1.days.toString())).epochSeconds)
+            }
+        ), keyId)
+    }
+
+    fun JsonObject.addUpdateJsoObject(updateJsonObject: JsonObject): JsonObject {
+        return JsonObject(
+            toMutableMap()
+                .apply {
+                    updateJsonObject.forEach { (key, je) ->
+                        put(key, je)
+                    }
+                }
+        )
+    }
+
+    fun toRequestObjectHttpParameters(requestObjectJWT: String): Map<String, List<String>> {
+        return mapOf(
+            "client_id" to listOf(clientId),
+            "request" to listOf(requestObjectJWT)
+        )
+    }
+
+    fun toRequestObjectByReferenceHttpParameters(requestUri: String): Map<String, List<String>> {
+        return mapOf(
+            "client_id" to listOf(clientId),
+            "request_uri" to listOf(requestUri)
+        )
+    }
+
+    fun toRequestObjectByReferenceHttpQueryString(requestUri: String): String {
+        return IHTTPDataObject.toHttpQueryString(toRequestObjectByReferenceHttpParameters(requestUri))
     }
 
     companion object : HTTPDataObjectFactory<AuthorizationRequest>() {

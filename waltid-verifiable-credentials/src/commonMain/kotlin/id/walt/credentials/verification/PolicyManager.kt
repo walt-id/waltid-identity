@@ -45,7 +45,8 @@ object PolicyManager {
             MinimumCredentialsPolicy(),
             MaximumCredentialsPolicy(),
             HolderBindingPolicy(),
-            AllowedIssuerPolicy()
+            AllowedIssuerPolicy(),
+            RevocationPolicy()
         )
     }
 
