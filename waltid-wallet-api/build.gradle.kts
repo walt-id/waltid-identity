@@ -28,7 +28,7 @@ tasks.withType<KotlinCompile> {
     kotlinOptions.jvmTarget = "17"
 }
 
-tasks.withType<org.gradle.api.tasks.bundling.Zip> {
+tasks.withType<Zip> {
     isZip64 = true
 }
 
@@ -65,6 +65,7 @@ dependencies {
     implementation("io.ktor:ktor-serialization-kotlinx-json:$ktor_version")
     implementation("io.ktor:ktor-server-cio-jvm:$ktor_version")
     implementation("io.ktor:ktor-server-method-override:$ktor_version")
+    implementation("io.ktor:ktor-server-rate-limit:$ktor_version")
 
     // Ktor server external libs
     implementation("io.github.smiley4:ktor-swagger-ui:2.10.0")
