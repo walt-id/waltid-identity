@@ -7,7 +7,6 @@ import id.walt.did.dids.registrar.dids.DidCheqdCreateOptions
 import id.walt.did.dids.registrar.dids.DidCreateOptions
 import id.walt.did.dids.registrar.local.cheqd.DidCheqdRegistrar
 import kotlinx.coroutines.runBlocking
-import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.Arguments
 import org.junit.jupiter.params.provider.Arguments.arguments
 import org.junit.jupiter.params.provider.MethodSource
