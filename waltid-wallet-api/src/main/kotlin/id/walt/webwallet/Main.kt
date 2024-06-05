@@ -72,8 +72,6 @@ private fun Application.configurePlugins() {
     configureSecurity()
     configureHTTP()
     configureMonitoring()
-    configureStatusPages()
-    configureSerialization()
     configureAdministration()
     configureRouting()
     configureOpenApi()
@@ -84,8 +82,6 @@ fun Application.webWalletModule(withPlugins: Boolean = true) {
     if (withPlugins) {
         configurePlugins()
     }
-    health()
-
     auth()
     accounts()
     push()
