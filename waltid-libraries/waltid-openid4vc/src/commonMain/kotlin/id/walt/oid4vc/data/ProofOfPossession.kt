@@ -74,6 +74,7 @@ data class ProofOfPossession @OptIn(ExperimentalSerializationApi::class) private
 
     class CWTProofBuilder(private val issuerUrl: String,
                           private val clientId: String?, private val nonce: String?,
+                          private val coseKeyAlgorithm: String,
                           private val coseKey: ByteArray?, private val x5Chain: ByteArray?): ProofBuilder() {
         val HEADER_LABEL_ALG = 1
         val HEADER_LABEL_CONTENT_TYPE = 3
