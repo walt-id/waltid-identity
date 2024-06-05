@@ -1,0 +1,78 @@
+name: Docker Compose test pipeline
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 0 * * *"
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Deploy Fedora Pod
+        uses: actions-hub/kubectl@master
+        env:
+          KUBE_CONFIG: ${{ secrets.HETZNER_KUBE_CONFIG }}
+        with:
+          args: apply -f docker-compose/podman.yaml
+
+      - name: Wait for pod to be ready
+        uses: actions-hub/kubectl@master
+        env:
+          KUBE_CONFIG: ${{ secrets.HETZNER_KUBE_CONFIG }}
+        with:
+          args: wait --for=condition=ready pod -l app=podman-priv --timeout=120s
+
+
+      - uses: tale/kubectl-action@v1
+
+        with:
+          base64-kube-config: ${{ secrets.HETZNER_KUBE_CONFIG }}
+
+      - name: Get Pod Name
+        id: get-pod
+        run: echo "POD_NAME=$(kubectl get pods -l app=podman-priv -o jsonpath='{.items[0].metadata.name}')" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for project directory to be cloned
+        run:  |
+          POD_NAME=$(kubectl get pods -l app=podman-priv -o jsonpath="{.items[0].metadata.name}")
+          TIMEOUT=60  # 1 minute timeout
+          INTERVAL=5  # Check every 5 seconds
+          ELAPSED=0
+          until kubectl exec -it "$POD_NAME" -- test -d /waltid-identity || [ $ELAPSED -ge $TIMEOUT ]; do
+            echo "Waiting for project directory..."
+            sleep $INTERVAL
+            ELAPSED=$((ELAPSED + INTERVAL))
+          done
+          if [ $ELAPSED -ge $TIMEOUT ]; then
+            echo "Error: Project directory not found within 1 minute"
+            exit 1
+          fi
+          echo "Project directory found."
+      - name: Wait for Docker Compose containers to be ready
+        run: |
+          POD_NAME=$(kubectl get pods -l app=podman-priv -o jsonpath="{.items[0].metadata.name}")
+          TIMEOUT=300  # 5 minutes timeout
+          INTERVAL=10  # Check every 10 seconds
+          ELAPSED=0
+          until kubectl exec -it "$POD_NAME" -- bash -c "cd /waltid-identity/docker-compose && podman-compose ps | grep -q 'Up'" || [ $ELAPSED -ge $TIMEOUT ]; do
+            echo "Waiting for Docker Compose containers to be up..."
+            sleep $INTERVAL
+            ELAPSED=$((ELAPSED + INTERVAL))
+          done
+          if [ $ELAPSED -ge $TIMEOUT ]; then
+            echo "Error: Docker Compose containers not up within 5 minutes"
+            exit 1
+          fi
+          echo "Docker Compose containers are up."
+
+      - name: Print Pod Name
+        env:
+          POD_NAME: ${{ steps.get-pod.outputs.POD_NAME }}
+        run: echo "$POD_NAME"
+
+      - name: Run Tests
+        run : kubectl exec --stdin --tty ${{ steps.get-pod.outputs.POD_NAME }}  -- bash -c "cd waltid-identity/docker-compose && pip3 install requests && python3 api-test.py"
