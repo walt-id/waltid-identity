@@ -120,6 +120,7 @@ kotlin {
         val jvmTest by getting {
             dependencies {
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
+                implementation("org.slf4j:slf4j-simple:2.0.13")
             }
         }
         val jsMain by getting {
