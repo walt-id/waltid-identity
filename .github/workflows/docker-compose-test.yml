@@ -1,6 +1,7 @@
 name: Docker Compose test pipeline
 
 on:
+  workflow_dispatch:
   schedule:
     - cron: "0 0 * * *"
 
