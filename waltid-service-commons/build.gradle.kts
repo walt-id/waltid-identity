@@ -23,7 +23,7 @@ dependencies {
     api("io.ktor:ktor-server-content-negotiation-jvm:${Versions.KTOR_VERSION}")
 
     // Logging
-    api("io.klogging:klogging-jvm:0.5.13") // JVM + ~JS
+    api("io.klogging:klogging-jvm:0.5.14") // JVM + ~JS
     implementation("io.klogging:slf4j-klogging:0.5.13")
     implementation("org.slf4j:jul-to-slf4j:2.0.13")
 
