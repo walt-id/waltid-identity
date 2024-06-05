@@ -1,4 +1,4 @@
-package id.walt.verifier.base.web.plugins
+package id.walt.verifier.web.plugins
 
 import io.ktor.http.*
 import io.ktor.server.application.*
