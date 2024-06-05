@@ -1,7 +1,7 @@
 import id.walt.config.ConfigManager
 import id.walt.config.list.WebConfig
 import id.walt.webwallet.config.DatasourceJsonConfiguration
-import id.walt.webwallet.config.KeyGenerationDefaults
+import id.walt.webwallet.config.KeyGenerationDefaultsConfig
 import id.walt.webwallet.config.RegistrationDefaultsConfig
 import id.walt.webwallet.db.Db
 import id.walt.webwallet.utils.WalletHttpClients
@@ -42,7 +42,7 @@ class E2EWalletTestLocal : E2EWalletTestBase() {
 
             ConfigManager.preloadAndRegisterConfig("web", WebConfig(webPort = 4545))
             ConfigManager.preloadAndRegisterConfig("registration-defaults", RegistrationDefaultsConfig())
-            ConfigManager.preloadAndRegisterConfig("key-generation-defaults", KeyGenerationDefaults(emptyMap()))
+            ConfigManager.preloadAndRegisterConfig("key-generation-defaults", KeyGenerationDefaultsConfig(emptyMap()))
             webWalletSetup()
             ConfigManager.loadConfigs(emptyArray())
         }
