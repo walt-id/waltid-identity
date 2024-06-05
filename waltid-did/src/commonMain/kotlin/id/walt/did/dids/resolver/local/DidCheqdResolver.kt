@@ -4,11 +4,9 @@ import id.walt.crypto.keys.Key
 import id.walt.did.dids.document.DidCheqdDocument
 import id.walt.did.dids.document.DidDocument
 import io.ktor.client.*
-import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import love.forte.plugin.suspendtrans.annotation.JsPromise
