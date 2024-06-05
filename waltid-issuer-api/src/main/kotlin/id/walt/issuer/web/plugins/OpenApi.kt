@@ -1,4 +1,4 @@
-package id.walt.issuer.base.web.plugins
+package id.walt.issuer.web.plugins
 
 import io.github.smiley4.ktorswaggerui.SwaggerUI
 import io.github.smiley4.ktorswaggerui.data.AuthKeyLocation
