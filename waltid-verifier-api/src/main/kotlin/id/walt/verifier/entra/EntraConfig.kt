@@ -1,7 +1,7 @@
 package id.walt.verifier.entra
 
-import id.walt.verifier.base.config.BaseConfig
+import id.walt.config.WaltConfig
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class EntraConfig (val callbackUrl: String): BaseConfig
+data class EntraConfig (val callbackUrl: String): WaltConfig()
