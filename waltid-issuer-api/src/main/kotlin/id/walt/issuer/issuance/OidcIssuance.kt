@@ -1,10 +1,7 @@
-package id.walt.issuer
+package id.walt.issuer.issuance
 
 import id.walt.credentials.vc.vcs.W3CVC
-import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.data.CredentialOffer
-import id.walt.oid4vc.data.JsonLDCredentialDefinition
-import id.walt.oid4vc.data.OfferedCredential
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonArray

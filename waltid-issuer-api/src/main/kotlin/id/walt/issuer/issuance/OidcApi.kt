@@ -1,4 +1,4 @@
-package id.walt.issuer
+package id.walt.issuer.issuance
 
 
 import id.walt.oid4vc.data.ResponseMode
