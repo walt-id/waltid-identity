@@ -1,14 +1,10 @@
+import id.walt.config.ConfigManager
 import id.walt.config.list.WebConfig
-import id.walt.issuer.base.config.OIDCIssuerServiceConfig
-import id.walt.issuer.issuerModule
-import id.walt.verifier.verifierModule
 import id.walt.webwallet.config.DatasourceJsonConfiguration
+import id.walt.webwallet.config.KeyGenerationDefaults
 import id.walt.webwallet.config.RegistrationDefaultsConfig
 import id.walt.webwallet.db.Db
-import id.walt.webwallet.db.SerializableHikariConfiguration
-import id.walt.webwallet.db.models.AccountWalletListing
 import id.walt.webwallet.utils.WalletHttpClients
-import id.walt.webwallet.webWalletModule
 import id.walt.webwallet.webWalletSetup
 import io.ktor.client.*
 import io.ktor.client.plugins.*
@@ -18,18 +14,9 @@ import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.testing.*
-import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.uuid.UUID
 import kotlin.io.path.Path
 import kotlin.io.path.absolutePathString
 import kotlin.test.Test
-import kotlin.test.assertNotEquals
-import kotlin.time.Duration.Companion.seconds
-import id.walt.config.ConfigManager
-import id.walt.webwallet.config.KeyGenerationDefaults
 
 class E2EWalletTestLocal : E2EWalletTestBase() {
 

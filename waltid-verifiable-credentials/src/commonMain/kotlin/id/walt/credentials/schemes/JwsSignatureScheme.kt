@@ -15,7 +15,7 @@ import love.forte.plugin.suspendtrans.annotation.JvmBlocking
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 
-private val log = KotlinLogging.logger {  }
+private val log = KotlinLogging.logger { }
 
 @OptIn(ExperimentalJsExport::class)
 @JsExport
@@ -62,6 +62,7 @@ class JwsSignatureScheme : SignatureScheme {
 
         return key.signJws(payload, jwtHeaders)
     }
+
     @JvmBlocking
     @JvmAsync
     @JsPromise
@@ -80,7 +81,7 @@ class JwsSignatureScheme : SignatureScheme {
 //        println("Subject: $subjectDid")
 
         DidService.resolveToKey(issuerDid)
-            .also { log.trace ( "Imported key: $it from did: $issuerDid, public is: ${it.getOrNull()?.getPublicKey()?.exportJWK()}" ) }
+            .also { log.trace("Imported key: $it from did: $issuerDid, public is: ${it.getOrNull()?.getPublicKey()?.exportJWK()}") }
             .getOrThrow()
             .verifyJws(data.split("~")[0])
             .also { log.trace { "Verification result: $it" } }
