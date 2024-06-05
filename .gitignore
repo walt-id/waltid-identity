@@ -56,3 +56,5 @@ secret*
 **/node_modules
 
 .kotlin
+
+*/*.pem
