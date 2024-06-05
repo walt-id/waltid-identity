@@ -13,37 +13,39 @@ plugins {
 rootProject.name = "waltid-identity"
 include(
     // Base SSI libs
-    "waltid-crypto",
-    "waltid-did",
-    "waltid-verifiable-credentials",
-    "waltid-mdoc-credentials",
-    "waltid-sdjwt",
+    ":waltid-libraries:waltid-crypto",
+    ":waltid-libraries:waltid-did",
+    ":waltid-libraries:waltid-verifiable-credentials",
+    ":waltid-libraries:waltid-mdoc-credentials",
+    ":waltid-libraries:waltid-sdjwt",
 
     // Protocols
-    "waltid-openid4vc",
+    ":waltid-libraries:waltid-openid4vc",
 
-    // Commons
-    "waltid-service-commons",
+    // Service commons
+    ":waltid-services:waltid-service-commons",
 
     // Services based on libs
-    "waltid-issuer-api",
-    "waltid-verifier-api",
-    "waltid-wallet-api",
+    ":waltid-services:waltid-issuer-api",
+    ":waltid-services:waltid-verifier-api",
+    ":waltid-services:waltid-wallet-api",
+
+    // Service tests
+    ":waltid-services:waltid-e2e-tests",
 
     // CLI
-    "waltid-cli",
+    ":waltid-applications:waltid-cli",
 
     // Reporting
-    "waltid-reporting",
+    ":waltid-libraries:waltid-reporting",
 
     // OCI extension for waltid-crypto
-    "waltid-crypto-oci",
+    ":waltid-libraries:waltid-crypto-oci",
 
     // Android - uncomment to enable build:
     /*
-    "waltid-crypto-android",
-    "waltid-android"
+    ":waltid-libraries:waltid-crypto-android",
+    ":waltid-applications:waltid-android"
     */
 )
-include("waltid-commons")
-include("waltid-service-commons")
+//include("waltid-e2e-tests")
