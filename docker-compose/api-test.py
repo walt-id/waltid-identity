@@ -17,7 +17,7 @@ class WalletAPITest(unittest.TestCase):
         cls.did_method = "jwk"  # Add your own value
         cls.key_algorithm = "Ed25519"  # Add your own value
         cls.key_origin = "jwk"  # Add your own value
-        cls.jwk_payload = "{ 'backend': 'jwk', 'keyType': 'Ed25519' }"  # Add your own value
+        cls.jwk_payload = json.dumps({"backend":"jwl","keyType":"Ed25519"})  # Add your own value
         cls.oci_payload = "your_oci_payload"  # Add your own value
 
     def register_user(self):
