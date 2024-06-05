@@ -46,6 +46,7 @@ bin/
 # walt.id
 secret*
 */data
+*/*/data
 **/*.db
 /kotlin-js-store/
 .idea/misc.xml
@@ -55,6 +56,6 @@ secret*
 **/.output
 **/node_modules
 
-.kotlin
+**/.kotlin
 
-*/*.pem
+**/*.pem
