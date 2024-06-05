@@ -1,16 +1,16 @@
 package id.walt
 
-import id.walt.config.ConfigManager
 import id.walt.config.WaltConfig
 import id.walt.config.buildconfig.BuildConfig
 import id.walt.config.list.WebConfig
-import id.walt.config.runconfig.RunConfiguration
+import id.walt.featureflag.CommonsFeatureCatalog
+import id.walt.featureflag.FeatureManager
+import id.walt.featureflag.ServiceFeatureCatalog
 import io.klogging.logger
 import kotlinx.coroutines.delay
 import kotlin.io.path.Path
 import kotlin.io.path.absolutePathString
 import kotlin.reflect.KClass
-import kotlin.reflect.jvm.jvmName
 import kotlin.time.measureTime
 import java.lang.System.getProperty as p
 
@@ -30,7 +30,7 @@ data class ConfigurationsList(
 )
 
 data class ServiceInitialization(
-    val configs: ConfigurationsList = ConfigurationsList(), // change to configs
+    val features: ServiceFeatureCatalog,
     val init: suspend () -> Unit,
     val run: suspend () -> Unit,
 )
@@ -47,26 +47,17 @@ object ServiceCommons {
         val service = "${config.vendor} ${config.name} ${config.version}"
 
         val log = logger(config.vendor + " " + config.name)
-//        val log = logger(config.name)
         log.info { "Starting $service..." }
 
         log.debug { debugLineString() }
 
-        log.info { "Registering configurations..." }
-        init.configs.default.forEach {
-            log.debug { "Registering default mandatory \"${it.first}\" to config ${it.second.jvmName}..." }
-            ConfigManager.registerRequiredConfig(it.first, it.second)
-        }
-        init.configs.mandatory.forEach {
-            log.debug { "Registering mandatory \"${it.first}\" to config ${it.second.jvmName}..." }
-            ConfigManager.registerRequiredConfig(it.first, it.second)
-        }
-        init.configs.optional.forEach {
-            log.debug { "Registering optional \"${it.first}\" to config ${it.second.jvmName}..." }
-            ConfigManager.registerConfig(it.first, it.second)
-        }
-        log.info { "Loading configurations..." }
-        ConfigManager.loadConfigs(RunConfiguration.args)
+        log.info { "Registering common feature catalog..." }
+        FeatureManager.registerCatalog(CommonsFeatureCatalog)
+        log.info { "Registering service feature catalog..." }
+        FeatureManager.registerCatalog(init.features)
+
+        log.info { "Loading features..." }
+        FeatureManager.load()
 
         log.info { "Initializing $service..." }
         measureTime {
