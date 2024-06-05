@@ -3,6 +3,7 @@ package id.walt.web.modules
 import com.sksamuel.cohort.Cohort
 import com.sksamuel.cohort.HealthCheckRegistry
 import com.sksamuel.cohort.HealthCheckResult
+import id.walt.config.ConfigManager
 import io.klogging.logger
 import io.ktor.server.application.*
 import kotlin.time.Duration.Companion.seconds
@@ -35,17 +36,30 @@ object ServiceHealthChecksDebugModule {
         }
     }
 
+    data class ServiceDebugModuleConfiguration(
+        val endpointPrefix: String = "debug",
+        val operatingSystem: Boolean = true,
+        val memory: Boolean = false, // currently broken?
+        val jvm: Boolean = true,
+        val sysprops: Boolean = true,
+        val heapdump: Boolean = true,
+        val threaddump: Boolean = true,
+        val gc: Boolean = true
+    )
+
     fun Application.enable() {
         install(Cohort) {
-            endpointPrefix = "debug"
             if (logger.isTraceEnabled()) {
-                operatingSystem = true
-                //memory = true
-                jvmInfo = true
-                sysprops = true
-                heapDump = true
-                threadDump = true
-                gc = true
+                val config = ConfigManager.getConfig<ServiceDebugModuleConfiguration>()
+
+                endpointPrefix = config.endpointPrefix
+                operatingSystem = config.operatingSystem
+                memory = config.memory
+                jvmInfo = config.jvm
+                sysprops = config.sysprops
+                heapDump = config.heapdump
+                threadDump = config.threaddump
+                gc = config.gc
             }
 
             KtorStatusChecker.run { init() }
