@@ -1,7 +1,7 @@
 package id.walt
 
 import id.walt.config.ConfigManager
-import id.walt.issuer.CIProvider
+import id.walt.issuer.issuance.CIProvider
 import id.walt.oid4vc.data.CredentialOffer
 import id.walt.oid4vc.requests.CredentialOfferRequest
 import kotlin.test.Test
