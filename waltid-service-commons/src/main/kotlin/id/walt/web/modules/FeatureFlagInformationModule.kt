@@ -9,22 +9,38 @@ import kotlinx.serialization.Serializable
 object FeatureFlagInformationModule {
 
     @Serializable
+    data class FeatureFlagInformations(
+        val enabled: FeatureFlagInformation,
+        val disabled: FeatureFlagInformation,
+        val defaulted: FeatureFlagInformation,
+    )
+
+    @Serializable
     data class FeatureFlagInformation(
-        val enabled: Map<String?, String?>,
-        val total: Int
-    ) {
-        companion object {
-            fun createCurrent(): FeatureFlagInformation {
-                val enabled = FeatureManager.enabledFeatures.values.associate { it?.name to it?.description }
-                return FeatureFlagInformation(enabled, enabled.size)
-            }
-        }
-    }
+        val features: Map<String, String>,
+        val total: Int = features.size
+    )
 
     fun Application.enable() {
         routing {
-            get("/features/enabled") {
-                context.respond(FeatureFlagInformation.createCurrent())
+            get("/features/registered") {
+                context.respond(FeatureManager.registeredFeatures.keys)
+            }
+            get("/features/state") {
+
+                val registered = FeatureManager.registeredFeatures
+
+                val enabled = registered.filterKeys { it in FeatureManager.enabledFeatures }.mapValues { it.value.description }
+                val disabled = registered.filterKeys { it in FeatureManager.disabledFeatures }.mapValues { it.value.description }
+
+                val defaulted = registered.keys.subtract(enabled.keys).subtract(disabled.keys)
+                    .associateWith { registered[it]!!.description }
+
+                context.respond(FeatureFlagInformations(
+                    enabled = FeatureFlagInformation(enabled),
+                    disabled = FeatureFlagInformation(disabled),
+                    defaulted = FeatureFlagInformation(defaulted)
+                ))
             }
         }
     }
