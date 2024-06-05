@@ -6,6 +6,8 @@ import id.walt.featureflag.CommonsFeatureCatalog
 import id.walt.featureflag.FeatureManager.whenFeature
 import id.walt.web.modules.FeatureFlagInformationModule
 import id.walt.web.modules.ServiceHealthChecksDebugModule
+import id.walt.web.plugins.configureSerialization
+import id.walt.web.plugins.configureStatusPages
 import io.klogging.logger
 import io.ktor.server.application.*
 import io.ktor.server.cio.*
@@ -19,6 +21,9 @@ data class WebService(
     private val webServiceModule: Application.() -> Unit = {
         { ServiceHealthChecksDebugModule.run { enable() } } whenFeature CommonsFeatureCatalog.healthChecksFeature
         { FeatureFlagInformationModule.run { enable() } } whenFeature CommonsFeatureCatalog.featureFlagInformationEndpointFeature
+
+        configureStatusPages()
+        configureSerialization()
 
         module.invoke(this)
     }
