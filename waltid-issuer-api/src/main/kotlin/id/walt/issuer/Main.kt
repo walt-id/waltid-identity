@@ -30,8 +30,6 @@ suspend fun main(args: Array<String>) {
 fun Application.configurePlugins() {
     configureHTTP()
     configureMonitoring()
-    configureStatusPages()
-    configureSerialization()
     configureRouting()
     configureOpenApi()
 }
