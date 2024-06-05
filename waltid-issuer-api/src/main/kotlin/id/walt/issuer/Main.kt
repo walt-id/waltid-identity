@@ -1,15 +1,14 @@
 package id.walt.issuer
 
-import id.walt.ConfigurationsList
 import id.walt.ServiceConfiguration
 import id.walt.ServiceInitialization
 import id.walt.ServiceMain
 import id.walt.did.helpers.WaltidServices
 import id.walt.featureflag.FeatureManager.whenFeature
-import id.walt.issuer.OidcApi.oidcApi
-import id.walt.issuer.base.config.CredentialTypeConfig
-import id.walt.issuer.base.config.OIDCIssuerServiceConfig
-import id.walt.issuer.base.web.plugins.*
+import id.walt.issuer.entra.entraIssuance
+import id.walt.issuer.issuance.OidcApi.oidcApi
+import id.walt.issuer.issuance.issuerApi
+import id.walt.issuer.web.plugins.*
 import id.walt.web.WebService
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.server.application.*
@@ -19,12 +18,7 @@ private val log = KotlinLogging.logger { }
 suspend fun main(args: Array<String>) {
     ServiceMain(
         ServiceConfiguration("issuer"), ServiceInitialization(
-            configs = ConfigurationsList(
-                mandatory = listOf(
-                    "issuer-service" to OIDCIssuerServiceConfig::class,
-                    "credential-issuer-metadata" to CredentialTypeConfig::class
-                )
-            ),
+            features = FeatureCatalog,
             init = {
                 WaltidServices.minimalInit()
             },
