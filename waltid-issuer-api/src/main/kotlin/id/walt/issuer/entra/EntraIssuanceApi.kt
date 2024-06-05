@@ -1,4 +1,4 @@
-package id.walt.issuer
+package id.walt.issuer.entra
 
 import io.github.smiley4.ktorswaggerui.dsl.post
 import io.github.smiley4.ktorswaggerui.dsl.route
