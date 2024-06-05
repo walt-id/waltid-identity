@@ -18,7 +18,7 @@ import id.walt.oid4vc.providers.OpenIDClientConfig
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.requests.CredentialOfferRequest
 import id.walt.oid4vc.responses.AuthorizationErrorCode
-import id.walt.webwallet.config.KeyGenerationDefaults
+import id.walt.webwallet.config.KeyGenerationDefaultsConfig
 import id.walt.webwallet.db.models.WalletCategoryData
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.db.models.WalletOperationHistories
@@ -439,7 +439,7 @@ class SSIKit2WalletService(
 
     override suspend fun generateKey(request: KeyGenerationRequest): String = let {
         if (request.config == null) {
-            ConfigManager.getConfig<KeyGenerationDefaults>().getConfigForBackend(request.backend)?.let {
+            ConfigManager.getConfig<KeyGenerationDefaultsConfig>().getConfigForBackend(request.backend)?.let {
                 request.config = it
             }
         }
