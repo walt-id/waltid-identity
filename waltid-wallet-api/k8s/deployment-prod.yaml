@@ -33,7 +33,6 @@ metadata:
   name: wallet-oidc-config
 data:
   oidc.conf: |
-    enableOidcLogin = true
     providerName = keycloak
     oidcRealm = "https://keycloak.walt-test.cloud/realms/waltid-keycloak-ktor"
     oidcJwks = "${oidcRealm}/protocol/openid-connect/certs"
@@ -54,14 +53,6 @@ data:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: wallet-wallet-config
-data:
-  wallet.conf: |
-    remoteWallet = "https://walletkit.walt.id"
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
   name: wallet-web-config
 data:
   web.conf: |
@@ -75,7 +66,6 @@ metadata:
   name: wallet-oidc-config
 data:
   oidc.conf: |
-    enableOidcLogin = true
     providerName = keycloak
     oidcRealm = "https://keycloak.walt-test.cloud/realms/waltid-keycloak-ktor"
     oidcJwks = "${oidcRealm}/protocol/openid-connect/certs"
@@ -93,40 +83,6 @@ data:
             refillRateMinutes: 1
         }
     }
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: wallet-marketplace-config
-data:
-  marketplace.conf: |
-    marketplaces = [
-        {
-            chain = "ethereum", name = "OpenSea", url = "https://opensea.io/assets/ethereum/%s/%s"
-        },
-        {chain = "polygon", name = "OpenSea", url = "https://opensea.io/assets/matic/%s/%s"},
-        {chain = "tezos", name = "Rarible", url = "https://rarible.com/token/tezos/%s/%s"},
-        {chain = "flow", name = "FlowVerse", url = "https://nft.flowverse.co/marketplace/%s/%s"},
-        {
-            chain = "unique", name = "Unique", url = "https://unqnft.io/market/%s/%s"
-        },
-    ]
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: wallet-chainexplorer-config
-data:
-  chainexplorer.conf: |
-    explorers = [
-        {chain = "ethereum", url = "https://etherscan.io/address/%s"},
-        {
-            chain = "polygon", url = "https://polygonscan.com/address/%s"
-        },
-        {chain = "mumbai", url = "https://mumbai.polygonscan.com/address/%s"},
-        {chain = "tezos", url = "https://tzkt.io/%s/operations"},
-        {chain = "ghostnet", url = "https://ghostnet.tzkt.io/%s/operations"},
-    ]
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -219,10 +175,6 @@ spec:
               mountPath: "/waltid-wallet-api/config/db.sqlite.conf"
               subPath: "db.sqlite.conf"
               readOnly: true
-            - name: wallet-wallet-config
-              mountPath: "/waltid-wallet-api/config/wallet.conf"
-              subPath: "wallet.conf"
-              readOnly: true
             - name: wallet-web-config
               mountPath: "/waltid-wallet-api/config/web.conf"
               subPath: "web.conf"
@@ -230,14 +182,6 @@ spec:
             - name: wallet-oidc-config
               mountPath: "/waltid-wallet-api/config/oidc.conf"
               subPath: "oidc.conf"
-              readOnly: true
-            - name: wallet-marketplace-config
-              mountPath: "/waltid-wallet-api/config/marketplace.conf"
-              subPath: "marketplace.conf"
-              readOnly: true
-            - name: wallet-chainexplorer-config
-              mountPath: "/waltid-wallet-api/config/chainexplorer.conf"
-              subPath: "chainexplorer.conf"
               readOnly: true
             - name: wallet-rejection-reason-config
               mountPath: "/waltid-wallet-api/config/rejectionreason.conf"
@@ -279,9 +223,6 @@ spec:
         - name: wallet-datasource-config
           configMap:
             name: wallet-datasource-config
-        - name: wallet-wallet-config
-          configMap:
-            name: wallet-wallet-config
         - name: wallet-web-config
           configMap:
             name: wallet-web-config
