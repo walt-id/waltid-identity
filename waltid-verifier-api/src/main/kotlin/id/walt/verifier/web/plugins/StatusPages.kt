@@ -1,6 +1,6 @@
-package id.walt.verifier.base.web.plugins
+package id.walt.verifier.web.plugins
 
-import id.walt.verifier.base.web.UnauthorizedException
+import id.walt.web.UnauthorizedException
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.plugins.*

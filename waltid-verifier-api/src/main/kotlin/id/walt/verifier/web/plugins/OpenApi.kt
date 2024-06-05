@@ -1,4 +1,4 @@
-package id.walt.verifier.base.web.plugins
+package id.walt.verifier.web.plugins
 
 import io.github.smiley4.ktorswaggerui.SwaggerUI
 import io.github.smiley4.ktorswaggerui.data.AuthKeyLocation
