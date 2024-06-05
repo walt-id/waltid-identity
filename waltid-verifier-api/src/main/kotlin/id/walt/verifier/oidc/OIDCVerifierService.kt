@@ -27,7 +27,7 @@ import id.walt.oid4vc.providers.CredentialVerifierConfig
 import id.walt.oid4vc.providers.OpenIDCredentialVerifier
 import id.walt.oid4vc.providers.PresentationSession
 import id.walt.oid4vc.responses.TokenResponse
-import id.walt.verifier.base.config.OIDCVerifierServiceConfig
+import id.walt.verifier.config.OIDCVerifierServiceConfig
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.*
