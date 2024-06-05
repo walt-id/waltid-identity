@@ -6,12 +6,14 @@ import com.nimbusds.jose.JWSObject
 import com.nimbusds.jose.Payload
 import com.nimbusds.jose.crypto.MACSigner
 import com.nimbusds.jose.crypto.MACVerifier
-import id.walt.crypto.keys.jwk.JWKKey
-import id.walt.crypto.utils.JsonUtils.toJsonElement
-import id.walt.oid4vc.definitions.JWTClaims
-import id.walt.webwallet.config.AuthConfig
 import id.walt.config.ConfigManager
 import id.walt.config.list.WebConfig
+import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto.utils.JsonUtils.toJsonElement
+import id.walt.featureflag.FeatureManager
+import id.walt.oid4vc.definitions.JWTClaims
+import id.walt.webwallet.FeatureCatalog
+import id.walt.webwallet.config.AuthConfig
 import id.walt.webwallet.db.models.AccountWalletMappings
 import id.walt.webwallet.db.models.AccountWalletPermissions
 import id.walt.webwallet.service.OidcLoginService
@@ -126,14 +128,16 @@ fun Application.configureSecurity() {
             urlProvider = { "${oidcConfig.publicBaseUrl}/wallet-api/auth/oidc-session" }
         }
 
-        jwt("auth-oauth-jwt") {
-            realm = OidcLoginService.oidcRealm
-            // verifier(jwkProvider, oidcRealm)
-            verifier(OidcLoginService.jwkProvider)
+        if (FeatureManager.isFeatureEnabled(FeatureCatalog.oidcAuthenticationFeature)) {
+            jwt("auth-oauth-jwt") {
+                realm = OidcLoginService.oidcRealm
+                // verifier(jwkProvider, oidcRealm)
+                verifier(OidcLoginService.jwkProvider)
 
-            validate { credential -> JWTPrincipal(credential.payload) }
-            challenge { _, _ ->
-                call.respond(HttpStatusCode.Unauthorized, "Token is not valid or has expired")
+                validate { credential -> JWTPrincipal(credential.payload) }
+                challenge { _, _ ->
+                    call.respond(HttpStatusCode.Unauthorized, "Token is not valid or has expired")
+                }
             }
         }
 
@@ -214,14 +218,16 @@ fun Application.auth() {
                     call.respondRedirect("oidc-session")
                 }
 
-                authenticate("auth-oauth-jwt") {
-                    get("oidc-session", { description = "Configure OIDC session" }) {
-                        val principal: OAuthAccessTokenResponse.OAuth2 =
-                            call.principal() ?: error("No OAuth principal")
+                if (FeatureManager.isFeatureEnabled(FeatureCatalog.oidcAuthenticationFeature)) {
+                    authenticate("auth-oauth-jwt") {
+                        get("oidc-session", { description = "Configure OIDC session" }) {
+                            val principal: OAuthAccessTokenResponse.OAuth2 =
+                                call.principal() ?: error("No OAuth principal")
 
-                        call.sessions.set(OidcTokenSession(principal.accessToken))
+                            call.sessions.set(OidcTokenSession(principal.accessToken))
 
-                        call.respondRedirect("/login?oidc_login=true")
+                            call.respondRedirect("/login?oidc_login=true")
+                        }
                     }
                 }
             }
