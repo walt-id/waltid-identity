@@ -12,13 +12,13 @@ class WalletAPITest(unittest.TestCase):
         cls.headers = {"Content-Type": "application/json" }
         cls.name = ''.join(random.choices(string.ascii_letters + string.digits, k=8))
         cls.email = f"{cls.name}@example.com"
-        cls.password = "password"  # Replace with a proper password policy if needed
-        cls.account_type = "email"  # Adjust this based on your actual account types
-        cls.did_method = "jwk"  # Add your own value
-        cls.key_algorithm = "Ed25519"  # Add your own value
-        cls.key_origin = "jwk"  # Add your own value
-        cls.jwk_payload = "{ 'backend': 'jwk', 'keyType': 'Ed25519' }"  # Add your own value
-        cls.oci_payload = "your_oci_payload"  # Add your own value
+        cls.password = "password"
+        cls.account_type = "email"
+        cls.did_method = "jwk"
+        cls.key_algorithm = "Ed25519"
+        cls.key_origin = "jwk"
+        cls.jwk_payload = json.dumps({"backend":"jwk","keyType":"Ed25519"})
+        cls.oci_payload = "your_oci_payload"
 
     def register_user(self):
         print("register user")
@@ -65,7 +65,6 @@ class WalletAPITest(unittest.TestCase):
         print(f"Generated key using algorithm: {self.key_algorithm}")
         print(f"By: {self.key_origin}")
         print(f"Key ID: {self.keyId}")
-        # Next request based on the did-method if needed
 
     def test_wallet_api(self):
         self.register_user()
@@ -73,7 +72,6 @@ class WalletAPITest(unittest.TestCase):
         self.select_wallet()
         self.generate_key()
 
-        # Proceed to the next request if needed
 
 if __name__ == "__main__":
     unittest.main()
