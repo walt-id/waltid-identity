@@ -1,4 +1,4 @@
-package id.walt.issuer
+package id.walt.issuer.issuance
 
 import id.walt.credentials.vc.vcs.W3CVC
 import id.walt.sdjwt.SDMap

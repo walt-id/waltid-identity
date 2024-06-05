@@ -1,4 +1,4 @@
-package id.walt.issuer
+package id.walt.issuer.issuance
 
 import id.walt.crypto.keys.KeyGenerationRequest
 import kotlinx.serialization.Serializable

@@ -1,4 +1,4 @@
-package id.walt.issuer
+package id.walt.issuer.issuance
 
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject

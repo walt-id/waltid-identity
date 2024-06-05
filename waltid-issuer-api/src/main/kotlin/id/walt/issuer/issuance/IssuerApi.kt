@@ -1,27 +1,10 @@
-package id.walt.issuer
+package id.walt.issuer.issuance
 
 import id.walt.credentials.vc.vcs.W3CVC
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.did.dids.DidService
-import id.walt.issuer.IssuanceExamples.batchExampleJwt
-import id.walt.issuer.IssuanceExamples.batchExampleSdJwt
-import id.walt.issuer.IssuanceExamples.issuerOnboardingRequestDefaultExample
-import id.walt.issuer.IssuanceExamples.issuerOnboardingRequestDidWebExample
-import id.walt.issuer.IssuanceExamples.issuerOnboardingRequestOciExample
-import id.walt.issuer.IssuanceExamples.issuerOnboardingRequestOciRestApiExample
-import id.walt.issuer.IssuanceExamples.issuerOnboardingRequestTseExample
-import id.walt.issuer.IssuanceExamples.issuerOnboardingResponseDefaultExample
-import id.walt.issuer.IssuanceExamples.issuerOnboardingResponseDidWebExample
-import id.walt.issuer.IssuanceExamples.issuerOnboardingResponseOciExample
-import id.walt.issuer.IssuanceExamples.issuerOnboardingResponseOciRestApiExample
-import id.walt.issuer.IssuanceExamples.issuerOnboardingResponseTseExample
-import id.walt.issuer.IssuanceExamples.openBadgeCredentialExampleJsonString
-import id.walt.issuer.IssuanceExamples.openBadgeCredentialSignExampleJsonString
-import id.walt.issuer.IssuanceExamples.sdJwtExample
-import id.walt.issuer.IssuanceExamples.universityDegreeCredential
-import id.walt.issuer.IssuanceExamples.universityDegreeCredentialSignedExample
 import id.walt.oid4vc.definitions.CROSS_DEVICE_CREDENTIAL_OFFER_URL
 import id.walt.oid4vc.requests.CredentialOfferRequest
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -84,19 +67,19 @@ fun Application.issuerApi() {
                 request {
                     body<IssuerOnboardingRequest> {
                         description = "Issuer onboarding request (key & DID) config."
-                        example("did:jwk + JWK key (Ed25519)", issuerOnboardingRequestDefaultExample)
-                        example("did:web + JWK key (Secp256k1)", issuerOnboardingRequestDidWebExample)
+                        example("did:jwk + JWK key (Ed25519)", IssuanceExamples.issuerOnboardingRequestDefaultExample)
+                        example("did:web + JWK key (Secp256k1)", IssuanceExamples.issuerOnboardingRequestDidWebExample)
                         example(
                             "did:key + TSE key (Hashicorp Vault Transit Engine - RSA)",
-                            issuerOnboardingRequestTseExample
+                            IssuanceExamples.issuerOnboardingRequestTseExample
                         )
                         example(
                             "did:jwk + OCI key (Oracle Cloud Infrastructure - Secp256r1)",
-                            issuerOnboardingRequestOciExample
+                            IssuanceExamples.issuerOnboardingRequestOciExample
                         )
                         example(
                             "did:jwk + OCI REST API key  (Oracle Cloud Infrastructure - Secp256r1)",
-                            issuerOnboardingRequestOciRestApiExample
+                            IssuanceExamples.issuerOnboardingRequestOciRestApiExample
                         )
                         required = true
                     }
@@ -108,23 +91,23 @@ fun Application.issuerApi() {
                         body<IssuerOnboardingResponse> {
                             example(
                                 "Local JWK key (Secp256r1) + did:jwk",
-                                issuerOnboardingResponseDefaultExample,
+                                IssuanceExamples.issuerOnboardingResponseDefaultExample,
                             )
                             example(
                                 "Local JWK key (Secp256r1) + did:web",
-                                issuerOnboardingResponseDidWebExample,
+                                IssuanceExamples.issuerOnboardingResponseDidWebExample,
                             )
                             example(
                                 "Remote TSE Ed25519 key + did:key",
-                                issuerOnboardingResponseTseExample,
+                                IssuanceExamples.issuerOnboardingResponseTseExample,
                             )
                             example(
                                 "Remote OCI Secp256r1 key + did:jwk",
-                                issuerOnboardingResponseOciExample,
+                                IssuanceExamples.issuerOnboardingResponseOciExample,
                             )
                             example(
                                 "Remote OCI REST API Secp256r1 key + did:jwk",
-                                issuerOnboardingResponseOciRestApiExample,
+                                IssuanceExamples.issuerOnboardingResponseOciRestApiExample,
                             )
                         }
                     }
@@ -186,7 +169,7 @@ fun Application.issuerApi() {
                             body<JsonObject> {
                                 description =
                                     "Pass the unsigned credential that you intend to sign as the body of the request."
-                                example("OpenBadgeCredential example", openBadgeCredentialSignExampleJsonString)
+                                example("OpenBadgeCredential example", IssuanceExamples.openBadgeCredentialSignExampleJsonString)
                                 required = true
                             }
                         }
@@ -197,7 +180,7 @@ fun Application.issuerApi() {
                                 body<JsonObject> {
                                     example(
                                         "Signed UniversityDegreeCredential example",
-                                        universityDegreeCredentialSignedExample
+                                        IssuanceExamples.universityDegreeCredentialSignedExample
                                     )
                                 }
                             }
@@ -234,8 +217,8 @@ fun Application.issuerApi() {
                             body<IssuanceRequest> {
                                 description =
                                     "Pass the unsigned credential that you intend to issue as the body of the request."
-                                example("OpenBadgeCredential example", openBadgeCredentialExampleJsonString)
-                                example("UniversityDegreeCredential example", universityDegreeCredential)
+                                example("OpenBadgeCredential example", IssuanceExamples.openBadgeCredentialExampleJsonString)
+                                example("UniversityDegreeCredential example", IssuanceExamples.universityDegreeCredential)
                                 required = true
                             }
                         }
@@ -268,7 +251,7 @@ fun Application.issuerApi() {
                             body<List<IssuanceRequest>> {
                                 description =
                                     "Pass the unsigned credential that you intend to issue as the body of the request."
-                                example("Batch example", batchExampleJwt)
+                                example("Batch example", IssuanceExamples.batchExampleJwt)
                                 required = true
                             }
                         }
@@ -305,7 +288,7 @@ fun Application.issuerApi() {
                             body<IssuanceRequest> {
                                 description =
                                     "Pass the unsigned credential that you intend to issue as the body of the request."
-                                example("SD-JWT example", sdJwtExample)
+                                example("SD-JWT example", IssuanceExamples.sdJwtExample)
                                 //example("UniversityDegreeCredential example", universityDegreeCredential)
                                 required = true
                             }
@@ -341,7 +324,7 @@ fun Application.issuerApi() {
                             body<List<IssuanceRequest>> {
                                 description =
                                     "Pass the unsigned credential that you intend to issue as the body of the request."
-                                example("Batch example", batchExampleSdJwt)
+                                example("Batch example", IssuanceExamples.batchExampleSdJwt)
                                 required = true
                             }
                         }

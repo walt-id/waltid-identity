@@ -1,6 +1,6 @@
 @file:Suppress("ExtractKtorModule")
 
-package id.walt.issuer
+package id.walt.issuer.issuance
 
 import id.walt.config.ConfigManager
 import id.walt.credentials.issuance.Issuer.mergingJwtIssue
@@ -12,9 +12,8 @@ import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.did.dids.DidService
 import id.walt.did.dids.DidUtils
-import id.walt.issuer.IssuanceExamples.openBadgeCredentialExample
-import id.walt.issuer.base.config.CredentialTypeConfig
-import id.walt.issuer.base.config.OIDCIssuerServiceConfig
+import id.walt.issuer.config.CredentialTypeConfig
+import id.walt.issuer.config.OIDCIssuerServiceConfig
 import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.data.CredentialSupported
 import id.walt.oid4vc.definitions.JWTClaims
@@ -236,7 +235,7 @@ open class CIProvider : OpenIDCredentialIssuer(
                         Json.parseToJsonElement(KeySerialization.serializeKey(exampleIssuerKey)).jsonObject,
                         exampleIssuerDid,
                         "OpenBadgeCredential_${credentialRequest.format.value}",
-                        W3CVC(openBadgeCredentialExample)
+                        W3CVC(IssuanceExamples.openBadgeCredentialExample)
                     )
                 )
             )
