@@ -2,6 +2,8 @@ package id.walt.web
 
 import id.walt.config.ConfigManager
 import id.walt.config.list.WebConfig
+import id.walt.featureflag.CommonsFeatureCatalog
+import id.walt.featureflag.FeatureManager.whenFeature
 import id.walt.web.modules.FeatureFlagInformationModule
 import id.walt.web.modules.ServiceHealthChecksDebugModule
 import io.klogging.logger
@@ -15,8 +17,8 @@ data class WebService(
     private val log = logger("WebService")
 
     private val webServiceModule: Application.() -> Unit = {
-        ServiceHealthChecksDebugModule.run { enable() }
-        FeatureFlagInformationModule.run { enable() }
+        { ServiceHealthChecksDebugModule.run { enable() } } whenFeature CommonsFeatureCatalog.healthChecksFeature
+        { FeatureFlagInformationModule.run { enable() } } whenFeature CommonsFeatureCatalog.featureFlagInformationEndpointFeature
 
         module.invoke(this)
     }
