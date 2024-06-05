@@ -8,11 +8,6 @@ import kotlin.io.path.createParentDirectories
 import kotlin.io.path.notExists
 
 @Serializable
-data class DatabaseConfiguration(
-    val database: String
-) : WalletConfig()
-
-@Serializable
 data class DatasourceJsonConfiguration(
     val dataSource: Db.SerializableHikariConfiguration,
     val recreateDatabaseOnStart: Boolean = false
