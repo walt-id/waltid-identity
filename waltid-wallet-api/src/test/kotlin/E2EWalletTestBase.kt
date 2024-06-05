@@ -1,7 +1,6 @@
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyType
-import id.walt.issuer.IssuanceExamples.issuerOnboardingRequestDefaultExample
-import id.walt.issuer.IssuerOnboardingResponse
+import id.walt.issuer.issuance.IssuerOnboardingResponse
 import id.walt.webwallet.db.models.AccountWalletListing
 import id.walt.webwallet.db.models.WalletDid
 import id.walt.webwallet.utils.IssuanceExamples
@@ -99,7 +98,7 @@ abstract class E2EWalletTestBase {
             //language=JSON
             contentType(ContentType.Application.Json)
             setBody(
-                issuerOnboardingRequestDefaultExample
+                id.walt.issuer.issuance.IssuanceExamples.issuerOnboardingRequestDefaultExample
             )
         }.also { response ->
             assertEquals(HttpStatusCode.OK, response.status)

@@ -3,8 +3,8 @@ package id.walt
 import id.walt.config.ConfigManager
 import id.walt.credentials.vc.vcs.W3CVC
 import id.walt.crypto.keys.KeySerialization
-import id.walt.issuer.IssuanceRequest
-import id.walt.issuer.createCredentialOfferUri
+import id.walt.issuer.issuance.IssuanceRequest
+import id.walt.issuer.issuance.createCredentialOfferUri
 import id.walt.sdjwt.SDMapBuilder
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
