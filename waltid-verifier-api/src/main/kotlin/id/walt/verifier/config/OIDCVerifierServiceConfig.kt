@@ -1,5 +1,6 @@
-package id.walt.verifier.base.config
+package id.walt.verifier.config
 
+import id.walt.config.WaltConfig
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -8,4 +9,4 @@ data class OIDCVerifierServiceConfig(
     val requestSigningKeyFile: String? = null,
     val requestSigningCertFile: String? = null,
     val x509SanDnsClientId: String? = null
-) : BaseConfig
+) : WaltConfig()
