@@ -22,6 +22,12 @@ class TraceLoggingSetup : LoggingSetup("trace", {
         }
     }
     logging {
+        fromLoggerBase("org.sqlite.core.NativeDB", stopOnMatch = true)
+        fromMinLevel(Level.DEBUG) {
+            toSink("stdout")
+        }
+    }
+    logging {
         fromMinLevel(Level.ERROR) {
             toSink("stderr")
         }
