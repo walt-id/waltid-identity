@@ -22,6 +22,12 @@ class TraceLoggingSetup : LoggingSetup("trace", {
         }
     }
     logging {
+        fromLoggerBase("io.ktor.routing.Routing", stopOnMatch = true)
+        fromMinLevel(Level.DEBUG) {
+            toSink("stdout")
+        }
+    }
+    logging {
         fromLoggerBase("org.sqlite.core.NativeDB", stopOnMatch = true)
         fromMinLevel(Level.DEBUG) {
             toSink("stdout")
