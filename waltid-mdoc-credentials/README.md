@@ -33,7 +33,7 @@ This library implements the mdoc specification: [ISO/IEC 18013-5:2021](https://w
 
 **Maven / Gradle repository**:
 
-`https://maven.walt.id/repository/waltid/`
+`https://maven.waltid.dev/`
 
 **Maven**
 
@@ -43,7 +43,7 @@ This library implements the mdoc specification: [ISO/IEC 18013-5:2021](https://w
   <repository>
     <id>waltid</id>
     <name>walt.id</name>
-    <url>https://maven.walt.id/repository/waltid/</url>
+    <url>https://maven.waltid.dev/</url>
   </repository>
 </repositories>
 [...]

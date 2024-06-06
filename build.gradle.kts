@@ -7,7 +7,7 @@ allprojects {
     repositories {
         google()
         mavenCentral()
-        maven(url = "https://maven.walt.id/repository/waltid/")
+        maven(url = "https://maven.waltid.dev/")
         maven(url = "https://jitpack.io")
     }
 }

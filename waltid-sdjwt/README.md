@@ -55,7 +55,7 @@ specification:  [draft-ietf-oauth-selective-disclosure-jwt-04](https://datatrack
 
 **Maven / Gradle repository**:
 
-`https://maven.walt.id/repository/waltid/`
+`https://maven.waltid.dev/`
 
 **Maven**
 
@@ -65,7 +65,7 @@ specification:  [draft-ietf-oauth-selective-disclosure-jwt-04](https://datatrack
     <repository>
         <id>waltid</id>
         <name>waltid</name>
-        <url>https://maven.walt.id/repository/waltid/</url>
+        <url>https://maven.waltid.dev/</url>
     </repository>
 </repositories>
         [...]
