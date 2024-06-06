@@ -11,7 +11,9 @@ import id.walt.web.plugins.configureStatusPages
 import id.walt.webwallet.db.Db
 import id.walt.webwallet.webWalletModule
 import id.walt.webwallet.webWalletSetup
+import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
+import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.testing.*
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -32,16 +34,18 @@ class E2ETest {
             module.invoke(this)
         }
 
-        fun run(): suspend () -> Unit = {
+        fun run(block: ApplicationTestBuilder.() -> Unit): suspend () -> Unit = {
             testApplication {
                 application {
                     webServiceModule()
+
+                    block.invoke(this@testApplication)
                 }
             }
         }
     }
 
-    suspend fun runServices() {
+    suspend fun tests(block: ApplicationTestBuilder.() -> Unit) {
         ServiceMain(
             ServiceConfiguration("e2e"), ServiceInitialization(
                 features = listOf(IssuerFeatureCatalog, VerifierFeatureCatalog, WalletFeatureCatalog),
@@ -51,16 +55,22 @@ class E2ETest {
                     WaltidServices.minimalInit()
                     Db.start()
                 },
-                run = TestWebService(Application::e2eTestModule).run()
+                run = TestWebService(Application::e2eTestModule).run(block)
             )
         ).main(emptyArray())
     }
 
     @Test
     fun e2e() = runTest(timeout = 5.minutes) {
-        runServices()
+        tests {
+            val client = createClient {
+                /*install(ContentNegotiation) {
+                    json()
+                }*/
+            }
 
-        // the e2e http request tests here
+            // the e2e http request tests here
+        }
     }
 }
 
