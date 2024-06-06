@@ -1,2 +1,0 @@
-class E2ETest {
-}
