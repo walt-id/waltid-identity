@@ -96,7 +96,7 @@ kotlin {
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:1.8.1")
 
                 // OCI
-                implementation("com.oracle.oci.sdk:oci-java-sdk-shaded-full:3.42.0")
+                implementation("com.oracle.oci.sdk:oci-java-sdk-shaded-full:3.43.0")
 
                 // JOSE
                 implementation("com.nimbusds:nimbus-jose-jwt:9.40")
