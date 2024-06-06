@@ -1,8 +1,8 @@
 package id.walt.webwallet
 
-import id.walt.ServiceConfiguration
-import id.walt.ServiceInitialization
-import id.walt.ServiceMain
+import id.walt.commons.ServiceConfiguration
+import id.walt.commons.ServiceInitialization
+import id.walt.commons.ServiceMain
 import id.walt.crypto.keys.oci.WaltCryptoOci
 import id.walt.did.helpers.WaltidServices
 import id.walt.web.WebService

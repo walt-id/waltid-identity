@@ -68,15 +68,29 @@ object FeatureManager {
         runIfEnabled(feature, this)
     }
 
-    fun registerCatalog(catalog: ServiceFeatureCatalog) {
-        catalog.baseFeatures.forEach {
+    fun registerBaseFeatures(baseFeatures: List<BaseFeature>) {
+        baseFeatures.forEach {
             log.debug { "Registering base feature \"${it.name}\"..." }
             registerFeature(it)
         }
-
-        catalog.optionalFeatures.forEach {
-            log.debug { "Registering optional feature \"${it.name}\"..." }
+    }
+    fun registerOptionalFeatures(baseFeatures: List<OptionalFeature>) {
+        baseFeatures.forEach {
+            log.debug { "Registering base feature \"${it.name}\"..." }
             registerFeature(it)
+        }
+    }
+
+    fun registerCatalog(catalog: ServiceFeatureCatalog) {
+        registerBaseFeatures(catalog.baseFeatures)
+        registerOptionalFeatures(catalog.optionalFeatures)
+    }
+    fun registerCatalogs(catalogs: List<ServiceFeatureCatalog>) {
+        catalogs.forEach { catalog ->
+            registerBaseFeatures(catalog.baseFeatures)
+        }
+        catalogs.forEach { catalog ->
+            registerOptionalFeatures(catalog.optionalFeatures)
         }
     }
 
