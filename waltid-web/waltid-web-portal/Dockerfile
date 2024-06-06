@@ -1,7 +1,7 @@
 # BUILD
 FROM docker.io/gplane/pnpm:8.6 as buildstage
 
-COPY waltid-web-portal/. /build
+COPY waltid-web/waltid-web-portal/. /build
 
 WORKDIR /build
 RUN pnpm install

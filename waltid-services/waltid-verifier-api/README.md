@@ -91,7 +91,7 @@ Verifier service relies on the following walt.id libraries:
 Run the following commands from the waltid-identity root path:
 
 ```shell
-docker build -t waltid/verifier-api -f waltid-verifier-api/Dockerfile .
+docker build -t waltid/verifier-api -f waltid-services/waltid-verifier-api/Dockerfile .
 docker run -p 7003:7003 waltid/verifier-api --webHost=0.0.0.0 --webPort=7003 --baseUrl=http://localhost:7003
 ```
 

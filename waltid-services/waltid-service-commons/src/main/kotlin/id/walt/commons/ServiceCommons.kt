@@ -1,8 +1,6 @@
 package id.walt.commons
 
-import id.walt.commons.config.WaltConfig
 import id.walt.commons.config.buildconfig.BuildConfig
-import id.walt.commons.config.list.WebConfig
 import id.walt.commons.featureflag.CommonsFeatureCatalog
 import id.walt.commons.featureflag.FeatureManager
 import id.walt.commons.featureflag.ServiceFeatureCatalog
@@ -10,7 +8,6 @@ import io.klogging.logger
 import kotlinx.coroutines.delay
 import kotlin.io.path.Path
 import kotlin.io.path.absolutePathString
-import kotlin.reflect.KClass
 import kotlin.time.measureTime
 import java.lang.System.getProperty as p
 
@@ -18,15 +15,6 @@ data class ServiceConfiguration(
     val name: String = "",
     val vendor: String = "walt.id",
     val version: String = BuildConfig.version,
-)
-
-data class ConfigurationsList(
-    val mandatory: List<Pair<String, KClass<out WaltConfig>>> = emptyList(),
-    val optional: List<Pair<String, KClass<out WaltConfig>>> = emptyList(),
-
-    val default: List<Pair<String, KClass<out WaltConfig>>> = listOf(
-        "web" to WebConfig::class
-    ),
 )
 
 data class ServiceInitialization(
