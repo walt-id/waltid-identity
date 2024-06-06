@@ -28,12 +28,12 @@ object FeatureCatalog : ServiceFeatureCatalog {
     val rejectionReasonsFeature = OptionalFeature("rejectionreason", "Rejection reasons use case", RejectionReasonConfig::class, false)
 
     val registrationDefaultsFeature =
-        OptionalFeature("registration-defaults", "Registration defaults (key, did) configuration", RegistrationDefaultsConfig::class, false)
+        OptionalFeature("registration-defaults", "Registration defaults (key, did) configuration", RegistrationDefaultsConfig::class, true)
     val keyGenerationDefaultsFeature = OptionalFeature(
         "key-generation-defaults",
         "Key generation defaults (key backend & generation config) configuration",
         KeyGenerationDefaultsConfig::class,
-        false
+        true
     )
 
     val notificationFeature = OptionalFeature("notification", "Notification dispatch use case", NotificationConfig::class, false)
