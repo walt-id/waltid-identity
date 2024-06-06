@@ -31,7 +31,7 @@ dependencies {
     implementation("io.ktor:ktor-serialization-kotlinx-json-jvm")
     implementation("io.ktor:ktor-server-cio-jvm")
     testImplementation("io.ktor:ktor-server-tests-jvm")
-    testImplementation("org.jetbrains.kotlin:kotlin-test-junit:$kotlin_version")
+    testImplementation(kotlin("test-junit"))
 
     // nftkit
     implementation("id.walt:waltid-nftkit:1.2311291144.0") {
