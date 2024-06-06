@@ -1,4 +1,4 @@
-package id.walt
+package id.walt.commons
 
 import id.walt.config.WaltConfig
 import id.walt.config.buildconfig.BuildConfig
@@ -30,10 +30,16 @@ data class ConfigurationsList(
 )
 
 data class ServiceInitialization(
-    val features: ServiceFeatureCatalog,
+    val features: List<ServiceFeatureCatalog>,
     val init: suspend () -> Unit,
     val run: suspend () -> Unit,
-)
+) {
+    constructor(
+        features: ServiceFeatureCatalog,
+        init: suspend () -> Unit,
+        run: suspend () -> Unit,
+    ) : this(listOf(features), init, run)
+}
 
 object ServiceCommons {
 
@@ -54,7 +60,7 @@ object ServiceCommons {
         log.info { "Registering common feature catalog..." }
         FeatureManager.registerCatalog(CommonsFeatureCatalog)
         log.info { "Registering service feature catalog..." }
-        FeatureManager.registerCatalog(init.features)
+        FeatureManager.registerCatalogs(init.features)
 
         log.info { "Loading features..." }
         FeatureManager.load()

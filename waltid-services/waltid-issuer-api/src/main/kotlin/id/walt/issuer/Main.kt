@@ -1,8 +1,8 @@
 package id.walt.issuer
 
-import id.walt.ServiceConfiguration
-import id.walt.ServiceInitialization
-import id.walt.ServiceMain
+import id.walt.commons.ServiceConfiguration
+import id.walt.commons.ServiceInitialization
+import id.walt.commons.ServiceMain
 import id.walt.did.helpers.WaltidServices
 import id.walt.featureflag.FeatureManager.whenFeature
 import id.walt.issuer.entra.entraIssuance

@@ -1,8 +1,8 @@
 package id.walt.verifier
 
-import id.walt.ServiceConfiguration
-import id.walt.ServiceInitialization
-import id.walt.ServiceMain
+import id.walt.commons.ServiceConfiguration
+import id.walt.commons.ServiceInitialization
+import id.walt.commons.ServiceMain
 import id.walt.credentials.verification.PolicyManager
 import id.walt.did.dids.DidService
 import id.walt.did.dids.resolver.LocalResolver
