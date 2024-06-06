@@ -126,7 +126,7 @@ dependencies {
     testImplementation(project(":waltid-services:waltid-issuer-api"))
     testImplementation(project(":waltid-services:waltid-verifier-api"))
 
-    implementation("com.nimbusds:nimbus-jose-jwt:9.39.1")
+    implementation("com.nimbusds:nimbus-jose-jwt:9.40")
 
     implementation("io.ktor:ktor-client-java:$ktor_version")
 
@@ -141,11 +141,11 @@ dependencies {
     }
 
     // DB
-    implementation("org.jetbrains.exposed:exposed-core:0.50.1")
-    implementation("org.jetbrains.exposed:exposed-jdbc:0.50.1")
-    implementation("org.jetbrains.exposed:exposed-dao:0.50.1")
-    implementation("org.jetbrains.exposed:exposed-java-time:0.50.1")
-    implementation("org.jetbrains.exposed:exposed-json:0.50.1")
+    implementation("org.jetbrains.exposed:exposed-core:0.51.1")
+    implementation("org.jetbrains.exposed:exposed-jdbc:0.51.1")
+    implementation("org.jetbrains.exposed:exposed-dao:0.51.1")
+    implementation("org.jetbrains.exposed:exposed-java-time:0.51.1")
+    implementation("org.jetbrains.exposed:exposed-json:0.51.1")
     // drivers
     implementation("org.xerial:sqlite-jdbc:3.46.0.0")
     implementation("org.postgresql:postgresql:42.7.3")
@@ -169,8 +169,8 @@ dependencies {
     implementation("io.github.oshai:kotlin-logging-jvm:6.0.9")
 //    implementation("org.slf4j:slf4j-simple:2.0.13")
     implementation("org.slf4j:jul-to-slf4j:2.0.13")
-    implementation("io.klogging:klogging-jvm:0.5.13")
-    implementation("io.klogging:slf4j-klogging:0.5.13")
+    implementation("io.klogging:klogging-jvm:0.5.14")
+    implementation("io.klogging:slf4j-klogging:0.5.14")
 
     // Test
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit:1.9.24")
@@ -178,5 +178,5 @@ dependencies {
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
     testImplementation("io.ktor:ktor-server-tests-jvm:$ktor_version")
     testImplementation("io.mockk:mockk:1.13.11")
-    testImplementation("io.klogging:klogging-jvm:0.5.13")
+    testImplementation("io.klogging:klogging-jvm:0.5.14")
 }

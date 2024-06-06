@@ -132,7 +132,7 @@ kotlin {
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:1.8.1")
 
                 // JOSE
-                implementation("com.nimbusds:nimbus-jose-jwt:9.39.1")
+                implementation("com.nimbusds:nimbus-jose-jwt:9.40")
 
                 // Multibase
 //                implementation("com.github.multiformats:java-multibase:v1.1.1")

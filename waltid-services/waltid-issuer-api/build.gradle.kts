@@ -90,8 +90,8 @@ dependencies {
     implementation("io.github.oshai:kotlin-logging-jvm:6.0.9")
 //    implementation("org.slf4j:slf4j-simple:2.0.13")
     implementation("org.slf4j:jul-to-slf4j:2.0.13")
-    implementation("io.klogging:klogging-jvm:0.5.13")
-    implementation("io.klogging:slf4j-klogging:0.5.13")
+    implementation("io.klogging:klogging-jvm:0.5.14")
+    implementation("io.klogging:slf4j-klogging:0.5.14")
 
 
     // Test
@@ -111,7 +111,7 @@ dependencies {
     api(project(":waltid-libraries:waltid-sdjwt"))
 
     // TODO: REMOVE:
-    implementation("com.nimbusds:nimbus-jose-jwt:9.39.1")
+    implementation("com.nimbusds:nimbus-jose-jwt:9.40")
 }
 
 tasks.withType<Test> {

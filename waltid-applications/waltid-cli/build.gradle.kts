@@ -80,7 +80,7 @@ kotlin {
                 implementation("org.slf4j:slf4j-simple:2.0.13")
 
                 // JOSE
-                implementation("com.nimbusds:nimbus-jose-jwt:9.39.1")
+                implementation("com.nimbusds:nimbus-jose-jwt:9.40")
 
                 // BouncyCastle for PEM import
                 implementation("org.bouncycastle:bcpkix-lts8on:2.73.6")
