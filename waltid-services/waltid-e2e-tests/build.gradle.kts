@@ -13,6 +13,7 @@ dependencies {
     testImplementation(kotlin("test"))
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test-jvm:1.8.1")
     testImplementation("io.ktor:ktor-server-test-host:2.3.11")
+    testImplementation("io.ktor:ktor-client-content-negotiation:2.3.11")
     implementation(project(":waltid-services:waltid-service-commons"))
     implementation(project(":waltid-services:waltid-issuer-api"))
     implementation(project(":waltid-services:waltid-verifier-api"))
