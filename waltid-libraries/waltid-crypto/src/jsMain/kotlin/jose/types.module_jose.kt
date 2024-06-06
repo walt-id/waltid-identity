@@ -224,10 +224,6 @@ external interface FlattenedJWE {
         set(value) = definedExternally
 }
 
-external interface GeneralJWE : Omit<FlattenedJWE, String /* "encrypted_key" | "header" */> {
-    var recipients: Array<Pick<FlattenedJWE, String /* "encrypted_key" | "header" */>>
-}
-
 external interface JWEHeaderParameters : JoseHeaderParameters {
     var alg: String?
         get() = definedExternally
