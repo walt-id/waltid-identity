@@ -127,9 +127,9 @@ kotlin {
             dependencies {
                 //implementation("io.mockk:mockk:1.13.2")
                 implementation("com.nimbusds:nimbus-jose-jwt:9.40")
-                implementation("io.kotest:kotest-runner-junit5:5.9.0")
-                implementation("io.kotest:kotest-assertions-core:5.9.0")
-                implementation("io.kotest:kotest-assertions-json:5.9.0")
+                implementation("io.kotest:kotest-runner-junit5:5.9.1")
+                implementation("io.kotest:kotest-assertions-core:5.9.1")
+                implementation("io.kotest:kotest-assertions-json:5.9.1")
                 implementation("org.junit.jupiter:junit-jupiter-params:5.10.2")
                 implementation("com.google.crypto.tink:tink:1.13.0") // for JOSE using Ed25519
                 // Multibase

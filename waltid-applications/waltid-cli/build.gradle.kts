@@ -53,8 +53,8 @@ kotlin {
 
 //                implementation("org.jetbrains.kotlinx:kotlinx-io-core:0.3.5")
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
-                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.0-RC.2")
-                implementation ("com.google.code.gson:gson:2.10.1")
+                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.0")
+                implementation ("com.google.code.gson:gson:2.11.0")
 
                 // CLI
                 implementation("com.varabyte.kotter:kotter-jvm:1.1.2")
