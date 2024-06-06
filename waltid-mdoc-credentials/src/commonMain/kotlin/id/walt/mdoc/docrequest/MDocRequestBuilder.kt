@@ -45,7 +45,7 @@ class MDocRequestBuilder(val docType: String) {
 
   fun sign(sessionTranscript: ListElement, cryptoProvider: COSECryptoProvider, keyID: String? = null): MDocRequest {
     val encodedItemsRequest = buildEncodedItemsRequest()
-    val readerAuth = cryptoProvider.sign1(EncodedCBORElement(ReaderAuthentication(sessionTranscript, encodedItemsRequest).toCBOR()).toCBOR(), keyID)
+    val readerAuth = cryptoProvider.sign1(EncodedCBORElement(ReaderAuthentication(sessionTranscript, encodedItemsRequest).toCBOR()).toCBOR(), null, null, keyID)
     return MDocRequest(encodedItemsRequest, readerAuth.detachPayload())
   }
 }

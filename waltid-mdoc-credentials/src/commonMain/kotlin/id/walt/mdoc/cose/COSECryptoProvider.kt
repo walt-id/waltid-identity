@@ -1,5 +1,7 @@
 package id.walt.mdoc.cose
 
+import id.walt.mdoc.dataelement.MapElement
+
 /**
  * Crypto provider, that provides COSE signing and verifying on the target platform.
  * The implementatin must support COSE_Sign1, as well as validation of certificate chains against a root CA.
@@ -12,10 +14,12 @@ interface COSECryptoProvider {
   /**
    * Create a COSE_Sign1 signature for the given payload, with an optional keyID parameter.
    * @param payload The payload data to be signed, as byte array
+   * @param headersProtected Additional headers for the cryptographically protected headers of the COSESign1 element
+   * @param headersUnprotected Additional headers for the cryptographically unprotected headers of the COSESign1 element
    * @param keyID Optional keyID of the signing key to be used, if required by crypto provider impl
    * @return  COSE_Sign1 structure with headers, payload and signature
    */
-  fun sign1(payload: ByteArray, keyID: String? = null): COSESign1
+  fun sign1(payload: ByteArray, headersProtected: MapElement? = null, headersUnprotected: MapElement? = null, keyID: String? = null): COSESign1
 
   /**
    * Verify a COSE_Sign1 signature, with an optional keyID parameter

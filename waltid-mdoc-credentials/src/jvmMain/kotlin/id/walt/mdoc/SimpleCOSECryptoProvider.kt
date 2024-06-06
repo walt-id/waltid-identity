@@ -7,6 +7,8 @@ import id.walt.mdoc.cose.COSECryptoProvider
 import id.walt.mdoc.cose.COSESign1
 import id.walt.mdoc.cose.COSESign1Serializer
 import id.walt.mdoc.cose.X5_CHAIN
+import id.walt.mdoc.dataelement.MapElement
+import id.walt.mdoc.dataelement.MapKeyType
 import korlibs.crypto.encoding.Hex
 import kotlinx.serialization.ExperimentalSerializationApi
 import java.io.ByteArrayInputStream
@@ -24,7 +26,7 @@ class SimpleCOSECryptoProvider(keys: List<COSECryptoProviderKeyInfo>): COSECrypt
   private val keyMap: Map<String, COSECryptoProviderKeyInfo> = keys.associateBy { it.keyID }
 
   @OptIn(ExperimentalSerializationApi::class)
-  override fun sign1(payload: ByteArray, keyID: String?): COSESign1 {
+  override fun sign1(payload: ByteArray, headersProtected: MapElement?, headersUnprotected: MapElement?, keyID: String?): COSESign1 {
     val keyInfo = keyID?.let { keyMap[it] } ?: throw Exception("No key ID given, or key with given ID not found")
     val sign1Msg = Sign1Message()
     sign1Msg.addAttribute(HeaderKeys.Algorithm, keyInfo.algorithmID.AsCBOR(), Attribute.PROTECTED)
@@ -45,6 +47,14 @@ class SimpleCOSECryptoProvider(keys: List<COSECryptoProviderKeyInfo>): COSECrypt
             Attribute.UNPROTECTED
           )
         }
+    }
+    headersProtected?.value?.forEach {
+      val attributeKey = when(it.key.type) { MapKeyType.int -> it.key.int else -> it.key.str }
+      sign1Msg.addAttribute(CBORObject.FromObject(attributeKey), CBORObject.DecodeFromBytes(it.value.toCBOR()), Attribute.PROTECTED)
+    }
+    headersUnprotected?.value?.forEach {
+      val attributeKey = when(it.key.type) { MapKeyType.int -> it.key.int else -> it.key.str }
+      sign1Msg.addAttribute(CBORObject.FromObject(attributeKey), CBORObject.DecodeFromBytes(it.value.toCBOR()), Attribute.UNPROTECTED)
     }
     sign1Msg.SetContent(payload)
     sign1Msg.sign(OneKey(keyInfo.publicKey, keyInfo.privateKey))

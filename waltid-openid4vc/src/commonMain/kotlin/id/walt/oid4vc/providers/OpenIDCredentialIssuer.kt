@@ -195,6 +195,7 @@ abstract class OpenIDCredentialIssuer(
             "Session invalid"
         )
         println("Credential request to validate: $credentialRequest")
+        //if(false) { // TODO: REMOVE THIS LINE, REACTIVATE LINE BELOW!!
         if (credentialRequest.proof == null || !validateProofOfPossession(credentialRequest, nonce)) {
             throw createCredentialError(
                 credentialRequest,

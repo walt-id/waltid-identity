@@ -1,18 +1,31 @@
 package id.walt
 
+import COSE.AlgorithmID
+import cbor.Cbor
+import com.nimbusds.jose.crypto.impl.ECDSA
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeyType
+import id.walt.did.dids.DidService
+import id.walt.did.dids.DidUtils
+import id.walt.did.dids.registrar.LocalRegistrar
+import id.walt.did.dids.registrar.dids.DidKeyCreateOptions
+import id.walt.did.dids.registrar.local.key.DidKeyRegistrar
 import id.walt.did.helpers.WaltidServices
 import id.walt.issuer.base.config.ConfigManager
 import id.walt.issuer.base.config.WebConfig
 import id.walt.issuer.issuerModule
+import id.walt.mdoc.COSECryptoProviderKeyInfo
+import id.walt.mdoc.SimpleCOSECryptoProvider
+import id.walt.mdoc.cose.COSESign1
+import id.walt.mdoc.dataelement.*
 import id.walt.oid4vc.OpenID4VCI
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.requests.CredentialOfferRequest
 import id.walt.oid4vc.requests.CredentialRequest
 import id.walt.oid4vc.requests.TokenRequest
+import id.walt.oid4vc.responses.CredentialResponse
 import id.walt.oid4vc.responses.TokenResponse
 import id.walt.oid4vc.util.randomUUID
 import io.ktor.client.*
@@ -29,8 +42,12 @@ import io.ktor.server.engine.*
 import io.ktor.util.*
 import io.ktor.utils.io.core.*
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.decodeFromByteArray
+import kotlinx.serialization.decodeFromHexString
 import kotlinx.serialization.json.JsonObject
 import org.kotlincrypto.hash.sha2.SHA256
+import java.security.KeyPairGenerator
+import java.security.PublicKey
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.test.*
@@ -131,13 +148,49 @@ class LspPotentialTest {
     assertNotNull(tokenResp.accessToken)
     assertTrue(tokenResp.isSuccess)
 
-    val deviceKey = KeyManager.createKey(KeyGenerationRequest(keyType = KeyType.secp256r1))
+    val kpg = KeyPairGenerator.getInstance("EC")
+    kpg.initialize(256)
+    val deviceKeyPair = kpg.genKeyPair()
     // ### steps 19-22: credential issuance
+
+    // TODO: support CWT proof of possession signing. Move COSE signing functionality to crypto lib?
     val credReq = CredentialRequest.forOfferedCredential(offeredCredential, ProofOfPossession.CWTProofBuilder(
       issuerUrl = parsedOffer.credentialIssuer, clientId = authReq.clientId, nonce = tokenResp.cNonce,
       coseKeyAlgorithm = COSE.AlgorithmID.ECDSA_256.AsCBOR().toString(),
-      coseKey = deviceKey.getPublicKeyRepresentation(), null
-    ).build(deviceKey))
+      coseKey = deviceKeyPair.public.encoded, null
+    ).build(SimpleCOSECryptoProvider(listOf(COSECryptoProviderKeyInfo("device-key", AlgorithmID.ECDSA_256,
+      deviceKeyPair.public, deviceKeyPair.private))), "device-key"))
+
+    val cwt = Cbor.decodeFromHexString(COSESign1.serializer(), credReq.proof!!.cwt!!)
+    assertNotNull(cwt.payload)
+    val cwtPayload = Cbor.decodeFromByteArray<MapElement>(cwt.payload!!)
+    assertEquals(DEType.textString, cwtPayload.value.get(MapKey(ProofOfPossession.CWTProofBuilder.LABEL_ISS))?.type)
+    val cwtProtectedHeader = Cbor.decodeFromByteArray<MapElement>(cwt.protectedHeader)
+    assertEquals(cwtProtectedHeader.value[MapKey(ProofOfPossession.CWTProofBuilder.HEADER_LABEL_ALG)]!!.value, -7L)
+    assertEquals(cwtProtectedHeader.value[MapKey(ProofOfPossession.CWTProofBuilder.HEADER_LABEL_CONTENT_TYPE)]!!.value, "openid4vci-proof+cwt")
+    assertContentEquals((cwtProtectedHeader.value[MapKey(ProofOfPossession.CWTProofBuilder.HEADER_LABEL_COSE_KEY)] as ByteStringElement).value, deviceKeyPair.public.encoded)
+
+    // TODO: temporarily set proof to null, which gets temporarily accepted for this test (CWT proof signing still needs to be implemented!!, accepting null proof needs to be disabled again! (OpenIdCredentialIssuer.kt:198)
+    //val credReq = CredentialRequest.forOfferedCredential(offeredCredential, null)
+
+    val credResp = http.post(providerMetadata.credentialEndpoint!!) {
+      contentType(ContentType.Application.Json)
+      bearerAuth(tokenResp.accessToken!!)
+      setBody(credReq.toJSON())
+    }.body<JsonObject>().let { CredentialResponse.fromJSON(it) }
+
+  }
+
+  @Test
+  fun testParseCWTExample() {
+    val data = "d28443a10126a104524173796d6d657472696345434453413235365850a701756" +
+        "36f61703a2f2f61732e6578616d706c652e636f6d02656572696b77037818636f" +
+        "61703a2f2f6c696768742e6578616d706c652e636f6d041a5612aeb0051a5610d" +
+        "9f0061a5610d9f007420b7158405427c1ff28d23fbad1f29c4c7c6a555e601d6f" +
+        "a29f9179bc3d7438bacaca5acd08c8d4d4f96131680c429a01f85951ecee743a5" +
+        "2b9b63632c57209120e1c9e30"
+    val parsedCwt = Cbor.decodeFromHexString(COSESign1.serializer(), data)
+    parsedCwt != null
 
   }
 }
