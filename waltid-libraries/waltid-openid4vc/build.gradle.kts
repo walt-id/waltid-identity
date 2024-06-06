@@ -73,7 +73,6 @@ kotlin {
 //        else -> throw GradleException("Host OS is not supported in Kotlin/Native.")
 //    }
     val ktor_version = "2.3.11"
-    val HOPLITE_VERSION = "2.8.0.RC3"
 
     sourceSets {
         val commonMain by getting {
@@ -127,7 +126,7 @@ kotlin {
         val jvmTest by getting {
             dependencies {
                 //implementation("io.mockk:mockk:1.13.2")
-                implementation("com.nimbusds:nimbus-jose-jwt:9.39.1")
+                implementation("com.nimbusds:nimbus-jose-jwt:9.40")
                 implementation("io.kotest:kotest-runner-junit5:5.9.0")
                 implementation("io.kotest:kotest-assertions-core:5.9.0")
                 implementation("io.kotest:kotest-assertions-json:5.9.0")

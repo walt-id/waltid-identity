@@ -72,7 +72,7 @@ class SDJwtTest {
         assertFalse(actual = sdPayload_3.undisclosedPayload.keys.any { setOf("sub", "nestedObject").contains(it) })
         val nestedDisclosure = sdPayload_3.sDisclosures.firstOrNull { sd -> sd.key == "nestedObject" && sd.value is JsonObject }
         assertNotNull(actual = nestedDisclosure)
-        assertContains(map = nestedDisclosure!!.value.jsonObject, key = SDJwt.DIGESTS_KEY)
+        assertContains(map = nestedDisclosure.value.jsonObject, key = SDJwt.DIGESTS_KEY)
         assertFalse(actual = nestedDisclosure.value.jsonObject.containsKey("arrProp"))
         assertEquals(expected = fullPayload, actual = Json.parseToJsonElement(sdPayload_3.fullPayload.toString()))
         assertEquals(expected = sdPayload_3.digestedDisclosures.size, actual = sdPayload_3.undisclosedPayload[SDJwt.DIGESTS_KEY]!!.jsonArray.size +

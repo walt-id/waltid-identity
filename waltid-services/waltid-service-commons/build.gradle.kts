@@ -25,7 +25,7 @@ dependencies {
 
     // Logging
     api("io.klogging:klogging-jvm:0.5.14") // JVM + ~JS
-    implementation("io.klogging:slf4j-klogging:0.5.13")
+    implementation("io.klogging:slf4j-klogging:0.5.14")
     implementation("org.slf4j:jul-to-slf4j:2.0.13")
 
     // CLI

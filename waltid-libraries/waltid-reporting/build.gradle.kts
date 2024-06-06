@@ -87,7 +87,7 @@ kotlin {
                 implementation("org.slf4j:slf4j-simple:2.0.13")
 
                 // JOSE
-                implementation("com.nimbusds:nimbus-jose-jwt:9.39.1")
+                implementation("com.nimbusds:nimbus-jose-jwt:9.40")
             }
         }
         val jvmTest by getting {
