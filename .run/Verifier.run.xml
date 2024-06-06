@@ -3,10 +3,10 @@
     <option name="ALTERNATIVE_JRE_PATH" value="17" />
     <option name="ALTERNATIVE_JRE_PATH_ENABLED" value="true" />
     <option name="MAIN_CLASS_NAME" value="id.walt.verifier.MainKt" />
-    <module name="waltid-identity.waltid-verifier-api.main" />
+    <module name="waltid-identity.waltid-services.waltid-verifier-api.main" />
     <option name="PROGRAM_PARAMETERS" value="-l trace" />
     <shortenClasspath name="NONE" />
-    <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/waltid-verifier-api" />
+    <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/waltid-services/waltid-verifier-api" />
     <method v="2">
       <option name="Make" enabled="true" />
     </method>
