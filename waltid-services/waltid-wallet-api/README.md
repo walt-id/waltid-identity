@@ -54,7 +54,7 @@ docker run \
 Update the wallet-api container by running the following commands from the root folder:
 
 ```bash
-docker build -t waltid/wallet-api -f waltid-wallet-api/Dockerfile .
+docker build -t waltid/wallet-api -f waltid-services/waltid-wallet-api/Dockerfile .
 ```
 
 # Database configuration
