@@ -74,8 +74,8 @@ object FeatureManager {
             registerFeature(it)
         }
     }
-    fun registerOptionalFeatures(baseFeatures: List<OptionalFeature>) {
-        baseFeatures.forEach {
+    fun registerOptionalFeatures(optionalFeatures: List<OptionalFeature>) {
+        optionalFeatures.forEach {
             log.debug { "Registering base feature \"${it.name}\"..." }
             registerFeature(it)
         }
