@@ -56,7 +56,7 @@ class VCUtil {
 
             val policies = policies.ifEmpty { listOf("signature") }
 
-            var requests: List<PolicyRequest> = mutableListOf()
+            val requests: ArrayList<PolicyRequest> = ArrayList()
 
             policies.forEach { policy ->
                 val verificationPolicy = PolicyManager.getPolicy(policy)

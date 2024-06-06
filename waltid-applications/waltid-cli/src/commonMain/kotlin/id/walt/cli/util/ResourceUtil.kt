@@ -15,7 +15,7 @@ fun getResourcePath(obj: Any, filename: String): String {
         return getNormalizedPath(path)
     }
 
-    throw FileNotFoundException(path)
+    throw FileNotFoundException("$filename not found")
 }
 //    // If Windows path, escape backslash
 //    val winPathRegex = """"^[a-zA-Z]:\\\\.*"""".toRegex()
