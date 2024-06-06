@@ -1,7 +1,7 @@
-package id.walt.featureflag
+package id.walt.commons.featureflag
 
-import id.walt.config.ConfigManager
-import id.walt.config.runconfig.RunConfiguration
+import id.walt.commons.config.ConfigManager
+import id.walt.commons.config.runconfig.RunConfiguration
 import io.klogging.noCoLogger
 
 object FeatureManager {

@@ -1,4 +1,4 @@
-package id.walt.commands
+package id.walt.commons.commands
 
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.parameters.options.option
@@ -6,7 +6,7 @@ import com.github.ajalt.clikt.parameters.types.choice
 import id.walt.commons.ServiceCommons
 import id.walt.commons.ServiceConfiguration
 import id.walt.commons.ServiceInitialization
-import id.walt.logging.LoggingManager
+import id.walt.commons.logging.LoggingManager
 import kotlinx.coroutines.runBlocking
 
 class ServiceRunnableCommand(

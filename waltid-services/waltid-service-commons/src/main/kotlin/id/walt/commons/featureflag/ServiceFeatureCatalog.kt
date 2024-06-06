@@ -1,4 +1,4 @@
-package id.walt.featureflag
+package id.walt.commons.featureflag
 
 /**
  * Implement this interface with an object in your service.

@@ -1,6 +1,6 @@
-package id.walt.logging.setups
+package id.walt.commons.logging.setups
 
-import id.walt.logging.LogStringManager
+import id.walt.commons.logging.LogStringManager
 import io.klogging.Level
 import io.klogging.sending.STDERR
 import io.klogging.sending.STDOUT

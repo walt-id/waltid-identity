@@ -1,9 +1,9 @@
-package id.walt.logging
+package id.walt.commons.logging
 
-import id.walt.logging.setups.DebugLoggingSetup
-import id.walt.logging.setups.DefaultLoggingSetup
-import id.walt.logging.setups.LoggingSetup
-import id.walt.logging.setups.TraceLoggingSetup
+import id.walt.commons.logging.setups.DebugLoggingSetup
+import id.walt.commons.logging.setups.DefaultLoggingSetup
+import id.walt.commons.logging.setups.LoggingSetup
+import id.walt.commons.logging.setups.TraceLoggingSetup
 import io.klogging.config.loggingConfiguration
 
 object LoggingManager {

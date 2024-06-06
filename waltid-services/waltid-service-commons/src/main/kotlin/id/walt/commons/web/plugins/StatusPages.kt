@@ -1,6 +1,6 @@
-package id.walt.web.plugins
+package id.walt.commons.web.plugins
 
-import id.walt.web.WebException
+import id.walt.commons.web.WebException
 import io.klogging.logger
 import io.ktor.http.*
 import io.ktor.server.application.*

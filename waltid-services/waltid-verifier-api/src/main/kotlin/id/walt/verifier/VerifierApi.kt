@@ -6,7 +6,7 @@ import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.Curve
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.jwk.gen.ECKeyGenerator
-import id.walt.config.ConfigManager
+import id.walt.commons.config.ConfigManager
 import id.walt.credentials.verification.PolicyManager
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.crypto.utils.JsonUtils.toJsonObject
@@ -226,7 +226,8 @@ fun Application.verfierApi() {
 
                 context.respond(authorizeBaseUrl.plus("?").plus(
                     when(openId4VPProfile) {
-                        OpenId4VPProfile.ISO_18013_7_MDOC -> session.authorizationRequest!!.toRequestObjectByReferenceHttpQueryString(ConfigManager.getConfig<OIDCVerifierServiceConfig>().baseUrl.let { "$it/openid4vc/request/${session.id}" })
+                        OpenId4VPProfile.ISO_18013_7_MDOC -> session.authorizationRequest!!.toRequestObjectByReferenceHttpQueryString(
+                            ConfigManager.getConfig<OIDCVerifierServiceConfig>().baseUrl.let { "$it/openid4vc/request/${session.id}" })
                         OpenId4VPProfile.EBSIV3 -> session.authorizationRequest!!.toEbsiRequestObjectByReferenceHttpQueryString(SERVER_URL.let { "$it/openid4vc/request/${session.id}"})
                         else -> session.authorizationRequest!!.toHttpQueryString()
                     }

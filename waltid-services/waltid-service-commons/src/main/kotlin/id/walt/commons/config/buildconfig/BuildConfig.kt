@@ -1,4 +1,4 @@
-package id.walt.config.buildconfig
+package id.walt.commons.config.buildconfig
 
 import java.util.Properties
 

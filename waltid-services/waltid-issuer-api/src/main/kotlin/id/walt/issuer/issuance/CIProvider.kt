@@ -2,7 +2,7 @@
 
 package id.walt.issuer.issuance
 
-import id.walt.config.ConfigManager
+import id.walt.commons.config.ConfigManager
 import id.walt.credentials.issuance.Issuer.mergingJwtIssue
 import id.walt.credentials.issuance.Issuer.mergingSdJwtIssue
 import id.walt.credentials.vc.vcs.W3CVC

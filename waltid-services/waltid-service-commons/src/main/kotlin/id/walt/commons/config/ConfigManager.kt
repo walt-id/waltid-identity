@@ -1,4 +1,4 @@
-package id.walt.config
+package id.walt.commons.config
 
 import com.sksamuel.hoplite.*
 import io.klogging.java.LoggerFactory

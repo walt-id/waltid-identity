@@ -4,12 +4,12 @@ import id.walt.commons.ServiceConfiguration
 import id.walt.commons.ServiceInitialization
 import id.walt.commons.ServiceMain
 import id.walt.did.helpers.WaltidServices
-import id.walt.featureflag.FeatureManager.whenFeature
+import id.walt.commons.featureflag.FeatureManager.whenFeature
 import id.walt.issuer.entra.entraIssuance
 import id.walt.issuer.issuance.OidcApi.oidcApi
 import id.walt.issuer.issuance.issuerApi
 import id.walt.issuer.web.plugins.*
-import id.walt.web.WebService
+import id.walt.commons.web.WebService
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.server.application.*
 

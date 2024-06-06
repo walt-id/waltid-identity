@@ -1,13 +1,13 @@
-package id.walt.web
+package id.walt.commons.web
 
-import id.walt.config.ConfigManager
-import id.walt.config.list.WebConfig
-import id.walt.featureflag.CommonsFeatureCatalog
-import id.walt.featureflag.FeatureManager.whenFeature
-import id.walt.web.modules.FeatureFlagInformationModule
-import id.walt.web.modules.ServiceHealthChecksDebugModule
-import id.walt.web.plugins.configureSerialization
-import id.walt.web.plugins.configureStatusPages
+import id.walt.commons.config.ConfigManager
+import id.walt.commons.config.list.WebConfig
+import id.walt.commons.featureflag.CommonsFeatureCatalog
+import id.walt.commons.featureflag.FeatureManager.whenFeature
+import id.walt.commons.web.modules.FeatureFlagInformationModule
+import id.walt.commons.web.modules.ServiceHealthChecksDebugModule
+import id.walt.commons.web.plugins.configureSerialization
+import id.walt.commons.web.plugins.configureStatusPages
 import io.klogging.logger
 import io.ktor.server.application.*
 import io.ktor.server.cio.*

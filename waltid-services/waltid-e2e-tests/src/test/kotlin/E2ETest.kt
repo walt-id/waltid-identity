@@ -6,14 +6,12 @@ import id.walt.did.helpers.WaltidServices
 import id.walt.issuer.issuerModule
 import id.walt.verifier.policies.PresentationDefinitionPolicy
 import id.walt.verifier.verifierModule
-import id.walt.web.plugins.configureSerialization
-import id.walt.web.plugins.configureStatusPages
+import id.walt.commons.web.plugins.configureSerialization
+import id.walt.commons.web.plugins.configureStatusPages
 import id.walt.webwallet.db.Db
 import id.walt.webwallet.webWalletModule
 import id.walt.webwallet.webWalletSetup
-import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
-import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.testing.*
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test

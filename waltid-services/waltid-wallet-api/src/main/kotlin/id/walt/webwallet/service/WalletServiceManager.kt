@@ -1,6 +1,6 @@
 package id.walt.webwallet.service
 
-import id.walt.config.ConfigManager
+import id.walt.commons.config.ConfigManager
 import id.walt.webwallet.config.OidcConfiguration
 import id.walt.webwallet.config.TrustConfig
 import id.walt.webwallet.db.models.AccountWalletMappings

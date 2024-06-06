@@ -5,7 +5,7 @@ import id.walt.commons.ServiceInitialization
 import id.walt.commons.ServiceMain
 import id.walt.crypto.keys.oci.WaltCryptoOci
 import id.walt.did.helpers.WaltidServices
-import id.walt.web.WebService
+import id.walt.commons.web.WebService
 import id.walt.webwallet.db.Db
 import id.walt.webwallet.web.Administration.configureAdministration
 import id.walt.webwallet.web.controllers.*

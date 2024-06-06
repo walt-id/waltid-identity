@@ -1,6 +1,6 @@
 package id.walt.verifier.entra
 
-import id.walt.config.WaltConfig
+import id.walt.commons.config.WaltConfig
 import kotlinx.serialization.Serializable
 
 @Serializable

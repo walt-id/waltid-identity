@@ -1,4 +1,4 @@
-package id.walt.web.modules
+package id.walt.commons.web.modules
 
 import com.sksamuel.cohort.Cohort
 import com.sksamuel.cohort.HealthCheckRegistry

@@ -1,4 +1,4 @@
-package id.walt.config.runconfig
+package id.walt.commons.config.runconfig
 
 object RunConfiguration {
 
