@@ -6,8 +6,8 @@ services:
       context: ../
       dockerfile: waltid-wallet-api/Dockerfile
     depends_on:
-      - "$DATABASE_ENGINE"
       - caddy
+      - "$DATABASE_ENGINE"
     env_file:
       - .env
     volumes:
@@ -41,8 +41,8 @@ services:
     image: docker.io/waltid/waltid-web-wallet:${VERSION_TAG:-latest}
     pull_policy: always
     depends_on:
-      - wallet-api
       - caddy
+      - wallet-api
     environment:
       NUXT_PUBLIC_ISSUER_CALLBACK_URL: "http://localhost:$WALLET_FRONTEND_PORT"
       PORT: $WALLET_FRONTEND_PORT
