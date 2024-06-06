@@ -1,6 +1,6 @@
-package id.walt.web.modules
+package id.walt.commons.web.modules
 
-import id.walt.featureflag.FeatureManager
+import id.walt.commons.featureflag.FeatureManager
 import io.ktor.server.application.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
@@ -36,11 +36,13 @@ object FeatureFlagInformationModule {
                 val defaulted = registered.keys.subtract(enabled.keys).subtract(disabled.keys)
                     .associateWith { registered[it]!!.description }
 
-                context.respond(FeatureFlagInformations(
+                context.respond(
+                    FeatureFlagInformations(
                     enabled = FeatureFlagInformation(enabled),
                     disabled = FeatureFlagInformation(disabled),
                     defaulted = FeatureFlagInformation(defaulted)
-                ))
+                )
+                )
             }
         }
     }

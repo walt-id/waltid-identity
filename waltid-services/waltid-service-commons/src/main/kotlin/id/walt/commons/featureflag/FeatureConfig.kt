@@ -1,6 +1,6 @@
-package id.walt.featureflag
+package id.walt.commons.featureflag
 
-import id.walt.config.WaltConfig
+import id.walt.commons.config.WaltConfig
 
 /**
  * Feature configuration:

@@ -1,6 +1,6 @@
 package id.walt.webwallet.config
 
-import id.walt.config.WaltConfig
+import id.walt.commons.config.WaltConfig
 
 //@Serializable
 //sealed interface WalletConfig

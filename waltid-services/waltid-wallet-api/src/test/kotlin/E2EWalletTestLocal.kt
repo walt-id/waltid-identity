@@ -1,5 +1,5 @@
-import id.walt.config.ConfigManager
-import id.walt.config.list.WebConfig
+import id.walt.commons.config.ConfigManager
+import id.walt.commons.config.list.WebConfig
 import id.walt.webwallet.config.DatasourceJsonConfiguration
 import id.walt.webwallet.config.KeyGenerationDefaultsConfig
 import id.walt.webwallet.config.RegistrationDefaultsConfig

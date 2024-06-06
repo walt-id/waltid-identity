@@ -1,11 +1,11 @@
 package id.walt.commons
 
-import id.walt.config.WaltConfig
-import id.walt.config.buildconfig.BuildConfig
-import id.walt.config.list.WebConfig
-import id.walt.featureflag.CommonsFeatureCatalog
-import id.walt.featureflag.FeatureManager
-import id.walt.featureflag.ServiceFeatureCatalog
+import id.walt.commons.config.WaltConfig
+import id.walt.commons.config.buildconfig.BuildConfig
+import id.walt.commons.config.list.WebConfig
+import id.walt.commons.featureflag.CommonsFeatureCatalog
+import id.walt.commons.featureflag.FeatureManager
+import id.walt.commons.featureflag.ServiceFeatureCatalog
 import io.klogging.logger
 import kotlinx.coroutines.delay
 import kotlin.io.path.Path

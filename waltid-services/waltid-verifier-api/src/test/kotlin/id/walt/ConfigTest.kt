@@ -1,7 +1,7 @@
 package id.walt
 
-import id.walt.config.ConfigManager
-import id.walt.logging.TestLoggingUtils
+import id.walt.commons.config.ConfigManager
+import id.walt.commons.logging.TestLoggingUtils
 import id.walt.oid4vc.data.ClientIdScheme
 import id.walt.verifier.config.OIDCVerifierServiceConfig
 import id.walt.verifier.oidc.OIDCVerifierService

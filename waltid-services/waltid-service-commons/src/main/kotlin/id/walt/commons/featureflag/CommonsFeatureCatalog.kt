@@ -1,7 +1,7 @@
-package id.walt.featureflag
+package id.walt.commons.featureflag
 
-import id.walt.config.list.WebConfig
-import id.walt.web.modules.ServiceHealthChecksDebugModule
+import id.walt.commons.config.list.WebConfig
+import id.walt.commons.web.modules.ServiceHealthChecksDebugModule
 
 object CommonsFeatureCatalog : ServiceFeatureCatalog {
 

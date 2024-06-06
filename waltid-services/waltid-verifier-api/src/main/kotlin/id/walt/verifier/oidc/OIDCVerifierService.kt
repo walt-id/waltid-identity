@@ -5,7 +5,7 @@ package id.walt.verifier.oidc
 import COSE.AlgorithmID
 import COSE.OneKey
 import com.upokecenter.cbor.CBORObject
-import id.walt.config.ConfigManager
+import id.walt.commons.config.ConfigManager
 import id.walt.credentials.verification.Verifier
 import id.walt.credentials.verification.models.PolicyRequest
 import id.walt.credentials.verification.models.PresentationVerificationResponse

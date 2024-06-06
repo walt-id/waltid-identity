@@ -1,4 +1,4 @@
-package id.walt.web.plugins
+package id.walt.commons.web.plugins
 
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*

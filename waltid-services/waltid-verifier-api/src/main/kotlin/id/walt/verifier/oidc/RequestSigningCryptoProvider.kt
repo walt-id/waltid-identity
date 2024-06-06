@@ -12,7 +12,7 @@ import com.nimbusds.jose.util.Base64
 import com.nimbusds.jose.util.X509CertChainUtils
 import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
-import id.walt.config.ConfigManager
+import id.walt.commons.config.ConfigManager
 import id.walt.sdjwt.JWTCryptoProvider
 import id.walt.sdjwt.JwtVerificationResult
 import id.walt.verifier.config.OIDCVerifierServiceConfig

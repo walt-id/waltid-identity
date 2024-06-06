@@ -1,6 +1,6 @@
 package id.walt
 
-import id.walt.config.ConfigManager
+import id.walt.commons.config.ConfigManager
 import id.walt.credentials.vc.vcs.W3CVC
 import id.walt.crypto.keys.KeySerialization
 import id.walt.issuer.issuance.IssuanceRequest

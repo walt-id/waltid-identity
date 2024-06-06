@@ -1,7 +1,7 @@
 package id.walt.commons
 
-import id.walt.commands.ServiceRunnableCommand
-import id.walt.config.runconfig.RunConfiguration
+import id.walt.commons.commands.ServiceRunnableCommand
+import id.walt.commons.config.runconfig.RunConfiguration
 
 class ServiceMain(
     val config: ServiceConfiguration,

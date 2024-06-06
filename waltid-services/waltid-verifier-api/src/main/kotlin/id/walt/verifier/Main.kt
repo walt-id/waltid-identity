@@ -9,7 +9,7 @@ import id.walt.did.dids.resolver.LocalResolver
 import id.walt.verifier.entra.entraVerifierApi
 import id.walt.verifier.policies.PresentationDefinitionPolicy
 import id.walt.verifier.web.plugins.*
-import id.walt.web.WebService
+import id.walt.commons.web.WebService
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.server.application.*
 

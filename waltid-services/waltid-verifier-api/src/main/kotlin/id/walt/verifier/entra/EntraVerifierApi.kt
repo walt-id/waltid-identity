@@ -1,6 +1,6 @@
 package id.walt.verifier.entra
 
-import id.walt.config.ConfigManager
+import id.walt.commons.config.ConfigManager
 import id.walt.credentials.verification.Verifier.runPolicyRequest
 import id.walt.credentials.verification.models.PolicyRequest
 import id.walt.credentials.verification.models.PolicyRequest.Companion.parsePolicyRequests

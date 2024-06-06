@@ -1,8 +1,8 @@
 package id.walt.verifier
 
-import id.walt.featureflag.BaseFeature
-import id.walt.featureflag.OptionalFeature
-import id.walt.featureflag.ServiceFeatureCatalog
+import id.walt.commons.featureflag.BaseFeature
+import id.walt.commons.featureflag.OptionalFeature
+import id.walt.commons.featureflag.ServiceFeatureCatalog
 import id.walt.verifier.config.OIDCVerifierServiceConfig
 import id.walt.verifier.entra.EntraConfig
 

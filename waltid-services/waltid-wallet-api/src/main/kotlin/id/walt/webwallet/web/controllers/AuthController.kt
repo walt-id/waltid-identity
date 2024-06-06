@@ -6,11 +6,11 @@ import com.nimbusds.jose.JWSObject
 import com.nimbusds.jose.Payload
 import com.nimbusds.jose.crypto.MACSigner
 import com.nimbusds.jose.crypto.MACVerifier
-import id.walt.config.ConfigManager
-import id.walt.config.list.WebConfig
+import id.walt.commons.config.ConfigManager
+import id.walt.commons.config.list.WebConfig
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.JsonUtils.toJsonElement
-import id.walt.featureflag.FeatureManager
+import id.walt.commons.featureflag.FeatureManager
 import id.walt.oid4vc.definitions.JWTClaims
 import id.walt.webwallet.FeatureCatalog
 import id.walt.webwallet.config.AuthConfig

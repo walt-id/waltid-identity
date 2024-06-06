@@ -1,4 +1,4 @@
-package id.walt.logging.setups
+package id.walt.commons.logging.setups
 
 import io.klogging.config.KloggingConfiguration
 

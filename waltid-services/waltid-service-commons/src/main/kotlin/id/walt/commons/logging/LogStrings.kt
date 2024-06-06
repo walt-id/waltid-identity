@@ -1,4 +1,4 @@
-package id.walt.logging
+package id.walt.commons.logging
 
 import io.klogging.rendering.*
 
