@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Free Disk Space (Ubuntu)
-        uses: jlumbroso/free-disk-space@v1.3.1  
+        uses: jlumbroso/free-disk-space@v1.3.1
         with:
           tool-cache: false
           docker-images: false
@@ -53,31 +53,31 @@ jobs:
         uses: docker/build-push-action@v4.0.0
         with:
           push: true
-          file: waltid-issuer-api/Dockerfile
+          file: waltid-services/waltid-issuer-api/Dockerfile
           tags: waltid/issuer-api:latest, waltid/issuer-api:${{ env.release_version }}
       - name: Build and push Docker images (verifier)
         uses: docker/build-push-action@v4.0.0
         with:
           push: true
-          file: waltid-verifier-api/Dockerfile
+          file: waltid-services/waltid-verifier-api/Dockerfile
           tags: waltid/verifier-api:latest, waltid/verifier-api:${{ env.release_version }}
       - name: Build and push Docker images (wallet-api)
         uses: docker/build-push-action@v4.0.0
         with:
           push: true
-          file: waltid-wallet-api/Dockerfile
+          file: waltid-services/waltid-wallet-api/Dockerfile
           tags: waltid/wallet-api:latest, waltid/wallet-api:${{ env.release_version }}
       - name: Build and push Docker images (waltid-web-wallet)
         uses: docker/build-push-action@v4.0.0
         with:
           push: true
-          file: waltid-web-wallet/Dockerfile
+          file: waltid-web/waltid-web-wallet/Dockerfile
           tags: waltid/waltid-web-wallet:latest, waltid/waltid-web-wallet:${{ env.release_version }}
       - name: Build and push Docker images (wallet-portal)
         uses: docker/build-push-action@v4
         with:
           push: true
-          file: waltid-web-portal/Dockerfile
+          file: waltid-web/waltid-web-portal/Dockerfile
           tags: waltid/portal:latest, waltid/portal:${{ env.release_version }}
 
       - name: Changelog
