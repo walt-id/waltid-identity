@@ -125,9 +125,6 @@ kotlin {
                 // Ktor client
                 implementation("io.ktor:ktor-client-okhttp:$ktor_version")
 
-                // Logging
-                // implementation("org.slf4j:slf4j-simple:2.0.13")
-
                 // Coroutines
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:1.8.1")
 
