@@ -115,8 +115,8 @@ class MDocTest {
         assertEquals(expected = true, actual = digests1.keys.containsAll(IntRange(0, 12).toSet()))
         val digests2 = mso.getValueDigestsFor("org.iso.18013.5.1.US")
         assertEquals(expected = 4, actual = digests2.size)
-        assertEquals(expected = 2L, actual = mso.deviceKeyInfo.deviceKey.value[MapKey(1)]!!.value)
-        assertEquals(expected = 1L, actual = mso.deviceKeyInfo.deviceKey.value[MapKey(-1)]!!.value)
+        assertEquals(expected = 2L, actual = mso.deviceKeyInfo.deviceKey.value[MapKey(1)]!!.internalValue)
+        assertEquals(expected = 1L, actual = mso.deviceKeyInfo.deviceKey.value[MapKey(-1)]!!.internalValue)
         assertEquals(
             expected = 0x96.toByte(),
             actual = (mso.deviceKeyInfo.deviceKey.value[MapKey(-2)]!! as ByteStringElement).value.first()
@@ -279,7 +279,7 @@ class MDocTest {
         )
         val deviceAuthentication =
             DataElement.fromCBOR<EncodedCBORElement>(deviceAuthenticationBytes).decode<DeviceAuthentication>()
-        assertEquals(expected = "DeviceAuthentication", actual = deviceAuthentication.data[0].value.toString())
+        assertEquals(expected = "DeviceAuthentication", actual = deviceAuthentication.data[0].internalValue.toString())
 
         val ephemeralMacKey = Hex.decode("dc2b9566fdaaae3c06baa40993cd0451aeba15e7677ef5305f6531f3533c35dd")
 
