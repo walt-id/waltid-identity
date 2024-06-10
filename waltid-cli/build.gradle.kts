@@ -65,7 +65,7 @@ kotlin {
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
 
                 // Logging
-                implementation("io.github.oshai:kotlin-logging:6.0.4")
+                implementation("io.github.oshai:kotlin-logging:6.0.9")
             }
         }
         val commonTest by getting {
