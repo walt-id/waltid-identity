@@ -52,7 +52,7 @@ kotlin {
                 api(project(":waltid-libraries:waltid-openid4vc"))
 
 //                implementation("org.jetbrains.kotlinx:kotlinx-io-core:0.3.5")
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.0")
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.0")
                 implementation ("com.google.code.gson:gson:2.11.0")
 
@@ -88,7 +88,7 @@ kotlin {
         }
         val jvmTest by getting {
             dependencies {
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.0")
                 implementation("com.wolpl.clikt-testkit:clikt-testkit:2.0.0")
 
                 implementation("org.junit.jupiter:junit-jupiter-params:5.10.2")

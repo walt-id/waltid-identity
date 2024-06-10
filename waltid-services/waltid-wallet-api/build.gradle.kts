@@ -95,7 +95,7 @@ dependencies {
     /* -- Kotlin -- */
 
     // Kotlinx.serialization
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.0")
 
     // Date
     implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.0")
@@ -173,7 +173,7 @@ dependencies {
     implementation("io.klogging:slf4j-klogging:0.5.14")
 
     // Test
-    testImplementation("org.jetbrains.kotlin:kotlin-test-junit:1.9.24")
+    testImplementation("org.jetbrains.kotlin:kotlin-test-junit:2.0.0")
     testImplementation(kotlin("test"))
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
     testImplementation("io.ktor:ktor-server-tests-jvm:$ktor_version")

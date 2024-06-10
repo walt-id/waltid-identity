@@ -78,7 +78,7 @@ kotlin {
                 api(project(":waltid-libraries:waltid-crypto"))
 
                 // JSON
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.0")
 
                 // Ktor client
                 implementation("io.ktor:ktor-client-core:2.3.10")
@@ -113,7 +113,7 @@ kotlin {
         val androidMain by getting {
             dependencies {
                 api(project(":waltid-libraries:waltid-crypto"))
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.0")
             }
 
 

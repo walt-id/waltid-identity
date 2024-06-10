@@ -67,7 +67,7 @@ kotlin {
         val commonMain by getting {
             dependencies {
                 // JSON
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.0")
 
                 // Coroutines
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
@@ -114,7 +114,7 @@ kotlin {
                 implementation(kotlin("test"))
 
                 implementation("org.junit.jupiter:junit-jupiter-api:5.10.2")
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.0")
                 implementation("org.junit.jupiter:junit-jupiter-params:5.10.2")
             }
         }

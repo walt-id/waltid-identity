@@ -72,7 +72,7 @@ kotlin {
         val commonMain by getting {
             dependencies {
                 // JSON
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.0")
 //                implementation("io.github.optimumcode:json-schema-validator:0.0.8")
 
                 // Ktor client
@@ -126,7 +126,7 @@ kotlin {
         }
         val jvmTest by getting {
             dependencies {
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.0")
                 implementation(kotlin("test"))
                 implementation("org.junit.jupiter:junit-jupiter-params:5.10.2")
                 implementation("io.ktor:ktor-server-test-host:$ktor_version")
