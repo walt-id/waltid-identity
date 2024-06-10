@@ -337,7 +337,7 @@ class JVMMdocTest {
         presentedMdoc.nameSpaces.forEach { ns ->
             println("Namespace: $ns")
             presentedMdoc.getIssuerSignedItems(ns).forEach { issuerSignedItem ->
-                println("- ${issuerSignedItem.elementIdentifier.value}: ${issuerSignedItem.elementValue.value.toString()}")
+                println("- ${issuerSignedItem.elementIdentifier.value}: ${issuerSignedItem.elementValue.internalValue.toString()}")
             }
         }
         assertEquals(expected = setOf("org.iso.18013.5.1"), actual = presentedMdoc.nameSpaces)
@@ -414,7 +414,7 @@ class JVMMdocTest {
         mdoc.nameSpaces.forEach { ns ->
             println("mobile eID ($ns)")
             mdoc.getIssuerSignedItems(ns).forEach { issuerSignedItem ->
-                println("- ${issuerSignedItem.elementIdentifier.value}: ${issuerSignedItem.elementValue.value.toString()}")
+                println("- ${issuerSignedItem.elementIdentifier.value}: ${issuerSignedItem.elementValue.internalValue.toString()}")
             }
         }
         println("SIGNED MDOC (mobile eID):")
@@ -482,7 +482,7 @@ class JVMMdocTest {
         presentedMdoc.nameSpaces.forEach { ns ->
             println("Presented mobile eID ($ns)")
             presentedMdoc.getIssuerSignedItems(ns).forEach { issuerSignedItem ->
-                println("- ${issuerSignedItem.elementIdentifier.value}: ${issuerSignedItem.elementValue.value.toString()}")
+                println("- ${issuerSignedItem.elementIdentifier.value}: ${issuerSignedItem.elementValue.internalValue.toString()}")
             }
         }
     }
