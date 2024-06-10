@@ -11,7 +11,6 @@ import id.walt.cli.util.DidMethod
 import id.walt.cli.util.DidUtil
 import id.walt.cli.util.KeyUtil
 import id.walt.cli.util.PrettyPrinter
-import id.walt.did.dids.registrar.dids.DidCreateOptions
 import id.walt.did.dids.registrar.dids.DidKeyCreateOptions
 import kotlinx.coroutines.runBlocking
 
