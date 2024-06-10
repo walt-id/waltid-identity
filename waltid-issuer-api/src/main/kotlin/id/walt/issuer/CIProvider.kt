@@ -2,6 +2,8 @@
 
 package id.walt.issuer
 
+import COSE.AlgorithmID
+import cbor.Cbor
 import id.walt.credentials.issuance.Issuer.mergingJwtIssue
 import id.walt.credentials.issuance.Issuer.mergingSdJwtIssue
 import id.walt.credentials.vc.vcs.W3CVC
@@ -9,13 +11,21 @@ import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto.keys.jwk.JWKKeyCreator
 import id.walt.did.dids.DidService
 import id.walt.did.dids.DidUtils
 import id.walt.issuer.IssuanceExamples.openBadgeCredentialExample
 import id.walt.issuer.base.config.ConfigManager
 import id.walt.issuer.base.config.OIDCIssuerServiceConfig
+import id.walt.mdoc.COSECryptoProviderKeyInfo
+import id.walt.mdoc.SimpleCOSECryptoProvider
+import id.walt.mdoc.cose.COSESign1
+import id.walt.mdoc.dataelement.ByteStringElement
+import id.walt.mdoc.dataelement.MapElement
+import id.walt.mdoc.dataelement.MapKey
 import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.data.CredentialSupported
+import id.walt.oid4vc.data.ProofOfPossession
 import id.walt.oid4vc.definitions.JWTClaims
 import id.walt.oid4vc.errors.CredentialError
 import id.walt.oid4vc.errors.DeferredCredentialError
@@ -32,8 +42,13 @@ import id.walt.oid4vc.responses.CredentialResponse
 import id.walt.oid4vc.util.randomUUID
 import id.walt.sdjwt.SDMap
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.decodeFromByteArray
+import kotlinx.serialization.decodeFromHexString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
+import java.security.KeyFactory
+import java.security.PublicKey
+import java.security.spec.X509EncodedKeySpec
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.time.Duration.Companion.minutes
@@ -207,6 +222,25 @@ open class CIProvider : OpenIDCredentialIssuer(
             CI_TOKEN_KEY.verifyJws(token)
         }
     }.isSuccess
+
+    override fun verifyCOSESign1Signature(target: TokenTarget, token: String) = runBlocking {
+        println("Verifying JWS: $token")
+        println("JWS Verification: target: $target")
+
+        val coseSign1 = Cbor.decodeFromHexString<COSESign1>(token)
+        val tokenHeader = coseSign1.protectedHeader.let { Cbor.decodeFromByteArray<MapElement>(it) }
+        val rawKey = (tokenHeader.value[MapKey(ProofOfPossession.CWTProofBuilder.HEADER_LABEL_COSE_KEY)] as ByteStringElement).value
+        val cryptoProvider = SimpleCOSECryptoProvider(listOf(COSECryptoProviderKeyInfo("pub-key", AlgorithmID.ECDSA_256, KeyFactory.getInstance("EC").generatePublic(X509EncodedKeySpec(rawKey)))))
+        cryptoProvider.verify1(coseSign1, "pub-key")
+//        if (tokenHeader.value[MapKey] != null) {
+//            val did = tokenHeader["kid"]!!.jsonPrimitive.content.split("#")[0]
+//            println("Resolving DID: $did")
+//            val key = DidService.resolveToKey(did).getOrThrow()
+//            key.verifyJws(token).also { println("VERIFICATION IS: $it") }
+//        } else {
+//            CI_TOKEN_KEY.verifyJws(token)
+//        }
+    }
 
     // -------------------------------------
     // Implementation of abstract issuer service provider interface

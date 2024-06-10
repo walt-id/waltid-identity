@@ -178,6 +178,7 @@ class LspPotentialTest {
       bearerAuth(tokenResp.accessToken!!)
       setBody(credReq.toJSON())
     }.body<JsonObject>().let { CredentialResponse.fromJSON(it) }
+    assertTrue(credResp.isSuccess)
 
   }
 

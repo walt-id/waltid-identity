@@ -9,10 +9,8 @@ import id.walt.mdoc.dataelement.*
 import id.walt.oid4vc.util.JwtUtils
 import io.ktor.utils.io.core.*
 import kotlinx.datetime.Clock
-import kotlinx.serialization.EncodeDefault
-import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
+import kotlinx.serialization.*
+import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.json.*
 
 @Serializable
@@ -38,6 +36,15 @@ data class ProofOfPossession @OptIn(ExperimentalSerializationApi::class) private
                 (clientId.isNullOrEmpty() || payload.containsKey("iss") && payload["iss"]!!.jsonPrimitive.content == clientId) &&
                 (nonce.isNullOrEmpty() || payload.containsKey("nonce") && payload["nonce"]!!.jsonPrimitive.content == nonce)
             }
+    }
+
+    @OptIn(ExperimentalSerializationApi::class)
+    suspend fun validateCwtProof(cryptoProvider: COSECryptoProvider,
+                                 issuerUrl: String, clientId: String?, nonce: String?, keyId: String?): Boolean {
+        return if(proofType == ProofType.cwt && cwt != null) {
+            val coseSign1: COSESign1 = Cbor.decodeFromHexString(cwt)
+            cryptoProvider.verify1(coseSign1, keyId) // && TODO: check issuer, audience, nonce, etc.
+        } else false
     }
 
     abstract class ProofBuilder() {
