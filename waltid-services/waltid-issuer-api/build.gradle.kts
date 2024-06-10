@@ -133,7 +133,7 @@ java {
 tasks.withType<KotlinCompile> {
     kotlinOptions.jvmTarget = "17"
 }
-tasks.withType<org.gradle.api.tasks.bundling.Zip> {
+tasks.withType<Zip> {
     isZip64 = true
 }
 tasks.named<CreateStartScripts>("startScripts") {
