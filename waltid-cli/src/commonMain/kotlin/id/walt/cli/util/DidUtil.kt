@@ -3,6 +3,7 @@ package id.walt.cli.util
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.did.dids.DidService
+import id.walt.did.dids.registrar.dids.DidCreateOptions
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonObject
 
@@ -22,11 +23,23 @@ class DidUtil {
             }
         }
 
-        fun createDid(method: DidMethod, key: JWKKey): String {
+        fun createDid(method: DidMethod,
+                      key: JWKKey,
+                      options: DidCreateOptions? = null): String {
             return runBlocking {
-                DidService.registerByKey(method.name.lowercase(), key).did
+                if (options != null)
+                    DidService.registerByKey(method.name.lowercase(), key, options).did
+                else
+                    DidService.registerByKey(method.name.lowercase(), key).did
             }
         }
+
+//        fun createDid(method: DidMethod,
+//                      key: JWKKey ): String {
+//            return runBlocking {
+//                DidService.registerByKey(method.name.lowercase(), key).did
+//            }
+//        }
 
         fun resolveDid(did:String): JsonObject? {
             return runBlocking {
