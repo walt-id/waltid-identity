@@ -12,6 +12,8 @@ class WaltIdDidCreateCmdTest {
 
     val command = DidCreateCmd()
 
+    // print-out related tests
+
     @Test
     fun `should print help message when called with --help argument`() {
         assertFailsWith<PrintHelpMessage> {
@@ -48,8 +50,10 @@ class WaltIdDidCreateCmdTest {
     }
 
     @Test
-    @Ignore
-    fun `should have --useJwkJcsPub option???? When?`() {
+    fun `should have -j (useJwkJcsPub) option flag`() {
+        val result = command.test("-h")
+
+        assertContains(result.stdout, "-j, --jjb")
     }
 
     // --method
@@ -175,6 +179,19 @@ class WaltIdDidCreateCmdTest {
         assertContains(failure.localizedMessage, "Missing key type")
     }
 
+    @Test
+    fun `should succeed creating a DID key using jwk_jcs-pub with all key types`() {
+        val keyFileList = listOf(
+            getResourcePath(this, "key/ed25519_by_waltid_pvt_key.jwk"),
+            getResourcePath(this, "key/rsa_by_waltid_pub_pvt_key.jwk"),
+            getResourcePath(this, "key/secp256k1_by_waltid_pvt_key.jwk"),
+            getResourcePath(this, "key/secp256r1_by_waltid_pub_pvt_key.jwk"),
+        )
+        for (keyFile in keyFileList) {
+            val cmdOutputLines = command.test("-j -k $keyFile").output.lines()
+            val did = cmdOutputLines[cmdOutputLines.lastIndex-1]
+        }
+    }
 
 // JWK
 
