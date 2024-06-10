@@ -4,9 +4,9 @@ import id.walt.webwallet.service.WalletServiceManager.eventFilterUseCase
 import id.walt.webwallet.service.WalletServiceManager.eventUseCase
 import id.walt.webwallet.service.events.EventLogFilter
 import id.walt.webwallet.service.events.EventLogFilterResult
-import io.github.smiley4.ktorswaggerui.dsl.delete
-import io.github.smiley4.ktorswaggerui.dsl.get
-import io.github.smiley4.ktorswaggerui.dsl.route
+import io.github.smiley4.ktorswaggerui.dsl.routing.delete
+import io.github.smiley4.ktorswaggerui.dsl.routing.get
+import io.github.smiley4.ktorswaggerui.dsl.routing.route
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.response.*
@@ -19,29 +19,29 @@ fun Application.eventLogs() = walletRoute {
         get({
             summary = "Retrieve event logs for currently signed in account wallet"
             request {
-                queryParameter<String>("limit") {
+                queryParameter<Int>("limit") {
                     description = "Page size"
-                    example = "10"
                     required = false
                 }
                 queryParameter<List<String>>("filter") {
                     description = "List of key=value pairs for filtering"
-                    example = "key=value"
+                    example("Example") { value = "key=value" }
                     required = false
                 }
                 queryParameter<String>("startingAfter") {
                     description = "Starting after page"
-                    example = ""
+                    // example = ""
                     required = false
                 }
                 queryParameter<String>("sortBy") {
                     description = "The property to sort by"
-                    example = ""
+                    // example = ""
                     required = false
                 }
                 queryParameter<String>("sortOrder") {
                     description = "The sort order [ASC|DESC]"
-                    example = "ASC"
+                    example("Sort ascending") { value = "ASC" }
+                    example("Sort descending") { value = "DESC" }
                     required = false
                 }
             }

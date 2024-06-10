@@ -235,7 +235,7 @@ open class CIProvider : OpenIDCredentialIssuer(
                         Json.parseToJsonElement(KeySerialization.serializeKey(exampleIssuerKey)).jsonObject,
                         exampleIssuerDid,
                         "OpenBadgeCredential_${credentialRequest.format.value}",
-                        W3CVC(IssuanceExamples.openBadgeCredentialExample)
+                        W3CVC(IssuanceExamples.openBadgeCredentialExampleParsed)
                     )
                 )
             )

@@ -26,9 +26,9 @@ import id.walt.verifier.config.OIDCVerifierServiceConfig
 import id.walt.verifier.oidc.LspPotentialInteropEvent
 import id.walt.verifier.oidc.RequestSigningCryptoProvider
 import id.walt.verifier.oidc.VerificationUseCase
-import io.github.smiley4.ktorswaggerui.dsl.get
-import io.github.smiley4.ktorswaggerui.dsl.post
-import io.github.smiley4.ktorswaggerui.dsl.route
+import io.github.smiley4.ktorswaggerui.dsl.routing.get
+import io.github.smiley4.ktorswaggerui.dsl.routing.post
+import io.github.smiley4.ktorswaggerui.dsl.routing.route
 import io.ktor.client.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.plugins.logging.*
@@ -45,10 +45,7 @@ import kotlinx.datetime.Clock
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.plus
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.encodeToHexString
-import kotlinx.serialization.encodeToString
+import kotlinx.serialization.*
 import kotlinx.serialization.json.*
 import kotlinx.uuid.UUID
 
@@ -65,18 +62,18 @@ data class DescriptorMappingFormParam(val id: String, val format: VCFormat, val 
 
 @Serializable
 data class PresentationSubmissionFormParam(
-    val id: String, val definition_id: String, val descriptor_map: List<DescriptorMappingFormParam>
+    val id: String, val definition_id: String, val descriptor_map: List<DescriptorMappingFormParam>,
 )
 
 @Serializable
 data class TokenResponseFormParam(
     val vp_token: JsonElement?,
     val presentation_submission: PresentationSubmissionFormParam?,
-    val response: String?
+    val response: String?,
 )
 
 data class LSPPotentialIssueFormDataParam(
-    val jwk: JsonObject
+    val jwk: JsonObject,
 )
 
 @Serializable
@@ -88,7 +85,7 @@ data class CredentialVerificationRequest(
     val vcPolicies: List<JsonElement>,
 
     @SerialName("request_credentials")
-    val requestCredentials: List<JsonElement>
+    val requestCredentials: List<JsonElement>,
 )
 
 const val defaultAuthorizeBaseUrl = "openid4vp://authorize"
@@ -126,11 +123,13 @@ val verifiableIdPresentationDefinitionExample = JsonObject(
 ).let { prettyJson.encodeToString(it) }
 
 
-private val fixedPresentationDefinitionForEbsiConformanceTest = "{\"id\":\"any\",\"format\":{\"jwt_vp\":{\"alg\":[\"ES256\"]}},\"input_descriptors\":[{\"id\":\"any\",\"format\":{\"jwt_vc\":{\"alg\":[\"ES256\"]}},\"constraints\":{\"fields\":[{\"path\":[\"$.vc.type\"],\"filter\":{\"type\":\"array\",\"contains\":{\"const\":\"VerifiableAttestation\"}}}]}},{\"id\":\"any\",\"format\":{\"jwt_vc\":{\"alg\":[\"ES256\"]}},\"constraints\":{\"fields\":[{\"path\":[\"$.vc.type\"],\"filter\":{\"type\":\"array\",\"contains\":{\"const\":\"VerifiableAttestation\"}}}]}},{\"id\":\"any\",\"format\":{\"jwt_vc\":{\"alg\":[\"ES256\"]}},\"constraints\":{\"fields\":[{\"path\":[\"$.vc.type\"],\"filter\":{\"type\":\"array\",\"contains\":{\"const\":\"VerifiableAttestation\"}}}]}}]}"
+private val fixedPresentationDefinitionForEbsiConformanceTest =
+    "{\"id\":\"any\",\"format\":{\"jwt_vp\":{\"alg\":[\"ES256\"]}},\"input_descriptors\":[{\"id\":\"any\",\"format\":{\"jwt_vc\":{\"alg\":[\"ES256\"]}},\"constraints\":{\"fields\":[{\"path\":[\"$.vc.type\"],\"filter\":{\"type\":\"array\",\"contains\":{\"const\":\"VerifiableAttestation\"}}}]}},{\"id\":\"any\",\"format\":{\"jwt_vc\":{\"alg\":[\"ES256\"]}},\"constraints\":{\"fields\":[{\"path\":[\"$.vc.type\"],\"filter\":{\"type\":\"array\",\"contains\":{\"const\":\"VerifiableAttestation\"}}}]}},{\"id\":\"any\",\"format\":{\"jwt_vc\":{\"alg\":[\"ES256\"]}},\"constraints\":{\"fields\":[{\"path\":[\"$.vc.type\"],\"filter\":{\"type\":\"array\",\"contains\":{\"const\":\"VerifiableAttestation\"}}}]}}]}"
 
 private val verificationUseCase = VerificationUseCase(httpClient, SimpleJWTCryptoProvider(JWSAlgorithm.EdDSA, null, null))
 
 
+@OptIn(ExperimentalSerializationApi::class)
 fun Application.verfierApi() {
     routing {
 
@@ -144,42 +143,47 @@ fun Application.verfierApi() {
                 request {
                     headerParameter<String>("authorizeBaseUrl") {
                         description = "Base URL of wallet authorize endpoint, defaults to: $defaultAuthorizeBaseUrl"
-                        example = defaultAuthorizeBaseUrl
+                        example("default authorize base url") {
+                            value = defaultAuthorizeBaseUrl
+                        }
                         required = false
                     }
                     headerParameter<ResponseMode>("responseMode") {
                         description = "Response mode, for vp_token response, defaults to ${ResponseMode.direct_post}"
-                        example = ResponseMode.direct_post.name
+                        example("direct post") {
+                            value = ResponseMode.direct_post.name
+                        }
                         required = false
                     }
                     headerParameter<String>("successRedirectUri") {
                         description = "Redirect URI to return when all policies passed. \"\$id\" will be replaced with the session id."
-                        example = ""
+                        // example = ""
                         required = false
                     }
                     headerParameter<String>("errorRedirectUri") {
                         description = "Redirect URI to return when a policy failed. \"\$id\" will be replaced with the session id."
-                        example = ""
+                        // example = ""
                         required = false
                     }
                     headerParameter<String>("statusCallbackUri") {
                         description = "Callback to push state changes of the presentation process to"
-                        example = ""
+                        // example = ""
                         required = false
                     }
                     headerParameter<String>("statusCallbackApiKey") {
                         description = ""
-                        example = ""
+                        // example = ""
                         required = false
                     }
                     headerParameter<String>("stateId") {
                         description = ""
-                        example = ""
+                        // example = ""
                         required = false
                     }
                     headerParameter<String?>("openId4VPProfile") {
-                        description = "Optional header to set the profile of the VP request " + "Available Profiles: DEFAULT: For W3C OpenID4VP, ISO_18013_7_MDOC: For MDOC OpenID4VP, EBSIV3: For EBSI V3 Compliant VP. " + "Defaults to DEFAULT"
-                        example = ""
+                        description =
+                            "Optional header to set the profile of the VP request " + "Available Profiles: DEFAULT: For W3C OpenID4VP, ISO_18013_7_MDOC: For MDOC OpenID4VP, EBSIV3: For EBSI V3 Compliant VP. " + "Defaults to DEFAULT"
+                        // example = ""
                         required = false
                     }
                     body<JsonObject> {
@@ -207,7 +211,8 @@ fun Application.verfierApi() {
                 val statusCallbackUri = context.request.header("statusCallbackUri")
                 val statusCallbackApiKey = context.request.header("statusCallbackApiKey")
                 val stateId = context.request.header("stateId")
-                val openId4VPProfile = context.request.header("openId4VPProfile")?.let{OpenId4VPProfile.valueOf(it)} ?: OpenId4VPProfile.fromAuthorizeBaseURL(authorizeBaseUrl) ?: OpenId4VPProfile.DEFAULT
+                val openId4VPProfile = context.request.header("openId4VPProfile")?.let { OpenId4VPProfile.valueOf(it) }
+                    ?: OpenId4VPProfile.fromAuthorizeBaseURL(authorizeBaseUrl) ?: OpenId4VPProfile.DEFAULT
                 val body = context.receive<JsonObject>()
 
                 val session = verificationUseCase.createSession(
@@ -224,14 +229,19 @@ fun Application.verfierApi() {
                     openId4VPProfile = openId4VPProfile
                 )
 
-                context.respond(authorizeBaseUrl.plus("?").plus(
-                    when(openId4VPProfile) {
-                        OpenId4VPProfile.ISO_18013_7_MDOC -> session.authorizationRequest!!.toRequestObjectByReferenceHttpQueryString(
-                            ConfigManager.getConfig<OIDCVerifierServiceConfig>().baseUrl.let { "$it/openid4vc/request/${session.id}" })
-                        OpenId4VPProfile.EBSIV3 -> session.authorizationRequest!!.toEbsiRequestObjectByReferenceHttpQueryString(SERVER_URL.let { "$it/openid4vc/request/${session.id}"})
-                        else -> session.authorizationRequest!!.toHttpQueryString()
-                    }
-                ))
+                context.respond(
+                    authorizeBaseUrl.plus("?").plus(
+                        when (openId4VPProfile) {
+                            OpenId4VPProfile.ISO_18013_7_MDOC -> session.authorizationRequest!!.toRequestObjectByReferenceHttpQueryString(
+                                ConfigManager.getConfig<OIDCVerifierServiceConfig>().baseUrl.let { "$it/openid4vc/request/${session.id}" })
+
+                            OpenId4VPProfile.EBSIV3 -> session.authorizationRequest!!.toEbsiRequestObjectByReferenceHttpQueryString(
+                                SERVER_URL.let { "$it/openid4vc/request/${session.id}" })
+
+                            else -> session.authorizationRequest!!.toHttpQueryString()
+                        }
+                    )
+                )
             }
 
             post("/verify/{state}", {
@@ -246,19 +256,19 @@ fun Application.verfierApi() {
                         required = true
                     }
                     body<TokenResponseFormParam> {
-                        mediaType(ContentType.Application.FormUrlEncoded)
-                        example(
-                            "simple vp_token response", TokenResponseFormParam(
+                        mediaTypes = listOf(ContentType.Application.FormUrlEncoded)
+                        example("simple vp_token response") {
+                            value = TokenResponseFormParam(
                                 JsonPrimitive("abc.def.ghi"), PresentationSubmissionFormParam(
                                     "1", "1", listOf(
                                         DescriptorMappingFormParam("1", VCFormat.jwt_vc_json, "$.type")
                                     )
                                 ), null
                             )
-                        )
-                        example("direct_post.jwt response", TokenResponseFormParam(
-                            null, null, "ey..."
-                        ))
+                        }
+                        example("direct_post.jwt response") {
+                            value = TokenResponseFormParam(null, null, "ey...")
+                        }
                     }
                 }
             }) {
@@ -276,19 +286,24 @@ fun Application.verfierApi() {
                     }.onFailure {
                         var errorDescription = it.localizedMessage
 
-                        if (sessionId != null ) {
+                        if (sessionId != null) {
                             val session = verificationUseCase.getSession(sessionId)
                             if (session.walletInitiatedAuthState != null) {
                                 val state = session.walletInitiatedAuthState
                                 when (it.localizedMessage) {
-                                    "Verification policies did not succeed: expired" -> errorDescription = "<\$presentation_submission.descriptor_map[x].id> is expired"
-                                    "Verification policies did not succeed: not-before" -> errorDescription = "<\$presentation_submission.descriptor_map[x].id> is not yet valid"
-                                    "Verification policies did not succeed: revoked_status_list" -> errorDescription = "<\$presentation_submission.descriptor_map[x].id> is revoked"
+                                    "Verification policies did not succeed: expired" -> errorDescription =
+                                        "<\$presentation_submission.descriptor_map[x].id> is expired"
+
+                                    "Verification policies did not succeed: not-before" -> errorDescription =
+                                        "<\$presentation_submission.descriptor_map[x].id> is not yet valid"
+
+                                    "Verification policies did not succeed: revoked_status_list" -> errorDescription =
+                                        "<\$presentation_submission.descriptor_map[x].id> is revoked"
                                 }
                                 context.respondRedirect("openid://?state=$state&error=invalid_request&error_description=$errorDescription")
                             }
                         } else {
-                                call.respond(HttpStatusCode.BadRequest, errorDescription)
+                            call.respond(HttpStatusCode.BadRequest, errorDescription)
                         }
                     }.also {
                         sessionId?.run { verificationUseCase.notifySubscribers(this) }
@@ -365,7 +380,7 @@ fun Application.verfierApi() {
             }
         }
 
-        get("/.well-known/openid-configuration", {tags= listOf("Ebsi") }) {
+        get("/.well-known/openid-configuration", { tags = listOf("Ebsi") }) {
             val metadata = buildJsonObject {
                 put("authorization_endpoint", "$SERVER_URL/authorize")
                 put("token_endpoint", "$SERVER_URL/token")
@@ -382,7 +397,7 @@ fun Application.verfierApi() {
             call.respond(metadata)
         }
 
-        get("/jwks", {tags= listOf("Ebsi") }) {
+        get("/jwks", { tags = listOf("Ebsi") }) {
             val jwks = buildJsonObject {
                 put("keys", buildJsonArray {
                     val jwkWithKid = buildJsonObject {
@@ -399,9 +414,10 @@ fun Application.verfierApi() {
         }
 
         get("authorize", {
-            tags= listOf("Ebsi")
-            description = "Authorize endpoint of OAuth Server as defined in EBSI Conformance Testing specifications. \nResponse is a 302 redirect with VP_TOKEN or ID_TOKEN request. \n" +
-                    "Use the /oidc4vp/verify endpoint using the header openId4VPProfile to get an EBSI-compliant VP_TOKEN request without redirects."
+            tags = listOf("Ebsi")
+            description =
+                "Authorize endpoint of OAuth Server as defined in EBSI Conformance Testing specifications. \nResponse is a 302 redirect with VP_TOKEN or ID_TOKEN request. \n" +
+                        "Use the /oidc4vp/verify endpoint using the header openId4VPProfile to get an EBSI-compliant VP_TOKEN request without redirects."
         })
         {
             val params = call.parameters.toMap().toJsonObject()
@@ -419,7 +435,7 @@ fun Application.verfierApi() {
                     add("revoked_status_list")
                 },
                 requestCredentialsJson = buildJsonArray {},
-                presentationDefinitionJson = when(scope.contains("openid ver_test:vp_token")){
+                presentationDefinitionJson = when (scope.contains("openid ver_test:vp_token")) {
                     true -> Json.parseToJsonElement(fixedPresentationDefinitionForEbsiConformanceTest)
                     else -> null
                 },
@@ -430,13 +446,13 @@ fun Application.verfierApi() {
                 statusCallbackApiKey = null,
                 stateId = stateId,
                 walletInitiatedAuthState = walletInitiatedAuthState,
-                responseType = when(scope.contains("openid ver_test:id_token")){
+                responseType = when (scope.contains("openid ver_test:id_token")) {
                     true -> ResponseType.IdToken
                     else -> ResponseType.VpToken
                 },
                 openId4VPProfile = OpenId4VPProfile.EBSIV3
             )
-            context.respondRedirect("openid://?${session.authorizationRequest!!.toEbsiRequestObjectByReferenceHttpQueryString(SERVER_URL.let { "$it/openid4vc/request/${session.id}"})}")
+            context.respondRedirect("openid://?${session.authorizationRequest!!.toEbsiRequestObjectByReferenceHttpQueryString(SERVER_URL.let { "$it/openid4vc/request/${session.id}" })}")
         }
 // ###### can be removed when LSP-Potential interop event is over ####
         route("lsp-potential") {
@@ -447,10 +463,12 @@ fun Application.verfierApi() {
                 hidden = true
                 request {
                     body<LSPPotentialIssueFormDataParam> {
-                        mediaType(ContentType.Application.FormUrlEncoded)
-                        example("jwk", LSPPotentialIssueFormDataParam(
-                            Json.parseToJsonElement(ECKeyGenerator(Curve.P_256).generate().toPublicJWK().toString()).jsonObject
-                        ))
+                        mediaTypes = listOf(ContentType.Application.FormUrlEncoded)
+                        example("jwk") {
+                            value = LSPPotentialIssueFormDataParam(
+                                Json.parseToJsonElement(ECKeyGenerator(Curve.P_256).generate().toPublicJWK().toString()).jsonObject
+                            )
+                        }
                     }
                 }
             }) {
@@ -462,10 +480,13 @@ fun Application.verfierApi() {
                     .addItemToSign("org.iso.18013.5.1", "given_name", "John".toDE())
                     .addItemToSign("org.iso.18013.5.1", "birth_date", FullDateElement(LocalDate(1990, 1, 15)))
                     .sign(
-                        ValidityInfo(Clock.System.now(), Clock.System.now(), Clock.System.now().plus(365*24, DateTimeUnit.HOUR)),
+                        ValidityInfo(Clock.System.now(), Clock.System.now(), Clock.System.now().plus(365 * 24, DateTimeUnit.HOUR)),
                         DeviceKeyInfo(DataElement.fromCBOR(OneKey(devicePubKey, null).AsCBOR().EncodeToBytes())),
-                        SimpleCOSECryptoProvider(listOf(
-                        LspPotentialInteropEvent.POTENTIAL_ISSUER_CRYPTO_PROVIDER_INFO)), LspPotentialInteropEvent.POTENTIAL_ISSUER_KEY_ID
+                        SimpleCOSECryptoProvider(
+                            listOf(
+                                LspPotentialInteropEvent.POTENTIAL_ISSUER_CRYPTO_PROVIDER_INFO
+                            )
+                        ), LspPotentialInteropEvent.POTENTIAL_ISSUER_KEY_ID
                     )
                 println("SIGNED MDOC (mDL):")
                 println(Cbor.encodeToHexString(mdoc))

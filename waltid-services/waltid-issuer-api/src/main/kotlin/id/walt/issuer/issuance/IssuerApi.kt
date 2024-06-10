@@ -8,9 +8,9 @@ import id.walt.did.dids.DidService
 import id.walt.oid4vc.definitions.CROSS_DEVICE_CREDENTIAL_OFFER_URL
 import id.walt.oid4vc.requests.CredentialOfferRequest
 import io.github.oshai.kotlinlogging.KotlinLogging
-import io.github.smiley4.ktorswaggerui.dsl.get
-import io.github.smiley4.ktorswaggerui.dsl.post
-import io.github.smiley4.ktorswaggerui.dsl.route
+import io.github.smiley4.ktorswaggerui.dsl.routing.get
+import io.github.smiley4.ktorswaggerui.dsl.routing.post
+import io.github.smiley4.ktorswaggerui.dsl.routing.route
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.plugins.*
@@ -217,7 +217,7 @@ fun Application.issuerApi() {
                             body<IssuanceRequest> {
                                 description =
                                     "Pass the unsigned credential that you intend to issue as the body of the request."
-                                example("OpenBadgeCredential example", IssuanceExamples.openBadgeCredentialExampleJsonString)
+                                example("OpenBadgeCredential example", IssuanceExamples.openBadgeCredentialExample)
                                 example("UniversityDegreeCredential example", IssuanceExamples.universityDegreeCredential)
                                 required = true
                             }
@@ -227,10 +227,10 @@ fun Application.issuerApi() {
                             "200" to {
                                 description = "Credential signed (with the *proof* attribute added)"
                                 body<String> {
-                                    example(
-                                        "Issuance URL URL",
-                                        "openid-credential-offer://localhost/?credential_offer=%7B%22credential_issuer%22%3A%22http%3A%2F%2Flocalhost%3A8000%22%2C%22credentials%22%3A%5B%22VerifiableId%22%5D%2C%22grants%22%3A%7B%22authorization_code%22%3A%7B%22issuer_state%22%3A%22501414a4-c461-43f0-84b2-c628730c7c02%22%7D%7D%7D"
-                                    )
+                                    example("Issuance URL URL") {
+                                        value =
+                                            "openid-credential-offer://localhost/?credential_offer=%7B%22credential_issuer%22%3A%22http%3A%2F%2Flocalhost%3A8000%22%2C%22credentials%22%3A%5B%22VerifiableId%22%5D%2C%22grants%22%3A%7B%22authorization_code%22%3A%7B%22issuer_state%22%3A%22501414a4-c461-43f0-84b2-c628730c7c02%22%7D%7D%7D"
+                                    }
                                 }
                             }
                         }
@@ -260,10 +260,10 @@ fun Application.issuerApi() {
                             "200" to {
                                 description = "Credential signed (with the *proof* attribute added)"
                                 body<String> {
-                                    example(
-                                        "Issuance URL URL",
-                                        "openid-credential-offer://localhost/?credential_offer=%7B%22credential_issuer%22%3A%22http%3A%2F%2Flocalhost%3A8000%22%2C%22credentials%22%3A%5B%22VerifiableId%22%5D%2C%22grants%22%3A%7B%22authorization_code%22%3A%7B%22issuer_state%22%3A%22501414a4-c461-43f0-84b2-c628730c7c02%22%7D%7D%7D"
-                                    )
+                                    example("Issuance URL URL") {
+                                        value =
+                                            "openid-credential-offer://localhost/?credential_offer=%7B%22credential_issuer%22%3A%22http%3A%2F%2Flocalhost%3A8000%22%2C%22credentials%22%3A%5B%22VerifiableId%22%5D%2C%22grants%22%3A%7B%22authorization_code%22%3A%7B%22issuer_state%22%3A%22501414a4-c461-43f0-84b2-c628730c7c02%22%7D%7D%7D"
+                                    }
                                 }
                             }
                         }
@@ -298,10 +298,10 @@ fun Application.issuerApi() {
                             "200" to {
                                 description = "Credential signed (with the *proof* attribute added)"
                                 body<String> {
-                                    example(
-                                        "Issuance URL URL",
-                                        "openid-credential-offer://localhost/?credential_offer=%7B%22credential_issuer%22%3A%22http%3A%2F%2Flocalhost%3A8000%22%2C%22credentials%22%3A%5B%22VerifiableId%22%5D%2C%22grants%22%3A%7B%22authorization_code%22%3A%7B%22issuer_state%22%3A%22501414a4-c461-43f0-84b2-c628730c7c02%22%7D%7D%7D"
-                                    )
+                                    example("Issuance URL URL") {
+                                        value =
+                                            "openid-credential-offer://localhost/?credential_offer=%7B%22credential_issuer%22%3A%22http%3A%2F%2Flocalhost%3A8000%22%2C%22credentials%22%3A%5B%22VerifiableId%22%5D%2C%22grants%22%3A%7B%22authorization_code%22%3A%7B%22issuer_state%22%3A%22501414a4-c461-43f0-84b2-c628730c7c02%22%7D%7D%7D"
+                                    }
                                 }
                             }
                         }
@@ -333,10 +333,10 @@ fun Application.issuerApi() {
                             "200" to {
                                 description = "Credential signed (with the *proof* attribute added)"
                                 body<String> {
-                                    example(
-                                        "Issuance URL URL",
-                                        "openid-credential-offer://localhost/?credential_offer=%7B%22credential_issuer%22%3A%22http%3A%2F%2Flocalhost%3A8000%22%2C%22credentials%22%3A%5B%22VerifiableId%22%5D%2C%22grants%22%3A%7B%22authorization_code%22%3A%7B%22issuer_state%22%3A%22501414a4-c461-43f0-84b2-c628730c7c02%22%7D%7D%7D"
-                                    )
+                                    example("Issuance URL URL") {
+                                        value =
+                                            "openid-credential-offer://localhost/?credential_offer=%7B%22credential_issuer%22%3A%22http%3A%2F%2Flocalhost%3A8000%22%2C%22credentials%22%3A%5B%22VerifiableId%22%5D%2C%22grants%22%3A%7B%22authorization_code%22%3A%7B%22issuer_state%22%3A%22501414a4-c461-43f0-84b2-c628730c7c02%22%7D%7D%7D"
+                                    }
                                 }
                             }
                         }
@@ -361,9 +361,11 @@ fun Application.issuerApi() {
                             headerParameter<String>("walt-key") {
                                 description =
                                     "Supply a  key representation to use to issue the credential, " + "e.g. a local key (internal JWK) or a TSE key."
-                                example = mapOf(
-                                    "type" to "jwk", "jwk" to "{ ... }"
-                                )
+                                example("JWK example") {
+                                    value = mapOf(
+                                        "type" to "jwk", "jwk" to "{ ... }"
+                                    )
+                                }
                                 required = false
                             }
                         }

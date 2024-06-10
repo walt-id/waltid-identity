@@ -2,8 +2,8 @@ package id.walt.webwallet.web.controllers
 
 import id.walt.webwallet.service.WalletServiceManager
 import id.walt.webwallet.web.WebBaseRoutes.authenticatedWebWalletRoute
-import io.github.smiley4.ktorswaggerui.dsl.post
-import io.github.smiley4.ktorswaggerui.dsl.route
+import io.github.smiley4.ktorswaggerui.dsl.routing.post
+import io.github.smiley4.ktorswaggerui.dsl.routing.route
 import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
@@ -17,7 +17,7 @@ fun Application.trustRegistry() = authenticatedWebWalletRoute {
             request {
                 body<TrustRequest> {
                     required = true
-                    example("Example issuer entity", TrustRequest("did", "VerifiableCredential", "egfUri", true))
+                    example("Example issuer entity") { value = TrustRequest("did", "VerifiableCredential", "egfUri", true) }
                 }
             }
         }) {

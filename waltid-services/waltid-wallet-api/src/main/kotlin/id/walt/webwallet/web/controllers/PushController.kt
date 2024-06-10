@@ -3,9 +3,9 @@ package id.walt.webwallet.web.controllers
 import id.walt.webwallet.service.push.PushManager
 import id.walt.webwallet.service.push.Subscription
 import id.walt.webwallet.web.WebBaseRoutes.webWalletRoute
-import io.github.smiley4.ktorswaggerui.dsl.get
-import io.github.smiley4.ktorswaggerui.dsl.post
-import io.github.smiley4.ktorswaggerui.dsl.route
+import io.github.smiley4.ktorswaggerui.dsl.routing.get
+import io.github.smiley4.ktorswaggerui.dsl.routing.post
+import io.github.smiley4.ktorswaggerui.dsl.routing.route
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*

@@ -100,8 +100,7 @@ class TestCredentialWallet(
             Json.parseToJsonElement(Base64.UrlSafe.decode(token.split(".")[0]).decodeToString()).jsonObject
         }.getOrElse {
             throw IllegalArgumentException(
-                message = "Could not verify token signature, as JWT header could not be coded for token: $token, cause attached.",
-                cause = it
+                "Could not verify token signature, as JWT header could not be coded for token: $token, cause attached.", it
             )
         }
 

@@ -1,10 +1,10 @@
 package id.walt.webwallet.web.controllers
 
 import id.walt.crypto.keys.KeyGenerationRequest
-import io.github.smiley4.ktorswaggerui.dsl.delete
-import io.github.smiley4.ktorswaggerui.dsl.get
-import io.github.smiley4.ktorswaggerui.dsl.post
-import io.github.smiley4.ktorswaggerui.dsl.route
+import io.github.smiley4.ktorswaggerui.dsl.routing.delete
+import io.github.smiley4.ktorswaggerui.dsl.routing.get
+import io.github.smiley4.ktorswaggerui.dsl.routing.post
+import io.github.smiley4.ktorswaggerui.dsl.routing.route
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
@@ -37,15 +37,15 @@ fun Application.keys() = walletRoute {
                 body<KeyGenerationRequest> {
                     description = "Key configuration (JSON)"
 
-                    example("JWK key generation request",
-                        buildJsonObject {
+                    example("JWK key generation request") {
+                        value = buildJsonObject {
                             put("backend", JsonPrimitive("jwk"))
                             put("keyType", JsonPrimitive("Ed25519"))
                         }.toString()
-                    )
+                    }
 
-                    example("TSE key generation request",
-                        buildJsonObject {
+                    example("TSE key generation request") {
+                        value = buildJsonObject {
                             put("backend", JsonPrimitive("tse"))
                             put("config",
                                 buildJsonObject {
@@ -54,10 +54,10 @@ fun Application.keys() = walletRoute {
                                 })
                             put("keyType", JsonPrimitive("Ed25519"))
                         }.toString()
-                    )
+                    }
 
-                    example("OCI key generation request",
-                        buildJsonObject {
+                    example("OCI key generation request") {
+                        value = buildJsonObject {
                             put("backend", JsonPrimitive("oci"))
                             put(
                                 "config",
@@ -75,10 +75,9 @@ fun Application.keys() = walletRoute {
                             )
                             put("keyType", JsonPrimitive("secp256r1"))
                         }.toString()
-                    )
-                    example(
-                        "OCI API key generation request",
-                        buildJsonObject {
+                    }
+                    example("OCI API key generation request") {
+                        value = buildJsonObject {
                             put("backend", JsonPrimitive("oci-rest-api"))
                             put(
                                 "config",
@@ -109,7 +108,7 @@ fun Application.keys() = walletRoute {
                             )
                             put("keyType", JsonPrimitive("secp256r1"))
                         }.toString()
-                    )
+                    }
                 }
             }
         }) {
@@ -140,7 +139,7 @@ fun Application.keys() = walletRoute {
             request {
                 pathParameter<String>("keyId") {
                     description = "the key id (or alias)"
-                    example = "bc6fa6b0593648238c4616800bed7746"
+                    example("Example") { value = "bc6fa6b0593648238c4616800bed7746" }
                 }
             }
         }) {
@@ -180,13 +179,13 @@ fun Application.keys() = walletRoute {
                 request {
                     queryParameter<String>("format") {
                         description = "Select format to export the key, e.g. 'JWK' / 'PEM'. JWK by default."
-                        example = "JWK"
+                        example("JWK") { value = "JWK" }
+                        example("PEM") { value = "PEM" }
                         required = false
                     }
                     queryParameter<Boolean>("loadPrivateKey") {
                         description =
                             "Select if the secret private key should be loaded - take special care in this case! False by default."
-                        example = false
                         required = false
                     }
                 }

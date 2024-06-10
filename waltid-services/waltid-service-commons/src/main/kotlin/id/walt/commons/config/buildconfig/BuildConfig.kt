@@ -13,6 +13,6 @@ object BuildConfig {
     }
 
     val version by lazy {
-        versionProps.getProperty("version") ?: "[no version - not built yet]"
+        versionProps.getProperty("version") ?: "[latest]"
     }
 }
