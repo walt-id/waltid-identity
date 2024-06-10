@@ -45,7 +45,7 @@ const val WALLET_BASE_URL = "http://localhost:$WALLET_PORT"
 
 class TestCredentialWallet(
     config: CredentialWalletConfig,
-    val did: String
+    val did: String,
 ) : OpenIDCredentialWallet<VPresentationSession>(WALLET_BASE_URL, config) {
 
     private val sessionCache = mutableMapOf<String, VPresentationSession>() // TODO not stateless because of oidc4vc library
@@ -75,11 +75,13 @@ class TestCredentialWallet(
 
 //        val key = runBlocking { walletService.getKeyByDid(keyId) }
         val key = runBlocking {
-            DidService.resolveToKey(keyId).getOrThrow().let { KeysService.get(it.getKeyId()) }
-                ?.let {
+            runCatching {
+                DidService.resolveToKey(keyId).getOrThrow().let { KeysService.get(it.getKeyId()) }?.let {
                     KeySerialization.deserializeKey(it.document).getOrThrow()
                 }
-        } ?: error("Failed to retrieve the key")
+            }.getOrElse { throw IllegalArgumentException("Could not resolve key to sign token", it) }
+                ?: error("No key was resolved when trying to resolve key to sign token")
+        }
 
         return runBlocking {
             val authKeyId = resolveDidAuthentication(did)
@@ -98,8 +100,8 @@ class TestCredentialWallet(
             Json.parseToJsonElement(Base64.UrlSafe.decode(token.split(".")[0]).decodeToString()).jsonObject
         }.getOrElse {
             throw IllegalArgumentException(
-                "Could not verify token signature, as JWT header could not be coded for token: $token, cause attached.",
-                it
+                message = "Could not verify token signature, as JWT header could not be coded for token: $token, cause attached.",
+                cause = it
             )
         }
 
@@ -180,9 +182,14 @@ class TestCredentialWallet(
 
 //        val key = runBlocking { walletService.getKeyByDid(this@TestCredentialWallet.did) }
         val key = runBlocking {
-            DidService.resolveToKey(did).getOrThrow().let { KeysService.get(it.getKeyId()) }
-                ?.let { KeySerialization.deserializeKey(it.document).getOrThrow() }
-        } ?: error("Failed to retrieve the key")
+            runCatching {
+                DidService.resolveToKey(did).getOrThrow().let { KeysService.get(it.getKeyId()) }
+                    ?.let { KeySerialization.deserializeKey(it.document).getOrThrow() }
+            }
+        }.getOrElse {
+            throw IllegalArgumentException("Could not resolve key to sign JWS to generate presentation for vp_token", it)
+        } ?: error("No key was resolved when trying to resolve key to sign JWS to generate presentation for vp_token")
+
         val signed = runBlocking {
             val authKeyId = resolveDidAuthentication(this@TestCredentialWallet.did)
 
@@ -266,7 +273,7 @@ class TestCredentialWallet(
     override fun createSIOPSession(
         id: String,
         authorizationRequest: AuthorizationRequest?,
-        expirationTimestamp: Instant
+        expirationTimestamp: Instant,
     ) = VPresentationSession(id, authorizationRequest, expirationTimestamp, setOf())
 
     override fun getDidFor(session: VPresentationSession): String {
@@ -289,7 +296,7 @@ class TestCredentialWallet(
     fun initializeAuthorization(
         authorizationRequest: AuthorizationRequest,
         expiresIn: Duration,
-        selectedCredentials: Set<String>
+        selectedCredentials: Set<String>,
     ): VPresentationSession {
         return super.initializeAuthorization(authorizationRequest, expiresIn, null).copy(selectedCredentialIds = selectedCredentials).also {
             putSession(it.id, it)
