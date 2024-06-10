@@ -188,8 +188,7 @@ class WaltIdDidCreateCmdTest {
             getResourcePath(this, "key/secp256r1_by_waltid_pub_pvt_key.jwk"),
         )
         for (keyFile in keyFileList) {
-            val cmdOutputLines = command.test("-j -k $keyFile").output.lines()
-            val did = cmdOutputLines[cmdOutputLines.lastIndex-1]
+            assertContains(command.test("-j -k $keyFile").output, "did:key:z[a-km-zA-HJ-NP-Z1-9]+".toRegex())
         }
     }
 
