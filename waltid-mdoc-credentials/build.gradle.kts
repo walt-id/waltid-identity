@@ -12,6 +12,7 @@ repositories {
 }
 
 kotlin {
+    jvmToolchain(16)
     targets.configureEach {
         compilations.configureEach {
             compilerOptions.configure {
@@ -21,7 +22,7 @@ kotlin {
     }
 
     jvm {
-        jvmToolchain(16)
+
         withJava()
         testRuns["test"].executionTask.configure {
             useJUnitPlatform()

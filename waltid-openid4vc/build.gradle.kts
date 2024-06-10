@@ -36,6 +36,7 @@ tasks.withType(KotlinCompile::class.java) {
 }
 
 kotlin {
+    jvmToolchain(toolingRuntime.majorVersion.toInt())
     targets.configureEach {
         compilations.configureEach {
             compilerOptions.configure {
@@ -45,7 +46,7 @@ kotlin {
     }
 
     jvm {
-        jvmToolchain(toolingRuntime.majorVersion.toInt())
+
         withJava()
         testRuns["test"].executionTask.configure {
             useJUnitPlatform()
