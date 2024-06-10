@@ -12,14 +12,12 @@ import java.text.ParseException
 class KeyUtil(private val cmd: CliktCommand? = null) {
 
     suspend fun getKey(keyFile: File?): JWKKey {
-        if (keyFile != null) {
-            try {
-                return JWKKey.importJWK(keyFile.readText()).getOrThrow()
-            } catch (e: ParseException) {
-                throw InvalidFileFormat(keyFile.name, e.let { e.message!! })
-            }
-        } else {
-            return generateDefaultKey()
+        keyFile ?: return generateDefaultKey()
+
+        try {
+            return JWKKey.importJWK(keyFile.readText()).getOrThrow()
+        } catch (e: ParseException) {
+            throw InvalidFileFormat(keyFile.name, e.let { e.message!! })
         }
     }
 
