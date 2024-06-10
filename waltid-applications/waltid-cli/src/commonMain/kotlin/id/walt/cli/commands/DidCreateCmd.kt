@@ -26,7 +26,7 @@ class DidCreateCmd : CliktCommand(
 
     private val keyFile by option("-k", "--key")
         .help("The Subject's key to be used. If none is provided, a new one will be generated.")
-        .file()
+        .file(canBeDir = false)
 
     override fun run() {
         runBlocking {
