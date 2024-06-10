@@ -2,16 +2,18 @@ package id.walt.webwallet.web.controllers
 
 import id.walt.webwallet.db.models.WalletDid
 import id.walt.webwallet.web.controllers.DidCreation.didCreate
-import io.github.smiley4.ktorswaggerui.dsl.delete
-import io.github.smiley4.ktorswaggerui.dsl.get
-import io.github.smiley4.ktorswaggerui.dsl.post
-import io.github.smiley4.ktorswaggerui.dsl.route
+import io.github.smiley4.ktorswaggerui.dsl.routing.delete
+import io.github.smiley4.ktorswaggerui.dsl.routing.get
+import io.github.smiley4.ktorswaggerui.dsl.routing.post
+import io.github.smiley4.ktorswaggerui.dsl.routing.route
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.response.*
+import io.ktor.server.routing.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonObject
 import org.jetbrains.exposed.sql.transactions.transaction
+import kotlin.text.get
 
 fun Application.dids() = walletRoute {
     route("dids", {
@@ -33,7 +35,9 @@ fun Application.dids() = walletRoute {
             request {
                 pathParameter<String>("did") {
                     description = "The DID"
-                    example = "did:web:walt.id"
+                    example("walt.id did:web") {
+                        value = "did:web:walt.id"
+                    }
                 }
             }
         }) {
@@ -72,8 +76,6 @@ fun Application.dids() = walletRoute {
             }
         }
 
-
-
         post("default", {
             summary = "Set the default DID"
             description =
@@ -81,7 +83,10 @@ fun Application.dids() = walletRoute {
             request {
                 queryParameter<String>("did") {
                     description = "DID to set as default DID"
-                    example = "did:web:walt.id"
+                    example("walt.id did:web") {
+                        value = "did:web:walt.id"
+                        summary = "walt.id did:web"
+                    }
                 }
             }
             response { HttpStatusCode.Accepted to { description = "Default DID updated" } }

@@ -1,21 +1,26 @@
 package id.walt.verifier
 
+import io.github.smiley4.ktorswaggerui.dsl.routes.ValueExampleDescriptorDsl
+
 object VerifierApiExamples {
 
 
     // Minimal call, default policies will be used, PresentationDefinition is generated based on credentials requested in `request_credentials`:
     //language=json
-    val minimal = """
+    val minimal: ValueExampleDescriptorDsl.() -> Unit = {
+        value = """
 {
   "request_credentials": [
     "OpenBadgeCredential"
   ]
 }
 """.trimIndent()
+    }
 
     //Call with policies for the VerifiablePresentation, default policies for VCs, generated PresentationDefinition:
     //language=json
-    val vpPolicies = """
+    val vpPolicies: ValueExampleDescriptorDsl.() -> Unit = {
+        value = """
 {
   "vp_policies": [
     { "policy": "minimum-credentials", "args": 2 },
@@ -27,11 +32,13 @@ object VerifierApiExamples {
   ]
 }
 """.trimIndent()
+    }
 
     //Call with policies for the VerifiablePresentation, defined policies for all VCs, generated PresentationDefinition:
     //language=json
-    val vpGlobalVcPolicies =
-        """
+    val vpGlobalVcPolicies: ValueExampleDescriptorDsl.() -> Unit = {
+        value =
+            """
 {
   "vp_policies": [
     { "policy": "minimum-credentials", "args": 2 },
@@ -49,11 +56,13 @@ object VerifierApiExamples {
   ]
 }
 """.trimIndent()
+    }
 
     // Call with policies for the VerifiablePresentation, defined policies for all VCs, generated PresentationDefinition,
     // and special policies for each credential type:
     //language=json
-    val vcVpIndividualPolicies = """
+    val vcVpIndividualPolicies: ValueExampleDescriptorDsl.() -> Unit = {
+        value = """
 {
   "vp_policies": [
     { "policy": "minimum-credentials", "args": 2 },
@@ -89,12 +98,14 @@ object VerifierApiExamples {
   ]
 }
 """.trimIndent()
+    }
 
     // Call with policies for the VerifiablePresentation, defined policies for all VCs, and special policies for each credential type,
     // the PresentationDefinition is not generated but manually defined:
     //language=json
-    val maxExample =
-        """
+    val maxExample: ValueExampleDescriptorDsl.() -> Unit = {
+        value =
+            """
 {
   "vp_policies": [
     { "policy": "minimum-credentials", "args": 2 },
@@ -160,10 +171,12 @@ object VerifierApiExamples {
   }
 }
 """.trimIndent()
+    }
 
     //language=JSON
-    val presentationDefinitionPolicy =
-        """
+    val presentationDefinitionPolicy: ValueExampleDescriptorDsl.() -> Unit = {
+        value =
+            """
 {
   "vp_policies": [
     "signature",
@@ -201,8 +214,10 @@ object VerifierApiExamples {
   ]
 }
 """.trimIndent()
+    }
 
-    val EbsiVerifiablePDA1 = """
+    val EbsiVerifiablePDA1: ValueExampleDescriptorDsl.() -> Unit = {
+        value = """
     {
       "vc_policies": [
         "signature",
@@ -250,4 +265,5 @@ object VerifierApiExamples {
       }
     }
     """.trimIndent()
+    }
 }

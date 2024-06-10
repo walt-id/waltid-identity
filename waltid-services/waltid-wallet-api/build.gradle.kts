@@ -81,7 +81,7 @@ dependencies {
     implementation("io.ktor:ktor-server-rate-limit:$ktor_version")
 
     // Ktor server external libs
-    implementation("io.github.smiley4:ktor-swagger-ui:2.10.0")
+    implementation("io.github.smiley4:ktor-swagger-ui:3.0.0")
     //implementation("io.github.microutils:kotlin-logging-jvm:2.1.23")
 
     // Ktor client

@@ -1,11 +1,13 @@
 package id.walt.issuer.issuance
 
+import io.github.smiley4.ktorswaggerui.dsl.routes.ValueExampleDescriptorDsl
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 
 object IssuanceExamples {
     // language=json
-    val universityDegreeCredential = """
+    val universityDegreeCredential: ValueExampleDescriptorDsl.() -> Unit = {
+        value = """
 {
   "issuerKey": {
     "type": "jwk",
@@ -54,9 +56,10 @@ object IssuanceExamples {
   }
 }
 """.trimIndent()
+    }
 
     // language=json
-    val openBadgeCredentialExampleJsonString = """
+    val openBadgeCredentialJson = """
         {
           "issuerKey": {
             "type": "jwk",
@@ -128,11 +131,17 @@ object IssuanceExamples {
           }
         }
         """.trimIndent()
-    val openBadgeCredentialExample = Json.parseToJsonElement(openBadgeCredentialExampleJsonString).jsonObject.toMap()
+
+    val openBadgeCredentialExample: ValueExampleDescriptorDsl.() -> Unit = {
+        value = openBadgeCredentialJson
+    }
+
+    val openBadgeCredentialExampleParsed = Json.parseToJsonElement(this.openBadgeCredentialJson).jsonObject.toMap()
 
 
     // language=json
-    val openBadgeCredentialSignExampleJsonString = """
+    val openBadgeCredentialSignExampleJsonString: ValueExampleDescriptorDsl.() -> Unit = {
+        value = """
         {
           "issuerKey": {
             "type": "jwk",
@@ -194,28 +203,26 @@ object IssuanceExamples {
           }
         }
         """.trimIndent()
+    }
 
-    val universityDegreeCredentialExample2 = mapOf(
-        "@context" to listOf(
-            "https://www.w3.org/2018/credentials/v1", "https://www.w3.org/2018/credentials/examples/v1"
-        ),
-        "id" to "http://example.gov/credentials/3732",
-        "type" to listOf(
-            "VerifiableCredential", "UniversityDegreeCredential"
-        ),
-        "issuer" to mapOf(
-            "id" to "did:web:vc.transmute.world"
-        ),
-        "issuanceDate" to "2020-03-10T04:24:12.164Z",
-        "credentialSubject" to mapOf(
-            "id" to "did:example:ebfeb1f712ebc6f1c276e12ec21", "degree" to mapOf(
-                "type" to "BachelorDegree", "name" to "Bachelor of Science and Arts"
-            )
-        ),
-    )
-
-    val universityDegreeCredentialSignedExample = universityDegreeCredentialExample2.plus(
-        mapOf(
+    val universityDegreeCredentialSignedExample: ValueExampleDescriptorDsl.() -> Unit = {
+        value = mapOf(
+            "@context" to listOf(
+                "https://www.w3.org/2018/credentials/v1", "https://www.w3.org/2018/credentials/examples/v1"
+            ),
+            "id" to "http://example.gov/credentials/3732",
+            "type" to listOf(
+                "VerifiableCredential", "UniversityDegreeCredential"
+            ),
+            "issuer" to mapOf(
+                "id" to "did:web:vc.transmute.world"
+            ),
+            "issuanceDate" to "2020-03-10T04:24:12.164Z",
+            "credentialSubject" to mapOf(
+                "id" to "did:example:ebfeb1f712ebc6f1c276e12ec21", "degree" to mapOf(
+                    "type" to "BachelorDegree", "name" to "Bachelor of Science and Arts"
+                )
+            ),
             "proof" to mapOf(
                 "type" to "JsonWebSignature2020",
                 "created" to "2020-03-21T17:51:48Z",
@@ -224,10 +231,11 @@ object IssuanceExamples {
                 "jws" to "eyJiNjQiOmZhbHNlLCJjcml0IjpbImI2NCJdLCJhbGciOiJFZERTQSJ9..OPxskX37SK0FhmYygDk-S4csY_gNhCUgSOAaXFXDTZx86CmI5nU9xkqtLWg-f4cqkigKDdMVdtIqWAvaYx2JBA"
             )
         )
-    )
+    }
 
     // language=JSON
-    val batchExampleJwt = """
+    val batchExampleJwt: ValueExampleDescriptorDsl.() -> Unit = {
+        value = """
      [
        {
           "issuerKey":{
@@ -335,10 +343,12 @@ object IssuanceExamples {
        }
     ]
     """.trimIndent()
+    }
 
 
     // language=json
-    val batchExampleSdJwt = """
+    val batchExampleSdJwt: ValueExampleDescriptorDsl.() -> Unit = {
+        value = """
         [
            {
               "issuerKey":{
@@ -473,9 +483,11 @@ object IssuanceExamples {
            }
         ]
     """.trimIndent()
+    }
 
     // language=JSON
-    val sdJwtExample = """
+    val sdJwtExample: ValueExampleDescriptorDsl.() -> Unit = {
+        value = """
         {
           "issuerKey": {
             "type": "jwk",
@@ -544,9 +556,11 @@ object IssuanceExamples {
           }
         }
     """.trimIndent()
+    }
 
     // language=JSON
-    val issuerOnboardingRequestDefaultExample = """
+    val issuerOnboardingRequestDefaultExample: ValueExampleDescriptorDsl.() -> Unit = {
+        value = """
         {
           "key": {
             "backend": "jwk",
@@ -557,9 +571,11 @@ object IssuanceExamples {
           }
         }
     """.trimIndent()
+    }
 
     // language=JSON
-    val issuerOnboardingRequestTseExample = """
+    val issuerOnboardingRequestTseExample: ValueExampleDescriptorDsl.() -> Unit = {
+        value = """
         {
           "key": {
             "backend": "tse",
@@ -574,9 +590,11 @@ object IssuanceExamples {
           }
         }
     """.trimIndent()
+    }
 
     //language=JSON
-    val issuerOnboardingRequestOciExample = """
+    val issuerOnboardingRequestOciExample: ValueExampleDescriptorDsl.() -> Unit = {
+        value = """
         {
           "key": {
             "backend": "oci",
@@ -591,9 +609,11 @@ object IssuanceExamples {
           }
         }
     """.trimIndent()
+    }
 
     //language=JSON
-    val issuerOnboardingResponseOciExample = """
+    val issuerOnboardingResponseOciExample: ValueExampleDescriptorDsl.() -> Unit = {
+        value = """
         {
           "issuerKey": {
             "type": "oci",
@@ -609,10 +629,12 @@ object IssuanceExamples {
         }
 
     """.trimIndent()
+    }
 
 
     //language=JSON
-    val issuerOnboardingRequestOciRestApiExample = """
+    val issuerOnboardingRequestOciRestApiExample: ValueExampleDescriptorDsl.() -> Unit = {
+        value = """
         {
           "key": {
             "backend": "oci-rest-api",
@@ -632,9 +654,11 @@ object IssuanceExamples {
           }
         }
     """.trimIndent()
+    }
 
     //language=JSON
-    val issuerOnboardingResponseOciRestApiExample = """
+    val issuerOnboardingResponseOciRestApiExample: ValueExampleDescriptorDsl.() -> Unit = {
+        value = """
         {
           "issuerKey": {
             "type": "oci",
@@ -655,9 +679,11 @@ object IssuanceExamples {
         }
 
     """.trimIndent()
+    }
 
     // language=JSON
-    val issuerOnboardingRequestDidWebExample = """
+    val issuerOnboardingRequestDidWebExample: ValueExampleDescriptorDsl.() -> Unit = {
+        value = """
         {
           "key": {
             "backend": "jwk",
@@ -672,9 +698,11 @@ object IssuanceExamples {
           }
         }
     """.trimIndent()
+    }
 
     // language=JSON
-    val issuerOnboardingResponseDidWebExample = """
+    val issuerOnboardingResponseDidWebExample: ValueExampleDescriptorDsl.() -> Unit = {
+        value = """
         {
    "issuerKey":{
       "type":"jwk",
@@ -690,9 +718,11 @@ object IssuanceExamples {
    "issuerDid":"did:web:example.com:optional-user-id-1234"
 }
     """.trimIndent()
+    }
 
     // language=JSON
-    val issuerOnboardingResponseDefaultExample = """
+    val issuerOnboardingResponseDefaultExample: ValueExampleDescriptorDsl.() -> Unit = {
+        value = """
         {
           "issuerKey": {
             "type": "jwk",
@@ -708,9 +738,11 @@ object IssuanceExamples {
           "issuerDid": "did:jwk:eyJrdHkiOiJFQyIsImNydiI6IlAtMjU2Iiwia2lkIjoiU2kwN2pJWHFMc01LSHkwdmd5dlBiY0l2SVB4ZHFMN1FzNlNUcXJ4MVVDOCIsIngiOiJxLUxaREstVFpRU1VjenlfMUs2VEJGZVZuNjByTXY0S2pZdlRlUHkyVEdzIiwieSI6InFUYmlTUkVmV1JadEFLWnNXLWstMEJISUlZcEFOMGZobmphcWVNSVU1T1kifQ"
         }
     """.trimIndent()
+    }
 
     // language=JSON
-    val issuerOnboardingResponseTseExample = """
+    val issuerOnboardingResponseTseExample: ValueExampleDescriptorDsl.() -> Unit = {
+        value = """
     {
       "issuerKey": {
         "type": "tse",
@@ -756,4 +788,5 @@ object IssuanceExamples {
       "issuerDid": "did:key:z6MkqogbukAXnhvY9dAtXw7ABpe9meJJRCYHwyrNA2q74o17"
     }
     """.trimIndent()
+    }
 }

@@ -6,7 +6,7 @@ import id.walt.webwallet.service.credentials.CredentialFilterObject
 import id.walt.webwallet.usecase.credential.CredentialStatusResult
 import id.walt.webwallet.web.parameter.CredentialRequestParameter
 import id.walt.webwallet.web.parameter.NoteRequestParameter
-import io.github.smiley4.ktorswaggerui.dsl.*
+import io.github.smiley4.ktorswaggerui.dsl.routing.*
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
@@ -27,22 +27,19 @@ fun Application.credentials() = walletRoute {
                 }
                 queryParameter<Boolean>("showDeleted") {
                     description = "include the deleted credentials in the query result"
-                    example = false
                     required = false
                 }
                 queryParameter<Boolean>("showPending") {
                     description = "include the pending credentials in the query result"
-                    example = false
                     required = false
                 }
                 queryParameter<String>("sortBy") {
                     description = "The property to sort by"
-                    example = "addedOn"
+                    example("Example") { value = "addedOn" }
                     required = false
                 }
                 queryParameter<Boolean>("descending") {
                     description = "Sort descending"
-                    example = false
                     required = false
                 }
             }
@@ -81,7 +78,7 @@ fun Application.credentials() = walletRoute {
             request {
                 pathParameter<String>("credentialId") {
                     description = "the credential id (or alias)"
-                    example = "urn:uuid:d36986f1-3cc0-4156-b5a4-6d3deab84270"
+                    example("Example") { value = "urn:uuid:d36986f1-3cc0-4156-b5a4-6d3deab84270" }
                 }
             }
         }) {
@@ -104,7 +101,6 @@ fun Application.credentials() = walletRoute {
                 request {
                     queryParameter<Boolean>("permanent") {
                         description = "Permanently delete the credential"
-                        example = false
                         required = false
                     }
                 }
@@ -161,7 +157,7 @@ fun Application.credentials() = walletRoute {
                     body<NoteRequestParameter> {
                         description = "Request data"
                         required = false
-                        example("Note", NoteRequestParameter("note"))
+                        example("Note") { value = NoteRequestParameter("note") }
                     }
                 }
                 response {

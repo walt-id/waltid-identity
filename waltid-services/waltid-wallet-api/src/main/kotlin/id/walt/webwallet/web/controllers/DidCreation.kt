@@ -1,6 +1,6 @@
 package id.walt.webwallet.web.controllers
 
-import io.github.smiley4.ktorswaggerui.dsl.post
+import io.github.smiley4.ktorswaggerui.dsl.routing.post
 import io.ktor.http.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*

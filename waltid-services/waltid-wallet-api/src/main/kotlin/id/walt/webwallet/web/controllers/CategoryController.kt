@@ -1,6 +1,6 @@
 package id.walt.webwallet.web.controllers
 
-import io.github.smiley4.ktorswaggerui.dsl.*
+import io.github.smiley4.ktorswaggerui.dsl.routing.*
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.response.*
@@ -26,7 +26,6 @@ fun Application.categories() = walletRoute {
             request {
                 pathParameter<String>("name") {
                     description = "the category name"
-                    example = "my-category"
                 }
             }
         }) {
@@ -59,7 +58,6 @@ fun Application.categories() = walletRoute {
                 request {
                     pathParameter<String>("newName") {
                         description = "the category new name"
-                        example = "new-category"
                     }
                 }
                 response {
