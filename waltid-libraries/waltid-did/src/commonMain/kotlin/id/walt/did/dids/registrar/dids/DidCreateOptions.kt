@@ -34,7 +34,7 @@ open class DidCreateOptions(val method: String, val config: JsonElement) {
 
 @OptIn(ExperimentalJsExport::class)
 @JsExport
-internal fun config(config: Map<String, Any>, secret: Map<String, Any> = emptyMap()) = mapOf(
+internal fun didCreateConfig(config: Map<String, Any>, secret: Map<String, Any> = emptyMap()) = mapOf(
     "config" to config,
     "didDocument" to mapOf(
         "@context" to "https://www.w3.org/ns/did/v1",
@@ -46,4 +46,4 @@ internal fun config(config: Map<String, Any>, secret: Map<String, Any> = emptyMa
 
 @OptIn(ExperimentalJsExport::class)
 @JsExport
-internal fun config(vararg inlineConfig: Pair<String, Any>) = config(mapOf(*inlineConfig))
+internal fun config(vararg inlineConfig: Pair<String, Any>) = didCreateConfig(mapOf(*inlineConfig))

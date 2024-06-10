@@ -1,9 +1,5 @@
 package id.walt.credentials.verification.policies
 
-import java.io.BufferedReader
-import java.io.InputStream
-import java.util.*
-
 import io.ktor.client.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
@@ -13,15 +9,16 @@ import kotlinx.datetime.Clock
 import kotlinx.serialization.json.*
 import love.forte.plugin.suspendtrans.annotation.JvmAsync
 import love.forte.plugin.suspendtrans.annotation.JvmBlocking
-import kotlin.io.encoding.ExperimentalEncodingApi
+import java.io.BufferedReader
+import java.io.InputStream
+import java.util.Base64
 import java.util.zip.GZIPInputStream
 
 
 actual class RevocationPolicy  : RevocationPolicyMp() {
-    @OptIn(ExperimentalEncodingApi::class)
     @JvmBlocking
     @JvmAsync
-    override suspend fun verify(data: JsonElement, args: Any?, context: Map<String, Any>): Result<Any> {
+    actual override suspend fun verify(data: JsonElement, args: Any?, context: Map<String, Any>): Result<Any> {
 
         var successfulKey = ""
 

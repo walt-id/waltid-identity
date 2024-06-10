@@ -211,7 +211,7 @@ actual class JWKKey actual constructor(
     @JsExport.Ignore
     actual override suspend fun getMeta(): JwkKeyMeta = JwkKeyMeta(getKeyId())
 
-    override val keyType: KeyType
+    actual override val keyType: KeyType
         get() {
             val k = _internalKey.asDynamic()
             return when {
