@@ -12,7 +12,12 @@ object CommonsFeatureCatalog : ServiceFeatureCatalog {
         default = true
     )
     val healthChecksFeature = OptionalFeature("healthchecks", "Enables healthcheck endpoints", default = true)
-    val debugEndpointsFeature = OptionalFeature("debug-endpoints", "Enables various debug endpoints", default = true, config = ServiceHealthChecksDebugModule.ServiceDebugModuleConfiguration::class)
+    val debugEndpointsFeature = OptionalFeature(
+        "debug-endpoints",
+        "Enables various debug endpoints",
+        default = true,
+        config = ServiceHealthChecksDebugModule.ServiceDebugModuleConfiguration::class
+    )
 
     override val baseFeatures: List<BaseFeature> = listOf(webFeature)
     override val optionalFeatures: List<OptionalFeature> =
