@@ -39,6 +39,13 @@ class WaltIdDidResolveCmdTest {
     val waltidDidLibSecp256r1 = "did:key:zDnaeWUm6JXpipAtL1N1hQFA4BQUwGCdaAVbpEZjN3Pf9nMrb"
     val waltidDidLibSecp256k1 = "did:key:zQ3shTZmje6ppF4oboKTX85hUWGrR1nxrWnFA3tnJhsHEC8c4"
 
+    // waltid generated private key list
+    val waltidKeyFileList = listOf(
+        getResourcePath(this, "key/ed25519_by_waltid_pvt_key.jwk"),
+        getResourcePath(this, "key/rsa_by_waltid_pub_pvt_key.jwk"),
+        getResourcePath(this, "key/secp256k1_by_waltid_pvt_key.jwk"),
+        getResourcePath(this, "key/secp256r1_by_waltid_pub_pvt_key.jwk"),)
+
     @Test
     @Ignore
     fun `should resolve uniresolver P-521 did-key example`() {
@@ -155,17 +162,16 @@ class WaltIdDidResolveCmdTest {
     @Test
     fun `should resolve did-key generated with jwk_jcs-pub encoding enabled`() {
         val didCreateCmd = DidCreateCmd()
-        val keyFileList = listOf(
-            getResourcePath(this, "key/ed25519_by_waltid_pvt_key.jwk"),
-            getResourcePath(this, "key/rsa_by_waltid_pub_pvt_key.jwk"),
-            getResourcePath(this, "key/secp256k1_by_waltid_pvt_key.jwk"),
-            getResourcePath(this, "key/secp256r1_by_waltid_pub_pvt_key.jwk"),
-        )
         assertDoesNotThrow {
-            for (keyFile in keyFileList) {
+            for (keyFile in waltidKeyFileList) {
                 val did = getDIDFromDidCreateCmdOutput(didCreateCmd.test("-j -k $keyFile").output)
                 command.test("-d ${did}")
             }
         }
+    }
+
+    @Test
+    fun `should resolve`() {
+
     }
 }
