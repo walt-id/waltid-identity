@@ -108,7 +108,7 @@ kotlin {
         val jvmTest by getting {
             dependencies {
                 // Logging
-//                implementation("org.slf4j:slf4j-simple:2.0.13")
+                implementation("org.slf4j:slf4j-simple:2.0.13")
 
                 // Test
                 implementation(kotlin("test"))
