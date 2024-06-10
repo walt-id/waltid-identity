@@ -39,6 +39,19 @@ A set of white-label apps to get started in no time.
 
 ## Use Services And Apps
 
+Add the following lines in your hosts file:
+
+ - On windows `(C:\Windows\System32\drivers\etc\hosts)`
+
+ - On linux `(/etc/hosts)`
+
+```bash
+127.0.0.1 issuer-api
+127.0.0.1 verifier-api
+````
+
+
+
 Use the [walt.id identity package](https://github.com/walt-id/waltid-identity/tree/main/docker-compose) to run all APIs and Apps with docker: 
 
 ```bash
