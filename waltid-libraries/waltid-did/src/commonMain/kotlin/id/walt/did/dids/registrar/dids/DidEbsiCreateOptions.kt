@@ -7,5 +7,5 @@ import kotlin.js.JsExport
 @JsExport
 class DidEbsiCreateOptions(version: Int, token: String) : DidCreateOptions(
     method = "ebsi",
-    config = config(config = mapOf("version" to version), secret = mapOf("token" to token))
+    config = didCreateConfig(config = mapOf("version" to version), secret = mapOf("token" to token))
 )

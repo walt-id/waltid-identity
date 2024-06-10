@@ -298,7 +298,7 @@ actual class JWKKey actual constructor(
 
     actual override suspend fun getPublicKey(): JWKKey = JWKKey(_internalJwk.toPublicJWK())
 
-    override val keyType: KeyType by lazy {
+    actual override val keyType: KeyType by lazy {
         when (_internalJwk.keyType) {
             com.nimbusds.jose.jwk.KeyType.RSA -> KeyType.RSA
             com.nimbusds.jose.jwk.KeyType.EC -> {

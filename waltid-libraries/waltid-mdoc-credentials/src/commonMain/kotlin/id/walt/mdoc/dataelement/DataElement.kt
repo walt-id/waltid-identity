@@ -1,3 +1,6 @@
+@file:Suppress("SERIALIZER_TYPE_INCOMPATIBLE", "UNCHECKED_CAST")
+@file:OptIn(ExperimentalSerializationApi::class)
+
 package id.walt.mdoc.dataelement
 
 import cbor.Cbor
@@ -69,9 +72,9 @@ class DEFullDateAttribute(val mode: DEFullDateMode = DEFullDateMode.full_date_st
 
 @Serializer(forClass = DataElement::class)
 @OptIn(ExperimentalSerializationApi::class)
-internal object DataElementSerializer : KSerializer<AnyDataElement> {
+internal object DataElementSerializer : KSerializer<DataElement> {
 
-    override fun deserialize(decoder: Decoder): AnyDataElement {
+    override fun deserialize(decoder: Decoder): DataElement {
         val curHead = decoder.peek()
         val majorType = curHead.shr(5)
         return when (majorType) {
@@ -102,31 +105,31 @@ internal object DataElementSerializer : KSerializer<AnyDataElement> {
         }
     }
 
-    override fun serialize(encoder: Encoder, value: AnyDataElement) {
+    override fun serialize(encoder: Encoder, value: DataElement) {
         when (value.type) {
-            DEType.number -> when (value.value) {
-                is Int, is Long, is Short -> encoder.encodeLong((value.value as Number).toLong())
-                is Float -> encoder.encodeFloat(value.value.toFloat())
-                is Double -> encoder.encodeDouble(value.value.toDouble())
+            DEType.number -> when (value.internalValue) {
+                is Int, is Long, is Short -> encoder.encodeLong((value.internalValue as Number).toLong())
+                is Float -> encoder.encodeFloat(value.internalValue.toFloat())
+                is Double -> encoder.encodeDouble(value.internalValue.toDouble())
             }
 
-            DEType.boolean -> encoder.encodeBoolean(value.value as Boolean)
-            DEType.textString -> encoder.encodeString(value.value as String)
-            DEType.byteString -> encoder.encodeByteString(value.value as ByteArray)
+            DEType.boolean -> encoder.encodeBoolean(value.internalValue as Boolean)
+            DEType.textString -> encoder.encodeString(value.internalValue as String)
+            DEType.byteString -> encoder.encodeByteString(value.internalValue as ByteArray)
             DEType.list -> encoder.encodeSerializableValue(
                 ListSerializer(DataElementSerializer),
-                value.value as List<AnyDataElement>
+                value.internalValue as List<DataElement>
             )
 
             DEType.map -> encoder.encodeSerializableValue(
                 MapSerializer(MapKeySerializer, DataElementSerializer),
-                value.value as Map<MapKey, AnyDataElement>
+                value.internalValue as Map<MapKey, DataElement>
             )
 
             DEType.nil -> encoder.encodeNull()
             DEType.encodedCbor -> {
                 encoder.encodeTag(ENCODED_CBOR.toULong())
-                encoder.encodeByteString(value.value as ByteArray)
+                encoder.encodeByteString(value.internalValue as ByteArray)
             }
 
             DEType.dateTime -> serializeDateTime(encoder, value as DateTimeElement)
@@ -134,20 +137,20 @@ internal object DataElementSerializer : KSerializer<AnyDataElement> {
         }
     }
 
-    private fun serializeDateTime(encoder: Encoder, element: DateTimeElement) {
-        val attribute = element.attribute as DEDateTimeAttribute
+    private fun serializeDateTime(encoder: Encoder, dateTime: DateTimeElement) {
+        val attribute = dateTime.attribute as DEDateTimeAttribute
         when (attribute.mode) {
             DEDateTimeMode.tdate -> {
                 encoder.encodeTag(TDATE.toULong())
-                encoder.encodeString(element.value.toString())
+                encoder.encodeString(dateTime.value.toString())
             }
 
             DEDateTimeMode.time_int, DEDateTimeMode.time_float, DEDateTimeMode.time_double -> {
                 encoder.encodeTag(TIME.toULong())
                 when (attribute.mode) {
-                    DEDateTimeMode.time_int -> encoder.encodeLong(element.value.epochSeconds)
-                    DEDateTimeMode.time_float -> encoder.encodeFloat(element.value.toEpochMilliseconds().toFloat() / 1000f)
-                    DEDateTimeMode.time_double -> encoder.encodeDouble(element.value.toEpochMilliseconds().toDouble() / 1000.0)
+                    DEDateTimeMode.time_int -> encoder.encodeLong(dateTime.value.epochSeconds)
+                    DEDateTimeMode.time_float -> encoder.encodeFloat(dateTime.value.toEpochMilliseconds().toFloat() / 1000f)
+                    DEDateTimeMode.time_double -> encoder.encodeDouble(dateTime.value.toEpochMilliseconds().toDouble() / 1000.0)
                     else -> {} // not possible
                 }
             }
@@ -177,17 +180,17 @@ internal object DataElementSerializer : KSerializer<AnyDataElement> {
 
     }
 
-    private fun serializeFullDate(encoder: Encoder, value: FullDateElement) {
-        val attribute = value.attribute as DEFullDateAttribute
+    private fun serializeFullDate(encoder: Encoder, date: FullDateElement) {
+        val attribute = date.attribute as DEFullDateAttribute
         when (attribute.mode) {
             DEFullDateMode.full_date_str -> {
                 encoder.encodeTag(FULL_DATE_STR.toULong())
-                encoder.encodeString(value.value.toString())
+                encoder.encodeString(date.value.toString())
             }
 
             DEFullDateMode.full_date_int -> {
                 encoder.encodeTag(FULL_DATE_INT.toULong())
-                encoder.encodeInt(value.value.toEpochDays())
+                encoder.encodeInt(date.value.toEpochDays())
             }
         }
     }
@@ -206,24 +209,24 @@ internal object DataElementSerializer : KSerializer<AnyDataElement> {
  * Generic CBOR data element
  */
 @Serializable(with = DataElementSerializer::class)
-abstract class DataElement<T>(
-    val value: T, val attribute: DEAttribute,
+abstract class DataElement(
+    val internalValue: Any?, val attribute: DEAttribute,
 ) {
     val type
         get() = attribute.type
 
     override fun equals(other: Any?): Boolean {
-        val res = other is DataElement<*> && other.type == type && when (type) {
-            DEType.byteString, DEType.encodedCbor -> (value as ByteArray).contentEquals(other.value as ByteArray)
-            DEType.list -> (value as List<AnyDataElement>).all { (other.value as List<AnyDataElement>).contains(it) }
-            DEType.map -> (value as Map<MapKey, AnyDataElement>).all { (other.value as Map<MapKey, AnyDataElement>)[it.key] == it.value }
-            else -> value == other.value
+        val res = other is DataElement && other.type == type && when (type) {
+            DEType.byteString, DEType.encodedCbor -> (internalValue as ByteArray).contentEquals(other.internalValue as ByteArray)
+            DEType.list -> (internalValue as List<DataElement>).all { (other.internalValue as List<DataElement>).contains(it) }
+            DEType.map -> (internalValue as Map<MapKey, DataElement>).all { (other.internalValue as Map<MapKey, DataElement>)[it.key] == it.value }
+            else -> internalValue == other.internalValue
         }
         return res
     }
 
     override fun hashCode(): Int {
-        return value.hashCode()
+        return internalValue.hashCode()
     }
 
     /**
@@ -248,7 +251,7 @@ abstract class DataElement<T>(
          * Deserialize data element from CBOR data
          */
         @OptIn(ExperimentalSerializationApi::class)
-        fun <T : AnyDataElement> fromCBOR(cbor: ByteArray): T {
+        fun <T : DataElement> fromCBOR(cbor: ByteArray): T {
             return Cbor.decodeFromByteArray(DataElementSerializer, cbor) as T
         }
 
@@ -256,19 +259,19 @@ abstract class DataElement<T>(
          * Deserialize data element from CBOR hex string
          */
         @OptIn(ExperimentalSerializationApi::class)
-        fun <T : AnyDataElement> fromCBORHex(cbor: String): T {
+        fun <T : DataElement> fromCBORHex(cbor: String): T {
             return Cbor.decodeFromHexString(DataElementSerializer, cbor) as T
         }
     }
 }
 
-typealias AnyDataElement = DataElement<*>
+typealias AnyDataElement = DataElement
 
 /**
  * Number element for Long, Int, UInt, float, double, ...
  */
 @Serializable(with = DataElementSerializer::class)
-class NumberElement(value: Number) : DataElement<Number>(value, DEAttribute(DEType.number)) {
+class NumberElement(val value: Number) : DataElement(value, DEAttribute(DEType.number)) {
     constructor(value: UInt) : this(value.toLong())
 }
 
@@ -276,25 +279,25 @@ class NumberElement(value: Number) : DataElement<Number>(value, DEAttribute(DETy
  * Boolean element
  */
 @Serializable(with = DataElementSerializer::class)
-class BooleanElement(value: Boolean) : DataElement<Boolean>(value, DEAttribute(DEType.boolean))
+class BooleanElement(val value: Boolean) : DataElement(value, DEAttribute(DEType.boolean))
 
 /**
  * String element
  */
 @Serializable(with = DataElementSerializer::class)
-class StringElement(value: String) : DataElement<String>(value, DEAttribute(DEType.textString))
+class StringElement(val value: String) : DataElement(value, DEAttribute(DEType.textString))
 
 /**
  * Byte string element
  */
 @Serializable(with = DataElementSerializer::class)
-class ByteStringElement(value: ByteArray) : DataElement<ByteArray>(value, DEAttribute(DEType.byteString))
+class ByteStringElement(val value: ByteArray) : DataElement(value, DEAttribute(DEType.byteString))
 
 /**
  * List element
  */
 @Serializable(with = DataElementSerializer::class)
-class ListElement(value: List<AnyDataElement>) : DataElement<List<AnyDataElement>>(value, DEAttribute(DEType.list)) {
+class ListElement(val value: List<DataElement>) : DataElement(value, DEAttribute(DEType.list)) {
     constructor() : this(listOf())
 }
 
@@ -303,21 +306,21 @@ class ListElement(value: List<AnyDataElement>) : DataElement<List<AnyDataElement
  * Supports int or string keys
  */
 @Serializable(with = DataElementSerializer::class)
-class MapElement(value: Map<MapKey, AnyDataElement>) : DataElement<Map<MapKey, AnyDataElement>>(value, DEAttribute(DEType.map))
+class MapElement(val value: Map<MapKey, DataElement>) : DataElement(value, DEAttribute(DEType.map))
 
 /**
  * Null element
  */
 @Serializable(with = DataElementSerializer::class)
-class NullElement(value: Nothing? = null) : DataElement<Nothing?>(null, DEAttribute(DEType.nil))
+class NullElement(val value: Nothing? = null) : DataElement(value, DEAttribute(DEType.nil))
 
 /**
  * Date element for CBOR tagged dates:
  * tdate (RFC3339 string): #6.0, time (seconds since epoch): #6.1
  */
 @Serializable(with = DataElementSerializer::class)
-open class DateTimeElement(value: Instant, subType: DEDateTimeMode = DEDateTimeMode.tdate) :
-    DataElement<Instant>(value, DEDateTimeAttribute(subType))
+open class DateTimeElement(val value: Instant, subType: DEDateTimeMode = DEDateTimeMode.tdate) :
+    DataElement(value, DEDateTimeAttribute(subType))
 
 /**
  * TDate element (RFC3339 string, #6.0)
@@ -329,27 +332,27 @@ class TDateElement(value: Instant) : DateTimeElement(value, DEDateTimeMode.tdate
  * Full date element: #6.1004 (RFC 3339 full-date string), #6.100 (Number of days since epoch)
  */
 @Serializable(with = DataElementSerializer::class)
-class FullDateElement(value: LocalDate, subType: DEFullDateMode = DEFullDateMode.full_date_str) :
-    DataElement<LocalDate>(value, DEFullDateAttribute(subType))
+class FullDateElement(val value: LocalDate, subType: DEFullDateMode = DEFullDateMode.full_date_str) :
+    DataElement(value, DEFullDateAttribute(subType))
 
 /**
  * Encoded CBOR element (tagged CBOR data, #6.24)
  */
 @Serializable(with = DataElementSerializer::class)
-class EncodedCBORElement(cborData: ByteArray) : DataElement<ByteArray>(cborData, DEAttribute(DEType.encodedCbor)) {
-    constructor(element: AnyDataElement) : this(element.toCBOR())
+class EncodedCBORElement(val value: ByteArray) : DataElement(value, DEAttribute(DEType.encodedCbor)) {
+    constructor(element: DataElement) : this(element.toCBOR())
 
     /**
      * Decode encoded data element
      */
-    fun decode(): AnyDataElement {
+    fun decode(): DataElement {
         return fromCBOR(value)
     }
 
     /**
      * Decode encoded data element to specific data element type
      */
-    inline fun <reified T : AnyDataElement> decodeDataElement(): T {
+    inline fun <reified T : DataElement> decodeDataElement(): T {
         return fromCBOR(value)
     }
 
