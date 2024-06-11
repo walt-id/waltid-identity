@@ -204,7 +204,6 @@ abstract class OpenIDCredentialIssuer(
             "Session invalid"
         )
         println("Credential request to validate: $credentialRequest")
-        //if(false) { // TODO: REMOVE THIS LINE, REACTIVATE LINE BELOW!!
         if (credentialRequest.proof == null || !validateProofOfPossession(credentialRequest, nonce)) {
             throw createCredentialError(
                 credentialRequest,
@@ -316,7 +315,7 @@ abstract class OpenIDCredentialIssuer(
         session: IssuanceSession
     ): CredentialResponse {
         return credentialResult.credential?.let {
-            CredentialResponse.success(credentialResult.format, it)
+            CredentialResponse.success(credentialResult.format, it, customParameters = credentialResult.customParameters)
         } ?: generateProofOfPossessionNonceFor(session).let { updatedSession ->
             CredentialResponse.deferred(
                 credentialResult.format,
@@ -327,20 +326,24 @@ abstract class OpenIDCredentialIssuer(
         }
     }
 
+    protected fun getNonceFromProof(proofOfPossession: ProofOfPossession) = when(proofOfPossession.proofType) {
+        ProofType.jwt -> parseTokenPayload(proofOfPossession.jwt!!)[JWTClaims.Payload.nonce]?.jsonPrimitive?.content
+        ProofType.cwt -> Cbor.decodeFromHexString<COSESign1>(proofOfPossession.cwt!!).decodePayload()?.let {
+            io.ktor.utils.io.core.String((it.value[MapKey(ProofOfPossession.CWTProofBuilder.LABEL_NONCE)] as ByteStringElement).value)
+        }
+        else -> null
+    }
+
     @OptIn(ExperimentalSerializationApi::class)
     private fun validateProofOfPossession(credentialRequest: CredentialRequest, nonce: String): Boolean {
         println("VALIDATING: ${credentialRequest.proof} with nonce $nonce")
         println("VERIFYING ITS SIGNATURE")
         if (credentialRequest.proof?.proofType == ProofType.jwt && credentialRequest.proof.jwt != null) {
             return verifyTokenSignature(TokenTarget.PROOF_OF_POSSESSION, credentialRequest.proof.jwt) &&
-                credentialRequest.proof.jwt.let {
-                    parseTokenPayload(it)
-                }[JWTClaims.Payload.nonce]?.jsonPrimitive?.content == nonce
+                getNonceFromProof(credentialRequest.proof) == nonce
         } else if(credentialRequest.proof?.proofType == ProofType.cwt && credentialRequest.proof.cwt != null) {
             return verifyCOSESign1Signature(TokenTarget.PROOF_OF_POSSESSION, credentialRequest.proof.cwt) &&
-                Cbor.decodeFromHexString<COSESign1>(credentialRequest.proof.cwt).payload?.let {
-                    io.ktor.utils.io.core.String((Cbor.decodeFromByteArray<MapElement>(it).value[MapKey(ProofOfPossession.CWTProofBuilder.LABEL_NONCE)] as ByteStringElement).value) == nonce
-                } ?: false
+                getNonceFromProof(credentialRequest.proof) == nonce
         } else return false
     }
 

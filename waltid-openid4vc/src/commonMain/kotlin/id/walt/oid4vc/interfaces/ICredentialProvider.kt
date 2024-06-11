@@ -41,5 +41,6 @@ interface ICredentialProvider {
 data class CredentialResult(
     val format: CredentialFormat,
     val credential: JsonElement?,
-    val credentialId: String? = null
+    val credentialId: String? = null,
+    val customParameters: Map<String, JsonElement> = mapOf()
 )
