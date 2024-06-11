@@ -65,5 +65,23 @@ class DidKeySimpleTests {
     fun testRSA() = testDids(
         "did:key:z4MXj1wBzi9jUstyPMS4jQqB6KdJaiatPkAtVtGc6bQEQEEsKTic4G7Rou3iBf9vPmT5dbkm9qsZsuVNjq8HCuW1w24nhBFGkRE4cd2Uf2tfrB3N7h4mnyPp1BF3ZttHTYv3DLUPi1zMdkULiow3M1GfXkoC6DoxDUm1jmN6GBj22SjVsr6dxezRVQc7aj9TxE7JLbMH1wh5X3kA58H3DFW8rnYMakFGbca5CB2Jf6CnGQZmL7o5uJAdTwXfy2iiiyPxXEGerMhHwhjTA1mKYobyk2CpeEcmvynADfNZ5MBvcCS7m3XkFCMNUYBS9NQ3fze6vMSUPsNa6GVYmKx2x6JrdEjCk3qRMMmyjnjCMfR4pXbRMZa3i",
         expectedKeyType = KeyType.RSA
-    )*/
+    )
+
+    @Test
+    fun testDidKeyCreateAndResolveConsistency() = runTest{
+        val keyList: List<JWKKey> = KeyType.entries.map { JWKKey.generate(it) }
+        for (key in keyList) {
+            val didResult = localRegistrar.registerByKey(key, DidKeyCreateOptions(keyType = key.keyType))
+            localResolver.resolveToKey(didResult.did)
+        }
+    }
+
+    @Test
+    fun testDidKeyCreateAndResolveJwkJcsPubConsistency() = runTest {
+        val keyList: List<JWKKey> = KeyType.entries.map { JWKKey.generate(it) }
+        for (key in keyList) {
+            val didResult = localRegistrar.registerByKey(key, DidKeyCreateOptions(keyType = key.keyType, useJwkJcsPub = true))
+            localResolver.resolveToKey(didResult.did)
+        }
+    }
 }
