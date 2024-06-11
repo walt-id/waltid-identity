@@ -1,7 +1,9 @@
 package id.walt.did.localresolvers
 
 import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.did.dids.registrar.dids.DidCreateOptions
+import id.walt.did.dids.registrar.dids.DidKeyCreateOptions
 import id.walt.did.dids.registrar.local.key.DidKeyRegistrar
 import id.walt.did.dids.resolver.local.DidKeyResolver
 import id.walt.did.localresolvers.LocalResolverTestUtils.testDids
@@ -10,6 +12,9 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class DidKeySimpleTests {
+
+    val localResolver = DidKeyResolver()
+    val localRegistrar = DidKeyRegistrar()
 
     private fun testDids(vararg dids: String, expectedKeyType: KeyType) =
         runTest {
@@ -33,7 +38,7 @@ class DidKeySimpleTests {
             }
         }
 
-    //FIXME @Test
+    @Test
     fun testEd25519() = testDids(
         "did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp",
         "did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG",
@@ -41,8 +46,7 @@ class DidKeySimpleTests {
         expectedKeyType = KeyType.Ed25519
     )
 
-    // TODO enable:
-    /*@Test
+    @Test
     fun testSecp256k1() = testDids(
         "did:key:zQ3shokFTS3brHcDQrn82RUDfCZESWL1ZdCEJwekUDPQiYBme",
         "did:key:zQ3shtxV1FrJfhqE1dvxYRcCknWNjHc3c5X1y3ZSoPDi2aur2",
