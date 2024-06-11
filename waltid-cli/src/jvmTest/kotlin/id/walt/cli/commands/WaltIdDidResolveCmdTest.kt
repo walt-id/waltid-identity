@@ -171,7 +171,28 @@ class WaltIdDidResolveCmdTest {
     }
 
     @Test
-    fun `should resolve`() {
+    fun `should resolve did-key generated without jwk_jcs-pub encoding enabled`() {
+        val didCreateCmd = DidCreateCmd()
+        assertDoesNotThrow {
+            for (keyFile in waltidKeyFileList) {
+                println("Attempting to resolve based on: $keyFile")
+                val did = getDIDFromDidCreateCmdOutput(didCreateCmd.test("-k $keyFile").output)
+                command.test("-d ${did}")
+                println("Success!")
+            }
+        }
+    }
 
+    @Test
+    fun `should resolve did-jwk`() {
+        val didCreateCmd = DidCreateCmd()
+        assertDoesNotThrow {
+            for (keyFile in waltidKeyFileList) {
+                println("Attempting to resolve based on: $keyFile")
+                val did = getDIDFromDidCreateCmdOutput(didCreateCmd.test("-m jwk -k $keyFile").output)
+                command.test("-d ${did}")
+                println("Success!")
+            }
+        }
     }
 }

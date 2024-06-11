@@ -67,7 +67,7 @@ class LocalJWKKeyAndDidManagementTest {
     fun signRaw(keyFile: String) = runTest {
         val key = KeySerialization.deserializeKey(loadSerializedLocal(keyFile)).getOrThrow()
         val signature = key.signRaw(payload.toString().encodeToByteArray())
-        val verificationResult = key.getPublicKey().verifyRaw(signature as ByteArray)
+        val verificationResult = key.getPublicKey().verifyRaw(signature as ByteArray, payload.toString().encodeToByteArray())
         assertTrue(verificationResult.isSuccess)
         assertEquals(payload.toString().encodeToByteArray(), verificationResult.getOrThrow())
     }
