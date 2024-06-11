@@ -325,7 +325,7 @@ that can be used as templates for creating your own. Choose the one that best su
 
 Let's choose the [OpenBadgeCredential](https://credentials.walt.id/credentials/openbadgecredential), adjust it
 accordingly and save it in a file called `openbadgecredential_sample.json`. For convenience, there
-is [an example file you can use](https://github.com/walt-id/waltid-identity/blob/main/waltid-cli/src/jvmTest/resources/vc/openbadgecredential_sample.json).
+is [an example file you can use](https://github.com/walt-id/waltid-identity/blob/main/waltid-applications/waltid-cli/src/jvmTest/resources/vc/openbadgecredential_sample.json).
 
 ```json
 {
