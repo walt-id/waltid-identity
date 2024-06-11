@@ -61,13 +61,13 @@ can be found in the table below:
 
 Verifier service relies on the following walt.id libraries:
 
-- [waltid-openid4vc library](https://github.com/walt-id/waltid-identity/tree/main/waltid-openid4vc)
+- [waltid-openid4vc library](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/waltid-openid4vc)
   for OID4VC interactions
-- [waltid-verifiable-credentials library](https://github.com/walt-id/waltid-identity/tree/main/waltid-verifiable-credentials)
+- [waltid-verifiable-credentials library](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/waltid-verifiable-credentials)
   for performing verifiable credential related tasks
-- [waltid-did library](https://github.com/walt-id/waltid-identity/tree/main/waltid-did)
+- [waltid-did library](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/waltid-did)
   for DID related operations
-- [waltid-crypto library](https://github.com/walt-id/waltid-identity/tree/main/waltid-crypto)
+- [waltid-crypto library](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/waltid-crypto)
   for key related operations
 
 ## How to use it

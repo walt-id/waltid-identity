@@ -29,11 +29,11 @@ data models.<p>
 
 Verifiable Credentials library relies on the following walt.id libraries:
 
-- [waltid-sd-jwt library](https://github.com/walt-id/waltid-identity/tree/main/waltid-sdjwt)
+- [waltid-sd-jwt library](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/waltid-sdjwt)
   for sd-jwt related processing
-- [waltid-did library](https://github.com/walt-id/waltid-identity/tree/main/waltid-did)
+- [waltid-did library](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/waltid-did)
   for DID related operations
-- [waltid-crypto library](https://github.com/walt-id/waltid-identity/tree/main/waltid-crypto)
+- [waltid-crypto library](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/waltid-crypto)
   for key related operations
 
 
