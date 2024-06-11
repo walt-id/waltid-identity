@@ -72,13 +72,13 @@ jobs:
         uses: docker/build-push-action@v4.0.0
         with:
           push: true
-          file: waltid-web/waltid-web-wallet/Dockerfile
+          file: waltid-applications/waltid-web-wallet/Dockerfile
           tags: waltid/waltid-web-wallet:latest, waltid/waltid-web-wallet:${{ inputs.release_version }}
       - name: Build and push Docker images (wallet-portal)
         uses: docker/build-push-action@v4
         with:
           push: true
-          file: waltid-web/waltid-web-portal/Dockerfile
+          file: waltid-applications/waltid-web-portal/Dockerfile
           tags: waltid/portal:latest, waltid/portal:${{ inputs.release_version }}
 
       - name: Changelog
