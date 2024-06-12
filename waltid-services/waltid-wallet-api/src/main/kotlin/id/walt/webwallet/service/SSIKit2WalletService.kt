@@ -443,13 +443,6 @@ class SSIKit2WalletService(
             }
         }
 
-        /*if (request.backend == "oci-rest-api" && request.config == null) {
-            request.config = ConfigManager.getConfig<OciRestApiKeyConfig>().asJsonObject()
-        }
-        if (request.backend == "oci" && request.config == null) {
-            request.config = ConfigManager.getConfig<OciKeyConfig>().asJsonObject()
-        }*/
-
         KeyManager.createKey(request)
             .also {
                 println("Generated key: $it")
