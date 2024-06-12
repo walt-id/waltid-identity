@@ -104,28 +104,16 @@ dependencies {
 
     // Test
     testImplementation(kotlin("test"))
-    //testImplementation("org.jetbrains.kotlin:kotlin-test-junit:${Versions.KOTLIN_VERSION}")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:${Versions.COROUTINES_VERSION}")
-    //testImplementation("io.ktor:ktor-server-tests-jvm:${Versions.KTOR_VERSION}")
-
-    // CLI
-    //implementation("com.github.ajalt.clikt:clikt:4.2.0")
 
     // OIDC
     api(project(":waltid-libraries:waltid-openid4vc"))
-
-    // SSIKit
-    //implementation("id.walt:waltid-ssikit:1.2309171812.0")
-    //implementation("id.walt:waltid-sd-jwt:1.2306191408.0")
-    //implementation("id.walt.servicematrix:WaltID-ServiceMatrix:1.1.3")
 
     // SSI Kit 2
     api(project(":waltid-libraries:waltid-crypto"))
     api(project(":waltid-libraries:waltid-verifiable-credentials"))
     api(project(":waltid-libraries:waltid-did"))
     api(project(":waltid-libraries:waltid-mdoc-credentials"))
-    // implementation("id.walt:waltid-ssikit2:1.0.8-SNAPSHOT")
-    // implementation("id.walt:core-crypto:1.0.7-SNAPSHOT")
 }
 tasks.withType<Zip> {
     isZip64 = true
