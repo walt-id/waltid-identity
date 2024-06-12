@@ -2,6 +2,8 @@ package id.walt.commons.config
 
 import com.sksamuel.hoplite.*
 import io.klogging.java.LoggerFactory
+import io.klogging.logger
+import io.klogging.noCoLogger
 import java.util.concurrent.ConcurrentLinkedQueue
 import kotlin.reflect.KClass
 import kotlin.reflect.jvm.jvmName
@@ -10,7 +12,7 @@ typealias WaltConfig = Any
 
 object ConfigManager {
 
-    val log = LoggerFactory.getLogger(ConfigManager::class.java)!!
+    val log = noCoLogger("ConfigManager")
 
     val registeredConfigurations = ConcurrentLinkedQueue<ConfigData>()
     val loadedConfigurations = HashMap<Pair<String, KClass<out WaltConfig>>, WaltConfig>()
@@ -92,15 +94,10 @@ object ConfigManager {
     fun registerConfig(
         id: String,
         type: KClass<out WaltConfig>,
-    ) = registerConfig(ConfigData(id, type/*, false, multiple, onLoad*/))
-
-    fun registerRequiredConfig(
-        id: String,
-        type: KClass<out WaltConfig>,
-    ) = registerConfig(ConfigData(id, type/*, true, multiple, onLoad*/))
+    ) = registerConfig(ConfigData(id, type))
 
     private fun registerConfig(data: ConfigData) {
-        if (registeredConfigurations.any { it.id == data.id } /*&& !data.multiple*/)
+        if (registeredConfigurations.any { it.id == data.id })
             throw IllegalArgumentException(
                 "A configuration with the name \"${data.id}\" already exists!"
             )
