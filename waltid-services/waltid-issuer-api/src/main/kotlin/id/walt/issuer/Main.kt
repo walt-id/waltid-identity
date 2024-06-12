@@ -31,7 +31,6 @@ fun Application.configurePlugins() {
     configureHTTP()
     configureMonitoring()
     configureRouting()
-    configureOpenApi()
 }
 
 fun Application.issuerModule(withPlugins: Boolean = true) {
