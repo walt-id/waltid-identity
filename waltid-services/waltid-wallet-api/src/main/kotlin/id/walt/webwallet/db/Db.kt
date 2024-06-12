@@ -3,7 +3,7 @@ package id.walt.webwallet.db
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
 import id.walt.commons.config.ConfigManager
-import id.walt.webwallet.config.DatasourceJsonConfiguration
+import id.walt.webwallet.config.DatasourceConfiguration
 import id.walt.webwallet.db.models.*
 import id.walt.webwallet.service.account.AccountsService
 import id.walt.webwallet.service.credentials.CredentialsService
@@ -31,13 +31,13 @@ import kotlin.random.Random
 
 object Db {
 
-    private lateinit var datasourceConfig: DatasourceJsonConfiguration
+    private lateinit var datasourceConfig: DatasourceConfiguration
     private val log = KotlinLogging.logger { }
 
     internal const val SQLITE_PREFIX = "jdbc:sqlite:"
 
     private fun connect() {
-        datasourceConfig = ConfigManager.getConfig<DatasourceJsonConfiguration>()
+        datasourceConfig = ConfigManager.getConfig<DatasourceConfiguration>()
 
         if (datasourceConfig.jdbcUrl?.contains("sqlite") == true) {
             log.info { "Will use sqlite database (${datasourceConfig.jdbcUrl}), working directory: ${Path(".").absolutePathString()}" }

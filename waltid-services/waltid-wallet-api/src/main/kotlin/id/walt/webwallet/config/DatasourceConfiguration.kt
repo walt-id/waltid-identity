@@ -8,11 +8,10 @@ import kotlin.io.path.createParentDirectories
 import kotlin.io.path.notExists
 
 @Serializable
-data class DatasourceJsonConfiguration(
+data class DatasourceConfiguration(
     val dataSource: Db.SerializableHikariConfiguration,
     val recreateDatabaseOnStart: Boolean = false,
 ) : WalletConfig() {
-
     companion object {
         private val log = KotlinLogging.logger { }
     }
