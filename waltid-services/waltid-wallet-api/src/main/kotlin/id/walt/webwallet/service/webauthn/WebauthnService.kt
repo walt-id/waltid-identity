@@ -35,7 +35,7 @@ object WebauthnService {
 
 
         val tokenBindingId: ByteArray? = null /* set tokenBindingId */
-        val serverProperty = ServerProperty(origin!!, rpId!!, challenge, tokenBindingId)
+        @Suppress("KotlinConstantConditions") val serverProperty = ServerProperty(origin!!, rpId!!, challenge, tokenBindingId)
 
 
         // expectations
