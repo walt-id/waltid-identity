@@ -4,7 +4,10 @@ import com.sksamuel.cohort.Cohort
 import com.sksamuel.cohort.HealthCheckRegistry
 import com.sksamuel.cohort.HealthCheckResult
 import id.walt.commons.config.ConfigManager
+import id.walt.commons.featureflag.CommonsFeatureCatalog
+import id.walt.commons.featureflag.FeatureManager
 import io.klogging.logger
+import io.klogging.noCoLogger
 import io.ktor.server.application.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
@@ -29,7 +32,13 @@ object ServiceHealthChecksDebugModule {
 
     object KtorStatusChecker {
 
+        private val log = noCoLogger("Ktor status")
+
         var ktorStatus: KtorStatus = KtorStatus.Unknown
+        set(value) {
+            log.trace { "New ktor server status: ${value.name}" }
+            field = value
+        }
 
         fun Application.init() {
             environment.monitor.subscribe(ApplicationStarting) { ktorStatus = KtorStatus.ApplicationStarting }
@@ -65,17 +74,21 @@ object ServiceHealthChecksDebugModule {
     }
 
     fun Application.enable() {
-        val config = ConfigManager.getConfig<ServiceDebugModuleConfiguration>()
+        val debugConfig = if (FeatureManager.isFeatureEnabled(CommonsFeatureCatalog.debugEndpointsFeature))
+            ConfigManager.getConfig<ServiceDebugModuleConfiguration>()
+        else null
 
         install(Cohort) {
-            endpointPrefix = config.endpointPrefix
-            operatingSystem = config.operatingSystem
-            memory = config.memory
-            jvmInfo = config.jvm
-            sysprops = config.sysprops
-            heapDump = config.heapdump
-            threadDump = config.threaddump
-            gc = config.gc
+            if (debugConfig != null) {
+                endpointPrefix = debugConfig.endpointPrefix
+                operatingSystem = debugConfig.operatingSystem
+                memory = debugConfig.memory
+                jvmInfo = debugConfig.jvm
+                sysprops = debugConfig.sysprops
+                heapDump = debugConfig.heapdump
+                threadDump = debugConfig.threaddump
+                gc = debugConfig.gc
+            }
 
             KtorStatusChecker.run { init() }
 
@@ -91,43 +104,45 @@ object ServiceHealthChecksDebugModule {
 
         // Custom debug endpoints
         routing {
-            route(config.endpointPrefix) {
-                if (config.ram) get("ram") {
-                    val rt = Runtime.getRuntime()
-                    val memory = ManagementFactory.getMemoryMXBean()
-                    context.respond(buildJsonObject {
-                        put("free", rt.freeMemory())
-                        put("max", rt.maxMemory())
-                        put("total", rt.totalMemory())
-                        put("used", (rt.totalMemory() - rt.freeMemory()))
+            if (debugConfig != null) {
+                route(debugConfig.endpointPrefix) {
+                    if (debugConfig.ram) get("ram") {
+                        val rt = Runtime.getRuntime()
+                        val memory = ManagementFactory.getMemoryMXBean()
+                        context.respond(buildJsonObject {
+                            put("free", rt.freeMemory())
+                            put("max", rt.maxMemory())
+                            put("total", rt.totalMemory())
+                            put("used", (rt.totalMemory() - rt.freeMemory()))
 
-                        put("heap", memoryStringToJson(memory.heapMemoryUsage))
-                        put("non_heap", memoryStringToJson(memory.nonHeapMemoryUsage))
-                    })
-                }
+                            put("heap", memoryStringToJson(memory.heapMemoryUsage))
+                            put("non_heap", memoryStringToJson(memory.nonHeapMemoryUsage))
+                        })
+                    }
 
-                if (config.cpu) get("cpu") {
-                    val thread = ManagementFactory.getThreadMXBean()
-                    context.respond(buildJsonObject {
-                        put("loadAverage", ManagementFactory.getOperatingSystemMXBean().systemLoadAverage)
-                        put("processors", ManagementFactory.getOperatingSystemMXBean().availableProcessors)
-                        put("threadCount", JsonPrimitive(thread.threadCount))
-                        put("peakThreadCount", JsonPrimitive(thread.threadCount))
-                        put("daemonThreadCount", JsonPrimitive(thread.daemonThreadCount))
-                    })
-                }
+                    if (debugConfig.cpu) get("cpu") {
+                        val thread = ManagementFactory.getThreadMXBean()
+                        context.respond(buildJsonObject {
+                            put("loadAverage", ManagementFactory.getOperatingSystemMXBean().systemLoadAverage)
+                            put("processors", ManagementFactory.getOperatingSystemMXBean().availableProcessors)
+                            put("threadCount", JsonPrimitive(thread.threadCount))
+                            put("peakThreadCount", JsonPrimitive(thread.threadCount))
+                            put("daemonThreadCount", JsonPrimitive(thread.daemonThreadCount))
+                        })
+                    }
 
-                if (config.memoryPool) get("memoryPool") {
-                    context.respond(buildJsonObject {
-                        ManagementFactory.getMemoryPoolMXBeans().forEach {
-                            putJsonObject(it.name) {
-                                put("type", JsonPrimitive(it.type.name))
-                                put("valid", JsonPrimitive(it.isValid))
-                                put("usage", memoryStringToJson(it.usage))
-                                putJsonArray("managerNames") { it.memoryManagerNames.forEach { name -> add(JsonPrimitive(name)) } }
+                    if (debugConfig.memoryPool) get("memoryPool") {
+                        context.respond(buildJsonObject {
+                            ManagementFactory.getMemoryPoolMXBeans().forEach {
+                                putJsonObject(it.name) {
+                                    put("type", JsonPrimitive(it.type.name))
+                                    put("valid", JsonPrimitive(it.isValid))
+                                    put("usage", memoryStringToJson(it.usage))
+                                    putJsonArray("managerNames") { it.memoryManagerNames.forEach { name -> add(JsonPrimitive(name)) } }
+                                }
                             }
-                        }
-                    })
+                        })
+                    }
                 }
             }
         }
