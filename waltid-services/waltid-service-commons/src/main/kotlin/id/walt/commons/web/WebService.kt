@@ -5,6 +5,7 @@ import id.walt.commons.config.list.WebConfig
 import id.walt.commons.featureflag.CommonsFeatureCatalog
 import id.walt.commons.featureflag.FeatureManager.whenFeature
 import id.walt.commons.web.modules.FeatureFlagInformationModule
+import id.walt.commons.web.modules.OpenApiModule
 import id.walt.commons.web.modules.ServiceHealthChecksDebugModule
 import id.walt.commons.web.plugins.configureSerialization
 import id.walt.commons.web.plugins.configureStatusPages
@@ -19,8 +20,9 @@ data class WebService(
     private val log = logger("WebService")
 
     private val webServiceModule: Application.() -> Unit = {
-        { ServiceHealthChecksDebugModule.run { enable() } } whenFeature CommonsFeatureCatalog.healthChecksFeature
         { FeatureFlagInformationModule.run { enable() } } whenFeature CommonsFeatureCatalog.featureFlagInformationEndpointFeature
+        { ServiceHealthChecksDebugModule.run { enable() } } whenFeature CommonsFeatureCatalog.healthChecksFeature
+        { OpenApiModule.run { enable() } } whenFeature CommonsFeatureCatalog.openApiFeature
 
         configureStatusPages()
         configureSerialization()
