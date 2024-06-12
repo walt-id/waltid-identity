@@ -32,11 +32,12 @@ class SilentClaimStrategy(
     private val notificationDispatchUseCase: NotificationDispatchUseCase,
     private val credentialTypeSeeker: Seeker<String>,
 ) {
+    @Suppress("ConvertCallChainIntoSequence") // suspending
     suspend fun claim(did: String, offer: String) = issuanceService.useOfferRequest(
         offer = offer,
         credentialWallet = SSIKit2WalletService.getCredentialWallet(did),
         clientId = SSIKit2WalletService.testCIClientConfig.clientID
-    ).asSequence().mapNotNull {
+    ).mapNotNull {
         val credential = WalletCredential.parseDocument(it.document, it.id) ?: JsonObject(emptyMap())
         val manifest = WalletCredential.tryParseManifest(it.manifest) ?: JsonObject(emptyMap())
         val issuerDid = WalletCredential.parseIssuerDid(credential, manifest) ?: "n/a"
