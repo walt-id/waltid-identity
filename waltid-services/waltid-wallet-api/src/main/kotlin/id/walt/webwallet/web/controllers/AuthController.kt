@@ -364,8 +364,8 @@ fun Application.auth() {
                         "Returns a access token to be used for all further operations towards Keycloak. Required Keycloak configuration in oidc.conf."
                 }) {
                 logger.debug { "Fetching Keycloak access token" }
-                val access_token = KeycloakAccountStrategy.getAccessToken()
-                call.respond(access_token)
+                val accessToken = KeycloakAccountStrategy.getAccessToken()
+                call.respond(accessToken)
             }
 
             // Create Keycloak User
@@ -484,26 +484,23 @@ suspend fun verifyToken(token: String): Result<String> {
     val jwsObject = JWSObject.parse(token)
 
     val key = JWKKey.importJWK(AuthKeys.tokenKey.decodeToString()).getOrNull()
-    if (key == null) {
-        // if (AuthKeys.tokenSignAlg == "HS256") {
+    return if (key == null) {
         val verifier = MACVerifier(AuthKeys.tokenKey)
-        return runCatching { jwsObject.verify(verifier) }
+        runCatching { jwsObject.verify(verifier) }
             .mapCatching { valid ->
                 if (valid) Json.parseToJsonElement(jwsObject.payload.toString()).jsonObject["sub"]?.jsonPrimitive?.content.toString() else throw IllegalArgumentException(
                     "Token is not valid."
                 )
             }
     } else {
-        // if (AuthKeys.tokenSignAlg == "RS256"){
         val verified = JWKKey.importJWK(AuthKeys.tokenKey.decodeToString()).getOrThrow().verifyJws(token)
-        return runCatching { verified }
+        runCatching { verified }
             .mapCatching {
                 if (verified.isSuccess) {
                     Json.parseToJsonElement(jwsObject.payload.toString()).jsonObject["sub"]?.jsonPrimitive?.content.toString()
                 } else throw IllegalArgumentException("Token is not valid.")
             }
     }
-
 }
 
 
