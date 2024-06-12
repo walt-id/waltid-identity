@@ -11,12 +11,17 @@ class OptionalFeature(
     val default: Boolean,
 ) : AbstractFeature(name, description, configs, dependsOn) {
 
-    constructor(name: String, description: String, config: KClass<out WaltConfig>, default: Boolean) : this(
-        name,
-        description,
-        mapOf(name to config),
-        emptyList(),
-        default
+    constructor(
+        name: String,
+        description: String,
+        config: KClass<out WaltConfig>,
+        default: Boolean,
+    ) : this(
+        name = name,
+        description = description,
+        configs = mapOf(name to config),
+        dependsOn = emptyList(),
+        default = default
     )
 
 }
