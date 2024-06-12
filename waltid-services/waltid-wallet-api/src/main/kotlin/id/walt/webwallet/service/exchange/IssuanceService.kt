@@ -60,9 +60,7 @@ object IssuanceService {
         }
         // === original ===
         logger.debug { "// parse and verify credential(s)" }
-        if (credentialResponses.all { it.credential == null }) {
-            throw IllegalStateException("No credential was returned from credentialEndpoint: $credentialResponses")
-        }
+        check(credentialResponses.any { it.credential != null }) { "No credential was returned from credentialEndpoint: $credentialResponses" }
 
         // ??multiple credentials manifests
         val manifest =
