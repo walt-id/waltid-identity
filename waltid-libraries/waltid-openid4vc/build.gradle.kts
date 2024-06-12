@@ -125,20 +125,12 @@ kotlin {
         }
         val jvmTest by getting {
             dependencies {
-                //implementation("io.mockk:mockk:1.13.2")
                 implementation("com.nimbusds:nimbus-jose-jwt:9.40")
                 implementation("io.kotest:kotest-runner-junit5:5.9.1")
                 implementation("io.kotest:kotest-assertions-core:5.9.1")
                 implementation("io.kotest:kotest-assertions-json:5.9.1")
                 implementation("org.junit.jupiter:junit-jupiter-params:5.10.2")
                 implementation("com.google.crypto.tink:tink:1.13.0") // for JOSE using Ed25519
-                // Multibase
-                // implementation("com.github.multiformats:java-multibase:v1.1.1")
-                // TODO: current version implementation("id.walt:waltid-ssikit:1.2311131043.0")
-                //implementation("id.walt:waltid-ssikit:1.JWTTYP") {
-                //    exclude("waltid-sd-jwt-jvm")
-                //    exclude(module = "waltid-sd-jwt-jvm")
-                //}
                 implementation("org.bouncycastle:bcprov-lts8on:2.73.6") // for secp256k1 (which was removed with Java 17)
                 implementation("org.bouncycastle:bcpkix-lts8on:2.73.6") // PEM import
 
