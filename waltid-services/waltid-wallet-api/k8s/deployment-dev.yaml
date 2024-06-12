@@ -34,7 +34,6 @@ data:
   web.conf: |
     webHost = "0.0.0.0"
     webPort = 4545
-    publicBaseUrl = "https://wallet.walt-test.cloud"
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -42,6 +41,7 @@ metadata:
   name: wallet-oidc-config
 data:
   oidc.conf: |
+    publicBaseUrl = "https://wallet.walt-test.cloud"
     providerName = keycloak
     oidcRealm = "https://keycloak.walt-test.cloud/realms/waltid-keycloak-ktor"
     oidcJwks = "${oidcRealm}/protocol/openid-connect/certs"
