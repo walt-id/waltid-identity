@@ -12,10 +12,7 @@ import id.walt.verifier.policies.PresentationDefinitionPolicy
 import id.walt.verifier.web.plugins.configureHTTP
 import id.walt.verifier.web.plugins.configureMonitoring
 import id.walt.verifier.web.plugins.configureRouting
-import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.server.application.*
-
-private val log = KotlinLogging.logger { }
 
 suspend fun main(args: Array<String>) {
     ServiceMain(
