@@ -95,10 +95,7 @@ object ConfigManager {
     ) = registerConfig(ConfigData(id, type))
 
     private fun registerConfig(data: ConfigData) {
-        if (registeredConfigurations.any { it.id == data.id })
-            throw IllegalArgumentException(
-                "A configuration with the name \"${data.id}\" already exists!"
-            )
+        require(!registeredConfigurations.any { it.id == data.id }) { "A configuration with the name \"${data.id}\" already exists!" }
 
         registeredConfigurations.add(data)
     }
