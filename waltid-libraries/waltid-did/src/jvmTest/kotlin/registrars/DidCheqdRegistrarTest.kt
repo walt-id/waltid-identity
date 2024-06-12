@@ -7,6 +7,7 @@ import id.walt.did.dids.registrar.dids.DidCheqdCreateOptions
 import id.walt.did.dids.registrar.dids.DidCreateOptions
 import id.walt.did.dids.registrar.local.cheqd.DidCheqdRegistrar
 import kotlinx.coroutines.runBlocking
+import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.Arguments
 import org.junit.jupiter.params.provider.Arguments.arguments
 import org.junit.jupiter.params.provider.MethodSource
@@ -14,8 +15,7 @@ import java.util.stream.Stream
 
 class DidCheqdRegistrarTest : DidRegistrarTestBase(DidCheqdRegistrar()) {
 
-    /* FIXME: Re-enable CHEQD tests (their API is currently broken)
-    @ParameterizedTest*/
+    @ParameterizedTest
     @MethodSource
     override fun `given did options with no key when register then returns a valid did result`(
         options: DidCreateOptions,
@@ -24,8 +24,7 @@ class DidCheqdRegistrarTest : DidRegistrarTestBase(DidCheqdRegistrar()) {
         super.`given did options with no key when register then returns a valid did result`(options, assert)
     }
 
-    /* FIXME: Re-enable CHEQD tests (their API is currently broken)
-    @ParameterizedTest*/
+    @ParameterizedTest
     @MethodSource
     override fun `given did options and key when register with key then returns a valid did result`(
         key: Key,
