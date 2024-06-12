@@ -130,22 +130,9 @@ object IssuanceService {
         }
         logger.debug { "credReqs: $credReqs" }
 
+        require(credReqs.isNotEmpty()) { "No credentials offered" }
 
         return when {
-            credReqs.size >= 2 -> {
-                val batchCredentialRequest = BatchCredentialRequest(credReqs)
-
-                val credentialResponses = http.post(providerMetadata.batchCredentialEndpoint!!) {
-                    contentType(ContentType.Application.Json)
-                    bearerAuth(tokenResp.accessToken!!)
-                    setBody(batchCredentialRequest.toJSON())
-                }.body<JsonObject>().let { BatchCredentialResponse.fromJSON(it) }
-                logger.debug { "credentialResponses: $credentialResponses" }
-
-                credentialResponses.credentialResponses
-                    ?: throw IllegalArgumentException("No credential responses returned")
-            }
-
             credReqs.size == 1 -> {
                 val credReq = credReqs.first()
 
@@ -159,7 +146,19 @@ object IssuanceService {
                 listOf(credentialResponse)
             }
 
-            else -> throw IllegalStateException("No credentials offered")
+            else -> {
+                val batchCredentialRequest = BatchCredentialRequest(credReqs)
+
+                val credentialResponses = http.post(providerMetadata.batchCredentialEndpoint!!) {
+                    contentType(ContentType.Application.Json)
+                    bearerAuth(tokenResp.accessToken!!)
+                    setBody(batchCredentialRequest.toJSON())
+                }.body<JsonObject>().let { BatchCredentialResponse.fromJSON(it) }
+                logger.debug { "credentialResponses: $credentialResponses" }
+
+                credentialResponses.credentialResponses
+                    ?: throw IllegalArgumentException("No credential responses returned")
+            }
         }
     }
 
