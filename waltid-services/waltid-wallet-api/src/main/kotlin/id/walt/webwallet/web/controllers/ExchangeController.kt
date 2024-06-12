@@ -72,12 +72,12 @@ fun Application.exchange() = walletRoute {
                 context.respond(HttpStatusCode.BadRequest, error.localizedMessage)
             }
         }
-
         post("matchCredentialsForPresentationDefinition", {
             summary = "Returns the credentials stored in the wallet that match the passed presentation definition"
 
             request {
-                body<PresentationDefinition> { description = "Presentation definition to match credentials against" }
+                 body<PresentationDefinition> { description = "Presentation definition to match credentials against" }
+//                body<JsonObject>{ description = "Presentation definition to match credentials against" }
             }
             response {
                 HttpStatusCode.OK to {
@@ -99,6 +99,7 @@ fun Application.exchange() = walletRoute {
 
             request {
                 body<PresentationDefinition> { description = "Presentation definition" }
+//                body<JsonObject>{ description = "Presentation definition" }
             }
             response {
                 HttpStatusCode.OK to {
