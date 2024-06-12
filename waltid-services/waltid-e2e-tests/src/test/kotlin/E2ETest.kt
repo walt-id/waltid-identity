@@ -18,20 +18,6 @@ class E2ETest {
     @Test
     fun e2e() = runTest(timeout = 5.minutes) {
         testBlock {
-            // Below client initialization will create a mock client (faster, but less cases):
-            /*val client = createClient {
-                install(ContentNegotiation) {
-                    json()
-                }
-                install(DefaultRequest) {
-                    contentType(ContentType.Application.Json)
-                }
-                install(Logging) {
-                    this.level = LogLevel.ALL
-                }
-            }*/
-
-            // Below client initialization will create a real HTTP client (covers more cases):
             val client = HttpClient(CIO) {
                 install(ContentNegotiation) {
                     json()

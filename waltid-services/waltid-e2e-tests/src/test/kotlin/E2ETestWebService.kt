@@ -32,15 +32,7 @@ object E2ETestWebService {
             module.invoke(this)
         }
 
-        //        fun run(block: suspend Application.() -> Unit): suspend () -> Unit = {
         fun run(block: suspend () -> Unit): suspend () -> Unit = {
-            /*testApplication {
-                application {
-                    webServiceModule()
-                }
-                block.invoke(this@testApplication)
-            }*/
-
             embeddedServer(
                 CIO,
                 port = 22222,
@@ -63,7 +55,6 @@ object E2ETestWebService {
     val testNames = HashMap<Int, String>()
     val t = Terminal(ansiLevel = AnsiLevel.TRUECOLOR)
 
-    //    suspend fun testBlock(block: suspend ApplicationTestBuilder.() -> Unit) {
     suspend fun testBlock(block: suspend () -> Unit) {
 
         fun getTestStats(): TestStats {
@@ -108,7 +99,6 @@ object E2ETestWebService {
     else
         TextColors.red("❌ FAILURE")
 
-    //    suspend fun ApplicationTestBuilder.test(name: String, function: suspend () -> Any?) {
     suspend fun test(name: String, function: suspend () -> Any?) {
         val id = testResults.size + 1
         testNames[id] = name
