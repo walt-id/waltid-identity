@@ -103,7 +103,3 @@ object ServiceCommons {
     }
 
 }
-
-fun main() {
-    println(ServiceConfiguration().version)
-}
