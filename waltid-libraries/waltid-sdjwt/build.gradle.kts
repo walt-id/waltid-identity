@@ -16,7 +16,6 @@ repositories {
     mavenCentral()
 }
 
-@OptIn(org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi::class)
 kotlin {
     targets.configureEach {
         compilations.configureEach {
@@ -26,7 +25,7 @@ kotlin {
         }
     }
 
-    jvmToolchain(15) // 16 possible?
+    jvmToolchain(15)
     jvm {
         withJava()
         testRuns["test"].executionTask.configure {
@@ -52,10 +51,11 @@ kotlin {
                         "firefox" to { useFirefoxHeadless() },
                         "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" to { useChromeHeadless() }, // macOS
                         "chrome" to { useChromeHeadless() },
+                        // what is it for Windows?
                     ).entries.firstOrNull { hasProgram(it.key) }
                     if (testEngine == null) println("No web test engine installed, please install chromium or firefox or chrome.")
                     else {
-//                        println("Using web test engine: ${testEngine.key}")
+                        // println("Using web test engine: ${testEngine.key}")
                         testEngine.value.invoke()
                     }
                 }
