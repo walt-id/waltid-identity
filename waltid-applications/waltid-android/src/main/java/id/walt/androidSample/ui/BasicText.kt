@@ -53,7 +53,7 @@ internal fun BasicText(
 
 @Preview(showBackground = true)
 @Composable
-private fun Preview_BasicText() {
+private fun PreviewBasicText() {
     WaltIdAndroidSampleTheme {
         BasicText(
             text = "Sample Text",
