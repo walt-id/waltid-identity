@@ -77,13 +77,13 @@ class DidKeySimpleTests {
 //            localResolver.resolveToKey(didResult.did)
 //        }
 //    }
-//
-//    @Test
-//    fun testDidKeyCreateAndResolveJwkJcsPubConsistency() = runTest {
-//        val keyList: List<JWKKey> = KeyType.values().map { JWKKey.generate(it) }
-//        for (key in keyList) {
-//            val didResult = localRegistrar.registerByKey(key, DidKeyCreateOptions(keyType = key.keyType, useJwkJcsPub = true))
-//            localResolver.resolveToKey(didResult.did)
-//        }
-//    }
+
+    @Test
+    fun testDidKeyCreateAndResolveJwkJcsPubConsistency() = runTest {
+        val keyList: List<JWKKey> = KeyType.entries.map { JWKKey.generate(it) }
+        for (key in keyList) {
+            val didResult = localRegistrar.registerByKey(key, DidKeyCreateOptions(keyType = key.keyType, useJwkJcsPub = true))
+            localResolver.resolveToKey(didResult.did)
+        }
+    }
 }
