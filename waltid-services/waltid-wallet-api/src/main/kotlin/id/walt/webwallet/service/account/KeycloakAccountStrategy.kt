@@ -115,7 +115,7 @@ object KeycloakAccountStrategy : PasswordAccountStrategy<KeycloakAccountRequest>
         val decoded = JWT.decode(token)
 
         val verifier =
-            JWT.require(OidcLoginService.jwkProvider.get(decoded.keyId).makeAlgorithm())
+            JWT.require(OidcLoginService.jwkProvider[decoded.keyId].makeAlgorithm())
                 .withIssuer(OidcLoginService.oidcRealm)
                 .build()
 
