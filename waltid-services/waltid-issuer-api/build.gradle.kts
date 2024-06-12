@@ -107,9 +107,6 @@ dependencies {
 
     api(project(":waltid-libraries:waltid-verifiable-credentials"))
     api(project(":waltid-libraries:waltid-sdjwt"))
-
-    // TODO: REMOVE:
-    implementation("com.nimbusds:nimbus-jose-jwt:9.40")
 }
 
 tasks.withType<Test> {
