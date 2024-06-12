@@ -53,8 +53,10 @@ object LoggingManager {
         }
     }
 
-    fun useLoggingSetup(logLevel: String) {
+    fun useLoggingSetup(logLevel: String, logType: RenderStrings?) {
         loggingSetup = loggingSetups[logLevel] ?: error("invalid log level supplied: $logLevel")
+
+        logType?.let { LogStringManager.selectedRenderString = logType }
     }
 
     fun useLoggingSetup(newLoggingSetup: LoggingSetup) {
