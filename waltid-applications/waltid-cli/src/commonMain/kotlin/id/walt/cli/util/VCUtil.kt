@@ -53,10 +53,10 @@ class VCUtil {
             policies: List<String>,
             args: Map<String, JsonElement> = emptyMap()
         ): List<PolicyResult> {
-
+            @Suppress("NAME_SHADOWING")
             val policies = policies.ifEmpty { listOf("signature") }
 
-            val requests: ArrayList<PolicyRequest> = ArrayList()
+            val requests = ArrayList<PolicyRequest>()
 
             policies.forEach { policy ->
                 val verificationPolicy = PolicyManager.getPolicy(policy)
