@@ -8,19 +8,9 @@ import kotlinx.serialization.json.JsonPrimitive
 @Serializable
 data class RegistrationDefaultsConfig(
     val defaultKeyConfig: KeyGenerationRequest = KeyGenerationRequest(),
-    /*
-    : JsonObject = buildJsonObject {
-        put("backend", JsonPrimitive("jwk"))
-        put("keyType", JsonPrimitive("Ed25519"))
-    },*/
 
     val defaultDidConfig: DidMethodConfig = DidMethodConfig(),
-    /*private val defaultDidConfig: JsonObject = buildJsonObject {
-        put("method", JsonPrimitive("jwk"))
-    }*/
 ) : WalletConfig() {
-//    val keyGenerationRequest = Json.decodeFromJsonElement<KeyGenerationRequest>(defaultKeyConfig)
-
     @Serializable
     data class DidMethodConfig(
         val didMethod: String = "jwk",
