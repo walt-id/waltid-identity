@@ -390,9 +390,8 @@ class SSIKit2WalletService(
 
     /* Keys */
 
-    private suspend fun getKey(keyId: String) = KeysService.get(walletId, keyId)?.let {
-        KeySerialization.deserializeKey(it.document)
-            .getOrElse { throw IllegalArgumentException("Could not deserialize resolved key: ${it.message}", it) }
+    private fun getKey(keyId: String) = KeysService.get(walletId, keyId)?.let {
+        KeyManager.resolveSerializedKey(it.document)
     } ?: throw IllegalArgumentException("Key not found: $keyId")
 
     suspend fun getKeyByDid(did: String): Key =
@@ -429,7 +428,7 @@ class SSIKit2WalletService(
 
     override suspend fun listKeys(): List<SingleKeyResponse> =
         KeysService.list(walletId).map {
-            val key = KeySerialization.deserializeKey(it.document).getOrThrow()
+            val key = KeyManager.resolveSerializedKey(it.document)
 
             SingleKeyResponse(
                 keyId = SingleKeyResponse.KeyId(it.keyId),
