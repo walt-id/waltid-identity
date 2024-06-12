@@ -129,7 +129,6 @@ fun Application.configureSecurity() {
         if (FeatureManager.isFeatureEnabled(FeatureCatalog.oidcAuthenticationFeature)) {
             jwt("auth-oauth-jwt") {
                 realm = OidcLoginService.oidcRealm
-                // verifier(jwkProvider, oidcRealm)
                 verifier(OidcLoginService.jwkProvider)
 
                 validate { credential -> JWTPrincipal(credential.payload) }
