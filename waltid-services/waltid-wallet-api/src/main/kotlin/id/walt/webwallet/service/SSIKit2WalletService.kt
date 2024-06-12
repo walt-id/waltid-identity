@@ -59,7 +59,6 @@ import kotlinx.uuid.UUID
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
-import java.net.URLDecoder
 import kotlin.collections.set
 import kotlin.time.Duration.Companion.seconds
 
@@ -146,30 +145,6 @@ class SSIKit2WalletService(
 
     override suspend fun rejectCredential(parameter: CredentialRequestParameter): Boolean =
         credentialService.delete(walletId, parameter.credentialId, true)
-
-    private fun getQueryParams(url: String): Map<String, MutableList<String>> {
-        val params: MutableMap<String, MutableList<String>> = HashMap()
-        val urlParts = url.split("\\?".toRegex()).dropLastWhile { it.isEmpty() }.toTypedArray()
-
-        if (urlParts.size <= 1) return params
-
-        val query = urlParts[1]
-        for (param in query.split("&".toRegex()).dropLastWhile { it.isEmpty() }.toTypedArray()) {
-            val pair = param.split("=".toRegex()).dropLastWhile { it.isEmpty() }.toTypedArray()
-            val key = URLDecoder.decode(pair[0], "UTF-8")
-            var value = ""
-            if (pair.size > 1) {
-                value = URLDecoder.decode(pair[1], "UTF-8")
-            }
-            var values = params[key]
-            if (values == null) {
-                values = ArrayList()
-                params[key] = values
-            }
-            values.add(value)
-        }
-        return params
-    }
 
     /* SIOP */
     @Serializable
