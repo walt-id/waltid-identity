@@ -447,11 +447,7 @@ class SSIKit2WalletService(
                 else -> throw IllegalArgumentException("Unknown key type: $type")
             }
 
-        if (keyResult.isFailure) {
-            throw IllegalArgumentException(
-                "Could not import key as: $type; error message: " + keyResult.exceptionOrNull()?.message
-            )
-        }
+        require(keyResult.isSuccess) { "Could not import key as: $type; error message: " + keyResult.exceptionOrNull()?.message }
 
         val key = keyResult.getOrThrow()
         val keyId = key.getKeyId()
