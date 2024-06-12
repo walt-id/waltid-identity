@@ -12,10 +12,7 @@ import id.walt.issuer.issuance.issuerApi
 import id.walt.issuer.web.plugins.configureHTTP
 import id.walt.issuer.web.plugins.configureMonitoring
 import id.walt.issuer.web.plugins.configureRouting
-import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.server.application.*
-
-private val log = KotlinLogging.logger { }
 
 suspend fun main(args: Array<String>) {
     ServiceMain(
