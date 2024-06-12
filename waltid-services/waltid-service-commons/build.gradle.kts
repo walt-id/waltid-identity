@@ -1,7 +1,6 @@
 plugins {
     kotlin("jvm")
     kotlin("plugin.serialization")
-//    id("io.ktor.plugin") version "2.3.11"
 }
 
 group = "id.walt"
