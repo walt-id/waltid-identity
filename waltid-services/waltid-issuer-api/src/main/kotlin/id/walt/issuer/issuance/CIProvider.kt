@@ -157,19 +157,9 @@ open class CIProvider : OpenIDCredentialIssuer(
         log.debug { "CREDENTIAL REQUEST JSON -------:" }
         log.debug { Json.encodeToString(credentialRequest) }
 
-        val jwt = credentialRequest.proof?.jwt ?: throw IllegalArgumentException("No proof.jwt in credential request!")
-        val jwtParts = jwt.split(".")
-
-        fun decodeJwtPart(idx: Int) = Json.parseToJsonElement(Base64.decode(jwtParts[idx]).decodeToString()).jsonObject
-
-        val header = decodeJwtPart(0)
-        val payload = decodeJwtPart(1)
-
-        val subjectDid =
-            header["kid"]?.jsonPrimitive?.contentOrNull ?: throw IllegalArgumentException("No kid in proof.jwt header!")
-        val nonce = payload["nonce"]?.jsonPrimitive?.contentOrNull
-            ?: throw IllegalArgumentException("No nonce in proof.jwt payload!")
-
+        val (subjectDid, nonce) = parseFromJwt(
+            credentialRequest.proof?.jwt ?: throw IllegalArgumentException("No proof.jwt in credential request!")
+        )
 
         if (deferIssuance) return CredentialResult(credentialRequest.format, null, randomUUID()).also {
             deferredCredentialRequests[it.credentialId!!] = credentialRequest
@@ -285,6 +275,24 @@ open class CIProvider : OpenIDCredentialIssuer(
         }))
     }
 
+    @OptIn(ExperimentalEncodingApi::class)
+    fun parseFromJwt(jwt: String): Pair<String, String> {
+        val jwtParts = jwt.split(".")
+
+        fun decodeJwtPart(idx: Int) =
+            Json.parseToJsonElement(Base64.decode(jwtParts[idx]).decodeToString()).jsonObject
+
+        val header = decodeJwtPart(0)
+        val payload = decodeJwtPart(1)
+
+        val subjectDid =
+            header["kid"]?.jsonPrimitive?.contentOrNull
+                ?: throw IllegalArgumentException("No kid in proof.jwt header!")
+        val nonce = payload["nonce"]?.jsonPrimitive?.contentOrNull
+            ?: throw IllegalArgumentException("No nonce in proof.jwt payload!")
+
+        return Pair(subjectDid, nonce)
+    }
 
     @OptIn(ExperimentalEncodingApi::class)
     override fun generateBatchCredentialResponse(
@@ -314,21 +322,10 @@ open class CIProvider : OpenIDCredentialIssuer(
 
 
         batchCredentialRequest.credentialRequests.first().let { credentialRequest ->
-            val jwt =
+
+            val (subjectDid, nonce) = parseFromJwt(
                 credentialRequest.proof?.jwt ?: throw IllegalArgumentException("No proof.jwt in credential request!")
-            val jwtParts = jwt.split(".")
-
-            fun decodeJwtPart(idx: Int) =
-                Json.parseToJsonElement(Base64.decode(jwtParts[idx]).decodeToString()).jsonObject
-
-            val header = decodeJwtPart(0)
-            val payload = decodeJwtPart(1)
-
-            val subjectDid =
-                header["kid"]?.jsonPrimitive?.contentOrNull
-                    ?: throw IllegalArgumentException("No kid in proof.jwt header!")
-            val nonce = payload["nonce"]?.jsonPrimitive?.contentOrNull
-                ?: throw IllegalArgumentException("No nonce in proof.jwt payload!")
+            )
 
             log.debug { "RETRIEVING VC FROM TOKEN MAPPING: $nonce" }
             val issuanceSessionData = tokenCredentialMapping[nonce]
