@@ -39,6 +39,7 @@ object KeySerialization {
     @Suppress("NON_EXPORTABLE_TYPE")
     fun serializeKeyToJson(key: Key): JsonElement = keySerializationJson.encodeToJsonElement(key)
 
+    @Deprecated("Will not handle externally implemented Keys, replace with KeyManager.resolveSerializedKey")
     @JvmBlocking
     @JvmAsync
     @JsPromise
@@ -46,6 +47,7 @@ object KeySerialization {
     suspend fun deserializeKey(json: String): Result<Key> =
         runCatching { keySerializationJson.decodeFromString<Key>(json).apply { init() } }
 
+    @Deprecated("Will not handle externally implemented Keys, replace with KeyManager.resolveSerializedKey")
     @JvmBlocking
     @JvmAsync
     @JsPromise
@@ -55,6 +57,7 @@ object KeySerialization {
             keySerializationJson.decodeFromJsonElement<Key>(json).apply { init() }
         }
 
+    @Deprecated("Will not handle externally implemented Keys, replace KeySerialization here with KeyManager")
     @JvmBlocking
     @JvmAsync
     @JsPromise
