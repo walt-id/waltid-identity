@@ -105,9 +105,7 @@ class VerificationUseCase(
         session
     }
 
-    fun getSession(sessionId: String): PresentationSession {
-        return sessionId.let { OIDCVerifierService.getSession(it) }!!
-    }
+    fun getSession(sessionId: String): PresentationSession = sessionId.let { OIDCVerifierService.getSession(it) }!!
 
     fun verify(sessionId: String?, tokenResponseParameters: Map<String, List<String>>): Result<String> {
         logger.debug { "Verifying session $sessionId" }
@@ -127,29 +125,29 @@ class VerificationUseCase(
 
         val maybePresentationSessionResult = runCatching { OIDCVerifierService.verify(tokenResponse, session) }
 
-        if (maybePresentationSessionResult.getOrNull() != null) {
-            val presentationSession = maybePresentationSessionResult.getOrThrow()
-            if (presentationSession.verificationResult == true) {
-                val redirectUri = sessionVerificationInfo.successRedirectUri?.replace("\$id", session.id) ?: ""
-                return Result.success(redirectUri)
-            } else {
-                val policyResults = OIDCVerifierService.policyResults[session.id]
-                val redirectUri = sessionVerificationInfo.errorRedirectUri?.replace("\$id", session.id)
+        if (maybePresentationSessionResult.isFailure) {
+            return Result.failure(IllegalStateException("Verification failed: ${maybePresentationSessionResult.exceptionOrNull()!!.message}"))
+        }
 
-                if (redirectUri != null) {
-                    return Result.failure(Exception(redirectUri))
-                }
-
-                return if (policyResults == null) {
-                    Result.failure(Exception("Verification policies did not succeed"))
-                } else {
-                    val failedPolicies =
-                        policyResults.results.flatMap { it.policyResults.map { it } }.filter { it.result.isFailure }
-                    Result.failure(Exception("Verification policies did not succeed: ${failedPolicies.joinToString { it.request.policy.name }}"))
-                }
-            }
+        val presentationSession = maybePresentationSessionResult.getOrThrow()
+        if (presentationSession.verificationResult == true) {
+            val redirectUri = sessionVerificationInfo.successRedirectUri?.replace("\$id", session.id) ?: ""
+            return Result.success(redirectUri)
         } else {
-            return Result.failure(Exception("Verification failed"))
+            val policyResults = OIDCVerifierService.policyResults[session.id]
+            val redirectUri = sessionVerificationInfo.errorRedirectUri?.replace("\$id", session.id)
+
+            if (redirectUri != null) {
+                return Result.failure(Exception(redirectUri))
+            }
+
+            return if (policyResults == null) {
+                Result.failure(Exception("Verification policies did not succeed"))
+            } else {
+                val failedPolicies =
+                    policyResults.results.flatMap { it.policyResults.map { it } }.filter { it.result.isFailure }
+                Result.failure(Exception("Verification policies did not succeed: ${failedPolicies.joinToString { it.request.policy.name }}"))
+            }
         }
     }
 
