@@ -13,10 +13,9 @@ plugins {
     kotlin("jvm") // Versions.KOTLIN_VERSION
     kotlin("plugin.serialization")  // Versions.KOTLIN_VERSION
 
-    //id("io.ktor.plugin") version "2.3.11" // Versions.KTOR_VERSION
     id("io.ktor.plugin") version "2.3.11" // Versions.KTOR_VERSION
     id("org.owasp.dependencycheck") version "9.2.0"
-    id("com.github.jk1.dependency-license-report") version "2.7"
+    id("com.github.jk1.dependency-license-report") version "2.8"
     application
     `maven-publish`
 
