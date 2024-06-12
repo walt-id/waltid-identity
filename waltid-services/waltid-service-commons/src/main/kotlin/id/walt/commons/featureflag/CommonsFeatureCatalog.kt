@@ -18,8 +18,9 @@ object CommonsFeatureCatalog : ServiceFeatureCatalog {
         default = true,
         config = ServiceHealthChecksDebugModule.ServiceDebugModuleConfiguration::class
     )
+    val openApiFeature = OptionalFeature("openapi", "Enables openapi endpoints", default = true)
 
     override val baseFeatures: List<BaseFeature> = listOf(webFeature)
     override val optionalFeatures: List<OptionalFeature> =
-        listOf(featureFlagInformationEndpointFeature, healthChecksFeature, debugEndpointsFeature)
+        listOf(featureFlagInformationEndpointFeature, healthChecksFeature, debugEndpointsFeature, openApiFeature)
 }
