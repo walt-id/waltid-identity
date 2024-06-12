@@ -2,6 +2,7 @@ package id.walt.webwallet.config
 
 import id.walt.crypto.keys.KeyGenerationRequest
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 import kotlinx.serialization.json.*
 
 @Serializable
@@ -13,12 +14,19 @@ data class RegistrationDefaultsConfig(
         put("keyType", JsonPrimitive("Ed25519"))
     },*/
 
-    private val defaultDidConfig: JsonObject = buildJsonObject {
+    val defaultDidConfig: DidMethodConfig = DidMethodConfig()
+    /*private val defaultDidConfig: JsonObject = buildJsonObject {
         put("method", JsonPrimitive("jwk"))
-    }
+    }*/
 ) : WalletConfig() {
 //    val keyGenerationRequest = Json.decodeFromJsonElement<KeyGenerationRequest>(defaultKeyConfig)
 
-    val didMethod = defaultDidConfig["method"]!!.jsonPrimitive.content
-    val didConfig: Map<String, JsonPrimitive> = defaultDidConfig["config"]?.jsonObject?.mapValues { it.value.jsonPrimitive } ?: emptyMap()
+    @Serializable
+    data class DidMethodConfig(
+        val didMethod: String = "jwk",
+        val didConfig: Map<String, JsonPrimitive> = emptyMap()
+    )
+
+    @Transient val didMethod = defaultDidConfig.didMethod
+    @Transient val didConfig: Map<String, JsonPrimitive> = defaultDidConfig.didConfig
 }
