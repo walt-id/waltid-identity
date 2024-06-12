@@ -1,18 +1,20 @@
 package id.walt.commons.featureflag
 
 import id.walt.commons.config.ConfigManager
-import id.walt.commons.config.runconfig.RunConfiguration
-import io.klogging.noCoLogger
+import id.walt.commons.config.statics.RunConfiguration
+import io.klogging.logger
 
 object FeatureManager {
-    val baseFeatures = HashSet<String>()
+    // val baseFeatures = HashSet<String>()
     val enabledFeatures = HashSet<String>()
     val disabledFeatures = HashSet<String>()
     val registeredFeatures = HashMap<String, AbstractFeature>()
 
-    private val log = noCoLogger("FeatureManager")
+    val featureAmendments = HashMap<AbstractFeature, suspend () -> Unit>()
 
-    fun enableFeature(feature: AbstractFeature): Boolean {
+    private val log = logger("FeatureManager")
+
+    suspend fun enableFeature(feature: AbstractFeature): Boolean {
         feature.dependsOn // todo: handle this
 
         if (disabledFeatures.contains(feature.name)) {
@@ -26,6 +28,11 @@ object FeatureManager {
             ConfigManager.loadConfig(ConfigManager.ConfigData(name, config), RunConfiguration.args).onFailure {
                 return false
             }
+        }
+
+        featureAmendments[feature]?.let {
+            log.info { "Amending feature \"${feature.name}\"..." }
+            it.invoke()
         }
 
         return enabledFeatures.add(feature.name)
@@ -68,24 +75,24 @@ object FeatureManager {
         runIfEnabled(feature, this)
     }
 
-    fun registerBaseFeatures(baseFeatures: List<BaseFeature>) {
+    suspend fun registerBaseFeatures(baseFeatures: List<BaseFeature>) {
         baseFeatures.forEach {
             log.debug { "Registering base feature \"${it.name}\"..." }
             registerFeature(it)
         }
     }
-    fun registerOptionalFeatures(optionalFeatures: List<OptionalFeature>) {
+    suspend fun registerOptionalFeatures(optionalFeatures: List<OptionalFeature>) {
         optionalFeatures.forEach {
             log.debug { "Registering base feature \"${it.name}\"..." }
             registerFeature(it)
         }
     }
 
-    fun registerCatalog(catalog: ServiceFeatureCatalog) {
+    suspend fun registerCatalog(catalog: ServiceFeatureCatalog) {
         registerBaseFeatures(catalog.baseFeatures)
         registerOptionalFeatures(catalog.optionalFeatures)
     }
-    fun registerCatalogs(catalogs: List<ServiceFeatureCatalog>) {
+    suspend fun registerCatalogs(catalogs: List<ServiceFeatureCatalog>) {
         catalogs.forEach { catalog ->
             registerBaseFeatures(catalog.baseFeatures)
         }
@@ -107,7 +114,9 @@ object FeatureManager {
         if (!this) block.invoke()
     }
 
-    fun load() {
+    suspend fun load(amendments: Map<AbstractFeature, suspend () -> Unit>) {
+        featureAmendments.putAll(amendments)
+
         ConfigManager.registerConfig("_features", FeatureConfig::class)
 
         ConfigManager.loadConfigs(RunConfiguration.args)
