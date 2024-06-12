@@ -1,14 +1,12 @@
 package resolvers
 
-import id.walt.crypto.keys.Key
 import id.walt.did.dids.document.DidDocument
-import id.walt.did.dids.resolver.local.DidCheqdResolver
 import id.walt.did.dids.resolver.local.DidEbsiResolver
 import id.walt.did.dids.resolver.local.LocalResolverMethod
+import io.ktor.client.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.Arguments
 import org.junit.jupiter.params.provider.Arguments.arguments
@@ -18,7 +16,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class DidEbsiResolverTest : DidResolverTestBase() {
-    override val sut: LocalResolverMethod = DidEbsiResolver()
+    override val sut: LocalResolverMethod = DidEbsiResolver(HttpClient())
     private val ebsiResolver: DidEbsiResolver = sut as DidEbsiResolver
 
     /*
@@ -61,28 +59,18 @@ class DidEbsiResolverTest : DidResolverTestBase() {
     fun simpleResolveTest() = runTest {
         for (did in staticTestVectorMapDidRegistryv5.keys) {
             val resolvedDoc = ebsiResolver.resolve(did).getOrThrow()
-            println(resolvedDoc.toString())
             assertEquals(staticTestVectorMapDidRegistryv5[did], resolvedDoc.toString())
         }
     }
 
-/*    @ParameterizedTest
-    @MethodSource
-    override fun `given a did String, when calling resolve, then the result is a valid did document`(
-        did: String, key: JsonObject, assert: resolverAssertion<DidDocument>
-    ) {
-        super.`given a did String, when calling resolve, then the result is a valid did document`(did, key, assert)
-    }
-
     @ParameterizedTest
     @MethodSource
-    @Disabled // not implemented
-    override fun `given a did String, when calling resolveToKey, then the result is valid key`(
+    override fun `given a did String, when calling resolve, then the result is a valid did document`(
         did: String,
         key: JsonObject,
-        assert: resolverAssertion<Key>
+        assert: resolverAssertion<DidDocument>
     ) {
-        super.`given a did String, when calling resolveToKey, then the result is valid key`(did, key, assert)
+        super.`given a did String, when calling resolve, then the result is a valid did document`(did, key, assert)
     }
 
     companion object {
@@ -92,24 +80,14 @@ class DidEbsiResolverTest : DidResolverTestBase() {
                 arguments(
                     "did:ebsi:zj46t2gXPgmdriraZG6mb5A",
                     Json.decodeFromString<JsonObject>("{\"kty\":\"EC\",\"crv\":\"secp256k1\",\"x\":\"u0LAULtFwOQwusN8esicYCz579culZW5htoPC_ADha4\",\"y\":\"mYnbYZH4iyvlyMWuXE-X2ssebVE7VC9aW3wPxkU9wdQ\"}"),
-                    secp256KeyAssertions
+                    secp256DidAssertions
 
                 ),
                 arguments(
-                    "did:ebsi:zjHZjJ4Sy7r92BxXzFGs7qD",
-                    Json.decodeFromString<JsonObject>("{\"@context\":[\"https://www.w3.org/ns/did/v1\",\"https://w3id.org/security/suites/jws-2020/v1\"],\"id\":\"did:ebsi:zjHZjJ4Sy7r92BxXzFGs7qD\",\"controller\":[\"did:ebsi:zjHZjJ4Sy7r92BxXzFGs7qD\"],\"verificationMethod\":[{\"id\":\"did:ebsi:zjHZjJ4Sy7r92BxXzFGs7qD#zWNYsdkpxcq6wMfNGhsB7ns3sSOT5yCtrc4gBxHG-Mc\",\"type\":\"JsonWebKey2020\",\"controller\":\"did:ebsi:zjHZjJ4Sy7r92BxXzFGs7qD\",\"publicKeyJwk\":{\"kty\":\"EC\",\"crv\":\"secp256k1\",\"x\":\"4TgiV8Fk3nG4At4ija1KQU_1N_DrI7STwyHBYnXxk7U\",\"y\":\"8wrHJAN1hdVGmXIoGnuqOIhnFC4PzKgCsHIWM50Jxwc\"}},{\"id\":\"did:ebsi:zjHZjJ4Sy7r92BxXzFGs7qD#T6iPMW-k8O4uwZid29GwLe-Njg40E6jNT7hdLpJ3ZSg\",\"type\":\"JsonWebKey2020\",\"controller\":\"did:ebsi:zjHZjJ4Sy7r92BxXzFGs7qD\",\"publicKeyJwk\":{\"kty\":\"EC\",\"crv\":\"P-256\",\"x\":\"AvOFLJgwIftVMBmW0Adfw1vZ6_f5rKz2Q9Il8tMyYv4\",\"y\":\"ZGynk89Jz8qKKP3qTlVm-w6LWc895B6__JbS4ldAQio\"}}],\"authentication\":[\"did:ebsi:zjHZjJ4Sy7r92BxXzFGs7qD#zWNYsdkpxcq6wMfNGhsB7ns3sSOT5yCtrc4gBxHG-Mc\",\"did:ebsi:zjHZjJ4Sy7r92BxXzFGs7qD#T6iPMW-k8O4uwZid29GwLe-Njg40E6jNT7hdLpJ3ZSg\"],\"assertionMethod\":[\"did:ebsi:zjHZjJ4Sy7r92BxXzFGs7qD#T6iPMW-k8O4uwZid29GwLe-Njg40E6jNT7hdLpJ3ZSg\"],\"capabilityInvocation\":[\"did:ebsi:zjHZjJ4Sy7r92BxXzFGs7qD#zWNYsdkpxcq6wMfNGhsB7ns3sSOT5yCtrc4gBxHG-Mc\"]}"),
-                    secp256KeyAssertions
-                )
+                    "did:ebsi:zj46t2gXPgmdriraZG6mb5A",
+                    Json.decodeFromString<JsonObject>("{\"kty\":\"EC\",\"crv\":\"P-256\",\"x\":\"mDX7h2ZIOL1993wj4H83_jg67d_TaYk3dvVL447rRC0\",\"y\":\"Lr-efgLN1QPv-rb2sk-4gv7cVwXpzTY6FE8kdNHUUwU\"}"),
+                    secp256DidAssertions
+                ),
             )
-
-        @JvmStatic
-        fun `given a did String, when calling resolveToKey, then the result is valid key`(): Stream<Arguments> =
-            Stream.of(
-                arguments(
-                    "did:cheqd:testnet:38088d21-a5f8-4277-bd35-b36918d81c14",
-                    Json.decodeFromString<JsonObject>("{\"kty\":\"OKP\",\"d\":\"24WxHxiKpnd1_BitZBU57ex8EKaNukiyC4punO4Lh-s\",\"crv\":\"Ed25519\",\"kid\":\"GaQD9pzL5wJyATB1UA2J71ygXgkykT1QOnL7uIBgcpo\",\"x\":\"bz2K3xX-D_R2_Pu7al6UCRXGSl1pzBRfEoD3bj94s_w\"}"),
-                    ed25519KeyAssertions
-                )
-            )
-    }*/
+    }
 }
