@@ -1,6 +1,6 @@
 package id.walt.webwallet.service.webauthn
 
-import com.webauthn4j.WebAuthnManager
+/*import com.webauthn4j.WebAuthnManager
 import com.webauthn4j.authenticator.Authenticator
 import com.webauthn4j.authenticator.AuthenticatorImpl
 import com.webauthn4j.converter.exception.DataConversionException
@@ -9,9 +9,9 @@ import com.webauthn4j.data.client.Origin
 import com.webauthn4j.data.client.challenge.Challenge
 import com.webauthn4j.data.client.challenge.DefaultChallenge
 import com.webauthn4j.server.ServerProperty
-import com.webauthn4j.validator.exception.ValidationException
+import com.webauthn4j.validator.exception.ValidationException*/
 
-
+/* Complete this implementation:
 object WebauthnService {
 
     private val webAuthnManager = WebAuthnManager.createNonStrictWebAuthnManager()
@@ -22,20 +22,20 @@ object WebauthnService {
 
     fun attestationVerification() {
         // Client properties
-        val attestationObject: ByteArray? = null /* set attestationObject */
-        val clientDataJSON: ByteArray? = null /* set clientDataJSON */
-        val clientExtensionJSON: String? = null /* set clientExtensionJSON */
-        val transports: Set<String>? = null /* set transports */
+        val attestationObject: ByteArray? = null *//* set attestationObject *//*
+        val clientDataJSON: ByteArray? = null *//* set clientDataJSON *//*
+        val clientExtensionJSON: String? = null *//* set clientExtensionJSON *//*
+        val transports: Set<String>? = null *//* set transports *//*
 
 
         // Server properties
-        val origin: Origin? = null /* set origin */
-        val rpId: String? = null /* set rpId */
-        val challenge: Challenge? = null /* set challenge */
+        val origin: Origin? = null *//* set origin *//*
+        val rpId: String? = null *//* set rpId *//*
+        val challenge: Challenge? = null *//* set challenge *//*
 
 
-        val tokenBindingId: ByteArray? = null /* set tokenBindingId */
-        @Suppress("KotlinConstantConditions") val serverProperty = ServerProperty(origin!!, rpId!!, challenge, tokenBindingId)
+        val tokenBindingId: ByteArray? = null *//* set tokenBindingId *//*
+//        val serverProperty = ServerProperty(origin!!, rpId!!, challenge, tokenBindingId)
 
 
         // expectations
@@ -88,19 +88,19 @@ object WebauthnService {
 
     fun assertionVerification() {
         // Client properties
-        val credentialId: ByteArray? = null /* set credentialId */
-        val userHandle: ByteArray? = null /* set userHandle */
-        val authenticatorData: ByteArray? = null /* set authenticatorData */
-        val clientDataJSON: ByteArray? = null /* set clientDataJSON */
-        val clientExtensionJSON: String? = null /* set clientExtensionJSON */
-        val signature: ByteArray? = null /* set signature */
+        val credentialId: ByteArray? = null *//* set credentialId *//*
+        val userHandle: ByteArray? = null *//* set userHandle *//*
+        val authenticatorData: ByteArray? = null *//* set authenticatorData *//*
+        val clientDataJSON: ByteArray? = null *//* set clientDataJSON *//*
+        val clientExtensionJSON: String? = null *//* set clientExtensionJSON *//*
+        val signature: ByteArray? = null *//* set signature *//*
 
 
         // Server properties
-        val origin: Origin? = null /* set origin */
-        val rpId: String? = null /* set rpId */
-        val challenge: Challenge? = null /* set challenge */
-        val tokenBindingId: ByteArray? = null /* set tokenBindingId */
+        val origin: Origin? = null *//* set origin *//*
+        val rpId: String? = null *//* set rpId *//*
+        val challenge: Challenge? = null *//* set challenge *//*
+        val tokenBindingId: ByteArray? = null *//* set tokenBindingId *//*
         val serverProperty = ServerProperty(origin!!, rpId!!, challenge, tokenBindingId)
 
 
@@ -150,4 +150,4 @@ object WebauthnService {
             authenticationData.authenticatorData!!.signCount
         )
     }
-}
+}*/
