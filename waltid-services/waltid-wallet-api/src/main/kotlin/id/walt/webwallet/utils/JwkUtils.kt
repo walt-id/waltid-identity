@@ -24,7 +24,7 @@ object JwkUtils {
     fun verifyToken(token: String): DecodedJWT {
         val decoded = JWT.decode(token)
 
-        val verifier = JWT.require(OidcLoginService.jwkProvider.get(decoded.keyId).makeAlgorithm())
+        val verifier = JWT.require(OidcLoginService.jwkProvider[decoded.keyId].makeAlgorithm())
             .withIssuer(OidcLoginService.oidcRealm)
             .build()
 
