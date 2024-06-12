@@ -14,13 +14,6 @@ object FeatureCatalog : ServiceFeatureCatalog {
     val tenantFeature = OptionalFeature("tenant", "Cloud-based tenant management", TenantConfig::class, false)
     val pushFeature = OptionalFeature("push", "Push notifications", PushConfig::class, false)
 
-    /*
-     * val pushFeature = OptionalFeature("push", "Push notifications", PushConfig::class, false) {
-     *     val pushConfig = ConfigManager.getConfig<PushConfig>()
-     *     check(pushConfig.xyz == "abc")
-     * }
-     */
-
     val runtimeMockFeature = OptionalFeature("runtime", "Runtime mock provider configuration", RuntimeConfig::class, false)
 
     val oidcAuthenticationFeature = OptionalFeature("oidc", "OIDC login feature", OidcConfiguration::class, false)
