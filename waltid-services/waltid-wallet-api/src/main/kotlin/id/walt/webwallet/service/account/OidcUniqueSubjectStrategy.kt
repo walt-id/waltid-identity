@@ -16,9 +16,7 @@ object OidcUniqueSubjectStrategy : PasswordlessAccountStrategy<OidcUniqueSubject
         val jwt = verifyToken(request.token)
         val sub = jwt.subject
 
-        if (AccountsService.hasAccountOidcId(sub)) {
-            throw IllegalArgumentException("Account already exists with OIDC id: ${request.token}")
-        }
+        require(!AccountsService.hasAccountOidcId(sub)) { "Account already exists with OIDC id: ${request.token}" }
 
         val createdAccountId = transaction {
             val accountId = Accounts.insert {
