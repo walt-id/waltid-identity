@@ -69,14 +69,14 @@ class DidKeySimpleTests {
         expectedKeyType = KeyType.RSA
     )*/
 
-//    @Test
-//    fun testDidKeyCreateAndResolveConsistency() = runTest{
-//        val keyList: List<JWKKey> = KeyType.values().map { JWKKey.generate(it) }
-//        for (key in keyList) {
-//            val didResult = localRegistrar.registerByKey(key, DidKeyCreateOptions(keyType = key.keyType))
-//            localResolver.resolveToKey(didResult.did)
-//        }
-//    }
+    @Test
+    fun testDidKeyCreateAndResolveConsistency() = runTest{
+        val keyList: List<JWKKey> = KeyType.entries.map { JWKKey.generate(it) }
+        for (key in keyList) {
+            val didResult = localRegistrar.registerByKey(key, DidKeyCreateOptions(keyType = key.keyType))
+            localResolver.resolveToKey(didResult.did)
+        }
+    }
 
     @Test
     fun testDidKeyCreateAndResolveJwkJcsPubConsistency() = runTest {
