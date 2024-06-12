@@ -314,9 +314,7 @@ open class CIProvider : OpenIDCredentialIssuer(
                 )
         }.distinct()
 
-        if (keyIdsDistinct.size >= 2) {
-            throw IllegalArgumentException("More than one key id requested")
-        }
+        require(keyIdsDistinct.size < 2) { "More than one key id requested" }
 
 //        val keyId = keyIdsDistinct.first()
 
