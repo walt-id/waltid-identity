@@ -15,9 +15,7 @@ object OidcAccountStrategy : PasswordlessAccountStrategy<OidcAccountRequest>() {
     override suspend fun register(tenant: String, request: OidcAccountRequest): Result<RegistrationResult> {
         val jwt = verifyToken(request.token)
 
-        if (AccountsService.hasAccountOidcId(jwt.subject)) {
-            throw IllegalArgumentException("Account already exists with OIDC id: ${request.token}")
-        }
+        require(!AccountsService.hasAccountOidcId(jwt.subject)) { "Account already exists with OIDC id: ${request.token}" }
 
         val createdAccountId = transaction {
             val accountId = Accounts.insert {
