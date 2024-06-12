@@ -7,7 +7,7 @@ import id.walt.webwallet.config.*
 
 object FeatureCatalog : ServiceFeatureCatalog {
 
-    val databaseFeature = BaseFeature("db", "Database manager", DatasourceJsonConfiguration::class)
+    val databaseFeature = BaseFeature("db", "Database manager", DatasourceConfiguration::class)
     val loginsMethodFeature = BaseFeature("logins", "Logins method management", LoginMethodsConfig::class)
     val authenticationFeature = BaseFeature("auth", "Base authentication system", AuthConfig::class)
 

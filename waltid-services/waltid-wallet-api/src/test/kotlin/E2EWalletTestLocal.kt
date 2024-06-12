@@ -1,6 +1,6 @@
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.config.list.WebConfig
-import id.walt.webwallet.config.DatasourceJsonConfiguration
+import id.walt.webwallet.config.DatasourceConfiguration
 import id.walt.webwallet.config.KeyGenerationDefaultsConfig
 import id.walt.webwallet.config.RegistrationDefaultsConfig
 import id.walt.webwallet.db.Db
@@ -27,7 +27,7 @@ class E2EWalletTestLocal : E2EWalletTestBase() {
     companion object {
         init {
             ConfigManager.preloadAndRegisterConfig(
-                "db.sqlite", DatasourceJsonConfiguration(
+                "db.sqlite", DatasourceConfiguration(
                     dataSource = Db.SerializableHikariConfiguration(
                         jdbcUrl = "jdbc:sqlite:data/wallet.db",
                         driverClassName = "org.sqlite.JDBC",
