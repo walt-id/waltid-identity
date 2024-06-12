@@ -10,14 +10,15 @@ import id.walt.oid4vc.interfaces.ITokenProvider
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.requests.TokenRequest
 import id.walt.oid4vc.responses.*
-
 import io.ktor.http.*
 import kotlinx.datetime.Clock
-import kotlinx.serialization.json.*
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
+import kotlinx.uuid.UUID
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
-import kotlinx.uuid.UUID
-import kotlin.js.ExperimentalJsExport
 
 abstract class OpenIDProvider<S : AuthorizationSession>(
     val baseUrl: String,

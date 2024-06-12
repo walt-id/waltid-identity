@@ -1,6 +1,5 @@
 package id.walt.credentials.vc.vcs
 
-import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlin.js.ExperimentalJsExport

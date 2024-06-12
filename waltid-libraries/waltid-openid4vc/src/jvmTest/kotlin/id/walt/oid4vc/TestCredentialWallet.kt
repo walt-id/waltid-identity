@@ -51,7 +51,6 @@ import io.ktor.util.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Instant
 import kotlinx.serialization.json.*
-import kotlin.js.ExperimentalJsExport
 
 const val WALLET_PORT = 8001
 const val WALLET_BASE_URL = "http://localhost:${WALLET_PORT}"
