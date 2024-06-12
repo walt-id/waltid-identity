@@ -18,7 +18,9 @@ import kotlinx.serialization.json.jsonObject
 data class SubmissionRequirement(
     val rule: SubmissionRequirementRule,
     val from: String? = null,
-    @SerialName("from_nested") @Serializable(SubmissionRequirementListSerializer::class) val fromNested: List<SubmissionRequirement>? = null,
+    @SerialName("from_nested") @Serializable(SubmissionRequirementListSerializer::class) val fromNested: List<JsonObject>? = null,
+    // TODO @SerialName("from_nested") @Serializable(SubmissionRequirementListSerializer::class) val fromNested: List<SubmissionRequirement>? = null,
+    // breaks openapi schema generation in wallet-api - https://github.com/SMILEY4/schema-kenerator/issues/1
     val name: String? = null,
     val purpose: String? = null,
     val count: Int? = null,
