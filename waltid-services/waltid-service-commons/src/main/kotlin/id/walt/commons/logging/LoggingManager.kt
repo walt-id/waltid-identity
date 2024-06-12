@@ -23,9 +23,9 @@ object LoggingManager {
      */
     internal val loggingSetups: Map<String, LoggingSetup> =
         listOf(
-            DefaultLoggingSetup(), // <- default
-            DebugLoggingSetup(),
-            TraceLoggingSetup(),
+            DefaultLoggingSetup, // <- default
+            DebugLoggingSetup,
+            TraceLoggingSetup,
             // ..., extend here <---
         ).associateBy { it.name }
 
@@ -33,7 +33,7 @@ object LoggingManager {
      * the logging setup to initialize, "default" by default,
      * override from outside this manager before initialization if required
      */
-    var loggingSetup: LoggingSetup = DefaultLoggingSetup()
+    var loggingSetup: LoggingSetup = DefaultLoggingSetup
 
     /**
      * determine if we shall apply some simple default logging configuration, or keep user
@@ -55,6 +55,10 @@ object LoggingManager {
 
     fun useLoggingSetup(logLevel: String) {
         loggingSetup = loggingSetups[logLevel] ?: error("invalid log level supplied: $logLevel")
+    }
+
+    fun useLoggingSetup(newLoggingSetup: LoggingSetup) {
+        loggingSetup = newLoggingSetup
     }
 
 }

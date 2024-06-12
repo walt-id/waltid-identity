@@ -5,7 +5,7 @@ import io.klogging.Level
 import io.klogging.sending.STDERR
 import io.klogging.sending.STDOUT
 
-class TraceLoggingSetup : LoggingSetup("trace", {
+data object TraceLoggingSetup : LoggingSetup("trace", {
     sink("stdout", LogStringManager.selectedRenderString.renderString, STDOUT)
     sink("stderr", LogStringManager.selectedRenderString.renderString, STDERR)
 
