@@ -42,6 +42,12 @@ dependencies {
     // Health checks
     api("com.sksamuel.cohort:cohort-ktor:2.5.1")
 
+    // OpenAPI
+    implementation("io.github.smiley4:ktor-swagger-ui:3.0.0")
+    implementation("io.github.smiley4:schema-kenerator-core:1.0.0")
+    implementation("io.github.smiley4:schema-kenerator-serialization:1.0.0")
+    implementation("io.github.smiley4:schema-kenerator-swagger:1.0.0")
+
     // Testing
     testImplementation(kotlin("test"))
 }
