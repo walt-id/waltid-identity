@@ -1,8 +1,6 @@
 package id.walt.commons.config
 
 import com.sksamuel.hoplite.*
-import io.klogging.java.LoggerFactory
-import io.klogging.logger
 import io.klogging.noCoLogger
 import java.util.concurrent.ConcurrentLinkedQueue
 import kotlin.reflect.KClass
