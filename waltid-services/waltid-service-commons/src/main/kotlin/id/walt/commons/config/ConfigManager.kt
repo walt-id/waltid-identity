@@ -30,14 +30,15 @@ object ConfigManager {
     @OptIn(ExperimentalHoplite::class)
     fun loadConfig(config: ConfigData, args: Array<String>): Result<WaltConfig> {
         val id = config.id
-        log.debug { "Loading configuration: \"$id\" (${config.type.simpleName ?: config.type.jvmName})..." }
+        val fullName = "\"$id\" (${config.type.simpleName ?: config.type.jvmName})"
+        log.debug { "Loading configuration: $fullName..." }
 
         val type = config.type
         val configKey = Pair(id, type)
 
         preloadedConfigurations[configKey]?.let {
             loadedConfigurations[configKey] = it
-            log.info { "Overwrote wallet configuration with preload: $id" }
+            log.info { "Overwrote wallet configuration with preload: $fullName" }
             return Result.success(it)
         }
 
@@ -57,9 +58,9 @@ object ConfigManager {
         }.onFailure {
                 log.error {
                     """
-                    |---- vvv Configuration error vvv ----
-                    |Could not load configuration for "$id": ${it.stackTraceToString()}
-                    |---- ^^^ Configuration error ^^^ ---
+                    |---- vvv Configuration error for "$id" vvv ----
+                    |Could not load configuration for $fullName: ${it.stackTraceToString()}
+                    |---- ^^^ Configuration error for "$id" ^^^ ---
                     |""".trimMargin()
                 }
         }
