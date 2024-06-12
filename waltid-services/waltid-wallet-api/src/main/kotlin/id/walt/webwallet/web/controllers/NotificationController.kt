@@ -169,10 +169,10 @@ object NotificationController {
                     summary = "Experimental: Push notification system"
                     // TODO
                 }) {
-                    var id = call.request.queryParameters["id"] ?: return@post call.respond(HttpStatusCode.OK)
+                    val id = call.request.queryParameters.getOrFail("id")
                     val type = call.request.queryParameters["type"] ?: "issuance"
 
-                    id = "did:key:z6Mkipa1mwZTvUaTCPkHsdKGWNWteQbpEmvcr9HFed9gS4Ye"
+                    //id = "did:key:z6Mkipa1mwZTvUaTCPkHsdKGWNWteQbpEmvcr9HFed9gS4Ye"
 
                     var offer = call.receiveText().trim()
 
