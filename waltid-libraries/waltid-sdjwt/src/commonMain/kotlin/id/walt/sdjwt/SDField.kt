@@ -36,14 +36,12 @@ data class SDField(
         fun fromJSON(json: JsonElement): SDField {
             println("Parsing SDField from $json")
             return SDField(
-                sd = json.jsonObject["sd"]?.jsonPrimitive?.boolean ?: throw Exception("Error parsing SDField.sd from JSON element"),
+                sd = json.jsonObject["sd"]?.jsonPrimitive?.boolean ?: error("Error parsing SDField.sd from JSON element"),
                 children = json.jsonObject["children"]?.let { children ->
-                    if (children is JsonObject) {
-                        children.jsonObject.let { SDMap.fromJSON(it) }
-                    } else if (children is JsonNull) {
-                        null
-                    } else {
-                        throw Exception("Error parsing SDField.children from JSON element")
+                    when (children) {
+                        is JsonObject -> children.jsonObject.let { SDMap.fromJSON(it) }
+                        is JsonNull -> null
+                        else -> error("Error parsing SDField.children from JSON element")
                     }
                 }
             )
