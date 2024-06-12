@@ -428,7 +428,7 @@ class SSIKit2WalletService(
 
     override suspend fun listKeys(): List<SingleKeyResponse> =
         KeysService.list(walletId).map {
-            val key = KeySerialization.deserializeKey(it.document).getOrThrow()
+            val key = KeyManager.resolveSerializedKey(it.document)
 
             SingleKeyResponse(
                 keyId = SingleKeyResponse.KeyId(it.keyId),
