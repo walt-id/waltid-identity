@@ -1,4 +1,3 @@
-import id.walt.crypto.keys.KeyType
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 

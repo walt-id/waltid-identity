@@ -7,5 +7,5 @@ import kotlinx.serialization.json.JsonObject
 @Serializable
 data class SignRequest(
     val issuerKey: JsonObject,
-    val vc: JsonElement
+    val vc: JsonElement,
 )

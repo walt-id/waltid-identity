@@ -8,7 +8,7 @@ import kotlinx.datetime.Instant
 
 class EntityNameResolutionUseCase(
     private val cacheService: EntityNameResolutionCacheService,
-    private val nameResolutionService: EntityNameResolutionService
+    private val nameResolutionService: EntityNameResolutionService,
 ) {
     //TODO: make configurable
     private val cacheAge = 1//day

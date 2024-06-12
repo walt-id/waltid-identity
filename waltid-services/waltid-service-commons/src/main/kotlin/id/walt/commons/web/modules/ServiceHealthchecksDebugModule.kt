@@ -35,10 +35,10 @@ object ServiceHealthChecksDebugModule {
         private val log = noCoLogger("Ktor status")
 
         var ktorStatus: KtorStatus = KtorStatus.Unknown
-        set(value) {
-            log.trace { "New ktor server status: ${value.name}" }
-            field = value
-        }
+            set(value) {
+                log.trace { "New ktor server status: ${value.name}" }
+                field = value
+            }
 
         fun Application.init() {
             environment.monitor.subscribe(ApplicationStarting) { ktorStatus = KtorStatus.ApplicationStarting }

@@ -27,7 +27,7 @@ object SettingsService {
         WalletSettings.wallet
     ) {
         it[WalletSettings.wallet] = wallet
-        it[WalletSettings.settings] = json.encodeToString(setting)
+        it[settings] = json.encodeToString(setting)
     }
 
     private fun tryParseSettings(settings: String?) =

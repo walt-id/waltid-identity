@@ -61,7 +61,7 @@ class EventFilterUseCase(
 
     private suspend fun updateEntityName(
         data: CredentialEventData,
-        entity: CredentialEventDataActor.Organization
+        entity: CredentialEventDataActor.Organization,
     ) = when (entity) {
         is CredentialEventDataActor.Organization.Issuer -> entity.copy(
             name = issuerNameResolutionUseCase.resolve(entity.did)

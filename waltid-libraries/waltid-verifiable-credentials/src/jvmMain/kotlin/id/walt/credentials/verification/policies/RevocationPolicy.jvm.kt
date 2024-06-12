@@ -34,7 +34,7 @@ actual class RevocationPolicy  : RevocationPolicyMp() {
         val statusListIndex = credentialStatus.jsonObject["statusListIndex"]?.jsonPrimitive?.content?.toULong()
         val statusListCredentialUrl = credentialStatus.jsonObject["statusListCredential"]?.jsonPrimitive?.content
 
-        val httpClient = HttpClient() {
+        val httpClient = HttpClient {
             install(ContentNegotiation) {
                 json(Json { ignoreUnknownKeys = true })
             }
@@ -44,17 +44,17 @@ actual class RevocationPolicy  : RevocationPolicyMp() {
 
          runCatching {httpClient.get(statusListCredentialUrl!!).bodyAsText() }
              .onSuccess{
-                 try {
+                 return try {
                      // response is a jwt
                      val payload = it.substringAfter(".").substringBefore(".").let {  Json.decodeFromString<JsonObject>(Base64Utils.decode(it).decodeToString()) }
 
                      val credentialSubject = payload["vc"]!!.jsonObject["credentialSubject"]?.jsonObject!!
-                     val encodedList = credentialSubject["encodedList"]?.jsonPrimitive?.content  as? String ?: ""
+                     val encodedList = credentialSubject["encodedList"]?.jsonPrimitive?.content ?: ""
                      val bitValue = get(encodedList, statusListIndex)
                      if (bitValue!![0].code == 0) {
-                         return Result.success("")
+                         Result.success("")
                      } else {
-                         return  Result.failure(Throwable("Credential has been revoked"))
+                         Result.failure(Throwable("Credential has been revoked"))
                      }
                  } catch (e: NumberFormatException) {
                      throw IllegalArgumentException()

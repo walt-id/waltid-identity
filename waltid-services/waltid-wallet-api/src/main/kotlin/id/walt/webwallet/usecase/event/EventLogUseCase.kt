@@ -22,7 +22,7 @@ class EventLogUseCase(
         walletId: UUID,
         data: EventData,
         credentialId: String? = null,
-        note: String? = null
+        note: String? = null,
     ) = log(
         Event(
             action = action,

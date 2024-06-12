@@ -12,7 +12,7 @@ import kotlin.js.JsName
 @JsExport
 @Serializable
 class DidDocument(
-    private val content: Map<String, JsonElement>
+    private val content: Map<String, JsonElement>,
 ) : Map<String, JsonElement> by content {
     override fun equals(other: Any?): Boolean = content == other
     override fun hashCode(): Int = content.hashCode()

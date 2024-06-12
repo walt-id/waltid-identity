@@ -2,7 +2,8 @@ package id.walt.webwallet.utils
 
 import io.github.oshai.kotlinlogging.KotlinLogging
 import java.io.InputStream
-import java.util.*
+import java.util.Base64
+import java.util.BitSet
 
 @OptIn(ExperimentalStdlibApi::class)
 object StringUtils {

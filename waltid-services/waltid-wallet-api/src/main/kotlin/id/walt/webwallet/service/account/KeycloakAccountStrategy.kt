@@ -45,7 +45,7 @@ object KeycloakAccountStrategy : PasswordAccountStrategy<KeycloakAccountRequest>
 
     override suspend fun register(
         tenant: String,
-        request: KeycloakAccountRequest
+        request: KeycloakAccountRequest,
     ): Result<RegistrationResult> {
 
         val user =
@@ -136,7 +136,7 @@ object KeycloakAccountStrategy : PasswordAccountStrategy<KeycloakAccountRequest>
 
     override suspend fun authenticate(
         tenant: String,
-        request: KeycloakAccountRequest
+        request: KeycloakAccountRequest,
     ): AuthenticatedUser {
 
         val token =
@@ -214,7 +214,7 @@ object KeycloakAccountStrategy : PasswordAccountStrategy<KeycloakAccountRequest>
     private suspend fun getToken(
         grantType: String,
         username: String? = null,
-        password: String? = null
+        password: String? = null,
     ): String {
         val requestParams =
             mutableMapOf(

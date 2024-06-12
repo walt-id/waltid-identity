@@ -5,7 +5,7 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class TrustConfig(
     val issuersRecord: TrustRecord,
-    val verifiersRecord: TrustRecord
+    val verifiersRecord: TrustRecord,
 ) : WalletConfig() {
     @Serializable
     data class TrustRecord(

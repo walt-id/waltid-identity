@@ -11,11 +11,11 @@ import kotlinx.serialization.json.jsonPrimitive
 
 class DescriptorNoMatchPresentationDefinitionMatchStrategy : PresentationDefinitionMatchStrategy<List<FilterData>> {
     override fun match(
-        credentials: List<WalletCredential>, presentationDefinition: PresentationDefinition
+        credentials: List<WalletCredential>, presentationDefinition: PresentationDefinition,
     ): List<FilterData> = match(credentials, presentationDefinition.inputDescriptors)
 
     private fun match(
-        credentialList: List<WalletCredential>, inputDescriptors: List<InputDescriptor>
+        credentialList: List<WalletCredential>, inputDescriptors: List<InputDescriptor>,
     ) = inputDescriptors.filter { desc ->
         credentialList.none { cred ->
             desc.name == JsonUtils.tryGetData(cred.parsedDocument, "type")?.jsonArray?.last()?.jsonPrimitive?.content

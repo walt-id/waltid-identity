@@ -21,7 +21,7 @@ object WalletKeys : Table("wallet_keys") {
 data class WalletKey(
     val keyId: String,
     val document: String,
-    val createdOn: Instant
+    val createdOn: Instant,
 ) {
     constructor(result: ResultRow) : this(
         keyId = result[WalletKeys.keyId],

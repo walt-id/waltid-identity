@@ -10,7 +10,7 @@ import kotlinx.uuid.UUID
 
 class NoMatchPresentationDefinitionCredentialsUseCase(
     private val credentialService: CredentialsService,
-    private vararg val matchStrategies: PresentationDefinitionMatchStrategy<List<FilterData>>
+    private vararg val matchStrategies: PresentationDefinitionMatchStrategy<List<FilterData>>,
 ) {
     private val logger = KotlinLogging.logger { }
 

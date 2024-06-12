@@ -17,7 +17,7 @@ abstract class DidResolverTestBase {
     open fun `given a did String, when calling resolve, then the result is a valid did document`(
         did: String,
         key: JsonObject,
-        assert: resolverAssertion<DidDocument>
+        assert: resolverAssertion<DidDocument>,
     ) {
         val result = runBlocking { sut.resolve(did) }
         assert(did, key, result)
@@ -26,7 +26,7 @@ abstract class DidResolverTestBase {
     open fun `given a did String, when calling resolveToKey, then the result is valid key`(
         did: String,
         key: JsonObject,
-        assert: resolverAssertion<Key>
+        assert: resolverAssertion<Key>,
     ) {
         val result = runBlocking { sut.resolveToKey(did) }
         assert(did, key, result)
@@ -122,7 +122,7 @@ abstract class DidResolverTestBase {
         //endregion -Key assertions-
 
         private val verificationMethodAssertions: (
-            doc: DidDocument, key: JsonObject, runChecks: (actual: JsonObject, expected: JsonObject) -> Boolean
+            doc: DidDocument, key: JsonObject, runChecks: (actual: JsonObject, expected: JsonObject) -> Boolean,
         ) -> Unit = { doc, key, runChecks ->
             // verification method is optional
             doc["verificationMethod"]?.takeIf { it != JsonNull }?.run {

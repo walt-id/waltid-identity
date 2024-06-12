@@ -119,7 +119,7 @@ class EBSI_Conformance_Test {
             }
             followRedirects = false
         }
-        val credentialOfferUrl = "https://api-conformance.ebsi.eu/conformance/v3/issuer-mock/initiate-credential-offer?credential_type="
+        const val credentialOfferUrl = "https://api-conformance.ebsi.eu/conformance/v3/issuer-mock/initiate-credential-offer?credential_type="
         lateinit var crossDeviceCredentialOfferRequestCaller: credentialOfferRequestCaller
         lateinit var sameDeviceCredentialOfferRequestCaller: credentialOfferRequestCaller
         lateinit var credentialWallet: EBSITestWallet
@@ -197,7 +197,7 @@ class EBSI_Conformance_Test {
 
 internal typealias credentialOfferRequestCaller = (initCredentialOfferUrl: Url) -> CredentialOfferRequest
 
-internal fun storeCredentials(vararg credentialResponses: CredentialResponse) = credentialResponses.forEach {
+internal fun storeCredentials(vararg credentialResponses: CredentialResponse) = credentialResponses.forEach { _ ->
 //    val cred = VerifiableCredential.fromString(it.credential!!.jsonPrimitive.content)
 //    Custodian.getService().storeCredential(cred.id ?: randomUUID(), cred)
 }

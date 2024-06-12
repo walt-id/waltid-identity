@@ -7,7 +7,6 @@ import com.nimbusds.jose.Payload
 import com.nimbusds.jose.crypto.MACSigner
 import com.nimbusds.jose.crypto.MACVerifier
 import id.walt.commons.config.ConfigManager
-import id.walt.commons.config.list.WebConfig
 import id.walt.commons.featureflag.FeatureManager
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.JsonUtils.toJsonElement
@@ -193,8 +192,7 @@ fun Application.configureSecurity() {
                 if (req is EmailAccountRequest || req is KeycloakAccountRequest) 1 else 0
             }
             requestKey { call ->
-                val req = call.getLoginRequest()
-                when (req) {
+                when (val req = call.getLoginRequest()) {
                     is EmailAccountRequest -> req.email
                     is KeycloakAccountRequest -> req.username ?: Unit
                     else -> Unit

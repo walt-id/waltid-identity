@@ -75,7 +75,7 @@ services:
   sqlite:
     image: alpine
     profiles:
-        -   sqlite
+      - sqlite
     entrypoint: [ "/bin/sh", "-c", "exit 0" ]
 
   postgres-engine:
@@ -100,7 +100,7 @@ services:
   postgres:
     image: alpine
     profiles:
-        -   postgres
+      - postgres
     entrypoint: [ "/bin/sh", "-c", "exit 0" ]
     depends_on:
       postgres-engine:

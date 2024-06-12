@@ -13,7 +13,7 @@ import kotlinx.serialization.encoding.Encoder
 data class PushConfig(
     val pushPublicKey: String,
     @Serializable(with = MaskedSerializer::class) val pushPrivateKey: Masked,
-    val pushSubject: String
+    val pushSubject: String,
 ) : WalletConfig()
 
 object MaskedSerializer : KSerializer<Masked> {

@@ -4,7 +4,7 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class NftListDataTransferObject(
-    val items: List<NftDetailDataTransferObject>
+    val items: List<NftDetailDataTransferObject>,
 )
 
 data class NftConvertResult(
@@ -39,7 +39,7 @@ data class NftDetailDataTransferObject(
     val type: String? = null,
     val attributes: List<TokenAttributes>? = null,
     val art: TokenArt? = null,
-    val chain: String
+    val chain: String,
 )
 
 @Serializable

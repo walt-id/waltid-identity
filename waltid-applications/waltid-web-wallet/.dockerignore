@@ -311,7 +311,6 @@ $RECYCLE.BIN/
 **/nbproject/Package-*.bash
 build/
 nbbuild/
-dist/
 nbdist/
 .nb-gradle/
 
@@ -512,7 +511,6 @@ LICENSE
 .vscode
 Makefile
 helm-charts
-.env
 .editorconfig
 .idea
 coverage*

@@ -167,7 +167,7 @@ class VCVerifyCmd : CliktCommand(
                 throw MissingOption(this.option("--arg for the 'schema' policy (--arg=schema=/file/path/to/schema.json)"))
             }
 
-            val schemaFilePath = policyArguments.get("schema")!!
+            val schemaFilePath = policyArguments["schema"]!!
             val schemaFile = File(schemaFilePath)
 
             // Schema exists?

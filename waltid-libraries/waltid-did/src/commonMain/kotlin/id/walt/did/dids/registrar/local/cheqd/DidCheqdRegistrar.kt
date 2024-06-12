@@ -56,7 +56,6 @@ class DidCheqdRegistrar : LocalRegistrarMethod("cheqd") {
     private val didDeactivateUrl = "$registrarUrl/$registrarApiVersion/deactivate"
     private val didUpdateUrl = "$registrarUrl/$registrarApiVersion/update"
 
-    @OptIn(ExperimentalSerializationApi::class)
     private val json = Json {
         serializersModule = didStateSerializationModule
         ignoreUnknownKeys = true

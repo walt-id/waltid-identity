@@ -16,7 +16,7 @@ class MatchPresentationDefinitionCredentialsUseCase(
     private val logger = KotlinLogging.logger { }
 
     fun match(
-        wallet: UUID, presentationDefinition: PresentationDefinition
+        wallet: UUID, presentationDefinition: PresentationDefinition,
     ): List<WalletCredential> {
         val credentialList = credentialService.list(wallet, CredentialFilterObject.default)
         logger.debug { "WalletCredential list is: ${credentialList.map { it.parsedDocument?.get("type")!!.jsonArray }}" }

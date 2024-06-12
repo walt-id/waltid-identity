@@ -16,7 +16,7 @@ sealed class AccountRequest {
 data class EmailAccountRequest(
     override val name: String? = null,
     val email: String,
-    val password: String
+    val password: String,
 ) : AccountRequest()
 
 @Serializable
@@ -24,7 +24,7 @@ data class EmailAccountRequest(
 data class AddressAccountRequest(
     override val name: String? = null,
     val address: String,
-    val ecosystem: String
+    val ecosystem: String,
 ) : AccountRequest()
 
 @Serializable
@@ -39,7 +39,7 @@ data class KeycloakAccountRequest(
     val email: String? = null,
     val username: String? = null,
     val password: String? = null,
-    val token: String? = null
+    val token: String? = null,
 ) : AccountRequest()
 
 @Serializable

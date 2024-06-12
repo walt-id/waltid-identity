@@ -5,7 +5,6 @@ import com.nimbusds.jose.crypto.ECDHEncrypter
 import com.nimbusds.jose.crypto.factories.DefaultJWEDecrypterFactory
 import com.nimbusds.jose.jwk.ECKey
 import com.nimbusds.jose.jwk.JWK
-import com.nimbusds.jose.proc.JWEDecrypterFactory
 import com.nimbusds.jose.util.Base64URL
 import kotlinx.serialization.json.*
 

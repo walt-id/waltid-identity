@@ -8,7 +8,7 @@ import kotlinx.serialization.json.JsonObject
 class SimpleJWTCryptoProvider(
     val jwsAlgorithm: JWSAlgorithm,
     private val jwsSigner: JWSSigner?,
-    private val jwsVerifier: JWSVerifier?
+    private val jwsVerifier: JWSVerifier?,
 ) : JWTCryptoProvider {
 
     override fun sign(payload: JsonObject, keyID: String?, typ: String): String {

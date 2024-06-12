@@ -23,4 +23,4 @@ import id.walt.commons.config.WaltConfig
 data class FeatureConfig(
     val enabledFeatures: List<String> = emptyList(),
     val disabledFeatures: List<String> = emptyList(),
-): WaltConfig()
+) : WaltConfig()

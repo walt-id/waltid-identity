@@ -6,5 +6,5 @@ import kotlinx.serialization.Serializable
 data class TokenMarketPlaceParameter(
     val chain: String,
     val contract: String,
-    val tokenId: String
+    val tokenId: String,
 )

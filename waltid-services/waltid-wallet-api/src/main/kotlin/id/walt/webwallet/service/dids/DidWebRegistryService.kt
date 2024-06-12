@@ -15,7 +15,7 @@ import org.jetbrains.exposed.sql.transactions.transaction
  */
 object DidWebRegistryService {
 
-    val DID_WEB_BASE_PATH = "wallet-api:registry"
+    const val DID_WEB_BASE_PATH = "wallet-api:registry"
 
     fun listRegisteredDids(): List<String> {
         return transaction {

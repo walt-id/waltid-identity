@@ -32,7 +32,7 @@ import kotlin.time.Duration.Companion.minutes
 
 class VP_JVM_Test {
 
-    val http = HttpClient() {
+    val http = HttpClient {
         install(ContentNegotiation) {
             json()
         }
@@ -747,7 +747,7 @@ class VP_JVM_Test {
         //testVerifier.start(wait = true)
 
 
-        val authReq = AuthorizationRequest.fromHttpParametersAuto(parseQueryString(Url(reqUri!!).encodedQuery).toMap())
+        val authReq = AuthorizationRequest.fromHttpParametersAuto(parseQueryString(Url(reqUri).encodedQuery).toMap())
         assertEquals(expected = "did:web:entra.walt.id", actual = authReq.clientId)
 
         val tokenResponse = testWallet.processImplicitFlowAuthorization(authReq)

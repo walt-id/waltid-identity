@@ -8,5 +8,5 @@ import kotlin.js.JsExport
 @JsExport
 @Serializable
 data class Secret(
-    val signingResponse: List<String>
+    val signingResponse: List<String>,
 )

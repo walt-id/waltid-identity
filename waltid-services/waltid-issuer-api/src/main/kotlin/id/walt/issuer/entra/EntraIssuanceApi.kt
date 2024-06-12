@@ -34,7 +34,7 @@ data class EntraAuthorizationInformation(
     val tenantId: String, // "8bc955d9-38fd-4c15-a520-0c656407537a"
     val clientId: String, // "e50ceaa6-8554-4ae6-bfdf-fd95e2243ae0"
     val clientSecret: String, // "ctL8Q~Ezdrcrju85gEtvbCmQQDmm7bXjJKsdXbCr"
-    val scope: String // 3db474b9-6a0c-4840-96ac-1fceb342124f/.default
+    val scope: String, // 3db474b9-6a0c-4840-96ac-1fceb342124f/.default
 ) {
     suspend fun getAccessToken(): String {
         val response = http.submitForm("https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token", parameters {
@@ -52,12 +52,12 @@ data class EntraIssuanceRequestData(
     val authority: String,
     val type: String,
     val manifest: String,
-    val claims: JsonObject
+    val claims: JsonObject,
 )
 
 @Serializable
 data class EntraRegistration(
-    val clientName: String
+    val clientName: String,
 )
 
 @Serializable
@@ -66,13 +66,13 @@ data class EntraFullIssuanceRequest(
     val registration: EntraRegistration,
     val type: String,
     val manifest: String,
-    val claims: JsonObject
+    val claims: JsonObject,
 )
 
 @Serializable
 data class EntraIssuanceRequest(
     val authorization: EntraAuthorizationInformation,
-    val data: EntraIssuanceRequestData
+    val data: EntraIssuanceRequestData,
 )
 
 fun Application.entraIssuance() {

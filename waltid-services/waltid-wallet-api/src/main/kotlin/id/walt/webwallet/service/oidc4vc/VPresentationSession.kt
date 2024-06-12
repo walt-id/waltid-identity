@@ -8,5 +8,5 @@ data class VPresentationSession(
     override val id: String,
     override val authorizationRequest: AuthorizationRequest?,
     override val expirationTimestamp: Instant,
-    val selectedCredentialIds: Set<String>
+    val selectedCredentialIds: Set<String>,
 ) : SIOPSession(id, authorizationRequest, expirationTimestamp)

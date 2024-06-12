@@ -24,7 +24,7 @@ data class DidKeyDocument(
     val authentication: List<String>?,
     val capabilityInvocation: List<String>?,
     val capabilityDelegation: List<String>?,
-    val keyAgreement: List<String>?
+    val keyAgreement: List<String>?,
 ) {
     companion object {
         private val DEFAULT_CONTEXT =
@@ -36,7 +36,7 @@ data class DidKeyDocument(
         val id: String, // did:key:
         val type: String, // JsonWebKey2020
         val controller: String, // did:key:
-        val publicKeyJwk: JsonObject // json-web-key
+        val publicKeyJwk: JsonObject, // json-web-key
     )
 
     fun toMap() = Json.encodeToJsonElement(this).jsonObject.toMap()

@@ -76,7 +76,7 @@ fun Application.exchange() = walletRoute {
             summary = "Returns the credentials stored in the wallet that match the passed presentation definition"
 
             request {
-                 body<PresentationDefinition> { description = "Presentation definition to match credentials against" }
+                body<PresentationDefinition> { description = "Presentation definition to match credentials against" }
             }
             response {
                 HttpStatusCode.OK to {
@@ -256,5 +256,5 @@ data class PresentationRequestParameter(
     val request: String,
     val selectedCredentials: List<String>,
     val disclosures: Map<String, List<String>>? = null,
-    val note: String? = null
+    val note: String? = null,
 )

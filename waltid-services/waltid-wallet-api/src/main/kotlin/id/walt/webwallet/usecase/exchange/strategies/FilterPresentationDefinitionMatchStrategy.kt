@@ -10,11 +10,11 @@ class FilterPresentationDefinitionMatchStrategy(
 ) : BaseFilterPresentationDefinitionMatchStrategy<List<WalletCredential>>() {
 
     override fun match(
-        credentials: List<WalletCredential>, presentationDefinition: PresentationDefinition
+        credentials: List<WalletCredential>, presentationDefinition: PresentationDefinition,
     ): List<WalletCredential> = match(credentials, filterParser.parse(presentationDefinition))
 
     private fun match(
-        credentialList: List<WalletCredential>, filters: List<FilterData>
+        credentialList: List<WalletCredential>, filters: List<FilterData>,
     ) = filters.isNotEmpty().takeIf { it }?.let {
         credentialList.filter { credential ->
             filters.any { fields ->

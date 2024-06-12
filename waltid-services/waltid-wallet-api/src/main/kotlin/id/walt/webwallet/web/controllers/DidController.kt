@@ -9,11 +9,9 @@ import io.github.smiley4.ktorswaggerui.dsl.routing.route
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.response.*
-import io.ktor.server.routing.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonObject
 import org.jetbrains.exposed.sql.transactions.transaction
-import kotlin.text.get
 
 fun Application.dids() = walletRoute {
     route("dids", {

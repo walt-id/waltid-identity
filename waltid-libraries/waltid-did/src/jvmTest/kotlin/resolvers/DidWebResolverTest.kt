@@ -24,7 +24,7 @@ class DidWebResolverTest : DidResolverTestBase() {
     override fun `given a did String, when calling resolve, then the result is a valid did document`(
         did: String,
         key: JsonObject,
-        assert: resolverAssertion<DidDocument>
+        assert: resolverAssertion<DidDocument>,
     ) {
         super.`given a did String, when calling resolve, then the result is a valid did document`(did, key, assert)
     }
@@ -34,7 +34,7 @@ class DidWebResolverTest : DidResolverTestBase() {
     override fun `given a did String, when calling resolveToKey, then the result is valid key`(
         did: String,
         key: JsonObject,
-        assert: resolverAssertion<Key>
+        assert: resolverAssertion<Key>,
     ) {
         super.`given a did String, when calling resolveToKey, then the result is valid key`(did, key, assert)
     }
@@ -70,7 +70,7 @@ class DidWebResolverTest : DidResolverTestBase() {
         private fun <T> testData(
             secpAssertions: resolverAssertion<T>,
             ed25519Assertions: resolverAssertion<T>,
-            rsaAssertions: resolverAssertion<T>
+            rsaAssertions: resolverAssertion<T>,
         ) =
             Stream.of(
                 //secp256k1

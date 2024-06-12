@@ -8,5 +8,5 @@ import kotlin.js.JsExport
 @JsExport
 @Serializable
 data class JobDeactivateRequest(
-    val did: String
+    val did: String,
 )

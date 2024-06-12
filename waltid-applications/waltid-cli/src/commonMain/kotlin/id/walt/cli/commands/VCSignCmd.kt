@@ -59,7 +59,7 @@ class VCSignCmd : CliktCommand(
 
         savedSignedVCFilePath?.let {
             print.green("Done. ", false)
-            print.plain("Signed VC saved at ${savedSignedVCFilePath}")
+            print.plain("Signed VC saved at $savedSignedVCFilePath")
             return
         }
 
@@ -80,7 +80,7 @@ class VCSignCmd : CliktCommand(
             DidUtil.resolveToKey(issuerDid)
         } catch (e: IllegalArgumentException) {
             e.printStackTrace()
-            throw BadParameterValue("DID can not be resolved: ${issuerDid}")
+            throw BadParameterValue("DID can not be resolved: $issuerDid")
         }
 
         // Check the key belongs to the issuer DID
@@ -88,7 +88,7 @@ class VCSignCmd : CliktCommand(
             throw BadParameterValue("Missing thumbprint from key ${key.getKeyId()}")
         }
         if (key.getPublicKey().getThumbprint() != didKey?.getPublicKey()?.getThumbprint()) {
-            throw BadParameterValue("Key ${key.getKeyId()} not associated with issuer DID ${issuerDid}")
+            throw BadParameterValue("Key ${key.getKeyId()} not associated with issuer DID $issuerDid")
         }
 
     }

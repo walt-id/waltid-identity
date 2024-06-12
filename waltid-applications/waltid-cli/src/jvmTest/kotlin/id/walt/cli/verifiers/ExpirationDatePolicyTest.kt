@@ -11,10 +11,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import java.io.File
-import kotlin.test.Test
-import kotlin.test.assertFalse
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 class ExpirationDatePolicyTest {
 
@@ -117,15 +114,12 @@ class ExpirationDatePolicyTest {
 
     private fun assertSuccess(result: Result<Any>?) {
         val policyAvailable =
-            (result!!.getOrThrow() as JsonObject).get("policy_available")!!.equals(JsonPrimitive(true))
+            (result!!.getOrThrow() as JsonObject)["policy_available"]!! == JsonPrimitive(true)
 
         assertTrue(policyAvailable, "policy not available i.e. policy not even applied.")
         assertTrue(result.isSuccess)
         assertNull(result.exceptionOrNull())
-        assertTrue(
-            (result.getOrThrow() as JsonObject).get("policy_available")!!.equals(JsonPrimitive(true)),
-            "policy not available i.e. policy not even applied."
-        )
+        assertEquals((result.getOrThrow() as JsonObject)["policy_available"]!!, JsonPrimitive(true), "policy not available i.e. policy not even applied.")
     }
 
     private fun assertFail(result: Result<Any?>) {
@@ -141,7 +135,7 @@ class ExpirationDatePolicyTest {
                 reason = exception.message!!
             }
         } else {
-            policyAvailable = (result.getOrThrow() as JsonObject).get("policy_available")!!.equals(JsonPrimitive(true))
+            policyAvailable = (result.getOrThrow() as JsonObject)["policy_available"]!! == JsonPrimitive(true)
         }
 
         assertTrue(policyAvailable, "policy not available i.e. policy not even applied (${reason})")

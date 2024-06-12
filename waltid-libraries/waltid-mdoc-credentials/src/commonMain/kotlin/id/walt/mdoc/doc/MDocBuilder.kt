@@ -12,7 +12,6 @@ import id.walt.mdoc.issuersigned.IssuerSignedItem
 import id.walt.mdoc.mso.DeviceKeyInfo
 import id.walt.mdoc.mso.MSO
 import id.walt.mdoc.mso.ValidityInfo
-import kotlinx.serialization.ExperimentalSerializationApi
 
 /**
  * MDoc builder, that provides high-level methods to create/issue and sign mdoc documents

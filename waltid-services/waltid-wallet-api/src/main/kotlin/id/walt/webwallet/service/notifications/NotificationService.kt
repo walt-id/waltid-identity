@@ -47,7 +47,7 @@ object NotificationService {
     }
 
     private fun filterAll(
-        wallet: UUID, type: String?, isRead: Boolean?, addedOn: String?, ascending: Boolean?
+        wallet: UUID, type: String?, isRead: Boolean?, addedOn: String?, ascending: Boolean?,
     ) = WalletNotifications.selectAll().where {
         WalletNotifications.wallet eq wallet
     }.andWhere {

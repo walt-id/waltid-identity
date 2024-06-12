@@ -324,7 +324,7 @@ class MainTest {
     @Ignore
     fun `should sign a given VC when no DID is provided for the Issuer`() {
 
-        val output = tapSystemOut { main(arrayOf("""vc sign -k "${keyFilePath}" -s ${did2} """)) }
+        val output = tapSystemOut { main(arrayOf("""vc sign -k "$keyFilePath" -s $did2 """)) }
 
         assertFalse(output.contains("ERROR"))
         assertContains(output, "Generated DID:")
@@ -335,7 +335,7 @@ class MainTest {
     @Ignore
     fun `should sign a given VC when all parameters are provided correctly`() {
 
-        val output = tapSystemOut { main(arrayOf("""vc sign -k "${keyFilePath}" -i ${did1} -s ${did2} """)) }
+        val output = tapSystemOut { main(arrayOf("""vc sign -k "$keyFilePath" -i $did1 -s $did2 """)) }
 
         assertFalse(output.contains("ERROR"))
         assertContains(output, "Signed VC saved at")
@@ -350,7 +350,7 @@ class MainTest {
 
     @Test
     fun `should verify the signature of a VC if the VC file is provided with no other parameter`() {
-        val output = tapSystemOut { main(arrayOf("vc", "verify", "--policy=signature", "${signedVCFilePath}")) }
+        val output = tapSystemOut { main(arrayOf("vc", "verify", "--policy=signature", signedVCFilePath)) }
 
         assertFalse(output.contains("ERROR"))
         assertContains(output, "signature: Success! ")
@@ -358,7 +358,7 @@ class MainTest {
 
     @Test
     fun `should succeed the signature verification when a valid VC is provided`() {
-        val output = tapSystemOut { main(arrayOf("vc", "verify", "--policy=signature", "${signedVCFilePath}")) }
+        val output = tapSystemOut { main(arrayOf("vc", "verify", "--policy=signature", signedVCFilePath)) }
 
         assertFalse(output.contains("ERROR"))
         assertContains(output, "signature: Success! ")
@@ -366,7 +366,7 @@ class MainTest {
 
     @Test
     fun `should fail the signature verification when an invalid VC is provided`() {
-        val output = tapSystemOut { main(arrayOf("vc", "verify", "--policy=signature", "${badSignedVCFilePath}")) }
+        val output = tapSystemOut { main(arrayOf("vc", "verify", "--policy=signature", badSignedVCFilePath)) }
 
         assertContains(output, "signature: Fail!")
     }
@@ -405,7 +405,7 @@ class MainTest {
                     "--policy=schema",
                     "-a",
                     "schema=${schemaFilePath}",
-                    "${signedValidSchemaVCFilePath}"
+                    signedValidSchemaVCFilePath
                 )
             )
         }
@@ -424,7 +424,7 @@ class MainTest {
                     "--policy=schema",
                     "-a",
                     "schema=${schemaFilePath}",
-                    "${signedInvalidSchemaVCFilePath}"
+                    signedInvalidSchemaVCFilePath
                 )
             )
         }
@@ -444,7 +444,7 @@ class MainTest {
                     "--policy=schema",
                     "-a",
                     "schema=${schemaFilePath}",
-                    "${signedInvalidSchemaVCFilePath}"
+                    signedInvalidSchemaVCFilePath
                 )
             )
         }
@@ -531,7 +531,7 @@ class MainTest {
         val match = expectedOutput.find(output)
         var filePath: String? = null
         if (match != null) {
-            filePath = match.groups.get(1)?.value
+            filePath = match.groups[1]?.value
         } else {
             throw Exception("Filename not found in the output with pattern '${expectedOutput}'")
         }

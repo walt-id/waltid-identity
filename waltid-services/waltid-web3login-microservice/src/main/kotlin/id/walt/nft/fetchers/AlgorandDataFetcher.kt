@@ -10,7 +10,7 @@ import id.walt.webwallet.service.nft.fetchers.parameters.TokenDetailParameter
 import id.walt.webwallet.service.nft.fetchers.parameters.TokenListParameter
 
 class AlgorandDataFetcher(
-    private val converter: NftDetailConverterBase<AlgorandToken>
+    private val converter: NftDetailConverterBase<AlgorandToken>,
 ) : DataFetcher {
     override fun all(parameter: TokenListParameter): List<NftDetailDataTransferObject> =
         AlgorandNftService.getAccountAssets(parameter.accountId, Common.getAlgorandChain(parameter.chain.uppercase())).map {

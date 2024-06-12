@@ -23,7 +23,7 @@ object IssuersService {
         description: String?,
         uiEndpoint: String,
         configurationEndpoint: String,
-        authorized: Boolean = false
+        authorized: Boolean = false,
     ) = transaction {
         addToWalletQuery(wallet, did, description, uiEndpoint, configurationEndpoint, authorized)
     }.insertedCount

@@ -9,5 +9,5 @@ import kotlin.js.JsExport
 @Serializable
 data class DidGetResponse(
     val didDoc: DidDocObject,
-    val key: CheqdKey
+    val key: CheqdKey,
 )

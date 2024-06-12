@@ -36,8 +36,7 @@ object CredentialStatusEntryBaseSerializer : JsonContentPolymorphicSerializer<Cr
         element: JsonElement,
     ): DeserializationStrategy<CredentialStatusEntry> {
         val json = element.jsonObject
-        val type = json.getValue("type").jsonPrimitive.content
-        return when (type) {
+        return when (val type = json.getValue("type").jsonPrimitive.content) {
             in CredentialStatusTypes.StatusList.type -> StatusListEntry.serializer()
             else -> throw IllegalArgumentException("$type is not a supported Base type.")
         }
