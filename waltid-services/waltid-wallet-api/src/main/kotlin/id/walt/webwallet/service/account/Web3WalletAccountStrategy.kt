@@ -13,7 +13,7 @@ object Web3WalletAccountStrategy : PasswordlessAccountStrategy<AddressAccountReq
     override suspend fun register(tenant: String, request: AddressAccountRequest): Result<RegistrationResult> = runCatching {
         val name = request.name
 
-        check(!AccountsService.hasAccountWeb3WalletAddress(request.address)) { "Account already exists with address: ${request.address}" }
+        require(!AccountsService.hasAccountWeb3WalletAddress(request.address)) { "Account already exists with address: ${request.address}" }
 
         val createdAccountId = transaction {
             val accountId = Accounts.insert {
