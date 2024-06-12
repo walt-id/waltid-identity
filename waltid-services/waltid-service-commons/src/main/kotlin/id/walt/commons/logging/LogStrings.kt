@@ -10,10 +10,13 @@ enum class RenderStrings(val renderString: RenderString) {
     CLEF(RENDER_CLEF),
     GELD(RENDER_GELF),
     ECS(RENDER_ECS),
+    ECS_DOTNET(RENDER_ECS_DOTNET)
 
 
 }
 
 object LogStringManager {
-    var selectedRenderString = RenderStrings.ANSI
+    val DEFAULT_RENDER_STRING = RenderStrings.ANSI
+
+    var selectedRenderString = DEFAULT_RENDER_STRING
 }
