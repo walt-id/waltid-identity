@@ -115,24 +115,25 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
 
         logger.debug { "VP token: $vpToken" }
 
-        if (session.openId4VPProfile == OpenId4VPProfile.ISO_18013_7_MDOC)
-            return verifyMdoc(tokenResponse, session)
-        else {
-            val results = runBlocking {
-                Verifier.verifyPresentation(
-                    vpTokenJwt = vpToken,
-                    vpPolicies = policies.vpPolicies,
-                    globalVcPolicies = policies.vcPolicies,
-                    specificCredentialPolicies = policies.specificPolicies,
-                    presentationContext = mapOf(
-                        "presentationDefinition" to session.presentationDefinition, "challenge" to session.id
+        return when (session.openId4VPProfile) {
+            OpenId4VPProfile.ISO_18013_7_MDOC -> verifyMdoc(tokenResponse, session)
+            else -> {
+                val results = runBlocking {
+                    Verifier.verifyPresentation(
+                        vpTokenJwt = vpToken,
+                        vpPolicies = policies.vpPolicies,
+                        globalVcPolicies = policies.vcPolicies,
+                        specificCredentialPolicies = policies.specificPolicies,
+                        presentationContext = mapOf(
+                            "presentationDefinition" to session.presentationDefinition, "challenge" to session.id
+                        )
                     )
-                )
+                }
+
+                policyResults[session.id] = results
+
+                results.overallSuccess()
             }
-
-            policyResults[session.id] = results
-
-            return results.overallSuccess()
         }
     }
 
