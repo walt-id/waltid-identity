@@ -16,12 +16,6 @@ class TraceLoggingSetup : LoggingSetup("trace", {
         }
     }
     logging {
-        fromLoggerBase("com.github.victools.jsonschema.generator", stopOnMatch = true)
-        fromMinLevel(Level.INFO) {
-            toSink("stdout")
-        }
-    }
-    logging {
         fromLoggerBase("io.ktor.routing.Routing", stopOnMatch = true)
         fromMinLevel(Level.DEBUG) {
             toSink("stdout")
