@@ -20,9 +20,7 @@ object EmailAccountStrategy : PasswordAccountStrategy<EmailAccountRequest>() {
         val name = request.name ?: throw IllegalArgumentException("No name provided!")
         val email = request.email
 
-        if (AccountsService.hasAccountEmail(tenant, email)) {
-            throw IllegalArgumentException("Account already exists!")
-        }
+        require(!AccountsService.hasAccountEmail(tenant, email)) { "Account already exists!" }
 
         val hash = hashPassword(ByteLoginRequest(request).password)
 
