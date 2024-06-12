@@ -399,12 +399,4 @@ open class CIProvider : OpenIDCredentialIssuer(
         log.debug { "SWAPPING PRE-MAPPED VC FROM SESSION ID TO NEW TOKEN: $token" }
         tokenCredentialMapping[token] = premappedVc
     }
-
-    fun mapSessionIdToIdAuthRequestState(sessionId: String, token: String) {
-        log.debug { "MAPPING SESSION ID TO TOKEN: $sessionId -->> $token" }
-        val premappedVc = sessionCredentialPreMapping.remove(sessionId)
-            ?: throw IllegalArgumentException("No credential pre-mapped with any such session id: $sessionId (for use with token: $token)")
-        log.debug { "SWAPPING PRE-MAPPED VC FROM SESSION ID TO NEW TOKEN: $token" }
-        tokenCredentialMapping[token] = premappedVc
-    }
 }
