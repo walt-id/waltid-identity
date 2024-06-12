@@ -51,7 +51,6 @@ kotlin {
                 api(project(":waltid-libraries:waltid-sdjwt"))
                 api(project(":waltid-libraries:waltid-openid4vc"))
 
-//                implementation("org.jetbrains.kotlinx:kotlinx-io-core:0.3.5")
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.0")
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.0")
                 implementation ("com.google.code.gson:gson:2.11.0")

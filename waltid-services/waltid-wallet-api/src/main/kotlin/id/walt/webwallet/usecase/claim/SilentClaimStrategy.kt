@@ -36,7 +36,7 @@ class SilentClaimStrategy(
         offer = offer,
         credentialWallet = SSIKit2WalletService.getCredentialWallet(did),
         clientId = SSIKit2WalletService.testCIClientConfig.clientID
-    ).mapNotNull {
+    ).asSequence().mapNotNull {
         val credential = WalletCredential.parseDocument(it.document, it.id) ?: JsonObject(emptyMap())
         val manifest = WalletCredential.tryParseManifest(it.manifest) ?: JsonObject(emptyMap())
         val issuerDid = WalletCredential.parseIssuerDid(credential, manifest) ?: "n/a"
@@ -75,20 +75,20 @@ class SilentClaimStrategy(
     }
 
     private suspend fun createNotifications(
-        account: UUID, credentials: Array<WalletCredential>, type: EventType.Action
+        account: UUID, credentials: Array<WalletCredential>, type: EventType.Action,
     ) = prepareNotifications(account, credentials, type.toString()).runCatching {
         notificationUseCase.add(*this.toTypedArray())
         notificationDispatchUseCase.send(*this.toTypedArray())
     }
 
     private fun createEvents(
-        tenant: String, account: UUID, credentials: List<Pair<WalletCredential, String?>>, type: EventType.Action
+        tenant: String, account: UUID, credentials: List<Pair<WalletCredential, String?>>, type: EventType.Action,
     ) = prepareEvents(account, tenant, credentials, type).runCatching {
         eventUseCase.log(*this.toTypedArray())
     }
 
     private fun prepareCredentialData(
-        did: String, data: IssuanceService.CredentialDataResult, issuerDid: String
+        did: String, data: IssuanceService.CredentialDataResult, issuerDid: String,
     ) = didService.getWalletsForDid(did).map {
         Pair(
             WalletCredential(
@@ -105,7 +105,7 @@ class SilentClaimStrategy(
     }
 
     private fun prepareEvents(
-        account: UUID, tenant: String, credentials: List<Pair<WalletCredential, String?>>, type: EventType.Action
+        account: UUID, tenant: String, credentials: List<Pair<WalletCredential, String?>>, type: EventType.Action,
     ) = credentials.map {
         Event(
             action = type,

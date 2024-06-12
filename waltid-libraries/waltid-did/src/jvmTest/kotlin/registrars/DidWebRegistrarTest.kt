@@ -21,7 +21,7 @@ class DidWebRegistrarTest : DidRegistrarTestBase(DidWebRegistrar()) {
     @MethodSource
     override fun `given did options with no key when register then returns a valid did result`(
         options: DidCreateOptions,
-        assert: registrarDidAssertion
+        assert: registrarDidAssertion,
     ) {
         super.`given did options with no key when register then returns a valid did result`(options, assert)
     }
@@ -31,7 +31,7 @@ class DidWebRegistrarTest : DidRegistrarTestBase(DidWebRegistrar()) {
     override fun `given did options and key when register with key then returns a valid did result`(
         key: Key,
         options: DidCreateOptions,
-        assert: registrarKeyAssertion
+        assert: registrarKeyAssertion,
     ) {
         super.`given did options and key when register with key then returns a valid did result`(key, options, assert)
     }

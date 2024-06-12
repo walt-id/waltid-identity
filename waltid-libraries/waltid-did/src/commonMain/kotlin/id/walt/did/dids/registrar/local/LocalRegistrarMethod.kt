@@ -18,6 +18,7 @@ abstract class LocalRegistrarMethod(val method: String) {
     @JsPromise
     @JsExport.Ignore
     abstract suspend fun register(options: DidCreateOptions): DidResult
+
     @JvmBlocking
     @JvmAsync
     @JsPromise

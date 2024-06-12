@@ -43,7 +43,7 @@ data class EntraAuthorizationInformation(
     val tenantId: String, // "8bc955d9-38fd-4c15-a520-0c656407537a"
     val clientId: String, // "e50ceaa6-8554-4ae6-bfdf-fd95e2243ae0"
     val clientSecret: String, // "ctL8Q~Ezdrcrju85gEtvbCmQQDmm7bXjJKsdXbCr"
-    val scope: String // 3db474b9-6a0c-4840-96ac-1fceb342124f/.default
+    val scope: String, // 3db474b9-6a0c-4840-96ac-1fceb342124f/.default
 ) {
     suspend fun getAccessToken(): String {
         val response = http.submitForm("https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token", parameters {
@@ -58,7 +58,7 @@ data class EntraAuthorizationInformation(
 
 @Serializable
 data class EntraAcceptableCredential(
-    val type: String, val purpose: String? = null, val acceptedIssuers: List<String>? = null
+    val type: String, val purpose: String? = null, val acceptedIssuers: List<String>? = null,
 )
 
 @Serializable
@@ -69,7 +69,7 @@ data class EntraVerificationRequest(
     // callback
     // client name
 
-    val credentials: List<EntraAcceptableCredential>
+    val credentials: List<EntraAcceptableCredential>,
 )
 
 object EntraVerifierApi {
@@ -78,22 +78,22 @@ object EntraVerifierApi {
         val authority: String,
         val callback: EntraCreatePresentationRequestCallback,
         val registration: EntraCreatePresentationRequestRegistration,
-        val requestedCredentials: List<EntraAcceptableCredential>
+        val requestedCredentials: List<EntraAcceptableCredential>,
     ) {
         @Serializable
         data class EntraCreatePresentationRequestCallback(
-            val url: String, val state: String, val headers: JsonObject
+            val url: String, val state: String, val headers: JsonObject,
         )
 
         @Serializable
         data class EntraCreatePresentationRequestRegistration(
-            val clientName: String
+            val clientName: String,
         )
 
         companion object {
             fun fromEntraVerificationRequest(
                 req: EntraVerificationRequest,
-                callback: EntraCreatePresentationRequestCallback
+                callback: EntraCreatePresentationRequestCallback,
             ): EntraCreatePresentationRequest =
                 EntraCreatePresentationRequest(
                     authority = req.authority,
@@ -174,20 +174,20 @@ object EntraVerifierApi {
 data class CredentialPolicyResults(
     val type: String,
     val credential: EntraVerificationApiResponse.VerifiedCredentialsData,
-    val policies: List<PolicyResult>
+    val policies: List<PolicyResult>,
 )
 
 
 @Serializable
 data class EntraVerifyRequest(
     val entraVerification: EntraVerificationRequest,
-    val data: EntraVerifierApi.VerifierData
+    val data: EntraVerifierApi.VerifierData,
 )
 
 @Serializable
 data class EntraVerifyResponse(
     val url: String,
-    val nonce: String
+    val nonce: String,
 )
 
 fun Application.entraVerifierApi() {
@@ -278,5 +278,8 @@ fun Application.entraVerifierApi() {
 }
 
 fun main() {
-    println("entra: " + (System.getenv()["ENTRA_CALLBACK_URL"] ?: throw IllegalArgumentException("No ENTRA_CALLBACK_URL environment variable configured!")))
+    println(
+        "entra: " + (System.getenv()["ENTRA_CALLBACK_URL"]
+            ?: throw IllegalArgumentException("No ENTRA_CALLBACK_URL environment variable configured!"))
+    )
 }

@@ -22,7 +22,7 @@ class PresentationDefinitionPolicy : CredentialWrapperValidatorPolicy(
             data.jsonObject["vp"]!!.jsonObject["verifiableCredential"]?.jsonArray?.mapNotNull {
                 it.jsonPrimitive.contentOrNull?.decodeJws()?.payload
                     ?.jsonObject?.get("vc")?.jsonObject?.get("type")?.jsonArray?.last()?.jsonPrimitive?.contentOrNull
-            }?.filterNotNull() ?: emptyList()
+            } ?: emptyList()
 
         val success = presentedTypes.containsAll(requestedTypes)
 

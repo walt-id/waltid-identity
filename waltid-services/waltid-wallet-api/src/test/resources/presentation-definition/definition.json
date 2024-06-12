@@ -1,18 +1,14 @@
 {
-    "input_descriptors":
-    [
-        {
-            "id": "VerifiableCredential#1",
-            "format":
-            {
-                "jwt_vc_json":
-                {
-                    "alg":
-                    [
-                        "EdDSA"
-                    ]
-                }
-            }
+  "input_descriptors": [
+    {
+      "id": "VerifiableCredential#1",
+      "format": {
+        "jwt_vc_json": {
+          "alg": [
+            "EdDSA"
+          ]
         }
-    ]
+      }
+    }
+  ]
 }

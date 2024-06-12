@@ -33,7 +33,7 @@ object AccountWalletMappings : Table("account_wallet_mapping") {
 @Serializable
 data class AccountWalletListing(
     val account: UUID,
-    val wallets: List<WalletListing>
+    val wallets: List<WalletListing>,
 ) {
     @Serializable
     data class WalletListing(
@@ -41,6 +41,6 @@ data class AccountWalletListing(
         val name: String,
         val createdOn: Instant,
         val addedOn: Instant,
-        val permission: AccountWalletPermissions
+        val permission: AccountWalletPermissions,
     )
 }

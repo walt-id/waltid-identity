@@ -20,7 +20,7 @@ import love.forte.plugin.suspendtrans.annotation.JvmBlocking
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 
-private val log = KotlinLogging.logger {  }
+private val log = KotlinLogging.logger { }
 
 @OptIn(ExperimentalJsExport::class)
 @JsExport
@@ -55,7 +55,12 @@ class UniresolverResolver : DidResolver {
         runCatching {
             http.get("$resolverUrl/identifiers/$did")
         }.map { response ->
-            runCatching { response.body<JsonObject>() }.getOrElse { throw RuntimeException("HTTP response (status ${response.status}) is not JSON, body: ${response.bodyAsText()}", it)  }
+            runCatching { response.body<JsonObject>() }.getOrElse {
+                throw RuntimeException(
+                    "HTTP response (status ${response.status}) is not JSON, body: ${response.bodyAsText()}",
+                    it
+                )
+            }
         }
 
     @JvmBlocking

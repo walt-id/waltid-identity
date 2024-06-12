@@ -269,7 +269,7 @@ Options:
 
 ## waltid did resolve
 
-```json
+```
 Usage: waltid did resolve [<options>]
 
 Resolve the decentralized identity passed as an argument, i.e. it retrieves the sovereign identity document addressed by the given DID.

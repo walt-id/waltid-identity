@@ -23,7 +23,7 @@ object OidcIssuance {
         issuanceRequestsToCredentialOfferBuilder(*issuanceRequests.toTypedArray())
 
     fun issuanceRequestsToCredentialOfferBuilder(vararg issuanceRequests: IssuanceRequest): CredentialOffer.Builder {
-        var builder = CredentialOffer.Builder(OidcApi.baseUrl)
+        val builder = CredentialOffer.Builder(OidcApi.baseUrl)
         issuanceRequests.forEach { issuanceRequest ->
             builder.addOfferedCredential(issuanceRequest.credentialConfigurationId)
         }

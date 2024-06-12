@@ -99,7 +99,7 @@ class CI_JVM_Test {
         ).associateBy { it.id }
     )
 
-    val ktorClient = HttpClient() {
+    val ktorClient = HttpClient {
         install(ContentNegotiation) {
             json()
         }
@@ -535,7 +535,7 @@ class CI_JVM_Test {
             assertContains(iterable = it.parameters.names(), element = ResponseType.Code.name.lowercase())
             assertEquals(
                 expected = authCodeResponse.code,
-                actual = it.parameters.get(ResponseType.Code.name.lowercase())
+                actual = it.parameters[ResponseType.Code.name.lowercase()]
             )
         }
 
@@ -570,7 +570,7 @@ class CI_JVM_Test {
         assertNotNull(actual = tokenResponse.cNonce)
 
         println("// receive credential")
-        var nonce = tokenResponse.cNonce!!
+        val nonce = tokenResponse.cNonce!!
         val holderDid = TEST_WALLET_DID_WEB1
 //        val holderKey = runBlocking { JWKKey.importJWK(TEST_WALLET_KEY1) }.getOrThrow()
         val holderKey = JWKKey.importJWK(TEST_WALLET_KEY1).getOrThrow()
@@ -587,7 +587,7 @@ class CI_JVM_Test {
         val parsedHolderKeyId = credReq.proof?.jwt?.let { JwtUtils.parseJWTHeader(it) }?.get("kid")?.jsonPrimitive?.content
         assertNotNull(actual = parsedHolderKeyId)
         assertTrue(actual = parsedHolderKeyId.startsWith("did:"))
-        val parsedHolderDid = parsedHolderKeyId!!.substringBefore("#")
+        val parsedHolderDid = parsedHolderKeyId.substringBefore("#")
 //        val resolvedKeyForHolderDid = runBlocking { DidService.resolveToKey(parsedHolderDid) }.getOrThrow()
         val resolvedKeyForHolderDid = DidService.resolveToKey(parsedHolderDid).getOrThrow()
 
@@ -596,7 +596,7 @@ class CI_JVM_Test {
 
         val generatedCredential = ciTestProvider.generateCredential(credReq).credential
         assertNotNull(generatedCredential)
-        val credentialResponse: CredentialResponse = CredentialResponse.success(credReq.format, generatedCredential!!)
+        val credentialResponse: CredentialResponse = CredentialResponse.success(credReq.format, generatedCredential)
 
         println("// -------- WALLET ----------")
         assertTrue(actual = credentialResponse.isSuccess)
@@ -608,7 +608,7 @@ class CI_JVM_Test {
         val credential = credentialResponse.credential!!.jsonPrimitive.content
         println(">>> Issued credential: $credential")
         verifyIssuerAndSubjectId(
-            SDJwt.parse(credential).fullPayload.get("vc")?.jsonObject!!,
+            SDJwt.parse(credential).fullPayload["vc"]?.jsonObject!!,
             ciTestProvider.CI_ISSUER_DID, credentialWallet.TEST_DID
         )
         assertTrue(actual = JwtSignaturePolicy().verify(credential, null, mapOf()).isSuccess)
@@ -736,14 +736,14 @@ class CI_JVM_Test {
         println("// as CI provider, initialize credential offer for user, this time providing full offered credential object, and allowing pre-authorized code flow with user pin")
         val issuanceSession = ciTestProvider.initializeCredentialOffer(
             CredentialOffer.Builder(ciTestProvider.baseUrl)
-                .addOfferedCredential(ciTestProvider.metadata.credentialsSupported!!.first().id!!),
+                .addOfferedCredential(ciTestProvider.metadata.credentialsSupported!!.first().id),
             5.minutes, allowPreAuthorized = true, txCode = TxCode(TxInputMode.numeric), txCodeValue = "1234"
         )
         println("issuanceSession: $issuanceSession")
 
         assertNotNull(actual = issuanceSession.credentialOffer)
         assertEquals(
-            expected = ciTestProvider.metadata.credentialsSupported!!.first().id!!,
+            expected = ciTestProvider.metadata.credentialsSupported!!.first().id,
             actual = issuanceSession.credentialOffer!!.credentialConfigurationIds.first()
         )
 
@@ -1115,14 +1115,14 @@ class CI_JVM_Test {
         println("// as CI provider, initialize credential offer for user, this time providing full offered credential object, and allowing pre-authorized code flow with user pin")
         val issuanceSession = ciTestProvider.initializeCredentialOffer(
             CredentialOffer.Builder(ciTestProvider.baseUrl)
-                .addOfferedCredential(ciTestProvider.metadata.credentialsSupported!!.first().id!!),
+                .addOfferedCredential(ciTestProvider.metadata.credentialsSupported!!.first().id),
             5.minutes, allowPreAuthorized = true, TxCode(TxInputMode.numeric), txCodeValue = "1234"
         )
         println("issuanceSession: $issuanceSession")
 
         assertNotNull(actual = issuanceSession.credentialOffer)
         assertEquals(
-            expected = ciTestProvider.metadata.credentialsSupported!!.first().id!!,
+            expected = ciTestProvider.metadata.credentialsSupported!!.first().id,
             actual = issuanceSession.credentialOffer!!.credentialConfigurationIds.first()
         )
 
@@ -1235,7 +1235,7 @@ class CI_JVM_Test {
     }
 
 
-    val http = HttpClient() {
+    val http = HttpClient {
         install(ContentNegotiation) {
             json()
         }

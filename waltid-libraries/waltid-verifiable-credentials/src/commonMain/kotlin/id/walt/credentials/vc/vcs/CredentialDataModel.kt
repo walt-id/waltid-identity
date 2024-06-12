@@ -13,7 +13,6 @@ sealed interface CredentialDataModel {
     @JsExport.Ignore
     companion object {
         internal val w3cJson = Json {
-            @OptIn(ExperimentalSerializationApi::class)
             explicitNulls = false
         }
     }

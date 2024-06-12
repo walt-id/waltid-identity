@@ -33,7 +33,7 @@ class DidEbsiResolver : LocalResolverMethod("ebsi") {
     override suspend fun resolve(did: String): Result<DidDocument> {
         val url = "https://api-conformance.ebsi.eu/did-registry/v5/identifiers/${did}"
 
-        val httpClient = HttpClient() {
+        val httpClient = HttpClient {
             install(ContentNegotiation) {
                 json(Json { ignoreUnknownKeys = true })
             }

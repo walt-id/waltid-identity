@@ -13,7 +13,7 @@ data class OnboardingRequest(
 
     private val did: JsonObject = buildJsonObject {
         put("method", JsonPrimitive("jwk"))
-    }
+    },
 ) {
     val keyGenerationRequest = Json.decodeFromJsonElement<KeyGenerationRequest>(key)
 

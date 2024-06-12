@@ -73,43 +73,6 @@ kotlin {
     }
 
     sourceSets {
-      /*  val commonMain by getting {
-            dependencies {
-                api(project(":waltid-libraries:waltid-crypto"))
-
-                // JSON
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.0")
-
-                // Ktor client
-                implementation("io.ktor:ktor-client-core:2.3.10")
-                implementation("io.ktor:ktor-client-serialization:2.3.11")
-                implementation("io.ktor:ktor-client-content-negotiation:2.3.10")
-                implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.10")
-                implementation("io.ktor:ktor-client-json:2.3.10")
-                implementation("io.ktor:ktor-client-logging:2.3.10")
-
-                implementation(project.dependencies.platform("org.kotlincrypto.hash:bom:0.5.1"))
-                implementation("org.kotlincrypto.hash:sha2")
-
-                // Date
-                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.0")
-
-                // Coroutines
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
-
-                // Logging
-                implementation("io.github.oshai:kotlin-logging:6.0.9")
-            }
-        }
-        val commonTest by getting {
-            dependencies {
-                implementation(kotlin("test-common"))
-                implementation(kotlin("test-annotations-common"))
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
-            }
-        }*/
-
-
         val androidMain by getting {
             dependencies {
                 api(project(":waltid-libraries:waltid-crypto"))

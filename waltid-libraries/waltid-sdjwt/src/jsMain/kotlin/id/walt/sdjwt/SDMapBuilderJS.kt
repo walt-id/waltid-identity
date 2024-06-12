@@ -5,7 +5,7 @@ package id.walt.sdjwt
 @JsName("SDMapBuilder")
 class SDMapBuilderJS(
     private val decoyMode: String = DecoyMode.NONE.name,
-    private val numDecoys: Int = 0
+    private val numDecoys: Int = 0,
 ) {
     private val fields = mutableMapOf<String, SDField>()
 

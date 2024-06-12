@@ -9,6 +9,6 @@ abstract class RevocationPolicyMp : CredentialWrapperValidatorPolicy(
     abstract override suspend fun verify(data: JsonElement, args: Any?, context: Map<String, Any>): Result<Any>
 }
 
-expect class RevocationPolicy constructor(): RevocationPolicyMp {
+expect class RevocationPolicy(): RevocationPolicyMp {
     override suspend fun verify(data: JsonElement, args: Any?, context: Map<String, Any>): Result<Any>
 }

@@ -16,7 +16,7 @@ import kotlin.js.JsName
 @OptIn(ExperimentalSerializationApi::class, ExperimentalJsExport::class)
 @Serializable
 data class DidWebDocument(
-    @EncodeDefault @SerialName("@context")  val context: List<String> = DEFAULT_CONTEXT,
+    @EncodeDefault @SerialName("@context") val context: List<String> = DEFAULT_CONTEXT,
     val id: String, // did:web:
 
     val verificationMethod: List<VerificationMethod>?,
@@ -24,7 +24,7 @@ data class DidWebDocument(
     val authentication: List<String>?,
     val capabilityInvocation: List<String>?,
     val capabilityDelegation: List<String>?,
-    val keyAgreement: List<String>?
+    val keyAgreement: List<String>?,
 ) {
     companion object {
         private val DEFAULT_CONTEXT =
@@ -36,7 +36,7 @@ data class DidWebDocument(
         val id: String, // did:web:
         val type: String, // JsonWebKey2020
         val controller: String, // did:web:
-        val publicKeyJwk: JsonObject // json-web-key
+        val publicKeyJwk: JsonObject, // json-web-key
     )
 
     fun toMap() = Json.encodeToJsonElement(this).jsonObject.toMap()

@@ -1,10 +1,8 @@
 package id.walt.mdoc.dataretrieval
 
 import cbor.Cbor
-import id.walt.mdoc.doc.MDoc
 import id.walt.mdoc.dataelement.*
-import korlibs.crypto.encoding.base64Url
-import korlibs.crypto.encoding.toBase64
+import id.walt.mdoc.doc.MDoc
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromByteArray

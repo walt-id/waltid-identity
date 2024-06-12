@@ -1,6 +1,5 @@
 package id.walt.oid4vc.responses
 
-import id.walt.crypto.keys.Key
 import id.walt.crypto.utils.JweUtils
 import id.walt.crypto.utils.JwsUtils
 import id.walt.oid4vc.data.*

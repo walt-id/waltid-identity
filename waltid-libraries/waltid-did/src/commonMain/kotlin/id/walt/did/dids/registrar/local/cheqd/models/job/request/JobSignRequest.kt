@@ -10,5 +10,5 @@ import kotlin.js.JsExport
 @Serializable
 data class JobSignRequest(
     val jobId: String,
-    val secret: Secret
+    val secret: Secret,
 )

@@ -56,13 +56,13 @@ object ConfigManager {
             log.trace { "Loaded config \"$id\": $it" }
             loadedConfigurations[configKey] = it
         }.onFailure {
-                log.error {
-                    """
+            log.error {
+                """
                     |---- vvv Configuration error for "$id" vvv ----
                     |Could not load configuration for $fullName: ${it.stackTraceToString()}
                     |---- ^^^ Configuration error for "$id" ^^^ ---
                     |""".trimMargin()
-                }
+            }
         }
     }
 

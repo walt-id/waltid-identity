@@ -36,7 +36,7 @@ data class DidJwkDocument(
     val authentication: List<String>?,
     val capabilityInvocation: List<String>?,
     val capabilityDelegation: List<String>?,
-    val keyAgreement: List<String>?
+    val keyAgreement: List<String>?,
 ) {
     companion object {
         private val DEFAULT_CONTEXT = listOf("https://www.w3.org/ns/did/v1", "https://w3id.org/security/suites/jws-2020/v1")
@@ -47,7 +47,7 @@ data class DidJwkDocument(
         val id: String, // did:jwk:${base64url-value}#0
         val type: String, // JsonWebKey2020
         val controller: String, // did:jwk:${base64url-value}
-        val publicKeyJwk: JsonObject // json-web-key
+        val publicKeyJwk: JsonObject, // json-web-key
     )
 
     fun toMap() = Json.encodeToJsonElement(this).jsonObject.toMap()

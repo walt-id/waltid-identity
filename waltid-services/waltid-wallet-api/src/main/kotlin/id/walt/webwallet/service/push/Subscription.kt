@@ -12,7 +12,7 @@ import java.security.PublicKey
 data class Subscription(
     val auth: String,
     val key: String,
-    val endpoint: String
+    val endpoint: String,
 ) {
     /**
      * Returns the base64 encoded auth string as a byte[]

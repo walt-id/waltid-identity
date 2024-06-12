@@ -14,15 +14,15 @@ class SDJwtTestIOS {
     fun testSignJwt() {
         val cryptoProvider = HMACJWTCryptoProvider("HS256", sharedSecret.encodeToByteArray())
 
-        val originalSet = mutableMapOf<String, JsonElement> (
-            "sub" to  JsonPrimitive("123"),
+        val originalSet = mutableMapOf<String, JsonElement>(
+            "sub" to JsonPrimitive("123"),
             "aud" to JsonPrimitive("456")
         )
 
         val originalClaimsSet = JsonObject(originalSet)
 
         // Create undisclosed claims set, by removing e.g. subject property from original claims set
-        val undisclosedSet = mutableMapOf<String, JsonElement> (
+        val undisclosedSet = mutableMapOf<String, JsonElement>(
             "aud" to JsonPrimitive("456")
         )
 
@@ -40,7 +40,10 @@ class SDJwtTestIOS {
         assertContains(map = sdJwt.undisclosedPayload, key = SDJwt.DIGESTS_KEY)
         assertContains(map = sdJwt.undisclosedPayload, key = "aud")
         assertEquals(expected = 1, actual = sdJwt.disclosures.size)
-        assertEquals(expected = "sub", actual = sdJwt.digestedDisclosures[sdJwt.undisclosedPayload[SDJwt.DIGESTS_KEY]!!.jsonArray[0].jsonPrimitive.content]!!.key)
+        assertEquals(
+            expected = "sub",
+            actual = sdJwt.digestedDisclosures[sdJwt.undisclosedPayload[SDJwt.DIGESTS_KEY]!!.jsonArray[0].jsonPrimitive.content]!!.key
+        )
         assertEquals(expected = originalClaimsSet, actual = Json.parseToJsonElement(sdJwt.fullPayload.toString()).jsonObject)
 
         assertTrue(actual = assersdJwt.verify(cryptoProvider).verified)
@@ -74,7 +77,8 @@ class SDJwtTestIOS {
     fun parseAndVerify() {
         // Create SimpleJWTCryptoProvider with MACSigner and MACVerifier
         val cryptoProvider = HMACJWTCryptoProvider("HS256", sharedSecret.encodeToByteArray())
-        val undisclosedJwt = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI0NTYiLCJfc2QiOlsiaGx6ZmpmMDRvNVpzTFIyNWhhNGMtWS05SFcyRFVseGNnaU1ZZDMyNE5nWSJdfQ.2fsLqzujWt0hS0peLS8JLHyyo3D5KCDkNnHcBYqQwVo~"
+        val undisclosedJwt =
+            "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI0NTYiLCJfc2QiOlsiaGx6ZmpmMDRvNVpzTFIyNWhhNGMtWS05SFcyRFVseGNnaU1ZZDMyNE5nWSJdfQ.2fsLqzujWt0hS0peLS8JLHyyo3D5KCDkNnHcBYqQwVo~"
 
         // verify and parse presented SD-JWT with all fields undisclosed, throws Exception if verification fails!
         val parseAndVerifyResult = SDJwt.verifyAndParse(undisclosedJwt, cryptoProvider)

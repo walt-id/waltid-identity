@@ -27,7 +27,7 @@ class WaltIdVCSignCmdTest {
 
     @Test
     fun `should print help message when called with no argument`() {
-        val result = command.test(emptyList<String>())
+        val result = command.test(emptyList())
         assertContains(result.stdout, "Usage: sign")
     }
 
@@ -130,7 +130,7 @@ class WaltIdVCSignCmdTest {
     @Test
     fun `should sign an existing VC when the issuer key and a subject DID is provided`() {
 
-        val result = command.test("""-k "${keyFileName}" -i ${issuerDid} -s ${subjectDid} "${vcFilePath}" """)
+        val result = command.test("""-k "$keyFileName" -i $issuerDid -s $subjectDid "$vcFilePath" """)
 
         assertContains(result.stdout, "Signed VC saved at")
     }

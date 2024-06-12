@@ -36,7 +36,7 @@ class wallettest {
      * 3. Run test "wallettest" (this file)
      */
 
-    private val ktorClient = HttpClient() {
+    private val ktorClient = HttpClient {
         install(ContentNegotiation) {
             json()
         }

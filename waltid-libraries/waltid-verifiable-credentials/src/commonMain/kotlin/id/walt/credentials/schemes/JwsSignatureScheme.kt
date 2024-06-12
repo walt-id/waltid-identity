@@ -81,7 +81,12 @@ class JwsSignatureScheme : SignatureScheme {
 //        println("Subject: $subjectDid")
 
         DidService.resolveToKey(issuerDid)
-            .also { log.trace("Imported key: $it from did: $issuerDid, public is: ${it.getOrNull()?.getPublicKey()?.exportJWK()}") }
+            .also {
+                if (log.isTraceEnabled()) {
+                    val exportedJwk = it.getOrNull()?.getPublicKey()?.exportJWK()
+                    log.trace { "Imported key: $it from did: $issuerDid, public is: $exportedJwk" }
+                }
+            }
             .getOrThrow()
             .verifyJws(data.split("~")[0])
             .also { log.trace { "Verification result: $it" } }

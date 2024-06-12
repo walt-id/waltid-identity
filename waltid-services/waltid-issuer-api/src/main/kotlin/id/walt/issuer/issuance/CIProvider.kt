@@ -40,6 +40,7 @@ import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.time.Duration.Companion.minutes
 
 val supportedCredentialTypes = ConfigManager.getConfig<CredentialTypeConfig>().supportedCredentialTypes
+
 /**
  * OIDC for Verifiable Credential Issuance service provider, implementing abstract service provider from OIDC4VC library.
  */
@@ -58,7 +59,7 @@ open class CIProvider : OpenIDCredentialIssuer(
         }
     }.associateBy { it.id })
 ) {
-    private val log = KotlinLogging.logger {  }
+    private val log = KotlinLogging.logger { }
 
     companion object {
 
@@ -113,7 +114,7 @@ open class CIProvider : OpenIDCredentialIssuer(
         payload: JsonObject,
         header: JsonObject?,
         keyId: String?,
-        privKey: Key?
+        privKey: Key?,
     ) =
         runBlocking {
             log.debug { "Signing JWS:   $payload" }
@@ -189,7 +190,7 @@ open class CIProvider : OpenIDCredentialIssuer(
     }
 
     private fun doGenerateCredential(
-        credentialRequest: CredentialRequest, subjectDid: String?, nonce: String?
+        credentialRequest: CredentialRequest, subjectDid: String?, nonce: String?,
     ): CredentialResult {
         if (credentialRequest.format == CredentialFormat.mso_mdoc) throw CredentialError(
             credentialRequest, CredentialErrorCode.unsupported_credential_format
@@ -288,7 +289,7 @@ open class CIProvider : OpenIDCredentialIssuer(
     @OptIn(ExperimentalEncodingApi::class)
     override fun generateBatchCredentialResponse(
         batchCredentialRequest: BatchCredentialRequest,
-        accessToken: String
+        accessToken: String,
     ): BatchCredentialResponse {
         if (batchCredentialRequest.credentialRequests.map { it.format }.distinct().size >= 2) {
             throw IllegalArgumentException("Credential request don't have the same format")
@@ -378,7 +379,7 @@ open class CIProvider : OpenIDCredentialIssuer(
 
 
     data class IssuanceSessionData(
-        val issuerKey: Key, val issuerDid: String, val request: IssuanceRequest
+        val issuerKey: Key, val issuerDid: String, val request: IssuanceRequest,
     )
 
     // TODO: Hack as this is non stateless because of oidc4vc lib API

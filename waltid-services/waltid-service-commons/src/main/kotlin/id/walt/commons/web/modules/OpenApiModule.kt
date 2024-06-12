@@ -39,7 +39,9 @@ object OpenApiModule {
                 title = "${ServiceConfig.config.vendor} ${ServiceConfig.config.name}"
                 version = BuildConfig.version
                 description = """
-                    Interact with the ${ServiceConfig.config.vendor} ${ServiceConfig.config.name}. Version is reported to be ${BuildConfig.version} and this service instance was started ${Clock.System.now().roundToSecond()}.
+                    Interact with the ${ServiceConfig.config.vendor} ${ServiceConfig.config.name}. Version is reported to be ${BuildConfig.version} and this service instance was started ${
+                    Clock.System.now().roundToSecond()
+                }.
                     Questions about anything here? Visit <a href='https://github.com/walt-id/#join-the-community'>support</a>.
                     
                 """.trimIndent().replace("\n", "<br/>")

@@ -17,7 +17,7 @@ import kotlin.coroutines.suspendCoroutine
 open class SimpleAsyncJWTCryptoProvider(
     private val algorithm: String,
     private val keyParam: dynamic,
-    private val options: dynamic
+    private val options: dynamic,
 ) : JSAsyncJWTCryptoProvider {
     @JsExport.Ignore
     override suspend fun sign(payload: JsonObject, keyID: String?): String = suspendCoroutine { continuation ->

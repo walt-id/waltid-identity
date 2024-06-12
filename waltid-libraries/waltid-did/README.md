@@ -13,6 +13,7 @@
 </div>
 
 ## Installation
+
 Add the did library as a dependency to your Kotlin or Java project, which includes the crypto lib.
 
 ### walt.id Repository
@@ -270,7 +271,8 @@ represented as **_walt.id crypto_** `Key`.
     </tbody>
 </table>
 
-(*) The did:key implementation defaults to W3C CCG https://w3c-ccg.github.io/did-method-key/. By setting _useJwkJcsPub_ to `true` the EBSI implementation (jwk_jcs-pub encoding) according https://hub.ebsi.eu/tools/libraries/key-did-resolver is performed. 
+(*) The did:key implementation defaults to W3C CCG https://w3c-ccg.github.io/did-method-key/. By setting _useJwkJcsPub_ to `true` the EBSI
+implementation (jwk_jcs-pub encoding) according https://hub.ebsi.eu/tools/libraries/key-did-resolver is performed.
 
 ## Remote DID operations by 3d party services (fallback)
 

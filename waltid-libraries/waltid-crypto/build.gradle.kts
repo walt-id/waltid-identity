@@ -25,7 +25,7 @@ suspendTransform {
     useDefault()
 }
 
-tasks.withType<org.gradle.language.jvm.tasks.ProcessResources> {
+tasks.withType<ProcessResources> {
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
 

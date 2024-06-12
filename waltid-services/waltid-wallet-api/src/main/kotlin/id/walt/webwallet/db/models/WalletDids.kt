@@ -34,7 +34,7 @@ data class WalletDid(
     val document: String,
     val keyId: String,
     val default: Boolean,
-    val createdOn: Instant
+    val createdOn: Instant,
 ) {
     constructor(result: ResultRow) : this(
         did = result[WalletDids.did],

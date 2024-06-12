@@ -19,21 +19,25 @@ interface DidRegistrar {
     @JsPromise
     @JsExport.Ignore
     suspend fun getSupportedMethods(): Result<Set<String>>
+
     @JvmBlocking
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
     suspend fun create(options: DidCreateOptions): DidResult
+
     @JvmBlocking
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
     suspend fun createByKey(key: Key, options: DidCreateOptions): DidResult
+
     @JvmBlocking
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
     suspend fun update()
+
     @JvmBlocking
     @JvmAsync
     @JsPromise

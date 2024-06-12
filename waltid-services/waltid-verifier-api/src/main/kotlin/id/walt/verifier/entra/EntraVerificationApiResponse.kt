@@ -10,7 +10,7 @@ data class EntraVerificationApiResponse(
     val requestStatus: String, // presentation_verified
     val state: String, // 1234
     val subject: String? = null, // did:web:entra.walt.id:holder
-    val verifiedCredentialsData: List<VerifiedCredentialsData>? = null
+    val verifiedCredentialsData: List<VerifiedCredentialsData>? = null,
 ) {
     @Serializable
     data class VerifiedCredentialsData(
@@ -19,12 +19,12 @@ data class EntraVerificationApiResponse(
         val expirationDate: String, // 2024-02-15T13:24:29.000Z
         val issuanceDate: String, // 2024-01-16T13:24:29.000Z
         val issuer: String, // did:web:entra.walt.id
-        val type: List<String>
+        val type: List<String>,
     ) {
 
         @Serializable
         data class CredentialState(
-            val revocationStatus: String  // VALID
+            val revocationStatus: String,  // VALID
         )
     }
 }

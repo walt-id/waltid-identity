@@ -23,7 +23,7 @@ class DidExamples {
     }
 
     private suspend fun isVaultAvailable() = runCatching {
-       HttpClient().get("http://127.0.0.1:8200").status == HttpStatusCode.OK
+        HttpClient().get("http://127.0.0.1:8200").status == HttpStatusCode.OK
     }.fold(onSuccess = { it }, onFailure = { false })
 
     private fun groupDidList(resolverMethods: Map<String, String>): Map<String, List<String>> =

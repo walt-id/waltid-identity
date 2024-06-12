@@ -728,7 +728,7 @@ class Sqids(
             chars[i] = chars[r]
             chars[r] = temp
         }
-        return chars.joinToString("");
+        return chars.joinToString("")
     }
 
     private fun toId(num: Long, alphabet: String): String {

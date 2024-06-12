@@ -13,7 +13,7 @@ import kotlinx.serialization.json.*
 class SDMap(
     val fields: Map<String, SDField>,
     val decoyMode: DecoyMode = DecoyMode.NONE,
-    val decoys: Int = 0
+    val decoys: Int = 0,
 ) : Map<String, SDField> {
     override val entries: Set<Map.Entry<String, SDField>>
         get() = fields.entries
@@ -67,7 +67,7 @@ class SDMap(
             fullPayload: JsonObject,
             undisclosedPayload: JsonObject,
             decoyMode: DecoyMode = DecoyMode.NONE,
-            decoys: Int = 0
+            decoys: Int = 0,
         ): SDMap {
             return fullPayload.mapValues { entry ->
                 if (!undisclosedPayload.containsKey(entry.key))
@@ -94,7 +94,7 @@ class SDMap(
             decoyMode: DecoyMode = DecoyMode.NONE,
             decoys: Int,
             sdPaths: Set<String>,
-            parent: String
+            parent: String,
         ): SDMap {
             val pathMap = jsonPaths.map { path -> Pair(path.substringBefore("."), path.substringAfter(".", "")) }
                 .groupBy({ p -> p.first }, { p -> p.second }).mapValues { entry -> entry.value.filterNot { it.isEmpty() } }

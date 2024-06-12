@@ -61,7 +61,7 @@ class WaltIdVCVerifyCmdTest {
 
     @Test
     fun `should print help message when called with no argument`() {
-        val result = command.test(emptyList<String>())
+        val result = command.test(emptyList())
         assertContains(result.stdout, "Usage: verify")
     }
 
@@ -82,13 +82,13 @@ class WaltIdVCVerifyCmdTest {
 
     @Test
     fun `should validate the VC signature when a good JWS is provided`() {
-        val result = command.test(listOf("""${signedVCFilePath}"""))
+        val result = command.test(listOf(signedVCFilePath))
         assertContains(result.output, "signature: Success")
     }
 
     @Test
     fun `should have --policy option`() {
-        val result = command.test(listOf("--policy=aPolicy", "${signedVCFilePath}"))
+        val result = command.test(listOf("--policy=aPolicy", signedVCFilePath))
         assertFalse(result.output.contains("Error: no such option --policy"))
     }
 
@@ -100,7 +100,7 @@ class WaltIdVCVerifyCmdTest {
                     "--policy=signature",
                     "--policy=schema",
                     "--arg=schema=${schemaFilePath}",
-                    "${signedVCFilePath}"
+                    signedVCFilePath
                 )
             )
         }
@@ -108,7 +108,7 @@ class WaltIdVCVerifyCmdTest {
 
     @Test
     fun `should not require a --policy`() {
-        val result = command.test(listOf("${signedVCFilePath}"))
+        val result = command.test(listOf(signedVCFilePath))
         assertContains(result.output, "signature: Success")
     }
 
@@ -120,7 +120,7 @@ class WaltIdVCVerifyCmdTest {
 
     @Test
     fun `should apply only the specified policy`() {
-        val result1 = command.test(listOf("${signedVCFilePath}"))
+        val result1 = command.test(listOf(signedVCFilePath))
         assertContains(result1.output, "signature: Success")
 
         val result2 = command.test(listOf("--policy=schema", "--arg=schema=${schemaFilePath}", signedVCFilePath))
@@ -131,7 +131,7 @@ class WaltIdVCVerifyCmdTest {
 
     @Test
     fun `should verify the VC's signature when no policy is specified`() {
-        val result = command.test(listOf("${signedVCFilePath}"))
+        val result = command.test(listOf(signedVCFilePath))
         assertContains(result.output, """signature: Success!\s*$""".toRegex())
     }
 

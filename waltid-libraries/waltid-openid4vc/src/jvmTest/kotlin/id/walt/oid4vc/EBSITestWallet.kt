@@ -53,7 +53,7 @@ class EBSITestWallet(
     config: CredentialWalletConfig
 ) : OpenIDCredentialWallet<SIOPSession>(EBSI_WALLET_BASE_URL, config) {
     private val sessionCache = mutableMapOf<String, SIOPSession>()
-    private val ktorClient = HttpClient() {
+    private val ktorClient = HttpClient {
         install(ContentNegotiation) {
             json()
         }
@@ -110,7 +110,6 @@ class EBSITestWallet(
     override fun signToken(target: TokenTarget, payload: JsonObject, header: JsonObject?, keyId: String?, privKey: Key?) =
         SDJwt.sign(SDPayload.createSDPayload(payload, SDMap.Companion.fromJSON("{}")), jwtCryptoProvider, keyId).jwt
 
-    @OptIn(ExperimentalJsExport::class)
     override fun verifyTokenSignature(target: TokenTarget, token: String) =
         SDJwt.verifyAndParse(token, jwtCryptoProvider).signatureVerified
 

@@ -5,6 +5,6 @@ import id.walt.webwallet.db.models.WalletCredential
 
 interface PresentationDefinitionMatchStrategy<out T> {
     fun match(
-        credentials: List<WalletCredential>, presentationDefinition: PresentationDefinition
+        credentials: List<WalletCredential>, presentationDefinition: PresentationDefinition,
     ): T
 }

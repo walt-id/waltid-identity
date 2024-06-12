@@ -73,7 +73,6 @@ kotlin {
             dependencies {
                 // JSON
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.0")
-//                implementation("io.github.optimumcode:json-schema-validator:0.0.8")
 
                 // Ktor client
                 implementation("io.ktor:ktor-client-core:$ktor_version")

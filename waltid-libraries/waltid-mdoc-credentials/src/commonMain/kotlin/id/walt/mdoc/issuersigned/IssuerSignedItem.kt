@@ -2,7 +2,6 @@ package id.walt.mdoc.issuersigned
 
 import id.walt.mdoc.dataelement.*
 import korlibs.crypto.SecureRandom
-import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Serializer

@@ -10,7 +10,7 @@ import kotlin.js.Promise
 @OptIn(ExperimentalJsExport::class)
 @JsExport
 class SDJwtJS(
-    sdJwt: SDJwt
+    sdJwt: SDJwt,
 ) : SDJwt(sdJwt) {
 
     @JsName("disclosures")
@@ -84,7 +84,7 @@ class SDJwtJS(
             sdPayload: SDPayload,
             jwtCryptoProvider: JSAsyncJWTCryptoProvider,
             keyID: String? = null,
-            withHolderJwt: String? = null
+            withHolderJwt: String? = null,
         ): Promise<SDJwtJS> = GlobalScope.promise {
             SDJwtJS(
                 SDJwt.signAsync(sdPayload, jwtCryptoProvider)

@@ -10,5 +10,5 @@ import kotlin.js.JsExport
 @Serializable
 data class DidResult(
     val did: String,
-    val didDocument: DidDocument
+    val didDocument: DidDocument,
 )

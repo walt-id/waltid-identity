@@ -47,7 +47,7 @@ fun handleNoSuchOption(cmd: WaltIdCmd, e: NoSuchOption) {
 }
 
 fun handleMultiUsageError(cmd: WaltIdCmd, e: MultiUsageError) {
-    var msgs = "Invalid command. Please, review the usage instructions bellow and try again."
+    val msgs = "Invalid command. Please, review the usage instructions bellow and try again."
     printError(cmd, e, msgs)
     printUsage(cmd, e)
 }

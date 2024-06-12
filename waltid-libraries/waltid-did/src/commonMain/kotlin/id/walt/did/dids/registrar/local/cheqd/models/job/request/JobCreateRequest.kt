@@ -9,5 +9,5 @@ import kotlin.js.JsExport
 @JsExport
 @Serializable
 data class JobCreateRequest(
-    val didDocument: DidDocObject
+    val didDocument: DidDocObject,
 )

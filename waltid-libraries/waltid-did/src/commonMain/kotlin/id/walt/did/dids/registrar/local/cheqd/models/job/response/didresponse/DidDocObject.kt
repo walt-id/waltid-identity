@@ -12,5 +12,5 @@ data class DidDocObject(
     val authentication: List<String>,
     val controller: List<String>,
     val id: String,
-    val verificationMethod: List<VerificationMethod>
+    val verificationMethod: List<VerificationMethod>,
 )

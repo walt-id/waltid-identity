@@ -12,5 +12,5 @@ class NoteRequestParameter(
 @Serializable
 class CredentialRequestParameter(
     val credentialId: String,
-    val parameter: RequestParameter? = null
+    val parameter: RequestParameter? = null,
 ) : RequestParameter

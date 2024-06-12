@@ -40,7 +40,8 @@ import kotlin.time.Duration
 object OIDCVerifierService : OpenIDCredentialVerifier(
     config = CredentialVerifierConfig(
         ConfigManager.getConfig<OIDCVerifierServiceConfig>().baseUrl.let { "$it/openid4vc/verify" },
-        clientIdMap = ConfigManager.getConfig<OIDCVerifierServiceConfig>().x509SanDnsClientId?.let { mapOf(ClientIdScheme.X509SanDns to it) } ?: emptyMap())
+        clientIdMap = ConfigManager.getConfig<OIDCVerifierServiceConfig>().x509SanDnsClientId?.let { mapOf(ClientIdScheme.X509SanDns to it) }
+            ?: emptyMap())
 ) {
     private val logger = KotlinLogging.logger {}
 
@@ -55,7 +56,7 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
         val successRedirectUri: String?,
         val errorRedirectUri: String?,
         val statusCallback: StatusCallback? = null,
-        val walletInitiatedAuthState: String? = null
+        val walletInitiatedAuthState: String? = null,
     )
 
     data class StatusCallback(
@@ -79,7 +80,7 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
     // ------------------------------------
     // Abstract verifier service provider interface implementation
     override fun preparePresentationDefinitionUri(
-        presentationDefinition: PresentationDefinition, sessionID: String
+        presentationDefinition: PresentationDefinition, sessionID: String,
     ): String {
         val baseUrl = ConfigManager.getConfig<OIDCVerifierServiceConfig>().baseUrl
         return "$baseUrl/openid4vc/pd/$sessionID"
@@ -95,7 +96,7 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
         val policies = sessionVerificationInfos[session.id]
             ?: throw IllegalArgumentException("Could not find policy listing for session: ${session.id}")
 
-        val vpToken = when(tokenResponse.idToken) {
+        val vpToken = when (tokenResponse.idToken) {
             null -> when (tokenResponse.vpToken) {
                 is JsonObject -> tokenResponse.vpToken.toString()
                 is JsonPrimitive -> tokenResponse.vpToken!!.jsonPrimitive.content
@@ -103,16 +104,18 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
                     logger.debug { "Null in tokenResponse.vpToken!" }
                     return false
                 }
+
                 else -> throw IllegalArgumentException("Illegal tokenResponse.vpToken: ${tokenResponse.vpToken}")
             }
-            else ->tokenResponse.idToken.toString()
+
+            else -> tokenResponse.idToken.toString()
         }
 
         if (tokenResponse.vpToken is JsonObject) TODO("Token response is jsonobject - not yet handled")
 
         logger.debug { "VP token: $vpToken" }
 
-        if(session.openId4VPProfile == OpenId4VPProfile.ISO_18013_7_MDOC)
+        if (session.openId4VPProfile == OpenId4VPProfile.ISO_18013_7_MDOC)
             return verifyMdoc(tokenResponse, session)
         else {
             val results = runBlocking {
@@ -134,23 +137,30 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
     }
 
     private fun verifyMdoc(tokenResponse: TokenResponse, session: PresentationSession): Boolean {
-        val mdocHandoverRestored = OpenID4VP.generateMDocOID4VPHandover(session.authorizationRequest!!, Base64.getUrlDecoder().decode(tokenResponse.jwsParts!!.header["apu"]!!.jsonPrimitive.content).decodeToString())
+        val mdocHandoverRestored = OpenID4VP.generateMDocOID4VPHandover(
+            session.authorizationRequest!!,
+            Base64.getUrlDecoder().decode(tokenResponse.jwsParts!!.header["apu"]!!.jsonPrimitive.content).decodeToString()
+        )
         val parsedDeviceResponse = DeviceResponse.fromCBORBase64URL(tokenResponse.vpToken!!.jsonPrimitive.content)
         val parsedMdoc = parsedDeviceResponse.documents[0]
         val deviceKey = OneKey(CBORObject.DecodeFromBytes(parsedMdoc.MSO!!.deviceKeyInfo.deviceKey.toCBOR()))
         //TODO("Find issuer key and device key")
         return parsedMdoc.verify(
             MDocVerificationParams(
-            VerificationType.forPresentation,
-            issuerKeyID = LspPotentialInteropEvent.POTENTIAL_ISSUER_KEY_ID, deviceKeyID = "DEVICE_KEY_ID",
-            deviceAuthentication = DeviceAuthentication(
-                ListElement(listOf(NullElement(), NullElement(), mdocHandoverRestored)),
-                session.authorizationRequest!!.presentationDefinition?.inputDescriptors?.first()?.id!!, EncodedCBORElement(MapElement(mapOf()))
+                VerificationType.forPresentation,
+                issuerKeyID = LspPotentialInteropEvent.POTENTIAL_ISSUER_KEY_ID, deviceKeyID = "DEVICE_KEY_ID",
+                deviceAuthentication = DeviceAuthentication(
+                    ListElement(listOf(NullElement(), NullElement(), mdocHandoverRestored)),
+                    session.authorizationRequest!!.presentationDefinition?.inputDescriptors?.first()?.id!!,
+                    EncodedCBORElement(MapElement(mapOf()))
+                )
+            ), SimpleCOSECryptoProvider(
+                listOf(
+                    LspPotentialInteropEvent.POTENTIAL_ISSUER_CRYPTO_PROVIDER_INFO,
+                    COSECryptoProviderKeyInfo("DEVICE_KEY_ID", AlgorithmID.ECDSA_256, deviceKey.AsPublicKey(), null)
+                )
             )
-        ), SimpleCOSECryptoProvider(
-            listOf(LspPotentialInteropEvent.POTENTIAL_ISSUER_CRYPTO_PROVIDER_INFO,
-            COSECryptoProviderKeyInfo("DEVICE_KEY_ID", AlgorithmID.ECDSA_256, deviceKey.AsPublicKey(), null))
-        ))
+        )
     }
 
     override fun initializeAuthorization(
@@ -180,13 +190,15 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
         return presentationSession.copy(
             authorizationRequest = presentationSession.authorizationRequest!!.copy(
                 clientMetadata = OpenIDClientMetadata(
-                    jwks = ephemeralEncKey?.let { buildJsonObject {
-                        put("keys", JsonArray(listOf(runBlocking {
-                            it.getPublicKey().exportJWKObject().let {
-                                JsonObject(it + ("use" to JsonPrimitive("enc")) + ("alg" to JsonPrimitive("ECDH-ES")))
-                            }
-                        })))
-                    }},
+                    jwks = ephemeralEncKey?.let {
+                        buildJsonObject {
+                            put("keys", JsonArray(listOf(runBlocking {
+                                it.getPublicKey().exportJWKObject().let {
+                                    JsonObject(it + ("use" to JsonPrimitive("enc")) + ("alg" to JsonPrimitive("ECDH-ES")))
+                                }
+                            })))
+                        }
+                    },
                     authorizationEncryptedResponseEnc = "A256GCM", // TODO: configurable?
                     authorizationEncryptedResponseAlg = "ECDH-ES"  // TODO: configurable?
                 )

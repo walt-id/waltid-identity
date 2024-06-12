@@ -81,6 +81,7 @@ object FeatureManager {
             registerFeature(it)
         }
     }
+
     suspend fun registerOptionalFeatures(optionalFeatures: List<OptionalFeature>) {
         optionalFeatures.forEach {
             log.debug { "Registering base feature \"${it.name}\"..." }
@@ -92,6 +93,7 @@ object FeatureManager {
         registerBaseFeatures(catalog.baseFeatures)
         registerOptionalFeatures(catalog.optionalFeatures)
     }
+
     suspend fun registerCatalogs(catalogs: List<ServiceFeatureCatalog>) {
         catalogs.forEach { catalog ->
             registerBaseFeatures(catalog.baseFeatures)

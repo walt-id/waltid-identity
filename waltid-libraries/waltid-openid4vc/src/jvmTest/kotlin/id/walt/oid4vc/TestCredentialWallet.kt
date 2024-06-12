@@ -56,13 +56,12 @@ import kotlin.js.ExperimentalJsExport
 const val WALLET_PORT = 8001
 const val WALLET_BASE_URL = "http://localhost:${WALLET_PORT}"
 
-@OptIn(ExperimentalJsExport::class)
 class TestCredentialWallet(
     config: CredentialWalletConfig
 ) : OpenIDCredentialWallet<SIOPSession>(WALLET_BASE_URL, config) {
 
     private val sessionCache = mutableMapOf<String, SIOPSession>()
-    private val ktorClient = HttpClient() {
+    private val ktorClient = HttpClient {
         install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) {
             json()
         }
@@ -77,7 +76,6 @@ class TestCredentialWallet(
     override fun signToken(target: TokenTarget, payload: JsonObject, header: JsonObject?, keyId: String?, privKey: Key?) =
         SDJwt.sign(SDPayload.createSDPayload(payload, SDMap.Companion.fromJSON("{}")), jwtCryptoProvider, keyId).jwt
 
-    @OptIn(ExperimentalJsExport::class)
     override fun verifyTokenSignature(target: TokenTarget, token: String) =
         SDJwt.verifyAndParse(token, jwtCryptoProvider).signatureVerified
 

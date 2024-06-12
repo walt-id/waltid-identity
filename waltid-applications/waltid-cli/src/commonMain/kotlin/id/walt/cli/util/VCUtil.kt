@@ -39,8 +39,8 @@ class VCUtil {
                     issuerKey = key,
                     issuerDid = issuerDid,
                     subjectDid = subjectDid,
-                    mappings = JsonObject(emptyMap<String, JsonElement>()),
-                    additionalJwtHeader = emptyMap<String, String>(),
+                    mappings = JsonObject(emptyMap()),
+                    additionalJwtHeader = emptyMap(),
                     additionalJwtOptions = emptyMap<String, JsonObject>()
                 )
             // .w3cVc.signJws(issuerKey = key, issuerDid = issuerDid, subjectDid = subjectDid)
@@ -67,7 +67,7 @@ class VCUtil {
                 return Verifier.verifyCredential(jws, requests) // jws.decodeJws().payload.toString(), requests
             } catch (e: IllegalStateException) {
                 println("Something went wrong.")
-                return emptyList<PolicyResult>()
+                return emptyList()
             }
         }
     }

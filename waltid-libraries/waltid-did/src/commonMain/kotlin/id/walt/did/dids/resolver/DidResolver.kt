@@ -18,11 +18,13 @@ interface DidResolver {
     @JsPromise
     @JsExport.Ignore
     suspend fun getSupportedMethods(): Result<Set<String>>
+
     @JvmBlocking
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
     suspend fun resolve(did: String): Result<JsonObject>
+
     @JvmBlocking
     @JvmAsync
     @JsPromise

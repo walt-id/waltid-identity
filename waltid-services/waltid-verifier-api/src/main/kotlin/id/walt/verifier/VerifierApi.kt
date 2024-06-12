@@ -91,7 +91,7 @@ data class CredentialVerificationRequest(
 const val defaultAuthorizeBaseUrl = "openid4vp://authorize"
 
 private val prettyJson = Json { prettyPrint = true }
-private val httpClient = HttpClient() {
+private val httpClient = HttpClient {
     install(ContentNegotiation) {
         json()
     }
@@ -123,7 +123,7 @@ val verifiableIdPresentationDefinitionExample = JsonObject(
 ).let { prettyJson.encodeToString(it) }
 
 
-private val fixedPresentationDefinitionForEbsiConformanceTest =
+private const val fixedPresentationDefinitionForEbsiConformanceTest =
     "{\"id\":\"any\",\"format\":{\"jwt_vp\":{\"alg\":[\"ES256\"]}},\"input_descriptors\":[{\"id\":\"any\",\"format\":{\"jwt_vc\":{\"alg\":[\"ES256\"]}},\"constraints\":{\"fields\":[{\"path\":[\"$.vc.type\"],\"filter\":{\"type\":\"array\",\"contains\":{\"const\":\"VerifiableAttestation\"}}}]}},{\"id\":\"any\",\"format\":{\"jwt_vc\":{\"alg\":[\"ES256\"]}},\"constraints\":{\"fields\":[{\"path\":[\"$.vc.type\"],\"filter\":{\"type\":\"array\",\"contains\":{\"const\":\"VerifiableAttestation\"}}}]}},{\"id\":\"any\",\"format\":{\"jwt_vc\":{\"alg\":[\"ES256\"]}},\"constraints\":{\"fields\":[{\"path\":[\"$.vc.type\"],\"filter\":{\"type\":\"array\",\"contains\":{\"const\":\"VerifiableAttestation\"}}}]}}]}"
 
 private val verificationUseCase = VerificationUseCase(httpClient, SimpleJWTCryptoProvider(JWSAlgorithm.EdDSA, null, null))
@@ -472,7 +472,7 @@ fun Application.verfierApi() {
                     }
                 }
             }) {
-                val deviceJwk = context.request.call.receiveParameters().toMap().get("jwk")
+                val deviceJwk = context.request.call.receiveParameters().toMap()["jwk"]
                 val devicePubKey = JWK.parse(deviceJwk!!.first()).toECKey().toPublicKey()
 
                 val mdoc = MDocBuilder("org.iso.18013.5.1.mDL")

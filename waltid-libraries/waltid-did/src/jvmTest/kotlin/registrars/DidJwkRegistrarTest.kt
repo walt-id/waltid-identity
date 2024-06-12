@@ -19,7 +19,7 @@ class DidJwkRegistrarTest : DidRegistrarTestBase(DidJwkRegistrar()) {
     @MethodSource
     override fun `given did options with no key when register then returns a valid did result`(
         options: DidCreateOptions,
-        assert: registrarDidAssertion
+        assert: registrarDidAssertion,
     ) {
         super.`given did options with no key when register then returns a valid did result`(options, assert)
     }
@@ -29,7 +29,7 @@ class DidJwkRegistrarTest : DidRegistrarTestBase(DidJwkRegistrar()) {
     override fun `given did options and key when register with key then returns a valid did result`(
         key: Key,
         options: DidCreateOptions,
-        assert: registrarKeyAssertion
+        assert: registrarKeyAssertion,
     ) {
         super.`given did options and key when register with key then returns a valid did result`(key, options, assert)
     }
@@ -52,7 +52,7 @@ class DidJwkRegistrarTest : DidRegistrarTestBase(DidJwkRegistrar()) {
         private fun keyTestData(
             secpAssertions: registrarKeyAssertion,
             ed25519Assertions: registrarKeyAssertion,
-            rsaAssertions: registrarKeyAssertion
+            rsaAssertions: registrarKeyAssertion,
         ) = Stream.of(
             //ed25519
             arguments(

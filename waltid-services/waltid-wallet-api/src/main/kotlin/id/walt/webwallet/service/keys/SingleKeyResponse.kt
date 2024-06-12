@@ -10,7 +10,7 @@ data class SingleKeyResponse(
     val cryptoProvider: String,
     val keyId: KeyId,
     val keyPair: JsonObject,
-    val keysetHandle: JsonElement
+    val keysetHandle: JsonElement,
 ) {
     @Serializable
     data class KeyId(val id: String)

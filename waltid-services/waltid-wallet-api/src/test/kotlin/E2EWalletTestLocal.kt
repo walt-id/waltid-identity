@@ -104,138 +104,138 @@ class E2EWalletTestLocal : E2EWalletTestBase() {
         testCreateUser(User(name = "tester", email = "tester@email.com", password = "password", accountType = "email"))
     }
 
-   /* @Test FIXME
-    fun e2eTestAuthentication() = testApplication {
-        runApplication()
+    /* @Test FIXME
+     fun e2eTestAuthentication() = testApplication {
+         runApplication()
 
-        login()
-        getTokenFor()
-        testUserInfo()
-        testUserSession()
-        localWalletClient = newClient(token)
+         login()
+         getTokenFor()
+         testUserInfo()
+         testUserSession()
+         localWalletClient = newClient(token)
 
-        // list all wallets for this user
-        listAllWalletsForUser()
-    }
+         // list all wallets for this user
+         listAllWalletsForUser()
+     }
 
-    @Test
-    fun e2eTestPermissions() = testApplication {
-        runApplication()
+     @Test
+     fun e2eTestPermissions() = testApplication {
+         runApplication()
 
-        val user1 = User(name = "tester", email = "tester@email.com", password = "password", accountType = "email")
-        val user2 = User(name = "tester2", email = "tester2@email.com", password = "password", accountType = "email")
+         val user1 = User(name = "tester", email = "tester@email.com", password = "password", accountType = "email")
+         val user2 = User(name = "tester2", email = "tester2@email.com", password = "password", accountType = "email")
 
-        testCreateUser(user1)
-        getTokenFor(user1)
-        localWalletClient = newClient(token)
+         testCreateUser(user1)
+         getTokenFor(user1)
+         localWalletClient = newClient(token)
 
-        fun List<AccountWalletListing.WalletListing>.getUserWallet(): UUID {
-            check(this.isNotEmpty()) { "No wallet found" }
-            return this.first().id
-        }
+         fun List<AccountWalletListing.WalletListing>.getUserWallet(): UUID {
+             check(this.isNotEmpty()) { "No wallet found" }
+             return this.first().id
+         }
 
-        val user1Wallets = listAllWalletsForUser()
-        println("User1: $user1Wallets")
-        val user1Wallet = user1Wallets.getUserWallet()
-
-
-        testCreateUser(user2)
-        getTokenFor(user2)
-        localWalletClient = newClient(token)
-
-        val user2Wallets = listAllWalletsForUser()
-        println("User2: $user2Wallets")
-        val user2Wallet = user2Wallets.getUserWallet()
-
-        println("Check accessing own wallet...")
-        check(localWalletClient.get("/wallet-api/wallet/$user2Wallet/credentials").status == HttpStatusCode.OK) { "Accessing own wallet does not work" }
+         val user1Wallets = listAllWalletsForUser()
+         println("User1: $user1Wallets")
+         val user1Wallet = user1Wallets.getUserWallet()
 
 
-        println("Check accessing strangers wallet...")
-        check(localWalletClient.get("/wallet-api/wallet/$user1Wallet/credentials").status == HttpStatusCode.Forbidden) { "Accessing strangers wallet should not work" }
-    }
+         testCreateUser(user2)
+         getTokenFor(user2)
+         localWalletClient = newClient(token)
 
-    @Test
-    fun e2eTestKeys() = testApplication {
-        runApplication()
-        login()
-        getTokenFor()
-        localWalletClient = newClient(token)
+         val user2Wallets = listAllWalletsForUser()
+         println("User2: $user2Wallets")
+         val user2Wallet = user2Wallets.getUserWallet()
 
-        // list all wallets for this user
-        listAllWalletsForUser()
+         println("Check accessing own wallet...")
+         check(localWalletClient.get("/wallet-api/wallet/$user2Wallet/credentials").status == HttpStatusCode.OK) { "Accessing own wallet does not work" }
 
-        testKeys()
-    }
 
-    @Test
-    fun e2eIssuerOnboarding() = testApplication {
-        runApplication()
-        login()
-        getTokenFor()
-        localWalletClient = newClient(token)
+         println("Check accessing strangers wallet...")
+         check(localWalletClient.get("/wallet-api/wallet/$user1Wallet/credentials").status == HttpStatusCode.Forbidden) { "Accessing strangers wallet should not work" }
+     }
 
-        onboardIssuer()
-    }
+     @Test
+     fun e2eTestKeys() = testApplication {
+         runApplication()
+         login()
+         getTokenFor()
+         localWalletClient = newClient(token)
 
-    @Test
-    fun e2eTestDids() = testApplication {
-        runTest(timeout = 60.seconds) {
-            runApplication()
-            login()
-            getTokenFor()
-            localWalletClient = newClient(token)
+         // list all wallets for this user
+         listAllWalletsForUser()
 
-            // list all wallets for this user
-            listAllWalletsForUser()
+         testKeys()
+     }
 
-            // create a did, one of each of the main types we support
-            createDids()
-            testDefaultDid()
-            val availableDids = listAllDids()
-            deleteAllDids(availableDids)
-        }
-    }
+     @Test
+     fun e2eIssuerOnboarding() = testApplication {
+         runApplication()
+         login()
+         getTokenFor()
+         localWalletClient = newClient(token)
 
-    @Test
-    fun e2eTestWalletCredentials() = testApplication {
-        runApplication()
-        login()
-        getTokenFor()
+         onboardIssuer()
+     }
 
-        localWalletClient = newClient(token)
+     @Test
+     fun e2eTestDids() = testApplication {
+         runTest(timeout = 60.seconds) {
+             runApplication()
+             login()
+             getTokenFor()
+             localWalletClient = newClient(token)
 
-        // list all wallets for this user
-        listAllWalletsForUser()
-        val response: JsonArray = listCredentials()
-        assertNotEquals(response.size, 0)
-        val id = response[0].jsonObject["id"]?.jsonPrimitive?.content ?: error("No credentials found")
-        viewCredential(id)
-        deleteCredential(id)
-    }
+             // list all wallets for this user
+             listAllWalletsForUser()
 
-    @Test
-    fun e2eTestIssuance() = testApplication {
-        runApplication()
-        login()
-        getTokenFor()
+             // create a did, one of each of the main types we support
+             createDids()
+             testDefaultDid()
+             val availableDids = listAllDids()
+             deleteAllDids(availableDids)
+         }
+     }
 
-        localWalletClient = newClient(token)
+     @Test
+     fun e2eTestWalletCredentials() = testApplication {
+         runApplication()
+         login()
+         getTokenFor()
 
-        // list all wallets for this user
-        listAllWalletsForUser()
+         localWalletClient = newClient(token)
 
-        // list all Dids for this user and set default for credential issuance
-        val availableDids = listAllDids()
-        println("Available DIDs: ${availableDids.map { it.did }}")
+         // list all wallets for this user
+         listAllWalletsForUser()
+         val response: JsonArray = listCredentials()
+         assertNotEquals(response.size, 0)
+         val id = response[0].jsonObject["id"]?.jsonPrimitive?.content ?: error("No credentials found")
+         viewCredential(id)
+         deleteCredential(id)
+     }
 
-        val issuanceUri = issueJwtCredential()
-        println("Issuance Offer uri = $issuanceUri")
-        check(issuanceUri.startsWith("openid-credential-offer://")) { "Issuance offer URI is invalid!" }
+     @Test
+     fun e2eTestIssuance() = testApplication {
+         runApplication()
+         login()
+         getTokenFor()
 
-        // Request credential and store in wallet
-        // FIXME: requestCredential(issuanceUri, availableDids.first().did) // WaltId-MikeRichardson: temporarily disabled due to failure caused by ktor client
-    }*/
+         localWalletClient = newClient(token)
+
+         // list all wallets for this user
+         listAllWalletsForUser()
+
+         // list all Dids for this user and set default for credential issuance
+         val availableDids = listAllDids()
+         println("Available DIDs: ${availableDids.map { it.did }}")
+
+         val issuanceUri = issueJwtCredential()
+         println("Issuance Offer uri = $issuanceUri")
+         check(issuanceUri.startsWith("openid-credential-offer://")) { "Issuance offer URI is invalid!" }
+
+         // Request credential and store in wallet
+         // FIXME: requestCredential(issuanceUri, availableDids.first().did) // WaltId-MikeRichardson: temporarily disabled due to failure caused by ktor client
+     }*/
 
     override var walletClient: HttpClient
         get() = localWalletClient

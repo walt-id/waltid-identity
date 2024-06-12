@@ -1,7 +1,5 @@
 package id.walt.commons.logging
 
-import id.walt.commons.logging.LoggingManager
-
 object TestLoggingUtils {
 
     fun setupTestLogging() {

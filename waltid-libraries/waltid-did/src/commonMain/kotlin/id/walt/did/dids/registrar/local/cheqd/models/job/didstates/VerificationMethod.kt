@@ -15,5 +15,5 @@ data class VerificationMethod(
     val publicKeyMultibase: String? = null,
     //@Json(serializeNull = false)
     val publicKeyBase58: String? = null,
-    val type: String
+    val type: String,
 )

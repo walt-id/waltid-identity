@@ -17,7 +17,7 @@ import kotlin.js.JsExport
 @Serializable
 data class SDField(
     val sd: Boolean,
-    val children: SDMap? = null
+    val children: SDMap? = null,
 ) {
 
     @JsExport.Ignore

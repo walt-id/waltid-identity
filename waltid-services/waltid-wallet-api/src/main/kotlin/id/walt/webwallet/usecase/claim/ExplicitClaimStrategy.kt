@@ -15,7 +15,7 @@ class ExplicitClaimStrategy(
     private val eventUseCase: EventLogUseCase,
 ) {
     suspend fun claim(
-        tenant: String, account: UUID, wallet: UUID, did: String, offer: String, pending: Boolean = true
+        tenant: String, account: UUID, wallet: UUID, did: String, offer: String, pending: Boolean = true,
     ): List<WalletCredential> = issuanceService.useOfferRequest(
         offer = offer,
         credentialWallet = SSIKit2WalletService.getCredentialWallet(did),

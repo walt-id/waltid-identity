@@ -8,7 +8,7 @@ import io.ktor.serialization.kotlinx.json.*
 object WalletHttpClients {
 
     var defaultMethod = {
-        HttpClient() {
+        HttpClient {
             install(ContentNegotiation) {
                 json()
             }

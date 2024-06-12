@@ -4,7 +4,6 @@ import cbor.Cbor
 import id.walt.mdoc.cose.COSECryptoProvider
 import id.walt.mdoc.cose.COSEMac0
 import id.walt.mdoc.dataelement.*
-import id.walt.mdoc.dataelement.DataElementSerializer
 import id.walt.mdoc.devicesigned.DeviceAuth
 import id.walt.mdoc.devicesigned.DeviceSigned
 import id.walt.mdoc.docrequest.MDocRequest
@@ -12,7 +11,6 @@ import id.walt.mdoc.issuersigned.IssuerSigned
 import id.walt.mdoc.issuersigned.IssuerSignedItem
 import id.walt.mdoc.mdocauth.DeviceAuthentication
 import id.walt.mdoc.mso.MSO
-import korlibs.crypto.HMAC
 import kotlinx.datetime.Clock
 import kotlinx.serialization.*
 import kotlinx.serialization.encoding.Decoder

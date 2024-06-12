@@ -18,7 +18,7 @@ object FeatureFlagInformationModule {
     @Serializable
     data class FeatureFlagInformation(
         val features: Map<String, String>,
-        val total: Int = features.size
+        val total: Int = features.size,
     )
 
     fun Application.enable() {
@@ -38,10 +38,10 @@ object FeatureFlagInformationModule {
 
                 context.respond(
                     FeatureFlagInformations(
-                    enabled = FeatureFlagInformation(enabled),
-                    disabled = FeatureFlagInformation(disabled),
-                    defaulted = FeatureFlagInformation(defaulted)
-                )
+                        enabled = FeatureFlagInformation(enabled),
+                        disabled = FeatureFlagInformation(disabled),
+                        defaulted = FeatureFlagInformation(defaulted)
+                    )
                 )
             }
         }

@@ -20,14 +20,14 @@ class WaltIdDidCreateCmdTest {
 
     @Test
     fun `should create a did-key from a random Ed25519 key when called with no argument`() {
-        val result = command.test(emptyList<String>())
+        val result = command.test(emptyList())
 
         assertContains(result.stdout, "DID created")
     }
 
     @Test
     fun `should create a valid did-key when called with no argument`() {
-        val result = command.test(emptyList<String>())
+        val result = command.test(emptyList())
 
         assertContains(result.stdout, "did:key:z[a-km-zA-HJ-NP-Z1-9]+".toRegex())
     }

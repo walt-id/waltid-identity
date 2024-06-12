@@ -20,7 +20,7 @@ class EventService {
         offset: Long,
         sortOrder: String,
         sortBy: String,
-        dataFilter: Map<String, List<String>>
+        dataFilter: Map<String, List<String>>,
     ) = transaction {
         let {
             limit?.let {

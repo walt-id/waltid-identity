@@ -43,5 +43,5 @@ abstract class ReportRequestParameter(
 )
 
 data class CredentialReportRequestParameter(
-    override val walletId: UUID, override val limit: Int?
+    override val walletId: UUID, override val limit: Int?,
 ) : ReportRequestParameter(walletId, limit)

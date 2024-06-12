@@ -18,7 +18,7 @@ open class SDJwt internal constructor(
     protected val header: JsonObject,
     protected val sdPayload: SDPayload,
     val holderJwt: String? = null,
-    protected val isPresentation: Boolean = false
+    protected val isPresentation: Boolean = false,
 ) {
     internal constructor(sdJwt: SDJwt) : this(sdJwt.jwt, sdJwt.header, sdJwt.sdPayload, sdJwt.holderJwt, sdJwt.isPresentation)
 
@@ -209,7 +209,7 @@ open class SDJwt internal constructor(
             jwtCryptoProvider: JWTCryptoProvider,
             keyID: String? = null,
             withHolderJwt: String? = null,
-            typ: String = "JWT"
+            typ: String = "JWT",
         ): SDJwt = createFromSignedJwt(
             jwtCryptoProvider.sign(sdPayload.undisclosedPayload, keyID, typ), sdPayload, withHolderJwt
         )
@@ -227,7 +227,7 @@ open class SDJwt internal constructor(
             sdPayload: SDPayload,
             jwtCryptoProvider: AsyncJWTCryptoProvider,
             keyID: String? = null,
-            withHolderJwt: String? = null
+            withHolderJwt: String? = null,
         ): SDJwt = createFromSignedJwt(
             jwtCryptoProvider.sign(sdPayload.undisclosedPayload, keyID), sdPayload, withHolderJwt
         )

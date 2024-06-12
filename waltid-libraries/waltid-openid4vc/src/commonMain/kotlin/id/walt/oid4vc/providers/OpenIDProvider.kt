@@ -85,7 +85,6 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
         return verifyAndParseToken(code, TokenTarget.TOKEN)
     }
 
-    @OptIn(ExperimentalJsExport::class)
     protected open fun verifyAndParseIdToken(token: String): JsonObject? {
         // 1. Validate Header
         val header = parseTokenHeader(token)
@@ -193,8 +192,8 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
             )
 
         // Bind authentication request with state
-        val idTokenRequestState = UUID().toString();
-        val idTokenRequestNonce = UUID().toString();
+        val idTokenRequestState = UUID().toString()
+        val idTokenRequestNonce = UUID().toString()
         val responseMode = ResponseMode.direct_post
 
         val clientId = this.metadata.issuer!!

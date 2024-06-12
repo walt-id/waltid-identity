@@ -16,6 +16,7 @@ abstract class LocalResolverMethod(val method: String) {
     @JsPromise
     @JsExport.Ignore
     abstract suspend fun resolve(did: String): Result<DidDocument>
+
     @JvmBlocking
     @JvmAsync
     @JsPromise

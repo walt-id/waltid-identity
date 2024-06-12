@@ -43,7 +43,10 @@ class SDJwtTestJVM {
         assertContains(map = sdJwt.undisclosedPayload, key = SDJwt.DIGESTS_KEY)
         assertContains(map = sdJwt.undisclosedPayload, key = "aud")
         assertEquals(expected = 1, actual = sdJwt.disclosures.size)
-        assertEquals(expected = "sub", actual = sdJwt.digestedDisclosures[sdJwt.undisclosedPayload[SDJwt.DIGESTS_KEY]!!.jsonArray[0].jsonPrimitive.content]!!.key)
+        assertEquals(
+            expected = "sub",
+            actual = sdJwt.digestedDisclosures[sdJwt.undisclosedPayload[SDJwt.DIGESTS_KEY]!!.jsonArray[0].jsonPrimitive.content]!!.key
+        )
         assertContentEquals(
             expected = Json.parseToJsonElement(originalClaimsSet.toString()).jsonObject.toSortedMap().asIterable(),
             actual = sdJwt.fullPayload.toSortedMap().asIterable()

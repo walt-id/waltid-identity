@@ -36,7 +36,7 @@ data class ProofOfPossession @OptIn(ExperimentalSerializationApi::class) private
             }
     }
 
-    abstract class ProofBuilder() {
+    abstract class ProofBuilder {
         abstract suspend fun build(key: Key): ProofOfPossession
     }
 

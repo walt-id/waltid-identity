@@ -61,113 +61,129 @@ class OidcTest {
 //      .start(wait = false)
 //  }
 
-  val baseUrl = "http://localhost:7003"
+    val baseUrl = "http://localhost:7003"
 
-  //@Test
-  fun testPotentialInteropFlow() {
-    println("Starting test")
+    //@Test
+    fun testPotentialInteropFlow() {
+        println("Starting test")
 
-    runBlocking {
-      // Step 1: Fetch mdoc
-      val holderKey = KeyManager.createKey(KeyGenerationRequest(keyType = KeyType.secp256r1))
-      assertEquals(KeyType.secp256r1, holderKey.getPublicKey().keyType)
-      assertTrue(holderKey.hasPrivateKey)
-      val holderKeyPubJwk = holderKey.getPublicKey().exportJWK()
-      val issueResponse = http.submitForm("$baseUrl/lsp-potential/issueMdl", parametersOf(
-        "jwk", holderKeyPubJwk
-      ))
-      assertEquals(200, issueResponse.status.value)
-      val mdoc = MDoc.fromCBORHex(issueResponse.bodyAsText())
-      assertEquals("org.iso.18013.5.1.mDL", mdoc.docType.value)
+        runBlocking {
+            // Step 1: Fetch mdoc
+            val holderKey = KeyManager.createKey(KeyGenerationRequest(keyType = KeyType.secp256r1))
+            assertEquals(KeyType.secp256r1, holderKey.getPublicKey().keyType)
+            assertTrue(holderKey.hasPrivateKey)
+            val holderKeyPubJwk = holderKey.getPublicKey().exportJWK()
+            val issueResponse = http.submitForm(
+                "$baseUrl/lsp-potential/issueMdl", parametersOf(
+                    "jwk", holderKeyPubJwk
+                )
+            )
+            assertEquals(200, issueResponse.status.value)
+            val mdoc = MDoc.fromCBORHex(issueResponse.bodyAsText())
+            assertEquals("org.iso.18013.5.1.mDL", mdoc.docType.value)
 
-      // Step 2: Create an openid4vc verification request
-      val createReqResponse = http.post("$baseUrl/openid4vc/verify") {
-        header("authorizeBaseUrl", "mdoc-openid4vp://")
-        header("responseMode", "direct_post_jwt")
-        contentType(ContentType.Application.Json)
-        setBody(
-        buildJsonObject {
-          put("request_credentials", JsonArray(listOf(JsonPrimitive("org.iso.18013.5.1.mDL"))))
-        })
-      }
-      assertEquals(200, createReqResponse.status.value)
-      val presReqUrl = createReqResponse.bodyAsText()
-      assertTrue(presReqUrl.startsWith("mdoc-openid4vp://"))
-      val presReq = AuthorizationRequest.fromHttpParametersAuto(parseQueryString(Url(presReqUrl).encodedQuery).toMap())
-      assertNotNull(presReq.presentationDefinition)
-
-      // Step 4: Get client_metadata for encrypted response
-      assertNotNull(presReq.clientMetadata?.jwks)
-      assertEquals("ECDH-ES", presReq.clientMetadata!!.authorizationEncryptedResponseAlg!!)
-      assertEquals("A256GCM", presReq.clientMetadata!!.authorizationEncryptedResponseEnc!!)
-
-      // Step 5: Create encrypted presentation response
-      val ephemeralReaderKey = JWKKey.importJWK(presReq.clientMetadata!!.jwks!!["keys"]!!.jsonArray.first().toString()).getOrNull()!!
-      val mdocNonce = UUID.generateUUID().toString()
-      val mdocHandover = OpenID4VP.generateMDocOID4VPHandover(presReq, mdocNonce)
-      val holderKeyNimbus = ECKey.parse(holderKey.exportJWK())
-      val deviceCryptoProvider = SimpleCOSECryptoProvider(listOf(
-        LspPotentialInteropEvent.POTENTIAL_ISSUER_CRYPTO_PROVIDER_INFO,
-        COSECryptoProviderKeyInfo(holderKey.getKeyId(), AlgorithmID.ECDSA_256, holderKeyNimbus.toECPublicKey(),
-          holderKeyNimbus.toECPrivateKey())
-      ))
-      val deviceAuthentication = DeviceAuthentication(sessionTranscript = ListElement(listOf(
-        NullElement(),
-        NullElement(), //EncodedCBORElement(ephemeralReaderKey.getPublicKeyRepresentation()),
-        mdocHandover
-      )), mdoc.docType.value, EncodedCBORElement(MapElement(mapOf()))
-      )
-      val presentedMdoc = mdoc.presentWithDeviceSignature(
-        MDocRequestBuilder(mdoc.docType.value).also {
-          presReq.presentationDefinition!!.inputDescriptors.forEach { inputDescriptor ->
-            inputDescriptor.constraints!!.fields!!.forEach { field ->
-              field.addToMdocRequest(it)
+            // Step 2: Create an openid4vc verification request
+            val createReqResponse = http.post("$baseUrl/openid4vc/verify") {
+                header("authorizeBaseUrl", "mdoc-openid4vp://")
+                header("responseMode", "direct_post_jwt")
+                contentType(ContentType.Application.Json)
+                setBody(
+                    buildJsonObject {
+                        put("request_credentials", JsonArray(listOf(JsonPrimitive("org.iso.18013.5.1.mDL"))))
+                    })
             }
-          }
-        }.build(),
-        deviceAuthentication, deviceCryptoProvider, holderKey.getKeyId())
+            assertEquals(200, createReqResponse.status.value)
+            val presReqUrl = createReqResponse.bodyAsText()
+            assertTrue(presReqUrl.startsWith("mdoc-openid4vp://"))
+            val presReq = AuthorizationRequest.fromHttpParametersAuto(parseQueryString(Url(presReqUrl).encodedQuery).toMap())
+            assertNotNull(presReq.presentationDefinition)
 
-      val verificationResult = presentedMdoc.verify(
-        MDocVerificationParams(
-          VerificationType.forPresentation,
-          issuerKeyID = LspPotentialInteropEvent.POTENTIAL_ISSUER_KEY_ID, deviceKeyID = holderKey.getKeyId(),
-          deviceAuthentication = DeviceAuthentication(
-            ListElement(listOf(NullElement(), NullElement(), mdocHandover)),
-            presReq.presentationDefinition?.inputDescriptors?.first()?.id!!, EncodedCBORElement(MapElement(mapOf()))
-          )
-        ), deviceCryptoProvider)
-      assertTrue(verificationResult)
+            // Step 4: Get client_metadata for encrypted response
+            assertNotNull(presReq.clientMetadata?.jwks)
+            assertEquals("ECDH-ES", presReq.clientMetadata!!.authorizationEncryptedResponseAlg!!)
+            assertEquals("A256GCM", presReq.clientMetadata!!.authorizationEncryptedResponseEnc!!)
 
-      // Step 6: Submit response
-      val deviceResponse = DeviceResponse(listOf(presentedMdoc))
-      val oid4vpResponse = OpenID4VP.generatePresentationResponse(
-        PresentationResult(
-        presentations = listOf(JsonPrimitive(deviceResponse.toCBORBase64URL())),
-        presentationSubmission = PresentationSubmission(
-          "response_1", "request_1",
-          listOf(DescriptorMapping(mdoc.docType.value, VCFormat.mso_mdoc, "$"))
-        )
-      )
-      )
-      assertNotNull(oid4vpResponse.vpToken)
-      assertEquals(presentedMdoc.toCBORHex(), DeviceResponse.fromCBORBase64URL(oid4vpResponse.vpToken!!.jsonPrimitive.content).documents.first().toCBORHex())
-      val encKey = presReq.clientMetadata?.jwks?.get("keys")?.jsonArray?.first {
-          jwk -> JWK.parse(jwk.toString()).keyUse?.equals(KeyUse.ENCRYPTION) ?: false }?.jsonObject ?: throw Exception("No ephemeral reader key found")
+            // Step 5: Create encrypted presentation response
+            val ephemeralReaderKey = JWKKey.importJWK(presReq.clientMetadata!!.jwks!!["keys"]!!.jsonArray.first().toString()).getOrNull()!!
+            val mdocNonce = UUID.generateUUID().toString()
+            val mdocHandover = OpenID4VP.generateMDocOID4VPHandover(presReq, mdocNonce)
+            val holderKeyNimbus = ECKey.parse(holderKey.exportJWK())
+            val deviceCryptoProvider = SimpleCOSECryptoProvider(
+                listOf(
+                    LspPotentialInteropEvent.POTENTIAL_ISSUER_CRYPTO_PROVIDER_INFO,
+                    COSECryptoProviderKeyInfo(
+                        holderKey.getKeyId(), AlgorithmID.ECDSA_256, holderKeyNimbus.toECPublicKey(),
+                        holderKeyNimbus.toECPrivateKey()
+                    )
+                )
+            )
+            val deviceAuthentication = DeviceAuthentication(
+                sessionTranscript = ListElement(
+                    listOf(
+                        NullElement(),
+                        NullElement(), //EncodedCBORElement(ephemeralReaderKey.getPublicKeyRepresentation()),
+                        mdocHandover
+                    )
+                ), mdoc.docType.value, EncodedCBORElement(MapElement(mapOf()))
+            )
+            val presentedMdoc = mdoc.presentWithDeviceSignature(
+                MDocRequestBuilder(mdoc.docType.value).also {
+                    presReq.presentationDefinition!!.inputDescriptors.forEach { inputDescriptor ->
+                        inputDescriptor.constraints!!.fields!!.forEach { field ->
+                            field.addToMdocRequest(it)
+                        }
+                    }
+                }.build(),
+                deviceAuthentication, deviceCryptoProvider, holderKey.getKeyId()
+            )
 
-      val ephemeralWalletKey = runBlocking { KeyManager.createKey(KeyGenerationRequest(keyType = KeyType.secp256r1)) }
-      val formParams = oid4vpResponse.toDirecPostJWTParameters(encKey,
-        alg = presReq.clientMetadata!!.authorizationEncryptedResponseAlg!!,
-        enc = presReq.clientMetadata!!.authorizationEncryptedResponseEnc!!,
-        mapOf(
-          "epk" to runBlocking{ ephemeralWalletKey.getPublicKey().exportJWKObject() },
-          "apu" to JsonPrimitive(Base64URL.encode(mdocNonce).toString()),
-          "apv" to JsonPrimitive(Base64URL.encode(presReq.nonce!!).toString())
-        )
-      )
-      val presResponse = http.submitForm(presReq.responseUri!!, parametersOf(formParams))
-      assertEquals(200, presResponse.status.value)
+            val verificationResult = presentedMdoc.verify(
+                MDocVerificationParams(
+                    VerificationType.forPresentation,
+                    issuerKeyID = LspPotentialInteropEvent.POTENTIAL_ISSUER_KEY_ID, deviceKeyID = holderKey.getKeyId(),
+                    deviceAuthentication = DeviceAuthentication(
+                        ListElement(listOf(NullElement(), NullElement(), mdocHandover)),
+                        presReq.presentationDefinition?.inputDescriptors?.first()?.id!!, EncodedCBORElement(MapElement(mapOf()))
+                    )
+                ), deviceCryptoProvider
+            )
+            assertTrue(verificationResult)
+
+            // Step 6: Submit response
+            val deviceResponse = DeviceResponse(listOf(presentedMdoc))
+            val oid4vpResponse = OpenID4VP.generatePresentationResponse(
+                PresentationResult(
+                    presentations = listOf(JsonPrimitive(deviceResponse.toCBORBase64URL())),
+                    presentationSubmission = PresentationSubmission(
+                        "response_1", "request_1",
+                        listOf(DescriptorMapping(mdoc.docType.value, VCFormat.mso_mdoc, "$"))
+                    )
+                )
+            )
+            assertNotNull(oid4vpResponse.vpToken)
+            assertEquals(
+                presentedMdoc.toCBORHex(),
+                DeviceResponse.fromCBORBase64URL(oid4vpResponse.vpToken!!.jsonPrimitive.content).documents.first().toCBORHex()
+            )
+            val encKey = presReq.clientMetadata?.jwks?.get("keys")?.jsonArray?.first { jwk ->
+                JWK.parse(jwk.toString()).keyUse?.equals(KeyUse.ENCRYPTION) ?: false
+            }?.jsonObject ?: throw Exception("No ephemeral reader key found")
+
+            val ephemeralWalletKey = runBlocking { KeyManager.createKey(KeyGenerationRequest(keyType = KeyType.secp256r1)) }
+            val formParams = oid4vpResponse.toDirecPostJWTParameters(
+                encKey,
+                alg = presReq.clientMetadata!!.authorizationEncryptedResponseAlg!!,
+                enc = presReq.clientMetadata!!.authorizationEncryptedResponseEnc!!,
+                mapOf(
+                    "epk" to runBlocking { ephemeralWalletKey.getPublicKey().exportJWKObject() },
+                    "apu" to JsonPrimitive(Base64URL.encode(mdocNonce).toString()),
+                    "apv" to JsonPrimitive(Base64URL.encode(presReq.nonce!!).toString())
+                )
+            )
+            val presResponse = http.submitForm(presReq.responseUri!!, parametersOf(formParams))
+            assertEquals(200, presResponse.status.value)
+        }
     }
-  }
 
     /*
     fun testClientFlow() {

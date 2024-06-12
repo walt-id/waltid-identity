@@ -6,7 +6,7 @@ import kotlinx.serialization.json.jsonObject
 @OptIn(ExperimentalJsExport::class)
 @JsExport
 class SDPayloadBuilder(
-    val fullPayload: dynamic
+    val fullPayload: dynamic,
 ) {
     fun buildForUndisclosedPayload(undisclosedSDPayload: dynamic): SDPayload {
         return SDPayload.createSDPayload(

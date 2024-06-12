@@ -158,7 +158,7 @@ object WalletServiceManager {
         val accountName = AccountsService.get(forAccount).email ?: "wallet name not defined"
 
         // TODO: remove testing code / lock behind dev-mode
-        if (accountName.contains("multi-wallet") == true) {
+        if (accountName.contains("multi-wallet")) {
             val second = Wallets.insert {
                 it[name] = "ABC Company wallet"
                 it[createdOn] = Clock.System.now().toJavaInstant()

@@ -13,7 +13,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 
 class NearDataFetcher(
-    private val converter: NftDetailConverterBase<NearNftCompoundMetadata>
+    private val converter: NftDetailConverterBase<NearNftCompoundMetadata>,
 ) : DataFetcher {
     private val testnetLikelyNftsUrl = "https://testnet-api.kitwallet.app/account/%s/likelyNFTs"
     private val mainnetLikelyNftsUrl = "https://api.kitwallet.app/account/%s/likelyNFTs"

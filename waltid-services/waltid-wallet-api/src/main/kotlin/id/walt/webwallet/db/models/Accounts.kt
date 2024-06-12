@@ -44,7 +44,7 @@ data class Account(
     @Transient
     val updatePasswordTo: String? = null,
     //val loginWeb3Wallet: UUID? = null,
-    val createdOn: Instant
+    val createdOn: Instant,
 ) {
     constructor(result: ResultRow) : this(
         tenant = result[Accounts.tenant],

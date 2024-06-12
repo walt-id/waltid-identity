@@ -2,7 +2,6 @@ package id.walt.mdoc.mso
 
 import id.walt.mdoc.dataelement.*
 import id.walt.mdoc.issuersigned.IssuerSignedItem
-import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 
 /**

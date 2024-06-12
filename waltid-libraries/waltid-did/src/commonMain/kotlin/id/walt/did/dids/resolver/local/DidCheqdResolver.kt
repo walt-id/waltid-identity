@@ -43,13 +43,14 @@ class DidCheqdResolver : LocalResolverMethod("cheqd") {
 
     private suspend fun resolveDid(did: String): DidDocument {
         val response = httpClient.get("https://resolver.cheqd.net/1.0/identifiers/${did}") {
-                headers {
-                    append("contentType", "application/did+ld+json")
-                }
+            headers {
+                append("contentType", "application/did+ld+json")
             }
+        }
         val responseText = response.bodyAsText()
 
-        val resolution = runCatching { Json.parseToJsonElement(responseText) }.getOrElse { throw RuntimeException("Illegal non-JSON response (${response.status}), body: >>$responseText<< (end of body), error: >>${it.stackTraceToString()}<<") }
+        val resolution =
+            runCatching { Json.parseToJsonElement(responseText) }.getOrElse { throw RuntimeException("Illegal non-JSON response (${response.status}), body: >>$responseText<< (end of body), error: >>${it.stackTraceToString()}<<") }
 
         val didDocument = resolution.jsonObject["didResolutionMetadata"]?.jsonObject?.get("error")?.let {
             throw IllegalArgumentException("Could not resolve did:cheqd, resolver responded: ${it.jsonPrimitive.content}")

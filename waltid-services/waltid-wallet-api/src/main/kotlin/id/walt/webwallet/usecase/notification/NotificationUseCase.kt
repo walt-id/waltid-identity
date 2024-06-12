@@ -28,6 +28,7 @@ class NotificationUseCase(
     suspend fun findById(id: UUID) = service.get(id).fold(onSuccess = {
         Result.success(notificationFormatter.format(it))
     }, onFailure = { Result.failure(it) })
+
     fun deleteById(id: UUID) = service.delete(id)
     fun deleteAll(wallet: UUID) = service.list(wallet).mapNotNull { it.id?.let { UUID(it) } }.let {
         service.delete(*it.toTypedArray())

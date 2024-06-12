@@ -10,7 +10,7 @@ import kotlin.io.path.notExists
 @Serializable
 data class DatasourceJsonConfiguration(
     val dataSource: Db.SerializableHikariConfiguration,
-    val recreateDatabaseOnStart: Boolean = false
+    val recreateDatabaseOnStart: Boolean = false,
 ) : WalletConfig() {
 
     companion object {

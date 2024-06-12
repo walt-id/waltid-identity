@@ -1,14 +1,14 @@
 [
-    {
-        "credential": "VerifiableCredential#1",
-        "filters": [
-            {
-                "path": [
-                    "type"
-                ],
-                "type": "string",
-                "pattern": "VerifiableCredential#1"
-            }
-        ]
-    }
+  {
+    "credential": "VerifiableCredential#1",
+    "filters": [
+      {
+        "path": [
+          "type"
+        ],
+        "type": "string",
+        "pattern": "VerifiableCredential#1"
+      }
+    ]
+  }
 ]

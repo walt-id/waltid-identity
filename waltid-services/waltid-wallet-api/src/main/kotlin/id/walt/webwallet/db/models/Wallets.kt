@@ -17,7 +17,7 @@ object Wallets : KotlinxUUIDTable("wallets") {
 data class Wallet(
     val id: UUID,
     val name: String,
-    val createdOn: Instant
+    val createdOn: Instant,
 ) {
     constructor(result: ResultRow) : this(
         id = result[Wallets.id].value,
