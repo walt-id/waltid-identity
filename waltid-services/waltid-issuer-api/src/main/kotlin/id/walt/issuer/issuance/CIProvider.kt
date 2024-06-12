@@ -294,14 +294,14 @@ open class CIProvider : OpenIDCredentialIssuer(
         return Pair(subjectDid, nonce)
     }
 
-    @OptIn(ExperimentalEncodingApi::class)
     override fun generateBatchCredentialResponse(
         batchCredentialRequest: BatchCredentialRequest,
         accessToken: String,
     ): BatchCredentialResponse {
-        if (batchCredentialRequest.credentialRequests.map { it.format }.distinct().size >= 2) {
-            throw IllegalArgumentException("Credential request don't have the same format")
-        }
+        val credentialRequestFormats = batchCredentialRequest.credentialRequests
+                .map { it.format }
+
+        require(credentialRequestFormats.distinct().size < 2) { "Credential requests don't have the same format: ${credentialRequestFormats.joinToString { it.value }}" }
 
         val keyIdsDistinct = batchCredentialRequest.credentialRequests.map { credReq ->
             credReq.proof?.jwt?.let { jwt -> parseTokenHeader(jwt) }
