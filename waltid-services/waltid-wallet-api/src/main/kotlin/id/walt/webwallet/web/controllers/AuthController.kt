@@ -86,7 +86,6 @@ object AuthKeys {
 }
 
 fun Application.configureSecurity() {
-    val webConfig = ConfigManager.getConfig<WebConfig>()
     install(Sessions) {
         cookie<LoginTokenSession>("login") {
             // cookie.encoding = CookieEncoding.BASE64_ENCODING
