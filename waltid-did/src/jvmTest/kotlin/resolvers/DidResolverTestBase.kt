@@ -105,7 +105,7 @@ abstract class DidResolverTestBase {
          * Inherits [ed25519KeyAssertions]
          */
         val secp256KeyAssertions: resolverAssertion<Key> = { did, key, result ->
-            keyAssertions(did, key, result)
+            ed25519KeyAssertions(did, key, result)
             val publicKey = runBlocking { result.getOrNull()!!.getPublicKey().exportJWKObject() }
             assert(secp256KeyChecks(publicKey, key))
         }
