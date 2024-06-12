@@ -37,7 +37,6 @@ fun Application.configurePlugins() {
     configureHTTP()
     configureMonitoring()
     configureRouting()
-    configureOpenApi()
 }
 
 fun Application.verifierModule(withPlugins: Boolean = true) {
