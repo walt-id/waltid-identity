@@ -92,6 +92,8 @@ class ImportJWKKeyTestsAndDidManagement {
                 arguments(loadJwkLocal("ed25519.public.json"), KeyType.Ed25519, false),
                 // secp256k1
                 arguments(loadJwkLocal("secp256k1.public.json"), KeyType.secp256k1, false),
+                // secp256k1-minimal
+                arguments(loadJwkLocal("secp256k1-minimal.public.json"), KeyType.secp256k1, false),
                 // secp256r1
                 arguments(loadJwkLocal("secp256r1.public.json"), KeyType.secp256r1, false),
                 // rsa
