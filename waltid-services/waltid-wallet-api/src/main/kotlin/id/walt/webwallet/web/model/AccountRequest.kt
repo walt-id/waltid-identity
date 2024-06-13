@@ -2,13 +2,18 @@ package id.walt.webwallet.web.model
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.*
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.polymorphic
 
 @Serializable
 sealed class AccountRequest {
     abstract val name: String?
+
+    fun encodeWithType(type: String) = Json.encodeToString(JsonObject(loginRequestJson.encodeToJsonElement(this).jsonObject.toMutableMap().apply {
+        this["type"] = JsonPrimitive(type)
+    }))
 }
 
 @Serializable
