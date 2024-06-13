@@ -1,6 +1,9 @@
 package id.walt.commons.web.modules
 
 import id.walt.commons.featureflag.FeatureManager
+import io.github.smiley4.ktorswaggerui.dsl.routing.get
+import io.github.smiley4.ktorswaggerui.dsl.routing.route
+import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
@@ -23,26 +26,45 @@ object FeatureFlagInformationModule {
 
     fun Application.enable() {
         routing {
-            get("/features/registered") {
-                context.respond(FeatureManager.registeredFeatures.keys)
-            }
-            get("/features/state") {
+            route("features", {
+                tags = listOf("Feature management")
+            }) {
+                get("registered", {
+                    summary = "List registered features"
+                    response {
+                        HttpStatusCode.OK to {
+                            body<Map<String, String>> {
+                                description = "Registered features"
+                            }
+                        }
+                    }
+                }) {
+                    context.respond(FeatureManager.registeredFeatures.mapValues { it.value.description })
+                }
+                get("state", {
+                    summary = "Show state of features"
+                    response {
+                        HttpStatusCode.OK to {
+                            body<FeatureFlagInformations>()
+                        }
+                    }
+                }) {
+                    val registered = FeatureManager.registeredFeatures
 
-                val registered = FeatureManager.registeredFeatures
+                    val enabled = registered.filterKeys { it in FeatureManager.enabledFeatures }.mapValues { it.value.description }
+                    val disabled = registered.filterKeys { it in FeatureManager.disabledFeatures }.mapValues { it.value.description }
 
-                val enabled = registered.filterKeys { it in FeatureManager.enabledFeatures }.mapValues { it.value.description }
-                val disabled = registered.filterKeys { it in FeatureManager.disabledFeatures }.mapValues { it.value.description }
+                    val defaulted = registered.keys.subtract(enabled.keys).subtract(disabled.keys)
+                        .associateWith { registered[it]!!.description }
 
-                val defaulted = registered.keys.subtract(enabled.keys).subtract(disabled.keys)
-                    .associateWith { registered[it]!!.description }
-
-                context.respond(
-                    FeatureFlagInformations(
-                        enabled = FeatureFlagInformation(enabled),
-                        disabled = FeatureFlagInformation(disabled),
-                        defaulted = FeatureFlagInformation(defaulted)
+                    context.respond(
+                        FeatureFlagInformations(
+                            enabled = FeatureFlagInformation(enabled),
+                            disabled = FeatureFlagInformation(disabled),
+                            defaulted = FeatureFlagInformation(defaulted)
+                        )
                     )
-                )
+                }
             }
         }
     }
