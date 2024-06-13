@@ -57,6 +57,9 @@ object OidcApi : CIProvider() {
             get("/.well-known/openid-credential-issuer") {
                 call.respond(metadata.toJSON())
             }
+            get("/.well-known/oauth-authorization-server") {
+                call.respond(metadata.toJSON())
+            }
         }
 
         route("", {
