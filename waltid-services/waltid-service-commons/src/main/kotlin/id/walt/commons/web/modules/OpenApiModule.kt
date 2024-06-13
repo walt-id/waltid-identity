@@ -23,6 +23,7 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
+import kotlin.reflect.KType
 import kotlin.time.Duration.Companion.nanoseconds
 
 object OpenApiModule {
@@ -33,34 +34,40 @@ object OpenApiModule {
         var custom: (PluginConfigDsl.() -> Unit)? = null
     }
 
+    private fun KType.processWithKotlinxSerializationGenerator() = processKotlinxSerialization()
+        .connectSubTypes()
+        .handleNameAnnotation()
+        .generateSwaggerSchema()
+        .handleCoreAnnotations()
+        .withAutoTitle(TitleType.SIMPLE)
+        .compileReferencingRoot()
+
+    private fun KType.processWithReflectionGenerator() =
+        collectSubTypes()
+            .processReflection()
+            .connectSubTypes()
+            .handleNameAnnotation()
+            .generateSwaggerSchema()
+            .handleCoreAnnotations()
+            .withAutoTitle(TitleType.SIMPLE)
+            .compileReferencingRoot()
+
     // Module
     fun Application.enable() {
         install(SwaggerUI) {
             schemas {
                 generator = { type ->
-                    runCatching {
-                        // println("Trying kotlinx schema with: $type")
-                        type.processKotlinxSerialization()
-                            .connectSubTypes()
-                            .handleNameAnnotation()
-                            .generateSwaggerSchema()
-                            .handleCoreAnnotations()
-                            .withAutoTitle(TitleType.SIMPLE)
-                            .compileReferencingRoot()
-                    }.recover { ex ->
-                        // println("Falling back to reflection schema with: $type, due to $ex")
-                        type
-                            .collectSubTypes()
-                            .processReflection()
-                            .connectSubTypes()
-                            .handleNameAnnotation()
-                            .generateSwaggerSchema()
-                            .handleCoreAnnotations()
-                            .withAutoTitle(TitleType.SIMPLE)
-                            .compileReferencingRoot()
-                    }.getOrElse { ex ->
-                        error("Could neither parse with kotlinx nor reflection: $type, due to $ex")
-                    }
+                    if (type.toString().startsWith("id.walt")) {
+                        runCatching {
+                            // println("Trying kotlinx schema with: $type")
+                            type.processWithKotlinxSerializationGenerator()
+                        }.recover { ex ->
+                            // println("Falling back to reflection schema with: $type, due to $ex")
+                            type.processWithReflectionGenerator()
+                        }.getOrElse { ex ->
+                            error("Could neither parse with kotlinx nor reflection: $type, due to $ex")
+                        }
+                    } else type.processWithReflectionGenerator()
                 }
             }
 
@@ -113,7 +120,9 @@ object OpenApiModule {
                 openApiSpec()
             }
 
-            get("/") {
+            get("/", {
+                summary = "Redirect to swagger interface for API documentation"
+            }) {
                 context.respondRedirect("swagger")
             }
         }
