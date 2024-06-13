@@ -98,7 +98,7 @@ object ServiceHealthChecksDebugModule {
                         KtorStatus.ServerReady -> HealthCheckResult.healthy("ktor ready")
                         else -> HealthCheckResult.unhealthy("ktor not ready; in status: ${KtorStatusChecker.ktorStatus}")
                     }
-                }, 1.seconds, 1.seconds)
+                }, 2.seconds, 1.seconds)
             })
         }
 
