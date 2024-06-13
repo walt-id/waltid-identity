@@ -167,7 +167,7 @@ class LspPotentialTest {
     ).build(SimpleCOSECryptoProvider(listOf(COSECryptoProviderKeyInfo("device-key", AlgorithmID.ECDSA_256,
       deviceKeyPair.public, deviceKeyPair.private))), "device-key"))
 
-    val cwt = Cbor.decodeFromHexString(COSESign1.serializer(), credReq.proof!!.cwt!!)
+    val cwt = Cbor.decodeFromByteArray(COSESign1.serializer(), credReq.proof!!.cwt!!.base64UrlDecode())
     assertNotNull(cwt.payload)
     val cwtPayload = Cbor.decodeFromByteArray<MapElement>(cwt.payload!!)
     assertEquals(DEType.textString, cwtPayload.value.get(MapKey(ProofOfPossession.CWTProofBuilder.LABEL_ISS))?.type)
