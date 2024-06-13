@@ -62,7 +62,6 @@ order: [...]
  */
 @Serializable
 data class CredentialSupported(
-    val id: String,
     val format: CredentialFormat,
     @SerialName("cryptographic_binding_methods_supported") val cryptographicBindingMethodsSupported: Set<String>? = null,
     @SerialName("cryptographic_suites_supported") val cryptographicSuitesSupported: Set<String>? = null,

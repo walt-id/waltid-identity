@@ -90,7 +90,7 @@ object OpenID4VCI {
 
     fun resolveOfferedCredentials(credentialOffer: CredentialOffer, providerMetadata: OpenIDProviderMetadata): List<OfferedCredential> {
         val supportedCredentials =
-            providerMetadata.credentialsSupported?.filter { !it.id.isNullOrEmpty() }?.associateBy { it.id!! } ?: mapOf()
+            providerMetadata.credentialConfigurationsSupported ?: mapOf()
         return credentialOffer.credentialConfigurationIds.mapNotNull { c ->
             supportedCredentials[c]?.let {
                 OfferedCredential.fromProviderMetadata(it)
