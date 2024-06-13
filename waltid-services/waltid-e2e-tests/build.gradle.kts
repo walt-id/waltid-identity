@@ -1,5 +1,8 @@
+import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
+
 plugins {
     kotlin("jvm")
+    kotlin("plugin.power-assert") version "2.0.0"
 }
 
 group = "id.walt"
@@ -21,6 +24,17 @@ dependencies {
     implementation(project(":waltid-services:waltid-issuer-api"))
     implementation(project(":waltid-services:waltid-verifier-api"))
     implementation(project(":waltid-services:waltid-wallet-api"))
+}
+
+@OptIn(ExperimentalKotlinGradlePluginApi::class)
+powerAssert {
+    functions = listOf(
+        // kotlin.test
+        "kotlin.assert", "kotlin.test.assertTrue", "kotlin.test.assertEquals", "kotlin.test.assertNull",
+
+        // checks
+        "kotlin.require", "kotlin.check"
+    )
 }
 
 tasks.test {
