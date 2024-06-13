@@ -94,10 +94,13 @@ object E2ETestWebService {
         }
     }
 
-    fun Result<*>.toSuccessString() = if (isSuccess)
-        TextColors.green("✅ SUCCESS")
-    else
-        TextColors.red("❌ FAILURE")
+    fun Result<*>.toSuccessString() = if (isSuccess) {
+        val res = if (getOrNull() !is Unit) " (${getOrNull().toString()})" else ""
+        TextColors.green("✅ SUCCESS$res")
+    } else {
+        val res = exceptionOrNull()!!.message?.let { " ($it)" } ?: ""
+        TextColors.red("❌ FAILURE$res")
+    }
 
     suspend fun test(name: String, function: suspend () -> Any?) {
         val id = testResults.size + 1
@@ -109,6 +112,9 @@ object E2ETestWebService {
         testResults.add(result)
 
         t.println(TextColors.blue("End result of test \"$name\": $result"))
+        if (result.isFailure) {
+            result.exceptionOrNull()!!.printStackTrace()
+        }
 
         t.println(TextStyles.bold(TextColors.cyan("---===  End  ${id}. test: $name === ---") + " " + result.toSuccessString()) + "\n")
 
