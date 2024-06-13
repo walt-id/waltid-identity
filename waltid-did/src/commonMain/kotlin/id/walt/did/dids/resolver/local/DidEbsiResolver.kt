@@ -66,6 +66,13 @@ class DidEbsiResolver(
         return tryConvertAnyPublicKeyJwkToKey(publicKeyJwks)
     }
 
+    /*
+    Note from Christos:
+    There exist cases of EBSI DID Documents that only have secp256k1. There is nothing invalid
+    in not having a secp256r1 key. Hence, this function was changed to prioritize secp256r1 keys,
+    but not to return a failure result otherwise.
+    * NOTE:
+    * */
     @JvmBlocking
     @JvmAsync
     @JsPromise
@@ -75,6 +82,6 @@ class DidEbsiResolver(
             val result = JWKKey.importJWK(publicKeyJwk)
             if (result.isSuccess && publicKeyJwk.contains("P-256")) return result
         }
-        return Result.failure(NoSuchElementException("No key could be imported"))
+        return JWKKey.importJWK(publicKeyJwks.first())
     }
 }
