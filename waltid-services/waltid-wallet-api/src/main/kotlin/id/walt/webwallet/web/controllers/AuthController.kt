@@ -244,25 +244,18 @@ fun Application.auth() {
                         request {
                             body<EmailAccountRequest> {
                                 example("E-mail + password") {
-                                    value = buildJsonObject {
-                                        put("type", JsonPrimitive("email"))
-                                        put("email", JsonPrimitive("user@email.com"))
-                                        put("password", JsonPrimitive("password"))
-                                    }
+                                    value = EmailAccountRequest(
+                                        email = "user@email.com",
+                                        password = "password"
+                                    ).encodeWithType("email")
                                 }
                                 example("Wallet address + ecosystem") {
-                                    value = buildJsonObject {
-                                        put("type", JsonPrimitive("address"))
-                                        put("address", JsonPrimitive("0xABC"))
-                                        put("ecosystem", JsonPrimitive("ecosystem"))
-                                    }
+                                    value = AddressAccountRequest(
+                                        address = "0xABC",
+                                        ecosystem = "ecosystem"
+                                    ).encodeWithType("address")
                                 }
-                                example("OIDC token") {
-                                    buildJsonObject {
-                                        put("type", JsonPrimitive("oidc"))
-                                        put("token", JsonPrimitive("oidc token"))
-                                    }
-                                }
+                                example("OIDC") { value = OidcAccountRequest(token = "ey...").encodeWithType("oidc") }
                             }
                         }
                         response {
@@ -281,29 +274,21 @@ fun Application.auth() {
                     summary = "Register with [email + password] or [wallet address + ecosystem]"
                     request {
                         body<EmailAccountRequest> {
-
-                            fun AccountRequest.encodeExample(type: String) =
-                                JsonObject(loginRequestJson.encodeToJsonElement(this).jsonObject.toMutableMap()
-                                    .apply {
-                                        this["type"] = JsonPrimitive(type)
-                                    })
-                                    .toString()
-
                             example("E-mail + password") {
                                 value = EmailAccountRequest(
                                     name = "Max Mustermann",
                                     email = "user@email.com",
                                     password = "password"
-                                ).encodeExample("email")
+                                ).encodeWithType("email")
                             }
                             example("Wallet address + ecosystem") {
-                                value = AddressAccountRequest(address = "0xABC", ecosystem = "ecosystem").encodeExample("address")
+                                value = AddressAccountRequest(address = "0xABC", ecosystem = "ecosystem").encodeWithType("address")
                             }
-                            example("OIDC") { value = OidcAccountRequest(token = "ey...").encodeExample("oidc") }
+                            example("OIDC") { value = OidcAccountRequest(token = "ey...").encodeWithType("oidc") }
                             example("OIDC Unique Subject") {
-                                value = OidcUniqueSubjectRequest(token = "ey...").encodeExample("oidc-unique-subject")
+                                value = OidcUniqueSubjectRequest(token = "ey...").encodeWithType("oidc-unique-subject")
                             }
-                            example("Keycloak") { value = KeycloakAccountRequest().encodeExample("keycloak") }
+                            example("Keycloak") { value = KeycloakAccountRequest().encodeWithType("keycloak") }
                         }
                     }
                     response {
@@ -377,13 +362,12 @@ fun Application.auth() {
                     request {
                         body<KeycloakAccountRequest> {
                             example("username + email + password") {
-                                value = buildJsonObject {
-                                    put("username", JsonPrimitive("Max_Mustermann"))
-                                    put("email", JsonPrimitive("user@email.com"))
-                                    put("password", JsonPrimitive("password"))
-                                    put("token", JsonPrimitive("eyJhb..."))
-                                    put("type", JsonPrimitive("keycloak"))
-                                }
+                                value = KeycloakAccountRequest(
+                                    username = "Max_Mustermann",
+                                    email = "user@email.com",
+                                    password = "password",
+                                    token = "eyJhb..."
+                                ).encodeWithType("keycloak")
                             }
                         }
                     }
@@ -412,25 +396,22 @@ fun Application.auth() {
                     request {
                         body<KeycloakAccountRequest> {
                             example("Keycloak username + password") {
-                                value = buildJsonObject {
-                                    put("type", JsonPrimitive("keycloak"))
-                                    put("username", JsonPrimitive("Max_Mustermann"))
-                                    put("password", JsonPrimitive("password"))
-                                }
+                                value = KeycloakAccountRequest(
+                                    username = "Max_Mustermann",
+                                    password = "password"
+                                ).encodeWithType("keycloak")
                             }
                             example("Keycloak username + Access Token ") {
-                                value = buildJsonObject {
-                                    put("type", JsonPrimitive("keycloak"))
-                                    put("username", JsonPrimitive("Max_Mustermann"))
-                                    put("token", JsonPrimitive("eyJhb..."))
-                                }
+                                value = KeycloakAccountRequest(
+                                    username = "Max_Mustermann",
+                                    token = "eyJhb..."
+                                ).encodeWithType("keycloak")
                             }
 
                             example("Keycloak user Access Token ") {
-                                value = buildJsonObject {
-                                    put("type", JsonPrimitive("keycloak"))
-                                    put("token", JsonPrimitive("eyJhb..."))
-                                }
+                                value = KeycloakAccountRequest(
+                                    token = "eyJhb..."
+                                ).encodeWithType("keycloak")
                             }
                         }
                     }
@@ -455,10 +436,10 @@ fun Application.auth() {
                     request {
                         body<KeycloakLogoutRequest> {
                             example("keycloakUserId + token") {
-                                value = buildJsonObject {
-                                    put("keycloakUserId", JsonPrimitive("3d09 ..."))
-                                    put("token", JsonPrimitive("eyJhb ..."))
-                                }
+                                value = KeycloakLogoutRequest(
+                                    keycloakUserId = "3d09 ...",
+                                    token = "eyJhb ..."
+                                )
                             }
                         }
                     }
