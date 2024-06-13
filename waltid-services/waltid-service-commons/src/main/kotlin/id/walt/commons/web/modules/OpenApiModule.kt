@@ -8,6 +8,16 @@ import io.github.smiley4.ktorswaggerui.dsl.config.PluginConfigDsl
 import io.github.smiley4.ktorswaggerui.dsl.routing.get
 import io.github.smiley4.ktorswaggerui.routing.openApiSpec
 import io.github.smiley4.ktorswaggerui.routing.swaggerUI
+import io.github.smiley4.schemakenerator.core.connectSubTypes
+import io.github.smiley4.schemakenerator.core.handleNameAnnotation
+import io.github.smiley4.schemakenerator.reflection.collectSubTypes
+import io.github.smiley4.schemakenerator.reflection.processReflection
+import io.github.smiley4.schemakenerator.serialization.processKotlinxSerialization
+import io.github.smiley4.schemakenerator.swagger.compileReferencingRoot
+import io.github.smiley4.schemakenerator.swagger.data.TitleType
+import io.github.smiley4.schemakenerator.swagger.generateSwaggerSchema
+import io.github.smiley4.schemakenerator.swagger.handleCoreAnnotations
+import io.github.smiley4.schemakenerator.swagger.withAutoTitle
 import io.ktor.server.application.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
@@ -26,14 +36,33 @@ object OpenApiModule {
     // Module
     fun Application.enable() {
         install(SwaggerUI) {
-            /*schemas {
+            schemas {
                 generator = { type ->
-                    type.processKotlinxSerialization()
-                        .generateSwaggerSchema()
-                        .withAutoTitle(TitleType.SIMPLE)
-                        .compileReferencingRoot()
+                    runCatching {
+                        // println("Trying kotlinx schema with: $type")
+                        type.processKotlinxSerialization()
+                            .connectSubTypes()
+                            .handleNameAnnotation()
+                            .generateSwaggerSchema()
+                            .handleCoreAnnotations()
+                            .withAutoTitle(TitleType.SIMPLE)
+                            .compileReferencingRoot()
+                    }.recover { ex ->
+                        // println("Falling back to reflection schema with: $type, due to $ex")
+                        type
+                            .collectSubTypes()
+                            .processReflection()
+                            .connectSubTypes()
+                            .handleNameAnnotation()
+                            .generateSwaggerSchema()
+                            .handleCoreAnnotations()
+                            .withAutoTitle(TitleType.SIMPLE)
+                            .compileReferencingRoot()
+                    }.getOrElse { ex ->
+                        error("Could neither parse with kotlinx nor reflection: $type, due to $ex")
+                    }
                 }
-            }*/
+            }
 
             info {
                 title = "${ServiceConfig.config.vendor} ${ServiceConfig.config.name}"
