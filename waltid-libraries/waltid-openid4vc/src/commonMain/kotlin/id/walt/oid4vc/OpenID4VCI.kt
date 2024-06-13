@@ -70,6 +70,12 @@ object OpenID4VCI {
         }.buildString()
     }
 
+    fun getOAuthProviderMetadataUrl(baseUrl: String): String {
+        return URLBuilder(baseUrl).apply {
+            appendPathSegments(".well-known", "oauth-authorization-server")
+        }.buildString()
+    }
+
     suspend fun resolveCIProviderMetadata(credOffer: CredentialOffer): OpenIDProviderMetadata {
         return http.get(getCIProviderMetadataUrl(credOffer)).bodyAsText().let {
             OpenIDProviderMetadata.fromJSONString(it)
