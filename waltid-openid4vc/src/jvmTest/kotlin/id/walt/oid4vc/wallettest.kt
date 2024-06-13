@@ -116,7 +116,7 @@ class wallettest : AnnotationSpec() {
         val providerMetadata = ktorClient.get(providerMetadataUri).call.body<OpenIDProviderMetadata>()
         println("providerMetadata: $providerMetadata")
 
-        providerMetadata.credentialsSupported shouldNotBe null
+        providerMetadata.credentialConfigurationsSupported shouldNotBe null
 
         println("// resolve offered credentials")
         val offeredCredentials = OpenID4VCI.resolveOfferedCredentials(parsedOfferReq.credentialOffer!!, providerMetadata)

@@ -62,9 +62,8 @@ class CI_JVM_Test : AnnotationSpec() {
 
     var testMetadata = OpenIDProviderMetadata(
         authorizationEndpoint = "https://localhost/oidc",
-        credentialConfigurationsSupported = listOf(
-            CredentialSupported(
-                "UniversityDegreeCredential_jwt_vc_json",
+        credentialConfigurationsSupported = mapOf(
+            "UniversityDegreeCredential_jwt_vc_json" to CredentialSupported(
                 CredentialFormat.jwt_vc_json, setOf("did"), setOf("ES256K"),
                 listOf(
                     DisplayProperties(
@@ -95,8 +94,7 @@ class CI_JVM_Test : AnnotationSpec() {
                     )
                 )
             ),
-            CredentialSupported(
-                "VerifiableId_ldp_vc",
+            "VerifiableId_ldp_vc" to CredentialSupported(
                 CredentialFormat.ldp_vc, setOf("did"), setOf("ES256K"),
                 listOf(DisplayProperties("Verifiable ID")),
                 types = listOf("VerifiableCredential", "VerifiableId"),
@@ -105,7 +103,7 @@ class CI_JVM_Test : AnnotationSpec() {
                     JsonObject(mapOf("@version" to JsonPrimitive(1.1)))
                 )
             )
-        ).associateBy { it.id }
+        )
     )
 
     val ktorClient = HttpClient() {
@@ -625,7 +623,7 @@ class CI_JVM_Test : AnnotationSpec() {
         val providerMetadata = ktorClient.get(providerMetadataUri).call.body<OpenIDProviderMetadata>()
         println("providerMetadata: $providerMetadata")
 
-        providerMetadata.credentialsSupported shouldNotBe null
+        providerMetadata.credentialConfigurationsSupported shouldNotBe null
 
         println("// resolve offered credentials")
         val offeredCredentials = OpenID4VCI.resolveOfferedCredentials(parsedOfferReq.credentialOffer!!, providerMetadata)
@@ -714,13 +712,13 @@ class CI_JVM_Test : AnnotationSpec() {
         println("// as CI provider, initialize credential offer for user, this time providing full offered credential object, and allowing pre-authorized code flow with user pin")
         val issuanceSession = ciTestProvider.initializeCredentialOffer(
             CredentialOffer.Builder(ciTestProvider.baseUrl)
-                .addOfferedCredential(ciTestProvider.metadata.credentialsSupported!!.first().id!!),
+                .addOfferedCredential(ciTestProvider.metadata.credentialConfigurationsSupported!!.keys.first()),
             5.minutes, allowPreAuthorized = true, txCode = TxCode(TxInputMode.numeric), txCodeValue = "1234"
         )
         println("issuanceSession: $issuanceSession")
 
         issuanceSession.credentialOffer shouldNotBe null
-        issuanceSession.credentialOffer!!.credentialConfigurationIds.first() shouldBe ciTestProvider.metadata.credentialsSupported!!.first().id!!
+        issuanceSession.credentialOffer!!.credentialConfigurationIds.first() shouldBe ciTestProvider.metadata.credentialConfigurationsSupported!!.keys.first()
 
         val offerRequest = CredentialOfferRequest(issuanceSession.credentialOffer!!)
         println("offerRequest: $offerRequest")
@@ -747,7 +745,7 @@ class CI_JVM_Test : AnnotationSpec() {
         val providerMetadata = ktorClient.get(providerMetadataUri).call.body<OpenIDProviderMetadata>()
         println("providerMetadata: $providerMetadata")
 
-        providerMetadata.credentialsSupported shouldNotBe null
+        providerMetadata.credentialConfigurationsSupported shouldNotBe null
 
         println("// resolve offered credentials")
         val offeredCredentials = OpenID4VCI.resolveOfferedCredentials(parsedOfferReq.credentialOffer!!, providerMetadata)
@@ -1087,13 +1085,13 @@ class CI_JVM_Test : AnnotationSpec() {
         println("// as CI provider, initialize credential offer for user, this time providing full offered credential object, and allowing pre-authorized code flow with user pin")
         val issuanceSession = ciTestProvider.initializeCredentialOffer(
             CredentialOffer.Builder(ciTestProvider.baseUrl)
-                .addOfferedCredential(ciTestProvider.metadata.credentialsSupported!!.first().id!!),
+                .addOfferedCredential(ciTestProvider.metadata.credentialConfigurationsSupported!!.keys.first()),
             5.minutes, allowPreAuthorized = true, TxCode(TxInputMode.numeric), txCodeValue = "1234"
         )
         println("issuanceSession: $issuanceSession")
 
         issuanceSession.credentialOffer shouldNotBe null
-        issuanceSession.credentialOffer!!.credentialConfigurationIds.first() shouldBe ciTestProvider.metadata.credentialsSupported!!.first().id!!
+        issuanceSession.credentialOffer!!.credentialConfigurationIds.first() shouldBe ciTestProvider.metadata.credentialConfigurationsSupported!!.keys.first()
 
         val offerRequest = ciTestProvider.getCredentialOfferRequest(issuanceSession, byReference = true)
         println("offerRequest: $offerRequest")
@@ -1122,7 +1120,7 @@ class CI_JVM_Test : AnnotationSpec() {
         val providerMetadata = ktorClient.get(providerMetadataUri).call.body<OpenIDProviderMetadata>()
         println("providerMetadata: $providerMetadata")
 
-        providerMetadata.credentialsSupported shouldNotBe null
+        providerMetadata.credentialConfigurationsSupported shouldNotBe null
 
         println("// resolve offered credentials")
         val offeredCredentials = OpenID4VCI.resolveOfferedCredentials(credentialOffer, providerMetadata)
