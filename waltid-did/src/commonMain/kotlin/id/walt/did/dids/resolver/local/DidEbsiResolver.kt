@@ -45,6 +45,8 @@ class DidEbsiResolver(
 
     }
 
+    private val json = Json { ignoreUnknownKeys = true }
+
     @JvmBlocking
     @JvmAsync
     @JsPromise
@@ -57,7 +59,7 @@ class DidEbsiResolver(
             runCatching {
                 val verificationMethod = it.jsonObject
                 val publicKeyJwk = verificationMethod["publicKeyJwk"]!!.jsonObject
-                DidWebResolver.json.encodeToString(publicKeyJwk)
+                json.encodeToString(publicKeyJwk)
             }
         }.filter { it.isSuccess }.map { it.getOrThrow() }
 
