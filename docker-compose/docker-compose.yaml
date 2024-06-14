@@ -161,8 +161,8 @@ services:
       /opt/mssql-tools/bin/sqlcmd -S mssql-engine -U sa -P $MSSQL_SA_PWD -i /docker-entrypoint-initdb.d/mssql-db-init.sql;
       echo "Configuration complete";
       '
-  postman-tests:
-    container_name: postman-tests
+  api-tests:
+    container_name: api-tests
     image: postman/newman
     #entrypoint: ["newman", "run", "/postman/collection.json", "--environment", "/postman/localhost.json", "--bail"]
     entrypoint: sh

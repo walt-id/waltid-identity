@@ -3,7 +3,7 @@
 set -eu pipefail
 
 echo "Attempting to connect to wallet-api:${WALLET_BACKEND_PORT}"
-until $(nc -zv localhost "${WALLET_BACKEND_PORT}"); do
+until nc -zv host.docker.internal "${WALLET_BACKEND_PORT}"; do
     sleep 5
 done
 echo "Connected!"

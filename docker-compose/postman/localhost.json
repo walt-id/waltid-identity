@@ -10,7 +10,7 @@
 		},
 		{
 			"key": "domain",
-			"value": "127.0.0.1",
+			"value": "host.docker.internal",
 			"type": "default",
 			"enabled": true
 		},

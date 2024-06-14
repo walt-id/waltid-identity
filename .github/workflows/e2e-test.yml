@@ -1,0 +1,18 @@
+name: Automated API tests using newman
+
+on: pull_request
+
+jobs:
+  automated-api-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Postman CLI
+        uses: actions/setup-node@v2
+        with:
+          node-version: "18"
+      - name: "Install newman"
+        run: "npm install -g newman"
+      - name: Run API tests
+        run: |
+          newman run docker-compose/postman/collection.json -e docker-compose/postman/dev.json

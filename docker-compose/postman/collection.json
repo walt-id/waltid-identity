@@ -1361,7 +1361,7 @@
 					"listen": "prerequest",
 					"script": {
 						"exec": [
-							"console.clear();\r",
+							"//console.clear();\r",
 							"let name = pm.variables.replaceIn(\"{{$randomFullName}}\")\r",
 							"let email = pm.variables.replaceIn(\"{{$randomEmail}}\")\r",
 							"pm.collectionVariables.set(\"name\", `${name}`);\r",
