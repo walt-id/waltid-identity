@@ -10,8 +10,6 @@ services:
       - caddy
     env_file:
       - .env
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     volumes:
       - ./wallet-api/config:/waltid-wallet-api/config
       - ./wallet-api/walt.yaml:/waltid-wallet-api/walt.yaml
@@ -75,7 +73,7 @@ services:
   sqlite:
     image: alpine
     profiles:
-        -   sqlite
+      -   sqlite
     entrypoint: [ "/bin/sh", "-c", "exit 0" ]
 
   postgres-engine:
@@ -100,7 +98,7 @@ services:
   postgres:
     image: alpine
     profiles:
-        -   postgres
+      -   postgres
     entrypoint: [ "/bin/sh", "-c", "exit 0" ]
     depends_on:
       postgres-engine:
