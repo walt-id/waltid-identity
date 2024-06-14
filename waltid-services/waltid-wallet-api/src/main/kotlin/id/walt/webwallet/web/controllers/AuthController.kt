@@ -13,6 +13,7 @@ import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.oid4vc.definitions.JWTClaims
 import id.walt.webwallet.FeatureCatalog
 import id.walt.webwallet.config.AuthConfig
+import id.walt.webwallet.db.models.Account
 import id.walt.webwallet.db.models.AccountWalletMappings
 import id.walt.webwallet.db.models.AccountWalletPermissions
 import id.walt.webwallet.service.OidcLoginService
@@ -306,14 +307,20 @@ fun Application.auth() {
             }
 
             authenticate("auth-session", "auth-bearer", "auth-bearer-alternative") {
-                get("user-info", { summary = "Return user ID if logged in" }) {
+                get("user-info", {
+                    summary = "Return user ID if logged in"
+                    response {
+                        HttpStatusCode.OK to {
+                            body<Account>()
+                        }
+                    }
+                }) {
                     getUsersSessionToken()?.run {
                         val jwsObject = JWSObject.parse(this)
                         val uuid =
                             Json.parseToJsonElement(jwsObject.payload.toString()).jsonObject["sub"]?.jsonPrimitive?.content.toString()
                         call.respond(AccountsService.get(UUID(uuid)))
-                    }
-                        ?: call.respond(HttpStatusCode.BadRequest)
+                    } ?: call.respond(HttpStatusCode.BadRequest)
                 }
                 get("session", { summary = "Return session ID if logged in" }) {
                     val token = getUsersSessionToken() ?: throw UnauthorizedException("Invalid session")
