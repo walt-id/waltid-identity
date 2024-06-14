@@ -322,7 +322,9 @@ fun Application.verfierApi() {
                 }
                 response {
                     HttpStatusCode.OK to {
-                        description = "Session info"
+                        body<JsonObject> { // it's PresentationSessionInfo
+                            description = "Session info"
+                        }
                     }
                 }
             }) {

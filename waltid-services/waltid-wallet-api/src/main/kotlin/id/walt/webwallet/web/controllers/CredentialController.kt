@@ -46,7 +46,7 @@ fun Application.credentials() = walletRoute {
             response {
                 HttpStatusCode.OK to {
                     description = "Array of (verifiable credentials) JSON documents"
-                    body<List<JsonObject>>()
+                    body<List<WalletCredential>>()
                 }
             }
         }) {

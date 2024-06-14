@@ -1,5 +1,6 @@
 package id.walt.webwallet.web.controllers
 
+import id.walt.oid4vc.data.CredentialOffer
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.requests.CredentialOfferRequest
 import id.walt.webwallet.db.models.WalletCredential
@@ -19,7 +20,7 @@ import kotlinx.serialization.json.JsonObject
 
 fun Application.exchange() = walletRoute {
     route("exchange", {
-        tags = listOf("WalletCredential exchange")
+        tags = listOf("Credential exchange")
     }) {
         post("useOfferRequest", {
             summary = "Claim credential(s) from an issuer"
@@ -230,6 +231,13 @@ fun Application.exchange() = walletRoute {
 
             request {
                 body<String> { description = "Credential offer request to resolve/parse" }
+            }
+            response {
+                HttpStatusCode.OK to {
+                    body<CredentialOffer> {
+                        description = "Resolved credential offer"
+                    }
+                }
             }
         }) {
             val wallet = getWalletService()

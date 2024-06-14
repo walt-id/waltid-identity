@@ -12,7 +12,7 @@ import io.ktor.server.util.*
 
 fun Application.silentExchange() = webWalletRoute {
     route("api", {
-        tags = listOf("WalletCredential Exchange")
+        tags = listOf("Silent Exchange")
     }) {
         post("useOfferRequest/{did}", {
             summary = "Silently claim credentials"
