@@ -110,9 +110,11 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
                     }
             )
         } catch (exc: SerializationException) {
+            exc.printStackTrace()
             throw AuthorizationError(
                 authorizationRequest,
-                AuthorizationErrorCode.invalid_presentation_definition_reference
+                AuthorizationErrorCode.invalid_presentation_definition_reference,
+                exc.message
             )
         }
     }
