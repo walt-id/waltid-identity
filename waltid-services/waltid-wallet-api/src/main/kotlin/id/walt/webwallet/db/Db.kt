@@ -91,7 +91,7 @@ object Db {
                 val walletResult = AccountsService.getAccountWalletMappings("", accountId)
                 val walletId = walletResult.wallets[0].id
 
-                CredentialsService().add(
+                /*CredentialsService().add(
                     wallet = walletId,
                     WalletCredential(
                         wallet = walletId,
@@ -102,7 +102,7 @@ object Db {
                         manifest = null,
                         deletedOn = null,
                     )
-                )
+                )*/
             }
         }
     }
