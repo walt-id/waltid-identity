@@ -1,0 +1,45 @@
+{
+	"id": "88f330a3-e81d-4b31-abeb-b6f30b48ca20",
+	"name": "localhost",
+	"values": [
+		{
+			"key": "protocol",
+			"value": "http",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "domain",
+			"value": "127.0.0.1",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "portal",
+			"value": "{{domain}}",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "wallet-url",
+			"value": "{{protocol}}://{{domain}}:7001",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "issuer-url",
+			"value": "{{protocol}}://{{domain}}:7002",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "verifier-url",
+			"value": "{{protocol}}://{{domain}}:7003",
+			"type": "default",
+			"enabled": true
+		}
+	],
+	"_postman_variable_scope": "environment",
+	"_postman_exported_at": "2024-06-14T11:18:10.072Z",
+	"_postman_exported_using": "Postman/10.24.25"
+}

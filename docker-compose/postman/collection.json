@@ -1,0 +1,1698 @@
+{
+	"info": {
+		"_postman_id": "1dbd442e-16ac-4c40-a8d0-581f326bea50",
+		"name": "Issuance/Presentation Tests",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "20879178"
+	},
+	"item": [
+		{
+			"name": "_start",
+			"item": [
+				{
+					"name": "_start",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {\r",
+									"  pm.response.to.have.status(200);\r",
+									"});\r",
+									"pm.execution.setNextRequest(\"Register\");"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{wallet-url}}",
+							"host": [
+								"{{wallet-url}}"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Authorized",
+			"item": [
+				{
+					"name": "Exchange",
+					"item": [
+						{
+							"name": "Resolve credential offer",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test(\"Status code is 200\", function () {\r",
+											"  pm.response.to.have.status(200);\r",
+											"});\r",
+											"pm.execution.setNextRequest(\"Claim credential\");"
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{{offer-request-url}}",
+									"options": {
+										"raw": {
+											"language": "text"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{wallet-url}}/wallet-api/wallet/{{wallet}}/exchange/resolveCredentialOffer",
+									"host": [
+										"{{wallet-url}}"
+									],
+									"path": [
+										"wallet-api",
+										"wallet",
+										"{{wallet}}",
+										"exchange",
+										"resolveCredentialOffer"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Claim credential",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test(\"Status code is 200\", function () {\r",
+											"  pm.response.to.have.status(200);\r",
+											"});\r",
+											"const nextRequest = pm.collectionVariables.get(\"present\");\r",
+											"pm.execution.setNextRequest(nextRequest);"
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{{offer-request-url}}",
+									"options": {
+										"raw": {
+											"language": "text"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{wallet-url}}/wallet-api/wallet/{{wallet}}/exchange/useOfferRequest?did={{did}}",
+									"host": [
+										"{{wallet-url}}"
+									],
+									"path": [
+										"wallet-api",
+										"wallet",
+										"{{wallet}}",
+										"exchange",
+										"useOfferRequest"
+									],
+									"query": [
+										{
+											"key": "did",
+											"value": "{{did}}"
+										}
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Resolve offer",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test(\"Status code is 200\", function () {\r",
+											"  pm.response.to.have.status(200);\r",
+											"});\r",
+											"let response = pm.response.text();\r",
+											"const arr = response.split(\"&\");\r",
+											"let pd = \"{}\";\r",
+											"for (let i = 0; i < arr.length; i++) {\r",
+											"    console.log(arr[i]);\r",
+											"  if(arr[i].startsWith(\"presentation_definition=\")){\r",
+											"    pd = decodeURIComponent(arr[i].split(\"=\")[1]);\r",
+											"  }\r",
+											"}\r",
+											"console.log(`presentation-definition=${pd}`);\r",
+											"pm.collectionVariables.set(\"presentation-definition\", pd);\r",
+											"pm.collectionVariables.set(\"presentation-offer\", response);\r",
+											"pm.execution.setNextRequest(\"Match credentials\");"
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{{presentation-offer}}",
+									"options": {
+										"raw": {
+											"language": "text"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{wallet-url}}/wallet-api/wallet/{{wallet}}/exchange/resolvePresentationRequest",
+									"host": [
+										"{{wallet-url}}"
+									],
+									"path": [
+										"wallet-api",
+										"wallet",
+										"{{wallet}}",
+										"exchange",
+										"resolvePresentationRequest"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Match credentials",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test(\"Status code is 200\", function () {\r",
+											"  pm.response.to.have.status(200);\r",
+											"});\r",
+											"const response = pm.response.json();\r",
+											"const id = response[0][\"id\"];\r",
+											"pm.collectionVariables.set(\"credential-id\", id);\r",
+											"pm.execution.setNextRequest(\"Present\");"
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{{presentation-definition}}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{wallet-url}}/wallet-api/wallet/{{wallet}}/exchange/matchCredentialsForPresentationDefinition",
+									"host": [
+										"{{wallet-url}}"
+									],
+									"path": [
+										"wallet-api",
+										"wallet",
+										"{{wallet}}",
+										"exchange",
+										"matchCredentialsForPresentationDefinition"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Present",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test(\"Status code is 200\", function () {\r",
+											"  pm.response.to.have.status(200);\r",
+											"});\r",
+											"pm.execution.setNextRequest(null);"
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n    \"did\": \"{{did}}\",\r\n    \"presentationRequest\": \"{{presentation-offer}}\",\r\n    \"selectedCredentials\":\r\n    [\r\n        \"{{credential-id}}\"\r\n    ]\r\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{wallet-url}}/wallet-api/wallet/{{wallet}}/exchange/usePresentationRequest",
+									"host": [
+										"{{wallet-url}}"
+									],
+									"path": [
+										"wallet-api",
+										"wallet",
+										"{{wallet}}",
+										"exchange",
+										"usePresentationRequest"
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "Dids",
+					"item": [
+						{
+							"name": "Create did:jwk",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test(\"Status code is 200\", function () {\r",
+											"  pm.response.to.have.status(200);\r",
+											"});\r",
+											"let response = pm.response.text();\r",
+											"pm.collectionVariables.set(\"did\", decodeURIComponent(response));\r",
+											"console.log(`created ${pm.collectionVariables.get(\"did\")}`);\r",
+											"pm.execution.setNextRequest(\"Set default did\");"
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [],
+								"url": {
+									"raw": "{{wallet-url}}/wallet-api/wallet/{{wallet}}/dids/create/jwk?keyId={{keyId}}",
+									"host": [
+										"{{wallet-url}}"
+									],
+									"path": [
+										"wallet-api",
+										"wallet",
+										"{{wallet}}",
+										"dids",
+										"create",
+										"jwk"
+									],
+									"query": [
+										{
+											"key": "keyId",
+											"value": "{{keyId}}"
+										}
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Create did:web",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test(\"Status code is 200\", function () {\r",
+											"  pm.response.to.have.status(200);\r",
+											"});\r",
+											"let response = pm.response.text();\r",
+											"pm.collectionVariables.set(\"did\", decodeURIComponent(response));\r",
+											"console.log(`created ${pm.collectionVariables.get(\"did\")}`);\r",
+											"pm.execution.setNextRequest(\"Set default did\");"
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [],
+								"url": {
+									"raw": "{{wallet-url}}/wallet-api/wallet/{{wallet}}/dids/create/web?keyId={{keyId}}&domain={{domain}}&path=/wallet-api/registry/{{$guid}}",
+									"host": [
+										"{{wallet-url}}"
+									],
+									"path": [
+										"wallet-api",
+										"wallet",
+										"{{wallet}}",
+										"dids",
+										"create",
+										"web"
+									],
+									"query": [
+										{
+											"key": "keyId",
+											"value": "{{keyId}}"
+										},
+										{
+											"key": "domain",
+											"value": "{{domain}}"
+										},
+										{
+											"key": "path",
+											"value": "/wallet-api/registry/{{$guid}}"
+										}
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Set default did",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test(\"Status code is 202\", function () {\r",
+											"    pm.response.to.have.status(202);\r",
+											"});\r",
+											"// const req = pm.collectionVariables.get(\"entra\") ?? \"issuer-walt\";\r",
+											"const req = pm.collectionVariables.get(\"entra\") ?? \"onboard\";\r",
+											"pm.execution.setNextRequest(req);//too bad folder referencing is not supported"
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [],
+								"url": {
+									"raw": "{{wallet-url}}/wallet-api/wallet/{{wallet}}/dids/default?did={{did}}",
+									"host": [
+										"{{wallet-url}}"
+									],
+									"path": [
+										"wallet-api",
+										"wallet",
+										"{{wallet}}",
+										"dids",
+										"default"
+									],
+									"query": [
+										{
+											"key": "did",
+											"value": "{{did}}"
+										}
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "List",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{wallet-url}}/wallet-api/wallet/{{wallet}}/dids",
+									"host": [
+										"{{wallet-url}}"
+									],
+									"path": [
+										"wallet-api",
+										"wallet",
+										"{{wallet}}",
+										"dids"
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "Keys",
+					"item": [
+						{
+							"name": "Generate key",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test(\"Status code is 200\", function () {\r",
+											"  pm.response.to.have.status(200);\r",
+											"});\r",
+											"let response = pm.response.text();\r",
+											"pm.collectionVariables.set(\"keyId\", response);\r",
+											"const method = pm.collectionVariables.get(\"holder-did-method\");\r",
+											"console.log(`generated key using algorithm: ${pm.collectionVariables.get(\"holder-key-algorithm\")}`);\r",
+											"console.log(`by: ${pm.collectionVariables.get(\"holder-key-backend\")}`);\r",
+											"pm.execution.setNextRequest(\"Create did:\" + method);"
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								},
+								{
+									"listen": "prerequest",
+									"script": {
+										"exec": [
+											"let payload = pm.collectionVariables.get(\"jwk-payload\")\r",
+											"if (pm.collectionVariables.get(\"holder-key-backend\") == \"oci\"){\r",
+											"    payload = pm.collectionVariables.get(\"oci-payload\")\r",
+											"}\r",
+											"pm.collectionVariables.set(\"payload\", `${payload}`);"
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{{payload}}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{wallet-url}}/wallet-api/wallet/{{wallet}}/keys/generate",
+									"host": [
+										"{{wallet-url}}"
+									],
+									"path": [
+										"wallet-api",
+										"wallet",
+										"{{wallet}}",
+										"keys",
+										"generate"
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "Events",
+					"item": [
+						{
+							"name": "List",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{wallet-url}}/wallet-api/wallet/{{wallet}}/eventlog?filter=action=present&filter=event=Credential&sortOrder=desc",
+									"host": [
+										"{{wallet-url}}"
+									],
+									"path": [
+										"wallet-api",
+										"wallet",
+										"{{wallet}}",
+										"eventlog"
+									],
+									"query": [
+										{
+											"key": "limit",
+											"value": "",
+											"disabled": true
+										},
+										{
+											"key": "startingAfter",
+											"value": "",
+											"disabled": true
+										},
+										{
+											"key": "sortBy",
+											"value": "",
+											"disabled": true
+										},
+										{
+											"key": "filter",
+											"value": "action=present"
+										},
+										{
+											"key": "filter",
+											"value": "event=Credential"
+										},
+										{
+											"key": "sortOrder",
+											"value": "desc"
+										}
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "Credentials",
+					"item": [
+						{
+							"name": "List",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{wallet-url}}/wallet-api/wallet/{{wallet}}/credentials",
+									"host": [
+										"{{wallet-url}}"
+									],
+									"path": [
+										"wallet-api",
+										"wallet",
+										"{{wallet}}",
+										"credentials"
+									],
+									"query": [
+										{
+											"key": "showPending",
+											"value": "true",
+											"disabled": true
+										},
+										{
+											"key": "showDeleted",
+											"value": "true",
+											"disabled": true
+										}
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Delete",
+							"request": {
+								"method": "DELETE",
+								"header": [],
+								"url": {
+									"raw": "{{wallet-url}}/wallet-api/wallet/{wallet}/credentials/{credentialId}",
+									"host": [
+										"{{wallet-url}}"
+									],
+									"path": [
+										"wallet-api",
+										"wallet",
+										"{wallet}",
+										"credentials",
+										"{credentialId}"
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "Categories",
+					"item": [
+						{
+							"name": "List",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{wallet-url}}/wallet-api/wallet/{{wallet}}/categories",
+									"host": [
+										"{{wallet-url}}"
+									],
+									"path": [
+										"wallet-api",
+										"wallet",
+										"{{wallet}}",
+										"categories"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Delete",
+							"request": {
+								"method": "DELETE",
+								"header": [],
+								"url": {
+									"raw": "{{wallet-url}}/wallet-api/wallet/{{wallet}}/categories/{{name}}",
+									"host": [
+										"{{wallet-url}}"
+									],
+									"path": [
+										"wallet-api",
+										"wallet",
+										"{{wallet}}",
+										"categories",
+										"{{name}}"
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "Select Wallet",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {\r",
+									"  pm.response.to.have.status(200);\r",
+									"});\r",
+									"let response = pm.response.json();\r",
+									"pm.collectionVariables.set(\"wallet\", response[\"wallets\"][0][\"id\"]);\r",
+									"pm.execution.setNextRequest(\"Generate key\");"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{wallet-url}}/wallet-api/wallet/accounts/wallets",
+							"host": [
+								"{{wallet-url}}"
+							],
+							"path": [
+								"wallet-api",
+								"wallet",
+								"accounts",
+								"wallets"
+							]
+						}
+					},
+					"response": []
+				}
+			],
+			"auth": {
+				"type": "bearer",
+				"bearer": [
+					{
+						"key": "token",
+						"value": "{{token}}",
+						"type": "string"
+					}
+				]
+			},
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"type": "text/javascript",
+						"packages": {},
+						"exec": [
+							""
+						]
+					}
+				},
+				{
+					"listen": "test",
+					"script": {
+						"type": "text/javascript",
+						"packages": {},
+						"exec": [
+							""
+						]
+					}
+				}
+			]
+		},
+		{
+			"name": "NTA",
+			"item": [
+				{
+					"name": "Authenticate",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {\r",
+									"  pm.response.to.have.status(200);\r",
+									"});\r",
+									"let response = pm.response.json();\r",
+									"pm.collectionVariables.set(\"idv-token\", response[\"access_token\"]);\r",
+									"pm.execution.setNextRequest(\"Issue idv\");"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "urlencoded",
+							"urlencoded": [
+								{
+									"key": "grant_type",
+									"value": "password",
+									"type": "text"
+								},
+								{
+									"key": "client_id",
+									"value": "tel-internal",
+									"type": "text"
+								},
+								{
+									"key": "client_secret",
+									"value": "wobMIcHSSe2k5jIz8bJH7SERt9yXUS3n",
+									"type": "text"
+								},
+								{
+									"key": "username",
+									"value": "dev-kaust",
+									"type": "text"
+								},
+								{
+									"key": "password",
+									"value": "CHzZfMs38A",
+									"type": "text"
+								}
+							]
+						},
+						"url": {
+							"raw": "https://keycloak-dev.tel-platform.online/realms/master/protocol/openid-connect/token",
+							"protocol": "https",
+							"host": [
+								"keycloak-dev",
+								"tel-platform",
+								"online"
+							],
+							"path": [
+								"realms",
+								"master",
+								"protocol",
+								"openid-connect",
+								"token"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "NTA Issuance Request",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {\r",
+									"  pm.response.to.have.status(200);\r",
+									"});\r",
+									"let response = pm.response.json();\r",
+									"// const idx = parseInt(pm.collectionVariables.get(\"idv\"));\r",
+									"// pm.collectionVariables.set(\"offer-request-url\", response[idx < response.length ? idx : 0][\"url\"]);\r",
+									"pm.collectionVariables.set(\"offer-request-url\", response[\"url\"]);\r",
+									"pm.execution.setNextRequest(\"Claim credential\");"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{idv-token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"protocol\": \"oidc\",\r\n    \"credentialType\": \"EducationIDV1\",\r\n    \"claims\" : {\r\n        \"id\": \"242003\",\r\n        \"First Name\": \"Nick\",\r\n        \"Last Name\": \"Novice\",\r\n        \"Card Number\": \"240002\",\r\n        \"Date of Birth\": \"2009-02-09\",\r\n        \"Role at Institution\": \"student\",\r\n        \"Program / Department\": \"Master's\",\r\n        \"Field of specialization\": \"Computer Engineering\",\r\n        \"Issuance Date\": \"2024-04-23T07:26:50.805Z\",\r\n        \"Expiry Date\": \"2034-04-23T07:28:21.867Z\"\r\n    },\r\n    \"issuanceDate\": \"2022-01-01T12:00:00Z\",\r\n    \"expirationDate\":\"2024-05-01T08:35:00.000Z\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "https://api-dev.tel-platform.online/nta/issuance/request",
+							"protocol": "https",
+							"host": [
+								"api-dev",
+								"tel-platform",
+								"online"
+							],
+							"path": [
+								"nta",
+								"issuance",
+								"request"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "NTA Presentation Request Copy",
+					"protocolProfileBehavior": {
+						"disabledSystemHeaders": {}
+					},
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{idv-token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "x-api-key",
+								"value": "test1",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICItYVJsZ1hSMElxejRfTWFZOUR1N3REWk5GQUZ4aWhNczQ1Q2xBSkxkT0xvIn0.eyJleHAiOjE3MDUzNzYxMzUsImlhdCI6MTcwNTM0MDEzNSwianRpIjoiYTEzNGNmMDctNmYxZS00OWZhLTg5MTQtOTU2OGVhZjVlMzUzIiwiaXNzIjoiaHR0cDovLzE5Mi4xNjguNjQuMzo4MDgwL3JlYWxtcy9tYXN0ZXIiLCJhdWQiOiJhY2NvdW50Iiwic3ViIjoiYzQ3OTRlOGEtMzZmNC00YjVkLWJjNzQtNjMxMTM3NzgxZTZmIiwidHlwIjoiQmVhcmVyIiwiYXpwIjoidGVsLWNsaWVudCIsInNlc3Npb25fc3RhdGUiOiJiNDlmZGFmNy0wM2Q4LTQ5ZjgtOGQzOC04YTE1NjkzNzdjOTAiLCJhY3IiOiIxIiwiYWxsb3dlZC1vcmlnaW5zIjpbIi8qIl0sInJlYWxtX2FjY2VzcyI6eyJyb2xlcyI6WyJkZWZhdWx0LXJvbGVzLW1hc3RlciIsIm9mZmxpbmVfYWNjZXNzIiwidGVsX2FkbWluIiwidW1hX2F1dGhvcml6YXRpb24iXX0sInJlc291cmNlX2FjY2VzcyI6eyJhY2NvdW50Ijp7InJvbGVzIjpbIm1hbmFnZS1hY2NvdW50IiwibWFuYWdlLWFjY291bnQtbGlua3MiLCJ2aWV3LXByb2ZpbGUiXX19LCJzY29wZSI6InRlbCBwcm9maWxlIGVtYWlsIiwic2lkIjoiYjQ5ZmRhZjctMDNkOC00OWY4LThkMzgtOGExNTY5Mzc3YzkwIiwiYXV0aG9yaXR5SWQiOiI2MDU2ODdkNS1mNTQ5LWI0ZGMtNzRmNS0wMjg4YmNkN2M5YTMiLCJlbWFpbF92ZXJpZmllZCI6ZmFsc2UsInRlbmFudElkIjoidGVsIiwiZGVjZW50cmFsaXNlZElkIjoiZGlkOndlYjp0ZWwtcGxhdGZvcm0uY29tIiwicHJlZmVycmVkX3VzZXJuYW1lIjoidGVzdDMifQ.t3MJxTjIAh7y5sfNnmGOE3MPAMkVMpqGMALW6ACwWT3H6KzrnAkqlTOkekuVga1UAUTGYoIfE2YK4s9ceW-jzGYeEu7cv4b2OL4I64qL2X2hksAeKpSn-sGCPbZuu1Mz664ti6tJgmur3yFzm8b1_CfzT2Ys5weNeYJlUJx_tyj4rM6uEQRAu7JEOq_rnPvwdmP2yLF874OG23os14cMUYWY64XE89AKTqY0nBlEGoBE-UvagCo_7XC4pCk5BTJaF8B_-iLonGoruLjtLAT2r2HZkkTv1QIRYHBoaIkEnNf60I69jqoJqbd_BpL6D0YMmLfj5KdRYttRNekBUaK75w",
+								"type": "text",
+								"disabled": true
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"protocol\": \"oidc\",\n    \"requestedCredentials\" : [\n        {\n            \"type\": \"EducationIDV5\",\n            \"purpose\": \"To test the functionality of the NTA\"\n        }\n    ]\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "https://api-dev.tel-platform.online/nta/presentation/request",
+							"protocol": "https",
+							"host": [
+								"api-dev",
+								"tel-platform",
+								"online"
+							],
+							"path": [
+								"nta",
+								"presentation",
+								"request"
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "NTA Presentation Request",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "x-api-key",
+										"value": "test1",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"protocol\": \"oidc\",\n    \"requestedCredentials\" : [\n        {\n            \"type\": \"StudentCardV0\",\n            \"purpose\": \"To test the functionality of the NTA\"\n        }\n    ]\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "http://localhost:1323/presentationRequest",
+									"protocol": "http",
+									"host": [
+										"localhost"
+									],
+									"port": "1323",
+									"path": [
+										"presentationRequest"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=UTF-8"
+								},
+								{
+									"key": "Date",
+									"value": "Fri, 22 Dec 2023 13:29:49 GMT"
+								},
+								{
+									"key": "Transfer-Encoding",
+									"value": "chunked"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"requestId\": \"f13e1c0c-6ecc-4ff4-b1b4-d2728821cb14\",\n    \"url\": \"openid-vc://?request_uri=https://verifiedid.did.msidentity.com/v1.0/tenants/37a99dab-212b-44d9-9b49-7756cb4dd915/verifiableCredentials/presentationRequests/f13e1c0c-6ecc-4ff4-b1b4-d2728821cb14\",\n    \"expiry\": 1703252089,\n    \"qrCode\": \"data:image/png;base64,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\"\n}"
+						}
+					]
+				},
+				{
+					"name": "Presentation-Status",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "token",
+								"value": "{{idv-token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "https://api-dev.tel-platform.online/ta/pr-status/c50c8404-bc92-497f-befa-98275ce5479e",
+							"protocol": "https",
+							"host": [
+								"api-dev",
+								"tel-platform",
+								"online"
+							],
+							"path": [
+								"ta",
+								"pr-status",
+								"c50c8404-bc92-497f-befa-98275ce5479e"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Issuer",
+			"item": [
+				{
+					"name": "idv",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"did\": \"did:jwk:eyJrdHkiOiJFQyIsImNydiI6IlAtMjU2IiwieCI6Il9VU2M5alRaX19iQS1XSmx0bU4xVTU5bXgxdVNzaWYtZldvWW9Pbl80bjAiLCJ5IjoiREVqbWVqeUVfbGx1NkN1WGFDcFdyMXRvU3ZiUkxjM2tudFd1TV9nYjZDSSJ9\",\r\n    \"requestId\": \"0d4ab820-fc97-49a2-9ec1-346553e3dec1\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "https://api-dev.tel-platform.online/idv/submit",
+							"protocol": "https",
+							"host": [
+								"api-dev",
+								"tel-platform",
+								"online"
+							],
+							"path": [
+								"idv",
+								"submit"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "issuer-entra-demo",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {\r",
+									"  pm.response.to.have.status(200);\r",
+									"});\r",
+									"let response = pm.response.text();\r",
+									"pm.collectionVariables.set(\"offer-request-url\", response);\r",
+									"pm.execution.setNextRequest(\"Resolve credential offer\");"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"data\":\r\n    {\r\n        \"authority\": \"did:web:entra.walt.id\",\r\n        \"claims\":\r\n        {\r\n            \"given_name\": \"Max\",\r\n            \"family_name\": \"Mustermann\"\r\n        },\r\n        \"manifest\": \"https://verifiedid.did.msidentity.com/v1.0/tenants/8bc955d9-38fd-4c15-a520-0c656407537a/verifiableCredentials/contracts/133d7e92-d227-f74d-1a5b-354cbc8df49a/manifest\",\r\n        \"type\": \"VerifiableCredential,MyID\"\r\n    }\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "https://entra-demo.walt.id/entra/issue",
+							"protocol": "https",
+							"host": [
+								"entra-demo",
+								"walt",
+								"id"
+							],
+							"path": [
+								"entra",
+								"issue"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "issuer-walt",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {\r",
+									"  pm.response.to.have.status(200);\r",
+									"});\r",
+									"let response = pm.response.text();\r",
+									"pm.collectionVariables.set(\"offer-request-url\", response);\r",
+									"pm.execution.setNextRequest(\"Resolve credential offer\");"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						},
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"const didMethod = pm.collectionVariables.get(\"issuer-did-method\")\r",
+									"const credential = pm.collectionVariables.get(pm.collectionVariables.get(\"credential-type\"))\r",
+									"pm.environment.set('issuer-request-body', credential);"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{{issuer-request-body}}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{issuer-url}}/openid4vc/jwt/issue",
+							"host": [
+								"{{issuer-url}}"
+							],
+							"path": [
+								"openid4vc",
+								"jwt",
+								"issue"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "onboard",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"let issuerKey = pm.collectionVariables.get(\"issuer-key-ebsi\");\r",
+									"let issuerDid = pm.collectionVariables.get(\"issuer-did-ebsi\");\r",
+									"const isEbsiDid = pm.collectionVariables.get(\"issuer-did-method\") == \"ebsi\";\r",
+									"pm.test(\"Status code is 200\", function () {\r",
+									"  isEbsiDid || pm.response.to.have.status(200);\r",
+									"});\r",
+									"if(!isEbsiDid){\r",
+									"    let response = pm.response.json();\r",
+									"    issuerKey = JSON.stringify(response[\"issuerKey\"]);\r",
+									"    issuerDid = response[\"issuerDid\"];\r",
+									"}\r",
+									"\r",
+									"pm.collectionVariables.set(\"issuer-key\", `${issuerKey}`);\r",
+									"pm.collectionVariables.set(\"issuer-did\", `${issuerDid}`);\r",
+									"pm.execution.setNextRequest(\"issuer-walt\");"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						},
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// if(pm.collectionVariables.get(\"issuer-did-method\") == \"ebsi\"){\r",
+									"//     pm.collectionVariables.set(\"issuer-key\", `${pm.collectionVariables.get(\"issuer-key-ebsi\")}`);\r",
+									"//     pm.collectionVariables.set(\"issuer-did\", `${pm.collectionVariables.get(\"issuer-key-ebsi\")}`);\r",
+									"//     throw new Error(\"Ebsi onboarding not supported. Will use hardcoded values. \\nNothing to worry about.\")\r",
+									"// }"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"key\": {\r\n    \"backend\": \"{{issuer-key-backend}}\",\r\n    \"keyType\": \"{{issuer-key-algorithm}}\"\r\n  },\r\n  \"did\": {\r\n    \"method\": \"{{issuer-did-method}}\"\r\n  }\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{issuer-url}}/onboard/issuer",
+							"host": [
+								"{{issuer-url}}"
+							],
+							"path": [
+								"onboard",
+								"issuer"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Verifier",
+			"item": [
+				{
+					"name": "entra-demo",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {\r",
+									"  pm.response.to.have.status(200);\r",
+									"});\r",
+									"let response = pm.response.json();\r",
+									"pm.collectionVariables.set(\"presentation-offer\", response[\"url\"]);\r",
+									"pm.execution.setNextRequest(\"Resolve offer\");"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"data\":\r\n    {\r\n        \"vc_policies\":\r\n        [\r\n            \"expired\",\r\n            \"not-before\",\r\n            {\r\n                \"policy\": \"allowed-issuer\",\r\n                \"args\": \"did:web:entra.walt.id\"\r\n            }\r\n        ]\r\n    },\r\n    \"entraVerification\":\r\n    {\r\n        \"authority\": \"did:web:entra.walt.id\",\r\n        \"credentials\":\r\n        [\r\n            {\r\n                \"purpose\": \"TEST\",\r\n                \"type\": \"MyID\"\r\n            }\r\n        ]\r\n    }\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "https://entra-demo.walt.id/entra/verify",
+							"protocol": "https",
+							"host": [
+								"entra-demo",
+								"walt",
+								"id"
+							],
+							"path": [
+								"entra",
+								"verify"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "walt",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {\r",
+									"  pm.response.to.have.status(200);\r",
+									"});\r",
+									"let response = pm.response.text();\r",
+									"pm.collectionVariables.set(\"presentation-offer\", response);\r",
+									"pm.execution.setNextRequest(\"Resolve offer\");"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"request_credentials\": [\r\n    \"{{credential-type}}\"\r\n  ]\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{verifier-url}}/openid4vc/verify",
+							"host": [
+								"{{verifier-url}}"
+							],
+							"path": [
+								"openid4vc",
+								"verify"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Register",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 201\", function () {\r",
+							"  pm.response.to.have.status(201);\r",
+							"});\r",
+							"console.log(`registered user:${pm.collectionVariables.get(\"email\")}`);\r",
+							"pm.execution.setNextRequest(\"Login\");"
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				},
+				{
+					"listen": "prerequest",
+					"script": {
+						"exec": [
+							"console.clear();\r",
+							"let name = pm.variables.replaceIn(\"{{$randomFullName}}\")\r",
+							"let email = pm.variables.replaceIn(\"{{$randomEmail}}\")\r",
+							"pm.collectionVariables.set(\"name\", `${name}`);\r",
+							"pm.collectionVariables.set(\"email\", `${email}`);"
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"name\": \"{{name}}\",\r\n  \"email\": \"{{email}}\",\r\n  \"password\": \"{{password}}\",\r\n  \"type\": \"{{account-type}}\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{wallet-url}}/wallet-api/auth/create",
+					"host": [
+						"{{wallet-url}}"
+					],
+					"path": [
+						"wallet-api",
+						"auth",
+						"create"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "KeycloakToken",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200\", function () {\r",
+							"  pm.response.to.have.status(200);\r",
+							"});\r",
+							"let response = pm.response\r",
+							"pm.collectionVariables.set(\"keycloak-token\", response);\r",
+							"pm.execution.setNextRequest(\"Login\");"
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{wallet-url}}/wallet-api/auth/keycloak/token",
+					"host": [
+						"{{wallet-url}}"
+					],
+					"path": [
+						"wallet-api",
+						"auth",
+						"keycloak",
+						"token"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Login",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200\", function () {\r",
+							"  pm.response.to.have.status(200);\r",
+							"});\r",
+							"let response = pm.response.json();\r",
+							"pm.collectionVariables.set(\"token\", response[\"token\"]);\r",
+							"console.log(`logged user:${pm.collectionVariables.get(\"email\")}`);\r",
+							"pm.execution.setNextRequest(\"Select Wallet\");"
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"type\": \"{{account-type}}\",\r\n  \"email\": \"{{email}}\",\r\n  \"password\": \"{{password}}\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{wallet-url}}/wallet-api/auth/login",
+					"host": [
+						"{{wallet-url}}"
+					],
+					"path": [
+						"wallet-api",
+						"auth",
+						"login"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Silent claim",
+			"request": {
+				"auth": {
+					"type": "noauth"
+				},
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{{offer-request-url}}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{wallet-url}}/wallet-api/api/useOfferRequest/{{did}}",
+					"host": [
+						"{{wallet-url}}"
+					],
+					"path": [
+						"wallet-api",
+						"api",
+						"useOfferRequest",
+						"{{did}}"
+					]
+				}
+			},
+			"response": []
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "entra",
+			"value": "entra-demo",
+			"type": "string",
+			"disabled": true
+		},
+		{
+			"key": "present",
+			"value": "walt",
+			"type": "string"
+		},
+		{
+			"key": "credential-type",
+			"value": "OpenBadgeCredential",
+			"type": "string"
+		},
+		{
+			"key": "holder-key-algorithm",
+			"value": "Ed25519",
+			"type": "string"
+		},
+		{
+			"key": "holder-key-backend",
+			"value": "jwk",
+			"type": "string"
+		},
+		{
+			"key": "holder-did-method",
+			"value": "jwk",
+			"type": "string"
+		},
+		{
+			"key": "issuer-key-algorithm",
+			"value": "Ed25519",
+			"type": "string"
+		},
+		{
+			"key": "issuer-key-backend",
+			"value": "jwk",
+			"type": "string"
+		},
+		{
+			"key": "issuer-did-method",
+			"value": "key",
+			"type": "string"
+		},
+		{
+			"key": "account-type",
+			"value": "email",
+			"type": "string"
+		},
+		{
+			"key": "password",
+			"value": "password",
+			"type": "string"
+		},
+		{
+			"key": "jwk-payload",
+			"value": "{\n  \"backend\": \"jwk\",\n  \"keyType\": \"{{holder-key-algorithm}}\"\n}",
+			"type": "string"
+		},
+		{
+			"key": "oci-payload",
+			"value": "{\n  \"backend\": \"oci\",\n  \"config\": {\n    \"tenancyOcid\": \"ocid1.tenancy.oc1..aaaaaaaaiijfupfvsqwqwgupzdy5yclfzcccmie4ktp2wlgslftv5j7xpk6q\",\n    \"userOcid\": \"ocid1.user.oc1..aaaaaaaaxjkkfjqxdqk7ldfjrxjmacmbi7sci73rbfiwpioehikavpbtqx5q\",\n    \"fingerprint\": \"bb:d4:4b:0c:c8:3a:49:15:7f:87:55:d5:2b:7e:dd:bc\",\n    \"cryptoEndpoint\": \"ens7o5fgaagzo-crypto.kms.eu-frankfurt-1.oraclecloud.com\",\n    \"managementEndpoint\": \"ens7o5fgaagzo-management.kms.eu-frankfurt-1.oraclecloud.com\",\n    \"signingKeyPem\": \"-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC0o+MR0tljVFdt\nEyNnov8nxXv905sWC4Px2lXAY6N1Y1ok8onERT9BsQ1004tlh1fyJqtUgqUMbvum\nU5iBfOWMeCFzZlNP7tqrlZ/lvrEkDo8q6Cy0zu7gJIHkKQcD9VLCdtqpkM59BSGh\nUy3rQ7p1/JRQRkAqVlvjbj4ZJwySKn4c8k1gkGPv4e2ixMGonWbOn71A7F/WylC0\n0NXaoSxp5Xxt8LufrV+ZuS9ck/o69kXiWCuD7Tkh0Lulob4hRhELgG/9qJz39qR2\nWOLVM+3gaZroXN4C+UU2c2qKYiyEk/NIOiQWTwsRKtcrZz4biY/tWfUUpRn60/Jm\nx5J4Xm7bAgMBAAECggEAUGn2nwwcbw3wP2O6KpwSdyuAN24YR3eH3MXjz5nrfcnl\nKrZ3otJqxv0g7uVvVBqsiWUydxQTklXjm9bx+I7XhzFBPuSJ6Pb9DE422KkLpW//\nxsuFf1XxXAGUezPSZi4zEdOkIsEOUvRSVMU5F1bWrkhq49NqJA6+qB9+8GaEP5p/\ncgBUQvUIxGX7lEK3T0fEI2/J/4f240V0QbLL4mJsXNMYctcIz4+mzCKTv1v/Cylk\nEJ4jg59Zi4r9oIuSQdkERygh1jpgEMJAjoHdbqwA7hG9VFewHxfJNFChqf046Skl\nR5v+4j3PyC0YSkr2H+zt54kvybHprutK3LISusGD8QKBgQDvC95Odp/r6xznfe7g\nKQ/EsR+SQyc917Cjfc0cEOkfzHSlm1WU1UxEUUTsSpe8tvwZPkJWrDO+FCrlUqd1\nd3kS4N99AaSHD8q01rUk2c2Kaoey6DlKoBb3fJUTFGfKtam6DackxriGBB+eMZAc\nvi1Tnin7/ObXMimo5LZtZdcpiwKBgQDBc5g4gA9nAUHsrEWOk5k9Ft83jLGwRw8v\npXiZzELMZQGQTf9L/YuhY9QEk6gu3njhW4v1+DbhMniLblcQ1rvpX4YezFT4Du1U\nXVjHlxCyjAdNB0AzC6DasS20k+xKZw07KDKIITGnQnLBrefQ+bjdHKpve7MNWexX\nXRKy1/1Z8QKBgQCHOyyZMMyJtylT4E9JqpEMEbOtl6XUe3enFdz5+qsXXR/ELBr/\nJqeNongeQJiUnuQBF9KJm8NtzZTyxI6NingI8QQdgNdlvM5M/YXeggSgQGHiGTOH\n/wbfHTBsacfJynlpEp4y1OTAlAabBKjlScT0n+5aapjgtrUQocp+GvXcvwKBgQCa\nxvTMh9FK9ZucU70XNQqO8QTJOh1Uz5Xb5kWWr/Hl/Q6COZWAZCzahLe2rbkLPt5y\nWD+kHeMyzKHb1P1+MICKWO5DJ/L3wWGrdUA5+KjYYebZf2qjLLOXJdlOuGd+o/LX\nGPNNLVm/3A9a3NwzvAlnh67poYwBq6fHwmTaiKtg0QKBgAwurBRizSv/YgKuozWm\nuecDhQgPR8S58H+czzhzkUmBVnz4b9FBUM5Iweda17NYdu2fSLwb/2aZn6L5CcjK\nvr+2JsnLyXGQj7WCoJ3gh1YVo3X/d/L85bkgUIlQGrhi1cRy1Rsi+112mTgi/PRW\nvW29ypivZnCZIC5WEzEzIGcn\n-----END PRIVATE KEY-----\n\"\n  },\n  \"keyType\": \"secp256r1\"\n}",
+			"type": "string"
+		},
+		{
+			"key": "issuer-key-ebsi",
+			"value": "{\n    \"type\": \"jwk\",\n    \"jwk\":\n    {\n        \"kty\": \"EC\",\n        \"x\": \"SgfOvOk1TL5yiXhK5Nq7OwKfn_RUkDizlIhAf8qd2wE\",\n        \"y\": \"u_y5JZOsw3SrnNPydzJkoaiqb8raSdCNE_nPovt1fNI\",\n        \"crv\": \"P-256\",\n        \"d\": \"UqSi2MbJmPczfRmwRDeOJrdivoEy-qk4OEDjFwJYlUI\"\n    }\n}",
+			"type": "string"
+		},
+		{
+			"key": "issuer-did-ebsi",
+			"value": "did:ebsi:zf39qHTXaLrr6iy3tQhT3UZ",
+			"type": "string"
+		},
+		{
+			"key": "OpenBadgeCredential",
+			"value": "{\n  \"issuerKey\": {{issuer-key}},\n  \"issuerDid\": \"{{issuer-did}}\",\n  \"credentialConfigurationId\": \"OpenBadgeCredential_jwt_vc_json\",\n  \"credentialData\": {\n    \"@context\": [\n      \"https://www.w3.org/2018/credentials/v1\",\n      \"https://purl.imsglobal.org/spec/ob/v3p0/context.json\"\n    ],\n    \"id\": \"urn:uuid:THIS WILL BE REPLACED WITH DYNAMIC DATA FUNCTION (see below)\",\n    \"type\": [\n      \"VerifiableCredential\",\n      \"OpenBadgeCredential\"\n    ],\n    \"name\": \"JFF x vc-edu PlugFest 3 Interoperability\",\n    \"issuer\": {\n      \"type\": [\n        \"Profile\"\n      ],\n      \"id\": \"did:key:THIS WILL BE REPLACED WITH DYNAMIC DATA FUNCTION FROM CONTEXT (see below)\",\n      \"name\": \"Jobs for the Future (JFF)\",\n      \"url\": \"https://www.jff.org/\",\n      \"image\": \"https://w3c-ccg.github.io/vc-ed/plugfest-1-2022/images/JFF_LogoLockup.png\"\n    },\n    \"issuanceDate\": \"2023-07-20T07:05:44Z (THIS WILL BE REPLACED BY DYNAMIC DATA FUNCTION (see below))\",\n    \"expirationDate\": \"WILL BE MAPPED BY DYNAMIC DATA FUNCTION (see below)\",\n    \"credentialSubject\": {\n      \"id\": \"did:key:123 (THIS WILL BE REPLACED BY DYNAMIC DATA FUNCTION (see below))\",\n      \"type\": [\n        \"AchievementSubject\"\n      ],\n      \"achievement\": {\n        \"id\": \"urn:uuid:ac254bd5-8fad-4bb1-9d29-efd938536926\",\n        \"type\": [\n          \"Achievement\"\n        ],\n        \"name\": \"JFF x vc-edu PlugFest 3 Interoperability\",\n        \"description\": \"This wallet supports the use of W3C Verifiable Credentials and has demonstrated interoperability during the presentation request workflow during JFF x VC-EDU PlugFest 3.\",\n        \"criteria\": {\n          \"type\": \"Criteria\",\n          \"narrative\": \"Wallet solutions providers earned this badge by demonstrating interoperability during the presentation request workflow. This includes successfully receiving a presentation request, allowing the holder to select at least two types of verifiable credentials to create a verifiable presentation, returning the presentation to the requestor, and passing verification of the presentation and the included credentials.\"\n        },\n        \"image\": {\n          \"id\": \"https://w3c-ccg.github.io/vc-ed/plugfest-3-2023/images/JFF-VC-EDU-PLUGFEST3-badge-image.png\",\n          \"type\": \"Image\"\n        }\n      }\n    }\n  },\n  \"mapping\": {\n    \"id\": \"<uuid>\",\n    \"issuer\": {\n      \"id\": \"<issuerDid>\"\n    },\n    \"credentialSubject\": {\n      \"id\": \"<subjectDid>\"\n    },\n    \"issuanceDate\": \"<timestamp>\",\n    \"expirationDate\": \"<timestamp-in:365d>\"\n  }\n}",
+			"type": "string"
+		},
+		{
+			"key": "UniversityDegreeCredential",
+			"value": "{\n  \"issuerKey\": {{issuer-key}},\n  \"issuerDid\": \"{{issuer-did}}\",\n  \"credentialConfigurationId\": \"UniversityDegree_jwt_vc_json\",\n  \"credentialData\": {\n    \"@context\": [\n      \"https://www.w3.org/2018/credentials/v1\",\n      \"https://www.w3.org/2018/credentials/examples/v1\"\n    ],\n    \"id\": \"http://example.gov/credentials/3732\",\n    \"type\": [\n      \"VerifiableCredential\",\n      \"UniversityDegreeCredential\"\n    ],\n    \"issuer\": {\n      \"id\": \"did:web:vc.transmute.world\"\n    },\n    \"issuanceDate\": \"2020-03-10T04:24:12.164Z\",\n    \"credentialSubject\": {\n      \"id\": \"did:example:ebfeb1f712ebc6f1c276e12ec21\",\n      \"degree\": {\n        \"type\": \"BachelorDegree\",\n        \"name\": \"Bachelor of Science and Arts\"\n      }\n    }\n  },\n  \"mapping\": {\n    \"id\": \"<uuid>\",\n    \"issuer\": {\n      \"id\": \"<issuerDid>\"\n    },\n    \"credentialSubject\": {\n      \"id\": \"<subjectDid>\"\n    },\n    \"issuanceDate\": \"<timestamp>\",\n    \"expirationDate\": \"<timestamp-in:365d>\"\n  }\n}",
+			"type": "string"
+		},
+		{
+			"key": "name",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "email",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "username",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "token",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "wallet",
+			"value": ""
+		},
+		{
+			"key": "keyId",
+			"value": ""
+		},
+		{
+			"key": "offer-request-url",
+			"value": ""
+		},
+		{
+			"key": "did",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "presentation-definition",
+			"value": ""
+		},
+		{
+			"key": "presentation-offer",
+			"value": ""
+		},
+		{
+			"key": "credential-id",
+			"value": ""
+		},
+		{
+			"key": "idv-token",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "keycloak-token",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "issuer-key",
+			"value": ""
+		},
+		{
+			"key": "issuer-did",
+			"value": ""
+		},
+		{
+			"key": "payload",
+			"value": ""
+		}
+	]
+}

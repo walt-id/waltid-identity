@@ -1,5 +1,6 @@
 services:
   wallet-api:
+    container_name: wallet-api
     image: docker.io/waltid/wallet-api:${VERSION_TAG:-latest}
     pull_policy: always
     build:
@@ -18,6 +19,7 @@ services:
       - ./wallet-api/data:/waltid-wallet-api/data
 
   issuer-api:
+    container_name: issuer-api
     platform: linux/x86_64
     image: docker.io/waltid/issuer-api:${VERSION_TAG:-latest}
     pull_policy: always
@@ -29,6 +31,7 @@ services:
       - ./issuer-api/config:/waltid-issuer-api/config
 
   verifier-api:
+    container_name: verifier-api
     platform: linux/x86_64
     image: docker.io/waltid/verifier-api:${VERSION_TAG:-latest}
     pull_policy: always
@@ -40,6 +43,7 @@ services:
       - ./verifier-api/config:/waltid-verifier-api/config
 
   waltid-web-wallet:
+    container_name: waltid-web-wallet
     image: docker.io/waltid/waltid-web-wallet:${VERSION_TAG:-latest}
     pull_policy: always
     depends_on:
@@ -50,6 +54,7 @@ services:
       PORT: $WALLET_FRONTEND_PORT
 
   web-portal:
+    container_name: waltid-web-portal
     platform: linux/x86_64
     image: docker.io/waltid/portal:${VERSION_TAG:-latest}
     pull_policy: always
@@ -63,6 +68,7 @@ services:
       PORT: $WEB_PORTAL_PORT
 
   vc-repo:
+    container_name: waltid-vc-repo
     platform: linux/x86_64
     image: docker.io/waltid/vc-repository:latest
     pull_policy: always
@@ -79,6 +85,7 @@ services:
     entrypoint: [ "/bin/sh", "-c", "exit 0" ]
 
   postgres-engine:
+    container_name: postgres
     image: postgres:alpine
     profiles:
       - postgres
@@ -107,6 +114,7 @@ services:
         condition: "service_healthy"
 
   phpmyadmin:
+    container_name: pgadmin
     image: dpage/pgadmin4
     profiles:
       - postgres
@@ -120,6 +128,7 @@ services:
     restart: always
 
   mssql-engine:
+    container_name: mssql
     image: mcr.microsoft.com/azure-sql-edge
     profiles:
       - mssql
@@ -152,6 +161,20 @@ services:
       /opt/mssql-tools/bin/sqlcmd -S mssql-engine -U sa -P $MSSQL_SA_PWD -i /docker-entrypoint-initdb.d/mssql-db-init.sql;
       echo "Configuration complete";
       '
+  postman-tests:
+    container_name: postman-tests
+    image: postman/newman
+    #entrypoint: ["newman", "run", "/postman/collection.json", "--environment", "/postman/localhost.json", "--bail"]
+    entrypoint: sh
+    command: "/postman/newman-wrapper.sh"
+    env_file:
+      - .env
+    volumes:
+      - ./postman:/postman
+    depends_on:
+      - wallet-api
+      - issuer-api
+      - verifier-api
 
   caddy:
     image: docker.io/caddy:2
