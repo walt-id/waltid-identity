@@ -4,7 +4,6 @@ import id.walt.credentials.vc.vcs.W3CVC
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.jwk.JWKKey
-import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.did.dids.DidService
 import id.walt.issuer.utils.LspPotentialInteropEvent
 import id.walt.oid4vc.definitions.CROSS_DEVICE_CREDENTIAL_OFFER_URL
@@ -404,6 +403,18 @@ fun Application.issuerApi() {
                         Json.parseToJsonElement(KeySerialization.serializeKey(jwkKey)).jsonObject,
                         "",
                         "org.iso.18013.5.1.mDL",
+                        W3CVC()
+                    ).let { createCredentialOfferUri(listOf(it)) }
+                    context.respond(
+                        HttpStatusCode.OK, offerUri
+                    )
+                }
+                get("lspPotentialCredentialOfferT2") {
+                    val jwkKey = JWKKey.importJWK(LspPotentialInteropEvent.POTENTIAL_ISSUER_KEY_JWK).getOrThrow()
+                    val offerUri = IssuanceRequest(
+                        Json.parseToJsonElement(KeySerialization.serializeKey(jwkKey)).jsonObject,
+                        "",
+                        "urn:eu.europa.ec.eudi:pid:1",
                         W3CVC()
                     ).let { createCredentialOfferUri(listOf(it)) }
                     context.respond(
