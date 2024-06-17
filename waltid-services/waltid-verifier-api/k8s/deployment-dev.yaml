@@ -3,6 +3,10 @@ kind: ConfigMap
 metadata:
   name: verifier-web-config
 data:
+  _features.conf : |
+    enabledFeatures = [
+        entra
+    ]
   web.conf: |
     webHost = "0.0.0.0"
     webPort = 3000
