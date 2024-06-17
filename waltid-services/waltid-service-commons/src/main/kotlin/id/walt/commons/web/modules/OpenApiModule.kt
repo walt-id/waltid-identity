@@ -62,10 +62,10 @@ object OpenApiModule {
 
                     if (kotlinxPrefixes.any { type.toString().startsWith(it) }) {
                         runCatching {
-                             println("Trying kotlinx schema with: $type")
+//                             println("Trying kotlinx schema with: $type")
                             type.processWithKotlinxSerializationGenerator()
                         }.recover { ex ->
-                             println("Falling back to reflection schema with: $type, due to $ex")
+//                             println("Falling back to reflection schema with: $type, due to $ex")
                             type.processWithReflectionGenerator()
                         }.getOrElse { ex ->
                             error("Could neither parse with kotlinx nor reflection: $type, due to $ex")
