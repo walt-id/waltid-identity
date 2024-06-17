@@ -58,7 +58,7 @@ object FeatureManager {
     /**
      * Run block if provided feature is enabled
      */
-    fun runIfEnabled(feature: OptionalFeature, block: () -> Unit) {
+    fun runIfEnabled(feature: OptionalFeature, block: () -> Any?) {
         if (isFeatureEnabled(feature)) block.invoke()
     }
 
@@ -71,7 +71,7 @@ object FeatureManager {
      * { your code... } whenFeature (FeatureCatalog.xyz)
      * ```
      */
-    infix fun (() -> Unit).whenFeature(feature: OptionalFeature) {
+    infix fun (() -> Any?).whenFeature(feature: OptionalFeature) {
         runIfEnabled(feature, this)
     }
 
