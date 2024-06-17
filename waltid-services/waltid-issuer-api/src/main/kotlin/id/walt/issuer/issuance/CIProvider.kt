@@ -86,7 +86,16 @@ open class CIProvider : OpenIDCredentialIssuer(
         cryptographicSuitesSupported = setOf("ES256"),
         types = listOf("org.iso.18013.5.1.mDL"),
         docType = "org.iso.18013.5.1.mDL"
-    ))).toMap())
+    ))).plus(
+        Pair("urn:eu.europa.ec.eudi:pid:1", CredentialSupported(
+        format = CredentialFormat.sd_jwt_vc,
+            cryptographicBindingMethodsSupported = null,
+            cryptographicSuitesSupported = setOf("ES256"),
+            types = listOf("urn:eu.europa.ec.eudi:pid:1"),
+            docType = "urn:eu.europa.ec.eudi:pid:1"
+    )
+        )
+    ).toMap())
 ) {
     private val log = KotlinLogging.logger { }
 
