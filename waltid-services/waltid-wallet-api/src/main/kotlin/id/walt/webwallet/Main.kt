@@ -4,6 +4,7 @@ import id.walt.commons.ServiceConfiguration
 import id.walt.commons.ServiceInitialization
 import id.walt.commons.ServiceMain
 import id.walt.commons.featureflag.CommonsFeatureCatalog
+import id.walt.commons.featureflag.FeatureManager.whenFeature
 import id.walt.commons.web.WebService
 import id.walt.crypto.keys.oci.WaltCryptoOci
 import id.walt.did.helpers.WaltidServices
@@ -59,26 +60,28 @@ fun Application.webWalletModule(withPlugins: Boolean = true) {
         configurePlugins()
     }
     auth()
-    accounts()
-    push()
-    notifications()
+    accounts();
+    { push() } whenFeature FeatureCatalog.pushFeature;
 
     // Wallet routes
     keys()
     dids()
     credentials()
     exchange()
-    history()
-    web3accounts()
+    history();
+    { web3accounts() } whenFeature FeatureCatalog.web3
     issuers()
     eventLogs()
     manifest()
     categories()
     reports()
-    settings()
-    reasons()
-    trustRegistry()
-    silentExchange()
+    settings();
+    { reasons() } whenFeature FeatureCatalog.rejectionReasonsFeature
+    {
+        silentExchange()
+        notifications()
+        trustRegistry()
+    } whenFeature FeatureCatalog.silentExchange
 
     // DID Web Registry
     didRegistry()
