@@ -8,7 +8,7 @@ import kotlinx.serialization.json.*
 data class CredentialOffer private constructor(
     @SerialName("credential_issuer") val credentialIssuer: String,
     @SerialName("credential_configuration_ids") val credentialConfigurationIds: Set<String>,
-    val grants: Map<String, GrantDetails>,
+    val grants: Map<String, GrantDetails> = mapOf(),
     override val customParameters: Map<String, JsonElement> = mapOf()
 ) : JsonDataObject() {
     override fun toJSON() = Json.encodeToJsonElement(CredentialOfferSerializer, this).jsonObject
