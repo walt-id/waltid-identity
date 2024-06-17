@@ -80,7 +80,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:${Versions.COROUTINES_VERSION}")
 
     // UUID
-    implementation("app.softwork:kotlinx-uuid-core:0.0.22")
+    implementation("app.softwork:kotlinx-uuid-core:0.0.25")
 
     /* -- Misc --*/
 

@@ -91,7 +91,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
 
     // UUID
-    implementation("app.softwork:kotlinx-uuid-core:0.0.22")
+    implementation("app.softwork:kotlinx-uuid-core:0.0.25")
     implementation("app.softwork:kotlinx-uuid-exposed:0.0.22")
 
     /* -- Security -- */
