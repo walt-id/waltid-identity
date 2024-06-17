@@ -420,7 +420,7 @@ class SSIKit2WalletService(
 
         KeyManager.createKey(request)
             .also {
-                println("Generated key: $it")
+                logger.trace { "Generated key: $it" }
                 KeysService.add(walletId, it.getKeyId(), KeySerialization.serializeKey(it))
                 eventUseCase.log(
                     action = EventType.Key.Create,
