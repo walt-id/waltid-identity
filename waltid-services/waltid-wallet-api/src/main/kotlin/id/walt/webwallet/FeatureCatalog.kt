@@ -8,16 +8,26 @@ import id.walt.webwallet.config.*
 object FeatureCatalog : ServiceFeatureCatalog {
 
     val databaseFeature = BaseFeature("db", "Database manager", DatasourceConfiguration::class)
-    val loginsMethodFeature = BaseFeature("logins", "Logins method management", LoginMethodsConfig::class)
+
+    // val loginsMethodFeature = BaseFeature("logins", "Logins method management", LoginMethodsConfig::class)
     val authenticationFeature = BaseFeature("auth", "Base authentication system", AuthConfig::class)
 
     val tenantFeature = OptionalFeature("tenant", "Cloud-based tenant management", TenantConfig::class, false)
     val pushFeature = OptionalFeature("push", "Push notifications", PushConfig::class, false)
 
+    val web3 = OptionalFeature("web3", "Web3 account management", default = false)
+
     val runtimeMockFeature = OptionalFeature("runtime", "Runtime mock provider configuration", RuntimeConfig::class, false)
 
     val oidcAuthenticationFeature = OptionalFeature("oidc", "OIDC login feature", OidcConfiguration::class, false)
-    val trustFeature = OptionalFeature("trust", "Trust records", TrustConfig::class, false)
+    val silentExchange = OptionalFeature(
+        "silent-exchange", "Silent exchange",
+        configs = mapOf(
+            "trust" to TrustConfig::class,
+            "notification" to NotificationConfig::class
+        ),
+        default = false
+    )
     val rejectionReasonsFeature = OptionalFeature("rejectionreason", "Rejection reasons use case", RejectionReasonConfig::class, false)
 
     val registrationDefaultsFeature =
@@ -29,19 +39,21 @@ object FeatureCatalog : ServiceFeatureCatalog {
         true
     )
 
-    val notificationFeature = OptionalFeature("notification", "Notification dispatch use case", NotificationConfig::class, false)
-
-    override val baseFeatures = listOf(databaseFeature, loginsMethodFeature, authenticationFeature)
+    override val baseFeatures = listOf(
+        databaseFeature,
+//        loginsMethodFeature,
+        authenticationFeature
+    )
     override val optionalFeatures = listOf(
+        web3,
         tenantFeature,
         pushFeature,
         runtimeMockFeature,
         oidcAuthenticationFeature,
-        trustFeature,
+        silentExchange,
         rejectionReasonsFeature,
         registrationDefaultsFeature,
         keyGenerationDefaultsFeature,
-        notificationFeature,
         runtimeMockFeature
     )
 }
