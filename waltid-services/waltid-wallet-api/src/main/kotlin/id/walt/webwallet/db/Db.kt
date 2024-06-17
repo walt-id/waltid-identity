@@ -43,7 +43,11 @@ object Db {
             log.info { "Will use sqlite database (${datasourceConfig.jdbcUrl}), working directory: ${Path(".").absolutePathString()}" }
         }
 
-        val hikariDataSourceConfig = createHikariDataSource(datasourceConfig.dataSource)
+        val hikariDataSourceConfig =runCatching {
+             createHikariDataSource(datasourceConfig.dataSource)
+        }.getOrElse { ex ->
+            throw IllegalArgumentException("Could not initialize hikari database connection pool configuration.", ex)
+        }
 
         // connect
         log.info { "Connecting to database at \"${datasourceConfig.jdbcUrl}\"..." }
@@ -78,7 +82,7 @@ object Db {
 
     private fun recreateDatabase() {
         transaction {
-            addLogger(StdOutSqlLogger)
+//            addLogger(StdOutSqlLogger)
 
             SchemaUtils.drop(*(tables.reversedArray()))
             SchemaUtils.create(*tables)
