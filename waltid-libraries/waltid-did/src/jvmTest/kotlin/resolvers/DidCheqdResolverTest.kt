@@ -14,7 +14,7 @@ import org.junit.jupiter.params.provider.MethodSource
 import java.util.stream.Stream
 
 class DidCheqdResolverTest : DidResolverTestBase() {
-    override val sut: LocalResolverMethod = DidCheqdResolver()
+    override val resolver: LocalResolverMethod = DidCheqdResolver()
 
     @ParameterizedTest
     @MethodSource

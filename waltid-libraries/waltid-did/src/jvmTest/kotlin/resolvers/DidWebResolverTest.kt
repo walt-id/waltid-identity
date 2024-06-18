@@ -17,7 +17,7 @@ import org.junit.jupiter.params.provider.MethodSource
 import java.util.stream.Stream
 
 class DidWebResolverTest : DidResolverTestBase() {
-    override val sut: LocalResolverMethod = DidWebResolver(TestClient.http)
+    override val resolver: LocalResolverMethod = DidWebResolver(TestClient.http)
 
     @ParameterizedTest
     @MethodSource
