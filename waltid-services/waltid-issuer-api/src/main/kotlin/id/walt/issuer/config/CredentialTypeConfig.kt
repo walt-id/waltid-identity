@@ -31,6 +31,7 @@ data class CredentialTypeConfig(
         "VerifiablePortableDocumentA1" to vc("VerifiableAttestation", "VerifiablePortableDocumentA1"),
         "Visa" to vc("VerifiableAttestation", "Visa"),
         "eID" to vc("VerifiableAttestation", "eID"),
-        "NaturalPersonVerifiableID" to vc("VerifiableAttestation", "NaturalPersonVerifiableID")
+        "NaturalPersonVerifiableID" to vc("VerifiableAttestation", "NaturalPersonVerifiableID"),
+        "BoardingPass" to vc("VerifiableAttestation", "BoardingPass")
     ),
 ) : WaltConfig()
