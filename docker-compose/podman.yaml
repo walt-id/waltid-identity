@@ -18,9 +18,9 @@ spec:
           image: fedora:latest
           securityContext:
             privileged: true
-          command: ["sh", "-c", "dnf install -y podman podman-compose git-all python3-pip && \
+          command: [ "sh", "-c", "dnf install -y podman podman-compose git-all python3-pip && \
                                   useradd waltid && \
                                   git clone https://github.com/walt-id/waltid-identity.git && \
                                   chown -R waltid:waltid /waltid-identity && \
                                   cd waltid-identity/docker-compose && \
-                                  podman compose pull && podman compose up "]
+                                  podman compose pull && podman compose up " ]

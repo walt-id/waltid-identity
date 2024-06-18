@@ -37,7 +37,7 @@ jobs:
         run: echo "POD_NAME=$(kubectl get pods -l app=podman-priv -o jsonpath='{.items[0].metadata.name}')" >> "$GITHUB_OUTPUT"
 
       - name: Wait for project directory to be cloned
-        run:  |
+        run: |
           POD_NAME=$(kubectl get pods -l app=podman-priv -o jsonpath="{.items[0].metadata.name}")
           TIMEOUT=60  # 1 minute timeout
           INTERVAL=5  # Check every 5 seconds
@@ -75,4 +75,4 @@ jobs:
         run: echo "$POD_NAME"
 
       - name: Run Tests
-        run : kubectl exec --stdin --tty ${{ steps.get-pod.outputs.POD_NAME }}  -- bash -c "cd waltid-identity/docker-compose && pip3 install requests && python3 api-test.py"
+        run: kubectl exec --stdin --tty ${{ steps.get-pod.outputs.POD_NAME }}  -- bash -c "cd waltid-identity/docker-compose && pip3 install requests && python3 api-test.py"
