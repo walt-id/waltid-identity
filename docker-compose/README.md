@@ -104,4 +104,4 @@ Make sure the ports are also updated in:
     - web.conf
 - wallet-api/config
     - web.conf
-    - db.<database-engine>.conf
+    - db.conf
