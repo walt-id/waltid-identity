@@ -6,8 +6,10 @@ services:
       context: ../
       dockerfile: waltid-wallet-api/Dockerfile
     depends_on:
-      - "$DATABASE_ENGINE"
-      - caddy
+      postgres:
+        condition: service_healthy
+      caddy:
+        condition: service_started
     env_file:
       - .env
     extra_hosts:
