@@ -1,8 +1,17 @@
+object Versions {
+    const val KOTLIN_VERSION = "1.9.22" // also change 2 plugins
+    const val KTOR_VERSION = "2.3.8" // also change 1 plugin
+    const val COROUTINES_VERSION = "1.8.0"
+    const val EXPOSED_VERSION = "0.43.0"
+    const val HOPLITE_VERSION = "2.8.0.RC3"
+}
+
 plugins {
     kotlin("multiplatform")
     kotlin("plugin.serialization")
     id("maven-publish")
     id("com.github.ben-manes.versions")
+    id("io.ktor.plugin") version "2.3.8"
     // Apply the application plugin to add support for building a CLI application in Java.
     application
 }
@@ -92,6 +101,23 @@ kotlin {
                 implementation("com.wolpl.clikt-testkit:clikt-testkit:2.0.0")
 
                 implementation("org.junit.jupiter:junit-jupiter-params:5.10.2")
+
+                implementation("io.ktor:ktor-server-core-jvm:${Versions.KTOR_VERSION}")
+                implementation("io.ktor:ktor-server-netty-jvm:${Versions.KTOR_VERSION}")
+                implementation("io.ktor:ktor-server-auth-jvm:${Versions.KTOR_VERSION}")
+                implementation("io.ktor:ktor-server-sessions-jvm:${Versions.KTOR_VERSION}")
+                implementation("io.ktor:ktor-server-auth-jwt-jvm:${Versions.KTOR_VERSION}")
+                implementation("io.ktor:ktor-server-auto-head-response-jvm:${Versions.KTOR_VERSION}")
+                implementation("io.ktor:ktor-server-double-receive-jvm:${Versions.KTOR_VERSION}")
+                implementation("io.ktor:ktor-server-host-common-jvm:${Versions.KTOR_VERSION}")
+                implementation("io.ktor:ktor-server-status-pages-jvm:${Versions.KTOR_VERSION}")
+                implementation("io.ktor:ktor-server-compression-jvm:${Versions.KTOR_VERSION}")
+                implementation("io.ktor:ktor-server-cors-jvm:${Versions.KTOR_VERSION}")
+                implementation("io.ktor:ktor-server-forwarded-header-jvm:${Versions.KTOR_VERSION}")
+                implementation("io.ktor:ktor-server-call-logging-jvm:${Versions.KTOR_VERSION}")
+                implementation("io.ktor:ktor-server-call-id-jvm:${Versions.KTOR_VERSION}")
+                implementation("io.ktor:ktor-server-content-negotiation-jvm:${Versions.KTOR_VERSION}")
+                implementation("io.ktor:ktor-server-cio-jvm:${Versions.KTOR_VERSION}")
             }
         }
         /*publishing {
