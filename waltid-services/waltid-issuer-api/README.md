@@ -114,5 +114,10 @@ Run the following commands from the waltid-identity root path:
 
 ```shell
 docker build -t waltid/issuer-api -f waltid-services/waltid-issuer-api/Dockerfile .
+docker run -p 7003:7003 waltid/issuer-api -- --webPort=7002 --baseUrl=http://localhost:7002
+```
+
+Or, run with local config directory:
+```shell
 docker run -p 7002:7002 -v $PWD/waltid-services/waltid-issuer-api/config:/waltid-issuer-api/config -t waltid/issuer-api
 ```
