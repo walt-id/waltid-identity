@@ -77,7 +77,7 @@ kotlin {
                 implementation("org.kotlincrypto.hash:sha2")
 
                 // Logging
-                implementation("io.github.oshai:kotlin-logging:6.0.9")
+                implementation("io.github.oshai:kotlin-logging:7.0.0")
 
                 // walt.id
                 api(project(":waltid-libraries:waltid-crypto"))
@@ -96,7 +96,7 @@ kotlin {
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:1.8.1")
 
                 // OCI
-                implementation("com.oracle.oci.sdk:oci-java-sdk-shaded-full:3.43.0")
+                implementation("com.oracle.oci.sdk:oci-java-sdk-shaded-full:3.43.1")
 
                 // JOSE
                 implementation("com.nimbusds:nimbus-jose-jwt:9.40")
