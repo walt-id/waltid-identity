@@ -91,6 +91,7 @@ class VCVerifyCmd : CliktCommand(
             |expired| - |
             |not-before| - |
             |schema|schema=/path/to/schema.json|
+            |allowed-issuer|issuer=did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV|
         """.trimMargin()
     }
 
@@ -154,6 +155,7 @@ class VCVerifyCmd : CliktCommand(
     private fun checkAndLoadArguments(): MutableMap<String, JsonElement> {
         val args = emptyMap<String, JsonElement>().toMutableMap()
         args.putAll(getSchemaPolicyArguments())
+        args.putAll(getAllowedIssuerPolicyArguments())
         return args
     }
 
@@ -177,6 +179,18 @@ class VCVerifyCmd : CliktCommand(
 
             val schema = File(schemaFilePath).readText()
             args["schema"] = Json.parseToJsonElement(schema).toJsonElement()
+        }
+
+        return args
+    }
+
+    private fun getAllowedIssuerPolicyArguments(): Map<out String, JsonElement> {
+        val args = mutableMapOf<String, JsonElement>()
+        if ("allowed-issuer" in policies) {
+            if ("issuer" !in policyArguments || policyArguments["issuer"]!!.isEmpty()) {
+                throw MissingOption(this.option("--arg for the 'allowed-issuer' policy (--arg=issuer=did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV"))
+            }
+            args["allowed-issuer"] = policyArguments["issuer"]!!.toJsonElement()
         }
 
         return args
