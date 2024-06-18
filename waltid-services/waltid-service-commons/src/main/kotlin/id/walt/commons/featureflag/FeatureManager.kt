@@ -25,7 +25,7 @@ object FeatureManager {
         feature.configs.forEach { (name, config) ->
             log.info { "↳ Loading config \"$name\" for feature \"${feature.name}\"..." }
             ConfigManager.registerConfig(name, config)
-            ConfigManager.loadConfig(ConfigManager.ConfigData(name, config), RunConfiguration.args).onFailure {
+            ConfigManager.loadConfig(ConfigManager.ConfigData(name, config), RunConfiguration.configArgs).onFailure {
                 return false
             }
         }
