@@ -21,7 +21,6 @@ import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.http.*
 import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import java.security.KeyFactory
 import java.security.cert.CertificateFactory

@@ -6,28 +6,20 @@ import id.walt.commons.config.ConfigManager
 import id.walt.webwallet.config.DatasourceConfiguration
 import id.walt.webwallet.db.models.*
 import id.walt.webwallet.service.account.AccountsService
-import id.walt.webwallet.service.credentials.CredentialsService
-import id.walt.webwallet.utils.IssuanceExamples
 import id.walt.webwallet.web.model.EmailAccountRequest
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.runBlocking
-import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.uuid.UUID
-import kotlinx.uuid.generateUUID
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SchemaUtils
-import org.jetbrains.exposed.sql.StdOutSqlLogger
-import org.jetbrains.exposed.sql.addLogger
 import org.jetbrains.exposed.sql.transactions.TransactionManager
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.slf4j.bridge.SLF4JBridgeHandler
 import java.sql.Connection
 import kotlin.io.path.Path
 import kotlin.io.path.absolutePathString
-import kotlin.random.Random
 
 object Db {
 
