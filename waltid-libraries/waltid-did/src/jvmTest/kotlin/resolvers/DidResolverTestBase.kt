@@ -7,20 +7,36 @@ import DidDocumentChecks.secp256KeyChecks
 import id.walt.crypto.keys.Key
 import id.walt.did.dids.document.DidDocument
 import id.walt.did.dids.resolver.local.LocalResolverMethod
+import io.ktor.client.network.sockets.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.*
 import kotlin.test.assertNotNull
 
 abstract class DidResolverTestBase {
-    protected abstract val sut: LocalResolverMethod
+    protected abstract val resolver: LocalResolverMethod
+
+    /**
+     * Some online resolvers are a bit flaky with their uptime, but we still want to test with them,
+     * e.g., to catch if the JSON response changes.
+     * However, they should not break our pipeline just because their offline again (sometimes happens every week or so).
+     */
+    private fun allowFailWithSocketTimeout(block: () -> Unit) = runCatching {
+        block.invoke()
+    }.getOrElse { ex ->
+        if (ex is SocketTimeoutException) {
+            println("A resolver URL is timing out: ${ex.message}")
+        } else throw ex
+    }
 
     open fun `given a did String, when calling resolve, then the result is a valid did document`(
         did: String,
         key: JsonObject,
         assert: resolverAssertion<DidDocument>,
     ) {
-        val result = runBlocking { sut.resolve(did) }
-        assert(did, key, result)
+        allowFailWithSocketTimeout {
+            val result = runBlocking { resolver.resolve(did) }
+            assert(did, key, result)
+        }
     }
 
     open fun `given a did String, when calling resolveToKey, then the result is valid key`(
@@ -28,8 +44,10 @@ abstract class DidResolverTestBase {
         key: JsonObject,
         assert: resolverAssertion<Key>,
     ) {
-        val result = runBlocking { sut.resolveToKey(did) }
-        assert(did, key, result)
+        allowFailWithSocketTimeout {
+            val result = runBlocking { resolver.resolveToKey(did) }
+            assert(did, key, result)
+        }
     }
 
     companion object {
