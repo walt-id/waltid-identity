@@ -35,7 +35,8 @@ data:
         VerifiablePortableDocumentA1 = [VerifiableCredential, VerifiableAttestation, VerifiablePortableDocumentA1],
         Visa = [VerifiableCredential, VerifiableAttestation, Visa],
         eID = [VerifiableCredential, VerifiableAttestation, eID],
-        NaturalPersonVerifiableID = [VerifiableCredential, VerifiableAttestation, NaturalPersonVerifiableID]
+        NaturalPersonVerifiableID = [VerifiableCredential, VerifiableAttestation, NaturalPersonVerifiableID],
+        BoardingPass = [VerifiableCredential, VerifiableAttestation, BoardingPass]
     }
 ---
 kind: Deployment
