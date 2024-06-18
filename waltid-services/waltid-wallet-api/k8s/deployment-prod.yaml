@@ -90,12 +90,21 @@ spec:
           image: waltid/wallet-api:__DEFAULT_IMAGE_TAG__
           volumeMounts:
             - name: wallet-config
-              mountPath: "/waltid-wallet-api/config/"
+              mountPath: /waltid-wallet-api/config/db.conf
               readOnly: true
+              subPath: db.conf
+            - name: wallet-config
+              mountPath: /waltid-wallet-api/config/web.conf
+              readOnly: true
+              subPath: web.conf
+            - name: wallet-config
+              mountPath: /waltid-wallet-api/config/oidc.conf
+              readOnly: true
+              subPath: oidc.conf
             - name: wallet-auth-secret
-              mountPath: "/waltid-wallet-api/config/auth.conf"
-              subPath: "auth.conf"
+              mountPath: /waltid-wallet-api/config/auth.conf
               readOnly: true
+              subPath: auth.conf
             - mountPath: "/waltid-wallet-api/data/"
               name: wallet-data
           ports:
