@@ -46,6 +46,7 @@ bin/
 # walt.id
 secret*
 */data
+*/*/data
 **/*.db
 /kotlin-js-store/
 .idea/misc.xml
@@ -54,3 +55,7 @@ secret*
 **/.nuxt
 **/.output
 **/node_modules
+
+**/.kotlin
+
+**/*.pem

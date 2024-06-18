@@ -9,7 +9,8 @@ docker-compose pull
 docker-compose up
 ```
 
-Note: If you are facing issues with the containers, try running the following command to remove the existing containers and then run the above command again.
+Note: If you are facing issues with the containers, try running the following command to remove the existing containers and then run the
+above command again.
 
 ```bash
 docker-compose down
@@ -18,6 +19,7 @@ docker-compose down
 ## Port mapping
 
 ### Services
+
 - Wallet API: [http://localhost:7001](http://localhost:7001)
 - Issuer API: [http://localhost:7002](http://localhost:7002)
 - Verifier API: [http://localhost:7003](http://localhost:7003)
@@ -28,29 +30,28 @@ docker-compose down
 - Web Portal: [http://localhost:7102](http://localhost:7102)
 - Credential Repo: [http://localhost:7103](http://localhost:7103)
 
-
 ## Configurations
 
 - wallet API:
-  - `wallet-api/config` - wallet configuration
-  - `wallet-api/walt.yaml` - nft configuration
+    - `wallet-api/config` - wallet configuration
+    - `wallet-api/walt.yaml` - nft configuration
 - issuer API:
-  - `issuer-api/config`
+    - `issuer-api/config`
 - verifier API:
-  - `verifier-api/config`
+    - `verifier-api/config`
 - ingress:
-  - `Caddyfile`
+    - `Caddyfile`
 
 ## Environment
 
 - main:
-  - `.env` - stores the common environment variables, such as port numbers,
-    version-tag, database-engine selection, etc.
+    - `.env` - stores the common environment variables, such as port numbers,
+      version-tag, database-engine selection, etc.
 - postgres:
-  - `postgres/postgres.env` - stores postgres specific variables, e.g. admin user, etc.
-  - `pgadmin.env` - stores pgAdmin specific variables, e.g. admin user, etc.
+    - `postgres/postgres.env` - stores postgres specific variables, e.g. admin user, etc.
+    - `pgadmin.env` - stores pgAdmin specific variables, e.g. admin user, etc.
 - microsoft sql-server:
-  - `mssql/mssql.env` - stores mssql specific variables, e.g. sql-server edition, etc. 
+    - `mssql/mssql.env` - stores mssql specific variables, e.g. sql-server edition, etc.
 
 Variables from `.env` are propagated automatically down to reverse proxy configurations
 (Caddyfile) and also api configurations (wallet, issuer, verifier).
@@ -61,9 +62,9 @@ Variables from `.env` are propagated automatically down to reverse proxy configu
 
 - browse `.env` file
 - set `DATABASE_ENGINE` to one of:
-  - sqlite
-  - postgres
-  - mssql
+    - sqlite
+    - postgres
+    - mssql
 
 This value will be used also by compose profile so only the required services are started.
 
@@ -78,11 +79,12 @@ This value will be used by reverse proxy (and services configs, if any).
 
 - browse `.env` file
 - update `VERSION_TAG` to a specific image version (e.g. a release version)
-  - if not set, `latest` tag is used
+    - if not set, `latest` tag is used
 
 ## Troubleshooting
 
 ---
+
 #### Display of VC verification result on success page of portal doesn't work
 
 We are working on fixing this issue.
@@ -92,13 +94,14 @@ We are working on fixing this issue.
 #### Updating ports doesn't work
 
 Make sure the ports are also updated in:
+
 - Caddyfile
 - issuer-api/config
-  - issuer-service.conf
-  - web.conf
+    - issuer-service.conf
+    - web.conf
 - verifier-api/config
-  - verifier-service.conf
-  - web.conf
+    - verifier-service.conf
+    - web.conf
 - wallet-api/config
-  - web.conf
-  - db.<database-engine>.conf
+    - web.conf
+    - db.conf
