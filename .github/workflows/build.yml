@@ -34,8 +34,8 @@ jobs:
         uses: tj-actions/changed-files@v44
         with:
           files: |
-            waltid-web-portal/**
-            waltid-web-wallet/web/**
+            waltid-applications/waltid-web-portal/**
+            waltid-applications/waltid-web-wallet/web/**
 
       - name: Running gradle build
         uses: eskatos/gradle-command-action@v3.3.2
