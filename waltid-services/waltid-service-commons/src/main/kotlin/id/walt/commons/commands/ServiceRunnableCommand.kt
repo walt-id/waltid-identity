@@ -18,8 +18,8 @@ class ServiceRunnableCommand(
     val config: ServiceConfiguration,
     val init: ServiceInitialization,
 ) : CliktCommand() {
-    private val logLevel: String? by option("--log-level", "--logLevel", "-l").choice(*LoggingManager.loggingSetups.keys.toTypedArray())
-    private val logType: RenderStrings? by option("--log-type", "--logType").enum<RenderStrings>()
+    private val logLevel: String? by option("--log-level", "--logLevel", "-l", envvar = "LOG_LEVEL").choice(*LoggingManager.loggingSetups.keys.toTypedArray())
+    private val logType: RenderStrings? by option("--log-type", "--logType", envvar = "LOG_TYPE").enum<RenderStrings>()
 
     private val configArgs by argument("config args", "pass configuration as command line arguments").multiple()
 
