@@ -151,8 +151,6 @@ dependencies {
     implementation("org.postgresql:postgresql:42.7.3")
     implementation("mysql:mysql-connector-java:8.0.33")
     implementation("com.microsoft.sqlserver:mssql-jdbc:12.7.0.jre8-preview")
-    // migration
-    //implementation("org.flywaydb:flyway-core:9.22.2")
 
     // Web push
     // implementation("dev.blanke.webpush:webpush:6.1.1") // alternative

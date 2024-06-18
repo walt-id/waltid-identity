@@ -150,7 +150,6 @@ open class CIProvider : OpenIDCredentialIssuer(
 
     // -------------------------------------
     // Implementation of abstract issuer service provider interface
-    @OptIn(ExperimentalEncodingApi::class)
     override fun generateCredential(credentialRequest: CredentialRequest): CredentialResult {
         log.debug { "GENERATING CREDENTIAL:" }
         log.debug { "Credential request: $credentialRequest" }
