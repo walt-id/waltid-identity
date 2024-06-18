@@ -73,7 +73,7 @@ kotlin {
             dependencies {
                 // JSON
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.0")
-                implementation("io.github.optimumcode:json-schema-validator:0.0.15")
+                implementation("io.github.optimumcode:json-schema-validator:0.2.0")
 
                 // Ktor client
                 implementation("io.ktor:ktor-client-core:$ktor_version")
@@ -91,7 +91,7 @@ kotlin {
                 implementation("app.softwork:kotlinx-uuid-core:0.0.25")
 
                 // Loggin
-                implementation("io.github.oshai:kotlin-logging:6.0.9")
+                implementation("io.github.oshai:kotlin-logging:7.0.0")
 
                 // walt.id
                 api(project(":waltid-libraries:waltid-crypto"))
