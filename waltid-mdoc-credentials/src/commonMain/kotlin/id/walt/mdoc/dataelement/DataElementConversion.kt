@@ -2,6 +2,7 @@ package id.walt.mdoc.dataelement
 
 import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
+import kotlinx.serialization.json.*
 
 /**
  * Convert to CBOR data element
@@ -51,3 +52,16 @@ fun Instant.toDE(subType: DEDateTimeMode = DEDateTimeMode.tdate) = when(subType)
  * Convert to CBOR data element
  */
 fun LocalDate.toDE(subType: DEFullDateMode = DEFullDateMode.full_date_str) = FullDateElement(this, subType)
+
+fun JsonElement.toDE(): AnyDataElement = when(this) {
+  is JsonObject -> this.mapValues { it.value.toDE() }.toDE()
+  is JsonArray -> this.map { it.toDE() }.toDE()
+  is JsonPrimitive ->
+    this.intOrNull?.toDE() ?:
+    this.longOrNull?.toDE() ?:
+    this.floatOrNull?.toDE() ?:
+    this.doubleOrNull?.toDE() ?:
+    this.booleanOrNull?.toDE() ?:
+    this.content.toDE()
+}
+
