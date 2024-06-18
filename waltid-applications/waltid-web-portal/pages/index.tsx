@@ -96,7 +96,8 @@ export default function Home() {
             <MagnifyingGlassIcon className='h-6 mt-3 text-gray-500' />
             <input type="text" className='w-full mt-1 border-none outline-none focus:ring-0 bg-gray-50' onChange={handleSearchTermChange} />
           </div>
-          <Button size='sm' onClick={() => { setModalVisible(true); }}>Custom Credential</Button>
+          {/* Commented out for now, because of oidc credentialConfigurationId introduction */}
+          {/* <Button size='sm' onClick={() => { setModalVisible(true); }}>Custom Credential</Button> */}
         </div>
         {credentials.length === 0 && <div className='w-full mt-10 text-center'>No Credential with that name.</div>}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-y-10 gap-x-5 mt-10">
