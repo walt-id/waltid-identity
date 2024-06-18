@@ -51,7 +51,7 @@ class VCUtil {
         suspend fun verify(
             jws: String,
             policies: List<String>,
-            args: Map<String, JsonElement> = emptyMap()
+            args: Map<String, JsonElement> = emptyMap(),
         ): List<PolicyResult> {
 
             val policies = policies.ifEmpty { listOf("signature") }

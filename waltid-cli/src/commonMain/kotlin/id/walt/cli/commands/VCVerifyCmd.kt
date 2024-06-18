@@ -92,6 +92,7 @@ class VCVerifyCmd : CliktCommand(
             |not-before| - |
             |schema|schema=/path/to/schema.json|
             |allowed-issuer|issuer=did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV|
+            |webhook|url=https://example.com|
         """.trimMargin()
     }
 
@@ -156,6 +157,7 @@ class VCVerifyCmd : CliktCommand(
         val args = emptyMap<String, JsonElement>().toMutableMap()
         args.putAll(getSchemaPolicyArguments())
         args.putAll(getAllowedIssuerPolicyArguments())
+        args.putAll(getWebhookPolicyArguments())
         return args
     }
 
@@ -191,6 +193,19 @@ class VCVerifyCmd : CliktCommand(
                 throw MissingOption(this.option("--arg for the 'allowed-issuer' policy (--arg=issuer=did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV"))
             }
             args["allowed-issuer"] = policyArguments["issuer"]!!.toJsonElement()
+        }
+
+        return args
+    }
+
+    private fun getWebhookPolicyArguments(): Map<out String, JsonElement> {
+        val args = mutableMapOf<String, JsonElement>()
+        if ("webhook" in policies) {
+            if ("url" !in policyArguments || policyArguments["url"]!!.isEmpty()) {
+                throw MissingOption(this.option("--arg for the 'webhook' policy (--arg=url=https://example.com"))
+            }
+            args["webhook"] = policyArguments["url"]!!.toJsonElement()
+            args["vc"] = vc.readText().toJsonElement()
         }
 
         return args
