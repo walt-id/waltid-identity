@@ -91,7 +91,7 @@ dependencies {
     implementation("com.sksamuel.hoplite:hoplite-hocon:${Versions.HOPLITE_VERSION}")
 
     // Logging
-    implementation("io.github.oshai:kotlin-logging-jvm:6.0.9")
+    implementation("io.github.oshai:kotlin-logging-jvm:7.0.0")
     implementation("org.slf4j:jul-to-slf4j:2.0.13")
     implementation("io.klogging:klogging-jvm:0.5.14")
     implementation("io.klogging:slf4j-klogging:0.5.14")

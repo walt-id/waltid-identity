@@ -68,7 +68,7 @@ kotlin {
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.0")
 
                 // Logging
-                implementation("io.github.oshai:kotlin-logging:6.0.9")
+                implementation("io.github.oshai:kotlin-logging:7.0.0")
             }
         }
         val commonTest by getting {

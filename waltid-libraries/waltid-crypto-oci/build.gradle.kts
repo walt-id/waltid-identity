@@ -77,7 +77,7 @@ kotlin {
                 implementation("org.kotlincrypto.hash:sha2")
 
                 // Logging
-                implementation("io.github.oshai:kotlin-logging:6.0.9")
+                implementation("io.github.oshai:kotlin-logging:7.0.0")
 
                 // walt.id
                 api(project(":waltid-libraries:waltid-crypto"))
