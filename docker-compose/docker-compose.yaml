@@ -6,8 +6,10 @@ services:
       context: ../
       dockerfile: waltid-wallet-api/Dockerfile
     depends_on:
-      - "$DATABASE_ENGINE"
-      - caddy
+      postgres:
+        condition: service_healthy
+      caddy:
+        condition: service_started
     env_file:
       - .env
     extra_hosts:
@@ -71,15 +73,8 @@ services:
     environment:
       PORT: $VC_REPO_PORT
 
-  # sqlite fake service
-  sqlite:
-    image: alpine
-    profiles:
-      - sqlite
-    entrypoint: [ "/bin/sh", "-c", "exit 0" ]
-
-  postgres-engine:
-    image: postgres:alpine
+  postgres:
+    image: postgres
     profiles:
       - postgres
     healthcheck:
@@ -88,70 +83,14 @@ services:
       timeout: 1s
       retries: 5
     restart: always
-    env_file:
-      - ./postgres/postgres.env
+    environment:
+      POSTGRES_DB: $DB_NAME
+      POSTGRES_USER: $DB_USERNAME
+      POSTGRES_PASSWORD: $DB_PASSWORD
     volumes:
       - wallet-api-db:/waltid-wallet-api/data
-      - ./postgres/postgres-db-init.sh:/docker-entrypoint-initdb.d/postgres-db-init.sh
     ports:
       - $POSTGRES_DB_PORT:$POSTGRES_DB_PORT #TODO: tcp/udp proxy with caddy
-
-  # postgres-proxy-service
-  postgres:
-    image: alpine
-    profiles:
-      - postgres
-    entrypoint: [ "/bin/sh", "-c", "exit 0" ]
-    depends_on:
-      postgres-engine:
-        condition: "service_healthy"
-
-  phpmyadmin:
-    image: dpage/pgadmin4
-    profiles:
-      - postgres
-    depends_on:
-      - postgres
-      - caddy
-    env_file:
-      - ./postgres/pgadmin.env
-    volumes:
-      - pgadmin:/waltid-wallet-api/data/pgadmin
-    restart: always
-
-  mssql-engine:
-    image: mcr.microsoft.com/azure-sql-edge
-    profiles:
-      - mssql
-    healthcheck:
-      test: [ "CMD-SHELL", "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P $DB_PASSWORD -Q 'SELECT 1' || exit 1" ]
-      interval: 5s
-      timeout: 1s
-      retries: 5
-    restart: always
-    env_file:
-      - ./mssql/mssql.env
-    ports:
-      - $MSSQL_DB_PORT:$MSSQL_DB_PORT
-
-  # mssql-proxy-service
-  mssql:
-    image: mcr.microsoft.com/azure-sql-edge
-    profiles:
-      - mssql
-    volumes:
-      - ./mssql/mssql-db-init.sql:/docker-entrypoint-initdb.d/mssql-db-init.sql
-    env_file:
-      - ./mssql/mssql.env
-      - .env
-    depends_on:
-      mssql-engine:
-        condition: "service_healthy"
-    command: >
-      bash -c '
-      /opt/mssql-tools/bin/sqlcmd -S mssql-engine -U sa -P $DB_PASSWORD -i /docker-entrypoint-initdb.d/mssql-db-init.sql;
-      echo "Configuration complete";
-      '
 
   caddy:
     image: docker.io/caddy:2
@@ -201,4 +140,3 @@ services:
       - ./Caddyfile:/etc/caddy/Caddyfile
 volumes:
   wallet-api-db:
-  pgadmin:
