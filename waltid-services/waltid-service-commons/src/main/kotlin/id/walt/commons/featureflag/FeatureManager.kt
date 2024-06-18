@@ -10,6 +10,8 @@ object FeatureManager {
     val disabledFeatures = HashSet<String>()
     val registeredFeatures = HashMap<String, AbstractFeature>()
 
+    private val failed = ArrayList<AbstractFeature>()
+
     val featureAmendments = HashMap<AbstractFeature, suspend () -> Unit>()
 
     private val log = logger("FeatureManager")
@@ -107,7 +109,8 @@ object FeatureManager {
         registeredFeatures[feature.name] = feature
     }
 
-    fun getDefaultedFeatures() = registeredFeatures.keys.subtract(enabledFeatures).subtract(disabledFeatures)
+    fun getDefaultedFeatures() = registeredFeatures.keys.subtract(enabledFeatures).subtract(disabledFeatures).subtract(failed.map { it.name }
+        .toSet())
     fun getDefaultedAbstractFeatures() =
         getDefaultedFeatures().map { registeredFeatures[it]!! }
 
@@ -132,7 +135,7 @@ object FeatureManager {
         log.info { "Disabled features (${disabledFeatures.size}): ${disabledFeatures.joinToString()}" }
 
 
-        val failed = ArrayList<AbstractFeature>()
+
 
         registeredFeatures.filterValues { it is BaseFeature }.forEach { (name, feature) ->
             log.info { "Enabling base feature \"${feature.name}\"..." }
