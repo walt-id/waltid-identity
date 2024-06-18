@@ -44,6 +44,8 @@ kotlin {
 }*/
 
 kotlin {
+    val isMacOS = System.getProperty("os.name") == "Mac OS X"
+
     targets.configureEach {
         compilations.configureEach {
             compilerOptions.configure {
@@ -61,8 +63,7 @@ kotlin {
         }
     }
     js(IR) {
-        moduleName = "crypto"
-        /*browser {
+        moduleName = "crypto"/*browser {
             commonWebpackConfig {
                 cssSupport {
                     enabled.set(true)
@@ -78,6 +79,19 @@ kotlin {
         binaries.library()
     }
 //    androidTarget()
+
+    if (isMacOS) {
+        listOf(
+            iosArm64(),
+            iosSimulatorArm64()
+        ).forEach { iosTarget ->
+            iosTarget.binaries.framework {
+                baseName = "waltid-crypto"
+                isStatic = true
+            }
+        }
+    }
+
 
     val ktor_version = "2.3.11"
     sourceSets {
@@ -172,12 +186,37 @@ kotlin {
 //                implementation(kotlin("test"))
 //            }
 //        }
+
+        if (isMacOS) {
+            val iosArm64Main by getting
+            val iosSimulatorArm64Main by getting
+
+            val iosMain by creating {
+                dependsOn(commonMain)
+                iosArm64Main.dependsOn(this)
+                iosSimulatorArm64Main.dependsOn(this)
+            }
+
+            val iosArm64Test by getting
+            val iosSimulatorArm64Test by getting
+
+            val iosTest by creating {
+                dependsOn(commonTest)
+                iosArm64Test.dependsOn(this)
+                iosSimulatorArm64Test.dependsOn(this)
+            }
+        }
+
         publishing {
             repositories {
                 maven {
                     val releasesRepoUrl = uri("https://maven.waltid.dev/releases")
                     val snapshotsRepoUrl = uri("https://maven.waltid.dev/snapshots")
-                    url = uri(if (version.toString().endsWith("SNAPSHOT")) snapshotsRepoUrl else releasesRepoUrl)
+                    url = uri(
+                        if (version.toString()
+                                .endsWith("SNAPSHOT")
+                        ) snapshotsRepoUrl else releasesRepoUrl
+                    )
 
                     val envUsername = System.getenv("MAVEN_USERNAME")
                     val envPassword = System.getenv("MAVEN_PASSWORD")
@@ -185,9 +224,13 @@ kotlin {
                     val usernameFile = File("$rootDir/secret_maven_username.txt")
                     val passwordFile = File("$rootDir/secret_maven_password.txt")
 
-                    val secretMavenUsername = envUsername ?: usernameFile.let { if (it.isFile) it.readLines().first() else "" }
+                    val secretMavenUsername = envUsername ?: usernameFile.let {
+                        if (it.isFile) it.readLines().first() else ""
+                    }
                     //println("Deploy username length: ${secretMavenUsername.length}")
-                    val secretMavenPassword = envPassword ?: passwordFile.let { if (it.isFile) it.readLines().first() else "" }
+                    val secretMavenPassword = envPassword ?: passwordFile.let {
+                        if (it.isFile) it.readLines().first() else ""
+                    }
 
                     //if (secretMavenPassword.isBlank()) {
                     //   println("WARNING: Password is blank!")
