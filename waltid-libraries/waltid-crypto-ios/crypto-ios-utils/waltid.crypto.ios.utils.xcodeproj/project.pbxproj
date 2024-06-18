@@ -1,0 +1,394 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		5871D038DD21439BBCD917B9 /* Pods_waltid_crypto_ios_utils.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E25CABD077A57C1AC3AF46AF /* Pods_waltid_crypto_ios_utils.framework */; };
+		B3C327EE2C20498600EABCC6 /* waltid_crypto_ios_utils.m in Sources */ = {isa = PBXBuildFile; fileRef = B3C327ED2C20498600EABCC6 /* waltid_crypto_ios_utils.m */; };
+		B3C327F72C204B8300EABCC6 /* CryptoUtils.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3C327F62C204B8300EABCC6 /* CryptoUtils.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		B3C327E92C20498600EABCC6 /* libwaltid.crypto.ios.utils.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = libwaltid.crypto.ios.utils.a; sourceTree = BUILT_PRODUCTS_DIR; };
+		B3C327EC2C20498600EABCC6 /* waltid_crypto_ios_utils.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = waltid_crypto_ios_utils.h; sourceTree = "<group>"; };
+		B3C327ED2C20498600EABCC6 /* waltid_crypto_ios_utils.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = waltid_crypto_ios_utils.m; sourceTree = "<group>"; };
+		B3C327F52C204B8200EABCC6 /* waltid.crypto.ios.utils-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "waltid.crypto.ios.utils-Bridging-Header.h"; sourceTree = "<group>"; };
+		B3C327F62C204B8300EABCC6 /* CryptoUtils.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CryptoUtils.swift; sourceTree = "<group>"; };
+		D18623087881BB24B20C3402 /* Pods-waltid.crypto.ios.utils.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-waltid.crypto.ios.utils.debug.xcconfig"; path = "Target Support Files/Pods-waltid.crypto.ios.utils/Pods-waltid.crypto.ios.utils.debug.xcconfig"; sourceTree = "<group>"; };
+		D1BFB6781C6276C500F5D2EE /* Pods-waltid.crypto.ios.utils.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-waltid.crypto.ios.utils.release.xcconfig"; path = "Target Support Files/Pods-waltid.crypto.ios.utils/Pods-waltid.crypto.ios.utils.release.xcconfig"; sourceTree = "<group>"; };
+		E25CABD077A57C1AC3AF46AF /* Pods_waltid_crypto_ios_utils.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_waltid_crypto_ios_utils.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		B3C327E62C20498600EABCC6 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5871D038DD21439BBCD917B9 /* Pods_waltid_crypto_ios_utils.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		67A6D1B92DF175DBEB47C902 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				E25CABD077A57C1AC3AF46AF /* Pods_waltid_crypto_ios_utils.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		B1896CA51A81345B17AF932B /* Pods */ = {
+			isa = PBXGroup;
+			children = (
+				D18623087881BB24B20C3402 /* Pods-waltid.crypto.ios.utils.debug.xcconfig */,
+				D1BFB6781C6276C500F5D2EE /* Pods-waltid.crypto.ios.utils.release.xcconfig */,
+			);
+			path = Pods;
+			sourceTree = "<group>";
+		};
+		B3C327E02C20498600EABCC6 = {
+			isa = PBXGroup;
+			children = (
+				B3C327EB2C20498600EABCC6 /* waltid.crypto.ios.utils */,
+				B3C327EA2C20498600EABCC6 /* Products */,
+				B1896CA51A81345B17AF932B /* Pods */,
+				67A6D1B92DF175DBEB47C902 /* Frameworks */,
+			);
+			sourceTree = "<group>";
+		};
+		B3C327EA2C20498600EABCC6 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				B3C327E92C20498600EABCC6 /* libwaltid.crypto.ios.utils.a */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		B3C327EB2C20498600EABCC6 /* waltid.crypto.ios.utils */ = {
+			isa = PBXGroup;
+			children = (
+				B3C327EC2C20498600EABCC6 /* waltid_crypto_ios_utils.h */,
+				B3C327ED2C20498600EABCC6 /* waltid_crypto_ios_utils.m */,
+				B3C327F62C204B8300EABCC6 /* CryptoUtils.swift */,
+				B3C327F52C204B8200EABCC6 /* waltid.crypto.ios.utils-Bridging-Header.h */,
+			);
+			path = waltid.crypto.ios.utils;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		B3C327E82C20498600EABCC6 /* waltid.crypto.ios.utils */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B3C327F22C20498600EABCC6 /* Build configuration list for PBXNativeTarget "waltid.crypto.ios.utils" */;
+			buildPhases = (
+				6D02B91035C1B24445F9D3FF /* [CP] Check Pods Manifest.lock */,
+				B3C327E52C20498600EABCC6 /* Sources */,
+				B3C327E62C20498600EABCC6 /* Frameworks */,
+				B3C327F82C204DD100EABCC6 /* CP Bridging Header */,
+				B3C327F92C204DEF00EABCC6 /* CP Products */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = waltid.crypto.ios.utils;
+			productName = waltid.crypto.ios.utils;
+			productReference = B3C327E92C20498600EABCC6 /* libwaltid.crypto.ios.utils.a */;
+			productType = "com.apple.product-type.library.static";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		B3C327E12C20498600EABCC6 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastUpgradeCheck = 1520;
+				TargetAttributes = {
+					B3C327E82C20498600EABCC6 = {
+						CreatedOnToolsVersion = 15.2;
+						LastSwiftMigration = 1520;
+					};
+				};
+			};
+			buildConfigurationList = B3C327E42C20498600EABCC6 /* Build configuration list for PBXProject "waltid.crypto.ios.utils" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = B3C327E02C20498600EABCC6;
+			productRefGroup = B3C327EA2C20498600EABCC6 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				B3C327E82C20498600EABCC6 /* waltid.crypto.ios.utils */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		6D02B91035C1B24445F9D3FF /* [CP] Check Pods Manifest.lock */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"${PODS_PODFILE_DIR_PATH}/Podfile.lock",
+				"${PODS_ROOT}/Manifest.lock",
+			);
+			name = "[CP] Check Pods Manifest.lock";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(DERIVED_FILE_DIR)/Pods-waltid.crypto.ios.utils-checkManifestLockResult.txt",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
+			showEnvVarsInLog = 0;
+		};
+		B3C327F82C204DD100EABCC6 /* CP Bridging Header */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "CP Bridging Header";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "targetDir=${BUILT_PRODUCTS_DIR}/include/${PRODUCT_MODULE_NAME}/\nmkdir -p $targetDir\ncp ${DERIVED_SOURCES_DIR}/*-Swift.h ${targetDir}\n";
+		};
+		B3C327F92C204DEF00EABCC6 /* CP Products */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "CP Products";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "mkdir -p ./build/${TARGET}\ncp -r ${BUILT_PRODUCTS_DIR}/../Release-${PLATFORM_NAME} ./build/${TARGET}\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		B3C327E52C20498600EABCC6 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B3C327F72C204B8300EABCC6 /* CryptoUtils.swift in Sources */,
+				B3C327EE2C20498600EABCC6 /* waltid_crypto_ios_utils.m in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		B3C327F02C20498600EABCC6 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.2;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+			};
+			name = Debug;
+		};
+		B3C327F12C20498600EABCC6 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.2;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		B3C327F32C20498600EABCC6 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = D18623087881BB24B20C3402 /* Pods-waltid.crypto.ios.utils.debug.xcconfig */;
+			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_STYLE = Automatic;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.4;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-ObjC",
+				);
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "waltid.crypto.ios.utils/waltid.crypto.ios.utils-Bridging-Header.h";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		B3C327F42C20498600EABCC6 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = D1BFB6781C6276C500F5D2EE /* Pods-waltid.crypto.ios.utils.release.xcconfig */;
+			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_STYLE = Automatic;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.4;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-ObjC",
+				);
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "waltid.crypto.ios.utils/waltid.crypto.ios.utils-Bridging-Header.h";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		B3C327E42C20498600EABCC6 /* Build configuration list for PBXProject "waltid.crypto.ios.utils" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B3C327F02C20498600EABCC6 /* Debug */,
+				B3C327F12C20498600EABCC6 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		B3C327F22C20498600EABCC6 /* Build configuration list for PBXNativeTarget "waltid.crypto.ios.utils" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B3C327F32C20498600EABCC6 /* Debug */,
+				B3C327F42C20498600EABCC6 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = B3C327E12C20498600EABCC6 /* Project object */;
+}
