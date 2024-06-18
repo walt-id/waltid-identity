@@ -47,5 +47,11 @@ include(
     ":waltid-libraries:waltid-crypto-android",
     ":waltid-applications:waltid-android"
     */
+
+    // iOS - uncomment to enable build:
+    /*
+    ":waltid-libraries:waltid-crypto-ios",
+    ":waltid-libraries:waltid-crypto-ios:crypto-ios-utils"
+     */
 )
 //include("waltid-e2e-tests")
