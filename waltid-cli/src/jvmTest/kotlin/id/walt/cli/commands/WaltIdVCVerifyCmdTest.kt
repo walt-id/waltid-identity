@@ -329,6 +329,17 @@ class WaltIdVCVerifyCmdTest {
         assertContains(result.output, "webhook: Fail!")
     }
 
+    @Test
+    fun `should output Success when the credential does not contain a revocation status list entry`() = runTest {
+        val result = command.test(
+            listOf(
+                "--policy=revoked_status_list",
+                signedVCFilePath,
+            )
+        )
+        assertContains(result.output, "revoked_status_list: Success!")
+    }
+
     private fun sign(vcFilePath: String): String {
         val vc = File(vcFilePath).readText()
         return runBlocking { VCUtil.sign(key = key, issuerDid = issuerDid, subjectDid = subjectDid, payload = vc) }
