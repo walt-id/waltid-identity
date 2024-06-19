@@ -1,0 +1,26 @@
+# this deployment runs docker compose to perform tests against
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: podman-priv-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: podman-priv
+  template:
+    metadata:
+      labels:
+        app: podman-priv
+    spec:
+      containers:
+        - name: podman
+          image: fedora:latest
+          securityContext:
+            privileged: true
+          command: [ "sh", "-c", "dnf install -y podman podman-compose git-all python3-pip && \
+                                  useradd waltid && \
+                                  git clone https://github.com/walt-id/waltid-identity.git && \
+                                  chown -R waltid:waltid /waltid-identity && \
+                                  cd waltid-identity/docker-compose && \
+                                  podman compose pull && podman compose up " ]
