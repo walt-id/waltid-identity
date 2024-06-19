@@ -158,6 +158,7 @@ class VCVerifyCmd : CliktCommand(
         args.putAll(getSchemaPolicyArguments())
         args.putAll(getAllowedIssuerPolicyArguments())
         args.putAll(getWebhookPolicyArguments())
+        args.putAll(getRevocationPolicyArguments())
         return args
     }
 
@@ -205,6 +206,15 @@ class VCVerifyCmd : CliktCommand(
                 throw MissingOption(this.option("--arg for the 'webhook' policy (--arg=url=https://example.com"))
             }
             args["webhook"] = policyArguments["url"]!!.toJsonElement()
+            args["vc"] = vc.readText().toJsonElement()
+        }
+
+        return args
+    }
+
+    private fun getRevocationPolicyArguments(): Map<out String, JsonElement> {
+        val args = mutableMapOf<String, JsonElement>()
+        if ("revoked_status_list" in policies) {
             args["vc"] = vc.readText().toJsonElement()
         }
 
