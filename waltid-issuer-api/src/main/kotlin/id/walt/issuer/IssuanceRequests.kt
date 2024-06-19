@@ -16,7 +16,8 @@ data class IssuanceRequest(
     val mdocData: Map<String, JsonObject>?,
     val mapping: JsonObject? = null,
     val selectiveDisclosure: SDMap? = null,
-
+    val x5Chain: List<String>? = null,
+    val trustedRootCAs: List<String>? = null
 )
 
 @Serializable
