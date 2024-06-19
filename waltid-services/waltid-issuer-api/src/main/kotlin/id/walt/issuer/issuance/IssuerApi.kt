@@ -408,7 +408,9 @@ fun Application.issuerApi() {
                             put("family_name", "Doe")
                             put("given_name", "John")
                             put("birth_date", "1980-01-01")
-                        })
+                        }),
+                        x5Chain = listOf(LspPotentialInteropEvent.POTENTIAL_ISSUER_CERT),
+                        trustedRootCAs = listOf(LspPotentialInteropEvent.POTENTIAL_ROOT_CA_CERT)
                     ).let { createCredentialOfferUri(listOf(it)) }
                     context.respond(
                         HttpStatusCode.OK, offerUri
