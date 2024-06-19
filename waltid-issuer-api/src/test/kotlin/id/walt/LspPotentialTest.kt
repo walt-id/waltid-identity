@@ -3,6 +3,7 @@ package id.walt
 import COSE.AlgorithmID
 import COSE.OneKey
 import cbor.Cbor
+import com.upokecenter.cbor.CBORObject
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeyType
@@ -364,5 +365,25 @@ class LspPotentialTest {
       Cbor.decodeFromByteArray(payload.hexToByteArray())
     ), null)
     assertNotNull(mdoc.issuerSigned.issuerAuth?.x5Chain)
+  }
+
+  @Test
+  fun testPanasonicCWTProof() {
+    val cwtStr = "0oRYb6MBJgN0b3BlbmlkNHZjaS1wcm9vZitjd3RoQ09TRV9LZXlYS6QBAiABIVggLJJHre5L8a2_3AqrrCAEPHrtwlOz3dNqapJwFCZFOv4iWCA73eeuJFAlZ1UTiZ3wVyRr7hdANprYk5WQbbEmYyFTPKEEWCA0MTRlODQxOGMxYzlkOGM4NDczZWZhM2YxOWZhMjc2OVhlpAFqd2FsbGV0LWRldgN4KGh0dHBzOi8vaXNzdWVyLnBvdGVudGlhbC53YWx0LXRlc3QuY2xvdWQGGmZyXdoKWCRkNTdjNzQxYi0wYWI0LTQwMWYtYjg1NS05YzdjMWY3MDIzNmFYQAdLyVSbkUSCwO6QnYw5wNayBfgkC6W2MklsjisIJZuK3ld9om_Jo9mrfLDuPcUkV__IwUrNBiUgqVMZqIuSFKA"
+    val cwt = Cbor.decodeFromByteArray(COSESign1.serializer(), cwtStr.base64UrlDecode())
+    assertNotNull(cwt.payload)
+    val cwtPayload = Cbor.decodeFromByteArray<MapElement>(cwt.payload!!)
+    assertEquals(DEType.textString, cwtPayload.value.get(MapKey(ProofOfPossession.CWTProofBuilder.LABEL_ISS))?.type)
+    val cwtProtectedHeader = Cbor.decodeFromByteArray<MapElement>(cwt.protectedHeader)
+    assertEquals(cwtProtectedHeader.value[MapKey(ProofOfPossession.CWTProofBuilder.HEADER_LABEL_ALG)]!!.value, -7L)
+    assertEquals(cwtProtectedHeader.value[MapKey(ProofOfPossession.CWTProofBuilder.HEADER_LABEL_CONTENT_TYPE)]!!.value, "openid4vci-proof+cwt")
+
+    val tokenHeader = cwt.decodeProtectedHeader()
+    val rawKey = (tokenHeader.value[MapKey(ProofOfPossession.CWTProofBuilder.HEADER_LABEL_COSE_KEY)] as ByteStringElement).value
+    val cryptoProvider = SimpleCOSECryptoProvider(listOf(COSECryptoProviderKeyInfo("pub-key", AlgorithmID.ECDSA_256,
+      OneKey(CBORObject.DecodeFromBytes(rawKey)).AsPublicKey()
+    )))
+    //assertTrue(cryptoProvider.verify1(cwt, "pub-key"))
+
   }
 }
