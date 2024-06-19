@@ -71,7 +71,7 @@ actual class OCIKey actual constructor(
     @JsExport.Ignore
     actual override suspend fun signJws(
         plaintext: ByteArray,
-        headers: Map<String, String>
+        headers: Map<String, JsonElement>
     ): String {
         TODO("Not yet implemented")
     }
