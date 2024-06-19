@@ -18,14 +18,11 @@
 
 Available for Kotlin/Java and JavaScript environments.
 
-- **Crypto
-  ** ([Docs](https://docs.oss.walt.id/issuer/sdks/manage-keys/overview) | [GitHub](https://github.com/walt-id/waltid-identity/blob/main/waltid-libraries/waltid-crypto/README.md)) -
+- **Crypto** ([Docs](https://docs.oss.walt.id/issuer/sdks/manage-keys/overview) | [GitHub](https://github.com/walt-id/waltid-identity/blob/main/waltid-libraries/waltid-crypto/README.md)) -
   create and use keys based on different algorithms.
-- **DID
-  ** ([Docs](https://docs.oss.walt.id/issuer/sdks/manage-dids/overview) | [GitHub](https://github.com/walt-id/waltid-identity/blob/main/waltid-libraries/waltid-did/README.md)) -
+- **DID** ([Docs](https://docs.oss.walt.id/issuer/sdks/manage-dids/overview) | [GitHub](https://github.com/walt-id/waltid-identity/blob/main/waltid-libraries/waltid-did/README.md)) -
   create, register, and resolve DIDs on different ecosystems.
-- **Verifiable Credentials
-  ** ([Docs](https://docs.oss.walt.id/issuer/sdks/manage-credentials/overview) | [GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/waltid-verifiable-credentials)) -
+- **Verifiable Credentials** ([Docs](https://docs.oss.walt.id/issuer/sdks/manage-credentials/overview) | [GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/waltid-verifiable-credentials)) -
   issue and verify W3C credentials as JWTs and SD-JWTs.
 - **mdoc Credentials** ([GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/waltid-mdoc-credentials)) - issue and
   verify mdoc credentials (mDL ISO/IEC 18013-5).
@@ -38,14 +35,11 @@ Available for Kotlin/Java and JavaScript environments.
 
 A set of APIs to build issuer, verifier, and wallet capabilities into any app.
 
-- **Issuer API
-  ** ([Docs](https://docs.oss.walt.id/issuer/api/getting-started) | [GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-services/waltid-issuer-api)) -
+- **Issuer API** ([Docs](https://docs.oss.walt.id/issuer/api/getting-started) | [GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-services/waltid-issuer-api)) -
   enable apps to issue credentials (W3C JWTs and SD-JWTs) via OID4VC.
-- **Verifier API
-  **  ([Docs](https://docs.oss.walt.id/verifier/api/getting-started) | [GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-services/waltid-verifier-api)) -
+- **Verifier API**  ([Docs](https://docs.oss.walt.id/verifier/api/getting-started) | [GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-services/waltid-verifier-api)) -
   enable apps to verify credentials (W3C JWTs and SD-JWTs) via OID4VP/SIOPv2.
-- **Wallet API
-  ** ([Docs](https://docs.oss.walt.id/wallet/api/getting-started) | [GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-services/waltid-wallet-api)) -
+- **Wallet API** ([Docs](https://docs.oss.walt.id/wallet/api/getting-started) | [GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-services/waltid-wallet-api)) -
   extend apps with wallet capabilities to collect, store, manage and share identity credentials and tokens.
 
 ### Apps
