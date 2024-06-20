@@ -117,12 +117,12 @@ class OperationsBase<TKeyType>: NSObject {
             guard let signer = Signer(signingAlgorithm: signingAlgorithm, key: key) else {
                 return SignResult.with(failure: "Could not construct signer.")
             }
-            
+
             var header = try {
-                            var h = try JSONSerialization.jsonObject(with: headersData) as! [String:Any]
-                            h["alg"] = signingAlgorithm.rawValue
-                            return try JWSHeader(parameters: h)
-                        }()
+                var h = try JSONSerialization.jsonObject(with: headersData) as! [String: Any]
+                h["alg"] = signingAlgorithm.rawValue
+                return try JWSHeader(parameters: h)
+            }()
 
             let jws = try JWS(header: header, payload: Payload(body), signer: signer)
             return SignResult.with(success: jws.compactSerializedString)
@@ -141,7 +141,11 @@ class OperationsBase<TKeyType>: NSObject {
                 return SignResult.with(failure: "Could not construct signer.")
             }
 
-            guard let header = try? JWSHeader(parameters: headers) else {
+            let jwsHeaders = headers.merging([ "alg": signingAlgorithm.rawValue ]) { _, new in
+                new
+            }
+
+            guard let header = try? JWSHeader(parameters: jwsHeaders) else {
                 return SignResult.with(failure: "Could not parse header")
             }
 
@@ -242,4 +246,17 @@ public class ECKeyUtils: NSObject {
 extension OSStatus: Error {}
 extension String: Error {}
 
+// MARK: - RSA
 
+@objc
+public class RSAKeyUtils: NSObject {
+    @objc static func exportJwt(publicKey: SecKey) throws -> String {
+        let publicKey = try! RSAPublicKey(publicKey: publicKey)
+        return publicKey.jsonString()!
+    }
+
+    @objc static func thumbprint(publicKey: SecKey) throws -> String {
+        let publicKey = try! RSAPublicKey(publicKey: publicKey)
+        return try! publicKey.thumbprint()
+    }
+}

@@ -27,139 +27,144 @@ struct ContentView: View {
     let appId = "appName"
      
     @State var keyId: String = ""
-    @State var p256Key: waltid_crypto_ios.IosKey? = nil
+    
+    @State var p256Key: waltid_crypto_ios.Waltid_cryptoKey? = nil
     @State var p256KeysignRawResult: Any? = nil
     @State var p256KeysignJwsResult: String? = nil
+    
+    @State var rsaKey: waltid_crypto_ios.Waltid_cryptoKey? = nil
+    @State var rsasignRawResult: Any? = nil
+    @State var rsasignJwsResult: String? = nil
     
     var body: some View {
         ScrollView {
             TextField("Key id", text: $keyId)
             
-//            GroupBox("RSA") {
-//                Button("Generate key") {
-//                    guard !keyId.isEmpty else {
-//                        print("keyid is empty.")
-//                        return
-//                    }
-//                    
-//                    do {
-//                        _ = waltid_crypto.RSAKey.companion.create(kid: keyId, appId: appId, size: 1536)
-//                        key = IosKeys.companion.load(kid: keyId, type: .rsa)
-//                    } catch {
-//                        print(error)
-//                    }
-//                }
-//                Button("Public representation") {
-//                    if let key {
-//                        key.getPublicKeyRepresentation { bytes, err in
-//                            if let bytes {
-//                                print(bytes)
-//                            }
-//                            
-//                            if let err {
-//                                print(err)
-//                            }
-//                        }
-//                    }
-//                }
-//                Button("Export jwk") {
-//                    if let key {
-//                        key.exportJWK(completionHandler: { jwk, err in
-//                            if let jwk {
-//                                print(jwk)
-//                            }
-//                            
-//                            if let err {
-//                                print(err)
-//                            }
-//                        })
-//                    }
-//                }
-//                
-//                Button("Export jwk object") {
-//                    if let key {
-//                        key.exportJWKObject { jwk, err in
-//                            if let jwk {
-//                                print(jwk)
-//                            }
-//                            
-//                            if let err {
-//                                print(err)
-//                            }
-//                        }
-//                    }
-//                }
-//                
-//                Button("Export pem") {
-//                    if let key {
-//                        key.exportPEM { pem, err in
-//                            if let pem {
-//                                print(pem)
-//                            }
-//                            
-//                            if let err {
-//                                print(err)
-//                            }
-//                        }
-//                    }
-//                }
-//                
-//                Button("Sign raw") {
-//                    if let key {
-//                        key.signRaw(plaintext: inputByteArray) { sig, err in
-//                            if let sig {
-//                                print(sig)
-//                                signRawResult = sig
-//                            }
-//                            
-//                            if let err {
-//                                print(err)
-//                            }
-//                        }
-//                    }
-//                }
-//                Button("Verify raw") {
-//                    if let key, let signRawResult {
-//                        key.verifyRaw(signed: signRawResult as! KotlinByteArray, detachedPlaintext: inputByteArray) { result, err in
-//                            if let result {
-//                                print(result)
-//                            }
-//                            
-//                            if let err {
-//                                print(err)
-//                            }
-//                        }
-//                    }
-//                }
-//                
-//                Button("Sign jws") {
-//                    if let key {
-//                        key.signJws(plaintext: inputByteArray, headers:[:]) { sig, err in
-//                            if let sig {
-//                                print(sig)
-//                                signJwsResult = sig
-//                            }
-//                            
-//                            if let err {
-//                                print(err)
-//                            }
-//                        }
-//                    }
-//                }
-//                Button("Verify jws") {
-//                    if let key, let signJwsResult {
-//                        key.verifyJws(signedJws: signJwsResult) { result, err in
-//                            if let result {
-//                                print(result)
-//                            }
-//                            
-//                            if let err {
-//                                print(err)
-//                            }
-//                        }
-//                    }
-//                }
-//            }
+            GroupBox("RSA") {
+                Button("Generate key") {
+                    guard !keyId.isEmpty else {
+                        print("keyid is empty.")
+                        return
+                    }
+                    
+                    do {
+                        _ = waltid_crypto_ios.RSAKey.companion.create(kid: keyId, appId: appId, size: 2048)
+                        rsaKey = try IosKeys.companion.load(kid: keyId, type: .rsa)
+                    } catch {
+                        print(error)
+                    }
+                }
+                Button("Public representation") {
+                    if let rsaKey {
+                        rsaKey.getPublicKeyRepresentation { bytes, err in
+                            if let bytes {
+                                print(bytes)
+                            }
+                            
+                            if let err {
+                                print(err)
+                            }
+                        }
+                    }
+                }
+                Button("Export jwk") {
+                    if let rsaKey {
+                        rsaKey.exportJWK(completionHandler: { jwk, err in
+                            if let jwk {
+                                print(jwk)
+                            }
+                            
+                            if let err {
+                                print(err)
+                            }
+                        })
+                    }
+                }
+                
+                Button("Export jwk object") {
+                    if let rsaKey {
+                        rsaKey.exportJWKObject { jwk, err in
+                            if let jwk {
+                                print(jwk)
+                            }
+                            
+                            if let err {
+                                print(err)
+                            }
+                        }
+                    }
+                }
+                
+                Button("Export pem") {
+                    if let rsaKey {
+                        rsaKey.exportPEM { pem, err in
+                            if let pem {
+                                print(pem)
+                            }
+                            
+                            if let err {
+                                print(err)
+                            }
+                        }
+                    }
+                }
+                
+                Button("Sign raw") {
+                    if let rsaKey {
+                        rsaKey.signRaw(plaintext: inputByteArray) { sig, err in
+                            if let sig {
+                                print(sig)
+                                rsasignRawResult = sig
+                            }
+                            
+                            if let err {
+                                print(err)
+                            }
+                        }
+                    }
+                }
+                Button("Verify raw") {
+                    if let rsaKey, let rsasignRawResult {
+                        rsaKey.verifyRaw(signed: rsasignRawResult as! KotlinByteArray, detachedPlaintext: inputByteArray) { result, err in
+                            if let result {
+                                print(result)
+                            }
+                            
+                            if let err {
+                                print(err)
+                            }
+                        }
+                    }
+                }
+                
+                Button("Sign jws") {
+                    if let rsaKey {
+                        rsaKey.signJws(plaintext: inputByteArray, headers:["alg":"RS256"]) { sig, err in
+                            if let sig {
+                                print(sig)
+                                rsasignJwsResult = sig
+                            }
+                            
+                            if let err {
+                                print(err)
+                            }
+                        }
+                    }
+                }
+                Button("Verify jws") {
+                    if let rsaKey, let rsasignJwsResult {
+                        rsaKey.verifyJws(signedJws: rsasignJwsResult) { result, err in
+                            if let result {
+                                print(result)
+                            }
+                            
+                            if let err {
+                                print(err)
+                            }
+                        }
+                    }
+                }
+            }
             GroupBox("secp256r1") {
                 Button("Generate key") {
                     guard !keyId.isEmpty else {
