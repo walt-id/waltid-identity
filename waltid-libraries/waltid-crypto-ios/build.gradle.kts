@@ -53,6 +53,7 @@ kotlin {
         val iosSimulatorArm64Main by getting
 
         val iosMain by creating {
+            this.dependsOn(commonMain.get())
             iosArm64Main.dependsOn(this)
             iosSimulatorArm64Main.dependsOn(this)
             dependencies {

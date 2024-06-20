@@ -260,3 +260,97 @@ public class RSAKeyUtils: NSObject {
         return try! publicKey.thumbprint()
     }
 }
+
+// MARK: - ed25519
+
+@objc
+public class Ed25519KeyUtils: NSObject {
+    @objc public static func create(kid: String, appName: String) throws -> String {
+        remove(key: kid, appName: appName)
+
+        let addCommand = [
+            kSecValueData as String: Curve25519.Signing.PrivateKey().rawRepresentation,
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrAccount as String: kid,
+            kSecAttrService as String: appName
+        ] as CFDictionary
+
+        switch SecItemAdd(addCommand, nil) {
+        case errSecSuccess: return kid
+        case let status: do {
+                let message = SecCopyErrorMessageString(status, nil)!
+                throw NSError(domain: "Ed25519KeyUtils",
+                              code: Int(status),
+                              userInfo: [NSLocalizedDescriptionKey: "Failed to create key. Reason: \(message)"])
+            }
+        }
+    }
+
+    @objc @discardableResult public static func remove(key: String, appName: String?) -> OSStatus {
+        var deleteQuery = [
+            kSecAttrAccount as String: key,
+            kSecReturnData as String: true,
+            kSecReturnAttributes as String: true,
+            kSecClass as String: kSecClassGenericPassword
+        ] as [String:Any]
+        
+        if let appName {
+            deleteQuery[kSecAttrService as String] = appName
+            
+        }
+        
+        return SecItemDelete(deleteQuery as CFDictionary)
+    }
+
+    @objc public static func load(key: String) throws
+    {
+        _ = try privateKey(kid: key)
+    }
+
+    static func privateKey(kid: String) throws -> Curve25519.Signing.PrivateKey {
+        let data = try retrieveData(forKey: kid)
+        return try Curve25519.Signing.PrivateKey(rawRepresentation: data)
+    }
+
+    static func retrieveData(forKey key: String) throws -> Data {
+        let query = [
+            kSecAttrAccount as String: key,
+            kSecReturnData: true,
+            kSecReturnAttributes: true,
+            kSecClass as String: kSecClassGenericPassword
+        ] as CFDictionary
+
+        var result: AnyObject?
+        let resultCode = SecItemCopyMatching(query, &result)
+
+        guard resultCode == errSecSuccess else {
+            let message = SecCopyErrorMessageString(resultCode, nil)!
+            throw NSError(domain: "Ed25519KeyUtils",
+                          code: Int(resultCode),
+                          userInfo: [NSLocalizedDescriptionKey: "Failed to retrieve data. Reason: \(message)"])
+        }
+
+        let dic = result as! NSDictionary
+
+        return dic[kSecValueData] as! Data
+    }
+    @objc static func publicRawRepresentation(kid: String) throws -> Data {
+        try privateKey(kid: kid).publicKey.rawRepresentation
+    }
+    
+    @objc static func signRaw(kid: String, plain: Data) throws -> Data {
+        return try privateKey(kid: kid).signature(for: plain).data()
+    }
+    
+    @objc static func verifyRaw(kid: String, signature: Data, data: Data) throws -> VerifyResult{
+        do {
+            guard try privateKey(kid: kid).publicKey.isValidSignature(signature, for: data) else {
+                return .with(isValid: false, data: nil)
+            }
+            
+            return .with(isValid: true, data: data)
+        } catch {
+            return .with(failure: error.localizedDescription)
+        }
+    }
+}
