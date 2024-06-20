@@ -9,6 +9,8 @@ const getOfferUrl = async (credentials: Array<AvailableCredential>, NEXT_PUBLIC_
   const credential_configurations_supported = data.credential_configurations_supported;
 
   const payload = await Promise.all(credentials.map(async (c) => {
+    c = { ...c, selectedFormat: c.selectedFormat ?? "JWT + VCDM", selectedDID: c.selectedDID ?? "did:key" };
+
     const offer = { ...c.offer, id: uuidv4() };
     const mapping = await (await fetch(`${NEXT_PUBLIC_VC_REPO}/api/mapping/${c.id}`).then(data => {
       return data.json();
