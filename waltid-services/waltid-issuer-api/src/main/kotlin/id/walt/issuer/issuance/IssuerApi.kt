@@ -32,7 +32,7 @@ suspend fun createCredentialOfferUri(issuanceRequests: List<IssuanceRequest>): S
         val key = if (it.issuerKey["type"].toJsonElement().jsonPrimitive.content == "jwk") {
             KeySerialization.deserializeJWTKey(it.issuerKey).getOrThrow()
         } else {
-            KeySerialization.deserializeKey(it.issuerKey).getOrThrow()
+            KeyManager.resolveSerializedKey(it.issuerKey)
         }
 
         CIProvider.IssuanceSessionData(
