@@ -209,6 +209,34 @@ spec:
                 name: wallet-api
                 port:
                   name: http
+          - path: /api.json
+            pathType: Prefix
+            backend:
+              service:
+                name: wallet-api
+                port:
+                  name: http
+          - path: /livez
+            pathType: Prefix
+            backend:
+              service:
+                name: wallet-api
+                port:
+                  name: http
+          - path: /features/
+            pathType: Prefix
+            backend:
+              service:
+                name: wallet-api
+                port:
+                  name: http
+          - path: /debug/
+            pathType: Prefix
+            backend:
+              service:
+                name: wallet-api
+                port:
+                  name: http
           - path: /
             pathType: Prefix
             backend:
