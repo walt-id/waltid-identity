@@ -3,7 +3,7 @@ import TestUtils.loadPemLocal
 import TestUtils.loadResource
 import TestUtils.loadResourceBytes
 import TestUtils.loadSerializedLocal
-import id.walt.crypto.keys.KeySerialization
+import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeyType
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
@@ -30,7 +30,7 @@ class LocalJWKKeyAndDidManagementTest {
     @ParameterizedTest
     @MethodSource
     fun getPublicKeyRepresentation(keyFile: String) = runTest {
-        val key = KeySerialization.deserializeKey(keyFile).getOrThrow()
+        val key = KeyManager.resolveSerializedKey(keyFile)
         val publicBytes = key.getPublicKeyRepresentation()
         println(publicBytes)
     }
@@ -38,8 +38,8 @@ class LocalJWKKeyAndDidManagementTest {
     @ParameterizedTest
     @MethodSource
     fun getPublicKey(keyFile: String, publicFile: String) = runTest {
-        val key = KeySerialization.deserializeKey(keyFile).getOrThrow()
-        val public = KeySerialization.deserializeKey(publicFile).getOrThrow()
+        val key = KeyManager.resolveSerializedKey(keyFile)
+        val public = KeyManager.resolveSerializedKey(publicFile)
         val publicKey = key.getPublicKey()
         assertTrue(!publicKey.hasPrivateKey)
         assertEquals(public.getKeyId(), publicKey.getKeyId())
@@ -50,14 +50,14 @@ class LocalJWKKeyAndDidManagementTest {
     @ParameterizedTest
     @MethodSource
     fun getKeyType(keyFile: String, type: KeyType) = runTest {
-        val key = KeySerialization.deserializeKey(keyFile).getOrThrow()
+        val key = KeyManager.resolveSerializedKey(keyFile)
         assertEquals(type, key.keyType)
     }
 
     @ParameterizedTest
     @MethodSource
     fun getHasPrivateKey(keyFile: String, isPrivate: Boolean) = runTest {
-        val key = KeySerialization.deserializeKey(keyFile).getOrThrow()
+        val key = KeyManager.resolveSerializedKey(keyFile)
         assertEquals(isPrivate, key.hasPrivateKey)
     }
 
@@ -65,7 +65,7 @@ class LocalJWKKeyAndDidManagementTest {
     @ValueSource(strings = ["ed25519.private.json", "secp256k1.private.json", "secp256r1.private.json", "rsa.private.json"])
     @Disabled // not implemented
     fun signRaw(keyFile: String) = runTest {
-        val key = KeySerialization.deserializeKey(loadSerializedLocal(keyFile)).getOrThrow()
+        val key = KeyManager.resolveSerializedKey(loadSerializedLocal(keyFile))
         val signature = key.signRaw(payload.toString().encodeToByteArray())
         val verificationResult = key.getPublicKey().verifyRaw(signature as ByteArray)
         assertTrue(verificationResult.isSuccess)
@@ -75,7 +75,7 @@ class LocalJWKKeyAndDidManagementTest {
     @ParameterizedTest
     @ValueSource(strings = ["ed25519.private.json", "secp256k1.private.json", "secp256r1.private.json", "rsa.private.json"])
     fun signJws(keyFile: String) = runTest {
-        val key = KeySerialization.deserializeKey(loadSerializedLocal(keyFile)).getOrThrow()
+        val key = KeyManager.resolveSerializedKey(loadSerializedLocal(keyFile))
         val signature = key.signJws(payload.toString().encodeToByteArray())
         val verificationResult = key.getPublicKey().verifyJws(signature)
         assertTrue(verificationResult.isSuccess)
@@ -85,7 +85,7 @@ class LocalJWKKeyAndDidManagementTest {
     @ParameterizedTest
     @MethodSource
     fun getKeyId(keyFile: String, keyId: String) = runTest {
-        val key = KeySerialization.deserializeKey(keyFile).getOrThrow()
+        val key = KeyManager.resolveSerializedKey(keyFile)
         assertEquals(keyId, key.getKeyId())
     }
 
@@ -97,7 +97,7 @@ class LocalJWKKeyAndDidManagementTest {
     fun verifyJws(keyFile: String, signature: String) = runTest {
         println("-- Verifying JWS")
 
-        val key = KeySerialization.deserializeKey(keyFile).getOrThrow()
+        val key = KeyManager.resolveSerializedKey(keyFile)
         println("Key: ($key)")
         println(key.exportJWK())
 
@@ -115,7 +115,7 @@ class LocalJWKKeyAndDidManagementTest {
     @ParameterizedTest
     @MethodSource
     fun exportJWK(keyFile: String, jwkFile: String) = runTest {
-        val key = KeySerialization.deserializeKey(keyFile).getOrThrow()
+        val key = KeyManager.resolveSerializedKey(keyFile)
         val export = key.exportJWK()
         assertEquals(jwkFile.replace("\\s".toRegex(), ""), export)
     }
@@ -123,7 +123,7 @@ class LocalJWKKeyAndDidManagementTest {
     @ParameterizedTest
     @MethodSource
     fun exportJWKObject(keyFile: String, jwkFile: String) = runTest {
-        val key = KeySerialization.deserializeKey(keyFile).getOrThrow()
+        val key = KeyManager.resolveSerializedKey(keyFile)
         val export = key.exportJWKObject()
         assertEquals(jwkFile.replace("\\s".toRegex(), ""), export.toString())
     }
@@ -132,7 +132,7 @@ class LocalJWKKeyAndDidManagementTest {
     @MethodSource
     @Disabled // not implemented
     fun exportPEM(keyFile: String, pemFile: String) = runTest {
-        val key = KeySerialization.deserializeKey(keyFile).getOrThrow()
+        val key = KeyManager.resolveSerializedKey(keyFile)
         val export = key.exportPEM()
         assertEquals(pemFile, export)
     }
