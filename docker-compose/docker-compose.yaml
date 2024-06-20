@@ -90,7 +90,7 @@ services:
     volumes:
       - wallet-api-db:/waltid-wallet-api/data
     ports:
-      - $POSTGRES_DB_PORT:$POSTGRES_DB_PORT #TODO: tcp/udp proxy with caddy
+      - $POSTGRES_DB_PORT:5432 #TODO: tcp/udp proxy with caddy
 
   caddy:
     image: docker.io/caddy:2
