@@ -1,9 +1,13 @@
 import E2ETestWebService.test
 import E2ETestWebService.testBlock
+import id.walt.commons.config.ConfigManager
 import id.walt.commons.web.plugins.httpJson
+import id.walt.crypto.keys.KeyType
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.verifier.oidc.PresentationSessionInfo
+import id.walt.webwallet.config.RegistrationDefaultsConfig
 import id.walt.webwallet.db.models.*
+import id.walt.webwallet.service.keys.SingleKeyResponse
 import id.walt.webwallet.web.controllers.UsePresentationRequest
 import id.walt.webwallet.web.model.EmailAccountRequest
 import io.ktor.client.*
@@ -18,12 +22,11 @@ import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.util.*
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.*
 import kotlinx.uuid.UUID
 import kotlin.test.Test
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.minutes
 
 class E2ETest {
@@ -34,6 +37,7 @@ class E2ETest {
             var client = testHttpClient()
 
             // the e2e http request tests here
+            //region -Login-
             test("/wallet-api/auth/user-info - not logged in without token") {
                 client.get("/wallet-api/auth/user-info").apply {
                     assert(status == HttpStatusCode.Unauthorized) { "Was authorized without authorizing!" }
@@ -79,6 +83,73 @@ class E2ETest {
                     println("Selected wallet: $wallet")
                 }
             }
+            //endregion -Login-
+
+            //region -Keys-
+            val defaultKeyConfig = ConfigManager.getConfig<RegistrationDefaultsConfig>().defaultKeyConfig
+            val generateKeyType = KeyType.Ed25519
+            val generateKeyBackend = "jwk"
+            lateinit var generatedKeyId: String
+            test("/wallet-api/wallet/{wallet}/keys - get keys") {
+                client.get("/wallet-api/wallet/$wallet/keys").expectSuccess().apply {
+                    val listing = body<List<SingleKeyResponse>>()
+                    assert(listing.isNotEmpty()) { "No default key was created!" }
+                    assert(KeyType.valueOf(listing[0].algorithm) == defaultKeyConfig.keyType) { "Default key type not ${defaultKeyConfig.keyType}" }
+                }
+            }
+            test("/wallet-api/wallet/{wallet}/keys/generate - generate key") {
+                client.post("/wallet-api/wallet/$wallet/keys/generate"){
+                    setBody(
+                        """
+                        {
+                          "backend": "$generateKeyBackend",
+                          "keyType": "${generateKeyType.name}"
+                        }
+                    """.trimIndent()
+                    )
+                }.expectSuccess().apply {
+                    generatedKeyId = body<String>()
+                    assert(generatedKeyId.isNotEmpty()) { "Empty key id is returned!" }
+                }
+            }
+            test("/wallet-api/wallet/{wallet}/keys/{keyId}/load - load key") {
+                client.get("/wallet-api/wallet/$wallet/keys/$generatedKeyId/load").expectSuccess().apply {
+                    val response = body<JsonElement>()
+                    assertKeyComponents(response, generatedKeyId, generateKeyType, true)
+                }
+            }
+            test("/wallet-api/wallet/{wallet}/keys/{keyId}/meta - key meta") {
+                client.get("/wallet-api/wallet/$wallet/keys/$generatedKeyId/meta").expectSuccess().apply {
+                    val response = body<JsonElement>()
+                    assertNotNull(response.tryGetData("keyId")?.jsonPrimitive?.content) { "Missing _keyId_ component!" }
+                    assert(response.tryGetData("keyId")?.jsonPrimitive?.content == generatedKeyId) { "Wrong _keyId_ value!" }
+                    assertNotNull(response.tryGetData("type")?.jsonPrimitive?.content) { "Missing _type_ component!" }
+                    when (generateKeyBackend) {
+                        "jwt" -> assert(response.tryGetData("type")!!.jsonPrimitive.content.endsWith("JwkKeyMeta")) { "Missing _type_ component!" }
+                        "tse" -> TODO()
+                        "oci" -> TODO()
+                        "oci-rest-api" -> TODO()
+                        else -> Unit
+                    }
+                }
+            }
+            val keyExportFormat = "JWK"
+            var keyExportPrivate = true
+            test("/wallet-api/wallet/{wallet}/keys/{keyId}/export - export key") {
+                client.get("/wallet-api/wallet/$wallet/keys/$generatedKeyId/export") {
+                    url {
+                        parameters.append("format", keyExportFormat)
+                        parameters.append("loadPrivateKey", "$keyExportPrivate")
+                    }
+                }.expectSuccess().apply {
+                    val response = Json.decodeFromString<JsonElement>(body<String>())
+                    assertKeyComponents(response, generatedKeyId, generateKeyType, keyExportPrivate)
+                }
+            }
+            test("/wallet-api/wallet/{wallet}/keys/{keyId}/meta - delete key") {
+                client.delete("/wallet-api/wallet/$wallet/keys/$generatedKeyId").expectSuccess()
+            }
+            //endregion -Keys-
 
             lateinit var did: String
 
@@ -352,4 +423,56 @@ class E2ETest {
         assert(status.isSuccess()) { "HTTP status is non-successful" }
     }
 
+    @Test
+    fun livez() = runTest {
+        testBlock {
+            val client = testHttpClient()
+            test("/livez - healthcheck") {
+                client.get("/livez").apply {
+                    assert(status == HttpStatusCode.OK)
+                    body<JsonElement>().let { result ->
+                        assertTrue(result is JsonArray)
+                        assertTrue(result.size>0)
+                        assertTrue(result.tryGetData("status")?.jsonPrimitive?.content == "Healthy")
+                    }
+                }
+            }
+        }
+    }
+
+}
+
+fun JsonElement.tryGetData(key: String): JsonElement? = key.split('.').let {
+    var element: JsonElement? = this
+    for (i in it) {
+        element = when (element) {
+            is JsonObject -> element[i]
+            is JsonArray -> element.firstOrNull {
+                it.jsonObject.containsKey(i)
+            }?.let {
+                it.jsonObject[i]
+            }
+
+            else -> element?.jsonPrimitive
+        }
+    }
+    element
+}
+
+fun main(){
+    val json = """
+        [
+            {
+                "name": "http",
+                "status": "Healthy",
+                "lastCheck": "2024-06-20T20:18:19.877047821Z",
+                "message": "ktor ready",
+                "cause": null,
+                "consecutiveSuccesses": 30789,
+                "consecutiveFailures": 0
+            }
+        ]
+    """.trimIndent()
+
+    println(Json.decodeFromString<JsonElement>(json))
 }
