@@ -1,7 +1,7 @@
 import TestUtils.loadJwkLocal
 import TestUtils.loadPemLocal
 import TestUtils.loadSerializedLocal
-import id.walt.crypto.keys.KeySerialization
+import id.walt.crypto.keys.KeyManager
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.params.ParameterizedTest
@@ -18,7 +18,7 @@ class ExportJWKKeyTestsAndDidManagement {
     fun `given key, when exporting jwk then the result is a valid jwk string`(keyFile: String, jwkFile: String) =
         runTest {
             // given
-            val key = KeySerialization.deserializeKey(keyFile).getOrThrow()
+            val key = KeyManager.resolveSerializedKey(keyFile)
             // when
             val export = key.exportJWK()
             // then
@@ -29,7 +29,7 @@ class ExportJWKKeyTestsAndDidManagement {
     @MethodSource
     fun `given key, when exporting JsonObject then the result is a valid jwk string`(keyFile: String, jwkFile: String) = runTest {
         // given
-        val key = KeySerialization.deserializeKey(keyFile).getOrThrow()
+        val key = KeyManager.resolveSerializedKey(keyFile)
         // when
         val export = key.exportJWKObject()
         // then
@@ -42,7 +42,7 @@ class ExportJWKKeyTestsAndDidManagement {
     fun `given key, when exporting pem then the result is a valid pem string`(keyFile: String, pemFile: String) =
         runTest {
             // given
-            val key = KeySerialization.deserializeKey(keyFile).getOrThrow()
+            val key = KeyManager.resolveSerializedKey(keyFile)
             // when
             val export = key.exportPEM()
             // then
