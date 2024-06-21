@@ -14,9 +14,9 @@ export const CredentialFormats = [
 ];
 
 export const DIDMethods = [
+  'did:jwk',
   'did:key',
   'did:ebsi',
-  'did:jwk',
   'did:web',
   'did:cheqd',
 ]
