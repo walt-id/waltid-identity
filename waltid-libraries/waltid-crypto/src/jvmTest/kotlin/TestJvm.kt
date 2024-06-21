@@ -1,4 +1,5 @@
 import id.walt.crypto.keys.Key
+import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
@@ -86,7 +87,7 @@ class TestJvm {
         val testObjJson = Json.encodeToString(testObj)
 
         val key = JWKKey.generate(KeyType.Ed25519)
-        val key2 = KeySerialization.deserializeKey(KeySerialization.serializeKey(key)).getOrThrow()
+        val key2 = KeyManager.resolveSerializedKey(KeySerialization.serializeKey(key))
 
         val jws = key.signJws(testObjJson.toByteArray())
 
@@ -101,7 +102,7 @@ class TestJvm {
         val testObjJson = Json.encodeToString(testObj)
 
         val keyToUseForVerifying = JWKKey.generate(KeyType.Ed25519)
-        val keyToUseForSigning = KeySerialization.deserializeKey(KeySerialization.serializeKey(keyToUseForVerifying)).getOrThrow()
+        val keyToUseForSigning = KeyManager.resolveSerializedKey(KeySerialization.serializeKey(keyToUseForVerifying))
 
         val jws = keyToUseForSigning.signJws(testObjJson.toByteArray())
 
@@ -151,7 +152,7 @@ class TestJvm {
 
     private suspend fun check(value: Pair<String, KClass<out Key>>) {
         println("Parsing: ${value.first}")
-        val key = KeySerialization.deserializeKey(value.first).getOrThrow()
+        val key = KeyManager.resolveSerializedKey(value.first)
 
         println("Got key: $key")
         println("Of type: " + key::class.simpleName)

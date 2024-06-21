@@ -171,10 +171,10 @@ walt.id identity.
             <td align="center" rowspan="2">pem</td>
             <td align="center">private</td>
             <!-- local -->
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
             <!-- tse -->
             <td align="center">&dash;</td>
             <td align="center">&dash;</td>
@@ -186,14 +186,14 @@ walt.id identity.
             <td align="center">public</td>
             <!-- local -->
             <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
             <!-- tse -->
             <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
         </tr>
         <!-- JsonObject -->
         <!-- private -->

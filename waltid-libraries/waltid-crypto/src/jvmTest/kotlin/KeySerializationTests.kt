@@ -2,6 +2,7 @@ import TestUtils.loadJwkLocal
 import TestUtils.loadSerializedLocal
 import TestUtils.loadSerializedTse
 import id.walt.crypto.keys.Key
+import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.keys.tse.TSEKey
@@ -42,7 +43,7 @@ class KeySerializationTests {
     ) =
         runTest {
             // when
-            val key = KeySerialization.deserializeKey(serialized).getOrThrow()
+            val key = KeyManager.resolveSerializedKey(serialized)
             // then
             assertEquals(clazz.java.simpleName, key::class.java.simpleName)
         }
