@@ -1,6 +1,6 @@
 <template>
-    <CenterMain>
-        <div class="absolute top-0 right-0 mt-5 mr-2 bg-[#E4E7EB] rounded-full p-1">
+    <CenterMain class="sm:mt-6 lg:ml-3">
+        <div class="absolute sm:hidden top-0 right-0 mt-5 mr-2 bg-[#E4E7EB] rounded-full p-1">
             <svg @click="logout" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
                 stroke="currentColor" class="w-6 h-5">
                 <path stroke-linecap="round" stroke-linejoin="round"
@@ -44,6 +44,6 @@ async function loadDids() {
 loadDids();
 
 definePageMeta({
-    layout: 'mobile'
+    layout: window.innerWidth > 650 ? "desktop" : "mobile",
 });
 </script>

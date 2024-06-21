@@ -49,7 +49,7 @@ const { pending, data: issuerCredentials, error, refresh } = useLazyFetch(`/wall
 const credentialType = ref<string>('jwt_vc_json');
 
 definePageMeta({
-    layout: 'mobile'
+    layout: window.innerWidth > 1024 ? "desktop" : "mobile",
 });
 useHead({
     title: `${issuer} - supported credentials`,

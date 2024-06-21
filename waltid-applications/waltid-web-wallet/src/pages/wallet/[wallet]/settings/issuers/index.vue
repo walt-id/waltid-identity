@@ -1,7 +1,7 @@
 <template>
-    <CenterMain>
-        <h1 class="text-lg font-semibold text-center">Issuers</h1>
-        <p class="text-center">Select Issuer to request credentials from.</p>
+    <CenterMain class="sm:mt-6 lg:ml-3">
+        <h1 class="text-lg font-semibold text-center sm:text-left sm:font-bold sm:text-3xl">Issuers</h1>
+        <p class="text-center sm:text-left">Select Issuer to request credentials from.</p>
         <ol class="mt-8" role="list">
             <li v-for="issuer in issuers" :key="issuer"
                 class="flex items-center justify-between py-4 rounded-lg shadow-md mt-4">
@@ -31,7 +31,7 @@ const issuers = await useLazyFetch(`/wallet-api/wallet/${currentWallet.value}/is
 refreshNuxtData();
 
 definePageMeta({
-    layout: 'mobile'
+    layout: window.innerWidth > 650 ? "desktop" : "mobile",
 });
 useHead({
     title: "Issuers - walt.id",

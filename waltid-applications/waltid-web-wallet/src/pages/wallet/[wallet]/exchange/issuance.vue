@@ -1,8 +1,8 @@
 <template>
     <div>
         <CenterMain>
-            <h1 class="mb-2 text-2xl text-center font-bold">New {{ credentialCount === 1 ? "Credential" : "Credentials"
-                }}</h1>
+            <h1 class="mb-2 text-2xl text-center font-bold sm:mt-5">New {{ credentialCount === 1 ? "Credential" :
+                "Credentials" }}</h1>
             <LoadingIndicator v-if="immediateAccept" class="my-6 mb-12 w-full"> Receiving {{ credentialCount }}
                 credential(s)...
             </LoadingIndicator>
@@ -14,12 +14,12 @@
                 </div>
             </div>
 
-            <div v-else>
-                <div class="my-10">
-                    <div v-for="(group, index) in groupedCredentialTypes.keys()" :key="group.id">
+            <div>
+                <div class="my-10 sm:flex flex-col items-center">
+                    <div v-if="mobileView" v-for="(group, index) in groupedCredentialTypes.keys()" :key="group.id">
                         <div v-for="credential in groupedCredentialTypes.get(group)" :key="credential"
                             :class="{ 'mt-[-85px]': index !== 0 }" class="col-span-1 divide-y divide-gray-200 rounded-2xl bg-white shadow transform hover:scale-105
-                        cursor-pointer duration-200">
+                        cursor-pointer duration-200 w-full sm:w-[400px]">
                             <VerifiableCredentialCard :credential="{
                                 parsedDocument: {
                                     type: [credential.name],
@@ -30,63 +30,98 @@
                             }" :isDetailView="true" />
                         </div>
                     </div>
+                    <div class="w-full sm:w-[400px] flex" v-else>
+                        <button @click="index--" class="mt-4 text-[#002159] font-bold" v-if="index > 0">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24"
+                                stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M15 19l-7-7 7-7" />
+                            </svg>
+                        </button>
+                        <VerifiableCredentialCard :credential="{
+                            parsedDocument: {
+                                type: [credentialTypes[index]],
+                                issuer: {
+                                    name: issuerHost,
+                                },
+                            },
+                        }" :isDetailView="true" />
+                        <button @click="index++" class="mt-4 text-[#002159] font-bold"
+                            v-if="index < credentialCount - 1">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24"
+                                stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M9 5l7 7-7 7" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="sm:w-[80%] md:w-[60%] mx-auto">
+                    <div class="text-sm font-bold text-gray-500">Credential Offered</div>
+                    <hr class="my-2 border-gray-200" />
+                    <div v-for="(group, index) in groupedCredentialTypes.keys()" :key="group.id">
+                        <div v-for="credential in groupedCredentialTypes.get(group)" :key="credential">
+                            <div class="text-black-800">{{ credential.name }}</div>
+                            <div v-if="issuerHost" class="text-sm text-gray-400">from {{ issuerHost }}</div>
+                            <hr class="my-2 border-gray-200" />
+                        </div>
+                    </div>
                 </div>
             </div>
         </CenterMain>
-        <div class="fixed bottom-0 w-full p-4 bg-white shadow-md">
-            <button @click="acceptCredential" class="w-full py-3 mt-4 text-white bg-[#002159] rounded-xl">
-                Accept
-            </button>
-            <button @click="navigateTo(`/wallet/${walletId}`)" class="w-full py-3 mt-4 bg-white">
-                Decline
-            </button>
+        <div v-if="!failed" class="w-full sm:max-w-2xl sm:mx-auto">
+            <div class="fixed sm:relative bottom-0 w-full p-4 bg-white shadow-md sm:shadow-none sm:flex sm:justify-end
+                        sm:gap-4">
+                <button @click="acceptCredential" class="w-full sm:w-44 py-3 mt-4 text-white bg-[#002159] rounded-xl">
+                    Accept
+                </button>
+                <button @click="navigateTo(`/wallet/${walletId}`)"
+                    class="w-full sm:w-44 py-3 mt-4 bg-white sm:border sm:border-gray-400 sm:rounded-xl">
+                    Decline
+                </button>
+            </div>
         </div>
     </div>
 </template>
 
 <script lang="ts" setup>
+
+import { ref } from "vue";
+import { useTitle } from "@vueuse/core";
 import CenterMain from "~/components/CenterMain.vue";
-import PageHeader from "~/components/PageHeader.vue";
-import CredentialIcon from "~/components/CredentialIcon.vue";
-import ActionButton from "~/components/buttons/ActionButton.vue";
 import LoadingIndicator from "~/components/loading/LoadingIndicator.vue";
 import VerifiableCredentialCard from "~/components/credentials/VerifiableCredentialCard.vue";
-import { Listbox, ListboxButton, ListboxLabel, ListboxOption, ListboxOptions } from "@headlessui/vue";
-import { CheckIcon, ChevronUpDownIcon } from "@heroicons/vue/20/solid";
-import { useTitle } from "@vueuse/core";
-import { ref } from "vue";
 
+const index = ref(0);
 const route = useRoute();
 const walletId = route.params.wallet;
+const mobileView = ref(window.innerWidth < 650);
+
 const currentWallet = useCurrentWallet()
 const { data: dids, pending: pendingDids } = await useLazyAsyncData(() => $fetch(`/wallet-api/wallet/${currentWallet.value}/dids`));
-
-const selectedDid: Ref<Object | null> = ref(null);
-
-//TODO: fix this hack for did-dropdown default selection
-watch(dids, async (newDids) => {
+const selectedDid: Ref<{ did: string; default: boolean; } | null> = ref(null);
+watch(dids, async (newDids: Array<{ did: string; default: boolean; }>) => {
     await nextTick();
 
-    const newDid: string | null =
+    const newDid =
         newDids?.find((item) => {
             return item.default == true;
         }) ??
         newDids[0] ??
         null;
 
-    console.log("Setting new DID: " + newDid);
-
     selectedDid.value = newDid;
 });
 
-async function resolveCredentialOffer(request) {
+async function resolveCredentialOffer(request: string) {
     try {
-        console.log("RESOLVING credential offer request", request);
-        const response = await $fetch(`/wallet-api/wallet/${currentWallet.value}/exchange/resolveCredentialOffer`, {
+        const response: {
+            credential_issuer: string;
+            credential_configuration_ids: string[];
+        } = await $fetch(`/wallet-api/wallet/${currentWallet.value}/exchange/resolveCredentialOffer`, {
             method: "POST",
             body: request
         });
-        console.log(response);
         return response;
     } catch (e) {
         failed.value = true;
@@ -95,22 +130,15 @@ async function resolveCredentialOffer(request) {
 }
 
 const query = useRoute().query;
+const request = decodeRequest(query.request as string);
 
-const request = decodeRequest(query.request);
-console.log("Issuance -> Using request: ", request);
-
-const immediateAccept = ref(false);
-
-const credentialOffer = await resolveCredentialOffer(decodeRequest(query.request));
+const credentialOffer = await resolveCredentialOffer(request);
 if (credentialOffer == null) {
     throw createError({
         statusCode: 400,
         statusMessage: "Invalid issuance request: No credential_offer",
     });
 }
-console.log("credentialOffer: ", credentialOffer);
-
-console.log("Issuer host...");
 const issuer = credentialOffer["credential_issuer"];
 
 let issuerHost: String;
@@ -120,17 +148,14 @@ try {
     issuerHost = issuer;
 }
 
-console.log("Issuer host:", issuerHost);
-const credential_issuer = await $fetch(`${issuer}/.well-known/openid-credential-issuer`)
+const credential_issuer: { credential_configurations_supported: Array<{ types: Array<String>; }>; } =
+    await $fetch(`${issuer}/.well-known/openid-credential-issuer`)
 const credentialList = credentialOffer.credential_configuration_ids.map((id) => credential_issuer.credential_configurations_supported[id]);
 
 let credentialTypes: String[] = [];
-
 for (let credentialListElement of credentialList) {
-    console.log(`Processing: ${credentialListElement}`)
     const typeList = credentialListElement["types"] as Array<String>;
     const lastType = typeList[typeList.length - 1] as String;
-
     credentialTypes.push(lastType);
 }
 
@@ -141,29 +166,22 @@ const groupedCredentialTypes = groupBy(
     credentialTypes.map((item) => {
         return { id: ++i, name: item };
     }),
-    (c) => c.name,
+    (c: { name: string }) => c.name,
 );
 
 const failed = ref(false);
 const failMessage = ref("Unknown error occurred.");
-
 async function acceptCredential() {
     const did: string | null = selectedDid.value?.did ?? dids.value[0]?.did ?? null;
+    if (did === null) { return; }
 
-    if (did === null) {
-        console.warn("NO DID AT ACCEPTCREDENTIAL");
-        console.log("Selected: " + selectedDid.value);
-        console.log("DIDs:" + dids.value[0]);
-        return;
-    }
-    console.log("Issue to: " + did);
     try {
         await $fetch(`/wallet-api/wallet/${currentWallet.value}/exchange/useOfferRequest?did=${did}`, {
             method: "POST",
             body: request,
         });
         navigateTo(`/wallet/${currentWallet.value}`);
-    } catch (e) {
+    } catch (e: any) {
         failed.value = true;
 
         let errorMessage = e?.data.startsWith("{") ? JSON.parse(e.data) : e.data ?? e;
@@ -178,21 +196,14 @@ async function acceptCredential() {
     }
 }
 
+const immediateAccept = ref(false);
 if (query.accept) {
-    // TODO make accept a JWT or something wallet-backend secured
     immediateAccept.value = true;
     acceptCredential();
 }
 
-/*if (query.request) {
-    const request = atob(query.request)
-    console.log(request)
-} else {
-    console.error("No request")
-}*/
-
 useTitle(`Claim credentials - walt.id`);
 definePageMeta({
-    layout: false
+    layout: window.innerWidth > 650 ? "desktop-without-sidebar" : false,
 });
 </script>
