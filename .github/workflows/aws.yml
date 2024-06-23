@@ -51,7 +51,7 @@ on:
 
 env:
   AWS_REGION: ap-south-1                   # set this to your preferred AWS region, e.g. us-west-1
-  ECR_REPOSITORY: 408003697004.dkr.ecr.ap-south-1.amazonaws.com           # set this to your Amazon ECR repository name
+  ECR_REPOSITORY: waltid-issuer-api           # set this to your Amazon ECR repository name
   ECS_SERVICE: Issuer-api-service                 # set this to your Amazon ECS service name
   ECS_CLUSTER: Issuer-api-cluster                 # set this to your Amazon ECS cluster name
   ECS_TASK_DEFINITION: ../../aws/Issuer-api-task-defn.json # set this to the path to your Amazon ECS task definition
