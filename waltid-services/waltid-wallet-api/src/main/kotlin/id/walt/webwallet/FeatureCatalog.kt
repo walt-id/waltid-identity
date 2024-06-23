@@ -39,6 +39,8 @@ object FeatureCatalog : ServiceFeatureCatalog {
         true
     )
 
+    val didWebRegistry = OptionalFeature("did-web-registry", "Enables the automatic did:web registry", default = true)
+
     override val baseFeatures = listOf(
         databaseFeature,
 //        loginsMethodFeature,
@@ -54,6 +56,7 @@ object FeatureCatalog : ServiceFeatureCatalog {
         rejectionReasonsFeature,
         registrationDefaultsFeature,
         keyGenerationDefaultsFeature,
-        runtimeMockFeature
+        runtimeMockFeature,
+        didWebRegistry
     )
 }
