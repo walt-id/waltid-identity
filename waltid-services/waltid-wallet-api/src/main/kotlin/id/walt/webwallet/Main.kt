@@ -84,5 +84,5 @@ fun Application.webWalletModule(withPlugins: Boolean = true) {
     } whenFeature FeatureCatalog.silentExchange
 
     // DID Web Registry
-    didRegistry()
+    { didRegistry() } whenFeature FeatureCatalog.didWebRegistry
 }
