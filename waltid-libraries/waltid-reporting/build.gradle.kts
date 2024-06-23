@@ -1,3 +1,6 @@
+import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
 plugins {
     kotlin("multiplatform")
     kotlin("plugin.serialization")
@@ -25,15 +28,18 @@ kotlin {
 kotlin {
     targets.configureEach {
         compilations.configureEach {
-            compilerOptions.configure {
-                freeCompilerArgs.add("-Xexpect-actual-classes")
+            compileTaskProvider.configure {
+                compilerOptions { 
+                    freeCompilerArgs.add("-Xexpect-actual-classes")
+                }
             }
         }
     }
 
     jvm {
-        compilations.all {
-            kotlinOptions.jvmTarget = "15" // JVM got Ed25519 at version 15
+        @OptIn(ExperimentalKotlinGradlePluginApi::class)
+        compilerOptions {
+            jvmTarget = JvmTarget.JVM_15 // JVM got Ed25519 at version 15
         }
         withJava()
         tasks.withType<Test>().configureEach {
@@ -41,7 +47,7 @@ kotlin {
         }
     }
 
-    val ktor_version = "2.3.11"
+    val ktor_version = "2.3.12"
     sourceSets {
         val commonMain by getting {
             dependencies {
@@ -75,7 +81,7 @@ kotlin {
             dependencies {
                 implementation(kotlin("test"))
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
-                implementation("org.junit.jupiter:junit-jupiter-api:5.10.2")
+                implementation("org.junit.jupiter:junit-jupiter-api:5.11.0-M2")
             }
         }
         val jvmMain by getting {

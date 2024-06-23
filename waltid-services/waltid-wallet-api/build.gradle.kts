@@ -1,9 +1,10 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import java.util.Properties
 
 plugins {
     kotlin("jvm")
-    id("io.ktor.plugin") version "2.3.11"
+    id("io.ktor.plugin") version "2.3.12"
     kotlin("plugin.serialization")
 
     id("com.github.ben-manes.versions")
@@ -26,7 +27,9 @@ repositories {
 }
 
 tasks.withType<KotlinCompile> {
-    kotlinOptions.jvmTarget = "17"
+    compilerOptions {
+        jvmTarget = JvmTarget.JVM_17
+    }
 }
 
 tasks.withType<Zip> {
@@ -59,7 +62,7 @@ dependencies {
 
     /* -- KTOR -- */
 
-    val ktor_version = "2.3.11"
+    val ktor_version = "2.3.12"
     // Ktor server
     implementation("io.ktor:ktor-server-core-jvm:$ktor_version")
     implementation("io.ktor:ktor-server-auth-jvm:$ktor_version")
@@ -81,7 +84,7 @@ dependencies {
     implementation("io.ktor:ktor-server-rate-limit:$ktor_version")
 
     // Ktor server external libs
-    implementation("io.github.smiley4:ktor-swagger-ui:3.0.0")
+    implementation("io.github.smiley4:ktor-swagger-ui:3.0.1")
     //implementation("io.github.microutils:kotlin-logging-jvm:2.1.23")
 
     // Ktor client
