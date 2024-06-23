@@ -165,7 +165,6 @@ fun Application.issuerApi() {
                             "This endpoint issues (signs) an Verifiable Credential, but does not utilize an credential exchange " + "mechanism flow like OIDC or DIDComm to adapt and send the signed credential to an user. This means, that the " + "caller will have to utilize such an credential exchange mechanism themselves."
 
                         request {
-
                             body<JsonObject> {
                                 description =
                                     "Pass the unsigned credential that you intend to sign as the body of the request."
@@ -190,7 +189,8 @@ fun Application.issuerApi() {
                         val body = context.receive<Map<String, JsonElement>>()
 
                         val keyJson = body["issuerKey"] ?: throw IllegalArgumentException("No key was passed.")
-                        val key = KeySerialization.deserializeJWTKey(keyJson.jsonObject).getOrThrow()
+
+                        val key = KeyManager.resolveSerializedKey(keyJson.jsonObject)
                         val issuerDid = body["issuerDid"]?.toString() ?: DidService.registerByKey("key", key).did
                         val subjectDid = body["subjectDid"]?.toString()
                             ?: throw IllegalArgumentException("No subjectDid was passed.")
