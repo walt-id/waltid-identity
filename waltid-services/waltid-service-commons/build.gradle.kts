@@ -11,7 +11,7 @@ repositories {
 }
 
 object Versions {
-    const val KTOR_VERSION = "2.3.11" // also change 1 plugin
+    const val KTOR_VERSION = "2.3.12" // also change 1 plugin
 }
 
 dependencies {
@@ -42,7 +42,7 @@ dependencies {
     api("com.sksamuel.cohort:cohort-ktor:2.5.1")
 
     // OpenAPI
-    implementation("io.github.smiley4:ktor-swagger-ui:3.0.0")
+    implementation("io.github.smiley4:ktor-swagger-ui:3.0.1")
     implementation("io.github.smiley4:schema-kenerator-core:1.0.0")
     implementation("io.github.smiley4:schema-kenerator-serialization:1.0.0")
     implementation("io.github.smiley4:schema-kenerator-reflection:1.0.0")
