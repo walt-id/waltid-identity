@@ -2,6 +2,7 @@ import love.forte.plugin.suspendtrans.ClassInfo
 import love.forte.plugin.suspendtrans.SuspendTransformConfiguration
 import love.forte.plugin.suspendtrans.TargetPlatform
 import love.forte.plugin.suspendtrans.gradle.SuspendTransformGradleExtension
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     kotlin("multiplatform")
@@ -46,15 +47,21 @@ kotlin {
 kotlin {
     targets.configureEach {
         compilations.configureEach {
-            compilerOptions.configure {
-                freeCompilerArgs.add("-Xexpect-actual-classes")
+            compileTaskProvider.configure {
+                compilerOptions {
+                    freeCompilerArgs.add("-Xexpect-actual-classes")
+                }
             }
         }
     }
 
     jvm {
         compilations.all {
-            kotlinOptions.jvmTarget = "15" // JVM got Ed25519 at version 15
+            compileTaskProvider.configure {
+                compilerOptions {
+                    jvmTarget = JvmTarget.JVM_15 // JVM got Ed25519 at version 15
+                }
+            }
         }
         tasks.withType<Test>().configureEach {
             useJUnitPlatform()
@@ -96,7 +103,7 @@ kotlin {
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:1.8.1")
 
                 // OCI
-                implementation("com.oracle.oci.sdk:oci-java-sdk-shaded-full:3.43.1")
+                implementation("com.oracle.oci.sdk:oci-java-sdk-shaded-full:3.43.2")
 
                 // JOSE
                 implementation("com.nimbusds:nimbus-jose-jwt:9.40")
@@ -113,9 +120,9 @@ kotlin {
                 // Test
                 implementation(kotlin("test"))
 
-                implementation("org.junit.jupiter:junit-jupiter-api:5.10.2")
+                implementation("org.junit.jupiter:junit-jupiter-api:5.11.0-M2")
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.0")
-                implementation("org.junit.jupiter:junit-jupiter-params:5.10.2")
+                implementation("org.junit.jupiter:junit-jupiter-params:5.11.0-M2")
             }
         }
 //        val androidMain by getting {

@@ -5,7 +5,7 @@ plugins {
 
     kotlin("plugin.serialization")
 
-    id("dev.petuska.npm.publish") version "3.4.2"
+    id("dev.petuska.npm.publish") version "3.4.3"
     `maven-publish`
     id("com.github.ben-manes.versions")
 }
@@ -19,8 +19,10 @@ repositories {
 kotlin {
     targets.configureEach {
         compilations.configureEach {
-            compilerOptions.configure {
-                freeCompilerArgs.add("-Xexpect-actual-classes")
+            compileTaskProvider.configure {
+                compilerOptions { 
+                    freeCompilerArgs.add("-Xexpect-actual-classes")
+                }
             }
         }
     }
