@@ -1,13 +1,8 @@
 package id.walt.sdjwt
 
-import id.walt.sdjwt.cinterop.ios.*
+import id.walt.platform.utils.ios.HMAC_Operations
 import kotlinx.cinterop.ExperimentalForeignApi
-import kotlinx.cinterop.addressOf
-import kotlinx.cinterop.pin
 import kotlinx.serialization.json.JsonObject
-import platform.Foundation.NSData
-import platform.Foundation.create
-import kotlin.js.ExperimentalJsExport
 
 @OptIn(ExperimentalForeignApi::class)
 class HMACJWTCryptoProvider(private val algorithm: String, private val key: ByteArray) :

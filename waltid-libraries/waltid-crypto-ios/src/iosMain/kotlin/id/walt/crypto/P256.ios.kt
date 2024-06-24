@@ -7,14 +7,31 @@ import id.walt.crypto.keys.KeyType
 import id.walt.platform.utils.ios.DS_Operations
 import id.walt.platform.utils.ios.ECKeyUtils
 import kotlinx.cinterop.ptr
-import kotlinx.cinterop.alloc
-import kotlinx.cinterop.value
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
-import platform.CoreFoundation.*
-import platform.Foundation.*
-import platform.Security.*
+import platform.CoreFoundation.CFDictionaryAddValue
+import platform.CoreFoundation.CFDictionaryCreateMutable
+import platform.CoreFoundation.CFMutableDictionaryRef
+import platform.CoreFoundation.CFStringRef
+import platform.CoreFoundation.CFTypeRef
+import platform.CoreFoundation.kCFAllocatorDefault
+import platform.CoreFoundation.kCFBooleanTrue
+import platform.CoreFoundation.kCFTypeDictionaryKeyCallBacks
+import platform.CoreFoundation.kCFTypeDictionaryValueCallBacks
+import platform.Foundation.CFBridgingRelease
+import platform.Foundation.CFBridgingRetain
+import platform.Foundation.NSNumber
+import platform.Security.SecItemDelete
+import platform.Security.SecKeyCreateRandomKey
+import platform.Security.kSecAttrApplicationLabel
+import platform.Security.kSecAttrApplicationTag
+import platform.Security.kSecAttrIsPermanent
+import platform.Security.kSecAttrKeySizeInBits
+import platform.Security.kSecAttrKeyType
+import platform.Security.kSecAttrKeyTypeECSECPrimeRandom
+import platform.Security.kSecKeyAlgorithmECDSASignatureMessageX962SHA256
+import platform.Security.kSecPrivateKeyAttrs
 
 private val ksecKeyType: CFStringRef? = kSecAttrKeyTypeECSECPrimeRandom
 
@@ -166,16 +183,13 @@ class P256Key private constructor(
                         CFDictionaryAddValue(this, kSecPrivateKeyAttrs, privateKeyParams)
                     }
 
-                    val createRandomKeyError = alloc<CFErrorRefVar>()
-                    val privateKey = SecKeyCreateRandomKey(
-                        generateKeyPairQuery, createRandomKeyError.ptr
-                    )
-
-                    check(createRandomKeyError.value == null) {
-                        val nsError = CFBridgingRelease(createRandomKeyError.value) as NSError
-                        println(nsError.toString())
-                        nsError.toString()
+                    val privateKey = checkErrorResult { error ->
+                        SecKeyCreateRandomKey(
+                            generateKeyPairQuery, error
+                        )
                     }
+
+                    CFBridgingRelease(privateKey)
 
                     P256Key(kid)
 

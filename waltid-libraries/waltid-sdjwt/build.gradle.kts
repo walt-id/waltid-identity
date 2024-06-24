@@ -1,5 +1,3 @@
-import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
-
 plugins {
     kotlin("multiplatform")
 
@@ -8,6 +6,7 @@ plugins {
     id("dev.petuska.npm.publish") version "3.4.2"
     `maven-publish`
     id("com.github.ben-manes.versions")
+    kotlin("native.cocoapods")
 }
 
 group = "id.walt"
@@ -44,7 +43,9 @@ kotlin {
             testTask {
                 useKarma {
                     fun hasProgram(program: String) =
-                        runCatching { ProcessBuilder(program, "--version").start().waitFor() }.getOrElse { -1 } == 0
+                        runCatching {
+                            ProcessBuilder(program, "--version").start().waitFor()
+                        }.getOrElse { -1 } == 0
 
                     val testEngine = mapOf(
                         "chromium" to { useChromiumHeadless() },
@@ -68,49 +69,36 @@ kotlin {
     }
 
     val hostOs = System.getProperty("os.name")
+    val isMacOS = hostOs == "Mac OS X"
     val hostArch = System.getProperty("os.arch")
     if (hostOs in listOf("Windows", "Linux") && hostArch == "aarch64") {
         println("Native compilation is not yet supported for aarch64 on Windows / Linux.")
     } else {
         val isMingwX64 = hostOs.startsWith("Windows")
-        val nativeTarget = when {
-            hostOs == "Mac OS X" -> macosX64("native")
+        when {
+            hostOs == "Mac OS X" -> {
+//                macosX64("native")
+                iosArm64()
+                iosSimulatorArm64()
+
+                cocoapods {
+                    summary = "Some description for the Shared Module"
+                    homepage = "Link to the Shared Module homepage"
+                    version = "1.0"
+                    ios.deploymentTarget = "15.4"
+                    framework {
+                        baseName = "waltid-sdjwt"
+                        isStatic = true
+                    }
+                    pod("JOSESwift") {
+                        version = "2.4.0"
+                    }
+                }
+            }
+
             hostOs == "Linux" -> linuxX64("native")
             isMingwX64 -> mingwX64("native")
             else -> throw GradleException("Host OS is not supported in Kotlin/Native.")
-        }
-
-        when (hostOs) {
-            "Mac OS X" -> listOf<KotlinNativeTarget>(
-//                iosArm64(),
-//                iosX64(),
-//                iosSimulatorArm64()
-            )
-
-            else -> listOf()
-        }.forEach {
-            println("Native compilation for target: ${it.name}")
-            val platform = when (it.name) {
-                "iosArm64" -> "iphoneos"
-                else -> "iphonesimulator"
-            }
-
-            it.binaries.framework {
-                baseName = "shared"
-            }
-
-            it.compilations.getByName("main") {
-//            cinterops.create("id.walt.sdjwt.cinterop.ios") {
-//                val interopTask = tasks[interopProcessingTaskName]
-//                interopTask.dependsOn(":waltid-sd-jwt-ios:build${platform.uppercase()}")
-//
-//                defFile("$projectDir/src/nativeInterop/cinterop/waltid-sd-jwt-ios.def")
-//                packageName("id.walt.sdjwt.cinterop.ios")
-//                includeDirs("$projectDir/waltid-sd-jwt-ios/build/Release-$platform/include/")
-//
-//                headers("$projectDir/waltid-sd-jwt-ios/build/Release-$platform/include/waltid_sd_jwt_ios/waltid_sd_jwt_ios-Swift.h")
-//            }
-            }
         }
     }
 
@@ -148,28 +136,32 @@ kotlin {
         val jsTest by getting {
 
         }
+
         //val nativeMain by getting
         //val nativeTest by getting
 
-        if (hostOs == "Mac OS X") {
-//            val iosArm64Main by getting
-//            val iosSimulatorArm64Main by getting
-            /*val iosX64Main by getting
+        if (isMacOS) {
+            val iosArm64Main by getting
+            val iosSimulatorArm64Main by getting
             val iosMain by creating {
                 dependsOn(commonMain)
-//                iosArm64Main.dependsOn(this)
-//                iosSimulatorArm64Main.dependsOn(this)
-                iosX64Main.dependsOn(this)
-            }*/
-//            val iosArm64Test by getting
-//            val iosSimulatorArm64Test by getting
-            /*val iosX64Test by getting
+                iosArm64Main.dependsOn(this)
+                iosSimulatorArm64Main.dependsOn(this)
+                dependencies {
+                    implementation(project(":waltid-libraries:waltid-crypto-ios"))
+                }
+            }
+
+            val iosArm64Test by getting
+            val iosSimulatorArm64Test by getting
             val iosTest by creating {
                 dependsOn(commonTest)
-//                iosArm64Test.dependsOn(this)
-//                iosSimulatorArm64Test.dependsOn(this)
-                iosX64Test.dependsOn(this)
-            }*/
+                iosArm64Test.dependsOn(this)
+                iosSimulatorArm64Test.dependsOn(this)
+                dependencies {
+                    implementation(project(":waltid-libraries:waltid-crypto-ios"))
+                }
+            }
         }
     }
 
@@ -178,16 +170,24 @@ kotlin {
             maven {
                 val releasesRepoUrl = uri("https://maven.waltid.dev/releases")
                 val snapshotsRepoUrl = uri("https://maven.waltid.dev/snapshots")
-                url = uri(if (version.toString().endsWith("SNAPSHOT")) snapshotsRepoUrl else releasesRepoUrl)
+                url = uri(
+                    if (version.toString()
+                            .endsWith("SNAPSHOT")
+                    ) snapshotsRepoUrl else releasesRepoUrl
+                )
                 val envUsername = System.getenv("MAVEN_USERNAME")
                 val envPassword = System.getenv("MAVEN_PASSWORD")
 
                 val usernameFile = File("secret_maven_username.txt")
                 val passwordFile = File("secret_maven_password.txt")
 
-                val secretMavenUsername = envUsername ?: usernameFile.let { if (it.isFile) it.readLines().first() else "" }
+                val secretMavenUsername = envUsername ?: usernameFile.let {
+                    if (it.isFile) it.readLines().first() else ""
+                }
                 //println("Deploy username length: ${secretMavenUsername.length}")
-                val secretMavenPassword = envPassword ?: passwordFile.let { if (it.isFile) it.readLines().first() else "" }
+                val secretMavenPassword = envPassword ?: passwordFile.let {
+                    if (it.isFile) it.readLines().first() else ""
+                }
 
                 //if (secretMavenPassword.isBlank()) {
                 //   println("WARNING: Password is blank!")
@@ -206,7 +206,8 @@ npmPublish {
     registries {
         val envToken = System.getenv("NPM_TOKEN")
         val npmTokenFile = File("secret_npm_token.txt")
-        val secretNpmToken = envToken ?: npmTokenFile.let { if (it.isFile) it.readLines().first() else "" }
+        val secretNpmToken =
+            envToken ?: npmTokenFile.let { if (it.isFile) it.readLines().first() else "" }
         val hasNPMToken = secretNpmToken.isNotEmpty()
         val isReleaseBuild = Regex("\\d+.\\d+.\\d+").matches(version.get())
         if (isReleaseBuild && hasNPMToken) {
