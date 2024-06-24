@@ -46,7 +46,7 @@ dependencies {
     implementation("io.github.smiley4:schema-kenerator-core:1.0.0")
     implementation("io.github.smiley4:schema-kenerator-serialization:1.0.0")
     implementation("io.github.smiley4:schema-kenerator-reflection:1.0.0")
-    implementation("io.github.smiley4:schema-kenerator-swagger:1.0.0")
+    implementation("io.github.smiley4:schema-kenerator-swagger:1.0.1")
 
     // Testing
     testImplementation(kotlin("test"))
