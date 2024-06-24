@@ -31,7 +31,7 @@ data object TraceLoggingSetup : LoggingSetup("trace", {
         fromMinLevel(Level.ERROR) {
             toSink("stderr")
         }
-        fromMinLevel(Level.TRACE) {
+        inLevelRange(Level.TRACE, Level.WARN) {
             toSink("stdout")
         }
     }

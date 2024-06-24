@@ -1,3 +1,4 @@
+import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
@@ -67,7 +68,7 @@ class JWKKeyAndDidManagementTest {
         val testObjJson = Json.encodeToString(testObj)
 
         // sign using newly generated key
-        val key = KeySerialization.deserializeKey(serializedKey).getOrThrow()
+        val key = KeyManager.resolveSerializedKey(serializedKey)
         val signature = key.signJws(testObjJson.encodeToByteArray())
 
         // verify the signature using public key
@@ -82,7 +83,7 @@ class JWKKeyAndDidManagementTest {
         val testObjJson = Json.encodeToString(testObj)
 
         // sign using newly generated key
-        val key = KeySerialization.deserializeKey(serializedKey).getOrThrow()
+        val key = KeyManager.resolveSerializedKey(serializedKey)
         val signature = key.signRaw(testObjJson.encodeToByteArray())
 
         assertNotNull(signature)
@@ -92,7 +93,7 @@ class JWKKeyAndDidManagementTest {
         val decoded = Json.decodeFromString<JsonObject>(serializedKey)
         val jwk = decoded["jwk"]!!.jsonPrimitive.content
 
-        val key = KeySerialization.deserializeKey(serializedKey).getOrThrow()
+        val key = KeyManager.resolveSerializedKey(serializedKey)
         val export = key.exportJWK()
 
         assertEquals(jwk, export)
@@ -102,7 +103,7 @@ class JWKKeyAndDidManagementTest {
         val decoded = Json.decodeFromString<JsonObject>(serializedKey)
         val jwk = decoded["jwk"]!!.jsonPrimitive.content
 
-        val key = KeySerialization.deserializeKey(serializedKey).getOrThrow()
+        val key = KeyManager.resolveSerializedKey(serializedKey)
         val export = key.exportJWKObject()
         assertEquals(jwk, export.toString())
     }

@@ -1,9 +1,11 @@
+import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import java.util.Properties
 
 object Versions {
     const val KOTLIN_VERSION = "2.0.0" // also change 2 plugins
-    const val KTOR_VERSION = "2.3.11" // also change 1 plugin
+    const val KTOR_VERSION = "2.3.12" // also change 1 plugin
     const val COROUTINES_VERSION = "1.8.1"
     const val EXPOSED_VERSION = "0.43.0"
     const val HOPLITE_VERSION = "2.8.0.RC3"
@@ -13,7 +15,7 @@ plugins {
     kotlin("jvm") // Versions.KOTLIN_VERSION
     kotlin("plugin.serialization") // Versions.KOTLIN_VERSION
 
-    id("io.ktor.plugin") version "2.3.11" // Versions.KTOR_VERSION
+    id("io.ktor.plugin") version "2.3.12" // Versions.KTOR_VERSION
     id("org.owasp.dependencycheck") version "9.2.0"
     id("com.github.jk1.dependency-license-report") version "2.8"
     application
@@ -59,7 +61,7 @@ dependencies {
     implementation("io.ktor:ktor-server-cio-jvm:${Versions.KTOR_VERSION}")
 
     // Ktor server external libs
-    implementation("io.github.smiley4:ktor-swagger-ui:3.0.0")
+    implementation("io.github.smiley4:ktor-swagger-ui:3.0.1")
 
     // Ktor client
     implementation("io.ktor:ktor-client-core-jvm:${Versions.KTOR_VERSION}")
@@ -91,7 +93,7 @@ dependencies {
     implementation("com.sksamuel.hoplite:hoplite-hocon:${Versions.HOPLITE_VERSION}")
 
     // Logging
-    implementation("io.github.oshai:kotlin-logging-jvm:6.0.9")
+    implementation("io.github.oshai:kotlin-logging-jvm:7.0.0")
     implementation("org.slf4j:jul-to-slf4j:2.0.13")
     implementation("io.klogging:klogging-jvm:0.5.14")
     implementation("io.klogging:slf4j-klogging:0.5.14")
@@ -147,7 +149,9 @@ java {
 }
 
 tasks.withType<KotlinCompile> {
-    kotlinOptions.jvmTarget = "17"
+    compilerOptions {
+        jvmTarget = JvmTarget.JVM_17
+    }
 }
 
 tasks.named<CreateStartScripts>("startScripts") {

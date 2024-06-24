@@ -38,7 +38,7 @@ object Db {
         val hikariDataSourceConfig =runCatching {
              createHikariDataSource(datasourceConfig.dataSource)
         }.getOrElse { ex ->
-            throw IllegalArgumentException("Could not initialize hikari database connection pool configuration.", ex)
+            throw IllegalArgumentException("Could not initialize hikari database connection pool configuration: ${ex.message}", ex)
         }
 
         // connect

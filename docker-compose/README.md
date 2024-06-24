@@ -42,29 +42,44 @@ docker-compose down
 - ingress:
     - `Caddyfile`
 
-## Environment
+[//]: # (## Environment)
 
-- main:
-    - `.env` - stores the common environment variables, such as port numbers,
-      version-tag, database-engine selection, etc.
-- postgres:
-    - `postgres/postgres.env` - stores postgres specific variables, e.g. admin user, etc.
-    - `pgadmin.env` - stores pgAdmin specific variables, e.g. admin user, etc.
-- microsoft sql-server:
-    - `mssql/mssql.env` - stores mssql specific variables, e.g. sql-server edition, etc.
+[//]: # ()
+[//]: # (- main:)
 
-Variables from `.env` are propagated automatically down to reverse proxy configurations
-(Caddyfile) and also api configurations (wallet, issuer, verifier).
+[//]: # (    - `.env` - stores the common environment variables, such as port numbers,)
+
+[//]: # (      version-tag, database-engine selection, etc.)
+
+[//]: # (- postgres:)
+
+[//]: # (    - `postgres/postgres.env` - stores postgres specific variables, e.g. admin user, etc.)
+
+[//]: # (    - `pgadmin.env` - stores pgAdmin specific variables, e.g. admin user, etc.)
+
+[//]: # (- microsoft sql-server:)
+
+[//]: # (    - `mssql/mssql.env` - stores mssql specific variables, e.g. sql-server edition, etc.)
+
+[//]: # ()
+[//]: # (Variables from `.env` are propagated automatically down to reverse proxy configurations)
+
+[//]: # (&#40;Caddyfile&#41; and also api configurations &#40;wallet, issuer, verifier&#41;.)
 
 ## How to
 
-### Select a database engine
+[//]: # (### Select a database engine)
 
-- browse `.env` file
-- set `DATABASE_ENGINE` to one of:
-    - sqlite
-    - postgres
-    - mssql
+[//]: # ()
+[//]: # (- browse `.env` file)
+
+[//]: # (- set `DATABASE_ENGINE` to one of:)
+
+[//]: # (    - sqlite)
+
+[//]: # (    - postgres)
+
+[//]: # (    - mssql)
 
 This value will be used also by compose profile so only the required services are started.
 
