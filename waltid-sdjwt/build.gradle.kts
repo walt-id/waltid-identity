@@ -109,7 +109,6 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                implementation(project(":waltid-crypto"))
                 implementation("dev.whyoleg.cryptography:cryptography-random:0.3.0")
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
@@ -127,6 +126,7 @@ kotlin {
         }
         val jvmMain by getting {
             dependencies {
+                implementation(project(":waltid-crypto"))
                 implementation("com.nimbusds:nimbus-jose-jwt:9.37.3")
             }
         }
