@@ -2,16 +2,12 @@ package id.walt
 
 import COSE.AlgorithmID
 import com.nimbusds.jose.JWSAlgorithm
-import com.nimbusds.jose.JWSSigner
 import com.nimbusds.jose.crypto.ECDSASigner
-import com.nimbusds.jose.crypto.ECDSAVerifier
 import com.nimbusds.jose.jwk.ECKey
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.jwk.KeyUse
 import com.nimbusds.jose.util.Base64URL
-import id.walt.credentials.PresentationBuilder
 import id.walt.credentials.verification.PolicyManager
-import id.walt.credentials.verification.Verifier
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeyType
@@ -37,14 +33,13 @@ import id.walt.oid4vc.data.dif.VCFormat
 import id.walt.oid4vc.interfaces.PresentationResult
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.util.http
-import id.walt.sdjwt.*
+import id.walt.sdjwt.SDJwtVC
+import id.walt.sdjwt.SimpleJWTCryptoProvider
 import id.walt.verifier.base.config.ConfigManager
 import id.walt.verifier.base.config.WebConfig
 import id.walt.verifier.oidc.LspPotentialInteropEvent
-import id.walt.verifier.oidc.VerificationUseCase
 import id.walt.verifier.policies.PresentationDefinitionPolicy
 import id.walt.verifier.verifierModule
-import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
@@ -53,7 +48,6 @@ import io.ktor.server.application.*
 import io.ktor.server.cio.*
 import io.ktor.server.engine.*
 import io.ktor.util.*
-import io.ktor.util.reflect.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.*
 import kotlinx.uuid.UUID
@@ -63,7 +57,10 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
-class OidcTest {
+object OidcTest {
+
+  var webConfig: WebConfig? = null
+  val baseUrl: String get() = "http://${webConfig!!.webHost}:${webConfig!!.webPort}"
 
   init {
     runBlocking {
@@ -76,13 +73,11 @@ class OidcTest {
 
     ConfigManager.loadConfigs(arrayOf())
 
-    val webConfig = ConfigManager.getConfig<WebConfig>()
+    webConfig = ConfigManager.getConfig<WebConfig>()
 
-    embeddedServer(CIO, port = webConfig.webPort, host = webConfig.webHost, module = Application::verifierModule)
+    embeddedServer(CIO, port = webConfig!!.webPort, host = webConfig!!.webHost, module = Application::verifierModule)
       .start(wait = false)
   }
-
-  val baseUrl = "http://localhost:7003"
 
   @Test
   fun testPotentialInteropFlow() {

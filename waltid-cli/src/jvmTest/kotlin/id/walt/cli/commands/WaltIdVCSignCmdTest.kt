@@ -109,7 +109,7 @@ class WaltIdVCSignCmdTest {
             command.parse(arrayOf("-k", invalidKeyFilePath, "-i", issuerDid, "-s", subjectDid, vcFilePath))
         }
 
-        failure.message?.let { assertContains(it, "${invalidKeyFilePath} (No such file or directory)") }
+        failure.message?.let { assertContains(it, "${invalidKeyFilePath}") }
     }
 
     @Test

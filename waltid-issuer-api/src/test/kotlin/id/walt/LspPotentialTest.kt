@@ -15,17 +15,13 @@ import id.walt.issuer.issuerModule
 import id.walt.issuer.utils.LspPotentialInteropEvent
 import id.walt.mdoc.COSECryptoProviderKeyInfo
 import id.walt.mdoc.SimpleCOSECryptoProvider
-import id.walt.mdoc.cose.COSECryptoProvider
 import id.walt.mdoc.cose.COSESign1
 import id.walt.mdoc.dataelement.*
 import id.walt.mdoc.doc.MDoc
 import id.walt.mdoc.doc.MDocVerificationParams
 import id.walt.mdoc.doc.VerificationType
-import id.walt.mdoc.docrequest.MDocRequest
 import id.walt.mdoc.docrequest.MDocRequestBuilder
 import id.walt.mdoc.issuersigned.IssuerSigned
-import id.walt.mdoc.mdocauth.DeviceAuthentication
-import id.walt.mdoc.mso.DeviceKeyInfo
 import id.walt.oid4vc.OpenID4VCI
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.requests.AuthorizationRequest
@@ -58,36 +54,36 @@ import java.security.KeyPairGenerator
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.test.*
-import kotlin.text.toByteArray
 
-class LspPotentialTest {
+object LspPotentialTest {
   val http = HttpClient {
     install(ContentNegotiation) {
       json()
     }
     followRedirects = false
   }
-  var webConfig: WebConfig = WebConfig("dummy")
-  init {
-    runBlocking {
-      WaltidServices.minimalInit()
-    }
+  var webConfig: WebConfig? = null
 
-    ConfigManager.loadConfigs(arrayOf())
-    webConfig = ConfigManager.getConfig<WebConfig>()
-    embeddedServer(
-      CIO,
-      port = webConfig.webPort,
-      host = webConfig.webHost,
-      module = Application::issuerModule
-    ).start(wait = false)
+  init {
+      runBlocking {
+        WaltidServices.minimalInit()
+      }
+
+      ConfigManager.loadConfigs(arrayOf())
+      webConfig = ConfigManager.getConfig<WebConfig>()
+      embeddedServer(
+        CIO,
+        port = webConfig!!.webPort,
+        host = webConfig!!.webHost,
+        module = Application::issuerModule
+      ).start(wait = false)
   }
 
   @OptIn(ExperimentalEncodingApi::class)
   @Test
   fun testLspPotentialTrack1(): Unit = runBlocking {
     // ### steps 1-6
-    val offerResp = http.get("http://${webConfig.webHost}:${webConfig.webPort}/openid4vc/lspPotentialCredentialOffer")
+    val offerResp = http.get("http://${webConfig!!.webHost}:${webConfig!!.webPort}/openid4vc/lspPotentialCredentialOffer")
     //val offerResp = http.get("https://issuer.potential.walt-test.cloud/openid4vc/lspPotentialCredentialOffer")
     assertEquals(HttpStatusCode.OK, offerResp.status)
 
@@ -239,7 +235,7 @@ class LspPotentialTest {
   @Test
   fun testLspPotentialTrack2(): Unit = runBlocking {
     // ### steps 1-6
-    val offerResp = http.get("http://${webConfig.webHost}:${webConfig.webPort}/openid4vc/lspPotentialCredentialOfferT2")
+    val offerResp = http.get("http://${webConfig!!.webHost}:${webConfig!!.webPort}/openid4vc/lspPotentialCredentialOfferT2")
     //val offerResp = http.get("https://issuer.potential.walt-test.cloud/openid4vc/lspPotentialCredentialOfferT2")
     assertEquals(HttpStatusCode.OK, offerResp.status)
 
