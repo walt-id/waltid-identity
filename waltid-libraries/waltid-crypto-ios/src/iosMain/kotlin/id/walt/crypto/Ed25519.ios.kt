@@ -6,6 +6,7 @@ import id.walt.crypto.keys.KeyType
 import id.walt.crypto.utils.Base64Utils.base64UrlDecode
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto.utils.JsonUtils.toJsonObject
+import id.walt.platform.utils.ios.Ed25519KeyUtils
 import io.ktor.util.decodeBase64String
 import io.ktor.utils.io.core.toByteArray
 import kotlinx.cinterop.ObjCObjectVar
@@ -18,8 +19,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
-import id.walt.platform.utils.ios.Ed25519KeyUtils
-import platform.Foundation.*
+import platform.Foundation.NSError
 
 class Ed25519Key(
     val keyId: String,

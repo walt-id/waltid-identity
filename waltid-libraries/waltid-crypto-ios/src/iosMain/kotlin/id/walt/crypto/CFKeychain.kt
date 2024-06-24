@@ -1,21 +1,47 @@
 package id.walt.crypto
 
-import kotlinx.cinterop.*
-import platform.CoreFoundation.*
-import platform.Foundation.*
-import platform.Security.*
+import kotlinx.cinterop.MemScope
+import kotlinx.cinterop.alloc
+import kotlinx.cinterop.ptr
+import kotlinx.cinterop.value
+import platform.CoreFoundation.CFDataRef
+import platform.CoreFoundation.CFDictionaryAddValue
+import platform.CoreFoundation.CFDictionaryCreateMutable
+import platform.CoreFoundation.CFDictionaryRef
+import platform.CoreFoundation.CFStringRef
+import platform.CoreFoundation.CFTypeRef
+import platform.CoreFoundation.CFTypeRefVar
+import platform.CoreFoundation.kCFAllocatorDefault
+import platform.CoreFoundation.kCFBooleanTrue
+import platform.CoreFoundation.kCFTypeDictionaryKeyCallBacks
+import platform.CoreFoundation.kCFTypeDictionaryValueCallBacks
+import platform.Foundation.CFBridgingRelease
+import platform.Foundation.NSData
+import platform.Foundation.NSString
+import platform.Security.SecCopyErrorMessageString
+import platform.Security.SecItemCopyMatching
+import platform.Security.SecKeyAlgorithm
+import platform.Security.SecKeyCopyExternalRepresentation
+import platform.Security.SecKeyCopyPublicKey
+import platform.Security.SecKeyCreateSignature
+import platform.Security.SecKeyRef
+import platform.Security.SecKeyVerifySignature
+import platform.Security.errSecSuccess
+import platform.Security.kSecAttrApplicationTag
+import platform.Security.kSecAttrKeyClass
+import platform.Security.kSecAttrKeyClassPrivate
+import platform.Security.kSecAttrKeyType
+import platform.Security.kSecClass
+import platform.Security.kSecClassKey
+import platform.Security.kSecReturnRef
+import platform.darwin.OSStatus
 
 internal inline fun <T> withSecKey(
     kid: String, type: CFStringRef?, keyClass: CFStringRef?, block: MemScope.(SecKeyRef?) -> T
 ) = cfRetain(kid.toNSData()) { kidCf ->
     operation(query(kidCf, type, keyClass)) { query ->
         val secKeyRef = alloc<CFTypeRefVar>()
-        val status = SecItemCopyMatching(query, secKeyRef.ptr)
-
-        check(status == 0) {
-            val msg = CFBridgingRelease(SecCopyErrorMessageString(status, null)) as NSString
-            msg.toString()
-        }
+        checkReturnStatus { SecItemCopyMatching(query, secKeyRef.ptr) }
         val secKey = secKeyRef.value as SecKeyRef?
         try {
             block(secKey)
@@ -70,19 +96,11 @@ internal interface CoreFoundationSecOperations {
 
         ) = withSecKey(keyId, keyType, kSecAttrKeyClassPrivate) { secKey ->
         cfRetain(data.toNSData()) { dataToSign ->
-
-            val err: CFErrorRefVar = alloc<CFErrorRefVar>()
-
-            val signed = SecKeyCreateSignature(
-                secKey, algorithm, dataToSign as CFDataRef, err.ptr
-            )
-
-            check(err.value == null) {
-                val err = CFBridgingRelease(err.value) as NSError
-                println(err)
-                err.toString()
+            val signed = checkErrorResult { error ->
+                SecKeyCreateSignature(
+                    secKey, algorithm, dataToSign as CFDataRef, error
+                )
             }
-
             val signedNsData = signed.toNSData()
             CFBridgingRelease(signed)
 
@@ -96,16 +114,14 @@ internal interface CoreFoundationSecOperations {
         publicKey: SecKeyRef?,
         signingAlgorithm: SecKeyAlgorithm?
     ): Boolean {
-        val err: CFErrorRefVar = alloc<CFErrorRefVar>()
-
-        val result = SecKeyVerifySignature(
-            publicKey, signingAlgorithm, signedData as CFDataRef?, signature as CFDataRef?, err.ptr
-        )
-
-        check(err.value == null) {
-            val nsError = CFBridgingRelease(err.value) as NSError
-            println(nsError)
-            nsError.toString()
+        val result = checkErrorResult { error ->
+            SecKeyVerifySignature(
+                publicKey,
+                signingAlgorithm,
+                signedData as CFDataRef?,
+                signature as CFDataRef?,
+                error
+            )
         }
 
         check(result) {
@@ -127,6 +143,15 @@ internal interface CoreFoundationSecOperations {
                 )
             ) as NSData
             nsData.toByteArray()
+        }
+    }
+}
+
+internal fun checkReturnStatus(block: () -> OSStatus) {
+    block().let { retStatus ->
+        check(retStatus == errSecSuccess) {
+            val msg = CFBridgingRelease(SecCopyErrorMessageString(retStatus, null)) as NSString
+            msg.toString()
         }
     }
 }

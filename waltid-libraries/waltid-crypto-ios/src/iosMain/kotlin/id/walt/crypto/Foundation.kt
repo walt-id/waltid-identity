@@ -1,9 +1,17 @@
 package id.walt.crypto
 
-import kotlinx.cinterop.*
-import platform.CoreFoundation.*
-import platform.Foundation.*
-import platform.posix.*
+import kotlinx.cinterop.addressOf
+import kotlinx.cinterop.allocArrayOf
+import kotlinx.cinterop.cstr
+import kotlinx.cinterop.memScoped
+import kotlinx.cinterop.usePinned
+import platform.CoreFoundation.CFDataGetBytePtr
+import platform.CoreFoundation.CFDataGetLength
+import platform.CoreFoundation.CFDataRef
+import platform.Foundation.NSData
+import platform.Foundation.create
+import platform.Foundation.dataWithBytes
+import platform.posix.memcpy
 
 internal fun String.toNSData(): NSData = memScoped {
     NSData.dataWithBytes(this@toNSData.cstr.ptr, this@toNSData.length.toULong())

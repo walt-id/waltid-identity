@@ -1,9 +1,11 @@
 package id.walt.sdjwt
 
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.*
 
@@ -46,7 +48,7 @@ class SDJwtTestIOS {
         )
         assertEquals(expected = originalClaimsSet, actual = Json.parseToJsonElement(sdJwt.fullPayload.toString()).jsonObject)
 
-        assertTrue(actual = assersdJwt.verify(cryptoProvider).verified)
+        assertTrue(actual = sdJwt.verify(cryptoProvider).verified)
     }
 
     @Test
