@@ -50,6 +50,7 @@ object KeyManager {
     }
 
     fun resolveSerializedKey(jsonString: String): Key = resolveSerializedKey(json = Json.parseToJsonElement(jsonString).jsonObject)
+    // TODO: return Result<..>
     fun resolveSerializedKey(json: JsonObject): Key {
         val type = getRegisteredKeyType(json["type"]?.jsonPrimitive?.content ?: error("No type in serialized key"))
 

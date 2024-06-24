@@ -1,3 +1,5 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
 plugins {
     kotlin("multiplatform")
     kotlin("plugin.serialization")
@@ -26,15 +28,21 @@ kotlin {
 kotlin {
     targets.configureEach {
         compilations.configureEach {
-            compilerOptions.configure {
-                freeCompilerArgs.add("-Xexpect-actual-classes")
+            compileTaskProvider.configure {
+                compilerOptions {
+                    freeCompilerArgs.add("-Xexpect-actual-classes")
+                }
             }
         }
     }
 
     jvm {
         compilations.all {
-            kotlinOptions.jvmTarget = "15" // JVM got Ed25519 at version 15
+            compileTaskProvider.configure {
+                compilerOptions {
+                    jvmTarget = JvmTarget.JVM_15 // JVM got Ed25519 at version 15
+                }
+            }
         }
         withJava()
         tasks.withType<Test>().configureEach {
@@ -53,10 +61,9 @@ kotlin {
 
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.0")
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.0")
-                implementation ("com.google.code.gson:gson:2.11.0")
+                implementation("com.google.code.gson:gson:2.11.0")
 
                 // CLI
-                implementation("com.varabyte.kotter:kotter-jvm:1.1.2")
                 implementation("com.github.ajalt.mordant:mordant:2.6.0")
                 implementation("com.github.ajalt.clikt:clikt:4.4.0")
 
@@ -64,7 +71,7 @@ kotlin {
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
 
                 // Logging
-                implementation("io.github.oshai:kotlin-logging:6.0.9")
+                implementation("io.github.oshai:kotlin-logging:7.0.0")
             }
         }
         val commonTest by getting {
@@ -90,7 +97,7 @@ kotlin {
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.0")
                 implementation("com.wolpl.clikt-testkit:clikt-testkit:2.0.0")
 
-                implementation("org.junit.jupiter:junit-jupiter-params:5.10.2")
+                implementation("org.junit.jupiter:junit-jupiter-params:5.11.0-M2")
             }
         }
         /*publishing {

@@ -4,7 +4,7 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 plugins {
     kotlin("multiplatform")
     kotlin("plugin.serialization")
-    id("dev.petuska.npm.publish") version "3.4.2"
+    id("dev.petuska.npm.publish") version "3.4.3"
     id("maven-publish")
     id("com.github.ben-manes.versions")
 }
@@ -38,8 +38,10 @@ tasks.withType(KotlinCompile::class.java) {
 kotlin {
     targets.configureEach {
         compilations.configureEach {
-            compilerOptions.configure {
-                freeCompilerArgs.add("-Xexpect-actual-classes")
+            compileTaskProvider.configure {
+                compilerOptions { 
+                    freeCompilerArgs.add("-Xexpect-actual-classes")
+                }
             }
         }
     }
@@ -72,7 +74,7 @@ kotlin {
 //        isMingwX64 -> mingwX64("native")
 //        else -> throw GradleException("Host OS is not supported in Kotlin/Native.")
 //    }
-    val ktor_version = "2.3.11"
+    val ktor_version = "2.3.12"
 
     sourceSets {
         val commonMain by getting {
@@ -85,7 +87,7 @@ kotlin {
                 implementation("io.ktor:ktor-client-content-negotiation:$ktor_version")
                 implementation("io.ktor:ktor-serialization-kotlinx-json:$ktor_version")
 
-                implementation("io.github.oshai:kotlin-logging:6.0.9")
+                implementation("io.github.oshai:kotlin-logging:7.0.0")
 
                 // JSON
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.0")
@@ -129,7 +131,7 @@ kotlin {
                 implementation("io.kotest:kotest-runner-junit5:5.9.1")
                 implementation("io.kotest:kotest-assertions-core:5.9.1")
                 implementation("io.kotest:kotest-assertions-json:5.9.1")
-                implementation("org.junit.jupiter:junit-jupiter-params:5.10.2")
+                implementation("org.junit.jupiter:junit-jupiter-params:5.11.0-M2")
                 implementation("com.google.crypto.tink:tink:1.13.0") // for JOSE using Ed25519
                 implementation("org.bouncycastle:bcprov-lts8on:2.73.6") // for secp256k1 (which was removed with Java 17)
                 implementation("org.bouncycastle:bcpkix-lts8on:2.73.6") // PEM import

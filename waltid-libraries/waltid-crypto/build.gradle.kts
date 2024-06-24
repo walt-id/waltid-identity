@@ -2,6 +2,8 @@ import love.forte.plugin.suspendtrans.ClassInfo
 import love.forte.plugin.suspendtrans.SuspendTransformConfiguration
 import love.forte.plugin.suspendtrans.TargetPlatform
 import love.forte.plugin.suspendtrans.gradle.SuspendTransformGradleExtension
+import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     kotlin("multiplatform")
@@ -48,15 +50,23 @@ kotlin {
 
     targets.configureEach {
         compilations.configureEach {
-            compilerOptions.configure {
-                freeCompilerArgs.add("-Xexpect-actual-classes")
+            compileTaskProvider.configure {
+                compilerOptions {
+                    freeCompilerArgs.add("-Xexpect-actual-classes")
+                }
+            }
+            compileTaskProvider.configure {
+                compilerOptions { 
+                    freeCompilerArgs.add("-Xexpect-actual-classes")
+                }
             }
         }
     }
 
     jvm {
-        compilations.all {
-            kotlinOptions.jvmTarget = "15" // JVM got Ed25519 at version 15
+        @OptIn(ExperimentalKotlinGradlePluginApi::class)
+        compilerOptions {
+            jvmTarget = JvmTarget.JVM_15 // JVM got Ed25519 at version 15
         }
         tasks.withType<Test>().configureEach {
             useJUnitPlatform()
@@ -80,6 +90,7 @@ kotlin {
     }
 //    androidTarget()
 
+
     if (isMacOS) {
         listOf(
             iosArm64(),
@@ -93,7 +104,8 @@ kotlin {
     }
 
 
-    val ktor_version = "2.3.11"
+    val ktor_version = "2.3.12"
+
     sourceSets {
         val commonMain by getting {
             dependencies {
@@ -118,7 +130,7 @@ kotlin {
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
 
                 // Logging
-                implementation("io.github.oshai:kotlin-logging:6.0.9")
+                implementation("io.github.oshai:kotlin-logging:7.0.0")
             }
         }
         val commonTest by getting {
@@ -157,9 +169,9 @@ kotlin {
                 // Test
                 implementation(kotlin("test"))
 
-                implementation("org.junit.jupiter:junit-jupiter-api:5.10.2")
+                implementation("org.junit.jupiter:junit-jupiter-api:5.11.0-M2")
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.0")
-                implementation("org.junit.jupiter:junit-jupiter-params:5.10.2")
+                implementation("org.junit.jupiter:junit-jupiter-params:5.11.0-M2")
             }
         }
         val jsMain by getting {

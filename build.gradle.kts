@@ -20,8 +20,8 @@ plugins {
 
     kotlin("plugin.serialization") version kotlinVersion apply false
 
-    id("com.android.library") version "8.4.1" apply false
-    id("com.android.application") version "8.4.1" apply false
+    id("com.android.library") version "8.5.0" apply false
+    id("com.android.application") version "8.5.0" apply false
 
     id("com.github.ben-manes.versions") version "0.51.0" apply false
 }
