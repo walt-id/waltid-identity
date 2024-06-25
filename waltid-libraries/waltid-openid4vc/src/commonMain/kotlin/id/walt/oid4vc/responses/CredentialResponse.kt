@@ -36,10 +36,10 @@ data class CredentialResponse private constructor(
 
         fun success(
             format: CredentialFormat,
-            credential: String,
+            credentialString: String,
             cNonce: String? = null,
             cNonceExpiresIn: Duration? = null
-        ) = CredentialResponse(format, JsonPrimitive(credential), null, cNonce, cNonceExpiresIn)
+        ) = CredentialResponse(format, JsonPrimitive(credentialString), null, cNonce, cNonceExpiresIn)
 
         fun success(
             format: CredentialFormat,
