@@ -30,7 +30,9 @@ data class RegistrationDefaultsConfig(
     val keyGenerationRequest: KeyGenerationRequest = KeyGenerationRequest(
         backend = defaultKeyConfig.backend,
         keyType = defaultKeyConfig.keyType,
-        config = Json.encodeToJsonElement(defaultKeyConfig.config).jsonObject
+        config = defaultKeyConfig.config?.let { 
+            Json.encodeToJsonElement(it).jsonObject 
+        } ?: JsonObject(emptyMap())
     )
 
     @Transient
