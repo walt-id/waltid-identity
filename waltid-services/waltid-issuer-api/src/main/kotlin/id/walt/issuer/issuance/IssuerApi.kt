@@ -65,9 +65,12 @@ fun Application.issuerApi() {
                 description = "Creates an issuer keypair and an associated DID based on the provided configuration."
 
                 request {
-                    body<IssuerOnboardingRequest> {
+                    body<OnboardingRequest> {
                         description = "Issuer onboarding request (key & DID) config."
-                        example("did:jwk + JWK key (Ed25519)", IssuanceExamples.issuerOnboardingRequestDefaultExample)
+                        example("did:jwk + JWK key (Ed25519)", IssuanceExamples.issuerOnboardingRequestDefaultEd25519Example)
+                        example("did:jwk + JWK key (secp256r1)", IssuanceExamples.issuerOnboardingRequestDefaultSecp256r1Example)
+                        example("did:jwk + JWK key (secp256k1)", IssuanceExamples.issuerOnboardingRequestDefaultSecp256k1Example)
+                        example("did:jwk + JWK key (RSA)", IssuanceExamples.issuerOnboardingRequestDefaultRsaExample)
                         example("did:web + JWK key (Secp256k1)", IssuanceExamples.issuerOnboardingRequestDidWebExample)
                         example(
                             "did:key + TSE key (Hashicorp Vault Transit Engine - RSA)",

@@ -1,6 +1,8 @@
 package id.walt.issuer.issuance
 
+import id.walt.crypto.keys.KeyType
 import io.github.smiley4.ktorswaggerui.dsl.routes.ValueExampleDescriptorDsl
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 
@@ -558,19 +560,33 @@ object IssuanceExamples {
     """.trimIndent()
     }
 
-    // language=JSON
-    val issuerOnboardingRequestDefaultExample: ValueExampleDescriptorDsl.() -> Unit = {
-        value = """
-        {
-          "key": {
-            "backend": "jwk",
-            "keyType": "secp256r1"
-          },
-          "did": {
-            "method" : "jwk"
-          }
-        }
-    """.trimIndent()
+    private fun onboardingRequestWithKey(key: KeyType) =
+        Json { encodeDefaults = true }.encodeToString( // todo: remove line when ktor-swagger-ui#107 is fixed
+            OnboardingRequest(
+                key = mapOf(
+                    "backend" to "jwk",
+                    "keyType" to key.name
+                ),
+                did = mapOf(
+                    "method" to "jwk"
+                )
+            )
+        ) // todo: remove line when ktor-swagger-ui#107 is fixed
+
+    val issuerOnboardingRequestDefaultEd25519Example: ValueExampleDescriptorDsl.() -> Unit = {
+        value = onboardingRequestWithKey(KeyType.Ed25519)
+    }
+
+    val issuerOnboardingRequestDefaultSecp256r1Example: ValueExampleDescriptorDsl.() -> Unit = {
+        value = onboardingRequestWithKey(KeyType.secp256r1)
+    }
+
+    val issuerOnboardingRequestDefaultSecp256k1Example: ValueExampleDescriptorDsl.() -> Unit = {
+        value = onboardingRequestWithKey(KeyType.secp256k1)
+    }
+
+    val issuerOnboardingRequestDefaultRsaExample: ValueExampleDescriptorDsl.() -> Unit = {
+        value = onboardingRequestWithKey(KeyType.RSA)
     }
 
     // language=JSON
