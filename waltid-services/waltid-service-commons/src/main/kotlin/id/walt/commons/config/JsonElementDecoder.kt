@@ -7,8 +7,9 @@ import kotlinx.serialization.json.*
 import kotlin.reflect.KType
 import kotlin.reflect.full.isSubtypeOf
 import kotlin.reflect.full.starProjectedType
+import kotlin.reflect.full.withNullability
 
-class JsonElementDecoder : Decoder<JsonElement> {
+class JsonElementDecoder : Decoder<JsonElement?> {
 
     private fun Node.toSpecificJson(): JsonElement = when (this) {
         is MapNode -> JsonObject(this.map.mapValues { it.value.toSpecificJson() })
@@ -21,9 +22,10 @@ class JsonElementDecoder : Decoder<JsonElement> {
         Undefined -> error("Undefined node type")
     }
 
-    override fun decode(node: Node, type: KType, context: DecoderContext): ConfigResult<JsonElement> =
-        Validated.Valid(node.toSpecificJson())
+    override fun decode(node: Node, type: KType, context: DecoderContext): ConfigResult<JsonElement?> =
+        if (node is Undefined) Validated.Valid(null)
+        else Validated.Valid(node.toSpecificJson())
 
     override fun supports(type: KType): Boolean =
-        type.isSubtypeOf(JsonElement::class.starProjectedType)
+        type.withNullability(false).isSubtypeOf(JsonElement::class.starProjectedType)
 }
