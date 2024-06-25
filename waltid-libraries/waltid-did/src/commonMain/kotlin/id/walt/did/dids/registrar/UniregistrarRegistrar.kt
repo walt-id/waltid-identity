@@ -18,16 +18,18 @@ import love.forte.plugin.suspendtrans.annotation.JvmBlocking
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 
+/**
+ * @param registrarUrl Resolver URL, e.g. "http://localhost:9080/1.0"
+ */
 @OptIn(ExperimentalJsExport::class)
 @JsExport
-class UniregistrarRegistrar : DidRegistrar {
+class UniregistrarRegistrar(var registrarUrl: String = DEFAULT_REGISTRAR_URL) : DidRegistrar {
 
-    @Suppress("MemberVisibilityCanBePrivate")
-    //var registrarUrl = "http://localhost:9080/1.0"
-    var registrarUrl = "https://uniregistrar.io/1.0"
+    companion object {
+        const val DEFAULT_REGISTRAR_URL = "https://uniregistrar.io/1.0"
+    }
 
     override val name = "uniresolver @ $registrarUrl"
-
 
     private val http = HttpClient {
         install(ContentNegotiation) {
