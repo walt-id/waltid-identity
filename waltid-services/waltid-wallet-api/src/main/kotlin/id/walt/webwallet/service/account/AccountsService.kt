@@ -53,7 +53,7 @@ object AccountsService {
 
         // Add default data:
 
-        val createdKey = walletService.generateKey(defaultGenerationConfig.defaultKeyConfig)
+        val createdKey = walletService.generateKey(defaultGenerationConfig.keyGenerationRequest)
 
         val createdDid = walletService.createDid(
             method = defaultGenerationConfig.didMethod,
