@@ -8,74 +8,8 @@ import kotlinx.serialization.json.jsonObject
 
 object IssuanceExamples {
     // language=json
-    val universityDegreeCredential: ValueExampleDescriptorDsl.() -> Unit = {
-        value = """
-{
-  "issuerKey": {
-    "type": "jwk",
-    "jwk": {
-               "kty":"OKP",
-               "d":"mDhpwaH6JYSrD2Bq7Cs-pzmsjlLj4EOhxyI-9DM1mFI",
-               "crv":"Ed25519",
-               "kid":"Vzx7l5fh56F3Pf9aR3DECU5BwfrY6ZJe05aiWYWzan8",
-               "x":"T3T4-u1Xz3vAV2JwPNxWfs4pik_JLiArz_WTCvrCFUM"
-            }
-  },
-  "issuerDid": "did:key:z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp",
-  "credentialConfigurationId": "UniversityDegree_jwt_vc_json",
-  "credentialData": {
-    "@context": [
-      "https://www.w3.org/2018/credentials/v1",
-      "https://www.w3.org/2018/credentials/examples/v1"
-    ],
-    "id": "http://example.gov/credentials/3732",
-    "type": [
-      "VerifiableCredential",
-      "UniversityDegreeCredential"
-    ],
-    "issuer": {
-      "id": "did:web:vc.transmute.world"
-    },
-    "issuanceDate": "2020-03-10T04:24:12.164Z",
-    "credentialSubject": {
-      "id": "did:example:ebfeb1f712ebc6f1c276e12ec21",
-      "degree": {
-        "type": "BachelorDegree",
-        "name": "Bachelor of Science and Arts"
-      }
-    }
-  },
-  "mapping": {
-    "id": "\u003cuuid\u003e",
-    "issuer": {
-      "id": "\u003cissuerDid\u003e"
-    },
-    "credentialSubject": {
-      "id": "\u003csubjectDid\u003e"
-    },
-    "issuanceDate": "\u003ctimestamp\u003e",
-    "expirationDate": "\u003ctimestamp-in:365d\u003e"
-  }
-}
-""".trimIndent()
-    }
-
-    // language=json
-    val openBadgeCredentialJson = """
+    private val openBadgeCredentialData = """
         {
-          "issuerKey": {
-            "type": "jwk",
-            "jwk": {
-               "kty":"OKP",
-               "d":"mDhpwaH6JYSrD2Bq7Cs-pzmsjlLj4EOhxyI-9DM1mFI",
-               "crv":"Ed25519",
-               "kid":"Vzx7l5fh56F3Pf9aR3DECU5BwfrY6ZJe05aiWYWzan8",
-               "x":"T3T4-u1Xz3vAV2JwPNxWfs4pik_JLiArz_WTCvrCFUM"
-            }
-          },
-          "issuerDid": "did:key:z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp",
-          "credentialConfigurationId": "OpenBadgeCredential_jwt_vc_json",
-          "credentialData": {
             "@context": [
               "https://www.w3.org/2018/credentials/v1",
               "https://purl.imsglobal.org/spec/ob/v3p0/context.json"
@@ -119,20 +53,131 @@ object IssuanceExamples {
                 }
               }
             }
-          },
-          "mapping": {
-            "id": "\u003cuuid\u003e",
-            "issuer": {
-              "id": "\u003cissuerDid\u003e"
-            },
-            "credentialSubject": {
-              "id": "\u003csubjectDid\u003e"
-            },
-            "issuanceDate": "\u003ctimestamp\u003e",
-            "expirationDate": "\u003ctimestamp-in:365d\u003e"
           }
+    """.trimIndent()
+    // language=json
+    private val universityDegreeCredentialData = """
+        {
+            "@context": [
+              "https://www.w3.org/2018/credentials/v1",
+              "https://www.w3.org/2018/credentials/examples/v1"
+            ],
+            "id": "http://example.gov/credentials/3732",
+            "type": [
+              "VerifiableCredential",
+              "UniversityDegreeCredential"
+            ],
+            "issuer": {
+              "id": "did:web:vc.transmute.world"
+            },
+            "issuanceDate": "2020-03-10T04:24:12.164Z",
+            "credentialSubject": {
+              "id": "did:example:ebfeb1f712ebc6f1c276e12ec21",
+              "degree": {
+                "type": "BachelorDegree",
+                "name": "Bachelor of Science and Arts"
+              }
+            }
+          }
+    """.trimIndent()
+    //language=json
+    private val bankIdCredentialData = """
+        {
+             "@context":[
+                "https://www.w3.org/2018/credentials/v1"
+             ],
+             "type":[
+                "VerifiableCredential",
+                "BankId"
+             ],
+             "credentialSubject":{
+                "accountId":"1234567890",
+                "IBAN":"DE99123456789012345678",
+                "BIC":"DEUTDEDBBER",
+                "birthDate":"1958-08-17",
+                "familyName":"DOE",
+                "givenName":"JOHN",
+                "id":"identity#bankId"
+             },
+             "id":"identity#BankId#3add94f4-28ec-42a1-8704-4e4aa51006b4",
+             "issued":"2021-08-31T00:00:00Z",
+             "issuer":{
+                "id":"did:key:z6MkrHKzgsahxBLyNAbLQyB1pcWNYC9GmywiWPgkrvntAZcj",
+                "image":{
+                   "id":"https://images.squarespace-cdn.com/content/v1/609c0ddf94bcc0278a7cbdb4/1660296169313-K159K9WX8J8PPJE005HV/Walt+Bot_Logo.png?format=100w",
+                   "type":"Image"
+                },
+                "name":"CH Authority",
+                "type":"Profile",
+                "url":"https://images.squarespace-cdn.com/content/v1/609c0ddf94bcc0278a7cbdb4/1660296169313-K159K9WX8J8PPJE005HV/Walt+Bot_Logo.png?format=100w"
+             },
+             "validFrom":"2021-08-31T00:00:00Z",
+             "issuanceDate":"2021-08-31T00:00:00Z"
+          }
+    """.trimIndent()
+    //language=json
+    private val issuerKey = """
+        {
+            "type": "jwk",
+            "jwk": {
+               "kty":"OKP",
+               "d":"mDhpwaH6JYSrD2Bq7Cs-pzmsjlLj4EOhxyI-9DM1mFI",
+               "crv":"Ed25519",
+               "kid":"Vzx7l5fh56F3Pf9aR3DECU5BwfrY6ZJe05aiWYWzan8",
+               "x":"T3T4-u1Xz3vAV2JwPNxWfs4pik_JLiArz_WTCvrCFUM"
+            }
+          }
+    """.trimIndent()
+    private val issuerDid = "\"did:key:z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp\""
+    //language=json
+    private val mapping = """
+        {
+             "id":"<uuid>",
+             "issuer":{
+                "id":"<issuerDid>"
+             },
+             "credentialSubject":{
+                "id":"<subjectDid>"
+             },
+             "issuanceDate":"<timestamp>",
+             "expirationDate":"<timestamp-in:365d>"
+          }
+    """.trimIndent()
+
+    // language=json
+    private val openBadgeCredentialJson = """
+        {
+          "issuerKey": $issuerKey,
+          "issuerDid": $issuerDid,
+          "credentialConfigurationId": "OpenBadgeCredential_jwt_vc_json",
+          "credentialData": $openBadgeCredentialData,
+          "mapping": $mapping
         }
         """.trimIndent()
+    //language=json
+    private val universityDegreeCredentialJson = """
+        {
+          "issuerKey": $issuerKey,
+          "issuerDid": $issuerDid,
+          "credentialConfigurationId": "UniversityDegree_jwt_vc_json",
+          "credentialData": $universityDegreeCredentialData,
+          "mapping": $mapping
+        }
+        """.trimIndent()
+    //language=json
+    private val bankIdCredentialJson = """
+        {
+          "issuerKey":$issuerKey,
+          "issuerDid":$issuerDid,
+          "credentialConfigurationId":"BankId_jwt_vc_json",
+          "credentialData":$bankIdCredentialData,
+          "mapping":$mapping
+       }
+        """.trimIndent()
+
+    val universityDegreeCredential: ValueExampleDescriptorDsl.() -> Unit = {
+        value = universityDegreeCredentialJson
+    }
 
     val openBadgeCredentialExample: ValueExampleDescriptorDsl.() -> Unit = {
         value = openBadgeCredentialJson
@@ -145,64 +190,11 @@ object IssuanceExamples {
     val openBadgeCredentialSignExampleJsonString: ValueExampleDescriptorDsl.() -> Unit = {
         value = """
         {
-          "issuerKey": {
-            "type": "jwk",
-            "jwk": {
-               "kty":"OKP",
-               "d":"mDhpwaH6JYSrD2Bq7Cs-pzmsjlLj4EOhxyI-9DM1mFI",
-               "crv":"Ed25519",
-               "kid":"Vzx7l5fh56F3Pf9aR3DECU5BwfrY6ZJe05aiWYWzan8",
-               "x":"T3T4-u1Xz3vAV2JwPNxWfs4pik_JLiArz_WTCvrCFUM"
-            }
-          },
-          "issuerDid": "did:key:z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp",
+          "issuerKey": $issuerKey,
+          "issuerDid": $issuerDid,
           "subjectDid":"did:jwk:eyJrdHkiOiJPS1AiLCJjcnYiOiJFZDI1NTE5Iiwia2lkIjoiMW1lTUJuX3EtVklTQzd5Yk42UnExX0FISkxwSHZKVG83N3V6Nk44UkdDQSIsIngiOiJQdEV1YlB1MWlrRzR5emZsYUF2dnNmTWIwOXR3NzlIcTFsVnJRX1c0ZnVjIn0",
           "credentialConfigurationId": "OpenBadgeCredential_jwt_vc_json",
-          "credentialData": {
-            "@context": [
-              "https://www.w3.org/2018/credentials/v1",
-              "https://purl.imsglobal.org/spec/ob/v3p0/context.json"
-            ],
-            "id": "urn:uuid:THIS WILL BE REPLACED WITH DYNAMIC DATA FUNCTION (see below)",
-            "type": [
-              "VerifiableCredential",
-              "OpenBadgeCredential"
-            ],
-            "name": "JFF x vc-edu PlugFest 3 Interoperability",
-            "issuer": {
-              "type": [
-                "Profile"
-              ],
-              "id": "did:key:THIS WILL BE REPLACED WITH DYNAMIC DATA FUNCTION FROM CONTEXT (see below)",
-              "name": "Jobs for the Future (JFF)",
-              "url": "https://www.jff.org/",
-              "image": "https://w3c-ccg.github.io/vc-ed/plugfest-1-2022/images/JFF_LogoLockup.png"
-            },
-            "issuanceDate": "2023-07-20T07:05:44Z (THIS WILL BE REPLACED BY DYNAMIC DATA FUNCTION (see below))",
-            "expirationDate": "WILL BE MAPPED BY DYNAMIC DATA FUNCTION (see below)",
-            "credentialSubject": {
-              "id": "did:key:123 (THIS WILL BE REPLACED BY DYNAMIC DATA FUNCTION (see below))",
-              "type": [
-                "AchievementSubject"
-              ],
-              "achievement": {
-                "id": "urn:uuid:ac254bd5-8fad-4bb1-9d29-efd938536926",
-                "type": [
-                  "Achievement"
-                ],
-                "name": "JFF x vc-edu PlugFest 3 Interoperability",
-                "description": "This wallet supports the use of W3C Verifiable Credentials and has demonstrated interoperability during the presentation request workflow during JFF x VC-EDU PlugFest 3.",
-                "criteria": {
-                  "type": "Criteria",
-                  "narrative": "Wallet solutions providers earned this badge by demonstrating interoperability during the presentation request workflow. This includes successfully receiving a presentation request, allowing the holder to select at least two types of verifiable credentials to create a verifiable presentation, returning the presentation to the requestor, and passing verification of the presentation and the included credentials."
-                },
-                "image": {
-                  "id": "https://w3c-ccg.github.io/vc-ed/plugfest-3-2023/images/JFF-VC-EDU-PLUGFEST3-badge-image.png",
-                  "type": "Image"
-                }
-              }
-            }
-          }
+          "credentialData": $openBadgeCredentialData
         }
         """.trimIndent()
     }
@@ -239,133 +231,8 @@ object IssuanceExamples {
     val batchExampleJwt: ValueExampleDescriptorDsl.() -> Unit = {
         value = """
      [
-       {
-          "issuerKey":{
-             "type":"jwk",
-             "jwk":{
-                "kty":"OKP",
-                "d":"mDhpwaH6JYSrD2Bq7Cs-pzmsjlLj4EOhxyI-9DM1mFI",
-                "crv":"Ed25519",
-                "kid":"Vzx7l5fh56F3Pf9aR3DECU5BwfrY6ZJe05aiWYWzan8",
-                "x":"T3T4-u1Xz3vAV2JwPNxWfs4pik_JLiArz_WTCvrCFUM"
-             }
-          },
-          "issuerDid":"did:key:z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp",
-          "credentialConfigurationId":"OpenBadgeCredential_jwt_vc_json",
-          "credentialData":{
-             "@context":[
-                "https://www.w3.org/2018/credentials/v1",
-                "https://purl.imsglobal.org/spec/ob/v3p0/context.json"
-             ],
-             "id":"urn:uuid:THIS WILL BE REPLACED WITH DYNAMIC DATA FUNCTION (see below)",
-             "type":[
-                "VerifiableCredential",
-                "OpenBadgeCredential"
-             ],
-             "name":"JFF x vc-edu PlugFest 3 Interoperability",
-             "issuer":{
-                "type":[
-                   "Profile"
-                ],
-                "id":"did:key:THIS WILL BE REPLACED WITH DYNAMIC DATA FUNCTION FROM CONTEXT (see below)",
-                "name":"Jobs for the Future (JFF)",
-                "url":"https://www.jff.org/",
-                "image":"https://w3c-ccg.github.io/vc-ed/plugfest-1-2022/images/JFF_LogoLockup.png"
-             },
-             "issuanceDate":"2023-07-20T07:05:44Z (THIS WILL BE REPLACED BY DYNAMIC DATA FUNCTION (see below))",
-             "expirationDate":"WILL BE MAPPED BY DYNAMIC DATA FUNCTION (see below)",
-             "credentialSubject":{
-                "id":"did:key:123 (THIS WILL BE REPLACED BY DYNAMIC DATA FUNCTION (see below))",
-                "type":[
-                   "AchievementSubject"
-                ],
-                "achievement":{
-                   "id":"urn:uuid:ac254bd5-8fad-4bb1-9d29-efd938536926",
-                   "type":[
-                      "Achievement"
-                   ],
-                   "name":"JFF x vc-edu PlugFest 3 Interoperability",
-                   "description":"This wallet supports the use of W3C Verifiable Credentials and has demonstrated interoperability during the presentation request workflow during JFF x VC-EDU PlugFest 3.",
-                   "criteria":{
-                      "type":"Criteria",
-                      "narrative":"Wallet solutions providers earned this badge by demonstrating interoperability during the presentation request workflow. This includes successfully receiving a presentation request, allowing the holder to select at least two types of verifiable credentials to create a verifiable presentation, returning the presentation to the requestor, and passing verification of the presentation and the included credentials."
-                   },
-                   "image":{
-                      "id":"https://w3c-ccg.github.io/vc-ed/plugfest-3-2023/images/JFF-VC-EDU-PLUGFEST3-badge-image.png",
-                      "type":"Image"
-                   }
-                }
-             }
-          },
-          "mapping":{
-             "id":"<uuid>",
-             "issuer":{
-                "id":"<issuerDid>"
-             },
-             "credentialSubject":{
-                "id":"<subjectDid>"
-             },
-             "issuanceDate":"<timestamp>",
-             "expirationDate":"<timestamp-in:365d>"
-          }
-       },
-       {
-          "issuerKey":{
-             "type":"jwk",
-             "jwk":{
-                "kty":"OKP",
-                "d":"mDhpwaH6JYSrD2Bq7Cs-pzmsjlLj4EOhxyI-9DM1mFI",
-                "crv":"Ed25519",
-                "kid":"Vzx7l5fh56F3Pf9aR3DECU5BwfrY6ZJe05aiWYWzan8",
-                "x":"T3T4-u1Xz3vAV2JwPNxWfs4pik_JLiArz_WTCvrCFUM"
-             }
-          },
-          "issuerDid":"did:key:z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp",
-          "credentialConfigurationId":"BankId_jwt_vc_json",
-          "credentialData":{
-             "@context":[
-                "https://www.w3.org/2018/credentials/v1"
-             ],
-             "type":[
-                "VerifiableCredential",
-                "BankId"
-             ],
-             "credentialSubject":{
-                "accountId":"1234567890",
-                "IBAN":"DE99123456789012345678",
-                "BIC":"DEUTDEDBBER",
-                "birthDate":"1958-08-17",
-                "familyName":"DOE",
-                "givenName":"JOHN",
-                "id":"identity#bankId"
-             },
-             "id":"identity#BankId#3add94f4-28ec-42a1-8704-4e4aa51006b4",
-             "issued":"2021-08-31T00:00:00Z",
-             "issuer":{
-                "id":"did:key:z6MkrHKzgsahxBLyNAbLQyB1pcWNYC9GmywiWPgkrvntAZcj",
-                "image":{
-                   "id":"https://images.squarespace-cdn.com/content/v1/609c0ddf94bcc0278a7cbdb4/1660296169313-K159K9WX8J8PPJE005HV/Walt+Bot_Logo.png?format=100w",
-                   "type":"Image"
-                },
-                "name":"CH Authority",
-                "type":"Profile",
-                "url":"https://images.squarespace-cdn.com/content/v1/609c0ddf94bcc0278a7cbdb4/1660296169313-K159K9WX8J8PPJE005HV/Walt+Bot_Logo.png?format=100w"
-             },
-             "validFrom":"2021-08-31T00:00:00Z",
-             "issuanceDate":"2021-08-31T00:00:00Z"
-          },
-          "mapping":{
-             "id":"<uuid>",
-             "issuer":{
-                "id":"<issuerDid>"
-             },
-             "credentialSubject":{
-                "id":"<subjectDid>"
-             },
-             "issuanceDate":"<timestamp>",
-             "expirationDate":"<timestamp-in:365d>"
-          }
-       }
+       $openBadgeCredentialJson,
+       $bankIdCredentialJson
     ]
     """.trimIndent()
     }
@@ -376,68 +243,11 @@ object IssuanceExamples {
         value = """
         [
            {
-              "issuerKey":{
-                 "type":"jwk",
-                 "jwk":"{\"kty\":\"OKP\",\"d\":\"mDhpwaH6JYSrD2Bq7Cs-pzmsjlLj4EOhxyI-9DM1mFI\",\"crv\":\"Ed25519\",\"kid\":\"Vzx7l5fh56F3Pf9aR3DECU5BwfrY6ZJe05aiWYWzan8\",\"x\":\"T3T4-u1Xz3vAV2JwPNxWfs4pik_JLiArz_WTCvrCFUM\"}"
-              },
-              "issuerDid":"did:key:z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp",
+              "issuerKey":$issuerKey,
+              "issuerDid":$issuerDid,
               "credentialConfigurationId":"OpenBadgeCredential_vc+sd-jwt",
-              "credentialData":{
-                 "@context":[
-                    "https://www.w3.org/2018/credentials/v1",
-                    "https://purl.imsglobal.org/spec/ob/v3p0/context.json"
-                 ],
-                 "id":"urn:uuid:THIS WILL BE REPLACED WITH DYNAMIC DATA FUNCTION (see below)",
-                 "type":[
-                    "VerifiableCredential",
-                    "OpenBadgeCredential"
-                 ],
-                 "name":"JFF x vc-edu PlugFest 3 Interoperability",
-                 "issuer":{
-                    "type":[
-                       "Profile"
-                    ],
-                    "id":"did:key:THIS WILL BE REPLACED WITH DYNAMIC DATA FUNCTION FROM CONTEXT (see below)",
-                    "name":"Jobs for the Future (JFF)",
-                    "url":"https://www.jff.org/",
-                    "image":"https://w3c-ccg.github.io/vc-ed/plugfest-1-2022/images/JFF_LogoLockup.png"
-                 },
-                 "issuanceDate":"2023-07-20T07:05:44Z (THIS WILL BE REPLACED BY DYNAMIC DATA FUNCTION (see below))",
-                 "expirationDate":"WILL BE MAPPED BY DYNAMIC DATA FUNCTION (see below)",
-                 "credentialSubject":{
-                    "id":"did:key:123 (THIS WILL BE REPLACED BY DYNAMIC DATA FUNCTION (see below))",
-                    "type":[
-                       "AchievementSubject"
-                    ],
-                    "achievement":{
-                       "id":"urn:uuid:ac254bd5-8fad-4bb1-9d29-efd938536926",
-                       "type":[
-                          "Achievement"
-                       ],
-                       "name":"JFF x vc-edu PlugFest 3 Interoperability",
-                       "description":"This wallet supports the use of W3C Verifiable Credentials and has demonstrated interoperability during the presentation request workflow during JFF x VC-EDU PlugFest 3.",
-                       "criteria":{
-                          "type":"Criteria",
-                          "narrative":"Wallet solutions providers earned this badge by demonstrating interoperability during the presentation request workflow. This includes successfully receiving a presentation request, allowing the holder to select at least two types of verifiable credentials to create a verifiable presentation, returning the presentation to the requestor, and passing verification of the presentation and the included credentials."
-                       },
-                       "image":{
-                          "id":"https://w3c-ccg.github.io/vc-ed/plugfest-3-2023/images/JFF-VC-EDU-PLUGFEST3-badge-image.png",
-                          "type":"Image"
-                       }
-                    }
-                 }
-              },
-              "mapping":{
-                 "id":"<uuid>",
-                 "issuer":{
-                    "id":"<issuerDid>"
-                 },
-                 "credentialSubject":{
-                    "id":"<subjectDid>"
-                 },
-                 "issuanceDate":"<timestamp>",
-                 "expirationDate":"<timestamp-in:365d>"
-              },
+              "credentialData":$openBadgeCredentialData,
+              "mapping":$mapping,
               "selectiveDisclosure":{
                  "fields":{
                     "name":{
@@ -453,49 +263,8 @@ object IssuanceExamples {
               },
               "issuerDid":"did:key:z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp",
               "credentialConfigurationId":"BankId_vc+sd-jwt",
-              "credentialData":{
-                 "@context":[
-                    "https://www.w3.org/2018/credentials/v1"
-                 ],
-                 "type":[
-                    "VerifiableCredential",
-                    "BankId"
-                 ],
-                 "credentialSubject":{
-                    "accountId":"1234567890",
-                    "IBAN":"DE99123456789012345678",
-                    "BIC":"DEUTDEDBBER",
-                    "birthDate":"1958-08-17",
-                    "familyName":"DOE",
-                    "givenName":"JOHN",
-                    "id":"identity#bankId"
-                 },
-                 "id":"identity#BankId#3add94f4-28ec-42a1-8704-4e4aa51006b4",
-                 "issued":"2021-08-31T00:00:00Z",
-                 "issuer":{
-                    "id":"did:key:z6MkrHKzgsahxBLyNAbLQyB1pcWNYC9GmywiWPgkrvntAZcj",
-                    "image":{
-                       "id":"https://images.squarespace-cdn.com/content/v1/609c0ddf94bcc0278a7cbdb4/1660296169313-K159K9WX8J8PPJE005HV/Walt+Bot_Logo.png?format=100w",
-                       "type":"Image"
-                    },
-                    "name":"CH Authority",
-                    "type":"Profile",
-                    "url":"https://images.squarespace-cdn.com/content/v1/609c0ddf94bcc0278a7cbdb4/1660296169313-K159K9WX8J8PPJE005HV/Walt+Bot_Logo.png?format=100w"
-                 },
-                 "validFrom":"2021-08-31T00:00:00Z",
-                 "issuanceDate":"2021-08-31T00:00:00Z"
-              },
-              "mapping":{
-                 "id":"<uuid>",
-                 "issuer":{
-                    "id":"<issuerDid>"
-                 },
-                 "credentialSubject":{
-                    "id":"<subjectDid>"
-                 },
-                 "issuanceDate":"<timestamp>",
-                 "expirationDate":"<timestamp-in:365d>"
-              },
+              "credentialData":$bankIdCredentialData,
+              "mapping":$mapping,
               "selectiveDisclosure":{
                  "fields":{
                     "credentialSubject":{
@@ -514,68 +283,11 @@ object IssuanceExamples {
     val sdJwtExample: ValueExampleDescriptorDsl.() -> Unit = {
         value = """
         {
-          "issuerKey": {
-            "type": "jwk",
-            "jwk": "{\"kty\":\"OKP\",\"d\":\"mDhpwaH6JYSrD2Bq7Cs-pzmsjlLj4EOhxyI-9DM1mFI\",\"crv\":\"Ed25519\",\"kid\":\"Vzx7l5fh56F3Pf9aR3DECU5BwfrY6ZJe05aiWYWzan8\",\"x\":\"T3T4-u1Xz3vAV2JwPNxWfs4pik_JLiArz_WTCvrCFUM\"}"
-          },
-          "issuerDid": "did:key:z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp",
+          "issuerKey": $issuerKey,
+          "issuerDid": $issuerDid,
           "credentialConfigurationId": "OpenBadgeCredential_vc+sd-jwt",
-          "credentialData": {
-            "@context": [
-              "https://www.w3.org/2018/credentials/v1",
-              "https://purl.imsglobal.org/spec/ob/v3p0/context.json"
-            ],
-            "id": "urn:uuid:THIS WILL BE REPLACED WITH DYNAMIC DATA FUNCTION (see below)",
-            "type": [
-              "VerifiableCredential",
-              "OpenBadgeCredential"
-            ],
-            "name": "JFF x vc-edu PlugFest 3 Interoperability",
-            "issuer": {
-              "type": [
-                "Profile"
-              ],
-              "id": "did:key:THIS WILL BE REPLACED WITH DYNAMIC DATA FUNCTION FROM CONTEXT (see below)",
-              "name": "Jobs for the Future (JFF)",
-              "url": "https://www.jff.org/",
-              "image": "https://w3c-ccg.github.io/vc-ed/plugfest-1-2022/images/JFF_LogoLockup.png"
-            },
-            "issuanceDate": "2023-07-20T07:05:44Z (THIS WILL BE REPLACED BY DYNAMIC DATA FUNCTION (see below))",
-            "expirationDate": "WILL BE MAPPED BY DYNAMIC DATA FUNCTION (see below)",
-            "credentialSubject": {
-              "id": "did:key:123 (THIS WILL BE REPLACED BY DYNAMIC DATA FUNCTION (see below))",
-              "type": [
-                "AchievementSubject"
-              ],
-              "achievement": {
-                "id": "urn:uuid:ac254bd5-8fad-4bb1-9d29-efd938536926",
-                "type": [
-                  "Achievement"
-                ],
-                "name": "JFF x vc-edu PlugFest 3 Interoperability",
-                "description": "This wallet supports the use of W3C Verifiable Credentials and has demonstrated interoperability during the presentation request workflow during JFF x VC-EDU PlugFest 3.",
-                "criteria": {
-                  "type": "Criteria",
-                  "narrative": "Wallet solutions providers earned this badge by demonstrating interoperability during the presentation request workflow. This includes successfully receiving a presentation request, allowing the holder to select at least two types of verifiable credentials to create a verifiable presentation, returning the presentation to the requestor, and passing verification of the presentation and the included credentials."
-                },
-                "image": {
-                  "id": "https://w3c-ccg.github.io/vc-ed/plugfest-3-2023/images/JFF-VC-EDU-PLUGFEST3-badge-image.png",
-                  "type": "Image"
-                }
-              }
-            }
-          },
-          "mapping": {
-            "id": "<uuid>",
-            "issuer": {
-              "id": "<issuerDid>"
-            },
-            "credentialSubject": {
-              "id": "<subjectDid>"
-            },
-            "issuanceDate": "<timestamp>",
-            "expirationDate": "<timestamp-in:365d>"
-          },
+          "credentialData": $openBadgeCredentialData,
+          "mapping": $mapping,
           "selectiveDisclosure": {
             "fields": {"name": {"sd": true}}
           }
