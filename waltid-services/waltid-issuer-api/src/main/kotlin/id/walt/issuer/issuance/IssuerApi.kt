@@ -69,7 +69,7 @@ fun Application.issuerApi() {
                         example("did:jwk + JWK key (RSA)", IssuanceExamples.issuerOnboardingRequestDefaultRsaExample)
                         example("did:web + JWK key (Secp256k1)", IssuanceExamples.issuerOnboardingRequestDidWebExample)
                         example(
-                            "did:key + TSE key (Hashicorp Vault Transit Engine - RSA)",
+                            "did:key + TSE key (Hashicorp Vault Transit Engine - Ed25519)",
                             IssuanceExamples.issuerOnboardingRequestTseExample
                         )
                         example(
