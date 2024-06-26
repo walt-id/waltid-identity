@@ -3,7 +3,13 @@ package id.walt.webwallet
 import id.walt.commons.featureflag.BaseFeature
 import id.walt.commons.featureflag.OptionalFeature
 import id.walt.commons.featureflag.ServiceFeatureCatalog
+import id.walt.crypto.keys.KeyGenerationRequest
+import id.walt.crypto.keys.KeyManager
+import id.walt.crypto.keys.KeyType
+import id.walt.did.dids.DidService
+import id.walt.did.dids.registrar.dids.DidKeyCreateOptions
 import id.walt.webwallet.config.*
+import kotlinx.coroutines.runBlocking
 
 object FeatureCatalog : ServiceFeatureCatalog {
 
@@ -59,4 +65,15 @@ object FeatureCatalog : ServiceFeatureCatalog {
         runtimeMockFeature,
         didWebRegistry
     )
+}
+
+fun main() = runBlocking {
+    DidService.minimalInit()
+    val type = KeyType.secp256r1
+    val key = KeyManager.createKey(KeyGenerationRequest(backend = "jwk", keyType = type))
+    println("Generated kid: ${key.getKeyId()}")
+    val did = DidService.registerByKey("key", key, DidKeyCreateOptions()).did
+    println("Generated did: $did")
+    val resolved = DidService.resolveToKey(did)
+    println("Resolved key: $resolved")
 }

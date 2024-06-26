@@ -66,8 +66,6 @@ object JvmJWKKeyCreator : JWKKeyCreator {
     private fun ecRawToJwk(rawPublicKey: ByteArray, curve: Curve): JWK {
         val spec: ECNamedCurveParameterSpec = ECNamedCurveTable.getParameterSpec(curve.name)
         val params: ECNamedCurveSpec = ECNamedCurveSpec(spec.name, spec.curve, spec.g, spec.n)
-        println(rawPublicKey.encodeBase64())
-        println(rawPublicKey.encodeToBase58String())
         val point: ECPoint? = ECPointUtil.decodePoint(params.curve, rawPublicKey)
         val pubKeySpec: ECPublicKeySpec = ECPublicKeySpec(point, params)
         val kf: KeyFactory = KeyFactory.getInstance("ECDH", BouncyCastleProvider())
@@ -81,11 +79,11 @@ object JvmJWKKeyCreator : JWKKeyCreator {
 }
 
 fun main() = runBlocking {
-    val identifier =
-        "zWmu9RCrS3hBhGSyhKfNSywuTWFCMjMxJeKhMPt6jyYidkimvaipCryGCiM61EAjAL1zY6iha35QsbSsahzyXQZEJu4XuUshQmGEPeKwzRwCCGmvMQjKSP7os7tzWoYh"
-    val raw = MultiBaseUtils.convertMultiBase58BtcToRawKey(identifier)
-    val code = MultiCodecUtils.getMultiCodecKeyCode(identifier)
-    val type = MultiCodecUtils.getKeyTypeFromKeyCode(code)
-    val key = JWKKey.importRawPublicKey(type, raw, null)
+//    val identifier =
+//        "zWmu9RCrS3hBhGSyhKfNSywuTWFCMjMxJeKhMPt6jyYidkimvaipCryGCiM61EAjAL1zY6iha35QsbSsahzyXQZEJu4XuUshQmGEPeKwzRwCCGmvMQjKSP7os7tzWoYh"
+//    val raw = MultiBaseUtils.convertMultiBase58BtcToRawKey(identifier)
+//    val code = MultiCodecUtils.getMultiCodecKeyCode(identifier)
+//    val type = MultiCodecUtils.getKeyTypeFromKeyCode(code)
+//    val key = JWKKey.importRawPublicKey(type, raw, null)
 //    println(key.exportJWK())
 }

@@ -1,7 +1,7 @@
 package id.walt.crypto.utils
 
-import io.ipfs.multibase.Base58
-import io.ipfs.multibase.Multibase
+//import io.ipfs.multibase.Base58
+//import io.ipfs.multibase.Multibase
 
 object MultiBaseUtils {
 
@@ -20,10 +20,10 @@ object MultiBaseUtils {
     }
 
     fun decodeMultiBase58Btc(mb: String): ByteArray = mb.substring(1).decodeBase58()
-    fun decodeMultiBase58Btc1(mb: String) = Multibase.decode(mb)
+//    fun decodeMultiBase58Btc1(mb: String) = Multibase.decode(mb)
 
     fun encodeMultiBase58Btc(byteArray: ByteArray): String = 'z' + byteArray.encodeToBase58String()
-    fun encodeMultiBase58Btc1(byteArray: ByteArray): String = Multibase.encode(Multibase.Base.Base58BTC, git this)
+//    fun encodeMultiBase58Btc1(byteArray: ByteArray): String = Multibase.encode(Multibase.Base.Base58BTC, git this)
 }
 
 /*expect object MultiBaseUtils {
