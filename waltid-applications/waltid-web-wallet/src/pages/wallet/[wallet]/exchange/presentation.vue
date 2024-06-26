@@ -15,49 +15,73 @@
             </div>
 
             <div v-else class="my-10">
-                <div v-for="(credential, credentialIdx) in matchedCredentials" :key="credentialIdx">
+                <div v-if="mobileView" v-for="(credential, credentialIdx) in matchedCredentials" :key="credentialIdx">
                     <div :class="{ 'mt-[-85px]': credentialIdx !== 0 }" class="col-span-1 divide-y divide-gray-200 rounded-2xl bg-white shadow transform hover:scale-105
                     cursor-pointer duration-200">
                         <VerifiableCredentialCard :credential="credential" />
                     </div>
                 </div>
+                <div class="w-full flex justify-center" v-else>
+                    <button @click="index--" class="mt-4 text-[#002159] font-bold" v-if="index > 0">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24"
+                            stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                        </svg>
+                    </button>
+                    <VerifiableCredentialCard :credential="{
+                        document: matchedCredentials[index].document
+                    }" :isDetailView="true" />
+                    <button @click="index++" class="mt-4 text-[#002159] font-bold"
+                        v-if="index < matchedCredentials.length - 1">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24"
+                            stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                        </svg>
+                    </button>
+                </div>
+                <div v-if="!mobileView" class="text-center text-gray-500 mt-2">
+                    {{ index + 1 }} of {{ matchedCredentials.length }}
+                </div>
             </div>
         </CenterMain>
-        <div class="fixed bottom-0 w-full p-4 bg-white shadow-md">
-            <button @click="acceptPresentation" class="w-full py-3 mt-4 text-white bg-[#002159] rounded-xl">
-                Share
-            </button>
-            <button @click="navigateTo(`/wallet/${walletId}`)" class="w-full py-3 mt-4 bg-white">
-                Decline
-            </button>
+        <div v-if="!failed && matchedCredentials.length" class="w-full sm:max-w-2xl sm:mx-auto">
+            <div class="fixed sm:relative bottom-0 w-full p-4 bg-white shadow-md sm:shadow-none sm:flex sm:justify-end
+                        sm:gap-4">
+                <button @click="acceptPresentation" class="w-full sm:w-44 py-3 mt-4 text-white bg-[#002159] rounded-xl">
+                    Accept
+                </button>
+                <button @click="navigateTo(`/wallet/${walletId}`)"
+                    class="w-full sm:w-44 py-3 mt-4 bg-white sm:border sm:border-gray-400 sm:rounded-xl">
+                    Decline
+                </button>
+            </div>
         </div>
     </div>
 </template>
 
 <script lang="ts" setup>
-import CenterMain from "~/components/CenterMain.vue";
-import PageHeader from "~/components/PageHeader.vue";
-import ActionButton from "~/components/buttons/ActionButton.vue";
-import LoadingIndicator from "~/components/loading/LoadingIndicator.vue";
-import { groupBy } from "~/composables/groupings";
 import { useTitle } from "@vueuse/core";
+import { groupBy } from "~/composables/groupings";
+import CenterMain from "~/components/CenterMain.vue";
+import { encodeDisclosure } from "~/composables/disclosures";
+import LoadingIndicator from "~/components/loading/LoadingIndicator.vue";
 import VerifiableCredentialCard from "~/components/credentials/VerifiableCredentialCard.vue";
 
-import { Disclosure, DisclosureButton, DisclosurePanel } from "@headlessui/vue";
-import { encodeDisclosure, parseDisclosures } from "~/composables/disclosures";
+const index = ref(0);
+const failed = ref(false);
+const immediateAccept = ref(false);
+const mobileView = ref(window.innerWidth < 650);
+const failMessage = ref("Unknown error occurred.");
 
 const route = useRoute();
 const walletId = route.params.wallet;
 const currentWallet = useCurrentWallet();
-
-async function resolvePresentationRequest(request) {
+async function resolvePresentationRequest(request: string) {
     try {
-        console.log("RESOLVING request", request);
         const response = await $fetch(`/wallet-api/wallet/${currentWallet.value}/exchange/resolvePresentationRequest`, {
             method: "POST",
             body: request
         });
-        console.log(response);
         return response;
     } catch (e) {
         failed.value = true;
@@ -65,68 +89,35 @@ async function resolvePresentationRequest(request) {
     }
 }
 
-
 const query = useRoute().query;
-
-const request = await resolvePresentationRequest(decodeRequest(query.request));
-console.log("Decoded request: " + request);
-
-const presentationUrl = new URL(request);
+const request = await resolvePresentationRequest(decodeRequest(query.request as string));
+const presentationUrl = new URL(request as string);
 const presentationParams = presentationUrl.searchParams;
 
 const verifierHost = new URL(presentationParams.get("response_uri") ?? presentationParams.get("redirect_uri") ?? "").host;
-console.log("verifierHost: ", verifierHost);
-
-const presentationDefinition = presentationParams.get("presentation_definition");
-console.log("presentationDefinition: ", presentationDefinition);
-
-let inputDescriptors = JSON.parse(presentationDefinition)["input_descriptors"];
-console.log("inputDescriptors: ", inputDescriptors);
-
-let i = 0;
-let groupedCredentialTypes = groupBy(
-    inputDescriptors.map((item) => {
-        return { id: ++i, name: item.id };
-    }),
-    (c) => c.name
-);
-console.log("groupedCredentialTypes: ", groupedCredentialTypes);
-
-const immediateAccept = ref(false);
-
-const failed = ref(false);
-const failMessage = ref("Unknown error occurred.");
-
-
-const matchedCredentials = await $fetch<Array<Object>>(`/wallet-api/wallet/${currentWallet.value}/exchange/matchCredentialsForPresentationDefinition`, {
+const presentationDefinition = presentationParams.get("presentation_definition") as string;
+const matchedCredentials = await $fetch<Array<{ id: string, document: string }>>(`/wallet-api/wallet/${currentWallet.value}/exchange/matchCredentialsForPresentationDefinition`, {
     method: "POST",
     body: presentationDefinition
 });
 
-const selection = ref({});
+const selection = ref<{ [key: string]: boolean; }>({});
 const selectedCredentialIds = computed(() => Object.entries(selection.value).filter((it) => it[1]).map((it) => it[0]))
-
 for (let credential of matchedCredentials) {
     selection.value[credential.id] = true
 }
 
-/*if (matchedCredentials.value.length == 1) {
-    selection[matchedCredentials[0].id] = true
-}*/
-
-const disclosures = ref({});
-//const encodedDisclosures = computed(() => Object.keys(disclosures.value).map((cred) => disclosures.values[cred].map((disclosure) => encodeDisclosure(disclosure))))
+const disclosures: Ref<{ [key: string]: any[] }> = ref({});
 const encodedDisclosures = computed(() => {
     if (JSON.stringify(disclosures.value) === "{}") return null
 
-    const m = {}
+    const m: { [key: string]: any[] } = {}
     for (let credId in disclosures.value) {
         if (m[credId] === undefined) {
             m[credId] = []
         }
 
         for (let disclosure of disclosures.value[credId]) {
-            console.log("DISC ", disclosure)
             m[credId].push(encodeDisclosure(disclosure))
         }
     }
@@ -138,7 +129,6 @@ function addDisclosure(credentialId: string, disclosure: string) {
     if (disclosures.value[credentialId] === undefined) {
         disclosures.value[credentialId] = []
     }
-
     disclosures.value[credentialId].push(disclosure)
 }
 
@@ -164,9 +154,7 @@ async function acceptPresentation() {
     });
 
     if (response.ok) {
-        console.log("Response: " + response);
         const parsedResponse: { redirectUri: string } = await response.json();
-
         if (parsedResponse.redirectUri) {
             navigateTo(parsedResponse.redirectUri, {
                 external: true
@@ -179,7 +167,7 @@ async function acceptPresentation() {
         }
     } else {
         failed.value = true;
-        const error: { message: string; redirectUri: string | null | undefined } = await response.json();
+        const error: { message: string; redirectUri: string | null | undefined, errorMessage: string } = await response.json();
         failMessage.value = error.message;
 
         console.log("Error response: " + JSON.stringify(error));
@@ -190,25 +178,17 @@ async function acceptPresentation() {
                 external: true
             });
         }
-        //console.log("Policy verification failed: ", err)
-
-        //let sessionId = presentationUrl.searchParams.get('state');
-        //window.location.href = `https://portal.walt.id/success/${sessionId}`;
-
-        //window.alert(err)
-        //throw err
     }
 }
 
 if (query.accept) {
-    // TODO make accept a JWT or something wallet-backend secured
     immediateAccept.value = true;
     acceptPresentation();
 }
 
 useTitle(`Present credentials - walt.id`);
 definePageMeta({
-    layout: false
+    layout: window.innerWidth > 650 ? "desktop-without-sidebar" : false,
 });
 </script>
 

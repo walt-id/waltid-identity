@@ -12,7 +12,7 @@
             <div class="font-bold text-lg">DID</div>
             <p class="mt-2">Your public Decentralised Identifier (DID) can be openly shared for issuers to issue
                 credentials.</p>
-            <div class="bg-gray-100 rounded-lg p-4 mt-4">
+            <div class="bg-gray-100 rounded-lg p-4 mt-4 max-w-md md:max-w-lg lg:max-w-xl">
                 <div class="overflow-auto" v-if="dids.length > 0">{{ dids[0].did }}</div>
                 <p v-else>No DID available</p>
             </div>

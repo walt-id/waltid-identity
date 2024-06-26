@@ -11,7 +11,7 @@
             </div>
         </div>
 
-        <div class="sm:mt-18">
+        <div :class="{ 'sm:mt-18': isNotExpired, 'sm:mt-8': !isNotExpired }">
             <div :class="{ 'text-white': issuerName, 'text-[#0573f000]': !issuerName }">Issuer</div>
             <div :class="{ 'text-white': issuerName, 'text-[#0573f000]': !issuerName }" class="font-bold">
                 {{ issuerName ?? 'Unknown' }}
@@ -58,7 +58,6 @@ const manifest = ref(props.credential?.manifest != "{}" ? props.credential?.mani
 const manifestDisplay = ref(manifest.value ? (typeof manifest.value === 'string' ? JSON.parse(manifest.value) : manifest.value)?.display : null);
 const manifestCard = ref(manifestDisplay.value?.card);
 
-const title = ref(manifestDisplay.value?.title ?? credential.value?.type?.at(-1));
 const titleTitelized = ref(manifestDisplay.value?.title ?? credential.value?.type?.at(-1).replace(/([a-z0-9])([A-Z])/g, "$1 $2"));
 const credentialSubtitle = ref(manifestCard.value?.description ?? credential.value?.name);
 
@@ -76,7 +75,6 @@ const updateComponent = () => {
     manifest.value = props.credential?.manifest != "{}" ? props.credential?.manifest : null;
     manifestDisplay.value = manifest.value ? (typeof manifest.value === 'string' ? JSON.parse(manifest.value) : manifest.value)?.display : null;
     manifestCard.value = manifestDisplay.value?.card;
-    title.value = manifestDisplay.value?.title ?? credential.value?.type?.at(-1);
     titleTitelized.value = manifestDisplay.value?.title ?? credential.value?.type?.at(-1).replace(/([a-z0-9])([A-Z])/g, "$1 $2");
     credentialSubtitle.value = manifestCard.value?.description ?? credential.value?.name;
     credentialImageUrl.value = manifestCard.value?.logo?.uri ?? credential.value?.issuer?.image?.id ?? credential.value?.issuer?.image;

@@ -1,25 +1,10 @@
 <template>
     <div class="min-h-full">
-        <ClientOnly>
-            <div v-if="$pwa?.needRefresh" class="pwa-toast" role="alert">
-                <div class="message">New content available, click on reload button to update.</div>
-                <button @click="$pwa.updateServiceWorker()">Reload</button>
-            </div>
-            <div v-if="$pwa?.showInstallPrompt && !$pwa?.offlineReady && !$pwa?.needRefresh" class="pwa-toast"
-                role="alert">
-                <div class="message">
-                    <span> Install PWA </span>
-                </div>
-                <button @click="$pwa.install()">Install</button>
-                <button @click="$pwa.cancelInstall()">Cancel</button>
-            </div>
-        </ClientOnly>
-
         <div class="flex h-20 flex-shrink-0 border-b border-gray-200 bg-white justify-between items-center px-8">
             <div class="flex items-center px-4 gap-4">
-                <div>
+                <NuxtLink :to="`/wallet/${currentWallet}`">
                     <img :src="logoImg" alt="walt.id logo" class="h-10" />
-                </div>
+                </NuxtLink>
                 <div>
                     <div class="text-[#002159] text-bold text-[20px]">ID WALLET</div>
                     <div class="text-[#002159] text-[15px]">by walt.id</div>

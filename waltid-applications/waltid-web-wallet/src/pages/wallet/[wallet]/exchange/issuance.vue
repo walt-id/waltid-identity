@@ -15,7 +15,7 @@
             </div>
 
             <div>
-                <div class="my-10 sm:flex flex-col items-center">
+                <div class="my-10">
                     <div v-if="mobileView" v-for="(group, index) in groupedCredentialTypes.keys()" :key="group.id">
                         <div v-for="credential in groupedCredentialTypes.get(group)" :key="credential"
                             :class="{ 'mt-[-85px]': index !== 0 }" class="col-span-1 divide-y divide-gray-200 rounded-2xl bg-white shadow transform hover:scale-105
@@ -30,7 +30,7 @@
                             }" :isDetailView="true" />
                         </div>
                     </div>
-                    <div class="w-full sm:w-[400px] flex" v-else>
+                    <div class="w-full flex justify-center" v-else>
                         <button @click="index--" class="mt-4 text-[#002159] font-bold" v-if="index > 0">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24"
                                 stroke="currentColor">
@@ -54,6 +54,9 @@
                                     d="M9 5l7 7-7 7" />
                             </svg>
                         </button>
+                    </div>
+                    <div v-if="!mobileView" class="text-center text-gray-500 mt-2">
+                        {{ index + 1 }} of {{ credentialCount }}
                     </div>
                 </div>
                 <div class="sm:w-[80%] md:w-[60%] mx-auto">

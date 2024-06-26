@@ -17,14 +17,17 @@ const props = defineProps<{
 </script>
 
 <template>
-    <label class="relative inline-flex cursor-pointer items-center justify-center rounded-md bg-white p-1">
+    <label class="relative inline-flex cursor-pointer items-center justify-center rounded-md bg-white p-1 gap-2">
         <input type="checkbox" class="sr-only" @change="handleOptionChange" />
-        <span :class="`${option1Selected ? 'bg-[#002159] text-white' : ''}`" class=" text-black flex items-center space-x-[6px] rounded py-2 px-[18px] text-sm
+        <span
+            :class="`${option1Selected ? 'bg-[#002159] text-white sm:bg-gradient-to-r from-[#0573F0] to-[#03449E]' : 'sm:border border-[#002159]'}`"
+            class=" text-black flex items-center space-x-[6px] rounded sm:rounded-full py-2 px-[18px] text-sm
             font-bold">
             {{ options[0] }}
         </span>
-        <span :class="`${!option1Selected ? 'bg-[#002159] text-white' : ''}`"
-            class="flex items-center space-x-[6px] rounded py-2 px-[18px] text-sm text-black font-bold">
+        <span
+            :class="`${!option1Selected ? 'bg-[#002159] text-white sm:bg-gradient-to-r from-[#0573F0] to-[#03449E]' : 'sm:border border-[#002159]'}`"
+            class="flex items-center space-x-[6px] rounded sm:rounded-full py-2 px-[18px] text-sm text-black font-bold">
             {{ options[1] }}
         </span>
     </label>

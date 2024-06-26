@@ -4,7 +4,7 @@
             <LoadingIndicator>Loading credential...</LoadingIndicator>
         </div>
         <div v-else>
-            <div class="flex justify-between items-center">
+            <div class="flex justify-between items-center sm:hidden">
                 <div class="cursor-pointer bg-gray-100 rounded-full w-8 h-8 flex items-center justify-center text-black text-xs font-bold"
                     @click="navigateTo({ path: `/wallet/${walletId}` })">X</div>
                 <div class="cursor-pointer bg-gray-100 rounded-full w-8 h-8 flex items-center justify-center text-black text-xs font-bold"
@@ -18,10 +18,53 @@
                     </svg>
                 </div>
             </div>
-            <div class="my-10">
+            <div v-if="credential" class="my-10 sm:flex justify-center">
                 <VerifiableCredentialCard :credential="credential" :isDetailView="true" />
             </div>
-            <div class="px-4 py-6 shadow-sm bg-white rounded-xl" v-if="credentialManifest">
+
+            <!-- Desktop view -->
+            <div class="hidden sm:block px-4 py-6 bg-white rounded-xl">
+                <hr v-if="credentialManifest" class="w-full border-gray-200 my-2" />
+                <div v-if="credentialManifest" class="text-gray-500 font-bold mt-4 mb-8">Subject Info</div>
+                <div v-for="(value, key, index) in credentialManifest?.claims" :key="key">
+                    <div class="flex mt-3">
+                        <div class="text-gray-500 w-sm">{{ key }}</div>
+                        <div class="text-gray-500 font-bold">{{ value }}</div>
+                    </div>
+                </div>
+                <hr class="w-full border-gray-200 mb-2 mt-8" />
+                <div class="text-gray-500 font-bold mt-4 mb-8">Issuer</div>
+                <div class="flex mt-2">
+                    <div class="text-gray-500 w-sm">Name</div>
+                    <div class="text-gray-500 font-bold">{{ issuerName }}</div>
+                </div>
+                <div class="flex mt-2 mb-8">
+                    <div class="text-gray-500 w-sm">DID</div>
+                    <div class="text-gray-500 font-bold">{{ issuerDid }}</div>
+                </div>
+                <hr class="w-full border-gray-200 my-2" />
+                <div class="flex justify-between my-6">
+                    <div v-if="jwtJson?.expirationDate" class="text-gray-500">Valid through
+                        {{ issuanceDate?.replace(/-/g, ".") }} -
+                        {{ new Date(jwtJson?.expirationDate).toISOString().slice(0, 10).replace(/-/g, ".") }}
+                    </div>
+                    <div v-else class="text-gray-500">No expiration date</div>
+                    <div class="text-gray-500">Issued {{ issuanceDate?.replace(/-/g, ".") }}</div>
+                </div>
+                <div class="flex justify-between my-16">
+                    <div class="text-blue-500 cursor-pointer underline"
+                        @click="showCredentialJson = !showCredentialJson">
+                        {{ showCredentialJson ? "Hide" : "Show" }} Credential JSON
+                    </div>
+                    <div class="text-red-500 cursor-pointer underline" @click="deleteCredential">Delete Credential</div>
+                </div>
+                <div v-if="showCredentialJson" class="bg-gray-100 p-4 rounded-xl overflow-auto">
+                    <pre class="text-xs">{{ jwtJson }}</pre>
+                </div>
+            </div>
+
+            <!-- Mobile view -->
+            <div class="px-4 py-6 shadow-sm bg-white rounded-xl sm:hidden" v-if="credentialManifest">
                 <div class="text-gray-600 font-bold mb-4">Credential Details</div>
                 <div v-for="(value, key, index) in credentialManifest.claims" :key="key">
                     <div class="text-gray-500">{{ key }}</div>
@@ -117,10 +160,10 @@ watchEffect(() => {
 });
 
 const issuanceDate = computed(() => {
-    if (jwtJson?.issuanceDate) {
-        return new Date(jwtJson?.issuanceDate).toISOString().slice(0, 10);
-    } else if (jwtJson?.validFrom) {
-        return new Date(jwtJson?.validFrom).toISOString().slice(0, 10);
+    if (jwtJson.value?.issuanceDate) {
+        return new Date(jwtJson.value?.issuanceDate).toISOString().slice(0, 10);
+    } else if (jwtJson.value?.validFrom) {
+        return new Date(jwtJson.value?.validFrom).toISOString().slice(0, 10);
     } else {
         return null;
     }
@@ -136,6 +179,6 @@ async function deleteCredential() {
 }
 
 definePageMeta({
-    layout: false
+    layout: window.innerWidth > 650 ? "desktop-without-sidebar" : false,
 });
 </script>

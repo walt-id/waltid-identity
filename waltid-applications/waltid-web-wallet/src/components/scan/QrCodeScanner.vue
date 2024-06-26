@@ -21,7 +21,7 @@
         </div>
 
         <!-- Menu bar -->
-        <div v-if="noError" class="text-center">
+        <div v-if="noError" class="text-center sm:hidden">
             <p class="font-semibold text-[#E6F6FF]">Scan Code</p>
             <p class="text-[#E6F6FF]">Scan QR codes to receive or present credentials</p>
         </div>
@@ -33,10 +33,10 @@
         <!-- Error indicator -->
         <div v-if="!noError" class="px-4 py-5 sm:px-6">
             <div class="flex flex-row gap-1.5 place-items-center">
-                <VideoCameraSlashIcon class="w-5 h-5 text-[#E6F6FF]" />
-                <p class="font-semibold text-[#E6F6FF]">{{ error.title }}</p>
+                <VideoCameraSlashIcon class="w-5 h-5 text-[#E6F6FF] sm:text-black" />
+                <p class="font-semibold text-[#E6F6FF] sm:text-black sm:text-sm">{{ error.title }}</p>
             </div>
-            <p class="text-[#E6F6FF]">{{ error.message }}</p>
+            <p class="text-[#E6F6FF] sm:text-black sm:text-sm">{{ error.message }}</p>
         </div>
     </div>
 </template>

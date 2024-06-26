@@ -1,6 +1,6 @@
 <template>
     <CenterMain>
-        <WalletListing v-if="wallets && wallets.length > 1" :wallets="wallets" :use-url="walletUrlFunction"/>
+        <WalletListing v-if="wallets && wallets.length > 1" :wallets="wallets" :use-url="walletUrlFunction" />
         <LoadingIndicator v-else>Loading wallets...</LoadingIndicator>
     </CenterMain>
 </template>
@@ -27,4 +27,8 @@ if (wallets && wallets.length == 1) {
     setWallet(wallet.id, undefined)
     navigateTo(walletUrlFunction(wallets[0]))
 }
+
+definePageMeta({
+    layout: "minimal"
+});
 </script>

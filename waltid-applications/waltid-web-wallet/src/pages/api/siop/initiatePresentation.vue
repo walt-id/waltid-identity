@@ -1,6 +1,6 @@
 <template>
     <CenterMain>
-        <WalletListing v-if="wallets && wallets.length > 1" :wallets="wallets" :use-url="walletUrlFunction"/>
+        <WalletListing v-if="wallets && wallets.length > 1" :wallets="wallets" :use-url="walletUrlFunction" />
         <LoadingIndicator v-else>Loading wallets...</LoadingIndicator>
     </CenterMain>
 </template>
@@ -9,7 +9,7 @@
 import CenterMain from "~/components/CenterMain.vue";
 import LoadingIndicator from "~/components/loading/LoadingIndicator.vue";
 import WalletListing from "~/components/wallets/WalletListing.vue";
-import {encodeRequest, fixRequest} from "~/composables/siop-requests";
+import { encodeRequest, fixRequest } from "~/composables/siop-requests";
 const queryRequest = new URL("http://example.invalid" + useRoute().fullPath).search // new URL(window.location.href).search
 console.log("queryRequest: ", queryRequest)
 
@@ -29,4 +29,8 @@ if (wallets && wallets.length == 1) {
     setWallet(wallet.id, undefined)
     navigateTo(walletUrlFunction(wallets[0]))
 }
+
+definePageMeta({
+    layout: "minimal"
+});
 </script>

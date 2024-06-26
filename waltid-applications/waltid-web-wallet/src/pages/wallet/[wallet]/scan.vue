@@ -1,11 +1,22 @@
 <template>
-    <div class="bg-[#3e4c597d]">
-        <div class="absolute top-3 left-3 cursor-pointer bg-gray-100 rounded-full w-8 h-8 flex items-center justify-center text-black text-xs font-bold"
+    <div class="bg-[#3e4c597d] sm:bg-white">
+        <div class="sm:hidden absolute top-3 left-3 cursor-pointer bg-gray-100 rounded-full w-8 h-8 flex items-center justify-center text-black text-xs font-bold"
             @click="navigateTo({ path: `/wallet/${walletId}` })">X</div>
-        <div class="flex flex-col justify-center items-center h-[100vh]">
-            <QrCodeScanner v-if="qrCodeDisplay" @request="startRequest" />
-            <ManualRequestEntry v-else @request="startRequest" />
-            <toggle class="mt-10" @update:option1-selected="qrCodeDisplay = $event" :options="['QR Code', 'Manual']" />
+        <div class="flex flex-col justify-center items-center sm:justify-start h-[100vh]">
+            <div v-if="isMobileView" class="w-full flex flex-col items-center">
+                <QrCodeScanner v-if="qrCodeDisplay" @request="startRequest" />
+                <ManualRequestEntry v-else @request="startRequest" />
+                <toggle class="mt-10" @update:option1-selected="qrCodeDisplay = $event"
+                    :options="['QR Code', 'Manual']" />
+            </div>
+            <div v-else class="w-2/3 lg:w-1/3 p-4">
+                <h1 class="text-2xl font-bold">Present/Receive Credential</h1>
+                <p class="text-xs mb-4">Paste offer URL or scan code.</p>
+                <toggle class="mb-3" @update:option1-selected="qrCodeDisplay = $event"
+                    :options="['Scan Code', 'Offer URL']" />
+                <QrCodeScanner v-if="qrCodeDisplay" @request="startRequest" />
+                <ManualRequestEntry v-else @request="startRequest" />
+            </div>
         </div>
     </div>
 </template>
@@ -15,6 +26,8 @@ import ManualRequestEntry from "~/components/scan/ManualRequestEntry.vue";
 import { encodeRequest, fixRequest } from "~/composables/siop-requests";
 import QrCodeScanner from "~/components/scan/QrCodeScanner.vue";
 import toggle from "~/components/toggle.vue";
+
+const isMobileView = ref(window.innerWidth < 650);
 
 const route = useRoute();
 const walletId = route.params.wallet;
@@ -49,7 +62,7 @@ function redirectByOfferType(offerUrl, encoded) {
 }
 
 definePageMeta({
-    layout: false,
+    layout: window.innerWidth > 650 ? "desktop-without-sidebar" : false,
 });
 </script>
 <style scoped></style>
