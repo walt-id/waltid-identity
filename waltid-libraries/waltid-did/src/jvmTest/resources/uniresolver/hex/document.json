@@ -1,0 +1,13 @@
+{
+  "@context": "https://www.w3.org/ns/did/v1",
+  "id": "did:io:0x476c81C27036D05cB5ebfe30ae58C23351a61C4A",
+  "proof": {},
+  "authentication": [
+    {
+      "id": "did:io:0x476c81C27036D05cB5ebfe30ae58C23351a61C4A#owner",
+      "type": "EcdsaSecp256k1VerificationKey2019",
+      "controller": "did:io:0x476c81C27036D05cB5ebfe30ae58C23351a61C4A",
+      "publicKeyHex": "0355237d4af6afc7f139e396329d56a4d1235c94abde9a25782241774c06cccfb6"
+    }
+  ]
+}

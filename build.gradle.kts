@@ -5,16 +5,25 @@ allprojects {
     version = "1.0.0-SNAPSHOT"
 
     repositories {
+        google()
         mavenCentral()
+        maven(url = "https://maven.walt.id/repository/waltid/")
+        maven(url = "https://jitpack.io")
     }
 }
 
 plugins {
-    val kotlinVersion = "1.9.23"
+//    val kotlinVersion = "2.0.0"
+    val kotlinVersion = "2.0.0"
     kotlin("multiplatform") version kotlinVersion apply false
-    kotlin("plugin.serialization") version kotlinVersion apply false
-    id("com.github.ben-manes.versions") version "0.49.0" apply false
     kotlin("jvm") version kotlinVersion
+
+    kotlin("plugin.serialization") version kotlinVersion apply false
+
+    //id("com.android.library") version "8.5.0" apply false
+    //id("com.android.application") version "8.5.0" apply false
+    id("com.github.ben-manes.versions") version "0.51.0" apply false
+
 }
 dependencies {
     implementation(kotlin("stdlib"))

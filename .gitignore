@@ -5,6 +5,7 @@ build/
 !gradle/wrapper/gradle-wrapper.jar
 !**/src/main/**/build/
 !**/src/test/**/build/
+.kotlin
 
 ### IntelliJ IDEA ###
 .idea/
@@ -45,6 +46,7 @@ bin/
 # walt.id
 secret*
 */data
+*/*/data
 **/*.db
 /kotlin-js-store/
 .idea/misc.xml
@@ -53,9 +55,7 @@ secret*
 **/.nuxt
 **/.output
 **/node_modules
-/waltid-openid4vc/issuer-cert.pem
-/waltid-openid4vc/issuer-priv.pem
-/waltid-openid4vc/issuer-pub.pem
-/waltid-openid4vc/root-ca-cert.pem
-/waltid-openid4vc/root-ca-priv.pem
-/waltid-openid4vc/root-ca-pub.pem
+
+**/.kotlin
+
+**/*.pem

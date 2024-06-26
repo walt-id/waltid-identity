@@ -1,0 +1,35 @@
+title OpenID4VC verification
+
+User->waltid-web-portal: Select credential types to be verified,\n choose verification options,\n start verification
+waltid-web-portal->waltid-verifier-api: POST request: /openid4vc/verify
+waltid-verifier-api->waltid-openid4vc: Open session on implementation of abstract class OpenIDCredentialVerifier:\n OIDCVerifierService.initializeAuthorization
+waltid-openid4vc-->waltid-verifier-api: return session object
+waltid-verifier-api-->waltid-web-portal: return OpenID4VC verification URL\nwith session parameters
+waltid-web-portal-->waltid-web-portal: display QR code with returned URL
+User->waltid-web-wallet: Click "Scan to receive or present credentials"
+User->waltid-web-wallet: Scan QR code on web-portal or copy/paste OpenID4VC URL
+User->waltid-web-wallet: Click "Present credential"
+waltid-web-wallet->waltid-wallet-api: POST /wallet/<wallet-id>/exchange/resolvePresentationRequest
+waltid-wallet-api->waltid-openid4vc: Call implementation of OpenIDCredentialWallet::resolveVPAuthorizationParameters (TestCredentialWallet)
+waltid-openid4vc-->waltid-wallet-api: return verification request with potentially lazy-loaded parameters resolved (e.g. presentation definition)
+waltid-wallet-api-->waltid-web-wallet: return resolved presentation request
+waltid-web-wallet->waltid-wallet-api: POST /wallet/<wallet-id>/exchange/matchCredentialsForPresentationDefinition
+waltid-wallet-api->waltid-wallet-api: Find credentials matching requested presentation definition \n(SSIKit2WalletService)
+waltid-wallet-api-->waltid-web-wallet: Return matching credentials
+waltid-web-wallet-->waltid-web-wallet: Display matching credentials
+User->waltid-web-wallet: Select credentials to present
+User->waltid-web-wallet: Click "Accept"
+waltid-web-wallet->waltid-wallet-api: POST /wallet/<wallet-id>/exchange/usePresentationRequest
+waltid-wallet-api->waltid-openid4vc: Call implementation of OpenIDCredentialWallet::initializeAuthorization (TestCredentialWallet)
+waltid-openid4vc->waltid-openid4vc: Validate authorization request
+waltid-openid4vc->waltid-wallet-api: create SIOP session (via abstract method)
+waltid-wallet-api->waltid-openid4vc: Call OpenIDProvider::processImplicitFlowAuthorization via implementation of OpenIDCredentialWallet class (TestCredentialWallet)
+waltid-openid4vc->waltid-openid4vc: generateTokenResponse on OpenIDCrdentialWallet
+waltid-openid4vc->waltid-wallet-api: generatePresentationForVPToken via abstract method on OpenIDCredentialWallet, on derived class TestCredentialWallet
+waltid-wallet-api->waltid-wallet-api: Find matching credentials
+waltid-wallet-api->waltid-wallet-api: Create and sign verifiable presentation
+waltid-wallet-api-->waltid-wallet-api: return token response with verifiable presentation
+waltid-wallet-api->waltid-verifier-api: POST: Submit presentation to response_uri/redirect_uri of presentation request
+waltid-verifier-api-->waltid-wallet-api: Response with redirection url (if any)
+waltid-wallet-api-->waltid-web-wallet: return redirection url or empty success response
+waltid-web-wallet-->waltid-web-wallet: redirect browser to success page
