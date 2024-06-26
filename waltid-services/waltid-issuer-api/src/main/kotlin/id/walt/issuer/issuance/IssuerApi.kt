@@ -21,7 +21,7 @@ import kotlinx.serialization.json.*
 import kotlin.time.Duration.Companion.minutes
 
 private val logger = KotlinLogging.logger {}
-suspend fun createCredentialOfferUri(issuanceRequests: List<IssuanceRequest>): String {
+fun createCredentialOfferUri(issuanceRequests: List<IssuanceRequest>): String {
     val credentialOfferBuilder =
         OidcIssuance.issuanceRequestsToCredentialOfferBuilder(issuanceRequests)
 
@@ -29,11 +29,7 @@ suspend fun createCredentialOfferUri(issuanceRequests: List<IssuanceRequest>): S
         credentialOfferBuilder = credentialOfferBuilder, expiresIn = 5.minutes, allowPreAuthorized = true
     )
     OidcApi.setIssuanceDataForIssuanceId(issuanceSession.id, issuanceRequests.map {
-        val key = if (it.issuerKey["type"].toJsonElement().jsonPrimitive.content == "jwk") {
-            KeySerialization.deserializeJWTKey(it.issuerKey).getOrThrow()
-        } else {
-            KeyManager.resolveSerializedKey(it.issuerKey)
-        }
+        val key = KeyManager.resolveSerializedKey(it.issuerKey)
 
         CIProvider.IssuanceSessionData(
             key, it.issuerDid, it
