@@ -2,6 +2,7 @@ package id.walt
 
 import id.walt.commons.config.ConfigManager
 import id.walt.credentials.vc.vcs.W3CVC
+import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeySerialization
 import id.walt.issuer.issuance.IssuanceRequest
 import id.walt.issuer.issuance.createCredentialOfferUri
@@ -168,8 +169,7 @@ class IssuerApiTest {
 
     @Test
     fun testSign() = runTest {
-        val jsonKeyObj = Json.decodeFromString<JsonObject>(TEST_KEY)
-        val key = KeySerialization.deserializeJWTKey(jsonKeyObj).getOrThrow()
+        val key = KeyManager.resolveSerializedKey(TEST_KEY)
         val jsonVCObj = Json.decodeFromString<JsonObject>(TEST_W3VC)
 
         val subjectDid = TEST_SUBJECT_DID
