@@ -21,48 +21,59 @@ class ExpirationDatePolicy : CredentialWrapperValidatorPolicy(
     @JsPromise
     @JsExport.Ignore
     override suspend fun verify(data: JsonElement, args: Any?, context: Map<String, Any>): Result<Any> {
-        var successfulKey = ""
-
-        fun setKey(key: String) {
-            successfulKey = key
-        }
-
-        val exp = data.jsonObject["exp"]?.jsonPrimitive?.longOrNull?.let { setKey("jwt:exp"); Instant.fromEpochSeconds(it) }
-            ?: data.jsonObject["validUntil"]?.jsonPrimitive?.let { setKey("validUntil"); Instant.parse(it.content) }
-            ?: data.jsonObject["expirationDate"]?.jsonPrimitive?.let { setKey("expirationDate"); Instant.parse(it.content) }
-            ?: return Result.success(
-                JsonObject(mapOf("policy_available" to JsonPrimitive(false)))
-            )
+        val (key, exp) = getExpirationKeyValuePair(data) ?: return buildPolicyUnavailableResult()
 
         val now = Clock.System.now()
 
-        if (now > exp) {
-            val expiredSince = now - exp
-            return Result.failure(
-                ExpirationDatePolicyException(
-                    date = exp,
-                    dateSeconds = exp.epochSeconds,
-                    expiredSince = expiredSince,
-                    expiredSinceSeconds = expiredSince.inWholeSeconds,
-                    key = successfulKey,
-                    policyAvailable = true
-                )
-            )
+        return if (now > exp) {
+            buildFailureResult(now, exp, key)
         } else {
-            val expiresIn = exp - now
+            buildSuccessResult(now, exp, key)
+        }
+    }
 
-            return Result.success(
-                JsonObject(
-                    mapOf(
-                        "date" to JsonPrimitive(exp.toString()),
-                        "date_seconds" to JsonPrimitive(exp.epochSeconds),
-                        "expires_in" to JsonPrimitive(expiresIn.toString()),
-                        "expires_in_seconds" to JsonPrimitive(expiresIn.inWholeSeconds),
-                        "used_key" to JsonPrimitive(successfulKey),
-                        "policy_available" to JsonPrimitive(true)
-                    )
+    private fun getExpirationKeyValuePair(data: JsonElement): Pair<String, Instant>? =
+        checkVc(data.jsonObject["vc"]) ?: checkJwt(data)
+
+    private fun checkJwt(data: JsonElement?) =
+        data?.jsonObject?.get("exp")?.jsonPrimitive?.longOrNull?.let { Pair("jwt:exp", Instant.fromEpochSeconds(it)) }
+
+    private fun checkVc(data: JsonElement?) =
+        data?.jsonObject?.get("validUntil")?.jsonPrimitive?.let {
+            Pair("validUntil", Instant.parse(it.content))
+        } ?: data?.jsonObject?.get("expirationDate")?.jsonPrimitive?.let {
+            Pair("expirationDate", Instant.parse(it.content))
+        }
+
+    private fun buildPolicyUnavailableResult() = Result.success(
+        JsonObject(mapOf("policy_available" to JsonPrimitive(false)))
+    )
+
+    private fun buildFailureResult(now: Instant, exp: Instant, key: String) = (now - exp).let {
+        Result.failure<ExpirationDatePolicyException>(
+            ExpirationDatePolicyException(
+                date = exp,
+                dateSeconds = exp.epochSeconds,
+                expiredSince = it,
+                expiredSinceSeconds = it.inWholeSeconds,
+                key = key,
+                policyAvailable = true
+            )
+        )
+    }
+
+    private fun buildSuccessResult(now: Instant, exp: Instant, key: String) = (exp - now).let {
+        Result.success(
+            JsonObject(
+                mapOf(
+                    "date" to JsonPrimitive(exp.toString()),
+                    "date_seconds" to JsonPrimitive(exp.epochSeconds),
+                    "expires_in" to JsonPrimitive(it.toString()),
+                    "expires_in_seconds" to JsonPrimitive(it.inWholeSeconds),
+                    "used_key" to JsonPrimitive(key),
+                    "policy_available" to JsonPrimitive(true)
                 )
             )
-        }
+        )
     }
 }
