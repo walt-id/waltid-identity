@@ -24,6 +24,7 @@
 
 <script lang="ts" setup>
 import { ref, watch, defineProps, onMounted } from 'vue';
+import { parseJwt } from '~/utils/jwt';
 
 const props = defineProps({
     credential: {
@@ -42,19 +43,9 @@ const props = defineProps({
     },
 });
 
-function parseJwt(token: string) {
-    var base64Url = token.split('.')[1];
-    var base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-    var jsonPayload = decodeURIComponent(window.atob(base64).split('').map(function (c) {
-        return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-    }).join(''));
-
-    return JSON.parse(jsonPayload);
-}
-
-const credential = ref(props.credential?.parsedDocument ?? parseJwt(props.credential?.document).vc);
+const credential = ref(props.credential.parsedDocument ?? parseJwt(props.credential.document).vc ?? parseJwt(props.credential.document));
 const isDetailView = ref(props.isDetailView ?? false);
-const manifest = ref(props.credential?.manifest != "{}" ? props.credential?.manifest : null)
+const manifest = ref(props.credential.manifest != "{}" ? props.credential.manifest : null)
 const manifestDisplay = ref(manifest.value ? (typeof manifest.value === 'string' ? JSON.parse(manifest.value) : manifest.value)?.display : null);
 const manifestCard = ref(manifestDisplay.value?.card);
 
@@ -70,9 +61,9 @@ const issuerName = ref(manifestCard.value?.issuedBy ?? credential.value?.issuer?
 const vcCardDiv: any = ref(null);
 
 const updateComponent = () => {
-    credential.value = props.credential?.parsedDocument ?? parseJwt(props.credential?.document).vc;
+    credential.value = props.credential.parsedDocument ?? parseJwt(props.credential.document).vc ?? parseJwt(props.credential.document);
     isDetailView.value = props.isDetailView ?? false;
-    manifest.value = props.credential?.manifest != "{}" ? props.credential?.manifest : null;
+    manifest.value = props.credential.manifest != "{}" ? props.credential.manifest : null;
     manifestDisplay.value = manifest.value ? (typeof manifest.value === 'string' ? JSON.parse(manifest.value) : manifest.value)?.display : null;
     manifestCard.value = manifestDisplay.value?.card;
     titleTitelized.value = manifestDisplay.value?.title ?? credential.value?.type?.at(-1).replace(/([a-z0-9])([A-Z])/g, "$1 $2");

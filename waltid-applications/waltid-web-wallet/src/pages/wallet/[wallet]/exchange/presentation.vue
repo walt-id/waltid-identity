@@ -42,13 +42,101 @@
                 <div v-if="!mobileView" class="text-center text-gray-500 mt-2">
                     {{ index + 1 }} of {{ matchedCredentials.length }}
                 </div>
+                <div class="sm:w-[80%] md:w-[60%] mx-auto">
+                    <div class="text-gray-500">
+                        {{ matchedCredentials.length > 1 ? 'Credentials' : 'Credential' }} to present
+                    </div>
+                    <hr class="mt-1 mb-2 border-gray-200" />
+                    <div v-for="credential in matchedCredentials" :key="credential.id">
+                        <div v-if="credential.disclosures && selection[credential.id]">
+                            <div class="flex justify-between items-center">
+                                <div @click="toggleDisclosure(credential.id)"
+                                    :class="{ 'font-semibold': disclosureModalState[credential.id] }"
+                                    class="text-black-800 flex gap-3 items-center pt-2 cursor-pointer">
+                                    {{
+                                        (
+                                            credential.parsedDocument ?? parseJwt(credential.document).vc ??
+                                            parseJwt(credential.document)
+                                        ).type?.at(-1).replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+                                    }}
+                                    <svg v-if="disclosureModalState[credential.id]" width="16" height="16"
+                                        viewBox="0 0 17 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <path d="M16 1L8.5 8.5L1 1" stroke="black" stroke-width="1.5"
+                                            stroke-linecap="round" stroke-linejoin="round" />
+                                    </svg>
+                                    <svg v-else width="16" height="16" viewBox="0 0 10 18" fill="none"
+                                        xmlns="http://www.w3.org/2000/svg">
+                                        <path d="M1.25 1.5L8.75 9L1.25 16.5" stroke="#323F4B" stroke-width="1.5"
+                                            stroke-linecap="round" stroke-linejoin="round" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <div v-if="disclosureModalState[credential.id]" class="flex items-center gap-2">
+                                        Share All
+                                        <input type="checkbox"
+                                            class="h-4 w-4 rounded border-gray-300 text-primary-400 focus:ring-primary-500"
+                                            @click="disclosures[credential.id] = $event.target?.checked ? parseDisclosures(credential.disclosures as string) : []"
+                                            :checked="disclosures[credential.id]?.length === parseDisclosures(credential.disclosures)?.length" />
+                                    </div>
+                                    <div v-else>
+                                        {{ disclosures[credential.id] === undefined ?
+                                            'Sharing 0 of ' + parseDisclosures(credential.disclosures).length +
+                                            ' attributes' : disclosures[credential.id]?.length ===
+                                                parseDisclosures(credential.disclosures).length ? 'Sharing all attributes'
+                                                : `Sharing ${disclosures[credential.id].length}
+                                        of ${parseDisclosures(credential.disclosures).length} attributes` }}
+                                    </div>
+                                </div>
+                            </div>
+                            <div v-if="disclosureModalState[credential.id]">
+                                <div class="flex items-center">
+                                    <div class="flex-1 border-t border-gray-300"></div>
+                                    <div class="mx-3 text-gray-400">Attributes to share</div>
+                                    <div class="flex-1 border-t border-gray-300"></div>
+                                </div>
+                                <div class="mt-1 divide-y px-10 divide-gray-100">
+                                    <div v-for="(disclosure, disclosureIdx) in parseDisclosures(credential.disclosures)"
+                                        :key="disclosureIdx" class="relative flex items-start py-1">
+                                        <div class="min-w-0 flex-1 text-sm leading-6">
+                                            <label :for="`disclosure-${credential.id}-${disclosure[0]}`"
+                                                class="select-none text-gray-900">
+                                                <span class="text-black-800">
+                                                    {{
+                                                        disclosure[1].charAt(0).toUpperCase() + disclosure[1].slice(1)
+                                                    }}
+                                                </span>
+                                            </label>
+                                        </div>
+                                        <div class="ml-3 flex h-6 items-center">
+                                            <input :id="`disclosure-${credential.id}-${disclosure[0]}`"
+                                                :name="`disclosure-${disclosure[0]}`"
+                                                class="h-4 w-4 rounded border-gray-300 text-primary-400 focus:ring-primary-500"
+                                                type="checkbox"
+                                                :checked="disclosures[credential.id] && disclosures[credential.id].find((elem: Array<string>) => elem[0] === disclosure[0])"
+                                                @click="$event.target?.checked ? addDisclosure(credential.id, disclosure) : removeDisclosure(credential.id, disclosure)" />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="text-black-800" v-else>
+                            {{
+                                (
+                                    credential.parsedDocument ?? parseJwt(credential.document).vc ??
+                                    parseJwt(credential.document)
+                                ).type?.at(-1).replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+                            }}
+                        </div>
+                        <hr class="my-2 border-gray-200" />
+                    </div>
+                </div>
             </div>
         </CenterMain>
         <div v-if="!failed && matchedCredentials.length" class="w-full sm:max-w-2xl sm:mx-auto">
             <div class="fixed sm:relative bottom-0 w-full p-4 bg-white shadow-md sm:shadow-none sm:flex sm:justify-end
                         sm:gap-4">
                 <button @click="acceptPresentation" class="w-full sm:w-44 py-3 mt-4 text-white bg-[#002159] rounded-xl">
-                    Accept
+                    {{ matchedCredentials.length > 1 ? 'Share All' : 'Share' }}
                 </button>
                 <button @click="navigateTo(`/wallet/${walletId}`)"
                     class="w-full sm:w-44 py-3 mt-4 bg-white sm:border sm:border-gray-400 sm:rounded-xl">
@@ -61,7 +149,6 @@
 
 <script lang="ts" setup>
 import { useTitle } from "@vueuse/core";
-import { groupBy } from "~/composables/groupings";
 import CenterMain from "~/components/CenterMain.vue";
 import { encodeDisclosure } from "~/composables/disclosures";
 import LoadingIndicator from "~/components/loading/LoadingIndicator.vue";
@@ -96,7 +183,7 @@ const presentationParams = presentationUrl.searchParams;
 
 const verifierHost = new URL(presentationParams.get("response_uri") ?? presentationParams.get("redirect_uri") ?? "").host;
 const presentationDefinition = presentationParams.get("presentation_definition") as string;
-const matchedCredentials = await $fetch<Array<{ id: string, document: string }>>(`/wallet-api/wallet/${currentWallet.value}/exchange/matchCredentialsForPresentationDefinition`, {
+const matchedCredentials = await $fetch<Array<{ id: string, document: string, parsedDocument?: string, disclosures?: string }>>(`/wallet-api/wallet/${currentWallet.value}/exchange/matchCredentialsForPresentationDefinition`, {
     method: "POST",
     body: presentationDefinition
 });
@@ -134,6 +221,14 @@ function addDisclosure(credentialId: string, disclosure: string) {
 
 function removeDisclosure(credentialId: string, disclosure: string) {
     disclosures.value[credentialId] = disclosures.value[credentialId].filter((elem) => elem[0] != disclosure[0])
+}
+
+const disclosureModalState: Ref<{ [key: string]: boolean }> = ref({});
+for (let credential of matchedCredentials) {
+    disclosureModalState.value[credential.id] = false
+}
+function toggleDisclosure(credentialId: string) {
+    disclosureModalState.value[credentialId] = !disclosureModalState.value[credentialId]
 }
 
 async function acceptPresentation() {
