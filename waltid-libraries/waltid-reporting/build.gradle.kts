@@ -13,7 +13,6 @@ group = "id.walt.reporting"
 repositories {
     mavenCentral()
     //maven("https://jitpack.io")
-    //jcenter()
 }
 
 java {
@@ -29,7 +28,7 @@ kotlin {
     targets.configureEach {
         compilations.configureEach {
             compileTaskProvider.configure {
-                compilerOptions { 
+                compilerOptions {
                     freeCompilerArgs.add("-Xexpect-actual-classes")
                 }
             }
