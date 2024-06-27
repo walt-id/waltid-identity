@@ -43,13 +43,13 @@
                     {{ index + 1 }} of {{ matchedCredentials.length }}
                 </div>
                 <div class="sm:w-[80%] md:w-[60%] mx-auto">
-                    <div class="text-gray-500">
+                    <div class="text-gray-500 mt-8 sm:mt-0">
                         {{ matchedCredentials.length > 1 ? 'Credentials' : 'Credential' }} to present
                     </div>
                     <hr class="mt-1 mb-2 border-gray-200" />
                     <div v-for="credential in matchedCredentials" :key="credential.id">
                         <div v-if="credential.disclosures && selection[credential.id]">
-                            <div class="flex justify-between items-center">
+                            <div class="sm:flex justify-between items-center">
                                 <div @click="toggleDisclosure(credential.id)"
                                     :class="{ 'font-semibold': disclosureModalState[credential.id] }"
                                     class="text-black-800 flex gap-3 items-center pt-2 cursor-pointer">
@@ -89,7 +89,7 @@
                                 </div>
                             </div>
                             <div v-if="disclosureModalState[credential.id]">
-                                <div class="flex items-center">
+                                <div class="flex items-center mt-1">
                                     <div class="flex-1 border-t border-gray-300"></div>
                                     <div class="mx-3 text-gray-400">Attributes to share</div>
                                     <div class="flex-1 border-t border-gray-300"></div>
