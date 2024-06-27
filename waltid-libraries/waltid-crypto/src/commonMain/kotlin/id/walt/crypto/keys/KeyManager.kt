@@ -3,6 +3,7 @@ package id.walt.crypto.keys
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.keys.oci.OCIKeyRestApi
 import id.walt.crypto.keys.tse.TSEKey
+import id.walt.crypto.utils.JsonUtils.toJsonElement
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.json.*
 import kotlinx.serialization.serializer
@@ -54,10 +55,11 @@ object KeyManager {
     fun resolveSerializedKey(json: JsonObject): Key {
         val type = getRegisteredKeyType(json["type"]?.jsonPrimitive?.content ?: error("No type in serialized key"))
 
-        val new = JsonObject(json.filterKeys { it != "type" })
+        val fields = json.filterKeys { it != "type" }
+            //jwkKey is a stringified json
+            .mapValues { if (it.value is JsonObject) it.value.toString().toJsonElement() else it.value }
 
-        val key: Key = Json.decodeFromJsonElement(serializer(type), new) as Key
-        return key
+        return Json.decodeFromJsonElement(serializer(type), JsonObject(fields)) as Key
     }
 
 
