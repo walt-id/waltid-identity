@@ -4,6 +4,7 @@ import id.walt.commons.ServiceConfiguration
 import id.walt.commons.ServiceInitialization
 import id.walt.commons.ServiceMain
 import id.walt.commons.web.WebService
+import id.walt.commons.web.plugins.configureSerialization
 import id.walt.credentials.verification.PolicyManager
 import id.walt.did.dids.DidService
 import id.walt.did.dids.resolver.LocalResolver
@@ -36,6 +37,7 @@ fun Application.configurePlugins() {
     configureHTTP()
     configureMonitoring()
     configureRouting()
+    configureSerialization()
 }
 
 fun Application.verifierModule(withPlugins: Boolean = true) {

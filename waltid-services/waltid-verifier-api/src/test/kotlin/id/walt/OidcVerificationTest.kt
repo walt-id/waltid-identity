@@ -57,7 +57,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
-object OidcTest {
+object OidcVerificationTest {
 
   var webConfig: WebConfig? = null
   val baseUrl: String get() = "http://${webConfig!!.webHost}:${webConfig!!.webPort}"
@@ -71,7 +71,7 @@ object OidcTest {
     }
     PolicyManager.registerPolicies(PresentationDefinitionPolicy())
 
-    ConfigManager.loadConfigs(arrayOf())
+    ConfigManager.testWithConfigs(testConfigs)
 
     webConfig = ConfigManager.getConfig<WebConfig>()
 
