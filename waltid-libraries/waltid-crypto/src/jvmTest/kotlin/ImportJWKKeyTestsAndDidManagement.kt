@@ -135,8 +135,7 @@ class ImportJWKKeyTestsAndDidManagement {
 //                arguments(loadResourceBytes("public-bytes/secp256k1.bin"), KeyType.secp256k1, false),
                 // secp256r1 (throwing Invalid point encoding 0x30)
 //                arguments(loadResourceBytes("public-bytes/secp256r1.bin"), KeyType.secp256r1, false),
-                // rsa (not implemented)
-//                arguments(loadResourceBytes("public-bytes/rsa.bin"), KeyType.RSA, false),
+                arguments(loadResourceBytes("public-bytes/rsa.bin"), KeyType.RSA, false),
             )
 
     }
