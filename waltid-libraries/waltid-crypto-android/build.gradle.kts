@@ -2,6 +2,7 @@ import love.forte.plugin.suspendtrans.ClassInfo
 import love.forte.plugin.suspendtrans.SuspendTransformConfiguration
 import love.forte.plugin.suspendtrans.TargetPlatform
 import love.forte.plugin.suspendtrans.gradle.SuspendTransformGradleExtension
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     kotlin("multiplatform")
@@ -35,8 +36,10 @@ kotlin {
 
     androidTarget {
         compilations.all {
-            kotlinOptions {
-                jvmTarget = "1.8"
+            compileTaskProvider.configure {
+                compilerOptions {
+                    jvmTarget = JvmTarget.JVM_1_8
+                }
             }
         }
     }
@@ -67,7 +70,7 @@ kotlin {
     targets.configureEach {
         compilations.configureEach {
             compileTaskProvider.configure {
-                compilerOptions { 
+                compilerOptions {
                     freeCompilerArgs.add("-Xexpect-actual-classes")
                 }
             }
@@ -86,17 +89,17 @@ kotlin {
         val androidInstrumentedTest by getting {
             dependencies {
                 implementation(kotlin("test"))
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
-                implementation("androidx.test.ext:junit:1.1.5")
-                implementation("androidx.test:runner:1.5.2")
-                implementation("androidx.test:rules:1.5.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
+                implementation("androidx.test.ext:junit:1.2.1")
+                implementation("androidx.test:runner:1.6.1")
+                implementation("androidx.test:rules:1.6.1")
             }
         }
         val androidUnitTest by getting {
             dependencies {
                 implementation(kotlin("test"))
-                implementation("org.junit.jupiter:junit-jupiter-api:5.10.1")
-                implementation("org.junit.jupiter:junit-jupiter-params:5.10.1")
+                implementation("org.junit.jupiter:junit-jupiter-api:5.10.2")
+                implementation("org.junit.jupiter:junit-jupiter-params:5.10.2")
             }
         }
         publishing {

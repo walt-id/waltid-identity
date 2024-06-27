@@ -28,7 +28,6 @@ group = "id.walt"
 
 repositories {
     mavenCentral()
-    //jcenter()
     maven("https://jitpack.io")
     maven("https://maven.waltid.dev/releases")
     maven("https://repo.danubetech.com/repository/maven-public/")

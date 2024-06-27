@@ -1,4 +1,3 @@
-import com.android.build.gradle.internal.utils.configureKotlinCompileTasks
 import love.forte.plugin.suspendtrans.ClassInfo
 import love.forte.plugin.suspendtrans.SuspendTransformConfiguration
 import love.forte.plugin.suspendtrans.TargetPlatform
@@ -41,7 +40,7 @@ kotlin {
     targets.configureEach {
         compilations.configureEach {
             compileTaskProvider.configure {
-                compilerOptions { 
+                compilerOptions {
                     freeCompilerArgs.add("-Xexpect-actual-classes")
                 }
             }
