@@ -14,7 +14,7 @@
                 </span>
             </div>
 
-            <div v-else class="my-10">
+            <div v-else class="my-10 mb-40 sm:mb-10 overflow-scroll">
                 <div v-if="mobileView" v-for="(credential, credentialIdx) in matchedCredentials" :key="credentialIdx">
                     <div :class="{ 'mt-[-85px]': credentialIdx !== 0 }" class="col-span-1 divide-y divide-gray-200 rounded-2xl bg-white shadow transform hover:scale-105
                     cursor-pointer duration-200">
