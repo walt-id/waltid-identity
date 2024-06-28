@@ -3,10 +3,13 @@ package id.walt.crypto.keys.jwk
 import id.walt.crypto.keys.JwkKeyMeta
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
-actual class JWKKey actual constructor(jwk: String?) : Key() {
+actual class JWKKey actual constructor(private val jwk: String?) : Key() {
 
     /*
     /**
@@ -28,7 +31,8 @@ actual class JWKKey actual constructor(jwk: String?) : Key() {
         get() = TODO("Not yet implemented")
 
     actual override suspend fun getKeyId(): String {
-        TODO("Not yet implemented")
+        return Json.parseToJsonElement(jwk!!).jsonObject["kid"]?.jsonPrimitive?.content
+            ?: throw IllegalStateException("JWK does not contain kid")
     }
 
     actual override suspend fun getThumbprint(): String {
@@ -36,11 +40,11 @@ actual class JWKKey actual constructor(jwk: String?) : Key() {
     }
 
     actual override suspend fun exportJWK(): String {
-        TODO("Not yet implemented")
+        return requireNotNull(jwk){"exportJWK ios"}
     }
 
     actual override suspend fun exportJWKObject(): JsonObject {
-        TODO("Not yet implemented")
+        return Json.parseToJsonElement(exportJWK()).jsonObject
     }
 
     actual override suspend fun exportPEM(): String {
@@ -112,7 +116,7 @@ actual class JWKKey actual constructor(jwk: String?) : Key() {
         }
 
         actual override suspend fun importJWK(jwk: String): Result<JWKKey> {
-            TODO("Not yet implemented")
+            return Result.success(JWKKey(jwk))
         }
 
         actual override suspend fun importPEM(pem: String): Result<JWKKey> {
