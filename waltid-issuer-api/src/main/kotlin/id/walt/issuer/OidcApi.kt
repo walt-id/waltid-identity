@@ -1,6 +1,7 @@
 package id.walt.issuer
 
 
+import id.walt.oid4vc.data.OpenId4VPProfile
 import id.walt.oid4vc.data.ResponseMode
 import id.walt.oid4vc.data.ResponseType
 import id.walt.oid4vc.errors.*
@@ -108,9 +109,21 @@ object OidcApi : CIProvider() {
                             val privKey = OidcApi.sessionCredentialPreMapping[authReq.issuerState]?.first()?.issuerKey!!
                             logger.info{"PrivateKey is: $privKey"}
                             logger.info{"KID is: $idTokenRequestKid"}
-                            processCodeFlowAuthorizationWithIdTokenRequest(authReq, idTokenRequestKid, privKey)
+                            val aa =  OidcApi.sessionCredentialPreMapping[authReq.issuerState]?.first()?.request
+                            println(aa)
+                            when(OidcApi.sessionCredentialPreMapping[authReq.issuerState]?.first()?.request?.dynamicCredentialRequest){
+                                null -> processCodeFlowAuthorizationWithDynamicCredentialRequest(authReq, idTokenRequestKid, privKey, ResponseType.IdToken) // add a new parameter here called: isRequestObject
+                                else -> processCodeFlowAuthorizationWithDynamicCredentialRequest(authReq, idTokenRequestKid, privKey, ResponseType.VpToken, OidcApi.sessionCredentialPreMapping[authReq.issuerState]?.first()?.request?.dynamicCredentialRequest)
+                            }
                         } else {
-                            processCodeFlowAuthorization(authReq)
+                            when(OidcApi.sessionCredentialPreMapping[authReq.issuerState]?.first()?.request?.dynamicCredentialRequest){
+                                null -> processCodeFlowAuthorization(authReq)
+                                else -> {
+                                    val idTokenRequestKid = OidcApi.sessionCredentialPreMapping[authReq.issuerState]?.first()?.issuerKey!!.getKeyId()
+                                    val privKey = OidcApi.sessionCredentialPreMapping[authReq.issuerState]?.first()?.issuerKey!!
+                                    processCodeFlowAuthorizationWithDynamicCredentialRequest(authReq, idTokenRequestKid,  privKey, ResponseType.VpToken, it.toString())
+                                }
+                            }
                         }
                     } else if (authReq.responseType.contains(ResponseType.Token)) {
                         processImplicitFlowAuthorization(authReq)
@@ -132,14 +145,29 @@ object OidcApi : CIProvider() {
                     )
 
                     logger.info{"Redirect Uri is: $redirectUri"}
+                    logger.info{"Redirect Uri is: ${authReq.responseMode}"}
 
+                    val ee = "http://localhost:3000/credentials?ids=BankId&mode=verification&auth=${Base64.encode(authResp.toRedirectUri("openid4vp://", ResponseMode.query).toByteArray())}"
+
+                    logger.info{"ee is: $ee"}
+                    logger.info{"Redirect is ${authResp.toRedirectUri(redirectUri, ResponseMode.query)}"}
+//                      ee.trimMargin()
                     call.response.apply {
                         status(HttpStatusCode.Found)
                         val defaultResponseMode =
                             if (authReq.responseType.contains(ResponseType.Code)) ResponseMode.query else ResponseMode.fragment
                         header(
                             HttpHeaders.Location,
-                            authResp.toRedirectUri(redirectUri, authReq.responseMode ?: defaultResponseMode)
+//                            authResp.toRedirectUri("openid://", authReq.responseMode ?: defaultResponseMode)
+                            when(authReq.state) {
+                                "1111111111111111111111111" -> "http://localhost:3000/credentials?ids=BankId&mode=verification&auth=${Base64.encode(authResp.toRedirectUri("openid4vp://", authReq.responseMode ?: defaultResponseMode).toByteArray())}"
+                                else -> authResp.toRedirectUri("openid://", authReq.responseMode ?: defaultResponseMode)
+                            }
+//                            authResp.toRedirectUri(redirectUri, authReq.responseMode ?: defaultResponseMode)
+//                            authResp.toRedirectUri("http://localhost:3000/verify?ids=BankId&vps=signature%252Cexpired%252Cnot-before&auth", authReq.responseMode ?: defaultResponseMode)
+//                            authResp.toRedirectUri("http://localhost:3000/credentials?ids=BankId&mode=verification&auth=${Base64.encode(authResp.toHttpQueryString().toByteArray())}",  authReq.responseMode ?: defaultResponseMode)
+                            // THIS IS WORKING
+                            // "http://localhost:3000/credentials?ids=BankId&mode=verification&auth=${Base64.encode(authResp.toRedirectUri("openid4vp://", authReq.responseMode ?: defaultResponseMode).toByteArray())}"
                         )
                     }
                 } catch (authExc: AuthorizationError) {
@@ -190,7 +218,23 @@ object OidcApi : CIProvider() {
 
                     } else {
                         // else it is a vp_token
-                        call.respond(HttpStatusCode.BadRequest, "vp_token not implemented")
+                        val state = params["state"]?.get(0)!!
+                        val idToken = params["vp_token"]?.get(0)!!
+
+                        // Verify and Parse ID Token
+//                        val payload = verifyAndParseIdToken(idToken)
+
+                        // Process response
+                        val resp = processDirectPost(state, buildJsonObject { })
+
+                        // Get the redirect_uri from the Authorization Request Parameter
+                        logger.info{"direct_post redirectUri is:" + resp.toRedirectUri("http://localhost:7001/wallet-api/wallet/bd527927-0684-4a25-8edd-096010e36b8e/exchange/useCodeForToken1", ResponseMode.query)}
+
+                        call.response.apply {
+                            status(HttpStatusCode.Found)
+                            header(HttpHeaders.Location, resp.toRedirectUri("http://localhost:7001/wallet-api/wallet/af138a54-0185-42bb-a279-a7e1ec7dd2bc/exchange/useCodeForToken1", ResponseMode.query))
+                        }
+//                        call.respond(HttpStatusCode.BadRequest, "vp_token not implemented")
                     }
 
                 } catch (exc: TokenError) {

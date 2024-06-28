@@ -42,8 +42,15 @@ suspend fun createCredentialOfferUri(issuanceRequests: List<IssuanceRequest>): S
     val credentialOfferBuilder =
         OidcIssuance.issuanceRequestsToCredentialOfferBuilder(issuanceRequests)
 
+
+
     val issuanceSession = OidcApi.initializeCredentialOffer(
-        credentialOfferBuilder = credentialOfferBuilder, expiresIn = 5.minutes, allowPreAuthorized = true
+        credentialOfferBuilder = credentialOfferBuilder,
+        expiresIn = 5.minutes,
+        allowPreAuthorized = when (issuanceRequests[0].dynamicCredentialRequest) {
+            null -> true
+            else -> false
+        }
     )
     OidcApi.setIssuanceDataForIssuanceId(issuanceSession.id, issuanceRequests.map {
         val key = if (it.issuerKey["type"].toJsonElement().jsonPrimitive.content == "jwk") {
@@ -401,6 +408,8 @@ fun Application.issuerApi() {
                         ?: throw BadRequestException("Session has no credential offer set")
                     context.respond(credentialOffer.toJSON())
                 }
+
+
             }
         }
     }

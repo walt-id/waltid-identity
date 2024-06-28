@@ -3,7 +3,7 @@ package id.walt.oid4vc.providers
 import id.walt.oid4vc.data.CredentialOffer
 import id.walt.oid4vc.data.TxCode
 import id.walt.oid4vc.requests.AuthorizationRequest
-import id.walt.oid4vc.responses.AuthorizationCodeIDTokenRequestResponse
+import id.walt.oid4vc.responses.AuthorizationCodeDynamicCredentialRequestResponse
 import kotlinx.datetime.Instant
 
 data class IssuanceSession(

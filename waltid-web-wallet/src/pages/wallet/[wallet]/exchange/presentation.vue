@@ -265,10 +265,29 @@ async function acceptPresentation() {
     });
 
     if (response.ok) {
-        console.log("Response: " + response);
+        console.log("Response: " + JSON.stringify(response.headers));
+        console.log(response.headers);
+
         const parsedResponse: { redirectUri: string } = await response.json();
 
-        if (parsedResponse.redirectUri) {
+        if (parsedResponse.redirectUri && parsedResponse.redirectUri.includes("code")) {
+            
+            // fetch callback of wallet-api to get the credentials
+            console.log("Redirecting with the code...");
+            const response = await fetch(`/wallet-api/wallet/${currentWallet.value}/exchange/useCodeForToken`, {
+                method: "POST",
+                body: JSON.stringify(parsedResponse.redirectUri),
+                redirect: "manual",
+                headers: {
+                    "Content-Type": "application/json"
+                }
+            });
+
+            console.log(response)
+            console.log("Redirect Success! Navigate to default");
+            navigateTo(`/wallet/${currentWallet.value}`);
+        }
+        else if (parsedResponse.redirectUri) {
             navigateTo(parsedResponse.redirectUri, {
                 external: true
             });

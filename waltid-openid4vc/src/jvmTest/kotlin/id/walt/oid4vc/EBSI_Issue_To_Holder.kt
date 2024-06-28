@@ -11,6 +11,7 @@ import id.walt.oid4vc.requests.TokenRequest
 import id.walt.oid4vc.responses.AuthorizationCodeResponse
 import id.walt.oid4vc.responses.TokenResponse
 import io.ktor.client.*
+import io.ktor.client.engine.*
 import io.ktor.client.engine.okhttp.*
 import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
@@ -44,26 +45,24 @@ suspend fun getIssuerKey(): JWKKey {
     return JWKKey.importJWK("{\"kty\":\"EC\",\"x\":\"bo4FsmViF9au5-iCZbvEy-WZGaRes_eZdpIucmg4XH8\",\"y\":\"htYUXUmIc-IxyR6QMFPwXHXAgj__Fqw9kuSVtSyulhI\",\"crv\":\"P-256\",\"d\":\"UPzeJStN6Wg7zXULIlGVhYh4gG5RN-5knejePt6deqY\"}").getOrThrow()
 }
 
-
-
 class EBSIIssueToHolderConformanceTest {
 
-    fun startEBSIIssuerMockServer() {
-        embeddedServer(Netty, port = ISSUER_MOCK_PORT) {
-            install(ContentNegotiation) {
-                json()
-            }
-            routing {
-                get("/client-mock") {
-                    println("CLIENT MOCK called")
-                    println(call.parameters.toString())
-                }
-                get("/jwks") {
-                    call.respondText( "{\"keys\":[{\"kty\":\"EC\",\"x\":\"bo4FsmViF9au5-iCZbvEy-WZGaRes_eZdpIucmg4XH8\",\"y\":\"htYUXUmIc-IxyR6QMFPwXHXAgj__Fqw9kuSVtSyulhI\",\"crv\":\"P-256\",\"kid\":\"z2dmzD81cgPx8Vki7JbuuMmFYrWPgYoytykUZ3eyqht1j9KbrJNL5rEcHRKkRBDnxzu2352jxSjTEFmM9hjTL2wMtzcTDjjDAQmPpQkaihjoAo8AygRr9M6yZsXHzWXnJRMNPzR3cCYbmvE9Q1sSQ1qzXHBo4iEc7Yb3MGu31ZAHKSd9Qx\"}]}")
-                }
-            }
-        }.start()
-    }
+//    fun startEBSIIssuerMockServer() {
+//        embeddedServer(Netty, port = ISSUER_MOCK_PORT) {
+//            install(ContentNegotiation) {
+//                json()
+//            }
+//            routing {
+//                get("/client-mock") {
+//                    println("CLIENT MOCK called")
+//                    println(call.parameters.toString())
+//                }
+//                get("/jwks") {
+//                    call.respondText( "{\"keys\":[{\"kty\":\"EC\",\"x\":\"bo4FsmViF9au5-iCZbvEy-WZGaRes_eZdpIucmg4XH8\",\"y\":\"htYUXUmIc-IxyR6QMFPwXHXAgj__Fqw9kuSVtSyulhI\",\"crv\":\"P-256\",\"kid\":\"z2dmzD81cgPx8Vki7JbuuMmFYrWPgYoytykUZ3eyqht1j9KbrJNL5rEcHRKkRBDnxzu2352jxSjTEFmM9hjTL2wMtzcTDjjDAQmPpQkaihjoAo8AygRr9M6yZsXHzWXnJRMNPzR3cCYbmvE9Q1sSQ1qzXHBo4iEc7Yb3MGu31ZAHKSd9Qx\"}]}")
+//                }
+//            }
+//        }.start()
+//    }
 
     val ktorClient = HttpClient(OkHttp){
         install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) {
@@ -76,7 +75,7 @@ class EBSIIssueToHolderConformanceTest {
     @Test
      fun getCTIssueQualificationCredential() = runTest {
 
-        startEBSIIssuerMockServer()
+//        startEBSIIssuerMockServer()
         // val taoIssuerServer = "http://localhost:3000/conformance/v3/issuer-mock"
         // val taoAuthServer = "http://localhost:3000/conformance/v3/auth-mock"
         val taoIssuerServer = "https://api-conformance.ebsi.eu/conformance/v3/issuer-mock"
@@ -102,10 +101,10 @@ class EBSIIssueToHolderConformanceTest {
                     locations = listOf(taoIssuerServer)
                 )
             ),
-            clientMetadata = OpenIDClientMetadata(customParameters = mapOf(
-                "jwks_uri" to JsonPrimitive("$ISSUER_MOCK_URL/jwks"),
-                "authorization_endpoint" to JsonPrimitive("openid:")
-            )),
+//            clientMetadata = OpenIDClientMetadata(customParameters = mapOf(
+//                "jwks_uri" to JsonPrimitive("$ISSUER_MOCK_URL/jwks"),
+//                "authorization_endpoint" to JsonPrimitive("openid:")
+//            )),
             codeChallenge = codeChallenge,
             codeChallengeMethod = "S256"
         )
@@ -117,7 +116,7 @@ class EBSIIssueToHolderConformanceTest {
                 put("client_id", clientId)
                 put("response_type", "code")
                 put("scope", "openid")
-                put("client_metadata", authReq.clientMetadata!!.toJSON())
+//                put("client_metadata", authReq.clientMetadata!!.toJSON())
                 put("redirect_uri", authReq.redirectUri)
                 put("code_challenge", authReq.codeChallenge)
                 put("code_challenge_method", authReq.codeChallengeMethod)

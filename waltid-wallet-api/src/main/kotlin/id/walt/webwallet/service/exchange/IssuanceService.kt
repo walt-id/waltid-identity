@@ -4,28 +4,27 @@ import id.walt.crypto.utils.JwsUtils
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.did.dids.DidService
 import id.walt.oid4vc.OpenID4VCI
-import id.walt.oid4vc.data.CredentialFormat
-import id.walt.oid4vc.data.CredentialOffer
-import id.walt.oid4vc.data.GrantType
-import id.walt.oid4vc.data.OpenIDProviderMetadata
+import id.walt.oid4vc.data.*
+import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.providers.TokenTarget
 import id.walt.oid4vc.requests.*
 import id.walt.oid4vc.responses.*
 import id.walt.oid4vc.util.randomUUID
 import id.walt.webwallet.manifest.extractor.EntraManifestExtractor
+import id.walt.webwallet.service.WalletServiceManager
 import id.walt.webwallet.service.oidc4vc.TestCredentialWallet
 import id.walt.webwallet.utils.WalletHttpClients
+import id.walt.webwallet.web.controllers.getWalletId
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
+import io.ktor.server.request.*
 import io.ktor.util.*
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.*
+import kotlinx.uuid.UUID
 import org.slf4j.LoggerFactory
 
 object IssuanceService {
@@ -33,8 +32,9 @@ object IssuanceService {
     private val http = WalletHttpClients.getHttpClient()
     private val logger = LoggerFactory.getLogger(this::class.java)
 
+
     suspend fun useOfferRequest(
-        offer: String, credentialWallet: TestCredentialWallet, clientId: String,
+        offer: String, credentialWallet: TestCredentialWallet, clientId: String, walletId: UUID? = null
     ) = let {
         logger.debug("// -------- WALLET ----------")
         logger.debug("// as WALLET: receive credential offer, either being called via deeplink or by scanning QR code")
@@ -55,7 +55,8 @@ object IssuanceService {
             processCredentialOffer(
                 credentialWallet.resolveCredentialOffer(CredentialOfferRequest.fromHttpParameters(reqParams)),
                 credentialWallet,
-                clientId
+                clientId,
+                walletId
             )
         }
         // === original ===
@@ -72,10 +73,83 @@ object IssuanceService {
         }
     }
 
+    suspend fun useOfferRequestAuthorize(
+        offer: String, credentialWallet: TestCredentialWallet, clientId: String, walletId: UUID? = null
+    ): HttpResponse = let {
+        logger.debug("// -------- WALLET ----------")
+        logger.debug("// as WALLET: receive credential offer, either being called via deeplink or by scanning QR code")
+        logger.debug("// parse credential URI")
+        val reqParams = Url(offer).parameters.toMap()
+
+        return processCredentialOfferAuthorize(
+            credentialWallet.resolveCredentialOffer(CredentialOfferRequest.fromHttpParameters(reqParams)),
+            credentialWallet,
+            clientId,
+            walletId
+        )
+
+    }
+
+    private suspend fun processCredentialOfferAuthorize(
+        credentialOffer: CredentialOffer,
+        credentialWallet: TestCredentialWallet,
+        clientId: String,
+        walletId: UUID? = null
+    ): HttpResponse {
+        logger.debug("// get issuer metadata")
+        val providerMetadataUri =
+            credentialWallet.getCIProviderMetadataUrl(credentialOffer.credentialIssuer)
+        logger.debug("Getting provider metadata from: $providerMetadataUri")
+        val providerMetadataResult = http.get(providerMetadataUri)
+        logger.debug("Provider metadata returned: " + providerMetadataResult.bodyAsText())
+
+        val providerMetadata = providerMetadataResult.body<JsonObject>().let { OpenIDProviderMetadata.fromJSON(it) }
+        logger.debug("providerMetadata: {}", providerMetadata)
+
+        logger.debug("// resolve offered credentials")
+        val offeredCredentials = OpenID4VCI.resolveOfferedCredentials(credentialOffer, providerMetadata)
+        logger.debug("offeredCredentials: {}", offeredCredentials)
+
+        //val offeredCredential = offeredCredentials.first()
+        //logger.debug("offeredCredentials[0]: $offeredCredential")
+
+        // 1. check if it is authorized flow
+//        when (credentialOffer.grants[GrantType.authorization_code.value]) {
+        // 2. extract issuer state
+        val issuerState = credentialOffer.grants[GrantType.authorization_code.value]!!.issuerState
+
+        // 3. do authorize request
+        val authReq = AuthorizationRequest(
+            responseType = setOf(ResponseType.Code),
+            clientId = credentialWallet.did,
+            scope = setOf("openid"),
+            redirectUri = "http://localhost:7101/wallet/bd527927-0684-4a25-8edd-096010e36b8e/callback/",
+            state = "1111111111111111111111111",
+            authorizationDetails = listOf(
+                AuthorizationDetails(
+                    format = CredentialFormat.jwt_vc,
+                    type = "openid_credential",
+                    types = listOf("VerifiableCredential","VerifiableAttestation","VerifiablePortableDocumentA1"),
+                )
+            ),
+            issuerState = issuerState
+        )
+
+        val authResp = http.get(providerMetadata.authorizationEndpoint!!) {
+            url {
+                parameters.appendAll(parametersOf(authReq.toHttpParameters()))
+            }
+        }
+
+        return authResp
+
+    }
+
     private suspend fun processCredentialOffer(
         credentialOffer: CredentialOffer,
         credentialWallet: TestCredentialWallet,
         clientId: String,
+        walletId: UUID? = null
     ): List<CredentialResponse> {
         logger.debug("// get issuer metadata")
         val providerMetadataUri =
@@ -94,7 +168,67 @@ object IssuanceService {
         //val offeredCredential = offeredCredentials.first()
         //logger.debug("offeredCredentials[0]: $offeredCredential")
 
-        logger.debug("// fetch access token using pre-authorized code (skipping authorization step)")
+        // 1. check if it is authorized flow
+//        when (credentialOffer.grants[GrantType.authorization_code.value]) {
+        if (credentialOffer.grants[GrantType.pre_authorized_code.value] == null) {
+                // 2. extract issuer state
+                val issuerState = credentialOffer.grants[GrantType.authorization_code.value]!!.issuerState
+
+                // 3. do authorize request
+                val authReq = AuthorizationRequest(
+                    responseType = setOf(ResponseType.Code),
+                    clientId = credentialWallet.did,
+                    scope = setOf("openid"),
+                    redirectUri = "http://localhost:7101/wallet/bd527927-0684-4a25-8edd-096010e36b8e/callback/",
+                    state = "1111111111111111111111111",
+                    authorizationDetails = listOf(
+                        AuthorizationDetails(
+                            format = CredentialFormat.jwt_vc,
+                            type = "openid_credential",
+                            types = listOf("VerifiableCredential","VerifiableAttestation","VerifiablePortableDocumentA1"),
+                        )
+                    ),
+                    issuerState = issuerState
+                )
+
+                val authResp = http.get(providerMetadata.authorizationEndpoint!!) {
+                    url {
+                        parameters.appendAll(parametersOf(authReq.toHttpParameters()))
+                    }
+                }
+
+                val locationUrl = authResp.headers["location"]!!
+
+                val locationUrlMap = Url(locationUrl).parameters.toMap()
+
+                // if response has locationUrlMap["code"] then its code otherwise it will contain the redirect uri
+//                println(locationUrlMap["code"])
+                println(locationUrlMap)
+                if (locationUrl.contains("vp_token")) {
+//                    CredentialResponse.fromJSON()
+                        val resp =  CredentialResponse.fromJSON(buildJsonObject { put("dynamicCredentialRequest", locationUrl) })
+                    return listOf(resp)
+                }
+
+//                val presentationDefinitionRaw = locationUrlMap["presentation_definition"]
+//                val presentationDefinition = PresentationDefinition.fromJSON(Json.decodeFromString(presentationDefinitionRaw!![0]))
+//                val matchedCredentials = WalletServiceManager.matchPresentationDefinitionCredentialsUseCase.match(
+//                    walletId!!, presentationDefinition
+//                )
+//                println(matchedCredentials)
+            }
+
+
+//        logger.debug("// fetch access token using pre-authorized code (skipping authorization step)")
+//        val tokenReq = TokenRequest(
+//            grantType = GrantType.pre_authorized_code,
+//            clientId = clientId,
+//            redirectUri = credentialWallet.config.redirectUri,
+//            preAuthorizedCode = credentialOffer.grants[GrantType.pre_authorized_code.value]!!.preAuthorizedCode,
+//            txCode = null
+//        )
+
+        logger.debug("// fetch access token using authorized code (skipping pre-authorized)")
         val tokenReq = TokenRequest(
             grantType = GrantType.pre_authorized_code,
             clientId = clientId,
@@ -164,6 +298,102 @@ object IssuanceService {
             else -> throw IllegalStateException("No credentials offered")
         }
     }
+
+    suspend fun useCodeForToken(
+        code: String, credentialWallet: TestCredentialWallet, clientId: String, walletId: UUID? = null
+    ) = let {
+        logger.debug("// -------- WALLET ----------")
+        logger.debug("// as WALLET: receive credential offer, either being called via deeplink or by scanning QR code")
+        logger.debug("// parse credential URI")
+        val credentialResponses =
+            exchangeCodeForToken(
+               code,
+                credentialWallet,
+                clientId,
+                walletId
+            )
+        // === original ===
+        logger.debug("// parse and verify credential(s)")
+        if (credentialResponses.all { it.credential == null }) {
+            throw IllegalStateException("No credential was returned from credentialEndpoint: $credentialResponses")
+        }
+
+        credentialResponses.map {
+            getCredentialData(it, null)
+        }
+    }
+
+    private suspend fun exchangeCodeForToken(
+        code: String,
+        credentialWallet: TestCredentialWallet,
+        clientId: String,
+        walletId: UUID? = null
+    ): List<CredentialResponse> {
+
+        logger.debug("// fetch access token using authorized code (skipping pre-authorized)")
+        val tokenReq = TokenRequest(
+            grantType = GrantType.authorization_code,
+            clientId = clientId,
+            redirectUri = credentialWallet.config.redirectUri,
+            code = code,
+            txCode = null
+        )
+//        logger.debug("tokenReq: {}", tokenReq)
+
+        val tokenResp = http.submitForm(
+            "http://localhost:7002/token", formParameters = parametersOf(tokenReq.toHttpParameters())
+        ).let {
+            logger.debug("tokenResp raw: {}", it)
+            it.body<JsonObject>().let { TokenResponse.fromJSON(it) }
+        }
+
+//        logger.debug("tokenResp: {}", tokenResp)
+
+        logger.debug(">>> Token response = success: ${tokenResp.isSuccess}")
+
+        logger.debug("// receive credential")
+        val nonce = tokenResp.cNonce
+
+        //        OfferedCredential(format=jwt_vc, types=[VerifiableCredential, VerifiableAttestation, VerifiablePortableDocumentA1], docType=null, credentialDefinition=JsonLDCredentialDefinition(context=null, types=[VerifiableCredential, VerifiableAttestation, VerifiablePortableDocumentA1]), customParameters={})
+
+        var offeredCredential = OfferedCredential(
+            format= CredentialFormat.jwt_vc,
+            types = listOf("VerifiableCredential", "VerifiableAttestation", "VerifiablePortableDocumentA1"),
+            docType=null,
+            credentialDefinition=JsonLDCredentialDefinition(context=null, listOf("VerifiableCredential", "VerifiableAttestation", "VerifiablePortableDocumentA1")),
+            customParameters = emptyMap()
+            )
+
+        var credReqs = listOf(CredentialRequest.forOfferedCredential(
+            offeredCredential = offeredCredential,
+            proof = credentialWallet.generateDidProof(
+                did = credentialWallet.did,
+                issuerUrl = "http://localhost:7002",
+                nonce = nonce
+            )
+            )
+        )
+
+        return when {
+            credReqs.size == 1 -> {
+                val credReq = credReqs.first()
+
+                val credentialResponse = http.post("http://localhost:7002/credential") {
+                    contentType(ContentType.Application.Json)
+                    bearerAuth(tokenResp.accessToken!!)
+                    setBody(credReq.toJSON())
+                }.body<JsonObject>().let { CredentialResponse.fromJSON(it) }
+                logger.debug("credentialResponse: {}", credentialResponse)
+
+                listOf(credentialResponse)
+            }
+
+            else -> throw IllegalStateException("No credentials offered")
+         }
+        }
+
+
+
 
     private suspend fun processMSEntraIssuanceRequest(
         entraIssuanceRequest: EntraIssuanceRequest,

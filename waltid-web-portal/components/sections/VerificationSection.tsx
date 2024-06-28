@@ -28,6 +28,33 @@ export default function VerificationSection() {
   const [credentialsToIssue, setCredentialsToIssue] = useState<AvailableCredential[]>([]);
 
   React.useEffect(() => {
+
+    console.log("verifyURLverifyURLverifyURLverifyURLverifyURLverifyURL")
+    console.log(params)
+    console.log(params.auth)
+    if (params.auth) {
+      console.log(params.auth)
+      console.log("REDIRECT")
+
+      const params2 = new URLSearchParams();
+      params2.append('ids', idsToIssue.join(','));
+      const vps = [];
+      vps.push('signature');
+      vps.push('expired');
+      vps.push('not-before');
+      if (vps.length) {
+        params2.append('vps', vps.join(','));
+      }
+  
+      const auth = []
+      auth.push(params.auth.toString())
+      params2.append('auth', auth.join(','));
+
+
+      router.push(`/verify?${params2.toString()}`);
+      return
+    }
+
     setCredentialsToIssue(AvailableCredentials.filter((cred) => {
       for (const id of idsToIssue) {
         if (id.toString() == cred.id.toString()) {
@@ -63,6 +90,9 @@ export default function VerificationSection() {
     if (vps.length) {
       params.append('vps', vps.join(','));
     }
+
+    const auth = []
+    params.append('auth', auth.join(','));
 
     router.push(`/verify?${params.toString()}`);
   }

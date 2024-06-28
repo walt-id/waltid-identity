@@ -17,7 +17,9 @@ export default function IssueSection() {
 
   const [preAuthorized, setPreAuthorized] = useState<boolean>(true);
   const [requirePin, setRequirePin] = useState<boolean>(true);
+  const [requireDynamicCredentialRequest, setRequireDynamicCredentialRequest] = useState<boolean>(true);
   const [pin, setPin] = useState<string>('0235');
+  const [dynamicCredentialRequest, setDynamicCredentialRequest] = useState<string>('NaturalPersonVerifiableID');
 
   const router = useRouter();
   const params = router.query;
@@ -48,7 +50,11 @@ export default function IssueSection() {
     } else {
       console.log("show qr-offer");
       localStorage.setItem('offer', JSON.stringify(credentialsToIssue));
-      await router.push(`/offer?ids=${idsToIssue.join(',')}`);
+      let url = `/offer?ids=${idsToIssue.join(',')}`;
+      if (requireDynamicCredentialRequest && dynamicCredentialRequest?.trim().length) {
+        url = url + `&dynamicCredentialRequest=${dynamicCredentialRequest}`;
+      }
+      await router.push(url);
     }
   }
 
@@ -112,6 +118,22 @@ export default function IssueSection() {
           type="id"
           placeholder=""
           onChange={setPin}
+        />
+      </div>
+      <div className="mt-5 flex flex-col sm:flex-row justify-between">
+        <div className="">
+          <Checkbox value={requireDynamicCredentialRequest} onChange={setRequireDynamicCredentialRequest}>
+            Dynamic Credential Request
+          </Checkbox>
+        </div>
+        <InputField
+          error={false}
+          label="Test"
+          value={dynamicCredentialRequest}
+          name="test"
+          type="id"
+          placeholder=""
+          onChange={setDynamicCredentialRequest}
         />
       </div>
       <hr className="my-5" />

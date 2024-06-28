@@ -7,6 +7,7 @@ import id.walt.webwallet.db.models.WalletOperationHistory
 import id.walt.webwallet.service.SSIKit2WalletService
 import id.walt.webwallet.service.WalletServiceManager
 import id.walt.webwallet.usecase.exchange.FilterData
+import io.github.smiley4.ktorswaggerui.dsl.get
 import io.github.smiley4.ktorswaggerui.dsl.post
 import io.github.smiley4.ktorswaggerui.dsl.route
 import io.ktor.http.*
@@ -17,12 +18,57 @@ import io.ktor.util.*
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 
+
 fun Application.exchange() = walletRoute {
+
     route("exchange", {
         tags = listOf("WalletCredential exchange")
     }) {
-        post("useOfferRequest", {
-            summary = "Claim credential(s) from an issuer"
+        get("useOfferRequestAuth", {
+            summary = "Claim credential(s) from an issuer using Authorized Flow"
+            request {
+                queryParameter<String>("did") { description = "The DID to issue the credential(s) to" }
+                queryParameter<Boolean>("requireUserInput") { description = "Whether to claim as pending acceptance" }
+                queryParameter<Boolean>("offer") { description =  "The offer request to use" }
+            }
+        }) {
+
+            val wallet = getWalletService()
+
+            val did = call.request.queryParameters["did"] ?: wallet.listDids().firstOrNull()?.did
+            ?: throw IllegalArgumentException("No DID to use supplied")
+            val requireUserInput = call.request.queryParameters["requireUserInput"].toBoolean()
+            val offer = call.request.queryParameters["offer"]?: throw IllegalArgumentException("No offer is provided")
+            println(offer)
+            println(did)
+
+            runCatching {
+                WalletServiceManager.explicitClaimStrategy.claimAuthorize(
+                    tenant = wallet.tenant,
+                    account = getUserUUID(),
+                    wallet = wallet.walletId,
+                    did = did,
+                    offer = offer,
+                    pending = requireUserInput
+                ).also {
+                    wallet.addOperationHistory(
+                        WalletOperationHistory.new(
+                            tenant = wallet.tenant,
+                            wallet = wallet,
+                            "useOfferRequest",
+                            mapOf("did" to did, "offer" to offer)
+                        )
+                    )
+                }
+            }.onSuccess {
+//                println(it)
+                call.respondRedirect(it.headers["location"]!!)
+            }
+
+        }
+
+        post("useOfferRequestPreAuth", {
+            summary = "Claim credential(s) from an issuer using PreAuthorized Flow"
 
             request {
                 queryParameter<String>("did") { description = "The DID to issue the credential(s) to" }
@@ -62,6 +108,91 @@ fun Application.exchange() = walletRoute {
                             wallet = wallet,
                             "useOfferRequest",
                             mapOf("did" to did, "offer" to offer)
+                        )
+                    )
+                }
+            }.onSuccess {
+                println(it)
+                it.firstOrNull()
+                context.respond(HttpStatusCode.OK, it)
+            }.onFailure { error ->
+                error.printStackTrace()
+                println(it)
+                if (error.localizedMessage.contains("dynamicCredentialRequest")) {
+                    context.respondRedirect("https://google.com")
+                } else {
+                    context.respond(HttpStatusCode.BadRequest, error.localizedMessage)
+                }
+            }
+        }
+
+
+
+        get("useCodeForToken1", { }) {
+            val wallet = getWalletService()
+
+            val did = "did:key:z2dmzD81cgPx8Vki7JbuuMmFYrWPgYoytykUZ3eyqht1j9KbrNnoNjBPx8fCQp3THJ4kWacGiuz35Q5ohdNbZHfA9BJps98WSv6GpB55Y6dK5rHa71K5hUyRJpUPdzUdtooQEyPknYDD4rbZAeXJaWQcicSiQ2PHnZ3AcuaLQ9c1tg2324"
+            val requireUserInput = false
+
+//            "openid://redirect?code=eyJhbGciOiJFZERTQSJ9.eyJzdWIiOiI4MmY2MGRlNi03YWU0LTRhODQtOTAxNy1mOWQ5OTI2YjE3YmYiLCJpc3MiOiJodHRwOi8vbG9jYWxob3N0OjcwMDIiLCJhdWQiOiJUT0tFTiJ9.vMD454XhhD2xk-0Ud7qbmXfikrtGVz66KPvP-4OgJWMsEMCj1OpvnBfap-g2Xczb3VuqFtAqGKaYHfnMJ6bACw&state=1111111111111111111111111"
+            val extractedCode = call.request.queryParameters["code"]?: throw IllegalArgumentException("No offer is provided")
+
+//            val extractedCode = code.replaceRange(0..23, "")
+//            val extractedCode = code.substringAfter("code=").substringBefore("&state")
+
+            runCatching {
+                WalletServiceManager.explicitClaimStrategy.exhangeCodeForToken(
+                    tenant = wallet.tenant,
+                    account = getUserUUID(),
+                    wallet = wallet.walletId,
+                    did = did,
+                    code = extractedCode,
+                    pending = requireUserInput
+                ).also {
+                    wallet.addOperationHistory(
+                        WalletOperationHistory.new(
+                            tenant = wallet.tenant,
+                            wallet = wallet,
+                            "useOfferRequest",
+                            mapOf("did" to did, "offer" to "offer")
+                        )
+                    )
+                }
+            }.onSuccess {
+                context.respond(HttpStatusCode.OK, it)
+            }.onFailure { error ->
+                error.printStackTrace()
+                context.respond(HttpStatusCode.BadRequest, error.localizedMessage)
+            }
+        }
+
+        post("useCodeForToken", { }) {
+            val wallet = getWalletService()
+
+            val did = call.request.queryParameters["did"] ?: wallet.listDids().firstOrNull()?.did
+            ?: throw IllegalArgumentException("No DID to use supplied")
+            val requireUserInput = call.request.queryParameters["requireUserInput"].toBoolean()
+
+//            "openid://redirect?code=eyJhbGciOiJFZERTQSJ9.eyJzdWIiOiI4MmY2MGRlNi03YWU0LTRhODQtOTAxNy1mOWQ5OTI2YjE3YmYiLCJpc3MiOiJodHRwOi8vbG9jYWxob3N0OjcwMDIiLCJhdWQiOiJUT0tFTiJ9.vMD454XhhD2xk-0Ud7qbmXfikrtGVz66KPvP-4OgJWMsEMCj1OpvnBfap-g2Xczb3VuqFtAqGKaYHfnMJ6bACw&state=1111111111111111111111111"
+            val code = call.receiveText().trimIndent()
+//            val extractedCode = code.replaceRange(0..23, "")
+            val extractedCode = code.substringAfter("code=").substringBefore("&state")
+
+            runCatching {
+                WalletServiceManager.explicitClaimStrategy.exhangeCodeForToken(
+                    tenant = wallet.tenant,
+                    account = getUserUUID(),
+                    wallet = wallet.walletId,
+                    did = did,
+                    code = extractedCode,
+                    pending = requireUserInput
+                ).also {
+                    wallet.addOperationHistory(
+                        WalletOperationHistory.new(
+                            tenant = wallet.tenant,
+                            wallet = wallet,
+                            "useOfferRequest",
+                            mapOf("did" to did, "offer" to "offer")
                         )
                     )
                 }
@@ -161,6 +292,8 @@ fun Application.exchange() = walletRoute {
                 )
             ) // TODO add disclosures here
 
+            println(result)
+
             if (result.isSuccess) {
                 wallet.addOperationHistory(
                     WalletOperationHistory.new(
@@ -176,8 +309,11 @@ fun Application.exchange() = walletRoute {
                         ) // change string true to bool
                     )
                 )
-
-                context.respond(HttpStatusCode.OK, mapOf("redirectUri" to result.getOrThrow()))
+                if (result.getOrThrow().toString().contains("code")) {
+                    context.respond(HttpStatusCode.OK, mapOf("redirectUri" to result.getOrThrow()))
+                } else {
+                    context.respond(HttpStatusCode.OK, mapOf("redirectUri" to result.getOrThrow()))
+                }
             } else {
                 val err = result.exceptionOrNull()
                 println("Presentation failed: $err")

@@ -28,7 +28,9 @@ data class CredentialRequest(
 
     companion object : JsonDataObjectFactory<CredentialRequest>() {
         override fun fromJSON(jsonObject: JsonObject) =
-            Json.decodeFromJsonElement(CredentialRequestSerializer, jsonObject)
+            Json{
+                ignoreUnknownKeys = true
+            }.decodeFromJsonElement(CredentialRequestSerializer, jsonObject)
 
         fun forAuthorizationDetails(authorizationDetails: AuthorizationDetails, proof: ProofOfPossession?) =
             CredentialRequest(

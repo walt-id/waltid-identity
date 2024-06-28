@@ -47,6 +47,7 @@ import id.walt.webwallet.web.controllers.PresentationRequestParameter
 import id.walt.webwallet.web.parameter.CredentialRequestParameter
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
+import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
@@ -260,10 +261,41 @@ class SSIKit2WalletService(
             }
         }
 
-
+//        val authResp = this.http.get(resp.headers["location"].toString())
 
         return if (resp.status.value==302 && !resp.headers["location"].toString().contains("error")){
+            println("EEEEEEEEEEEe")
+            println("EEEEEEEEEEEe")
+            println("EEEEEEEEEEEe")
+            println("EEEEEEEEEEEe")
+            println(http.get(resp.headers["location"].toString()))
+            println("EEEEEEEEEEEe")
+            println("EEEEEEEEEEEe")
+            println("EEEEEEEEEEEe")
+            println("EEEEEEEEEEEe")
+            println("EEEEEEEEEEEe")
+            println("EEEEEEEEEEEe")
+            println("EEEEEEEEEEEe")
+            println(http.get(resp.headers["location"].toString()))
+            println("EEEEEEEEEEEe")
+            println("EEEEEEEEEEEe")
+            println("EEEEEEEEEEEe")
+            val authResp = runBlocking { http.get(resp.headers["location"].toString()) {
+                headers{
+                    append(HttpHeaders.Authorization, "Bearer eyJhbGciOiJIUzI1NiJ9.eyJuYmYiOjE3MTgwMTcxMTksImV4cCI6MTcyMDYwOTExOSwiaWF0IjoxNzE4MDE3MTE5LCJqdGkiOiJlMjk4YWM1Ni03ZjlhLTQzNDUtOGQzYi1iMGYwMjgzMmNlNGEiLCJpc3MiOiJpc3N1ZXIgdmFsdWUiLCJhdWQiOiJhdWRpZW5jZSB2YWx1ZSIsInN1YiI6IjBlN2UxY2NjLWIwNTctNDk1ZC05MDI3LWE1YjExYjFkOTdhMiJ9.0lrLAjRuy18DOk8DiZF_3gZ9PRLV_Akr4z4U_QX5IzE")
+                }
+                }
+            }
+
             Result.success(if (isResponseRedirectUrl) httpResponseBody else null)
+
+//            val aa = resp.headers["location"]
+//            println(aa)
+//            if (resp.headers["location"].toString().contains("code")) {
+//                Result.success(resp.headers["location"])
+//            } else {
+//                Result.success(if (isResponseRedirectUrl) httpResponseBody else null)
+//            }
         }
         else if (resp.status.isSuccess()) {
             Result.success(if (isResponseRedirectUrl) httpResponseBody else null)

@@ -1,13 +1,16 @@
 package id.walt.oid4vc.providers
 
 import id.walt.crypto.keys.Key
+import id.walt.oid4vc.OpenID4VP
 import id.walt.oid4vc.data.*
+import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.definitions.JWTClaims
 import id.walt.oid4vc.errors.AuthorizationError
 import id.walt.oid4vc.errors.TokenError
 import id.walt.oid4vc.interfaces.ISessionCache
 import id.walt.oid4vc.interfaces.ITokenProvider
 import id.walt.oid4vc.requests.AuthorizationRequest
+import id.walt.oid4vc.requests.CredentialRequest
 import id.walt.oid4vc.requests.TokenRequest
 import id.walt.oid4vc.responses.*
 
@@ -183,8 +186,9 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
     // open fun proccessJar(authorizationRequest: AuthorizationRequest, kid: String){
     // }
 
-    // Create an ID Token request using JAR OAuth2.0 specification https://www.rfc-editor.org/rfc/rfc9101.html
-    open fun processCodeFlowAuthorizationWithIdTokenRequest(authorizationRequest: AuthorizationRequest, keyId: String, privKey: Key): AuthorizationCodeIDTokenRequestResponse {
+    // For ID/VP Requests. Create a Dynamic Credential Request using JAR OAuth2.0 specification https://www.rfc-editor.org/rfc/rfc9101.html
+    open fun processCodeFlowAuthorizationWithDynamicCredentialRequest(authorizationRequest: AuthorizationRequest, keyId: String, privKey: Key, type: ResponseType? = ResponseType.IdToken, dynamicCredentialRequest: String? = null ): AuthorizationCodeDynamicCredentialRequestResponse {
+        println(dynamicCredentialRequest)
         if (!authorizationRequest.responseType.contains(ResponseType.Code))
             throw AuthorizationError(
                 authorizationRequest,
@@ -193,14 +197,41 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
             )
 
         // Bind authentication request with state
-        val idTokenRequestState = UUID().toString();
-        val idTokenRequestNonce = UUID().toString();
+        val dynamicCredentialRequestState = UUID().toString();
+        val dynamicCredentialRequestNonce = UUID().toString();
         val responseMode = ResponseMode.direct_post
 
         val clientId = this.metadata.issuer!!
         val redirectUri = this.metadata.issuer + "/direct_post"
-        val responseType = "id_token"
+        val responseType = type!!.value
         val scope = setOf("openid")
+
+        var req: AuthorizationRequest? = null
+        var presentationDefinition: PresentationDefinition?  = null
+        when (type) {
+            ResponseType.VpToken -> {
+                // Generate Presentation Definition
+                val requestCredentialsArr = buildJsonArray { add(dynamicCredentialRequest!!) }
+                val requestedTypes = requestCredentialsArr.map {
+                    when (it) {
+                        is JsonPrimitive -> it.contentOrNull
+                        is JsonObject -> it["credential"]?.jsonPrimitive?.contentOrNull
+                        else -> throw IllegalArgumentException("Invalid JSON type for requested credential: $it")
+                    } ?: throw IllegalArgumentException("Invalid VC type for requested credential: $it")
+                }
+                presentationDefinition = PresentationDefinition.primitiveGenerationFromVcTypes(requestedTypes, OpenId4VPProfile.EBSIV3)
+                req = OpenID4VP.createPresentationRequest(
+                    presentationDefinition = PresentationDefinitionParameter.fromPresentationDefinition(presentationDefinition),
+                    clientId = authorizationRequest.clientId,
+                    clientIdScheme = null,
+                    clientMetadataParameter = null,
+                    nonce = dynamicCredentialRequestNonce,
+                    redirectOrResponseUri = null,
+                    state = dynamicCredentialRequestNonce
+                )
+            }
+            else -> null
+        }
 
         // Create a jwt as request object as defined in JAR OAuth2.0 specification
         val requestJar = signToken (
@@ -208,8 +239,17 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
             buildJsonObject {
                 put(JWTClaims.Payload.issuer, metadata.issuer)
                 put(JWTClaims.Payload.audience, authorizationRequest.clientId)
-                put(JWTClaims.Payload.nonce, idTokenRequestNonce)
-                put("state", idTokenRequestState)
+                put(JWTClaims.Payload.nonce, dynamicCredentialRequestNonce)
+                put("state", dynamicCredentialRequestState)
+                when (type) {
+                    ResponseType.VpToken -> {
+                        when(authorizationRequest.state) {
+                            "1111111111111111111111111" -> put("presentation_definition", req!!.toJSON())
+                            else -> put( "presentation_definition",Json.decodeFromString( "{\"id\":\"70fc7fab-89c0-4838-ba77-4886f47c3761\",\"input_descriptors\":[{\"id\":\"e3d700aa-0988-4eb6-b9c9-e00f4b27f1d8\",\"constraints\":{\"fields\":[{\"path\":[\"\$.type\"],\"filter\":{\"contains\":{\"const\":\"NaturalPersonVerifiableID\"},\"type\":\"array\"}}]}}],\"format\":{\"jwt_vc\":{\"alg\":[\"ES256\"]},\"jwt_vp\":{\"alg\":[\"ES256\"]}}}"))
+                        }
+                    }
+                    else -> null
+                }
                 put("client_id", clientId)
                 put("redirect_uri", redirectUri)
                 put("response_type", responseType)
@@ -224,10 +264,19 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
             privKey
         )
 
-        // Create a session with the state of the ID Token request since it is needed in the direct_post endpoint
-        initializeAuthorization(authorizationRequest, 5.minutes, idTokenRequestState)
+        // Create a session with the state of the ID Token or VP Token request since it is needed in the direct_post endpoint
+        initializeAuthorization(authorizationRequest, 5.minutes, dynamicCredentialRequestState)
 
-        return AuthorizationCodeIDTokenRequestResponse.success(idTokenRequestState, clientId, redirectUri, responseType, responseMode, scope, idTokenRequestNonce, null,  requestJar)
+//        var presentationDefinitionEnd = "{\"id\":\"Q9OmuRSSF0O\",\"input_descriptors\":[{\"id\":\"VerifiablePortableDocumentA1\",\"format\":{\"jwt_vc\":{\"alg\":[\"ES256\"]}},\"constraints\":{\"fields\":[{\"path\":[\"\$.type\"],\"filter\":{\"type\":\"array\",\"pattern\":\"VerifiablePortableDocumentA1\"}}]}}]}"
+
+        // THIS IS WORKING
+//         var presentationDefinitionEnc = presentationDefinition?.toJSONString()
+//        var presentationDefinitionEnc = "{\"id\":\"70fc7fab-89c0-4838-ba77-4886f47c3761\",\"input_descriptors\":[{\"id\":\"e3d700aa-0988-4eb6-b9c9-e00f4b27f1d8\",\"constraints\":{\"fields\":[{\"path\":[\"\$.type\"],\"filter\":{\"contains\":{\"const\":\"NaturalPersonVerifiableID\"},\"type\":\"array\"}}]}}],\"format\":{\"jwt_vc\":{\"alg\":[\"ES256\"]},\"jwt_vp\":{\"alg\":[\"ES256\"]}}}"
+        val presentationDefinitionEnc = when(authorizationRequest.state) {
+            "1111111111111111111111111" -> presentationDefinition!!.toJSONString()
+            else -> "{\"id\":\"70fc7fab-89c0-4838-ba77-4886f47c3761\",\"input_descriptors\":[{\"id\":\"e3d700aa-0988-4eb6-b9c9-e00f4b27f1d8\",\"constraints\":{\"fields\":[{\"path\":[\"\$.type\"],\"filter\":{\"contains\":{\"const\":\"NaturalPersonVerifiableID\"},\"type\":\"array\"}}]}}],\"format\":{\"jwt_vc\":{\"alg\":[\"ES256\"]},\"jwt_vp\":{\"alg\":[\"ES256\"]}}}"
+        }
+        return AuthorizationCodeDynamicCredentialRequestResponse.success(dynamicCredentialRequestState, clientId, redirectUri, responseType, responseMode, scope, dynamicCredentialRequestNonce, null, requestJar, presentationDefinitionEnc)
     }
 
     open fun processImplicitFlowAuthorization(authorizationRequest: AuthorizationRequest): TokenResponse {
