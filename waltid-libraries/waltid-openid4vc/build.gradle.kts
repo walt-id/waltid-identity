@@ -7,6 +7,7 @@ plugins {
     id("dev.petuska.npm.publish") version "3.4.3"
     id("maven-publish")
     id("com.github.ben-manes.versions")
+    kotlin("native.cocoapods")
 }
 
 group = "id.walt"
@@ -36,6 +37,7 @@ tasks.withType(KotlinCompile::class.java) {
 }
 
 kotlin {
+    val isMacOS = System.getProperty("os.name") == "Mac OS X"
     targets.configureEach {
         compilations.configureEach {
             compileTaskProvider.configure {
@@ -66,17 +68,32 @@ kotlin {
         }
         binaries.library()
     }
-//    val hostOs = System.getProperty("os.name")
-//    val isMingwX64 = hostOs.startsWith("Windows")
-//    val nativeTarget = when {
-//        hostOs == "Mac OS X" -> macosX64("native")
-//        hostOs == "Linux" -> linuxX64("native")
-//        isMingwX64 -> mingwX64("native")
-//        else -> throw GradleException("Host OS is not supported in Kotlin/Native.")
-//    }
+
+    if (isMacOS) {
+        iosArm64()
+        iosSimulatorArm64()
+
+        cocoapods {
+            summary = "Some description for the Shared Module"
+            homepage = "Link to the Shared Module homepage"
+            version = "1.0"
+            ios.deploymentTarget = "15.4"
+            framework {
+                baseName = "waltid-openid4vc"
+                isStatic = true
+            }
+        }
+    }
+
+
+
     val ktor_version = "2.3.12"
 
     sourceSets {
+
+        all {
+            languageSettings.optIn("kotlinx.serialization.ExperimentalSerializationApi")
+        }
         val commonMain by getting {
             dependencies {
                 // Coroutines
@@ -168,6 +185,31 @@ kotlin {
 //        val nativeMain by getting
 //        val nativeTest by getting
         // Add for native: implementation("io.ktor:ktor-client-cio:$ktor_version")
+
+        if (isMacOS) {
+            if (isMacOS) {
+                val iosArm64Main by getting
+                val iosSimulatorArm64Main by getting
+
+                val iosMain by creating {
+                    dependsOn(commonMain)
+                    iosArm64Main.dependsOn(this)
+                    iosSimulatorArm64Main.dependsOn(this)
+                    dependencies{
+                        implementation("io.ktor:ktor-client-darwin:$ktor_version")
+                    }
+                }
+
+                val iosArm64Test by getting
+                val iosSimulatorArm64Test by getting
+
+                val iosTest by creating {
+                    dependsOn(commonTest)
+                    iosArm64Test.dependsOn(this)
+                    iosSimulatorArm64Test.dependsOn(this)
+                }
+            }
+        }
     }
 
     publishing {

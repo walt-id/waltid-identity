@@ -61,7 +61,7 @@ class P256Key private constructor(
         this.keyId, ksecKeyType, null
     ) { secKey ->
         usePublicKey(secKey) { publicKey ->
-            ECKeyUtils.exportJwtWithPublicKey(publicKey, null)!!
+            ECKeyUtils.exportJwkWithPublicKey(publicKey, null)!!
         }
     }
 

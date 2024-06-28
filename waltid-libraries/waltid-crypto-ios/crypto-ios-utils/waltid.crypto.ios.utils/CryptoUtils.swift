@@ -226,7 +226,7 @@ extension Digest {
 
 @objc
 public class ECKeyUtils: NSObject {
-    @objc static func exportJwt(publicKey: SecKey) throws -> String {
+    @objc static func exportJwk(publicKey: SecKey) throws -> String {
         let publicKey = try! ECPublicKey(publicKey: publicKey)
         return publicKey.jsonString()!
     }
@@ -250,7 +250,7 @@ extension String: Error {}
 
 @objc
 public class RSAKeyUtils: NSObject {
-    @objc static func exportJwt(publicKey: SecKey) throws -> String {
+    @objc static func exportJwk(publicKey: SecKey) throws -> String {
         let publicKey = try! RSAPublicKey(publicKey: publicKey)
         return publicKey.jsonString()!
     }

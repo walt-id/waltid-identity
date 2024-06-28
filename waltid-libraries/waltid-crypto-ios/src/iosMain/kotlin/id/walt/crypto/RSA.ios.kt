@@ -45,7 +45,7 @@ class RSAKey private constructor(
     override suspend fun exportJWK(): String = withSecKey(
         this.keyId, kSecAttrKeyTypeRSA, null
     ) { secKey ->
-        RSAKeyUtils.exportJwtWithPublicKey(secKey, null)!!
+        RSAKeyUtils.exportJwkWithPublicKey(secKey, null)!!
     }
 
     override suspend fun signRaw(inputBytes: ByteArray): Any = signRaw(

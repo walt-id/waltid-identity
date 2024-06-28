@@ -107,6 +107,11 @@ kotlin {
     val ktor_version = "2.3.12"
 
     sourceSets {
+
+        all {
+            languageSettings.optIn("kotlinx.cinterop.BetaInteropApi")
+
+        }
         val commonMain by getting {
             dependencies {
                 // JSON
