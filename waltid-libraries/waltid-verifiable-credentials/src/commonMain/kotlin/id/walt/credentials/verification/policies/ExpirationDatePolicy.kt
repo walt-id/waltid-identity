@@ -1,5 +1,7 @@
 package id.walt.credentials.verification.policies
 
+import id.walt.credentials.JwtClaims
+import id.walt.credentials.VcClaims
 import id.walt.credentials.verification.CredentialWrapperValidatorPolicy
 import id.walt.credentials.verification.ExpirationDatePolicyException
 import kotlinx.datetime.Clock
@@ -36,13 +38,15 @@ class ExpirationDatePolicy : CredentialWrapperValidatorPolicy(
         checkVc(data.jsonObject["vc"]) ?: checkVc(data) ?: checkJwt(data)
 
     private fun checkJwt(data: JsonElement?) =
-        data?.jsonObject?.get("exp")?.jsonPrimitive?.longOrNull?.let { Pair("jwt:exp", Instant.fromEpochSeconds(it)) }
+        data?.jsonObject?.get(JwtClaims.NotAfter.getValue())?.jsonPrimitive?.longOrNull?.let {
+            Pair("jwt:${JwtClaims.NotAfter.getValue()}", Instant.fromEpochSeconds(it))
+        }
 
     private fun checkVc(data: JsonElement?) =
-        data?.jsonObject?.get("validUntil")?.jsonPrimitive?.let {
-            Pair("validUntil", Instant.parse(it.content))
-        } ?: data?.jsonObject?.get("expirationDate")?.jsonPrimitive?.let {
-            Pair("expirationDate", Instant.parse(it.content))
+        data?.jsonObject?.get(VcClaims.V2.NotAfter.getValue())?.jsonPrimitive?.let {
+            Pair(VcClaims.V2.NotAfter.getValue(), Instant.parse(it.content))
+        } ?: data?.jsonObject?.get(VcClaims.V1.NotAfter.getValue())?.jsonPrimitive?.let {
+            Pair(VcClaims.V1.NotAfter.getValue(), Instant.parse(it.content))
         }
 
     private fun buildPolicyUnavailableResult() = Result.success(
