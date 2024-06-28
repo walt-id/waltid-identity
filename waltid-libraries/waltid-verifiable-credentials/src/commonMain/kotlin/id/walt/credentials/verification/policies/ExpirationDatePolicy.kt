@@ -33,7 +33,7 @@ class ExpirationDatePolicy : CredentialWrapperValidatorPolicy(
     }
 
     private fun getExpirationKeyValuePair(data: JsonElement): Pair<String, Instant>? =
-        checkVc(data.jsonObject["vc"]) ?: checkJwt(data)
+        checkVc(data.jsonObject["vc"]) ?: checkVc(data) ?: checkJwt(data)
 
     private fun checkJwt(data: JsonElement?) =
         data?.jsonObject?.get("exp")?.jsonPrimitive?.longOrNull?.let { Pair("jwt:exp", Instant.fromEpochSeconds(it)) }
