@@ -4,6 +4,7 @@ export type AvailableCredential = {
   selectedFormat?: String;
   selectedDID?: String;
   offer: any;
+  useDynamicCredentialRequest: String;
 };
 
 export const CredentialFormats = [

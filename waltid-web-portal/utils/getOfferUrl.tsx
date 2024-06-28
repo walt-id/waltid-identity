@@ -2,8 +2,10 @@ import axios from 'axios';
 import { v4 as uuidv4 } from 'uuid';
 import { AvailableCredential, DIDMethodsConfig } from '@/types/credentials';
 
-const getOfferUrl = async (credentials: Array<AvailableCredential>, NEXT_PUBLIC_VC_REPO: string, NEXT_PUBLIC_ISSUER: string) => {
-  const data = await fetch(`${NEXT_PUBLIC_ISSUER}/.well-known/openid-credential-issuer`).then(data => {
+const getOfferUrl = async (credentials: Array<AvailableCredential>, NEXT_PUBLIC_VC_REPO: string, NEXT_PUBLIC_ISSUER: string, dynamicCredentialRequest?: string) => {
+  const data = await fetch(`${NEXT_PUBLIC_ISSUER}/.well-known/openid-credential-issuer`, {
+    headers: {"ngrok-skip-browser-warning": "true"}
+  } ).then(data => {
     return data.json();
   });
   const credential_configurations_supported = data.credential_configurations_supported;
@@ -22,7 +24,8 @@ const getOfferUrl = async (credentials: Array<AvailableCredential>, NEXT_PUBLIC_
       credentialConfigurationId: string,
       credentialData: any,
       mapping?: any,
-      selectiveDisclosure?: any
+      selectiveDisclosure?: any,
+      dynamicCredentialRequest?: string
     } = {
       'issuerDid': DIDMethodsConfig[c.selectedDID as keyof typeof DIDMethodsConfig].issuerDid,
       'issuerKey': DIDMethodsConfig[c.selectedDID as keyof typeof DIDMethodsConfig].issuerKey,
@@ -50,6 +53,10 @@ const getOfferUrl = async (credentials: Array<AvailableCredential>, NEXT_PUBLIC_
         }
       }
     }
+    if (dynamicCredentialRequest) {
+      payload.dynamicCredentialRequest = dynamicCredentialRequest;
+    }
+
     return mapping ? { ...payload, mapping } : payload;
   }));
 

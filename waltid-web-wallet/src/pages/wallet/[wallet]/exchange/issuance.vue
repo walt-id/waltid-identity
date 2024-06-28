@@ -149,6 +149,10 @@
 import CenterMain from "~/components/CenterMain.vue";
 import PageHeader from "~/components/PageHeader.vue";
 import CredentialIcon from "~/components/CredentialIcon.vue";
+
+
+// import { resolvePresentationRequest} from "~/pages/wallet/[wallet]/exchange/presentation.vue";
+
 import ActionButton from "~/components/buttons/ActionButton.vue";
 import LoadingIndicator from "~/components/loading/LoadingIndicator.vue";
 import { Listbox, ListboxButton, ListboxLabel, ListboxOption, ListboxOptions } from "@headlessui/vue";
@@ -219,7 +223,13 @@ try {
 }
 
 console.log("Issuer host:", issuerHost);
-const credential_issuer = await $fetch(`${issuer}/.well-known/openid-credential-issuer`)
+const credential_issuer = await $fetch(`${issuer}/.well-known/openid-credential-issuer`, {
+    headers: {"ngrok-skip-browser-warning": "true"}
+  } )
+console.log(credential_issuer.credential_configurations_supported)
+console.log(credential_issuer.credential_configurations_supported)
+console.log(credential_issuer.credential_configurations_supported)
+
 const credentialList = [credential_issuer.credential_configurations_supported[Object.keys(credential_issuer.credential_configurations_supported).find(key => credentialOffer.credential_configuration_ids.includes(key))]];
 
 let credentialTypes: String[] = [];
@@ -255,25 +265,86 @@ async function acceptCredential() {
         return;
     }
     console.log("Issue to: " + did);
-    try {
-        await $fetch(`/wallet-api/wallet/${currentWallet.value}/exchange/useOfferRequest?did=${did}`, {
-            method: "POST",
-            body: request,
+
+
+    const credentialOffer = await resolveCredentialOffer(request);
+    if (credentialOffer == null) {
+        throw createError({
+            statusCode: 400,
+            statusMessage: "Invalid issuance request: No credential_offer",
         });
-        navigateTo(`/wallet/${currentWallet.value}`);
-    } catch (e) {
-        failed.value = true;
-
-        let errorMessage = e?.data.startsWith("{") ? JSON.parse(e.data) : e.data ?? e;
-        errorMessage = errorMessage?.message ?? errorMessage;
-
-        failMessage.value = errorMessage;
-
-        console.log("Error: ", e?.data);
-        alert("Error occurred while trying to receive credential: " + failMessage.value);
-
-        throw e;
     }
+    // Add here an If/Else statement to handle authorize code and preautorized code, we have a weird error in model, thats why the following statement:
+    if (JSON.stringify(credentialOffer).includes(`"pre-authorized_code":null`) &&  JSON.stringify(credentialOffer).includes(`"issuer_state":null`)){ //then its preauthorized
+        console.log("its preauthorized flow");
+        try {
+            await $fetch(`/wallet-api/wallet/${currentWallet.value}/exchange/useOfferRequestPreAuth?did=${did}`, {
+                mode: 'cors',
+                redirect: 'follow',
+                method: "POST",
+                body: request,
+            });
+            navigateTo(`/wallet/${currentWallet.value}`);
+        } catch (e) {
+            if (e.data.includes("vp_token")) {
+                console.log("It is a VP Token request using Dynamic Credential Requst: ", e?.data);
+                let req = e?.data.split("dynamicCredentialRequest=")[1];
+                let req2 = req.split('"})]')[0].split('"')[1];
+                console.log(`REQ: ${req}`);
+                console.log(`REQ2: ${req2}`);
+
+                // let reqHardCode = "openid://localhost/?state=4b9cae8d-51da-4c14-ad05-5563e5e22103&client_id=http%3A%2F%2Flocalhost%3A7002&redirect_uri=http%3A%2F%2Flocalhost%3A7002%2Fdirect_post&response_type=vp_token&response_mode=direct_post&scope=openid&nonce=ddd77a8d-0301-48a0-a296-674a60e7e0e4&request=eyJ0eXBlIjoiand0IiwiYWxnIjoiRVMyNTYiLCJraWQiOiJWenBpWEZrVi1VdXZhSXB2RkRUS2N6NHMySGlidlIxVEZLTzFLXzlKWUtJIn0.eyJpc3MiOiJodHRwOi8vbG9jYWxob3N0OjcwMDIiLCJhdWQiOiJkaWQ6a2V5OnoyZG16RDgxY2dQeDhWa2k3SmJ1dU1tRllyV1BnWW95dHlrVVozZXlxaHQxajlLYnE4ZFFDWnF6YW1Db0NHWnJYbWtxd0hWWXdiNGZmWlN5N0MzZ2pYY3B1TXNBTDloc212RVpDQXdNaUZKNlN3OTlpajhSY1NCa0NuYXhuWUtiR3ZNUkVDVnJwRk1hZkZQZG9Vc2JvSkh4cWg2VG16c0hpaUtMdVV4THo3OFFZNFpZRmUiLCJub25jZSI6ImRkZDc3YThkLTAzMDEtNDhhMC1hMjk2LTY3NGE2MGU3ZTBlNCIsInN0YXRlIjoiNGI5Y2FlOGQtNTFkYS00YzE0LWFkMDUtNTU2M2U1ZTIyMTAzIiwicHJlc2VudGF0aW9uX2RlZmluaXRpb24iOnsiaWQiOiI3MGZjN2ZhYi04OWMwLTQ4MzgtYmE3Ny00ODg2ZjQ3YzM3NjEiLCJpbnB1dF9kZXNjcmlwdG9ycyI6W3siaWQiOiJlM2Q3MDBhYS0wOTg4LTRlYjYtYjljOS1lMDBmNGIyN2YxZDgiLCJjb25zdHJhaW50cyI6eyJmaWVsZHMiOlt7InBhdGgiOlsiJC50eXBlIl0sImZpbHRlciI6eyJjb250YWlucyI6eyJjb25zdCI6IlZlcmlmaWFibGVQb3J0YWJsZURvY3VtZW50QTEifSwidHlwZSI6ImFycmF5In19XX19XSwiZm9ybWF0Ijp7Imp3dF92YyI6eyJhbGciOlsiRVMyNTYiXX0sImp3dF92cCI6eyJhbGciOlsiRVMyNTYiXX19fSwiY2xpZW50X2lkIjoiaHR0cDovL2xvY2FsaG9zdDo3MDAyIiwicmVkaXJlY3RfdXJpIjoiaHR0cDovL2xvY2FsaG9zdDo3MDAyL2RpcmVjdF9wb3N0IiwicmVzcG9uc2VfdHlwZSI6InZwX3Rva2VuIiwicmVzcG9uc2VfbW9kZSI6ImRpcmVjdF9wb3N0Iiwic2NvcGUiOiJvcGVuaWQifQ.ub1RXOjXp9SBSH8VARnEja7FhcQeDGOXt_J1Kq_thdlg0VckZbYkje30TunsiF1UOrayQ2MLOpr3JU48e1TeLQ&presentation_definition=%7B%22id%22%3A%22Q9OmuRSSF0O%22%2C%22input_descriptors%22%3A%5B%7B%22id%22%3A%22VerifiablePortableDocumentA1%22%2C%22format%22%3A%7B%22jwt_vc%22%3A%7B%22alg%22%3A%5B%22ES256%22%5D%7D%7D%2C%22constraints%22%3A%7B%22fields%22%3A%5B%7B%22path%22%3A%5B%22%24.type%22%5D%2C%22filter%22%3A%7B%22type%22%3A%22array%22%2C%22pattern%22%3A%22VerifiablePortableDocumentA1%22%7D%7D%5D%7D%7D%5D%7D"
+                // let reqBase64HardCode = "b3BlbmlkNHZwOi8vYXV0aG9yaXplP3Jlc3BvbnNlX3R5cGU9dnBfdG9rZW4mY2xpZW50X2lkPWh0dHBzJTNBJTJGJTJGdmVyaWZpZXIucG9ydGFsLndhbHQtdGVzdC5jbG91ZCUyRm9wZW5pZDR2YyUyRnZlcmlmeSZyZXNwb25zZV9tb2RlPWRpcmVjdF9wb3N0JnN0YXRlPXA1RTlycTlHNExXVCZwcmVzZW50YXRpb25fZGVmaW5pdGlvbl91cmk9aHR0cHMlM0ElMkYlMkZ2ZXJpZmllci5wb3J0YWwud2FsdC10ZXN0LmNsb3VkJTJGb3BlbmlkNHZjJTJGcGQlMkZwNUU5cnE5RzRMV1QmY2xpZW50X2lkX3NjaGVtZT1yZWRpcmVjdF91cmkmY2xpZW50X21ldGFkYXRhPSU3QiUyMmF1dGhvcml6YXRpb25fZW5jcnlwdGVkX3Jlc3BvbnNlX2FsZyUyMiUzQSUyMkVDREgtRVMlMjIlMkMlMjJhdXRob3JpemF0aW9uX2VuY3J5cHRlZF9yZXNwb25zZV9lbmMlMjIlM0ElMjJBMjU2R0NNJTIyJTdEJm5vbmNlPWI0YzUyYzBlLTZiNjItNDU5YS1hMmFhLTZmZjZhYjU2NmI3ZCZyZXNwb25zZV91cmk9aHR0cHMlM0ElMkYlMkZ2ZXJpZmllci5wb3J0YWwud2FsdC10ZXN0LmNsb3VkJTJGb3BlbmlkNHZjJTJGdmVyaWZ5JTJGcDVFOXJxOUc0TFdU"
+                
+                const encoded = encodeRequest(req2);
+                console.log("Using encoded request:", encoded);
+                await navigateTo({ path: `/wallet/${currentWallet.value}/exchange/presentation`, query: { request: encoded } });
+
+            } else {
+                failed.value = true;
+
+                let errorMessage = e?.data.startsWith("{") ? JSON.parse(e.data) : e.data ?? e;
+                
+                errorMessage = errorMessage?.message ?? errorMessage;
+                
+                console.log("Error: ", e?.data);
+                
+                failMessage.value = errorMessage;     
+
+                alert("Error occurred while trying to receive credential: " + failMessage.value);
+
+                throw e;
+            }
+
+            // navigateTo(`/wallet/${currentWallet.value}/exchange/presentation/request=${reqBase64}`);
+
+            // try {
+            //         console.log("RESOLVING request", req);
+            //         const response = await $fetch(`/wallet-api/wallet/${currentWallet.value}/exchange/resolvePresentationRequest`, {
+            //             method: "POST",
+            //             body: req
+            //         });
+            //         console.log(response);
+            //         alert("Dynamic Credentia Request in use");
+            //         navigateTo(`/wallet/${currentWallet.value}/exchange/presentation?request=${req}}`);
+            //         return response;
+            //     } catch (e) {
+            //         failed.value = true;
+            //         throw e;
+            //     }        
+    
+        }
+    } else if (JSON.stringify(credentialOffer).includes(`"pre-authorized_code":null`)) { //its authorized
+        console.log("its authorized flow");
+        navigateTo(`/wallet-api/wallet/${currentWallet.value}/exchange/useOfferRequestAuth?did=${did}&offer=${request}`, { external: true });
+    } else {
+        throw createError({
+            statusCode: 400,
+            statusMessage: "Invalid issuance request: No credential_offer",
+        }); 
+    }
+
+  
 }
 
 if (query.accept) {

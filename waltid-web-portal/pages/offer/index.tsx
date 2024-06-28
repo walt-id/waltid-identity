@@ -29,11 +29,11 @@ export default function Offer() {
   useEffect(() => {
     const getOfferURL = async () => {
       let credentials;
-      if (localStorage.getItem('offer')){
+      if (localStorage.getItem('offer')) {
         credentials = JSON.parse(localStorage.getItem('offer')!);
         localStorage.removeItem('offer');
       }
-      else{
+      else {
         let ids = router.query.ids?.toString().split(',') ?? [];
         credentials = AvailableCredentials.filter((cred) => {
           for (const id of ids) {
@@ -45,13 +45,14 @@ export default function Offer() {
         });
       }
       if (credentials) {
-        const response = await getOfferUrl(credentials, env.NEXT_PUBLIC_VC_REPO ? env.NEXT_PUBLIC_VC_REPO : nextConfig.publicRuntimeConfig!.NEXT_PUBLIC_VC_REPO, env.NEXT_PUBLIC_ISSUER ? env.NEXT_PUBLIC_ISSUER : nextConfig.publicRuntimeConfig!.NEXT_PUBLIC_ISSUER);
+        const response = await getOfferUrl(credentials, env.NEXT_PUBLIC_VC_REPO ? env.NEXT_PUBLIC_VC_REPO : nextConfig.publicRuntimeConfig!.NEXT_PUBLIC_VC_REPO, env.NEXT_PUBLIC_ISSUER ? env.NEXT_PUBLIC_ISSUER : nextConfig.publicRuntimeConfig!.NEXT_PUBLIC_ISSUER, router.query.dynamicCredentialRequest as string);
         setOfferURL(response.data);
         setLoading(false);
       }
     };
-    getOfferURL();
-  }, [router.query.credentialId]);
+    if (router.isReady)
+      getOfferURL();
+  }, [router.isReady, router.query]);
 
   async function copyCurrentURLToClipboard() {
     navigator.clipboard.writeText(offerURL).then(

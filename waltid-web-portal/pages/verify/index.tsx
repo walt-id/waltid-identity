@@ -9,6 +9,7 @@ import axios from 'axios';
 import { sendToWebWallet } from '@/utils/sendToWebWallet';
 import nextConfig from '@/next.config';
 import BackButton from '@/components/walt/button/BackButton';
+import handleVerify from '@/components/sections/VerificationSection'
 
 const BUTTON_COPY_TEXT_DEFAULT = 'Copy offer URL';
 const BUTTON_COPY_TEXT_COPIED = 'Copied';
@@ -27,9 +28,15 @@ export default function Verification() {
   }
 
   useEffect(() => {
+    copyCurrentURLToClipboard()
+
     const getverifyURL = async () => {
       let vps = router.query.vps?.toString().split(',') ?? [];
       let ids = router.query.ids?.toString().split(',') ?? [];
+      let auth = router.query.auth?.toString();
+      
+      console.log(router.route)
+
       let credentials = AvailableCredentials.filter((cred) => {
         for (const id of ids) {
           if (id.toString() == cred.id.toString()) {
@@ -42,6 +49,29 @@ export default function Verification() {
         return credential.offer.type[credential.offer.type.length - 1]
       });
 
+      console.log("auth")
+      console.log("auth")
+      console.log("auth")
+      console.log(router.query.auth)
+      console.log(router.query)
+      console.log(router.query)
+      console.log(router.query)
+
+      console.log(ids)
+      console.log(vps)
+      console.log(auth)
+      console.log(credentialType)
+      console.log("auth")
+      console.log("auth")
+      console.log("auth")
+      console.log("auth")
+      console.log("auth")
+      console.log("auth")
+      console.log("auth")
+      console.log("auth")
+      console.log("auth")
+      console.log("auth")
+   
       const response = await axios.post(
         `${env.NEXT_PUBLIC_VERIFIER ? env.NEXT_PUBLIC_VERIFIER : nextConfig.publicRuntimeConfig!.NEXT_PUBLIC_VERIFIER}/openid4vc/verify`,
         {
@@ -64,13 +94,30 @@ export default function Verification() {
           },
         }
       );
-      setverifyURL(response.data);
+      if (router.query.auth) {
+        let vpRequestBase64 = decodeURI(router.query.auth as string)
+        let vpReq = atob(vpRequestBase64)
+
+        console.log(vpReq)
+        console.log(vpReq)
+        console.log(vpReq)
+        console.log(vpReq)
+        console.log(vpReq)
+        console.log(vpReq)
+        console.log(vpReq)
+
+        setverifyURL(vpReq);
+      } else {
+        setverifyURL(response.data);
+
+      }
       setLoading(false);
     };
     getverifyURL();
   }, []);
 
   async function copyCurrentURLToClipboard() {
+
     navigator.clipboard.writeText(verifyURL).then(
       function () {
         setCopyText(BUTTON_COPY_TEXT_COPIED);
@@ -99,7 +146,7 @@ export default function Verification() {
       <div className="relative w-10/12 sm:w-7/12 lg:w-5/12 text-center shadow-2xl rounded-lg pt-8 pb-8 px-10 bg-white">
         <BackButton />
         <h1 className="text-xl sm:text-2xl lg:text-3xl text-gray-900 text-center font-bold mt-5">
-          Scan to Verify
+          Scan to Verify you Credentials
         </h1>
         <div className="flex justify-center">
           {
