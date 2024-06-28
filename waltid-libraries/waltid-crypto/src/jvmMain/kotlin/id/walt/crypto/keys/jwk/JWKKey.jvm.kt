@@ -29,6 +29,7 @@ import org.bouncycastle.asn1.DEROctetString
 import org.bouncycastle.asn1.edec.EdECObjectIdentifiers
 import org.bouncycastle.asn1.pkcs.PrivateKeyInfo
 import org.bouncycastle.asn1.x509.AlgorithmIdentifier
+import org.bouncycastle.jce.ECNamedCurveTable
 import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.bouncycastle.util.io.pem.PemObject
 import org.bouncycastle.util.io.pem.PemWriter
@@ -70,7 +71,7 @@ actual class JWKKey actual constructor(
     actual override suspend fun getPublicKeyRepresentation(): ByteArray = when (keyType) {
         KeyType.Ed25519 -> _internalJwk.toOctetKeyPair().decodedX
         KeyType.RSA -> getRsaPublicKeyBytes(_internalJwk.toRSAKey().toPublicKey())
-        KeyType.secp256k1, KeyType.secp256r1 -> _internalJwk.toECKey().toPublicKey().encoded
+        KeyType.secp256k1, KeyType.secp256r1 ->  getECPublicKeyBytes(_internalJwk.toECKey().toECPublicKey())
     }
 
     actual override suspend fun getMeta(): JwkKeyMeta = JwkKeyMeta(getKeyId())
@@ -332,6 +333,12 @@ actual class JWKKey actual constructor(
         val pubPrim = ASN1Sequence.fromByteArray(key.encoded) as ASN1Sequence
         return (pubPrim.getObjectAt(1) as ASN1BitString).octets
     }
+
+    private fun getECPublicKeyBytes(key: java.security.interfaces.ECPublicKey): ByteArray {
+        val curveName = Curve.forECParameterSpec(key.params).name
+        return ECNamedCurveTable.getParameterSpec(curveName)
+            .curve.createPoint(key.w.affineX, key.w.affineY)
+            .getEncoded(true) }
 
     private fun getPrivateKey() = when (keyType) {
         KeyType.secp256r1, KeyType.secp256k1 -> _internalJwk.toECKey().toPrivateKey()
