@@ -33,14 +33,14 @@ suspendTransform {
 
 
 kotlin {
-    jvmToolchain(15)
+    jvmToolchain(17)
 }
 
 kotlin {
     targets.configureEach {
         compilations.configureEach {
             compileTaskProvider.configure {
-                compilerOptions { 
+                compilerOptions {
                     freeCompilerArgs.add("-Xexpect-actual-classes")
                 }
             }
