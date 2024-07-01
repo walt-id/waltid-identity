@@ -29,18 +29,29 @@
                 <div v-for="(value, key, index) in credentialManifest?.claims" :key="key">
                     <div class="flex mt-3">
                         <div class="text-gray-500 w-sm">{{ key }}</div>
-                        <div class="text-gray-500 font-bold">{{ value }}</div>
+                        <div class="text-gray-500 font-bold w-2xl">{{ value }}</div>
                     </div>
                 </div>
                 <hr class="w-full border-gray-200 mb-2 mt-8" />
                 <div class="text-gray-500 font-bold mt-4 mb-8">Issuer</div>
                 <div class="flex mt-2">
                     <div class="text-gray-500 w-sm">Name</div>
-                    <div class="text-gray-500 font-bold">{{ issuerName }}</div>
+                    <div class="text-gray-500 font-bold w-2xl">{{ issuerName }}</div>
                 </div>
                 <div class="flex mt-2 mb-8">
                     <div class="text-gray-500 w-sm">DID</div>
-                    <div class="text-gray-500 font-bold">{{ issuerDid }}</div>
+                    <div class="text-gray-500 font-bold w-2xl">{{ issuerDid }}</div>
+                </div>
+                <hr v-if="disclosures" class="w-full border-gray-200 mb-2 mt-8" />
+                <div v-if="disclosures" class="text-gray-500 font-bold mt-4 mb-8">Selectively disclosable attributes
+                </div>
+                <div v-if="disclosures">
+                    <div v-for="disclosure in disclosures">
+                        <div class="flex mt-2">
+                            <div class="text-gray-500 w-sm">{{ disclosure[1] }}</div>
+                            <div class="text-gray-500 font-bold overflow-scroll w-2xl">{{ disclosure[2] }}</div>
+                        </div>
+                    </div>
                 </div>
                 <hr class="w-full border-gray-200 my-2" />
                 <div class="flex justify-between my-6">

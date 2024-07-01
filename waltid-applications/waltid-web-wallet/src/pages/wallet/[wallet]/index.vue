@@ -34,7 +34,7 @@
             <div v-else class="h-full flex flex-col items-center justify-center">
                 <!-- <h3 class="text-2xl font-bold text-[#01337D]">Wallet is Inactive</h3> -->
                 <p class="mt-2 text-md text-black">You don’t have any credentials yet!</p>
-                <NuxtLink :to="`/wallet/${walletId}/settings/issuers`">
+                <NuxtLink :to="`/wallet/${walletId}/scan`">
                     <button
                         class="mt-8 px-4 py-2 text-white bg-[#01337D] rounded-lg shadow-lg hover:bg-[#002159] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#002159]">
                         Receive Credential

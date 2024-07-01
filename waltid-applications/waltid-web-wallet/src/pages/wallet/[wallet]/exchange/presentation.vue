@@ -21,8 +21,9 @@
                         <VerifiableCredentialCard :credential="credential" />
                     </div>
                 </div>
-                <div class="w-full flex justify-center" v-else>
-                    <button @click="index--" class="mt-4 text-[#002159] font-bold" v-if="index > 0">
+                <div class="w-full flex justify-center gap-5" v-else>
+                    <button @click="index--" class="mt-4 text-[#002159] font-bold bg-white" :disabled="index === 0"
+                        :class="{ 'cursor-not-allowed opacity-50': index === 0 }">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24"
                             stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
@@ -30,9 +31,10 @@
                     </button>
                     <VerifiableCredentialCard :credential="{
                         document: matchedCredentials[index].document
-                    }" :isDetailView="true" />
-                    <button @click="index++" class="mt-4 text-[#002159] font-bold"
-                        v-if="index < matchedCredentials.length - 1">
+                    }" class="sm:w-[400px]" />
+                    <button @click="index++" class="mt-4 text-[#002159] font-bold bg-white"
+                        :disabled="index === matchedCredentials.length - 1"
+                        :class="{ 'cursor-not-allowed opacity-50': index === matchedCredentials.length - 1 }">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24"
                             stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />

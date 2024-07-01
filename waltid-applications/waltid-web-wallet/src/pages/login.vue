@@ -111,14 +111,14 @@
                             </NuxtLink>
                         </p>
                     </div>
-                    <button
+                    <!-- <button
                         class="mt-5 flex w-full justify-center rounded-xl px-3 py-2 text-sm font-semibold text-gray-400 bg-white border border-gray-300">
-                        Connect Wallet </button>
-                    <div class="flex items-center mt-5">
+                        Connect Wallet </button> -->
+                    <!-- <div class="flex items-center mt-5">
                         <div class="flex-1 border-t border-gray-300"></div>
                         <div class="mx-3 text-gray-400">or</div>
                         <div class="flex-1 border-t border-gray-300"></div>
-                    </div>
+                    </div> -->
                     <div class="mt-5">
                         <div class="mt-6">
                             <form class="space-y-6" @submit.prevent="login">
@@ -141,10 +141,10 @@
                                                 for="password">
                                                 <span class="flex flex-row items-center">Password</span>
                                             </label>
-                                            <NuxtLink class="text-sm font-medium text-[#7B8794] hover:text-blue-500"
+                                            <!-- <NuxtLink class="text-sm font-medium text-[#7B8794] hover:text-blue-500"
                                                 to="/forgot-password">
                                                 Forgot password
-                                            </NuxtLink>
+                                            </NuxtLink> -->
                                         </div>
                                         <div class="mt-1">
                                             <input id="password" v-model="passwordInput" autocomplete="current-password"
