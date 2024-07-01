@@ -42,14 +42,17 @@ private val logger = KotlinLogging.logger { }
 // Works with the Hashicorp Transit Secret Engine
 class TSEKey(
     val server: String,
-    private val auth: TSEAuth,
+    private val auth: TSEAuth? = null,
+    @Deprecated("use TSEAuth in `auth` instead") private val accessKey: String? = null,
     private val namespace: String? = null,
     val id: String,
-    //private var publicKey: ByteArray? = null,
-    //override var keyType: KeyType? = null
     private var _publicKey: ByteArray? = null,
     private var _keyType: KeyType? = null,
 ) : Key() {
+
+    @Suppress("DEPRECATION")
+    @Transient
+    private val effectiveAuth: TSEAuth = auth ?: TSEAuth(accessKey = accessKey ?: throw IllegalArgumentException("Either auth or accessKey must be provided"))
 
     @OptIn(DelicateCoroutinesApi::class)
     private inline fun <T> lazySuspended(
@@ -65,7 +68,7 @@ class TSEKey(
             this.url("$server/$url")
             this.method = method
 
-            header("X-Vault-Token", auth.getCachedLogin(server))
+            header("X-Vault-Token", effectiveAuth.getCachedLogin(server))
             namespace?.let { header("X-Vault-Namespace", namespace) }
 
             body?.let { this.setBody(body) }
@@ -350,7 +353,12 @@ class TSEKey(
                 ?: throwTSEError("no keys array in key data: $keyData")).jsonObject["1"]!!.jsonObject["public_key"]!!.jsonPrimitive.content.decodeBase64Bytes()
 
             return TSEKey(
-                metadata.server, metadata.auth, metadata.namespace, keyName, publicKey, type
+                server = metadata.server,
+                auth = metadata.auth,
+                namespace = metadata.namespace,
+                id = keyName,
+                _publicKey = publicKey,
+                _keyType = type
             ).apply { init() }
         }
 
