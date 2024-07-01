@@ -3,12 +3,6 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.assertNotNull
 
-enum class KeyTests(val test: TestFunctionType) {
-    Generate({ name, function ->
-        println("Testing $name...")
-    })
-}
-
 fun assertKeyComponents(document: JsonElement, keyId: String, type: KeyType, isPrivate: Boolean = false) {
     assertNotNull(document.tryGetData("kid")?.jsonPrimitive?.content) { "Missing _kid_ component!" }
     assert(document.tryGetData("kid")?.jsonPrimitive?.content == keyId) { "Wrong _kid_ value!" }
