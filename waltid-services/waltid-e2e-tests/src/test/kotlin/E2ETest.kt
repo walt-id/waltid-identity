@@ -38,16 +38,6 @@ class E2ETest {
             var client = testHttpClient()
 
             // the e2e http request tests here
-//            test("/livez - healthcheck") {
-//                client.get("/livez").apply {
-//                    assert(status == HttpStatusCode.OK)
-//                    body<JsonElement>().let { result ->
-//                        assertTrue(result is JsonArray)
-//                        assertTrue(result.size > 0)
-//                        assertTrue(result.tryGetData("status")?.jsonPrimitive?.content == "Healthy")
-//                    }
-//                }
-//            }
 
             //region -Login-
             test("/wallet-api/auth/user-info - not logged in without token") {
@@ -58,7 +48,12 @@ class E2ETest {
 
             test("/wallet-api/auth/login - wallet-api login") {
                 client.post("/wallet-api/auth/login") {
-                    setBody(EmailAccountRequest(email = "user@email.com", password = "password").encodeWithType("email"))
+                    setBody(
+                        EmailAccountRequest(
+                            email = "user@email.com",
+                            password = "password"
+                        ).encodeWithType("email")
+                    )
                 }.expectSuccess().apply {
                     body<JsonObject>().let { result ->
                         assertNotNull(result["token"])
@@ -290,7 +285,8 @@ class E2ETest {
                 }
                 assert(resolvedPresentationOfferString.contains("presentation_definition="))
 
-                presentationDefinition = Url(resolvedPresentationOfferString).parameters.getOrFail("presentation_definition")
+                presentationDefinition =
+                    Url(resolvedPresentationOfferString).parameters.getOrFail("presentation_definition")
 
                 presentationDefinition
             }
