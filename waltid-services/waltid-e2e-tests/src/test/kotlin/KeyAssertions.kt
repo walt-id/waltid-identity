@@ -44,7 +44,7 @@ fun assertRSAKeyComponents(document: JsonElement, isPrivate: Boolean) {
     assert(document.tryGetData("kty")?.jsonPrimitive?.content == "RSA") { "Wrong _kty_ value!" }
     assertNotNull(document.tryGetData("e")?.jsonPrimitive?.content) { "Missing _e_ component!" }
     assertNotNull(document.tryGetData("n")?.jsonPrimitive?.content) { "Missing _n_ component!" }
-    if(isPrivate) {
+    if (isPrivate) {
         assertNotNull(document.tryGetData("d")?.jsonPrimitive?.content) { "Missing _d_ component!" }
         assertNotNull(document.tryGetData("p")?.jsonPrimitive?.content) { "Missing _p_ component!" }
         assertNotNull(document.tryGetData("q")?.jsonPrimitive?.content) { "Missing _q_ component!" }
