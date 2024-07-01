@@ -148,7 +148,7 @@ dependencies {
     implementation("org.jetbrains.exposed:exposed-jdbc:0.51.1")
     implementation("org.jetbrains.exposed:exposed-dao:0.51.1")
     implementation("org.jetbrains.exposed:exposed-java-time:0.51.1")
-    implementation("org.jetbrains.exposed:exposed-json:0.51.1")
+    implementation("org.jetbrains.exposed:exposed-json:0.52.0")
     // drivers
     implementation("org.xerial:sqlite-jdbc:3.46.0.0")
     implementation("org.postgresql:postgresql:42.7.3")
