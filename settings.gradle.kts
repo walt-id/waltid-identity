@@ -41,7 +41,7 @@ include(
     // OCI extension for waltid-crypto
     ":waltid-libraries:waltid-crypto-oci",
 
-    // Android - uncomment to enable build:
+    // Android - uncomment to enable build, and set Android SDK in local.properties:
     /*
     ":waltid-libraries:waltid-crypto-android",
     ":waltid-applications:waltid-android"

@@ -22,7 +22,7 @@ object AccountsService {
 //        val loginMethods = ConfigManager.getConfig<LoginMethodsConfig>().enabledLoginMethods
     }
 
-    val defaultGenerationConfig by lazy { ConfigManager.getConfig<RegistrationDefaultsConfig>() }
+    private val defaultGenerationConfig by lazy { ConfigManager.getConfig<RegistrationDefaultsConfig>() }
 
     suspend fun register(tenant: String = "", request: AccountRequest): Result<RegistrationResult> = when (request) {
         is EmailAccountRequest -> EmailAccountStrategy.register(tenant, request)

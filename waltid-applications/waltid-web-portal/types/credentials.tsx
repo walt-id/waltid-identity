@@ -23,8 +23,8 @@ export const DIDMethods = [
 
 export const DIDMethodsConfig = {
   'did:key': {
-    'issuerDid': 'did:key:zWmu9RCrS3hBhGSyhKfNSywuTWFCMjMxJeKhMPt6iHCZU8jTdd3GFExQUWze9TEE877crWsxxaJ7w4UCUKBwfpSe5uW6aVhfXLTUXUSR4A22HtgtR3dMxn2kkWvrZGNo',
-    'issuerKey': { "type": "jwk", "jwk": "{\"kty\":\"EC\",\"d\":\"_zAoNn2NdPkLmWfUm5HSARkiV34uHMDfNh3NfItBfKc\",\"crv\":\"P-256\",\"kid\":\"AczCHuog4j86KkSoZHopTOdyw2lnHPv_Pvvn_vrvZxQ\",\"x\":\"QRTTjcCikd89Kl-jA0Bt3I252wKpLquWa4ZJJySPpOY\",\"y\":\"eEmDUil7BMPDR9Raewfu77yNHOVzaktvCGntE1YGcvw\"}" }
+    'issuerDid': 'did:key:z6MkmANLkdcnbriWeVaqdfrA3MmtXoVPNu98tww6xDeyVnyF',
+    'issuerKey': {"type":"jwk","jwk":"{\"kty\":\"OKP\",\"d\":\"fbpXmCh4KkcVIGOnkcjHvWAcaUPvvkBvgMFPE4nAgvA\",\"crv\":\"Ed25519\",\"kid\":\"DJ3X4BZqk4GJsMGZL44hEZrlEy9scbMcSA_QuUi3tGs\",\"x\":\"Y64Ns3aRo6KQgJTtCZKFA78uYvslBcIrOk7xaS1PIZI\"}"}
   },
   'did:ebsi': {
     'issuerDid': 'did:ebsi:zf39qHTXaLrr6iy3tQhT3UZ',

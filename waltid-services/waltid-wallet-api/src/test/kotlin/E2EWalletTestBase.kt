@@ -98,7 +98,7 @@ abstract class E2EWalletTestBase {
             //language=JSON
             contentType(ContentType.Application.Json)
             setBody(
-                id.walt.issuer.issuance.IssuanceExamples.issuerOnboardingRequestDefaultExample
+                id.walt.issuer.issuance.IssuanceExamples.issuerOnboardingRequestDefaultSecp256r1Example
             )
         }.also { response ->
             assertEquals(HttpStatusCode.OK, response.status)

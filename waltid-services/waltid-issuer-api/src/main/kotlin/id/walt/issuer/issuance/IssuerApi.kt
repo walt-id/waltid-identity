@@ -22,7 +22,7 @@ import kotlinx.serialization.json.*
 import kotlin.time.Duration.Companion.minutes
 
 private val logger = KotlinLogging.logger {}
-suspend fun createCredentialOfferUri(issuanceRequests: List<IssuanceRequest>): String {
+fun createCredentialOfferUri(issuanceRequests: List<IssuanceRequest>): String {
     val credentialOfferBuilder =
         OidcIssuance.issuanceRequestsToCredentialOfferBuilder(issuanceRequests)
 
@@ -30,9 +30,11 @@ suspend fun createCredentialOfferUri(issuanceRequests: List<IssuanceRequest>): S
         credentialOfferBuilder = credentialOfferBuilder, expiresIn = 5.minutes, allowPreAuthorized = true
     )
     OidcApi.setIssuanceDataForIssuanceId(issuanceSession.id, issuanceRequests.map {
-        CIProvider.IssuanceSessionData(KeySerialization.deserializeKey(it.issuerKey)
-            .onFailure { throw IllegalArgumentException("Invalid key was supplied, error occurred is: $it") }
-            .getOrThrow(), it.issuerDid, it)
+        val key = KeyManager.resolveSerializedKey(it.issuerKey)
+
+        CIProvider.IssuanceSessionData(
+            key, it.issuerDid, it
+        )
     })  // TODO: Hack as this is non stateless because of oidc4vc lib API
 
     logger.debug { "issuanceSession: $issuanceSession" }
@@ -60,12 +62,15 @@ fun Application.issuerApi() {
                 description = "Creates an issuer keypair and an associated DID based on the provided configuration."
 
                 request {
-                    body<IssuerOnboardingRequest> {
+                    body<OnboardingRequest> {
                         description = "Issuer onboarding request (key & DID) config."
-                        example("did:jwk + JWK key (Ed25519)", IssuanceExamples.issuerOnboardingRequestDefaultExample)
+                        example("did:jwk + JWK key (Ed25519)", IssuanceExamples.issuerOnboardingRequestDefaultEd25519Example)
+                        example("did:jwk + JWK key (secp256r1)", IssuanceExamples.issuerOnboardingRequestDefaultSecp256r1Example)
+                        example("did:jwk + JWK key (secp256k1)", IssuanceExamples.issuerOnboardingRequestDefaultSecp256k1Example)
+                        example("did:jwk + JWK key (RSA)", IssuanceExamples.issuerOnboardingRequestDefaultRsaExample)
                         example("did:web + JWK key (Secp256k1)", IssuanceExamples.issuerOnboardingRequestDidWebExample)
                         example(
-                            "did:key + TSE key (Hashicorp Vault Transit Engine - RSA)",
+                            "did:key + TSE key (Hashicorp Vault Transit Engine - Ed25519)",
                             IssuanceExamples.issuerOnboardingRequestTseExample
                         )
                         example(

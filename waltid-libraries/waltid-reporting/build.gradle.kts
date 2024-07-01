@@ -13,7 +13,6 @@ group = "id.walt.reporting"
 repositories {
     mavenCentral()
     //maven("https://jitpack.io")
-    //jcenter()
 }
 
 java {
