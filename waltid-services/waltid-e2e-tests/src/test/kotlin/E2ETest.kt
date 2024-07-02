@@ -5,6 +5,7 @@ import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.verifier.oidc.PresentationSessionInfo
 import id.walt.webwallet.db.models.*
 import id.walt.webwallet.web.controllers.UsePresentationRequest
+import id.walt.webwallet.web.model.AccountRequest
 import id.walt.webwallet.web.model.EmailAccountRequest
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -42,7 +43,7 @@ class E2ETest {
 
             test("/wallet-api/auth/login - wallet-api login") {
                 client.post("/wallet-api/auth/login") {
-                    setBody(EmailAccountRequest(email = "user@email.com", password = "password"))
+                    setBody(EmailAccountRequest(email = "user@email.com", password = "password") as AccountRequest)
                 }.expectSuccess().apply {
                     body<JsonObject>().let { result ->
                         assertNotNull(result["token"])
