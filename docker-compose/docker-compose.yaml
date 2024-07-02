@@ -74,9 +74,7 @@ services:
       PORT: $VC_REPO_PORT
 
   postgres:
-    image: postgres
-    profiles:
-      - postgres
+    image: docker.io/library/postgres
     healthcheck:
       test: [ "CMD", "pg_isready", "-q", "-U", "$DB_USERNAME" ]
       interval: 5s

@@ -1,4 +1,3 @@
-# this deployment runs docker compose to perform tests against
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -15,12 +14,21 @@ spec:
     spec:
       containers:
         - name: podman
-          image: fedora:latest
+          image: mgoltzsche/podman:4.9.5-minimal
           securityContext:
             privileged: true
-          command: [ "sh", "-c", "dnf install -y podman podman-compose git-all python3-pip && \
-                                  useradd waltid && \
-                                  git clone https://github.com/walt-id/waltid-identity.git && \
-                                  chown -R waltid:waltid /waltid-identity && \
-                                  cd waltid-identity/docker-compose && \
-                                  podman compose pull && podman compose up " ]
+          command: ["sh", "-c", "
+          echo 'http://dl-cdn.alpinelinux.org/alpine/edge/main' > /etc/apk/repositories && \
+          echo 'http://dl-cdn.alpinelinux.org/alpine/edge/community' >> /etc/apk/repositories && \
+          echo 'http://dl-cdn.alpinelinux.org/alpine/edge/testing' >> /etc/apk/repositories && \
+          cat /etc/apk/repositories && \
+          apk update && \
+          apk upgrade && \
+          apk add --no-cache podman-compose git py3-pip && \
+          adduser -D waltid && \
+          git clone https://github.com/walt-id/waltid-identity.git && \
+          chown -R waltid:waltid /waltid-identity && \
+          cd /waltid-identity/docker-compose && \
+          chmod -R a+rw wallet-api/data && \
+          podman compose pull && \
+          podman compose up "]
