@@ -9,6 +9,7 @@ import id.walt.verifier.oidc.PresentationSessionInfo
 import id.walt.webwallet.config.RegistrationDefaultsConfig
 import id.walt.webwallet.db.models.*
 import id.walt.webwallet.web.controllers.UsePresentationRequest
+import id.walt.webwallet.web.model.AccountRequest
 import id.walt.webwallet.web.model.EmailAccountRequest
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -52,7 +53,7 @@ class E2ETest {
                         EmailAccountRequest(
                             email = "user@email.com",
                             password = "password"
-                        ).encodeWithType("email")
+                        ) as AccountRequest
                     )
                 }.expectSuccess().apply {
                     body<JsonObject>().let { result ->
