@@ -37,7 +37,7 @@ private val ksecKeyType: CFStringRef? = kSecAttrKeyTypeECSECPrimeRandom
 
 class P256Key private constructor(
     val keyId: String, override val keyType: KeyType = KeyType.secp256r1
-) : IosKey(), CoreFoundationSecOperations {
+) : Key(), CoreFoundationSecOperations {
 
 
     override val hasPrivateKey: Boolean
@@ -74,7 +74,7 @@ class P256Key private constructor(
     )
 
 
-    override suspend fun signJws(bodyJson: ByteArray, headersJson: ByteArray): String = withSecKey(
+    private suspend fun signJws(bodyJson: ByteArray, headersJson: ByteArray): String = withSecKey(
         keyId, ksecKeyType, null
     ) { privateKey ->
 

@@ -34,7 +34,7 @@ import platform.Security.kSecKeyAlgorithmRSASignatureDigestPKCS1v15SHA256
 
 class RSAKey private constructor(
     val keyId: String, override val keyType: KeyType = KeyType.RSA,
-) : IosKey(), CoreFoundationSecOperations {
+) : Key(), CoreFoundationSecOperations {
 
     override suspend fun getThumbprint(): String = withSecKey(
         this.keyId, kSecAttrKeyTypeRSA, null
@@ -52,7 +52,7 @@ class RSAKey private constructor(
         keyId, kSecAttrKeyTypeRSA, kSecKeyAlgorithmRSASignatureDigestPKCS1v15SHA256, inputBytes
     )
 
-    override suspend fun signJws(bodyJson: ByteArray, headersJson: ByteArray): String {
+    private suspend fun signJws(bodyJson: ByteArray, headersJson: ByteArray): String {
         return withSecKey(
             keyId, kSecAttrKeyTypeRSA, kSecAttrKeyClassPrivate
         ) { privateKey ->

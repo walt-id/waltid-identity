@@ -105,6 +105,11 @@ kotlin {
     }
 
     sourceSets {
+
+        all {
+            languageSettings.optIn("kotlinx.cinterop.BetaInteropApi")
+        }
+
         val commonMain by getting {
             dependencies {
                 implementation("dev.whyoleg.cryptography:cryptography-random:0.3.1")

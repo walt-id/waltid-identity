@@ -3,9 +3,6 @@ package id.walt.crypto
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 
-abstract class IosKey: Key() {
-    abstract suspend fun signJws(bodyJson: ByteArray, headersJson: ByteArray): String
-}
 @Suppress("unused")
 class IosKeys {
 
