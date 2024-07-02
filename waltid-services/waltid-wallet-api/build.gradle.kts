@@ -83,10 +83,6 @@ dependencies {
     implementation("io.ktor:ktor-server-method-override:$ktor_version")
     implementation("io.ktor:ktor-server-rate-limit:$ktor_version")
 
-    // Ktor server external libs
-    implementation("io.github.smiley4:ktor-swagger-ui:3.0.1")
-    //implementation("io.github.microutils:kotlin-logging-jvm:2.1.23")
-
     // Ktor client
     implementation("io.ktor:ktor-client-core-jvm:$ktor_version")
     implementation("io.ktor:ktor-client-serialization-jvm:$ktor_version")
@@ -144,11 +140,11 @@ dependencies {
     }
 
     // DB
-    implementation("org.jetbrains.exposed:exposed-core:0.51.1")
-    implementation("org.jetbrains.exposed:exposed-jdbc:0.51.1")
-    implementation("org.jetbrains.exposed:exposed-dao:0.51.1")
-    implementation("org.jetbrains.exposed:exposed-java-time:0.51.1")
-    implementation("org.jetbrains.exposed:exposed-json:0.51.1")
+    implementation("org.jetbrains.exposed:exposed-core:0.52.0")
+    implementation("org.jetbrains.exposed:exposed-jdbc:0.52.0")
+    implementation("org.jetbrains.exposed:exposed-dao:0.52.0")
+    implementation("org.jetbrains.exposed:exposed-java-time:0.52.0")
+    implementation("org.jetbrains.exposed:exposed-json:0.52.0")
     // drivers
     implementation("org.xerial:sqlite-jdbc:3.46.0.0")
     implementation("org.postgresql:postgresql:42.7.3")
