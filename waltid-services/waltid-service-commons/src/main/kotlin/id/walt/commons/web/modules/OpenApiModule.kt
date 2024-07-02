@@ -3,6 +3,7 @@ package id.walt.commons.web.modules
 import id.walt.commons.config.statics.BuildConfig
 import id.walt.commons.config.statics.ServiceConfig
 import io.github.smiley4.ktorswaggerui.SwaggerUI
+import io.github.smiley4.ktorswaggerui.data.KTypeDescriptor
 import io.github.smiley4.ktorswaggerui.dsl.config.OpenApiInfo
 import io.github.smiley4.ktorswaggerui.dsl.config.PluginConfigDsl
 import io.github.smiley4.ktorswaggerui.dsl.routing.get
@@ -23,6 +24,8 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.serializer
 import kotlin.reflect.KType
 import kotlin.time.Duration.Companion.nanoseconds
 
@@ -55,6 +58,27 @@ object OpenApiModule {
     // Module
     fun Application.enable() {
         install(SwaggerUI) {
+
+            examples {
+                example("UUID") {
+                    value = "12345678-abcd-9876-efgh-543210123456"
+                }
+
+                example("Instant") {
+                    value = Clock.System.now().toString()
+                }
+
+                encoder { type, example ->
+                    if (type is KTypeDescriptor) {
+                        println("Example for: ${type.type}; example is: $example (${example!!::class.simpleName})")
+                        Json.encodeToString(Json.serializersModule.serializer(type.type), example)
+                    } else {
+                        println("Example not; as type is: $type")
+                        example
+                    }
+                }
+            }
+
             schemas {
                 val kotlinxPrefixes = listOf("id.walt")
 
