@@ -25,7 +25,7 @@ class Ed25519Key(
     val keyId: String,
     override val hasPrivateKey: Boolean,
     override val keyType: KeyType = KeyType.Ed25519
-) : IosKey() {
+) : Key() {
     override suspend fun getKeyId(): String = keyId
 
     override suspend fun getThumbprint(): String {
@@ -61,7 +61,7 @@ class Ed25519Key(
         return signJws(plaintext, headers.toJsonObject().toString().encodeToByteArray())
     }
 
-    override suspend fun signJws(bodyJson: ByteArray, headersJson: ByteArray): String {
+    private suspend fun signJws(bodyJson: ByteArray, headersJson: ByteArray): String {
         val signingInput = headersJson.encodeToBase64Url() + "." + bodyJson.encodeToBase64Url()
 
         val signature = signRaw(signingInput.toByteArray())

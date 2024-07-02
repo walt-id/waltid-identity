@@ -49,9 +49,11 @@ include(
     */
 
     // iOS - uncomment to enable build:
-//    /*
+    /*
     ":waltid-libraries:waltid-crypto-ios",
-    ":waltid-libraries:waltid-crypto-ios:crypto-ios-utils"
-//     */
+    ":waltid-libraries:waltid-crypto-ios:crypto-ios-utils",
+    ":waltid-applications:waltid-openid4vc-ios-testApp",
+    ":waltid-applications:waltid-openid4vc-ios-testApp:shared"
+     */
 )
 //include("waltid-e2e-tests")
