@@ -1,8 +1,12 @@
 import E2ETestWebService.test
 import E2ETestWebService.testBlock
+import id.walt.commons.config.ConfigManager
 import id.walt.commons.web.plugins.httpJson
+import id.walt.crypto.keys.KeyGenerationRequest
+import id.walt.crypto.keys.KeyType
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.verifier.oidc.PresentationSessionInfo
+import id.walt.webwallet.config.RegistrationDefaultsConfig
 import id.walt.webwallet.db.models.*
 import id.walt.webwallet.web.controllers.UsePresentationRequest
 import id.walt.webwallet.web.model.AccountRequest
@@ -19,10 +23,10 @@ import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.util.*
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.*
 import kotlinx.uuid.UUID
+import java.io.File
+import java.net.URLDecoder
 import kotlin.test.Test
 import kotlin.test.assertNotNull
 import kotlin.time.Duration.Companion.minutes
@@ -35,6 +39,8 @@ class E2ETest {
             var client = testHttpClient()
 
             // the e2e http request tests here
+
+            //region -Login-
             test("/wallet-api/auth/user-info - not logged in without token") {
                 client.get("/wallet-api/auth/user-info").apply {
                     assert(status == HttpStatusCode.Unauthorized) { "Was authorized without authorizing!" }
@@ -43,7 +49,12 @@ class E2ETest {
 
             test("/wallet-api/auth/login - wallet-api login") {
                 client.post("/wallet-api/auth/login") {
-                    setBody(EmailAccountRequest(email = "user@email.com", password = "password") as AccountRequest)
+                    setBody(
+                        EmailAccountRequest(
+                            email = "user@email.com",
+                            password = "password"
+                        )
+                    )
                 }.expectSuccess().apply {
                     body<JsonObject>().let { result ->
                         assertNotNull(result["token"])
@@ -80,6 +91,22 @@ class E2ETest {
                     println("Selected wallet: $wallet")
                 }
             }
+            //endregion -Login-
+
+            //region -Keys-
+            val keysApi = KeysApi(client)
+            val defaultKeyConfig = ConfigManager.getConfig<RegistrationDefaultsConfig>().defaultKeyConfig
+            val keyGenRequest = KeyGenerationRequest("jwk", KeyType.Ed25519)
+            lateinit var generatedKeyId: String
+            val rsaJwkImport = loadResource("keys/rsa.json")
+            keysApi.list(wallet, defaultKeyConfig)
+            keysApi.generate(wallet, keyGenRequest) { generatedKeyId = it }
+            keysApi.load(wallet, generatedKeyId, keyGenRequest)
+            keysApi.meta(wallet, generatedKeyId, keyGenRequest)
+            keysApi.export(wallet, generatedKeyId, "JWK", true, keyGenRequest)
+            keysApi.delete(wallet, generatedKeyId)
+            keysApi.import(wallet, rsaJwkImport)
+            //endregion -Keys-
 
             lateinit var did: String
 
@@ -259,7 +286,8 @@ class E2ETest {
                 }
                 assert(resolvedPresentationOfferString.contains("presentation_definition="))
 
-                presentationDefinition = Url(resolvedPresentationOfferString).parameters.getOrFail("presentation_definition")
+                presentationDefinition =
+                    Url(resolvedPresentationOfferString).parameters.getOrFail("presentation_definition")
 
                 presentationDefinition
             }
@@ -345,12 +373,31 @@ class E2ETest {
             level = LogLevel.ALL
         }
     }
-
-    private fun String.expectLooksLikeJwt(): String =
-        also { assert(startsWith("ey") && count { it == '.' } == 2) { "Does not look like JWT" } }
-
-    private fun HttpResponse.expectSuccess(): HttpResponse = also {
-        assert(status.isSuccess()) { "HTTP status is non-successful" }
-    }
-
 }
+
+fun String.expectLooksLikeJwt(): String =
+    also { assert(startsWith("ey") && count { it == '.' } == 2) { "Does not look like JWT" } }
+
+fun HttpResponse.expectSuccess(): HttpResponse = also {
+    assert(status.isSuccess()) { "HTTP status is non-successful" }
+}
+
+fun JsonElement.tryGetData(key: String): JsonElement? = key.split('.').let {
+    var element: JsonElement? = this
+    for (i in it) {
+        element = when (element) {
+            is JsonObject -> element[i]
+            is JsonArray -> element.firstOrNull {
+                it.jsonObject.containsKey(i)
+            }?.let {
+                it.jsonObject[i]
+            }
+
+            else -> element?.jsonPrimitive
+        }
+    }
+    element
+}
+
+fun loadResource(relativePath: String): String =
+    URLDecoder.decode(object {}.javaClass.getResource(relativePath)!!.path, "UTF-8").let { File(it).readText() }
