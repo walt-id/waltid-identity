@@ -54,7 +54,7 @@ const credentialSubtitle = ref(manifestCard.value?.description ?? credential.val
 
 const credentialImageUrl = ref(manifestCard.value?.logo?.uri ?? credential.value?.issuer?.image?.id ?? credential.value?.issuer?.image);
 
-const isNotExpired = ref(credential.value?.expirationDate ? new Date(credential.value?.expirationDate).getTime() > new Date().getTime() : true);
+const isNotExpired = ref(credential.value?.expirationDate ? new Date(credential.value?.expirationDate).getTime() > new Date().getTime() : credential.value?.validUntil ? new Date(credential.value?.validUntil).getTime() > new Date().getTime() : true);
 
 const issuerName = ref(manifestCard.value?.issuedBy ?? credential.value?.issuer?.name);
 
@@ -69,7 +69,7 @@ const updateComponent = () => {
     titleTitelized.value = manifestDisplay.value?.title ?? credential.value?.type?.at(-1).replace(/([a-z0-9])([A-Z])/g, "$1 $2");
     credentialSubtitle.value = manifestCard.value?.description ?? credential.value?.name;
     credentialImageUrl.value = manifestCard.value?.logo?.uri ?? credential.value?.issuer?.image?.id ?? credential.value?.issuer?.image;
-    isNotExpired.value = credential.value?.expirationDate ? new Date(credential.value?.expirationDate).getTime() > new Date().getTime() : true;
+    isNotExpired.value = credential.value?.expirationDate ? new Date(credential.value?.expirationDate).getTime() > new Date().getTime() : credential.value?.validUntil ? new Date(credential.value?.validUntil).getTime() > new Date().getTime() : true;
     issuerName.value = manifestCard.value?.issuedBy ?? credential.value?.issuer?.name;
 };
 

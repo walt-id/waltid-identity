@@ -55,9 +55,9 @@
                 </div>
                 <hr class="w-full border-gray-200 my-2" />
                 <div class="flex justify-between my-6">
-                    <div v-if="jwtJson?.expirationDate" class="text-gray-500">Valid through
+                    <div v-if="expirationDate" class="text-gray-500">Valid through
                         {{ issuanceDate?.replace(/-/g, ".") }} -
-                        {{ new Date(jwtJson?.expirationDate).toISOString().slice(0, 10).replace(/-/g, ".") }}
+                        {{ expirationDate.replace(/-/g, ".") }}
                     </div>
                     <div v-else class="text-gray-500">No expiration date</div>
                     <div class="text-gray-500">Issued {{ issuanceDate?.replace(/-/g, ".") }}</div>
@@ -175,6 +175,15 @@ const issuanceDate = computed(() => {
         return new Date(jwtJson.value?.issuanceDate).toISOString().slice(0, 10);
     } else if (jwtJson.value?.validFrom) {
         return new Date(jwtJson.value?.validFrom).toISOString().slice(0, 10);
+    } else {
+        return null;
+    }
+});
+const expirationDate = computed(() => {
+    if (jwtJson.value?.expirationDate) {
+        return new Date(jwtJson.value?.expirationDate).toISOString().slice(0, 10);
+    } else if (jwtJson.value?.validUntil) {
+        return new Date(jwtJson.value?.validUntil).toISOString().slice(0, 10);
     } else {
         return null;
     }
