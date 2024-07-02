@@ -42,7 +42,7 @@ class E2ETest {
 
             test("/wallet-api/auth/login - wallet-api login") {
                 client.post("/wallet-api/auth/login") {
-                    setBody(EmailAccountRequest(email = "user@email.com", password = "password").encodeWithType("email"))
+                    setBody(EmailAccountRequest(email = "user@email.com", password = "password"))
                 }.expectSuccess().apply {
                     body<JsonObject>().let { result ->
                         assertNotNull(result["token"])
