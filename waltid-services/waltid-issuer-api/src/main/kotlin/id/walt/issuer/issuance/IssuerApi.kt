@@ -69,8 +69,16 @@ fun Application.issuerApi() {
                         example("did:jwk + JWK key (RSA)", IssuanceExamples.issuerOnboardingRequestDefaultRsaExample)
                         example("did:web + JWK key (Secp256k1)", IssuanceExamples.issuerOnboardingRequestDidWebExample)
                         example(
-                            "did:key + TSE key (Hashicorp Vault Transit Engine - Ed25519)",
-                            IssuanceExamples.issuerOnboardingRequestTseExample
+                            "did:key + TSE key (Hashicorp Vault Transit Engine - Ed25519) + AppRole (Auth)",
+                            IssuanceExamples.issuerOnboardingRequestTseExampleAppRole
+                        )
+                        example(
+                            "did:key + TSE key (Hashicorp Vault Transit Engine - Ed25519) + UserPass (Auth)",
+                            IssuanceExamples.issuerOnboardingRequestTseExampleUserPass
+                        )
+                        example(
+                            "did:key + TSE key (Hashicorp Vault Transit Engine - Ed25519) + AccessKey (Auth)",
+                            IssuanceExamples.issuerOnboardingRequestTseExampleAccessKey
                         )
                         example(
                             "did:jwk + OCI key (Oracle Cloud Infrastructure - Secp256r1)",
