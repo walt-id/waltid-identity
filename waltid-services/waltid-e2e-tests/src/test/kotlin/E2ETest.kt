@@ -1,8 +1,6 @@
 import E2ETestWebService.test
 import E2ETestWebService.testBlock
 import id.walt.commons.web.plugins.httpJson
-import id.walt.oid4vc.OpenID4VCI
-import id.walt.oid4vc.data.OpenIDProviderMetadata
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.verifier.oidc.PresentationSessionInfo
 import id.walt.webwallet.db.models.*
@@ -336,19 +334,40 @@ class E2ETest {
             test("lsp issuance track2") {
               lspPotentialIssuance.testTrack2()
             }
+            val lspPotentialVerification = LspPotentialVerification(testHttpClient(doFollowRedirects = false))
+            test("lsp verification track 3"){
+              lspPotentialVerification.testPotentialInteropTrack3()
+            }
+            test("lsp verification track 4") {
+              lspPotentialVerification.testPotentialInteropTrack4()
+            }
         }
     }
 
   //@Test // enable to execute test selectively
-  fun lspTests() = runTest(timeout = 5.minutes) {
-    var client = testHttpClient(doFollowRedirects = false)
+  fun lspIssuanceTests() = runTest(timeout = 5.minutes) {
+    val client = testHttpClient(doFollowRedirects = false)
     testBlock {
       val lspPotentialIssuance = LspPotentialIssuance(client)
-      test("lsp issuance track1") {
+      test("lsp issuance track 1") {
         lspPotentialIssuance.testTrack1()
       }
-      test("lsp issuance track2") {
+      test("lsp issuance track 2") {
         lspPotentialIssuance.testTrack2()
+      }
+    }
+  }
+
+  //@Test
+  fun lspVerifierTests() = runTest(timeout = 5.minutes) {
+    val client = testHttpClient(doFollowRedirects = false)
+    testBlock {
+      val lspPotentialVerification = LspPotentialVerification(client)
+      test("lsp verification track 3"){
+        lspPotentialVerification.testPotentialInteropTrack3()
+      }
+      test("lsp verification track 4") {
+        lspPotentialVerification.testPotentialInteropTrack4()
       }
     }
   }

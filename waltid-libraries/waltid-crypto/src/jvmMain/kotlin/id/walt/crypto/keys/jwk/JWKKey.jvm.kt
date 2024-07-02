@@ -46,7 +46,8 @@ private val log = KotlinLogging.logger { }
 @SerialName("jwk")
 actual class JWKKey actual constructor(
     @Suppress("CanBeParameter", "RedundantSuppression")
-    var jwk: String?
+    var jwk: String?,
+    val _keyId: String?
 ) : Key() {
 
     @Transient
@@ -326,7 +327,7 @@ actual class JWKKey actual constructor(
     actual override val hasPrivateKey: Boolean
         get() = _internalJwk.isPrivate
 
-    actual override suspend fun getKeyId(): String = _internalJwk.keyID ?: getThumbprint()
+    actual override suspend fun getKeyId(): String = _keyId ?: _internalJwk.keyID ?: getThumbprint()
 
     actual override suspend fun getThumbprint(): String = _internalJwk.computeThumbprint().toString()
 

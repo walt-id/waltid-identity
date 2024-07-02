@@ -4,7 +4,6 @@ package id.walt.issuer.issuance
 import com.nimbusds.jose.jwk.JWK
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyManager
-import id.walt.issuer.utils.LspPotentialInteropEvent
 import id.walt.oid4vc.data.ResponseMode
 import id.walt.oid4vc.data.ResponseType
 import id.walt.oid4vc.errors.*

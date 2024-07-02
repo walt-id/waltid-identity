@@ -1,12 +1,14 @@
 import COSE.AlgorithmID
 import COSE.OneKey
 import cbor.Cbor
+import com.nimbusds.jose.JWSAlgorithm
+import com.nimbusds.jose.crypto.ECDSASigner
+import com.nimbusds.jose.crypto.ECDSAVerifier
 import com.nimbusds.jose.jwk.ECKey
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.utils.Base64Utils.base64UrlDecode
-import id.walt.issuer.utils.LspPotentialInteropEvent
 import id.walt.mdoc.COSECryptoProviderKeyInfo
 import id.walt.mdoc.SimpleCOSECryptoProvider
 import id.walt.mdoc.cose.COSESign1
@@ -29,6 +31,7 @@ import id.walt.oid4vc.responses.CredentialResponse
 import id.walt.oid4vc.responses.TokenResponse
 import id.walt.oid4vc.util.randomUUID
 import id.walt.sdjwt.SDJwtVC
+import id.walt.sdjwt.SimpleJWTCryptoProvider
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
@@ -43,7 +46,12 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.kotlincrypto.hash.sha2.SHA256
 import java.io.FileReader
+import java.security.KeyFactory
 import java.security.KeyPairGenerator
+import java.security.cert.CertificateFactory
+import java.security.cert.X509Certificate
+import java.security.spec.PKCS8EncodedKeySpec
+import java.security.spec.X509EncodedKeySpec
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.test.*
@@ -53,7 +61,7 @@ class LspPotentialIssuance(val client: HttpClient) {
   @OptIn(ExperimentalEncodingApi::class)
   fun testTrack1() = runBlocking {
     // ### steps 1-6
-    val offerResp = client.get("/openid4vc/lspPotentialCredentialOffer")
+    val offerResp = client.get("/lsp-potential/lspPotentialCredentialOfferT1")
     assert(offerResp.status == HttpStatusCode.OK)
     val offerUri = offerResp.bodyAsText()
     val parsedOffer = OpenID4VCI.parseAndResolveCredentialOfferRequestUrl(offerUri)
@@ -197,9 +205,9 @@ class LspPotentialIssuance(val client: HttpClient) {
         mdoc.verifySignature(
           SimpleCOSECryptoProvider(
             listOf(
-              LspPotentialInteropEvent.loadPotentialIssuerKeys()
+              loadPotentialIssuerKeys()
             )
-          ), LspPotentialInteropEvent.POTENTIAL_ISSUER_KEY_ID
+          ), POTENTIAL_ISSUER_KEY_ID
         )
       )
       assertNotNull(mdoc.issuerSigned.nameSpaces)
@@ -208,9 +216,9 @@ class LspPotentialIssuance(val client: HttpClient) {
       assertTrue(
         mdoc.verify(
           MDocVerificationParams(
-            VerificationType.forIssuance, LspPotentialInteropEvent.POTENTIAL_ISSUER_KEY_ID, deviceKeyId,
+            VerificationType.forIssuance, POTENTIAL_ISSUER_KEY_ID, deviceKeyId,
             mDocRequest = MDocRequestBuilder(offeredCredential.docType!!).build()
-          ), SimpleCOSECryptoProvider(listOf(LspPotentialInteropEvent.POTENTIAL_ISSUER_CRYPTO_PROVIDER_INFO))
+          ), SimpleCOSECryptoProvider(listOf(POTENTIAL_ISSUER_CRYPTO_PROVIDER_INFO))
         )
       )
     }
@@ -219,7 +227,7 @@ class LspPotentialIssuance(val client: HttpClient) {
   @OptIn(ExperimentalEncodingApi::class)
   fun testTrack2() = runBlocking {
     // ### steps 1-6
-    val offerResp = client.get("/openid4vc/lspPotentialCredentialOfferT2")
+    val offerResp = client.get("/lsp-potential/lspPotentialCredentialOfferT2")
     assertEquals(HttpStatusCode.OK, offerResp.status)
 
     val offerUri = offerResp.bodyAsText()
@@ -326,5 +334,52 @@ class LspPotentialIssuance(val client: HttpClient) {
     assertNotNull(credResp.credential)
     val sdJwtVc = SDJwtVC.parse(credResp.credential!!.jsonPrimitive.content)
     assertNotNull(sdJwtVc.cnfObject)
+  }
+
+  val POTENTIAL_ROOT_CA_CERT = "-----BEGIN CERTIFICATE-----\n" +
+      "MIIBQzCB66ADAgECAgjbHnT+6LsrbDAKBggqhkjOPQQDAjAYMRYwFAYDVQQDDA1NRE9DIFJPT1QgQ1NQMB4XDTI0MDUwMjEzMTMzMFoXDTI0MDUwMzEzMTMzMFowFzEVMBMGA1UEAwwMTURPQyBST09UIENBMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEWP0sG+CkjItZ9KfM3sLF+rLGb8HYCfnlsIH/NWJjiXkTx57ryDLYfTU6QXYukVKHSq6MEebvQPqTJT1blZ/xeKMgMB4wDAYDVR0TAQH/BAIwADAOBgNVHQ8BAf8EBAMCAQYwCgYIKoZIzj0EAwIDRwAwRAIgWM+JtnhdqbTzFD1S3byTvle0n/6EVALbkKCbdYGLn8cCICOoSETqwk1oPnJEEPjUbdR4txiNqkHQih8HKAQoe8t5\n" +
+      "-----END CERTIFICATE-----\n"
+  val POTENTIAL_ROOT_CA_PRIV = "-----BEGIN PRIVATE KEY-----\n" +
+      "MEECAQAwEwYHKoZIzj0CAQYIKoZIzj0DAQcEJzAlAgEBBCBXPx4eVTypvm0pQkFdqVXlORn+YIFNb+Hs5xvmG3EM8g==\n" +
+      "-----END PRIVATE KEY-----\n"
+  val POTENTIAL_ROOT_CA_PUB = "-----BEGIN PUBLIC KEY-----\n" +
+      "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEWP0sG+CkjItZ9KfM3sLF+rLGb8HYCfnlsIH/NWJjiXkTx57ryDLYfTU6QXYukVKHSq6MEebvQPqTJT1blZ/xeA==\n" +
+      "-----END PUBLIC KEY-----\n"
+  val POTENTIAL_ISSUER_CERT = "-----BEGIN CERTIFICATE-----\n" +
+      "MIIBRzCB7qADAgECAgg57ch6mnj5KjAKBggqhkjOPQQDAjAXMRUwEwYDVQQDDAxNRE9DIFJPT1QgQ0EwHhcNMjQwNTAyMTMxMzMwWhcNMjUwNTAyMTMxMzMwWjAbMRkwFwYDVQQDDBBNRE9DIFRlc3QgSXNzdWVyMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEG0RINBiF+oQUD3d5DGnegQuXenI29JDaMGoMvioKRBN53d4UazakS2unu8BnsEtxutS2kqRhYBPYk9RAriU3gaMgMB4wDAYDVR0TAQH/BAIwADAOBgNVHQ8BAf8EBAMCB4AwCgYIKoZIzj0EAwIDSAAwRQIhAI5wBBAA3ewqIwslhuzFn4rNFW9dkz2TY7xeImO7CraYAiAYhai1NzJ6abAiYg8HxcRdYpO4bu2Sej8E6CzFHK34Yw==\n" +
+      "-----END CERTIFICATE-----"
+  val POTENTIAL_ISSUER_PUB = "-----BEGIN PUBLIC KEY-----\n" +
+      "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEG0RINBiF+oQUD3d5DGnegQuXenI29JDaMGoMvioKRBN53d4UazakS2unu8BnsEtxutS2kqRhYBPYk9RAriU3gQ==\n" +
+      "-----END PUBLIC KEY-----\n"
+  val POTENTIAL_ISSUER_PRIV = "-----BEGIN PRIVATE KEY-----\n" +
+      "MEECAQAwEwYHKoZIzj0CAQYIKoZIzj0DAQcEJzAlAgEBBCAoniTdVyXlKP0x+rius1cGbYyg+hjf8CT88hH8SCwWFA==\n" +
+      "-----END PRIVATE KEY-----\n"
+  val POTENTIAL_ISSUER_KEY_ID = "potential-lsp-issuer-key-01"
+  val POTENTIAL_ISSUER_CRYPTO_PROVIDER_INFO = loadPotentialIssuerKeys()
+  val POTENTIAL_JWT_CRYPTO_PROVIDER = SimpleJWTCryptoProvider(
+    JWSAlgorithm.ES256,
+    ECDSASigner(ECKey.parseFromPEMEncodedObjects(POTENTIAL_ISSUER_PRIV + POTENTIAL_ISSUER_PUB).toECKey()), ECDSAVerifier(
+      ECKey.parseFromPEMEncodedObjects(POTENTIAL_ISSUER_PUB).toECKey())
+  )
+  val POTENTIAL_ISSUER_KEY_JWK = ECKey.parseFromPEMEncodedObjects(POTENTIAL_ISSUER_PRIV + POTENTIAL_ISSUER_PUB).toJSONString()
+
+  fun readKeySpec(pem: String): ByteArray {
+    val publicKeyPEM = pem
+      .replace("-----BEGIN PUBLIC KEY-----", "")
+      .replace("-----BEGIN PRIVATE KEY-----", "")
+      .replace(System.lineSeparator().toRegex(), "")
+      .replace("-----END PUBLIC KEY-----", "")
+      .replace("-----END PRIVATE KEY-----", "")
+
+    return java.util.Base64.getDecoder().decode(publicKeyPEM)
+  }
+
+  fun loadPotentialIssuerKeys(): COSECryptoProviderKeyInfo {
+    val factory = CertificateFactory.getInstance("X.509")
+    val rootCaCert = (factory.generateCertificate(POTENTIAL_ROOT_CA_CERT.byteInputStream())) as X509Certificate
+    val issuerCert = (factory.generateCertificate(POTENTIAL_ISSUER_CERT.byteInputStream())) as X509Certificate
+    val issuerPub = KeyFactory.getInstance("EC").generatePublic(X509EncodedKeySpec(readKeySpec(POTENTIAL_ISSUER_PUB)))
+    val issuerPriv = KeyFactory.getInstance("EC").generatePrivate(PKCS8EncodedKeySpec(readKeySpec(POTENTIAL_ISSUER_PRIV)))
+    return COSECryptoProviderKeyInfo(POTENTIAL_ISSUER_KEY_ID, AlgorithmID.ECDSA_256, issuerPub, issuerPriv, listOf(issuerCert), listOf(rootCaCert))
   }
 }

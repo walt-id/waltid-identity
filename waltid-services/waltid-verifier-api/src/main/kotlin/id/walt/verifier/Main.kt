@@ -3,12 +3,14 @@ package id.walt.verifier
 import id.walt.commons.ServiceConfiguration
 import id.walt.commons.ServiceInitialization
 import id.walt.commons.ServiceMain
+import id.walt.commons.featureflag.FeatureManager.whenFeature
 import id.walt.commons.web.WebService
 import id.walt.commons.web.plugins.configureSerialization
 import id.walt.credentials.verification.PolicyManager
 import id.walt.did.dids.DidService
 import id.walt.did.dids.resolver.LocalResolver
 import id.walt.verifier.entra.entraVerifierApi
+import id.walt.verifier.lspPotential.lspPotentialVerificationTestApi
 import id.walt.verifier.policies.PresentationDefinitionPolicy
 import id.walt.verifier.web.plugins.configureHTTP
 import id.walt.verifier.web.plugins.configureMonitoring
@@ -37,13 +39,13 @@ fun Application.configurePlugins() {
     configureHTTP()
     configureMonitoring()
     configureRouting()
-    configureSerialization()
 }
 
 fun Application.verifierModule(withPlugins: Boolean = true) {
     if (withPlugins) {
         configurePlugins()
     }
-    verfierApi()
-    entraVerifierApi()
+    verfierApi();
+    { entraVerifierApi() } whenFeature FeatureCatalog.entra
+    { lspPotentialVerificationTestApi() } whenFeature FeatureCatalog.lspPotential
 }

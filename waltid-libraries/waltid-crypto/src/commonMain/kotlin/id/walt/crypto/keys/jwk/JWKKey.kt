@@ -6,7 +6,7 @@ import id.walt.crypto.keys.KeyType
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 
-expect class JWKKey(jwk: String?) : Key {
+expect class JWKKey(jwk: String?, _keyId: String? = null) : Key {
     override val keyType: KeyType
 
     override suspend fun getKeyId(): String

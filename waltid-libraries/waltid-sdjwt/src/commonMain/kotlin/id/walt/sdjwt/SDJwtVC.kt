@@ -30,7 +30,7 @@ class SDJwtVC(sdJwt: SDJwt): SDJwt(sdJwt.jwt, sdJwt.header, sdJwt.sdPayload, sdJ
                audience: String? = null, nonce: String? = null): VCVerificationResult {
     var message: String = ""
     return VCVerificationResult(
-      this, verify(jwtCryptoProvider),
+      this, verify(jwtCryptoProvider, issuer ?: header["kid"]?.jsonPrimitive?.content),
 (notBefore?.let { Clock.System.now().epochSeconds > it } ?: true).also {
         if(!it) message = "$message, VC is not valid before $notBefore"
       } &&
@@ -69,7 +69,7 @@ class SDJwtVC(sdJwt: SDJwt): SDJwt(sdJwt.jwt, sdJwt.header, sdJwt.sdPayload, sdJ
       issuerKeyId: String? = null,
       vct: String, nbf: Long? = null, exp: Long? = null, status: String? = null,
       /** Set additional options in the JWT header */
-      additionalJwtHeader: Map<String, String> = emptyMap()
+      additionalJwtHeader: Map<String, Any> = emptyMap()
     ): SDJwtVC = doSign(sdPayload, jwtCryptoProvider, issuerDid, buildJsonObject {
       put("kid", holderDid)
     }, issuerKeyId, vct, nbf, exp, status, additionalJwtHeader)
@@ -82,7 +82,7 @@ class SDJwtVC(sdJwt: SDJwt): SDJwt(sdJwt.jwt, sdJwt.header, sdJwt.sdPayload, sdJ
       issuerKeyId: String? = null,
       vct: String, nbf: Long? = null, exp: Long? = null, status: String? = null,
       /** Set additional options in the JWT header */
-      additionalJwtHeader: Map<String, String> = emptyMap()
+      additionalJwtHeader: Map<String, Any> = emptyMap()
     ): SDJwtVC = doSign(sdPayload, jwtCryptoProvider, issuerDid, buildJsonObject {
       put("jwk", holderKeyJWK)
     }, issuerKeyId, vct, nbf, exp, status, additionalJwtHeader)
@@ -95,7 +95,7 @@ class SDJwtVC(sdJwt: SDJwt): SDJwt(sdJwt.jwt, sdJwt.header, sdJwt.sdPayload, sdJ
       issuerKeyId: String? = null,
       vct: String, nbf: Long? = null, exp: Long? = null, status: String? = null,
       /** Set additional options in the JWT header */
-      additionalJwtHeader: Map<String, String> = emptyMap()
+      additionalJwtHeader: Map<String, Any> = emptyMap()
     ): SDJwtVC {
       val undisclosedPayload = sdPayload.undisclosedPayload.toMutableMap().apply {
         put("iss", JsonPrimitive(issuerDid))
