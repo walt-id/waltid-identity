@@ -55,6 +55,7 @@ object IssuanceExamples {
             }
           }
     """.trimIndent()
+
     // language=json
     private val universityDegreeCredentialData = """
         {
@@ -80,6 +81,7 @@ object IssuanceExamples {
             }
           }
     """.trimIndent()
+
     //language=json
     private val bankIdCredentialData = """
         {
@@ -115,6 +117,7 @@ object IssuanceExamples {
              "issuanceDate":"2021-08-31T00:00:00Z"
           }
     """.trimIndent()
+
     //language=json
     private val issuerKey = """
         {
@@ -129,6 +132,7 @@ object IssuanceExamples {
           }
     """.trimIndent()
     private val issuerDid = "\"did:key:z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp\""
+
     //language=json
     private val mapping = """
         {
@@ -154,6 +158,7 @@ object IssuanceExamples {
           "mapping": $mapping
         }
         """.trimIndent()
+
     //language=json
     private val universityDegreeCredentialJson = """
         {
@@ -164,6 +169,7 @@ object IssuanceExamples {
           "mapping": $mapping
         }
         """.trimIndent()
+
     //language=json
     private val bankIdCredentialJson = """
         {
@@ -325,7 +331,7 @@ object IssuanceExamples {
     }
 
     // language=JSON
-    val issuerOnboardingRequestTseExample: ValueExampleDescriptorDsl.() -> Unit = {
+    val issuerOnboardingRequestTseExampleUserPass: ValueExampleDescriptorDsl.() -> Unit = {
         value = """
         {
           "key": {
@@ -333,13 +339,60 @@ object IssuanceExamples {
             "keyType": "Ed25519",
             "config": {
               "server": "http://127.0.0.1:8200/v1/transit",
-              "accessKey": "dev-only-token"
+              "auth": {
+                  "userpassPath":"userpass",
+                  "username":"myuser",
+                  "password":"mypassword"
+              }
             }
           },
           "did": {
             "method": "key"
           }
-        }
+    }
+    """.trimIndent()
+    }
+
+    // language=JSON
+    val issuerOnboardingRequestTseExampleAppRole: ValueExampleDescriptorDsl.() -> Unit = {
+        value = """
+        {
+          "key": {
+            "backend": "tse",
+            "keyType": "Ed25519",
+            "config": {
+              "server": "http://127.0.0.1:8200/v1/transit",
+              "auth": {
+                  "roleId":"9ec67fde-412a-d000-66fd-ba433560f092",
+                  "secretId":"65015f17-1f22-39f8-9c70-85af514e98f1"
+              }
+            }
+          },
+          "did": {
+            "method": "key"
+          }
+    }
+    """.trimIndent()
+    }
+
+    // language=JSON
+    val issuerOnboardingRequestTseExampleAccessKey: ValueExampleDescriptorDsl.() -> Unit = {
+        value = """
+        {
+          "key": {
+            "backend": "tse",
+            "keyType": "Ed25519",
+            "config": {
+              "server": "http://127.0.0.1:8200/v1/transit",
+              "auth": {
+                  "accessKey" :"dev-only-token"
+              }
+            }
+          },
+          "did": {
+            "method": "key"
+          }
+    }
     """.trimIndent()
     }
 
