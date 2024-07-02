@@ -54,8 +54,7 @@ class E2ETest {
                 client.post("/wallet-api/auth/login") {
                     setBody(
                         EmailAccountRequest(
-                            email = "user@email.com",
-                            password = "password"
+                            email = "user@email.com", password = "password"
                         ) as AccountRequest
                     )
                 }.expectSuccess().apply {
@@ -126,11 +125,14 @@ class E2ETest {
                 createdDids.add(it)
             }
             didsApi.create(
-                wallet, DidsApi.DidCreateRequest(method = "web", options = mapOf("domain" to "domain", "path" to "path"))
+                wallet,
+                DidsApi.DidCreateRequest(method = "web", options = mapOf("domain" to "domain", "path" to "path"))
             ) {
                 createdDids.add(it)
             }
-            didsApi.create(wallet, DidsApi.DidCreateRequest(method ="cheqd", options = mapOf("network" to "testnet"))) {
+            didsApi.create(
+                wallet, DidsApi.DidCreateRequest(method = "cheqd", options = mapOf("network" to "testnet"))
+            ) {
                 createdDids.add(it)
             }
             //TODO: error(400) DID method not supported for auto-configuration: ebsi
@@ -140,7 +142,9 @@ class E2ETest {
             //TODO: didsApi.create(wallet, DidsApi.DidCreateRequest(method = "iota")){ createdDids.add(it) }
             didsApi.default(wallet, createdDids[0])
             didsApi.list(wallet, createdDids.size + 1, DidsApi.DefaultDidOption.Some(createdDids[0]))
-            for(d in createdDids) { didsApi.delete(wallet, d) }
+            for (d in createdDids) {
+                didsApi.delete(wallet, d)
+            }
             didsApi.list(wallet, 1, DidsApi.DefaultDidOption.None)
             didsApi.get(wallet, did)
             didsApi.default(wallet, did)

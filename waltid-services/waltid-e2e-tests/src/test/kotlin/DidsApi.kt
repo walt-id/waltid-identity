@@ -10,7 +10,12 @@ import kotlin.test.assertNotNull
 
 class DidsApi(private val client: HttpClient) {
     private val didRegexPattern = "^^did:%s:\\S+\$"
-    suspend fun list(wallet: UUID, size: Int, expectedDefault: DefaultDidOption, output: ((List<WalletDid>) -> Unit)? = null) =
+    suspend fun list(
+        wallet: UUID,
+        size: Int,
+        expectedDefault: DefaultDidOption,
+        output: ((List<WalletDid>) -> Unit)? = null
+    ) =
         test("/wallet-api/wallet/{wallet}/dids - list DIDs") {
             client.get("/wallet-api/wallet/$wallet/dids").expectSuccess().apply {
                 val dids = body<List<WalletDid>>()
@@ -60,7 +65,6 @@ class DidsApi(private val client: HttpClient) {
         val keyId: String? = null,
         val alias: String? = null,
         val options: Map<String, Any> = emptyMap(),
-//        val options: DidCreateOptions,
     ) {
         fun toMap() = emptyMap<String, String>().let {
             keyId?.run { it.plus("keyId" to this) }
