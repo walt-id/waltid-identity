@@ -53,7 +53,7 @@ class E2ETest {
                         EmailAccountRequest(
                             email = "user@email.com",
                             password = "password"
-                        )
+                        ) as AccountRequest
                     )
                 }.expectSuccess().apply {
                     body<JsonObject>().let { result ->
