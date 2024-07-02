@@ -108,26 +108,15 @@ class E2ETest {
             keysApi.import(wallet, rsaJwkImport)
             //endregion -Keys-
 
+            val didsApi = DidsApi(client)
+            //region -Dids-
             lateinit var did: String
-
-            test("/wallet-api/wallet/{wallet}/dids - list DIDs") {
-                client.get("/wallet-api/wallet/$wallet/dids").expectSuccess().apply {
-                    val dids = body<List<WalletDid>>()
-                    assert(dids.isNotEmpty()) { "Wallet has no DIDs!" }
-
-                    assert(dids.size == 1) { "Wallet has invalid number of DIDs!" }
-
-                    did = dids.first().did
-                    println("Selected DID: $did")
-                }
+            didsApi.list(wallet) {
+                did = it.first().did
+                println("Selected DID: $did")
             }
-
-            test("/wallet-api/wallet/{wallet}/dids/{did} - show specific DID") {
-                client.get("/wallet-api/wallet/$wallet/dids/$did").expectSuccess().apply {
-                    val response = body<JsonObject>()
-                    println("DID document: $response")
-                }
-            }
+            didsApi.get(wallet, did)
+            //endregion -Dids-
 
             test("/wallet-api/wallet/{wallet}/credentials - list credentials") {
                 client.get("/wallet-api/wallet/$wallet/credentials").expectSuccess().apply {
