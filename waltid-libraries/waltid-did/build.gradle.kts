@@ -37,6 +37,8 @@ kotlin {
 }
 
 kotlin {
+    val isMacOS = System.getProperty("os.name") == "Mac OS X"
+
     targets.configureEach {
         compilations.configureEach {
             compileTaskProvider.configure {
@@ -70,6 +72,11 @@ kotlin {
             generateTypeScriptDefinitions()
         }
         binaries.library()
+    }
+
+    if (isMacOS) {
+        iosArm64()
+        iosSimulatorArm64()
     }
 
     val ktor_version = "2.3.12"
@@ -141,6 +148,26 @@ kotlin {
 
                 implementation(npm("canonicalize", "2.0.0"))
                 implementation(npm("uuid", "9.0.1"))
+            }
+        }
+
+        if (isMacOS) {
+            val iosArm64Main by getting
+            val iosSimulatorArm64Main by getting
+
+            val iosMain by creating {
+                dependsOn(commonMain)
+                iosArm64Main.dependsOn(this)
+                iosSimulatorArm64Main.dependsOn(this)
+            }
+
+            val iosArm64Test by getting
+            val iosSimulatorArm64Test by getting
+
+            val iosTest by creating {
+                dependsOn(commonTest)
+                iosArm64Test.dependsOn(this)
+                iosSimulatorArm64Test.dependsOn(this)
             }
         }
         publishing {

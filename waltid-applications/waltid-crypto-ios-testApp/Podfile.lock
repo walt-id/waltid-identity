@@ -1,0 +1,23 @@
+PODS:
+  - JOSESwift (2.4.0)
+  - waltid_crypto_ios (1.0):
+    - JOSESwift (= 2.4.0)
+
+DEPENDENCIES:
+  - waltid_crypto_ios (from `../../waltid-libraries/waltid-crypto-ios/build/cocoapods/publish/debug/waltid_crypto_ios.podspec`)
+
+SPEC REPOS:
+  trunk:
+    - JOSESwift
+
+EXTERNAL SOURCES:
+  waltid_crypto_ios:
+    :path: "../../waltid-libraries/waltid-crypto-ios/build/cocoapods/publish/debug/waltid_crypto_ios.podspec"
+
+SPEC CHECKSUMS:
+  JOSESwift: 7ff178bb9173ff42c6e990929a9f2fa702a34f69
+  waltid_crypto_ios: bda706404e737bbd7c3f75b026910a09f3d96313
+
+PODFILE CHECKSUM: b74eccdb6f868773aff85436e6e7a839d49e3da3
+
+COCOAPODS: 1.15.2

@@ -1,0 +1,13 @@
+language = Objective-C
+package = id.walt.platform.utils.ios
+
+staticLibraries = libwaltid.crypto.ios.utils.a
+
+libraryPaths.ios_simulator_arm64 = crypto-ios-utils/build/iosSimulatorArm64/Release-iphonesimulator/
+libraryPaths.ios_x64 = crypto-ios-utils/build/iosX64/Release-iphonesimulator/
+libraryPaths.ios_arm64 = crypto-ios-utils/build/iosArm64/Release-iphoneos/
+
+linkerOpts = -L/usr/lib/swift
+linkerOpts.ios_arm64 = -L/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/iphoneos/
+linkerOpts.ios_simulator_arm64 = -L/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/iphonesimulator/
+linkerOpts.ios_x64 = -L/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/iphonesimulator/

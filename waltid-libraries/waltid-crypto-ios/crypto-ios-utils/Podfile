@@ -1,0 +1,10 @@
+# Uncomment the next line to define a global platform for your project
+platform :ios, '15.4'
+
+target 'waltid.crypto.ios.utils' do
+  # Comment the next line if you don't want to use dynamic frameworks
+  use_frameworks!
+
+  # Pods for waltid.crypto.ios.utils
+  pod 'JOSESwift', '~> 2.4.0'
+end
