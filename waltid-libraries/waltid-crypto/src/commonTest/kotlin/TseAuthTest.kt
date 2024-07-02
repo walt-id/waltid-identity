@@ -12,7 +12,7 @@ class TseAuthTest {
     suspend fun testKeyUsage(auth: TSEAuth) {
         val tseKey = TSEKey.generate(
             KeyType.Ed25519,
-            TSEKeyMetadata("http://0.0.0.0:8200/v1/transit", auth)
+            TSEKeyMetadata("http://127.0.0.1:8200/v1/transit", auth)
         )
         val plaintext = "This is a plaintext 123".encodeToByteArray()
 
