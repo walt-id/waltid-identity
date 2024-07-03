@@ -30,6 +30,7 @@ import kotlinx.serialization.json.*
 import kotlinx.uuid.UUID
 import java.io.File
 import java.net.URLDecoder
+import java.net.URLEncoder
 import kotlin.test.Test
 import kotlin.test.assertNotNull
 import kotlin.time.Duration.Companion.minutes
@@ -110,8 +111,8 @@ class E2ETest {
             keysApi.import(wallet, rsaJwkImport)
             //endregion -Keys-
 
-            val didsApi = DidsApi(client)
             //region -Dids-
+            val didsApi = DidsApi(client)
             lateinit var did: String
             val createdDids = mutableListOf<String>()
             didsApi.list(wallet, 1, DidsApi.DefaultDidOption.Any) {
@@ -154,12 +155,26 @@ class E2ETest {
             didsApi.list(wallet, 1, DidsApi.DefaultDidOption.Some(did))
             //endregion -Dids-
 
-            test("/wallet-api/wallet/{wallet}/credentials - list credentials") {
-                client.get("/wallet-api/wallet/$wallet/credentials").expectSuccess().apply {
-                    val credentials = body<List<JsonObject>>()
-                    assert(credentials.isEmpty()) { "should not have any credentials yet" }
-                }
+            //region -Categories-
+            val categoryApi = CategoryApi(client)
+            val categoryName = "name#1"
+            val categoryNewName = "name#2"
+            categoryApi.list(wallet, 0)
+            categoryApi.add(wallet, categoryName)
+            categoryApi.list(wallet, 1){
+                assertNotNull(it.single { it["name"]?.jsonPrimitive?.content == categoryName })
             }
+            categoryApi.rename(wallet, categoryName, categoryNewName)
+            categoryApi.list(wallet, 1){
+                assertNotNull(it.single { it["name"]?.jsonPrimitive?.content == categoryNewName })
+            }
+            categoryApi.delete(wallet, categoryNewName)
+            //endregion -Categories
+
+            //region -Credentials-
+            val credentialsApi = CredentialsApi(client)
+            credentialsApi.list(wallet, 0)
+            //endregion -Credentials-
 
             lateinit var offerUrl: String
             test("/openid4vc/jwt/issue - issue credential") {
