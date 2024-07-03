@@ -1,4 +1,4 @@
-package id.walt.crypto
+package id.walt.target.ios.keys
 
 import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.allocArrayOf

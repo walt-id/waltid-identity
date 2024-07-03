@@ -227,19 +227,27 @@ extension Digest {
 @objc
 public class ECKeyUtils: NSObject {
     @objc static func exportJwk(publicKey: SecKey) throws -> String {
-        let publicKey = try! ECPublicKey(publicKey: publicKey)
-        return publicKey.jsonString()!
+        return try! ECPublicKey(publicKey: publicKey).jsonString()!
+    }
+    
+    @objc static func exportJwk(privateKey: SecKey) throws -> String {
+        return try! ECPrivateKey(privateKey: privateKey).jsonString()!
     }
 
     @objc static func thumbprint(publicKey: SecKey) throws -> String {
-        let publicKey = try! ECPublicKey(publicKey: publicKey)
-        return try! publicKey.thumbprint()
+        try! ECPublicKey(publicKey: publicKey).thumbprint()
+    }
+    
+    @objc static func thumbprint(privateKey: SecKey) throws -> String {
+        try! ECPrivateKey(privateKey: privateKey).thumbprint()
     }
 
     @objc static func pem(publicKeyRepresentation: Data) -> String {
-        print(publicKeyRepresentation.hexadecimal)
-
         return try! P256.Signing.PublicKey(x963Representation: publicKeyRepresentation).pemRepresentation
+    }
+    
+    @objc static func pem(privateKeyRepresentation: Data) -> String {
+        return try! P256.Signing.PrivateKey(x963Representation: privateKeyRepresentation).pemRepresentation
     }
 }
 

@@ -10,7 +10,6 @@ plugins {
     kotlin("plugin.serialization")
     id("maven-publish")
     id("com.github.ben-manes.versions")
-//    id("com.android.library")
     id("love.forte.plugin.suspend-transform") version "0.6.0"
 }
 
@@ -212,6 +211,9 @@ kotlin {
                 dependsOn(commonMain)
                 iosArm64Main.dependsOn(this)
                 iosSimulatorArm64Main.dependsOn(this)
+                dependencies{
+                    implementation(project(":waltid-libraries:waltid-target-ios"))
+                }
             }
 
             val iosArm64Test by getting

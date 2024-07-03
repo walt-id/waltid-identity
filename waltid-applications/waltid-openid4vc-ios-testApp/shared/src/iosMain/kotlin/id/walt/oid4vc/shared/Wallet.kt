@@ -1,8 +1,9 @@
 package id.walt.oid4vc.shared
 
 import id.walt.credentials.PresentationBuilder
-import id.walt.crypto.IosKeys
+import id.walt.crypto.IosKey
 import id.walt.crypto.keys.Key
+import id.walt.crypto.keys.KeyType
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.crypto.utils.JwsUtils.jwsAlg
 import id.walt.did.dids.DidService
@@ -71,7 +72,7 @@ internal sealed class DidMethod(val signingKeyInKeychainIdentifier: String) {
     internal class DidJwk(signingKeyInKeychainIdentifier: String): DidMethod(signingKeyInKeychainIdentifier) {
         override fun resolveDid(): String {
             val encodedJwk = runBlocking {
-                IosKeys.load(signingKeyInKeychainIdentifier)?.exportJWK()?.encodeBase64() ?: throw IllegalStateException("Loading key problem")
+                IosKey.load(signingKeyInKeychainIdentifier, KeyType.secp256r1)?.exportJWK()?.encodeBase64() ?: throw IllegalStateException("Loading key problem")
             }
 
             return "did:jwk:$encodedJwk"
@@ -89,7 +90,7 @@ internal class TestCredentialWallet(
             override fun sign(payload: JsonObject, keyID: String?, typ: String): String {
                 val kid = requireNotNull(keyID) { "Requires kid" }
 
-                val key = requireNotNull(IosKeys.load(kid)) { "Could not find key with kid in ios" }
+                val key = requireNotNull(IosKey.load(kid, KeyType.secp256r1)) { "Could not find key with kid in ios" }
 
                 val header = buildJsonObject {
                     put("typ", typ)
@@ -146,7 +147,7 @@ internal class TestCredentialWallet(
         return when (target) {
             TokenTarget.PROOF_OF_POSSESSION -> {
                 runBlocking {
-                    requireNotNull(IosKeys.load(didMethod.signingKeyInKeychainIdentifier)).run {
+                    requireNotNull(IosKey.load(didMethod.signingKeyInKeychainIdentifier, KeyType.secp256r1)).run {
 
                         val headerWithAlg = header?.let {
                             JsonObject(it.toMutableMap().apply {
@@ -273,7 +274,7 @@ internal class TestCredentialWallet(
 
 
         val signKey =
-            requireNotNull(IosKeys.load(didMethod.signingKeyInKeychainIdentifier)){"Load key failed"}
+            requireNotNull(IosKey.load(didMethod.signingKeyInKeychainIdentifier, KeyType.secp256r1)){"Load key failed"}
 
         println("walletCredentials: $walletCredentials")
 

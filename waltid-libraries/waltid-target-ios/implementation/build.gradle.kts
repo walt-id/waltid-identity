@@ -1,6 +1,6 @@
 listOf("iosArm64", "iosSimulatorArm64").forEach { target ->
 
-    tasks.register<Exec>("crypto-ios-utils-$target-pod-install") {
+    tasks.register<Exec>("implementation-$target-pod-install") {
         group = "build"
         workingDir(projectDir)
         commandLine(
@@ -14,10 +14,10 @@ listOf("iosArm64", "iosSimulatorArm64").forEach { target ->
         )
     }
 
-    tasks.register<Exec>("crypto-ios-utils-$target") {
+    tasks.register<Exec>("implementation-$target") {
         group = "build"
 
-        this.dependsOn("crypto-ios-utils-$target-pod-install")
+        this.dependsOn("implementation-$target-pod-install")
 
         val sdk = when (target) {
             "iosArm64" -> "iphoneos"
