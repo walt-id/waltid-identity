@@ -28,7 +28,7 @@ import kotlin.js.json
 @Serializable
 @SerialName("jwk")
 actual class JWKKey actual constructor(
-    var jwk: String?
+    var jwk: String?,
 ) : Key() {
 
     @Transient
@@ -117,7 +117,16 @@ actual class JWKKey actual constructor(
         }
     }
 
-    @JsPromise
+    /* FIXME: annotation @JsPromise
+
+    error:
+    e: waltid-crypto/src/jsMain/kotlin/id/walt/crypto/keys/jwk/JWKKey.js.kt:30:14 '@OptIn(...) @JsExport() @Serializable() @SerialName(...) actual class JWKKey : Key' has no corresponding members for expected class members:
+
+    @JvmBlocking() @JvmAsync() @JsPromise() @Api4Js() fun signRawAsync(plaintext: ByteArray): Promise<out Any>
+
+    The following declaration is incompatible because return type is different:
+        @JsPromise() @Api4Js() actual fun signRawAsync(plaintext: ByteArray): Promise<out ByteArray>
+     */
     @JsExport.Ignore
     actual override suspend fun signRaw(plaintext: ByteArray): ByteArray {
         check(hasPrivateKey) { "No private key is attached to this key!" }
@@ -186,7 +195,14 @@ actual class JWKKey actual constructor(
             ).jsonObject
         }
 
-    @JsPromise
+    /* FIXME: add annotation @JsPromise
+    e: waltid-identity/waltid-libraries/waltid-crypto/src/jsMain/kotlin/id/walt/crypto/keys/jwk/JWKKey.js.kt:30:14 '@OptIn(...) @JsExport() @Serializable() @SerialName(...) actual class JWKKey : Key' has no corresponding members for expected class members:
+
+    @JvmBlocking() @JvmAsync() @JsPromise() @Api4Js() fun getPublicKeyAsync(): Promise<out Key>
+
+    The following declaration is incompatible because return type is different:
+        @JsPromise() @Api4Js() actual fun getPublicKeyAsync(): Promise<out JWKKey>
+     */
     @JsExport.Ignore
     actual override suspend fun getPublicKey(): JWKKey =
         JWKKey(
@@ -207,7 +223,14 @@ actual class JWKKey actual constructor(
         return getPublicKey().exportPEM().toByteArray()
     }
 
-    @JsPromise
+    /* FIXME: add annotation: @JsPromise
+    e: waltid-identity/waltid-libraries/waltid-crypto/src/jsMain/kotlin/id/walt/crypto/keys/jwk/JWKKey.js.kt:30:14 '@OptIn(...) @JsExport() @Serializable() @SerialName(...) actual class JWKKey : Key' has no corresponding members for expected class members:
+
+    @JvmBlocking() @JvmAsync() @JsPromise() @Api4Js() fun getMetaAsync(): Promise<out KeyMeta>
+
+    The following declaration is incompatible because return type is different:
+        @JsPromise() @Api4Js() actual fun getMetaAsync(): Promise<out JwkKeyMeta>
+     */
     @JsExport.Ignore
     actual override suspend fun getMeta(): JwkKeyMeta = JwkKeyMeta(getKeyId())
 
@@ -269,7 +292,7 @@ actual class JWKKey actual constructor(
         actual override suspend fun importRawPublicKey(
             type: KeyType,
             rawPublicKey: ByteArray,
-            metadata: JwkKeyMeta?
+            metadata: JwkKeyMeta?,
         ): Key =
             JsJWKKeyCreator.importRawPublicKey(type, rawPublicKey, metadata)
 

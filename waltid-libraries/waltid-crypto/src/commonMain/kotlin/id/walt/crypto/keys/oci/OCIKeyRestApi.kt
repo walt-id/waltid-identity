@@ -283,9 +283,9 @@ class OCIKeyRestApi(
         }
 
         @OptIn(ExperimentalSerializationApi::class)
-        @JvmBlocking
+      /*  @JvmBlocking
         @JvmAsync
-        @JsPromise
+        @JsPromise*/
         @JsExport.Ignore
         suspend fun generateKey(type: KeyType, config: OCIKeyMetadata): OCIKeyRestApi {
             return retry {
@@ -335,11 +335,8 @@ class OCIKeyRestApi(
             }
         }
 
-        @JvmBlocking
-        @JvmAsync
-        @JsPromise
         @JsExport.Ignore
-        suspend fun getKeyVersion(
+        private suspend fun getKeyVersion(
             ocidKeyId: String, keyId: String, host: String, signingKey: String?
         ): String {
             val signature = signingRequest("GET", "/20180608/keys/$ocidKeyId", host, null, signingKey)
@@ -355,11 +352,7 @@ class OCIKeyRestApi(
             return response.body<JsonObject>()["currentKeyVersion"]?.jsonPrimitive?.content ?: ""
         }
 
-        @JvmBlocking
-        @JvmAsync
-        @JsPromise
-        @JsExport.Ignore
-        suspend fun HttpResponse.ociJsonDataBody(): JsonObject {
+        private suspend fun HttpResponse.ociJsonDataBody(): JsonObject {
             val baseMsg = { "OCI server (URL: ${this.request.url}) returned invalid response: " }
 
             if (!status.isSuccess()) throw IllegalStateException(
@@ -375,12 +368,8 @@ class OCIKeyRestApi(
             }
         }
 
-        @JvmBlocking
-        @JvmAsync
-        @JsPromise
-        @JsExport.Ignore
         @OptIn(ExperimentalEncodingApi::class)
-        fun signingRequest(
+        private fun signingRequest(
             method: String, restApi: String, host: String, requestBody: String?, signingKey: String? // = null
         ): String {
             val date = GMTDate().toHttpDate()
@@ -405,18 +394,15 @@ class OCIKeyRestApi(
         }
 
         @OptIn(ExperimentalEncodingApi::class)
-        fun calculateSHA256(data: String?): String {
+        private fun calculateSHA256(data: String?): String {
             if (data == null) return ""
             val digest = SHA256()
             val hash = digest.digest(data.encodeToByteArray())
             return Base64.encode(hash)
         }
 
-        @JvmBlocking
-        @JvmAsync
-        @JsPromise
         @JsExport.Ignore
-        suspend fun getKeys(
+        private suspend fun getKeys(
             keyId: String, host: String, tenancyOcid: String, signingKey: String?
         ): Array<JsonObject> {
             val signature = signingRequest(
@@ -436,11 +422,8 @@ class OCIKeyRestApi(
             return response.body<Array<JsonObject>>()
         }
 
-        @JvmBlocking
-        @JvmAsync
-        @JsPromise
         @JsExport.Ignore
-        suspend fun getOCIPublicKey(
+        private suspend fun getOCIPublicKey(
             OCIDKeyID: String, keyId: String, host: String, keyVersion: String, signingKeyPem: String?
         ): Key {
             val signature = signingRequest(
