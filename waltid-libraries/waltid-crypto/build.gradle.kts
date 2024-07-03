@@ -11,7 +11,7 @@ plugins {
     id("maven-publish")
     id("com.github.ben-manes.versions")
 //    id("com.android.library")
-    id("love.forte.plugin.suspend-transform") version "2.0.20-Beta1-0.9.1"
+    id("love.forte.plugin.suspend-transform") version "0.9.0"
 }
 
 group = "id.walt.crypto"
