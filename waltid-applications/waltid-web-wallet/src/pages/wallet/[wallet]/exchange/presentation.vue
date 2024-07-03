@@ -22,7 +22,8 @@
                     </div>
                 </div>
                 <div class="w-full flex justify-center gap-5" v-else>
-                    <button @click="index--" class="mt-4 text-[#002159] font-bold bg-white" :disabled="index === 0"
+                    <button v-if="matchedCredentials.length > 1" @click="index--"
+                        class="mt-4 text-[#002159] font-bold bg-white" :disabled="index === 0"
                         :class="{ 'cursor-not-allowed opacity-50': index === 0 }">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24"
                             stroke="currentColor">
@@ -32,7 +33,8 @@
                     <VerifiableCredentialCard :credential="{
                         document: matchedCredentials[index].document
                     }" class="sm:w-[400px]" />
-                    <button @click="index++" class="mt-4 text-[#002159] font-bold bg-white"
+                    <button v-if="matchedCredentials.length > 1" @click="index++"
+                        class="mt-4 text-[#002159] font-bold bg-white"
                         :disabled="index === matchedCredentials.length - 1"
                         :class="{ 'cursor-not-allowed opacity-50': index === matchedCredentials.length - 1 }">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24"
@@ -74,7 +76,7 @@
                                 </div>
                                 <div>
                                     <div v-if="disclosureModalState[credential.id]" class="flex items-center gap-2">
-                                        Share All
+                                        Disclose All
                                         <input type="checkbox"
                                             class="h-4 w-4 rounded border-gray-300 text-primary-400 focus:ring-primary-500"
                                             @click="disclosures[credential.id] = $event.target?.checked ? parseDisclosures(credential.disclosures as string) : []"
@@ -82,10 +84,10 @@
                                     </div>
                                     <div v-else>
                                         {{ disclosures[credential.id] === undefined ?
-                                            'Sharing 0 of ' + parseDisclosures(credential.disclosures).length +
+                                            'Disclosing 0 of ' + parseDisclosures(credential.disclosures).length +
                                             ' attributes' : disclosures[credential.id]?.length ===
-                                                parseDisclosures(credential.disclosures).length ? 'Sharing all attributes'
-                                                : `Sharing ${disclosures[credential.id].length}
+                                                parseDisclosures(credential.disclosures).length ? 'Disclosing all attributes'
+                                                : `Disclosing ${disclosures[credential.id].length}
                                         of ${parseDisclosures(credential.disclosures).length} attributes` }}
                                     </div>
                                 </div>
@@ -93,7 +95,7 @@
                             <div v-if="disclosureModalState[credential.id]">
                                 <div class="flex items-center mt-1">
                                     <div class="flex-1 border-t border-gray-300"></div>
-                                    <div class="mx-3 text-gray-400">Attributes to share</div>
+                                    <div class="mx-3 text-gray-400">Attributes to disclose</div>
                                     <div class="flex-1 border-t border-gray-300"></div>
                                 </div>
                                 <div class="mt-1 divide-y px-10 divide-gray-100">
@@ -138,7 +140,7 @@
             <div class="fixed sm:relative bottom-0 w-full p-4 bg-white shadow-md sm:shadow-none sm:flex sm:justify-end
                         sm:gap-4">
                 <button @click="acceptPresentation" class="w-full sm:w-44 py-3 mt-4 text-white bg-[#002159] rounded-xl">
-                    {{ matchedCredentials.length > 1 ? 'Share All' : 'Share' }}
+                    {{ matchedCredentials.length > 1 ? 'Disclose All' : 'Disclose' }}
                 </button>
                 <button @click="navigateTo(`/wallet/${walletId}`)"
                     class="w-full sm:w-44 py-3 mt-4 bg-white sm:border sm:border-gray-400 sm:rounded-xl">
@@ -229,9 +231,18 @@ const disclosureModalState: Ref<{ [key: string]: boolean }> = ref({});
 for (let credential of matchedCredentials) {
     disclosureModalState.value[credential.id] = false
 }
+disclosureModalState.value[matchedCredentials[index.value].id] = true
+
 function toggleDisclosure(credentialId: string) {
     disclosureModalState.value[credentialId] = !disclosureModalState.value[credentialId]
 }
+// Disable all disclosure modals when switching between credentials and set the current one to active
+watch(index, () => {
+    for (let credential of matchedCredentials) {
+        disclosureModalState.value[credential.id] = false
+    }
+    disclosureModalState.value[matchedCredentials[index.value].id] = true
+})
 
 async function acceptPresentation() {
     const req = {

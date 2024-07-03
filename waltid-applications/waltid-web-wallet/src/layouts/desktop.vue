@@ -1,15 +1,15 @@
 <template>
     <div class="min-h-full">
         <div class="flex h-20 flex-shrink-0 border-b border-gray-200 bg-white justify-between items-center px-8">
-            <div class="flex items-center px-4 gap-4">
-                <NuxtLink :to="`/wallet/${currentWallet}`">
+            <NuxtLink :to="`/wallet/${currentWallet}`">
+                <div class="flex items-center px-4 gap-4">
                     <img :src="logoImg" alt="walt.id logo" class="h-10" />
-                </NuxtLink>
-                <div>
-                    <div class="text-[#002159] text-bold text-[20px]">ID WALLET</div>
-                    <div class="text-[#002159] text-[15px]">by walt.id</div>
+                    <div>
+                        <div class="text-[#002159] text-bold text-[20px]">ID WALLET</div>
+                        <div class="text-[#002159] text-[15px]">by walt.id</div>
+                    </div>
                 </div>
-            </div>
+            </NuxtLink>
             <div class="w-full max-w-xs md:max-w-md">
                 <form action="#" class="flex w-full md:ml-0" method="GET">
                     <div class="relative w-full text-gray-400 focus-within:text-gray-600">
@@ -74,8 +74,7 @@
                             <div v-for="navItem in navigation" class="pb-3">
                                 <NuxtLink v-for="item in navItem.items" :key="item.name" :to="item.href"
                                     class="text-gray-400 group flex items-center rounded-md px-2 py-2 text-base font-medium">
-                                    <component :is="item.icon" aria-hidden="true"
-                                        class="mr-4 h-6 w-6 flex-shrink-0 text-gray-400" />
+                                    <component :is="item.icon" aria-hidden="true" class="mr-4 h-6 w-6 flex-shrink-0" />
                                     <div>
                                         {{ item.name }}
                                         <hr class="border-t border-gray-200 mt-1" aria-hidden="true" />

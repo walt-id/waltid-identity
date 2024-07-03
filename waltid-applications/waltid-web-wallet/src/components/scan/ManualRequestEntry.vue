@@ -14,10 +14,10 @@
                 </div>
             </div>
         </div>
-        <div class="mt-2 flex justify-center">
+        <div v-if="text" class="mt-5 flex justify-center">
             <button v-if="status === 'empty' || status === 'ok'" ref="submitBtn"
                 :disabled="status === 'empty' || text.value == ''"
-                class="inline-flex disabled:cursor-not-allowed disabled:opacity-60 disabled:bg-gray-500 items-center rounded-md bg-blue-500 px-3 py-2 text-sm font-semibold text-[#E6F6FF] shadow-sm hover:bg-blue-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+                class="w-full disabled:cursor-not-allowed disabled:opacity-60 disabled:bg-gray-500 rounded-xl bg-[#002159] px-3 py-2 text-sm text-center font-semibold text-[#E6F6FF] shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
                 type="submit">
                 {{ requestTypeName }}
             </button>
