@@ -30,7 +30,6 @@ import kotlinx.serialization.json.*
 import kotlinx.uuid.UUID
 import java.io.File
 import java.net.URLDecoder
-import java.net.URLEncoder
 import kotlin.test.Test
 import kotlin.test.assertNotNull
 import kotlin.time.Duration.Companion.minutes
@@ -173,8 +172,7 @@ class E2ETest {
 
             //region -Credentials-
             val credentialsApi = CredentialsApi(client)
-            credentialsApi.list(wallet, 0)
-            //endregion -Credentials-
+            credentialsApi.list(wallet)
 
             lateinit var offerUrl: String
             test("/openid4vc/jwt/issue - issue credential") {
@@ -280,15 +278,19 @@ class E2ETest {
                 }
             }
 
-            test("/wallet-api/wallet/{wallet}/credentials - list credentials after issuance") {
-                client.get("/wallet-api/wallet/$wallet/credentials").expectSuccess().apply {
-                    val credentials = body<List<WalletCredential>>()
-                    assert(credentials.size == 1) { "should have exactly 1 credential by now" }
-
-                    assert(credentials.first().id == newCredentialId) { "credential should be the one received" }
-                    credentials.map { it.id }
-                }
-            }
+            credentialsApi.list(wallet, expectedSize = 1, expectedCredential = arrayOf(newCredentialId))
+            credentialsApi.get(wallet, newCredentialId)
+            credentialsApi.accept(wallet, newCredentialId)
+            credentialsApi.delete(wallet, newCredentialId)
+            credentialsApi.restore(wallet, newCredentialId)
+            credentialsApi.status(wallet, newCredentialId)
+            categoryApi.add(wallet, categoryName)
+            categoryApi.add(wallet, categoryNewName)
+            credentialsApi.attachCategory(wallet, newCredentialId, listOf(categoryName, categoryNewName))
+            credentialsApi.detachCategory(wallet, newCredentialId, listOf(categoryName, categoryNewName))
+//            credentialsApi.reject(wallet, newCredentialId)
+//            credentialsApi.delete(wallet, newCredentialId, true)
+            //endregion -Credentials-
 
             lateinit var verificationUrl: String
             lateinit var verificationId: String
