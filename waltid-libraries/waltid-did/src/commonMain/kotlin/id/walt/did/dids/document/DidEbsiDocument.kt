@@ -23,6 +23,9 @@ data class DidEbsiDocument(
     companion object {
         private val DEFAULT_CONTEXT =
             listOf("https://www.w3.org/ns/did/v1", "https://w3id.org/security/suites/jws-2020/v1")
+        private val json = Json {
+            explicitNulls = false
+        }
     }
 
     @Serializable
@@ -32,11 +35,6 @@ data class DidEbsiDocument(
         val controller: String, // did:ebsi:
         val publicKeyJwk: JsonObject // jwk
     )
-
-    @Transient
-    private val json = Json {
-        explicitNulls = false
-    }
 
     fun toMap() = json.encodeToJsonElement(this).jsonObject.toMap()
 
