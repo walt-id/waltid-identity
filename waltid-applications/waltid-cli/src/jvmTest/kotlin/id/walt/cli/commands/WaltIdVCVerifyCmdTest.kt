@@ -214,10 +214,49 @@ class WaltIdVCVerifyCmdTest {
     }
 
     @Test
-    @Ignore("Policy not implemented yet")
-    fun `should verify XXX when --policy=allowed-issuer`() {
-        val result = command.test(listOf("--policy=allowed-issuer", signedVCFilePath))
+    fun `should verify VC when --policy=allowed-issuer has multiple arguments and one of them is valid`() {
+        val result = command.test(
+            listOf("--policy=allowed-issuer",
+                "--arg=issuer=did:key:z6MkmtB51KWs2ayDmqU7fRcfxx8k5DYfUFqUSJ8wiPFkahNe",
+                "--arg=issuer=did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV",
+                signedVCFilePath,
+            )
+        )
         assertContains(result.output, "allowed-issuer: Success")
+    }
+
+    @Test
+    fun `should verify the VC when --policy=allowed-issuer has one argument that is valid`() {
+        val result = command.test(
+            listOf("--policy=allowed-issuer",
+                "--arg=issuer=did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV",
+                signedVCFilePath,
+            )
+        )
+        assertContains(result.output, "allowed-issuer: Success")
+    }
+
+    @Test
+    fun `should not verify the VC when --policy=allowed-issuer has one argument that is not valid`() {
+        val result = command.test(
+            listOf("--policy=allowed-issuer",
+                "--arg=issuer=did:key:z6MkmtB51KWs2ayDmqU7fRcfxx8k5DYfUFqUSJ8wiPFkahNe",
+                signedVCFilePath,
+            )
+        )
+        assertContains(result.output, "allowed-issuer: Fail!")
+    }
+
+    @Test
+    fun `should not verify the VC when --policy=allowed-issuer has multiple arguments and all of them are invalid`() {
+        val result = command.test(
+            listOf("--policy=allowed-issuer",
+                "--arg=issuer=did:key:z6MkmtB51KWs2ayDmqU7fRcfxx8k5DYfUFqUSJ8wiPFkahNe",
+                "--arg=issuer=did:key:z6MkosbA8G31BkzZDPZepew7c498656kaNS9E8q4czWCj47o",
+                signedVCFilePath,
+            )
+        )
+        assertContains(result.output, "allowed-issuer: Fail!")
     }
 
     private fun sign(vcFilePath: String): String {
