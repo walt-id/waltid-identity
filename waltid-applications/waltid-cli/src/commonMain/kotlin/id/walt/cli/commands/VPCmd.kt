@@ -1,6 +1,7 @@
 package id.walt.cli.commands
 
 import com.github.ajalt.clikt.core.CliktCommand
+import com.github.ajalt.clikt.core.subcommands
 
 class VPCmd : CliktCommand(
     name = "vp",
@@ -9,6 +10,7 @@ class VPCmd : CliktCommand(
 ) {
 
     init {
+        subcommands(VPCreateCmd())
     }
 
     override fun run(): Unit {}
