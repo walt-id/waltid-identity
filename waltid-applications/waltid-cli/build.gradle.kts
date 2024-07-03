@@ -1,10 +1,15 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
+object Versions {
+    const val KTOR_VERSION = "2.3.12"
+}
+
 plugins {
     kotlin("multiplatform")
     kotlin("plugin.serialization")
     id("maven-publish")
     id("com.github.ben-manes.versions")
+    id("io.ktor.plugin") version "2.3.12" // Versions.KTOR_VERSION
     // Apply the application plugin to add support for building a CLI application in Java.
     application
 }
@@ -98,6 +103,33 @@ kotlin {
                 implementation("com.wolpl.clikt-testkit:clikt-testkit:2.0.0")
 
                 implementation("org.junit.jupiter:junit-jupiter-params:5.11.0-M2")
+
+                // Ktor server
+                implementation("io.ktor:ktor-server-core-jvm:${Versions.KTOR_VERSION}")
+                implementation("io.ktor:ktor-server-netty-jvm:${Versions.KTOR_VERSION}")
+                implementation("io.ktor:ktor-server-auth-jvm:${Versions.KTOR_VERSION}")
+                implementation("io.ktor:ktor-server-sessions-jvm:${Versions.KTOR_VERSION}")
+                implementation("io.ktor:ktor-server-auth-jwt-jvm:${Versions.KTOR_VERSION}")
+                implementation("io.ktor:ktor-server-auto-head-response-jvm:${Versions.KTOR_VERSION}")
+                implementation("io.ktor:ktor-server-double-receive-jvm:${Versions.KTOR_VERSION}")
+                implementation("io.ktor:ktor-server-host-common-jvm:${Versions.KTOR_VERSION}")
+                implementation("io.ktor:ktor-server-status-pages-jvm:${Versions.KTOR_VERSION}")
+                implementation("io.ktor:ktor-server-compression-jvm:${Versions.KTOR_VERSION}")
+                implementation("io.ktor:ktor-server-cors-jvm:${Versions.KTOR_VERSION}")
+                implementation("io.ktor:ktor-server-forwarded-header-jvm:${Versions.KTOR_VERSION}")
+                implementation("io.ktor:ktor-server-call-logging-jvm:${Versions.KTOR_VERSION}")
+                implementation("io.ktor:ktor-server-call-id-jvm:${Versions.KTOR_VERSION}")
+                implementation("io.ktor:ktor-server-content-negotiation-jvm:${Versions.KTOR_VERSION}")
+                implementation("io.ktor:ktor-server-cio-jvm:${Versions.KTOR_VERSION}")
+
+                // Ktor client
+                implementation("io.ktor:ktor-client-core-jvm:${Versions.KTOR_VERSION}")
+                implementation("io.ktor:ktor-client-serialization-jvm:${Versions.KTOR_VERSION}")
+                implementation("io.ktor:ktor-client-content-negotiation:${Versions.KTOR_VERSION}")
+                implementation("io.ktor:ktor-client-json-jvm:${Versions.KTOR_VERSION}")
+                implementation("io.ktor:ktor-client-okhttp-jvm:${Versions.KTOR_VERSION}")
+                implementation("io.ktor:ktor-client-logging-jvm:${Versions.KTOR_VERSION}")
+
             }
         }
         /*publishing {
