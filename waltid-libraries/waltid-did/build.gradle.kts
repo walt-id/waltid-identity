@@ -33,7 +33,7 @@ suspendTransform {
 
 
 kotlin {
-    jvmToolchain(15)
+    jvmToolchain(17)
 }
 
 kotlin {
