@@ -22,14 +22,14 @@ class KeysApi(private val client: HttpClient) {
             }
         }
 
-    suspend fun generate(wallet: UUID, request: KeyGenerationRequest, output: (String) -> Unit) =
+    suspend fun generate(wallet: UUID, request: KeyGenerationRequest, output: ((String) -> Unit)? = null) =
         test("/wallet-api/wallet/{wallet}/keys/generate - generate key") {
             client.post("/wallet-api/wallet/$wallet/keys/generate") {
                 setBody(request)
             }.expectSuccess().apply {
                 val generatedKeyId = body<String>()
-                output(generatedKeyId)
                 assert(generatedKeyId.isNotEmpty()) { "Empty key id is returned!" }
+                output?.invoke(generatedKeyId)
             }
         }
 
