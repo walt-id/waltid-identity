@@ -36,17 +36,17 @@ dependencies {
     api("com.sksamuel.hoplite:hoplite-hikaricp:2.8.0.RC3")
 
     // Kotlinx.serialization
-    api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.0")
+    api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.1")
 
     // Health checks
     api("com.sksamuel.cohort:cohort-ktor:2.5.1")
 
     // OpenAPI
-    implementation("io.github.smiley4:ktor-swagger-ui:3.0.1")
-    implementation("io.github.smiley4:schema-kenerator-core:1.0.0")
-    implementation("io.github.smiley4:schema-kenerator-serialization:1.0.0")
-    implementation("io.github.smiley4:schema-kenerator-reflection:1.0.0")
-    implementation("io.github.smiley4:schema-kenerator-swagger:1.0.0")
+    api("io.github.smiley4:ktor-swagger-ui:3.1.0")
+    implementation("io.github.smiley4:schema-kenerator-core:1.0.1")
+    implementation("io.github.smiley4:schema-kenerator-serialization:1.0.1")
+    implementation("io.github.smiley4:schema-kenerator-reflection:1.0.1")
+    implementation("io.github.smiley4:schema-kenerator-swagger:1.0.1")
 
     // Testing
     testImplementation(kotlin("test"))

@@ -243,20 +243,20 @@ fun Application.auth() {
                         summary =
                             "Login with [email + password] or [wallet address + ecosystem] or [oidc session]"
                         request {
-                            body<EmailAccountRequest> {
+                            body<AccountRequest> {
                                 example("E-mail + password") {
                                     value = EmailAccountRequest(
                                         email = "user@email.com",
                                         password = "password"
-                                    ).encodeWithType("email")
+                                    )
                                 }
                                 example("Wallet address + ecosystem") {
                                     value = AddressAccountRequest(
                                         address = "0xABC",
                                         ecosystem = "ecosystem"
-                                    ).encodeWithType("address")
+                                    )
                                 }
-                                example("OIDC") { value = OidcAccountRequest(token = "ey...").encodeWithType("oidc") }
+                                example("OIDC") { value = OidcAccountRequest(token = "ey...") }
                             }
                         }
                         response {
@@ -274,22 +274,22 @@ fun Application.auth() {
                 {
                     summary = "Register with [email + password] or [wallet address + ecosystem]"
                     request {
-                        body<EmailAccountRequest> {
+                        body<AccountRequest> {
                             example("E-mail + password") {
                                 value = EmailAccountRequest(
                                     name = "Max Mustermann",
                                     email = "user@email.com",
                                     password = "password"
-                                ).encodeWithType("email")
+                                )
                             }
                             example("Wallet address + ecosystem") {
-                                value = AddressAccountRequest(address = "0xABC", ecosystem = "ecosystem").encodeWithType("address")
+                                value = AddressAccountRequest(address = "0xABC", ecosystem = "ecosystem")
                             }
-                            example("OIDC") { value = OidcAccountRequest(token = "ey...").encodeWithType("oidc") }
+                            example("OIDC") { value = OidcAccountRequest(token = "ey...") }
                             example("OIDC Unique Subject") {
-                                value = OidcUniqueSubjectRequest(token = "ey...").encodeWithType("oidc-unique-subject")
+                                value = OidcUniqueSubjectRequest(token = "ey...")
                             }
-                            example("Keycloak") { value = KeycloakAccountRequest().encodeWithType("keycloak") }
+                            example("Keycloak") { value = KeycloakAccountRequest() }
                         }
                     }
                     response {
@@ -374,7 +374,7 @@ fun Application.auth() {
                                     email = "user@email.com",
                                     password = "password",
                                     token = "eyJhb..."
-                                ).encodeWithType("keycloak")
+                                )
                             }
                         }
                     }
@@ -406,19 +406,19 @@ fun Application.auth() {
                                 value = KeycloakAccountRequest(
                                     username = "Max_Mustermann",
                                     password = "password"
-                                ).encodeWithType("keycloak")
+                                )
                             }
                             example("Keycloak username + Access Token ") {
                                 value = KeycloakAccountRequest(
                                     username = "Max_Mustermann",
                                     token = "eyJhb..."
-                                ).encodeWithType("keycloak")
+                                )
                             }
 
                             example("Keycloak user Access Token ") {
                                 value = KeycloakAccountRequest(
                                     token = "eyJhb..."
-                                ).encodeWithType("keycloak")
+                                )
                             }
                         }
                     }

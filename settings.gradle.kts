@@ -7,7 +7,7 @@ pluginManagement {
 }
 
 plugins {
-    id("org.gradle.toolchains.foojay-resolver-convention") version "0.7.0"
+    id("org.gradle.toolchains.foojay-resolver-convention") version "0.8.0"
 }
 
 rootProject.name = "waltid-identity"
@@ -46,7 +46,7 @@ include(
     // OCI extension for waltid-crypto
     "$libraries:waltid-crypto-oci",
 
-    // Android - uncomment to enable build:
+    // Android - uncomment to enable build, and set Android SDK in local.properties:
     /*
     ":waltid-libraries:waltid-crypto-android",
     ":waltid-applications:waltid-android"

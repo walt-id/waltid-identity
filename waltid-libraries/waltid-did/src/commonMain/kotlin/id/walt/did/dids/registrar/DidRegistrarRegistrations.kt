@@ -7,9 +7,9 @@ import kotlin.js.JsExport
 @JsExport
 object DidRegistrarRegistrations {
 
-    val didRegistrars = setOf(
+    fun curatedDidRegistrars(uniregistrarUrl: String? = null) = setOf(
         LocalRegistrar(),
-        UniregistrarRegistrar()
+        UniregistrarRegistrar(uniregistrarUrl ?: UniregistrarRegistrar.DEFAULT_REGISTRAR_URL)
     )
 
 }

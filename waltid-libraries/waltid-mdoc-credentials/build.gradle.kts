@@ -73,7 +73,7 @@ kotlin {
             dependencies {
                 implementation("org.bouncycastle:bcprov-lts8on:2.73.6")
                 implementation("org.bouncycastle:bcpkix-lts8on:2.73.6")
-                implementation("io.mockk:mockk:1.13.2")
+                implementation("io.mockk:mockk:1.13.11")
 
                 implementation(kotlin("reflect"))
             }

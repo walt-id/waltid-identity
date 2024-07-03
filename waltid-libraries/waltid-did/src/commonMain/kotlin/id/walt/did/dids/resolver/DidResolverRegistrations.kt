@@ -7,9 +7,11 @@ import kotlin.js.JsExport
 @JsExport
 object DidResolverRegistrations {
 
-    val didResolvers = setOf(
+    fun curatedDidResolvers(
+        uniresolverUrl: String? = null,
+    ) = setOf(
         LocalResolver(),
-        UniresolverResolver()
+        UniresolverResolver(uniresolverUrl ?: UniresolverResolver.DEFAULT_RESOLVER_URL)
     )
 
 }

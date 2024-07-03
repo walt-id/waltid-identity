@@ -21,7 +21,7 @@ import kotlinx.serialization.json.*
 import kotlin.time.Duration.Companion.minutes
 
 private val logger = KotlinLogging.logger {}
-suspend fun createCredentialOfferUri(issuanceRequests: List<IssuanceRequest>): String {
+fun createCredentialOfferUri(issuanceRequests: List<IssuanceRequest>): String {
     val credentialOfferBuilder =
         OidcIssuance.issuanceRequestsToCredentialOfferBuilder(issuanceRequests)
 
@@ -29,11 +29,7 @@ suspend fun createCredentialOfferUri(issuanceRequests: List<IssuanceRequest>): S
         credentialOfferBuilder = credentialOfferBuilder, expiresIn = 5.minutes, allowPreAuthorized = true
     )
     OidcApi.setIssuanceDataForIssuanceId(issuanceSession.id, issuanceRequests.map {
-        val key = if (it.issuerKey["type"].toJsonElement().jsonPrimitive.content == "jwk") {
-            KeySerialization.deserializeJWTKey(it.issuerKey).getOrThrow()
-        } else {
-            KeyManager.resolveSerializedKey(it.issuerKey)
-        }
+        val key = KeyManager.resolveSerializedKey(it.issuerKey)
 
         CIProvider.IssuanceSessionData(
             key, it.issuerDid, it
@@ -65,13 +61,24 @@ fun Application.issuerApi() {
                 description = "Creates an issuer keypair and an associated DID based on the provided configuration."
 
                 request {
-                    body<IssuerOnboardingRequest> {
+                    body<OnboardingRequest> {
                         description = "Issuer onboarding request (key & DID) config."
-                        example("did:jwk + JWK key (Ed25519)", IssuanceExamples.issuerOnboardingRequestDefaultExample)
+                        example("did:jwk + JWK key (Ed25519)", IssuanceExamples.issuerOnboardingRequestDefaultEd25519Example)
+                        example("did:jwk + JWK key (secp256r1)", IssuanceExamples.issuerOnboardingRequestDefaultSecp256r1Example)
+                        example("did:jwk + JWK key (secp256k1)", IssuanceExamples.issuerOnboardingRequestDefaultSecp256k1Example)
+                        example("did:jwk + JWK key (RSA)", IssuanceExamples.issuerOnboardingRequestDefaultRsaExample)
                         example("did:web + JWK key (Secp256k1)", IssuanceExamples.issuerOnboardingRequestDidWebExample)
                         example(
-                            "did:key + TSE key (Hashicorp Vault Transit Engine - RSA)",
-                            IssuanceExamples.issuerOnboardingRequestTseExample
+                            "did:key + TSE key (Hashicorp Vault Transit Engine - Ed25519) + AppRole (Auth)",
+                            IssuanceExamples.issuerOnboardingRequestTseExampleAppRole
+                        )
+                        example(
+                            "did:key + TSE key (Hashicorp Vault Transit Engine - Ed25519) + UserPass (Auth)",
+                            IssuanceExamples.issuerOnboardingRequestTseExampleUserPass
+                        )
+                        example(
+                            "did:key + TSE key (Hashicorp Vault Transit Engine - Ed25519) + AccessKey (Auth)",
+                            IssuanceExamples.issuerOnboardingRequestTseExampleAccessKey
                         )
                         example(
                             "did:jwk + OCI key (Oracle Cloud Infrastructure - Secp256r1)",

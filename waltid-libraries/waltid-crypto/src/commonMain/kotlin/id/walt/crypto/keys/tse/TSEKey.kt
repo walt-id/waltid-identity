@@ -41,18 +41,38 @@ private val logger = KotlinLogging.logger { }
 @SerialName("tse")
 // Works with the Hashicorp Transit Secret Engine
 class TSEKey(
-    val server: String, private val accessKey: String, private val namespace: String? = null, val id: String,
-    //private var publicKey: ByteArray? = null,
-    //override var keyType: KeyType? = null
-    private var _publicKey: ByteArray? = null, private var _keyType: KeyType? = null
+    val server: String,
+    private val auth: TSEAuth? = null,
+    @Deprecated("use TSEAuth in `auth` instead") private val accessKey: String? = null,
+    private val namespace: String? = null,
+    val id: String,
+    private var _publicKey: ByteArray? = null,
+    private var _keyType: KeyType? = null,
 ) : Key() {
+
+    @Suppress("DEPRECATION")
+    @Transient
+    private val effectiveAuth: TSEAuth = auth ?: TSEAuth(accessKey = accessKey ?: throw IllegalArgumentException("Either auth or accessKey must be provided"))
 
     @OptIn(DelicateCoroutinesApi::class)
     private inline fun <T> lazySuspended(
-        crossinline block: suspend CoroutineScope.() -> T
+        crossinline block: suspend CoroutineScope.() -> T,
     ): Deferred<T> = GlobalScope.async(Dispatchers.Unconfined, start = CoroutineStart.LAZY) {
         block.invoke(this)
         //retrieveKeyType()
+    }
+
+
+    private suspend fun httpRequest(method: HttpMethod = HttpMethod.Get, url: String = "keys/$id", body: Any? = null): HttpResponse {
+        return http.request {
+            this.url("$server/$url")
+            this.method = method
+
+            header("X-Vault-Token", effectiveAuth.getCachedLogin(server))
+            namespace?.let { header("X-Vault-Namespace", namespace) }
+
+            body?.let { this.setBody(body) }
+        }
     }
 
     @Suppress("NON_EXPORTABLE_TYPE")
@@ -86,10 +106,8 @@ class TSEKey(
 
     private suspend fun retrievePublicKey(): ByteArray {
         logger.debug { "Retrieving public key: ${this.id}" }
-        val keyData = http.get("$server/keys/$id") {
-            header("X-Vault-Token", accessKey)
-            namespace?.let { header("X-Vault-Namespace", namespace) }
-        }.tseJsonDataBody().jsonObject["keys"]?.jsonObject ?: throwTSEError("No keys in data response")
+        val keyData = httpRequest(HttpMethod.Get, "keys/$id")
+            .tseJsonDataBody().jsonObject["keys"]?.jsonObject ?: throwTSEError("No keys in data response")
 
         // TO\\DO: try this
         val keyStr = keyData["1"]?.jsonObject?.get("public_key")?.jsonPrimitive?.content
@@ -100,10 +118,10 @@ class TSEKey(
         return keyStr.decodeBase64Bytes()
     }
 
-    private suspend fun retrieveKeyType(): KeyType = tseKeyToKeyTypeMapping(http.get("$server/keys/$id") {
-        this.header("X-Vault-Token", accessKey)
-        namespace?.let { header("X-Vault-Namespace", namespace) }
-    }.tseJsonDataBody().jsonObject["type"]?.jsonPrimitive?.content ?: throwTSEError("No type in data response"))
+    private suspend fun retrieveKeyType(): KeyType = tseKeyToKeyTypeMapping(
+        httpRequest()
+            .tseJsonDataBody().jsonObject["type"]?.jsonPrimitive?.content ?: throwTSEError("No type in data response")
+    )
 
     override val hasPrivateKey: Boolean
         get() = TODO("Not yet implemented")
@@ -147,11 +165,9 @@ class TSEKey(
     @JsPromise
     @JsExport.Ignore
     override suspend fun signRaw(plaintext: ByteArray): Any {
-        val signatureBase64 = http.post("$server/sign/${id}") {
-            header("X-Vault-Token", accessKey) // TODO
-            namespace?.let { header("X-Vault-Namespace", namespace) }
-            setBody(mapOf("input" to plaintext.encodeBase64()))
-        }.tseJsonDataBody().jsonObject["signature"]?.jsonPrimitive?.content?.removePrefix("vault:v1:") ?: throwTSEError(
+        val body = mapOf("input" to plaintext.encodeBase64())
+        val signatureBase64 = httpRequest(HttpMethod.Post, "sign/$id", body)
+            .tseJsonDataBody().jsonObject["signature"]?.jsonPrimitive?.content?.removePrefix("vault:v1:") ?: throwTSEError(
             "No signature in data response"
         )
 
@@ -196,15 +212,11 @@ class TSEKey(
 
         check(detachedPlaintext != null) { "An detached plaintext is needed." }
 
-        val valid = http.post("$server/verify/${id}") {
-            header("X-Vault-Token", accessKey)
-            namespace?.let { header("X-Vault-Namespace", namespace) }
-            setBody(
-                mapOf(
-                    "input" to detachedPlaintext.encodeBase64(), "signature" to "vault:v1:${signed.encodeBase64()}"
-                )
-            )
-        }.tseJsonDataBody().jsonObject["valid"]?.jsonPrimitive?.boolean
+        val body = mapOf(
+            "input" to detachedPlaintext.encodeBase64(), "signature" to "vault:v1:${signed.encodeBase64()}"
+        )
+        val valid = httpRequest(HttpMethod.Post, "verify/$id", body)
+            .tseJsonDataBody().jsonObject["valid"]?.jsonPrimitive?.boolean
             ?: throwTSEError("No (verification) valid response in data response")
 
         return if (valid) Result.success(detachedPlaintext)
@@ -243,10 +255,8 @@ class TSEKey(
     @JsExport.Ignore
     suspend fun getEncodedPublicKey(): String = // TODO add to base Key
         lazyOf(
-            http.get("$server/keys/$id") {
-                header("X-Vault-Token", accessKey)
-                namespace?.let { header("X-Vault-Namespace", namespace) }
-            }.tseJsonDataBody().jsonObject["keys"]?.jsonObject?.get("1")?.jsonObject?.get("public_key")?.jsonPrimitive?.content
+            httpRequest()
+                .tseJsonDataBody().jsonObject["keys"]?.jsonObject?.get("1")?.jsonObject?.get("public_key")?.jsonPrimitive?.content
                 ?: throwTSEError("No keys/1/public_key in data response")
         ).value
 
@@ -276,15 +286,6 @@ class TSEKey(
     @JsExport.Ignore
     override suspend fun getMeta(): TseKeyMeta = TseKeyMeta(getKeyId())
 
-    /*
-        val user = "corecrypto"
-        val password = "Eibaekie0eeshieph1vahho6fengei7vioph"
-
-        val token = http.post("$server/auth/userpass/login/$user") {
-            setBody(mapOf("password" to password))
-        }.body<JsonObject>()["auth"]!!.jsonObject["client_token"]!!.jsonPrimitive.content
-        */
-
     override fun toString(): String = "[TSE ${keyType.name} key @ $server]"
 
     @JvmBlocking
@@ -292,19 +293,13 @@ class TSEKey(
     @JsPromise
     @JsExport.Ignore
     suspend fun delete() {
-        http.post("$server/keys/$id/config") {
-            header("X-Vault-Token", accessKey)
-            namespace?.let { header("X-Vault-Namespace", namespace) }
-            setBody(mapOf("deletion_allowed" to true))
-        }
-
-        http.delete("$server/keys/$id") {
-            header("X-Vault-Token", accessKey)
-            namespace?.let { header("X-Vault-Namespace", namespace) }
-        }
+        httpRequest(HttpMethod.Post, "keys/$id/config", mapOf("deletion_allowed" to true))
+        httpRequest(HttpMethod.Delete)
     }
 
     companion object : TSEKeyCreator {
+
+
         private fun keyTypeToTseKeyMapping(type: KeyType) = when (type) {
             KeyType.Ed25519 -> "ed25519"
             KeyType.secp256r1 -> "ecdsa-p256"
@@ -344,7 +339,7 @@ class TSEKey(
             logger.debug { "Generating TSE key ($type)" }
 
             val keyData = http.post("${metadata.server}/keys/k${metadata.id ?: Random.nextInt()}") {
-                header("X-Vault-Token", metadata.accessKey)
+                header("X-Vault-Token", metadata.auth.getCachedLogin(metadata.server))
                 metadata.namespace?.let { header("X-Vault-Namespace", metadata.namespace) }
                 setBody(mapOf("type" to keyTypeToTseKeyMapping(type)))
             }.tseJsonDataBody()
@@ -358,7 +353,12 @@ class TSEKey(
                 ?: throwTSEError("no keys array in key data: $keyData")).jsonObject["1"]!!.jsonObject["public_key"]!!.jsonPrimitive.content.decodeBase64Bytes()
 
             return TSEKey(
-                metadata.server, metadata.accessKey, metadata.namespace, keyName, publicKey, type
+                server = metadata.server,
+                auth = metadata.auth,
+                namespace = metadata.namespace,
+                id = keyName,
+                _publicKey = publicKey,
+                _keyType = type
             ).apply { init() }
         }
 
@@ -376,20 +376,3 @@ class TSEKey(
         }
     }
 }
-
-/*suspend fun main() {
-    val tseKey = TSEKey.generate(KeyType.Ed25519, TSEKeyMetadata("http://0.0.0.0:8200/v1/transit", "hvs.1eeHn0cyrzOyjeohJalj0gCW"))
-    val plaintext = "This is a plaintext 123".encodeToByteArray()
-
-    val signed = tseKey.signRaw(plaintext) as String
-
-    val verified = tseKey.verifyRaw(signed.decodeBase64Bytes(), plaintext)
-
-    println("TSEKey: ${tseKey.getEncodedPublicKey()}")
-    println("Plaintext: ${plaintext.decodeToString()}")
-    println("Signed: $signed")
-    println("Verified signature success: ${verified.isSuccess}")
-    println("Verified plaintext: ${verified.getOrNull()!!.decodeToString()}")
-
-    tseKey.delete()
-}*/
