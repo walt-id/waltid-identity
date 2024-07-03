@@ -64,7 +64,7 @@ kotlin {
                 implementation("com.google.code.gson:gson:2.11.0")
 
                 // CLI
-                implementation("com.github.ajalt.mordant:mordant:2.6.0")
+                implementation("com.github.ajalt.mordant:mordant:2.7.0")
                 implementation("com.github.ajalt.clikt:clikt:4.4.0")
 
                 // Coroutines

@@ -29,7 +29,6 @@ group = "id.walt"
 
 repositories {
     mavenCentral()
-    //jcenter()
     maven("https://jitpack.io")
     maven("https://maven.waltid.dev/releases")
     mavenLocal()
@@ -57,9 +56,6 @@ dependencies {
     implementation("io.ktor:ktor-server-call-id-jvm:${Versions.KTOR_VERSION}")
     implementation("io.ktor:ktor-server-content-negotiation-jvm:${Versions.KTOR_VERSION}")
     implementation("io.ktor:ktor-server-cio-jvm:${Versions.KTOR_VERSION}")
-
-    // Ktor server external libs
-    implementation("io.github.smiley4:ktor-swagger-ui:3.0.1")
 
     // Ktor client
     implementation("io.ktor:ktor-client-core-jvm:${Versions.KTOR_VERSION}")
