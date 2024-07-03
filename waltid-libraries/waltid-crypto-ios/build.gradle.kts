@@ -4,39 +4,24 @@ plugins {
 }
 
 kotlin {
-    listOf(
-        iosArm64(),
-        iosSimulatorArm64()
-    )
-        .forEach {
-            val iosUtilsProjectName = "crypto-ios-utils"
-            val target = it.name
 
-            val sdk = when (target) {
-                "iosArm64" -> "iphoneos"
-                else -> "iphonesimulator"
-            }
-
-            it.compilations.getByName("main") {
-                cinterops.create("waltid-crypto-ios") {
-                    val interopTask = tasks[interopProcessingTaskName]
-                    interopTask.dependsOn(":waltid-libraries:${project.name}:$iosUtilsProjectName:$iosUtilsProjectName-$target")
-                    headers("$projectDir/$iosUtilsProjectName/build/$target/Release-$sdk/include/waltid_crypto_ios_utils/waltid_crypto_ios_utils-Swift.h")
-                }
-            }
-        }
+    iosArm64()
+    iosSimulatorArm64()
 
     cocoapods {
         summary = "Some description for the Shared Module"
         homepage = "Link to the Shared Module homepage"
         version = "1.0"
         ios.deploymentTarget = "15.4"
+
         framework {
             baseName = "waltid-crypto-ios"
             isStatic = true
+            export(project(":waltid-libraries:waltid-target-ios"))
+            export(project(":waltid-libraries:waltid-crypto"))
         }
 
-        pod("JOSESwift"){
+        pod("JOSESwift") {
             version = "2.4.0"
         }
     }
@@ -59,6 +44,7 @@ kotlin {
             iosSimulatorArm64Main.dependsOn(this)
             dependencies {
                 api(project(":waltid-libraries:waltid-crypto"))
+                api(project(":waltid-libraries:waltid-target-ios"))
             }
         }
     }

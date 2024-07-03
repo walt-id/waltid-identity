@@ -1,6 +1,7 @@
 package id.walt.oid4vc.shared
 
-import id.walt.crypto.P256Key
+import id.walt.crypto.IosKey
+import id.walt.crypto.keys.KeyType
 import id.walt.did.dids.DidService
 import id.walt.oid4vc.data.CredentialOffer
 import id.walt.oid4vc.data.GrantType
@@ -9,7 +10,6 @@ import id.walt.oid4vc.providers.OpenIDClientConfig
 import id.walt.oid4vc.requests.CredentialOfferRequest
 import io.ktor.http.Url
 import io.ktor.util.toMap
-import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.jsonPrimitive
 
 val testCIClientConfig = OpenIDClientConfig("test-client", null, redirectUri = "http://blank")
@@ -17,7 +17,7 @@ val testCIClientConfig = OpenIDClientConfig("test-client", null, redirectUri = "
 internal lateinit var credentialWallet: TestCredentialWallet
 
 @Throws(Exception::class)
-suspend fun generateEcKey(kid: String) = P256Key.create(kid, "testApp").exportJWK()
+suspend fun generateEcKey(kid: String) = IosKey.create(kid, KeyType.secp256r1).exportJWK()
 
 @Throws(Exception::class)
 internal fun setupWallet(kid: String) {

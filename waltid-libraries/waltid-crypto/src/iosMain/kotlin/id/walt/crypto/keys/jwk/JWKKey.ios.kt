@@ -4,6 +4,7 @@ import id.walt.crypto.keys.JwkKeyMeta
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.utils.JsonUtils.toJsonObject
+import id.walt.target.ios.keys.P256
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -11,7 +12,6 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
 actual class JWKKey actual constructor(private val jwk: String?) : Key() {
-
 
     private var _jwkObj: JsonObject =
         Json.parseToJsonElement(requireNotNull(jwk) { "jws is null" }).jsonObject
@@ -34,15 +34,19 @@ actual class JWKKey actual constructor(private val jwk: String?) : Key() {
         return _jwkObj["kid"]?.jsonPrimitive?.content ?: error("Kid not found in $jwk")
     }
 
-    actual override suspend fun getThumbprint(): String = error("getThumbprint not implemented")
+    actual override suspend fun getThumbprint(): String = when (keyType) {
+        KeyType.secp256r1 -> P256.PublicKey.fromJwk(jwk!!).thumbprint()
+        else -> error("Not implemented for $keyType")
+    }
 
     actual override suspend fun exportJWK(): String = _jwkObj.toString()
 
 
     actual override suspend fun exportJWKObject(): JsonObject = _jwkObj
 
-    actual override suspend fun exportPEM(): String {
-        error("Not yet implemented")
+    actual override suspend fun exportPEM(): String = when (keyType) {
+        KeyType.secp256r1 -> P256.PublicKey.fromJwk(jwk!!).pem()
+        else -> error("Not implemented for $keyType")
     }
 
     /**
@@ -52,13 +56,13 @@ actual class JWKKey actual constructor(private val jwk: String?) : Key() {
      * @return signed (JWS)
      */
     actual override suspend fun signRaw(plaintext: ByteArray): ByteArray {
-        error("Not yet implemented")
+        error("Not implemented")
     }
 
     actual override suspend fun signJws(
         plaintext: ByteArray, headers: Map<String, String>
     ): String {
-        error("Not yet implemented")
+        error("Not implemented")
     }
 
     /**
@@ -68,12 +72,14 @@ actual class JWKKey actual constructor(private val jwk: String?) : Key() {
      */
     actual override suspend fun verifyRaw(
         signed: ByteArray, detachedPlaintext: ByteArray?
-    ): Result<ByteArray> {
-        TODO("Not yet implemented")
+    ): Result<ByteArray> = when (keyType) {
+        KeyType.secp256r1 -> P256.PublicKey.fromJwk(jwk!!).verifyRaw(signed, detachedPlaintext!!)
+        else -> error("Not implemented for $keyType")
     }
 
-    actual override suspend fun verifyJws(signedJws: String): Result<JsonElement> {
-        TODO("Not yet implemented")
+    actual override suspend fun verifyJws(signedJws: String): Result<JsonElement> = when (keyType) {
+        KeyType.secp256r1 -> P256.PublicKey.fromJwk(jwk!!).verifyJws(signedJws)
+        else -> error("Not implemented for $keyType")
     }
 
     actual override suspend fun getPublicKey(): JWKKey = _jwkObj.toMap().filterKeys {
@@ -81,8 +87,9 @@ actual class JWKKey actual constructor(private val jwk: String?) : Key() {
     }.toJsonObject().toString().let { JWKKey(it) }
 
 
-    actual override suspend fun getPublicKeyRepresentation(): ByteArray {
-        TODO("Not yet implemented")
+    actual override suspend fun getPublicKeyRepresentation(): ByteArray = when (keyType) {
+        KeyType.secp256r1 -> P256.PublicKey.fromJwk(jwk!!).externalRepresentation()
+        else -> error("Not implemented for $keyType")
     }
 
     actual override suspend fun getMeta(): JwkKeyMeta {

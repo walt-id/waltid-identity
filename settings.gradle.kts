@@ -11,36 +11,40 @@ plugins {
 }
 
 rootProject.name = "waltid-identity"
+
+val libraries = ":waltid-libraries"
+val applications = ":waltid-applications"
+val services = ":waltid-services"
 include(
     // Base SSI libs
-    ":waltid-libraries:waltid-crypto",
-    ":waltid-libraries:waltid-did",
-    ":waltid-libraries:waltid-verifiable-credentials",
-    ":waltid-libraries:waltid-mdoc-credentials",
-    ":waltid-libraries:waltid-sdjwt",
+    "$libraries:waltid-crypto",
+    "$libraries:waltid-did",
+    "$libraries:waltid-verifiable-credentials",
+    "$libraries:waltid-mdoc-credentials",
+    "$libraries:waltid-sdjwt",
 
     // Protocols
-    ":waltid-libraries:waltid-openid4vc",
+    "$libraries:waltid-openid4vc",
 
     // Service commons
-    ":waltid-services:waltid-service-commons",
+    "$services:waltid-service-commons",
 
     // Services based on libs
-    ":waltid-services:waltid-issuer-api",
-    ":waltid-services:waltid-verifier-api",
-    ":waltid-services:waltid-wallet-api",
+    "$services:waltid-issuer-api",
+    "$services:waltid-verifier-api",
+    "$services:waltid-wallet-api",
 
     // Service tests
-    ":waltid-services:waltid-e2e-tests",
+    "$services:waltid-e2e-tests",
 
     // CLI
-    ":waltid-applications:waltid-cli",
+    "$applications:waltid-cli",
 
     // Reporting
-    ":waltid-libraries:waltid-reporting",
+    "$libraries:waltid-reporting",
 
     // OCI extension for waltid-crypto
-    ":waltid-libraries:waltid-crypto-oci",
+    "$libraries:waltid-crypto-oci",
 
     // Android - uncomment to enable build:
     /*
@@ -50,10 +54,11 @@ include(
 
     // iOS - uncomment to enable build:
     /*
-    ":waltid-libraries:waltid-crypto-ios",
-    ":waltid-libraries:waltid-crypto-ios:crypto-ios-utils",
-    ":waltid-applications:waltid-openid4vc-ios-testApp",
-    ":waltid-applications:waltid-openid4vc-ios-testApp:shared"
+    "$libraries:waltid-crypto-ios",
+    "$libraries:waltid-target-ios",
+    "$libraries:waltid-target-ios:implementation",
+    "$applications:waltid-openid4vc-ios-testApp",
+    "$applications:waltid-openid4vc-ios-testApp:shared"
      */
 )
 //include("waltid-e2e-tests")

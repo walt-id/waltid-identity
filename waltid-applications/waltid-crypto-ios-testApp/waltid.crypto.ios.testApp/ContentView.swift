@@ -20,156 +20,26 @@ struct ContentView: View {
     var inputByteArray: KotlinByteArray
     {
         get {
-            IosKeyKt.ExportedToByteArray(input, startIndex: 0, endIndex: 0, throwOnInvalidSequence: false)
+            Key_iosKt.ExportedToByteArray(input, startIndex: 0, endIndex: 0, throwOnInvalidSequence: false)
         }
     }
-    
-    let appId = "appName"
      
     @State var keyId: String = ""
     
-    @State var p256Key: waltid_crypto_ios.Waltid_cryptoKey? = nil
+    @State var p256Key: waltid_crypto_ios.Key? = nil
     @State var p256KeysignRawResult: Any? = nil
     @State var p256KeysignJwsResult: String? = nil
     
-    @State var rsaKey: waltid_crypto_ios.Waltid_cryptoKey? = nil
-    @State var rsasignRawResult: Any? = nil
-    @State var rsasignJwsResult: String? = nil
-    
-    @State var edKey: waltid_crypto_ios.Waltid_cryptoKey? = nil
-    @State var edsignRawResult: Any? = nil
-    @State var edsignJwsResult: String? = nil
+    @State var p256jwk: String = ""
     
     var body: some View {
         ScrollView {
             TextField("Key id", text: $keyId)
-            
-            GroupBox("RSA") {
-                Button("Generate key") {
-                    guard !keyId.isEmpty else {
-                        print("keyid is empty.")
-                        return
-                    }
-                    
-                    do {
-                        _ = waltid_crypto_ios.RSAKey.companion.create(kid: keyId, appId: appId, size: 2048)
-                        rsaKey = try IosKeys.companion.load(kid: keyId, type: .rsa)
-                    } catch {
-                        print(error)
-                    }
-                }
-                Button("Public representation") {
-                    if let rsaKey {
-                        rsaKey.getPublicKeyRepresentation { bytes, err in
-                            if let bytes {
-                                print(bytes)
-                            }
-                            
-                            if let err {
-                                print(err)
-                            }
-                        }
-                    }
-                }
-                Button("Export jwk") {
-                    if let rsaKey {
-                        rsaKey.exportJWK(completionHandler: { jwk, err in
-                            if let jwk {
-                                print(jwk)
-                            }
-                            
-                            if let err {
-                                print(err)
-                            }
-                        })
-                    }
-                }
-                
-                Button("Export jwk object") {
-                    if let rsaKey {
-                        rsaKey.exportJWKObject { jwk, err in
-                            if let jwk {
-                                print(jwk)
-                            }
-                            
-                            if let err {
-                                print(err)
-                            }
-                        }
-                    }
-                }
-                
-                Button("Export pem") {
-                    if let rsaKey {
-                        rsaKey.exportPEM { pem, err in
-                            if let pem {
-                                print(pem)
-                            }
-                            
-                            if let err {
-                                print(err)
-                            }
-                        }
-                    }
-                }
-                
-                Button("Sign raw") {
-                    if let rsaKey {
-                        rsaKey.signRaw(plaintext: inputByteArray) { sig, err in
-                            if let sig {
-                                print(sig)
-                                rsasignRawResult = sig
-                            }
-                            
-                            if let err {
-                                print(err)
-                            }
-                        }
-                    }
-                }
-                Button("Verify raw") {
-                    if let rsaKey, let rsasignRawResult {
-                        rsaKey.verifyRaw(signed: rsasignRawResult as! KotlinByteArray, detachedPlaintext: inputByteArray) { result, err in
-                            if let result {
-                                print(result)
-                            }
-                            
-                            if let err {
-                                print(err)
-                            }
-                        }
-                    }
-                }
-                
-                Button("Sign jws") {
-                    if let rsaKey {
-                        rsaKey.signJws(plaintext: inputByteArray, headers:["alg":"RS256"]) { sig, err in
-                            if let sig {
-                                print(sig)
-                                rsasignJwsResult = sig
-                            }
-                            
-                            if let err {
-                                print(err)
-                            }
-                        }
-                    }
-                }
-                Button("Verify jws") {
-                    if let rsaKey, let rsasignJwsResult {
-                        rsaKey.verifyJws(signedJws: rsasignJwsResult) { result, err in
-                            if let result {
-                                print(result)
-                            }
-                            
-                            if let err {
-                                print(err)
-                            }
-                        }
-                    }
-                }
+            Button("Random KID") {
+                keyId = UUID().uuidString
             }
-            GroupBox("secp256r1") {
+            
+            GroupBox("iOS Keychain secp256r1") {
                 Button("Generate key") {
                     guard !keyId.isEmpty else {
                         print("keyid is empty.")
@@ -177,13 +47,13 @@ struct ContentView: View {
                     }
                     
                     do {
-                        _ = P256Key.companion.create(kid: keyId, appId: appId)
-                        p256Key = try IosKeys.companion.load(kid: keyId, type: .secp256r1)
+                        _ = try IosKey.companion.create(kid: keyId, type: .secp256r1)
+                        p256Key = try IosKey.companion.load(kid: keyId, type: .secp256r1)
                     } catch {
                         print(error)
                     }
                 }
-                Button("Public representation") {
+                Button("Private Key - Public representation") {
                     if let p256Key {
                         p256Key.getPublicKeyRepresentation { bytes, err in
                             if let bytes {
@@ -196,7 +66,29 @@ struct ContentView: View {
                         }
                     }
                 }
-                Button("Export jwk") {
+                
+                Button("Public Key - Public representation") {
+                    if let p256Key {
+                        p256Key.getPublicKey { key, err in
+                            if let err {
+                                return print(err)
+                            }
+                            
+                            if let key {
+                                key.getPublicKeyRepresentation { bytes, err in
+                                    if let bytes {
+                                        print(bytes)
+                                    }
+                                    
+                                    if let err {
+                                        print(err)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                Button("Private Key - Export jwk") {
                     if let p256Key {
                         p256Key.exportJWK(completionHandler: { jwk, err in
                             if let jwk {
@@ -210,7 +102,30 @@ struct ContentView: View {
                     }
                 }
                 
-                Button("Export jwk object") {
+                Button("Public Key - Export jwk") {
+                    if let p256Key {
+                        p256Key.getPublicKey { key, err in
+                            if let err {
+                                return print(err)
+                            }
+                            
+                            if let key {
+                                key.exportJWK(completionHandler: { jwk, err in
+                                    if let jwk {
+                                        print(jwk)
+                                        p256jwk = jwk
+                                    }
+                                    
+                                    if let err {
+                                        print(err)
+                                    }
+                                })
+                            }
+                        }
+                    }
+                }
+                
+                Button("Private Key - Export jwk object") {
                     if let p256Key {
                         p256Key.exportJWKObject { jwk, err in
                             if let jwk {
@@ -224,7 +139,7 @@ struct ContentView: View {
                     }
                 }
                 
-                Button("Export pem") {
+                Button("Private Key - Export pem") {
                     if let p256Key {
                         p256Key.exportPEM { pem, err in
                             if let pem {
@@ -238,7 +153,30 @@ struct ContentView: View {
                     }
                 }
                 
-                Button("Sign raw") {
+                Button("Public Key - Export pem") {
+                    if let p256Key {
+                        
+                        p256Key.getPublicKey { key, err in
+                            if let err {
+                                return print(err)
+                            }
+                            
+                            if let key {
+                                key.exportPEM { pem, err in
+                                    if let pem {
+                                        print(pem)
+                                    }
+                                    
+                                    if let err {
+                                        print(err)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                Button("Private Key - Sign raw") {
                     if let p256Key {
                         p256Key.signRaw(plaintext: inputByteArray) { sig, err in
                             if let sig {
@@ -252,7 +190,8 @@ struct ContentView: View {
                         }
                     }
                 }
-                Button("Verify raw") {
+                
+                Button("Public Key - Verify raw") {
                     if let p256Key, let p256KeysignRawResult {
                         p256Key.verifyRaw(signed: p256KeysignRawResult as! KotlinByteArray, detachedPlaintext: inputByteArray) { result, err in
                             if let result {
@@ -266,7 +205,8 @@ struct ContentView: View {
                     }
                 }
                 
-                Button("Sign jws") {
+                
+                Button("Private Key - Sign jws") {
                     if let p256Key {
                         p256Key.signJws(plaintext: inputByteArray, headers:["alg":"ES256"]) { sig, err in
                             if let sig {
@@ -280,7 +220,8 @@ struct ContentView: View {
                         }
                     }
                 }
-                Button("Verify jws") {
+                
+                Button("Public Key - Verify jws") {
                     if let p256Key, let p256KeysignJwsResult {
                         p256Key.verifyJws(signedJws: p256KeysignJwsResult) { result, err in
                             if let result {
@@ -295,132 +236,32 @@ struct ContentView: View {
                 }
             }
             
-            GroupBox("Ed25519") {
-                Button("Generate key") {
-                    guard !keyId.isEmpty else {
-                        print("keyid is empty.")
-                        return
-                    }
-                    
-                    do {
-                        _ = Ed25519Key.companion.create(kid: keyId, appId: appId)
-                        edKey = try IosKeys.companion.load(kid: keyId, type: .ed25519)
-
-                    } catch {
-                        print(error)
-                    }
-                }
-                Button("Public representation") {
-                    if let edKey {
-                        edKey.getPublicKeyRepresentation { bytes, err in
-                            if let bytes {
-                                print(bytes)
-                            }
-                            
-                            if let err {
-                                print(err)
-                            }
+            GroupBox("JWK secp256r1") {
+                TextField("JWK", text: $p256jwk)
+                Button("Public Key - Export pem") {
+                    JWKKey(jwk: p256jwk).exportPEM { result, err in
+                        if let result {
+                            print(result)
                         }
-                    }
-                }
-                Button("Export jwk") {
-                    if let edKey {
-                        edKey.exportJWK(completionHandler: { jwk, err in
-                            if let jwk {
-                                print(jwk)
-                            }
-                            
-                            if let err {
-                                print(err)
-                            }
-                        })
-                    }
-                }
-                
-                Button("Export jwk object") {
-                    if let edKey {
-                        edKey.exportJWKObject { jwk, err in
-                            if let jwk {
-                                print(jwk)
-                            }
-                            
-                            if let err {
-                                print(err)
-                            }
-                        }
-                    }
-                }
-                
-                Button("Export pem") {
-                    if let edKey {
-                        edKey.exportPEM { pem, err in
-                            if let pem {
-                                print(pem)
-                            }
-                            
-                            if let err {
-                                print(err)
-                            }
-                        }
-                    }
-                }
-                
-                Button("Sign raw") {
-                    if let edKey {
-                        edKey.signRaw(plaintext: inputByteArray) { sig, err in
-                            if let sig {
-                                print(sig)
-                                edsignRawResult = sig
-                            }
-                            
-                            if let err {
-                                print(err)
-                            }
-                        }
-                    }
-                }
-                Button("Verify raw") {
-                    if let edKey, let edsignRawResult {
-                        edKey.verifyRaw(signed: edsignRawResult as! KotlinByteArray, detachedPlaintext: inputByteArray) { result, err in
-                            if let result {
-                                print(result)
-                            }
-                            
-                            if let err {
-                                print(err)
-                            }
-                        }
-                    }
-                }
-                
-                Button("Sign jws") {
-                    if let edKey{
                         
-                        edKey.signJws(plaintext: inputByteArray, headers:["alg:":"EdDSA"]) { sig, err in
-                            if let sig {
-                                print(sig)
-                                edsignJwsResult = sig
-                            }
-                            
-                            if let err {
-                                print(err)
-                            }
+                        if let err {
+                            print(err)
                         }
                     }
-                }
-                Button("Verify jws") {
-                    if let edKey, let edsignJwsResult {
-                        edKey.verifyJws(signedJws: edsignJwsResult) { result, err in
-                            if let result {
-                                print(result)
-                            }
-                            
-                            if let err {
-                                print(err)
-                            }
+                }.disabled(p256jwk.isEmpty)
+                
+                Button("Public Key - Verify jws") {
+                    JWKKey(jwk: p256jwk).verifyJws(signedJws: p256KeysignJwsResult!) { result, err in
+                        if let result {
+                            print(result)
+                        }
+                        
+                        if let err {
+                            print(err)
                         }
                     }
-                }
+                }.disabled(p256jwk.isEmpty || p256KeysignJwsResult?.isEmpty == true)
+                
             }
         }.padding()
     }

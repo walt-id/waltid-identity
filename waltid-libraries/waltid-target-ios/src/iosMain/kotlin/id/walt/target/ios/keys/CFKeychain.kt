@@ -1,10 +1,9 @@
-package id.walt.crypto
+package id.walt.target.ios.keys
 
 import kotlinx.cinterop.MemScope
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.ptr
 import kotlinx.cinterop.value
-import platform.CoreFoundation.CFDataRef
 import platform.CoreFoundation.CFDictionaryAddValue
 import platform.CoreFoundation.CFDictionaryCreateMutable
 import platform.CoreFoundation.CFDictionaryRef
@@ -16,20 +15,14 @@ import platform.CoreFoundation.kCFBooleanTrue
 import platform.CoreFoundation.kCFTypeDictionaryKeyCallBacks
 import platform.CoreFoundation.kCFTypeDictionaryValueCallBacks
 import platform.Foundation.CFBridgingRelease
-import platform.Foundation.NSData
 import platform.Foundation.NSString
 import platform.Security.SecCopyErrorMessageString
 import platform.Security.SecItemCopyMatching
-import platform.Security.SecKeyAlgorithm
-import platform.Security.SecKeyCopyExternalRepresentation
 import platform.Security.SecKeyCopyPublicKey
-import platform.Security.SecKeyCreateSignature
 import platform.Security.SecKeyRef
-import platform.Security.SecKeyVerifySignature
 import platform.Security.errSecSuccess
 import platform.Security.kSecAttrApplicationTag
 import platform.Security.kSecAttrKeyClass
-import platform.Security.kSecAttrKeyClassPrivate
 import platform.Security.kSecAttrKeyType
 import platform.Security.kSecClass
 import platform.Security.kSecClassKey
@@ -84,66 +77,6 @@ internal inline fun <T> MemScope.usePublicKey(
         block(publicKey)
     } finally {
         CFBridgingRelease(publicKey)
-    }
-}
-
-internal interface CoreFoundationSecOperations {
-    fun signRaw(
-        keyId: String,
-        keyType: CFStringRef?,
-        algorithm: SecKeyAlgorithm?,
-        data: ByteArray,
-
-        ) = withSecKey(keyId, keyType, kSecAttrKeyClassPrivate) { secKey ->
-        cfRetain(data.toNSData()) { dataToSign ->
-            val signed = checkErrorResult { error ->
-                SecKeyCreateSignature(
-                    secKey, algorithm, dataToSign as CFDataRef, error
-                )
-            }
-            val signedNsData = signed.toNSData()
-            CFBridgingRelease(signed)
-
-            signedNsData.toByteArray()
-        }
-    }
-
-    fun MemScope.verify(
-        signature: CFTypeRef?,
-        signedData: CFTypeRef?,
-        publicKey: SecKeyRef?,
-        signingAlgorithm: SecKeyAlgorithm?
-    ): Boolean {
-        val result = checkErrorResult { error ->
-            SecKeyVerifySignature(
-                publicKey,
-                signingAlgorithm,
-                signedData as CFDataRef?,
-                signature as CFDataRef?,
-                error
-            )
-        }
-
-        check(result) {
-            "Not verified."
-        }
-
-        return result
-    }
-
-    fun publicKeyExternalRepresentation(
-        keyId: String, keyType: CFStringRef?
-    ) = withSecKey(
-        keyId, keyType, null
-    ) { secKey ->
-        usePublicKey(secKey) { publicKey ->
-            val nsData = CFBridgingRelease(
-                SecKeyCopyExternalRepresentation(
-                    publicKey, null
-                )
-            ) as NSData
-            nsData.toByteArray()
-        }
     }
 }
 
