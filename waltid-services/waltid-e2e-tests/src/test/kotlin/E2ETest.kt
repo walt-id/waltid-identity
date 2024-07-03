@@ -7,7 +7,10 @@ import id.walt.crypto.keys.KeyType
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.verifier.oidc.PresentationSessionInfo
 import id.walt.webwallet.config.RegistrationDefaultsConfig
-import id.walt.webwallet.db.models.*
+import id.walt.webwallet.db.models.Account
+import id.walt.webwallet.db.models.AccountWalletListing
+import id.walt.webwallet.db.models.WalletCredential
+import id.walt.webwallet.db.models.WalletOperationHistory
 import id.walt.webwallet.web.controllers.UsePresentationRequest
 import id.walt.webwallet.web.model.AccountRequest
 import id.walt.webwallet.web.model.EmailAccountRequest
@@ -51,8 +54,7 @@ class E2ETest {
                 client.post("/wallet-api/auth/login") {
                     setBody(
                         EmailAccountRequest(
-                            email = "user@email.com",
-                            password = "password"
+                            email = "user@email.com", password = "password"
                         ) as AccountRequest
                     )
                 }.expectSuccess().apply {
@@ -108,26 +110,46 @@ class E2ETest {
             keysApi.import(wallet, rsaJwkImport)
             //endregion -Keys-
 
+            val didsApi = DidsApi(client)
+            //region -Dids-
             lateinit var did: String
-
-            test("/wallet-api/wallet/{wallet}/dids - list DIDs") {
-                client.get("/wallet-api/wallet/$wallet/dids").expectSuccess().apply {
-                    val dids = body<List<WalletDid>>()
-                    assert(dids.isNotEmpty()) { "Wallet has no DIDs!" }
-
-                    assert(dids.size == 1) { "Wallet has invalid number of DIDs!" }
-
-                    did = dids.first().did
-                    println("Selected DID: $did")
-                }
+            val createdDids = mutableListOf<String>()
+            didsApi.list(wallet, 1, DidsApi.DefaultDidOption.Any) {
+                assert(it.first().default)
+                did = it.first().did
             }
-
-            test("/wallet-api/wallet/{wallet}/dids/{did} - show specific DID") {
-                client.get("/wallet-api/wallet/$wallet/dids/$did").expectSuccess().apply {
-                    val response = body<JsonObject>()
-                    println("DID document: $response")
-                }
+            didsApi.create(wallet, DidsApi.DidCreateRequest(method = "key", options = mapOf("useJwkJcsPub" to false))) {
+                createdDids.add(it)
             }
+            didsApi.create(wallet, DidsApi.DidCreateRequest(method = "jwk")) {
+                createdDids.add(it)
+            }
+            didsApi.create(
+                wallet,
+                DidsApi.DidCreateRequest(method = "web", options = mapOf("domain" to "domain", "path" to "path"))
+            ) {
+                createdDids.add(it)
+            }
+            didsApi.create(
+                wallet, DidsApi.DidCreateRequest(method = "cheqd", options = mapOf("network" to "testnet"))
+            ) {
+                createdDids.add(it)
+            }
+            //TODO: error(400) DID method not supported for auto-configuration: ebsi
+//            didsApi.create(wallet, DidsApi.DidCreateRequest(method = "ebsi", options = mapOf("version" to 2, "bearerToken" to "token"))){
+//                createdDids.add(it)
+//            }
+            //TODO: didsApi.create(wallet, DidsApi.DidCreateRequest(method = "iota")){ createdDids.add(it) }
+            didsApi.default(wallet, createdDids[0])
+            didsApi.list(wallet, createdDids.size + 1, DidsApi.DefaultDidOption.Some(createdDids[0]))
+            for (d in createdDids) {
+                didsApi.delete(wallet, d)
+            }
+            didsApi.list(wallet, 1, DidsApi.DefaultDidOption.None)
+            didsApi.get(wallet, did)
+            didsApi.default(wallet, did)
+            didsApi.list(wallet, 1, DidsApi.DefaultDidOption.Some(did))
+            //endregion -Dids-
 
             test("/wallet-api/wallet/{wallet}/credentials - list credentials") {
                 client.get("/wallet-api/wallet/$wallet/credentials").expectSuccess().apply {
