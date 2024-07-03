@@ -3,10 +3,7 @@ package id.walt.cli
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.subcommands
 import com.github.ajalt.clikt.parameters.groups.provideDelegate
-import id.walt.cli.commands.CommonOptions
-import id.walt.cli.commands.DidCmd
-import id.walt.cli.commands.KeyCmd
-import id.walt.cli.commands.VCCmd
+import id.walt.cli.commands.*
 
 class WaltIdCmd : CliktCommand(
     name = "waltid",
@@ -71,7 +68,7 @@ class WaltIdCmd : CliktCommand(
     printHelpOnEmptyArgs = true
 ) {
     init {
-        subcommands(KeyCmd(), DidCmd(), VCCmd())
+        subcommands(KeyCmd(), DidCmd(), VCCmd(), VPCmd())
     }
 
     private val commonOptions by CommonOptions()
