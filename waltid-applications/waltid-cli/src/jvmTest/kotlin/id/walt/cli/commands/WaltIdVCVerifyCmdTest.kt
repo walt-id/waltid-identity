@@ -5,15 +5,19 @@ import com.github.ajalt.clikt.core.PrintHelpMessage
 import com.github.ajalt.clikt.testing.test
 import id.walt.cli.util.KeyUtil
 import id.walt.cli.util.VCUtil
+import io.ktor.http.*
+import io.ktor.server.application.*
+import io.ktor.server.engine.*
+import io.ktor.server.netty.*
+import io.ktor.server.response.*
+import io.ktor.server.routing.*
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.assertDoesNotThrow
 import org.junit.jupiter.api.assertThrows
 import java.io.File
-import kotlin.test.Ignore
-import kotlin.test.Test
-import kotlin.test.assertContains
-import kotlin.test.assertFailsWith
+import kotlin.test.*
 
 class WaltIdVCVerifyCmdTest {
 
@@ -51,6 +55,41 @@ class WaltIdVCVerifyCmdTest {
     val signedInvalidHolderVCFilePath = "${resourcesPath}/vc/openbadgecredential_sample.invalidholder.signed.json"
 
     val schemaFilePath = "${resourcesPath}/schema/OpenBadgeV3_schema.json"
+
+    private val webhookTestServer: NettyApplicationEngine
+    private val webhookTestServerURL: String
+    private val webhookTestServerSuccessURL: String
+    private val webhookTestServerFailURL: String
+
+    init {
+        var url: String
+        webhookTestServer = embeddedServer(
+            Netty,
+            port = 0,
+        ) {
+            routing {
+                post("/success") {
+                    call.respondText("{\"status\": \"OK\"}", ContentType.Application.Json)
+                }
+
+                post("/fail") {
+                    call.respondText("{\"status\": \"Error\"}", ContentType.Application.Json, HttpStatusCode.BadRequest)
+                }
+            }
+        }.start(false)
+        runBlocking {
+            url = "http://" + webhookTestServer.resolvedConnectors()
+                .first().host + ":${webhookTestServer.resolvedConnectors().first().port}"
+        }
+        webhookTestServerURL = url
+        webhookTestServerSuccessURL = "$webhookTestServerURL/success"
+        webhookTestServerFailURL = "$webhookTestServerURL/fail"
+    }
+
+    @AfterTest
+    fun cleanUp() {
+        webhookTestServer.stop()
+    }
 
     @Test
     fun `should print help message when called with --help argument`() {
@@ -216,7 +255,8 @@ class WaltIdVCVerifyCmdTest {
     @Test
     fun `should verify VC when --policy=allowed-issuer has multiple arguments and one of them is valid`() {
         val result = command.test(
-            listOf("--policy=allowed-issuer",
+            listOf(
+                "--policy=allowed-issuer",
                 "--arg=issuer=did:key:z6MkmtB51KWs2ayDmqU7fRcfxx8k5DYfUFqUSJ8wiPFkahNe",
                 "--arg=issuer=did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV",
                 signedVCFilePath,
@@ -228,7 +268,8 @@ class WaltIdVCVerifyCmdTest {
     @Test
     fun `should verify the VC when --policy=allowed-issuer has one argument that is valid`() {
         val result = command.test(
-            listOf("--policy=allowed-issuer",
+            listOf(
+                "--policy=allowed-issuer",
                 "--arg=issuer=did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV",
                 signedVCFilePath,
             )
@@ -239,7 +280,8 @@ class WaltIdVCVerifyCmdTest {
     @Test
     fun `should not verify the VC when --policy=allowed-issuer has one argument that is not valid`() {
         val result = command.test(
-            listOf("--policy=allowed-issuer",
+            listOf(
+                "--policy=allowed-issuer",
                 "--arg=issuer=did:key:z6MkmtB51KWs2ayDmqU7fRcfxx8k5DYfUFqUSJ8wiPFkahNe",
                 signedVCFilePath,
             )
@@ -250,13 +292,38 @@ class WaltIdVCVerifyCmdTest {
     @Test
     fun `should not verify the VC when --policy=allowed-issuer has multiple arguments and all of them are invalid`() {
         val result = command.test(
-            listOf("--policy=allowed-issuer",
+            listOf(
+                "--policy=allowed-issuer",
                 "--arg=issuer=did:key:z6MkmtB51KWs2ayDmqU7fRcfxx8k5DYfUFqUSJ8wiPFkahNe",
                 "--arg=issuer=did:key:z6MkosbA8G31BkzZDPZepew7c498656kaNS9E8q4czWCj47o",
                 signedVCFilePath,
             )
         )
         assertContains(result.output, "allowed-issuer: Fail!")
+    }
+
+    @Test
+    fun `should output Success when webhook URL returns HTTP 200 status code`() = runTest {
+        val result = command.test(
+            listOf(
+                "--policy=webhook",
+                "--arg=url=$webhookTestServerSuccessURL",
+                signedVCFilePath,
+            )
+        )
+        assertContains(result.output, "webhook: Success")
+    }
+
+    @Test
+    fun `should output Fail! when webhook URL returns HTTP 400 status code`() = runTest {
+        val result = command.test(
+            listOf(
+                "--policy=webhook",
+                "--arg=url=$webhookTestServerFailURL",
+                signedVCFilePath,
+            )
+        )
+        assertContains(result.output, "webhook: Fail!")
     }
 
     private fun sign(vcFilePath: String): String {
