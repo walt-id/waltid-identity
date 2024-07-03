@@ -282,10 +282,9 @@ class OCIKeyRestApi(
             else -> throw IllegalArgumentException("Not supported: $type")
         }
 
-        @OptIn(ExperimentalSerializationApi::class)
-      /*  @JvmBlocking
+        @JvmBlocking
         @JvmAsync
-        @JsPromise*/
+        @JsPromise
         @JsExport.Ignore
         suspend fun generateKey(type: KeyType, config: OCIKeyMetadata): OCIKeyRestApi {
             return retry {
@@ -308,7 +307,7 @@ class OCIKeyRestApi(
                                 "length" to JsonPrimitive(length),
                                 when (type) {
                                     KeyType.secp256r1 -> "curveId" to JsonPrimitive("NIST_P256")
-                                    else -> "curveId" to JsonPrimitive(null)
+                                    else -> "curveId" to JsonNull
                                 },
                             )
                         ),
