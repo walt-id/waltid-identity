@@ -32,7 +32,7 @@ class VPCreateCmd : CliktCommand(
         .required()
 
     private val holderSigningKeyFile: File by option("-hk", "--holder-key")
-        .help("The file path of the holder's signing key (required).")
+        .help("The file path of the holder's (private) signing key in JWK format (required).")
         .file(true, true, false, mustBeReadable = true, canBeSymlink = false)
         .required()
 
