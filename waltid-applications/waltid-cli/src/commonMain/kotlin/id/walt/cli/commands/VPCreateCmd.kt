@@ -41,7 +41,7 @@ class VPCreateCmd : CliktCommand(
         .required()
 
     private val nonce: String by option("-n", "--nonce")
-        .help("asdfasdfasdf")
+        .help("Unique value used in the context of the OID4VP protocol to mitigate replay attacks. Random value will be generated if not specified.")
         .default(randomUUID())
 
     private val inputVcFileList: List<File> by option("-vc", "--vc-file")
