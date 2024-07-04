@@ -146,7 +146,6 @@ class LspPotentialIssuance(val client: HttpClient) {
       val credReq = CredentialRequest.forOfferedCredential(
         offeredCredential, ProofOfPossession.CWTProofBuilder(
           issuerUrl = parsedOffer.credentialIssuer, clientId = authReq.clientId, nonce = tokenResp.cNonce,
-          coseKeyAlgorithm = COSE.AlgorithmID.ECDSA_256.AsCBOR().toString(),
           coseKey = when (it) { // test with COSE_Key header
             0 -> coseKey
             else -> null

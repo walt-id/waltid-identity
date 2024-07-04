@@ -79,7 +79,6 @@ data class ProofOfPossession @OptIn(ExperimentalSerializationApi::class) private
      */
     class CWTProofBuilder(private val issuerUrl: String,
                           private val clientId: String?, private val nonce: String?,
-                          private val coseKeyAlgorithm: String,
                           private val coseKey: ByteArray? = null, private val x5Cert: ByteArray? = null, private val x5Chain: List<ByteArray>? = null): ProofBuilder() {
         val headers = MapElement(buildMap {
             put(MapKey(HEADER_LABEL_CONTENT_TYPE), StringElement(CWT_HEADER_TYPE))
@@ -101,6 +100,10 @@ data class ProofOfPossession @OptIn(ExperimentalSerializationApi::class) private
         fun build(cryptoProvider: COSECryptoProvider, keyId: String): ProofOfPossession {
             val signedPayload = cryptoProvider.sign1(payload.toCBOR(), headers, null, keyId)
             return ProofOfPossession(ProofType.cwt, cwt = signedPayload.toCBOR().encodeToBase64Url())
+        }
+
+        fun build(signedCwt: String): ProofOfPossession {
+            return ProofOfPossession(ProofType.cwt, null, signedCwt, null)
         }
 
         companion object {

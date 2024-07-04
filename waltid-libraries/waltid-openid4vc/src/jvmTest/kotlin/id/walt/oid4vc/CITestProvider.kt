@@ -9,6 +9,7 @@ import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.did.dids.DidService
+import id.walt.mdoc.dataelement.MapElement
 import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.data.CredentialSupported
 import id.walt.oid4vc.data.ResponseMode
@@ -87,6 +88,16 @@ class CITestProvider : OpenIDCredentialIssuer(
 
     override fun signToken(target: TokenTarget, payload: JsonObject, header: JsonObject?, keyId: String?, privKey: Key?) =
         runBlocking { CI_TOKEN_KEY.signJws(payload.toString().toByteArray()) }
+
+    override fun signCWTToken(
+        target: TokenTarget,
+        payload: MapElement,
+        header: MapElement?,
+        keyId: String?,
+        privKey: Key?
+    ): String {
+        TODO("Not yet implemented")
+    }
 
     fun getKeyFor(token: String): Key {
         return runBlocking { DidService.resolveToKey((JWTParser.parse(token).header as JWSHeader).keyID.substringBefore("#")) }.getOrThrow()

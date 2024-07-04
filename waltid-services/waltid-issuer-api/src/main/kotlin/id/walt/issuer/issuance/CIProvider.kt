@@ -168,6 +168,16 @@ open class CIProvider : OpenIDCredentialIssuer(
             }
         }
 
+    override fun signCWTToken(
+        target: TokenTarget,
+        payload: MapElement,
+        header: MapElement?,
+        keyId: String?,
+        privKey: Key?
+    ): String {
+        TODO("Not yet implemented")
+    }
+
     @OptIn(ExperimentalEncodingApi::class)
     override fun verifyTokenSignature(target: TokenTarget, token: String) = runBlocking {
         log.debug { "Verifying JWS: $token" }

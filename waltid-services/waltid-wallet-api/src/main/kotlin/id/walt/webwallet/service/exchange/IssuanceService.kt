@@ -1,13 +1,17 @@
 package id.walt.webwallet.service.exchange
 
+import COSE.OneKey
+import cbor.Cbor
+import com.nimbusds.jose.jwk.ECKey
+import id.walt.crypto.utils.Base64Utils.base64UrlDecode
 import id.walt.crypto.utils.JwsUtils
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.did.dids.DidService
+import id.walt.mdoc.dataelement.toDE
+import id.walt.mdoc.doc.MDoc
+import id.walt.mdoc.issuersigned.IssuerSigned
 import id.walt.oid4vc.OpenID4VCI
-import id.walt.oid4vc.data.CredentialFormat
-import id.walt.oid4vc.data.CredentialOffer
-import id.walt.oid4vc.data.GrantType
-import id.walt.oid4vc.data.OpenIDProviderMetadata
+import id.walt.oid4vc.data.*
 import id.walt.oid4vc.providers.TokenTarget
 import id.walt.oid4vc.requests.*
 import id.walt.oid4vc.responses.*
@@ -23,6 +27,7 @@ import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.util.*
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
@@ -43,7 +48,7 @@ object IssuanceService {
 
         // entra or openid4vc credential offer
         val isEntra = EntraIssuanceRequest.isEntraIssuanceRequestUri(offer)
-        val credentialResponses = if (isEntra) {
+        val processedCredentialOffers = if (isEntra) {
             processMSEntraIssuanceRequest(
                 EntraIssuanceRequest.fromAuthorizationRequest(
                     AuthorizationRequest.fromHttpParametersAuto(
@@ -60,12 +65,12 @@ object IssuanceService {
         }
         // === original ===
         logger.debug { "// parse and verify credential(s)" }
-        check(credentialResponses.any { it.credential != null }) { "No credential was returned from credentialEndpoint: $credentialResponses" }
+        check(processedCredentialOffers.any { it.credentialResponse.credential != null }) { "No credential was returned from credentialEndpoint: $processedCredentialOffers" }
 
         // ??multiple credentials manifests
         val manifest =
             isEntra.takeIf { it }?.let { EntraManifestExtractor().extract(offer) }
-        credentialResponses.map {
+        processedCredentialOffers.map {
             getCredentialData(it, manifest)
         }
     }
@@ -74,7 +79,7 @@ object IssuanceService {
         credentialOffer: CredentialOffer,
         credentialWallet: TestCredentialWallet,
         clientId: String,
-    ): List<CredentialResponse> {
+    ): List<ProcessedCredentialOffer> {
         logger.debug { "// get issuer metadata" }
         val providerMetadataUri =
             credentialWallet.getCIProviderMetadataUrl(credentialOffer.credentialIssuer)
@@ -119,13 +124,27 @@ object IssuanceService {
 
         logger.debug { "Using issuer URL: ${credentialOffer.credentialIssuer}" }
         val credReqs = offeredCredentials.map { offeredCredential ->
+            // Use key proof if supported cryptographic binding method is not empty, doesn't contain did and contains cose_key
+            val useKeyProof = (offeredCredential.cryptographicBindingMethodsSupported != null &&
+                offeredCredential.cryptographicBindingMethodsSupported!!.contains("cose_key") &&
+                !offeredCredential.cryptographicBindingMethodsSupported!!.contains("did"))
+            val key = DidService.resolveToKey(credentialWallet.did).getOrThrow()
             CredentialRequest.forOfferedCredential(
                 offeredCredential = offeredCredential,
-                proof = credentialWallet.generateDidProof(
-                    did = credentialWallet.did,
-                    issuerUrl = credentialOffer.credentialIssuer,
-                    nonce = nonce
-                )
+                proof = when(useKeyProof) {
+                    true -> credentialWallet.generateKeyProof(
+                        key = key,
+                        cosePubKey = OneKey(ECKey.parse(key.getPublicKey().exportJWK()).toECPublicKey(), null).AsCBOR().EncodeToBytes(),
+                        issuerUrl = credentialOffer.credentialIssuer,
+                        nonce = nonce,
+                        proofType = offeredCredential.proofTypesSupported?.keys?.first() ?: ProofType.jwt)
+                    else -> credentialWallet.generateDidProof(
+                        did = credentialWallet.did,
+                        issuerUrl = credentialOffer.credentialIssuer,
+                        nonce = nonce,
+                        proofType = offeredCredential.proofTypesSupported?.keys?.first() ?: ProofType.jwt
+                    )
+                }
             )
         }
         logger.debug { "credReqs: $credReqs" }
@@ -140,7 +159,7 @@ object IssuanceService {
                     contentType(ContentType.Application.Json)
                     bearerAuth(tokenResp.accessToken!!)
                     setBody(credReq.toJSON())
-                }.body<JsonObject>().let { CredentialResponse.fromJSON(it) }
+                }.body<JsonObject>().let { ProcessedCredentialOffer(CredentialResponse.fromJSON(it), credReq) }
                 logger.debug { "credentialResponse: $credentialResponse" }
 
                 listOf(credentialResponse)
@@ -156,8 +175,12 @@ object IssuanceService {
                 }.body<JsonObject>().let { BatchCredentialResponse.fromJSON(it) }
                 logger.debug { "credentialResponses: $credentialResponses" }
 
-                credentialResponses.credentialResponses
-                    ?: throw IllegalArgumentException("No credential responses returned")
+                (credentialResponses.credentialResponses
+                    ?: throw IllegalArgumentException("No credential responses returned")).indices.map {
+                        ProcessedCredentialOffer(
+                            credentialResponses.credentialResponses!![it],
+                            batchCredentialRequest.credentialRequests[it])
+                }
             }
         }
     }
@@ -166,7 +189,7 @@ object IssuanceService {
         entraIssuanceRequest: EntraIssuanceRequest,
         credentialWallet: TestCredentialWallet,
         pin: String? = null,
-    ): List<CredentialResponse> {
+    ): List<ProcessedCredentialOffer> {
         // *) Load key:
 //        val walletKey = getKeyByDid(credentialWallet.did)
         val walletKey = DidService.resolveToKey(credentialWallet.did).getOrThrow()
@@ -199,7 +222,11 @@ object IssuanceService {
                 throw IllegalArgumentException("Could not get Verifiable Credential from response: $responseBody")
             }
         msEntraSendIssuanceCompletionCB(entraIssuanceRequest, EntraIssuanceCompletionCode.issuance_successful)
-        return listOf(CredentialResponse.Companion.success(CredentialFormat.jwt_vc_json, vc))
+        return listOf(ProcessedCredentialOffer(
+            CredentialResponse.Companion.success(CredentialFormat.jwt_vc_json, vc),
+            null,
+            entraIssuanceRequest
+        ))
     }
 
     private suspend fun msEntraSendIssuanceCompletionCB(
@@ -224,15 +251,27 @@ object IssuanceService {
     }
 
     private suspend fun getCredentialData(
-        credentialResp: CredentialResponse, manifest: JsonObject?,
+        processedOffer: ProcessedCredentialOffer, manifest: JsonObject?,
     ) = let {
-        val credential = credentialResp.credential!!.jsonPrimitive.content
-        val credentialJwt = credential.decodeJws(withSignature = true)
-        when (val typ = credentialJwt.header["typ"]?.jsonPrimitive?.content?.lowercase()) {
-            "jwt" -> parseJwtCredentialResponse(credentialJwt, credential, manifest, typ)
-            "vc+sd-jwt" -> parseSdJwtCredentialResponse(credentialJwt, credential, manifest, typ)
-            null -> throw IllegalArgumentException("WalletCredential JWT does not have \"typ\"")
-            else -> throw IllegalArgumentException("Invalid credential \"typ\": $typ")
+        val credential = processedOffer.credentialResponse.credential!!.jsonPrimitive.content
+        if(processedOffer.credentialResponse.format == CredentialFormat.mso_mdoc) {
+            val credentialEncoding = processedOffer.credentialResponse.customParameters["credential_encoding"]?.jsonPrimitive?.content ?: "issuer-signed"
+            val docType = processedOffer.credentialRequest?.docType ?: throw IllegalArgumentException("Credential request has no docType property")
+            when(credentialEncoding) {
+                // TODO: find ID for mdoc
+                "issuer-signed" -> CredentialDataResult(docType, MDoc(docType.toDE(), IssuerSigned.fromMapElement(
+                    Cbor.decodeFromByteArray(credential.base64UrlDecode())
+                ), null).toCBORHex(), type = docType)
+                else -> throw IllegalArgumentException("Invalid credential encoding: $credentialEncoding")
+            }
+        } else {
+            val credentialJwt = credential.decodeJws(withSignature = true)
+            when (val typ = credentialJwt.header["typ"]?.jsonPrimitive?.content?.lowercase()) {
+                "jwt" -> parseJwtCredentialResponse(credentialJwt, credential, manifest, typ)
+                "vc+sd-jwt" -> parseSdJwtCredentialResponse(credentialJwt, credential, manifest, typ)
+                null -> throw IllegalArgumentException("WalletCredential JWT does not have \"typ\"")
+                else -> throw IllegalArgumentException("Invalid credential \"typ\": $typ")
+            }
         }
     }
 
