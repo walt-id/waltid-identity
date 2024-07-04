@@ -429,11 +429,6 @@ val key = JWKKey.importRawPublicKey(KeyType.Ed25519, bytes, JWKKeyMetadata())
 val jwkString = key.exportJWK()
 ```
 
-- pem
-
-```kotlin
-val pemString = key.exportPEM()
-```
 
 - JsonObject
 
