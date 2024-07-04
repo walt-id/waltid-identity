@@ -71,4 +71,12 @@ class WaltIdVPCreateCmdTest {
         assertContains(result.stdout, "--presentation-definition")
         assertContains(result.stdout, "-p")
     }
+
+    @Test
+    fun `should have -po and --presentation-submission-output options displayed`() = runTest {
+        val result = command.test(listOf("--help"))
+
+        assertContains(result.stdout, "--presentation-submission-output")
+        assertContains(result.stdout, "-po")
+    }
 }
