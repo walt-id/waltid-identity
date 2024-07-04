@@ -370,7 +370,7 @@ The library provides the following key entities to work with:
 **Create key**
 
 ```kotlin
-val key = JWKKey.generate(KeyType.Ed25519, JWKKeyMetadata())
+val key = JWKKey.generate(KeyType.Ed25519)
 ```
 
 **Sign**
