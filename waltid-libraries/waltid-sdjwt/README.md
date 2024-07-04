@@ -86,7 +86,7 @@ repositories {
     maven("https://maven.waltid.dev/releases")
 }
 [...]
-val sdJwtVersion = "1.2306071235.0"
+val sdJwtVersion = "<version>"
 [...]
 dependencies {
     implementation("id.walt:waltid-sdjwt-jvm:$sdJwtVersion")
@@ -168,7 +168,9 @@ fun main() {
 
 _Example output_
 
-`eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI0NTYiLCJfc2QiOlsiaGx6ZmpmMDRvNVpzTFIyNWhhNGMtWS05SFcyRFVseGNnaU1ZZDMyNE5nWSJdfQ.2fsLqzujWt0hS0peLS8JLHyyo3D5KCDkNnHcBYqQwVo~WyJ4RFk5VjBtOG43am82ZURIUGtNZ1J3Iiwic3ViIiwiMTIzIl0`
+``` 
+eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI0NTYiLCJfc2QiOlsiaGx6ZmpmMDRvNVpzTFIyNWhhNGMtWS05SFcyRFVseGNnaU1ZZDMyNE5nWSJdfQ.2fsLqzujWt0hS0peLS8JLHyyo3D5KCDkNnHcBYqQwVo~WyJ4RFk5VjBtOG43am82ZURIUGtNZ1J3Iiwic3ViIiwiMTIzIl0
+```
 
 _Parsed JWT body_
 
