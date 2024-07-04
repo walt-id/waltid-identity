@@ -1,8 +1,5 @@
 package id.walt.target.ios.keys
 
-import KeyRepresentation
-import Signing
-import Verification
 import id.walt.platform.utils.ios.DS_Operations
 import id.walt.platform.utils.ios.ECKeyUtils
 import kotlinx.serialization.Serializable

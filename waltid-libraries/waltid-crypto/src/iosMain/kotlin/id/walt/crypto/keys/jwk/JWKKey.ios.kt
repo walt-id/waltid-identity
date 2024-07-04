@@ -4,6 +4,7 @@ import id.walt.crypto.keys.JwkKeyMeta
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.utils.JsonUtils.toJsonObject
+import id.walt.target.ios.keys.Ed25519
 import id.walt.target.ios.keys.P256
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
@@ -36,6 +37,7 @@ actual class JWKKey actual constructor(private val jwk: String?) : Key() {
 
     actual override suspend fun getThumbprint(): String = when (keyType) {
         KeyType.secp256r1 -> P256.PublicKey.fromJwk(jwk!!).thumbprint()
+        KeyType.Ed25519 -> Ed25519.PublicKey.fromJwk(jwk!!).thumbprint()
         else -> error("Not implemented for $keyType")
     }
 
@@ -46,6 +48,7 @@ actual class JWKKey actual constructor(private val jwk: String?) : Key() {
 
     actual override suspend fun exportPEM(): String = when (keyType) {
         KeyType.secp256r1 -> P256.PublicKey.fromJwk(jwk!!).pem()
+        KeyType.Ed25519 -> Ed25519.PublicKey.fromJwk(jwk!!).pem()
         else -> error("Not implemented for $keyType")
     }
 
@@ -74,11 +77,13 @@ actual class JWKKey actual constructor(private val jwk: String?) : Key() {
         signed: ByteArray, detachedPlaintext: ByteArray?
     ): Result<ByteArray> = when (keyType) {
         KeyType.secp256r1 -> P256.PublicKey.fromJwk(jwk!!).verifyRaw(signed, detachedPlaintext!!)
+        KeyType.Ed25519 -> Ed25519.PublicKey.fromJwk(jwk!!).verifyRaw(signed, detachedPlaintext!!)
         else -> error("Not implemented for $keyType")
     }
 
     actual override suspend fun verifyJws(signedJws: String): Result<JsonElement> = when (keyType) {
         KeyType.secp256r1 -> P256.PublicKey.fromJwk(jwk!!).verifyJws(signedJws)
+        KeyType.Ed25519 -> Ed25519.PublicKey.fromJwk(jwk!!).verifyJws(signedJws)
         else -> error("Not implemented for $keyType")
     }
 
@@ -89,6 +94,7 @@ actual class JWKKey actual constructor(private val jwk: String?) : Key() {
 
     actual override suspend fun getPublicKeyRepresentation(): ByteArray = when (keyType) {
         KeyType.secp256r1 -> P256.PublicKey.fromJwk(jwk!!).externalRepresentation()
+        KeyType.Ed25519 -> Ed25519.PublicKey.fromJwk(jwk!!).externalRepresentation()
         else -> error("Not implemented for $keyType")
     }
 

@@ -346,6 +346,10 @@ public class Ed25519KeyUtils: NSObject {
         try privateKey(kid: kid).publicKey.rawRepresentation
     }
     
+    @objc static func privateRawRepresentation(kid: String) throws -> Data {
+        try privateKey(kid: kid).rawRepresentation
+    }
+    
     @objc static func signRaw(kid: String, plain: Data) throws -> Data {
         return try privateKey(kid: kid).signature(for: plain).data()
     }
@@ -353,6 +357,18 @@ public class Ed25519KeyUtils: NSObject {
     @objc static func verifyRaw(kid: String, signature: Data, data: Data) throws -> VerifyResult{
         do {
             guard try privateKey(kid: kid).publicKey.isValidSignature(signature, for: data) else {
+                return .with(isValid: false, data: nil)
+            }
+            
+            return .with(isValid: true, data: data)
+        } catch {
+            return .with(failure: error.localizedDescription)
+        }
+    }
+    
+    @objc static func verifyRaw(publicKeyRaw: Data, signature: Data, data: Data) throws -> VerifyResult{
+        do {
+            guard try Curve25519.Signing.PublicKey(rawRepresentation: publicKeyRaw).isValidSignature(signature, for: data) else {
                 return .with(isValid: false, data: nil)
             }
             
