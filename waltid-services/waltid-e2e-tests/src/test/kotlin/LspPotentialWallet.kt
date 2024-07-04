@@ -1,3 +1,5 @@
+import id.walt.crypto.keys.KeyGenerationRequest
+import id.walt.crypto.keys.KeyType
 import id.walt.oid4vc.data.CredentialOffer
 import id.walt.oid4vc.data.OpenIDProviderMetadata
 import id.walt.webwallet.db.models.WalletDid
@@ -8,6 +10,7 @@ import io.ktor.client.statement.*
 import io.ktor.http.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonObject
+import kotlinx.uuid.UUID
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
 
@@ -35,13 +38,15 @@ class LspPotentialWallet(val client: HttpClient, val walletId: String) {
     assertEquals(issuerMetadata.issuer, resolvedOffer.credentialIssuer)
     assertContains(issuerMetadata.credentialConfigurationsSupported!!.keys, resolvedOffer.credentialConfigurationIds.first())
 
-    // === get wallet DID ===
-    val did = client.get("/wallet-api/wallet/$walletId/dids").expectSuccess().let {
-      it.body<List<WalletDid>>().first().did
-    }
+    // === create EC256 key and DID:JWK (did is not necessarily required, but currently needed for wallet initialization) ===
+    val keysApi = KeysApi(client)
+    lateinit var generatedKeyId: String
+    lateinit var generatedDid: String
+    keysApi.generate(UUID(walletId), KeyGenerationRequest(keyType = KeyType.secp256r1)) { generatedKeyId = it }
+    DidsApi(client).create(UUID(walletId), DidsApi.DidCreateRequest("jwk", keyId = generatedKeyId)) { generatedDid = it }
 
     // === use credential offer request ===
-    client.post("/wallet-api/wallet/$walletId/exchange/useOfferRequest?did=$did") {
+    client.post("/wallet-api/wallet/$walletId/exchange/useOfferRequest?did=$generatedDid") {
       setBody(offerUri)
     }.expectSuccess()
   }

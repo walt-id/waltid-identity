@@ -1,11 +1,19 @@
 package id.walt.webwallet.service.oidc4vc
 
+import COSE.AlgorithmID
+import COSE.OneKey
+import com.nimbusds.jose.jwk.ECKey
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.utils.Base64Utils.base64UrlToBase64
+import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.did.dids.DidService
+import id.walt.did.dids.DidUtils
+import id.walt.mdoc.COSECryptoProviderKeyInfo
+import id.walt.mdoc.SimpleCOSECryptoProvider
+import id.walt.mdoc.dataelement.MapElement
 import id.walt.oid4vc.data.OpenIDProviderMetadata
 import id.walt.oid4vc.data.dif.DescriptorMapping
 import id.walt.oid4vc.data.dif.PresentationDefinition
@@ -91,6 +99,36 @@ class TestCredentialWallet(
         }
 
         //JwtService.getService().sign(payload, keyId)
+    }
+
+    override fun signCWTToken(
+        target: TokenTarget,
+        payload: MapElement,
+        header: MapElement?,
+        keyId: String?,
+        privKey: Key?
+    ): String = runBlocking {
+        fun debugStateMsg() = "(target: $target, payload: $payload, header: $header, keyId: $keyId)"
+
+        val key = privKey ?: keyId?.let {
+            runCatching {
+                if(DidUtils.isDidUrl(keyId))
+                    DidService.resolveToKey(keyId).getOrThrow()
+                else
+                    KeysService.get(keyId)?.let {
+                        KeyManager.resolveSerializedKey(it.document)
+                }
+            }.getOrElse { throw IllegalArgumentException("Could not resolve key to sign token", it) }
+                ?: error("No key was resolved when trying to resolve key to sign token")
+        }
+
+        key ?: throw IllegalArgumentException("No key given or found for given keyId ${debugStateMsg()}")
+
+        val ecKey = ECKey.parseFromPEMEncodedObjects(key.exportPEM()).toECKey()
+        val cryptoProvider = SimpleCOSECryptoProvider(listOf(
+            COSECryptoProviderKeyInfo(key.getKeyId(), AlgorithmID.ECDSA_256, ecKey.toECPublicKey(), ecKey.toECPrivateKey())
+        ))
+        return@runBlocking cryptoProvider.sign1(payload.toCBOR(), header, null, keyId).toCBOR().encodeToBase64Url()
     }
 
     @OptIn(ExperimentalEncodingApi::class)

@@ -9,6 +9,7 @@ import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.did.dids.DidService
+import id.walt.mdoc.dataelement.MapElement
 import id.walt.oid4vc.data.OpenIDProviderMetadata
 import id.walt.oid4vc.data.dif.DescriptorMapping
 import id.walt.oid4vc.data.dif.PresentationDefinition
@@ -108,6 +109,16 @@ class EBSITestWallet(
 
     override fun signToken(target: TokenTarget, payload: JsonObject, header: JsonObject?, keyId: String?, privKey: Key?) =
         SDJwt.sign(SDPayload.createSDPayload(payload, SDMap.Companion.fromJSON("{}")), jwtCryptoProvider, keyId).jwt
+
+    override fun signCWTToken(
+        target: TokenTarget,
+        payload: MapElement,
+        header: MapElement?,
+        keyId: String?,
+        privKey: Key?
+    ): String {
+        TODO("Not yet implemented")
+    }
 
     override fun verifyTokenSignature(target: TokenTarget, token: String) =
         SDJwt.verifyAndParse(token, jwtCryptoProvider).signatureVerified
