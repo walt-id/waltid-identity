@@ -398,7 +398,7 @@ val verificationResult = key.getPublicKey().verifyJws(signature)
 - raw
 
 ```kotlin
-val verificationResult = key.getPublicKey().verifyRaw(signature as ByteArray)
+val verificationResult = key.getPublicKey().verifyRaw(signature , payloadString.encodeToByteArray())
 ```
 
 **Import key**
