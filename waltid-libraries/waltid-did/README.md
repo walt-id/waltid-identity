@@ -60,6 +60,18 @@ The complete class hierarchy can be viewed in the [class diagram](did-lib_class.
 
 ## How to use it
 
+### Local Resolver & Registrar Setup
+This function initializes the DidService instance with the local DID registrars and resolvers.
+```kotlin
+DidService.minimalInit()
+```
+### Standard Setup 
+
+You can leverage the universal registrar and resolver by suing the `init()` method for setup.
+```kotlin
+DidService.init()
+```
+
 ### Register DID
 
 Create the key and register the DID:
