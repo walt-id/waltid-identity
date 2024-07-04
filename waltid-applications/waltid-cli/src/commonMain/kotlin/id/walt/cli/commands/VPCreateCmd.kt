@@ -28,7 +28,7 @@ class VPCreateCmd : CliktCommand(
     val print: PrettyPrinter = PrettyPrinter(this)
 
     private val holderDid: String by option("-hd", "--holder-did")
-        .help("The DID of the verifiable credential's holder.")
+        .help("The DID of the verifiable credential's holder (required).")
         .required()
 
     private val holderSigningKeyFile: File by option("-hk", "--holder-key")
@@ -37,7 +37,7 @@ class VPCreateCmd : CliktCommand(
         .required()
 
     private val verifierDid: String by option("-vd", "--verifier-did")
-        .help("The DID of the verifier for whom the Verifiable Presentation is created.")
+        .help("The DID of the verifier for whom the Verifiable Presentation is created (required).")
         .required()
 
     private val nonce: String by option("-n", "--nonce")
@@ -46,7 +46,7 @@ class VPCreateCmd : CliktCommand(
 
     private val inputVcFileList: List<File> by option("-vc", "--vc-file")
         .file(true, true, false, mustBeReadable = true, canBeSymlink = false)
-        .help("The file path of the verifiable credential. Can be specified multiple times to include more than one vc in the vp (required - at least once).")
+        .help("The file path of the verifiable credential. Can be specified multiple times to include more than one vc in the vp (required - at least one vc file must be provided).")
         .multiple(required = true)
 
     private val vpOutputFilePath by option("-o", "--vp-output")
