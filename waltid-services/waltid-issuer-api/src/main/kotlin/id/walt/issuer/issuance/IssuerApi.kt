@@ -26,7 +26,12 @@ fun createCredentialOfferUri(issuanceRequests: List<IssuanceRequest>): String {
         OidcIssuance.issuanceRequestsToCredentialOfferBuilder(issuanceRequests)
 
     val issuanceSession = OidcApi.initializeCredentialOffer(
-        credentialOfferBuilder = credentialOfferBuilder, expiresIn = 5.minutes, allowPreAuthorized = true
+        credentialOfferBuilder = credentialOfferBuilder,
+        expiresIn = 5.minutes,
+        allowPreAuthorized = when (issuanceRequests[0].authenticationMethod) {
+            "pre_auth" -> true
+            else -> false
+        }
     )
     OidcApi.setIssuanceDataForIssuanceId(issuanceSession.id, issuanceRequests.map {
         val key = KeyManager.resolveSerializedKey(it.issuerKey)
