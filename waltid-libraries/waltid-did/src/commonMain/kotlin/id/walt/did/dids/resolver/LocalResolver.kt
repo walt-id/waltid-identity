@@ -27,7 +27,7 @@ class LocalResolver : DidResolver {
         DidJwkResolver(),
         DidWebResolver(http),
         DidKeyResolver(),
-        DidEbsiResolver()
+        DidEbsiResolver(http)
     ).associateBy { it.method }.toMutableMap()
 
     fun deactivateMethod(method: String) {
