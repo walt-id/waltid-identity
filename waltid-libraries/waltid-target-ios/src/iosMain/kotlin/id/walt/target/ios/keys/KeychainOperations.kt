@@ -14,7 +14,6 @@ import platform.CoreFoundation.kCFTypeDictionaryKeyCallBacks
 import platform.CoreFoundation.kCFTypeDictionaryValueCallBacks
 import platform.Foundation.CFBridgingRelease
 import platform.Foundation.CFBridgingRetain
-import platform.Foundation.NSBundle
 import platform.Foundation.NSData
 import platform.Foundation.NSNumber
 import platform.Security.SecItemDelete
@@ -39,8 +38,7 @@ import platform.Security.kSecPrivateKeyAttrs
 
 internal object KeychainOperations {
 
-    private val appId: String =
-        requireNotNull(NSBundle.mainBundle.bundleIdentifier) { "Bundle identifier could not be retrieved" }
+
 
     private fun deleteFromKeychain(kid: String, keyType: CFStringRef?) {
         cfRetain(kid.toNSData()) { kidCF ->

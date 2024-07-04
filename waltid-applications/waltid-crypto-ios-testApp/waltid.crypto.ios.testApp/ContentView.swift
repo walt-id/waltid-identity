@@ -29,8 +29,13 @@ struct ContentView: View {
     @State var p256Key: waltid_crypto_ios.Key? = nil
     @State var p256KeysignRawResult: Any? = nil
     @State var p256KeysignJwsResult: String? = nil
-    
     @State var p256jwk: String = ""
+    
+    @State var edKey: waltid_crypto_ios.Key? = nil
+    @State var edKeysignRawResult: Any? = nil
+    @State var edKeysignJwsResult: String? = nil
+    @State var edjwk: String = ""
+    
     
     var body: some View {
         ScrollView {
@@ -261,6 +266,231 @@ struct ContentView: View {
                         }
                     }
                 }.disabled(p256jwk.isEmpty || p256KeysignJwsResult?.isEmpty == true)
+                
+            }
+            
+            GroupBox("iOS Keychain Ed25519") {
+                Button("Generate key") {
+                    guard !keyId.isEmpty else {
+                        print("keyid is empty.")
+                        return
+                    }
+                    
+                    do {
+                        _ = try IosKey.companion.create(kid: keyId, type: .ed25519)
+                        edKey = try IosKey.companion.load(kid: keyId, type: .ed25519)
+                    } catch {
+                        print(error)
+                    }
+                }
+                Button("Private Key - Public representation") {
+                    if let edKey {
+                        edKey.getPublicKeyRepresentation { bytes, err in
+                            if let bytes {
+                                print(bytes)
+                            }
+                            
+                            if let err {
+                                print(err)
+                            }
+                        }
+                    }
+                }
+                
+                Button("Public Key - Public representation") {
+                    if let edKey {
+                        edKey.getPublicKey { key, err in
+                            if let err {
+                                return print(err)
+                            }
+                            
+                            if let key {
+                                key.getPublicKeyRepresentation { bytes, err in
+                                    if let bytes {
+                                        print(bytes)
+                                    }
+                                    
+                                    if let err {
+                                        print(err)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                Button("Private Key - Export jwk") {
+                    if let edKey {
+                        edKey.exportJWK(completionHandler: { jwk, err in
+                            if let jwk {
+                                print(jwk)
+                            }
+                            
+                            if let err {
+                                print(err)
+                            }
+                        })
+                    }
+                }
+                
+                Button("Public Key - Export jwk") {
+                    if let edKey {
+                        edKey.getPublicKey { key, err in
+                            if let err {
+                                return print(err)
+                            }
+                            
+                            if let key {
+                                key.exportJWK(completionHandler: { jwk, err in
+                                    if let jwk {
+                                        print(jwk)
+                                        edjwk = jwk
+                                    }
+                                    
+                                    if let err {
+                                        print(err)
+                                    }
+                                })
+                            }
+                        }
+                    }
+                }
+                
+                Button("Private Key - Export jwk object") {
+                    if let edKey {
+                        edKey.exportJWKObject { jwk, err in
+                            if let jwk {
+                                print(jwk)
+                            }
+                            
+                            if let err {
+                                print(err)
+                            }
+                        }
+                    }
+                }
+                
+                Button("Private Key - Export pem") {
+                    if let edKey {
+                        edKey.exportPEM { pem, err in
+                            if let pem {
+                                print(pem)
+                            }
+                            
+                            if let err {
+                                print(err)
+                            }
+                        }
+                    }
+                }
+                
+                Button("Public Key - Export pem") {
+                    if let edKey {
+                        
+                        edKey.getPublicKey { key, err in
+                            if let err {
+                                return print(err)
+                            }
+                            
+                            if let key {
+                                key.exportPEM { pem, err in
+                                    if let pem {
+                                        print(pem)
+                                    }
+                                    
+                                    if let err {
+                                        print(err)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                Button("Private Key - Sign raw") {
+                    if let edKey {
+                        edKey.signRaw(plaintext: inputByteArray) { sig, err in
+                            if let sig {
+                                print(sig)
+                                edKeysignRawResult = sig
+                            }
+                            
+                            if let err {
+                                print(err)
+                            }
+                        }
+                    }
+                }
+                
+                Button("Public Key - Verify raw") {
+                    if let edKey, let edKeysignRawResult {
+                        edKey.verifyRaw(signed: edKeysignRawResult as! KotlinByteArray, detachedPlaintext: inputByteArray) { result, err in
+                            if let result {
+                                print(result)
+                            }
+                            
+                            if let err {
+                                print(err)
+                            }
+                        }
+                    }
+                }
+                
+                
+                Button("Private Key - Sign jws") {
+                    if let edKey {
+                        edKey.signJws(plaintext: inputByteArray, headers:["alg":"EdDSA","crv":"Ed25519"]) { sig, err in
+                            if let sig {
+                                print(sig)
+                                edKeysignJwsResult = sig
+                            }
+                            
+                            if let err {
+                                print(err)
+                            }
+                        }
+                    }
+                }
+                
+                Button("Public Key - Verify jws") {
+                    if let edKey, let edKeysignJwsResult {
+                        edKey.verifyJws(signedJws: edKeysignJwsResult) { result, err in
+                            if let result {
+                                print(result)
+                            }
+                            
+                            if let err {
+                                print(err)
+                            }
+                        }
+                    }
+                }
+            }
+            
+            GroupBox("JWK Ed25519") {
+                TextField("JWK", text: $edjwk)
+                Button("Public Key - Export pem") {
+                    JWKKey(jwk: edjwk).exportPEM { result, err in
+                        if let result {
+                            print(result)
+                        }
+                        
+                        if let err {
+                            print(err)
+                        }
+                    }
+                }.disabled(edjwk.isEmpty)
+                
+                Button("Public Key - Verify jws") {
+                    JWKKey(jwk: edjwk).verifyJws(signedJws: edKeysignJwsResult!) { result, err in
+                        if let result {
+                            print(result)
+                        }
+                        
+                        if let err {
+                            print(err)
+                        }
+                    }
+                }.disabled(edjwk.isEmpty || edKeysignJwsResult?.isEmpty == true)
                 
             }
         }.padding()
