@@ -10,6 +10,7 @@ import id.walt.oid4vc.interfaces.ITokenProvider
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.requests.TokenRequest
 import id.walt.oid4vc.responses.*
+import id.walt.oid4vc.util.randomUUID
 import io.ktor.http.*
 import kotlinx.datetime.Clock
 import kotlinx.serialization.json.JsonObject
@@ -161,7 +162,7 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
             )
         val authorizationSession = getOrInitAuthorizationSession(authorizationRequest)
         val code = generateAuthorizationCodeFor(authorizationSession)
-        return AuthorizationCodeResponse.success(code)
+        return AuthorizationCodeResponse.success(code,  mapOf("state" to listOf(authorizationRequest.state ?: randomUUID())))
     }
 
     open fun processDirectPost(state: String, tokenPayload: JsonObject) : AuthorizationCodeResponse {

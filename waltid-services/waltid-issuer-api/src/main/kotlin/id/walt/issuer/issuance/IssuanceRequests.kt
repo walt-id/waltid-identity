@@ -15,6 +15,9 @@ data class IssuanceRequest(
     val credentialData: W3CVC,
     val mapping: JsonObject? = null,
     val selectiveDisclosure: SDMap? = null,
+    val authenticationMethod: String? = null, // "pwd" OR "id_token" OR "vp_token" OR "pre_auth"
+    val dynamicCredentialRequestValue: String? = null,
+    val useJar: Boolean? = null,
 )
 
 @Serializable
