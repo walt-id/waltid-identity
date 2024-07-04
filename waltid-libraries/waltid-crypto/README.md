@@ -360,11 +360,11 @@ walt.id identity.
 
 The library provides the following key entities to work with:
 
-- [JWKKey](https://github.com/walt-id/waltid-identity/blob/main/waltid-libraries/waltid-crypto/src/commonMain/kotlin/id/walt/crypto/keys/JWKKey.kt) -
+- [JWKKey](https://github.com/walt-id/waltid-identity/blob/main/waltid-libraries/waltid-crypto/src/commonMain/kotlin/id/walt/crypto/keys/jwk/JWKKey.kt) -
   an implementation of a local (in-memory) key (private / public)
-- [TSEKey](https://github.com/walt-id/waltid-identity/blob/main/waltid-libraries/waltid-crypto/src/commonMain/kotlin/id/walt/crypto/keys/TSEKey.kt) -
+- [TSEKey](https://github.com/walt-id/waltid-identity/blob/main/waltid-libraries/waltid-crypto/src/commonMain/kotlin/id/walt/crypto/keys/tse/TSEKey.kt) -
   an implementation of a Hashicorp Vault Transit Secrets Engine key (private / public)
-
+- [OCIKey](https://github.com/walt-id/waltid-identity/blob/main/waltid-libraries/waltid-crypto/src/commonMain/kotlin/id/walt/crypto/keys/oci/OCIKeyRestApi.kt) - an implementation of an OCI key (private / public)
 ### Working with JWKKey
 
 **Create key**
