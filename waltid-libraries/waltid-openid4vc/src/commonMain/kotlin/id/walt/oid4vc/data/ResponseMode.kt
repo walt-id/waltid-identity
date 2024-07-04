@@ -1,7 +1,9 @@
 package id.walt.oid4vc.data
 
 import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
+@Serializable
 enum class ResponseMode {
     query,
     fragment,
