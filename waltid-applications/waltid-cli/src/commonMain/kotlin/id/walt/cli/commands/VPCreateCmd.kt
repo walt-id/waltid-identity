@@ -9,6 +9,7 @@ import com.github.ajalt.mordant.terminal.YesNoPrompt
 import id.walt.cli.models.Credential
 import id.walt.cli.presexch.MatchPresentationDefinitionCredentialsUseCase
 import id.walt.cli.presexch.PresentationDefinitionFilterParser
+import id.walt.cli.presexch.PresentationSubmissionBuilder
 import id.walt.cli.presexch.strategies.DescriptorPresentationDefinitionMatchStrategy
 import id.walt.cli.presexch.strategies.FilterPresentationDefinitionMatchStrategy
 import id.walt.cli.util.KeyUtil
@@ -20,8 +21,7 @@ import id.walt.did.dids.DidService
 import id.walt.did.utils.randomUUID
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.*
 import java.io.File
 import kotlin.io.path.absolutePathString
 import kotlin.io.path.exists
@@ -73,6 +73,11 @@ class VPCreateCmd : CliktCommand(
         .help("File path to save the created vp (required).")
         .required()
 
+    private val presentationSubmissionOutputFilePath by option("-po", "--presentation-submission-output")
+        .path()
+        .help("File path to save the created vp (required).")
+        .required()
+
 
     override fun run() {
         initCmd()
@@ -82,7 +87,16 @@ class VPCreateCmd : CliktCommand(
                 terminal
             ).ask() == false
         ) {
-            print.plain("Will not overwrite output file.")
+            print.plain("Will not overwrite VP output file.")
+            return
+        }
+
+        if (presentationSubmissionOutputFilePath.exists() && YesNoPrompt(
+                "The file \"${presentationSubmissionOutputFilePath.absolutePathString()}\" already exists, do you want to overwrite it?",
+                terminal
+            ).ask() == false
+        ) {
+            print.plain("Will not overwrite presentation submission output file.")
             return
         }
 
@@ -98,9 +112,17 @@ class VPCreateCmd : CliktCommand(
 
         val vpToken = createVpToken(cmdParams, qualifiedVcList)
 
+        val presentationSubmission = PresentationSubmissionBuilder(
+            cmdParams.presentationDefinition,
+            qualifiedVcList,
+        ).buildToString()
+
         vpOutputFilePath.writeText(vpToken)
-        print.greenb("Done. ", linebreak = false)
+        presentationSubmissionOutputFilePath.writeText(presentationSubmission)
+
+        print.greenb("Done.")
         print.plain("VP saved at file \"${vpOutputFilePath.absolutePathString()}\".")
+        print.plain("Presentation Submission saved at file \"${presentationSubmissionOutputFilePath.absolutePathString()}\".")
     }
 
     private fun initCmd() = runBlocking {
