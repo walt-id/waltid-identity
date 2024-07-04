@@ -6,11 +6,13 @@ import id.walt.oid4vc.data.CredentialOffer
 import id.walt.oid4vc.requests.CredentialOfferRequest
 import kotlin.test.Test
 import kotlin.time.Duration.Companion.minutes
+import kotlinx.coroutines.test.runTest
+import kotlin.test.assertEquals
 
 class OidcTest {
 
     @Test
-    fun testInitCredentialOffer() {
+    fun testInitCredentialOffer() = runTest {
         ConfigManager.testWithConfigs(testConfigs)
         val ciTestProvider = CIProvider()
 
@@ -24,6 +26,7 @@ class OidcTest {
         val offerRequest = CredentialOfferRequest(issuanceSession.credentialOffer!!)
         val offerUri = ciTestProvider.getCredentialOfferRequestUrl(offerRequest)
         println("Offer URI: $offerUri")
+        assertEquals(true, offerUri.contains("openid-credential-offer"))
     }
 
     /*

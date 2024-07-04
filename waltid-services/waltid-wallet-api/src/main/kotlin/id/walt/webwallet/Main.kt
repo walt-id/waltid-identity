@@ -13,9 +13,8 @@ import id.walt.webwallet.web.Administration.configureAdministration
 import id.walt.webwallet.web.controllers.*
 import id.walt.webwallet.web.controllers.NotificationController.notifications
 import id.walt.webwallet.web.controllers.PushController.push
-import id.walt.webwallet.web.plugins.configureHTTP
-import id.walt.webwallet.web.plugins.configureMonitoring
-import id.walt.webwallet.web.plugins.configureRouting
+import id.walt.webwallet.web.plugins.*
+import id.walt.webwallet.web.plugins.walletAuthenticationPluginAmendment
 import id.walt.webwallet.web.plugins.walletOpenApiPluginAmendment
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.server.application.*
@@ -29,7 +28,8 @@ suspend fun main(args: Array<String>) {
         ServiceConfiguration("wallet"), ServiceInitialization(
             features = FeatureCatalog,
             featureAmendments = mapOf(
-                CommonsFeatureCatalog.openApiFeature to walletOpenApiPluginAmendment
+                CommonsFeatureCatalog.openApiFeature to walletOpenApiPluginAmendment,
+                CommonsFeatureCatalog.authenticationServiceFeature to walletAuthenticationPluginAmendment
             ),
             init = {
                 webWalletSetup()

@@ -4,9 +4,7 @@ import id.walt.commons.config.ConfigManager
 import id.walt.commons.config.list.WebConfig
 import id.walt.commons.featureflag.CommonsFeatureCatalog
 import id.walt.commons.featureflag.FeatureManager.whenFeature
-import id.walt.commons.web.modules.FeatureFlagInformationModule
-import id.walt.commons.web.modules.OpenApiModule
-import id.walt.commons.web.modules.ServiceHealthChecksDebugModule
+import id.walt.commons.web.modules.*
 import id.walt.commons.web.plugins.configureSerialization
 import id.walt.commons.web.plugins.configureStatusPages
 import io.klogging.logger
@@ -23,6 +21,7 @@ data class WebService(
         { FeatureFlagInformationModule.run { enable() } } whenFeature CommonsFeatureCatalog.featureFlagInformationEndpointFeature
         { ServiceHealthChecksDebugModule.run { enable() } } whenFeature CommonsFeatureCatalog.healthChecksFeature
         { OpenApiModule.run { enable() } } whenFeature CommonsFeatureCatalog.openApiFeature
+        { AuthenticationServiceModule.run { enable() } } whenFeature CommonsFeatureCatalog.authenticationServiceFeature
 
         configureStatusPages()
         configureSerialization()
