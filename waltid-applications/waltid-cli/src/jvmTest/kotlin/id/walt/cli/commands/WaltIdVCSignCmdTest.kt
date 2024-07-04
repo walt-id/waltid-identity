@@ -56,7 +56,7 @@ class WaltIdVCSignCmdTest {
     fun `should accept one positional argument after --options`() {
         val result = command.test(listOf("--help"))
 
-        assertContains(result.stdout, "the verifiable credential file")
+        assertContains(result.stdout, "The verifiable credential file (required).")
     }
 
     @Test
@@ -109,12 +109,8 @@ class WaltIdVCSignCmdTest {
             command.parse(arrayOf("-k", invalidKeyFilePath, "-i", issuerDid, "-s", subjectDid, vcFilePath))
         }
 
-        //unix: No such file or directory
-        //winos: The system cannot find the file specified
-        val fileNotFoundMessage = "The system cannot find the file specified".takeIf {
-            System.getProperty("os.name").contains(Regex("^windows", setOf(RegexOption.IGNORE_CASE)))
-        } ?: "No such file or directory"
-        failure.message?.let { assertContains(it, "$invalidKeyFilePath ($fileNotFoundMessage)") }
+        val fileNotFoundMessage = "file \"$invalidKeyFilePath\" does not exist."
+        failure.message?.let { assertContains(it, fileNotFoundMessage) }
     }
 
     @Test

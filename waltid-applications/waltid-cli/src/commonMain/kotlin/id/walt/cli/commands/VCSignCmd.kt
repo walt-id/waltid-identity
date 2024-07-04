@@ -25,18 +25,19 @@ class VCSignCmd : CliktCommand(
     val print: PrettyPrinter = PrettyPrinter(this)
 
     private val keyFile by option("-k", "--key")
-        .help("Key to be used to sign the credential (required)")
-        .file()
+        .help("Key to be used to sign the credential, i.e., the issuer's signing key (required).")
+        .file(mustExist = true, canBeDir = false, canBeSymlink = false, mustBeReadable = true)
         .required()
 
     private val issuerDid by option("-i", "--issuer")
-        .help("The verifiable credential's issuer DID")
+        .help("The DID of the verifiable credential's issuer. If not specified, a default will be generated based on the did:key method.")
 
     private val subjectDid by option("-s", "--subject")
-        .help("The verifiable credential's subject DID (required)")
+        .help("The DID of the verifiable credential's subject, i.e., the to-be holder of the credential (required).")
         .required()
 
-    private val vc: File by argument(help = "the verifiable credential file (required").file()
+    private val vc: File by argument(help = "The verifiable credential file (required).")
+        .file(mustExist = true, canBeDir = false, canBeSymlink = false, mustBeReadable = true)
 
     private val overwrite by option("--overwrite", "-o")
         .help("Flag to overwrite the signed output file if it exists")
