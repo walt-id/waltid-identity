@@ -1,12 +1,14 @@
 package id.walt.verifier
 
 import io.github.smiley4.ktorswaggerui.dsl.routes.ValueExampleDescriptorDsl
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 
 object VerifierApiExamples {
 
     //todo: remove line when ktor-swagger-ui#107 is fixed
     private fun jsonObjectValueExampleDescriptorDsl(content: String): ValueExampleDescriptorDsl.() -> Unit = {
-        value = content
+        value = Json.decodeFromString<JsonObject>(content)
     }
 
     // Minimal call, default policies will be used, PresentationDefinition is generated based on credentials requested in `request_credentials`:
