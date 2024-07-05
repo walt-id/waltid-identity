@@ -1,10 +1,11 @@
 package id.walt.issuer.issuance
 
+import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyType
+import id.walt.crypto.utils.JsonUtils.toJsonElement
 import io.github.smiley4.ktorswaggerui.dsl.routes.ValueExampleDescriptorDsl
 import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.*
 
 object IssuanceExamples {
     // language=json
@@ -181,6 +182,25 @@ object IssuanceExamples {
        }
         """.trimIndent()
 
+    //language=json
+    private fun onboardingRequestWithKey(key: KeyType) = """
+        {
+            "key":
+            {
+                "backend": "jwk",
+                "keyType": "${key.name}"
+            },
+            "did":
+            {
+                "method": "jwk"
+            }
+        }
+    """.trimIndent()
+
+    val jwkKeyExample: ValueExampleDescriptorDsl.() -> Unit = {
+        value = issuerKey
+    }
+
     val universityDegreeCredential: ValueExampleDescriptorDsl.() -> Unit = {
         value = universityDegreeCredentialJson
     }
@@ -300,19 +320,6 @@ object IssuanceExamples {
         }
     """.trimIndent()
     }
-
-    private fun onboardingRequestWithKey(key: KeyType) =
-        Json { encodeDefaults = true }.encodeToString( // todo: remove line when ktor-swagger-ui#107 is fixed
-            OnboardingRequest(
-                key = mapOf(
-                    "backend" to "jwk",
-                    "keyType" to key.name
-                ),
-                did = mapOf(
-                    "method" to "jwk"
-                )
-            )
-        ) // todo: remove line when ktor-swagger-ui#107 is fixed
 
     val issuerOnboardingRequestDefaultEd25519Example: ValueExampleDescriptorDsl.() -> Unit = {
         value = onboardingRequestWithKey(KeyType.Ed25519)
