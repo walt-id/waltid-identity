@@ -24,6 +24,7 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.serializer
 import kotlin.reflect.KType
@@ -71,7 +72,7 @@ object OpenApiModule {
                 encoder { type, example ->
                     if (type is KTypeDescriptor) {
                         println("Example for: ${type.type}; example is: $example (${example!!::class.simpleName})")
-                        Json.encodeToString(Json.serializersModule.serializer(type.type), example)
+                        encodeSwaggerExample(type, example)
                     } else {
                         println("Example not; as type is: $type")
                         example
@@ -158,3 +159,10 @@ object OpenApiModule {
 
 private fun Instant.roundToSecond(): Instant =
     minus(nanosecondsOfSecond.nanoseconds)
+
+private fun encodeSwaggerExample(descriptor: KTypeDescriptor, example: Any?) = when (descriptor.type) {
+//     still returns json with type,e.g. {"content": "OpenBadgeCredential", "type": "String"}
+//    typeOf<JsonObject>() -> Json.decodeFromString<JsonObject>(example.toString())
+//    else -> Json.encodeToString(Json.serializersModule.serializer(descriptor.type), example)
+    else -> example
+}
