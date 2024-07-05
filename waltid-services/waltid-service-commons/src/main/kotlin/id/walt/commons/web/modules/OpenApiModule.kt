@@ -163,6 +163,8 @@ private fun Instant.roundToSecond(): Instant =
 private fun encodeSwaggerExample(descriptor: KTypeDescriptor, example: Any?) = when (descriptor.type) {
 //     still returns json with type,e.g. {"content": "OpenBadgeCredential", "type": "String"}
 //    typeOf<JsonObject>() -> Json.decodeFromString<JsonObject>(example.toString())
-//    else -> Json.encodeToString(Json.serializersModule.serializer(descriptor.type), example)
-    else -> example
+    else -> Json {
+        encodeDefaults = true
+        explicitNulls = false
+    }.encodeToString(Json.serializersModule.serializer(descriptor.type), example)
 }
