@@ -3,8 +3,8 @@ package id.walt.issuer.issuance
 import id.walt.credentials.vc.vcs.W3CVC
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeySerialization
-import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.did.dids.DidService
+import id.walt.issuer.issuance.IssuanceExamples.jwkKeyExample
 import id.walt.oid4vc.definitions.CROSS_DEVICE_CREDENTIAL_OFFER_URL
 import id.walt.oid4vc.requests.CredentialOfferRequest
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -368,11 +368,7 @@ fun Application.issuerApi() {
                             headerParameter<String>("walt-key") {
                                 description =
                                     "Supply a  key representation to use to issue the credential, " + "e.g. a local key (internal JWK) or a TSE key."
-                                example("JWK example") {
-                                    value = mapOf(
-                                        "type" to "jwk", "jwk" to "{ ... }"
-                                    )
-                                }
+                                example("JWK example", jwkKeyExample)
                                 required = false
                             }
                         }
