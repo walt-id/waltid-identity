@@ -1,8 +1,6 @@
 package id.walt.verifier
 
 import io.github.smiley4.ktorswaggerui.dsl.routes.ValueExampleDescriptorDsl
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
 
 object VerifierApiExamples {
 
