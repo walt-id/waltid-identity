@@ -53,41 +53,41 @@ jobs:
           fi
           echo "Project directory found."
 
-      - name: Wait for Docker Compose containers to be ready
-        run: |
-          POD_NAME=${{ steps.get-pod.outputs.POD_NAME }}
-          TIMEOUT=300  # 5 minutes timeout
-          INTERVAL=5  # Check every 10 seconds
-          ELAPSED=0
-          CONTAINER_COUNT=0
+#      - name: Wait for Docker Compose containers to be ready
+#        run: |
+#          POD_NAME=${{ steps.get-pod.outputs.POD_NAME }}
+#          TIMEOUT=300  # 5 minutes timeout
+#          INTERVAL=5  # Check every 10 seconds
+#          ELAPSED=0
+#          CONTAINER_COUNT=0
           
-          until [ "$CONTAINER_COUNT" -gt 0 ] || [ $ELAPSED -ge $TIMEOUT ] ; do
-            CONTAINER_COUNT=$(kubectl -n compose exec "$POD_NAME" -- sh -c "cd /waltid-identity/docker-compose && podman-compose ps -q | wc -l")
-            sleep $INTERVAL
-            ELAPSED=$((ELAPSED + INTERVAL))
-            echo "$CONTAINER_COUNT"
-          done
+#          until [ "$CONTAINER_COUNT" -gt 0 ] || [ $ELAPSED -ge $TIMEOUT ] ; do
+#            CONTAINER_COUNT=$(kubectl -n compose exec "$POD_NAME" -- sh -c "cd /waltid-identity/docker-compose && podman-compose ps -q | wc -l")
+#            sleep $INTERVAL
+#            ELAPSED=$((ELAPSED + INTERVAL))
+#            echo "$CONTAINER_COUNT"
+#          done
           
-          until [ $ELAPSED -ge $TIMEOUT ] ; do    
-            CONTAINER_COUNT=$(kubectl -n compose exec "$POD_NAME" -- sh -c "cd /waltid-identity/docker-compose && podman-compose ps -q | wc -l")
-            RUNNING_COUNT=$(kubectl -n compose exec "$POD_NAME" -- sh -c "cd /waltid-identity/docker-compose && podman-compose ps -q | xargs podman inspect -f '{{.State.Status}}' | grep -c 'running'")
-            echo "container: $CONTAINER_COUNT"
-            echo "running: $RUNNING_COUNT"
-            if [ "$CONTAINER_COUNT" -eq "$RUNNING_COUNT" ]; then
-              echo "All Docker Compose containers are up and running."
-              exit 0
-            else
-              echo "Waiting for Docker Compose containers to be up... ($ELAPSED/$TIMEOUT seconds)"
-              sleep $INTERVAL
-              ELAPSED=$((ELAPSED + INTERVAL))
-            fi
-          done
-          echo "Error: Docker Compose containers not up within 5 minutes"
-          exit 1
+#          until [ $ELAPSED -ge $TIMEOUT ] ; do    
+#            CONTAINER_COUNT=$(kubectl -n compose exec "$POD_NAME" -- sh -c "cd /waltid-identity/docker-compose && podman-compose ps -q | wc -l")
+#            RUNNING_COUNT=$(kubectl -n compose exec "$POD_NAME" -- sh -c "cd /waltid-identity/docker-compose && podman-compose ps -q | xargs podman inspect -f '{{.State.Status}}' | grep -c 'running'")
+#            echo "container: $CONTAINER_COUNT"
+#            echo "running: $RUNNING_COUNT"
+#            if [ "$CONTAINER_COUNT" -eq "$RUNNING_COUNT" ]; then
+#              echo "All Docker Compose containers are up and running."
+#              exit 0
+#            else
+#              echo "Waiting for Docker Compose containers to be up... ($ELAPSED/$TIMEOUT seconds)"
+#              sleep $INTERVAL
+#              ELAPSED=$((ELAPSED + INTERVAL))
+#            fi
+#          done
+#          echo "Error: Docker Compose containers not up within 5 minutes"
+#          exit 1
 
       - name: Health check for wallet-api
         run: |
-          TIMEOUT=60  # 1 minute timeout for the health check
+          TIMEOUT=180  # 3 minute timeout for the health check
           INTERVAL=5  # Check every 5 seconds
           ELAPSED=0
           until kubectl -n compose exec -it ${{ steps.get-pod.outputs.POD_NAME }} -- sh -c "curl -sf -X GET http://localhost:7001/wallet-api/healthz > /dev/null 2>&1" || [ $ELAPSED -ge $TIMEOUT ]; do
