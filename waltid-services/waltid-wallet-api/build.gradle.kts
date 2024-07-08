@@ -104,7 +104,7 @@ dependencies {
 
     // UUID
     implementation("app.softwork:kotlinx-uuid-core:0.0.25")
-    implementation("app.softwork:kotlinx-uuid-exposed:0.0.25")
+    implementation("app.softwork:kotlinx-uuid-exposed:0.0.26")
 
     /* -- Security -- */
     // Bouncy Castle
