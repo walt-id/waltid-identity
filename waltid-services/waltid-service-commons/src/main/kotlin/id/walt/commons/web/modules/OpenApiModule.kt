@@ -29,7 +29,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.serializer
 import kotlin.reflect.KType
 import kotlin.reflect.full.isSubtypeOf
-import kotlin.reflect.full.starProjectedType
+import kotlin.reflect.typeOf
 import kotlin.time.Duration.Companion.nanoseconds
 
 object OpenApiModule {
@@ -74,19 +74,8 @@ object OpenApiModule {
                 }
 
                 encoder { type, example ->
-                    val skippedTypes = listOf(String::class)
-                        .map { it.starProjectedType }
-                    val skippedSubTypes = listOf(Enum::class)
-                        .map { it.starProjectedType }
-
                     if (type is KTypeDescriptor) {
-                        if (type.type in skippedTypes || skippedSubTypes.any { type.type.isSubtypeOf(it) }) {
-                            logger.trace { "Skipped encoding for type: ${type.type}; example is: $example (${example!!::class.simpleName})" }
-                            example
-                        } else {
-                            logger.trace("Example for: ${type.type}; example is: $example (${example!!::class.simpleName})")
-                            encodeSwaggerExample(type, example)
-                        }
+                        encodeSwaggerExample(type, example)
                     } else {
                         logger.trace { "No type descriptor for example, type is: $type" }
                         example
@@ -169,16 +158,20 @@ object OpenApiModule {
             }
         }
     }
+    private val skippedTypes = listOf(typeOf<String>(), typeOf<Enum<*>>())
+    private fun encodeSwaggerExample(descriptor: KTypeDescriptor, example: Any?) = when {
+        skippedTypes.any { descriptor.type.isSubtypeOf(it) } -> {
+            logger.trace { "Skipped encoding for type: ${descriptor.type}; example is: $example (${example!!::class.simpleName})" }
+            example
+        }
+        else -> {
+            logger.trace("Example for: ${descriptor.type}; example is: $example (${example!!::class.simpleName})")
+            Json.encodeToString(Json.serializersModule.serializer(descriptor.type), example)
+        }
+    }
 }
 
 private fun Instant.roundToSecond(): Instant =
     minus(nanosecondsOfSecond.nanoseconds)
 
-private fun encodeSwaggerExample(descriptor: KTypeDescriptor, example: Any?) = when (descriptor.type) {
-//     still returns json with type,e.g. {"content": "OpenBadgeCredential", "type": "String"}
-//    typeOf<JsonObject>() -> Json.decodeFromString<JsonObject>(example.toString())
-    else -> Json {
-        encodeDefaults = true
-        explicitNulls = false
-    }.encodeToString(Json.serializersModule.serializer(descriptor.type), example)
-}
+
