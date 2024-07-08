@@ -5,7 +5,7 @@ import id.walt.oid4vc.data.HTTPDataObjectFactory
 import id.walt.oid4vc.data.ResponseMode
 
 // Naming :/
-data class AuthorizationCodeIDTokenRequestResponse private constructor(
+data class AuthorizationCodeWithAuthorizationRequestResponse private constructor(
     val state: String?,
     val clientId: String?,
     val redirectUri: String?,
@@ -33,10 +33,10 @@ data class AuthorizationCodeIDTokenRequestResponse private constructor(
         }
     }
 
-    companion object : HTTPDataObjectFactory<AuthorizationCodeIDTokenRequestResponse>() {
+    companion object : HTTPDataObjectFactory<AuthorizationCodeWithAuthorizationRequestResponse>() {
         private val knownKeys = setOf("code", "error", "error_description")
-        override fun fromHttpParameters(parameters: Map<String, List<String>>): AuthorizationCodeIDTokenRequestResponse {
-            return AuthorizationCodeIDTokenRequestResponse(
+        override fun fromHttpParameters(parameters: Map<String, List<String>>): AuthorizationCodeWithAuthorizationRequestResponse {
+            return AuthorizationCodeWithAuthorizationRequestResponse(
                 parameters["state"]?.firstOrNull(),
                 parameters["client_id"]?.firstOrNull(),
                 parameters["redirect_uri"]?.firstOrNull(),
@@ -50,8 +50,7 @@ data class AuthorizationCodeIDTokenRequestResponse private constructor(
             )
         }
 
-        fun success(state: String, clientId: String, redirectUri: String, responseType: String,  responseMode: ResponseMode, scope: Set<String>, nonce: String, requestUri: String? ,  request: String?, customParameters:Map<String, List<String>> = mapOf()) =
-            AuthorizationCodeIDTokenRequestResponse(state, clientId, redirectUri, responseType,  responseMode, scope, nonce, requestUri, request, customParameters)
-
+        fun success(state: String, clientId: String, redirectUri: String, responseType: String,  responseMode: ResponseMode, scope: Set<String>, nonce: String, requestUri: String?, request: String?, customParameters:Map<String, List<String>> = mapOf()) =
+            AuthorizationCodeWithAuthorizationRequestResponse(state, clientId, redirectUri, responseType,  responseMode, scope, nonce, requestUri, request, customParameters)
     }
 }

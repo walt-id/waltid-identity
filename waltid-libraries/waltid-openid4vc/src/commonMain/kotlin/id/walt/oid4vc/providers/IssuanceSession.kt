@@ -11,7 +11,7 @@ data class IssuanceSession(
     override val expirationTimestamp: Instant,
     val txCode: TxCode? = null,
     val txCodeValue: String? = null,
-    override val idTokenRequestState: String?  = null,
+    override val authServerState: String?  = null, //the state used for additional authentication with pwd, id_token or vp_token.
     val credentialOffer: CredentialOffer? = null,
     val cNonce: String? = null,
     val customParameters: Map<String, Any>? = null,

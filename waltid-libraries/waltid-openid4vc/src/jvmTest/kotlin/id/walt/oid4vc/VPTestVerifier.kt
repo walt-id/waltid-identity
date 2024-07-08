@@ -37,7 +37,7 @@ class VPTestVerifier : OpenIDCredentialVerifier(
     override fun putSession(id: String, session: PresentationSession): PresentationSession? =
         sessionCache.put(id, session)
 
-    override fun getSessionByIdTokenRequestState(idTokenRequestState: String): PresentationSession? {
+    override fun getSessionByAuthServerState(authServerState: String): PresentationSession? {
         TODO("Not yet implemented")
     }
 

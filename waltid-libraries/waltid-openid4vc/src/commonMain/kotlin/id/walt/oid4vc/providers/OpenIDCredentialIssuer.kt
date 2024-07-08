@@ -72,7 +72,7 @@ abstract class OpenIDCredentialIssuer(
     override fun initializeAuthorization(
         authorizationRequest: AuthorizationRequest,
         expiresIn: Duration,
-        idTokenRequestState: String?,
+        authServerState: String?, //the state used for additional authentication with pwd, id_token or vp_token.
     ): IssuanceSession {
         return if (authorizationRequest.issuerState.isNullOrEmpty()) {
             if (!validateAuthorizationRequest(authorizationRequest)) {
@@ -83,7 +83,7 @@ abstract class OpenIDCredentialIssuer(
             }
             IssuanceSession(
                 randomUUID(), authorizationRequest,
-                Clock.System.now().plus(expiresIn), idTokenRequestState = idTokenRequestState
+                Clock.System.now().plus(expiresIn), authServerState = authServerState
             )
         } else {
             getVerifiedSession(authorizationRequest.issuerState)?.copy(authorizationRequest = authorizationRequest)
@@ -96,7 +96,7 @@ abstract class OpenIDCredentialIssuer(
                 id = it.id,
                 authorizationRequest = authorizationRequest,
                 expirationTimestamp = Clock.System.now().plus(5.minutes),
-                idTokenRequestState = idTokenRequestState,
+                authServerState = authServerState,
                 txCode = it.txCode,
                 txCodeValue = it.txCodeValue,
                 credentialOffer = it.credentialOffer,
