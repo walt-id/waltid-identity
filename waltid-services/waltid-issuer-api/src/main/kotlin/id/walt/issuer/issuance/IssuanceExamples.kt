@@ -1,13 +1,19 @@
 package id.walt.issuer.issuance
 
+import id.walt.credentials.vc.vcs.W3CVC
+import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyType
+import id.walt.crypto.utils.JsonUtils.toJsonObject
+import id.walt.sdjwt.SDField
+import id.walt.sdjwt.SDMap
 import io.github.smiley4.ktorswaggerui.dsl.routes.ValueExampleDescriptorDsl
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 
 object IssuanceExamples {
-    // language=json
-    private val openBadgeCredentialData = """
+    val openBadgeCredentialData = W3CVC.fromJson(
+        // language=json
+        """
         {
             "@context": [
               "https://www.w3.org/2018/credentials/v1",
@@ -54,9 +60,11 @@ object IssuanceExamples {
             }
           }
     """.trimIndent()
+    )
 
-    // language=json
-    private val universityDegreeCredentialData = """
+    private val universityDegreeCredentialData = W3CVC.fromJson(
+        // language=json
+        """
         {
             "@context": [
               "https://www.w3.org/2018/credentials/v1",
@@ -80,9 +88,11 @@ object IssuanceExamples {
             }
           }
     """.trimIndent()
+    )
 
-    //language=json
-    private val bankIdCredentialData = """
+    private val bankIdCredentialData = W3CVC.fromJson(
+        //language=json
+        """
         {
              "@context":[
                 "https://www.w3.org/2018/credentials/v1"
@@ -116,9 +126,11 @@ object IssuanceExamples {
              "issuanceDate":"2021-08-31T00:00:00Z"
           }
     """.trimIndent()
+    )
 
     //language=json
-    private val issuerKey = """
+    private val issuerKey = Json.parseToJsonElement(
+        """
         {
             "type": "jwk",
             "jwk": {
@@ -130,10 +142,13 @@ object IssuanceExamples {
             }
           }
     """.trimIndent()
-    private val issuerDid = "\"did:key:z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp\""
+    ).jsonObject
+
+    private val issuerDid = "did:key:z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp"
 
     //language=json
-    private val mapping = """
+    private val mapping = Json.parseToJsonElement(
+        """
         {
              "id":"<uuid>",
              "issuer":{
@@ -146,69 +161,41 @@ object IssuanceExamples {
              "expirationDate":"<timestamp-in:365d>"
           }
     """.trimIndent()
+    ).jsonObject
 
-    // language=json
-    private val openBadgeCredentialJson = """
-        {
-          "issuerKey": $issuerKey,
-          "issuerDid": $issuerDid,
-          "credentialConfigurationId": "OpenBadgeCredential_jwt_vc_json",
-          "credentialData": $openBadgeCredentialData,
-          "mapping": $mapping
-        }
-        """.trimIndent()
+    private val openBadgeCredentialIssuanceRequest = IssuanceRequest(
+        issuerKey = issuerKey,
+        issuerDid = issuerDid,
+        credentialConfigurationId = "OpenBadgeCredential_jwt_vc_json",
+        credentialData = openBadgeCredentialData,
+        mapping = mapping
+    )
 
-    //language=json
-    private val universityDegreeCredentialJson = """
-        {
-          "issuerKey": $issuerKey,
-          "issuerDid": $issuerDid,
-          "credentialConfigurationId": "UniversityDegree_jwt_vc_json",
-          "credentialData": $universityDegreeCredentialData,
-          "mapping": $mapping
-        }
-        """.trimIndent()
-
-    //language=json
-    private val bankIdCredentialJson = """
-        {
-          "issuerKey":$issuerKey,
-          "issuerDid":$issuerDid,
-          "credentialConfigurationId":"BankId_jwt_vc_json",
-          "credentialData":$bankIdCredentialData,
-          "mapping":$mapping
-       }
-        """.trimIndent()
-
-    //language=json
-    private fun onboardingRequestWithKey(key: KeyType) = """
-        {
-            "key":
-            {
-                "backend": "jwk",
-                "keyType": "${key.name}"
-            },
-            "did":
-            {
-                "method": "jwk"
-            }
-        }
-    """.trimIndent()
+    private val bankIdCredentialJson = IssuanceRequest(
+        issuerKey = issuerKey,
+        issuerDid = issuerDid,
+        credentialConfigurationId = "BankId_jwt_vc_json",
+        credentialData = bankIdCredentialData,
+        mapping = mapping
+    )
 
     val jwkKeyExample: ValueExampleDescriptorDsl.() -> Unit = {
         value = issuerKey
     }
 
-    val universityDegreeCredential: ValueExampleDescriptorDsl.() -> Unit = {
-        value = universityDegreeCredentialJson
+    val universityDegreeIssuanceCredential: ValueExampleDescriptorDsl.() -> Unit = {
+        value = IssuanceRequest(
+            issuerKey = issuerKey,
+            issuerDid = issuerDid,
+            credentialConfigurationId = "UniversityDegree_jwt_vc_json",
+            credentialData = universityDegreeCredentialData,
+            mapping = mapping
+        )
     }
 
-    val openBadgeCredentialExample: ValueExampleDescriptorDsl.() -> Unit = {
-        value = openBadgeCredentialJson
+    val openBadgeCredentialIssuanceExample: ValueExampleDescriptorDsl.() -> Unit = {
+        value = openBadgeCredentialIssuanceRequest
     }
-
-    val openBadgeCredentialExampleParsed = Json.parseToJsonElement(this.openBadgeCredentialJson).jsonObject.toMap()
-
 
     // language=json
     val openBadgeCredentialSignExampleJsonString: ValueExampleDescriptorDsl.() -> Unit = {
@@ -227,97 +214,94 @@ object IssuanceExamples {
         value = mapOf(
             "@context" to listOf(
                 "https://www.w3.org/2018/credentials/v1", "https://www.w3.org/2018/credentials/examples/v1"
-            ),
-            "id" to "http://example.gov/credentials/3732",
-            "type" to listOf(
+            ), "id" to "http://example.gov/credentials/3732", "type" to listOf(
                 "VerifiableCredential", "UniversityDegreeCredential"
-            ),
-            "issuer" to mapOf(
+            ), "issuer" to mapOf(
                 "id" to "did:web:vc.transmute.world"
-            ),
-            "issuanceDate" to "2020-03-10T04:24:12.164Z",
-            "credentialSubject" to mapOf(
+            ), "issuanceDate" to "2020-03-10T04:24:12.164Z", "credentialSubject" to mapOf(
                 "id" to "did:example:ebfeb1f712ebc6f1c276e12ec21", "degree" to mapOf(
                     "type" to "BachelorDegree", "name" to "Bachelor of Science and Arts"
                 )
-            ),
-            "proof" to mapOf(
+            ), "proof" to mapOf(
                 "type" to "JsonWebSignature2020",
                 "created" to "2020-03-21T17:51:48Z",
                 "verificationMethod" to "did:web:vc.transmute.world#_Qq0UL2Fq651Q0Fjd6TvnYE-faHiOpRlPVQcY_-tA4A",
                 "proofPurpose" to "assertionMethod",
                 "jws" to "eyJiNjQiOmZhbHNlLCJjcml0IjpbImI2NCJdLCJhbGciOiJFZERTQSJ9..OPxskX37SK0FhmYygDk-S4csY_gNhCUgSOAaXFXDTZx86CmI5nU9xkqtLWg-f4cqkigKDdMVdtIqWAvaYx2JBA"
             )
-        )
+        ).toJsonObject()
     }
 
     // language=JSON
     val batchExampleJwt: ValueExampleDescriptorDsl.() -> Unit = {
-        value = """
-     [
-       $openBadgeCredentialJson,
-       $bankIdCredentialJson
-    ]
-    """.trimIndent()
+        value = listOf(
+            openBadgeCredentialIssuanceRequest,
+            bankIdCredentialJson
+        )
     }
 
-
-    // language=json
     val batchExampleSdJwt: ValueExampleDescriptorDsl.() -> Unit = {
-        value = """
-        [
-           {
-              "issuerKey":$issuerKey,
-              "issuerDid":$issuerDid,
-              "credentialConfigurationId":"OpenBadgeCredential_vc+sd-jwt",
-              "credentialData":$openBadgeCredentialData,
-              "mapping":$mapping,
-              "selectiveDisclosure":{
-                 "fields":{
-                    "name":{
-                       "sd":true
-                    }
-                 }
-              }
-           },
-           {
-              "issuerKey":{
-                 "type":"jwk",
-                 "jwk":"{\"kty\":\"OKP\",\"d\":\"mDhpwaH6JYSrD2Bq7Cs-pzmsjlLj4EOhxyI-9DM1mFI\",\"crv\":\"Ed25519\",\"kid\":\"Vzx7l5fh56F3Pf9aR3DECU5BwfrY6ZJe05aiWYWzan8\",\"x\":\"T3T4-u1Xz3vAV2JwPNxWfs4pik_JLiArz_WTCvrCFUM\"}"
-              },
-              "issuerDid":"did:key:z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp",
-              "credentialConfigurationId":"BankId_vc+sd-jwt",
-              "credentialData":$bankIdCredentialData,
-              "mapping":$mapping,
-              "selectiveDisclosure":{
-                 "fields":{
-                    "credentialSubject":{
-                       
-                          "sd":true
-                      
-                    }
-                 }
-              }
-           }
-        ]
-    """.trimIndent()
+        value =
+            listOf(
+                IssuanceRequest(
+                    issuerKey = issuerKey,
+                    issuerDid = issuerDid,
+                    credentialConfigurationId = "OpenBadgeCredential_vc+sd-jwt",
+                    credentialData = openBadgeCredentialData,
+                    mapping = mapping,
+                    selectiveDisclosure = SDMap(
+                        fields = mapOf(
+                            "name" to SDField(
+                                sd = true
+                            )
+                        )
+                    )
+                ),
+
+                IssuanceRequest(
+                    issuerKey = Json.parseToJsonElement(
+                        """
+                       {
+                         "type": "jwk",
+                         "jwk": "{\"kty\":\"OKP\",\"d\":\"mDhpwaH6JYSrD2Bq7Cs-pzmsjlLj4EOhxyI-9DM1mFI\",\"crv\":\"Ed25519\",\"kid\":\"Vzx7l5fh56F3Pf9aR3DECU5BwfrY6ZJe05aiWYWzan8\",\"x\":\"T3T4-u1Xz3vAV2JwPNxWfs4pik_JLiArz_WTCvrCFUM\"}"
+                       }
+                    """.trimIndent()
+                    ).jsonObject,
+                    issuerDid = "did:key:z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp",
+                    credentialConfigurationId = "BankId_vc+sd-jwt",
+                    credentialData = bankIdCredentialData,
+                    mapping = mapping,
+                    selectiveDisclosure = SDMap(
+                        fields = mapOf(
+                            "credentialSubject" to SDField(sd = true)
+                        )
+                    )
+                )
+            )
     }
 
-    // language=JSON
     val sdJwtExample: ValueExampleDescriptorDsl.() -> Unit = {
-        value = """
-        {
-          "issuerKey": $issuerKey,
-          "issuerDid": $issuerDid,
-          "credentialConfigurationId": "OpenBadgeCredential_vc+sd-jwt",
-          "credentialData": $openBadgeCredentialData,
-          "mapping": $mapping,
-          "selectiveDisclosure": {
-            "fields": {"name": {"sd": true}}
-          }
-        }
-    """.trimIndent()
+        value = IssuanceRequest(
+            issuerKey = issuerKey,
+            issuerDid = issuerDid,
+            credentialConfigurationId = "OpenBadgeCredential_vc+sd-jwt",
+            credentialData = openBadgeCredentialData,
+            mapping = mapping,
+            selectiveDisclosure = SDMap(
+                fields = mapOf(
+                    "name" to SDField(sd = true)
+                )
+            )
+        )
     }
+
+    private fun onboardingRequestWithKey(key: KeyType) = OnboardingRequest(
+        key = KeyGenerationRequest(
+            keyType = key
+        ), did = OnboardRequestDid(
+            method = "jwk"
+        )
+    )
 
     val issuerOnboardingRequestDefaultEd25519Example: ValueExampleDescriptorDsl.() -> Unit = {
         value = onboardingRequestWithKey(KeyType.Ed25519)
@@ -335,205 +319,110 @@ object IssuanceExamples {
         value = onboardingRequestWithKey(KeyType.RSA)
     }
 
-    // language=JSON
+    fun onboardWithTse(auth: Map<String, String>) = OnboardingRequest(
+        key = KeyGenerationRequest(
+            backend = "tse", keyType = KeyType.Ed25519, config = mapOf(
+                "server" to "http://127.0.0.1:8200/v1/transit", "auth" to auth
+            ).toJsonObject()
+        ), did = OnboardRequestDid(
+            method = "jwk",
+        )
+    )
+
     val issuerOnboardingRequestTseExampleUserPass: ValueExampleDescriptorDsl.() -> Unit = {
-        value = """
-        {
-          "key": {
-            "backend": "tse",
-            "keyType": "Ed25519",
-            "config": {
-              "server": "http://127.0.0.1:8200/v1/transit",
-              "auth": {
-                  "userpassPath":"userpass",
-                  "username":"myuser",
-                  "password":"mypassword"
-              }
-            }
-          },
-          "did": {
-            "method": "key"
-          }
-    }
-    """.trimIndent()
+        value = onboardWithTse(
+            auth = mapOf(
+                "userpassPath" to "userpass", "username" to "myuser", "password" to "mypassword"
+            )
+        )
     }
 
-    // language=JSON
     val issuerOnboardingRequestTseExampleAppRole: ValueExampleDescriptorDsl.() -> Unit = {
-        value = """
-        {
-          "key": {
-            "backend": "tse",
-            "keyType": "Ed25519",
-            "config": {
-              "server": "http://127.0.0.1:8200/v1/transit",
-              "auth": {
-                  "roleId":"9ec67fde-412a-d000-66fd-ba433560f092",
-                  "secretId":"65015f17-1f22-39f8-9c70-85af514e98f1"
-              }
-            }
-          },
-          "did": {
-            "method": "key"
-          }
-    }
-    """.trimIndent()
+        value = onboardWithTse(
+            auth = mapOf(
+                "roleId" to "9ec67fde-412a-d000-66fd-ba433560f092", "secretId" to "65015f17-1f22-39f8-9c70-85af514e98f1"
+            )
+        )
     }
 
-    // language=JSON
     val issuerOnboardingRequestTseExampleAccessKey: ValueExampleDescriptorDsl.() -> Unit = {
-        value = """
-        {
-          "key": {
-            "backend": "tse",
-            "keyType": "Ed25519",
-            "config": {
-              "server": "http://127.0.0.1:8200/v1/transit",
-              "auth": {
-                  "accessKey" :"dev-only-token"
-              }
-            }
-          },
-          "did": {
-            "method": "key"
-          }
-    }
-    """.trimIndent()
+        value = onboardWithTse(
+            auth = mapOf("accessKey" to "dev-only-token")
+        )
     }
 
-    //language=JSON
+    fun onboardOci(backend: String, vararg config: Pair<String, String>) = OnboardingRequest(
+        key = KeyGenerationRequest(
+            backend = backend, keyType = KeyType.secp256r1, config = mapOf(*config).toJsonObject()
+        ), did = OnboardRequestDid(
+            method = "jwk"
+        )
+    )
+
     val issuerOnboardingRequestOciExample: ValueExampleDescriptorDsl.() -> Unit = {
-        value = """
-        {
-          "key": {
-            "backend": "oci",
-            "keyType": "secp256r1",
-            "config": {
-              "vaultId" : "ocid1.vault.oc1.eu-frankfurt-1.enta2fneaadmk",
-              "compartmentId": "ocid1.tenancy.oc1..aaaaaaaaiijfupfvsqwqwgupzdy5yclfzcccmie4ktp2wlgslftv5j7xpk6q"
-            }
-          },
-          "did": {
-            "method": "jwk"
-          }
-        }
-    """.trimIndent()
+        value = onboardOci(
+            backend = "oci",
+            "vaultId" to "ocid1.vault.oc1.eu-frankfurt-1.enta2fneaadmk",
+            "compartmentId" to "ocid1.tenancy.oc1..aaaaaaaaiijfupfvsqwqwgupzdy5yclfzcccmie4ktp2wlgslftv5j7xpk6q"
+        )
     }
 
-    //language=JSON
-    val issuerOnboardingResponseOciExample: ValueExampleDescriptorDsl.() -> Unit = {
-        value = """
-        {
-          "issuerKey": {
-            "type": "oci",
-            "config": {
-              "vaultId" : "ocid1.vault.oc1.eu-frankfurt-1.enta2fneaadmk",
-              "compartmentId": "ocid1.tenancy.oc1..aaaaaaaaiijfupfvsqwqwgupzdy5yclfzcccmie4ktp2wlgslftv5j7xpk6q"
-            },
-            "id": "ocid1.key.oc1.eu-frankfurt-1.enta2fneaadmk.abtheljrlj5snthwkx7ycdmknuftght527dkyjsoz72dcogklixrsdyolo5a",
-            "_publicKey": "{\"kty\":\"EC\",\"crv\":\"P-256\",\"x\":\"tT1DAZdtp7vUPphTxoilmr6dfZPKcPfwL8G_Ri3K0_E\",\"y\":\"JabPubkHQPK0G7O8eL3bKg75hX4Wkojb_AOepX8xdAs\"}",
-            "_keyType": "secp256r1"
-          },
-          "issuerDid": "did:jwk:eyJrdHkiOiJFQyIsImNydiI6IlAtMjU2IiwieCI6InRUMURBWmR0cDd2VVBwaFR4b2lsbXI2ZGZaUEtjUGZ3TDhHX1JpM0swX0UiLCJ5IjoiSmFiUHVia0hRUEswRzdPOGVMM2JLZzc1aFg0V2tvamJfQU9lcFg4eGRBcyJ9"
-        }
-
-    """.trimIndent()
-    }
-
-
-    //language=JSON
     val issuerOnboardingRequestOciRestApiExample: ValueExampleDescriptorDsl.() -> Unit = {
-        value = """
-        {
-          "key": {
-            "backend": "oci-rest-api",
-            "keyType": "secp256r1",
-             "config": {
-              "tenancyOcid": "ocid1.tenancy.oc1..aaaaaaaaiijfupfvsqwqwgupzdy5yclfzcccmie4ktp2wlgslftv5j7xpk6q",
-              "compartmentOcid": "ocid1.tenancy.oc1..aaaaaaaaiijfupfvsqwqwgupzdy5yclfzcccmie4ktp2wlgslftv5j7xpk6q",
-              "userOcid": "ocid1.user.oc1..aaaaaaaaxjkkfjqxdqk7ldfjrxjmacmbi7sci73rbfiwpioehikavpbtqx5q",
-              "fingerprint": "bb:d4:4b:0c:c8:3a:49:15:7f:87:55:d5:2b:7e:dd:bc",
-              "managementEndpoint": "entaftlvaaemy-management.kms.eu-frankfurt-1.oraclecloud.com",
-              "cryptoEndpoint": "entaftlvaaemy-crypto.kms.eu-frankfurt-1.oraclecloud.com",
-              "signingKeyPem": "-----BEGIN PRIVATE KEY-----\n\n-----END PRIVATE KEY-----\n"
-            }
-          },
-          "did": {
-            "method": "jwk"
-          }
-        }
-    """.trimIndent()
+        value = onboardOci(
+            backend = "oci-rest-api",
+            "tenancyOcid" to "ocid1.tenancy.oc1..aaaaaaaaiijfupfvsqwqwgupzdy5yclfzcccmie4ktp2wlgslftv5j7xpk6q",
+            "compartmentOcid" to "ocid1.tenancy.oc1..aaaaaaaaiijfupfvsqwqwgupzdy5yclfzcccmie4ktp2wlgslftv5j7xpk6q",
+            "userOcid" to "ocid1.user.oc1..aaaaaaaaxjkkfjqxdqk7ldfjrxjmacmbi7sci73rbfiwpioehikavpbtqx5q",
+            "fingerprint" to "bb:d4:4b:0c:c8:3a:49:15:7f:87:55:d5:2b:7e:dd:bc",
+            "managementEndpoint" to "entaftlvaaemy-management.kms.eu-frankfurt-1.oraclecloud.com",
+            "cryptoEndpoint" to "entaftlvaaemy-crypto.kms.eu-frankfurt-1.oraclecloud.com",
+            "signingKeyPem" to "-----BEGIN PRIVATE KEY-----\n\n-----END PRIVATE KEY-----\n"
+
+        )
     }
 
-    //language=JSON
-    val issuerOnboardingResponseOciRestApiExample: ValueExampleDescriptorDsl.() -> Unit = {
-        value = """
-        {
-          "issuerKey": {
-            "type": "oci",
-             "config": {
-              "tenancyOcid": "ocid1.tenancy.oc1..aaaaaaaaiijfupfvsqwqwgupzdy5yclfzcccmie4ktp2wlgslftv5j7xpk6q",
-              "compartmentOcid": "ocid1.tenancy.oc1..aaaaaaaaiijfupfvsqwqwgupzdy5yclfzcccmie4ktp2wlgslftv5j7xpk6q",
-              "userOcid": "ocid1.user.oc1..aaaaaaaaxjkkfjqxdqk7ldfjrxjmacmbi7sci73rbfiwpioehikavpbtqx5q",
-              "fingerprint": "bb:d4:4b:0c:c8:3a:49:15:7f:87:55:d5:2b:7e:dd:bc",
-              "managementEndpoint": "entaftlvaaemy-management.kms.eu-frankfurt-1.oraclecloud.com",
-              "cryptoEndpoint": "entaftlvaaemy-crypto.kms.eu-frankfurt-1.oraclecloud.com",
-              "signingKeyPem": "-----BEGIN PRIVATE KEY-----\n\n-----END PRIVATE KEY-----\n"
-            },
-            "id": "ocid1.key.oc1.eu-frankfurt-1.enta2fneaadmk.abtheljrlj5snthwkx7ycdmknuftght527dkyjsoz72dcogklixrsdyolo5a",
-            "_publicKey": "{\"kty\":\"EC\",\"crv\":\"P-256\",\"x\":\"tT1DAZdtp7vUPphTxoilmr6dfZPKcPfwL8G_Ri3K0_E\",\"y\":\"JabPubkHQPK0G7O8eL3bKg75hX4Wkojb_AOepX8xdAs\"}",
-            "_keyType": "secp256r1"
-          },
-          "issuerDid": "did:jwk:eyJrdHkiOiJFQyIsImNydiI6IlAtMjU2IiwieCI6InRUMURBWmR0cDd2VVBwaFR4b2lsbXI2ZGZaUEtjUGZ3TDhHX1JpM0swX0UiLCJ5IjoiSmFiUHVia0hRUEswRzdPOGVMM2JLZzc1aFg0V2tvamJfQU9lcFg4eGRBcyJ9"
-        }
 
-    """.trimIndent()
-    }
-
-    // language=JSON
     val issuerOnboardingRequestDidWebExample: ValueExampleDescriptorDsl.() -> Unit = {
-        value = """
-        {
-          "key": {
-            "backend": "jwk",
-            "keyType": "secp256k1"
-          },
-          "did": {
-            "method": "web",
-            "config": {
-                "domain": "example.com",
-                "path": "optional-user-id-1234"
-            }
-          }
-        }
-    """.trimIndent()
+        value = OnboardingRequest(
+            key = KeyGenerationRequest(
+                backend = "jwk", keyType = KeyType.secp256k1
+            ), did = OnboardRequestDid(
+                method = "web", config = mapOf(
+                    "domain" to "example.com", "path" to "optional-user-id-1234"
+                ).toJsonObject()
+            )
+        )
     }
 
-    // language=JSON
+    fun onboardingResponse(keyJson: String, did: String) = IssuerOnboardingResponse(
+        issuerKey = Json.parseToJsonElement(keyJson).jsonObject, issuerDid = did
+    )
+
     val issuerOnboardingResponseDidWebExample: ValueExampleDescriptorDsl.() -> Unit = {
-        value = """
-        {
-   "issuerKey":{
-      "type":"jwk",
-      "jwk": {
-              "kty": "EC",
-              "d": "sMjI1SVu4vKHLr3JwgUMu10Ihn5OL0sCaqjfZP8xpUU",
-              "crv": "secp256k1",
-              "kid": "Si07jIXqLsMKHy0vgyvPbcIvIPxdqL7Qs6STqrx1UC8",
-              "x": "q-LZDK-TZQSUczy_1K6TBFeVn60rMv4KjYvTePy2TGs",
-              "y": "qTbiSREfWRZtAKZsW-k-0BHIIYpAN0fhnjaqeMIU5OY"
-            }
-   },
-   "issuerDid":"did:web:example.com:optional-user-id-1234"
-}
-    """.trimIndent()
+        value = onboardingResponse(
+            // language=JSON
+            keyJson = """
+              {
+                "type": "jwk",
+                "jwk": {
+                  "kty": "EC",
+                  "d": "sMjI1SVu4vKHLr3JwgUMu10Ihn5OL0sCaqjfZP8xpUU",
+                  "crv": "secp256k1",
+                  "kid": "Si07jIXqLsMKHy0vgyvPbcIvIPxdqL7Qs6STqrx1UC8",
+                  "x": "q-LZDK-TZQSUczy_1K6TBFeVn60rMv4KjYvTePy2TGs",
+                  "y": "qTbiSREfWRZtAKZsW-k-0BHIIYpAN0fhnjaqeMIU5OY"
+                }
+              }
+            """.trimIndent(), did = "did:web:example.com:optional-user-id-1234"
+        )
     }
 
     // language=JSON
     val issuerOnboardingResponseDefaultExample: ValueExampleDescriptorDsl.() -> Unit = {
-        value = """
-        {
-          "issuerKey": {
+        value = onboardingResponse(
+            // language=JSON
+            keyJson = """
+          {
             "type": "jwk",
             "jwk": {
               "kty": "EC",
@@ -543,17 +432,17 @@ object IssuanceExamples {
               "x": "q-LZDK-TZQSUczy_1K6TBFeVn60rMv4KjYvTePy2TGs",
               "y": "qTbiSREfWRZtAKZsW-k-0BHIIYpAN0fhnjaqeMIU5OY"
             }
-          },
-          "issuerDid": "did:jwk:eyJrdHkiOiJFQyIsImNydiI6IlAtMjU2Iiwia2lkIjoiU2kwN2pJWHFMc01LSHkwdmd5dlBiY0l2SVB4ZHFMN1FzNlNUcXJ4MVVDOCIsIngiOiJxLUxaREstVFpRU1VjenlfMUs2VEJGZVZuNjByTXY0S2pZdlRlUHkyVEdzIiwieSI6InFUYmlTUkVmV1JadEFLWnNXLWstMEJISUlZcEFOMGZobmphcWVNSVU1T1kifQ"
-        }
-    """.trimIndent()
+          }
+    """.trimIndent(),
+            did = "did:jwk:eyJrdHkiOiJFQyIsImNydiI6IlAtMjU2Iiwia2lkIjoiU2kwN2pJWHFMc01LSHkwdmd5dlBiY0l2SVB4ZHFMN1FzNlNUcXJ4MVVDOCIsIngiOiJxLUxaREstVFpRU1VjenlfMUs2VEJGZVZuNjByTXY0S2pZdlRlUHkyVEdzIiwieSI6InFUYmlTUkVmV1JadEFLWnNXLWstMEJISUlZcEFOMGZobmphcWVNSVU1T1kifQ"
+        )
     }
 
-    // language=JSON
     val issuerOnboardingResponseTseExample: ValueExampleDescriptorDsl.() -> Unit = {
-        value = """
-    {
-      "issuerKey": {
+        value = onboardingResponse(
+            // language=JSON
+            keyJson = """
+      {
         "type": "tse",
         "server": "http://127.0.0.1:8200/v1/transit",
         "accessKey": "dev-only-token",
@@ -593,9 +482,54 @@ object IssuanceExamples {
           22
         ],
         "_keyType": "Ed25519"
-      },
-      "issuerDid": "did:key:z6MkqogbukAXnhvY9dAtXw7ABpe9meJJRCYHwyrNA2q74o17"
+      }
+    """.trimIndent(),
+            did = "did:key:z6MkqogbukAXnhvY9dAtXw7ABpe9meJJRCYHwyrNA2q74o17"
+        )
     }
-    """.trimIndent()
+
+    val issuerOnboardingResponseOciExample: ValueExampleDescriptorDsl.() -> Unit = {
+        value = onboardingResponse(
+            //language=JSON
+            keyJson =
+            """
+          {
+            "type": "oci",
+            "config": {
+              "vaultId": "ocid1.vault.oc1.eu-frankfurt-1.enta2fneaadmk",
+              "compartmentId": "ocid1.tenancy.oc1..aaaaaaaaiijfupfvsqwqwgupzdy5yclfzcccmie4ktp2wlgslftv5j7xpk6q"
+            },
+            "id": "ocid1.key.oc1.eu-frankfurt-1.enta2fneaadmk.abtheljrlj5snthwkx7ycdmknuftght527dkyjsoz72dcogklixrsdyolo5a",
+            "_publicKey": "{\"kty\":\"EC\",\"crv\":\"P-256\",\"x\":\"tT1DAZdtp7vUPphTxoilmr6dfZPKcPfwL8G_Ri3K0_E\",\"y\":\"JabPubkHQPK0G7O8eL3bKg75hX4Wkojb_AOepX8xdAs\"}",
+            "_keyType": "secp256r1"
+          }
+    """.trimIndent(),
+            did = "did:jwk:eyJrdHkiOiJFQyIsImNydiI6IlAtMjU2IiwieCI6InRUMURBWmR0cDd2VVBwaFR4b2lsbXI2ZGZaUEtjUGZ3TDhHX1JpM0swX0UiLCJ5IjoiSmFiUHVia0hRUEswRzdPOGVMM2JLZzc1aFg0V2tvamJfQU9lcFg4eGRBcyJ9"
+        )
+    }
+
+    val issuerOnboardingResponseOciRestApiExample: ValueExampleDescriptorDsl.() -> Unit = {
+        value = onboardingResponse(
+            keyJson =
+            //language=JSON
+            """
+          {
+            "type": "oci",
+            "config": {
+              "tenancyOcid": "ocid1.tenancy.oc1..aaaaaaaaiijfupfvsqwqwgupzdy5yclfzcccmie4ktp2wlgslftv5j7xpk6q",
+              "compartmentOcid": "ocid1.tenancy.oc1..aaaaaaaaiijfupfvsqwqwgupzdy5yclfzcccmie4ktp2wlgslftv5j7xpk6q",
+              "userOcid": "ocid1.user.oc1..aaaaaaaaxjkkfjqxdqk7ldfjrxjmacmbi7sci73rbfiwpioehikavpbtqx5q",
+              "fingerprint": "bb:d4:4b:0c:c8:3a:49:15:7f:87:55:d5:2b:7e:dd:bc",
+              "managementEndpoint": "entaftlvaaemy-management.kms.eu-frankfurt-1.oraclecloud.com",
+              "cryptoEndpoint": "entaftlvaaemy-crypto.kms.eu-frankfurt-1.oraclecloud.com",
+              "signingKeyPem": "-----BEGIN PRIVATE KEY-----\n\n-----END PRIVATE KEY-----\n"
+            },
+            "id": "ocid1.key.oc1.eu-frankfurt-1.enta2fneaadmk.abtheljrlj5snthwkx7ycdmknuftght527dkyjsoz72dcogklixrsdyolo5a",
+            "_publicKey": "{\"kty\":\"EC\",\"crv\":\"P-256\",\"x\":\"tT1DAZdtp7vUPphTxoilmr6dfZPKcPfwL8G_Ri3K0_E\",\"y\":\"JabPubkHQPK0G7O8eL3bKg75hX4Wkojb_AOepX8xdAs\"}",
+            "_keyType": "secp256r1"
+          }
+    """.trimIndent(),
+            did = "did:jwk:eyJrdHkiOiJFQyIsImNydiI6IlAtMjU2IiwieCI6InRUMURBWmR0cDd2VVBwaFR4b2lsbXI2ZGZaUEtjUGZ3TDhHX1JpM0swX0UiLCJ5IjoiSmFiUHVia0hRUEswRzdPOGVMM2JLZzc1aFg0V2tvamJfQU9lcFg4eGRBcyJ9"
+        )
     }
 }
