@@ -337,7 +337,7 @@ object OidcApi : CIProvider() {
 
             val authorizationPhase = PipelinePhase("Authorization")
 
-            authenticate("external-oauth-server") {
+            authenticate("auth-oauth") {
                 // intercept request and store the state
                 this.insertPhaseBefore(ApplicationCallPipeline.Call, authorizationPhase)
                 this.intercept(authorizationPhase) {
