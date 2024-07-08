@@ -1,0 +1,32 @@
+{
+  "@context": ["https://www.w3.org/2018/credentials/v1"],
+  "id": "urn:uuid:db2a23dc-80e2-4ef8-b708-5d2ea7b5deb6",
+  "type": [
+    "VerifiableCredential",
+    "VerifiableAttestation",
+    "VerifiableEducationalID"
+  ],
+  "issuer": "did:ebsi:zvHWX359A3CvfJnCYaAiAde",
+  "issuanceDate": "2023-11-11T00:00:00Z",
+  "issued": "2023-11-11T00:00:00Z",
+  "validFrom": "2023-11-11T00:00:00Z",
+  "validUntil": "2024-11-11T00:00:00Z",
+  "credentialSubject": {
+    "id": "did:key:z2dmzD81cgPx8Vki7JbuuMmFYrWPgYoytykUZ3eyqht1j9KbsEYvdrjxMjQ4tpnje9BDBTzuNDP3knn6qLZErzd4bJ5go2CChoPjd5GAH3zpFJP5fuwSk66U5Pq6EhF4nKnHzDnznEP8fX99nZGgwbAh1o7Gj1X52Tdhf7U4KTk66xsA5r",
+    "identifier": "c305487c-52ae-459e-b3d9-2a8d0a1b96e3",
+    "eduPersonScopedAffiliation": ["student"]
+  },
+  "credentialSchema": {
+    "id": "https://api-test.ebsi.eu/trusted-schemas-registry/v3/schemas/0xff4f1fa4f0efd4306a218f669c7482d8cfcc7a13ba44f34af69f41889704002a",
+    "type": "JsonSchema"
+  },
+  "relatedResource": [
+    {
+      "id": "https://www.w3.org/ns/credentials/v2",
+      "mediaType": "application/ld+json",
+      "digestSRI": "sha384-lHKDHh0msc6pRx8PhDOMkNtSI8bOfsp4giNbUrw71nXXLf13nTqNJoRp3Nx+ArVK",
+      "digestMultibase": "moLay0ut7BUL5IfvPTaE2QhqrtH5cU3mrf4fQb/MhrH5NhGh+oDwdoqE0AynGRjFJ"
+    }
+  ]
+}
+
