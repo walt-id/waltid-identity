@@ -1,6 +1,7 @@
 package id.walt.webwallet.db.models
 
 import id.walt.crypto.utils.JwsUtils.decodeJws
+import id.walt.oid4vc.data.CredentialFormat
 import id.walt.webwallet.manifest.provider.ManifestProvider
 import id.walt.webwallet.utils.JsonUtils
 import kotlinx.datetime.Instant
@@ -26,6 +27,7 @@ object WalletCredentials : Table("credentials") {
 
     val deletedOn = timestamp("deleted_on").nullable().default(null)
     val pending = bool("pending").default(false)
+    val format = varchar("format", 32)
 
     override val primaryKey = PrimaryKey(wallet, id)
 }
@@ -41,24 +43,26 @@ data class WalletCredential(
     val manifest: String? = null,
     val deletedOn: Instant?,
     val pending: Boolean = false,
+    val format: CredentialFormat,
 
-    val parsedDocument: JsonObject? = parseDocument(document, id),
+    val parsedDocument: JsonObject? = parseDocument(document, id, format),
     @SerialName("manifest")
     val parsedManifest: JsonObject? = tryParseManifest(manifest),
 ) {
 
     companion object {
-        fun parseDocument(document: String, id: String) =
+        fun parseDocument(document: String, id: String, format: CredentialFormat) =
             runCatching {
-                when {
-                    document.startsWith("{") -> Json.parseToJsonElement(document).jsonObject
-                    document.startsWith("ey") -> document.decodeJws().payload
+                when(format) {
+                    CredentialFormat.ldp_vc -> Json.parseToJsonElement(document).jsonObject
+                    CredentialFormat.jwt_vc, CredentialFormat.sd_jwt_vc, CredentialFormat.jwt_vc_json,
+                    CredentialFormat.jwt_vc_json_ld -> document.decodeJws().payload
                         .run { jsonObject["vc"]?.jsonObject ?: jsonObject }
-
+                    CredentialFormat.mso_mdoc -> null // TODO: parse mdoc as json object for wallet UI (?)
                     else -> throw IllegalArgumentException("Unknown credential format")
-                }.toMutableMap().also {
-                    it.putIfAbsent("id", JsonPrimitive(id))
-                }.let {
+                }?.toMutableMap().also {
+                    it?.putIfAbsent("id", JsonPrimitive(id))
+                }?.let {
                     JsonObject(it)
                 }
             }.onFailure { it.printStackTrace() }
@@ -95,5 +99,6 @@ data class WalletCredential(
         manifest = result[WalletCredentials.manifest],
         deletedOn = result[WalletCredentials.deletedOn]?.toKotlinInstant(),
         pending = result[WalletCredentials.pending],
+        format = CredentialFormat.fromValue(result[WalletCredentials.format]) ?: throw IllegalArgumentException("Credential format couldn't be decoded")
     )
 }

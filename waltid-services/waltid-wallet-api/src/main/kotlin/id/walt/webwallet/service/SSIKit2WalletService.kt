@@ -290,6 +290,7 @@ class SSIKit2WalletService(
                     manifest = it.manifest,
                     deletedOn = null,
                     pending = requireUserInput,
+                    format = it.format
                 ).also { credential ->
                     eventUseCase.log(
                         action = EventType.Credential.Receive,
