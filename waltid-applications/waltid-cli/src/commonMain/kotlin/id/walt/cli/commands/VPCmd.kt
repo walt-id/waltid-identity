@@ -10,7 +10,7 @@ class VPCmd : CliktCommand(
 ) {
 
     init {
-        subcommands(VPCreateCmd())
+        subcommands(VPCreateCmd(), VPVerifyCmd())
     }
 
     override fun run(): Unit {}
