@@ -4,7 +4,6 @@ import id.walt.credentials.vc.vcs.W3CVC
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeySerialization
 import id.walt.did.dids.DidService
-import id.walt.issuer.issuance.IssuanceExamples.jwkKeyExample
 import id.walt.oid4vc.definitions.CROSS_DEVICE_CREDENTIAL_OFFER_URL
 import id.walt.oid4vc.requests.CredentialOfferRequest
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -173,7 +172,10 @@ fun Application.issuerApi() {
                             body<JsonObject> {
                                 description =
                                     "Pass the unsigned credential that you intend to sign as the body of the request."
-//                                example("OpenBadgeCredential example", IssuanceExamples.openBadgeCredentialSignExampleJsonString)
+                                example(
+                                    "UniversityDegreeCredential example",
+                                    IssuanceExamples.universityDegreeSignRequestCredentialExample
+                                )
                                 required = true
                             }
                         }
@@ -184,7 +186,7 @@ fun Application.issuerApi() {
                                 body<JsonObject> {
                                     example(
                                         "Signed UniversityDegreeCredential example",
-                                        IssuanceExamples.universityDegreeCredentialSignedExample
+                                        IssuanceExamples.universityDegreeSignedSignCredentialExample
                                     )
                                 }
                             }
@@ -223,7 +225,7 @@ fun Application.issuerApi() {
                                 description =
                                     "Pass the unsigned credential that you intend to issue as the body of the request."
                                 example("OpenBadgeCredential example", IssuanceExamples.openBadgeCredentialIssuanceExample)
-                                example("UniversityDegreeCredential example", IssuanceExamples.universityDegreeIssuanceCredential)
+                                example("UniversityDegreeCredential example", IssuanceExamples.universityDegreeIssuanceCredentialExample)
                                 required = true
                             }
                         }
@@ -368,7 +370,7 @@ fun Application.issuerApi() {
                             headerParameter<String>("walt-key") {
                                 description =
                                     "Supply a  key representation to use to issue the credential, " + "e.g. a local key (internal JWK) or a TSE key."
-                                example("JWK example", jwkKeyExample)
+                                example("JWK example", IssuanceExamples.jwkKeyExample)
                                 required = false
                             }
                         }
