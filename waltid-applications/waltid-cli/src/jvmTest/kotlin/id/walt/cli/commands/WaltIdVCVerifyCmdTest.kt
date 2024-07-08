@@ -28,7 +28,7 @@ class WaltIdVCVerifyCmdTest {
     val keyFileName = "${resourcesPath}/key/ed25519_by_waltid_pvt_key.jwk"
     val key = runBlocking { KeyUtil().getKey(File(keyFileName)) }
     val issuerDid = "did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV"
-    val subjectDid = "did:key:z6Mkjm2gaGsodGchfG4k8P6KwCHZsVEPZho5VuEbY94qiBB9"
+    val subjectDid = "did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV"
     val vcFilePath = "${resourcesPath}/vc/openbadgecredential_sample.json"
 
     val signedVCFilePath = "${resourcesPath}/vc/openbadgecredential_sample.signed.json"
