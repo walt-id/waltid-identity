@@ -579,7 +579,7 @@ fun PipelineContext<Unit, ApplicationCall>.ensurePermissionsForWallet(
                         (AccountWalletMappings.wallet eq walletId)
             }
             .firstOrNull()
-            ?: throw ForbiddenException("This account does not have access to the specified wallet."))[
+            ?: throw NotFoundException("This account does not have access to the specified wallet."))[
             AccountWalletMappings.permissions]
     }
 
