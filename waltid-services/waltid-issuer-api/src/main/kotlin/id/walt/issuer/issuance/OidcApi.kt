@@ -1,9 +1,6 @@
 package id.walt.issuer.issuance
 
 
-import id.walt.commons.featureflag.FeatureManager
-import id.walt.crypto.utils.JsonUtils.toJsonElement
-import id.walt.issuer.FeatureCatalog
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.errors.*
 import id.walt.oid4vc.providers.TokenTarget
@@ -105,17 +102,18 @@ object OidcApi : CIProvider() {
 
             get("/authorize") {
                 val authReq = runBlocking { AuthorizationRequest.fromHttpParametersAuto(call.parameters.toMap()) }
-
                 try {
                     val authResp: Any = when {
-
                         ResponseType.Code in authReq.responseType -> {
+                            val issuerState = OidcApi.sessionCredentialPreMapping[authReq.issuerState]
+                            if (issuerState == null) {
+                                call.response.apply {
+                                    status(HttpStatusCode.BadRequest)
+                                }
+                                return@get
+                            }
 
-                            when (OidcApi.sessionCredentialPreMapping[authReq.issuerState]?.first()?.request?.authenticationMethod.let {
-                                AuthenticationMethod.valueOf(
-                                    it!!
-                                )
-                            }) {
+                            when (issuerState.first().request.authenticationMethod) {
                                 AuthenticationMethod.PWD -> {
                                     call.response.apply {
                                         status(HttpStatusCode.Found)
@@ -128,26 +126,18 @@ object OidcApi : CIProvider() {
                                 }
 
                                 AuthenticationMethod.ID_TOKEN -> {
-                                    val idTokenRequestKid =
-                                        OidcApi.sessionCredentialPreMapping[authReq.issuerState]?.first()?.issuerKey!!.getKeyId()
-                                    val privKey =
-                                        OidcApi.sessionCredentialPreMapping[authReq.issuerState]?.first()?.issuerKey!!
-                                    when (OidcApi.sessionCredentialPreMapping[authReq.issuerState]?.first()?.request?.useJar) {
-                                        true -> processCodeFlowAuthorizationWithIdTokenRequest(
-                                            authReq,
-                                            idTokenRequestKid,
-                                            privKey
-                                        )
-
-                                        else -> throw AuthorizationError(
-                                            authReq,
-                                            AuthorizationErrorCode.temporarily_unavailable,
-                                            "ID Token without JAR is not implemented"
-                                        )
-                                    }
+                                    val idTokenRequestJwtKid = issuerState.first().issuerKey.getKeyId()
+                                    val idTokenRequestJwtPrivKey = issuerState.first().issuerKey
+                                    processCodeFlowAuthorizationWithAuthorizationRequest(
+                                        authReq,
+                                        idTokenRequestJwtKid,
+                                        idTokenRequestJwtPrivKey,
+                                        ResponseType.IdToken,
+                                        issuerState.first().request.useJar!!
+                                    )
                                 }
 
-                                AuthenticationMethod.VP_TOKEN -> when (OidcApi.sessionCredentialPreMapping[authReq.issuerState]?.first()?.request?.useJar) {
+                                AuthenticationMethod.VP_TOKEN -> when (issuerState.first().request.useJar) {
                                     true -> throw AuthorizationError(
                                         authReq,
                                         AuthorizationErrorCode.temporarily_unavailable,
