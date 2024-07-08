@@ -19,18 +19,22 @@ import io.github.smiley4.schemakenerator.swagger.data.TitleType
 import io.github.smiley4.schemakenerator.swagger.generateSwaggerSchema
 import io.github.smiley4.schemakenerator.swagger.handleCoreAnnotations
 import io.github.smiley4.schemakenerator.swagger.withAutoTitle
+import io.klogging.noCoLogger
 import io.ktor.server.application.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.serializer
 import kotlin.reflect.KType
+import kotlin.reflect.full.isSubtypeOf
+import kotlin.reflect.full.starProjectedType
 import kotlin.time.Duration.Companion.nanoseconds
 
 object OpenApiModule {
+
+    private val logger = noCoLogger("OpenAPI")
 
     object OpenApiConfig {
         var customInfo: (OpenApiInfo.() -> Unit)? = null
@@ -70,11 +74,21 @@ object OpenApiModule {
                 }
 
                 encoder { type, example ->
+                    val skippedTypes = listOf(String::class)
+                        .map { it.starProjectedType }
+                    val skippedSubTypes = listOf(Enum::class)
+                        .map { it.starProjectedType }
+
                     if (type is KTypeDescriptor) {
-                        println("Example for: ${type.type}; example is: $example (${example!!::class.simpleName})")
-                        encodeSwaggerExample(type, example)
+                        if (type.type in skippedTypes || skippedSubTypes.any { type.type.isSubtypeOf(it) }) {
+                            logger.trace { "Skipped encoding for type: ${type.type}; example is: $example (${example!!::class.simpleName})" }
+                            example
+                        } else {
+                            logger.trace("Example for: ${type.type}; example is: $example (${example!!::class.simpleName})")
+                            encodeSwaggerExample(type, example)
+                        }
                     } else {
-                        println("Example not; as type is: $type")
+                        logger.trace { "No type descriptor for example, type is: $type" }
                         example
                     }
                 }
