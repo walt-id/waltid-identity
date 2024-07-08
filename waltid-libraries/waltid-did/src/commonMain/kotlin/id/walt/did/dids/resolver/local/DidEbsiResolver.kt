@@ -3,11 +3,13 @@ package id.walt.did.dids.resolver.local
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.did.dids.document.DidDocument
+import id.walt.did.dids.document.DidEbsiDocument
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.plugins.logging.*
 import io.ktor.client.request.*
+import io.ktor.client.statement.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -22,36 +24,33 @@ import kotlin.js.JsExport
 
 @OptIn(ExperimentalJsExport::class)
 @JsExport
-class DidEbsiResolver : LocalResolverMethod("ebsi") {
+class DidEbsiResolver(
+    private val client: HttpClient,
+) : LocalResolverMethod("ebsi") {
 
     val httpLogging = false
+    private val didRegistryUrlBaseURL = "https://api-conformance.ebsi.eu/did-registry/v5/identifiers/"
+    private val json = Json { ignoreUnknownKeys = true }
 
     @JvmBlocking
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    override suspend fun resolve(did: String): Result<DidDocument> {
-        val url = "https://api-conformance.ebsi.eu/did-registry/v5/identifiers/${did}"
+    override suspend fun resolve(did: String): Result<DidDocument> = runCatching {
+        resolveDid(did)
+    }
 
-        val httpClient = HttpClient {
-            install(ContentNegotiation) {
-                json(Json { ignoreUnknownKeys = true })
-            }
-            if (httpLogging) {
-                install(Logging) {
-                    logger = Logger.SIMPLE
-                    level = LogLevel.HEADERS
-                }
-            }
-        }
-
-        val response = runCatching {
+    private suspend fun resolveDid(did: String): DidDocument {
+        val url = didRegistryUrlBaseURL + did
+        return client.get(url).bodyAsText().let {
             DidDocument(
-                jsonObject = httpClient.get(url).body<JsonObject>()
+                DidEbsiDocument(
+                    DidDocument(
+                        jsonObject = Json.parseToJsonElement(it).jsonObject
+                    )
+                ).toMap()
             )
         }
-
-        return response
     }
 
     @JvmBlocking
@@ -73,6 +72,13 @@ class DidEbsiResolver : LocalResolverMethod("ebsi") {
         return tryConvertAnyPublicKeyJwkToKey(publicKeyJwks)
     }
 
+    /*
+    Note from Christos:
+    There exist cases of EBSI DID Documents that only have secp256k1. There is nothing invalid
+    in not having a secp256r1 key. Hence, this function was changed to prioritize secp256r1 keys,
+    but not to return a failure result otherwise.
+    * NOTE:
+    * */
     @JvmBlocking
     @JvmAsync
     @JsPromise
@@ -82,6 +88,6 @@ class DidEbsiResolver : LocalResolverMethod("ebsi") {
             val result = JWKKey.importJWK(publicKeyJwk)
             if (result.isSuccess && publicKeyJwk.contains("P-256")) return result
         }
-        return Result.failure(NoSuchElementException("No key could be imported"))
+        return JWKKey.importJWK(publicKeyJwks.first())
     }
 }
