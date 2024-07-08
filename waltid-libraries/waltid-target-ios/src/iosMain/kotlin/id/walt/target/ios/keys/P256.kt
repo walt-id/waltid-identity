@@ -7,12 +7,13 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.jsonObject
+import platform.Security.SecKeyRef
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 
 
 sealed class P256 {
-    sealed class PrivateKey : KeyRepresentation, Signing, Verification {
+    sealed class PrivateKey : KeyRepresentation, Signing {
         companion object {
 
             fun createInKeychain(kid: String): PrivateKey {
@@ -41,6 +42,46 @@ sealed class P256 {
                 return P256JwkPublicKey(jwk)
             }
         }
+
+        internal abstract fun <T> publicSecKey(block: (SecKeyRef?) -> T): T
+
+        override fun thumbprint(): String {
+            return publicSecKey {
+                ECKeyUtils.thumbprintWithPublicKey(it, null)!!
+            }
+        }
+
+        override fun externalRepresentation(): ByteArray {
+            return publicSecKey {
+                KeychainOperations.keyExternalRepresentation(it)
+            }
+        }
+
+        override fun pem(): String = externalRepresentation().let {
+            ECKeyUtils.pemWithPublicKeyRepresentation(it.toNSData())
+        }
+
+        override fun verifyJws(jws: String): Result<JsonObject> {
+            return publicSecKey {
+                val result = DS_Operations.verifyWithJws(jws, it)
+
+                check(result.success()) {
+                    result.errorMessage()!!
+                }
+
+                result.isValidData()!!.toByteArray().let {
+                    Json.parseToJsonElement(it.decodeToString())
+                }.let {
+                    Result.success(it.jsonObject)
+                }
+            }
+        }
+
+        override fun verifyRaw(signature: ByteArray, signedData: ByteArray): Result<ByteArray> {
+            return publicSecKey {
+                KeychainOperations.P256.verifyRaw(it, signature, signedData)
+            }
+        }
     }
 }
 
@@ -65,46 +106,13 @@ internal class P256JwkPublicKey(private val jwk: String) : P256.PublicKey() {
         return Json.parseToJsonElement(jwk).jsonObject
     }
 
-    override fun thumbprint(): String {
-        return KeychainOperations.P256.createPublicKeyFrom(x963Representation) { publicKey ->
-            ECKeyUtils.exportJwkWithPublicKey(publicKey, null)!!
+    override fun <T> publicSecKey(block: (SecKeyRef?) -> T) =
+        KeychainOperations.P256.createPublicKeyFrom(x963Representation) { publicKey ->
+            block(publicKey)
         }
-    }
-
-    override fun pem(): String {
-        return ECKeyUtils.pemWithPublicKeyRepresentation(x963Representation.toNSData())
-    }
 
     override fun kid(): String? {
         return _jwk.kid
-    }
-
-    override fun externalRepresentation(): ByteArray {
-        return KeychainOperations.P256.createPublicKeyFrom(x963Representation) { publicKey ->
-            KeychainOperations.keyExternalRepresentation(publicKey)
-        }
-    }
-
-    override fun verifyJws(jws: String): Result<JsonObject> {
-        return KeychainOperations.P256.createPublicKeyFrom(x963Representation) { publicKey ->
-            val result = DS_Operations.verifyWithJws(jws, publicKey)
-
-            check(result.success()) {
-                result.errorMessage()!!
-            }
-
-            result.isValidData()!!.toByteArray().let {
-                Json.parseToJsonElement(it.decodeToString())
-            }.let {
-                Result.success(it.jsonObject)
-            }
-        }
-    }
-
-    override fun verifyRaw(signature: ByteArray, signedData: ByteArray): Result<ByteArray> {
-        return KeychainOperations.P256.createPublicKeyFrom(x963Representation) { publicKey ->
-            KeychainOperations.P256.verifyRaw(publicKey, signature, signedData)
-        }
     }
 }
 
@@ -113,44 +121,12 @@ internal class P256KeychainPublicKey(private val kid: String) : P256.PublicKey()
         ECKeyUtils.exportJwkWithPublicKey(privateKey, null)!!
     }.let { Json.parseToJsonElement(it).jsonObject }
 
-    override fun thumbprint(): String {
-        return KeychainOperations.P256.withPublicKey(kid) { privateKey ->
-            ECKeyUtils.thumbprintWithPublicKey(privateKey, null)!!
+    override fun <T> publicSecKey(block: (SecKeyRef?) -> T): T =
+        KeychainOperations.P256.withPublicKey(kid) {
+            block(it)
         }
-    }
-
-    override fun pem(): String {
-        return KeychainOperations.P256.withPublicKey(kid) { publicKey ->
-            KeychainOperations.keyExternalRepresentation(publicKey)
-        }.let { ECKeyUtils.pemWithPublicKeyRepresentation(it.toNSData()) }
-    }
 
     override fun kid(): String = kid
-    override fun externalRepresentation(): ByteArray {
-        return KeychainOperations.P256.withPublicKey(kid()) { publicKey ->
-            KeychainOperations.keyExternalRepresentation(publicKey)
-        }
-    }
-
-    override fun verifyJws(jws: String): Result<JsonObject> {
-        return KeychainOperations.P256.withPublicKey(kid) { publicKey ->
-            val result = DS_Operations.verifyWithJws(jws, publicKey)
-
-            check(result.success()) {
-                result.errorMessage()!!
-            }
-
-            result.isValidData()!!.toByteArray().let {
-                Json.parseToJsonElement(it.decodeToString())
-            }.let {
-                Result.success(it.jsonObject)
-            }
-        }
-    }
-
-    override fun verifyRaw(signature: ByteArray, signedData: ByteArray): Result<ByteArray> {
-        return KeychainOperations.P256.verifyRaw(kid, signature, signedData)
-    }
 }
 
 internal class P256KeychainPrivateKey(private val kid: String) : P256.PrivateKey() {
@@ -197,24 +173,4 @@ internal class P256KeychainPrivateKey(private val kid: String) : P256.PrivateKey
 
     override fun signRaw(plainText: ByteArray): ByteArray =
         KeychainOperations.P256.signRaw(kid, plainText)
-
-    override fun verifyJws(jws: String): Result<JsonObject> {
-        return KeychainOperations.P256.withPublicKey(kid) { publicKey ->
-            val result = DS_Operations.verifyWithJws(jws, publicKey)
-
-            check(result.success()) {
-                result.errorMessage()!!
-            }
-
-            result.isValidData()!!.toByteArray().let {
-                Json.parseToJsonElement(it.decodeToString())
-            }.let {
-                Result.success(it.jsonObject)
-            }
-        }
-    }
-
-    override fun verifyRaw(signature: ByteArray, signedData: ByteArray): Result<ByteArray> {
-        return KeychainOperations.P256.verifyRaw(kid, signature, signedData)
-    }
 }
