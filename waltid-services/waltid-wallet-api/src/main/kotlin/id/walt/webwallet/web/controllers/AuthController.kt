@@ -46,6 +46,7 @@ import io.ktor.util.pipeline.*
 import kotlinx.datetime.Clock
 import kotlinx.datetime.toJavaInstant
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import kotlinx.uuid.UUID
@@ -492,8 +493,16 @@ suspend fun verifyToken(token: String): Result<String> {
 }
 
 
-suspend fun ApplicationCall.getLoginRequest() = loginRequestJson.decodeFromString<AccountRequest>(receive())
-
+suspend fun ApplicationCall.getLoginRequest(): AccountRequest {
+    return try {
+        val requestBody = receive<String>()
+        Json.decodeFromString<AccountRequest>(requestBody)
+    } catch (e: SerializationException) {
+        throw BadRequestException("Invalid request format")
+    } catch (e: Exception) {
+        throw BadRequestException("Invalid request parameters")
+    }
+}
 suspend fun PipelineContext<Unit, ApplicationCall>.doLogin() {
     val reqBody = call.getLoginRequest()
     AccountsService.authenticate("", reqBody).onSuccess {
