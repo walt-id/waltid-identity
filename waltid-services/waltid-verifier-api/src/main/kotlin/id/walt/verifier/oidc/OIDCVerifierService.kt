@@ -71,7 +71,7 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
 
     override fun getSession(id: String) = presentationSessions[id]
     override fun putSession(id: String, session: PresentationSession) = presentationSessions.put(id, session)
-    override fun getSessionByIdTokenRequestState(idTokenRequestState: String): PresentationSession? {
+    override fun getSessionByAuthServerState(authServerState: String): PresentationSession? {
         TODO("Not yet implemented")
     }
 

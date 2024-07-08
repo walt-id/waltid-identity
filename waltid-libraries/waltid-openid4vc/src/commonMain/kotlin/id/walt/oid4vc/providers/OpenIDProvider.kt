@@ -151,7 +151,7 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
 
     protected abstract fun validateAuthorizationRequest(authorizationRequest: AuthorizationRequest): Boolean
 
-    abstract fun initializeAuthorization(authorizationRequest: AuthorizationRequest, expiresIn: Duration, idTokenRequestState: String? ): S
+    abstract fun initializeAuthorization(authorizationRequest: AuthorizationRequest, expiresIn: Duration, authServerState: String? ): S
 
     open fun processCodeFlowAuthorization(authorizationRequest: AuthorizationRequest): AuthorizationCodeResponse {
         if (!authorizationRequest.responseType.contains(ResponseType.Code))
@@ -167,7 +167,7 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
 
     open fun processDirectPost(state: String, tokenPayload: JsonObject) : AuthorizationCodeResponse {
         // here we get the initial session to retrieve the state of the initial authorization request
-        val session = getSessionByIdTokenRequestState(state)
+        val session = getSessionByAuthServerState(state)
             ?: throw IllegalStateException( "No authentication request found for given state")
 
         // Verify nonce - need to add Id token nonce session
@@ -308,10 +308,10 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
         expiresIn = authorizationSession.expirationTimestamp - Clock.System.now()
     )
 
-    protected open fun getOrInitAuthorizationSession(authorizationRequest: AuthorizationRequest, idTokenRequestState: String?=null): S {
+    protected open fun getOrInitAuthorizationSession(authorizationRequest: AuthorizationRequest, authServerState: String?=null): S {
         return when (authorizationRequest.isReferenceToPAR) {
             true -> getPushedAuthorizationSession(authorizationRequest)
-            false -> initializeAuthorization(authorizationRequest, 5.minutes, idTokenRequestState)
+            false -> initializeAuthorization(authorizationRequest, 5.minutes, authServerState)
         }
     }
 

@@ -82,13 +82,13 @@ open class CIProvider : OpenIDCredentialIssuer(
         return authSessions[id]
     }
 
-    override fun getSessionByIdTokenRequestState(idTokenRequestState: String): IssuanceSession? {
-        log.debug { "RETRIEVING CI AUTH SESSION by idTokenRequestState: $idTokenRequestState" }
+    override fun getSessionByAuthServerState(authServerState: String): IssuanceSession? {
+        log.debug { "RETRIEVING CI AUTH SESSION by authServerState: $authServerState" }
         var properSession: IssuanceSession? = null
         authSessions.forEach { entry ->
             print("${entry.key} : ${entry.value}")
             val session = entry.value
-            if (session.idTokenRequestState == idTokenRequestState) {
+            if (session.authServerState == authServerState) {
                 properSession = session
             }
         }

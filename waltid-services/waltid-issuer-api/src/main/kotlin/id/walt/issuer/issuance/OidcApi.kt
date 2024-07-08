@@ -386,7 +386,7 @@ object OidcApi : CIProvider() {
                     val currentPrincipal: OAuthAccessTokenResponse.OAuth2? = call.principal()
 
                     // should redirect to authorization request redirect uri with the code
-                    val session = getSessionByIdTokenRequestState(call.request.rawQueryParameters.toMap()["state"]!![0])
+                    val session = getSessionByAuthServerState(call.request.rawQueryParameters.toMap()["state"]!![0])
                     val authResp = processCodeFlowAuthorization(session?.authorizationRequest!!)
 
                     val redirectUri = if (session.authorizationRequest!!.isReferenceToPAR) {

@@ -280,7 +280,7 @@ class TestCredentialWallet(
     }
 
     override fun getSession(id: String) = sessionCache[id]
-    override fun getSessionByIdTokenRequestState(idTokenRequestState: String): VPresentationSession? {
+    override fun getSessionByAuthServerState(authServerState: String): VPresentationSession? {
         TODO("Not yet implemented")
     }
 

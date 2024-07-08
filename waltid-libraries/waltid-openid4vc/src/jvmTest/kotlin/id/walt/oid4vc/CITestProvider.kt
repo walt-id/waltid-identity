@@ -70,7 +70,7 @@ class CITestProvider : OpenIDCredentialIssuer(
 
     override fun getSession(id: String): IssuanceSession? = authSessions[id]
     override fun putSession(id: String, session: IssuanceSession) = authSessions.put(id, session)
-    override fun getSessionByIdTokenRequestState(idTokenRequestState: String): IssuanceSession? {
+    override fun getSessionByAuthServerState(authServerState: String): IssuanceSession? {
         TODO("Not yet implemented")
     }
 

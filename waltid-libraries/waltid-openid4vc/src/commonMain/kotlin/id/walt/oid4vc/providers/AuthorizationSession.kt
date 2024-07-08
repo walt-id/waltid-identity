@@ -8,6 +8,6 @@ abstract class AuthorizationSession {
     abstract val id: String
     abstract val authorizationRequest: AuthorizationRequest?
     abstract val expirationTimestamp: Instant
-    abstract val idTokenRequestState: String?
+    abstract val authServerState: String? //the state used for additional authentication with pwd, id_token or vp_token.
     val isExpired get() = expirationTimestamp < Clock.System.now()
 }
