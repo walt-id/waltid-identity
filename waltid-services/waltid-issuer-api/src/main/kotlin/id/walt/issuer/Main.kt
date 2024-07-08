@@ -3,6 +3,7 @@ package id.walt.issuer
 import id.walt.commons.ServiceConfiguration
 import id.walt.commons.ServiceInitialization
 import id.walt.commons.ServiceMain
+import id.walt.commons.featureflag.CommonsFeatureCatalog
 import id.walt.commons.featureflag.FeatureManager.whenFeature
 import id.walt.commons.web.WebService
 import id.walt.did.helpers.WaltidServices
@@ -16,6 +17,9 @@ suspend fun main(args: Array<String>) {
     ServiceMain(
         ServiceConfiguration("issuer"), ServiceInitialization(
             features = FeatureCatalog,
+            featureAmendments = mapOf(
+                CommonsFeatureCatalog.authenticationServiceFeature to issuerAuthenticationPluginAmendment
+            ),
             init = {
                 WaltidServices.minimalInit()
             },
@@ -25,7 +29,6 @@ suspend fun main(args: Array<String>) {
 }
 
 fun Application.configurePlugins() {
-    configureExternalAuth()
     configureHTTP()
     configureMonitoring()
     configureRouting()
@@ -33,7 +36,6 @@ fun Application.configurePlugins() {
 
 fun Application.issuerModule(withPlugins: Boolean = true) {
     if (withPlugins) {
-//        configureExternalAuth()
         configurePlugins()
     }
     oidcApi()
