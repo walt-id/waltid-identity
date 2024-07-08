@@ -4,7 +4,7 @@
         <div class="flex justify-end gap-1.5">
             <CredentialIcon :credentialType="title"
                 class="h-6 w-6 p-0.5 flex-none rounded-full backdrop-contrast-50 justify-self-start" />
-            <div :class="credential?.expirationDate ? (isNotExpired ? 'bg-cyan-100' : 'bg-red-50') : 'bg-cyan-50'"
+            <div :class="credential?.expirationDate || credential?.validUntil ? (isNotExpired ? 'bg-cyan-100' : 'bg-red-50') : 'bg-cyan-50'"
                 class="rounded-lg px-3 mb-2">
                 <span :class="isNotExpired ? 'text-cyan-900' : 'text-orange-900'">
                     {{ isNotExpired ? "Valid" : "Expired" }}
@@ -78,7 +78,7 @@ const credentialSubtitle = manifestCard?.description ?? credential?.name;
 
 const credentialImageUrl = manifestCard?.logo?.uri ?? credential?.issuer?.image?.id ?? credential?.issuer?.image;
 
-const isNotExpired = credential?.expirationDate ? new Date(credential?.expirationDate).getTime() > new Date().getTime() : true;
+const isNotExpired = credential?.expirationDate ? new Date(credential?.expirationDate).getTime() > new Date().getTime() : credential?.validUntil ? new Date(credential?.validUntil).getTime() > new Date().getTime() : true;
 
 const issuerName = manifestCard?.issuedBy ?? credential?.issuer?.name;
 

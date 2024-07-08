@@ -10,7 +10,7 @@ plugins {
     kotlin("plugin.serialization")
     id("maven-publish")
     id("com.github.ben-manes.versions")
-    id("love.forte.plugin.suspend-transform") version "0.6.0"
+    id("love.forte.plugin.suspend-transform") version "0.9.0"
 }
 
 group = "id.walt.did"
@@ -33,14 +33,14 @@ suspendTransform {
 
 
 kotlin {
-    jvmToolchain(15)
+    jvmToolchain(17)
 }
 
 kotlin {
     targets.configureEach {
         compilations.configureEach {
             compileTaskProvider.configure {
-                compilerOptions { 
+                compilerOptions {
                     freeCompilerArgs.add("-Xexpect-actual-classes")
                 }
             }

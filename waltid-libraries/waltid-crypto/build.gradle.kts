@@ -11,7 +11,7 @@ plugins {
     id("maven-publish")
     id("com.github.ben-manes.versions")
 //    id("com.android.library")
-    id("love.forte.plugin.suspend-transform") version "0.6.0"
+    id("love.forte.plugin.suspend-transform") version "0.9.0"
 }
 
 group = "id.walt.crypto"
@@ -37,7 +37,7 @@ java {
 }
 
 kotlin {
-    jvmToolchain(15)
+    jvmToolchain(17)
 }
 
 /*android {
@@ -54,7 +54,7 @@ kotlin {
                 }
             }
             compileTaskProvider.configure {
-                compilerOptions { 
+                compilerOptions {
                     freeCompilerArgs.add("-Xexpect-actual-classes")
                 }
             }
@@ -109,6 +109,9 @@ kotlin {
 
                 // Date
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.0")
+
+                // Cache
+                implementation("io.github.reactivecircus.cache4k:cache4k:0.13.0")
 
                 // Coroutines
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
