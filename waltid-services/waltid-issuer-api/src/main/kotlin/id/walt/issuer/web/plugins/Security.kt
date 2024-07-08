@@ -1,8 +1,6 @@
 package id.walt.issuer.web.plugins
 
 import id.walt.commons.config.ConfigManager
-import id.walt.commons.featureflag.FeatureManager
-import id.walt.issuer.FeatureCatalog
 import id.walt.issuer.config.AuthenticationServiceConfig
 import id.walt.issuer.config.OIDCIssuerServiceConfig
 import io.ktor.client.*
@@ -15,7 +13,7 @@ fun Application.configureExternalAuth() {
     val issuerServiceConfig = ConfigManager.getConfig<OIDCIssuerServiceConfig>()
 
     install(Authentication) {
-            oauth("external-oauth-server") {
+            oauth("auth-oauth") {
                 client = HttpClient()
                 providerLookup = {
                     OAuthServerSettings.OAuth2ServerSettings(
