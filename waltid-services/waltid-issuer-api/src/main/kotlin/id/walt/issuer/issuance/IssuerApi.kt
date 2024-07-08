@@ -5,6 +5,7 @@ import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.did.dids.DidService
+import id.walt.oid4vc.data.AuthenticationMethod
 import id.walt.oid4vc.definitions.CROSS_DEVICE_CREDENTIAL_OFFER_URL
 import id.walt.oid4vc.requests.CredentialOfferRequest
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -29,7 +30,7 @@ fun createCredentialOfferUri(issuanceRequests: List<IssuanceRequest>): String {
         credentialOfferBuilder = credentialOfferBuilder,
         expiresIn = 5.minutes,
         allowPreAuthorized = when (issuanceRequests[0].authenticationMethod) {
-            "pre_auth" -> true
+            AuthenticationMethod.PRE_AUTHORIZED -> true
             else -> false
         }
     )

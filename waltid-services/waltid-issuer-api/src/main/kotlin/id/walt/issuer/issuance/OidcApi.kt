@@ -352,7 +352,7 @@ object OidcApi : CIProvider() {
 
             val authorizationPhase = PipelinePhase("Authorization")
 
-            authenticate("auth-oauth") {
+            authenticate("external-oauth-server") {
                 // intercept request and store the state
                 this.insertPhaseBefore(ApplicationCallPipeline.Call, authorizationPhase)
                 this.intercept(authorizationPhase) {
@@ -360,19 +360,15 @@ object OidcApi : CIProvider() {
                         when (val externalAuthReqStr = call.response.headers.allValues().toMap()["Location"]) {
                             null -> null
                             else -> runBlocking {
-                                AuthorizationRequest.fromHttpQueryString(
-                                    externalAuthReqStr[0].substringAfter(
-                                        "?"
-                                    )
-                                )
+                                AuthorizationRequest.fromHttpQueryString( externalAuthReqStr[0].substringAfter( "?"))
                             }
                         }
-                    val internalAuthReq = when (val internalAuthReqParams = call.parameters["internalAuthReq"]) {
+                    val authReq = when (val internalAuthReqParams = call.parameters["internalAuthReq"]) {
                         null -> null
                         else -> runBlocking { AuthorizationRequest.fromHttpQueryString(internalAuthReqParams) }
                     }
-                    if (internalAuthReq != null && externalAuthReq != null) {
-                        initializeAuthorization(internalAuthReq, 5.minutes, externalAuthReq.state)
+                    if (authReq != null && externalAuthReq != null) {
+                        initializeAuthorization(authReq, 5.minutes, externalAuthReq.state)
                     }
 
                 }
