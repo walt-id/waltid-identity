@@ -23,6 +23,7 @@ class WaltIdVPCreateCmdTest {
     private val verifierDID: String = "did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV"
 
     private val openBadgeSignedVcPath = getResourcePath(this, "vc/openbadgecredential_sample.signed.json")
+    private val verifiableEducationalIdSignedVcPath = getResourcePath(this, "vc/verifiable_educational_id_sample.signed.json")
 
     @Test
     fun `should print help message when called with --help argument`() {
@@ -182,6 +183,42 @@ class WaltIdVPCreateCmdTest {
                     verifierDID,
                     "-vc",
                     openBadgeSignedVcPath,
+                    "-p",
+                    presDefPath,
+                    "-o",
+                    outputVpPath,
+                    "-po",
+                    outputPresSubPath,
+                )
+            )
+            assertContains(result.stdout, "Done".toRegex(RegexOption.MULTILINE))
+            assertContains(result.stdout, "VP saved at file .*${outputVpPath}".toRegex(RegexOption.MULTILINE))
+            assertContains(result.stdout, "Presentation Submission saved at file .*${outputPresSubPath}".toRegex(RegexOption.MULTILINE))
+            val expectedPresSub = Json.decodeFromString<PresentationSubmission>(File(expectedPresSubPath).readText())
+            val outputPresSub = Json.decodeFromString<PresentationSubmission>(File(outputPresSubPath).readText())
+            assertEquals(expectedPresSub.descriptorMap, outputPresSub.descriptorMap, "Presentation submissions descriptor maps do not match")
+        }
+    @Test
+    fun `should successfully create vp based on openbadge_verifiable_educational_id_presdef and submission should match openbadge_verifiable_educational_id_pressub`() =
+        runTest {
+            val presDefPath = getResourcePath(this, "presexch/openbadge_verifiable_educational_id_presdef.json")
+            val expectedPresSubPath = getResourcePath(this, "presexch/openbadge_verifiable_educational_id_pressub.json")
+            val outputPresSubPath = "${randomUUID()}_temp_pressub.json"
+            val outputVpPath = "${randomUUID()}_temp_vp.json"
+            File(outputPresSubPath).deleteOnExit()
+            File(outputVpPath).deleteOnExit()
+            val result = command.test(
+                listOf(
+                    "-hd",
+                    holderDID,
+                    "-hk",
+                    holderKeyPath,
+                    "-vd",
+                    verifierDID,
+                    "-vc",
+                    openBadgeSignedVcPath,
+                    "-vc",
+                    verifiableEducationalIdSignedVcPath,
                     "-p",
                     presDefPath,
                     "-o",

@@ -37,6 +37,22 @@
           }
         ]
       }
+    },
+    {
+      "id": "VerifiableCredential#2",
+      "constraints": {
+        "fields": [
+          {
+            "path": [
+              "$.vc.type"
+            ],
+            "filter": {
+              "type": "array",
+              "pattern": "VerifiableEducationalID"
+            }
+          }
+        ]
+      }
     }
   ]
 }

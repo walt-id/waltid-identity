@@ -19,11 +19,11 @@
         "fields": [
           {
             "path": [
-              "$.vc.credentialSubject.achievement.id"
+              "$.vc.type"
             ],
             "filter": {
-              "type": "string",
-              "pattern": "urn:uuid:ac254bd5-8fad-4bb1-9d29-efd938536926"
+              "type": "array",
+              "pattern": "OpenBadgeCredential"
             }
           }
         ]
