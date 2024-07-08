@@ -257,18 +257,19 @@ object IssuanceService {
         if(processedOffer.credentialResponse.format == CredentialFormat.mso_mdoc) {
             val credentialEncoding = processedOffer.credentialResponse.customParameters["credential_encoding"]?.jsonPrimitive?.content ?: "issuer-signed"
             val docType = processedOffer.credentialRequest?.docType ?: throw IllegalArgumentException("Credential request has no docType property")
+            val format = processedOffer.credentialResponse.format ?: throw IllegalArgumentException("Credential response has no format property")
             when(credentialEncoding) {
                 // TODO: find ID for mdoc
                 "issuer-signed" -> CredentialDataResult(docType, MDoc(docType.toDE(), IssuerSigned.fromMapElement(
                     Cbor.decodeFromByteArray(credential.base64UrlDecode())
-                ), null).toCBORHex(), type = docType)
+                ), null).toCBORHex(), type = docType, format = format)
                 else -> throw IllegalArgumentException("Invalid credential encoding: $credentialEncoding")
             }
         } else {
             val credentialJwt = credential.decodeJws(withSignature = true)
             when (val typ = credentialJwt.header["typ"]?.jsonPrimitive?.content?.lowercase()) {
-                "jwt" -> parseJwtCredentialResponse(credentialJwt, credential, manifest, typ)
-                "vc+sd-jwt" -> parseSdJwtCredentialResponse(credentialJwt, credential, manifest, typ)
+                "jwt" -> parseJwtCredentialResponse(credentialJwt, credential, manifest, typ, CredentialFormat.jwt_vc)
+                "vc+sd-jwt" -> parseSdJwtCredentialResponse(credentialJwt, credential, manifest, typ, CredentialFormat.sd_jwt_vc)
                 null -> throw IllegalArgumentException("WalletCredential JWT does not have \"typ\"")
                 else -> throw IllegalArgumentException("Invalid credential \"typ\": $typ")
             }
@@ -276,7 +277,7 @@ object IssuanceService {
     }
 
     private suspend fun parseJwtCredentialResponse(
-        credentialJwt: JwsUtils.JwsParts, document: String, manifest: JsonObject?, type: String,
+        credentialJwt: JwsUtils.JwsParts, document: String, manifest: JsonObject?, type: String, format: CredentialFormat
     ) = let {
         val credentialId =
             credentialJwt.payload["vc"]!!.jsonObject["id"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
@@ -288,12 +289,12 @@ object IssuanceService {
             id = credentialId,
             document = document,
             manifest = manifest?.toString(),
-            type = type,
+            type = type, format = format
         )
     }
 
     private suspend fun parseSdJwtCredentialResponse(
-        credentialJwt: JwsUtils.JwsParts, document: String, manifest: JsonObject?, type: String,
+        credentialJwt: JwsUtils.JwsParts, document: String, manifest: JsonObject?, type: String, format: CredentialFormat
     ) = let {
         val credentialId =
             credentialJwt.payload["id"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() } ?: randomUUID()
@@ -313,6 +314,7 @@ object IssuanceService {
             disclosures = disclosuresString,
             manifest = manifest?.toString(),
             type = type,
+            format = format
         )
     }
 
@@ -322,6 +324,7 @@ object IssuanceService {
         val document: String,
         val manifest: String? = null,
         val disclosures: String? = null,
-        val type: String?,
+        val type: String,
+        val format: CredentialFormat
     )
 }

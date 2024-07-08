@@ -1,5 +1,6 @@
 package id.walt.webwallet.usecase.notification
 
+import id.walt.oid4vc.data.CredentialFormat
 import id.walt.webwallet.db.models.Notification
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.service.credentials.CredentialsService
@@ -58,6 +59,7 @@ class NotificationFilterUseCaseTest {
             manifest = null,
             deletedOn = null,
             pending = true,
+            format = CredentialFormat.jwt_vc
         ),
         // not pending
         WalletCredential(
@@ -69,6 +71,7 @@ class NotificationFilterUseCaseTest {
             manifest = null,
             deletedOn = null,
             pending = false,
+            format = CredentialFormat.jwt_vc
         ),
     )
     private val pendingFilter = NotificationFilterParameter(

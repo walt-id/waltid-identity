@@ -2,6 +2,7 @@ package id.walt.webwallet.usecase.exchange
 
 import TestUtils
 import id.walt.crypto.utils.JsonUtils.toJsonElement
+import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.service.credentials.CredentialsService
@@ -42,6 +43,7 @@ class NoMatchPresentationDefinitionCredentialsUseCaseTest {
             disclosures = null,
             addedOn = Clock.System.now(),
             deletedOn = null,
+            format = CredentialFormat.jwt_vc
         ),
     )
     private val wallet = UUID()

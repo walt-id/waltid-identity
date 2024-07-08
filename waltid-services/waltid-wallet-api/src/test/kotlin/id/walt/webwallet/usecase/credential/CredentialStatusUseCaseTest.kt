@@ -1,5 +1,6 @@
 package id.walt.webwallet.usecase.credential
 
+import id.walt.oid4vc.data.CredentialFormat
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.service.credentials.CredentialStatusServiceFactory
 import id.walt.webwallet.service.credentials.CredentialsService
@@ -43,6 +44,7 @@ class CredentialStatusUseCaseTest {
         disclosures = null,
         addedOn = Clock.System.now(),
         deletedOn = null,
+        format = CredentialFormat.jwt_vc
     )
     private val credentialMultiStatus = WalletCredential(
         wallet = wallet,
@@ -75,6 +77,7 @@ class CredentialStatusUseCaseTest {
         disclosures = null,
         addedOn = Clock.System.now(),
         deletedOn = null,
+        format = CredentialFormat.jwt_vc
     )
 
     @Test

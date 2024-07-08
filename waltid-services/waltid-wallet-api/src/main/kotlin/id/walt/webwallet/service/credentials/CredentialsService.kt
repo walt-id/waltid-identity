@@ -101,6 +101,7 @@ class CredentialsService {
             this[WalletCredentials.addedOn] = Clock.System.now().toJavaInstant()
             this[WalletCredentials.manifest] = credential.manifest
             this[WalletCredentials.pending] = credential.pending
+            this[WalletCredentials.format] = credential.format.value
         }.map { it[WalletCredentials.id] }
     }
 
