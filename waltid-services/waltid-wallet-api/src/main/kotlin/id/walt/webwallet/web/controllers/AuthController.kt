@@ -21,6 +21,7 @@ import id.walt.webwallet.service.WalletServiceManager
 import id.walt.webwallet.service.WalletServiceManager.oidcConfig
 import id.walt.webwallet.service.account.AccountsService
 import id.walt.webwallet.service.account.KeycloakAccountStrategy
+import id.walt.webwallet.web.ForbiddenException
 import id.walt.webwallet.web.InsufficientPermissionsException
 import id.walt.webwallet.web.UnauthorizedException
 import id.walt.webwallet.web.WebBaseRoutes.webWalletRoute
@@ -578,7 +579,7 @@ fun PipelineContext<Unit, ApplicationCall>.ensurePermissionsForWallet(
                         (AccountWalletMappings.wallet eq walletId)
             }
             .firstOrNull()
-            ?: throw NotFoundException("This account does not have access to the specified wallet."))[
+            ?: throw ForbiddenException("This account does not have access to the specified wallet."))[
             AccountWalletMappings.permissions]
     }
 
