@@ -103,17 +103,18 @@ object OidcApi : CIProvider() {
             get("/authorize") {
                 val authReq = runBlocking { AuthorizationRequest.fromHttpParametersAuto(call.parameters.toMap()) }
                 try {
+                    val issuerState = OidcApi.sessionCredentialPreMapping[authReq.issuerState]
+                    if (issuerState == null) {
+                        call.response.apply {
+                            status(HttpStatusCode.BadRequest)
+                        }
+                        return@get
+                    }
+
+                    val authMethod = issuerState.first().request.authenticationMethod
                     val authResp: Any = when {
                         ResponseType.Code in authReq.responseType -> {
-                            val issuerState = OidcApi.sessionCredentialPreMapping[authReq.issuerState]
-                            if (issuerState == null) {
-                                call.response.apply {
-                                    status(HttpStatusCode.BadRequest)
-                                }
-                                return@get
-                            }
-
-                            when (issuerState.first().request.authenticationMethod) {
+                            when (authMethod) {
                                 AuthenticationMethod.PWD -> {
                                     call.response.apply {
                                         status(HttpStatusCode.Found)
@@ -174,15 +175,18 @@ object OidcApi : CIProvider() {
                         }
                     }
 
-                    val redirectUri = if (authReq.isReferenceToPAR) {
-                        getPushedAuthorizationSession(authReq).authorizationRequest?.redirectUri
-                    } else {
-                        authReq.redirectUri
-                    } ?: throw AuthorizationError(
-                        authReq,
-                        AuthorizationErrorCode.invalid_request,
-                        "No redirect_uri found for this authorization request"
-                    )
+                    val redirectUri = when(authMethod) {
+                        AuthenticationMethod.VP_TOKEN, AuthenticationMethod.ID_TOKEN -> authReq.clientMetadata!!.customParameters["authorization_endpoint"]?.jsonPrimitive?.content ?: "openid://"
+                        else -> if (authReq.isReferenceToPAR) {
+                                    getPushedAuthorizationSession(authReq).authorizationRequest?.redirectUri
+                                } else {
+                                    authReq.redirectUri
+                                } ?: throw AuthorizationError(
+                                    authReq,
+                                    AuthorizationErrorCode.invalid_request,
+                                    "No redirect_uri found for this authorization request"
+                                )
+                    }
 
                     logger.info { "Redirect Uri is: $redirectUri" }
 
