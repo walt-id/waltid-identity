@@ -20,7 +20,9 @@ object CommonsFeatureCatalog : ServiceFeatureCatalog {
     )
     val openApiFeature = OptionalFeature("openapi", "Enables openapi endpoints", default = true)
 
+    val authenticationServiceFeature = OptionalFeature("authservice", "Enables user authentication", default = true)
+
     override val baseFeatures: List<BaseFeature> = listOf(webFeature)
     override val optionalFeatures: List<OptionalFeature> =
-        listOf(featureFlagInformationEndpointFeature, healthChecksFeature, debugEndpointsFeature, openApiFeature)
+        listOf(featureFlagInformationEndpointFeature, healthChecksFeature, debugEndpointsFeature, openApiFeature, authenticationServiceFeature)
 }
