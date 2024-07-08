@@ -2,14 +2,27 @@ package id.walt.cli.commands
 
 import com.github.ajalt.clikt.core.PrintHelpMessage
 import com.github.ajalt.clikt.testing.test
+import id.walt.cli.util.getResourcePath
+import id.walt.did.utils.randomUUID
+import id.walt.oid4vc.data.dif.PresentationSubmission
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
+import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertContains
+import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
 class WaltIdVPCreateCmdTest {
 
     private val command = VPCreateCmd()
+
+    private val holderKeyPath = getResourcePath(this, "key/ed25519_by_waltid_pvt_key.jwk")
+    private val holderDID = "did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV"
+
+    private val verifierDID: String = "did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV"
+
+    private val openBadgeSignedVcPath = getResourcePath(this, "vc/openbadgecredential_sample.signed.json")
 
     @Test
     fun `should print help message when called with --help argument`() {
@@ -79,4 +92,109 @@ class WaltIdVPCreateCmdTest {
         assertContains(result.stdout, "--presentation-submission-output")
         assertContains(result.stdout, "-po")
     }
+
+    @Test
+    fun `should successfully create vp based on openbadge_presdef_vc_type and submission should match openbadge_pressub_vc_type`() =
+        runTest {
+            val presDefPath = getResourcePath(this, "presexch/openbadge_presdef_vc_type.json")
+            val expectedPresSubPath = getResourcePath(this, "presexch/openbadge_pressub_vc_type.json")
+            val outputPresSubPath = "${randomUUID()}_temp_pressub.json"
+            val outputVpPath = "${randomUUID()}_temp_vp.json"
+            File(outputPresSubPath).deleteOnExit()
+            File(outputVpPath).deleteOnExit()
+            val result = command.test(
+                listOf(
+                    "-hd",
+                    holderDID,
+                    "-hk",
+                    holderKeyPath,
+                    "-vd",
+                    verifierDID,
+                    "-vc",
+                    openBadgeSignedVcPath,
+                    "-p",
+                    presDefPath,
+                    "-o",
+                    outputVpPath,
+                    "-po",
+                    outputPresSubPath,
+                )
+            )
+            assertContains(result.stdout, "Done".toRegex(RegexOption.MULTILINE))
+            assertContains(result.stdout, "VP saved at file .*${outputVpPath}".toRegex(RegexOption.MULTILINE))
+            assertContains(result.stdout, "Presentation Submission saved at file .*${outputPresSubPath}".toRegex(RegexOption.MULTILINE))
+            val expectedPresSub = Json.decodeFromString<PresentationSubmission>(File(expectedPresSubPath).readText())
+            val outputPresSub = Json.decodeFromString<PresentationSubmission>(File(outputPresSubPath).readText())
+            assertEquals(expectedPresSub.descriptorMap, outputPresSub.descriptorMap, "Presentation submissions descriptor maps do not match")
+        }
+
+    @Test
+    fun `should successfully create vp based on openbadge_presdef_issuer_did and submission should match openbadge_pressub_vc_type`() =
+        runTest {
+            val presDefPath = getResourcePath(this, "presexch/openbadge_presdef_issuer_did.json")
+            val expectedPresSubPath = getResourcePath(this, "presexch/openbadge_pressub_vc_type.json")
+            val outputPresSubPath = "${randomUUID()}_temp_pressub.json"
+            val outputVpPath = "${randomUUID()}_temp_vp.json"
+            File(outputPresSubPath).deleteOnExit()
+            File(outputVpPath).deleteOnExit()
+            val result = command.test(
+                listOf(
+                    "-hd",
+                    holderDID,
+                    "-hk",
+                    holderKeyPath,
+                    "-vd",
+                    verifierDID,
+                    "-vc",
+                    openBadgeSignedVcPath,
+                    "-p",
+                    presDefPath,
+                    "-o",
+                    outputVpPath,
+                    "-po",
+                    outputPresSubPath,
+                )
+            )
+            assertContains(result.stdout, "Done".toRegex(RegexOption.MULTILINE))
+            assertContains(result.stdout, "VP saved at file .*${outputVpPath}".toRegex(RegexOption.MULTILINE))
+            assertContains(result.stdout, "Presentation Submission saved at file .*${outputPresSubPath}".toRegex(RegexOption.MULTILINE))
+            val expectedPresSub = Json.decodeFromString<PresentationSubmission>(File(expectedPresSubPath).readText())
+            val outputPresSub = Json.decodeFromString<PresentationSubmission>(File(outputPresSubPath).readText())
+            assertEquals(expectedPresSub.descriptorMap, outputPresSub.descriptorMap, "Presentation submissions descriptor maps do not match")
+        }
+
+    @Test
+    fun `should successfully create vp based on openbadge_presdef_vc_type_and_issuer_did and submission should match openbadge_pressub_vc_type`() =
+        runTest {
+            val presDefPath = getResourcePath(this, "presexch/openbadge_presdef_vc_type_and_issuer_did.json")
+            val expectedPresSubPath = getResourcePath(this, "presexch/openbadge_pressub_vc_type.json")
+            val outputPresSubPath = "${randomUUID()}_temp_pressub.json"
+            val outputVpPath = "${randomUUID()}_temp_vp.json"
+            File(outputPresSubPath).deleteOnExit()
+            File(outputVpPath).deleteOnExit()
+            val result = command.test(
+                listOf(
+                    "-hd",
+                    holderDID,
+                    "-hk",
+                    holderKeyPath,
+                    "-vd",
+                    verifierDID,
+                    "-vc",
+                    openBadgeSignedVcPath,
+                    "-p",
+                    presDefPath,
+                    "-o",
+                    outputVpPath,
+                    "-po",
+                    outputPresSubPath,
+                )
+            )
+            assertContains(result.stdout, "Done".toRegex(RegexOption.MULTILINE))
+            assertContains(result.stdout, "VP saved at file .*${outputVpPath}".toRegex(RegexOption.MULTILINE))
+            assertContains(result.stdout, "Presentation Submission saved at file .*${outputPresSubPath}".toRegex(RegexOption.MULTILINE))
+            val expectedPresSub = Json.decodeFromString<PresentationSubmission>(File(expectedPresSubPath).readText())
+            val outputPresSub = Json.decodeFromString<PresentationSubmission>(File(outputPresSubPath).readText())
+            assertEquals(expectedPresSub.descriptorMap, outputPresSub.descriptorMap, "Presentation submissions descriptor maps do not match")
+        }
 }
