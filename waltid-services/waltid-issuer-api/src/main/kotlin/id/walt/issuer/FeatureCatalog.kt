@@ -3,6 +3,7 @@ package id.walt.issuer
 import id.walt.commons.featureflag.BaseFeature
 import id.walt.commons.featureflag.OptionalFeature
 import id.walt.commons.featureflag.ServiceFeatureCatalog
+import id.walt.issuer.config.AuthenticationServiceConfig
 import id.walt.issuer.config.CredentialTypeConfig
 import id.walt.issuer.config.OIDCIssuerServiceConfig
 
@@ -20,9 +21,15 @@ object FeatureCatalog : ServiceFeatureCatalog {
         OIDCIssuerServiceConfig::class
     )
 
+    val authenticationService = BaseFeature(
+        "authentication-service",
+        "Authentication Service Implementation",
+        AuthenticationServiceConfig::class
+    )
+
     val entra = OptionalFeature("entra", "Enable support for Microsoft Entra", default = false)
 
-    override val baseFeatures = listOf(credentialTypes, issuerService)
+    override val baseFeatures = listOf(credentialTypes, issuerService, authenticationService)
     override val optionalFeatures = listOf(entra)
 
 }
