@@ -236,17 +236,12 @@ object OidcApi : CIProvider() {
                     // Process response
                     val resp = processDirectPost(state, payload!!)
 
-                    // Get the redirect_uri from the Authorization Request Parameter
-                    logger.info {
-                        "direct_post redirectUri is:" + resp.toRedirectUri(
-                            "openid://redirect",
-                            ResponseMode.query
-                        )
-                    }
+                    // Get the authorization_endpoint parameter which is the redirect_uri from the Authorization Request Parameter
+                    val redirectUri = getSessionByAuthServerState(state)!!.authorizationRequest!!.redirectUri!!
 
                     call.response.apply {
                         status(HttpStatusCode.Found)
-                        header(HttpHeaders.Location, resp.toRedirectUri("openid://redirect", ResponseMode.query))
+                        header(HttpHeaders.Location, resp.toRedirectUri(redirectUri, ResponseMode.query))
                     }
 
                 } else {
