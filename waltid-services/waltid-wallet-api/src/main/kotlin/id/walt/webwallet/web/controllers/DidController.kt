@@ -26,7 +26,7 @@ fun Application.dids() = walletRoute {
                 }
             }
         }) {
-            context.respond(getWalletService().run { transaction { runBlocking { listDids() } } })
+            context.respond(getWalletService().run {  runBlocking { listDids() }  })
         }
 
         route("{did}", {
