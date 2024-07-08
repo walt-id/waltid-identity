@@ -374,10 +374,9 @@ object OidcApi : CIProvider() {
                     val session = getSessionByAuthServerState(call.request.rawQueryParameters.toMap()["state"]!![0])
                     val authResp = processCodeFlowAuthorization(session?.authorizationRequest!!)
 
-                    val redirectUri = if (session.authorizationRequest!!.isReferenceToPAR) {
-                        getPushedAuthorizationSession(session.authorizationRequest!!).authorizationRequest?.redirectUri
-                    } else {
-                        session.authorizationRequest!!.redirectUri
+                    val redirectUri = when (session.authorizationRequest!!.isReferenceToPAR) {
+                        true -> getPushedAuthorizationSession(session.authorizationRequest!!).authorizationRequest?.redirectUri
+                        false-> session.authorizationRequest!!.redirectUri
                     } ?: throw AuthorizationError(
                         session.authorizationRequest!!,
                         AuthorizationErrorCode.invalid_request,
@@ -388,9 +387,7 @@ object OidcApi : CIProvider() {
 
                     call.response.apply {
                         status(HttpStatusCode.Found)
-                        val defaultResponseMode =
-                            if (session.authorizationRequest!!.responseType.contains(ResponseType.Code)) ResponseMode.query else ResponseMode.fragment
-                        authResp as IHTTPDataObject
+                        val defaultResponseMode = if (session.authorizationRequest!!.responseType.contains(ResponseType.Code)) ResponseMode.query else ResponseMode.fragment
                         header(
                             HttpHeaders.Location,
                             authResp.toRedirectUri(
