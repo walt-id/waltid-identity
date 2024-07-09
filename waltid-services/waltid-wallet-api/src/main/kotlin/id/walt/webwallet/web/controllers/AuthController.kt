@@ -295,6 +295,7 @@ fun Application.auth() {
                     response {
                         HttpStatusCode.Created to { description = "Registration succeeded " }
                         HttpStatusCode.BadRequest to { description = "Registration failed" }
+                        HttpStatusCode.Conflict to { description = "Account already exists!" }
                     }
                 }) {
                 val req = loginRequestJson.decodeFromString<AccountRequest>(call.receive())
@@ -303,7 +304,13 @@ fun Application.auth() {
                         call.response.status(HttpStatusCode.Created)
                         call.respond("Registration succeeded ")
                     }
-                    .onFailure { call.respond(HttpStatusCode.BadRequest, it.localizedMessage) }
+                    .onFailure {
+                        if (it.message?.contains("Account already exists!") == true) {
+                            call.respond(HttpStatusCode.Conflict, it.localizedMessage)
+                        } else {
+                            call.respond(HttpStatusCode.BadRequest, it.localizedMessage)
+                        }
+                    }
             }
 
             authenticate("auth-session", "auth-bearer", "auth-bearer-alternative") {
