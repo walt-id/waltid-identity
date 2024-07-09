@@ -26,7 +26,10 @@ object DidsService {
 
     fun add(wallet: UUID, did: String, document: String, keyId: String, alias: String? = null) = transaction {
         val now = Clock.System.now()
-
+        check(WalletDids.select { (WalletDids.wallet eq wallet) and (WalletDids.did eq did.replace("%3A", ":")) }
+            .count() == 0L) {
+            "DID already exists"
+        }
         WalletDids.insert {
             it[WalletDids.wallet] = wallet
             it[WalletDids.did] = did.replace("%3A", ":")
