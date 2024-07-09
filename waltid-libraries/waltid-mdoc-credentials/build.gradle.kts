@@ -5,7 +5,7 @@ plugins {
     `maven-publish`
 }
 
-group = "id.walt"
+group = "id.walt.mdoc-credentials"
 
 repositories {
     mavenCentral()
