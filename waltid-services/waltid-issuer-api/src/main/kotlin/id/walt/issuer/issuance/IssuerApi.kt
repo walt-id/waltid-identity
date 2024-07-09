@@ -16,6 +16,7 @@ import io.ktor.server.plugins.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import kotlin.time.Duration.Companion.minutes
 
@@ -198,11 +199,12 @@ fun Application.issuerApi() {
                         val keyJson = body["issuerKey"] ?: throw IllegalArgumentException("No key was passed.")
 
                         val key = KeyManager.resolveSerializedKey(keyJson.jsonObject)
-                        val issuerDid = body["issuerDid"]?.toString() ?: DidService.registerByKey("key", key).did
-                        val subjectDid = body["subjectDid"]?.toString()
+                        val issuerDid =
+                            body["issuerDid"]?.jsonPrimitive?.content ?: DidService.registerByKey("key", key).did
+                        val subjectDid = body["subjectDid"]?.jsonPrimitive?.content
                             ?: throw IllegalArgumentException("No subjectDid was passed.")
 
-                        val vc = W3CVC(body)
+                        val vc = W3CVC.fromJson(Json.encodeToString(body["credentialData"]))
 
                         // Sign VC
                         val jws = vc.signJws(
