@@ -70,7 +70,7 @@ specification:  [draft-ietf-oauth-selective-disclosure-jwt-04](https://datatrack
 </repositories>
         [...]
 <dependency>
-<groupId>id.walt</groupId>
+<groupId>id.walt.sdjwt</groupId>
 <artifactId>waltid-sdjwt-jvm</artifactId>
 <version>[ version ]</version>
 </dependency>
