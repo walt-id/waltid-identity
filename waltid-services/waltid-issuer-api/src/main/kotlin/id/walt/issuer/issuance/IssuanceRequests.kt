@@ -18,11 +18,6 @@ data class IssuanceRequest(
 )
 
 @Serializable
-data class IssuerOnboardingRequest(
-    val issuerKeyConfig: JsonObject, val issuerDidConfig: JsonObject,
-)
-
-@Serializable
 data class IssuerOnboardingResponse(
     val issuerKey: JsonElement, val issuerDid: String,
 )
