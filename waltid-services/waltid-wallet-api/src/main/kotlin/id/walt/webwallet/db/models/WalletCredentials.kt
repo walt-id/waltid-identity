@@ -44,7 +44,6 @@ data class WalletCredential(
     val deletedOn: Instant?,
     val pending: Boolean = false,
     val format: CredentialFormat,
-
     val parsedDocument: JsonObject? = parseDocument(document, id, format),
     @SerialName("manifest")
     val parsedManifest: JsonObject? = tryParseManifest(manifest),
