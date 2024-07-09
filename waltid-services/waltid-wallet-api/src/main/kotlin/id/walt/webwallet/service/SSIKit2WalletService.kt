@@ -454,6 +454,10 @@ class SSIKit2WalletService(
 
         val key = keyResult.getOrThrow()
         val keyId = key.getKeyId()
+        if (KeysService.get(walletId, keyId) !== null) {
+            throw IllegalArgumentException("Key with ID $keyId already exists in the database")
+        }
+
         eventUseCase.log(
             action = EventType.Key.Import,
             originator = "wallet",
