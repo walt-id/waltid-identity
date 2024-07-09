@@ -5,6 +5,7 @@ import id.walt.crypto.keys.KeyMeta
 import id.walt.crypto.keys.KeyType
 import id.walt.target.ios.keys.Ed25519
 import id.walt.target.ios.keys.P256
+import id.walt.target.ios.keys.RSA
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 
@@ -17,6 +18,7 @@ class IosKey(
         fun create(kid: String, type: KeyType): Key = when (type) {
             KeyType.secp256r1 -> P256.PrivateKey.createInKeychain(kid)
             KeyType.Ed25519 -> Ed25519.PrivateKey.createInKeychain(kid)
+            KeyType.RSA -> RSA.PrivateKey.createInKeychain(kid, 2048u)
 
             else -> error("Not implemented")
         }.let { key -> IosKey(type, true, kid) }
@@ -25,6 +27,7 @@ class IosKey(
         fun load(kid: String, type: KeyType): Key = when (type) {
             KeyType.secp256r1 -> P256.PrivateKey.loadFromKeychain(kid)
             KeyType.Ed25519 -> Ed25519.PrivateKey.loadFromKeychain(kid)
+            KeyType.RSA -> RSA.PrivateKey.loadFromKeychain(kid)
             else -> error("Not implemented")
         }.let { key -> IosKey(type, true, kid) }
 
@@ -32,6 +35,7 @@ class IosKey(
         fun delete(kid: String, type: KeyType): Unit = when (type) {
             KeyType.secp256r1 -> P256.PrivateKey.deleteFromKeychain(kid)
             KeyType.Ed25519 -> Ed25519.PrivateKey.deleteFromKeychain(kid)
+            KeyType.RSA -> RSA.PrivateKey.deleteFromKeychain(kid)
             else -> error("Not implemented")
         }
     }
@@ -39,6 +43,7 @@ class IosKey(
     override suspend fun getKeyId(): String = when (keyType) {
         KeyType.secp256r1 -> P256.PrivateKey.loadFromKeychain(kid)
         KeyType.Ed25519 -> Ed25519.PrivateKey.loadFromKeychain(kid)
+        KeyType.RSA -> RSA.PrivateKey.loadFromKeychain(kid)
         else -> error("Not implemented")
     }.kid()!!
 
@@ -49,6 +54,9 @@ class IosKey(
 
         KeyType.Ed25519 -> if (hasPrivateKey) Ed25519.PrivateKey.loadFromKeychain(kid)
         else Ed25519.PrivateKey.loadFromKeychain(kid).publicKey()
+
+        KeyType.RSA -> if (hasPrivateKey) RSA.PrivateKey.loadFromKeychain(kid) else
+            RSA.PrivateKey.loadFromKeychain(kid).publicKey()
 
         else -> error("Not implemented")
     }.thumbprint()
@@ -63,6 +71,9 @@ class IosKey(
         KeyType.Ed25519 -> if (hasPrivateKey) Ed25519.PrivateKey.loadFromKeychain(kid)
         else Ed25519.PrivateKey.loadFromKeychain(kid).publicKey()
 
+        KeyType.RSA -> if (hasPrivateKey) RSA.PrivateKey.loadFromKeychain(kid)
+        else RSA.PrivateKey.loadFromKeychain(kid).publicKey()
+
         else -> error("Not implemented")
     }.jwk()
 
@@ -73,6 +84,9 @@ class IosKey(
         KeyType.Ed25519 -> if (hasPrivateKey) Ed25519.PrivateKey.loadFromKeychain(kid)
         else Ed25519.PrivateKey.loadFromKeychain(kid).publicKey()
 
+        KeyType.RSA -> if (hasPrivateKey) RSA.PrivateKey.loadFromKeychain(kid)
+        else RSA.PrivateKey.loadFromKeychain(kid).publicKey()
+
         else -> error("Not implemented")
     }.pem()
 
@@ -82,6 +96,7 @@ class IosKey(
         return when (keyType) {
             KeyType.secp256r1 -> P256.PrivateKey.loadFromKeychain(kid)
             KeyType.Ed25519 -> Ed25519.PrivateKey.loadFromKeychain(kid)
+            KeyType.RSA -> RSA.PrivateKey.loadFromKeychain(kid)
             else -> error("Not implemented")
         }.signRaw(plaintext)
     }
@@ -92,6 +107,7 @@ class IosKey(
         return when (keyType) {
             KeyType.secp256r1 -> P256.PrivateKey.loadFromKeychain(kid)
             KeyType.Ed25519 -> Ed25519.PrivateKey.loadFromKeychain(kid)
+            KeyType.RSA -> RSA.PrivateKey.loadFromKeychain(kid)
             else -> error("Not implemented")
         }.signJws(plaintext, headers)
     }
@@ -102,7 +118,7 @@ class IosKey(
         return when (keyType) {
             KeyType.secp256r1 -> P256.PrivateKey.loadFromKeychain(kid).publicKey()
             KeyType.Ed25519 -> Ed25519.PrivateKey.loadFromKeychain(kid).publicKey()
-
+            KeyType.RSA -> RSA.PrivateKey.loadFromKeychain(kid).publicKey()
             else -> error("Not implemented")
         }.verifyRaw(signed, detachedPlaintext!!)
     }
@@ -111,7 +127,7 @@ class IosKey(
         return when (keyType) {
             KeyType.secp256r1 -> P256.PrivateKey.loadFromKeychain(kid).publicKey()
             KeyType.Ed25519 -> Ed25519.PrivateKey.loadFromKeychain(kid).publicKey()
-
+            KeyType.RSA -> RSA.PrivateKey.loadFromKeychain(kid).publicKey()
             else -> error("Not implemented")
         }.verifyJws(signedJws)
     }
@@ -122,7 +138,7 @@ class IosKey(
         return when (keyType) {
             KeyType.secp256r1 -> P256.PrivateKey.loadFromKeychain(kid).publicKey()
             KeyType.Ed25519 -> Ed25519.PrivateKey.loadFromKeychain(kid).publicKey()
-
+            KeyType.RSA -> RSA.PrivateKey.loadFromKeychain(kid).publicKey()
             else -> error("Not implemented")
         }.externalRepresentation()
     }

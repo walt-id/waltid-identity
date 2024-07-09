@@ -6,6 +6,7 @@ import id.walt.crypto.keys.KeyType
 import id.walt.crypto.utils.JsonUtils.toJsonObject
 import id.walt.target.ios.keys.Ed25519
 import id.walt.target.ios.keys.P256
+import id.walt.target.ios.keys.RSA
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -35,11 +36,13 @@ actual class JWKKey actual constructor(private val jwk: String?) : Key() {
         return _jwkObj["kid"]?.jsonPrimitive?.content ?: error("Kid not found in $jwk")
     }
 
+
     actual override suspend fun getThumbprint(): String = when (keyType) {
-        KeyType.secp256r1 -> P256.PublicKey.fromJwk(jwk!!).thumbprint()
-        KeyType.Ed25519 -> Ed25519.PublicKey.fromJwk(jwk!!).thumbprint()
+        KeyType.secp256r1 -> P256.PublicKey.fromJwk(jwk!!)
+        KeyType.Ed25519 -> Ed25519.PublicKey.fromJwk(jwk!!)
+        KeyType.RSA -> RSA.PublicKey.fromJwk(jwk!!)
         else -> error("Not implemented for $keyType")
-    }
+    }.thumbprint()
 
     actual override suspend fun exportJWK(): String = _jwkObj.toString()
 
@@ -47,10 +50,11 @@ actual class JWKKey actual constructor(private val jwk: String?) : Key() {
     actual override suspend fun exportJWKObject(): JsonObject = _jwkObj
 
     actual override suspend fun exportPEM(): String = when (keyType) {
-        KeyType.secp256r1 -> P256.PublicKey.fromJwk(jwk!!).pem()
-        KeyType.Ed25519 -> Ed25519.PublicKey.fromJwk(jwk!!).pem()
+        KeyType.secp256r1 -> P256.PublicKey.fromJwk(jwk!!)
+        KeyType.Ed25519 -> Ed25519.PublicKey.fromJwk(jwk!!)
+        KeyType.RSA -> RSA.PublicKey.fromJwk(jwk!!)
         else -> error("Not implemented for $keyType")
-    }
+    }.pem()
 
     /**
      * Signs as a JWS: Signs a message using this private key (with the algorithm this key is based on)
@@ -76,16 +80,18 @@ actual class JWKKey actual constructor(private val jwk: String?) : Key() {
     actual override suspend fun verifyRaw(
         signed: ByteArray, detachedPlaintext: ByteArray?
     ): Result<ByteArray> = when (keyType) {
-        KeyType.secp256r1 -> P256.PublicKey.fromJwk(jwk!!).verifyRaw(signed, detachedPlaintext!!)
-        KeyType.Ed25519 -> Ed25519.PublicKey.fromJwk(jwk!!).verifyRaw(signed, detachedPlaintext!!)
+        KeyType.secp256r1 -> P256.PublicKey.fromJwk(jwk!!)
+        KeyType.Ed25519 -> Ed25519.PublicKey.fromJwk(jwk!!)
+        KeyType.RSA -> RSA.PublicKey.fromJwk(jwk!!)
         else -> error("Not implemented for $keyType")
-    }
+    }.verifyRaw(signed, detachedPlaintext!!)
 
     actual override suspend fun verifyJws(signedJws: String): Result<JsonElement> = when (keyType) {
-        KeyType.secp256r1 -> P256.PublicKey.fromJwk(jwk!!).verifyJws(signedJws)
-        KeyType.Ed25519 -> Ed25519.PublicKey.fromJwk(jwk!!).verifyJws(signedJws)
+        KeyType.secp256r1 -> P256.PublicKey.fromJwk(jwk!!)
+        KeyType.Ed25519 -> Ed25519.PublicKey.fromJwk(jwk!!)
+        KeyType.RSA -> RSA.PublicKey.fromJwk(jwk!!)
         else -> error("Not implemented for $keyType")
-    }
+    }.verifyJws(signedJws)
 
     actual override suspend fun getPublicKey(): JWKKey = _jwkObj.toMap().filterKeys {
         it !in privateParameters
@@ -93,10 +99,11 @@ actual class JWKKey actual constructor(private val jwk: String?) : Key() {
 
 
     actual override suspend fun getPublicKeyRepresentation(): ByteArray = when (keyType) {
-        KeyType.secp256r1 -> P256.PublicKey.fromJwk(jwk!!).externalRepresentation()
-        KeyType.Ed25519 -> Ed25519.PublicKey.fromJwk(jwk!!).externalRepresentation()
+        KeyType.secp256r1 -> P256.PublicKey.fromJwk(jwk!!)
+        KeyType.Ed25519 -> Ed25519.PublicKey.fromJwk(jwk!!)
+        KeyType.RSA -> RSA.PublicKey.fromJwk(jwk!!)
         else -> error("Not implemented for $keyType")
-    }
+    }.externalRepresentation()
 
     actual override suspend fun getMeta(): JwkKeyMeta {
         TODO("Not yet implemented")

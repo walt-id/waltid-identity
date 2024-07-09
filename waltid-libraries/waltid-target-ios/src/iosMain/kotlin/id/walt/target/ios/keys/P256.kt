@@ -100,7 +100,7 @@ internal class P256JwkPublicKey(private val jwk: String) : P256.PublicKey() {
     }
 
     @Serializable
-    internal data class Jwk(val x: String, val y: String, var kid: String? = null)
+    private data class Jwk(val x: String, val y: String, var kid: String? = null)
 
     override fun jwk(): JsonObject {
         return Json.parseToJsonElement(jwk).jsonObject
