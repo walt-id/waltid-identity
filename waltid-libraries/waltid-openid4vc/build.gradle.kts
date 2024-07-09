@@ -9,7 +9,7 @@ plugins {
     id("com.github.ben-manes.versions")
 }
 
-group = "id.walt"
+group = "id.walt.openid4vc"
 
 repositories {
     mavenCentral()

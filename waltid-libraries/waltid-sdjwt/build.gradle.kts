@@ -10,7 +10,7 @@ plugins {
     id("com.github.ben-manes.versions")
 }
 
-group = "id.walt"
+group = "id.walt.sdjwt"
 
 repositories {
     mavenCentral()

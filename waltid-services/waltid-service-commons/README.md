@@ -17,6 +17,33 @@
 - Service initialization & phase management
 - Debug endpoints & health checks
 
+
+# How to use it
+
+Add the waltid-service-commons library as a dependency to your Kotlin or Java project.
+
+### walt.id Repository
+
+Add the Maven repository which hosts the walt.id libraries to your build.gradle file.
+
+```kotlin
+repositories {
+    maven { url = uri("https://maven.waltid.dev/releases") }
+} 
+```
+
+### Library Dependency
+
+Adding the waltid-service-commons library as dependency. Specify the version that coincides with the latest or required
+snapshot for your project. [Latest releases](https://github.com/walt-id/waltid-identity/releases).
+
+```kotlin
+dependencies {
+  implementation("id.walt:waltid-service-commons:<version>")
+}
+```
+
+
 # Feature system
 
 Many users have encountered various issues with the old configuration system, including:
