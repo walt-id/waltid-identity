@@ -94,7 +94,7 @@ dependencies {
     /* -- Kotlin -- */
 
     // Kotlinx.serialization
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.1")
 
     // Date
     implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.0")

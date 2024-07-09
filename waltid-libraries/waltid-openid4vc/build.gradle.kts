@@ -90,7 +90,7 @@ kotlin {
                 implementation("io.github.oshai:kotlin-logging:7.0.0")
 
                 // JSON
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.1")
 
                 // walt.id
                 implementation(project(":waltid-libraries:waltid-crypto"))
