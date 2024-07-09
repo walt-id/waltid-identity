@@ -258,13 +258,14 @@ object IssuanceService {
             val credentialEncoding = processedOffer.credentialResponse.customParameters["credential_encoding"]?.jsonPrimitive?.content ?: "issuer-signed"
             val docType = processedOffer.credentialRequest?.docType ?: throw IllegalArgumentException("Credential request has no docType property")
             val format = processedOffer.credentialResponse.format ?: throw IllegalArgumentException("Credential response has no format property")
-            when(credentialEncoding) {
-                // TODO: find ID for mdoc
-                "issuer-signed" -> CredentialDataResult(docType, MDoc(docType.toDE(), IssuerSigned.fromMapElement(
+            val mdoc = when(credentialEncoding) {
+                "issuer-signed" -> MDoc(docType.toDE(), IssuerSigned.fromMapElement(
                     Cbor.decodeFromByteArray(credential.base64UrlDecode())
-                ), null).toCBORHex(), type = docType, format = format)
+                ), null)
                 else -> throw IllegalArgumentException("Invalid credential encoding: $credentialEncoding")
             }
+            // TODO: review ID generation for mdoc
+            CredentialDataResult(randomUUID(), mdoc.toCBORHex(), type = docType, format = format)
         } else {
             val credentialJwt = credential.decodeJws(withSignature = true)
             when (val typ = credentialJwt.header["typ"]?.jsonPrimitive?.content?.lowercase()) {
