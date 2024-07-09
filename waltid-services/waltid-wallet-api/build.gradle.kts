@@ -135,7 +135,7 @@ dependencies {
     implementation("io.github.reactivecircus.cache4k:cache4k:0.13.0")
 
     // Webauthn
-    implementation("com.webauthn4j:webauthn4j-core:0.24.1.RELEASE") {
+    implementation("com.webauthn4j:webauthn4j-core:0.25.0.RELEASE") {
         exclude("ch.qos.logback")
     }
 
