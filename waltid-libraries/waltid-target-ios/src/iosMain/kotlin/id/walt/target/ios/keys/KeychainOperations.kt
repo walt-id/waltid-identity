@@ -33,7 +33,9 @@ import platform.Security.kSecAttrKeyClassPublic
 import platform.Security.kSecAttrKeySizeInBits
 import platform.Security.kSecAttrKeyType
 import platform.Security.kSecAttrKeyTypeECSECPrimeRandom
+import platform.Security.kSecAttrKeyTypeRSA
 import platform.Security.kSecKeyAlgorithmECDSASignatureMessageX962SHA256
+import platform.Security.kSecKeyAlgorithmRSASignatureDigestPKCS1v15SHA256
 import platform.Security.kSecPrivateKeyAttrs
 
 internal object KeychainOperations {
@@ -152,6 +154,78 @@ internal object KeychainOperations {
         }
     }
 
+    object RSA {
+        internal fun create(kid: String, size: UInt): String {
+            check(size in 1024u..7680u step 256) {
+                "The key size you provided is not supported."
+            }
+
+            return cfRetain(kid.toNSData(), appId.toNSData()) { kidCf, appLabelCf ->
+                var generateKeyParams: CFMutableDictionaryRef? = null
+                val nsSize = CFBridgingRetain(NSNumber(size))
+                try {
+                    generateKeyParams = CFDictionaryCreateMutable(
+                        kCFAllocatorDefault,
+                        5,
+                        kCFTypeDictionaryKeyCallBacks.ptr,
+                        kCFTypeDictionaryValueCallBacks.ptr
+                    ).apply {
+                        CFDictionaryAddValue(this, kSecAttrKeyType, kSecAttrKeyTypeRSA)
+                        CFDictionaryAddValue(this, kSecAttrApplicationTag, kidCf)
+                        CFDictionaryAddValue(this, kSecAttrApplicationLabel, appLabelCf)
+                        CFDictionaryAddValue(this, kSecAttrKeySizeInBits, nsSize)
+                        CFDictionaryAddValue(this, kSecAttrIsPermanent, kCFBooleanTrue)
+                    }
+
+                    val privateKey = checkErrorResult { error ->  SecKeyCreateRandomKey(
+                        generateKeyParams, error
+                    )}
+
+                    CFBridgingRelease(privateKey)
+
+                    kid
+
+                } finally {
+                    generateKeyParams?.let { CFBridgingRelease(it) }
+                    CFBridgingRelease(nsSize)
+                }
+            }
+        }
+
+        internal fun load(kid: String) = loadFromKeychain(kid, kSecAttrKeyTypeRSA)
+
+        internal fun delete(kid: String) = deleteFromKeychain(kid, kSecAttrKeyTypeRSA)
+
+        internal inline fun <T> withPrivateKey(kid: String, block: MemScope.(SecKeyRef?) -> T) =
+            withSecKey(kid, kSecAttrKeyTypeRSA, kSecAttrKeyClassPrivate) {
+                block(it)
+            }
+
+
+        internal inline fun <T> withPublicKey(kid: String, block: MemScope.(SecKeyRef?) -> T) =
+            withSecKey(kid, kSecAttrKeyTypeRSA, kSecAttrKeyClassPublic) {
+                block(it)
+            }
+
+        internal fun signRaw(kid: String, plainText: ByteArray) = signRaw(
+            kid,
+            kSecAttrKeyTypeRSA,
+            kSecKeyAlgorithmRSASignatureDigestPKCS1v15SHA256,
+            plainText
+        )
+
+        internal fun verifyRaw(publicKey: SecKeyRef?, signature: ByteArray, signedData: ByteArray) =
+            cfRetain(signature.toNSData(), signedData.toNSData()) { signatureCf, signedCf ->
+                verify(
+                    signatureCf,
+                    signedCf,
+                    publicKey,
+                    kSecKeyAlgorithmRSASignatureDigestPKCS1v15SHA256
+                )
+                Result.success(signedData)
+            }
+    }
+
     object P256 {
         internal fun delete(kid: String) = deleteFromKeychain(kid, kSecAttrKeyTypeECSECPrimeRandom)
 
@@ -240,11 +314,6 @@ internal object KeychainOperations {
             kSecKeyAlgorithmECDSASignatureMessageX962SHA256,
             plainText
         )
-
-        internal fun verifyRaw(kid: String, signature: ByteArray, signedData: ByteArray) =
-            withPublicKey(kid) { publicKey ->
-                verifyRaw(publicKey, signature, signedData )
-            }
 
         internal fun verifyRaw(publicKey: SecKeyRef?, signature: ByteArray, signedData: ByteArray) =
             cfRetain(signature.toNSData(), signedData.toNSData()) { signatureCf, signedCf ->

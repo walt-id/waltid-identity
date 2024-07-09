@@ -258,14 +258,20 @@ extension String: Error {}
 
 @objc
 public class RSAKeyUtils: NSObject {
+    
     @objc static func exportJwk(publicKey: SecKey) throws -> String {
-        let publicKey = try! RSAPublicKey(publicKey: publicKey)
-        return publicKey.jsonString()!
+        return try! RSAPublicKey(publicKey: publicKey).jsonString()!
     }
 
     @objc static func thumbprint(publicKey: SecKey) throws -> String {
         let publicKey = try! RSAPublicKey(publicKey: publicKey)
         return try! publicKey.thumbprint()
+    }
+    
+    @objc static func publicJwkToSecKey(jwk: String) throws -> SecKey {
+        let publicKey = try! RSAPublicKey(data: jwk.data(using: .utf8)!)
+        let secKey = try! publicKey.converted(to: SecKey.self)
+        return secKey
     }
 }
 
