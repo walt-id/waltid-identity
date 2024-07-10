@@ -49,9 +49,18 @@ object DidCreation {
                 }
             }
         }) {
-            getWalletService().createDid(
-                DidWebMethodName, extractDidCreateParameters(DidWebMethodName, context.request.queryParameters)
-            ).let { context.respond(it) }
+            val parameters = extractDidCreateParameters(DidWebMethodName, context.request.queryParameters)
+            runCatching {
+                getWalletService().createDid(DidWebMethodName, parameters)
+            }.onFailure {
+                if (it.message?.contains("DID already exists") == true) {
+                    context.respond(HttpStatusCode.Conflict, "DID already exists")
+                } else {
+                    context.respond(HttpStatusCode.InternalServerError, it.message ?: "Internal Server Error")
+                }
+            }.onSuccess {
+                context.respond(it)
+            }
         }
 
         post(DidEbsiMethodName, {
