@@ -21,7 +21,7 @@ spec:
             - name: NUXT_PUBLIC_CREDENTIALS_REPOSITORY_URL
               value: "https://credentials.walt.id"
             - name: NUXT_PUBLIC_DEV_WALLET_URL
-              value: "https://wallet.demo.walt.id"
+              value: "https://wallet-demo.walt.id"
           ports:
             - containerPort: 7101
               name: http
