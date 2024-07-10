@@ -184,10 +184,10 @@ fun Application.issuerApi() {
                         response {
                             "200" to {
                                 description = "Signed Credential (with the *proof* attribute added)"
-                                body<JsonObject> {
+                                body<String> {
                                     example(
                                         "Signed UniversityDegreeCredential example",
-                                        IssuanceExamples.universityDegreeSignedSignCredentialExample
+                                        IssuanceExamples.universityDegreeSignResponseCredentialExample
                                     )
                                 }
                             }
