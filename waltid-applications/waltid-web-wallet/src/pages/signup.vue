@@ -319,7 +319,7 @@ async function register() {
             isProgress.value = false;
             error.value = {
                 isError: true,
-                message: err.data.cause
+                message: err.data.cause ?? err.data.message ?? "An error occurred",
             };
         });
 }

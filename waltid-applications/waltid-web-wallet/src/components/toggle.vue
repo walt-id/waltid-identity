@@ -1,21 +1,3 @@
-<script setup lang="ts">
-import { ref } from 'vue'
-
-const emit = defineEmits(['update:option1Selected'])
-
-const option1Selected = ref(true)
-
-const handleOptionChange = () => {
-    option1Selected.value = !option1Selected.value
-    emit('update:option1Selected', option1Selected.value)
-}
-
-const props = defineProps<{
-    options: string[]
-}>()
-
-</script>
-
 <template>
     <label class="relative inline-flex cursor-pointer items-center justify-center rounded-md bg-white p-1 gap-2">
         <input type="checkbox" class="sr-only" @change="handleOptionChange" />
@@ -31,3 +13,19 @@ const props = defineProps<{
         </span>
     </label>
 </template>
+
+<script setup lang="ts">
+import { ref } from 'vue'
+
+const props = defineProps<{
+    options: string[],
+    option1Selected?: boolean
+}>()
+const emit = defineEmits(['update:option1Selected'])
+
+const option1Selected = ref(props.option1Selected ?? true)
+const handleOptionChange = () => {
+    option1Selected.value = !option1Selected.value
+    emit('update:option1Selected', option1Selected.value)
+}
+</script>

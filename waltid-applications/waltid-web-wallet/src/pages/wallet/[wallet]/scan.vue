@@ -12,7 +12,7 @@
             <div v-else class="w-2/3 lg:w-1/3 p-4">
                 <h1 class="text-2xl font-bold">Present/Receive Credential</h1>
                 <p class="text-xs mb-4">Paste offer URL or scan code.</p>
-                <toggle class="mb-3" @update:option1-selected="qrCodeDisplay = $event"
+                <toggle class="mb-3" @update:option1-selected="qrCodeDisplay = $event" :option1-selected="false"
                     :options="['Scan Code', 'Offer URL']" />
                 <QrCodeScanner v-if="qrCodeDisplay" @request="startRequest" />
                 <ManualRequestEntry v-else @request="startRequest" />
@@ -33,7 +33,7 @@ const route = useRoute();
 const walletId = route.params.wallet;
 const currentWallet = useCurrentWallet();
 
-const qrCodeDisplay = ref(true);
+const qrCodeDisplay = ref(false);
 
 async function startRequest(request) {
     console.log("Start request:", request);

@@ -10,7 +10,7 @@
                     </div>
                 </div>
             </NuxtLink>
-            <div class="w-full max-w-xs md:max-w-md">
+            <div class="hidden sm:block w-full max-w-xs md:max-w-md">
                 <form action="#" class="flex w-full md:ml-0" method="GET">
                     <div class="relative w-full text-gray-400 focus-within:text-gray-600">
                         <div aria-hidden="true"

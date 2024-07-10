@@ -130,21 +130,21 @@ const jwtJson = computed(() => {
         else return parsed;
     } else return null;
 });
-const { data: credentialManifest } = await useLazyFetch(`${runtimeConfig.public.credentialsRepositoryUrl}/api/manifest/${jwtJson.value?.type[jwtJson.value?.type.length - 1]}`, {
-    transform: (data: { claims: { [key: string]: string; } }) => {
-        return {
-            ...data,
-            claims: Object.fromEntries(Object.entries(data?.claims).map(([key, value]) => {
-                return [key, JSONPath({ path: value, json: jwtJson.value })[0]];
-            })),
-        }
-    },
-});
 
 const disclosures = computed(() => {
     if (credential.value && credential.value.disclosures) {
         return parseDisclosures(credential.value.disclosures);
     } else return null;
+});
+const { data: credentialManifest } = await useLazyFetch(`${runtimeConfig.public.credentialsRepositoryUrl}/api/manifest/${jwtJson.value?.type[jwtJson.value?.type.length - 1]}`, {
+    transform: (data: { claims: { [key: string]: string; } }) => {
+        return {
+            ...data,
+            claims: Object.fromEntries(Object.entries(data?.claims).map(([key, value]) => {
+                return [key, JSONPath({ path: value, json: jwtJson.value })[0] ?? disclosures.value?.find((disclosure) => disclosure[1] === value.split('.').pop())?.[2]];
+            })),
+        }
+    },
 });
 
 type WalletCredential = {
