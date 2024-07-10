@@ -298,8 +298,16 @@ fun Application.auth() {
                         HttpStatusCode.Conflict to { description = "Account already exists!" }
                     }
                 }) {
-                val req = loginRequestJson.decodeFromString<AccountRequest>(call.receive())
-                AccountsService.register("", req)
+                val req = call.receiveText()
+                val jsonElement = Json.parseToJsonElement(req)
+                val jsonObject = jsonElement.jsonObject
+
+                if (!jsonObject.containsKey("type") || jsonObject["type"]?.jsonPrimitive?.content.isNullOrEmpty()) {
+                    call.respond(HttpStatusCode.BadRequest, "Missing type in request")
+                    return@post
+                }
+                val accountRequest = loginRequestJson.decodeFromString<AccountRequest>(call.receive())
+                AccountsService.register("", accountRequest)
                     .onSuccess {
                         call.response.status(HttpStatusCode.Created)
                         call.respond("Registration succeeded ")
@@ -597,9 +605,10 @@ fun PipelineContext<Unit, ApplicationCall>.ensurePermissionsForWallet(
     }
 }
 
-private fun createHS256Token(tokenPayload: String) = JWSObject(JWSHeader(JWSAlgorithm.HS256), Payload(tokenPayload)).apply {
-    sign(MACSigner(AuthKeys.tokenKey))
-}.serialize()
+private fun createHS256Token(tokenPayload: String) =
+    JWSObject(JWSHeader(JWSAlgorithm.HS256), Payload(tokenPayload)).apply {
+        sign(MACSigner(AuthKeys.tokenKey))
+    }.serialize()
 
 private suspend fun createRsaToken(key: JWKKey, tokenPayload: String) =
     mapOf(JWTClaims.Header.keyID to key.getPublicKey().getKeyId(), JWTClaims.Header.type to "JWT").let {
