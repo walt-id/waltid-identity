@@ -125,8 +125,7 @@ fun Application.keys() = walletRoute {
             context.response.header(HttpHeaders.Location, "/keys/$key")
             context.respond(
                 HttpStatusCode.Created,
-
-                "Key imported successfully with id: $key"
+                key
             )
         }
         route("{keyId}", {
