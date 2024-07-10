@@ -17,9 +17,11 @@ spec:
           image: waltid/waltid-pwa-wallet
           env:
             - name: NUXT_PUBLIC_ISSUER_CALLBACK_URL
-              value: "https://wallet.demo.walt.id"
+              value: "https://wallet.walt.id"
             - name: NUXT_PUBLIC_CREDENTIALS_REPOSITORY_URL
               value: "https://credentials.walt.id"
+            - name: NUXT_PUBLIC_DEV_WALLET_URL
+              value: "https://wallet.demo.walt.id"
           ports:
             - containerPort: 7101
               name: http
@@ -46,10 +48,10 @@ metadata:
 spec:
   tls:
     - hosts:
-        - wallet.demo.walt.id
+        - wallet.walt.id
       secretName: waltid-pwa-wallet-tls-secret
   rules:
-    - host: wallet.demo.walt.id
+    - host: wallet.walt.id
       http:
         paths:
           - path: /wallet-api/
@@ -60,6 +62,34 @@ spec:
                 port:
                   name: http
           - path: /swagger
+            pathType: Prefix
+            backend:
+              service:
+                name: wallet-api
+                port:
+                  name: http
+          - path: /api.json
+            pathType: Prefix
+            backend:
+              service:
+                name: wallet-api
+                port:
+                  name: http
+          - path: /livez
+            pathType: Prefix
+            backend:
+              service:
+                name: wallet-api
+                port:
+                  name: http
+          - path: /features/
+            pathType: Prefix
+            backend:
+              service:
+                name: wallet-api
+                port:
+                  name: http
+          - path: /debug/
             pathType: Prefix
             backend:
               service:
