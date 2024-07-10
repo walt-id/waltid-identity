@@ -3,7 +3,6 @@ package id.walt.issuer.issuance
 import id.walt.credentials.vc.vcs.W3CVC
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeySerialization
-import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.did.dids.DidService
 import id.walt.oid4vc.definitions.CROSS_DEVICE_CREDENTIAL_OFFER_URL
 import id.walt.oid4vc.requests.CredentialOfferRequest
@@ -122,7 +121,7 @@ fun Application.issuerApi() {
             }) {
                 val req = context.receive<OnboardingRequest>()
 
-                val keyConfig = req.keyGenerationRequest.config?.mapValues { (key, value) ->
+                val keyConfig = req.key.config?.mapValues { (key, value) ->
                     if (key == "signingKeyPem") {
                         JsonPrimitive(value.jsonPrimitive.content.trimIndent().replace(" ", ""))
 
@@ -131,19 +130,18 @@ fun Application.issuerApi() {
                     }
                 }
 
-                val keyGenerationRequest =
-                    req.keyGenerationRequest.copy(config = keyConfig?.let { it1 -> JsonObject(it1) })
+                val keyGenerationRequest = req.key.copy(config = keyConfig?.let { it1 -> JsonObject(it1) })
 
 
                 val key = KeyManager.createKey(keyGenerationRequest)
 
-                val did = DidService.registerDefaultDidMethodByKey(req.didMethod, key, req.didConfig).did
+                val did = DidService.registerDefaultDidMethodByKey(req.did.method, key, req.did.config?.mapValues { it.value.jsonPrimitive } ?: emptyMap()).did
 
 
                 val serializedKey = KeySerialization.serializeKeyToJson(key)
 
 
-                val issuanceKey = if (req.keyGenerationRequest.backend == "jwk") {
+                val issuanceKey = if (req.key.backend == "jwk") {
                     val jsonObject = serializedKey.jsonObject
                     val jwkObject = jsonObject["jwk"] ?: throw IllegalArgumentException(
                         "No JWK key found in serialized key."
@@ -163,7 +161,6 @@ fun Application.issuerApi() {
         route("", {
             tags = listOf("Credential Issuance")
         }) {
-
             route("raw") {
                 route("jwt") {
                     post("sign", {
@@ -175,7 +172,10 @@ fun Application.issuerApi() {
                             body<JsonObject> {
                                 description =
                                     "Pass the unsigned credential that you intend to sign as the body of the request."
-                                example("OpenBadgeCredential example", IssuanceExamples.openBadgeCredentialSignExampleJsonString)
+                                example(
+                                    "UniversityDegreeCredential example",
+                                    IssuanceExamples.universityDegreeSignRequestCredentialExample
+                                )
                                 required = true
                             }
                         }
@@ -186,7 +186,7 @@ fun Application.issuerApi() {
                                 body<JsonObject> {
                                     example(
                                         "Signed UniversityDegreeCredential example",
-                                        IssuanceExamples.universityDegreeCredentialSignedExample
+                                        IssuanceExamples.universityDegreeSignedSignCredentialExample
                                     )
                                 }
                             }
@@ -213,8 +213,8 @@ fun Application.issuerApi() {
                     }
                 }
             }
-
             route("openid4vc") {
+
                 route("jwt") {
                     post("issue", {
                         summary = "Signs credential with JWT and starts an OIDC credential exchange flow."
@@ -224,8 +224,8 @@ fun Application.issuerApi() {
                             body<IssuanceRequest> {
                                 description =
                                     "Pass the unsigned credential that you intend to issue as the body of the request."
-                                example("OpenBadgeCredential example", IssuanceExamples.openBadgeCredentialExample)
-                                example("UniversityDegreeCredential example", IssuanceExamples.universityDegreeCredential)
+                                example("OpenBadgeCredential example", IssuanceExamples.openBadgeCredentialIssuanceExample)
+                                example("UniversityDegreeCredential example", IssuanceExamples.universityDegreeIssuanceCredentialExample)
                                 required = true
                             }
                         }
@@ -286,6 +286,7 @@ fun Application.issuerApi() {
                         )
                     }
                 }
+
                 route("sdjwt") {
                     post("issue", {
                         summary = "Signs credential and starts an OIDC credential exchange flow."
@@ -359,7 +360,8 @@ fun Application.issuerApi() {
                         )
                     }
                 }
-                route("mdoc") {
+
+                /*route("mdoc") {
                     post("issue", {
                         summary = "Signs a credential based on the IEC/ISO18013-5 mdoc/mDL format."
                         description = "This endpoint issues a mdoc and returns an issuance URL "
@@ -368,18 +370,15 @@ fun Application.issuerApi() {
                             headerParameter<String>("walt-key") {
                                 description =
                                     "Supply a  key representation to use to issue the credential, " + "e.g. a local key (internal JWK) or a TSE key."
-                                example("JWK example") {
-                                    value = mapOf(
-                                        "type" to "jwk", "jwk" to "{ ... }"
-                                    )
-                                }
+                                example("JWK example", IssuanceExamples.jwkKeyExample)
                                 required = false
                             }
                         }
                     }) {
                         context.respond(HttpStatusCode.OK, "mdoc issued")
                     }
-                }
+                }*/
+
                 get("credentialOffer", {
                     summary = "Gets a credential offer based on the session id"
                     request {
