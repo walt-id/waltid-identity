@@ -3,8 +3,15 @@ package id.walt.crypto.keys.jwk
 import id.walt.crypto.keys.JwkKeyMeta
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.encodeToJsonElement
 
 expect class JWKKey(jwk: String?) : Key {
     override val keyType: KeyType
@@ -70,4 +77,13 @@ expect class JWKKey(jwk: String?) : Key {
         override suspend fun importPEM(pem: String): Result<JWKKey>
     }
 
+}
+
+object JWKKeyJsonFieldSerializer : KSerializer<String?> {
+    override val descriptor: SerialDescriptor = JsonElement.serializer().descriptor
+    override fun deserialize(decoder: Decoder): String =
+        Json.encodeToString(decoder.decodeSerializableValue(JsonElement.serializer()))
+
+    override fun serialize(encoder: Encoder, value: String?) =
+        encoder.encodeSerializableValue(JsonElement.serializer(), Json.encodeToJsonElement(value))
 }
