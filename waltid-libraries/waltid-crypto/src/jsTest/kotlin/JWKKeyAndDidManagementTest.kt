@@ -105,20 +105,20 @@ class JWKKeyAndDidManagementTest {
 
     private suspend fun exportJwk(serializedKey: String) {
         val decoded = Json.decodeFromString<JsonObject>(serializedKey)
-        val jwk = decoded["jwk"]!!.jsonPrimitive.content
+        val jwk = decoded["jwk"]!!.jsonObject
 
         val key = KeyManager.resolveSerializedKey(serializedKey)
         val export = key.exportJWK()
 
-        assertEquals(jwk, export)
+        assertEquals(Json.encodeToString(jwk), export)
     }
 
     private suspend fun exportJson(serializedKey: String) {
         val decoded = Json.decodeFromString<JsonObject>(serializedKey)
-        val jwk = decoded["jwk"]!!.jsonPrimitive.content
+        val jwk = decoded["jwk"]!!.jsonObject
 
         val key = KeyManager.resolveSerializedKey(serializedKey)
         val export = key.exportJWKObject()
-        assertEquals(jwk, export.toString())
+        assertEquals(jwk, export)
     }
 }
