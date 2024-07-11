@@ -27,6 +27,7 @@ import kotlin.test.assertNotNull
 
 class LspPotentialWallet(val client: HttpClient, val walletId: String) {
   private var issuedMdocId: String = ""
+  private var issuedSDJwtVCId: String = ""
   private lateinit var generatedKeyId: String
   private lateinit var generatedDid: String
 
@@ -109,5 +110,42 @@ class LspPotentialWallet(val client: HttpClient, val walletId: String) {
       setBody(UsePresentationRequest(generatedDid, presReqUrl, listOf(issuedMdocId)))
     }.expectSuccess()
   }
+
+  fun testSDJwtVCIssuance() = runBlocking {
+    // === get credential offer from test issuer API ===
+    val offerResp = client.get("/lsp-potential/lspPotentialCredentialOfferT2")
+    assert(offerResp.status == HttpStatusCode.OK)
+    val offerUri = offerResp.bodyAsText()
+
+    // === resolve credential offer ===
+    val resolvedOffer = client.post("/wallet-api/wallet/$walletId/exchange/resolveCredentialOffer") {
+      setBody(offerUri)
+    }.expectSuccess().let {
+      it.body<CredentialOffer>()
+    }
+    assertEquals(1, resolvedOffer.credentialConfigurationIds.size)
+    assertEquals("urn:eu.europa.ec.eudi:pid:1", resolvedOffer.credentialConfigurationIds.first())
+
+    // === resolve issuer metadata ===
+    val issuerMetadata = client.get("${resolvedOffer.credentialIssuer}/.well-known/openid-credential-issuer").expectSuccess().let {
+      it.body<OpenIDProviderMetadata>()
+    }
+    assertEquals(issuerMetadata.issuer, resolvedOffer.credentialIssuer)
+    assertContains(issuerMetadata.credentialConfigurationsSupported!!.keys, resolvedOffer.credentialConfigurationIds.first())
+
+    // === use credential offer request ===
+    val issuedCred = client.post("/wallet-api/wallet/$walletId/exchange/useOfferRequest?did=$generatedDid") {
+      setBody(offerUri)
+    }.expectSuccess().body<List<WalletCredential>>().first()
+
+    assertEquals(CredentialFormat.sd_jwt_vc, issuedCred.format)
+
+    // === get issued credential from wallet-api
+    val fetchedCredential = client.get("/wallet-api/wallet/$walletId/credentials/${issuedCred.id}")
+      .expectSuccess().body<WalletCredential>()
+    assertEquals(issuedCred.format, fetchedCredential.format)
+    issuedSDJwtVCId = fetchedCredential.id
+  }
+
 
 }
