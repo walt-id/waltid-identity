@@ -29,7 +29,7 @@ class VPVerifyCmd : CliktCommand(
         .help("The DID of the verifier for whom the Verifiable Presentation has been created (required).")
         .required()
 
-    private val presentationDefinitionPath by option("-p", "--presentation-definition")
+    private val presentationDefinitionPath by option("-pd", "--presentation-definition")
         .path(mustExist = true, canBeDir = false, mustBeReadable = true, canBeSymlink = false)
         .help("The file path of the presentation definition based on which the VP token has been created (required).")
         .required()

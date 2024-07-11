@@ -63,17 +63,17 @@ class VPCreateCmd : CliktCommand(
         .help("The file path of the verifiable credential. Can be specified multiple times to include more than one vc in the vp (required - at least one vc file must be provided).")
         .multiple(required = true)
 
-    private val presentationDefinitionPath by option("-p", "--presentation-definition")
+    private val presentationDefinitionPath by option("-pd", "--presentation-definition")
         .path(mustExist = true, canBeDir = false, mustBeReadable = true, canBeSymlink = false)
         .help("The file path of the presentation definition based on which the VP token will be created (required).")
         .required()
 
-    private val vpOutputFilePath by option("-o", "--vp-output")
+    private val vpOutputFilePath by option("-vp", "--vp-output")
         .path()
         .help("File path to save the created vp (required).")
         .required()
 
-    private val presentationSubmissionOutputFilePath by option("-po", "--presentation-submission-output")
+    private val presentationSubmissionOutputFilePath by option("-ps", "--presentation-submission-output")
         .path()
         .help("File path to save the created vp (required).")
         .required()
