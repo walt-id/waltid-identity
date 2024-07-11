@@ -21,7 +21,7 @@ import kotlinx.serialization.json.*
 import kotlin.time.Duration.Companion.minutes
 
 private val logger = KotlinLogging.logger {}
-fun createCredentialOfferUri(issuanceRequests: List<IssuanceRequest>): String {
+suspend fun createCredentialOfferUri(issuanceRequests: List<IssuanceRequest>): String {
     val credentialOfferBuilder =
         OidcIssuance.issuanceRequestsToCredentialOfferBuilder(issuanceRequests)
 
