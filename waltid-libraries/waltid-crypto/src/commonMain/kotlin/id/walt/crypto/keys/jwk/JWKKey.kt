@@ -4,14 +4,12 @@ import id.walt.crypto.keys.JwkKeyMeta
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.encodeToJsonElement
+import kotlinx.serialization.json.*
 
 expect class JWKKey(jwk: String?) : Key {
     override val keyType: KeyType
@@ -84,6 +82,6 @@ object JWKKeyJsonFieldSerializer : KSerializer<String?> {
     override fun deserialize(decoder: Decoder): String =
         Json.encodeToString(decoder.decodeSerializableValue(JsonElement.serializer()))
 
-    override fun serialize(encoder: Encoder, value: String?) =
-        encoder.encodeSerializableValue(JsonElement.serializer(), Json.encodeToJsonElement(value))
+    override fun serialize(encoder: Encoder, value: String?) = encoder.encodeSerializableValue(JsonElement.serializer(),
+        value?.let { Json.decodeFromString<JsonElement>(it) } ?: JsonNull)
 }
