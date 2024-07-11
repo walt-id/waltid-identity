@@ -71,27 +71,27 @@ class WaltIdVPCreateCmdTest {
     }
 
     @Test
-    fun `should have -o and --vp-output options displayed`() = runTest {
+    fun `should have -vp and --vp-output options displayed`() = runTest {
         val result = command.test(listOf("--help"))
 
         assertContains(result.stdout, "--vp-output")
-        assertContains(result.stdout, "-o")
+        assertContains(result.stdout, "-vp")
     }
 
     @Test
-    fun `should have -p and --presentation-definition options displayed`() = runTest {
+    fun `should have -pd and --presentation-definition options displayed`() = runTest {
         val result = command.test(listOf("--help"))
 
         assertContains(result.stdout, "--presentation-definition")
-        assertContains(result.stdout, "-p")
+        assertContains(result.stdout, "-pd")
     }
 
     @Test
-    fun `should have -po and --presentation-submission-output options displayed`() = runTest {
+    fun `should have -ps and --presentation-submission-output options displayed`() = runTest {
         val result = command.test(listOf("--help"))
 
         assertContains(result.stdout, "--presentation-submission-output")
-        assertContains(result.stdout, "-po")
+        assertContains(result.stdout, "-ps")
     }
 
     @Test
@@ -113,11 +113,11 @@ class WaltIdVPCreateCmdTest {
                     verifierDID,
                     "-vc",
                     openBadgeSignedVcPath,
-                    "-p",
+                    "-pd",
                     presDefPath,
-                    "-o",
+                    "-vp",
                     outputVpPath,
-                    "-po",
+                    "-ps",
                     outputPresSubPath,
                 )
             )
@@ -148,11 +148,11 @@ class WaltIdVPCreateCmdTest {
                     verifierDID,
                     "-vc",
                     openBadgeSignedVcPath,
-                    "-p",
+                    "-pd",
                     presDefPath,
-                    "-o",
+                    "-vp",
                     outputVpPath,
-                    "-po",
+                    "-ps",
                     outputPresSubPath,
                 )
             )
@@ -183,11 +183,11 @@ class WaltIdVPCreateCmdTest {
                     verifierDID,
                     "-vc",
                     openBadgeSignedVcPath,
-                    "-p",
+                    "-pd",
                     presDefPath,
-                    "-o",
+                    "-vp",
                     outputVpPath,
-                    "-po",
+                    "-ps",
                     outputPresSubPath,
                 )
             )
@@ -219,11 +219,11 @@ class WaltIdVPCreateCmdTest {
                     openBadgeSignedVcPath,
                     "-vc",
                     verifiableEducationalIdSignedVcPath,
-                    "-p",
+                    "-pd",
                     presDefPath,
-                    "-o",
+                    "-vp",
                     outputVpPath,
-                    "-po",
+                    "-ps",
                     outputPresSubPath,
                 )
             )
