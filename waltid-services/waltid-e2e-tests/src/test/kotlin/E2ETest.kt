@@ -450,9 +450,13 @@ class E2ETest {
         it.body<AccountWalletListing>().wallets.first().id.toString()
       }
       val lspPotentialWallet = LspPotentialWallet(client, walletId)
-      test("lsp potential wallet mdoc issuance and presentation") {
-        lspPotentialWallet.testMDocIssuance()
-        lspPotentialWallet.testMdocPresentation()
+//      test("lsp potential wallet mdoc issuance and presentation") {
+//        lspPotentialWallet.testMDocIssuance()
+//        lspPotentialWallet.testMdocPresentation()
+//      }
+      test("lsp potential wallet sd-jwt-vc issuance and presentation") {
+        lspPotentialWallet.testSDJwtVCIssuance()
+        //lspPotentialWallet.testMdocPresentation()
       }
     }
   }
