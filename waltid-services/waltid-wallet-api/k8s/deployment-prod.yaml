@@ -240,3 +240,109 @@ spec:
                 name: waltid-web-wallet
                 port:
                   name: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: waltid-pwa-wallet
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: waltid-pwa-wallet
+  template:
+    metadata:
+      labels:
+        app: waltid-pwa-wallet
+    spec:
+      containers:
+        - name: waltid-pwa-wallet
+          image: waltid/waltid-pwa-wallet
+          env:
+            - name: NUXT_PUBLIC_ISSUER_CALLBACK_URL
+              value: "https://wallet.walt.id"
+            - name: NUXT_PUBLIC_CREDENTIALS_REPOSITORY_URL
+              value: "https://credentials.walt.id"
+            - name: NUXT_PUBLIC_DEV_WALLET_URL
+              value: "https://wallet-dev.walt.id"
+          ports:
+            - containerPort: 7101
+              name: http
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: waltid-pwa-wallet
+spec:
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+  selector:
+    app: waltid-pwa-wallet
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: waltid-pwa-wallet-ingress
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  tls:
+    - hosts:
+        - wallet.walt.id
+      secretName: waltid-pwa-wallet-tls-secret
+  rules:
+    - host: wallet.walt.id
+      http:
+        paths:
+          - path: /wallet-api/
+            pathType: Prefix
+            backend:
+              service:
+                name: wallet-api
+                port:
+                  name: http
+          - path: /swagger
+            pathType: Prefix
+            backend:
+              service:
+                name: wallet-api
+                port:
+                  name: http
+          - path: /api.json
+            pathType: Prefix
+            backend:
+              service:
+                name: wallet-api
+                port:
+                  name: http
+          - path: /livez
+            pathType: Prefix
+            backend:
+              service:
+                name: wallet-api
+                port:
+                  name: http
+          - path: /features/
+            pathType: Prefix
+            backend:
+              service:
+                name: wallet-api
+                port:
+                  name: http
+          - path: /debug/
+            pathType: Prefix
+            backend:
+              service:
+                name: wallet-api
+                port:
+                  name: http
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: waltid-pwa-wallet
+                port:
+                  name: http
