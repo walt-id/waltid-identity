@@ -1,3 +1,4 @@
+import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
@@ -41,19 +42,15 @@ class JWKKeyAndDidManagementTest {
             assertEquals("jwk", decoded["type"]!!.jsonPrimitive.content)
 
             println("Parsing JWK...")
-            val jwk = decoded["jwk"]!!.jsonPrimitive.content
+            val jwk = decoded["jwk"]!!.jsonObject
             println("JWK is: $jwk")
 
-            println("Parsing JWK...")
-            val jwkObj = Json.parseToJsonElement(jwk).jsonObject
-            println("Parsed as: $jwkObj")
-
             println("Getting kty, d, crv, kid, x...")
-            val kty = jwkObj["kty"].toString().removeSurrounding("\"")
-            val d = jwkObj["d"].toString().removeSurrounding("\"")
-            val crv = jwkObj["crv"].toString().removeSurrounding("\"")
-            val kid = jwkObj["kid"].toString().removeSurrounding("\"")
-            val x = jwkObj["x"].toString().removeSurrounding("\"")
+            val kty = jwk["kty"].toString().removeSurrounding("\"")
+            val d = jwk["d"].toString().removeSurrounding("\"")
+            val crv = jwk["crv"].toString().removeSurrounding("\"")
+            val kid = jwk["kid"].toString().removeSurrounding("\"")
+            val x = jwk["x"].toString().removeSurrounding("\"")
 
             println("Checking kty, d, crv, kid, x...")
             assertEquals(kty, getKeyTypeMap(it))
@@ -85,7 +82,7 @@ class JWKKeyAndDidManagementTest {
         val testObjJson = Json.encodeToString(testObj)
 
         // sign using newly generated key
-        val key = KeySerialization.deserializeKey(serializedKey).getOrThrow()
+        val key = KeyManager.resolveSerializedKey(serializedKey)
         val signature = key.signJws(testObjJson.encodeToByteArray())
 
         // verify the signature using public key
@@ -100,7 +97,7 @@ class JWKKeyAndDidManagementTest {
         val testObjJson = Json.encodeToString(testObj)
 
         // sign using newly generated key
-        val key = KeySerialization.deserializeKey(serializedKey).getOrThrow()
+        val key = KeyManager.resolveSerializedKey(serializedKey)
         val signature = key.signRaw(testObjJson.encodeToByteArray())
 
         assertNotNull(signature)
@@ -110,7 +107,7 @@ class JWKKeyAndDidManagementTest {
         val decoded = Json.decodeFromString<JsonObject>(serializedKey)
         val jwk = decoded["jwk"]!!.jsonPrimitive.content
 
-        val key = KeySerialization.deserializeKey(serializedKey).getOrThrow()
+        val key = KeyManager.resolveSerializedKey(serializedKey)
         val export = key.exportJWK()
 
         assertEquals(jwk, export)
@@ -120,7 +117,7 @@ class JWKKeyAndDidManagementTest {
         val decoded = Json.decodeFromString<JsonObject>(serializedKey)
         val jwk = decoded["jwk"]!!.jsonPrimitive.content
 
-        val key = KeySerialization.deserializeKey(serializedKey).getOrThrow()
+        val key = KeyManager.resolveSerializedKey(serializedKey)
         val export = key.exportJWKObject()
         assertEquals(jwk, export.toString())
     }

@@ -39,14 +39,13 @@ class JWKKeyAndDidManagementTest {
 
             assertEquals("jwk", decoded["type"]!!.jsonPrimitive.content)
 
-            val jwk = decoded["jwk"]!!.jsonPrimitive.content
-            val jwkObj = Json.parseToJsonElement(jwk).jsonObject
+            val jwk = decoded["jwk"]!!.jsonObject
 
-            val kty = jwkObj["kty"].toString().removeSurrounding("\"")
-            val d = jwkObj["d"].toString().removeSurrounding("\"")
-            val crv = jwkObj["crv"].toString().removeSurrounding("\"")
-            val kid = jwkObj["kid"].toString().removeSurrounding("\"")
-            val x = jwkObj["x"].toString().removeSurrounding("\"")
+            val kty = jwk["kty"].toString().removeSurrounding("\"")
+            val d = jwk["d"].toString().removeSurrounding("\"")
+            val crv = jwk["crv"].toString().removeSurrounding("\"")
+            val kid = jwk["kid"].toString().removeSurrounding("\"")
+            val x = jwk["x"].toString().removeSurrounding("\"")
 
             assertEquals(kty, getKeyTypeMap(it))
             assertNotNull(d)
@@ -91,20 +90,20 @@ class JWKKeyAndDidManagementTest {
 
     private suspend fun exportJwk(serializedKey: String) {
         val decoded = Json.decodeFromString<JsonObject>(serializedKey)
-        val jwk = decoded["jwk"]!!.jsonPrimitive.content
+        val jwk = decoded["jwk"]!!.jsonObject
 
         val key = KeyManager.resolveSerializedKey(serializedKey)
         val export = key.exportJWK()
 
-        assertEquals(jwk, export)
+        assertEquals(Json.encodeToString(jwk), export)
     }
 
     private suspend fun exportJson(serializedKey: String) {
         val decoded = Json.decodeFromString<JsonObject>(serializedKey)
-        val jwk = decoded["jwk"]!!.jsonPrimitive.content
+        val jwk = decoded["jwk"]!!.jsonObject
 
         val key = KeyManager.resolveSerializedKey(serializedKey)
         val export = key.exportJWKObject()
-        assertEquals(jwk, export.toString())
+        assertEquals(jwk, export)
     }
 }
