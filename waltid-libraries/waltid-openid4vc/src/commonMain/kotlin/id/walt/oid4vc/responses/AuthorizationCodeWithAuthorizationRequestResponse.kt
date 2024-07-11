@@ -15,6 +15,7 @@ data class AuthorizationCodeWithAuthorizationRequestResponse private constructor
     val nonce: String?,
     val requestUri: String? = null,
     val request: String?,
+    val presentationDefinition: String? = null,
     override val customParameters: Map<String, List<String>> = mapOf()
 ) : HTTPDataObject() {
 
@@ -29,6 +30,7 @@ data class AuthorizationCodeWithAuthorizationRequestResponse private constructor
             nonce?.let { put("nonce", listOf(it)) }
             requestUri?.let { put("request_uri", listOf(it)) }
             request?.let { put("request", listOf(it)) }
+            presentationDefinition?.let {  put("presentation_definition", listOf(it)) }
             putAll(customParameters)
         }
     }
@@ -46,11 +48,12 @@ data class AuthorizationCodeWithAuthorizationRequestResponse private constructor
                 parameters["nonce"]?.firstOrNull(),
                 parameters["request_uri"]?.firstOrNull(),
                 parameters["request"]?.firstOrNull(),
+                parameters["presentation_definition"]?.firstOrNull(),
                 parameters.filterKeys { !knownKeys.contains(it) }
             )
         }
 
-        fun success(state: String, clientId: String, redirectUri: String, responseType: String,  responseMode: ResponseMode, scope: Set<String>, nonce: String, requestUri: String?, request: String?, customParameters:Map<String, List<String>> = mapOf()) =
-            AuthorizationCodeWithAuthorizationRequestResponse(state, clientId, redirectUri, responseType,  responseMode, scope, nonce, requestUri, request, customParameters)
+        fun success(state: String, clientId: String, redirectUri: String, responseType: String,  responseMode: ResponseMode, scope: Set<String>, nonce: String, requestUri: String?, request: String?,  presentationDefinition: String?, customParameters:Map<String, List<String>> = mapOf()) =
+            AuthorizationCodeWithAuthorizationRequestResponse(state, clientId, redirectUri, responseType,  responseMode, scope, nonce, requestUri, request,  presentationDefinition, customParameters)
     }
 }

@@ -3,6 +3,7 @@ package id.walt.oid4vc.providers
 import id.walt.crypto.keys.Key
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.data.ResponseType.Companion.getResponseTypeString
+import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.definitions.JWTClaims
 import id.walt.oid4vc.errors.AuthorizationError
 import id.walt.oid4vc.errors.TokenError
@@ -14,10 +15,7 @@ import id.walt.oid4vc.responses.*
 import id.walt.oid4vc.util.randomUUID
 import io.ktor.http.*
 import kotlinx.datetime.Clock
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.put
+import kotlinx.serialization.json.*
 import kotlinx.uuid.UUID
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
@@ -186,7 +184,7 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
     // }
 
     // Create an ID or VP Token request using JAR OAuth2.0 specification https://www.rfc-editor.org/rfc/rfc9101.html
-    open fun processCodeFlowAuthorizationWithAuthorizationRequest(authorizationRequest: AuthorizationRequest, keyId: String, privKey: Key, responseType: ResponseType, isJar: Boolean, vpRequestValue: String? = null): AuthorizationCodeWithAuthorizationRequestResponse {
+    open fun processCodeFlowAuthorizationWithAuthorizationRequest(authorizationRequest: AuthorizationRequest, keyId: String, privKey: Key, responseType: ResponseType, isJar: Boolean, presentationDefinition: PresentationDefinition? = null):AuthorizationCodeWithAuthorizationRequestResponse {
         if (!authorizationRequest.responseType.contains(ResponseType.Code))
             throw AuthorizationError(
                 authorizationRequest,
@@ -199,8 +197,6 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
         val authorizationRequestServerNonce = UUID().toString()
         val authorizationResponseServerMode = ResponseMode.direct_post
 
-
-
         val clientId = this.metadata.issuer!!
         val redirectUri = this.metadata.issuer + "/direct_post"
         val scope = setOf("openid")
@@ -209,9 +205,15 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
         initializeAuthorization(authorizationRequest, 5.minutes, authorizationRequestServerState)
 
         return AuthorizationCodeWithAuthorizationRequestResponse.success(
-            authorizationRequestServerState, clientId, redirectUri, getResponseTypeString(responseType),
-            authorizationResponseServerMode, scope, authorizationRequestServerNonce, null,
-            when(isJar){
+            state = authorizationRequestServerState,
+            clientId = clientId,
+            redirectUri = redirectUri,
+            responseType = getResponseTypeString(responseType),
+            responseMode = authorizationResponseServerMode,
+            scope = scope,
+            nonce = authorizationRequestServerNonce,
+            requestUri = null,
+            request = when(isJar){
                 // Create a jwt as request object as defined in JAR OAuth2.0 specification
                 true -> signToken (
                     TokenTarget.TOKEN,
@@ -225,6 +227,10 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
                         put("response_type", getResponseTypeString(responseType))
                         put("response_mode", authorizationResponseServerMode.name)
                         put("scope", "openid")
+                        when(responseType) {
+                            ResponseType.VpToken -> put("presentation_definition", presentationDefinition!!.toJSON())
+                            else -> null
+                        }
                     }, buildJsonObject {
                         put(JWTClaims.Header.algorithm, "ES256")
                         put(JWTClaims.Header.keyID, keyId)
@@ -234,7 +240,12 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
                     privKey
                 )
                 false -> null
-            })
+            },
+            presentationDefinition = when(responseType) {
+                ResponseType.VpToken -> presentationDefinition!!.toJSONString()
+                else -> null
+            }
+        )
     }
 
     open fun processImplicitFlowAuthorization(authorizationRequest: AuthorizationRequest): TokenResponse {
