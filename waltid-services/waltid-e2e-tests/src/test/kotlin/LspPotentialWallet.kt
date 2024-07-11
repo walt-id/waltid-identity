@@ -26,7 +26,22 @@ import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 
 class LspPotentialWallet(val client: HttpClient, val walletId: String) {
-  var issuedMdocId: String = ""
+  private var issuedMdocId: String = ""
+  private lateinit var generatedKeyId: String
+  private lateinit var generatedDid: String
+
+  init {
+    // === create EC256 key and DID:JWK (did is not necessarily required, but currently needed for wallet initialization) ===
+    val keysApi = KeysApi(client)
+
+    runBlocking {
+      keysApi.generate(UUID(walletId), KeyGenerationRequest(keyType = KeyType.secp256r1)) { generatedKeyId = it }
+      DidsApi(client).create(UUID(walletId), DidsApi.DidCreateRequest("jwk", keyId = generatedKeyId)) {
+        generatedDid = it
+      }
+    }
+  }
+
   fun testMDocIssuance() = runBlocking {
     // === get credential offer from test issuer API ===
     val offerResp = client.get("/lsp-potential/lspPotentialCredentialOfferT1")
@@ -48,13 +63,6 @@ class LspPotentialWallet(val client: HttpClient, val walletId: String) {
     }
     assertEquals(issuerMetadata.issuer, resolvedOffer.credentialIssuer)
     assertContains(issuerMetadata.credentialConfigurationsSupported!!.keys, resolvedOffer.credentialConfigurationIds.first())
-
-    // === create EC256 key and DID:JWK (did is not necessarily required, but currently needed for wallet initialization) ===
-    val keysApi = KeysApi(client)
-    lateinit var generatedKeyId: String
-    lateinit var generatedDid: String
-    keysApi.generate(UUID(walletId), KeyGenerationRequest(keyType = KeyType.secp256r1)) { generatedKeyId = it }
-    DidsApi(client).create(UUID(walletId), DidsApi.DidCreateRequest("jwk", keyId = generatedKeyId)) { generatedDid = it }
 
     // === use credential offer request ===
     val issuedCred = client.post("/wallet-api/wallet/$walletId/exchange/useOfferRequest?did=$generatedDid") {
@@ -98,7 +106,7 @@ class LspPotentialWallet(val client: HttpClient, val walletId: String) {
 //    assertNotEquals(0, matchingCreds.size)
 
     client.post("/wallet-api/wallet/$walletId/exchange/usePresentationRequest") {
-      setBody(UsePresentationRequest(null, presReqUrl, listOf(issuedMdocId)))
+      setBody(UsePresentationRequest(generatedDid, presReqUrl, listOf(issuedMdocId)))
     }.expectSuccess()
   }
 

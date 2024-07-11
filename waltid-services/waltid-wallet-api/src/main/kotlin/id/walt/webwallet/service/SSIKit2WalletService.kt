@@ -1,5 +1,8 @@
 package id.walt.webwallet.service
 
+import com.nimbusds.jose.jwk.JWK
+import com.nimbusds.jose.jwk.KeyUse
+import com.nimbusds.jose.util.Base64URL
 import id.walt.commons.config.ConfigManager
 import id.walt.crypto.keys.*
 import id.walt.crypto.keys.jwk.JWKKey
@@ -12,6 +15,7 @@ import id.walt.did.dids.registrar.dids.DidWebCreateOptions
 import id.walt.did.dids.resolver.LocalResolver
 import id.walt.did.utils.EnumUtils.enumValueIgnoreCase
 import id.walt.oid4vc.data.CredentialOffer
+import id.walt.oid4vc.data.ResponseMode
 import id.walt.oid4vc.errors.AuthorizationError
 import id.walt.oid4vc.providers.CredentialWalletConfig
 import id.walt.oid4vc.providers.OpenIDClientConfig
@@ -198,6 +202,22 @@ class SSIKit2WalletService(
         logger.debug { "Resolved presentation definition: ${presentationSession.authorizationRequest!!.presentationDefinition!!.toJSONString()}" }
 
         val tokenResponse = credentialWallet.processImplicitFlowAuthorization(presentationSession.authorizationRequest!!)
+        val submitFormParams = if(presentationSession.authorizationRequest.responseMode == ResponseMode.direct_post_jwt) {
+            val encKey = presentationSession.authorizationRequest.clientMetadata?.jwks?.get("keys")?.jsonArray?.first {
+                    jwk -> JWK.parse(jwk.toString()).keyUse?.equals(KeyUse.ENCRYPTION) ?: false }?.jsonObject ?: throw Exception("No ephemeral reader key found")
+            val ephemeralWalletKey = runBlocking { KeyManager.createKey(KeyGenerationRequest(keyType = KeyType.secp256r1)) }
+            tokenResponse.toDirecPostJWTParameters(encKey,
+                alg = presentationSession.authorizationRequest.clientMetadata!!.authorizationEncryptedResponseAlg!!,
+                enc = presentationSession.authorizationRequest.clientMetadata!!.authorizationEncryptedResponseEnc!!,
+                mapOf(
+                    "epk" to runBlocking{ ephemeralWalletKey.getPublicKey().exportJWKObject() },
+                    "apu" to JsonPrimitive(Base64URL.encode(presentationSession.nonce).toString()),
+                    "apv" to JsonPrimitive(Base64URL.encode(presentationSession.authorizationRequest.nonce!!).toString())
+                )
+            )
+        }
+        else tokenResponse.toHttpParameters()
+
         val resp = this.http.submitForm(
             presentationSession.authorizationRequest.responseUri
                 ?: presentationSession.authorizationRequest.redirectUri ?: throw AuthorizationError(
@@ -205,9 +225,9 @@ class SSIKit2WalletService(
                     AuthorizationErrorCode.invalid_request,
                     "No response_uri or redirect_uri found on authorization request"
                 ), parameters {
-                tokenResponse.toHttpParameters().forEach { entry ->
-                    entry.value.forEach { append(entry.key, it) }
-                }
+                    submitFormParams.forEach { entry ->
+                        entry.value.forEach { append(entry.key, it) }
+                    }
             })
         val httpResponseBody = runCatching { resp.bodyAsText() }.getOrNull()
         val isResponseRedirectUrl = httpResponseBody != null && httpResponseBody.take(10).lowercase().let {

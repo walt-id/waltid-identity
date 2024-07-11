@@ -219,7 +219,7 @@ class TestCredentialWallet(
 
         val mdocHandover = OpenID4VP.generateMDocOID4VPHandover(session.authorizationRequest, session.nonce!!)
         val mdocsPresented = runBlocking {
-            val ecKey = ECKey.parseFromPEMEncodedObjects(key.exportPEM()).toECKey()
+            val ecKey = ECKey.parse(key.exportJWK()).toECKey()
             val cryptoProvider = SimpleCOSECryptoProvider(listOf(
                 COSECryptoProviderKeyInfo(key.getKeyId(), AlgorithmID.ECDSA_256, ecKey.toECPublicKey(), ecKey.toECPrivateKey())
             ))
@@ -248,7 +248,7 @@ class TestCredentialWallet(
 
         val presentationId = (session.presentationDefinition?.id ?: "urn:uuid:${UUID.generateUUID().toString().lowercase()}")
 
-        val vp = getVpJson(jwtsPresented, presentationId, session.nonce, session.authorizationRequest.clientId)
+        val vp = if(!jwtsPresented.isNullOrEmpty()) getVpJson(jwtsPresented, presentationId, session.nonce, session.authorizationRequest.clientId) else null
 
         val signedJwtVP = if(!vp.isNullOrEmpty()) runBlocking {
             val authKeyId = resolveDidAuthentication(this@TestCredentialWallet.did)
@@ -261,19 +261,25 @@ class TestCredentialWallet(
             )
         } else null
 
-        val deviceResponse = if(!mdocsPresented.isNullOrEmpty()) mdocsPresented.let { DeviceResponse(it) } else null
+        val deviceResponse = if(!mdocsPresented.isNullOrEmpty()) mdocsPresented.let { DeviceResponse(it).toCBORBase64URL() } else null
 
         println("GENERATED VP: $signedJwtVP")
 
-        // TODO: filter presentations if null
-        // TODO: generate descriptor mappings based on type (vp or mdoc device response)
-        // TODO: set root path of descriptor mapping based on whether there are multiple presentations or just one ("$" or "$[idx]")
+        // DONE: filter presentations if null
+        // DONE: generate descriptor mappings based on type (vp or mdoc device response)
+        // DONE: set root path of descriptor mapping based on whether there are multiple presentations or just one ("$" or "$[idx]")
+        val presentations = listOf(signedJwtVP, deviceResponse).filterNotNull().map { JsonPrimitive(it) }
+        val rootPathVP = "$" + (if(presentations.size == 2) "[0]" else "")
+        val rootPathMDoc = "$" + (if(presentations.size == 2) "[1]" else "")
         return PresentationResult(
-            listOf(JsonPrimitive(signedJwtVP), JsonPrimitive(deviceResponse?.toCBORHex())), PresentationSubmission(
+            presentations, PresentationSubmission(
                 id = presentationId,
                 definitionId = presentationId,
-                descriptorMap = matchedCredentials.map { it.document }.mapIndexed { index, vcJwsStr ->
-                    buildDescriptorMappingJwtVP(session, index, vcJwsStr)
+                descriptorMap = matchedCredentials.mapIndexed { index, credential ->
+                    when(credential.format) {
+                        CredentialFormat.mso_mdoc -> buildDescriptorMappingMDoc(session, index, credential.document, rootPathMDoc)
+                        else -> buildDescriptorMappingJwtVP(session, index, credential.document, rootPathVP)
+                    }
                 }
             )
         )
