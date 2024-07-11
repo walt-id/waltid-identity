@@ -1,7 +1,10 @@
 package id.walt.issuer.issuance
 
 
+import id.walt.credentials.verification.Verifier
+import id.walt.credentials.verification.models.PolicyRequest.Companion.parsePolicyRequests
 import id.walt.oid4vc.data.*
+import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.errors.*
 import id.walt.oid4vc.providers.TokenTarget
 import id.walt.oid4vc.requests.AuthorizationRequest
@@ -103,15 +106,8 @@ object OidcApi : CIProvider() {
             get("/authorize") {
                 val authReq = runBlocking { AuthorizationRequest.fromHttpParametersAuto(call.parameters.toMap()) }
                 try {
-                    val issuerState = OidcApi.sessionCredentialPreMapping[authReq.issuerState]
-                    if (issuerState == null) {
-                        call.response.apply {
-                            status(HttpStatusCode.BadRequest)
-                        }
-                        return@get
-                    }
-
-                    val authMethod = issuerState.first().request.authenticationMethod
+                    val issuerState = OidcApi.sessionCredentialPreMapping[authReq.issuerState] ?: throw IllegalArgumentException("missing issuer state parameter")
+                    val authMethod = issuerState.first().request.authenticationMethod ?: AuthenticationMethod.NONE
                     val authResp: Any = when {
                         ResponseType.Code in authReq.responseType -> {
                             when (authMethod) {
@@ -138,17 +134,30 @@ object OidcApi : CIProvider() {
                                     )
                                 }
 
-                                AuthenticationMethod.VP_TOKEN -> when (issuerState.first().request.useJar) {
-                                    true -> throw AuthorizationError(
-                                        authReq,
-                                        AuthorizationErrorCode.temporarily_unavailable,
-                                        "VP Token with JAR is not implemented"
-                                    )
+                                AuthenticationMethod.VP_TOKEN -> {
+                                    val vpTokenRequestJwtKid = issuerState.first().issuerKey.getKeyId()
+                                    val vpTokenRequestJwtPrivKey = issuerState.first().issuerKey
+                                    val vpProfile  = issuerState.first().request.vpProfile
+                                    val vpRequestValue  = issuerState.first().request.vpRequestValue ?: throw IllegalArgumentException("missing vpRequestValue parameter")
 
-                                    else -> throw AuthorizationError(
+                                    // Generate Presentation Definition
+                                    val requestCredentialsArr = buildJsonArray { add(vpRequestValue) }
+                                    val requestedTypes = requestCredentialsArr.map {
+                                        when (it) {
+                                            is JsonPrimitive -> it.contentOrNull
+                                            is JsonObject -> it["credential"]?.jsonPrimitive?.contentOrNull
+                                            else -> throw IllegalArgumentException("Invalid JSON type for requested credential: $it")
+                                        } ?: throw IllegalArgumentException("Invalid VC type for requested credential: $it")
+                                    }
+                                    val presentationDefinition = PresentationDefinition.primitiveGenerationFromVcTypes(requestedTypes, vpProfile!!)
+
+                                    processCodeFlowAuthorizationWithAuthorizationRequest(
                                         authReq,
-                                        AuthorizationErrorCode.temporarily_unavailable,
-                                        "VP Token without JAR is not implemented"
+                                        vpTokenRequestJwtKid,
+                                        vpTokenRequestJwtPrivKey,
+                                        ResponseType.VpToken,
+                                        issuerState.first().request.useJar!!,
+                                        presentationDefinition
                                     )
                                 }
 
@@ -225,37 +234,38 @@ object OidcApi : CIProvider() {
                 throw IllegalArgumentException("missing missing state/id_token/vp_token  parameter")
             }
 
-            logger.info { "/direct_post values from params: ${params.values}" }
-            logger.info { "/direct_post state from param: ${params["state"]}" }
-            logger.info { "/direct_post token from param: ${params["id_token"]}" }
-
             try {
+                val state = params["state"]?.get(0)!!
                 if (params["id_token"]?.get(0) != null) {
-                    val state = params["state"]?.get(0)!!
                     val idToken = params["id_token"]?.get(0)!!
 
                     // Verify and Parse ID Token
-                    val payload = verifyAndParseIdToken(idToken)
+                   verifyAndParseIdToken(idToken)
 
-                    // Process response
-                    val resp = processDirectPost(state, payload!!)
+                } else  {
+                    val vpToken = params["vp_token"]?.get(0)!!
+                    val presSub = params["presentation_submission"]?.get(0)!!
 
-                    // Get the authorization_endpoint parameter which is the redirect_uri from the Authorization Request Parameter
-                    val redirectUri = getSessionByAuthServerState(state)!!.authorizationRequest!!.redirectUri!!
+                    // Verify and Parse VP Token
+                    val policies = Json.parseToJsonElement("""["signature", "expired", "not-before"]""").jsonArray.parsePolicyRequests()
 
-                    call.response.apply {
-                        status(HttpStatusCode.Found)
-                        header(HttpHeaders.Location, resp.toRedirectUri(redirectUri, ResponseMode.query))
-                    }
+                   Verifier.verifyPresentation(vpTokenJwt = vpToken, vpPolicies = policies, globalVcPolicies = policies, specificCredentialPolicies = emptyMap(), mapOf("presentationSubmission" to presSub))
+                }
 
-                } else {
-                    // else it is a vp_token
-                    call.respond(HttpStatusCode.BadRequest, "vp_token not implemented")
+                // Process response
+                val resp = processDirectPost(state, buildJsonObject { })
+
+                // Get the authorization_endpoint parameter which is the redirect_uri from the Authorization Request Parameter
+                val redirectUri = getSessionByAuthServerState(state)!!.authorizationRequest!!.redirectUri!!
+
+                call.response.apply {
+                    status(HttpStatusCode.Found)
+                    header(HttpHeaders.Location, resp.toRedirectUri(redirectUri, ResponseMode.query))
                 }
 
             } catch (exc: TokenError) {
-                logger.error(exc) { "Token error: " }
                 call.respond(HttpStatusCode.BadRequest, exc.toAuthorizationErrorResponse().toJSON())
+                throw IllegalArgumentException(exc.toAuthorizationErrorResponse().toString())
             }
         }
 

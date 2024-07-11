@@ -2,6 +2,7 @@ package id.walt.issuer.issuance
 
 import id.walt.credentials.vc.vcs.W3CVC
 import id.walt.oid4vc.data.AuthenticationMethod
+import id.walt.oid4vc.data.OpenId4VPProfile
 import id.walt.sdjwt.SDMap
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
@@ -18,6 +19,7 @@ data class IssuanceRequest(
     val selectiveDisclosure: SDMap? = null,
     val authenticationMethod: AuthenticationMethod? = AuthenticationMethod.PRE_AUTHORIZED, // "PWD" OR "ID_TOKEN" OR "VP_TOKEN" OR "PRE_AUTHORIZED" OR "NONE"
     val vpRequestValue: String? = null,
+    val vpProfile: OpenId4VPProfile? = OpenId4VPProfile.DEFAULT,
     val useJar: Boolean? = true,
 )
 
