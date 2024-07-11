@@ -268,7 +268,7 @@ spec:
             - name: NUXT_PUBLIC_ISSUER_CALLBACK_URL
               value: "https://wallet.walt-test.cloud"
             - name: NUXT_PUBLIC_CREDENTIALS_REPOSITORY_URL
-              value: "https://credentials.walt-test.cloud"
+              value: "vc-repo.walt-test.cloud"
             - name: NUXT_PUBLIC_DEV_WALLET_URL
               value: "https://wallet-dev.walt-test.cloud"
           ports:
