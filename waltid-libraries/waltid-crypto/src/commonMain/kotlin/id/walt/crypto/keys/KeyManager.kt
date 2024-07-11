@@ -49,13 +49,13 @@ object KeyManager {
         return function.invoke(generationRequest)
     }
 
-    fun resolveSerializedKey(jsonString: String): Key =
+    suspend fun resolveSerializedKey(jsonString: String): Key =
         resolveSerializedKey(json = Json.parseToJsonElement(jsonString).jsonObject)
 
     // TODO: return Result<..>
-    fun resolveSerializedKey(json: JsonObject): Key {
-        val type = getRegisteredKeyType(json["type"]?.jsonPrimitive?.content ?: error("No type in serialized key"))
+    suspend fun resolveSerializedKey(json: JsonObject): Key = json["type"]?.jsonPrimitive?.content?.let {
+        val type = getRegisteredKeyType(it)
         val fields = json.filterKeys { it != "type" }.mapValues { it.value }
-        return Json.decodeFromJsonElement(serializer(type), JsonObject(fields)) as Key
-    }
+        Json.decodeFromJsonElement(serializer(type), JsonObject(fields)) as Key
+    }?.apply { init() } ?: error("No type in serialized key")
 }
