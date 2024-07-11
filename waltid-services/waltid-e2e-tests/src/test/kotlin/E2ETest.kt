@@ -456,7 +456,7 @@ class E2ETest {
 //      }
       test("lsp potential wallet sd-jwt-vc issuance and presentation") {
         lspPotentialWallet.testSDJwtVCIssuance()
-        //lspPotentialWallet.testMdocPresentation()
+        lspPotentialWallet.testSDJwtPresentation()
       }
     }
   }
