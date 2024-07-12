@@ -1,12 +1,9 @@
 plugins {
     kotlin("multiplatform")
-
     kotlin("plugin.serialization")
-
     id("dev.petuska.npm.publish") version "3.4.3"
     `maven-publish`
     id("com.github.ben-manes.versions")
-    kotlin("native.cocoapods")
 }
 
 group = "id.walt"
@@ -78,24 +75,10 @@ kotlin {
     } else {
         val isMingwX64 = hostOs.startsWith("Windows")
         when {
-            hostOs == "Mac OS X" -> {
+            isMacOS -> {
 //                macosX64("native")
                 iosArm64()
                 iosSimulatorArm64()
-
-                cocoapods {
-                    summary = "Some description for the Shared Module"
-                    homepage = "Link to the Shared Module homepage"
-                    version = "1.0"
-                    ios.deploymentTarget = "15.4"
-                    framework {
-                        baseName = "waltid-sdjwt"
-                        isStatic = true
-                    }
-                    pod("JOSESwift") {
-                        version = "2.4.0"
-                    }
-                }
             }
 
             hostOs == "Linux" -> linuxX64("native")

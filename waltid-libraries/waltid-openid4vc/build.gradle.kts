@@ -7,7 +7,6 @@ plugins {
     id("dev.petuska.npm.publish") version "3.4.3"
     id("maven-publish")
     id("com.github.ben-manes.versions")
-    kotlin("native.cocoapods")
 }
 
 group = "id.walt"
@@ -41,7 +40,7 @@ kotlin {
     targets.configureEach {
         compilations.configureEach {
             compileTaskProvider.configure {
-                compilerOptions { 
+                compilerOptions {
                     freeCompilerArgs.add("-Xexpect-actual-classes")
                 }
             }
@@ -72,17 +71,6 @@ kotlin {
     if (isMacOS) {
         iosArm64()
         iosSimulatorArm64()
-
-        cocoapods {
-            summary = "Some description for the Shared Module"
-            homepage = "Link to the Shared Module homepage"
-            version = "1.0"
-            ios.deploymentTarget = "15.4"
-            framework {
-                baseName = "waltid-openid4vc"
-                isStatic = true
-            }
-        }
     }
 
 
@@ -195,7 +183,7 @@ kotlin {
                     dependsOn(commonMain)
                     iosArm64Main.dependsOn(this)
                     iosSimulatorArm64Main.dependsOn(this)
-                    dependencies{
+                    dependencies {
                         implementation("io.ktor:ktor-client-darwin:$ktor_version")
                     }
                 }
