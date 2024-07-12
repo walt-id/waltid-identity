@@ -8,6 +8,7 @@ import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -19,14 +20,17 @@ import kotlin.js.JsExport
 
 @OptIn(ExperimentalJsExport::class)
 @JsExport
+@Serializable
 class WebhookPolicy : CredentialWrapperValidatorPolicy(
     "webhook",
     "Sends the credential data to an webhook URL as HTTP POST, and returns the verified status based on the webhooks set status code (success = 200 - 299)."
 ) {
 
-    val http = HttpClient {
-        install(ContentNegotiation) {
-            json()
+    companion object {
+        private val http = HttpClient {
+            install(ContentNegotiation) {
+                json()
+            }
         }
     }
     @JvmBlocking

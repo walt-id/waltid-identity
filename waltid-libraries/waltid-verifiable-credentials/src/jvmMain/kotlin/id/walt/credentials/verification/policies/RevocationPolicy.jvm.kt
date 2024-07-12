@@ -6,6 +6,7 @@ import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.datetime.Clock
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import love.forte.plugin.suspendtrans.annotation.JvmAsync
 import love.forte.plugin.suspendtrans.annotation.JvmBlocking
@@ -15,6 +16,7 @@ import java.util.Base64
 import java.util.zip.GZIPInputStream
 
 
+@Serializable
 actual class RevocationPolicy  : RevocationPolicyMp() {
     @JvmBlocking
     @JvmAsync

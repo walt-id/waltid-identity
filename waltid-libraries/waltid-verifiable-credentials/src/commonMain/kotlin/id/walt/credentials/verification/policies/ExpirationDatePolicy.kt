@@ -6,6 +6,7 @@ import id.walt.credentials.verification.CredentialWrapperValidatorPolicy
 import id.walt.credentials.verification.ExpirationDatePolicyException
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import love.forte.plugin.suspendtrans.annotation.JsPromise
 import love.forte.plugin.suspendtrans.annotation.JvmAsync
@@ -15,6 +16,7 @@ import kotlin.js.JsExport
 
 @OptIn(ExperimentalJsExport::class)
 @JsExport
+@Serializable
 class ExpirationDatePolicy : CredentialWrapperValidatorPolicy(
     "expired", "Verifies that the credentials expiration date (`exp` for JWTs) has not been exceeded."
 ) {

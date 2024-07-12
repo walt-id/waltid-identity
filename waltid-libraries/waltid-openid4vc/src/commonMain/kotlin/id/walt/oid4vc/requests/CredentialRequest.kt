@@ -42,11 +42,16 @@ data class CredentialRequest(
                 authorizationDetails.customParameters
             )
 
-        fun forOfferedCredential(offeredCredential: OfferedCredential, proof: ProofOfPossession?) = CredentialRequest(
-            offeredCredential.format, proof, offeredCredential.types, null,
-            offeredCredential.docType, null,
-            offeredCredential.credentialDefinition, offeredCredential.customParameters
-        )
+       fun forOfferedCredential(offeredCredential: OfferedCredential, proof: ProofOfPossession?) = CredentialRequest(
+           format = offeredCredential.format,
+           proof = proof,
+           types = offeredCredential.types,
+           credentialSubject = null,
+           docType = offeredCredential.docType,
+           claims = null,
+           credentialDefinition = offeredCredential.credentialDefinition,
+           customParameters = offeredCredential.customParameters
+       )
     }
 }
 

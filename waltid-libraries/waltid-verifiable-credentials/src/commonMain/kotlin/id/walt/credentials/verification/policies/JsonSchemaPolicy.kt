@@ -14,6 +14,7 @@ import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 
 @OptIn(ExperimentalJsExport::class)
+@Serializable
 @JsExport
 class JsonSchemaPolicy : CredentialDataValidatorPolicy(
     "schema",

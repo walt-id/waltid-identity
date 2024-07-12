@@ -4,6 +4,7 @@ import id.walt.credentials.verification.CredentialWrapperValidatorPolicy
 import id.walt.credentials.verification.NotBeforePolicyException
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import love.forte.plugin.suspendtrans.annotation.JsPromise
 import love.forte.plugin.suspendtrans.annotation.JvmAsync
@@ -14,6 +15,7 @@ import kotlin.time.Duration.Companion.minutes
 
 @OptIn(ExperimentalJsExport::class)
 @JsExport
+@Serializable
 class NotBeforeDatePolicy : CredentialWrapperValidatorPolicy(
     "not-before",
     "Verifies that the credentials not-before date (for JWT: `nbf`, if unavailable: `iat` - 1 min) is correctly exceeded."

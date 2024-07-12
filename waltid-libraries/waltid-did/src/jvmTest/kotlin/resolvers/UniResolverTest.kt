@@ -35,6 +35,7 @@ class UniResolverTest {
     fun `given a did String, when calling resolveToKey, then the result is valid key`(
         did: String, key: String,
     ) = runTest {
+        println("Resolving: $did")
         val result = sut.resolveToKey(did)
         assertEquals(true, result.isSuccess)
         assertEquals(key, result.getOrNull()?.exportJWK())
@@ -44,12 +45,13 @@ class UniResolverTest {
         @JvmStatic
         fun `given a did String, when calling resolve, then the result is a valid did document`(): Stream<Arguments> =
             Stream.of(
-                arguments("did:key:z6MkfXgppgAzxNZNijP35wjPdQjThkr78S3WXpsXLN8UpPH5#z6MkfXgppgAzxNZNijP35wjPdQjThkr78S3WXpsXLN8UpPH5",
+                // FIXME: Uniresolver broke with some did:key: [representationNotSupported] 406 Not Acceptable (unknown DID document representation `application/ld+json;profile="https://w3id.org/did-resolution",application/did+ld+json`)
+                /*arguments("did:key:z6MkfXgppgAzxNZNijP35wjPdQjThkr78S3WXpsXLN8UpPH5#z6MkfXgppgAzxNZNijP35wjPdQjThkr78S3WXpsXLN8UpPH5",
                     // URI(this.javaClass.getClassLoader().getResource(filename)!!.toString()).path
                     URI(
                         Companion::class.java.classLoader.getResource("uniresolver/jwk/document.json")!!.toString()
                     ).path.let { File(it).readText() }
-                        .replace("[\\s\\n\\r]".toRegex(), "")),
+                        .replace("[\\s\\n\\r]".toRegex(), "")),*/
                 arguments("did:v1:test:nym:z6MkoPnnkWaXsC94xPJHNLUi15TLyCBe68jrKPi7PenS3pi4",
                     URI(
                         Companion::class.java.classLoader.getResource("uniresolver/base58/document.json")!!.toString()
@@ -75,13 +77,14 @@ class UniResolverTest {
         @JvmStatic
         fun `given a did String, when calling resolveToKey, then the result is valid key`(): Stream<Arguments> =
             Stream.of(
-                arguments(
+                // FIXME: Uniresolver error: [representationNotSupported] 406 Not Acceptable (unknown DID document representation `application/ld+json;profile="https://w3id.org/did-resolution",application/did+ld+json`)
+                /*arguments(
                     "did:key:z6MkfXgppgAzxNZNijP35wjPdQjThkr78S3WXpsXLN8UpPH5#z6MkfXgppgAzxNZNijP35wjPdQjThkr78S3WXpsXLN8UpPH5",
                     URI(
                         Companion::class.java.classLoader.getResource("uniresolver/jwk/publicKeyJwk.json")!!.toString()
                     ).path.let { File(it).readText() }
                         .replace("[\\s\\n\\r]".toRegex(), ""),
-                ),
+                ),*/
                 arguments(
                     "did:v1:test:nym:z6MkoPnnkWaXsC94xPJHNLUi15TLyCBe68jrKPi7PenS3pi4",
                     URI(

@@ -7,6 +7,7 @@ import id.walt.sdjwt.JWTCryptoProvider
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import kotlinx.datetime.Clock
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
@@ -21,6 +22,7 @@ interface IAuthorizationRequest {
     val nonce: String?
 }
 
+@Serializable
 data class AuthorizationRequest(
     override val responseType: Set<ResponseType> = setOf(ResponseType.Code),
     override val clientId: String,

@@ -48,6 +48,11 @@ dependencies {
     implementation("io.github.smiley4:schema-kenerator-reflection:1.0.1")
     implementation("io.github.smiley4:schema-kenerator-swagger:1.0.1")
 
+    // Persistence
+    api("io.github.reactivecircus.cache4k:cache4k:0.13.0")
+    api("app.softwork:kotlinx-uuid-core:0.0.26")
+    api("redis.clients:jedis:5.2.0-beta4")
+
     // Testing
     testImplementation(kotlin("test"))
 }

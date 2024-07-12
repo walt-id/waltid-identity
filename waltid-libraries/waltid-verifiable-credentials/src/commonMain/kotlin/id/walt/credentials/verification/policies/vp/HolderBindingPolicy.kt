@@ -4,6 +4,7 @@ import id.walt.credentials.schemes.JwsSignatureScheme.JwsOption
 import id.walt.credentials.verification.CredentialWrapperValidatorPolicy
 import id.walt.credentials.verification.HolderBindingException
 import id.walt.crypto.utils.JwsUtils.decodeJws
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -16,6 +17,7 @@ import kotlin.js.JsExport
 
 @OptIn(ExperimentalJsExport::class)
 @JsExport
+@Serializable
 class HolderBindingPolicy : CredentialWrapperValidatorPolicy(
     "holder-binding",
     "Verifies that issuer of the Verifiable Presentation (presenter) is also the subject of all Verifiable Credentials contained within."
