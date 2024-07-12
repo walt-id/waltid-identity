@@ -14,7 +14,7 @@ protocol.<p>
 </div>
 
 Refer to the
-[walt.id documentation](https://docs.oss.walt.id/verifier/api/verify-oidc4vc)
+[walt.id documentation](https://docs.oss.walt.id/verifier/api/getting-started)
 for a detailed view on using the verifier service.
 
 ## What it provides

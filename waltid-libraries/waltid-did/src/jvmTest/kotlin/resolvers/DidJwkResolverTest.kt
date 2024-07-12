@@ -72,12 +72,12 @@ class DidJwkResolverTest : DidResolverTestBase() {
                     Json.decodeFromString<JsonObject>("{\"kty\":\"OKP\",\"use\":\"sig\",\"crv\":\"Ed25519\",\"kid\":\"151df6ec01714883b812f26f2d63e584\",\"x\":\"qBDsYw3k62mUT8UmEx99Xz3yckiSRmTsL6aa21ZcAVM\",\"alg\":\"EdDSA\"}"),
                     ed25519Assertions
                 ),
-//                //rsa
-//                arguments(
-//                    "",
-//                    Json.decodeFromString<JsonObject>(""),
-//                    rsaAssertions
-//                ),//not implemented core-crypto
+                //rsa
+                arguments(
+                    "did:jwk:eyJrdHkiOiJSU0EiLCJlIjoiQVFBQiIsImtpZCI6Im1FRDVFTk91c19ZSkVsWi0tM2VKMk9OUzMteVMtbHFUMWgxU216NlJMNmciLCJuIjoibUxRR3gtRmZXUkZURjdtdlZuaVVoX1F0UkhRWDUxUVJZZnN3ZWNJUlhuZ1JXU2lmZjJQZEpTRmdHbS1CRlJsQ1NhbmJTVm1ONVg0RXNqdnhmaUdGcFVmLWFUdUNMbzJDVWdqRzdILXk0c2JQYW9ieXNaaG8zWWowV0ZKQU9IczBSUE0teG1YSW91cXpCLVExYjF0TDh2QjJpd2Y2TnJsVWFuNGxIQXR6LVFKS0JnbThWUTVuOGVIaG5Fa1hoRlkxREFTcXpQMzRvTTBmaDhYSmtIN0gyckduME5hLWRxR2Z6WVFkMWJyQUk5ZTlwVnN4WVNUSExieFhxMDRfQThiQVhDUkdVMkx2TURIVVR5V2JvSGhBZm9pd245VjI1MmRKYXBfWUxQYldtNzFjNmdyb0lQcXB6d2pxaS1HTHhxRmI1ZExMYUQ0aDRPbnB2NlhCc29DbXdRIn0",
+                    Json.decodeFromString<JsonObject>("{\"kty\":\"RSA\",\"e\":\"AQAB\",\"kid\":\"mED5ENOus_YJElZ--3eJ2ONS3-yS-lqT1h1Smz6RL6g\",\"n\":\"mLQGx-FfWRFTF7mvVniUh_QtRHQX51QRYfswecIRXngRWSiff2PdJSFgGm-BFRlCSanbSVmN5X4EsjvxfiGFpUf-aTuCLo2CUgjG7H-y4sbPaobysZho3Yj0WFJAOHs0RPM-xmXIouqzB-Q1b1tL8vB2iwf6NrlUan4lHAtz-QJKBgm8VQ5n8eHhnEkXhFY1DASqzP34oM0fh8XJkH7H2rGn0Na-dqGfzYQd1brAI9e9pVsxYSTHLbxXq04_A8bAXCRGU2LvMDHUTyWboHhAfoiwn9V252dJap_YLPbWm71c6groIPqpzwjqi-GLxqFb5dLLaD4h4Onpv6XBsoCmwQ\"}"),
+                    rsaAssertions
+                ),
             )
     }
 }
