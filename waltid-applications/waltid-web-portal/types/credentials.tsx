@@ -43,3 +43,17 @@ export const DIDMethodsConfig = {
     'issuerKey': { "type": "jwk", "jwk": "{\"kty\":\"OKP\",\"d\":\"YqOrL8iTCxeoVAFAxXC-CVxX7-RfOtVggl55wwP3wg0\",\"crv\":\"Ed25519\",\"kid\":\"AMSWqtZTHp2PosnSCeFJ10rES2Vd6IzNx8UV3oZuKGw\",\"x\":\"3oKRKU2W66W8DycLCQ26WCv8scVBGI-H3PvTIvZ0Fjw\"}" }
   }
 }
+
+export const AuthenticationMethods = [
+  'PRE_AUTHORIZED',
+  'PWD',
+  'ID_TOKEN',
+  'VP_TOKEN',
+  'NONE',
+]
+
+export const VpProfiles = [
+  'EBSIV3',
+  'DEFAULT',
+  'ISO_18013_7_MDOC',
+]
