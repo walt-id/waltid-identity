@@ -49,7 +49,7 @@ class VPVerifyCmd : CliktCommand(
 
     private val vpPolicies: List<String> by option(
         "-vpp", "--vp-policy"
-    ).help("Specify one, or more policies to be applied while validating the VP JWT (signature policy is always applied)")
+    ).help("Specify one, or more policies to be applied while validating the VP JWT (signature policy is always applied).")
         .choice(
             *listOf(
                 "signature",
@@ -76,7 +76,7 @@ class VPVerifyCmd : CliktCommand(
 
     private val globalVcPolicies: List<String> by option(
         "-vcp", "--vc-policy"
-    ).help("Specify one, or more policies to be applied to all credentials contained in the VP JWT (signature policy is always applied)")
+    ).help("Specify one, or more policies to be applied to all credentials contained in the VP JWT (signature policy is always applied).")
         .choice(
             *listOf(
                 "signature",
@@ -95,7 +95,7 @@ class VPVerifyCmd : CliktCommand(
             |signature| - |
             |expired| - |
             |not-before| - |
-            |allowed-issuer|isser=did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV|
+            |allowed-issuer|issuer=did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV|
             |webhook|url=https://example.com|
         """.trimMargin()
     }
@@ -104,7 +104,6 @@ class VPVerifyCmd : CliktCommand(
         initCmd()
 
         val cmdParams = parseParameters()
-        println(cmdParams)
 
         val verificationResponse = runBlocking {
             verify(cmdParams)
@@ -115,7 +114,7 @@ class VPVerifyCmd : CliktCommand(
 
         print.box("VP Verification Result")
         print.dim("Overall: ", false)
-        if (verificationResponse.overallSuccess()) print.green("Success!") else print.green("Fail!")
+        if (verificationResponse.overallSuccess()) print.green("Success!") else print.red("Fail!")
 
         results.forEach {
             if (it.isSuccess()) {
@@ -203,7 +202,7 @@ class VPVerifyCmd : CliktCommand(
 
                 "allowed-issuer" -> {
                     if ("issuer" !in globalVcPolicyArguments || globalVcPolicyArguments["issuer"]!!.isEmpty()) {
-                        throw MissingOption(this.option("--arg for the 'allowed-issuer' policy (--arg=issuer=did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV"))
+                        throw MissingOption(this.option("--vcpa for the 'allowed-issuer' policy (--vcpa=issuer=did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV"))
                     }
                     PolicyRequest(
                         PolicyManager.getPolicy(policyName),
@@ -213,7 +212,7 @@ class VPVerifyCmd : CliktCommand(
 
                 "webhook" -> {
                     if ("url" !in globalVcPolicyArguments || globalVcPolicyArguments["url"]!!.isEmpty()) {
-                        throw MissingOption(this.option("--arg for the 'webhook' policy (--arg=url=https://example.com"))
+                        throw MissingOption(this.option("--vcpa for the 'webhook' policy (--vcpa=url=https://example.com"))
                     }
                     PolicyRequest(
                         PolicyManager.getPolicy(policyName),
@@ -221,7 +220,7 @@ class VPVerifyCmd : CliktCommand(
                     )
                 }
 
-                else -> throw IllegalArgumentException("Unknown, or inapplicable global vc policy $policyName")
+                else -> throw IllegalArgumentException("Unknown, or inapplicable vc policy $policyName")
             }
         }
         return globalVcPolicyRequests
@@ -294,7 +293,7 @@ class VPVerifyCmd : CliktCommand(
                 exception?.message?.let {
                     print.red("Fail! ", false)
                     print.italic(it, linebreak = true)
-                } ?: let { print.red("Fail! ") }
+                } ?: print.red("Fail! ")
             }
         }
     }
