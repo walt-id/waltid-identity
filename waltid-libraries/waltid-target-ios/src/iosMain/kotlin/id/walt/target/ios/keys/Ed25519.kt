@@ -169,7 +169,7 @@ internal class Ed25519KeychainPrivateKey(private val kid: String) : Ed25519.Priv
     }
 
     override fun jwk(): JsonObject {
-        val publicRaw = Ed25519KeyUtils.publicRawRepresentationWithKid(kid, null)
+        val publicRaw = publicKey().externalRepresentation()
         val privateRaw = externalRepresentation()
 
         return buildJsonObject {
@@ -177,7 +177,7 @@ internal class Ed25519KeychainPrivateKey(private val kid: String) : Ed25519.Priv
             put("d", Base64.UrlSafe.encode(privateRaw))
             put("kid", kid)
             put("kty", "OKP")
-            put("x", Base64.UrlSafe.encode(publicRaw!!.toByteArray()))
+            put("x", Base64.UrlSafe.encode(publicRaw))
         }
     }
 

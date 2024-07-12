@@ -18,7 +18,7 @@ struct ContentView: View {
     }
     """
     var inputByteArray: KotlinByteArray {
-        Key_iosKt.ExportedToByteArray(input, startIndex: 0, endIndex: 0, throwOnInvalidSequence: false)
+        IosKeyKt.ExportedToByteArray(input, startIndex: 0, endIndex: 0, throwOnInvalidSequence: false)
     }
      
     @State var keyId: String = ""

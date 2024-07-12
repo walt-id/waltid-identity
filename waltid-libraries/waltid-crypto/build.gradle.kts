@@ -91,17 +91,9 @@ kotlin {
 
 
     if (isMacOS) {
-        listOf(
-            iosArm64(),
-            iosSimulatorArm64()
-        ).forEach { iosTarget ->
-            iosTarget.binaries.framework {
-                baseName = "waltid-crypto"
-                isStatic = true
-            }
-        }
+        iosArm64()
+        iosSimulatorArm64()
     }
-
 
     val ktor_version = "2.3.12"
 
@@ -214,7 +206,7 @@ kotlin {
                 dependsOn(commonMain)
                 iosArm64Main.dependsOn(this)
                 iosSimulatorArm64Main.dependsOn(this)
-                dependencies{
+                dependencies {
                     implementation(project(":waltid-libraries:waltid-target-ios"))
                 }
             }
