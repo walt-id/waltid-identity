@@ -2,6 +2,7 @@ package id.walt.credentials.verification.policies.vp
 
 import id.walt.credentials.verification.CredentialWrapperValidatorPolicy
 import id.walt.credentials.verification.MinimumCredentialsException
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import love.forte.plugin.suspendtrans.annotation.JsPromise
 import love.forte.plugin.suspendtrans.annotation.JvmAsync
@@ -11,6 +12,7 @@ import kotlin.js.JsExport
 
 @OptIn(ExperimentalJsExport::class)
 @JsExport
+@Serializable
 class MinimumCredentialsPolicy : CredentialWrapperValidatorPolicy(
     name = "minimum-credentials",
     description = "Verifies that a minimum number of credentials are included in the Verifiable Presentation"

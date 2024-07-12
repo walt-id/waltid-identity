@@ -3,6 +3,7 @@ package id.walt.credentials.verification.policies
 import id.walt.credentials.schemes.JwsSignatureScheme.JwsOption
 import id.walt.credentials.verification.CredentialWrapperValidatorPolicy
 import id.walt.credentials.verification.NotAllowedIssuerException
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import love.forte.plugin.suspendtrans.annotation.JsPromise
 import love.forte.plugin.suspendtrans.annotation.JvmAsync
@@ -12,6 +13,7 @@ import kotlin.js.JsExport
 
 @OptIn(ExperimentalJsExport::class)
 @JsExport
+@Serializable
 class AllowedIssuerPolicy : CredentialWrapperValidatorPolicy(
     "allowed-issuer",
     "Checks that the issuer of the credential is present in the supplied list."

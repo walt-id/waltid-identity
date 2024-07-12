@@ -130,11 +130,6 @@ class E2ETest {
             ) {
                 createdDids.add(it)
             }
-            didsApi.create(
-                wallet, DidsApi.DidCreateRequest(method = "cheqd", options = mapOf("network" to "testnet"))
-            ) {
-                createdDids.add(it)
-            }
             //TODO: error(400) DID method not supported for auto-configuration: ebsi
 //            didsApi.create(wallet, DidsApi.DidCreateRequest(method = "ebsi", options = mapOf("version" to 2, "bearerToken" to "token"))){
 //                createdDids.add(it)
@@ -400,8 +395,8 @@ class E2ETest {
 fun String.expectLooksLikeJwt(): String =
     also { assert(startsWith("ey") && count { it == '.' } == 2) { "Does not look like JWT" } }
 
-fun HttpResponse.expectSuccess(): HttpResponse = also {
-    assert(status.isSuccess()) { "HTTP status is non-successful" }
+suspend fun HttpResponse.expectSuccess(): HttpResponse = also {
+    assert(status.isSuccess()) { "HTTP status is non-successful for response: $it, body is ${it.bodyAsText()}" }
 }
 
 fun JsonElement.tryGetData(key: String): JsonElement? = key.split('.').let {

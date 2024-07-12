@@ -144,8 +144,8 @@ class VerificationUseCase(
                 Result.failure(Exception("Verification policies did not succeed"))
             } else {
                 val failedPolicies =
-                    policyResults.results.flatMap { it.policyResults.map { it } }.filter { it.result.isFailure }
-                Result.failure(Exception("Verification policies did not succeed: ${failedPolicies.joinToString { it.request.policy.name }}"))
+                    policyResults.results.flatMap { it.policyResults.map { it } }.filter { !it.isSuccess }
+                Result.failure(Exception("Verification policies did not succeed: ${failedPolicies.joinToString { it.policy }}"))
             }
         }
     }
@@ -159,7 +159,7 @@ class VerificationUseCase(
         return Result.success(
 //            Json { prettyPrint = true }.encodeToString(
                 PresentationSessionInfo.fromPresentationSession(
-                    session, policyResults?.toJson()
+                    session, Json.encodeToJsonElement(policyResults).jsonObject
 //                )
             )
         )

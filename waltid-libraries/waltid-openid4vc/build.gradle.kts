@@ -39,7 +39,7 @@ kotlin {
     targets.configureEach {
         compilations.configureEach {
             compileTaskProvider.configure {
-                compilerOptions { 
+                compilerOptions {
                     freeCompilerArgs.add("-Xexpect-actual-classes")
                 }
             }
@@ -153,6 +153,7 @@ kotlin {
                 implementation("com.augustcellars.cose:cose-java:1.1.0")
                 implementation("com.soywiz.korlibs.krypto:krypto:4.0.10")
 
+                implementation("org.slf4j:slf4j-simple:2.0.13")
             }
         }
         val jsMain by getting {

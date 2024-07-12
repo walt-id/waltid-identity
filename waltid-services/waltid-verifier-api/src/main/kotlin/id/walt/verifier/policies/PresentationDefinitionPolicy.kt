@@ -4,8 +4,10 @@ import id.walt.credentials.verification.CredentialWrapperValidatorPolicy
 import id.walt.credentials.verification.PresentationDefinitionException
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.oid4vc.data.dif.PresentationDefinition
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 
+@Serializable
 class PresentationDefinitionPolicy : CredentialWrapperValidatorPolicy(
     "presentation-definition",
     "Verifies that with an Verifiable Presentation at minimum the list of credentials `request_credentials` has been presented."

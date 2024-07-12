@@ -96,14 +96,14 @@ open class CIProvider : OpenIDCredentialIssuer(
     }
 
 
-    override fun putSession(id: String, session: IssuanceSession): IssuanceSession? {
+    override fun putSession(id: String, session: IssuanceSession) {
         log.debug { "SETTING CI AUTH SESSION: $id = $session" }
-        return authSessions.put(id, session)
+        authSessions[id] = session
     }
 
-    override fun removeSession(id: String): IssuanceSession? {
+    override fun removeSession(id: String) {
         log.debug { "REMOVING CI AUTH SESSION: $id" }
-        return authSessions.remove(id)
+        authSessions.remove(id)
     }
 
 
@@ -222,10 +222,10 @@ open class CIProvider : OpenIDCredentialIssuer(
                     exampleIssuerKey,
                     exampleIssuerDid,
                     IssuanceRequest(
-                        Json.parseToJsonElement(KeySerialization.serializeKey(exampleIssuerKey)).jsonObject,
-                        exampleIssuerDid,
-                        "OpenBadgeCredential_${credentialRequest.format.value}",
-                        W3CVC.fromJson(IssuanceExamples.openBadgeCredentialData)
+                        issuerKey = Json.parseToJsonElement(KeySerialization.serializeKey(exampleIssuerKey)).jsonObject,
+                        issuerDid = exampleIssuerDid,
+                        credentialData = W3CVC.fromJson(IssuanceExamples.openBadgeCredentialData),
+                        credentialConfigurationId = "OpenBadgeCredential_${credentialRequest.format.value}",
                     )
                 )
             )
@@ -298,7 +298,7 @@ open class CIProvider : OpenIDCredentialIssuer(
         accessToken: String,
     ): BatchCredentialResponse {
         val credentialRequestFormats = batchCredentialRequest.credentialRequests
-                .map { it.format }
+            .map { it.format }
 
         require(credentialRequestFormats.distinct().size < 2) { "Credential requests don't have the same format: ${credentialRequestFormats.joinToString { it.value }}" }
 

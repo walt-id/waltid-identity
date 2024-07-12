@@ -78,7 +78,7 @@ class PresentationVerificationTest {
 
         println(
             Json { prettyPrint = true }.encodeToString(
-                r.toJson()
+                r
             )
         )
 

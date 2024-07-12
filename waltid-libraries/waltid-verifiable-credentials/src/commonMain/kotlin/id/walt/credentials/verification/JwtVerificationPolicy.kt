@@ -1,15 +1,20 @@
 package id.walt.credentials.verification
 
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 import love.forte.plugin.suspendtrans.annotation.JsPromise
 import love.forte.plugin.suspendtrans.annotation.JvmAsync
 import love.forte.plugin.suspendtrans.annotation.JvmBlocking
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 
+@Serializable
 @OptIn(ExperimentalJsExport::class)
 @JsExport
-abstract class JwtVerificationPolicy(override val name: String, override val description: String? = null) :
-    VerificationPolicy(name, description) {
+abstract class JwtVerificationPolicy(
+    @Transient override val name: String = "unknown JwtVerificationPolicy",
+    @Transient override val description: String? = null,
+) : VerificationPolicy(name, description) {
     @JvmBlocking
     @JvmAsync
     @JsPromise

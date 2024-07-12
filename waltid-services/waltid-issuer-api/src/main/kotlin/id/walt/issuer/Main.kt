@@ -9,6 +9,7 @@ import id.walt.did.helpers.WaltidServices
 import id.walt.issuer.entra.entraIssuance
 import id.walt.issuer.issuance.OidcApi.oidcApi
 import id.walt.issuer.issuance.issuerApi
+import id.walt.issuer.issuance2.NewApiTest.newApi
 import id.walt.issuer.web.plugins.configureHTTP
 import id.walt.issuer.web.plugins.configureMonitoring
 import id.walt.issuer.web.plugins.configureRouting
@@ -36,8 +37,9 @@ fun Application.issuerModule(withPlugins: Boolean = true) {
     if (withPlugins) {
         configurePlugins()
     }
-    oidcApi()
-    issuerApi();
+     oidcApi()
+     issuerApi();
+//    newApi();
 
     { entraIssuance() } whenFeature FeatureCatalog.entra
 }

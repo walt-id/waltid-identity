@@ -263,7 +263,8 @@ fun Application.entraVerifierApi() {
                                 put("credential", Json.encodeToJsonElement(it.credential))
                                 putJsonArray("policies") {
                                     it.policies.forEach {
-                                        add(it.toJsonResult())
+                                        add(Json.encodeToJsonElement(it))
+                                        // add(it.toJsonResult())
                                     }
                                 }
                             }

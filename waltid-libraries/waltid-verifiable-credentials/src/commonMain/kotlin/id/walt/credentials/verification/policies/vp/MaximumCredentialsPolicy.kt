@@ -2,6 +2,7 @@ package id.walt.credentials.verification.policies.vp
 
 import id.walt.credentials.verification.CredentialWrapperValidatorPolicy
 import id.walt.credentials.verification.MaximumCredentialsException
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import love.forte.plugin.suspendtrans.annotation.JsPromise
 import love.forte.plugin.suspendtrans.annotation.JvmAsync
@@ -11,6 +12,7 @@ import kotlin.js.JsExport
 
 @OptIn(ExperimentalJsExport::class)
 @JsExport
+@Serializable
 class MaximumCredentialsPolicy : CredentialWrapperValidatorPolicy(
     name = "maximum-credentials",
     description = "Verifies that a maximum number of credentials in the Verifiable Presentation is not exceeded"
