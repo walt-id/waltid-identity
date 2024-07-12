@@ -1,4 +1,3 @@
-import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import java.util.Properties
@@ -162,10 +161,10 @@ publishing {
     publications {
         create<MavenPublication>("mavenJava") {
             pom {
-                name.set("walt.id XYZ Kit")
+                name.set("walt.id issuer")
                 description.set(
                     """
-                    Kotlin/Java library for XYZ core services
+                    Kotlin/Java library for walt.id issuer
                     """.trimIndent()
                 )
                 url.set("https://walt.id")
