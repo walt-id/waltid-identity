@@ -20,7 +20,7 @@ const getOfferUrl = async (credentials: Array<AvailableCredential>, NEXT_PUBLIC_
 
     let payload: {
       'issuerDid': string,
-      'issuerKey': { "type": string, "jwk": string },
+      'issuerKey': { "type": string, "jwk": object },
       credentialConfigurationId: string,
       credentialData: any,
       mapping?: any,
