@@ -47,6 +47,7 @@ private val log = KotlinLogging.logger { }
 @SerialName("jwk")
 actual class JWKKey actual constructor(
     @Suppress("CanBeParameter", "RedundantSuppression")
+    @Serializable(with = JWKKeyJsonFieldSerializer::class)
     var jwk: String?
 ) : Key() {
 
