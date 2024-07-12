@@ -25,17 +25,32 @@ object DidCreation {
                 }
             }
         }) {
-            getWalletService().createDid(
-                DidKeyMethodName, extractDidCreateParameters(DidKeyMethodName, context.request.queryParameters)
-            ).let { context.respond(it) }
+           runCatching {
+               getWalletService().createDid(
+                   DidKeyMethodName, extractDidCreateParameters(DidKeyMethodName, context.request.queryParameters)
+               )
+           }.onFailure {
+               context.respondText(it.message ?: "Failed to create DID", status = HttpStatusCode.Forbidden)
+           }.onSuccess {
+               context.respond(it)
+           }
         }
 
         post(DidJwkMethodName, {
             summary = "Create a did:jwk"
         }) {
-            getWalletService().createDid(
-                DidJwkMethodName, extractDidCreateParameters(DidJwkMethodName, context.request.queryParameters)
-            ).let { context.respond(it) }
+           runCatching {
+               getWalletService().createDid(
+                   DidJwkMethodName, extractDidCreateParameters(DidJwkMethodName, context.request.queryParameters)
+               )
+           }.onFailure {
+
+                context.respondText(it.localizedMessage ?: "Failed to create DID", status = HttpStatusCode.Forbidden)
+
+           }.onSuccess {
+
+                context.respond(it)
+           }
         }
 
         post(DidWebMethodName, {

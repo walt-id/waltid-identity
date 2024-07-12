@@ -1,6 +1,7 @@
 package id.walt.webwallet.web.controllers
 
 import id.walt.webwallet.db.models.WalletDid
+import id.walt.webwallet.web.ForbiddenException
 import id.walt.webwallet.web.controllers.DidCreation.didCreate
 import io.github.smiley4.ktorswaggerui.dsl.routing.delete
 import io.github.smiley4.ktorswaggerui.dsl.routing.get
@@ -25,7 +26,18 @@ fun Application.dids() = walletRoute {
                 }
             }
         }) {
-            context.respond(getWalletService().run {  runBlocking { listDids() }  })
+        //  context.respond(getWalletService().run {  runBlocking { listDids() }  })
+            runCatching {
+                getWalletService().run {  runBlocking { listDids() }  }
+            }.onFailure {
+                if (it is ForbiddenException) {
+                    context.respondText(it.message ?: "Failed to list DIDs", status = HttpStatusCode.Forbidden)
+                } else {
+                    context.respondText("Failed to list DIDs", status = HttpStatusCode.InternalServerError)
+                }
+            }.onSuccess {
+                context.respond(it)
+            }
         }
 
         route("{did}", {

@@ -109,7 +109,7 @@ fun Application.keys() = walletRoute {
             }.onSuccess {
                 context.respond(it)
             }.onFailure {
-                context.respond(HttpStatusCode.BadRequest, it.localizedMessage)
+                context.respond(HttpStatusCode.Forbidden, it.localizedMessage)
             }
         }
 
