@@ -10,7 +10,6 @@ import id.walt.cli.util.PrettyPrinter
 import id.walt.credentials.verification.*
 import id.walt.credentials.verification.models.PolicyRequest
 import id.walt.credentials.verification.models.PolicyResult
-import id.walt.credentials.verification.models.PresentationResultEntry
 import id.walt.credentials.verification.models.PresentationVerificationResponse
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.did.dids.DidService
@@ -24,51 +23,46 @@ import kotlin.time.Duration
 
 class VPVerifyCmd : CliktCommand(
     name = "verify",
+    help = "Perform various verifications on a Verifiable Presentations",
     printHelpOnEmptyArgs = true,
 ) {
 
     val print: PrettyPrinter = PrettyPrinter(this)
 
-    private val holderDid: String by option("-hd", "--holder-did")
-        .help("The DID of the verifiable credential's holder (required).")
+    private val holderDid: String by option(
+        "-hd", "--holder-did"
+    ).help("The DID of the holder that created (signed) the verifiable presentation. If specified, the VP token signature will be validated against this value.")
+        .default("")
+
+    private val presentationDefinitionPath by option("-pd", "--presentation-definition").path(
+        mustExist = true, canBeDir = false, mustBeReadable = true, canBeSymlink = false
+    ).help("The file path of the presentation definition (required).")
         .required()
 
-    private val verifierDid: String by option("-vd", "--verifier-did")
-        .help("The DID of the verifier for whom the Verifiable Presentation has been created (required).")
-        .required()
+    private val presentationSubmissionPath by option("-ps", "--presentation-submission").path(
+        mustExist = true, canBeDir = false, mustBeReadable = true, canBeSymlink = false
+    ).help("The file path of the presentation submission (required).").required()
 
-    private val presentationDefinitionPath by option("-pd", "--presentation-definition")
-        .path(mustExist = true, canBeDir = false, mustBeReadable = true, canBeSymlink = false)
-        .help("The file path of the presentation definition based on which the VP token has been created (required).")
-        .required()
+    private val vpPath by option("-vp", "--verifiable-presentation").path(
+        mustExist = true, canBeDir = false, mustBeReadable = true, canBeSymlink = false
+    ).help("The file path of the verifiable presentation (required).").required()
 
-    private val presentationSubmissionPath by option("-ps", "--presentation-submission")
-        .path(mustExist = true, canBeDir = false, mustBeReadable = true, canBeSymlink = false)
-        .help("The file path of the presentation submission (required).")
-        .required()
-
-    private val vpPath by option("-vp", "--verifiable-presentation")
-        .path(mustExist = true, canBeDir = false, mustBeReadable = true, canBeSymlink = false)
-        .help("The file path of the verifiable presentation (required).")
-        .required()
-
-    private val vpPolicies: List<String> by option("-vpp", "--vp-policies")
-        .help("list of vp policies - signature is always applied")
+    private val vpPolicies: List<String> by option(
+        "-vpp", "--vp-policy"
+    ).help("Specify one, or more policies to be applied while validating the VP JWT (signature policy is always applied)")
         .choice(
-            listOf(
+            *listOf(
                 "signature",
                 "expired",
                 "not-before",
+                "holder-binding",
                 "maximum-credentials",
                 "minimum-credentials",
-            ).joinToString()
-        )
-        .multiple()
+            ).toTypedArray()
+        ).multiple()
 
-    private val vpPolicyArguments: Map<String, String> by option("-vppa", "--vp-policy-arg")
-        .associate()
-        .help {
-            """Argument required by some policies, namely:
+    private val vpPolicyArguments: Map<String, String> by option("-vppa", "--vp-policy-arg").associate().help {
+        """Argument required by some VP policies, namely:
             
             |Policy|Expected Argument|
             |------|--------|
@@ -78,55 +72,62 @@ class VPVerifyCmd : CliktCommand(
             |maximum-credentials|max=5|
             |minimum-credentials|min=2|
         """.trimMargin()
-        }
+    }
 
-    private val globalVcPolicies: List<String> by option("-vcp", "--vc-policies")
-        .help("list of vc policies - signature policy  is always applied")
+    private val globalVcPolicies: List<String> by option(
+        "-vcp", "--vc-policy"
+    ).help("Specify one, or more policies to be applied to all credentials contained in the VP JWT (signature policy is always applied)")
         .choice(
-            listOf(
+            *listOf(
                 "signature",
                 "expired",
                 "not-before",
-            ).joinToString()
-        )
-        .multiple()
+                "allowed-issuer",
+                "webhook",
+            ).toTypedArray()
+        ).multiple()
 
-    private val globalVcPolicyArguments: Map<String, String> by option("-vcpa", "--vc-policy-arg")
-        .associate()
-        .help {
-            """Argument required by some policies, namely:
+    private val globalVcPolicyArguments: Map<String, String> by option("-vcpa", "--vc-policy-arg").associate().help {
+        """Argument required by some VC policies, namely:
             
             |Policy|Expected Argument|
             |------|--------|
             |signature| - |
             |expired| - |
             |not-before| - |
+            |allowed-issuer|isser=did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV|
+            |webhook|url=https://example.com|
         """.trimMargin()
-        }
+    }
 
     override fun run() {
         initCmd()
-    }
-
-    private fun initCmd() = runBlocking {
-        DidService.minimalInit()
 
         val cmdParams = parseParameters()
+        println(cmdParams)
 
         val verificationResponse = runBlocking {
             verify(cmdParams)
         }
 
         val results = verificationResponse.results.flatMap { it.policyResults }
+        println(results)
 
         print.box("VP Verification Result")
+        print.dim("Overall: ", false)
+        if (verificationResponse.overallSuccess()) print.green("Success!") else print.green("Fail!")
+
         results.forEach {
-            if (it.isSuccess()) { // Not enough to be a successful verification. Sometimes, the verification succeeds because the policy is not even applied.
+            if (it.isSuccess()) {
                 handleSuccess(it)
             } else {
                 handleFailure(it)
             }
         }
+    }
+
+    private fun initCmd() = runBlocking {
+        DidService.minimalInit()
     }
 
     private fun parseParameters(): VpVerifyParameters {
@@ -145,7 +146,6 @@ class VPVerifyCmd : CliktCommand(
 
         return VpVerifyParameters(
             holderDid,
-            verifierDid,
             presentationDefinition,
             presentationSubmission,
             vpPath.readText(),
@@ -155,18 +155,16 @@ class VPVerifyCmd : CliktCommand(
     }
 
     private fun parseVpPolicyRequests(): List<PolicyRequest> {
-        val vpPolicyRequests = mutableListOf<PolicyRequest>(
+        val vpPolicyRequests = mutableListOf(
             PolicyRequest(PolicyManager.getPolicy("signature")),
-            PolicyRequest(PolicyManager.getPolicy("presentation-definition")),
+        )
+        if (holderDid.isNotEmpty()) vpPolicyRequests += PolicyRequest(
+            PolicyManager.getPolicy("allowed-issuer"), holderDid.toJsonPrimitive()
         )
         vpPolicies.forEach { policyName ->
             vpPolicyRequests += when (policyName) {
-                "expired" -> {
-                    PolicyRequest(PolicyManager.getPolicy("expired"))
-                }
-
-                "not-before" -> {
-                    PolicyRequest(PolicyManager.getPolicy("not-before"))
+                "expired", "not-before", "holder-binding" -> {
+                    PolicyRequest(PolicyManager.getPolicy(policyName))
                 }
 
                 "maximum-credentials" -> {
@@ -174,8 +172,7 @@ class VPVerifyCmd : CliktCommand(
                         throw MissingOption(this.option("-vppa for the 'maximum-credentials' policy (-vppa=max=5"))
                     }
                     PolicyRequest(
-                        PolicyManager.getPolicy("maximum-credentials"),
-                        vpPolicyArguments["max"].toJsonPrimitive()
+                        PolicyManager.getPolicy(policyName), vpPolicyArguments["max"].toJsonPrimitive()
                     )
                 }
 
@@ -184,8 +181,7 @@ class VPVerifyCmd : CliktCommand(
                         throw MissingOption(this.option("-vppa for the 'minimum-credentials' policy (-vppa=min=2"))
                     }
                     PolicyRequest(
-                        PolicyManager.getPolicy("minimum-credentials"),
-                        vpPolicyArguments["min"].toJsonPrimitive()
+                        PolicyManager.getPolicy(policyName), vpPolicyArguments["min"].toJsonPrimitive()
                     )
                 }
 
@@ -201,12 +197,28 @@ class VPVerifyCmd : CliktCommand(
         )
         globalVcPolicies.forEach { policyName ->
             globalVcPolicyRequests += when (policyName) {
-                "expired" -> {
-                    PolicyRequest(PolicyManager.getPolicy("expired"))
+                "expired", "not-before" -> {
+                    PolicyRequest(PolicyManager.getPolicy(policyName))
                 }
 
-                "not-before" -> {
-                    PolicyRequest(PolicyManager.getPolicy("not-before"))
+                "allowed-issuer" -> {
+                    if ("issuer" !in globalVcPolicyArguments || globalVcPolicyArguments["issuer"]!!.isEmpty()) {
+                        throw MissingOption(this.option("--arg for the 'allowed-issuer' policy (--arg=issuer=did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV"))
+                    }
+                    PolicyRequest(
+                        PolicyManager.getPolicy(policyName),
+                        globalVcPolicyArguments["issuer"].toJsonElement(),
+                    )
+                }
+
+                "webhook" -> {
+                    if ("url" !in globalVcPolicyArguments || globalVcPolicyArguments["url"]!!.isEmpty()) {
+                        throw MissingOption(this.option("--arg for the 'webhook' policy (--arg=url=https://example.com"))
+                    }
+                    PolicyRequest(
+                        PolicyManager.getPolicy(policyName),
+                        globalVcPolicyArguments["url"].toJsonElement(),
+                    )
                 }
 
                 else -> throw IllegalArgumentException("Unknown, or inapplicable global vc policy $policyName")
@@ -224,15 +236,15 @@ class VPVerifyCmd : CliktCommand(
                     globalVcPolicies = params.globalVcPolicyRequests,
                     specificCredentialPolicies = emptyMap(),
                     mapOf(
-                        "presentationDefinition" to params.presentationDefinition.toJsonElement(),
-                        "presentationSubmission" to params.presentationSubmission.toJsonElement(),
+                        "presentationDefinition" to params.presentationDefinition,
+                        "presentationSubmission" to params.presentationSubmission,
                     )
                 )
             }
         } catch (e: IllegalStateException) {
             println("Something went wrong.")
             return PresentationVerificationResponse(
-                results = ArrayList<PresentationResultEntry>(),
+                results = ArrayList(),
                 time = Duration.ZERO,
                 policiesRun = 0,
             )
@@ -241,7 +253,6 @@ class VPVerifyCmd : CliktCommand(
 
     private data class VpVerifyParameters(
         val holderDid: String,
-        val verifierDid: String,
         val presentationDefinition: PresentationDefinition,
         val presentationSubmission: PresentationSubmission,
         val vp: String,
@@ -257,9 +268,11 @@ class VPVerifyCmd : CliktCommand(
                     print.dim("${it.request.policy.name}: ", false)
                     print.red("Fail! ", false)
                     if (err.objectPath.isEmpty()) {
-                        print.italic("""-> ${err.message}""")
+                        print.italic("""-> ${err.message}""", linebreak = true)
                     } else {
-                        print.italic(""""${err.objectPath}" (in ${err.schemaPath}) -> ${err.message}""")
+                        print.italic(
+                            """"${err.objectPath}" (in ${err.schemaPath}) -> ${err.message}""", linebreak = true
+                        )
                     }
                 }
             }
@@ -267,25 +280,27 @@ class VPVerifyCmd : CliktCommand(
             is ExpirationDatePolicyException -> {
                 print.dim("${it.request.policy.name}: ", false)
                 print.red("Fail! ", false)
-                print.italic("VC expired since ${exception.date}")
+                print.italic("VC expired since ${exception.date}", linebreak = true)
             }
 
             is NotBeforePolicyException -> {
                 print.dim("${it.request.policy.name}: ", false)
                 print.red("Fail! ", false)
-                print.italic("VC not valid until ${exception.date}")
+                print.italic("VC not valid until ${exception.date}", linebreak = true)
             }
 
             else -> {
                 print.dim("${it.request.policy.name}: ", false)
-                print.red("Fail! ", false)
-                exception?.message?.let { print.italic(it) }
+                exception?.message?.let {
+                    print.red("Fail! ", false)
+                    print.italic(it, linebreak = true)
+                } ?: let { print.red("Fail! ") }
             }
         }
     }
 
     private fun handleSuccess(it: PolicyResult) {
         print.dim("${it.request.policy.name}: ", false)
-        print.green("Success! ")
+        print.green("Success!", linebreak = true)
     }
 }
