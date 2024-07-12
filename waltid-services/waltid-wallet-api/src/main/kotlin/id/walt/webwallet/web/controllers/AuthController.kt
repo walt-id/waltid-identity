@@ -367,7 +367,7 @@ fun Application.auth() {
                     summary = "Keycloak registration with [username + email + password]"
                     description = "Creates a user in the configured Keycloak instance."
                     request {
-                        body<KeycloakAccountRequest> {
+                        body<AccountRequest> {
                             example("username + email + password") {
                                 value = KeycloakAccountRequest(
                                     username = "Max_Mustermann",
@@ -401,7 +401,7 @@ fun Application.auth() {
                     summary = "Keycloak login with [username + password]"
                     description = "Login of a user managed by Keycloak."
                     request {
-                        body<KeycloakAccountRequest> {
+                        body<AccountRequest> {
                             example("Keycloak username + password") {
                                 value = KeycloakAccountRequest(
                                     username = "Max_Mustermann",

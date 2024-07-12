@@ -94,7 +94,7 @@ dependencies {
     /* -- Kotlin -- */
 
     // Kotlinx.serialization
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.1")
 
     // Date
     implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.0")
@@ -104,7 +104,7 @@ dependencies {
 
     // UUID
     implementation("app.softwork:kotlinx-uuid-core:0.0.25")
-    implementation("app.softwork:kotlinx-uuid-exposed:0.0.25")
+    implementation("app.softwork:kotlinx-uuid-exposed:0.0.26")
 
     /* -- Security -- */
     // Bouncy Castle
@@ -135,7 +135,7 @@ dependencies {
     implementation("io.github.reactivecircus.cache4k:cache4k:0.13.0")
 
     // Webauthn
-    implementation("com.webauthn4j:webauthn4j-core:0.24.1.RELEASE") {
+    implementation("com.webauthn4j:webauthn4j-core:0.25.0.RELEASE") {
         exclude("ch.qos.logback")
     }
 

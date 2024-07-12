@@ -165,7 +165,7 @@ abstract class Key {
     @JsPromise
     @JsExport.Ignore
 
-    override fun toString() = "[walt.id CoreCrypto ${if (hasPrivateKey) "private" else "public"} $keyType key]"
+    override fun toString() = "[walt.id crypto ${if (hasPrivateKey) "private" else "public"} $keyType key]"
 
     @JvmBlocking
     @JvmAsync

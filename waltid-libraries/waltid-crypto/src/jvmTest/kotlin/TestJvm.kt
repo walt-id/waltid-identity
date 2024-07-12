@@ -15,6 +15,8 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import org.junit.jupiter.api.condition.EnabledIf
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 import kotlin.reflect.KClass
 import kotlin.system.measureTimeMillis
 import kotlin.test.*
@@ -53,31 +55,29 @@ class TestJvm {
         }
     }
 
-    @Test
-    fun testJWKKeySerialization() = runTest {
-        val jwkKey = JWKKey.generate(KeyType.Ed25519)
-        val jwkKeySerialized = KeySerialization.serializeKey(jwkKey)
-
-        val jsons = listOf(
-            jwkKeySerialized to JWKKey::class,
-        )
-
-        jsons.forEach {
-            check(it)
-        }
+    @ParameterizedTest
+    @ValueSource(
+        strings = [
+            """{"type":"jwk","jwk":{"kty":"OKP","d":"mZVIizeqW7CbSidx5YetFD9hWqFkBZgwnsjt6Hcjxf4","crv":"Ed25519","kid":"m2Y_qWPRlvD5J8cDCNlCiJTa1gM1bcukNZWXSQ6ioVM","x":"0guspTLB3IM9f9kgT-061K-4NslAgAj1BoCmBE7zZ58"}}""",
+        ]
+    )
+    fun testJWKKeySerialization(json: String) = runTest {
+        check(json to JWKKey::class)
     }
 
-    @Test
     @EnabledIf("isVaultAvailable")
-    fun testTseKeySerialization() = runTest {
-        val jsons = listOf(
-            """{"type":"tse","server":"http://127.0.0.1:8200/v1/transit","accessKey":"dev-only-token","id":"k-307668075","_publicKey":[-41,-105,-126,77,-74,88,-28,123,93,-81,105,-13,-93,-111,27,81,-90,-1,86,59,68,105,-108,118,-68,121,18,-114,71,-69,-106,-109],"_keyType":"Ed25519"}""" to TSEKey::class,
+    @ParameterizedTest
+    @ValueSource(
+        strings = [
+            """{"type":"tse","server":"http://127.0.0.1:8200/v1/transit","accessKey":"dev-only-token","id":"k-307668075","_publicKey":[-41,-105,-126,77,-74,88,-28,123,93,-81,105,-13,-93,-111,27,81,-90,-1,86,59,68,105,-108,118,-68,121,18,-114,71,-69,-106,-109],"_keyType":"Ed25519"}""",
+            """{"type":"tse","server":"http://127.0.0.1:8200/v1/transit","auth":{"accessKey":"dev-only-token"},"id":"k1870739605","_publicKey":[24,100,-34,34,57,75,-79,106,107,18,70,61,-58,-52,-28,64,-44,69,-63,86,-67,2,28,80,-44,41,-14,112,8,-110,97,13],"_keyType":"Ed25519"}""",
+            """{"type":"tse","server":"http://127.0.0.1:8200/v1/transit","auth":{"username":"myuser","password":"mypassword"},"id":"k1870739605","_publicKey":[24,100,-34,34,57,75,-79,106,107,18,70,61,-58,-52,-28,64,-44,69,-63,86,-67,2,28,80,-44,41,-14,112,8,-110,97,13],"_keyType":"Ed25519"}""",
+            """{"type":"tse","server":"http://127.0.0.1:8200/v1/transit","auth":{"roleId":"2d2713db-593b-cc85-dff1-bd6793d47a4d","secretId":"09096426-05c6-a816-7a67-798eac0002e2"},"id":"k-1695742643","_publicKey":[113,63,23,-127,11,124,-37,-113,24,-53,68,101,83,-15,-21,62,-85,-47,50,-35,-94,-21,-39,5,126,82,24,-64,-85,-85,48,-65],"_keyType":"Ed25519"}""",
             //"""{"type":"tse","server":"http://127.0.0.1:8200/v1/transit","accessKey":"dev-only-token","id":"k-307668075"}""" to TSEKey::class // TODO: cannot access key information in TSE when pre-generated (ID will ofc not be found)
-        )
-
-        jsons.forEach {
-            check(it)
-        }
+        ]
+    )
+    fun testTseKeySerialization(json: String) = runTest {
+        check(json to TSEKey::class)
     }
 
     private val testObj = JsonObject(mapOf("value1" to JsonPrimitive("123456789")))
@@ -204,8 +204,10 @@ class TestJvm {
         }
     }
 
-    private fun isVaultAvailable() = runCatching {
-        runBlocking { HttpClient().get("http://127.0.0.1:8200") }.status == HttpStatusCode.OK
-    }.fold(onSuccess = { it }, onFailure = { false })
-
+    companion object {
+        @JvmStatic
+        fun isVaultAvailable() = runCatching {
+            runBlocking { HttpClient().get("http://127.0.0.1:8200") }.status == HttpStatusCode.OK
+        }.fold(onSuccess = { it }, onFailure = { false })
+    }
 }
