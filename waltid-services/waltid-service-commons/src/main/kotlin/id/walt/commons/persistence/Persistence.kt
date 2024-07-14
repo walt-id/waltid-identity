@@ -15,7 +15,9 @@ abstract class Persistence<V>(
     fun mutate(id: String, mutation: (V) -> V) {
         set(id, mutation.invoke(get(id)))
     }
+    abstract operator fun contains(id: String): Boolean
 
+    abstract fun getAll(): Sequence<V>
 }
 
 
