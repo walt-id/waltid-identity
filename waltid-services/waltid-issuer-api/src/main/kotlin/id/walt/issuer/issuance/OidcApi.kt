@@ -76,15 +76,15 @@ object OidcApi : CIProvider() {
 
             get("/jwks") {
                 var jwks = buildJsonObject {}
-                OidcApi.sessionCredentialPreMapping.forEach {
-                    it.value.forEach {
+                OidcApi.sessionCredentialPreMapping.getAll().forEach {
+                    it.forEach {
                         jwks = buildJsonObject {
                             put("keys", buildJsonArray {
                                 val jwkWithKid = buildJsonObject {
-                                    it.issuerKey.getPublicKey().exportJWKObject().forEach {
+                                    it.issuerKey.key.getPublicKey().exportJWKObject().forEach {
                                         put(it.key, it.value)
                                     }
-                                    put("kid", it.issuerKey.getPublicKey().getKeyId())
+                                    put("kid", it.issuerKey.key.getPublicKey().getKeyId())
                                 }
                                 add(jwkWithKid)
                                 jwks.forEach {
@@ -104,12 +104,12 @@ object OidcApi : CIProvider() {
                 try {
                     val authResp = if (authReq.responseType.contains(ResponseType.Code)) {
                         if (authReq.clientId.startsWith("did:key") && authReq.clientId.length == 186) {  // EBSI conformance
-                            val idTokenRequestKid =
-                                OidcApi.sessionCredentialPreMapping[authReq.issuerState]?.first()?.issuerKey!!.getKeyId()
-                            val privKey = OidcApi.sessionCredentialPreMapping[authReq.issuerState]?.first()?.issuerKey!!
+                            // TODO: test following two lines:
+                            val idTokenRequestKid = OidcApi.sessionCredentialPreMapping[authReq.issuerState!!].first().issuerKey.key.getKeyId()
+                            val privKey = OidcApi.sessionCredentialPreMapping[authReq.issuerState!!].first().issuerKey
                             logger.info { "PrivateKey is: $privKey" }
                             logger.info { "KID is: $idTokenRequestKid" }
-                            processCodeFlowAuthorizationWithIdTokenRequest(authReq, idTokenRequestKid, privKey)
+                            processCodeFlowAuthorizationWithIdTokenRequest(authReq, idTokenRequestKid, privKey.key)
                         } else {
                             processCodeFlowAuthorization(authReq)
                         }

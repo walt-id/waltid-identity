@@ -3,9 +3,11 @@
 package id.walt.issuer.issuance
 
 import id.walt.commons.config.ConfigManager
+import id.walt.commons.persistence.RedisPersistence
 import id.walt.credentials.issuance.Issuer.mergingJwtIssue
 import id.walt.credentials.issuance.Issuer.mergingSdJwtIssue
 import id.walt.credentials.vc.vcs.W3CVC
+import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.KeyType
@@ -33,6 +35,7 @@ import id.walt.oid4vc.util.randomUUID
 import id.walt.sdjwt.SDMap
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import kotlin.io.encoding.Base64
@@ -72,11 +75,20 @@ open class CIProvider : OpenIDCredentialIssuer(
 
     // -------------------------------
     // Simple in-memory session management
-    private val authSessions: MutableMap<String, IssuanceSession> = mutableMapOf()
+    private val authSessions = RedisPersistence<IssuanceSession>(
+        "auth_sessions", defaultExpiration = 5.minutes,
+        encoding = { Json.encodeToString(it) },
+        decoding = { Json.decodeFromString(it) },
+    )
 
 
     var deferIssuance = false
-    val deferredCredentialRequests = mutableMapOf<String, CredentialRequest>()
+    val deferredCredentialRequests = RedisPersistence<CredentialRequest>(
+        "deferred_credential_requests", defaultExpiration = 5.minutes,
+        encoding = { Json.encodeToString(it) },
+        decoding = { Json.decodeFromString(it) },
+    )
+
     override fun getSession(id: String): IssuanceSession? {
         log.debug { "RETRIEVING CI AUTH SESSION: $id" }
         return authSessions[id]
@@ -85,9 +97,7 @@ open class CIProvider : OpenIDCredentialIssuer(
     override fun getSessionByIdTokenRequestState(idTokenRequestState: String): IssuanceSession? {
         log.debug { "RETRIEVING CI AUTH SESSION by idTokenRequestState: $idTokenRequestState" }
         var properSession: IssuanceSession? = null
-        authSessions.forEach { entry ->
-            print("${entry.key} : ${entry.value}")
-            val session = entry.value
+        authSessions.getAll().forEach { session ->
             if (session.idTokenRequestState == idTokenRequestState) {
                 properSession = session
             }
@@ -170,9 +180,9 @@ open class CIProvider : OpenIDCredentialIssuer(
     }
 
     override fun getDeferredCredential(credentialID: String): CredentialResult {
-        if (deferredCredentialRequests.containsKey(credentialID)) {
+        if (deferredCredentialRequests.contains(credentialID)) {
             return doGenerateCredential(
-                deferredCredentialRequests[credentialID]!!, null, null
+                deferredCredentialRequests[credentialID], null, null
             ) // TODO: the null parameters
         }
         throw DeferredCredentialError(CredentialErrorCode.invalid_request, message = "Invalid credential ID given")
@@ -244,11 +254,11 @@ open class CIProvider : OpenIDCredentialIssuer(
                     issuerKid = issuerDid + "#" + issuerDid.removePrefix("did:key:")
 
                 if (issuerDid.startsWith("did:ebsi"))
-                    issuerKid = issuerDid + "#" + issuerKey.getKeyId()
+                    issuerKid = issuerDid + "#" + issuerKey.key.getKeyId()
 
                 when (credentialRequest.format) {
                     CredentialFormat.sd_jwt_vc -> vc.mergingSdJwtIssue(
-                        issuerKey = issuerKey,
+                        issuerKey = issuerKey.key,
                         issuerDid = issuerDid,
                         subjectDid = holderDid,
                         mappings = request.mapping ?: JsonObject(emptyMap()),
@@ -261,7 +271,7 @@ open class CIProvider : OpenIDCredentialIssuer(
                     )
 
                     else -> vc.mergingJwtIssue(
-                        issuerKey = issuerKey,
+                        issuerKey = issuerKey.key,
                         issuerDid = issuerDid,
                         issuerKid = issuerKid,
                         subjectDid = holderDid,
@@ -338,7 +348,7 @@ open class CIProvider : OpenIDCredentialIssuer(
                             data.run {
                                 when (credentialRequest.format) {
                                     CredentialFormat.sd_jwt_vc -> vc.mergingSdJwtIssue(
-                                        issuerKey = issuerKey,
+                                        issuerKey = issuerKey.key,
                                         issuerDid = issuerDid,
                                         subjectDid = subjectDid,
                                         mappings = request.mapping ?: JsonObject(emptyMap()),
@@ -352,7 +362,7 @@ open class CIProvider : OpenIDCredentialIssuer(
                                     )
 
                                     else -> vc.mergingJwtIssue(
-                                        issuerKey = issuerKey,
+                                        issuerKey = issuerKey.key,
                                         issuerDid = issuerDid,
                                         subjectDid = subjectDid,
                                         mappings = request.mapping ?: JsonObject(emptyMap()),
@@ -372,15 +382,28 @@ open class CIProvider : OpenIDCredentialIssuer(
     }
 
 
+    @Serializable
     data class IssuanceSessionData(
-        val issuerKey: Key, val issuerDid: String, val request: IssuanceRequest,
+        val issuerKey: DirectSerializedKey, val issuerDid: String, val request: IssuanceRequest,
+    ) {
+        constructor(issuerKey: Key, issuerDid: String, request: IssuanceRequest) : this(DirectSerializedKey(issuerKey), issuerDid, request)
+    }
+
+    // TODO: Hack as this is non stateless because of oidc4vc lib API
+    val sessionCredentialPreMapping = RedisPersistence<List<IssuanceSessionData>>(
+        // session id -> VC
+        "sessionid_vc", defaultExpiration = 5.minutes,
+        encoding = { Json.encodeToString(it) },
+        decoding = { Json.decodeFromString(it) },
     )
 
     // TODO: Hack as this is non stateless because of oidc4vc lib API
-    val sessionCredentialPreMapping = HashMap<String, List<IssuanceSessionData>>() // session id -> VC
-
-    // TODO: Hack as this is non stateless because of oidc4vc lib API
-    private val tokenCredentialMapping = HashMap<String, List<IssuanceSessionData>>() // token -> VC
+    private val tokenCredentialMapping = RedisPersistence<List<IssuanceSessionData>>(
+        // token -> VC
+        "token_vc", defaultExpiration = 5.minutes,
+        encoding = { Json.encodeToString(it) },
+        decoding = { Json.decodeFromString(it) },
+    )
 
     //private val sessionTokenMapping = HashMap<String, String>() // session id -> token
 
@@ -393,8 +416,9 @@ open class CIProvider : OpenIDCredentialIssuer(
     // TODO: Hack as this is non stateless because of oidc4vc lib API
     fun mapSessionIdToToken(sessionId: String, token: String) {
         log.debug { "MAPPING SESSION ID TO TOKEN: $sessionId -->> $token" }
-        val premappedVc = sessionCredentialPreMapping.remove(sessionId)
+        val premappedVc = sessionCredentialPreMapping[sessionId]
             ?: throw IllegalArgumentException("No credential pre-mapped with any such session id: $sessionId (for use with token: $token)")
+        sessionCredentialPreMapping.remove(sessionId)
         log.debug { "SWAPPING PRE-MAPPED VC FROM SESSION ID TO NEW TOKEN: $token" }
         tokenCredentialMapping[token] = premappedVc
     }

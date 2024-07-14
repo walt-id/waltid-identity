@@ -20,4 +20,7 @@ class InMemoryPersistence<V : Any>(discriminator: String, defaultExpiration: Dur
     override fun remove(id: String) {
         store.invalidate(id)
     }
+
+    override fun contains(id: String): Boolean = store.get(id) != null
+    override fun getAll(): Sequence<V> = store.asMap().values.asSequence()
 }

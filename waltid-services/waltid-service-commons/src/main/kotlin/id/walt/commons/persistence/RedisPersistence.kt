@@ -1,6 +1,8 @@
 package id.walt.commons.persistence
 
+import io.klogging.config.seq
 import redis.clients.jedis.JedisPooled
+import redis.clients.jedis.params.ScanParams
 import kotlin.time.Duration
 
 class RedisPersistence<V>(
@@ -20,6 +22,18 @@ class RedisPersistence<V>(
     }
 
     override fun remove(id: String) {
-        pool.del(id)
+        pool.del("$discriminator:$id")
+    }
+
+    override fun contains(id: String): Boolean = pool.exists("$discriminator:$id")
+
+    override fun getAll(): Sequence<V> {
+        val keys = pool.scan("", ScanParams().match("$discriminator:")).result
+
+        return sequence {
+            keys.forEach {
+                yield(get(it))
+            }
+        }
     }
 }
