@@ -14,25 +14,29 @@ struct ContentView: View {
     @State var presentationOffer: String = ""
     
     var body: some View {
-        VStack {
+        VStack(alignment: .leading) {
+            Text("Instructions").font(.title)
+            Text("Browse to https://portal.walt.id")
+            Text("Generate offers without PIN")
+            
             TextField(text: $kid) {
                 Label(
                     title: { Text("kid") },
                     icon: { Image(systemName: "42.circle") }
                 )
             }
-
+            
             Button("Random kid") {
                 kid = UUID().uuidString
             }
-
+            
             Button("Generate key") {
                 shared.Platform_iosKt.generateEcKey(kid: kid) { JWK, err in
                     print(JWK)
                     print(err)
                 }
             }.disabled(kid.isEmpty)
-
+            
             TextField(text: $offer) {
                 Label(
                     title: { Text("paste credential offer uri") },
@@ -60,8 +64,9 @@ struct ContentView: View {
                 }
                 
             }.disabled(kid.isEmpty || presentationOffer.isEmpty)
-        }
-        .padding()
+        }.padding()
+        Spacer()
+        
     }
 }
 
