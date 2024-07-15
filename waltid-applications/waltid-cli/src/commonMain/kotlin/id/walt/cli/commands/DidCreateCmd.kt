@@ -1,23 +1,34 @@
 package id.walt.cli.commands
 
 import com.github.ajalt.clikt.core.CliktCommand
+import com.github.ajalt.clikt.core.context
 import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.help
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.types.enum
 import com.github.ajalt.clikt.parameters.types.file
-import id.walt.cli.util.DidMethod
-import id.walt.cli.util.DidUtil
-import id.walt.cli.util.KeyUtil
-import id.walt.cli.util.PrettyPrinter
+import id.walt.cli.util.*
 import id.walt.did.dids.registrar.dids.DidKeyCreateOptions
 import kotlinx.coroutines.runBlocking
 
 class DidCreateCmd : CliktCommand(
     name = "create",
-    help = "Create a brand new Decentralized Identity"
+    help = """Create a Decentralized Identifier (DID).
+        
+        Example usage:
+        --------------
+        waltid did create 
+        waltid did create -k myKey.json
+        waltid did create -m jwk
+    """
 ) {
+
+    init {
+        context {
+            localization = WaltIdCmdHelpOptionMessage
+        }
+    }
 
     val print: PrettyPrinter = PrettyPrinter(this)
 
@@ -27,10 +38,10 @@ class DidCreateCmd : CliktCommand(
         .default(DidMethod.KEY)
 
     private val keyFile by option("-k", "--key")
-        .help("The Subject's key to be used. If none is provided, a new one will be generated.")
+        .help("The subject's key to be used. If none is provided, a new one will be generated.")
         .file(canBeDir = false)
     private val useJwkJcsPub by option("-j", "--useJwkJcsPub")
-        .help("Flag to enable JWK_JCS-Pub encoding (default=off). Applies only to the did:key method.")
+        .help("Flag to enable JWK_JCS-Pub encoding (default=off). Applies only to the did:key method and is relevant in the context of EBSI.")
         .flag(default = false)
 
     override fun run() {
