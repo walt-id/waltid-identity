@@ -54,9 +54,9 @@ class WaltIdVCSignCmdTest {
 
     @Test
     fun `should accept one positional argument after --options`() {
-        val result = command.test(listOf("--help"))
+        val result = command.test(listOf("--help"), width = 800, height = 800)
 
-        assertContains(result.stdout, "The verifiable credential file (required).")
+        assertContains(result.stdout, "The file path to the Verifiable Credential that will be signed (required).")
     }
 
     @Test

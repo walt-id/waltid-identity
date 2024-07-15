@@ -2,6 +2,7 @@ package id.walt.cli.commands
 
 import com.github.ajalt.clikt.core.BadParameterValue
 import com.github.ajalt.clikt.core.CliktCommand
+import com.github.ajalt.clikt.core.context
 import com.github.ajalt.clikt.core.terminal
 import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.options.flag
@@ -19,9 +20,25 @@ import kotlin.io.path.absolutePathString
 
 class VCSignCmd : CliktCommand(
     name = "sign",
-    help = "Signs a Verifiable Credential.",
-    printHelpOnEmptyArgs = true
+    help = """Sign a W3C Verifiable Credential (VC).
+        
+        Example usage:
+        --------------
+        waltid vc sign -k ./myKey.json -s did:key:z6Mkjm2gaGsodGchfG4k8P6KwCHZsVEPZho5VuEbY94qiBB9 ./myVC.json
+        waltid vc sign -k ./myKey.json \
+                       -s did:key:z6Mkjm2gaGsodGchfG4k8P6KwCHZsVEPZho5VuEbY94qiBB9 \
+                       -i did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV \
+                       ./myVC.json
+    """,
+    printHelpOnEmptyArgs = true,
 ) {
+
+    init {
+        context {
+            localization = WaltIdCmdHelpOptionMessage
+        }
+    }
+
     val print: PrettyPrinter = PrettyPrinter(this)
 
     private val keyFile by option("-k", "--key")
@@ -36,11 +53,11 @@ class VCSignCmd : CliktCommand(
         .help("The DID of the verifiable credential's subject, i.e., the to-be holder of the credential (required).")
         .required()
 
-    private val vc: File by argument(help = "The verifiable credential file (required).")
+    private val vc: File by argument(help = "The file path to the Verifiable Credential that will be signed (required).")
         .file(mustExist = true, canBeDir = false, canBeSymlink = false, mustBeReadable = true)
 
     private val overwrite by option("--overwrite", "-o")
-        .help("Flag to overwrite the signed output file if it exists")
+        .help("Flag to overwrite the signed output file if it exists.")
         .flag(default = false)
 
     override fun run() {
