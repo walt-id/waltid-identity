@@ -2,13 +2,22 @@ package id.walt.cli.commands
 
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.context
+import com.github.ajalt.clikt.core.terminal
 import com.github.ajalt.clikt.parameters.options.*
 import com.github.ajalt.clikt.parameters.types.enum
 import com.github.ajalt.clikt.parameters.types.file
+import com.github.ajalt.clikt.parameters.types.path
+import com.github.ajalt.mordant.terminal.YesNoPrompt
 import id.walt.cli.util.*
 import id.walt.did.dids.registrar.dids.DidKeyCreateOptions
 import id.walt.did.dids.registrar.dids.DidWebCreateOptions
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+import kotlin.io.path.Path
+import kotlin.io.path.absolutePathString
+import kotlin.io.path.exists
+import kotlin.io.path.writeText
 
 class DidCreateCmd : CliktCommand(
     name = "create",
@@ -41,6 +50,10 @@ class DidCreateCmd : CliktCommand(
     private val useJwkJcsPub by option("-j", "--useJwkJcsPub")
         .help("Flag to enable JWK_JCS-Pub encoding (default=off). Applies only to the did:key method and is relevant in the context of EBSI.")
         .flag(default = false)
+
+    private val output by option("-o", "--did-doc-output")
+        .path()
+        .help("File path to save the created DID Document (optional). If not specified, the did document will be saved at the <did>.json file.")
 
     private val webDomain by option("-wd", "--web-domain")
         .help("The domain name to use when creating a did:web (required in this case).")
@@ -76,9 +89,28 @@ class DidCreateCmd : CliktCommand(
             } else
                 DidUtil.createDid(method, key)
 
+            val outputFile = output ?: Path("${result.did}.json")
+            if (outputFile.exists()
+                && YesNoPrompt(
+                    "The file \"${outputFile.absolutePathString()}\" already exists, do you want to overwrite it?",
+                    terminal
+                ).ask() == false
+            ) {
+                print.plain("Will not overwrite output file.")
+                return@runBlocking
+            }
+
+            val prettyJson = Json {
+                prettyPrint = true
+            }
+
+            val prettyJsonString = prettyJson.encodeToString(result.didDocument)
+
+            print.box(prettyJson.encodeToString(result.didDocument))
+            outputFile.writeText(prettyJsonString)
+
             print.green("DID created:")
-            // print.box(result) // Can't be used because truncates long DIDs
-            print.plain(result)
+            print.plain(result.did)
         }
     }
 }

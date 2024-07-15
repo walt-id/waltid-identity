@@ -63,7 +63,7 @@ class VCSignCmd : CliktCommand(
     override fun run() {
 
         val key = runBlocking { KeyUtil().getKey(keyFile) }
-        val issuerDid = issuerDid ?: runBlocking { DidUtil.createDid(DidMethod.KEY, key) }
+        val issuerDid = issuerDid ?: runBlocking { DidUtil.createDid(DidMethod.KEY, key).did }
 
         validateIssuerKey(issuerDid, key)
 

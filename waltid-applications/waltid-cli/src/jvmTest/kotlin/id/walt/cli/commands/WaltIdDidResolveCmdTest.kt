@@ -2,7 +2,9 @@ package id.walt.cli.commands
 
 import com.github.ajalt.clikt.testing.test
 import id.walt.cli.util.getResourcePath
+import id.walt.did.utils.randomUUID
 import org.junit.jupiter.api.assertDoesNotThrow
+import java.io.File
 import kotlin.test.Ignore
 import kotlin.test.Test
 
@@ -163,7 +165,9 @@ class WaltIdDidResolveCmdTest {
         )
         assertDoesNotThrow {
             for (keyFile in keyFileList) {
-                val did = didCreateCmd.test("-j -k $keyFile").output.lines().let { lines -> lines[lines.lastIndex - 1] }
+                val tempOutputFile = "${randomUUID()}.json"
+                File(tempOutputFile).deleteOnExit()
+                val did = didCreateCmd.test("-j -k $keyFile -o $tempOutputFile").output.lines().let { lines -> lines[lines.lastIndex - 1] }
                 command.test("-d $did")
             }
         }
