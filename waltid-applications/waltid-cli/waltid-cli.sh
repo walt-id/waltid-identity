@@ -9,7 +9,7 @@ else
   echo "waltid-cli not yet build."
 
   echo "Running build..."
-  ../gradlew installDist
+  ../../gradlew installDist
 
   echo "Trying to run CLI command after build..."
   build/install/waltid/bin/waltid "$@"
