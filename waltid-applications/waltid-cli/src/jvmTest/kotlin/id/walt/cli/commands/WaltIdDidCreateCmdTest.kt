@@ -4,7 +4,9 @@ import com.github.ajalt.clikt.core.InvalidFileFormat
 import com.github.ajalt.clikt.core.PrintHelpMessage
 import com.github.ajalt.clikt.testing.test
 import id.walt.cli.util.getResourcePath
+import id.walt.did.utils.randomUUID
 import org.junit.jupiter.api.assertDoesNotThrow
+import java.io.File
 import kotlin.test.*
 
 class WaltIdDidCreateCmdTest {
@@ -186,7 +188,9 @@ class WaltIdDidCreateCmdTest {
             getResourcePath(this, "key/secp256r1_by_waltid_pub_pvt_key.jwk"),
         )
         for (keyFile in keyFileList) {
-            assertContains(command.test("-j -k $keyFile").output, "did:key:z[a-km-zA-HJ-NP-Z1-9]+".toRegex())
+            val tempOutputFile = "${randomUUID()}.json"
+            File(tempOutputFile).deleteOnExit()
+            assertContains(command.test("-j -k $keyFile -o $tempOutputFile").output, "did:key:z[a-km-zA-HJ-NP-Z1-9]+".toRegex())
         }
     }
 
