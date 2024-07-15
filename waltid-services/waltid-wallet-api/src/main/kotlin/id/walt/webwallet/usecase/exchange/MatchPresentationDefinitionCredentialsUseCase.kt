@@ -21,13 +21,6 @@ class MatchPresentationDefinitionCredentialsUseCase(
         val credentialList = credentialService.list(wallet, CredentialFilterObject.default)
         logger.debug { "WalletCredential list is: ${credentialList.map { it.parsedDocument?.get("type")!!.jsonArray }}" }
 
-//        val filters = getFilters(presentationDefinition)
-//        logger.debug { "Using filters: $filters" }
-
-//        val matchedCredentials = when {
-//            filters.isNotEmpty() -> match(credentialList, filters)
-//            else -> match(credentialList, presentationDefinition.inputDescriptors)
-//        }
         var matchedCredentials = emptyList<WalletCredential>()
         run loop@{
             matchStrategies.forEach {
@@ -38,6 +31,6 @@ class MatchPresentationDefinitionCredentialsUseCase(
 
         logger.debug { "Matched credentials: $matchedCredentials" }
 
-        return matchedCredentials//.ifEmpty { credentialList }
+        return matchedCredentials
     }
 }

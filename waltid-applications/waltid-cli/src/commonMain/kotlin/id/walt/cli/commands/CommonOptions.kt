@@ -6,6 +6,6 @@ import com.github.ajalt.clikt.parameters.options.help
 import com.github.ajalt.clikt.parameters.options.option
 
 class CommonOptions : OptionGroup("Common Options") {
-    val verbose by option().flag().help("Set verbose mode ON")
+    val verbose by option().flag().help("Set verbose mode ON (currently always ON by default).")
 
 }
