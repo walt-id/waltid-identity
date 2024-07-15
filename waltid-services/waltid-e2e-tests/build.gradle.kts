@@ -25,7 +25,7 @@ dependencies {
     implementation(project(":waltid-services:waltid-verifier-api"))
     implementation(project(":waltid-services:waltid-wallet-api"))
 
-    testImplementation("app.softwork:kotlinx-uuid-core:0.0.25")
+    testImplementation("app.softwork:kotlinx-uuid-core:0.0.26")
 
 }
 
