@@ -36,10 +36,30 @@ class VPCreateCmd : CliktCommand(
         
         Example usage:
         ----------------
-        waltid vc verify ./myVC.signed.json
-        waltid vc verify --policy=signature ./myVC.signed.json
-        waltid vc verify --policy=schema --arg=schema=mySchema.json ./myVC.signed.json
-        waltid vc verify --policy=signature --policy=schema --arg=schema=mySchema.json ./myVC.signed.json
+        waltid vp create -hd did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV \
+        -hk ./holder-key.json \
+        -vd did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV \
+        -vc ./someVcFile.json \
+        -pd ./presDef.json \
+        -vp ./outputVp.jwt \
+        -ps ./outputPresSub.json
+        waltid vp create -hd did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV \
+        -hk ./holder-key.json \
+        -vd did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV \
+        -vc ./firstVcFile.json \
+        -vc ./secondVcFile.json \
+        -pd ./presDef.json \
+        -vp ./outputVp.jwt \
+        -ps ./outputPresSub.json
+        waltid vp create -hd did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV \
+        -hk ./holder-key.json \
+        -vd did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV \
+        -n some-random-value-goes-here  \
+        -vc ./firstVcFile.json \
+        -vc ./secondVcFile.json \
+        -pd ./presDef.json \
+        -vp ./outputVp.jwt \
+        -ps ./outputPresSub.json
     """,
     printHelpOnEmptyArgs = true,
 ) {

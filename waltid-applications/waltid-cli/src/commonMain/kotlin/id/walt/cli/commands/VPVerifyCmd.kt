@@ -27,6 +27,30 @@ class VPVerifyCmd : CliktCommand(
     name = "verify",
     help = """Apply a wide range of verification policies on a W3C Verifiable Presentation (VP).
         
+        Example usage:
+        ----------------
+        waltid vp verify -hd did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV \
+        -pd ./presDef.json \
+        -ps ./presSub.json \
+        -vp ./vpPath.jwt
+        waltid vp verify -hd did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV \
+        -pd ./presDef.json \
+        -ps ./presSub.json \
+        -vp ./vpPath.jwt \
+        -vpp maximum-credentials \
+        -vppa=max=2 \
+        -vpp minimum-credentials \
+        -vppa=min=1
+        waltid vp verify -hd did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV \
+        -pd ./presDef.json \
+        -ps ./presSub.json \
+        -vp ./vpPath.jwt \
+        -vpp maximum-credentials \
+        -vppa=max=2 \
+        -vpp minimum-credentials \
+        -vppa=min=1 \
+        -vcp allowed-issuer \
+        -vcpa=issuer=did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV
     """,
     printHelpOnEmptyArgs = true,
 ) {
