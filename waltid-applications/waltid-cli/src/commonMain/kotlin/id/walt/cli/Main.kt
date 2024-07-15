@@ -13,6 +13,10 @@ fun t(args: Array<String>) {
 
 fun main(args: Array<String>) {
     val cmd = WaltIdCmd()
+    if (args.isEmpty() || args.joinToString(" ").trim() == "") {
+        cmd.echoFormattedHelp(null)
+        return
+    }
     try {
         cmd.parse(args)
     } catch (e: PrintHelpMessage) {
