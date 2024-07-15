@@ -2,11 +2,13 @@ package id.walt.cli.commands
 
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.MissingOption
+import com.github.ajalt.clikt.core.context
 import com.github.ajalt.clikt.parameters.options.*
 import com.github.ajalt.clikt.parameters.types.choice
 import com.github.ajalt.clikt.parameters.types.path
 import id.walt.cli.util.JsonUtils.toJsonPrimitive
 import id.walt.cli.util.PrettyPrinter
+import id.walt.cli.util.WaltIdCmdHelpOptionMessage
 import id.walt.credentials.verification.*
 import id.walt.credentials.verification.models.PolicyRequest
 import id.walt.credentials.verification.models.PolicyResult
@@ -23,9 +25,17 @@ import kotlin.time.Duration
 
 class VPVerifyCmd : CliktCommand(
     name = "verify",
-    help = "Perform various verifications on a Verifiable Presentations",
+    help = """Apply a wide range of verification policies on a W3C Verifiable Presentation (VP).
+        
+    """,
     printHelpOnEmptyArgs = true,
 ) {
+
+    init {
+        context {
+            localization = WaltIdCmdHelpOptionMessage
+        }
+    }
 
     val print: PrettyPrinter = PrettyPrinter(this)
 

@@ -1,6 +1,7 @@
 package id.walt.cli.commands
 
 import com.github.ajalt.clikt.core.CliktCommand
+import com.github.ajalt.clikt.core.context
 import com.github.ajalt.clikt.core.terminal
 import com.github.ajalt.clikt.parameters.options.*
 import com.github.ajalt.clikt.parameters.types.file
@@ -14,6 +15,7 @@ import id.walt.cli.presexch.strategies.DescriptorPresentationDefinitionMatchStra
 import id.walt.cli.presexch.strategies.FilterPresentationDefinitionMatchStrategy
 import id.walt.cli.util.KeyUtil
 import id.walt.cli.util.PrettyPrinter
+import id.walt.cli.util.WaltIdCmdHelpOptionMessage
 import id.walt.credentials.PresentationBuilder
 import id.walt.crypto.keys.Key
 import id.walt.crypto.utils.JsonUtils.toJsonElement
@@ -30,9 +32,23 @@ import kotlin.io.path.writeText
 
 class VPCreateCmd : CliktCommand(
     name = "create",
-    help = "Create a new Verifiable Presentation.",
+    help = """Create a W3C Verifiable Presentation (VP).
+        
+        Example usage:
+        ----------------
+        waltid vc verify ./myVC.signed.json
+        waltid vc verify --policy=signature ./myVC.signed.json
+        waltid vc verify --policy=schema --arg=schema=mySchema.json ./myVC.signed.json
+        waltid vc verify --policy=signature --policy=schema --arg=schema=mySchema.json ./myVC.signed.json
+    """,
     printHelpOnEmptyArgs = true,
 ) {
+
+    init {
+        context {
+            localization = WaltIdCmdHelpOptionMessage
+        }
+    }
 
     val print: PrettyPrinter = PrettyPrinter(this)
 
