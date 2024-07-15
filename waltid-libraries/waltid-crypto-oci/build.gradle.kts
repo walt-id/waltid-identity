@@ -74,7 +74,7 @@ kotlin {
         val commonMain by getting {
             dependencies {
                 // JSON
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.1")
 
                 // Coroutines
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
@@ -103,7 +103,7 @@ kotlin {
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:1.8.1")
 
                 // OCI
-                implementation("com.oracle.oci.sdk:oci-java-sdk-shaded-full:3.43.2")
+                implementation("com.oracle.oci.sdk:oci-java-sdk-shaded-full:3.44.1")
 
                 // JOSE
                 implementation("com.nimbusds:nimbus-jose-jwt:9.40")
@@ -121,7 +121,7 @@ kotlin {
                 implementation(kotlin("test"))
 
                 implementation("org.junit.jupiter:junit-jupiter-api:5.11.0-M2")
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.1")
                 implementation("org.junit.jupiter:junit-jupiter-params:5.11.0-M2")
             }
         }

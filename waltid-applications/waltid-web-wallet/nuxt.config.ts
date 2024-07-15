@@ -171,6 +171,7 @@ export default defineNuxtConfig({
         public: {
             projectId: process.env.ProjectId,
             issuerCallbackUrl: process.env.IssuerCallbackUrl ?? "http://localhost:7100",
+            demoWalletUrl: "https://wallet.walt.id",
         }
     },
 

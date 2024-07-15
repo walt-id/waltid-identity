@@ -7,8 +7,9 @@ Manage keys, DIDs, issue W3C Verifiable Credentials, and verify them using the W
 ## In development
 
 * `git clone https://github.com/walt-id/waltid-identity.git`
-* `cd waltid-identity/waltid-cli`
-* `../gradlew clean build`
+* `cd waltid-identity`
+* `./gradlew clean build`
+* `cd waltid-applications/waltid-cli`
 * `alias waltid="./waltid-cli.sh"` (for running the project)
 * `alias waltid="./waltid-cli-development.sh"` (for building and running the project)
 
@@ -56,14 +57,14 @@ We are still preparing a nice distribution strategy. It will be available soon.
 
 In the meantime, you can use Gradle to generate the distribution package:
 
-* `cd waltid-identity/waltid-cli`
+* `cd waltid-identity/waltid-applications/waltid-cli`
 * `../gradlew distZip` or `../gradlew distTar`
 
 A `waltid-cli-1.0.0-SNAPSHOT` file will be created in the `build/distributions` directory.
 
 ```bash
 $ pwd
-.../waltid-identity/waltid-cli
+.../waltid-identity/waltid-applications/waltid-cli
 
 $ ls -la build/distributions/
 total 67024
