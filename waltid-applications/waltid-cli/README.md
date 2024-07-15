@@ -423,9 +423,8 @@ Walt.id
 provides [a repository of VCs](https://docs.oss.walt.id/issuer/sdks/manage-credentials/sign/w3c-credential#manual-create-credential)
 that can be used as templates for creating your own. Choose the one that best suits your needs.
 
-Let's choose the [OpenBadgeCredential](https://credentials.walt.id/credentials/openbadgecredential), adjust it
-accordingly and save it in a file called `openbadgecredential_sample.json`. For convenience, there
-is [an example file you can use](https://github.com/walt-id/waltid-identity/blob/main/waltid-applications/waltid-cli/src/jvmTest/resources/vc/openbadgecredential_sample.json).
+Let's choose the [OpenBadgeCredential](https://github.com/walt-id/waltid-identity/blob/main/waltid-applications/waltid-cli/src/jvmTest/resources/vc/openbadgecredential_sample.json), adjust it
+accordingly and save it in a file called `openbadgecredential_sample.json`.
 
 ```json
 {
@@ -492,6 +491,11 @@ $ waltid vc sign --key myKey.json
 ```
 
 ## `waltid vc verify` command
+
+Run the `verify` command to validate the credential. On default the signature is validated. You can easily extend the validation steps by applying [Verification Policies](https://docs.walt.id/v/ssikit/concepts/verification-policies). 
+
+For example, for validating the credential schema, apply the _schema_ policy. Download the [Schema for the OpenBadgeCredential](https://github.com/walt-id/waltid-identity/blob/main/waltid-applications/waltid-cli/src/jvmTest/resources/schema/OpenBadgeV3_schema.json) and place it in the file `mySchema.json`, to run the command. 
+
 
 ```bash
 Usage: waltid vc verify [<options>] <vc>
