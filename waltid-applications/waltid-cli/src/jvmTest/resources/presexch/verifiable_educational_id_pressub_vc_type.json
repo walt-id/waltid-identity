@@ -1,0 +1,1 @@
+{"id":"MWN9jR1eQdM6","definition_id":"MWN9jR1eQdM6","descriptor_map":[{"format":"jwt_vp_json","path":"$","path_nested":{"format":"jwt_vc_json","path":"$.verifiableCredential[0]"}}]}

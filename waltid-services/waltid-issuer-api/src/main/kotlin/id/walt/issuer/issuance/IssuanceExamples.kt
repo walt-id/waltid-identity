@@ -165,7 +165,7 @@ object IssuanceExamples {
     """.trimIndent()
 
     // language=json
-    private val openBadgeCredentialIssuance = """
+    val openBadgeCredentialIssuance = """
         {
           "issuerKey": $issuerKey,
           "issuerDid": $issuerDid,
