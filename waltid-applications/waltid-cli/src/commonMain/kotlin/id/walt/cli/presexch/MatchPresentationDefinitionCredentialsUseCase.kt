@@ -19,6 +19,6 @@ class MatchPresentationDefinitionCredentialsUseCase(
                 if (matchedCredentials.isNotEmpty()) return@loop
             }
         }
-        return matchedCredentials//.ifEmpty { credentialList }
+        return matchedCredentials
     }
 }

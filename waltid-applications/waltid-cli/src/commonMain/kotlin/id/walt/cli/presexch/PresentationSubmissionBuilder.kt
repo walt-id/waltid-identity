@@ -33,16 +33,16 @@ class PresentationSubmissionBuilder(
             id = getDescriptorId(
                 type,
                 presentationDefinition
-            ),//session.presentationDefinition?.inputDescriptors?.get(index)?.id,
-            format = VCFormat.jwt_vp_json,  // jwt_vp_json
+            ),
+            format = VCFormat.jwt_vp_json,
             path = "$",
             pathNested = DescriptorMapping(
                 id = getDescriptorId(
                     type,
                     presentationDefinition
-                ),//session.presentationDefinition?.inputDescriptors?.get(index)?.id,
-                format = VCFormat.jwt_vc_json, // jwt_vc_json
-                path = "$.verifiableCredential[$index]", //.vp.verifiableCredentials
+                ),
+                format = VCFormat.jwt_vc_json,
+                path = "$.verifiableCredential[$index]",
             )
         )
     }
