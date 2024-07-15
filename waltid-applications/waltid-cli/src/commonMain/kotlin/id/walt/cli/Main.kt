@@ -33,28 +33,28 @@ fun main(args: Array<String>) {
 fun handleGenericException(cmd: WaltIdCmd, e: Exception) {
     val cliktError = CliktError(e.message)
     printError(cmd, cliktError)
-    cmd.echoFormattedHelp(PrintHelpMessage(cmd.currentContext))
+//    cmd.echoFormattedHelp(PrintHelpMessage(cmd.currentContext))
 }
 
 fun handleCliktError(cmd: WaltIdCmd, e: CliktError) {
     printError(cmd, e)
-    printUsage(cmd, e)
+//    printUsage(cmd, e)
 }
 
 fun handleNoSuchOption(cmd: WaltIdCmd, e: NoSuchOption) {
     printError(cmd, e)
-    printUsage(cmd, e)
+//    printUsage(cmd, e)
 }
 
 fun handleMultiUsageError(cmd: WaltIdCmd, e: MultiUsageError) {
     val msgs = "Invalid command. Please, review the usage instructions bellow and try again."
     printError(cmd, e, msgs)
-    printUsage(cmd, e)
+//    printUsage(cmd, e)
 }
 
 fun handleInvalidFileFormat(cmd: WaltIdCmd, e: InvalidFileFormat) {
     printError(cmd, e)
-    printUsage(cmd, e)
+//    printUsage(cmd, e)
 }
 
 fun handlePrintHelpMessage(cmd: WaltIdCmd, e: PrintHelpMessage) {

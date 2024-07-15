@@ -28,6 +28,8 @@ class DidCreateCmd : CliktCommand(
         waltid did create 
         waltid did create -k myKey.json
         waltid did create -m jwk
+        waltid did create -m web -wd example.com
+        waltid did create -m web -wd example.com -wp /alice/bob
     """
 ) {
 
@@ -106,8 +108,8 @@ class DidCreateCmd : CliktCommand(
 
             val prettyJsonString = prettyJson.encodeToString(result.didDocument)
 
-            print.box(prettyJson.encodeToString(result.didDocument))
             print.green("DID Document:")
+            print.box(prettyJson.encodeToString(result.didDocument))
             outputFile.writeText(prettyJsonString)
 
             print.green("DID created:")
