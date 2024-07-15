@@ -1,9 +1,6 @@
 package id.walt.cli.commands
 
-import com.github.ajalt.clikt.core.CliktCommand
-import com.github.ajalt.clikt.core.Context
-import com.github.ajalt.clikt.core.FileNotFound
-import com.github.ajalt.clikt.core.MissingOption
+import com.github.ajalt.clikt.core.*
 import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.options.associate
 import com.github.ajalt.clikt.parameters.options.help
@@ -13,6 +10,7 @@ import com.github.ajalt.clikt.parameters.types.choice
 import com.github.ajalt.clikt.parameters.types.file
 import id.walt.cli.util.PrettyPrinter
 import id.walt.cli.util.VCUtil
+import id.walt.cli.util.WaltIdCmdHelpOptionMessage
 import id.walt.credentials.verification.ExpirationDatePolicyException
 import id.walt.credentials.verification.JsonSchemaVerificationException
 import id.walt.credentials.verification.NotBeforePolicyException
@@ -29,9 +27,15 @@ class VCVerifyCmd : CliktCommand(
     printHelpOnEmptyArgs = true,
 ) {
 
+    init {
+        context {
+            localization = WaltIdCmdHelpOptionMessage
+        }
+    }
+
     override fun commandHelp(context: Context): String {
         var help = """
-        VC verification command.
+        Apply a wide range of verification policies on a W3C Verifiable Credential (VC).
             
         Verifies the specified VC under a set of specified policies.
 
@@ -74,9 +78,17 @@ class VCVerifyCmd : CliktCommand(
     val policies: List<String> by option(
         "-p",
         "--policy",
-        help = """Specify a policy to be applied in the verification process."""
+        help = "Specify one, or more policies to be applied during the verification process of the VC (signature policy is always applied)."
     ).choice(
-        *PolicyManager.listPolicyDescriptions().keys.toTypedArray()
+        *listOf(
+            "signature",
+            "expired",
+            "not-before",
+            "revoked_status_list",
+            "schema",
+            "allowed-issuer",
+            "webhook",
+        ).toTypedArray()
     ).multiple()
 
     val policyArguments: Map<String, String> by option(
@@ -90,6 +102,7 @@ class VCVerifyCmd : CliktCommand(
             |signature| - |
             |expired| - |
             |not-before| - |
+            |revoked_status_list| - |
             |schema|schema=/path/to/schema.json|
             |allowed-issuer|issuer=did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV|
             |webhook|url=https://example.com|
@@ -159,6 +172,11 @@ class VCVerifyCmd : CliktCommand(
         args.putAll(getAllowedIssuerPolicyArguments())
         args.putAll(getWebhookPolicyArguments())
         args.putAll(getRevocationPolicyArguments())
+        for (noArgPolicyName in listOf("signature", "expired", "not-before", "revoked_status_list")) {
+            if (noArgPolicyName in policies) {
+                args[noArgPolicyName] = "".toJsonElement()
+            }
+        }
         return args
     }
 
