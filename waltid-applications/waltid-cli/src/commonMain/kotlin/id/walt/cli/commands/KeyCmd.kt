@@ -3,8 +3,8 @@ package id.walt.cli.commands
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.context
 import com.github.ajalt.clikt.core.subcommands
-import com.github.ajalt.clikt.output.Localization
 import com.github.ajalt.clikt.parameters.groups.provideDelegate
+import id.walt.cli.util.WaltIdCmdHelpOptionMessage
 
 class KeyCmd : CliktCommand(
     name = "key",
@@ -16,9 +16,7 @@ class KeyCmd : CliktCommand(
         subcommands(KeyGenerateCmd(), KeyConvertCmd())
 
         context {
-            localization = object : Localization {
-                override fun helpOptionMessage() = "Show this message and exit."
-            }
+            localization = WaltIdCmdHelpOptionMessage
         }
     }
 

@@ -1,7 +1,6 @@
 package id.walt.cli.commands
 
 import com.github.ajalt.clikt.core.*
-import com.github.ajalt.clikt.output.Localization
 import com.github.ajalt.clikt.parameters.groups.provideDelegate
 import com.github.ajalt.clikt.parameters.options.defaultLazy
 import com.github.ajalt.clikt.parameters.options.help
@@ -10,6 +9,7 @@ import com.github.ajalt.clikt.parameters.options.required
 import com.github.ajalt.clikt.parameters.types.file
 import com.github.ajalt.mordant.terminal.YesNoPrompt
 import id.walt.cli.util.PrettyPrinter
+import id.walt.cli.util.WaltIdCmdHelpOptionMessage
 import id.walt.cli.util.getNormalizedPath
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.jwk.JWKKey
@@ -53,9 +53,7 @@ class KeyConvertCmd : CliktCommand(
 
     init {
         context {
-            localization = object : Localization {
-                override fun helpOptionMessage() = "Show this message and exit."
-            }
+            localization = WaltIdCmdHelpOptionMessage
         }
     }
 
