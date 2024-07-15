@@ -46,8 +46,8 @@ class KeyGenerateCmd : CliktCommand(
 
     private val keyType by option("-t", "--keyType")
         .enum<KeyType>()
-        .help("Key type to use. Possible values are: [${acceptedKeyTypes}]. Default value is ${TextColors.brightBlue(KeyType.Ed25519.name)}.")
-        .default(KeyType.Ed25519)
+        .help("Key type to use. Possible values are: [${acceptedKeyTypes}]. Default value is ${TextColors.brightBlue(KeyType.secp256r1.name)}.")
+        .default(KeyType.secp256r1)
 
     private val optOutputFilePath by option("-o", "--output")
         .path()
