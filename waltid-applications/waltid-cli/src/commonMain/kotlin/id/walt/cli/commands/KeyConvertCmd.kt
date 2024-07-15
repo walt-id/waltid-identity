@@ -1,6 +1,7 @@
 package id.walt.cli.commands
 
 import com.github.ajalt.clikt.core.*
+import com.github.ajalt.clikt.output.Localization
 import com.github.ajalt.clikt.parameters.groups.provideDelegate
 import com.github.ajalt.clikt.parameters.options.defaultLazy
 import com.github.ajalt.clikt.parameters.options.help
@@ -38,8 +39,25 @@ enum class KeyFileFormat {
 }
 
 class KeyConvertCmd : CliktCommand(
-    name = "convert", help = "Convert key files between PEM and JWK formats.", printHelpOnEmptyArgs = true
+    name = "convert",
+    printHelpOnEmptyArgs = true,
+    help = """Convert key files between PEM and JWK formats.
+        
+        Example usage:
+        ---------------
+        waltid key convert -i myRsaKey.pem
+        waltid key convert -i myEncryptedRsaKey.pem -p 123123 -o myRsaKey.jwk
+    """,
+
 ) {
+
+    init {
+        context {
+            localization = object : Localization {
+                override fun helpOptionMessage() = "Show this message and exit."
+            }
+        }
+    }
 
     val print: PrettyPrinter = PrettyPrinter(this)
 
@@ -53,12 +71,12 @@ class KeyConvertCmd : CliktCommand(
     private val output by option(
         "-o",
         "--output"
-    ).help("The output file path. Accepted formats are: JWK and PEM. If not provided the input filename will be used with a different extension.")
+    ).help("The output file path. Accepted formats are: JWK and PEM. If not provided, the input filename will be used with a different extension.")
         .file().defaultLazy {
             File(input.parent, "${input.nameWithoutExtension}.${targetKeyType.toString().lowercase()}")
         }
 
-    private val passphrase by option("-p", "--passphrase").help("Passphrase to open an encrypted PEM")
+    private val passphrase by option("-p", "--passphrase").help("Passphrase to open an encrypted PEM.")
     // .prompt(text = "Please, inform the PEM passphrase", hideInput = true)
 
     private val commonOptions by CommonOptions()
