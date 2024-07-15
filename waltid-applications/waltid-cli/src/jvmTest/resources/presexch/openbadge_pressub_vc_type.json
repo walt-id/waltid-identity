@@ -1,0 +1,14 @@
+{
+  "id": "FRNts7u56840",
+  "definition_id": "FRNts7u56840",
+  "descriptor_map": [
+    {
+      "format": "jwt_vp_json",
+      "path": "$",
+      "path_nested": {
+        "format": "jwt_vc_json",
+        "path": "$.verifiableCredential[0]"
+      }
+    }
+  ]
+}

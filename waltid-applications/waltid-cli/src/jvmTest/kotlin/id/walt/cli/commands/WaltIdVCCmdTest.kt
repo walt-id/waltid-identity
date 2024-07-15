@@ -18,11 +18,11 @@ class WaltIdVCCmdTest {
             command.parse(emptyList())
         }
 
-        val helpMsg = "Issuing, presenting and verifying Verifiable Credentials"
+        val helpMsg = """Sign and apply a wide range verification policies on W3C Verifiable Credentials (VCs)."""
         result1.message?.let { assertTrue(it.contains(helpMsg)) }
 
-        val result2 = command.test()
-        assertTrue(result2.stdout.contains(helpMsg, ignoreCase = true))
+        val result2 = command.test(width = 800, height = 800)
+        assertTrue(result2.output.contains(helpMsg, ignoreCase = true))
     }
 
     @Test
