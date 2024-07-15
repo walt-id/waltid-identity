@@ -1,0 +1,23 @@
+PODS:
+  - JOSESwift (2.4.0)
+  - shared (1.0):
+    - JOSESwift (= 2.4.0)
+
+DEPENDENCIES:
+  - shared (from `../shared/build/cocoapods/publish/debug/shared.podspec`)
+
+SPEC REPOS:
+  trunk:
+    - JOSESwift
+
+EXTERNAL SOURCES:
+  shared:
+    :path: "../shared/build/cocoapods/publish/debug/shared.podspec"
+
+SPEC CHECKSUMS:
+  JOSESwift: 7ff178bb9173ff42c6e990929a9f2fa702a34f69
+  shared: ee3dddd40553f58ef0a4e678e03fea2487be7a72
+
+PODFILE CHECKSUM: 93d05305c37e358f2ec4eace64af0c7c9c22a708
+
+COCOAPODS: 1.15.2

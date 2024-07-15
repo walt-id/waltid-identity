@@ -73,8 +73,6 @@ kotlin {
         iosSimulatorArm64()
     }
 
-
-
     val ktor_version = "2.3.12"
 
     sourceSets {
@@ -175,27 +173,25 @@ kotlin {
         // Add for native: implementation("io.ktor:ktor-client-cio:$ktor_version")
 
         if (isMacOS) {
-            if (isMacOS) {
-                val iosArm64Main by getting
-                val iosSimulatorArm64Main by getting
+            val iosArm64Main by getting
+            val iosSimulatorArm64Main by getting
 
-                val iosMain by creating {
-                    dependsOn(commonMain)
-                    iosArm64Main.dependsOn(this)
-                    iosSimulatorArm64Main.dependsOn(this)
-                    dependencies {
-                        implementation("io.ktor:ktor-client-darwin:$ktor_version")
-                    }
+            val iosMain by creating {
+                dependsOn(commonMain)
+                iosArm64Main.dependsOn(this)
+                iosSimulatorArm64Main.dependsOn(this)
+                dependencies {
+                    implementation("io.ktor:ktor-client-darwin:$ktor_version")
                 }
+            }
 
-                val iosArm64Test by getting
-                val iosSimulatorArm64Test by getting
+            val iosArm64Test by getting
+            val iosSimulatorArm64Test by getting
 
-                val iosTest by creating {
-                    dependsOn(commonTest)
-                    iosArm64Test.dependsOn(this)
-                    iosSimulatorArm64Test.dependsOn(this)
-                }
+            val iosTest by creating {
+                dependsOn(commonTest)
+                iosArm64Test.dependsOn(this)
+                iosSimulatorArm64Test.dependsOn(this)
             }
         }
     }
@@ -206,14 +202,20 @@ kotlin {
             val envPassword = System.getenv("MAVEN_PASSWORD")
             val usernameFile = File("secret_maven_username.txt")
             val passwordFile = File("secret_maven_password.txt")
-            val secretMavenUsername = envUsername ?: usernameFile.let { if (it.isFile) it.readLines().first() else "" }
-            val secretMavenPassword = envPassword ?: passwordFile.let { if (it.isFile) it.readLines().first() else "" }
+            val secretMavenUsername =
+                envUsername ?: usernameFile.let { if (it.isFile) it.readLines().first() else "" }
+            val secretMavenPassword =
+                envPassword ?: passwordFile.let { if (it.isFile) it.readLines().first() else "" }
             val hasMavenAuth = secretMavenUsername.isNotEmpty() && secretMavenPassword.isNotEmpty()
             if (hasMavenAuth) {
                 maven {
                     val releasesRepoUrl = uri("https://maven.waltid.dev/releases")
                     val snapshotsRepoUrl = uri("https://maven.waltid.dev/snapshots")
-                    url = uri(if (version.toString().endsWith("SNAPSHOT")) snapshotsRepoUrl else releasesRepoUrl)
+                    url = uri(
+                        if (version.toString()
+                                .endsWith("SNAPSHOT")
+                        ) snapshotsRepoUrl else releasesRepoUrl
+                    )
                     credentials {
                         username = secretMavenUsername
                         password = secretMavenPassword
@@ -228,7 +230,8 @@ npmPublish {
     registries {
         val envToken = System.getenv("NPM_TOKEN")
         val npmTokenFile = File("secret_npm_token.txt")
-        val secretNpmToken = envToken ?: npmTokenFile.let { if (it.isFile) it.readLines().first() else "" }
+        val secretNpmToken =
+            envToken ?: npmTokenFile.let { if (it.isFile) it.readLines().first() else "" }
         val hasNPMToken = secretNpmToken.isNotEmpty()
         val isReleaseBuild = Regex("\\d+.\\d+.\\d+").matches(version.get())
         if (isReleaseBuild && hasNPMToken) {

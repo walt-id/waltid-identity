@@ -171,4 +171,4 @@ iOSInjectionProject/
 
 # End of https://www.toptal.com/developers/gitignore/api/xcode,swift,cocoapods
 
-/waltid-libraries/waltid-crypto-ios/crypto-ios-utils/DerivedData**
+/waltid-libraries/waltid-target-ios/implementation/DerivedData**/
