@@ -126,18 +126,26 @@ object IssuanceService {
         val credReqs = offeredCredentials.map { offeredCredential ->
             // Use key proof if supported cryptographic binding method is not empty, doesn't contain did and contains cose_key
             val useKeyProof = (offeredCredential.cryptographicBindingMethodsSupported != null &&
-                offeredCredential.cryptographicBindingMethodsSupported!!.contains("cose_key") &&
+                (offeredCredential.cryptographicBindingMethodsSupported!!.contains("cose_key") ||
+                    offeredCredential.cryptographicBindingMethodsSupported!!.contains("kb+jwt")) &&
                 !offeredCredential.cryptographicBindingMethodsSupported!!.contains("did"))
-            val key = DidService.resolveToKey(credentialWallet.did).getOrThrow()
             CredentialRequest.forOfferedCredential(
                 offeredCredential = offeredCredential,
                 proof = when(useKeyProof) {
-                    true -> credentialWallet.generateKeyProof(
-                        key = key,
-                        cosePubKey = OneKey(ECKey.parse(key.getPublicKey().exportJWK()).toECPublicKey(), null).AsCBOR().EncodeToBytes(),
-                        issuerUrl = credentialOffer.credentialIssuer,
-                        nonce = nonce,
-                        proofType = offeredCredential.proofTypesSupported?.keys?.first() ?: ProofType.jwt)
+                    true -> {
+                        val key = DidService.resolveToKey(credentialWallet.did).getOrThrow()
+                        val proofType = offeredCredential.proofTypesSupported?.keys?.first() ?: ProofType.jwt
+                        credentialWallet.generateKeyProof(
+                            key = key,
+                            cosePubKey = if(proofType == ProofType.cwt) OneKey(
+                                ECKey.parse(key.getPublicKey().exportJWK()).toECPublicKey(),
+                                null
+                            ).AsCBOR().EncodeToBytes() else null,
+                            issuerUrl = credentialOffer.credentialIssuer,
+                            nonce = nonce,
+                            proofType = proofType
+                        )
+                    }
                     else -> credentialWallet.generateDidProof(
                         did = credentialWallet.did,
                         issuerUrl = credentialOffer.credentialIssuer,

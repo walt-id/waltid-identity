@@ -111,7 +111,9 @@ fun Application.lspPotentialIssuanceTestApi() {
           credentialData = W3CVC(buildJsonObject {
             put("family_name", "Doe")
             put("given_name", "John")
-          }), null
+          }), null,
+          x5Chain = listOf(LspPotentialIssuanceInterop.POTENTIAL_ISSUER_CERT),
+          trustedRootCAs = listOf(LspPotentialIssuanceInterop.POTENTIAL_ROOT_CA_CERT)
         ).let { createCredentialOfferUri(listOf(it)) }
         context.respond(
           HttpStatusCode.OK, offerUri
