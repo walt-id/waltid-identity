@@ -339,7 +339,7 @@ class SSIKit2WalletService(
         return result.did
     }
 
-    override suspend fun listDids() = transaction { DidsService.list(walletId) }
+    override suspend fun listDids() =  DidsService.list(walletId)
 
     override suspend fun loadDid(did: String): JsonObject =
         DidsService.get(walletId, did)?.let { Json.parseToJsonElement(it.document).jsonObject }
@@ -365,7 +365,7 @@ class SSIKit2WalletService(
 
     /* Keys */
 
-    private fun getKey(keyId: String) = KeysService.get(walletId, keyId)?.let {
+    private suspend fun getKey(keyId: String) = KeysService.get(walletId, keyId)?.let {
         KeyManager.resolveSerializedKey(it.document)
     } ?: throw IllegalArgumentException("Key not found: $keyId")
 

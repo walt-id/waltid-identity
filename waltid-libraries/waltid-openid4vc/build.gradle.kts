@@ -9,7 +9,7 @@ plugins {
     id("com.github.ben-manes.versions")
 }
 
-group = "id.walt"
+group = "id.walt.openid4vc"
 
 repositories {
     mavenCentral()
@@ -90,7 +90,7 @@ kotlin {
                 implementation("io.github.oshai:kotlin-logging:7.0.0")
 
                 // JSON
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.1")
 
                 // walt.id
                 implementation(project(":waltid-libraries:waltid-crypto"))
@@ -132,7 +132,7 @@ kotlin {
                 implementation("io.kotest:kotest-assertions-core:5.9.1")
                 implementation("io.kotest:kotest-assertions-json:5.9.1")
                 implementation("org.junit.jupiter:junit-jupiter-params:5.11.0-M2")
-                implementation("com.google.crypto.tink:tink:1.13.0") // for JOSE using Ed25519
+                implementation("com.google.crypto.tink:tink:1.14.0") // for JOSE using Ed25519
                 implementation("org.bouncycastle:bcprov-lts8on:2.73.6") // for secp256k1 (which was removed with Java 17)
                 implementation("org.bouncycastle:bcpkix-lts8on:2.73.6") // PEM import
 

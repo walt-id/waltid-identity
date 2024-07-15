@@ -60,6 +60,18 @@ The complete class hierarchy can be viewed in the [class diagram](did-lib_class.
 
 ## How to use it
 
+### Local Resolver & Registrar Setup
+This function initializes the DidService instance with the local DID registrars and resolvers.
+```kotlin
+DidService.minimalInit()
+```
+### Standard Setup 
+
+You can leverage the universal registrar and resolver by suing the `init()` method for setup.
+```kotlin
+DidService.init()
+```
+
 ### Register DID
 
 Create the key and register the DID:
@@ -170,7 +182,7 @@ represented as **_walt.id crypto_** `Key`.
             <td align="center">rsa</td>
             <td align="center">&check;</td>
             <td align="center">&dash;</td>
-            <td align="center">&cross;</td>
+            <td align="center">&check;</td>
         </tr>
         <!-- end key -->
         <tr><td colspan="5"></td></tr>
@@ -202,7 +214,7 @@ represented as **_walt.id crypto_** `Key`.
             <td align="center">rsa</td>
             <td align="center">&check;</td>
             <td align="center">&dash;</td>
-            <td align="center">&cross;</td>
+            <td align="center">&check;</td>
         </tr>
         <!-- end jwk -->
         <tr><td colspan="5"></td></tr>
@@ -234,7 +246,7 @@ represented as **_walt.id crypto_** `Key`.
             <td align="center">rsa</td>
             <td align="center">&check;</td>
             <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
+            <td align="center">&check;</td>
         </tr>
         <!-- end web -->
         <tr><td colspan="5"></td></tr>
@@ -251,11 +263,17 @@ represented as **_walt.id crypto_** `Key`.
         <tr><td colspan="5"></td></tr>
         <!-- ebsi -->
         <tr>
-            <td align="center">ebsi</td>
+            <td align="center" rowspan="2">ebsi</td>
             <td align="center">secp256r1</td>
             <td align="center">&cross;</td>
             <td align="center">&cross;</td>
+            <td align="center">&check;</td>
+        </tr>
+        <tr>
+            <td align="center">secp256k1</td>
             <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&check;</td>
         </tr>
         <!-- end ebsi -->
         <tr><td colspan="5"></td></tr>
@@ -274,7 +292,7 @@ represented as **_walt.id crypto_** `Key`.
 (*) The did:key implementation defaults to W3C CCG https://w3c-ccg.github.io/did-method-key/. By setting _useJwkJcsPub_ to `true` the EBSI
 implementation (jwk_jcs-pub encoding) according https://hub.ebsi.eu/tools/libraries/key-did-resolver is performed.
 
-## Remote DID operations by 3d party services (fallback)
+## Remote DID operations by 3rd party services (fallback)
 
 According Universal Resolver: https://github.com/decentralized-identity/universal-resolver/
 
