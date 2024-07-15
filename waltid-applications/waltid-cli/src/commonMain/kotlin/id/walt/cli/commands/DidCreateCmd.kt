@@ -107,6 +107,7 @@ class DidCreateCmd : CliktCommand(
             val prettyJsonString = prettyJson.encodeToString(result.didDocument)
 
             print.box(prettyJson.encodeToString(result.didDocument))
+            print.green("DID Document:")
             outputFile.writeText(prettyJsonString)
 
             print.green("DID created:")
