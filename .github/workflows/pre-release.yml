@@ -37,7 +37,7 @@ jobs:
       - name: Gradle wrapper validation
         uses: gradle/wrapper-validation-action@v3
       - name: Running gradle build
-        uses: eskatos/gradle-command-action@v3.4.1
+        uses: eskatos/gradle-command-action@v3
         env:
           MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
@@ -50,31 +50,31 @@ jobs:
           password: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: Build and push Docker images (issuer)
-        uses: docker/build-push-action@v4.0.0
+        uses: docker/build-push-action@v6
         with:
           push: true
           file: waltid-services/waltid-issuer-api/Dockerfile
           tags: waltid/issuer-api:latest, waltid/issuer-api:${{ env.release_version }}
       - name: Build and push Docker images (verifier)
-        uses: docker/build-push-action@v4.0.0
+        uses: docker/build-push-action@v6
         with:
           push: true
           file: waltid-services/waltid-verifier-api/Dockerfile
           tags: waltid/verifier-api:latest, waltid/verifier-api:${{ env.release_version }}
       - name: Build and push Docker images (wallet-api)
-        uses: docker/build-push-action@v4.0.0
+        uses: docker/build-push-action@v6
         with:
           push: true
           file: waltid-services/waltid-wallet-api/Dockerfile
           tags: waltid/wallet-api:latest, waltid/wallet-api:${{ env.release_version }}
       - name: Build and push Docker images (waltid-web-wallet)
-        uses: docker/build-push-action@v4.0.0
+        uses: docker/build-push-action@v6
         with:
           push: true
           file: waltid-applications/waltid-web-wallet/Dockerfile
           tags: waltid/waltid-web-wallet:latest, waltid/waltid-web-wallet:${{ env.release_version }}
       - name: Build and push Docker images (wallet-portal)
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v6
         with:
           push: true
           file: waltid-applications/waltid-web-portal/Dockerfile

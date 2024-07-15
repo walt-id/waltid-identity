@@ -2,12 +2,14 @@ import TestUtils.loadJwkLocal
 import TestUtils.loadSerializedLocal
 import TestUtils.loadSerializedTse
 import id.walt.crypto.keys.Key
+import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.keys.tse.TSEKey
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.Arguments
@@ -31,7 +33,7 @@ class KeySerializationTests {
         val decoded = Json.decodeFromString<JsonObject>(serialized)
         // then
         assertEquals(type, decoded["type"]!!.jsonPrimitive.content)
-        assertEquals(keyFile.replace("\\s".toRegex(), ""), decoded["jwk"]!!.jsonPrimitive.content)
+        assertEquals(Json.decodeFromString(keyFile), decoded["jwk"]!!.jsonObject)
     }
 
     @ParameterizedTest
@@ -42,7 +44,7 @@ class KeySerializationTests {
     ) =
         runTest {
             // when
-            val key = KeySerialization.deserializeKey(serialized).getOrThrow()
+            val key = KeyManager.resolveSerializedKey(serialized)
             // then
             assertEquals(clazz.java.simpleName, key::class.java.simpleName)
         }

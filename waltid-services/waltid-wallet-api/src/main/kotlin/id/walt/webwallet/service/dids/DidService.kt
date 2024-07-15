@@ -15,7 +15,8 @@ object DidsService {
             .singleOrNull()?.let { WalletDid(it) }
     }
 
-    fun list(wallet: UUID): List<WalletDid> = WalletDids.selectAll().where { WalletDids.wallet eq wallet }.map { WalletDid(it) }
+    fun list(wallet: UUID): List<WalletDid> =
+        transaction { WalletDids.selectAll().where { WalletDids.wallet eq wallet }.map { WalletDid(it) } }
 
     fun getWalletsForDid(did: String): List<UUID> = transaction {
         WalletDids.selectAll().where { WalletDids.did eq did }.map {

@@ -24,6 +24,7 @@ import id.walt.oid4vc.data.dif.*
 import id.walt.sdjwt.SimpleJWTCryptoProvider
 import id.walt.verifier.config.OIDCVerifierServiceConfig
 import id.walt.verifier.oidc.LspPotentialInteropEvent
+import id.walt.verifier.oidc.PresentationSessionInfo
 import id.walt.verifier.oidc.RequestSigningCryptoProvider
 import id.walt.verifier.oidc.VerificationUseCase
 import io.github.smiley4.ktorswaggerui.dsl.routing.get
@@ -151,7 +152,7 @@ fun Application.verfierApi() {
                     headerParameter<ResponseMode>("responseMode") {
                         description = "Response mode, for vp_token response, defaults to ${ResponseMode.direct_post}"
                         example("direct post") {
-                            value = ResponseMode.direct_post.name
+                            value = ResponseMode.direct_post
                         }
                         required = false
                     }
@@ -205,7 +206,7 @@ fun Application.verfierApi() {
             }) {
                 val authorizeBaseUrl = context.request.header("authorizeBaseUrl") ?: defaultAuthorizeBaseUrl
                 val responseMode =
-                    context.request.header("responseMode")?.let { ResponseMode.valueOf(it) } ?: ResponseMode.direct_post
+                    context.request.header("responseMode")?.let { ResponseMode.fromString(it) } ?: ResponseMode.direct_post
                 val successRedirectUri = context.request.header("successRedirectUri")
                 val errorRedirectUri = context.request.header("errorRedirectUri")
                 val statusCallbackUri = context.request.header("statusCallbackUri")
@@ -322,7 +323,7 @@ fun Application.verfierApi() {
                 }
                 response {
                     HttpStatusCode.OK to {
-                        body<JsonObject> { // it's PresentationSessionInfo
+                        body<PresentationSessionInfo> { // it's PresentationSessionInfo
                             description = "Session info"
                         }
                     }

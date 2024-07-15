@@ -57,7 +57,7 @@ jobs:
           password: ${{secrets.DOCKER_PASSWORD}}
 
       - name: Build and push
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v6
         with:
           push: true
           tags: waltid/portal:latest, waltid/portal:${{ env.release_version }}

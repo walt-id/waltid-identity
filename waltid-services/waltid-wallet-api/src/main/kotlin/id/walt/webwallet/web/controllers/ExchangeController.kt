@@ -43,7 +43,7 @@ fun Application.exchange() = walletRoute {
             val wallet = getWalletService()
 
             val did = call.request.queryParameters["did"] ?: wallet.listDids().firstOrNull()?.did
-            ?: throw IllegalArgumentException("No DID to use supplied")
+            ?: throw IllegalArgumentException("No DID to use supplied and no DID was found in wallet.")
             val requireUserInput = call.request.queryParameters["requireUserInput"].toBoolean()
 
             val offer = call.receiveText()

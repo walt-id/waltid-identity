@@ -19,6 +19,7 @@ import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.requests.CredentialOfferRequest
 import id.walt.oid4vc.responses.AuthorizationErrorCode
 import id.walt.webwallet.config.KeyGenerationDefaultsConfig
+import id.walt.webwallet.config.RegistrationDefaultsConfig
 import id.walt.webwallet.db.models.WalletCategoryData
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.db.models.WalletOperationHistories
@@ -77,6 +78,8 @@ class SSIKit2WalletService(
     private val credentialReportsService = ReportService.Credentials(credentialService, eventService)
 
     companion object {
+        val defaultGenerationConfig by lazy { ConfigManager.getConfig<RegistrationDefaultsConfig>() }
+
         init {
             runBlocking {
                 DidService.apply {
@@ -314,7 +317,7 @@ class SSIKit2WalletService(
     /* DIDs */
 
     override suspend fun createDid(method: String, args: Map<String, JsonPrimitive>): String {
-        val keyId = args["keyId"]?.content?.takeIf { it.isNotEmpty() } ?: generateKey()
+        val keyId = args["keyId"]?.content?.takeIf { it.isNotEmpty() } ?: generateKey(defaultGenerationConfig.defaultKeyConfig)
         val key = getKey(keyId)
         val result = DidService.registerDefaultDidMethodByKey(method, key, args)
 
@@ -336,7 +339,7 @@ class SSIKit2WalletService(
         return result.did
     }
 
-    override suspend fun listDids() = transaction { DidsService.list(walletId) }
+    override suspend fun listDids() =  DidsService.list(walletId)
 
     override suspend fun loadDid(did: String): JsonObject =
         DidsService.get(walletId, did)?.let { Json.parseToJsonElement(it.document).jsonObject }
@@ -362,7 +365,7 @@ class SSIKit2WalletService(
 
     /* Keys */
 
-    private fun getKey(keyId: String) = KeysService.get(walletId, keyId)?.let {
+    private suspend fun getKey(keyId: String) = KeysService.get(walletId, keyId)?.let {
         KeyManager.resolveSerializedKey(it.document)
     } ?: throw IllegalArgumentException("Key not found: $keyId")
 

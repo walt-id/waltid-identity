@@ -13,6 +13,10 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 
+val json = Json {
+    ignoreUnknownKeys = true
+}
+
 @Serializable
 data class CredentialRequest(
     val format: CredentialFormat,
@@ -24,11 +28,11 @@ data class CredentialRequest(
     @SerialName("credential_definition") val credentialDefinition: JsonLDCredentialDefinition? = null,
     override val customParameters: Map<String, JsonElement> = mapOf()
 ) : JsonDataObject() {
-    override fun toJSON() = Json.encodeToJsonElement(CredentialRequestSerializer, this).jsonObject
+    override fun toJSON() = json.encodeToJsonElement(CredentialRequestSerializer, this).jsonObject
 
     companion object : JsonDataObjectFactory<CredentialRequest>() {
         override fun fromJSON(jsonObject: JsonObject) =
-            Json.decodeFromJsonElement(CredentialRequestSerializer, jsonObject)
+            json.decodeFromJsonElement(CredentialRequestSerializer, jsonObject)
 
         fun forAuthorizationDetails(authorizationDetails: AuthorizationDetails, proof: ProofOfPossession?) =
             CredentialRequest(

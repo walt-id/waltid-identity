@@ -20,49 +20,25 @@ export default function RowCredential({ credentialToEdit, credentialsToIssue, se
     setCredentialsToIssue(
       credentialsToIssue.map((credential) => {
         if (credential.offer.id == credentialToEdit.offer.id) {
-          return {
-            ...credential,
-            offer: {
-              ...credential.offer,
-              credentialSubject: credentialSubject,
-            },
-          };
-        } else {
-          return credential;
-        }
-      })
-    );
-  }, [credentialSubject]);
+          let updatedCredential = { ...credential };
 
-  React.useEffect(() => {
-    setCredentialsToIssue(
-      credentialsToIssue.map((credential) => {
-        if (credential.offer.id == credentialToEdit.offer.id) {
-          return {
-            ...credential,
-            selectedFormat: selectedFormat,
-          };
-        } else {
-          return credential;
-        }
-      })
-    );
-  }, [selectedFormat]);
+          if (credentialSubject !== credential.offer.credentialSubject) {
+            updatedCredential.offer.credentialSubject = credentialSubject;
+          }
+          if (selectedFormat !== CredentialFormats[0]) {
+            updatedCredential.selectedFormat = selectedFormat;
+          }
+          if (selectedDID !== DIDMethods[0]) {
+            updatedCredential.selectedDID = selectedDID;
+          }
 
-  React.useEffect(() => {
-    setCredentialsToIssue(
-      credentialsToIssue.map((credential) => {
-        if (credential.offer.id == credentialToEdit.offer.id) {
-          return {
-            ...credential,
-            selectedDID: selectedDID,
-          };
+          return updatedCredential;
         } else {
           return credential;
         }
       })
     );
-  }, [selectedDID]);
+  }, [credentialSubject, selectedFormat, selectedDID]);
 
   return (
     <>

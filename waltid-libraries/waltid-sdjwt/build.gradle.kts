@@ -5,12 +5,12 @@ plugins {
 
     kotlin("plugin.serialization")
 
-    id("dev.petuska.npm.publish") version "3.4.2"
+    id("dev.petuska.npm.publish") version "3.4.3"
     `maven-publish`
     id("com.github.ben-manes.versions")
 }
 
-group = "id.walt"
+group = "id.walt.sdjwt"
 
 repositories {
     mavenCentral()
@@ -19,8 +19,10 @@ repositories {
 kotlin {
     targets.configureEach {
         compilations.configureEach {
-            compilerOptions.configure {
-                freeCompilerArgs.add("-Xexpect-actual-classes")
+            compileTaskProvider.configure {
+                compilerOptions { 
+                    freeCompilerArgs.add("-Xexpect-actual-classes")
+                }
             }
         }
     }
@@ -118,7 +120,7 @@ kotlin {
         val commonMain by getting {
             dependencies {
                 implementation("dev.whyoleg.cryptography:cryptography-random:0.3.1")
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.1")
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
                 implementation("com.soywiz.korlibs.krypto:krypto:4.0.10")
             }

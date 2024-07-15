@@ -25,7 +25,7 @@ data object DebugLoggingSetup : LoggingSetup("debug", {
         fromMinLevel(Level.ERROR) {
             toSink("stderr")
         }
-        fromMinLevel(Level.DEBUG) {
+        inLevelRange(Level.DEBUG, Level.WARN) {
             toSink("stdout")
         }
     }

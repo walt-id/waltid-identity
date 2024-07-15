@@ -1,8 +1,11 @@
 package id.walt.commons.featureflag
 
+import com.sksamuel.hoplite.ConfigException
 import id.walt.commons.config.ConfigManager
+import id.walt.commons.config.ConfigurationException
 import id.walt.commons.config.statics.RunConfiguration
 import io.klogging.logger
+import kotlin.system.exitProcess
 
 object FeatureManager {
     // val baseFeatures = HashSet<String>()
@@ -10,25 +13,25 @@ object FeatureManager {
     val disabledFeatures = HashSet<String>()
     val registeredFeatures = HashMap<String, AbstractFeature>()
 
-    private val failed = ArrayList<AbstractFeature>()
+    private val failed = ArrayList<Pair<AbstractFeature, Throwable>>()
 
     val featureAmendments = HashMap<AbstractFeature, suspend () -> Unit>()
 
     private val log = logger("FeatureManager")
 
-    suspend fun enableFeature(feature: AbstractFeature): Boolean {
+    suspend fun enableFeature(feature: AbstractFeature): Result<Boolean> {
         feature.dependsOn // todo: handle this
 
         if (disabledFeatures.contains(feature.name)) {
             log.info { "Will not enable \"${feature.name}\" as it was explicitly disabled." }
-            return true
+            return Result.success(false)
         }
 
         feature.configs.forEach { (name, config) ->
             log.info { "↳ Loading config \"$name\" for feature \"${feature.name}\"..." }
             ConfigManager.registerConfig(name, config)
-            ConfigManager.loadConfig(ConfigManager.ConfigData(name, config), RunConfiguration.configArgs).onFailure {
-                return false
+            ConfigManager.loadConfig(ConfigManager.ConfigData(name, config), RunConfiguration.configArgs).onFailure { ex ->
+                return Result.failure(ConfigurationException(ex as ConfigException))
             }
         }
 
@@ -37,7 +40,7 @@ object FeatureManager {
             it.invoke()
         }
 
-        return enabledFeatures.add(feature.name)
+        return if (enabledFeatures.add(feature.name)) Result.success(true) else Result.failure(IllegalStateException("Feature \"${feature.name}\" already enabled."))
     }
 
     fun disableFeature(feature: AbstractFeature) {
@@ -45,17 +48,15 @@ object FeatureManager {
     }
 
     fun isFeatureEnabled(featureName: String): Boolean {
-        return enabledFeatures.contains(featureName) ||
-                (!disabledFeatures.contains(featureName) &&
-                        when (val registeredFeature = registeredFeatures[featureName]) {
-                            is BaseFeature -> true
-                            is OptionalFeature -> registeredFeature.default
-                            else -> false
-                        })
+        return enabledFeatures.contains(featureName) || (!disabledFeatures.contains(featureName) && when (val registeredFeature =
+            registeredFeatures[featureName]) {
+            is BaseFeature -> true
+            is OptionalFeature -> registeredFeature.default
+            else -> false
+        })
     }
 
-    fun isFeatureEnabled(feature: OptionalFeature): Boolean =
-        isFeatureEnabled(feature.name)
+    fun isFeatureEnabled(feature: OptionalFeature): Boolean = isFeatureEnabled(feature.name)
 
     /**
      * Run block if provided feature is enabled
@@ -109,14 +110,21 @@ object FeatureManager {
         registeredFeatures[feature.name] = feature
     }
 
-    fun getDefaultedFeatures() = registeredFeatures.keys.subtract(enabledFeatures).subtract(disabledFeatures).subtract(failed.map { it.name }
-        .toSet())
-    fun getDefaultedAbstractFeatures() =
-        getDefaultedFeatures().map { registeredFeatures[it]!! }
+    fun getDefaultedFeatures() =
+        registeredFeatures.keys.subtract(enabledFeatures).subtract(disabledFeatures).subtract(failed.map { it.first.name }.toSet())
+
+    fun getDefaultedAbstractFeatures() = getDefaultedFeatures().map { registeredFeatures[it]!! }
 
 
-    private fun Boolean.ifNotSucceeded(block: () -> Unit) {
-        if (!this) block.invoke()
+    private suspend fun Result<Boolean>.ifNotSucceeded(block: (Throwable) -> Unit) {
+        if (isFailure) {
+            val exception = exceptionOrNull()!!
+
+            if (exception !is ConfigurationException) // already handled by ConfigManager
+                log.error("Did not succeed enabling feature:", exception)
+
+            block.invoke(exception)
+        }
     }
 
     suspend fun load(amendments: Map<AbstractFeature, suspend () -> Unit>) {
@@ -140,30 +148,58 @@ object FeatureManager {
         registeredFeatures.filterValues { it is BaseFeature }.forEach { (name, feature) ->
             log.info { "Enabling base feature \"${feature.name}\"..." }
 
-            enableFeature(feature).ifNotSucceeded { failed += feature }
+            enableFeature(feature).ifNotSucceeded { failed += feature to it }
         }
 
         config.enabledFeatures.forEach { name ->
             registeredFeatures[name]?.let { feature ->
                 log.info { "Enabling feature \"${feature.name}\"..." }
-                enableFeature(feature).ifNotSucceeded { failed += feature }
+                enableFeature(feature).ifNotSucceeded { failed += feature to it }
             }
                 ?: error("Could not enable feature \"$name\" as it's not loaded/registered by any catalog. Registered features are: ${registeredFeatures.keys}")
         }
         log.info { "Enabled features (${enabledFeatures.size}): ${enabledFeatures.joinToString()}" }
 
         log.info { "Defaulted features (${getDefaultedFeatures().size}): ${getDefaultedFeatures().joinToString()}" }
-        getDefaultedAbstractFeatures().forEach {
-            if (it is BaseFeature || (it is OptionalFeature && it.default)) {
-                log.info { "Enabling default feature \"${it.name}\"..." }
-                enableFeature(it).ifNotSucceeded { failed += it }
+        getDefaultedAbstractFeatures().forEach { feature ->
+            if ((feature is BaseFeature || (feature is OptionalFeature && feature.default)) && !failed.any { it.first == feature }) {
+                log.info { "Enabling default feature \"${feature.name}\"..." }
+                enableFeature(feature).ifNotSucceeded { failed += feature to it }
             }
         }
 
 
         if (failed.isNotEmpty()) {
-            error("Failed to enable ${failed.size} features: ${failed.joinToString { it.name }}")
+            log.error {
+                """
+                |${failed.size} features failed to enable (see above for specifics) - error summary:
+                ${
+                    failed.mapIndexed { index, fail ->
+                        "|- Failure ${index + 1}/${failed.size}: Loading \"${fail.first.name}\" failed: ${
+                            when (val err = fail.second) {
+                                is ConfigurationException -> err.errorMessage().summary()
+                                else -> err.message?.shortSummary()
+                            }
+                        }"
+                    }.joinToString(separator = "\n")
+                }
+                """.trimMargin()
+            }
+            exitProcess(1)
         }
     }
 }
 
+private fun String.shortSummary(roughLength: Int = 200) =
+    summary()
+        .let { if (it.length > roughLength * 1.2) it.take(roughLength).trim() + "……" else it }
+
+private fun String.summary() =
+    replaceWhile("\n\n", "\n")
+        .trim()
+
+private fun String.replaceWhile(old: String, new: String): String {
+    var s = this
+    while (s.contains(old)) s = s.replace(old, new)
+    return s
+}

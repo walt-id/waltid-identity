@@ -3,6 +3,7 @@ package id.walt.commons.web.modules
 import id.walt.commons.config.statics.BuildConfig
 import id.walt.commons.config.statics.ServiceConfig
 import io.github.smiley4.ktorswaggerui.SwaggerUI
+import io.github.smiley4.ktorswaggerui.data.KTypeDescriptor
 import io.github.smiley4.ktorswaggerui.dsl.config.OpenApiInfo
 import io.github.smiley4.ktorswaggerui.dsl.config.PluginConfigDsl
 import io.github.smiley4.ktorswaggerui.dsl.routing.get
@@ -18,15 +19,22 @@ import io.github.smiley4.schemakenerator.swagger.data.TitleType
 import io.github.smiley4.schemakenerator.swagger.generateSwaggerSchema
 import io.github.smiley4.schemakenerator.swagger.handleCoreAnnotations
 import io.github.smiley4.schemakenerator.swagger.withAutoTitle
+import io.klogging.noCoLogger
 import io.ktor.server.application.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.serializer
 import kotlin.reflect.KType
+import kotlin.reflect.full.isSubtypeOf
+import kotlin.reflect.typeOf
 import kotlin.time.Duration.Companion.nanoseconds
 
 object OpenApiModule {
+
+    private val logger = noCoLogger("OpenAPI")
 
     object OpenApiConfig {
         var customInfo: (OpenApiInfo.() -> Unit)? = null
@@ -55,6 +63,26 @@ object OpenApiModule {
     // Module
     fun Application.enable() {
         install(SwaggerUI) {
+
+            examples {
+                example("UUID") {
+                    value = "12345678-abcd-9876-efgh-543210123456"
+                }
+
+                example("Instant") {
+                    value = Clock.System.now().toString()
+                }
+
+                encoder { type, example ->
+                    if (type is KTypeDescriptor) {
+                        encodeSwaggerExample(type, example)
+                    } else {
+                        logger.trace { "No type descriptor for example, type is: $type" }
+                        example
+                    }
+                }
+            }
+
             schemas {
                 val kotlinxPrefixes = listOf("id.walt")
 
@@ -130,7 +158,23 @@ object OpenApiModule {
             }
         }
     }
+    private val skippedTypes = listOf(typeOf<String>(), typeOf<Enum<*>>())
+    private fun encodeSwaggerExample(descriptor: KTypeDescriptor, example: Any?) = when {
+        skippedTypes.any { descriptor.type.isSubtypeOf(it) } -> {
+            logger.trace { "Skipped encoding for type: ${descriptor.type}; example is: $example (${example!!::class.simpleName})" }
+            example
+        }
+        else -> {
+            logger.trace("Example for: ${descriptor.type}; example is: $example (${example!!::class.simpleName})")
+            Json {
+                encodeDefaults = true
+                explicitNulls = false
+            }.encodeToString(Json.serializersModule.serializer(descriptor.type), example)
+        }
+    }
 }
 
 private fun Instant.roundToSecond(): Instant =
     minus(nanosecondsOfSecond.nanoseconds)
+
+

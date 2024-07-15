@@ -25,7 +25,6 @@ fun Application.eventLogs() = walletRoute {
                 }
                 queryParameter<List<String>>("filter") {
                     description = "List of key=value pairs for filtering"
-                    example("Example") { value = "key=value" }
                     required = false
                 }
                 queryParameter<String>("startingAfter") {

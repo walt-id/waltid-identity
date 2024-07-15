@@ -142,7 +142,7 @@ object NotificationController {
                         response {
                             HttpStatusCode.OK to {
                                 description = "Notification object"
-                                body<JsonObject>()
+                                body<NotificationDTO>()
                             }
                         }
                     }) {

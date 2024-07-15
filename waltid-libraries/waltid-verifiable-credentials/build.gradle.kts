@@ -2,13 +2,15 @@ import love.forte.plugin.suspendtrans.ClassInfo
 import love.forte.plugin.suspendtrans.SuspendTransformConfiguration
 import love.forte.plugin.suspendtrans.TargetPlatform
 import love.forte.plugin.suspendtrans.gradle.SuspendTransformGradleExtension
+import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     kotlin("multiplatform")
     kotlin("plugin.serialization")
     id("maven-publish")
-    id("dev.petuska.npm.publish") version "3.4.2"
-    id("love.forte.plugin.suspend-transform") version "0.6.0"
+    id("dev.petuska.npm.publish") version "3.4.3"
+    id("love.forte.plugin.suspend-transform") version "0.9.0"
     id("com.github.ben-manes.versions")
 }
 
@@ -31,21 +33,24 @@ java {
 }
 
 kotlin {
-    jvmToolchain(15)
+    jvmToolchain(17)
 }
 
 kotlin {
     targets.configureEach {
         compilations.configureEach {
-            compilerOptions.configure {
-                freeCompilerArgs.add("-Xexpect-actual-classes")
+            compileTaskProvider.configure {
+                compilerOptions {
+                    freeCompilerArgs.add("-Xexpect-actual-classes")
+                }
             }
         }
     }
 
     jvm {
-        compilations.all {
-            kotlinOptions.jvmTarget = "15" // JVM got Ed25519 at version 15
+        @OptIn(ExperimentalKotlinGradlePluginApi::class)
+        compilerOptions {
+            jvmTarget = JvmTarget.JVM_15 // JVM got Ed25519 at version 15
         }
         withJava()
         tasks.withType<Test>().configureEach {
@@ -67,13 +72,13 @@ kotlin {
         binaries.library()
     }
 
-    val ktor_version = "2.3.11"
+    val ktor_version = "2.3.12"
     sourceSets {
         val commonMain by getting {
             dependencies {
                 // JSON
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.0")
-                implementation("io.github.optimumcode:json-schema-validator:0.2.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.1")
+                implementation("io.github.optimumcode:json-schema-validator:0.2.1")
 
                 // Ktor client
                 implementation("io.ktor:ktor-client-core:$ktor_version")
@@ -116,7 +121,7 @@ kotlin {
         }
         val jvmTest by getting {
             dependencies {
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.1")
                 implementation("org.slf4j:slf4j-simple:2.0.13")
             }
         }

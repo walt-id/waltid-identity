@@ -7,8 +7,9 @@ Manage keys, DIDs, issue W3C Verifiable Credentials, and verify them using the W
 ## In development
 
 * `git clone https://github.com/walt-id/waltid-identity.git`
-* `cd waltid-identity/waltid-cli`
-* `../gradlew clean build`
+* `cd waltid-identity`
+* `./gradlew clean build`
+* `cd waltid-applications/waltid-cli`
 * `alias waltid="./waltid-cli.sh"` (for running the project)
 * `alias waltid="./waltid-cli-development.sh"` (for building and running the project)
 
@@ -42,7 +43,7 @@ Now, you can run:
 | `waltid did create -h`                                                                                                                                | Print WaltID CLI DID create command usage message                                                                                                      |
 | `waltid did create`                                                                                                                                   | Creates a new did:key                                                                                                                                  |
 | `waltid did create -k src/jvmTest/resources/key/ed25519_by_waltid_pvt_key.jwk`                                                                        | Creates a new did:key with the key provided in the specified file.                                                                                     |
-| `waltid did resolve -d did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV`                                                                      | Resolves the DID specified.                                                                                                                            
+| `waltid did resolve -d did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV`                                                                      | Resolves the DID specified.                                                                                                                            |
 | `waltid vc sign --key=./myEd25519Key.json --subject=<your subject DID> --issuer=<your issuer DID> ./myCredential.json`                                | Signs a W3C Verifiable Credential (see [to be created first](#1-create-a-vc)). The issuer DID must be resolvable and associated with the provided key. |
 | `waltid vc sign --key=./myEd25519Key.json --subject=<your subject DID> ./myCredential.json`                                                           | Signs a W3C Verifiable Credential with a generated Issuer DID (did:key).                                                                               |
 | `waltid vc verify ./myCredential.signed.json`                                                                                                         | Verifies the signature of the provided VC.                                                                                                             |
@@ -56,14 +57,14 @@ We are still preparing a nice distribution strategy. It will be available soon.
 
 In the meantime, you can use Gradle to generate the distribution package:
 
-* `cd waltid-identity/waltid-cli`
+* `cd waltid-identity/waltid-applications/waltid-cli`
 * `../gradlew distZip` or `../gradlew distTar`
 
 A `waltid-cli-1.0.0-SNAPSHOT` file will be created in the `build/distributions` directory.
 
 ```bash
 $ pwd
-.../waltid-identity/waltid-cli
+.../waltid-identity/waltid-applications/waltid-cli
 
 $ ls -la build/distributions/
 total 67024

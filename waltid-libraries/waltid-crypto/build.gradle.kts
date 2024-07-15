@@ -2,6 +2,8 @@ import love.forte.plugin.suspendtrans.ClassInfo
 import love.forte.plugin.suspendtrans.SuspendTransformConfiguration
 import love.forte.plugin.suspendtrans.TargetPlatform
 import love.forte.plugin.suspendtrans.gradle.SuspendTransformGradleExtension
+import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     kotlin("multiplatform")
@@ -9,7 +11,7 @@ plugins {
     id("maven-publish")
     id("com.github.ben-manes.versions")
 //    id("com.android.library")
-    id("love.forte.plugin.suspend-transform") version "0.6.0"
+    id("love.forte.plugin.suspend-transform") version "0.9.0"
 }
 
 group = "id.walt.crypto"
@@ -35,7 +37,7 @@ java {
 }
 
 kotlin {
-    jvmToolchain(15)
+    jvmToolchain(17)
 }
 
 /*android {
@@ -46,15 +48,23 @@ kotlin {
 kotlin {
     targets.configureEach {
         compilations.configureEach {
-            compilerOptions.configure {
-                freeCompilerArgs.add("-Xexpect-actual-classes")
+            compileTaskProvider.configure {
+                compilerOptions {
+                    freeCompilerArgs.add("-Xexpect-actual-classes")
+                }
+            }
+            compileTaskProvider.configure {
+                compilerOptions {
+                    freeCompilerArgs.add("-Xexpect-actual-classes")
+                }
             }
         }
     }
 
     jvm {
-        compilations.all {
-            kotlinOptions.jvmTarget = "15" // JVM got Ed25519 at version 15
+        @OptIn(ExperimentalKotlinGradlePluginApi::class)
+        compilerOptions {
+            jvmTarget = JvmTarget.JVM_15 // JVM got Ed25519 at version 15
         }
         tasks.withType<Test>().configureEach {
             useJUnitPlatform()
@@ -79,12 +89,12 @@ kotlin {
     }
 //    androidTarget()
 
-    val ktor_version = "2.3.11"
+    val ktor_version = "2.3.12"
     sourceSets {
         val commonMain by getting {
             dependencies {
                 // JSON
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.1")
 
                 // Ktor client
                 implementation("io.ktor:ktor-client-core:$ktor_version")
@@ -99,6 +109,9 @@ kotlin {
 
                 // Date
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.0")
+
+                // Cache
+                implementation("io.github.reactivecircus.cache4k:cache4k:0.13.0")
 
                 // Coroutines
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
@@ -117,7 +130,7 @@ kotlin {
         val jvmMain by getting {
             dependencies {
                 //implementation("dev.whyoleg.cryptography:cryptography-jdk:0.1.0")
-                implementation("com.google.crypto.tink:tink:1.13.0") // for JOSE using Ed25519
+                implementation("com.google.crypto.tink:tink:1.14.0") // for JOSE using Ed25519
 
                 implementation("org.bouncycastle:bcprov-lts8on:2.73.6") // for secp256k1 (which was removed with Java 17)
                 implementation("org.bouncycastle:bcpkix-lts8on:2.73.6") // PEM import
@@ -143,9 +156,9 @@ kotlin {
                 // Test
                 implementation(kotlin("test"))
 
-                implementation("org.junit.jupiter:junit-jupiter-api:5.10.2")
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.0")
-                implementation("org.junit.jupiter:junit-jupiter-params:5.10.2")
+                implementation("org.junit.jupiter:junit-jupiter-api:5.11.0-M2")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.1")
+                implementation("org.junit.jupiter:junit-jupiter-params:5.11.0-M2")
             }
         }
         val jsMain by getting {

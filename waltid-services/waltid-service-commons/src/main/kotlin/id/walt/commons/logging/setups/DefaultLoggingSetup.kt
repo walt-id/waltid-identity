@@ -13,7 +13,7 @@ data object DefaultLoggingSetup : LoggingSetup("default", {
         fromMinLevel(Level.ERROR) {
             toSink("stderr")
         }
-        fromMinLevel(Level.INFO) {
+        inLevelRange(Level.INFO, Level.WARN) {
             toSink("stdout")
         }
     }

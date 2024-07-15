@@ -1,5 +1,7 @@
 package id.walt.credentials.issuance
 
+import id.walt.credentials.JwtClaims
+import id.walt.credentials.VcClaims
 import id.walt.credentials.utils.W3CDataMergeUtils.mergeWithMapping
 import id.walt.credentials.utils.W3CVcUtils.overwrite
 import id.walt.credentials.utils.W3CVcUtils.update
@@ -50,6 +52,7 @@ object Issuer {
             additionalJwtOptions = additionalJwtOptions
         )
     }
+
     @JvmBlocking
     @JvmAsync
     @JsPromise
@@ -85,6 +88,7 @@ object Issuer {
             }
         )
     }
+
     @JvmBlocking
     @JvmAsync
     @JsPromise
@@ -163,9 +167,11 @@ object Issuer {
 
         if (completeJwtWithDefaultCredentialData) {
             completeJwtAttributes("jti") { vc["id"] }
-            completeJwtAttributes("exp") {
-                vc["expirationDate"]?.let { Instant.parse(it.jsonPrimitive.content) }
+            completeJwtAttributes(JwtClaims.NotAfter.getValue()) {
+                vc[VcClaims.V1.NotAfter.getValue()]?.let { Instant.parse(it.jsonPrimitive.content) }
                     ?.epochSeconds?.let { JsonPrimitive(it) }
+                    ?: vc[VcClaims.V2.NotAfter.getValue()]?.let { Instant.parse(it.jsonPrimitive.content) }
+                        ?.epochSeconds?.let { JsonPrimitive(it) }
             }
             completeJwtAttributes("iat") {
                 vc["issuanceDate"]?.let { Instant.parse(it.jsonPrimitive.content) }

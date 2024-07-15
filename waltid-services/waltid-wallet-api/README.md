@@ -61,11 +61,11 @@ docker build -t waltid/wallet-api -f waltid-services/waltid-wallet-api/Dockerfil
 
 Currently, the following databases can be used:
 
-- sqlite (db.sqlite.conf)
-- postgres (db.postgres.conf)
-- microsoft sql server (db.mssql.conf)
+- sqlite
+- postgres 
+- microsoft sql server 
 
-The configuration files contain the datasource info required to connect to the respective database engine.
+The configuration file `db.conf` contain the datasource info required to connect to the respective database engine.
 For more details about database and datasource,
 refer to https://github.com/JetBrains/Exposed/wiki/DataBase-and-DataSource.
 
@@ -80,13 +80,21 @@ Switching to use a database engine requires the following steps:
 ### Sqlite
 
 1. config/db.config:
-    - set database = "db.sqlite"
+```kotlin
+jdbcUrl = "jdbc:sqlite:data/wallet.db"
+driverClassName = "org.sqlite.JDBC"
+```
 2. the database file will be created by default at the `data/wallet.db` location
 
 ### Postgres
 
 1. config/db.config:
-    - set database = "db.postgres"
+```kotlin
+jdbcUrl = "jdbc:postgresql://127.0.0.1:5432/waltid"
+driverClassName = "org.postgresql.Driver"
+username = "postgres"
+password = "postgres"
+```
 2. start postgres:
 
 ```bash
@@ -96,7 +104,10 @@ docker run --name postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_USER=postgr
 ### Microsoft Sql Server
 
 1. config/db.config:
-    - set database = "db.mssql"
+```kotlin
+jdbcUrl = "jdbc:sqlserver://localhost:1433;databaseName=master"
+driverClassName = "com.microsoft.sqlserver.jdbc.SQLServerDriver"
+```
 2. start sql server:
 
 ```bash

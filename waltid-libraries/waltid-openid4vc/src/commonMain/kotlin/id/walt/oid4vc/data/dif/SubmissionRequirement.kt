@@ -18,15 +18,13 @@ import kotlinx.serialization.json.jsonObject
 data class SubmissionRequirement(
     val rule: SubmissionRequirementRule,
     val from: String? = null,
-    @SerialName("from_nested") /*@Serializable(SubmissionRequirementListSerializer::class)*/ val fromNested: List<JsonObject>? = null,
-    // TODO @SerialName("from_nested") @Serializable(SubmissionRequirementListSerializer::class) val fromNested: List<SubmissionRequirement>? = null,
-    // breaks openapi schema generation in wallet-api - https://github.com/SMILEY4/schema-kenerator/issues/1
+    @SerialName("from_nested") @Serializable(SubmissionRequirementListSerializer::class) val fromNested: List<SubmissionRequirement>? = null,
     val name: String? = null,
     val purpose: String? = null,
     val count: Int? = null,
     val min: Int? = null,
     val max: Int? = null,
-    override val customParameters: Map<String, JsonElement> = mapOf()
+    override val customParameters: Map<String, JsonElement> = mapOf(),
 ) : JsonDataObject() {
     override fun toJSON() = Json.encodeToJsonElement(SubmissionRequirementSerializer, this).jsonObject
 

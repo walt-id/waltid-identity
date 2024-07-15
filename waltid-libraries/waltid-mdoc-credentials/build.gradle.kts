@@ -1,11 +1,11 @@
 plugins {
     kotlin("multiplatform")
     kotlin("plugin.serialization")
-    id("dev.petuska.npm.publish") version "3.4.2"
+    id("dev.petuska.npm.publish") version "3.4.3"
     `maven-publish`
 }
 
-group = "id.walt"
+group = "id.walt.mdoc-credentials"
 
 repositories {
     mavenCentral()
@@ -14,8 +14,10 @@ repositories {
 kotlin {
     targets.configureEach {
         compilations.configureEach {
-            compilerOptions.configure {
-                freeCompilerArgs.add("-Xexpect-actual-classes")
+            compileTaskProvider.configure {
+                compilerOptions {
+                    freeCompilerArgs.add("-Xexpect-actual-classes")
+                }
             }
         }
     }
@@ -52,7 +54,7 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.1")
                 //implementation("org.jetbrains.kotlinx:kotlinx-serialization-cbor:1.5.1")
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.0")
@@ -73,7 +75,7 @@ kotlin {
             dependencies {
                 implementation("org.bouncycastle:bcprov-lts8on:2.73.6")
                 implementation("org.bouncycastle:bcpkix-lts8on:2.73.6")
-                implementation("io.mockk:mockk:1.13.2")
+                implementation("io.mockk:mockk:1.13.11")
 
                 implementation(kotlin("reflect"))
             }

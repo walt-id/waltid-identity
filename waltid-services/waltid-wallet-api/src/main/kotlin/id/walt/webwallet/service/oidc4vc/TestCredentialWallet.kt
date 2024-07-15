@@ -1,7 +1,7 @@
 package id.walt.webwallet.service.oidc4vc
 
 import id.walt.crypto.keys.Key
-import id.walt.crypto.keys.KeySerialization
+import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.utils.Base64Utils.base64UrlToBase64
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.crypto.utils.JwsUtils.decodeJws
@@ -77,7 +77,7 @@ class TestCredentialWallet(
         val key = runBlocking {
             runCatching {
                 DidService.resolveToKey(keyId).getOrThrow().let { KeysService.get(it.getKeyId()) }?.let {
-                    KeySerialization.deserializeKey(it.document).getOrThrow()
+                    KeyManager.resolveSerializedKey(it.document)
                 }
             }.getOrElse { throw IllegalArgumentException("Could not resolve key to sign token", it) }
                 ?: error("No key was resolved when trying to resolve key to sign token")
@@ -183,7 +183,7 @@ class TestCredentialWallet(
         val key = runBlocking {
             runCatching {
                 DidService.resolveToKey(did).getOrThrow().let { KeysService.get(it.getKeyId()) }
-                    ?.let { KeySerialization.deserializeKey(it.document).getOrThrow() }
+                    ?.let { KeyManager.resolveSerializedKey(it.document) }
             }
         }.getOrElse {
             throw IllegalArgumentException("Could not resolve key to sign JWS to generate presentation for vp_token", it)

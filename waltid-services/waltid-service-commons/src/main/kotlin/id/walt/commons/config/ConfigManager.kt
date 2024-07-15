@@ -8,6 +8,10 @@ import kotlin.reflect.jvm.jvmName
 
 typealias WaltConfig = Any
 
+class ConfigurationException(override val cause: ConfigException): IllegalArgumentException() {
+    fun errorMessage() = cause.localizedMessage.replace(" com.typesafe.config.ConfigException\$Parse: Reader:", "")
+}
+
 object ConfigManager {
 
     val log = noCoLogger("ConfigManager")

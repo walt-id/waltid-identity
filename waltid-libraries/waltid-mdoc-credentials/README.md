@@ -66,7 +66,7 @@ repositories {
 val mdocVersion = "1.xxx.0"
 [...]
 dependencies {
-  implementation("id.walt:waltid-mdoc-jvm:$mdocVersion")
+  implementation("id.walt.mdoc-credentials:waltid-mdoc-jvm:$mdocVersion")
 }
 ```
 

@@ -1,9 +1,10 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import java.util.Properties
 
 object Versions {
     const val KOTLIN_VERSION = "2.0.0" // also change 2 plugins
-    const val KTOR_VERSION = "2.3.11" // also change 1 plugin
+    const val KTOR_VERSION = "2.3.12" // also change 1 plugin
     const val COROUTINES_VERSION = "1.8.1"
     const val EXPOSED_VERSION = "0.43.0"
     const val HOPLITE_VERSION = "2.8.0.RC3"
@@ -13,7 +14,7 @@ plugins {
     kotlin("jvm") // Versions.KOTLIN_VERSION
     kotlin("plugin.serialization")  // Versions.KOTLIN_VERSION
 
-    id("io.ktor.plugin") version "2.3.11" // Versions.KTOR_VERSION
+    id("io.ktor.plugin") version "2.3.12" // Versions.KTOR_VERSION
     id("org.owasp.dependencycheck") version "9.2.0"
     id("com.github.jk1.dependency-license-report") version "2.8"
     application
@@ -27,7 +28,6 @@ group = "id.walt"
 
 repositories {
     mavenCentral()
-    //jcenter()
     maven("https://jitpack.io")
     maven("https://maven.waltid.dev/releases")
     mavenLocal()
@@ -55,9 +55,6 @@ dependencies {
     implementation("io.ktor:ktor-server-call-id-jvm:${Versions.KTOR_VERSION}")
     implementation("io.ktor:ktor-server-content-negotiation-jvm:${Versions.KTOR_VERSION}")
     implementation("io.ktor:ktor-server-cio-jvm:${Versions.KTOR_VERSION}")
-
-    // Ktor server external libs
-    implementation("io.github.smiley4:ktor-swagger-ui:3.0.0")
 
     // Ktor client
     implementation("io.ktor:ktor-client-core-jvm:${Versions.KTOR_VERSION}")
@@ -126,8 +123,11 @@ java {
 }
 
 tasks.withType<KotlinCompile> {
-    kotlinOptions.jvmTarget = "17"
+    compilerOptions {
+        jvmTarget = JvmTarget.JVM_17
+    }
 }
+
 tasks.withType<Zip> {
     isZip64 = true
 }
@@ -161,10 +161,10 @@ publishing {
     publications {
         create<MavenPublication>("mavenJava") {
             pom {
-                name.set("walt.id XYZ Kit")
+                name.set("walt.id issuer")
                 description.set(
                     """
-                    Kotlin/Java library for XYZ core services
+                    Kotlin/Java library for walt.id issuer
                     """.trimIndent()
                 )
                 url.set("https://walt.id")

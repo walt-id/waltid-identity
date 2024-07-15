@@ -39,38 +39,65 @@ class DidKeyRegistrarTest : DidRegistrarTestBase(DidKeyRegistrar()) {
         @JvmStatic
         fun `given did options with no key when register then returns a valid did result`(): Stream<Arguments> =
             Stream.of(
-                arguments(DidKeyCreateOptions(useJwkJcsPub = true), ed25519DidAssertions),
                 arguments(DidKeyCreateOptions(KeyType.Ed25519), ed25519DidAssertions),
+                arguments(DidKeyCreateOptions(KeyType.Ed25519, useJwkJcsPub = true), ed25519DidAssertions),
                 arguments(DidKeyCreateOptions(KeyType.RSA), rsaDidAssertions),
+                arguments(DidKeyCreateOptions(KeyType.RSA, useJwkJcsPub = true), rsaDidAssertions),
                 arguments(DidKeyCreateOptions(KeyType.secp256k1), secp256DidAssertions),
+                arguments(DidKeyCreateOptions(KeyType.secp256k1, useJwkJcsPub = true), secp256DidAssertions),
                 arguments(DidKeyCreateOptions(KeyType.secp256r1), secp256DidAssertions),
+                arguments(DidKeyCreateOptions(KeyType.secp256r1, useJwkJcsPub = true), secp256DidAssertions),
             )
 
         @JvmStatic
         fun `given did options and key when register with key then returns a valid did result`(): Stream<Arguments> =
             Stream.of(
-                //ed25519
+                //ed25519 without jwk jcs pub encoding
+                arguments(
+                    runBlocking { JWKKey.generate(KeyType.Ed25519) },
+                    DidKeyCreateOptions(),
+                    ed25519KeyAssertions
+                ),
+                //ed25519 with jwk jcs pub encoding
                 arguments(
                     runBlocking { JWKKey.generate(KeyType.Ed25519) },
                     DidKeyCreateOptions(useJwkJcsPub = true),
                     ed25519KeyAssertions
                 ),
-                //rsa
+                //rsa without jwk jcs pub encoding
                 arguments(
                     runBlocking { JWKKey.generate(KeyType.RSA) },
                     DidKeyCreateOptions(),
                     rsaKeyAssertions
                 ),
-                //secp256k1
+                //rsa with jwk jcs pub encoding
+                arguments(
+                    runBlocking { JWKKey.generate(KeyType.RSA) },
+                    DidKeyCreateOptions(useJwkJcsPub = true),
+                    rsaKeyAssertions
+                ),
+                //secp256k1 without jwk jcs pub encoding
                 arguments(
                     runBlocking { JWKKey.generate(KeyType.secp256k1) },
                     DidKeyCreateOptions(),
                     secp256KeyAssertions
                 ),
-                //secp256r1
+                //secp256k1 with jwk jcs pub encoding
+                arguments(
+                    runBlocking { JWKKey.generate(KeyType.secp256k1) },
+                    DidKeyCreateOptions(useJwkJcsPub = true),
+                    secp256KeyAssertions
+                ),
+                //secp256r1 without jwk jcs pub encoding
                 arguments(
                     runBlocking { JWKKey.generate(KeyType.secp256r1) },
                     DidKeyCreateOptions(),
+                    secp256KeyAssertions
+                ),
+                //secp256r1 with jwk jcs pub encoding
+                arguments(
+                    runBlocking { JWKKey.generate(KeyType.secp256r1) },
+                    DidKeyCreateOptions(useJwkJcsPub = true),
                     secp256KeyAssertions
                 ),
             )

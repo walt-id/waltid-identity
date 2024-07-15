@@ -56,6 +56,13 @@
                                             {{ item.name }}
                                         </NuxtLink>
                                     </div>
+                                    <div
+                                        class="absolute left-0 right-0 flex flex-col items-center justify-center bottom-3">
+                                        <NuxtLink :to="demoWalletUrl" class="text-white group text-base font-medium">
+                                            Switch To Demo Version
+                                        </NuxtLink>
+                                        <hr class="w-2/3 border-blue-200" />
+                                    </div>
                                 </div>
                             </nav>
                         </DialogPanel>
@@ -75,13 +82,19 @@
                     <img alt="" class="h-14 w-auto" :src="inWalletLogoImage" />
                 </div>
                 <nav aria-label="Sidebar" class="mt-5 flex flex-1 flex-col divide-y divide-blue-800 overflow-y-auto">
-                    <div class="mt-2 pt-2">
+                    <div class="mt-2 pt-2 flex flex-col justify-between h-full">
                         <div class="space-y-1 px-2">
                             <NuxtLink v-for="item in secondaryNavigation" :key="item.name" :to="item.href"
                                 class="group flex items-center rounded-md px-2 py-2 text-base font-medium leading-6 text-white hover:bg-blue-700 hover:text-white">
                                 <component :is="item.icon" aria-hidden="true" class="mr-4 h-6 w-6 text-blue-200" />
                                 {{ item.name }}
                             </NuxtLink>
+                        </div>
+                        <div class="flex flex-col items-center justify-center">
+                            <NuxtLink :to="demoWalletUrl" class="text-white group text-base font-medium">
+                                Switch To Demo Version
+                            </NuxtLink>
+                            <hr class="w-2/3 border-blue-200" />
                         </div>
                     </div>
                 </nav>
@@ -186,6 +199,9 @@ import { useUserStore } from "~/stores/user";
 import { storeToRefs } from "pinia";
 import { useTenant } from "~/composables/tenants";
 import { logout } from "~/composables/authentication";
+
+const runtimeConfig = useRuntimeConfig()
+const demoWalletUrl = runtimeConfig.public.demoWalletUrl as string
 
 const tenant = await (useTenant()).value
 const name = tenant?.name

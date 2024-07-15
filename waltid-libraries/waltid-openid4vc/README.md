@@ -33,7 +33,7 @@ snapshot for your project. [Latest releases](https://github.com/walt-id/waltid-i
 
 ```kotlin
 dependencies {
-  implementation("id.walt:waltid-openid4vc:<version>")
+  implementation("id.walt.openid4vc:waltid-openid4vc:<version>")
 }
 ```
 

@@ -52,7 +52,7 @@ object KeySerialization {
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    suspend fun deserializeKey(json: JsonObject): Result<Key> =
+    suspend fun deserializeKeyObject(json: JsonObject): Result<Key> =
         runCatching {
             keySerializationJson.decodeFromJsonElement<Key>(json).apply { init() }
         }

@@ -125,6 +125,8 @@ object E2ETestWebService {
     }
 }
 
+typealias TestFunctionType = (String, suspend() -> Any?) -> Unit
+
 private fun Application.e2eTestModule() {
     webWalletModule(true)
     issuerModule(false)
