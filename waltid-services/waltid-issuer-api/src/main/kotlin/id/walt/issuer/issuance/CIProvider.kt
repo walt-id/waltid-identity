@@ -87,7 +87,7 @@ open class CIProvider : OpenIDCredentialIssuer(
     ))).plus(
         Pair("urn:eu.europa.ec.eudi:pid:1", CredentialSupported(
         format = CredentialFormat.sd_jwt_vc,
-            cryptographicBindingMethodsSupported = null,
+            cryptographicBindingMethodsSupported = setOf("kb+jwt"),
             credentialSigningAlgValuesSupported = setOf("ES256"),
             types = listOf("urn:eu.europa.ec.eudi:pid:1"),
             docType = "urn:eu.europa.ec.eudi:pid:1"
@@ -305,12 +305,17 @@ open class CIProvider : OpenIDCredentialIssuer(
                     CredentialFormat.sd_jwt_vc -> (holderKey?.let {
                         SDJwtVC.sign(SDPayload.Companion.createSDPayload(vc.toJsonObject(), buildJsonObject {}),
                             WaltIdJWTCryptoProvider(mapOf(issuerKey.getKeyId() to issuerKey)),
-                            issuerDid = issuerDid, holderKeyJWK = holderKey, issuerKeyId = issuerKey.getKeyId(),
-                            vct = data.request.credentialConfigurationId) } ?:
+                            issuerDid = issuerDid.ifEmpty { issuerKey.getKeyId() }, holderKeyJWK = holderKey, issuerKeyId = issuerKey.getKeyId(),
+                            vct = data.request.credentialConfigurationId, additionalJwtHeader = data.request.x5Chain?.let {
+                                mapOf("x5c" to JsonArray(it.map { cert -> cert.toJsonElement() }))
+                            } ?: mapOf()
+                        ) } ?:
                         SDJwtVC.sign(SDPayload.Companion.createSDPayload(vc.toJsonObject(), buildJsonObject {}),
                             WaltIdJWTCryptoProvider(mapOf(issuerKey.getKeyId() to issuerKey)),
-                            issuerDid = issuerDid, holderDid = holderDid!!, issuerKeyId = issuerKey.getKeyId(),
-                            vct = data.request.credentialConfigurationId)).toString()
+                            issuerDid = issuerDid.ifEmpty { issuerKey.getKeyId() }, holderDid = holderDid!!, issuerKeyId = issuerKey.getKeyId(),
+                            vct = data.request.credentialConfigurationId, additionalJwtHeader = data.request.x5Chain?.first()?.let {
+                                mapOf("x5c" to JsonPrimitive(it))
+                            } ?: mapOf())).toString()
                     //
                     //                    vc.mergingSdJwtIssue(
 //                        issuerKey = issuerKey,

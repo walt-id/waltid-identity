@@ -35,6 +35,8 @@ import id.walt.oid4vc.providers.OpenIDCredentialWallet
 import id.walt.oid4vc.providers.TokenTarget
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.requests.TokenRequest
+import id.walt.sdjwt.SDJwtVC
+import id.walt.sdjwt.WaltIdJWTCryptoProvider
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.service.SessionAttributes.HACK_outsideMappedSelectedCredentialsPerSession
 import id.walt.webwallet.service.SessionAttributes.HACK_outsideMappedSelectedDisclosuresPerSession
@@ -94,7 +96,7 @@ class TestCredentialWallet(
 //        val key = runBlocking { walletService.getKeyByDid(keyId) }
         val key = runBlocking {
             runCatching {
-                DidService.resolveToKey(keyId).getOrThrow().let { KeysService.get(it.getKeyId()) }?.let {
+                KeysService.get(if(DidUtils.isDidUrl(keyId)) DidService.resolveToKey(keyId).getOrThrow().getKeyId() else keyId)?.let {
                     KeyManager.resolveSerializedKey(it.document)
                 }
             }.getOrElse { throw IllegalArgumentException("Could not resolve key to sign token", it) }
@@ -105,7 +107,10 @@ class TestCredentialWallet(
             val authKeyId = resolveDidAuthentication(did)
 
             val payloadToSign = Json.encodeToString(payload).encodeToByteArray()
-            key.signJws(payloadToSign, mapOf("typ" to "JWT".toJsonElement(), "kid" to authKeyId.toJsonElement()))
+            val headersToSign = mapOf("typ" to "JWT".toJsonElement(), "kid" to authKeyId.toJsonElement()).plus(
+                header?.toMap() ?: mapOf()
+            )
+            key.signJws(payloadToSign, headersToSign)
         }
 
         //JwtService.getService().sign(payload, keyId)
@@ -209,13 +214,20 @@ class TestCredentialWallet(
             throw IllegalArgumentException("Could not resolve key to sign JWS to generate presentation for vp_token", it)
         } ?: error("No key was resolved when trying to resolve key to sign JWS to generate presentation for vp_token")
 
-        val jwtsPresented = matchedCredentials.filter { setOf(CredentialFormat.sd_jwt_vc, CredentialFormat.jwt_vc, CredentialFormat.jwt_vc_json).contains(it.format) }.map {
+        val jwtsPresented = matchedCredentials.filter { setOf(CredentialFormat.jwt_vc, CredentialFormat.jwt_vc_json).contains(it.format) }.map {
             if (selectedDisclosures?.containsKey(it.id) == true) {
                 it.document + "~${selectedDisclosures[it.id]!!.joinToString("~")}"
             } else {
                 it.document
             }
         }
+
+        val sdJwtVCsPresented = runBlocking { matchedCredentials.filter { it.format == CredentialFormat.sd_jwt_vc }.map {
+            // TODO: adopt selective disclosure selection (doesn't work with jwts other than sd_jwt anyway, like above)
+            SDJwtVC.parse(it.document).present(
+                true, audience = session.authorizationRequest.clientId, nonce = session.nonce ?: "",
+                WaltIdJWTCryptoProvider(mapOf(key.getKeyId() to key)), key.getKeyId())
+        }}.map { it.toString(true, true) }
 
         val mdocHandover = OpenID4VP.generateMDocOID4VPHandover(session.authorizationRequest, session.nonce!!)
         val mdocsPresented = runBlocking {
@@ -268,7 +280,7 @@ class TestCredentialWallet(
         // DONE: filter presentations if null
         // DONE: generate descriptor mappings based on type (vp or mdoc device response)
         // DONE: set root path of descriptor mapping based on whether there are multiple presentations or just one ("$" or "$[idx]")
-        val presentations = listOf(signedJwtVP, deviceResponse).filterNotNull().map { JsonPrimitive(it) }
+        val presentations = listOf(signedJwtVP, deviceResponse).filterNotNull().plus(sdJwtVCsPresented).map { JsonPrimitive(it) }
         val rootPathVP = "$" + (if(presentations.size == 2) "[0]" else "")
         val rootPathMDoc = "$" + (if(presentations.size == 2) "[1]" else "")
         return PresentationResult(

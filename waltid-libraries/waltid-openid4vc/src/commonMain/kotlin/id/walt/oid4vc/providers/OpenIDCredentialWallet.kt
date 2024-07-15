@@ -76,7 +76,7 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
 
     open suspend fun generateKeyProof(
         key: Key,
-        cosePubKey: ByteArray,
+        cosePubKey: ByteArray?,
         issuerUrl: String,
         nonce: String?,
         client: OpenIDClientConfig? = null,

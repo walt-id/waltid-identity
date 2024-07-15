@@ -208,6 +208,7 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
 
     private suspend fun verifySdJwtVC(tokenResponse: TokenResponse, session: PresentationSession): Boolean {
         val sdJwtVC = SDJwtVC.parse(tokenResponse.vpToken!!.jsonPrimitive.content)
+        if(!sdJwtVC.isPresentation || sdJwtVC.keyBindingJwt == null) throw IllegalArgumentException("SD-JWT is not a presentation and/or doesn't contain a holder key binding JWT")
         val holderKey = JWKKey.importJWK(sdJwtVC.holderKeyJWK.toString()).getOrThrow()
         val issuerKey = resolveIssuerKeyFromSdJwt(sdJwtVC)
         val verificationResult = sdJwtVC.verifyVC(
