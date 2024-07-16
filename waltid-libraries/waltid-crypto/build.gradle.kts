@@ -10,7 +10,7 @@ plugins {
     kotlin("plugin.serialization")
     id("maven-publish")
     id("com.github.ben-manes.versions")
-    id("love.forte.plugin.suspend-transform") version "0.9.0"
+    id("love.forte.plugin.suspend-transform") version "2.0.20-Beta1-0.9.2"
 }
 
 group = "id.walt.crypto"
