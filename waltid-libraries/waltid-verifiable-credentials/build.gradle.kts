@@ -10,7 +10,7 @@ plugins {
     kotlin("plugin.serialization")
     id("maven-publish")
     id("dev.petuska.npm.publish") version "3.4.3"
-    id("love.forte.plugin.suspend-transform") version "0.9.0"
+    id("love.forte.plugin.suspend-transform") version "2.0.20-Beta1-0.9.2"
     id("com.github.ben-manes.versions")
 }
 
@@ -99,7 +99,7 @@ kotlin {
 
                 // Kotlinx
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.0")
-                implementation("app.softwork:kotlinx-uuid-core:0.0.25")
+                implementation("app.softwork:kotlinx-uuid-core:0.0.26")
 
                 // Loggin
                 implementation("io.github.oshai:kotlin-logging:7.0.0")
