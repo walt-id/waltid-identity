@@ -1,5 +1,6 @@
 package id.walt.webwallet.service.dids
 
+import id.walt.commons.web.ConflictException
 import id.walt.webwallet.db.models.WalletDid
 import id.walt.webwallet.db.models.WalletDids
 import kotlinx.datetime.Clock
@@ -26,11 +27,12 @@ object DidsService {
 
     fun add(wallet: UUID, did: String, document: String, keyId: String, alias: String? = null) = transaction {
         val now = Clock.System.now()
-        check(
-            WalletDids.selectAll()
-                .where { (WalletDids.wallet eq wallet) and (WalletDids.did eq did.replace("%3A", ":")) }
-            .count() == 0L) {
-            "DID already exists"
+        val didExists = WalletDids.selectAll()
+            .where { (WalletDids.wallet eq wallet) and (WalletDids.did eq did.replace("%3A", ":")) }
+            .count() > 0L
+
+        if (didExists) {
+            throw ConflictException("DID already exists")
         }
         WalletDids.insert {
             it[WalletDids.wallet] = wallet
