@@ -63,6 +63,7 @@ abstract class Key {
 
     /**
      * export this key as a PEM if supported
+     * yoy can validate at: https://8gwifi.org/PemParserFunctions.jsp various formats
      * @return encoded PEM
      */
     @JvmBlocking
@@ -156,6 +157,5 @@ abstract class Key {
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    open suspend fun init() {
-    }
+    open suspend fun init() {}
 }
