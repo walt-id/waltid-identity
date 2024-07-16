@@ -109,6 +109,8 @@ fun Application.dids() = walletRoute {
                 HttpStatusCode.OK to {
                     description = "DID created"
                 }
+                HttpStatusCode.Conflict to { description = "DID already exists" }
+
             }
         }) {
             didCreate()
