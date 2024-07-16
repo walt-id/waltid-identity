@@ -101,7 +101,7 @@ kotlin {
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.0")
 
                 // UUID
-                implementation("app.softwork:kotlinx-uuid-core:0.0.25")
+                implementation("app.softwork:kotlinx-uuid-core:0.0.26")
 
                 // Crypto
                 api(project(":waltid-libraries:waltid-crypto"))

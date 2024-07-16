@@ -103,7 +103,7 @@ kotlin {
 
                 // -- Multiplatform --
                 // Multiplatform / UUID
-                implementation("app.softwork:kotlinx-uuid-core:0.0.25")
+                implementation("app.softwork:kotlinx-uuid-core:0.0.26")
 
                 // Multiplatform / Date & time
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.0")
