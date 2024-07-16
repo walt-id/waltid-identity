@@ -19,13 +19,13 @@ dependencies {
     testImplementation("io.ktor:ktor-client-cio:2.3.12")
     testImplementation("io.ktor:ktor-client-content-negotiation:2.3.12")
     testImplementation("io.ktor:ktor-client-logging:2.3.12")
-    testImplementation("com.github.ajalt.mordant:mordant:2.7.0")
+    testImplementation("com.github.ajalt.mordant:mordant:2.7.1")
     implementation(project(":waltid-services:waltid-service-commons"))
     implementation(project(":waltid-services:waltid-issuer-api"))
     implementation(project(":waltid-services:waltid-verifier-api"))
     implementation(project(":waltid-services:waltid-wallet-api"))
 
-    testImplementation("app.softwork:kotlinx-uuid-core:0.0.25")
+    testImplementation("app.softwork:kotlinx-uuid-core:0.0.26")
 
 }
 

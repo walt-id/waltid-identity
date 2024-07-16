@@ -99,7 +99,7 @@ kotlin {
 
                 // Kotlinx
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.0")
-                implementation("app.softwork:kotlinx-uuid-core:0.0.25")
+                implementation("app.softwork:kotlinx-uuid-core:0.0.26")
 
                 // Loggin
                 implementation("io.github.oshai:kotlin-logging:7.0.0")
