@@ -54,7 +54,7 @@ object DidCreation {
                 getWalletService().createDid(DidWebMethodName, parameters)
             }.onFailure {
                 if (it.message?.contains("DID already exists") == true) {
-                    context.respond(HttpStatusCode.Conflict, "DID already exists")
+                    context.respond(HttpStatusCode.Conflict, it.message!!)
                 } else {
                     context.respond(HttpStatusCode.InternalServerError, it.message ?: "Internal Server Error")
                 }
