@@ -1,6 +1,5 @@
 package id.walt.webwallet.web.controllers
 
-import id.walt.commons.web.ConflictException
 import io.github.smiley4.ktorswaggerui.dsl.routing.post
 import io.ktor.http.*
 import io.ktor.server.response.*
@@ -51,25 +50,7 @@ object DidCreation {
             }
         }) {
             val parameters = extractDidCreateParameters(DidWebMethodName, context.request.queryParameters)
-            runCatching {
-                getWalletService().createDid(DidWebMethodName, parameters)
-
-            }.onSuccess {
-                context.respond(it)
-            }.onFailure { exception ->
-                when (exception) {
-                    is ConflictException -> {
-                        context.respondText(exception.message ?: "Conflict", status = HttpStatusCode.Conflict)
-                    }
-
-                    else -> {
-                        context.respondText(
-                            exception.message ?: "Internal Server Error",
-                            status = HttpStatusCode.InternalServerError
-                        )
-                    }
-                }
-            }
+            getWalletService().createDid(DidWebMethodName, parameters).let { context.respond(it) }
         }
 
         post(DidEbsiMethodName, {
