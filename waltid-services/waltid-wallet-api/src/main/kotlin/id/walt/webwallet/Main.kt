@@ -9,6 +9,7 @@ import id.walt.commons.web.WebService
 import id.walt.crypto.keys.oci.WaltCryptoOci
 import id.walt.did.helpers.WaltidServices
 import id.walt.webwallet.db.Db
+import id.walt.webwallet.db.Migration
 import id.walt.webwallet.web.Administration.configureAdministration
 import id.walt.webwallet.web.controllers.*
 import id.walt.webwallet.web.controllers.NotificationController.notifications
@@ -40,6 +41,7 @@ suspend fun main(args: Array<String>) {
                 WaltidServices.minimalInit()
                 WaltCryptoOci.init()
                 Db.start()
+                Migration.Keys.execute()
             },
             run = WebService(Application::webWalletModule).run()
         )
