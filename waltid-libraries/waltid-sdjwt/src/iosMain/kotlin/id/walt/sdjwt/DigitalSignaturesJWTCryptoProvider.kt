@@ -1,10 +1,9 @@
+import id.walt.platform.utils.ios.DS_Operations
 import id.walt.sdjwt.JWTCryptoProvider
 import id.walt.sdjwt.JwtVerificationResult
-import id.walt.sdjwt.cinterop.ios.DS_Operations
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.serialization.json.JsonObject
-import platform.Security.*
-import kotlin.js.ExperimentalJsExport
+import platform.Security.SecKeyRef
 
 @OptIn(ExperimentalForeignApi::class)
 class DigitalSignaturesJWTCryptoProvider(private val algorithm: String, private val key: SecKeyRef) :
