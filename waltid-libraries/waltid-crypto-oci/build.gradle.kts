@@ -10,7 +10,7 @@ plugins {
     id("maven-publish")
     id("com.github.ben-manes.versions")
 //    id("com.android.library")
-    id("love.forte.plugin.suspend-transform") version "0.9.0"
+    id("love.forte.plugin.suspend-transform") version "2.0.20-Beta1-0.9.2"
 }
 
 group = "id.walt.crypto"
@@ -103,7 +103,7 @@ kotlin {
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:1.8.1")
 
                 // OCI
-                implementation("com.oracle.oci.sdk:oci-java-sdk-shaded-full:3.44.1")
+                implementation("com.oracle.oci.sdk:oci-java-sdk-shaded-full:3.44.2")
 
                 // JOSE
                 implementation("com.nimbusds:nimbus-jose-jwt:9.40")
