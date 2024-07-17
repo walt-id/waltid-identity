@@ -2,6 +2,8 @@ import E2ETestWebService.test
 import E2ETestWebService.testBlock
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.web.plugins.httpJson
+import id.walt.oid4vc.OpenID4VCI
+import id.walt.oid4vc.data.OpenIDProviderMetadata
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyType
 import id.walt.oid4vc.data.dif.PresentationDefinition
@@ -380,10 +382,32 @@ class E2ETest {
                     assert(history.any { it.operation == "useOfferRequest" } && history.any { it.operation == "usePresentationRequest" }) { "incorrect history items" }
                 }
             }
+
+            val lspPotentialIssuance = LspPotentialIssuance(testHttpClient(doFollowRedirects = false))
+            test("lsp issuance track1") {
+                lspPotentialIssuance.testTrack1()
+            }
+            test("lsp issuance track2") {
+              lspPotentialIssuance.testTrack2()
+            }
         }
     }
 
-    fun testHttpClient(token: String? = null) = HttpClient(CIO) {
+  //@Test // enable to execute test selectively
+  fun lspTests() = runTest(timeout = 5.minutes) {
+    var client = testHttpClient(doFollowRedirects = false)
+    testBlock {
+      val lspPotentialIssuance = LspPotentialIssuance(client)
+      test("lsp issuance track1") {
+        lspPotentialIssuance.testTrack1()
+      }
+      test("lsp issuance track2") {
+        lspPotentialIssuance.testTrack2()
+      }
+    }
+  }
+
+    fun testHttpClient(token: String? = null, doFollowRedirects: Boolean = true) = HttpClient(CIO) {
         install(ContentNegotiation) {
             json(httpJson)
         }
@@ -397,6 +421,7 @@ class E2ETest {
         install(Logging) {
             level = LogLevel.ALL
         }
+      followRedirects = doFollowRedirects
     }
 }
 
