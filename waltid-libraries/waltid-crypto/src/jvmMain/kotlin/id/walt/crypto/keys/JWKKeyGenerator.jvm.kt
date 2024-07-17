@@ -17,6 +17,7 @@ import org.bouncycastle.asn1.ASN1BitString
 import org.bouncycastle.asn1.ASN1Integer
 import org.bouncycastle.asn1.ASN1Sequence
 import org.bouncycastle.jce.ECNamedCurveTable
+import org.bouncycastle.math.ec.ECCurve
 import org.bouncycastle.math.ec.ECPoint
 import java.security.KeyFactory
 import java.security.interfaces.RSAPublicKey
@@ -58,27 +59,25 @@ object JvmJWKKeyCreator : JWKKeyCreator {
         runCatching { JWKKey(JWK.parseFromPEMEncodedObjects(pem)) }
 
     private fun ecRawToJwk(rawPublicKey: ByteArray, curve: Curve): JWK {
-        var pubKeyEcPoint: ECPoint
-        try {
-            val asn1PubKeySequence = ASN1Sequence.getInstance(rawPublicKey)
-            val subjectPublicKeyObject = asn1PubKeySequence.getObjectAt(1)
-            val subjectPublicKeyBitStr = ASN1BitString.getInstance(subjectPublicKeyObject)
-            pubKeyEcPoint = ECNamedCurveTable
-                .getParameterSpec(curve.name)
-                .curve
-                .decodePoint(subjectPublicKeyBitStr.bytes)
-        } catch (e: IllegalArgumentException) {
-            pubKeyEcPoint = ECNamedCurveTable
-                .getParameterSpec(curve.name)
-                .curve
-                .decodePoint(rawPublicKey)
-        }
+        val bcEC = ECNamedCurveTable.getParameterSpec(curve.name).curve
+        val pubKeyEcPoint = decodeRawPubKeyEcPoint(bcEC, rawPublicKey)
         return ECKey.Builder(
             curve,
             Base64URL.encode(pubKeyEcPoint.rawXCoord.encoded),
             Base64URL.encode(pubKeyEcPoint.rawYCoord.encoded),
         ).build()
     }
+
+    private fun decodeRawPubKeyEcPoint(bcEC: ECCurve, rawEncodedPoint: ByteArray): ECPoint =
+        try { //this is how an EC pub key should be encoded
+            val asn1PubKeySequence = ASN1Sequence.getInstance(rawEncodedPoint)
+            val subjectPublicKeyObject = asn1PubKeySequence.getObjectAt(1)
+            val subjectPublicKeyBitStr = ASN1BitString.getInstance(subjectPublicKeyObject)
+            bcEC.decodePoint(subjectPublicKeyBitStr.bytes)
+        } catch (e: IllegalArgumentException) {
+            //and this here is so that uniresolver tests in the did library don't break :)
+            bcEC.decodePoint(rawEncodedPoint)
+        }
 
     private fun rawRsaToJwk(rawPublicKey: ByteArray): JWK {
         val keySequence = ASN1Sequence.getInstance(rawPublicKey)
