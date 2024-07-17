@@ -11,6 +11,8 @@ import id.walt.credentials.verification.PolicyManager
 import id.walt.did.helpers.WaltidServices
 import id.walt.issuer.FeatureCatalog
 import id.walt.issuer.issuerModule
+import id.walt.issuer.lspPotential.lspPotentialIssuanceTestApi
+import id.walt.verifier.lspPotential.lspPotentialVerificationTestApi
 import id.walt.verifier.policies.PresentationDefinitionPolicy
 import id.walt.verifier.verifierModule
 import id.walt.webwallet.db.Db
@@ -130,5 +132,7 @@ typealias TestFunctionType = (String, suspend() -> Any?) -> Unit
 private fun Application.e2eTestModule() {
     webWalletModule(true)
     issuerModule(false)
+    lspPotentialIssuanceTestApi()
     verifierModule(false)
+    lspPotentialVerificationTestApi()
 }

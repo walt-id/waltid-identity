@@ -11,7 +11,7 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.*
 
-expect class JWKKey(jwk: String?) : Key {
+expect class JWKKey(jwk: String?, _keyId: String? = null) : Key {
     override val keyType: KeyType
 
     override suspend fun getKeyId(): String
