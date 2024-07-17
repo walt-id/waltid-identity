@@ -149,7 +149,7 @@ actual class JWKKey actual constructor(
      */
     @JsPromise
     @JsExport.Ignore
-    actual override suspend fun signJws(plaintext: ByteArray, headers: Map<String, String>): String {
+    actual override suspend fun signJws(plaintext: ByteArray, headers: Map<String, JsonElement>): String {
         check(hasPrivateKey) { "No private key is attached to this key!" }
 
         val headerEntries = headers.entries.toTypedArray().map { it.toPair() }.toTypedArray()

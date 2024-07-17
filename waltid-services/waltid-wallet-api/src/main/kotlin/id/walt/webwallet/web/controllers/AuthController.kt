@@ -595,7 +595,7 @@ private fun createHS256Token(tokenPayload: String) = JWSObject(JWSHeader(JWSAlgo
 }.serialize()
 
 private suspend fun createRsaToken(key: JWKKey, tokenPayload: String) =
-    mapOf(JWTClaims.Header.keyID to key.getPublicKey().getKeyId(), JWTClaims.Header.type to "JWT").let {
+    mapOf(JWTClaims.Header.keyID to key.getPublicKey().getKeyId().toJsonElement(), JWTClaims.Header.type to "JWT".toJsonElement()).let {
         key.signJws(tokenPayload.toByteArray(), it)
     }
 

@@ -17,6 +17,7 @@ import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.base64UrlDecode
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
+import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.did.dids.DidService
 import id.walt.did.dids.DidUtils
 import id.walt.issuer.config.CredentialTypeConfig
@@ -158,7 +159,7 @@ open class CIProvider : OpenIDCredentialIssuer(
             log.debug { "Signing JWS:   $payload" }
             log.debug { "JWS Signature: target: $target, keyId: $keyId, header: $header" }
             if (header != null && keyId != null && privKey != null) {
-                val headers = mapOf("alg" to "ES256", "type" to "jwt", "kid" to keyId)
+                val headers = header.toMutableMap().plus(mapOf("alg" to "ES256".toJsonElement(), "type" to "jwt".toJsonElement(), "kid" to keyId.toJsonElement()))
                 privKey.signJws(payload.toString().toByteArray(), headers).also {
                     log.debug { "Signed JWS: >> $it" }
                 }

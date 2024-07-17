@@ -12,6 +12,7 @@ import id.walt.crypto.keys.KeyType
 import id.walt.crypto.utils.Base64Utils.base64UrlDecode
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto.utils.JsonUtils.toJsonElement
+import id.walt.crypto.utils.JsonUtils.toJsonObject
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.SerialName
@@ -204,14 +205,16 @@ actual class JWKKey actual constructor(
      * @param plaintext data to be signed
      * @return signed (JWS)
      */
-    actual override suspend fun signJws(plaintext: ByteArray, headers: Map<String, String>): String {
+    actual override suspend fun signJws(plaintext: ByteArray, headers: Map<String, JsonElement>): String {
         check(hasPrivateKey) { "No private key is attached to this key!" }
 
         log.trace { "Signing JWS, Key: ${toString()}" }
 
         // Nimbus signature:
         val jwsObject = JWSObject(
-            JWSHeader.Builder(_internalJwsAlgorithm).customParams(headers).build(),
+            JWSHeader.parse(headers.toMutableMap().apply {
+                put("alg", _internalJwsAlgorithm.toString().toJsonElement())
+            }.toJsonObject().toString()),
             Payload(plaintext)
         )
         /*jwsObject.sign(_internalSigner)

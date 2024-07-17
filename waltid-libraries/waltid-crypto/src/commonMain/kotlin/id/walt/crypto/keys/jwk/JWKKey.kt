@@ -31,7 +31,7 @@ expect class JWKKey(jwk: String?) : Key {
      * @return signed (JWS)
      */
     override suspend fun signRaw(plaintext: ByteArray): ByteArray
-    override suspend fun signJws(plaintext: ByteArray, headers: Map<String, String>): String
+    override suspend fun signJws(plaintext: ByteArray, headers: Map<String, JsonElement>): String
 
     /**
      * Verifies JWS: Verifies a signed message using this public key
