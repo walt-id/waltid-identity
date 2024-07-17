@@ -422,11 +422,10 @@ fun Application.issuerApi() {
                         Json.parseToJsonElement(KeySerialization.serializeKey(jwkKey)).jsonObject,
                         "",
                         "urn:eu.europa.ec.eudi:pid:1",
-                        null,
-                        mdocData = mapOf("org.iso.18013.5.1" to buildJsonObject {
+                        credentialData = W3CVC(buildJsonObject {
                             put("family_name", "Doe")
                             put("given_name", "John")
-                        })
+                        }), null
                     ).let { createCredentialOfferUri(listOf(it)) }
                     context.respond(
                         HttpStatusCode.OK, offerUri
