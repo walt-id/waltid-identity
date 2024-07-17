@@ -5,6 +5,7 @@ import id.walt.commons.ServiceInitialization
 import id.walt.commons.ServiceMain
 import id.walt.commons.featureflag.FeatureManager.whenFeature
 import id.walt.commons.web.WebService
+import id.walt.commons.web.plugins.configureSerialization
 import id.walt.did.helpers.WaltidServices
 import id.walt.issuer.entra.entraIssuance
 import id.walt.issuer.issuance.OidcApi.oidcApi
@@ -30,6 +31,7 @@ fun Application.configurePlugins() {
     configureHTTP()
     configureMonitoring()
     configureRouting()
+    configureSerialization()
 }
 
 fun Application.issuerModule(withPlugins: Boolean = true) {
