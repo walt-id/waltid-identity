@@ -1,15 +1,8 @@
 // # walt.id identity build configuration
 
-
-// --- Custom build flags ---
-
-/** For building Android, make sure to set up your Android SDK in local.properties */
-ext["enable-android-build"] = false
-/** For iOS builds, run `kdoctor` (https://github.com/Kotlin/kdoctor) to make sure your environment is setup correctly */
-ext["enable-ios-build"] = false
-
-// --- End of custom build flags ---
-
+fun getSetting(name: String) = providers.gradleProperty(name).orNull.toBoolean()
+val enableAndroidBuild = getSetting("enableAndroidBuild")
+val enableIosBuild = getSetting("enableAndroidBuild")
 
 // Build setup:
 
@@ -64,8 +57,8 @@ val iosModules = listOf(
 
 val enabledModules = ArrayList<String>(baseModules)
 
-if (ext["enable-android-build"] == true) enabledModules.addAll(androidModules)
-if (ext["enable-ios-build"] == true) enabledModules.addAll(iosModules)
+if (enableAndroidBuild) enabledModules.addAll(androidModules)
+if (enableIosBuild) enabledModules.addAll(iosModules)
 
 include(*enabledModules.toTypedArray())
 

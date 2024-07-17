@@ -6,6 +6,10 @@ import love.forte.plugin.suspendtrans.gradle.SuspendTransformGradleExtension
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
+fun getSetting(name: String) = providers.gradleProperty(name).orNull.toBoolean()
+val enableAndroidBuild = getSetting("enableAndroidBuild")
+val enableIosBuild = getSetting("enableAndroidBuild")
+
 plugins {
     kotlin("multiplatform")
     kotlin("plugin.serialization")
@@ -41,11 +45,6 @@ java {
 kotlin {
     jvmToolchain(17)
 }
-
-/*android {
-    namespace = "id.walt.crypto"
-    compileSdk = 34
-}*/
 
 kotlin {
     val isMacOS = System.getProperty("os.name") == "Mac OS X"
@@ -92,8 +91,7 @@ kotlin {
     }
 //    androidTarget()
 
-
-    if (isMacOS) {
+    if (enableIosBuild) {
         iosArm64()
         iosSimulatorArm64()
     }
@@ -204,7 +202,7 @@ kotlin {
 //            }
 //        }
 
-        if (isMacOS) {
+        if (enableIosBuild) {
             val iosArm64Main by getting
             val iosSimulatorArm64Main by getting
 
