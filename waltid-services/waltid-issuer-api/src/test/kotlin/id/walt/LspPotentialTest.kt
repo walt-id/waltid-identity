@@ -218,6 +218,8 @@ class LspPotentialTest {
     assertTrue(mdoc.verifySignature(SimpleCOSECryptoProvider(listOf(
       LspPotentialInteropEvent.loadPotentialIssuerKeys()
     )), LspPotentialInteropEvent.POTENTIAL_ISSUER_KEY_ID))
+    assertNotNull(mdoc.issuerSigned.nameSpaces)
+    assertNotEquals(0, mdoc.issuerSigned.nameSpaces!!.size)
   }
 
   @Test
