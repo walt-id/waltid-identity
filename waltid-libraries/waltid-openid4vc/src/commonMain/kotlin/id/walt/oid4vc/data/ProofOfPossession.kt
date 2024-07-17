@@ -1,6 +1,10 @@
 package id.walt.oid4vc.data
 
+import cbor.Cbor
+import cbor.CborBuilder
 import id.walt.crypto.keys.Key
+import id.walt.mdoc.cose.COSECryptoProvider
+import id.walt.mdoc.cose.COSESign1
 import id.walt.mdoc.dataelement.*
 import id.walt.oid4vc.util.JwtUtils
 import io.ktor.utils.io.core.*
@@ -76,14 +80,6 @@ data class ProofOfPossession @OptIn(ExperimentalSerializationApi::class) private
                           private val clientId: String?, private val nonce: String?,
                           private val coseKeyAlgorithm: String,
                           private val coseKey: ByteArray?, private val x5Chain: ByteArray?): ProofBuilder() {
-        val HEADER_LABEL_ALG = 1
-        val HEADER_LABEL_CONTENT_TYPE = 3
-        val HEADER_LABEL_COSE_KEY = "COSE_Key"
-        val HEADER_LABEL_X5CHAIN = 33
-        val LABEL_ISS = 1
-        val LABEL_AUD = 3
-        val LABEL_IAT = 6
-        val LABEL_NONCE = 10
         val headers = MapElement(buildMap {
             put(MapKey(HEADER_LABEL_CONTENT_TYPE), StringElement(CWT_HEADER_TYPE))
             coseKey?.let { put(MapKey(HEADER_LABEL_COSE_KEY), ByteStringElement(it)) }
@@ -100,6 +96,21 @@ data class ProofOfPossession @OptIn(ExperimentalSerializationApi::class) private
             TODO("Not yet implemented")
         }
 
+        fun build(cryptoProvider: COSECryptoProvider, keyId: String): ProofOfPossession {
+            val signedPayload = cryptoProvider.sign1(payload.toCBOR(), headers, null, keyId)
+            return ProofOfPossession(ProofType.cwt, cwt = signedPayload.toCBORHex())
+        }
+
+        companion object {
+            const val HEADER_LABEL_ALG = 1
+            const val HEADER_LABEL_CONTENT_TYPE = 3
+            const val HEADER_LABEL_COSE_KEY = "COSE_Key"
+            const val HEADER_LABEL_X5CHAIN = 33
+            const val LABEL_ISS = 1
+            const val LABEL_AUD = 3
+            const val LABEL_IAT = 6
+            const val LABEL_NONCE = 10
+        }
     }
 
     companion object : JsonDataObjectFactory<ProofOfPossession>() {
