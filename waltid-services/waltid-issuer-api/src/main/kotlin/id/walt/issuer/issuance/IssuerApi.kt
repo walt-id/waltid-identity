@@ -403,7 +403,12 @@ fun Application.issuerApi() {
                         Json.parseToJsonElement(KeySerialization.serializeKey(jwkKey)).jsonObject,
                         "",
                         "org.iso.18013.5.1.mDL",
-                        W3CVC()
+                        null,
+                        mdocData = mapOf("org.iso.18013.5.1" to buildJsonObject {
+                            put("family_name", "Doe")
+                            put("given_name", "John")
+                            put("birth_date", "1980-01-01")
+                        })
                     ).let { createCredentialOfferUri(listOf(it)) }
                     context.respond(
                         HttpStatusCode.OK, offerUri
@@ -415,7 +420,11 @@ fun Application.issuerApi() {
                         Json.parseToJsonElement(KeySerialization.serializeKey(jwkKey)).jsonObject,
                         "",
                         "urn:eu.europa.ec.eudi:pid:1",
-                        W3CVC()
+                        null,
+                        mdocData = mapOf("org.iso.18013.5.1" to buildJsonObject {
+                            put("family_name", "Doe")
+                            put("given_name", "John")
+                        })
                     ).let { createCredentialOfferUri(listOf(it)) }
                     context.respond(
                         HttpStatusCode.OK, offerUri
