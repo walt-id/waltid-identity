@@ -1,5 +1,11 @@
 package id.walt.oid4vc.providers
 
+import cbor.Cbor
+import id.walt.mdoc.cose.COSESign1
+import id.walt.mdoc.dataelement.ByteStringElement
+import id.walt.mdoc.dataelement.MapElement
+import id.walt.mdoc.dataelement.MapKey
+import id.walt.mdoc.dataelement.StringElement
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.definitions.CROSS_DEVICE_CREDENTIAL_OFFER_URL
 import id.walt.oid4vc.definitions.JWTClaims
@@ -13,6 +19,8 @@ import id.walt.oid4vc.util.randomUUID
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.http.*
 import kotlinx.datetime.Clock
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.decodeFromHexString
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.time.Duration
@@ -309,7 +317,7 @@ abstract class OpenIDCredentialIssuer(
         session: IssuanceSession
     ): CredentialResponse {
         return credentialResult.credential?.let {
-            CredentialResponse.success(credentialResult.format, it)
+            CredentialResponse.success(credentialResult.format, it, customParameters = credentialResult.customParameters)
         } ?: generateProofOfPossessionNonceFor(session).let { updatedSession ->
             CredentialResponse.deferred(
                 credentialResult.format,
@@ -320,15 +328,25 @@ abstract class OpenIDCredentialIssuer(
         }
     }
 
+    protected fun getNonceFromProof(proofOfPossession: ProofOfPossession) = when(proofOfPossession.proofType) {
+        ProofType.jwt -> parseTokenPayload(proofOfPossession.jwt!!)[JWTClaims.Payload.nonce]?.jsonPrimitive?.content
+        ProofType.cwt -> Cbor.decodeFromHexString<COSESign1>(proofOfPossession.cwt!!).decodePayload()?.let {
+            io.ktor.utils.io.core.String((it.value[MapKey(ProofOfPossession.CWTProofBuilder.LABEL_NONCE)] as ByteStringElement).value)
+        }
+        else -> null
+    }
+
+    @OptIn(ExperimentalSerializationApi::class)
     private fun validateProofOfPossession(credentialRequest: CredentialRequest, nonce: String): Boolean {
         log.debug { "VALIDATING: ${credentialRequest.proof} with nonce $nonce" }
-        if (credentialRequest.proof?.proofType != ProofType.jwt || credentialRequest.proof.jwt == null)
-            return false
         log.debug { "VERIFYING ITS SIGNATURE" }
-        return verifyTokenSignature(TokenTarget.PROOF_OF_POSSESSION, credentialRequest.proof.jwt) &&
-                credentialRequest.proof.jwt.let {
-                    parseTokenPayload(it)
-                }[JWTClaims.Payload.nonce]?.jsonPrimitive?.content == nonce
+        if (credentialRequest.proof?.proofType == ProofType.jwt && credentialRequest.proof.jwt != null) {
+            return verifyTokenSignature(TokenTarget.PROOF_OF_POSSESSION, credentialRequest.proof.jwt) &&
+                getNonceFromProof(credentialRequest.proof) == nonce
+        } else if(credentialRequest.proof?.proofType == ProofType.cwt && credentialRequest.proof.cwt != null) {
+            return verifyCOSESign1Signature(TokenTarget.PROOF_OF_POSSESSION, credentialRequest.proof.cwt) &&
+                getNonceFromProof(credentialRequest.proof) == nonce
+        } else return false
     }
 
     fun getCIProviderMetadataUrl(): String {

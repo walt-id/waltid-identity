@@ -6,6 +6,7 @@ import com.nimbusds.jose.crypto.impl.ECDSA
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeyType
+import id.walt.crypto.utils.Base64Utils.base64UrlDecode
 import id.walt.did.dids.DidService
 import id.walt.did.dids.DidUtils
 import id.walt.did.dids.registrar.LocalRegistrar
@@ -19,6 +20,8 @@ import id.walt.mdoc.COSECryptoProviderKeyInfo
 import id.walt.mdoc.SimpleCOSECryptoProvider
 import id.walt.mdoc.cose.COSESign1
 import id.walt.mdoc.dataelement.*
+import id.walt.mdoc.doc.MDoc
+import id.walt.mdoc.issuersigned.IssuerSigned
 import id.walt.oid4vc.OpenID4VCI
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.requests.AuthorizationRequest
@@ -45,6 +48,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.decodeFromHexString
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.kotlincrypto.hash.sha2.SHA256
 import java.security.KeyPairGenerator
 import java.security.PublicKey
@@ -153,7 +157,7 @@ class LspPotentialTest {
     val deviceKeyPair = kpg.genKeyPair()
     // ### steps 19-22: credential issuance
 
-    // TODO: support CWT proof of possession signing. Move COSE signing functionality to crypto lib?
+    // TODO: move COSE signing functionality to crypto lib?
     val credReq = CredentialRequest.forOfferedCredential(offeredCredential, ProofOfPossession.CWTProofBuilder(
       issuerUrl = parsedOffer.credentialIssuer, clientId = authReq.clientId, nonce = tokenResp.cNonce,
       coseKeyAlgorithm = COSE.AlgorithmID.ECDSA_256.AsCBOR().toString(),
@@ -170,15 +174,21 @@ class LspPotentialTest {
     assertEquals(cwtProtectedHeader.value[MapKey(ProofOfPossession.CWTProofBuilder.HEADER_LABEL_CONTENT_TYPE)]!!.value, "openid4vci-proof+cwt")
     assertContentEquals((cwtProtectedHeader.value[MapKey(ProofOfPossession.CWTProofBuilder.HEADER_LABEL_COSE_KEY)] as ByteStringElement).value, deviceKeyPair.public.encoded)
 
-    // TODO: temporarily set proof to null, which gets temporarily accepted for this test (CWT proof signing still needs to be implemented!!, accepting null proof needs to be disabled again! (OpenIdCredentialIssuer.kt:198)
-    //val credReq = CredentialRequest.forOfferedCredential(offeredCredential, null)
-
     val credResp = http.post(providerMetadata.credentialEndpoint!!) {
       contentType(ContentType.Application.Json)
       bearerAuth(tokenResp.accessToken!!)
       setBody(credReq.toJSON())
     }.body<JsonObject>().let { CredentialResponse.fromJSON(it) }
 
+    assertTrue(credResp.isSuccess)
+    assertContains(credResp.customParameters.keys, "credential_encoding")
+    assertEquals("issuer-signed", credResp.customParameters["credential_encoding"]!!.jsonPrimitive.content)
+    assertNotNull(credResp.credential)
+    val mdoc = MDoc(credReq.docType!!.toDE(), IssuerSigned.fromMapElement(
+      Cbor.decodeFromByteArray(credResp.credential!!.jsonPrimitive.content.base64UrlDecode())
+    ), null)
+    assertEquals(credReq.docType, mdoc.docType.value)
+    assertNotNull(mdoc.issuerSigned)
   }
 
   @Test
