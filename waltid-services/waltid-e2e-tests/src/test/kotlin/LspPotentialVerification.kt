@@ -1,7 +1,6 @@
 import COSE.AlgorithmID
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.crypto.ECDSASigner
-import com.nimbusds.jose.crypto.ECDSAVerifier
 import com.nimbusds.jose.jwk.ECKey
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.jwk.KeyUse
@@ -41,12 +40,6 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.*
 import kotlinx.uuid.UUID
 import kotlinx.uuid.generateUUID
-import java.security.KeyFactory
-import java.security.cert.CertificateFactory
-import java.security.cert.X509Certificate
-import java.security.spec.PKCS8EncodedKeySpec
-import java.security.spec.X509EncodedKeySpec
-import java.util.*
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -77,6 +70,8 @@ class LspPotentialVerification(private val client: HttpClient) {
         setBody(
           buildJsonObject {
             put("request_credentials", JsonArray(listOf(JsonPrimitive("org.iso.18013.5.1.mDL"))))
+            put("trusted_root_cas", JsonArray(listOf(JsonPrimitive(LspPotentialVerificationInterop.POTENTIAL_ROOT_CA_CERT))))
+
           })
       }
       assertEquals(200, createReqResponse.status.value)

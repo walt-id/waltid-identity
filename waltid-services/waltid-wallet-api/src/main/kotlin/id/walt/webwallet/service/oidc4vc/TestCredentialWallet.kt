@@ -229,33 +229,36 @@ class TestCredentialWallet(
                 WaltIdJWTCryptoProvider(mapOf(key.getKeyId() to key)), key.getKeyId())
         }}.map { it.toString(true, true) }
 
-        val mdocHandover = OpenID4VP.generateMDocOID4VPHandover(session.authorizationRequest, session.nonce!!)
         val mdocsPresented = runBlocking {
-            val ecKey = ECKey.parse(key.exportJWK()).toECKey()
-            val cryptoProvider = SimpleCOSECryptoProvider(listOf(
-                COSECryptoProviderKeyInfo(key.getKeyId(), AlgorithmID.ECDSA_256, ecKey.toECPublicKey(), ecKey.toECPrivateKey())
-            ))
-            matchedCredentials.filter { it.format == CredentialFormat.mso_mdoc }.map { cred ->
-                val mdoc = MDoc.fromCBORHex(cred.document)
-                mdoc.presentWithDeviceSignature(
-                    MDocRequestBuilder(mdoc.docType.value).also {
-                        session.authorizationRequest.presentationDefinition!!.inputDescriptors.forEach { inputDescriptor ->
-                            inputDescriptor.constraints!!.fields!!.forEach { field ->
-                                field.addToMdocRequest(it)
+            val matchingMDocs = matchedCredentials.filter { it.format == CredentialFormat.mso_mdoc }
+            if(matchingMDocs.size > 0) {
+                val mdocHandover = OpenID4VP.generateMDocOID4VPHandover(session.authorizationRequest, session.nonce!!)
+                val ecKey = ECKey.parse(key.exportJWK()).toECKey()
+                val cryptoProvider = SimpleCOSECryptoProvider(listOf(
+                    COSECryptoProviderKeyInfo(key.getKeyId(), AlgorithmID.ECDSA_256, ecKey.toECPublicKey(), ecKey.toECPrivateKey())
+                ))
+                matchingMDocs.map { cred ->
+                    val mdoc = MDoc.fromCBORHex(cred.document)
+                    mdoc.presentWithDeviceSignature(
+                        MDocRequestBuilder(mdoc.docType.value).also {
+                            session.authorizationRequest.presentationDefinition!!.inputDescriptors.forEach { inputDescriptor ->
+                                inputDescriptor.constraints!!.fields!!.forEach { field ->
+                                    field.addToMdocRequest(it)
+                                }
                             }
-                        }
-                    }.build(),
-                    DeviceAuthentication(
-                        sessionTranscript = ListElement(
-                            listOf(
-                                NullElement(),
-                                NullElement(), //EncodedCBORElement(ephemeralReaderKey.getPublicKeyRepresentation()),
-                                mdocHandover
-                            )
-                        ), mdoc.docType.value, EncodedCBORElement(MapElement(mapOf()))
-                    ), cryptoProvider, key.getKeyId()
-                )
-            }
+                        }.build(),
+                        DeviceAuthentication(
+                            sessionTranscript = ListElement(
+                                listOf(
+                                    NullElement(),
+                                    NullElement(), //EncodedCBORElement(ephemeralReaderKey.getPublicKeyRepresentation()),
+                                    mdocHandover
+                                )
+                            ), mdoc.docType.value, EncodedCBORElement(MapElement(mapOf()))
+                        ), cryptoProvider, key.getKeyId()
+                    )
+                }
+            } else listOf()
         }
 
         val presentationId = (session.presentationDefinition?.id ?: "urn:uuid:${UUID.generateUUID().toString().lowercase()}")
