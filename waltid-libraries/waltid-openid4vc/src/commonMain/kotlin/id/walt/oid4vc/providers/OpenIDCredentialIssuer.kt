@@ -5,6 +5,7 @@ import id.walt.crypto.utils.Base64Utils.base64UrlDecode
 import id.walt.mdoc.cose.COSESign1
 import id.walt.mdoc.dataelement.ByteStringElement
 import id.walt.mdoc.dataelement.MapKey
+import id.walt.mdoc.dataelement.StringElement
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.definitions.CROSS_DEVICE_CREDENTIAL_OFFER_URL
 import id.walt.oid4vc.definitions.JWTClaims
@@ -331,8 +332,12 @@ abstract class OpenIDCredentialIssuer(
 
     protected fun getNonceFromProof(proofOfPossession: ProofOfPossession) = when(proofOfPossession.proofType) {
         ProofType.jwt -> parseTokenPayload(proofOfPossession.jwt!!)[JWTClaims.Payload.nonce]?.jsonPrimitive?.content
-        ProofType.cwt -> Cbor.decodeFromByteArray<COSESign1>(proofOfPossession.cwt!!.base64UrlDecode()).decodePayload()?.let {
-            io.ktor.utils.io.core.String((it.value[MapKey(ProofOfPossession.CWTProofBuilder.LABEL_NONCE)] as ByteStringElement).value)
+        ProofType.cwt -> Cbor.decodeFromByteArray<COSESign1>(proofOfPossession.cwt!!.base64UrlDecode()).decodePayload()?.let { payload ->
+            payload.value[MapKey(ProofOfPossession.CWTProofBuilder.LABEL_NONCE)].let { when(it) {
+                is ByteStringElement -> io.ktor.utils.io.core.String(it.value)
+                is StringElement -> it.value
+                else -> throw Error("Invalid nonce type")
+            } }
         }
         else -> null
     }
