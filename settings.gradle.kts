@@ -62,5 +62,4 @@ include(
     "$applications:waltid-openid4vc-ios-testApp",
     "$applications:waltid-openid4vc-ios-testApp:shared"
      */
-)
 //include("waltid-e2e-tests")
