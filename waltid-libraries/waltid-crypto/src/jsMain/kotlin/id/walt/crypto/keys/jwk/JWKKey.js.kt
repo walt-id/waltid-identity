@@ -28,8 +28,7 @@ import kotlin.js.json
 @Serializable
 @SerialName("jwk")
 actual class JWKKey actual constructor(
-    @Serializable(with = JWKKeyJsonFieldSerializer::class)
-    var jwk: String?,
+    var jwk: String?, val _keyId: String?
 ) : Key() {
 
     @Transient
@@ -275,7 +274,7 @@ actual class JWKKey actual constructor(
 
     @JsPromise
     @JsExport.Ignore
-    actual override suspend fun getKeyId(): String = _internalJwk.kid ?: getThumbprint()
+    actual override suspend fun getKeyId(): String = _keyId ?: _internalJwk.kid ?: getThumbprint()
 
     @JsPromise
     @JsExport.Ignore
