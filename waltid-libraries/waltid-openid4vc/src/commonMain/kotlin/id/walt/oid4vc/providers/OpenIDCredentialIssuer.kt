@@ -43,7 +43,7 @@ abstract class OpenIDCredentialIssuer(
         )
     private var _supportedCredentialFormats: Set<CredentialFormat>? = null
     val supportedCredentialFormats
-        get() = _supportedCredentialFormats ?: (metadata.credentialsSupported?.map { it.format }?.toSet()
+        get() = _supportedCredentialFormats ?: (metadata.credentialConfigurationsSupported?.values?.map { it.format }?.toSet()
             ?: setOf()).also {
             _supportedCredentialFormats = it
         }

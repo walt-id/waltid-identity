@@ -118,11 +118,6 @@ data class OpenIDProviderMetadata @OptIn(ExperimentalSerializationApi::class) co
     @SerialName("code_challenge_methods_supported") val codeChallengeMethodsSupported: List<String>? = null,
     override val customParameters: Map<String, JsonElement> = mapOf()
 ) : JsonDataObject() {
-
-
-
-    @EncodeDefault @SerialName("credentials_supported") @Serializable(CredentialSupportedListSerializer::class)
-    val credentialsSupported = credentialConfigurationsSupported?.values?.toList()
     override fun toJSON(): JsonObject = Json.encodeToJsonElement(OpenIDProviderMetadataSerializer, this).jsonObject
 
     companion object : JsonDataObjectFactory<OpenIDProviderMetadata>() {
