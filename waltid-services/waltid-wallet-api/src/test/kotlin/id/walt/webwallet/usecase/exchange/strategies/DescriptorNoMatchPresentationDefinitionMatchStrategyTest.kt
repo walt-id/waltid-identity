@@ -32,7 +32,7 @@ class DescriptorNoMatchPresentationDefinitionMatchStrategyTest {
             disclosures = null,
             addedOn = Clock.System.now(),
             deletedOn = null,
-            format = CredentialFormat.jwt_vc
+            format = CredentialFormat.ldp_vc
         ),
     )
     private val expectedFilterData =

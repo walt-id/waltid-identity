@@ -44,7 +44,7 @@ class CredentialStatusUseCaseTest {
         disclosures = null,
         addedOn = Clock.System.now(),
         deletedOn = null,
-        format = CredentialFormat.jwt_vc
+        format = CredentialFormat.ldp_vc
     )
     private val credentialMultiStatus = WalletCredential(
         wallet = wallet,
@@ -77,7 +77,7 @@ class CredentialStatusUseCaseTest {
         disclosures = null,
         addedOn = Clock.System.now(),
         deletedOn = null,
-        format = CredentialFormat.jwt_vc
+        format = CredentialFormat.ldp_vc
     )
 
     @Test
