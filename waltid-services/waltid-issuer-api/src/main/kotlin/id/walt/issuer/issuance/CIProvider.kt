@@ -25,8 +25,6 @@ import id.walt.did.dids.DidUtils
 import id.walt.issuer.config.CredentialTypeConfig
 import id.walt.issuer.config.OIDCIssuerServiceConfig
 import id.walt.did.dids.json
-import id.walt.issuer.base.config.ConfigManager
-import id.walt.issuer.base.config.OIDCIssuerServiceConfig
 import id.walt.mdoc.COSECryptoProviderKeyInfo
 import id.walt.mdoc.SimpleCOSECryptoProvider
 import id.walt.mdoc.cose.COSESign1
