@@ -29,6 +29,10 @@ import id.walt.oid4vc.data.dif.VCFormat
 import id.walt.oid4vc.interfaces.PresentationResult
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.util.http
+import id.walt.sdjwt.SDJwtVC
+import id.walt.sdjwt.SimpleJWTCryptoProvider
+import id.walt.verifier.policies.PresentationDefinitionPolicy
+import id.walt.verifier.verifierModule
 import id.walt.verifier.oidc.LspPotentialInteropEvent
 import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
