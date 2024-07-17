@@ -4,12 +4,17 @@ package id.walt.verifier.oidc
 
 import COSE.AlgorithmID
 import COSE.OneKey
+import com.nimbusds.jose.JWSAlgorithm
+import com.nimbusds.jose.crypto.ECDSAVerifier
+import com.nimbusds.jose.jwk.ECKey
 import com.upokecenter.cbor.CBORObject
 import id.walt.commons.config.ConfigManager
 import id.walt.credentials.verification.Verifier
 import id.walt.credentials.verification.models.PolicyRequest
 import id.walt.credentials.verification.models.PresentationVerificationResponse
 import id.walt.crypto.keys.Key
+import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto.utils.Base64Utils
 import id.walt.mdoc.COSECryptoProviderKeyInfo
 import id.walt.mdoc.SimpleCOSECryptoProvider
 import id.walt.mdoc.dataelement.EncodedCBORElement
@@ -28,6 +33,11 @@ import id.walt.oid4vc.providers.OpenIDCredentialVerifier
 import id.walt.oid4vc.providers.PresentationSession
 import id.walt.oid4vc.responses.TokenResponse
 import id.walt.verifier.config.OIDCVerifierServiceConfig
+import id.walt.sdjwt.SDJwtVC
+import id.walt.sdjwt.SimpleJWTCryptoProvider
+import id.walt.sdjwt.SimpleMultiKeyJWTCryptoProvider
+import id.walt.verifier.base.config.ConfigManager
+import id.walt.verifier.base.config.OIDCVerifierServiceConfig
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.*
@@ -117,6 +127,7 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
 
         return when (session.openId4VPProfile) {
             OpenId4VPProfile.ISO_18013_7_MDOC -> verifyMdoc(tokenResponse, session)
+            OpenId4VPProfile.HAIP -> verifySdJwtVC(tokenResponse, session)
             else -> {
                 val results = runBlocking {
                     Verifier.verifyPresentation(
@@ -162,6 +173,15 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
                 )
             )
         )
+    }
+
+    private fun verifySdJwtVC(tokenResponse: TokenResponse, session: PresentationSession): Boolean {
+        val sdJwtVC = SDJwtVC.parse(tokenResponse.vpToken!!.jsonPrimitive.content)
+        val holderKey = ECKey.parse(sdJwtVC.holderKeyJWK.toString())
+        return sdJwtVC.verifyVC(SimpleMultiKeyJWTCryptoProvider(mapOf(
+            LspPotentialInteropEvent.POTENTIAL_ISSUER_KEY_ID to LspPotentialInteropEvent.POTENTIAL_JWT_CRYPTO_PROVIDER,
+            holderKey.keyID to SimpleJWTCryptoProvider(JWSAlgorithm.parse(holderKey.keyType.value), null, ECDSAVerifier(holderKey))
+        )), requiresHolderKeyBinding = true, session.authorizationRequest!!.clientId, session.authorizationRequest!!.nonce!!).verified
     }
 
     override fun initializeAuthorization(

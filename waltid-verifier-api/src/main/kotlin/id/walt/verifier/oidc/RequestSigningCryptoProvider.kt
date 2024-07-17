@@ -34,7 +34,7 @@ object RequestSigningCryptoProvider: JWTCryptoProvider {
     ).also { it.sign(ECDSASigner(signingKey)) }.serialize()
   }
 
-  override fun verify(jwt: String): JwtVerificationResult {
+  override fun verify(jwt: String, keyID: String?): JwtVerificationResult {
     TODO("Not yet implemented")
   }
 }
