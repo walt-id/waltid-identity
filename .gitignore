@@ -55,6 +55,12 @@ secret*
 **/.nuxt
 **/.output
 **/node_modules
+/waltid-openid4vc/issuer-cert.pem
+/waltid-openid4vc/issuer-priv.pem
+/waltid-openid4vc/issuer-pub.pem
+/waltid-openid4vc/root-ca-cert.pem
+/waltid-openid4vc/root-ca-priv.pem
+/waltid-openid4vc/root-ca-pub.pem
 
 **/.kotlin
 
