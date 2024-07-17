@@ -217,10 +217,6 @@ open class CIProvider : OpenIDCredentialIssuer(
         log.debug { "CREDENTIAL REQUEST JSON -------:" }
         log.debug { Json.encodeToString(credentialRequest) }
 
-        val (subjectDid, nonce) = parseFromJwt(
-            credentialRequest.proof?.jwt ?: throw IllegalArgumentException("No proof.jwt in credential request!")
-        )
-
         if (deferIssuance) return CredentialResult(credentialRequest.format, null, randomUUID()).also {
             deferredCredentialRequests[it.credentialId!!] = credentialRequest
         }

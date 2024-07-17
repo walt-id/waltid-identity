@@ -7,14 +7,17 @@ import com.nimbusds.jose.jwk.ECKey
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.util.X509CertUtils
 import com.upokecenter.cbor.CBORObject
+import id.walt.commons.config.ConfigManager
+import id.walt.commons.config.list.WebConfig
+import id.walt.commons.web.WebService
+import id.walt.commons.web.plugins.configureSerialization
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.utils.Base64Utils.base64UrlDecode
 import id.walt.did.dids.DidService
 import id.walt.did.helpers.WaltidServices
-import id.walt.issuer.base.config.ConfigManager
-import id.walt.issuer.base.config.WebConfig
+import id.walt.issuer.config.OIDCIssuerServiceConfig
 import id.walt.issuer.issuerModule
 import id.walt.issuer.utils.LspPotentialInteropEvent
 import id.walt.mdoc.COSECryptoProviderKeyInfo
@@ -63,25 +66,26 @@ import kotlin.test.*
 object LspPotentialTest {
   val http = HttpClient {
     install(ContentNegotiation) {
-      json()
+      json(Json { explicitNulls = false })
     }
     followRedirects = false
   }
   var webConfig: WebConfig? = null
 
   init {
-      runBlocking {
-        WaltidServices.minimalInit()
-      }
-
-      ConfigManager.loadConfigs(arrayOf())
-      webConfig = ConfigManager.getConfig<WebConfig>()
-      embeddedServer(
-        CIO,
-        port = webConfig!!.webPort,
-        host = webConfig!!.webHost,
-        module = Application::issuerModule
-      ).start(wait = false)
+    runBlocking {
+      WaltidServices.minimalInit()
+    }
+    ConfigManager.testWithConfigs(testConfigs)
+    webConfig = ConfigManager.getConfig<WebConfig>()
+    embeddedServer(
+      CIO,
+      port = webConfig!!.webPort,
+      host = webConfig!!.webHost,
+      configure = {
+      },
+      module = Application::issuerModule
+    ).start(wait = false)
   }
 
   @OptIn(ExperimentalEncodingApi::class)
