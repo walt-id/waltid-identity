@@ -45,6 +45,8 @@ include(
 
     // OCI extension for waltid-crypto
     "$libraries:waltid-crypto-oci",
+    "$libraries:waltid-credentials-base"
+)
 
     // Android - uncomment to enable build, and set Android SDK in local.properties:
     /*
