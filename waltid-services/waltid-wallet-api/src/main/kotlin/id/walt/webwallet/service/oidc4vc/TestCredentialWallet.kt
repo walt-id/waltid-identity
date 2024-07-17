@@ -116,6 +116,10 @@ class TestCredentialWallet(
         // JwtService.getService().verify(token).verified
     }
 
+    override fun verifyCOSESign1Signature(target: TokenTarget, token: String): Boolean {
+        TODO("Not yet implemented")
+    }
+
     override fun httpGet(url: Url, headers: Headers?): SimpleHttpResponse {
         return runBlocking {
             ktorClient.get(url) {

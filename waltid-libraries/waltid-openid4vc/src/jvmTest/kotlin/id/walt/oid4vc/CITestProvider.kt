@@ -49,19 +49,19 @@ const val CI_PROVIDER_BASE_URL = "http://localhost:$CI_PROVIDER_PORT"
 class CITestProvider : OpenIDCredentialIssuer(
     baseUrl = CI_PROVIDER_BASE_URL,
     config = CredentialIssuerConfig(
-        credentialConfigurationsSupported = listOf(
-            CredentialSupported(
-                "VerifiableId", CredentialFormat.jwt_vc_json,
+        credentialConfigurationsSupported = mapOf(
+            "VerifiableId" to CredentialSupported(
+                CredentialFormat.jwt_vc_json,
                 cryptographicBindingMethodsSupported = setOf("did"), cryptographicSuitesSupported = setOf("ES256K"),
                 types = listOf("VerifiableCredential", "VerifiableId"),
                 customParameters = mapOf("foo" to JsonPrimitive("bar"))
             ),
-            CredentialSupported(
-                "VerifiableDiploma", CredentialFormat.jwt_vc_json,
+            "VerifiableDiploma" to CredentialSupported(
+                CredentialFormat.jwt_vc_json,
                 cryptographicBindingMethodsSupported = setOf("did"), cryptographicSuitesSupported = setOf("ES256K"),
                 types = listOf("VerifiableCredential", "VerifiableAttestation", "VerifiableDiploma")
             )
-        ).associateBy { it.id }
+        )
     )
 ) {
 
@@ -91,6 +91,10 @@ class CITestProvider : OpenIDCredentialIssuer(
     }
     override fun verifyTokenSignature(target: TokenTarget, token: String) =
         runBlocking { (if(target == TokenTarget.PROOF_OF_POSSESSION) getKeyFor(token) else CI_TOKEN_KEY).verifyJws(token).isSuccess }
+
+    override fun verifyCOSESign1Signature(target: TokenTarget, token: String): Boolean {
+        TODO("Not yet implemented")
+    }
 
     override fun generateCredential(credentialRequest: CredentialRequest): CredentialResult {
         if (deferIssuance) return CredentialResult(credentialRequest.format, null, randomUUID()).also {
