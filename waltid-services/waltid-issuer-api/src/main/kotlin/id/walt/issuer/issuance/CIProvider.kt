@@ -183,7 +183,9 @@ open class CIProvider : OpenIDCredentialIssuer(
         val coseSign1 = Cbor.decodeFromByteArray<COSESign1>(token.base64UrlDecode())
         val tokenHeader = coseSign1.decodeProtectedHeader()
         val rawKey = (tokenHeader.value[MapKey(ProofOfPossession.CWTProofBuilder.HEADER_LABEL_COSE_KEY)] as ByteStringElement).value
-        val cryptoProvider = SimpleCOSECryptoProvider(listOf(COSECryptoProviderKeyInfo("pub-key", AlgorithmID.ECDSA_256, KeyFactory.getInstance("EC").generatePublic(X509EncodedKeySpec(rawKey)))))
+        val cryptoProvider = SimpleCOSECryptoProvider(listOf(COSECryptoProviderKeyInfo("pub-key", AlgorithmID.ECDSA_256,
+            OneKey(CBORObject.DecodeFromBytes(rawKey)).AsPublicKey()
+        )))
         cryptoProvider.verify1(coseSign1, "pub-key")
 //        if (tokenHeader.value[MapKey] != null) {
 //            val did = tokenHeader["kid"]!!.jsonPrimitive.content.split("#")[0]
@@ -329,7 +331,7 @@ open class CIProvider : OpenIDCredentialIssuer(
         ).sign( // TODO: expiration date!
             ValidityInfo(Clock.System.now(), Clock.System.now(), Clock.System.now().plus(365*24, DateTimeUnit.HOUR)),
             DeviceKeyInfo(DataElement.fromCBOR(
-                OneKey(KeyFactory.getInstance("EC").generatePublic(X509EncodedKeySpec(rawHolderKey)), null).AsCBOR().EncodeToBytes()
+                OneKey(CBORObject.DecodeFromBytes(rawHolderKey)).AsCBOR().EncodeToBytes()
             )), cryptoProvider, keyId
         )
         return CredentialResult(CredentialFormat.mso_mdoc, JsonPrimitive(mdoc.issuerSigned.toMapElement().toCBOR().encodeToBase64Url()),
