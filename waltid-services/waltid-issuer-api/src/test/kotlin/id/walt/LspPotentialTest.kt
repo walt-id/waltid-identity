@@ -16,6 +16,7 @@ import id.walt.did.helpers.WaltidServices
 import id.walt.issuer.base.config.ConfigManager
 import id.walt.issuer.base.config.WebConfig
 import id.walt.issuer.issuerModule
+import id.walt.issuer.utils.LspPotentialInteropEvent
 import id.walt.mdoc.COSECryptoProviderKeyInfo
 import id.walt.mdoc.SimpleCOSECryptoProvider
 import id.walt.mdoc.cose.COSESign1
@@ -84,7 +85,8 @@ class LspPotentialTest {
   @Test
   fun testLspPotentialTrack1(): Unit = runBlocking {
     // ### steps 1-6
-    val offerResp = http.get("http://${webConfig.webHost}:${webConfig.webPort}/openid4vc/lspPotentialCredentialOffer")
+    //val offerResp = http.get("http://${webConfig.webHost}:${webConfig.webPort}/openid4vc/lspPotentialCredentialOffer")
+    val offerResp = http.get("https://issuer.potential.walt-test.cloud/openid4vc/lspPotentialCredentialOffer")
     assertEquals(HttpStatusCode.OK, offerResp.status)
 
     val offerUri = offerResp.bodyAsText()
@@ -189,6 +191,9 @@ class LspPotentialTest {
     ), null)
     assertEquals(credReq.docType, mdoc.docType.value)
     assertNotNull(mdoc.issuerSigned)
+    assertTrue(mdoc.verifySignature(SimpleCOSECryptoProvider(listOf(
+      LspPotentialInteropEvent.loadPotentialIssuerKeys()
+    )), LspPotentialInteropEvent.POTENTIAL_ISSUER_KEY_ID))
   }
 
   @Test
