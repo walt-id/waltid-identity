@@ -122,7 +122,6 @@ fun Application.keys() = walletRoute {
         }) {
             val body = call.receiveText()
             val key = getWalletService().importKey(body)
-            context.response.header(HttpHeaders.Location, "/keys/$key")
             context.respond(
                 HttpStatusCode.Created,
                 key
