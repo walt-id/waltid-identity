@@ -25,7 +25,7 @@ expect class OCIKey(
     override suspend fun signRaw(plaintext: ByteArray): ByteArray
     override suspend fun signJws(
         plaintext: ByteArray,
-        headers: Map<String, String>
+        headers: Map<String, JsonElement>
     ): String
 
     override suspend fun verifyRaw(

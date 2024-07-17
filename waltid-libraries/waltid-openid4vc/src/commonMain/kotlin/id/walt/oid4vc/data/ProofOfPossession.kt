@@ -61,9 +61,7 @@ data class ProofOfPossession @OptIn(ExperimentalSerializationApi::class) private
         }
 
         override suspend fun build(key: Key): ProofOfPossession {
-            return ProofOfPossession(ProofType.jwt, key.signJws(payload.toString().toByteArray(),
-                // NOTE: this assumes every header to be string valued, due to the Key interface of crypto-lib
-                headers.mapValues { it.value.jsonPrimitive.content }),
+            return ProofOfPossession(ProofType.jwt, key.signJws(payload.toString().toByteArray(), headers),
                 null, null)
         }
 

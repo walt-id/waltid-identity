@@ -88,8 +88,8 @@ class PresentationBuilder {
         return key.signJws(
             plaintext = buildPresentationJsonString().encodeToByteArray(),
             headers = mapOf(
-                "kid" to (did?.let { resolveDidAuthentication(it) } ?: key.getKeyId()),
-                "typ" to "JWT"
+                "kid" to (did?.let { resolveDidAuthentication(it) } ?: key.getKeyId()).toJsonElement(),
+                "typ" to "JWT".toJsonElement()
             )
         )
     }

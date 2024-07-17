@@ -130,7 +130,7 @@ actual class OCIKey actual constructor(
     }
 
     @OptIn(ExperimentalStdlibApi::class)
-    actual override suspend fun signJws(plaintext: ByteArray, headers: Map<String, String>): String {
+    actual override suspend fun signJws(plaintext: ByteArray, headers: Map<String, JsonElement>): String {
         val jwsObject = JWSObject(
             JWSHeader.Builder(_internalJwsAlgorithm).customParams(headers).build(), Payload(plaintext)
         )
