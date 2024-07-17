@@ -37,7 +37,7 @@ class MatchPresentationDefinitionCredentialsUseCaseTest {
             disclosures = null,
             addedOn = Clock.System.now(),
             deletedOn = null,
-            format = CredentialFormat.jwt_vc
+            format = CredentialFormat.ldp_vc
         ),
         WalletCredential(
             wallet = UUID(),
@@ -53,7 +53,7 @@ class MatchPresentationDefinitionCredentialsUseCaseTest {
             disclosures = null,
             addedOn = Clock.System.now(),
             deletedOn = null,
-            format = CredentialFormat.jwt_vc
+            format = CredentialFormat.ldp_vc
         ),
     )
     val wallet = UUID()

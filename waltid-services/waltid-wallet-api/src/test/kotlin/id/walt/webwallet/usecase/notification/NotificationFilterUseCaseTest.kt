@@ -59,7 +59,7 @@ class NotificationFilterUseCaseTest {
             manifest = null,
             deletedOn = null,
             pending = true,
-            format = CredentialFormat.jwt_vc
+            format = CredentialFormat.ldp_vc
         ),
         // not pending
         WalletCredential(
@@ -71,7 +71,7 @@ class NotificationFilterUseCaseTest {
             manifest = null,
             deletedOn = null,
             pending = false,
-            format = CredentialFormat.jwt_vc
+            format = CredentialFormat.ldp_vc
         ),
     )
     private val pendingFilter = NotificationFilterParameter(
