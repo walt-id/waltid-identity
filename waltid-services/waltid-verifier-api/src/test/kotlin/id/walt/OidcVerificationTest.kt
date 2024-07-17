@@ -5,6 +5,7 @@ import com.nimbusds.jose.jwk.ECKey
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.jwk.KeyUse
 import com.nimbusds.jose.util.Base64URL
+import id.walt.commons.config.list.WebConfig
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeyType
@@ -42,7 +43,10 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
-class OidcTest {
+object OidcVerificationTest {
+
+  var webConfig: WebConfig? = null
+  val baseUrl: String get() = "http://${webConfig!!.webHost}:${webConfig!!.webPort}"
 
 //  init {
 //    runBlocking {
@@ -61,7 +65,6 @@ class OidcTest {
 //      .start(wait = false)
 //  }
 
-    val baseUrl = "http://localhost:7003"
 
     //@Test
     fun testPotentialInteropFlow() {
