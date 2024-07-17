@@ -1,18 +1,15 @@
 package id.walt.oid4vc.data
 
 import cbor.Cbor
-import cbor.CborBuilder
 import id.walt.crypto.keys.Key
+import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.mdoc.cose.COSECryptoProvider
 import id.walt.mdoc.cose.COSESign1
 import id.walt.mdoc.dataelement.*
 import id.walt.oid4vc.util.JwtUtils
 import io.ktor.utils.io.core.*
 import kotlinx.datetime.Clock
-import kotlinx.serialization.EncodeDefault
-import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
+import kotlinx.serialization.*
 import kotlinx.serialization.json.*
 
 @Serializable
@@ -98,7 +95,7 @@ data class ProofOfPossession @OptIn(ExperimentalSerializationApi::class) private
 
         fun build(cryptoProvider: COSECryptoProvider, keyId: String): ProofOfPossession {
             val signedPayload = cryptoProvider.sign1(payload.toCBOR(), headers, null, keyId)
-            return ProofOfPossession(ProofType.cwt, cwt = signedPayload.toCBORHex())
+            return ProofOfPossession(ProofType.cwt, cwt = signedPayload.toCBOR().encodeToBase64Url())
         }
 
         companion object {

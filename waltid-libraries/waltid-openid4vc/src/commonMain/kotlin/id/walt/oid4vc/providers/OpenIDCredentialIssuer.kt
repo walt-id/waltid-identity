@@ -1,11 +1,10 @@
 package id.walt.oid4vc.providers
 
 import cbor.Cbor
+import id.walt.crypto.utils.Base64Utils.base64UrlDecode
 import id.walt.mdoc.cose.COSESign1
 import id.walt.mdoc.dataelement.ByteStringElement
-import id.walt.mdoc.dataelement.MapElement
 import id.walt.mdoc.dataelement.MapKey
-import id.walt.mdoc.dataelement.StringElement
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.definitions.CROSS_DEVICE_CREDENTIAL_OFFER_URL
 import id.walt.oid4vc.definitions.JWTClaims
@@ -21,10 +20,12 @@ import io.ktor.http.*
 import kotlinx.datetime.Clock
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.decodeFromHexString
+import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
+
 /**
  * Base object for a service, providing issuance of verifiable credentials via the OpenID4CI issuance protocol
  * e.g.: Credential issuer
@@ -330,7 +331,7 @@ abstract class OpenIDCredentialIssuer(
 
     protected fun getNonceFromProof(proofOfPossession: ProofOfPossession) = when(proofOfPossession.proofType) {
         ProofType.jwt -> parseTokenPayload(proofOfPossession.jwt!!)[JWTClaims.Payload.nonce]?.jsonPrimitive?.content
-        ProofType.cwt -> Cbor.decodeFromHexString<COSESign1>(proofOfPossession.cwt!!).decodePayload()?.let {
+        ProofType.cwt -> Cbor.decodeFromByteArray<COSESign1>(proofOfPossession.cwt!!.base64UrlDecode()).decodePayload()?.let {
             io.ktor.utils.io.core.String((it.value[MapKey(ProofOfPossession.CWTProofBuilder.LABEL_NONCE)] as ByteStringElement).value)
         }
         else -> null

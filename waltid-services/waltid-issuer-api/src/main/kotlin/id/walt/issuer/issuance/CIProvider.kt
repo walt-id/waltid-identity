@@ -15,7 +15,7 @@ import id.walt.credentials.issuance.Issuer.mergingSdJwtIssue
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
-import id.walt.crypto.utils.Base64Utils
+import id.walt.crypto.utils.Base64Utils.base64UrlDecode
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.did.dids.DidService
 import id.walt.did.dids.DidUtils
@@ -26,7 +26,6 @@ import id.walt.mdoc.SimpleCOSECryptoProvider
 import id.walt.mdoc.cose.COSESign1
 import id.walt.mdoc.dataelement.ByteStringElement
 import id.walt.mdoc.dataelement.DataElement
-import id.walt.mdoc.dataelement.MapElement
 import id.walt.mdoc.dataelement.MapKey
 import id.walt.mdoc.doc.MDocBuilder
 import id.walt.mdoc.mso.DeviceKeyInfo
@@ -55,13 +54,9 @@ import kotlinx.datetime.Clock
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.plus
 import kotlinx.serialization.decodeFromByteArray
-import kotlinx.serialization.decodeFromHexString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import java.security.KeyFactory
-import java.security.KeyPair
-import java.security.KeyPairGenerator
-import java.security.PublicKey
 import java.security.spec.X509EncodedKeySpec
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
@@ -186,8 +181,7 @@ open class CIProvider : OpenIDCredentialIssuer(
     override fun verifyCOSESign1Signature(target: TokenTarget, token: String) = runBlocking {
         println("Verifying JWS: $token")
         println("JWS Verification: target: $target")
-
-        val coseSign1 = Cbor.decodeFromHexString<COSESign1>(token)
+        val coseSign1 = Cbor.decodeFromByteArray<COSESign1>(token.base64UrlDecode())
         val tokenHeader = coseSign1.decodeProtectedHeader()
         val rawKey = (tokenHeader.value[MapKey(ProofOfPossession.CWTProofBuilder.HEADER_LABEL_COSE_KEY)] as ByteStringElement).value
         val cryptoProvider = SimpleCOSECryptoProvider(listOf(COSECryptoProviderKeyInfo("pub-key", AlgorithmID.ECDSA_256, KeyFactory.getInstance("EC").generatePublic(X509EncodedKeySpec(rawKey)))))
@@ -319,7 +313,7 @@ open class CIProvider : OpenIDCredentialIssuer(
     private fun doGenerateMDoc(
         credentialRequest: CredentialRequest
     ): CredentialResult {
-        val coseSign1 = Cbor.decodeFromHexString<COSESign1>(credentialRequest.proof?.cwt ?: throw CredentialError(credentialRequest,
+        val coseSign1 = Cbor.decodeFromByteArray<COSESign1>(credentialRequest.proof?.cwt?.base64UrlDecode() ?: throw CredentialError(credentialRequest,
             CredentialErrorCode.invalid_or_missing_proof, message = "No CWT proof found on credential request"))
         val tokenHeader = coseSign1.decodeProtectedHeader()
         val rawHolderKey = (tokenHeader.value[MapKey(ProofOfPossession.CWTProofBuilder.HEADER_LABEL_COSE_KEY)] as ByteStringElement).value
