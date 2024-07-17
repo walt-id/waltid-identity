@@ -71,23 +71,22 @@ open class CIProvider : OpenIDCredentialIssuer(
     baseUrl = let {
         ConfigManager.getConfig<OIDCIssuerServiceConfig>().baseUrl
     }, config = CredentialIssuerConfig(credentialConfigurationsSupported = supportedCredentialTypes.flatMap { entry ->
-        CredentialFormat.entries.map { format ->
+        CredentialFormat.values().map { format -> Pair(
+          "${entry.key}_${format.value}",
             CredentialSupported(
-                id = "${entry.key}_${format.value}",
                 format = format,
                 cryptographicBindingMethodsSupported = setOf("did"),
                 cryptographicSuitesSupported = setOf("EdDSA", "ES256", "ES256K", "RSA"),
                 types = entry.value
-            )
+            ))
         }
-    }.plus(CredentialSupported(
-        id = "potential.light.profile",
+    }.plus(Pair("org.iso.18013.5.1.mDL", CredentialSupported(
         format = CredentialFormat.mso_mdoc,
         cryptographicBindingMethodsSupported = setOf("cose_key"),
         cryptographicSuitesSupported = setOf("ES256"),
         types = listOf("org.iso.18013.5.1.mDL"),
         docType = "org.iso.18013.5.1.mDL"
-    )).associateBy { it.id })
+    ))).toMap())
 ) {
     private val log = KotlinLogging.logger { }
 

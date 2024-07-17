@@ -403,7 +403,7 @@ fun Application.issuerApi() {
                     val offerUri = IssuanceRequest(
                         Json.parseToJsonElement(KeySerialization.serializeKey(jwkKey)).jsonObject,
                         "",
-                        "potential.light.profile",
+                        "org.iso.18013.5.1.mDL",
                         W3CVC()
                     ).let { createCredentialOfferUri(listOf(it)) }
                     context.respond(
