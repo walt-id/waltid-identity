@@ -1,3 +1,7 @@
+fun getSetting(name: String) = providers.gradleProperty(name).orNull.toBoolean()
+val enableAndroidBuild = getSetting("enableAndroidBuild")
+val enableIosBuild = getSetting("enableAndroidBuild")
+
 plugins {
     kotlin("multiplatform")
     kotlin("plugin.serialization")
@@ -16,7 +20,7 @@ kotlin {
     targets.configureEach {
         compilations.configureEach {
             compileTaskProvider.configure {
-                compilerOptions { 
+                compilerOptions {
                     freeCompilerArgs.add("-Xexpect-actual-classes")
                 }
             }
@@ -74,11 +78,15 @@ kotlin {
         println("Native compilation is not yet supported for aarch64 on Windows / Linux.")
     } else {
         val isMingwX64 = hostOs.startsWith("Windows")
+
+        if (enableIosBuild) {
+            iosArm64()
+            iosSimulatorArm64()
+        }
+
         when {
             isMacOS -> {
-//                macosX64("native")
-                iosArm64()
-                iosSimulatorArm64()
+               // macosX64("native")
             }
 
             hostOs == "Linux" -> linuxX64("native")
@@ -130,7 +138,7 @@ kotlin {
         //val nativeMain by getting
         //val nativeTest by getting
 
-        if (isMacOS) {
+        if (enableIosBuild) {
             val iosArm64Main by getting
             val iosSimulatorArm64Main by getting
             val iosMain by creating {
