@@ -3,11 +3,15 @@ package id.walt
 import COSE.AlgorithmID
 import COSE.OneKey
 import cbor.Cbor
+import com.nimbusds.jose.jwk.ECKey
+import com.nimbusds.jose.jwk.JWK
+import com.nimbusds.jose.util.X509CertUtils
 import com.upokecenter.cbor.CBORObject
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.utils.Base64Utils.base64UrlDecode
+import id.walt.did.dids.DidService
 import id.walt.did.helpers.WaltidServices
 import id.walt.issuer.base.config.ConfigManager
 import id.walt.issuer.base.config.WebConfig
@@ -50,6 +54,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.kotlincrypto.hash.sha2.SHA256
+import java.io.FileReader
 import java.security.KeyPairGenerator
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
@@ -169,54 +174,90 @@ object LspPotentialTest {
     assertNotNull(tokenResp.accessToken)
     assertTrue(tokenResp.isSuccess)
 
-    val kpg = KeyPairGenerator.getInstance("EC")
-    kpg.initialize(256)
     val deviceKeyId = "device-key"
-    val deviceKeyPair = kpg.genKeyPair()
+    val deviceKeyPair: ECKey = runBlocking { ECKey.parseFromPEMEncodedObjects(FileReader("./src/test/resources/ec_device_key.pem").readText()).toECKey() }
+    val certificateChain: String = FileReader("./src/test/resources/cert-device-potential.pem").readText()
     // ### steps 19-22: credential issuance
 
-    // TODO: move COSE signing functionality to crypto lib?
-    val coseKey = OneKey(deviceKeyPair.public, null).AsCBOR().EncodeToBytes()
-    val credReq = CredentialRequest.forOfferedCredential(offeredCredential, ProofOfPossession.CWTProofBuilder(
-      issuerUrl = parsedOffer.credentialIssuer, clientId = authReq.clientId, nonce = tokenResp.cNonce,
-      coseKeyAlgorithm = COSE.AlgorithmID.ECDSA_256.AsCBOR().toString(), coseKey = coseKey, null
-    ).build(SimpleCOSECryptoProvider(listOf(COSECryptoProviderKeyInfo(deviceKeyId, AlgorithmID.ECDSA_256,
-      deviceKeyPair.public, deviceKeyPair.private))), deviceKeyId))
+    repeat(3) { it ->
+      // TODO: move COSE signing functionality to crypto lib?
+      val coseKey = OneKey(deviceKeyPair.toECPublicKey(), null).AsCBOR().EncodeToBytes()
+      val credReq = CredentialRequest.forOfferedCredential(
+        offeredCredential, ProofOfPossession.CWTProofBuilder(
+          issuerUrl = parsedOffer.credentialIssuer, clientId = authReq.clientId, nonce = tokenResp.cNonce,
+          coseKeyAlgorithm = COSE.AlgorithmID.ECDSA_256.AsCBOR().toString(),
+          coseKey = when(it) { // test with COSE_Key header
+            0 -> coseKey
+            else -> null
+          },
+          x5Cert = when(it) { // test with single x509 certificate in x5chain header
+            1 -> certificateChain.encodeToByteArray()
+            else -> null
+          },
+          x5Chain = when(it) { // test with x509 certificate list in x5chain header
+            2 -> listOf(certificateChain.encodeToByteArray())
+            else -> null
+          }
+        ).build(
+          SimpleCOSECryptoProvider(
+            listOf(
+              COSECryptoProviderKeyInfo(
+                deviceKeyId, AlgorithmID.ECDSA_256,
+                deviceKeyPair.toECPublicKey(), deviceKeyPair.toECPrivateKey()
+              )
+            )
+          ), deviceKeyId
+        )
+      )
 
-    val cwt = Cbor.decodeFromByteArray(COSESign1.serializer(), credReq.proof!!.cwt!!.base64UrlDecode())
-    assertNotNull(cwt.payload)
-    val cwtPayload = Cbor.decodeFromByteArray<MapElement>(cwt.payload!!)
-    assertEquals(DEType.textString, cwtPayload.value.get(MapKey(ProofOfPossession.CWTProofBuilder.LABEL_ISS))?.type)
-    val cwtProtectedHeader = Cbor.decodeFromByteArray<MapElement>(cwt.protectedHeader)
-    assertEquals(cwtProtectedHeader.value[MapKey(ProofOfPossession.CWTProofBuilder.HEADER_LABEL_ALG)]!!.value, -7L)
-    assertEquals(cwtProtectedHeader.value[MapKey(ProofOfPossession.CWTProofBuilder.HEADER_LABEL_CONTENT_TYPE)]!!.value, "openid4vci-proof+cwt")
-    assertContentEquals((cwtProtectedHeader.value[MapKey(ProofOfPossession.CWTProofBuilder.HEADER_LABEL_COSE_KEY)] as ByteStringElement).value, coseKey)
+      val cwt = Cbor.decodeFromByteArray(COSESign1.serializer(), credReq.proof!!.cwt!!.base64UrlDecode())
+      assertNotNull(cwt.payload)
+      val cwtPayload = Cbor.decodeFromByteArray<MapElement>(cwt.payload!!)
+      assertEquals(DEType.textString, cwtPayload.value.get(MapKey(ProofOfPossession.CWTProofBuilder.LABEL_ISS))?.type)
+      val cwtProtectedHeader = Cbor.decodeFromByteArray<MapElement>(cwt.protectedHeader)
+      assertEquals(cwtProtectedHeader.value[MapKey(ProofOfPossession.CWTProofBuilder.HEADER_LABEL_ALG)]!!.value, -7L)
+      assertEquals(
+        cwtProtectedHeader.value[MapKey(ProofOfPossession.CWTProofBuilder.HEADER_LABEL_CONTENT_TYPE)]!!.value,
+        "openid4vci-proof+cwt"
+      )
 
-    val credResp = http.post(providerMetadata.credentialEndpoint!!) {
-      contentType(ContentType.Application.Json)
-      bearerAuth(tokenResp.accessToken!!)
-      setBody(credReq.toJSON())
-    }.body<JsonObject>().let { CredentialResponse.fromJSON(it) }
-
-    assertTrue(credResp.isSuccess)
-    assertContains(credResp.customParameters.keys, "credential_encoding")
-    assertEquals("issuer-signed", credResp.customParameters["credential_encoding"]!!.jsonPrimitive.content)
-    assertNotNull(credResp.credential)
-    val mdoc = MDoc(credReq.docType!!.toDE(), IssuerSigned.fromMapElement(
-      Cbor.decodeFromByteArray(credResp.credential!!.jsonPrimitive.content.base64UrlDecode())
-    ), null)
-    assertEquals(credReq.docType, mdoc.docType.value)
-    assertNotNull(mdoc.issuerSigned)
-    assertTrue(mdoc.verifySignature(SimpleCOSECryptoProvider(listOf(
-      LspPotentialInteropEvent.loadPotentialIssuerKeys()
-    )), LspPotentialInteropEvent.POTENTIAL_ISSUER_KEY_ID))
-    assertNotNull(mdoc.issuerSigned.nameSpaces)
-    assertNotEquals(0, mdoc.issuerSigned.nameSpaces!!.size)
-    assertNotNull(mdoc.issuerSigned.issuerAuth?.x5Chain)
-    assertTrue(mdoc.verify(MDocVerificationParams(
-      VerificationType.forIssuance, LspPotentialInteropEvent.POTENTIAL_ISSUER_KEY_ID, deviceKeyId,
-      mDocRequest = MDocRequestBuilder(offeredCredential.docType!!).build()
-    ), SimpleCOSECryptoProvider(listOf(LspPotentialInteropEvent.POTENTIAL_ISSUER_CRYPTO_PROVIDER_INFO))))
+      val credResp = http.post(providerMetadata.credentialEndpoint!!) {
+        contentType(ContentType.Application.Json)
+        bearerAuth(tokenResp.accessToken!!)
+        setBody(credReq.toJSON())
+      }.body<JsonObject>().let { CredentialResponse.fromJSON(it) }
+      assertTrue(credResp.isSuccess)
+      assertContains(credResp.customParameters.keys, "credential_encoding")
+      assertEquals("issuer-signed", credResp.customParameters["credential_encoding"]!!.jsonPrimitive.content)
+      assertNotNull(credResp.credential)
+      val mdoc = MDoc(
+        credReq.docType!!.toDE(), IssuerSigned.fromMapElement(
+          Cbor.decodeFromByteArray(credResp.credential!!.jsonPrimitive.content.base64UrlDecode())
+        ), null
+      )
+      assertEquals(credReq.docType, mdoc.docType.value)
+      assertNotNull(mdoc.issuerSigned)
+      assertTrue(
+        mdoc.verifySignature(
+          SimpleCOSECryptoProvider(
+            listOf(
+              LspPotentialInteropEvent.loadPotentialIssuerKeys()
+            )
+          ), LspPotentialInteropEvent.POTENTIAL_ISSUER_KEY_ID
+        )
+      )
+      assertNotNull(mdoc.issuerSigned.nameSpaces)
+      assertNotEquals(0, mdoc.issuerSigned.nameSpaces!!.size)
+      assertNotNull(mdoc.issuerSigned.issuerAuth?.x5Chain)
+      assertTrue(
+        mdoc.verify(
+          MDocVerificationParams(
+            VerificationType.forIssuance, LspPotentialInteropEvent.POTENTIAL_ISSUER_KEY_ID, deviceKeyId,
+            mDocRequest = MDocRequestBuilder(offeredCredential.docType!!).build()
+          ), SimpleCOSECryptoProvider(listOf(LspPotentialInteropEvent.POTENTIAL_ISSUER_CRYPTO_PROVIDER_INFO))
+        )
+      )
+    }
   }
 
   @Test
@@ -374,5 +415,22 @@ object LspPotentialTest {
     )))
     //assertTrue(cryptoProvider.verify1(cwt, "pub-key"))
 
+  }
+
+  //@Test
+  fun testASitCredentialRequest() {
+    val reqBody = "{\"format\":\"mso_mdoc\",\"credential_identifier\":null,\"credential_response_encryption\":null,\"doctype\":\"org.iso.18013.5.1.mDL\",\"claims\":null,\"credential_definition\":null,\"vct\":null,\"proof\":{\"proof_type\":\"cwt\",\"jwt\":null,\"cwt\":\"hFkBdaQBJgN0b3BlbmlkNHZjaS1wcm9vZitjd3QEWDlkaWQ6a2V5OnpEbmFldVpxenBudnFTMThiOTVXbXdMdmlrTWZyUjJrRGpSWUVFV0xvQUU4eWVicm8YIVkBGzCCARcwgb6gAwIBAgIIL5E2MUilrikwCgYIKoZIzj0EAwIwEjEQMA4GA1UEAwwHRGVmYXVsdDAeFw0yNDA2MjQxMDA0MDdaFw0yNDA2MjQxMDA0MzdaMBIxEDAOBgNVBAMMB0RlZmF1bHQwWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAASw55kB7ZDt6FLVLEiJrQoMutGOSL6wintZ28Q6vPX8eO-o6-iH2qXBBO9h_4JlALgh0q8cPXczGR-GFPhWQ9ALMAoGCCqGSM49BAMCA0gAMEUCIQC8foX3SsFomX14ZLffSKalmABj4Mdr13KG0xd33NfrYwIgFFYZEeyFCYJpwlFDi0XCvmRoYEwqznJTBmkifoDGyQmgWHekAXgbaHR0cHM6Ly93YWxsZXQuYS1zaXQuYXQvYXBwA3goaHR0cHM6Ly9pc3N1ZXIucG90ZW50aWFsLndhbHQtdGVzdC5jbG91ZAYaZnlEmApYJDIyMmUzYTZlLWM2ZTctNGQ0Ni1hMjhlLWQ4ODIyN2JlZmIzYVhA58GZhhZPvdefAJ46vvoUVDSs-0y41E_J4m95QbsgDDPHjbuD3778mnhJwB3HSCKkK96L8jrgsQSgFpqeIGqKTw\"}}"
+    val req = CredentialRequest.fromJSONString(reqBody)
+    assertEquals(CredentialFormat.mso_mdoc, req.format)
+    val coseSign1 = Cbor.decodeFromByteArray<COSESign1>(req.proof!!.cwt!!.base64UrlDecode())
+    assertNotNull(coseSign1.payload)
+    val tokenHeader = coseSign1.decodeProtectedHeader()
+    val x5c = X509CertUtils.parse((tokenHeader.value[MapKey(ProofOfPossession.CWTProofBuilder.HEADER_LABEL_X5CHAIN)] as ByteStringElement).value)
+    val keyId = (tokenHeader.value[MapKey(4)] as ByteStringElement).value.decodeToString()
+    //val rawKey = (tokenHeader.value[MapKey(ProofOfPossession.CWTProofBuilder.HEADER_LABEL_COSE_KEY)] as ByteStringElement).value
+    val cryptoProvider = SimpleCOSECryptoProvider(listOf(COSECryptoProviderKeyInfo("pub-key", AlgorithmID.ECDSA_256,
+      JWK.parse(runBlocking { DidService.resolveToKey(keyId).getOrThrow().exportJWK() }).toECKey().toECPublicKey()
+    )))
+    assertTrue(cryptoProvider.verify1(coseSign1, "pub-key"))
   }
 }

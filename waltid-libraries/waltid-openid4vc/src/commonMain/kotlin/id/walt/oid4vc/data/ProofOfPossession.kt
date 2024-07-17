@@ -71,14 +71,21 @@ data class ProofOfPossession @OptIn(ExperimentalSerializationApi::class) private
 
     }
 
+    /**
+     * @param coseKey Cose Key structure, for device/holder key, mutually exclusive with x5Cert and x5Chain!
+     * @param x5Cert X509 certificate, for device/holder key, mutually exclusive with coseKey and x5Chain!
+     * @param x5Chain X509 certificate chain, for device/holder key, mutually exclusive with x5Cert and coseKey!
+     *
+     */
     class CWTProofBuilder(private val issuerUrl: String,
                           private val clientId: String?, private val nonce: String?,
                           private val coseKeyAlgorithm: String,
-                          private val coseKey: ByteArray?, private val x5Chain: ByteArray?): ProofBuilder() {
+                          private val coseKey: ByteArray? = null, private val x5Cert: ByteArray? = null, private val x5Chain: List<ByteArray>? = null): ProofBuilder() {
         val headers = MapElement(buildMap {
             put(MapKey(HEADER_LABEL_CONTENT_TYPE), StringElement(CWT_HEADER_TYPE))
             coseKey?.let { put(MapKey(HEADER_LABEL_COSE_KEY), ByteStringElement(it)) }
-            x5Chain?.let { put(MapKey(HEADER_LABEL_X5CHAIN), ByteStringElement(it)) }
+            x5Cert?.let { put(MapKey(HEADER_LABEL_X5CHAIN), ByteStringElement(it)) }
+            x5Chain?.let { x5c -> put(MapKey(HEADER_LABEL_X5CHAIN), ListElement(x5c.map { ByteStringElement(it) })) }
         })
         val payload = MapElement(buildMap {
             clientId?.let { put(MapKey(LABEL_ISS), StringElement(it)) }
