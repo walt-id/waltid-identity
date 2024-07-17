@@ -115,6 +115,7 @@ data class OpenIDProviderMetadata @OptIn(ExperimentalSerializationApi::class) co
     //@SerialName("vp_formats_supported") @Serializable(SupportedVPFormatMapSerializer::class) val vpFormatsSupported: Map<CredentialFormat, SupportedVPFormat>? = null,
     @SerialName("client_id_schemes_supported") val clientIdSchemesSupported: List<String>? = null,
     @SerialName("authorization_server") val authorizationServer: String? = authorizationServers?.firstOrNull(), // Move here since if we have a null value for this parameter, the discovery fails
+    @SerialName("code_challenge_methods_supported") val codeChallengeMethodsSupported: List<String>? = null,
     override val customParameters: Map<String, JsonElement> = mapOf()
 ) : JsonDataObject() {
 

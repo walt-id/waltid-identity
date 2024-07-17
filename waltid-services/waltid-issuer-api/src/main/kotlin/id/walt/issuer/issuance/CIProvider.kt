@@ -57,7 +57,13 @@ open class CIProvider : OpenIDCredentialIssuer(
                 types = entry.value
             )
         }
-    }.associateBy { it.id })
+    }.plus(CredentialSupported(
+        id = "potential.light.profile",
+        format = CredentialFormat.mso_mdoc,
+        cryptographicBindingMethodsSupported = setOf("cose_key"),
+        cryptographicSuitesSupported = setOf("ES256"),
+        types = listOf("org.iso.18013.5.1.mDL")
+    )).associateBy { it.id })
 ) {
     private val log = KotlinLogging.logger { }
 
