@@ -6,6 +6,7 @@ import COSE.AlgorithmID
 import COSE.OneKey
 import cbor.Cbor
 import com.nimbusds.jose.jwk.JWK
+import com.nimbusds.jose.util.X509CertUtils
 import com.upokecenter.cbor.CBORObject
 import id.walt.credentials.issuance.Issuer.mergingJwtIssue
 import id.walt.credentials.issuance.Issuer.mergingSdJwtIssue
@@ -54,6 +55,7 @@ import kotlinx.serialization.MissingFieldException
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
+import java.security.cert.X509Certificate
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.time.Duration.Companion.minutes
@@ -364,7 +366,13 @@ open class CIProvider : OpenIDCredentialIssuer(
         val issuerSignedItems = data.request.mdocData ?: throw MissingFieldException(listOf("mdocData"), "mdocData")
         val issuerKey = JWK.parse(runBlocking { data.issuerKey.exportJWK() }).toECKey()
         val keyId = runBlocking { data.issuerKey.getKeyId() }
-        val cryptoProvider = SimpleCOSECryptoProvider(listOf(COSECryptoProviderKeyInfo(keyId, AlgorithmID.ECDSA_256, issuerKey.toECPublicKey(), issuerKey.toECPrivateKey())))
+        val cryptoProvider = SimpleCOSECryptoProvider(listOf(
+            COSECryptoProviderKeyInfo(
+                keyId, AlgorithmID.ECDSA_256, issuerKey.toECPublicKey(), issuerKey.toECPrivateKey(),
+                x5Chain =  data.request.x5Chain?.map { X509CertUtils.parse(it) } ?: listOf(),
+                trustedRootCAs = data.request.trustedRootCAs?.map { X509CertUtils.parse(it) } ?: listOf()
+            )
+        ))
         val mdoc = MDocBuilder(credentialRequest.docType
             ?: throw CredentialError(credentialRequest, CredentialErrorCode.invalid_request, message = "Missing doc type in credential request")
         ).apply {
