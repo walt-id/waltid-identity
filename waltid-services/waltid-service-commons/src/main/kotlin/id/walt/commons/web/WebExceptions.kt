@@ -10,4 +10,5 @@ class ForbiddenException(message: String) : WebException(HttpStatusCode.Forbidde
 class BadRequestException(message: String) : WebException(HttpStatusCode.BadRequest, message)
 class IllegalArgumentException(message: String) : WebException(HttpStatusCode.BadRequest, message)
 class IllegalStateException(message: String) : WebException(HttpStatusCode.BadRequest, message)
+class NotAcceptedContentTypeException(message: String) : WebException(HttpStatusCode.NotAcceptable, message)
 
