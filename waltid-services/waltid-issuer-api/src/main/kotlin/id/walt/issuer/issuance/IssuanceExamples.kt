@@ -1,6 +1,7 @@
 package id.walt.issuer.issuance
 
 import id.walt.crypto.keys.KeyType
+import id.walt.crypto.utils.JsonUtils.toJsonObject
 import io.github.smiley4.ktorswaggerui.dsl.routes.ValueExampleDescriptorDsl
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject

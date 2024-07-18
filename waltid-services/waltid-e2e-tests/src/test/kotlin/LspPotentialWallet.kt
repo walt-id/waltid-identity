@@ -1,5 +1,12 @@
+import id.walt.credentials.vc.vcs.W3CVC
 import id.walt.crypto.keys.KeyGenerationRequest
+import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto.utils.JsonUtils.toJsonElement
+import id.walt.issuer.issuance.IssuanceRequest
+import id.walt.issuer.issuance.createCredentialOfferUri
+import id.walt.issuer.lspPotential.LspPotentialIssuanceInterop
 import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.data.CredentialOffer
 import id.walt.oid4vc.data.OpenIDProviderMetadata
@@ -15,10 +22,7 @@ import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.util.*
 import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.*
 import kotlinx.uuid.UUID
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
@@ -113,7 +117,22 @@ class LspPotentialWallet(val client: HttpClient, val walletId: String) {
 
   fun testSDJwtVCIssuance() = runBlocking {
     // === get credential offer from test issuer API ===
-    val offerResp = client.get("/lsp-potential/lspPotentialCredentialOfferT2")
+    val jwkKey = JWKKey.importJWK(LspPotentialIssuanceInterop.POTENTIAL_ISSUER_KEY_JWK).getOrThrow()
+    val issuanceReq = IssuanceRequest(
+      Json.parseToJsonElement(KeySerialization.serializeKey(jwkKey)).jsonObject,
+      "",
+      "urn:eu.europa.ec.eudi:pid:1",
+      credentialData = W3CVC(buildJsonObject {
+        put("family_name", "Doe")
+        put("given_name", "John")
+      }), null,
+      x5Chain = listOf(LspPotentialIssuanceInterop.POTENTIAL_ISSUER_CERT),
+      trustedRootCAs = listOf(LspPotentialIssuanceInterop.POTENTIAL_ROOT_CA_CERT)
+    )
+    val offerResp = client.post("/openid4vc/sdjwt/issue") {
+      contentType(ContentType.Application.Json)
+      setBody(Json.encodeToJsonElement(issuanceReq).toString())
+    }
     assert(offerResp.status == HttpStatusCode.OK)
     val offerUri = offerResp.bodyAsText()
 
