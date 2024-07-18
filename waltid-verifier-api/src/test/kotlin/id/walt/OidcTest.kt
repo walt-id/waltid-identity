@@ -2,6 +2,7 @@ package id.walt
 
 import COSE.AlgorithmID
 import com.nimbusds.jose.JWSAlgorithm
+import com.nimbusds.jose.JWSSigner
 import com.nimbusds.jose.crypto.ECDSASigner
 import com.nimbusds.jose.crypto.ECDSAVerifier
 import com.nimbusds.jose.jwk.ECKey
@@ -227,33 +228,13 @@ class OidcTest {
       assertTrue(holderKey.hasPrivateKey)
       val holderKeyPubJwk = holderKey.getPublicKey().exportJWK()
 
-      // 2. create sd-jwt (issuer)
-      val testVCSdJwt = SDJwt.sign(SDPayload.createSDPayload(Json.parseToJsonElement("""
-        {
-          "vct": "urn:eu.europa.ec.eudi:pid:1",
-          "iss": "https://example.com/your-issuer-path",
-          "cnf": {
-            "jwk": $holderKeyPubJwk 
-          },
-          "exp": 1717070950,
-          "iat": 1715861350,
-          "given_name": "ERIKA",
-          "family_name": "MUSTERMANN",
-          "birthdate": "1964-08-12",
-          "issuing_authority": "DE",
-          "issuing_country": "DE",
-          "age_equal_or_over": {
-          "18": true
-          },
-          "place_of_birth": {
-          "locality": "BERLIN"
-          },
-          "address": {
-          "formatted": "HEIDESTRASSE 17 51147 KÖLN"
-          }
-        }
-      """.trimIndent()).jsonObject, SDMap.Companion.generateSDMap(setOf("age_equal_or_over.18", "place_of_birth.locality", "address.formatted"))),
-        LspPotentialInteropEvent.POTENTIAL_JWT_CRYPTO_PROVIDER)
+      // 2. issue sd-jwt-vc (issuer)
+      val issueResponse = http.submitForm("$baseUrl/lsp-potential/issueSdJwtVC", parametersOf(
+        "jwk", holderKeyPubJwk
+      ))
+      assertEquals(200, issueResponse.status.value)
+      val sdJwtVc = SDJwtVC.parse(issueResponse.bodyAsText())
+      assertEquals(LspPotentialInteropEvent.POTENTIAL_ISSUER_KEY_ID, sdJwtVc.issuer)
 
       // 3. make presentation request (verifier)
       val createReqResponse = http.post("$baseUrl/openid4vc/verify") {
@@ -273,29 +254,22 @@ class OidcTest {
       assertNotNull(presReq.responseUri)
 
       // 4. present (wallet)
-      val vp_token = PresentationBuilder().apply {
-        did = null
-        holderPubKeyJwk = holderKey.getPublicKey().exportJWKObject()
-        addCredential(JsonPrimitive(testVCSdJwt.present(true).toString()))
-        nonce = presReq.nonce
-      }.buildAndSign(holderKey)
+      val vp_token = sdJwtVc.present(true, presReq.clientId, presReq.nonce!!, SimpleJWTCryptoProvider(
+        JWSAlgorithm.ES256, ECDSASigner(ECKey.parse(holderKey.exportJWK())), null
+      )).toString()
 
       println(vp_token)
 
       val tokenResp = OpenID4VP.generatePresentationResponse(PresentationResult(
         listOf(JsonPrimitive(vp_token)),
         PresentationSubmission("presentation_1", presReq.presentationDefinition!!.id, listOf(
-          DescriptorMapping(presReq.presentationDefinition!!.id, VCFormat.jwt_vp, path = "$",
-            pathNested = DescriptorMapping(presReq.presentationDefinition!!.inputDescriptors.first().id, VCFormat.sd_jwt_vc, path = "$.vp.verifiableCredential[0]")
-          )
+          DescriptorMapping(presReq.presentationDefinition!!.id, VCFormat.sd_jwt_vc, path = "$")
         ))
       ))
       println(tokenResp)
 
       val httpResp = http.submitForm(presReq.responseUri!!, parametersOf(tokenResp.toHttpParameters()))
       assertEquals(200, httpResp.status.value)
-      val respBody = Json.parseToJsonElement(httpResp.bodyAsText())
-      assertTrue(respBody.instanceOf(JsonObject::class))
     }
   }
 

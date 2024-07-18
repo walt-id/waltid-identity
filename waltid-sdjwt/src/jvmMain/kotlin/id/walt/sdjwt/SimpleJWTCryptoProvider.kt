@@ -23,7 +23,7 @@ class SimpleJWTCryptoProvider(
         }.serialize()
     }
 
-    override fun verify(jwt: String): JwtVerificationResult {
+    override fun verify(jwt: String, keyID: String?): JwtVerificationResult {
         if (jwsVerifier == null) {
             throw Exception("No verifier available")
         }
@@ -40,8 +40,8 @@ class SimpleMultiKeyJWTCryptoProvider(
         return (providerMap[keyID] ?: throw Exception("No key ID defined")).sign(payload, keyID, typ, headers)
     }
 
-    override fun verify(jwt: String): JwtVerificationResult {
-        return (providerMap[SignedJWT.parse(jwt).header.keyID] ?: throw Exception("No key ID defined")).verify(jwt)
+    override fun verify(jwt: String, keyID: String?): JwtVerificationResult {
+        return (providerMap[keyID ?: SignedJWT.parse(jwt).header.keyID] ?: throw Exception("No key ID defined")).verify(jwt)
     }
 
 }
