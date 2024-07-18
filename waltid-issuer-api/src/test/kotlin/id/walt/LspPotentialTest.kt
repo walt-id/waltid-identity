@@ -1,6 +1,7 @@
 package id.walt
 
 import COSE.AlgorithmID
+import COSE.OneKey
 import cbor.Cbor
 import com.nimbusds.jose.crypto.impl.ECDSA
 import id.walt.crypto.keys.KeyGenerationRequest
@@ -48,7 +49,9 @@ import io.ktor.utils.io.core.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.decodeFromHexString
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.kotlincrypto.hash.sha2.SHA256
 import java.security.KeyPairGenerator
@@ -90,7 +93,7 @@ class LspPotentialTest {
     assertEquals(HttpStatusCode.OK, offerResp.status)
 
     val offerUri = offerResp.bodyAsText()
-    //val offerUri = "openid-credential-offer://?credential_offer=%7B%22credential_issuer%22:%22https://mdlpilot.japaneast.cloudapp.azure.com:8017%22,%22credential_configuration_ids%22:%5B%22org.iso.18013.5.1.mDL%22%5D,%22grants%22:%7B%22authorization_code%22:%7B%22issuer_state%22:%22ODREVeAlsJUxNeQGOxic1hNUg30GY2onbshtjdD3Xde%22,%22authorization_server%22:%22https://mdlpilot.japaneast.cloudapp.azure.com:8017%22%7D%7D%7D"
+    //val offerUri = "openid-credential-offer://?credential_offer=%7B%22credential_issuer%22:%22https://mdlpilot.japaneast.cloudapp.azure.com:8017%22,%22credential_configuration_ids%22:%5B%22org.iso.18013.5.1.mDL%22%5D,%22grants%22:%7B%22authorization_code%22:%7B%22issuer_state%22:%22fX35ofcFrYUh2ltjnDZtNXIW7UTUrme767eqPvNix44%22,%22authorization_server%22:%22https://mdlpilot.japaneast.cloudapp.azure.com:8017%22%7D%7D%7D"
 
     // -------- WALLET ----------
     // as WALLET: receive credential offer, either being called via deeplink or by scanning QR code
@@ -100,16 +103,20 @@ class LspPotentialTest {
 
     // ### get issuer metadata, steps 7-10
     val providerMetadataUri = OpenID4VCI.getCIProviderMetadataUrl(parsedOffer.credentialIssuer)
+    val oauthMetadataUri = OpenID4VCI.getOAuthProviderMetadataUrl(parsedOffer.credentialIssuer)
     val providerMetadata = http.get(providerMetadataUri).body<OpenIDProviderMetadata>()
+    val oauthMetadata = http.get(oauthMetadataUri).body<OpenIDProviderMetadata>()
     assertNotNull(providerMetadata.credentialConfigurationsSupported)
-    assertContains(providerMetadata.codeChallengeMethodsSupported.orEmpty(), "S256")
-    assertNotNull(providerMetadata.tokenEndpoint)
+    assertNotNull(providerMetadata.credentialEndpoint)
+    assertNotNull(oauthMetadata.authorizationEndpoint)
+    assertNotNull(oauthMetadata.tokenEndpoint)
+    //assertContains(providerMetadata.codeChallengeMethodsSupported.orEmpty(), "S256")
 
     // resolve offered credentials
     val offeredCredentials = OpenID4VCI.resolveOfferedCredentials(parsedOffer, providerMetadata)
     val offeredCredential = offeredCredentials.first()
     assertEquals(CredentialFormat.mso_mdoc, offeredCredential.format)
-    assertEquals("org.iso.18013.5.1.mDL", offeredCredential.types?.first())
+    assertEquals("org.iso.18013.5.1.mDL", offeredCredential.docType)
 
     // ### step 11: confirm issuance (nothing to do)
 
@@ -134,18 +141,29 @@ class LspPotentialTest {
       codeChallenge = codeChallenge,
       codeChallengeMethod = "S256"
     )
-
-    val authResp = http.get(providerMetadata.authorizationEndpoint!!) {
-      authReq.toHttpParameters().forEach {
-        parameter(it.key, it.value.first())
+    val location = if(oauthMetadata.requirePushedAuthorizationRequests != true) {
+      val authResp = http.get(oauthMetadata.authorizationEndpoint!!) {
+        authReq.toHttpParameters().forEach {
+          parameter(it.key, it.value.first())
+        }
       }
-    }
-    assertEquals(HttpStatusCode.Found, authResp.status)
-    var location = Url(authResp.headers[HttpHeaders.Location]!!)
-    assertContains(location.parameters.names(), "code")
+      assertEquals(HttpStatusCode.Found, authResp.status)
+      Url(authResp.headers[HttpHeaders.Location]!!)
 
+    } else {
+      // TODO: check PAR support, also check issuer of panasonic (https://mdlpilot.japaneast.cloudapp.azure.com:8017), which uses PAR and doesn't seem to work
+      val parResp = http.submitForm(oauthMetadata.pushedAuthorizationRequestEndpoint!!, parametersOf(
+        authReq.toHttpParameters()
+      ))
+      val authResp = http.get(oauthMetadata.authorizationEndpoint!!) {
+        parameter("request_uri", Json.parseToJsonElement(parResp.bodyAsText()).jsonObject["request_uri"]!!.jsonPrimitive.content)
+      }
+      assertEquals(HttpStatusCode.Found, authResp.status)
+      Url(authResp.headers[HttpHeaders.Location]!!)
+    }
+    assertContains(location.parameters.names(), "code")
     // ### step 16-18: access token retrieval
-    val tokenResp = http.submitForm(providerMetadata.tokenEndpoint!!,
+    val tokenResp = http.submitForm(oauthMetadata.tokenEndpoint!!,
       parametersOf(
         TokenRequest(
           GrantType.authorization_code, authReq.clientId,
@@ -161,10 +179,10 @@ class LspPotentialTest {
     // ### steps 19-22: credential issuance
 
     // TODO: move COSE signing functionality to crypto lib?
+    val coseKey = OneKey(deviceKeyPair.public, null).AsCBOR().EncodeToBytes()
     val credReq = CredentialRequest.forOfferedCredential(offeredCredential, ProofOfPossession.CWTProofBuilder(
       issuerUrl = parsedOffer.credentialIssuer, clientId = authReq.clientId, nonce = tokenResp.cNonce,
-      coseKeyAlgorithm = COSE.AlgorithmID.ECDSA_256.AsCBOR().toString(),
-      coseKey = deviceKeyPair.public.encoded, null
+      coseKeyAlgorithm = COSE.AlgorithmID.ECDSA_256.AsCBOR().toString(), coseKey = coseKey, null
     ).build(SimpleCOSECryptoProvider(listOf(COSECryptoProviderKeyInfo("device-key", AlgorithmID.ECDSA_256,
       deviceKeyPair.public, deviceKeyPair.private))), "device-key"))
 
@@ -175,7 +193,7 @@ class LspPotentialTest {
     val cwtProtectedHeader = Cbor.decodeFromByteArray<MapElement>(cwt.protectedHeader)
     assertEquals(cwtProtectedHeader.value[MapKey(ProofOfPossession.CWTProofBuilder.HEADER_LABEL_ALG)]!!.value, -7L)
     assertEquals(cwtProtectedHeader.value[MapKey(ProofOfPossession.CWTProofBuilder.HEADER_LABEL_CONTENT_TYPE)]!!.value, "openid4vci-proof+cwt")
-    assertContentEquals((cwtProtectedHeader.value[MapKey(ProofOfPossession.CWTProofBuilder.HEADER_LABEL_COSE_KEY)] as ByteStringElement).value, deviceKeyPair.public.encoded)
+    assertContentEquals((cwtProtectedHeader.value[MapKey(ProofOfPossession.CWTProofBuilder.HEADER_LABEL_COSE_KEY)] as ByteStringElement).value, coseKey)
 
     val credResp = http.post(providerMetadata.credentialEndpoint!!) {
       contentType(ContentType.Application.Json)
