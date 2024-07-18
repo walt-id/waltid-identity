@@ -5,7 +5,6 @@ package id.walt.issuer
 import COSE.AlgorithmID
 import COSE.OneKey
 import cbor.Cbor
-import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.util.X509CertUtils
 import com.upokecenter.cbor.CBORObject
@@ -24,10 +23,7 @@ import id.walt.issuer.base.config.OIDCIssuerServiceConfig
 import id.walt.mdoc.COSECryptoProviderKeyInfo
 import id.walt.mdoc.SimpleCOSECryptoProvider
 import id.walt.mdoc.cose.COSESign1
-import id.walt.mdoc.dataelement.ByteStringElement
-import id.walt.mdoc.dataelement.DataElement
-import id.walt.mdoc.dataelement.MapKey
-import id.walt.mdoc.dataelement.toDE
+import id.walt.mdoc.dataelement.*
 import id.walt.mdoc.doc.MDocBuilder
 import id.walt.mdoc.mso.DeviceKeyInfo
 import id.walt.mdoc.mso.ValidityInfo
@@ -47,7 +43,10 @@ import id.walt.oid4vc.responses.BatchCredentialResponse
 import id.walt.oid4vc.responses.CredentialErrorCode
 import id.walt.oid4vc.responses.CredentialResponse
 import id.walt.oid4vc.util.randomUUID
-import id.walt.sdjwt.*
+import id.walt.sdjwt.SDJwtVC
+import id.walt.sdjwt.SDMap
+import id.walt.sdjwt.SDPayload
+import id.walt.sdjwt.WaltIdJWTCryptoProvider
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Clock
 import kotlinx.datetime.DateTimeUnit
@@ -56,7 +55,6 @@ import kotlinx.serialization.MissingFieldException
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
-import java.security.cert.X509Certificate
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.time.Duration.Companion.minutes
@@ -247,11 +245,9 @@ open class CIProvider : OpenIDCredentialIssuer(
         println("Verifying JWS: $token")
         println("JWS Verification: target: $target")
         val coseSign1 = Cbor.decodeFromByteArray<COSESign1>(token.base64UrlDecode())
-        val tokenHeader = coseSign1.decodeProtectedHeader()
-        val rawKey = (tokenHeader.value[MapKey(ProofOfPossession.CWTProofBuilder.HEADER_LABEL_COSE_KEY)] as ByteStringElement).value
-        val cryptoProvider = SimpleCOSECryptoProvider(listOf(COSECryptoProviderKeyInfo("pub-key", AlgorithmID.ECDSA_256,
-            OneKey(CBORObject.DecodeFromBytes(rawKey)).AsPublicKey()
-        )))
+        val keyInfo = extractHolderKey(coseSign1)
+        val cryptoProvider = SimpleCOSECryptoProvider(listOf(keyInfo))
+
         cryptoProvider.verify1(coseSign1, "pub-key")
 //        if (tokenHeader.value[MapKey] != null) {
 //            val did = tokenHeader["kid"]!!.jsonPrimitive.content.split("#")[0]
@@ -373,13 +369,33 @@ open class CIProvider : OpenIDCredentialIssuer(
         }))
     }
 
+    private fun extractHolderKey(coseSign1: COSESign1): COSECryptoProviderKeyInfo {
+        val tokenHeader = coseSign1.decodeProtectedHeader()
+        return if(tokenHeader.value.containsKey(MapKey(ProofOfPossession.CWTProofBuilder.HEADER_LABEL_COSE_KEY))) {
+            val rawKey = (tokenHeader.value[MapKey(ProofOfPossession.CWTProofBuilder.HEADER_LABEL_COSE_KEY)] as ByteStringElement).value
+            COSECryptoProviderKeyInfo(
+                "pub-key", AlgorithmID.ECDSA_256,
+                OneKey(CBORObject.DecodeFromBytes(rawKey)).AsPublicKey()
+            )
+        } else {
+            val x5c = tokenHeader.value[MapKey(ProofOfPossession.CWTProofBuilder.HEADER_LABEL_X5CHAIN)]
+            val x5Chain = when(x5c) {
+                is ListElement -> x5c.value.map { X509CertUtils.parse((it as ByteStringElement).value) }
+                else -> listOf(X509CertUtils.parse((x5c as ByteStringElement).value))
+            }
+            COSECryptoProviderKeyInfo(
+                "pub-key", AlgorithmID.ECDSA_256,
+                x5Chain.first().publicKey, x5Chain = x5Chain
+            )
+        }
+    }
+
     private fun doGenerateMDoc(
         credentialRequest: CredentialRequest
     ): CredentialResult {
         val coseSign1 = Cbor.decodeFromByteArray<COSESign1>(credentialRequest.proof?.cwt?.base64UrlDecode() ?: throw CredentialError(credentialRequest,
             CredentialErrorCode.invalid_or_missing_proof, message = "No CWT proof found on credential request"))
-        val tokenHeader = coseSign1.decodeProtectedHeader()
-        val rawHolderKey = (tokenHeader.value[MapKey(ProofOfPossession.CWTProofBuilder.HEADER_LABEL_COSE_KEY)] as ByteStringElement).value
+        val holderKey = extractHolderKey(coseSign1)
         val nonce = getNonceFromProof(credentialRequest.proof!!) ?: throw CredentialError(credentialRequest, CredentialErrorCode.invalid_or_missing_proof, message = "No nonce found on proof")
         println("RETRIEVING VC FROM TOKEN MAPPING: $nonce")
         val data: IssuanceSessionData = tokenCredentialMapping[nonce]?.first()
@@ -403,7 +419,7 @@ open class CIProvider : OpenIDCredentialIssuer(
         }.sign( // TODO: expiration date!
             ValidityInfo(Clock.System.now(), Clock.System.now(), Clock.System.now().plus(365*24, DateTimeUnit.HOUR)),
             DeviceKeyInfo(DataElement.fromCBOR(
-                OneKey(CBORObject.DecodeFromBytes(rawHolderKey)).AsCBOR().EncodeToBytes()
+                OneKey(holderKey.publicKey, null).AsCBOR().EncodeToBytes()
             )), cryptoProvider, keyId
         )
         return CredentialResult(CredentialFormat.mso_mdoc, JsonPrimitive(mdoc.issuerSigned.toMapElement().toCBOR().encodeToBase64Url()),
