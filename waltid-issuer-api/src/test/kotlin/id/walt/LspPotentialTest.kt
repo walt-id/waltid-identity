@@ -34,6 +34,7 @@ import id.walt.oid4vc.requests.TokenRequest
 import id.walt.oid4vc.responses.CredentialResponse
 import id.walt.oid4vc.responses.TokenResponse
 import id.walt.oid4vc.util.randomUUID
+import id.walt.sdjwt.SDJwtVC
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.plugins.contentnegotiation.*
@@ -333,8 +334,7 @@ class LspPotentialTest {
 
     // TODO: move COSE signing functionality to crypto lib?
     val credReq = CredentialRequest.forOfferedCredential(offeredCredential, ProofOfPossession.JWTProofBuilder(
-      issuerUrl = parsedOffer.credentialIssuer, clientId = authReq.clientId, nonce = tokenResp.cNonce,
-      keyId = deviceKeyPair.getKeyId(),
+      issuerUrl = parsedOffer.credentialIssuer, clientId = authReq.clientId, nonce = tokenResp.cNonce, keyId = null,
       keyJwk = deviceKeyPair.getPublicKey().exportJWKObject()
     ).build(deviceKeyPair))
 
@@ -344,17 +344,9 @@ class LspPotentialTest {
       setBody(credReq.toJSON())
     }.body<JsonObject>().let { CredentialResponse.fromJSON(it) }
     assertTrue(credResp.isSuccess)
-    assertContains(credResp.customParameters.keys, "credential_encoding")
-    assertEquals("issuer-signed", credResp.customParameters["credential_encoding"]!!.jsonPrimitive.content)
     assertNotNull(credResp.credential)
-    val mdoc = MDoc(credReq.docType!!.toDE(), IssuerSigned.fromMapElement(
-      Cbor.decodeFromByteArray(credResp.credential!!.jsonPrimitive.content.base64UrlDecode())
-    ), null)
-    assertEquals(credReq.docType, mdoc.docType.value)
-    assertNotNull(mdoc.issuerSigned)
-    assertTrue(mdoc.verifySignature(SimpleCOSECryptoProvider(listOf(
-      LspPotentialInteropEvent.loadPotentialIssuerKeys()
-    )), LspPotentialInteropEvent.POTENTIAL_ISSUER_KEY_ID))
+    val sdJwtVc = SDJwtVC.parse(credResp.credential!!.jsonPrimitive.content)
+    assertNotNull(sdJwtVc.cnfObject)
   }
 
   @OptIn(ExperimentalStdlibApi::class)

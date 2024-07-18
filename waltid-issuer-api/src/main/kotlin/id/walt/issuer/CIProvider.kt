@@ -5,6 +5,7 @@ package id.walt.issuer
 import COSE.AlgorithmID
 import COSE.OneKey
 import cbor.Cbor
+import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.util.X509CertUtils
 import com.upokecenter.cbor.CBORObject
@@ -18,6 +19,7 @@ import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.did.dids.DidService
 import id.walt.did.dids.DidUtils
+import id.walt.did.dids.json
 import id.walt.issuer.base.config.ConfigManager
 import id.walt.issuer.base.config.OIDCIssuerServiceConfig
 import id.walt.mdoc.COSECryptoProviderKeyInfo
@@ -46,7 +48,7 @@ import id.walt.oid4vc.responses.BatchCredentialResponse
 import id.walt.oid4vc.responses.CredentialErrorCode
 import id.walt.oid4vc.responses.CredentialResponse
 import id.walt.oid4vc.util.randomUUID
-import id.walt.sdjwt.SDMap
+import id.walt.sdjwt.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Clock
 import kotlinx.datetime.DateTimeUnit
@@ -229,14 +231,17 @@ open class CIProvider : OpenIDCredentialIssuer(
         println("JWS Verification: target: $target")
 
         val tokenHeader = Json.parseToJsonElement(Base64.decode(token.split(".")[0]).decodeToString()).jsonObject
-        if (tokenHeader["kid"] != null) {
+        val key = if(tokenHeader["jwk"] != null) {
+            JWKKey.importJWK(tokenHeader["jwk"].toString()).getOrThrow()
+        }
+        else if (tokenHeader["kid"] != null) {
             val did = tokenHeader["kid"]!!.jsonPrimitive.content.split("#")[0]
             println("Resolving DID: $did")
-            val key = DidService.resolveToKey(did).getOrThrow()
-            key.verifyJws(token).also { println("VERIFICATION IS: $it") }
+            DidService.resolveToKey(did).getOrThrow()
         } else {
-            CI_TOKEN_KEY.verifyJws(token)
+            CI_TOKEN_KEY
         }
+        key.verifyJws(token).also { println("VERIFICATION IS: $it") }
     }.isSuccess
 
     override fun verifyCOSESign1Signature(target: TokenTarget, token: String) = runBlocking {
@@ -299,12 +304,15 @@ open class CIProvider : OpenIDCredentialIssuer(
             credentialRequest, CredentialErrorCode.invalid_or_missing_proof, message = "Proof must be JWT proof"
         )
 
-        val holderKid = proofHeader[JWTClaims.Header.keyID]?.jsonPrimitive?.content ?: throw CredentialError(
+        val holderKid = proofHeader[JWTClaims.Header.keyID]?.jsonPrimitive?.content
+        val holderKey = proofHeader[JWTClaims.Header.jwk]?.jsonObject
+
+        if(holderKey.isNullOrEmpty() && holderKid.isNullOrEmpty()) throw CredentialError(
             credentialRequest,
             CredentialErrorCode.invalid_or_missing_proof,
-            message = "Proof JWT header must contain kid claim"
+            message = "Proof JWT header must contain kid or jwk claim"
         )
-        val holderDid = if (DidUtils.isDidUrl(holderKid)) holderKid.substringBefore("#") else holderKid
+        val holderDid = if (!holderKid.isNullOrEmpty() && DidUtils.isDidUrl(holderKid)) holderKid.substringBefore("#") else holderKid
         val nonce = proofPayload["nonce"]?.jsonPrimitive?.content ?: throw CredentialError(
             credentialRequest,
             CredentialErrorCode.invalid_or_missing_proof, message = "Proof must contain nonce")
@@ -325,27 +333,41 @@ open class CIProvider : OpenIDCredentialIssuer(
                     issuerKid = issuerDid + "#" + issuerKey.getKeyId()
 
                 when (credentialRequest.format) {
-                    CredentialFormat.sd_jwt_vc -> vc.mergingSdJwtIssue(
-                        issuerKey = issuerKey,
-                        issuerDid = issuerDid,
-                        subjectDid = holderDid,
-                        mappings = request.mapping ?: JsonObject(emptyMap()),
-                        additionalJwtHeader = emptyMap(),
-                        additionalJwtOptions = emptyMap(),
-                        disclosureMap = data.request.selectiveDisclosure ?: SDMap.Companion.generateSDMap(
-                            JsonObject(emptyMap()),
-                            JsonObject(emptyMap())
-                        )
-                    )
+                    CredentialFormat.sd_jwt_vc -> (holderKey?.let {
+                        SDJwtVC.sign(SDPayload.Companion.createSDPayload(vc.toJsonObject(), buildJsonObject {}),
+                            WaltIdJWTCryptoProvider(mapOf(issuerKey.getKeyId() to issuerKey)),
+                            issuerDid = issuerDid, holderKeyJWK = holderKey, issuerKeyId = issuerKey.getKeyId(),
+                            vct = data.request.credentialConfigurationId) } ?:
+                        SDJwtVC.sign(SDPayload.Companion.createSDPayload(vc.toJsonObject(), buildJsonObject {}),
+                            WaltIdJWTCryptoProvider(mapOf(issuerKey.getKeyId() to issuerKey)),
+                            issuerDid = issuerDid, holderDid = holderDid!!, issuerKeyId = issuerKey.getKeyId(),
+                            vct = data.request.credentialConfigurationId)).toString()
+                    //
+                    //                    vc.mergingSdJwtIssue(
+//                        issuerKey = issuerKey,
+//                        issuerDid = issuerDid,
+//                        subjectDid = holderDid ?: "",
+//                        mappings = request.mapping ?: JsonObject(emptyMap()),
+//                        additionalJwtHeader = emptyMap(),
+//                        additionalJwtOptions = holderKey?.let { mapOf(
+//                            "cnf" to buildJsonObject { put("jwk", it) }
+//                        ) } ?: emptyMap(),
+//                        disclosureMap = data.request.selectiveDisclosure ?: SDMap.Companion.generateSDMap(
+//                            JsonObject(emptyMap()),
+//                            JsonObject(emptyMap())
+//                        )
+//                    )
 
                     else -> vc.mergingJwtIssue(
                         issuerKey = issuerKey,
                         issuerDid = issuerDid,
                         issuerKid = issuerKid,
-                        subjectDid = holderDid,
+                        subjectDid = holderDid ?: "",
                         mappings = request.mapping ?: JsonObject(emptyMap()),
                         additionalJwtHeader = emptyMap(),
-                        additionalJwtOptions = emptyMap(),
+                        additionalJwtOptions = holderKey?.let { mapOf(
+                            "cnf" to buildJsonObject { put("jwk", it) }
+                        ) } ?: emptyMap(),
                     )
                 }
             }.also { println("Respond VC: $it") }
