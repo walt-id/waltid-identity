@@ -21,6 +21,7 @@ import io.ktor.http.*
 import kotlinx.datetime.Clock
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.decodeFromByteArray
+import kotlinx.serialization.decodeFromHexString
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.time.Duration
@@ -331,7 +332,7 @@ abstract class OpenIDCredentialIssuer(
 
     protected fun getNonceFromProof(proofOfPossession: ProofOfPossession) = when(proofOfPossession.proofType) {
         ProofType.jwt -> parseTokenPayload(proofOfPossession.jwt!!)[JWTClaims.Payload.nonce]?.jsonPrimitive?.content
-        ProofType.cwt -> Cbor.decodeFromByteArray<COSESign1>(proofOfPossession.cwt!!.base64UrlDecode()).decodePayload()?.let { payload ->
+        ProofType.cwt -> Cbor.decodeFromHexString<COSESign1>(proofOfPossession.cwt!!).decodePayload()?.let { payload ->
             payload.value[MapKey(ProofOfPossession.CWTProofBuilder.LABEL_NONCE)].let { when(it) {
                 is ByteStringElement -> io.ktor.utils.io.core.String(it.value)
                 is StringElement -> it.value
