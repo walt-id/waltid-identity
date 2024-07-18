@@ -18,6 +18,12 @@ data class IssuanceRequest(
     val selectiveDisclosure: SDMap? = null,
     val x5Chain: List<String>? = null,
     val trustedRootCAs: List<String>? = null
+
+)
+
+@Serializable
+data class IssuerOnboardingRequest(
+    val issuerKeyConfig: JsonObject, val issuerDidConfig: JsonObject
 )
 
 @Serializable
