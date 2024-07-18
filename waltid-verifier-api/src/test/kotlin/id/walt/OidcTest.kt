@@ -252,6 +252,8 @@ class OidcTest {
       val presReq = AuthorizationRequest.fromHttpParametersAuto(parseQueryString(Url(presReqUrl).encodedQuery).toMap())
       assertNotNull(presReq.presentationDefinition)
       assertNotNull(presReq.responseUri)
+      assertEquals(VCFormat.sd_jwt_vc, presReq.presentationDefinition!!.inputDescriptors.firstOrNull()?.format?.keys?.first())
+      assertEquals("urn:eu.europa.ec.eudi:pid:1", presReq.presentationDefinition!!.inputDescriptors.flatMap { it.constraints!!.fields!! }.first { it.path.contains("$.vct") }.filter?.get("const")?.jsonPrimitive?.content)
 
       // 4. present (wallet)
       val vp_token = sdJwtVc.present(true, presReq.clientId, presReq.nonce!!, SimpleJWTCryptoProvider(
