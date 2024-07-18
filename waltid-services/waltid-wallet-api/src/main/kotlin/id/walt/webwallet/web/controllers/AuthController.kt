@@ -10,6 +10,7 @@ import id.walt.commons.config.ConfigManager
 import id.walt.commons.featureflag.FeatureManager
 import id.walt.commons.web.BadRequestException
 import id.walt.commons.web.ForbiddenException
+import id.walt.commons.web.IllegalStateException
 import id.walt.commons.web.UnauthorizedException
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.JsonUtils.toJsonElement
@@ -24,6 +25,7 @@ import id.walt.webwallet.service.WalletServiceManager
 import id.walt.webwallet.service.WalletServiceManager.oidcConfig
 import id.walt.webwallet.service.account.AccountsService
 import id.walt.webwallet.service.account.KeycloakAccountStrategy
+import id.walt.webwallet.utils.JsonUtils
 import id.walt.webwallet.web.InsufficientPermissionsException
 import id.walt.webwallet.web.WebBaseRoutes.webWalletRoute
 import id.walt.webwallet.web.model.*
@@ -46,6 +48,7 @@ import io.ktor.util.pipeline.*
 import kotlinx.datetime.Clock
 import kotlinx.datetime.toJavaInstant
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import kotlinx.uuid.UUID
@@ -512,7 +515,16 @@ data class LoginRequestError(override val message: String) : BadRequestException
     )
 }
 
-suspend fun ApplicationCall.getLoginRequest() = loginRequestJson.decodeFromString<AccountRequest>(receive())
+suspend fun ApplicationCall.getLoginRequest() = runCatching {
+    val jsonText = receiveText()
+    val jsonObject = Json.parseToJsonElement(jsonText).jsonObject
+    val accountType = JsonUtils.tryGetData(jsonObject, "type")?.jsonPrimitive?.content
+    check(!accountType.isNullOrEmpty()) {
+        "No account type provided"
+    }
+    Json.decodeFromString<AccountRequest>(jsonText)
+}.getOrElse { throw LoginRequestError(it) }
+
 
 suspend fun PipelineContext<Unit, ApplicationCall>.doLogin() {
     val reqBody = call.getLoginRequest()
