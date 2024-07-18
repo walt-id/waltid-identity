@@ -1,6 +1,6 @@
 fun getSetting(name: String) = providers.gradleProperty(name).orNull.toBoolean()
 val enableAndroidBuild = getSetting("enableAndroidBuild")
-val enableIosBuild = getSetting("enableAndroidBuild")
+val enableIosBuild = getSetting("enableIosBuild")
 
 plugins {
     kotlin("multiplatform")
