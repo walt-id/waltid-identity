@@ -26,7 +26,7 @@ import id.walt.sdjwt.SDMapBuilder
 import id.walt.sdjwt.SDPayload
 import id.walt.sdjwt.SimpleJWTCryptoProvider
 import id.walt.verifier.config.OIDCVerifierServiceConfig
-import id.walt.verifier.oidc.LspPotentialInteropEvent
+import id.walt.verifier.lspPotential.LspPotentialVerificationInterop
 import id.walt.verifier.oidc.PresentationSessionInfo
 import id.walt.verifier.oidc.RequestSigningCryptoProvider
 import id.walt.verifier.oidc.VerificationUseCase
@@ -74,6 +74,10 @@ data class TokenResponseFormParam(
     val vp_token: JsonElement?,
     val presentation_submission: PresentationSubmissionFormParam?,
     val response: String?,
+)
+
+data class LSPPotentialIssueFormDataParam(
+    val jwk: JsonObject,
 )
 
 @Serializable
@@ -455,78 +459,6 @@ fun Application.verfierApi() {
                 openId4VPProfile = OpenId4VPProfile.EBSIV3
             )
             context.respondRedirect("openid://?${session.authorizationRequest!!.toEbsiRequestObjectByReferenceHttpQueryString(SERVER_URL.let { "$it/openid4vc/request/${session.id}" })}")
-        }
-// ###### can be removed when LSP-Potential interop event is over ####
-        route("lsp-potential") {
-            post("issueMdl", {
-                tags = listOf("LSP POTENTIAL Interop Event")
-                summary = "Issue MDL for given device key, using internal issuer keys"
-                description = "Give device public key JWK in form body."
-                hidden = false
-                request {
-                    body<LSPPotentialIssueFormDataParam> {
-                        mediaTypes = listOf(ContentType.Application.FormUrlEncoded)
-                        example("jwk") {
-                            value = LSPPotentialIssueFormDataParam(
-                                Json.parseToJsonElement(ECKeyGenerator(Curve.P_256).generate().toPublicJWK().toString()).jsonObject
-                            )
-                        }
-                    }
-                }
-            }) {
-                val deviceJwk = context.request.call.receiveParameters().toMap()["jwk"]
-                val devicePubKey = JWK.parse(deviceJwk!!.first()).toECKey().toPublicKey()
-
-                val mdoc = MDocBuilder("org.iso.18013.5.1.mDL")
-                    .addItemToSign("org.iso.18013.5.1", "family_name", "Doe".toDE())
-                    .addItemToSign("org.iso.18013.5.1", "given_name", "John".toDE())
-                    .addItemToSign("org.iso.18013.5.1", "birth_date", FullDateElement(LocalDate(1990, 1, 15)))
-                    .sign(
-                        ValidityInfo(Clock.System.now(), Clock.System.now(), Clock.System.now().plus(365 * 24, DateTimeUnit.HOUR)),
-                        DeviceKeyInfo(DataElement.fromCBOR(OneKey(devicePubKey, null).AsCBOR().EncodeToBytes())),
-                        SimpleCOSECryptoProvider(
-                            listOf(
-                                LspPotentialInteropEvent.POTENTIAL_ISSUER_CRYPTO_PROVIDER_INFO
-                            )
-                        ), LspPotentialInteropEvent.POTENTIAL_ISSUER_KEY_ID
-                    )
-                println("SIGNED MDOC (mDL):")
-                println(Cbor.encodeToHexString(mdoc))
-                call.respond(mdoc.toCBORHex())
-            }
-            post("issueSdJwtVC", {
-                tags = listOf("LSP POTENTIAL Interop Event")
-                summary = "Issue SD-JWT-VC for given holder key, using internal issuer keys"
-                description = "Give holder public key JWK in form body."
-                hidden = false
-                request {
-                    body<LSPPotentialIssueFormDataParam> {
-                        mediaType(ContentType.Application.FormUrlEncoded)
-                        example("jwk", LSPPotentialIssueFormDataParam(
-                            Json.parseToJsonElement(ECKeyGenerator(Curve.P_256).generate().toPublicJWK().toString().also {
-                                println(it)
-                            }).jsonObject
-                        ))
-                    }
-                }
-            }) {
-                val holderJwk = context.request.call.receiveParameters().toMap().get("jwk")!!.first()
-
-                val sdJwtVc = SDJwtVC.sign(
-                    SDPayload.Companion.createSDPayload(buildJsonObject {
-                        put("family_name", "Doe")
-                        put("given_name", "John")
-                        put("birthdate", "1940-01-01")
-                    }, SDMapBuilder().addField("family_name", true).addField("given_name", true).addField("birthdate", true).build()),
-                    LspPotentialInteropEvent.POTENTIAL_JWT_CRYPTO_PROVIDER, LspPotentialInteropEvent.POTENTIAL_ISSUER_KEY_ID,
-                    Json.parseToJsonElement(holderJwk).jsonObject, LspPotentialInteropEvent.POTENTIAL_ISSUER_KEY_ID,
-                    vct = "urn:eu.europa.ec.eudi:pid:1"
-                )
-
-                println("SIGNED SD-JWT-VC:")
-                println(sdJwtVc.toString(false))
-                call.respond(sdJwtVc.toString(false))
-            }
         }
     }
 }

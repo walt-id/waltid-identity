@@ -40,7 +40,7 @@ data class PresentationDefinition(
         override fun fromJSON(jsonObject: JsonObject) =
             Json.decodeFromJsonElement(PresentationDefinitionSerializer, jsonObject)
 
-        fun primitiveGenerationFromVcTypes(types: List<String>, openId4VPProfile: OpenId4VPProfile = OpenId4VPProfile.Default): PresentationDefinition {
+        fun primitiveGenerationFromVcTypes(types: List<String>, openId4VPProfile: OpenId4VPProfile = OpenId4VPProfile.DEFAULT): PresentationDefinition {
             return PresentationDefinition(inputDescriptors = types.map { type ->
                 when(type) {
                     "org.iso.18013.5.1.mDL" -> InputDescriptor(
@@ -69,7 +69,7 @@ data class PresentationDefinition(
             })
         }
 
-        fun generateDefaultInputDescriptor(type: String, openId4VPProfile: OpenId4VPProfile = OpenId4VPProfile.Default): InputDescriptor {
+        fun generateDefaultInputDescriptor(type: String, openId4VPProfile: OpenId4VPProfile = OpenId4VPProfile.DEFAULT): InputDescriptor {
             return when(openId4VPProfile) {
                 OpenId4VPProfile.HAIP -> InputDescriptor(
                     id = type,
