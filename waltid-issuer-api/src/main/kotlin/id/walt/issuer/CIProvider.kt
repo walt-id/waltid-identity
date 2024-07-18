@@ -24,6 +24,7 @@ import id.walt.mdoc.cose.COSESign1
 import id.walt.mdoc.dataelement.ByteStringElement
 import id.walt.mdoc.dataelement.DataElement
 import id.walt.mdoc.dataelement.MapKey
+import id.walt.mdoc.dataelement.toDE
 import id.walt.mdoc.doc.MDocBuilder
 import id.walt.mdoc.mso.DeviceKeyInfo
 import id.walt.mdoc.mso.ValidityInfo
@@ -48,11 +49,10 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Clock
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.plus
+import kotlinx.serialization.MissingFieldException
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
-import java.security.KeyFactory
-import java.security.spec.X509EncodedKeySpec
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.time.Duration.Companion.minutes
@@ -311,7 +311,7 @@ open class CIProvider : OpenIDCredentialIssuer(
             ?: throw IllegalArgumentException("The issuanceIdCredentialMapping does not contain a mapping for: $nonce!")
 
         return CredentialResult(format = credentialRequest.format, credential = JsonPrimitive(runBlocking {
-            val vc = data.request.credentialData
+            val vc = data.request.credentialData ?: throw MissingFieldException(listOf("credentialData"), "credentialData")
 
             data.run {
                 var issuerKid = issuerDid
@@ -360,13 +360,17 @@ open class CIProvider : OpenIDCredentialIssuer(
         println("RETRIEVING VC FROM TOKEN MAPPING: $nonce")
         val data: IssuanceSessionData = tokenCredentialMapping[nonce]?.first()
             ?: throw CredentialError(credentialRequest, CredentialErrorCode.invalid_request,"The issuanceIdCredentialMapping does not contain a mapping for: $nonce!")
+        val issuerSignedItems = data.request.mdocData ?: throw MissingFieldException(listOf("mdocData"), "mdocData")
         val issuerKey = JWK.parse(runBlocking { data.issuerKey.exportJWK() }).toECKey()
         val keyId = runBlocking { data.issuerKey.getKeyId() }
         val cryptoProvider = SimpleCOSECryptoProvider(listOf(COSECryptoProviderKeyInfo(keyId, AlgorithmID.ECDSA_256, issuerKey.toECPublicKey(), issuerKey.toECPrivateKey())))
         val mdoc = MDocBuilder(credentialRequest.docType
             ?: throw CredentialError(credentialRequest, CredentialErrorCode.invalid_request, message = "Missing doc type in credential request")
-            // TODO: add items to sign (document properties)
-        ).sign( // TODO: expiration date!
+        ).apply {
+            issuerSignedItems.forEach { namespace -> namespace.value.forEach { property ->
+                addItemToSign(namespace.key, property.key, property.value.toDE())
+            }}
+        }.sign( // TODO: expiration date!
             ValidityInfo(Clock.System.now(), Clock.System.now(), Clock.System.now().plus(365*24, DateTimeUnit.HOUR)),
             DeviceKeyInfo(DataElement.fromCBOR(
                 OneKey(CBORObject.DecodeFromBytes(rawHolderKey)).AsCBOR().EncodeToBytes()
@@ -431,7 +435,7 @@ open class CIProvider : OpenIDCredentialIssuer(
                     format = credentialRequest.format,
                     credential = JsonPrimitive(
                         runBlocking {
-                            val vc = data.request.credentialData
+                            val vc = data.request.credentialData ?: throw MissingFieldException(listOf("credentialData"), "credentialData")
 
                             data.run {
                                 when (credentialRequest.format) {
