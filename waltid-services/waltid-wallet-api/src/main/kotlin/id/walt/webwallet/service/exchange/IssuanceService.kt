@@ -7,7 +7,7 @@ import id.walt.crypto.utils.Base64Utils.base64UrlDecode
 import id.walt.crypto.utils.JwsUtils
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.did.dids.DidService
-import id.walt.mdoc.dataelement.toDE
+import id.walt.mdoc.dataelement.toDataElement
 import id.walt.mdoc.doc.MDoc
 import id.walt.mdoc.issuersigned.IssuerSigned
 import id.walt.oid4vc.OpenID4VCI
@@ -267,7 +267,7 @@ object IssuanceService {
             val docType = processedOffer.credentialRequest?.docType ?: throw IllegalArgumentException("Credential request has no docType property")
             val format = processedOffer.credentialResponse.format ?: throw IllegalArgumentException("Credential response has no format property")
             val mdoc = when(credentialEncoding) {
-                "issuer-signed" -> MDoc(docType.toDE(), IssuerSigned.fromMapElement(
+                "issuer-signed" -> MDoc(docType.toDataElement(), IssuerSigned.fromMapElement(
                     Cbor.decodeFromByteArray(credential.base64UrlDecode())
                 ), null)
                 else -> throw IllegalArgumentException("Invalid credential encoding: $credentialEncoding")
