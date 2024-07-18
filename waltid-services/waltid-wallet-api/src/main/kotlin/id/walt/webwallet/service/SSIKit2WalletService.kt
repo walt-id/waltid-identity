@@ -131,7 +131,7 @@ class SSIKit2WalletService(
 
     override suspend fun getCredential(credentialId: String): WalletCredential =
         credentialService.get(walletId, credentialId)
-            ?: throw IllegalArgumentException("WalletCredential not found for credentialId: $credentialId")
+            ?: throw NotFoundException("WalletCredential not found for credentialId: $credentialId")
 
     override suspend fun attachCategory(credentialId: String, categories: List<String>): Boolean =
         credentialService.categoryService.add(
@@ -346,7 +346,7 @@ class SSIKit2WalletService(
 
     override suspend fun loadDid(did: String): JsonObject =
         DidsService.get(walletId, did)?.let { Json.parseToJsonElement(it.document).jsonObject }
-            ?: throw IllegalArgumentException("Did not found: $did for account: $walletId")
+            ?: throw NotFoundException("Did not found: $did for account: $walletId")
 
     override suspend fun deleteDid(did: String): Boolean {
         DidsService.get(walletId, did).also {
