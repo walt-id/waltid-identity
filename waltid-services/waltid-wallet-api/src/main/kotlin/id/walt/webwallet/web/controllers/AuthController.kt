@@ -501,6 +501,16 @@ suspend fun verifyToken(token: String): Result<String> {
     }
 }
 
+data class LoginRequestError(override val message: String) : BadRequestException(message) {
+    constructor(throwable: Throwable) : this(
+        when (throwable) {
+            is BadRequestException -> "Error processing request"
+            is SerializationException -> "Failed to parse JSON string"
+            is IllegalStateException -> "Invalid request"
+            else -> throwable.localizedMessage
+        }
+    )
+}
 
 suspend fun ApplicationCall.getLoginRequest() = loginRequestJson.decodeFromString<AccountRequest>(receive())
 
