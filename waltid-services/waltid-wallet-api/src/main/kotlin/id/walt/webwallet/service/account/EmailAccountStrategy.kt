@@ -1,8 +1,9 @@
 package id.walt.webwallet.service.account
 
 import de.mkammerer.argon2.Argon2Factory
+import id.walt.commons.web.ConflictException
+import id.walt.commons.web.UnauthorizedException
 import id.walt.webwallet.db.models.Accounts
-import id.walt.webwallet.web.UnauthorizedException
 import id.walt.webwallet.web.controllers.ByteLoginRequest
 import id.walt.webwallet.web.model.EmailAccountRequest
 import kotlinx.datetime.Clock
