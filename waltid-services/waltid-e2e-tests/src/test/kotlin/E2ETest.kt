@@ -397,6 +397,15 @@ class E2ETest {
             test("lsp verification track 4") {
               lspPotentialVerification.testPotentialInteropTrack4()
             }
+            val lspPotentialWallet = setupTestWallet()
+            test("lsp potential wallet mdoc issuance and presentation") {
+              lspPotentialWallet.testMDocIssuance()
+              lspPotentialWallet.testMdocPresentation()
+            }
+            test("lsp potential wallet sd-jwt-vc issuance and presentation") {
+              lspPotentialWallet.testSDJwtVCIssuance()
+              lspPotentialWallet.testSDJwtPresentation()
+            }
         }
     }
 
@@ -414,7 +423,7 @@ class E2ETest {
     }
   }
 
-  @Test
+  //@Test // enable to execute test selectively
   fun lspVerifierTests() = runTest(timeout = 5.minutes) {
     val client = testHttpClient(doFollowRedirects = false)
     testBlock {
@@ -428,32 +437,36 @@ class E2ETest {
     }
   }
 
-  @Test
+  suspend fun setupTestWallet(): LspPotentialWallet {
+    var client = testHttpClient()
+    client.post("/wallet-api/auth/login") {
+      setBody(
+        EmailAccountRequest(
+          email = "user@email.com", password = "password"
+        ) as AccountRequest
+      )
+    }.expectSuccess().apply {
+      body<JsonObject>().let { result ->
+        assertNotNull(result["token"])
+        val token = result["token"]!!.jsonPrimitive.content.expectLooksLikeJwt()
+
+        client = testHttpClient(token = token)
+      }
+    }
+    val walletId = client.get("/wallet-api/wallet/accounts/wallets").expectSuccess().let {
+      it.body<AccountWalletListing>().wallets.first().id.toString()
+    }
+    return LspPotentialWallet(client, walletId)
+  }
+
+  //@Test // enable to execute test selectively
   fun lspWalletTests() = runTest(timeout = 5.minutes) {
     testBlock {
-      var client = testHttpClient()
-      client.post("/wallet-api/auth/login") {
-        setBody(
-          EmailAccountRequest(
-            email = "user@email.com", password = "password"
-          ) as AccountRequest
-        )
-      }.expectSuccess().apply {
-        body<JsonObject>().let { result ->
-          assertNotNull(result["token"])
-          val token = result["token"]!!.jsonPrimitive.content.expectLooksLikeJwt()
-
-          client = testHttpClient(token = token)
-        }
+      val lspPotentialWallet = setupTestWallet()
+      test("lsp potential wallet mdoc issuance and presentation") {
+        lspPotentialWallet.testMDocIssuance()
+        lspPotentialWallet.testMdocPresentation()
       }
-      val walletId = client.get("/wallet-api/wallet/accounts/wallets").expectSuccess().let {
-        it.body<AccountWalletListing>().wallets.first().id.toString()
-      }
-      val lspPotentialWallet = LspPotentialWallet(client, walletId)
-//      test("lsp potential wallet mdoc issuance and presentation") {
-//        lspPotentialWallet.testMDocIssuance()
-//        lspPotentialWallet.testMdocPresentation()
-//      }
       test("lsp potential wallet sd-jwt-vc issuance and presentation") {
         lspPotentialWallet.testSDJwtVCIssuance()
         lspPotentialWallet.testSDJwtPresentation()
