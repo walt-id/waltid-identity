@@ -8,6 +8,9 @@ import com.nimbusds.jose.crypto.MACSigner
 import com.nimbusds.jose.crypto.MACVerifier
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.featureflag.FeatureManager
+import id.walt.commons.web.BadRequestException
+import id.walt.commons.web.ForbiddenException
+import id.walt.commons.web.UnauthorizedException
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.oid4vc.definitions.JWTClaims
@@ -21,9 +24,7 @@ import id.walt.webwallet.service.WalletServiceManager
 import id.walt.webwallet.service.WalletServiceManager.oidcConfig
 import id.walt.webwallet.service.account.AccountsService
 import id.walt.webwallet.service.account.KeycloakAccountStrategy
-import id.walt.webwallet.web.ForbiddenException
 import id.walt.webwallet.web.InsufficientPermissionsException
-import id.walt.webwallet.web.UnauthorizedException
 import id.walt.webwallet.web.WebBaseRoutes.webWalletRoute
 import id.walt.webwallet.web.model.*
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -37,7 +38,6 @@ import io.ktor.http.parsing.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
 import io.ktor.server.auth.jwt.*
-import io.ktor.server.plugins.*
 import io.ktor.server.plugins.ratelimit.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
@@ -303,8 +303,7 @@ fun Application.auth() {
                 val jsonObject = jsonElement.jsonObject
 
                 if (!jsonObject.containsKey("type") || jsonObject["type"]?.jsonPrimitive?.content.isNullOrEmpty()) {
-                    call.respond(HttpStatusCode.BadRequest, "Missing type in request")
-                    return@post
+                    throw BadRequestException("No account type provided")
                 }
                 val accountRequest = loginRequestJson.decodeFromString<AccountRequest>(call.receive())
                 AccountsService.register("", accountRequest)
@@ -313,11 +312,7 @@ fun Application.auth() {
                         call.respond("Registration succeeded ")
                     }
                     .onFailure {
-                        if (it.message?.contains("Account already exists!") == true) {
-                            call.respond(HttpStatusCode.Conflict, it.localizedMessage)
-                        } else {
-                            call.respond(HttpStatusCode.BadRequest, it.localizedMessage)
-                        }
+                        throw it
                     }
             }
 
