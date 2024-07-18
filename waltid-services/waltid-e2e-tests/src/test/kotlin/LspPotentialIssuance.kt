@@ -9,6 +9,7 @@ import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.utils.Base64Utils.base64UrlDecode
+import id.walt.issuer.utils.LspPotentialInteropEvent
 import id.walt.mdoc.COSECryptoProviderKeyInfo
 import id.walt.mdoc.SimpleCOSECryptoProvider
 import id.walt.mdoc.cose.COSESign1
@@ -21,6 +22,7 @@ import id.walt.mdoc.doc.MDocVerificationParams
 import id.walt.mdoc.doc.VerificationType
 import id.walt.mdoc.docrequest.MDocRequestBuilder
 import id.walt.mdoc.issuersigned.IssuerSigned
+import id.walt.mdoc.mso.DigestAlgorithm
 import id.walt.oid4vc.OpenID4VCI
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.requests.AuthorizationRequest
@@ -204,9 +206,9 @@ class LspPotentialIssuance(val client: HttpClient) {
         mdoc.verifySignature(
           SimpleCOSECryptoProvider(
             listOf(
-              loadPotentialIssuerKeys()
+              LspPotentialInteropEvent.loadPotentialIssuerKeys()
             )
-          ), POTENTIAL_ISSUER_KEY_ID
+          ), LspPotentialInteropEvent.POTENTIAL_ISSUER_KEY_ID
         )
       )
       assertNotNull(mdoc.issuerSigned.nameSpaces)
