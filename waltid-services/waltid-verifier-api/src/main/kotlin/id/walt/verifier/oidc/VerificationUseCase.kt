@@ -52,8 +52,9 @@ class VerificationUseCase(
         statusCallbackUri: String?,
         statusCallbackApiKey: String?,
         stateId: String?,
-        walletInitiatedAuthState: String? = null,
         openId4VPProfile: OpenId4VPProfile = OpenId4VPProfile.DEFAULT,
+        walletInitiatedAuthState: String? = null,
+        trustedRootCAs: JsonArray? = null
     ) = let {
         val vpPolicies = vpPoliciesJson?.jsonArray?.parsePolicyRequests() ?: listOf(PolicyRequest(JwtSignaturePolicy()))
 
@@ -84,7 +85,8 @@ class VerificationUseCase(
             clientIdScheme = this.getClientIdScheme(openId4VPProfile, OIDCVerifierService.config.defaultClientIdScheme),
             openId4VPProfile = openId4VPProfile,
             walletInitiatedAuthState = walletInitiatedAuthState,
-            responseType = responseType
+            responseType = responseType,
+            trustedRootCAs = trustedRootCAs?.map { it.jsonPrimitive.content }
         )
 
         val specificPolicies = requestCredentialsArr.filterIsInstance<JsonObject>().associate {

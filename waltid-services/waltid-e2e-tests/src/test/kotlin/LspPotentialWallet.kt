@@ -12,6 +12,7 @@ import id.walt.oid4vc.data.CredentialOffer
 import id.walt.oid4vc.data.OpenIDProviderMetadata
 import id.walt.oid4vc.data.dif.VCFormat
 import id.walt.oid4vc.requests.AuthorizationRequest
+import id.walt.verifier.lspPotential.LspPotentialVerificationInterop
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.db.models.WalletDid
 import id.walt.webwallet.web.controllers.UsePresentationRequest
@@ -91,6 +92,7 @@ class LspPotentialWallet(val client: HttpClient, val walletId: String) {
       setBody(
         buildJsonObject {
           put("request_credentials", JsonArray(listOf(JsonPrimitive("org.iso.18013.5.1.mDL"))))
+          put("trusted_root_cas", JsonArray(listOf(JsonPrimitive(LspPotentialVerificationInterop.POTENTIAL_ROOT_CA_CERT))))
         })
     }
     assertEquals(200, createReqResponse.status.value)
