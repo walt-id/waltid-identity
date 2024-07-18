@@ -370,7 +370,7 @@ class SSIKit2WalletService(
 
     private fun getKey(keyId: String) = KeysService.get(walletId, keyId)?.let {
         KeyManager.resolveSerializedKey(it.document)
-    } ?: throw IllegalArgumentException("Key not found: $keyId")
+    } ?: throw NotFoundException("Key not found: $keyId")
 
     suspend fun getKeyByDid(did: String): Key =
         DidService.resolveToKey(did)
