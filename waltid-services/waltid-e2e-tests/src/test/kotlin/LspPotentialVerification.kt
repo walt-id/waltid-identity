@@ -54,7 +54,7 @@ import kotlin.test.assertTrue
 class LspPotentialVerification(private val client: HttpClient) {
 
   fun testPotentialInteropTrack3() {
-    println("Starting test")
+     println("Starting test")
 
     runBlocking {
       // Step 1: Fetch mdoc
