@@ -77,7 +77,7 @@ class CITestProvider : OpenIDCredentialIssuer(
     override fun removeSession(id: String) = authSessions.remove(id)
 
     // crypto operations and credential issuance
-    private val CI_TOKEN_KEY = runBlocking { JWKKey.generate(KeyType.RSA) }
+    val CI_TOKEN_KEY = runBlocking { JWKKey.generate(KeyType.RSA) }
     private val CI_DID_KEY = runBlocking { JWKKey.generate(KeyType.Ed25519) }
     val CI_ISSUER_DID = runBlocking { DidService.registerByKey("key", CI_DID_KEY).did }
     val deferredCredentialRequests = mutableMapOf<String, CredentialRequest>()

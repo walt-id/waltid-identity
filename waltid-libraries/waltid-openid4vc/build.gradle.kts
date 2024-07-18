@@ -97,6 +97,7 @@ kotlin {
                 implementation(project(":waltid-libraries:waltid-mdoc-credentials"))
                 implementation(project(":waltid-libraries:waltid-did"))
                 implementation(project(":waltid-libraries:waltid-sdjwt"))
+                implementation(project(":waltid-libraries:waltid-verifiable-credentials"))
 
                 // -- Multiplatform --
                 // Multiplatform / UUID
