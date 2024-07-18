@@ -5,9 +5,6 @@ package id.walt.issuer.issuance
 import COSE.AlgorithmID
 import COSE.OneKey
 import cbor.Cbor
-import com.nimbusds.jose.JWSAlgorithm
-import com.nimbusds.jose.crypto.impl.ECDSA
-import com.nimbusds.jose.jwk.ECKey
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.util.X509CertUtils
 import com.upokecenter.cbor.CBORObject
@@ -26,7 +23,6 @@ import id.walt.did.dids.DidService
 import id.walt.did.dids.DidUtils
 import id.walt.issuer.config.CredentialTypeConfig
 import id.walt.issuer.config.OIDCIssuerServiceConfig
-import id.walt.did.dids.json
 import id.walt.mdoc.COSECryptoProviderKeyInfo
 import id.walt.mdoc.SimpleCOSECryptoProvider
 import id.walt.mdoc.cose.COSESign1
@@ -383,7 +379,7 @@ open class CIProvider : OpenIDCredentialIssuer(
             ?: throw CredentialError(credentialRequest, CredentialErrorCode.invalid_request, message = "Missing doc type in credential request")
         ).apply {
             issuerSignedItems.forEach { namespace -> namespace.value.forEach { property ->
-                addItemToSign(namespace.key, property.key, property.value.toDE())
+                addItemToSign(namespace.key, property.key, property.value.toDataElement())
             }}
         }.sign( // TODO: expiration date!
             ValidityInfo(Clock.System.now(), Clock.System.now(), Clock.System.now().plus(365*24, DateTimeUnit.HOUR)),

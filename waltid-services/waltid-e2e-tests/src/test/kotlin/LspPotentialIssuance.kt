@@ -15,13 +15,12 @@ import id.walt.mdoc.cose.COSESign1
 import id.walt.mdoc.dataelement.DEType
 import id.walt.mdoc.dataelement.MapElement
 import id.walt.mdoc.dataelement.MapKey
-import id.walt.mdoc.dataelement.toDE
+import id.walt.mdoc.dataelement.toDataElement
 import id.walt.mdoc.doc.MDoc
 import id.walt.mdoc.doc.MDocVerificationParams
 import id.walt.mdoc.doc.VerificationType
 import id.walt.mdoc.docrequest.MDocRequestBuilder
 import id.walt.mdoc.issuersigned.IssuerSigned
-import id.walt.mdoc.mso.DigestAlgorithm
 import id.walt.oid4vc.OpenID4VCI
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.requests.AuthorizationRequest
@@ -195,7 +194,7 @@ class LspPotentialIssuance(val client: HttpClient) {
       assertEquals("issuer-signed", credResp.customParameters["credential_encoding"]!!.jsonPrimitive.content)
       assertNotNull(credResp.credential)
       val mdoc = MDoc(
-        credReq.docType!!.toDE(), IssuerSigned.fromMapElement(
+        credReq.docType!!.toDataElement(), IssuerSigned.fromMapElement(
           Cbor.decodeFromByteArray(credResp.credential!!.jsonPrimitive.content.base64UrlDecode())
         ), null
       )

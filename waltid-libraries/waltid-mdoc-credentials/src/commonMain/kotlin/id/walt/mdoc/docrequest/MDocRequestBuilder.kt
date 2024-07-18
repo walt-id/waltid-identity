@@ -25,12 +25,12 @@ class MDocRequestBuilder(val docType: String) {
   }
 
   private fun buildEncodedItemsRequest() = EncodedCBORElement(ItemsRequest(
-    docType = docType.toDE(),
+    docType = docType.toDataElement(),
     nameSpaces = nameSpaces.map { ns ->
       Pair(MapKey(ns.key), ns.value.map { item ->
         Pair(MapKey(item.key), BooleanElement(item.value))
-      }.toMap().toDE())
-    }.toMap().toDE()
+      }.toMap().toDataElement())
+    }.toMap().toDataElement()
   ).toMapElement())
 
   /**

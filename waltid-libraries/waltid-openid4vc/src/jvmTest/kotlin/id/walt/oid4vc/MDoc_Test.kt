@@ -197,8 +197,8 @@ class MDoc_Test: AnnotationSpec() {
     // build mdoc of type mDL and sign using issuer key with holder binding to device key
     val lspPotentialCryptoProvider = SimpleCOSECryptoProvider(listOf(issuerProviderKeyInfo))
     val mdoc = MDocBuilder("org.iso.18013.5.1.mDL")
-      .addItemToSign("org.iso.18013.5.1", "family_name", "Doe".toDE())
-      .addItemToSign("org.iso.18013.5.1", "given_name", "John".toDE())
+      .addItemToSign("org.iso.18013.5.1", "family_name", "Doe".toDataElement())
+      .addItemToSign("org.iso.18013.5.1", "given_name", "John".toDataElement())
       .addItemToSign("org.iso.18013.5.1", "birth_date", FullDateElement(LocalDate(1990, 1, 15)))
       .sign(
         ValidityInfo(Clock.System.now(), Clock.System.now(), Clock.System.now().plus(365*24, DateTimeUnit.HOUR)),
