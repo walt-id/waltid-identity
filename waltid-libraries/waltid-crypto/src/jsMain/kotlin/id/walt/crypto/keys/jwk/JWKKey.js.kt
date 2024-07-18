@@ -28,7 +28,9 @@ import kotlin.js.json
 @Serializable
 @SerialName("jwk")
 actual class JWKKey actual constructor(
-    var jwk: String?, val _keyId: String?
+    @Serializable(with = JWKKeyJsonFieldSerializer::class)
+    var jwk: String?,
+    val _keyId: String?
 ) : Key() {
 
     @Transient

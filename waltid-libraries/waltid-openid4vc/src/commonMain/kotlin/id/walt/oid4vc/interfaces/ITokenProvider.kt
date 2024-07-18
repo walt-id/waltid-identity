@@ -20,6 +20,12 @@ interface ITokenProvider {
      */
     fun verifyTokenSignature(target: TokenTarget, token: String): Boolean
 
+    /**
+     * Verifies the signature of the given _CoseSign1_ [token] (CWT), ensuring the appropriate key and algorithm for the given token [target] was used.
+     * @return Returns `true` if the signature is valid or `false` otherwise
+     */
+    fun verifyCOSESign1Signature(target: TokenTarget, token: String): Boolean
+
     @OptIn(ExperimentalEncodingApi::class)
     fun parseTokenPayload(token: String): JsonObject {
         return token.substringAfter(".").substringBefore(".").let {

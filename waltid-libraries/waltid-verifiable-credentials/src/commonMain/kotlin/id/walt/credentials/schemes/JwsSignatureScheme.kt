@@ -48,7 +48,7 @@ class JwsSignatureScheme : SignatureScheme {
   suspend fun sign(
     data: JsonObject, key: Key,
     /** Set additional options in the JWT header */
-    jwtHeaders: Map<String, String> = emptyMap(),
+    jwtHeaders: Map<String, JsonElement> = emptyMap(),
     /** Set additional options in the JWT payload */
     jwtOptions: Map<String, JsonElement> = emptyMap(),
   ): String {

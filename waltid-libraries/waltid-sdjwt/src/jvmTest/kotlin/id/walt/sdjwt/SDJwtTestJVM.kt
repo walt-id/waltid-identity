@@ -9,14 +9,6 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.*
-import io.kotest.assertions.json.shouldEqualJson
-import io.kotest.matchers.collections.shouldContainAll
-import io.kotest.matchers.collections.shouldHaveSize
-import io.kotest.matchers.maps.shouldContainKey
-import io.kotest.matchers.maps.shouldNotContainKey
-import io.kotest.matchers.shouldBe
-import io.kotest.matchers.shouldNotBe
-import io.kotest.matchers.string.shouldStartWith
 import korlibs.crypto.SHA256
 import korlibs.crypto.encoding.ASCII
 import korlibs.crypto.encoding.base64Url
@@ -134,10 +126,12 @@ class SDJwtTestJVM {
             )
         )
         val parsedJwt = SDJwt.parse(signedJwt)
-        parsedJwt.header.keys shouldContainAll listOf("h1", "h2", "h3")
-        parsedJwt.header["h1"]!!.jsonPrimitive.content shouldBe "v1"
-        parsedJwt.header["h2"]!!.jsonPrimitive.int shouldBe 2
-        parsedJwt.header["h3"]!!.jsonObject["h3.1"]!!.jsonPrimitive.content shouldBe "v3"
+        assertContains(parsedJwt.header.keys, "h1")
+        assertContains(parsedJwt.header.keys, "h2")
+        assertContains(parsedJwt.header.keys, "h3")
+        assertEquals("v1", parsedJwt.header["h1"]!!.jsonPrimitive.content)
+        assertEquals(2, parsedJwt.header["h2"]!!.jsonPrimitive.int)
+        assertEquals("v3", parsedJwt.header["h3"]!!.jsonObject["h3.1"]!!.jsonPrimitive.content)
     }
 
     @Test
@@ -149,13 +143,13 @@ class SDJwtTestJVM {
             buildJsonObject { put("test", JsonPrimitive("hello")) },
             SDMapBuilder().addField("test", true).build()), cryptoProvider)
         val presentedJwtNoKb = signedJwt.present(true)
-        presentedJwtNoKb.keyBindingJwt shouldBe null
+        assertNull(presentedJwtNoKb.keyBindingJwt)
         val presentedJwtWithKb = signedJwt.present(true, aud, nonce, cryptoProvider)
-        presentedJwtWithKb.keyBindingJwt shouldNotBe null
-        presentedJwtWithKb.toString() shouldStartWith presentedJwtNoKb.toString()
-        presentedJwtWithKb.keyBindingJwt!!.audience shouldBe aud
-        presentedJwtWithKb.keyBindingJwt!!.nonce shouldBe nonce
-        presentedJwtWithKb.keyBindingJwt!!.sdHash shouldBe SHA256.digest(ASCII.encode(presentedJwtNoKb.toString())).base64Url
+        assertNotNull(presentedJwtWithKb.keyBindingJwt)
+        assertTrue(presentedJwtWithKb.toString().startsWith(presentedJwtNoKb.toString()))
+        assertEquals(aud, presentedJwtWithKb.keyBindingJwt!!.audience)
+        assertEquals(nonce, presentedJwtWithKb.keyBindingJwt!!.nonce)
+        assertEquals(SHA256.digest(ASCII.encode(presentedJwtNoKb.toString())).base64Url, presentedJwtWithKb.keyBindingJwt!!.sdHash)
 
     }
 }

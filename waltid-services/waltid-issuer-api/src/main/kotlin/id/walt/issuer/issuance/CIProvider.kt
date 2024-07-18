@@ -14,7 +14,9 @@ import com.upokecenter.cbor.CBORObject
 import id.walt.commons.config.ConfigManager
 import id.walt.credentials.issuance.Issuer.mergingJwtIssue
 import id.walt.credentials.issuance.Issuer.mergingSdJwtIssue
+import id.walt.credentials.vc.vcs.W3CVC
 import id.walt.crypto.keys.Key
+import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.base64UrlDecode
@@ -183,12 +185,11 @@ open class CIProvider : OpenIDCredentialIssuer(
         else if (tokenHeader["kid"] != null) {
             val did = tokenHeader["kid"]!!.jsonPrimitive.content.split("#")[0]
             log.debug { "Resolving DID: $did" }
-            val key = DidService.resolveToKey(did).getOrThrow()
-            key.verifyJws(token).also { log.debug { "VERIFICATION IS: $it" } }
+            DidService.resolveToKey(did).getOrThrow()
         } else {
             CI_TOKEN_KEY
         }
-        key.verifyJws(token).also { println("VERIFICATION IS: $it") }
+        key.verifyJws(token).also { log.debug { "VERIFICATION IS: $it" } }
     }.isSuccess
 
     override fun verifyCOSESign1Signature(target: TokenTarget, token: String) = runBlocking {
@@ -235,7 +236,7 @@ open class CIProvider : OpenIDCredentialIssuer(
     }
 
     private fun doGenerateCredential(
-        credentialRequest: CredentialRequest, subjectDid: String?, nonce: String?,
+        credentialRequest: CredentialRequest
     ): CredentialResult {
         if (credentialRequest.format == CredentialFormat.mso_mdoc) throw CredentialError(
             credentialRequest, CredentialErrorCode.unsupported_credential_format
@@ -261,7 +262,7 @@ open class CIProvider : OpenIDCredentialIssuer(
             credentialRequest,
             CredentialErrorCode.invalid_or_missing_proof, message = "Proof must contain nonce")
 
-        val data: IssuanceSessionData = (if (subjectDid == null || nonce == null) {
+        val data: IssuanceSessionData = (if (holderDid == null || nonce == null) {
             repeat(10) {
                 log.debug { "WARNING: RETURNING DEMO/EXAMPLE (= BOGUS) CREDENTIAL: subjectDid or nonce is null (was deferred issuance tried?)" }
             }
@@ -273,7 +274,8 @@ open class CIProvider : OpenIDCredentialIssuer(
                         Json.parseToJsonElement(KeySerialization.serializeKey(exampleIssuerKey)).jsonObject,
                         exampleIssuerDid,
                         "OpenBadgeCredential_${credentialRequest.format.value}",
-                        W3CVC.fromJson(IssuanceExamples.openBadgeCredentialData)
+                        W3CVC.fromJson(IssuanceExamples.openBadgeCredentialData),
+                        mdocData = null
                     )
                 )
             )
