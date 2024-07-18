@@ -27,7 +27,7 @@ class JWKKeyAndDidManagementTest {
 
     @Test
     fun jwkKeyGenerationTest() = runTest {
-        KeyType.values().forEach {
+        KeyType.entries.forEach {
             println("Generate key for key type $it")
             val generatedKey = JWKKey.generate(it)
 
