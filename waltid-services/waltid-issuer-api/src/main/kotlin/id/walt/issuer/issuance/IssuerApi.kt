@@ -409,6 +409,18 @@ fun Application.issuerApi() {
                         HttpStatusCode.OK, offerUri
                     )
                 }
+                get("lspPotentialCredentialOfferT2") {
+                    val jwkKey = JWKKey.importJWK(LspPotentialInteropEvent.POTENTIAL_ISSUER_KEY_JWK).getOrThrow()
+                    val offerUri = IssuanceRequest(
+                        Json.parseToJsonElement(KeySerialization.serializeKey(jwkKey)).jsonObject,
+                        "",
+                        "urn:eu.europa.ec.eudi:pid:1",
+                        W3CVC()
+                    ).let { createCredentialOfferUri(listOf(it)) }
+                    context.respond(
+                        HttpStatusCode.OK, offerUri
+                    )
+                }
             }
         }
     }
