@@ -507,10 +507,10 @@ data class LoginRequestError(override val message: String) : WebException(
 ) {
     constructor(throwable: Throwable) : this(
         when (throwable) {
-            is BadRequestException -> "Error processing request"
-            is SerializationException -> "Failed to parse JSON string"
-            is IllegalStateException -> "Invalid request"
-            else -> throwable.localizedMessage
+            is BadRequestException -> "Error processing request: ${throwable.localizedMessage ?: "Unknown reason"}"
+            is SerializationException -> "Failed to parse JSON string: ${throwable.localizedMessage ?: "Unknown reason"}"
+            is IllegalStateException -> "Invalid request: ${throwable.localizedMessage ?: "Unknown reason"}"
+            else -> "Unexpected error: ${throwable.localizedMessage ?: "Unknown reason"}"
         }
     )
 }
@@ -520,7 +520,11 @@ suspend fun ApplicationCall.getLoginRequest() = runCatching {
     val jsonObject = Json.parseToJsonElement(jsonText).jsonObject
     val accountType = JsonUtils.tryGetData(jsonObject, "type")?.jsonPrimitive?.content
     check(!accountType.isNullOrEmpty()) {
-        "No account type provided"
+        if (jsonObject.containsKey("type")) {
+            "Account type '${jsonObject["type"]}' is not recognized"
+        } else {
+            "No account type provided"
+        }
     }
     Json.decodeFromString<AccountRequest>(jsonText)
 }.getOrElse { throw LoginRequestError(it) }
