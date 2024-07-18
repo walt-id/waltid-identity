@@ -127,7 +127,7 @@ class SSIKit2WalletService(
     }
 
     override suspend fun restoreCredential(id: String): WalletCredential =
-        credentialService.restore(walletId, id) ?: error("Credential not found: $id")
+        credentialService.restore(walletId, id) ?: throw NotFoundException("Credential not found: $id")
 
     override suspend fun getCredential(credentialId: String): WalletCredential =
         credentialService.get(walletId, credentialId)
@@ -147,7 +147,7 @@ class SSIKit2WalletService(
     override suspend fun acceptCredential(parameter: CredentialRequestParameter): Boolean =
         credentialService.get(walletId, parameter.credentialId)?.takeIf { it.deletedOn == null }?.let {
             credentialService.setPending(walletId, parameter.credentialId, false) > 0
-        } ?: error("Credential not found: ${parameter.credentialId}")
+        } ?: throw NotFoundException("Credential not found: ${parameter.credentialId}")
 
     override suspend fun rejectCredential(parameter: CredentialRequestParameter): Boolean =
         credentialService.delete(walletId, parameter.credentialId, true)
