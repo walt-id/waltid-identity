@@ -5,6 +5,7 @@ import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.did.dids.DidService
+import id.walt.issuer.utils.LspPotentialInteropEvent
 import id.walt.oid4vc.definitions.CROSS_DEVICE_CREDENTIAL_OFFER_URL
 import id.walt.oid4vc.requests.CredentialOfferRequest
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -395,6 +396,18 @@ fun Application.issuerApi() {
                     val credentialOffer = issuanceSession.credentialOffer
                         ?: throw BadRequestException("Session has no credential offer set")
                     context.respond(credentialOffer.toJSON())
+                }
+                get("lspPotentialCredentialOffer") {
+                    val jwkKey = JWKKey.importJWK(LspPotentialInteropEvent.POTENTIAL_ISSUER_KEY_JWK).getOrThrow()
+                    val offerUri = IssuanceRequest(
+                        Json.parseToJsonElement(KeySerialization.serializeKey(jwkKey)).jsonObject,
+                        "",
+                        "potential.light.profile",
+                        W3CVC(), null
+                    ).let { createCredentialOfferUri(listOf(it)) }
+                    context.respond(
+                        HttpStatusCode.OK, offerUri
+                    )
                 }
             }
         }
