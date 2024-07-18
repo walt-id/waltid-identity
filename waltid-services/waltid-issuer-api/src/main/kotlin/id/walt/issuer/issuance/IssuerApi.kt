@@ -22,7 +22,7 @@ import kotlinx.serialization.json.*
 import kotlin.time.Duration.Companion.minutes
 
 private val logger = KotlinLogging.logger {}
-fun createCredentialOfferUri(issuanceRequests: List<IssuanceRequest>): String {
+suspend fun createCredentialOfferUri(issuanceRequests: List<IssuanceRequest>): String {
     val credentialOfferBuilder =
         OidcIssuance.issuanceRequestsToCredentialOfferBuilder(issuanceRequests)
 
@@ -154,7 +154,7 @@ fun Application.issuerApi() {
                         "No JWK key found in serialized key."
                     )
                     val finalJsonObject = jsonObject.toMutableMap().apply {
-                        this["jwk"] = Json.parseToJsonElement(jwkObject.jsonPrimitive.content).jsonObject
+                        this["jwk"] = jwkObject.jsonObject
                     }
                     JsonObject(finalJsonObject)
                 } else {
