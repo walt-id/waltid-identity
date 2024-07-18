@@ -3,26 +3,264 @@ package id.walt
 import COSE.AlgorithmID
 import COSE.OneKey
 import cbor.Cbor
+import com.nimbusds.jose.jwk.ECKey
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.util.X509CertUtils
 import com.upokecenter.cbor.CBORObject
+import id.walt.commons.config.ConfigManager
+import id.walt.commons.config.list.WebConfig
+import id.walt.commons.web.WebService
+import id.walt.commons.web.plugins.configureSerialization
+import id.walt.crypto.keys.KeyGenerationRequest
+import id.walt.crypto.keys.KeyManager
+import id.walt.crypto.keys.KeyType
 import id.walt.crypto.utils.Base64Utils.base64UrlDecode
 import id.walt.did.dids.DidService
+import id.walt.did.helpers.WaltidServices
+import id.walt.did.utils.randomUUID
+import id.walt.issuer.config.OIDCIssuerServiceConfig
+import id.walt.issuer.issuerModule
+import id.walt.issuer.utils.LspPotentialInteropEvent
 import id.walt.mdoc.COSECryptoProviderKeyInfo
 import id.walt.mdoc.SimpleCOSECryptoProvider
 import id.walt.mdoc.cose.COSESign1
 import id.walt.mdoc.dataelement.*
 import id.walt.mdoc.doc.MDoc
+import id.walt.mdoc.doc.MDocVerificationParams
+import id.walt.mdoc.doc.VerificationType
+import id.walt.mdoc.docrequest.MDocRequestBuilder
 import id.walt.mdoc.issuersigned.IssuerSigned
+import id.walt.oid4vc.OpenID4VCI
 import id.walt.oid4vc.data.*
+import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.requests.CredentialRequest
+import id.walt.oid4vc.requests.TokenRequest
+import id.walt.oid4vc.responses.CredentialResponse
+import id.walt.oid4vc.responses.TokenResponse
+import io.ktor.client.*
+import io.ktor.client.call.*
+import io.ktor.client.plugins.contentnegotiation.*
+import io.ktor.client.request.*
+import io.ktor.client.request.forms.*
+import io.ktor.client.statement.*
+import io.ktor.http.*
+import io.ktor.serialization.kotlinx.json.*
+import io.ktor.server.application.*
+import io.ktor.server.cio.*
+import io.ktor.server.engine.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.decodeFromHexString
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import org.kotlincrypto.hash.sha2.SHA256
+import java.io.FileReader
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.test.*
 
 object LspPotentialTest {
+  val http = HttpClient {
+    install(ContentNegotiation) {
+      json(Json { explicitNulls = false })
+    }
+    followRedirects = false
+  }
+  var webConfig: WebConfig? = null
 
+  init {
+    runBlocking {
+      WaltidServices.minimalInit()
+    }
+    ConfigManager.testWithConfigs(testConfigs)
+    webConfig = ConfigManager.getConfig<WebConfig>()
+    embeddedServer(
+      CIO,
+      port = webConfig!!.webPort,
+      host = webConfig!!.webHost,
+      configure = {
+      },
+      module = Application::issuerModule
+    ).start(wait = false)
+  }
+
+  @OptIn(ExperimentalEncodingApi::class)
+  @Test
+  fun testLspPotentialTrack1(): Unit = runBlocking {
+    // ### steps 1-6
+    val offerResp = http.get("http://${webConfig!!.webHost}:${webConfig!!.webPort}/openid4vc/lspPotentialCredentialOffer")
+    //val offerResp = http.get("https://issuer.potential.walt-test.cloud/openid4vc/lspPotentialCredentialOffer")
+    assertEquals(HttpStatusCode.OK, offerResp.status)
+
+    val offerUri = offerResp.bodyAsText()
+    //val offerUri = "openid-credential-offer://?credential_offer=%7B%22credential_issuer%22:%22https://mdlpilot.japaneast.cloudapp.azure.com:8017%22,%22credential_configuration_ids%22:%5B%22org.iso.18013.5.1.mDL%22%5D,%22grants%22:%7B%22authorization_code%22:%7B%22issuer_state%22:%22fX35ofcFrYUh2ltjnDZtNXIW7UTUrme767eqPvNix44%22,%22authorization_server%22:%22https://mdlpilot.japaneast.cloudapp.azure.com:8017%22%7D%7D%7D"
+    //val offerUri = "openid-credential-offer://?credential_offer=%7B%22credential_issuer%22%3A%22https%3A%2F%2Flaunchpad.vii.proton.mattrlabs.io%22%2C%22credential_configuration_ids%22%3A%5B%22b59d6a4c-b331-476b-9a4e-ea234c7882c8%22%5D%7D"
+
+    // -------- WALLET ----------
+    // as WALLET: receive credential offer, either being called via deeplink or by scanning QR code
+    // parse credential URI
+    val parsedOffer = OpenID4VCI.parseAndResolveCredentialOfferRequestUrl(offerUri)
+    //assertContains(parsedOffer.credentialConfigurationIds, "potential.light.profile")
+
+    // ### get issuer metadata, steps 7-10
+    val providerMetadataUri = OpenID4VCI.getCIProviderMetadataUrl(parsedOffer.credentialIssuer)
+    val oauthMetadataUri = OpenID4VCI.getOAuthProviderMetadataUrl(parsedOffer.credentialIssuer)
+    val providerMetadata = http.get(providerMetadataUri).bodyAsText().let { OpenIDProviderMetadata.fromJSONString(it) }
+    val oauthMetadata = http.get(oauthMetadataUri).body<OpenIDProviderMetadata>()
+    assertNotNull(providerMetadata.credentialConfigurationsSupported)
+    assertNotNull(providerMetadata.credentialEndpoint)
+    assertNotNull(oauthMetadata.authorizationEndpoint)
+    assertNotNull(oauthMetadata.tokenEndpoint)
+    //assertContains(providerMetadata.codeChallengeMethodsSupported.orEmpty(), "S256")
+
+    // resolve offered credentials
+    val offeredCredentials = OpenID4VCI.resolveOfferedCredentials(parsedOffer, providerMetadata)
+    val offeredCredential = offeredCredentials.first()
+    assertEquals(CredentialFormat.mso_mdoc, offeredCredential.format)
+    assertEquals("org.iso.18013.5.1.mDL", offeredCredential.docType)
+
+    // ### step 11: confirm issuance (nothing to do)
+
+    // ### step 12-15: authorization
+    val codeVerifier = randomUUID()
+
+    val codeChallenge =
+      codeVerifier.let { Base64.UrlSafe.encode(SHA256().digest(it.toByteArray(Charsets.UTF_8))).trimEnd('=') }
+
+    val authReq = AuthorizationRequest(
+      responseType = setOf(ResponseType.Code),
+      clientId = "test-wallet",
+      redirectUri = "https://test-wallet.org",
+      scope = setOf("openid"),
+      issuerState = parsedOffer.grants[GrantType.authorization_code.value]?.issuerState,
+      authorizationDetails = offeredCredentials.map {
+        AuthorizationDetails.fromOfferedCredential(
+          it,
+          providerMetadata.credentialIssuer
+        )
+      },
+      codeChallenge = codeChallenge,
+      codeChallengeMethod = "S256"
+    )
+    val location = if(oauthMetadata.requirePushedAuthorizationRequests != true) {
+      val authResp = http.get(oauthMetadata.authorizationEndpoint!!) {
+        authReq.toHttpParameters().forEach {
+          parameter(it.key, it.value.first())
+        }
+      }
+      assertEquals(HttpStatusCode.Found, authResp.status)
+      Url(authResp.headers[HttpHeaders.Location]!!)
+
+    } else {
+      // TODO: check PAR support, also check issuer of panasonic (https://mdlpilot.japaneast.cloudapp.azure.com:8017), which uses PAR and doesn't seem to work
+      val parResp = http.submitForm(oauthMetadata.pushedAuthorizationRequestEndpoint!!, parametersOf(
+        authReq.toHttpParameters()
+      ))
+      val authResp = http.get(oauthMetadata.authorizationEndpoint!!) {
+        parameter("request_uri", Json.parseToJsonElement(parResp.bodyAsText()).jsonObject["request_uri"]!!.jsonPrimitive.content)
+      }
+      assertEquals(HttpStatusCode.Found, authResp.status)
+      Url(authResp.headers[HttpHeaders.Location]!!)
+    }
+    assertContains(location.parameters.names(), "code")
+    // ### step 16-18: access token retrieval
+    val tokenResp = http.submitForm(oauthMetadata.tokenEndpoint!!,
+      parametersOf(
+        TokenRequest(
+          GrantType.authorization_code, authReq.clientId,
+          authReq.redirectUri, location.parameters["code"]!!,
+          codeVerifier = codeVerifier
+      ).toHttpParameters())).let { TokenResponse.fromJSON(it.body<JsonObject>()) }
+    assertNotNull(tokenResp.accessToken)
+    assertTrue(tokenResp.isSuccess)
+
+    val deviceKeyId = "device-key"
+    val deviceKeyPair: ECKey = runBlocking { ECKey.parseFromPEMEncodedObjects(FileReader("./src/test/resources/ec_device_key.pem").readText()).toECKey() }
+    val certificateChain: String = FileReader("./src/test/resources/cert-device-potential.pem").readText()
+    // ### steps 19-22: credential issuance
+
+    repeat(3) { it ->
+      // TODO: move COSE signing functionality to crypto lib?
+      val coseKey = OneKey(deviceKeyPair.toECPublicKey(), null).AsCBOR().EncodeToBytes()
+      val credReq = CredentialRequest.forOfferedCredential(
+        offeredCredential, ProofOfPossession.CWTProofBuilder(
+          issuerUrl = parsedOffer.credentialIssuer, clientId = authReq.clientId, nonce = tokenResp.cNonce,
+          coseKeyAlgorithm = COSE.AlgorithmID.ECDSA_256.AsCBOR().toString(),
+          coseKey = when(it) { // test with COSE_Key header
+            0 -> coseKey
+            else -> null
+          },
+          x5Cert = when(it) { // test with single x509 certificate in x5chain header
+            1 -> certificateChain.encodeToByteArray()
+            else -> null
+          },
+          x5Chain = when(it) { // test with x509 certificate list in x5chain header
+            2 -> listOf(certificateChain.encodeToByteArray())
+            else -> null
+          }
+        ).build(
+          SimpleCOSECryptoProvider(
+            listOf(
+              COSECryptoProviderKeyInfo(
+                deviceKeyId, AlgorithmID.ECDSA_256,
+                deviceKeyPair.toECPublicKey(), deviceKeyPair.toECPrivateKey()
+              )
+            )
+          ), deviceKeyId
+        )
+      )
+
+      val cwt = Cbor.decodeFromByteArray(COSESign1.serializer(), credReq.proof!!.cwt!!.base64UrlDecode())
+      assertNotNull(cwt.payload)
+      val cwtPayload = Cbor.decodeFromByteArray<MapElement>(cwt.payload!!)
+      assertEquals(DEType.textString, cwtPayload.value.get(MapKey(ProofOfPossession.CWTProofBuilder.LABEL_ISS))?.type)
+      val cwtProtectedHeader = Cbor.decodeFromByteArray<MapElement>(cwt.protectedHeader)
+      assertEquals(cwtProtectedHeader.value[MapKey(ProofOfPossession.CWTProofBuilder.HEADER_LABEL_ALG)]!!.internalValue, -7L)
+      assertEquals(
+        cwtProtectedHeader.value[MapKey(ProofOfPossession.CWTProofBuilder.HEADER_LABEL_CONTENT_TYPE)]!!.internalValue,
+        "openid4vci-proof+cwt"
+      )
+
+      val credResp = http.post(providerMetadata.credentialEndpoint!!) {
+        contentType(ContentType.Application.Json)
+        bearerAuth(tokenResp.accessToken!!)
+        setBody(credReq.toJSON())
+      }.body<JsonObject>().let { CredentialResponse.fromJSON(it) }
+      assertTrue(credResp.isSuccess)
+      assertContains(credResp.customParameters.keys, "credential_encoding")
+      assertEquals("issuer-signed", credResp.customParameters["credential_encoding"]!!.jsonPrimitive.content)
+      assertNotNull(credResp.credential)
+      val mdoc = MDoc(
+        credReq.docType!!.toDataElement(), IssuerSigned.fromMapElement(
+          Cbor.decodeFromByteArray(credResp.credential!!.jsonPrimitive.content.base64UrlDecode())
+        ), null
+      )
+      assertEquals(credReq.docType, mdoc.docType.value)
+      assertNotNull(mdoc.issuerSigned)
+      assertTrue(
+        mdoc.verifySignature(
+          SimpleCOSECryptoProvider(
+            listOf(
+              LspPotentialInteropEvent.loadPotentialIssuerKeys()
+            )
+          ), LspPotentialInteropEvent.POTENTIAL_ISSUER_KEY_ID
+        )
+      )
+      assertNotNull(mdoc.issuerSigned.nameSpaces)
+      assertNotEquals(0, mdoc.issuerSigned.nameSpaces!!.size)
+      assertNotNull(mdoc.issuerSigned.issuerAuth?.x5Chain)
+      assertTrue(
+        mdoc.verify(
+          MDocVerificationParams(
+            VerificationType.forIssuance, LspPotentialInteropEvent.POTENTIAL_ISSUER_KEY_ID, deviceKeyId,
+            mDocRequest = MDocRequestBuilder(offeredCredential.docType!!).build()
+          ), SimpleCOSECryptoProvider(listOf(LspPotentialInteropEvent.POTENTIAL_ISSUER_CRYPTO_PROVIDER_INFO))
+        )
+      )
+    }
+  }
 
   @Test
   fun testParseCWTExample() {
