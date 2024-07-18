@@ -75,7 +75,7 @@ object AccountsService {
             initializeUserAccount(tenant, request.name, it)
 
         }, onFailure = {
-            throw IllegalStateException("Could not register user: ${it.message}", it)
+            throw it
         })
     }
 
