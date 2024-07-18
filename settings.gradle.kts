@@ -1,22 +1,17 @@
-pluginManagement {
-    repositories {
-        google()
-        mavenCentral()
-        gradlePluginPortal()
-    }
-}
+// # walt.id identity build configuration
 
-plugins {
-    id("org.gradle.toolchains.foojay-resolver-convention") version "0.8.0"
-}
+fun getSetting(name: String) = providers.gradleProperty(name).orNull.toBoolean()
+val enableAndroidBuild = getSetting("enableAndroidBuild")
+val enableIosBuild = getSetting("enableIosBuild")
 
-rootProject.name = "waltid-identity"
+// Build setup:
 
+// Shorthands
 val libraries = ":waltid-libraries"
 val applications = ":waltid-applications"
 val services = ":waltid-services"
-include(
-    // Base SSI libs
+
+val baseModules = listOf(
     "$libraries:waltid-crypto",
     "$libraries:waltid-did",
     "$libraries:waltid-verifiable-credentials",
@@ -48,18 +43,36 @@ include(
     "$libraries:waltid-credentials-base"
 )
 
-    // Android - uncomment to enable build, and set Android SDK in local.properties:
-    /*
+val androidModules = listOf(
     ":waltid-libraries:waltid-crypto-android",
     ":waltid-applications:waltid-android"
-    */
+)
 
-    // iOS - uncomment to enable build:
-    /*
+val iosModules = listOf(
     "$libraries:waltid-crypto-ios",
     "$libraries:waltid-target-ios",
     "$libraries:waltid-target-ios:implementation",
     "$applications:waltid-openid4vc-ios-testApp",
     "$applications:waltid-openid4vc-ios-testApp:shared"
-     */
-//include("waltid-e2e-tests")
+)
+
+val enabledModules = ArrayList<String>(baseModules)
+
+if (enableAndroidBuild) enabledModules.addAll(androidModules)
+if (enableIosBuild) enabledModules.addAll(iosModules)
+
+include(*enabledModules.toTypedArray())
+
+pluginManagement {
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+
+plugins {
+    id("org.gradle.toolchains.foojay-resolver-convention") version "0.8.0"
+}
+
+rootProject.name = "waltid-identity"
