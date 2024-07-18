@@ -19,9 +19,16 @@ object EmailAccountStrategy : PasswordAccountStrategy<EmailAccountRequest>() {
     override suspend fun register(tenant: String, request: EmailAccountRequest): Result<RegistrationResult> = runCatching {
         val name = request.name
         val email = request.email
-        check(email.isNotBlank()) { "Email must not be blank!" }
-        check(request.password.isNotBlank()) { "Password must not be blank!" }
-        require(!AccountsService.hasAccountEmail(tenant, email)) { "Account already exists!" }
+
+        if (email.isBlank()) {
+            throw IllegalArgumentException("Email must not be blank!")
+        }
+        if (request.password.isBlank()) {
+            throw IllegalArgumentException("Password must not be blank!")
+        }
+        if (AccountsService.hasAccountEmail(tenant, email)) {
+            throw ConflictException("An account with email $email already exists.")
+        }
 
         val hash = hashPassword(ByteLoginRequest(request).password)
 
