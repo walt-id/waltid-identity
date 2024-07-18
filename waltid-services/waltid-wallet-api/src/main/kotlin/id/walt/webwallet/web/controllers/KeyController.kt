@@ -119,28 +119,22 @@ fun Application.keys() = walletRoute {
             request {
                 body<String> { description = "Key in JWK or PEM format" }
             }
-            response {
-                HttpStatusCode.Created to {
-                    description = "The key id (or alias)"
-                    body<String>()
-                }
-                HttpStatusCode.BadRequest to {
-                    description = "Key could not be imported"
-                }
-                HttpStatusCode.Conflict to {
-                    description = "Key already exists"
-                }
-                HttpStatusCode.NotAcceptable to {
-                    description = "Key format not supported"
-                }
-            }
         }) {
             val body = call.receiveText()
-            val key = getWalletService().importKey(body)
-            context.respond(
-                HttpStatusCode.Created,
-                key
-            )
+
+            runCatching {
+                getWalletService().importKey(body)
+            }
+
+                .onSuccess { key ->
+                    context.respond(
+                        HttpStatusCode.Created,
+                        key
+                    )
+                }.onFailure {
+                    throw it
+                }
+
         }
         route("{keyId}", {
             request {
