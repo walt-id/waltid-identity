@@ -1,6 +1,7 @@
 import love.forte.plugin.suspendtrans.ClassInfo
 import love.forte.plugin.suspendtrans.SuspendTransformConfiguration
 import love.forte.plugin.suspendtrans.TargetPlatform
+import love.forte.plugin.suspendtrans.gradle.SuspendTransPluginConstants
 import love.forte.plugin.suspendtrans.gradle.SuspendTransformGradleExtension
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
@@ -29,6 +30,8 @@ suspendTransform {
     enabled = true
     includeRuntime = true
     useDefault()
+
+    includeAnnotation = false // Required in the current version to avoid "compileOnly" warning
 }
 
 
@@ -112,6 +115,8 @@ kotlin {
                 // Logging
                 implementation("io.github.oshai:kotlin-logging:7.0.0")
 
+                // suspend-transform plugin annotations (required in the current version to avoid "compileOnly" warning)
+                implementation("${SuspendTransPluginConstants.ANNOTATION_GROUP}:${SuspendTransPluginConstants.ANNOTATION_NAME}:${SuspendTransPluginConstants.ANNOTATION_VERSION}")
             }
         }
         val commonTest by getting {
