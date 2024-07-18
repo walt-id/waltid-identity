@@ -8,6 +8,7 @@ import io.ktor.client.statement.*
 import io.ktor.http.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonObject
+import kotlin.test.assertContains
 import kotlin.test.assertEquals
 
 class LspPotentialWallet(val client: HttpClient, val walletId: String) {
@@ -32,6 +33,7 @@ class LspPotentialWallet(val client: HttpClient, val walletId: String) {
       it.body<OpenIDProviderMetadata>()
     }
     assertEquals(issuerMetadata.issuer, resolvedOffer.credentialIssuer)
+    assertContains(issuerMetadata.credentialConfigurationsSupported!!.keys, resolvedOffer.credentialConfigurationIds.first())
 
     // === get wallet DID ===
     val did = client.get("/wallet-api/wallet/$walletId/dids").expectSuccess().let {

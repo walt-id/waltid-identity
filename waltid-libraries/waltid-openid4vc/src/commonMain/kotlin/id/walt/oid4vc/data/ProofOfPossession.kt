@@ -128,3 +128,8 @@ object ProofOfPossessionSerializer : JsonDataObjectSerializer<ProofOfPossession>
 enum class ProofType {
     jwt, cwt, ldp_vp
 }
+
+@Serializable
+data class ProofTypeMetadata (
+    @SerialName("proof_signing_alg_values_supported") val proofSigningAlgValuesSupported: Set<String>
+)

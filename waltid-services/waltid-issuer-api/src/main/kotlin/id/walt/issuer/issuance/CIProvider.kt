@@ -30,9 +30,7 @@ import id.walt.mdoc.dataelement.*
 import id.walt.mdoc.doc.MDocBuilder
 import id.walt.mdoc.mso.DeviceKeyInfo
 import id.walt.mdoc.mso.ValidityInfo
-import id.walt.oid4vc.data.CredentialFormat
-import id.walt.oid4vc.data.CredentialSupported
-import id.walt.oid4vc.data.ProofOfPossession
+import id.walt.oid4vc.data.*
 import id.walt.oid4vc.definitions.JWTClaims
 import id.walt.oid4vc.errors.CredentialError
 import id.walt.oid4vc.errors.DeferredCredentialError
@@ -75,21 +73,22 @@ open class CIProvider : OpenIDCredentialIssuer(
             CredentialSupported(
                 format = format,
                 cryptographicBindingMethodsSupported = setOf("did"),
-                cryptographicSuitesSupported = setOf("EdDSA", "ES256", "ES256K", "RSA"),
+                credentialSigningAlgValuesSupported = setOf("EdDSA", "ES256", "ES256K", "RSA"),
                 types = entry.value
             ))
         }
     }.plus(Pair("org.iso.18013.5.1.mDL", CredentialSupported(
         format = CredentialFormat.mso_mdoc,
         cryptographicBindingMethodsSupported = setOf("cose_key"),
-        cryptographicSuitesSupported = setOf("ES256"),
+        credentialSigningAlgValuesSupported = setOf("ES256"),
+        proofTypesSupported = mapOf(ProofType.cwt to ProofTypeMetadata(setOf("ES256"))),
         types = listOf("org.iso.18013.5.1.mDL"),
         docType = "org.iso.18013.5.1.mDL"
     ))).plus(
         Pair("urn:eu.europa.ec.eudi:pid:1", CredentialSupported(
         format = CredentialFormat.sd_jwt_vc,
             cryptographicBindingMethodsSupported = null,
-            cryptographicSuitesSupported = setOf("ES256"),
+            credentialSigningAlgValuesSupported = setOf("ES256"),
             types = listOf("urn:eu.europa.ec.eudi:pid:1"),
             docType = "urn:eu.europa.ec.eudi:pid:1"
     )
