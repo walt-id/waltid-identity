@@ -39,10 +39,12 @@ import id.walt.oid4vc.providers.OpenIDCredentialVerifier
 import id.walt.oid4vc.providers.PresentationSession
 import id.walt.oid4vc.responses.TokenResponse
 import id.walt.oid4vc.util.randomUUID
-import id.walt.verifier.config.OIDCVerifierServiceConfig
 import id.walt.sdjwt.SDJwtVC
+import id.walt.sdjwt.SimpleJWTCryptoProvider
+import id.walt.sdjwt.SimpleMultiKeyJWTCryptoProvider
 import id.walt.sdjwt.WaltIdJWTCryptoProvider
 import id.walt.verifier.FeatureCatalog
+import id.walt.verifier.config.OIDCVerifierServiceConfig
 import id.walt.verifier.lspPotential.LspPotentialVerificationInterop
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.runBlocking

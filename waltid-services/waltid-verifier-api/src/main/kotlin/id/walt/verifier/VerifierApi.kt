@@ -59,10 +59,6 @@ data class TokenResponseFormParam(
     val response: String?,
 )
 
-data class LSPPotentialIssueFormDataParam(
-    val jwk: JsonObject,
-)
-
 @Serializable
 data class CredentialVerificationRequest(
     @SerialName("vp_policies")
