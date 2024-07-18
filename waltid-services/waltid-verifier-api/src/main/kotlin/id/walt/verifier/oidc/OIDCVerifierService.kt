@@ -158,13 +158,8 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
         }
     }
 
-    private fun getAdditionalTrustedRootCAs(): List<X509Certificate> {
-        val trustedRootCAs = mutableListOf<X509Certificate>();
-        {
-            trustedRootCAs.addAll(LspPotentialVerificationInterop.POTENTIAL_ISSUER_CRYPTO_PROVIDER_INFO.trustedRootCAs)
-        } whenFeature FeatureCatalog.lspPotential
-
-        return trustedRootCAs
+    private fun getAdditionalTrustedRootCAs(session: PresentationSession): List<X509Certificate> {
+        return session.trustedRootCAs?.map { X509CertUtils.parse(it) } ?: listOf()
     }
 
     private fun verifyMdoc(tokenResponse: TokenResponse, session: PresentationSession): Boolean {
@@ -188,7 +183,7 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
                 )
             ), SimpleCOSECryptoProvider(
                 listOf(
-                    COSECryptoProviderKeyInfo("ISSUER_KEY_ID", AlgorithmID.ECDSA_256, issuerKey, null, listOf(), getAdditionalTrustedRootCAs()),
+                    COSECryptoProviderKeyInfo("ISSUER_KEY_ID", AlgorithmID.ECDSA_256, issuerKey, null, listOf(), getAdditionalTrustedRootCAs(session)),
                     COSECryptoProviderKeyInfo("DEVICE_KEY_ID", AlgorithmID.ECDSA_256, deviceKey.AsPublicKey(), null)
                 )
             )
@@ -234,6 +229,7 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
         clientIdScheme: ClientIdScheme,
         openId4VPProfile: OpenId4VPProfile,
         walletInitiatedAuthState: String?,
+        trustedRootCAs: List<String>?
     ): PresentationSession {
         val presentationSession = super.initializeAuthorization(
             presentationDefinition = presentationDefinition,
@@ -245,7 +241,8 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
             ephemeralEncKey = ephemeralEncKey,
             clientIdScheme = clientIdScheme,
             openId4VPProfile = openId4VPProfile,
-            walletInitiatedAuthState = walletInitiatedAuthState
+            walletInitiatedAuthState = walletInitiatedAuthState,
+            trustedRootCAs = trustedRootCAs
         )
         return presentationSession.copy(
             authorizationRequest = presentationSession.authorizationRequest!!.copy(

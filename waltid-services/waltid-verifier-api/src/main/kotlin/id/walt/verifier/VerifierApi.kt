@@ -209,7 +209,8 @@ fun Application.verfierApi() {
                     statusCallbackUri = statusCallbackUri,
                     statusCallbackApiKey = statusCallbackApiKey,
                     stateId = stateId,
-                    openId4VPProfile = openId4VPProfile
+                    openId4VPProfile = openId4VPProfile,
+                    trustedRootCAs = body["trusted_root_cas"]?.jsonArray
                 )
 
                 context.respond(
