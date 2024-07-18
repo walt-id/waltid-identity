@@ -20,7 +20,6 @@ import id.walt.did.helpers.WaltidServices
 import id.walt.did.utils.randomUUID
 import id.walt.issuer.config.OIDCIssuerServiceConfig
 import id.walt.issuer.issuerModule
-import id.walt.issuer.utils.LspPotentialInteropEvent
 import id.walt.mdoc.COSECryptoProviderKeyInfo
 import id.walt.mdoc.SimpleCOSECryptoProvider
 import id.walt.mdoc.cose.COSESign1

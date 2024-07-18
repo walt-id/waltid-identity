@@ -401,20 +401,6 @@ class E2ETest {
     }
 
   //@Test // enable to execute test selectively
-  fun lspTests() = runTest(timeout = 5.minutes) {
-    var client = testHttpClient(doFollowRedirects = false)
-    testBlock {
-      val lspPotentialIssuance = LspPotentialIssuance(client)
-      test("lsp issuance track1") {
-        lspPotentialIssuance.testTrack1()
-      }
-      test("lsp issuance track2") {
-        lspPotentialIssuance.testTrack2()
-      }
-    }
-  }
-
-  //@Test // enable to execute test selectively
   fun lspIssuanceTests() = runTest(timeout = 5.minutes) {
     val client = testHttpClient(doFollowRedirects = false)
     testBlock {

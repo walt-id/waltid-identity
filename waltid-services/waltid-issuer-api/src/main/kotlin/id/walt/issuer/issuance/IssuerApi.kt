@@ -5,7 +5,7 @@ import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.did.dids.DidService
-import id.walt.issuer.utils.LspPotentialInteropEvent
+import id.walt.issuer.lspPotential.LspPotentialIssuanceInterop
 import id.walt.oid4vc.definitions.CROSS_DEVICE_CREDENTIAL_OFFER_URL
 import id.walt.oid4vc.requests.CredentialOfferRequest
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -398,7 +398,7 @@ fun Application.issuerApi() {
                     context.respond(credentialOffer.toJSON())
                 }
                 get("lspPotentialCredentialOffer") {
-                    val jwkKey = JWKKey.importJWK(LspPotentialInteropEvent.POTENTIAL_ISSUER_KEY_JWK).getOrThrow()
+                    val jwkKey = JWKKey.importJWK(LspPotentialIssuanceInterop.POTENTIAL_ISSUER_KEY_JWK).getOrThrow()
                     val offerUri = IssuanceRequest(
                         Json.parseToJsonElement(KeySerialization.serializeKey(jwkKey)).jsonObject,
                         "",
@@ -409,15 +409,15 @@ fun Application.issuerApi() {
                             put("given_name", "John")
                             put("birth_date", "1980-01-01")
                         }),
-                        x5Chain = listOf(LspPotentialInteropEvent.POTENTIAL_ISSUER_CERT),
-                        trustedRootCAs = listOf(LspPotentialInteropEvent.POTENTIAL_ROOT_CA_CERT)
+                        x5Chain = listOf(LspPotentialIssuanceInterop.POTENTIAL_ISSUER_CERT),
+                        trustedRootCAs = listOf(LspPotentialIssuanceInterop.POTENTIAL_ROOT_CA_CERT)
                     ).let { createCredentialOfferUri(listOf(it)) }
                     context.respond(
                         HttpStatusCode.OK, offerUri
                     )
                 }
                 get("lspPotentialCredentialOfferT2") {
-                    val jwkKey = JWKKey.importJWK(LspPotentialInteropEvent.POTENTIAL_ISSUER_KEY_JWK).getOrThrow()
+                    val jwkKey = JWKKey.importJWK(LspPotentialIssuanceInterop.POTENTIAL_ISSUER_KEY_JWK).getOrThrow()
                     val offerUri = IssuanceRequest(
                         Json.parseToJsonElement(KeySerialization.serializeKey(jwkKey)).jsonObject,
                         "",
