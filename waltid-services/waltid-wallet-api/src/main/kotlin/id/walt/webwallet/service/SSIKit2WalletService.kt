@@ -1,6 +1,7 @@
 package id.walt.webwallet.service
 
 import id.walt.commons.config.ConfigManager
+import id.walt.commons.web.ConflictException
 import id.walt.crypto.keys.*
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.did.dids.DidService
@@ -454,8 +455,10 @@ class SSIKit2WalletService(
 
         val key = keyResult.getOrThrow()
         val keyId = key.getKeyId()
-        KeysService.get(walletId, keyId)
-            ?.let { throw IllegalArgumentException("Key with ID $keyId already exists in the database") }
+
+        KeysService.exists(walletId, keyId)
+            .takeIf { it }
+            ?.let { throw ConflictException("Key with ID $keyId already exists in the database") }
 
         eventUseCase.log(
             action = EventType.Key.Import,
