@@ -2,6 +2,7 @@ package id.walt.webwallet.service
 
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.web.ConflictException
+import id.walt.commons.web.NotAcceptedContentTypeException
 import id.walt.crypto.keys.*
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.did.dids.DidService
@@ -50,6 +51,7 @@ import io.ktor.client.*
 import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
+import io.ktor.server.plugins.*
 import io.ktor.util.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Clock
@@ -437,39 +439,55 @@ class SSIKit2WalletService(
             }.getKeyId()
     }
 
-    override suspend fun importKey(jwkOrPem: String): String {
-        val type =
-            when {
-                jwkOrPem.lines().first().contains("BEGIN ") -> "pem"
-                else -> "jwk"
-            }
+    private fun getKeyType(jwkOrPem: String): String {
+        return when {
+            jwkOrPem.lines().first().contains("BEGIN ") -> "pem"
+            jwkOrPem.contains("kty") -> "jwk"
+            else -> throw NotAcceptedContentTypeException("Unknown key format")
+        }
+    }
 
-        val keyResult =
-            when (type) {
+
+    override suspend fun importKey(jwkOrPem: String): String {
+        return runCatching {
+            val keyResult = when (val type = getKeyType(jwkOrPem)) {
                 "pem" -> JWKKey.importPEM(jwkOrPem)
                 "jwk" -> JWKKey.importJWK(jwkOrPem)
-                else -> throw IllegalArgumentException("Unknown key type: $type")
+                else -> throw NotAcceptedContentTypeException("Unknown key type: $type")
             }
 
-        require(keyResult.isSuccess) { "Could not import key as: $type; error message: " + keyResult.exceptionOrNull()?.message }
+            keyResult.getOrElse {
+                throw IllegalArgumentException("Invalid key format: ${keyResult.exceptionOrNull()?.message}")
+            }
+        }.mapCatching { key ->
+            val keyId = key.getKeyId()
 
-        val key = keyResult.getOrThrow()
-        val keyId = key.getKeyId()
+            if (KeysService.exists(walletId, keyId)) {
+                throw ConflictException("Key with ID $keyId already exists in the database")
+            }
 
-        KeysService.exists(walletId, keyId)
-            .takeIf { it }
-            ?.let { throw ConflictException("Key with ID $keyId already exists in the database") }
+            runBlocking {
+                eventUseCase.log(
+                    action = EventType.Key.Import,
+                    originator = "wallet",
+                    tenant = tenant,
+                    accountId = accountId,
+                    walletId = walletId,
+                    data = eventUseCase.keyEventData(key, EventDataNotAvailable)
+                )
+            }
 
-        eventUseCase.log(
-            action = EventType.Key.Import,
-            originator = "wallet",
-            tenant = tenant,
-            accountId = accountId,
-            walletId = walletId,
-            data = eventUseCase.keyEventData(key, EventDataNotAvailable)
-        )
-        KeysService.add(walletId, keyId, KeySerialization.serializeKey(key))
-        return keyId
+            KeysService.add(walletId, keyId, KeySerialization.serializeKey(key))
+            keyId
+        }.getOrElse { throwable ->
+            when (throwable) {
+                is IllegalArgumentException -> throw BadRequestException(throwable.message ?: "Invalid input")
+                is ConflictException -> throw throwable
+                is IllegalStateException -> throw throwable
+                is NotAcceptedContentTypeException -> throw throwable
+                else -> throw Exception("Unexpected error occurred: ${throwable.localizedMessage}", throwable)
+            }
+        }
     }
 
     override suspend fun deleteKey(alias: String): Boolean = runCatching {
