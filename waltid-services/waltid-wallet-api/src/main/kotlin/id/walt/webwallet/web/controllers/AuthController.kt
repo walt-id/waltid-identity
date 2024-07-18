@@ -8,10 +8,7 @@ import com.nimbusds.jose.crypto.MACSigner
 import com.nimbusds.jose.crypto.MACVerifier
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.featureflag.FeatureManager
-import id.walt.commons.web.BadRequestException
-import id.walt.commons.web.ForbiddenException
-import id.walt.commons.web.IllegalStateException
-import id.walt.commons.web.UnauthorizedException
+import id.walt.commons.web.*
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.oid4vc.definitions.JWTClaims
@@ -504,7 +501,10 @@ suspend fun verifyToken(token: String): Result<String> {
     }
 }
 
-data class LoginRequestError(override val message: String) : BadRequestException(message) {
+data class LoginRequestError(override val message: String) : WebException(
+    message = message,
+    status = HttpStatusCode.BadRequest
+) {
     constructor(throwable: Throwable) : this(
         when (throwable) {
             is BadRequestException -> "Error processing request"
