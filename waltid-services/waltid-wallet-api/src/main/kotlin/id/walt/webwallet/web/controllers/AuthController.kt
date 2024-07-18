@@ -529,7 +529,9 @@ suspend fun PipelineContext<Unit, ApplicationCall>.doLogin() {
         call.respond(
             Json.encodeToJsonElement(it).jsonObject.minus("type").plus(Pair("token", token.toJsonElement()))
         )
-    }.onFailure { call.respond(HttpStatusCode.BadRequest, it.localizedMessage) }
+    }.onFailure {
+        throw BadRequestException(it.localizedMessage)
+    }
 }
 
 private fun PipelineContext<Unit, ApplicationCall>.clearUserSession() {
