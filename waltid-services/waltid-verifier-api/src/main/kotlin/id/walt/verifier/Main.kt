@@ -39,6 +39,7 @@ fun Application.configurePlugins() {
     configureHTTP()
     configureMonitoring()
     configureRouting()
+    configureSerialization()
 }
 
 fun Application.verifierModule(withPlugins: Boolean = true) {
