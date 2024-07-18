@@ -152,7 +152,7 @@ fun Application.configureSecurity() {
                     try {
                         parseAuthorizationHeader(it)
                     } catch (cause: ParseException) {
-                        throw BadRequestException("Invalid auth header", cause)
+                        throw BadRequestException("Invalid Authorization header")
                     }
                 }
             }
