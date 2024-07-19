@@ -1,4 +1,8 @@
+package apis
+
 import E2ETestWebService.test
+import assertions.assertKeyComponents
+import expectSuccess
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyType
 import id.walt.webwallet.service.keys.SingleKeyResponse
@@ -9,6 +13,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.uuid.UUID
+import tryGetData
 import kotlin.test.assertNotNull
 
 class KeysApi(private val client: HttpClient) {

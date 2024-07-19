@@ -1,6 +1,9 @@
+package assertions
+
 import id.walt.crypto.keys.KeyType
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.jsonPrimitive
+import tryGetData
 import kotlin.test.assertNotNull
 
 fun assertKeyComponents(document: JsonElement, keyId: String, type: KeyType, isPrivate: Boolean = false) {

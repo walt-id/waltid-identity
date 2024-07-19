@@ -1,5 +1,6 @@
 import E2ETestWebService.loadResource
 import E2ETestWebService.testBlock
+import apis.*
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.web.plugins.httpJson
 import id.walt.crypto.keys.KeyGenerationRequest
@@ -9,7 +10,6 @@ import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.webwallet.config.RegistrationDefaultsConfig
 import id.walt.webwallet.web.model.EmailAccountRequest
 import io.ktor.client.*
-import io.ktor.client.call.*
 import io.ktor.client.engine.cio.*
 import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.*

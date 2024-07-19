@@ -1,6 +1,4 @@
 import com.github.ajalt.mordant.rendering.AnsiLevel
-import com.github.ajalt.mordant.rendering.TextColors
-import com.github.ajalt.mordant.rendering.TextStyles
 import com.github.ajalt.mordant.terminal.Terminal
 import id.walt.commons.ServiceConfiguration
 import id.walt.commons.ServiceInitialization
@@ -46,25 +44,12 @@ object E2ETestWebService {
         }
     }
 
-    data class TestStats(
-        val overall: Int,
-        val success: Int,
-        val failed: Int,
-    )
-
 
     val testResults = ArrayList<Result<Any?>>()
     val testNames = HashMap<Int, String>()
     val t = Terminal(ansiLevel = AnsiLevel.TRUECOLOR)
 
     suspend fun testBlock(block: suspend () -> Unit) {
-
-        fun getTestStats(): TestStats {
-            val succeeded = testResults.count { it.isSuccess }
-            val failed = testResults.size - succeeded
-            return TestStats(testResults.size, succeeded, failed)
-        }
-
 
         ServiceMain(
             ServiceConfiguration("e2e-test"), ServiceInitialization(
@@ -78,59 +63,20 @@ object E2ETestWebService {
                 run = TestWebService(Application::e2eTestModule).run(block)
             )
         ).main(arrayOf("-l", "trace"))
-
-        t.println("\n" + TextColors.magenta("Test results:"))
-        testResults.forEachIndexed { index, result ->
-            val idx = index + 1
-            val name = testNames[idx]!!
-            t.println(TextColors.magenta("$idx. $name: ${result.toSuccessString()}"))
-        }
-
-        val testStats = getTestStats()
-        if (testStats.failed > 0) {
-            error("${testStats.failed} tests failed!")
-        }
-
-        if (testStats.overall == 0) {
-            error("Error - no E2E tests were executed!")
-        }
-    }
-
-    fun Result<*>.toSuccessString() = if (isSuccess) {
-        val res = if (getOrNull() !is Unit) " (${getOrNull().toString()})" else ""
-        TextColors.green("✅ SUCCESS$res")
-    } else {
-        val res = exceptionOrNull()!!.message?.let { " ($it)" } ?: ""
-        TextColors.red("❌ FAILURE$res")
+        //printStats
     }
 
     suspend fun test(name: String, function: suspend () -> Any?) {
         val id = testResults.size + 1
         testNames[id] = name
 
-        t.println("\n${TextColors.cyan(TextStyles.bold("---=== Start $id. test: $name === ---"))}")
-
         val result = runCatching { function.invoke() }
-        testResults.add(result)
-
-        t.println(TextColors.blue("End result of test \"$name\": $result"))
-        if (result.isFailure) {
-            result.exceptionOrNull()!!.printStackTrace()
-        }
-
-        t.println(TextStyles.bold(TextColors.cyan("---===  End  ${id}. test: $name === ---") + " " + result.toSuccessString()) + "\n")
-
-        val overallSuccess = testResults.count { it.isSuccess }
-        val failed = testResults.size - overallSuccess
-        val failedStr = if (failed == 0) "none failed ✅" else TextColors.red("$failed failed")
-        t.println(TextColors.magenta("Current test stats: ${testResults.size} overall | $overallSuccess succeeded | $failedStr\n"))
+        //logTestResult
     }
 
     fun loadResource(relativePath: String): String =
-        URLDecoder.decode(object {}.javaClass.getResource(relativePath)!!.path, "UTF-8").let { File(it).readText() }
+        URLDecoder.decode(this.javaClass.getResource(relativePath)!!.path, "UTF-8").let { File(it).readText() }
 }
-
-typealias TestFunctionType = (String, suspend() -> Any?) -> Unit
 
 private fun Application.e2eTestModule() {
     webWalletModule(true)

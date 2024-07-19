@@ -1,4 +1,7 @@
+package apis
+
 import E2ETestWebService.test
+import expectSuccess
 import id.walt.verifier.oidc.PresentationSessionInfo
 import io.ktor.client.*
 import io.ktor.client.call.*

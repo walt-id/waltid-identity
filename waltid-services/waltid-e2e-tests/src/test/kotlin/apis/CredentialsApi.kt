@@ -1,4 +1,7 @@
+package apis
+
 import E2ETestWebService.test
+import expectSuccess
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.service.credentials.CredentialFilterObject
 import id.walt.webwallet.usecase.credential.CredentialStatusResult

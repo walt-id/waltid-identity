@@ -1,4 +1,7 @@
+package apis
+
 import E2ETestWebService.test
+import expectSuccess
 import id.walt.issuer.issuance.IssuanceRequest
 import io.ktor.client.*
 import io.ktor.client.call.*

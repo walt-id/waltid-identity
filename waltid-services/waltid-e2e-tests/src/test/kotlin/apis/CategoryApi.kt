@@ -1,4 +1,7 @@
+package apis
+
 import E2ETestWebService.test
+import expectSuccess
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
