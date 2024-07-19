@@ -1,3 +1,6 @@
+import extensions.Login
+import extensions.ServicesExtension
+import extensions.StatsExtension
 import id.walt.commons.web.plugins.httpJson
 import io.ktor.client.*
 import io.ktor.client.engine.cio.*
@@ -7,22 +10,18 @@ import io.ktor.client.plugins.logging.*
 import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
-import org.junit.jupiter.api.AfterAll
-import org.junit.jupiter.api.BeforeAll
-import org.junit.jupiter.api.TestInstance
+import org.junit.jupiter.api.extension.ExtendWith
+import java.io.File
+import java.net.URLDecoder
+import kotlin.test.Test
 
 
-@TestInstance(TestInstance.Lifecycle.PER_CLASS)
-abstract class ComponentTestBase : ComponentTest {
+@ExtendWith(ServicesExtension::class)
+@ExtendWith(StatsExtension::class)
+class ComponentTestBase() : ComponentTest {
 
-    @BeforeAll
-    override fun setup() {
-        TODO("Not yet implemented")
-    }
-
-    @AfterAll
-    override fun tearDown() {
-        TODO("Not yet implemented")
+    @Test
+    fun testTest(){
     }
 
     protected fun testHttpClient(token: String? = null) = HttpClient(CIO) {
@@ -40,4 +39,7 @@ abstract class ComponentTestBase : ComponentTest {
             level = LogLevel.ALL
         }
     }
+
+    protected fun loadResource(relativePath: String): String =
+        URLDecoder.decode(this.javaClass.getResource(relativePath)!!.path, "UTF-8").let { File(it).readText() }
 }

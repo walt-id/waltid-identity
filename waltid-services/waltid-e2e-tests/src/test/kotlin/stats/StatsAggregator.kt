@@ -4,18 +4,17 @@ import com.github.ajalt.mordant.rendering.AnsiLevel
 import com.github.ajalt.mordant.rendering.TextColors
 import com.github.ajalt.mordant.rendering.TextStyles
 import com.github.ajalt.mordant.terminal.Terminal
+import java.util.*
 
 class StatsAggregator {
-    private val testResults = ArrayList<Result<Any?>>()
-    private val testNames = HashMap<Int, String>()
+    private val testStats = ArrayList<TestStatIdentifier>()
     private val t = Terminal(ansiLevel = AnsiLevel.TRUECOLOR)
 
     fun printStats() {
         t.println("\n" + TextColors.magenta("Test results:"))
-        testResults.forEachIndexed { index, result ->
-            val idx = index + 1
-            val name = testNames[idx]!!
-            t.println(TextColors.magenta("$idx. $name: ${result.toSuccessString()}"))
+        testStats.forEachIndexed { index, stat ->
+            val name = testStats[index].name
+            t.println(TextColors.magenta("{$index+1}. $name: ${stat.result.toSuccessString()}"))
         }
 
         val testStats = getTestStats()
@@ -28,10 +27,20 @@ class StatsAggregator {
         }
     }
 
-    fun logTestResult(result: Result<Any>, id: String, name: String) {
+    fun logTestStart(name: String) {
+        val id = testStats.size + 1
         t.println("\n${TextColors.cyan(TextStyles.bold("---=== Start $id. test: $name === ---"))}")
+    }
 
-        testResults.add(result)
+    fun logTestResult(option: Optional<Throwable>?, name: String) = let {
+        option.takeIf { it?.isPresent ?: false }?.let {
+            Result.failure<Any>(it.get())
+        } ?: Result.success<Any?>(null)
+    }.run { logTestResult(this, name) }
+
+    private fun logTestResult(result: Result<*>, name: String) {
+        testStats.add(TestStatIdentifier(name, result))
+        val id = testStats.size
 
         t.println(TextColors.blue("End result of test \"$name\": $result"))
         if (result.isFailure) {
@@ -40,16 +49,16 @@ class StatsAggregator {
 
         t.println(TextStyles.bold(TextColors.cyan("---===  End  ${id}. test: $name === ---") + " " + result.toSuccessString()) + "\n")
 
-        val overallSuccess = testResults.count { it.isSuccess }
-        val failed = testResults.size - overallSuccess
+        val overallSuccess = testStats.count { it.result.isSuccess }
+        val failed = testStats.size - overallSuccess
         val failedStr = if (failed == 0) "none failed ✅" else TextColors.red("$failed failed")
-        t.println(TextColors.magenta("Current test stats: ${testResults.size} overall | $overallSuccess succeeded | $failedStr\n"))
+        t.println(TextColors.magenta("Current test stats: ${testStats.size} overall | $overallSuccess succeeded | $failedStr\n"))
     }
 
     private fun getTestStats(): TestStats {
-        val succeeded = testResults.count { it.isSuccess }
-        val failed = testResults.size - succeeded
-        return TestStats(testResults.size, succeeded, failed)
+        val succeeded = testStats.count { it.result.isSuccess }
+        val failed = testStats.size - succeeded
+        return TestStats(testStats.size, succeeded, failed)
     }
 
     private fun Result<*>.toSuccessString() = if (isSuccess) {
@@ -59,4 +68,9 @@ class StatsAggregator {
         val res = exceptionOrNull()!!.message?.let { " ($it)" } ?: ""
         TextColors.red("❌ FAILURE$res")
     }
+
+    data class TestStatIdentifier(
+        val name: String,
+        val result: Result<*>,
+    )
 }

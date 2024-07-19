@@ -20,10 +20,16 @@ dependencies {
     testImplementation("io.ktor:ktor-client-content-negotiation:2.3.12")
     testImplementation("io.ktor:ktor-client-logging:2.3.12")
     testImplementation("com.github.ajalt.mordant:mordant:2.7.1")
+
     implementation(project(":waltid-services:waltid-service-commons"))
     implementation(project(":waltid-services:waltid-issuer-api"))
     implementation(project(":waltid-services:waltid-verifier-api"))
     implementation(project(":waltid-services:waltid-wallet-api"))
+
+    implementation("io.github.oshai:kotlin-logging-jvm:7.0.0")
+    implementation("org.slf4j:jul-to-slf4j:2.0.13")
+    implementation("io.klogging:klogging-jvm:0.5.14")
+    implementation("io.klogging:slf4j-klogging:0.5.14")
 
     testImplementation("app.softwork:kotlinx-uuid-core:0.0.26")
 
