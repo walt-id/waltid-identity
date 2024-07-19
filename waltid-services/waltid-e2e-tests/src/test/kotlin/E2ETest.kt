@@ -1,5 +1,4 @@
 import E2ETestWebService.loadResource
-import E2ETestWebService.test
 import E2ETestWebService.testBlock
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.web.plugins.httpJson
@@ -8,9 +7,6 @@ import id.walt.crypto.keys.KeyType
 import id.walt.issuer.issuance.IssuanceRequest
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.webwallet.config.RegistrationDefaultsConfig
-import id.walt.webwallet.db.models.Account
-import id.walt.webwallet.db.models.AccountWalletListing
-import id.walt.webwallet.web.model.AccountRequest
 import id.walt.webwallet.web.model.EmailAccountRequest
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -36,58 +32,32 @@ class E2ETest {
     fun e2e() = runTest(timeout = 5.minutes) {
         testBlock {
             var client = testHttpClient()
-
-            //region -Login-
-            test("/wallet-api/auth/user-info - not logged in without token") {
-                client.get("/wallet-api/auth/user-info").apply {
-                    assert(status == HttpStatusCode.Unauthorized) { "Was authorized without authorizing!" }
-                }
-            }
-
-            test("/wallet-api/auth/login - wallet-api login") {
-                client.post("/wallet-api/auth/login") {
-                    setBody(
-                        EmailAccountRequest(
-                            email = "user@email.com", password = "password"
-                        ) as AccountRequest
-                    )
-                }.expectSuccess().apply {
-                    body<JsonObject>().let { result ->
-                        assertNotNull(result["token"])
-                        val token = result["token"]!!.jsonPrimitive.content.expectLooksLikeJwt()
-
-                        client = testHttpClient(token = token)
-                    }
-                }
-            }
-
             lateinit var accountId: UUID
-
-            test("/wallet-api/auth/user-info - logged in after login") {
-                client.get("/wallet-api/auth/user-info").expectSuccess().apply {
-                    body<Account>().let { account ->
-                        accountId = account.id
-                    }
-                }
-            }
-
-            test("/wallet-api/auth/session - logged in after login") {
-                client.get("/wallet-api/auth/session").expectSuccess()
-            }
-
             lateinit var wallet: UUID
+            var authApi = AuthApi(client)
 
-            test("/wallet-api/wallet/accounts/wallets - get wallets") {
-                client.get("/wallet-api/wallet/accounts/wallets").expectSuccess().apply {
-                    val listing = body<AccountWalletListing>()
-                    assert(listing.account == accountId) { "Wallet listing is for wrong account!" }
+            // the e2e http request tests here
 
-                    assert(listing.wallets.isNotEmpty()) { "No wallets available!" }
-                    wallet = listing.wallets.first().id
-                    println("Selected wallet: $wallet")
-                }
+            //region -Auth-
+            authApi.userInfo(HttpStatusCode.Unauthorized)
+            authApi.login(
+                EmailAccountRequest(
+                    email = "user@email.com",
+                    password = "password"
+                )
+            ) {
+                client = testHttpClient(token = it)
+                authApi = AuthApi(client)
             }
-            //endregion -Login-
+            authApi.userInfo(HttpStatusCode.OK) {
+                accountId = it.id
+            }
+            authApi.userSession()
+            authApi.userWallets(accountId) {
+                wallet = it.wallets.first().id
+                println("Selected wallet: $wallet")
+            }
+            //endregion -Auth-
 
             //region -Keys-
             val keysApi = KeysApi(client)
