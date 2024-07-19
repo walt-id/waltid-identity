@@ -127,7 +127,7 @@ object IssuanceService {
             // Use key proof if supported cryptographic binding method is not empty, doesn't contain did and contains cose_key
             val useKeyProof = (offeredCredential.cryptographicBindingMethodsSupported != null &&
                 (offeredCredential.cryptographicBindingMethodsSupported!!.contains("cose_key") ||
-                    offeredCredential.cryptographicBindingMethodsSupported!!.contains("kb+jwt")) &&
+                    offeredCredential.cryptographicBindingMethodsSupported!!.contains("jwk")) &&
                 !offeredCredential.cryptographicBindingMethodsSupported!!.contains("did"))
             CredentialRequest.forOfferedCredential(
                 offeredCredential = offeredCredential,

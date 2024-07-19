@@ -87,7 +87,7 @@ open class CIProvider : OpenIDCredentialIssuer(
     ))).plus(
         Pair("urn:eu.europa.ec.eudi:pid:1", CredentialSupported(
         format = CredentialFormat.sd_jwt_vc,
-            cryptographicBindingMethodsSupported = setOf("kb+jwt"),
+            cryptographicBindingMethodsSupported = setOf("jwk"),
             credentialSigningAlgValuesSupported = setOf("ES256"),
             types = listOf("urn:eu.europa.ec.eudi:pid:1"),
             docType = "urn:eu.europa.ec.eudi:pid:1"
