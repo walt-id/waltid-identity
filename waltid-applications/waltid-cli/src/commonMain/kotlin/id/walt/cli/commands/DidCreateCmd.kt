@@ -3,7 +3,10 @@ package id.walt.cli.commands
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.context
 import com.github.ajalt.clikt.core.terminal
-import com.github.ajalt.clikt.parameters.options.*
+import com.github.ajalt.clikt.parameters.options.default
+import com.github.ajalt.clikt.parameters.options.flag
+import com.github.ajalt.clikt.parameters.options.help
+import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.types.enum
 import com.github.ajalt.clikt.parameters.types.file
 import com.github.ajalt.clikt.parameters.types.path
@@ -14,6 +17,7 @@ import id.walt.did.dids.registrar.dids.DidWebCreateOptions
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import java.net.URLEncoder
 import kotlin.io.path.Path
 import kotlin.io.path.absolutePathString
 import kotlin.io.path.exists
@@ -91,7 +95,7 @@ class DidCreateCmd : CliktCommand(
             } else
                 DidUtil.createDid(method, key)
 
-            val outputFile = output ?: Path("${result.did}.json")
+            val outputFile = output ?: Path("${URLEncoder.encode(result.did, "UTF-8")}.json")
             if (outputFile.exists()
                 && YesNoPrompt(
                     "The file \"${outputFile.absolutePathString()}\" already exists, do you want to overwrite it?",
