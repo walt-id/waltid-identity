@@ -2,7 +2,7 @@ package id.walt.webwallet.service
 
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.web.ConflictException
-import id.walt.commons.web.NotAcceptedContentTypeException
+import id.walt.commons.web.UnsupportedMediaTypeException
 import id.walt.crypto.keys.*
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.did.dids.DidService
@@ -441,25 +441,22 @@ class SSIKit2WalletService(
 
     private fun getKeyType(jwkOrPem: String): String {
         return when {
-            jwkOrPem.lines().first().contains("BEGIN ") -> "pem"
-            jwkOrPem.contains("kty") -> "jwk"
-            else -> throw NotAcceptedContentTypeException("Unknown key format")
+            jwkOrPem.trim().startsWith("{") -> "jwk"
+            jwkOrPem.trim().startsWith("-----BEGIN ") -> "pem"
+            else -> throw UnsupportedMediaTypeException("Unknown key format")
         }
     }
 
 
     override suspend fun importKey(jwkOrPem: String): String {
         return runCatching {
-            val keyResult = when (val type = getKeyType(jwkOrPem)) {
+            val keyType = getKeyType(jwkOrPem)
+            val key = when (keyType) {
                 "pem" -> JWKKey.importPEM(jwkOrPem)
                 "jwk" -> JWKKey.importJWK(jwkOrPem)
-                else -> throw NotAcceptedContentTypeException("Unknown key type: $type")
-            }
+                else -> throw UnsupportedMediaTypeException("Unknown key type: $keyType")
+            }.getOrThrow()
 
-            keyResult.getOrElse {
-                throw IllegalArgumentException("Invalid key format: ${keyResult.exceptionOrNull()?.message}")
-            }
-        }.mapCatching { key ->
             val keyId = key.getKeyId()
 
             if (KeysService.exists(walletId, keyId)) {
@@ -481,11 +478,11 @@ class SSIKit2WalletService(
             keyId
         }.getOrElse { throwable ->
             when (throwable) {
-                is IllegalArgumentException -> throw BadRequestException(throwable.message ?: "Invalid input")
+                is IllegalArgumentException -> throw throwable
+                is UnsupportedMediaTypeException -> throw throwable
                 is ConflictException -> throw throwable
                 is IllegalStateException -> throw throwable
-                is NotAcceptedContentTypeException -> throw throwable
-                else -> throw Exception("Unexpected error occurred: ${throwable.localizedMessage}", throwable)
+                else -> throw BadRequestException("Unexpected error occurred: ${throwable.localizedMessage}", throwable)
             }
         }
     }
