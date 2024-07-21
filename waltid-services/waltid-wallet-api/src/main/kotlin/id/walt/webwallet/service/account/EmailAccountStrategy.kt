@@ -21,12 +21,8 @@ object EmailAccountStrategy : PasswordAccountStrategy<EmailAccountRequest>() {
         val name = request.name
         val email = request.email
 
-        if (email.isBlank()) {
-            throw IllegalArgumentException("Email must not be blank!")
-        }
-        if (request.password.isBlank()) {
-            throw IllegalArgumentException("Password must not be blank!")
-        }
+        require(email.isNotBlank()) { "Email must not be blank!" }
+        require(request.password.isNotBlank()) { "Password must not be blank!" }
         if (AccountsService.hasAccountEmail(tenant, email)) {
             throw ConflictException("An account with email $email already exists.")
         }
