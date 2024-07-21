@@ -7,8 +7,4 @@ open class WebException(val status: HttpStatusCode, message: String) : Exception
 class UnauthorizedException(message: String) : WebException(HttpStatusCode.Unauthorized, message)
 class ConflictException(message: String) : WebException(HttpStatusCode.Conflict, message)
 class ForbiddenException(message: String) : WebException(HttpStatusCode.Forbidden, message)
-class BadRequestException(message: String) : WebException(HttpStatusCode.BadRequest, message)
-class IllegalArgumentException(message: String) : WebException(HttpStatusCode.BadRequest, message)
-class IllegalStateException(message: String) : WebException(HttpStatusCode.BadRequest, message)
-class NotAcceptedContentTypeException(message: String) : WebException(HttpStatusCode.NotAcceptable, message)
-
+class UnsupportedMediaTypeException(message: String) : WebException(HttpStatusCode.UnsupportedMediaType, message)
