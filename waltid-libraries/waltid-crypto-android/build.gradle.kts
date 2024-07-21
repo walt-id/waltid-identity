@@ -98,8 +98,8 @@ kotlin {
         val androidUnitTest by getting {
             dependencies {
                 implementation(kotlin("test"))
-                implementation("org.junit.jupiter:junit-jupiter-api:5.10.2")
-                implementation("org.junit.jupiter:junit-jupiter-params:5.10.2")
+                implementation("org.junit.jupiter:junit-jupiter-api:5.11.0-M2")
+                implementation("org.junit.jupiter:junit-jupiter-params:5.11.0-M2")
             }
         }
         publishing {
