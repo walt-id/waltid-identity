@@ -103,7 +103,7 @@ kotlin {
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:1.8.1")
 
                 // OCI
-                implementation("com.oracle.oci.sdk:oci-java-sdk-shaded-full:3.44.2")
+                implementation("com.oracle.oci.sdk:oci-java-sdk-shaded-full:3.44.3")
 
                 // JOSE
                 implementation("com.nimbusds:nimbus-jose-jwt:9.40")
@@ -114,14 +114,14 @@ kotlin {
         }
         val jvmTest by getting {
             dependencies {
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.1")
+
                 // Logging
                 implementation("org.slf4j:slf4j-simple:2.0.13")
 
                 // Test
                 implementation(kotlin("test"))
-
                 implementation("org.junit.jupiter:junit-jupiter-api:5.11.0-M2")
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.1")
                 implementation("org.junit.jupiter:junit-jupiter-params:5.11.0-M2")
             }
         }
