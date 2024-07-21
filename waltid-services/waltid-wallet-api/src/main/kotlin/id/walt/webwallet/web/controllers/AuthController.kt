@@ -8,7 +8,9 @@ import com.nimbusds.jose.crypto.MACSigner
 import com.nimbusds.jose.crypto.MACVerifier
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.featureflag.FeatureManager
-import id.walt.commons.web.*
+import id.walt.commons.web.ForbiddenException
+import id.walt.commons.web.UnauthorizedException
+import id.walt.commons.web.WebException
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.oid4vc.definitions.JWTClaims
@@ -22,7 +24,6 @@ import id.walt.webwallet.service.WalletServiceManager
 import id.walt.webwallet.service.WalletServiceManager.oidcConfig
 import id.walt.webwallet.service.account.AccountsService
 import id.walt.webwallet.service.account.KeycloakAccountStrategy
-import id.walt.webwallet.utils.JsonUtils
 import id.walt.webwallet.web.InsufficientPermissionsException
 import id.walt.webwallet.web.WebBaseRoutes.webWalletRoute
 import id.walt.webwallet.web.model.*
@@ -37,6 +38,7 @@ import io.ktor.http.parsing.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
 import io.ktor.server.auth.jwt.*
+import io.ktor.server.plugins.*
 import io.ktor.server.plugins.ratelimit.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
@@ -514,17 +516,18 @@ data class LoginRequestError(override val message: String) : WebException(
 }
 
 suspend fun ApplicationCall.getLoginRequest() = runCatching {
-    val jsonText = receiveText()
-    val jsonObject = Json.parseToJsonElement(jsonText).jsonObject
-    val accountType = JsonUtils.tryGetData(jsonObject, "type")?.jsonPrimitive?.content
-    check(!accountType.isNullOrEmpty()) {
-        if (jsonObject.containsKey("type")) {
-            "Account type '${jsonObject["type"]}' is not recognized"
-        } else {
-            "No account type provided"
-        }
+    val jsonObject = receive<JsonObject>()
+    val accountType = jsonObject["type"]?.jsonPrimitive?.contentOrNull
+    if (accountType.isNullOrEmpty()) {
+        throw BadRequestException(
+            if (jsonObject.containsKey("type")) {
+                "Account type '${jsonObject["type"]}' is not recognized"
+            } else {
+                "No account type provided"
+            }
+        )
     }
-    Json.decodeFromString<AccountRequest>(jsonText)
+    Json.decodeFromJsonElement<AccountRequest>(jsonObject)
 }.getOrElse { throw LoginRequestError(it) }
 
 
