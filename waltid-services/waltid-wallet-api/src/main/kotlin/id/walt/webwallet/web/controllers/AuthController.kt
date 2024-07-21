@@ -298,14 +298,12 @@ fun Application.auth() {
                         HttpStatusCode.Conflict to { description = "Account already exists!" }
                     }
                 }) {
-                val req = call.receiveText()
-                val jsonElement = Json.parseToJsonElement(req)
-                val jsonObject = jsonElement.jsonObject
-
-                if (!jsonObject.containsKey("type") || jsonObject["type"]?.jsonPrimitive?.content.isNullOrEmpty()) {
+                val jsonObject = call.receive<JsonObject>()
+                val type = jsonObject["type"]?.jsonPrimitive?.contentOrNull
+                if (type.isNullOrEmpty()) {
                     throw BadRequestException("No account type provided")
                 }
-                val accountRequest = loginRequestJson.decodeFromString<AccountRequest>(call.receive())
+                val accountRequest = loginRequestJson.decodeFromJsonElement<AccountRequest>(jsonObject)
                 AccountsService.register("", accountRequest)
                     .onSuccess {
                         call.response.status(HttpStatusCode.Created)
