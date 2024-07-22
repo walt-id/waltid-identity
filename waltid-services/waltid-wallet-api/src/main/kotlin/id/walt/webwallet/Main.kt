@@ -25,22 +25,24 @@ import java.security.Security
 private val log = KotlinLogging.logger { }
 
 suspend fun main(args: Array<String>) {
-    ServiceMain(
-        ServiceConfiguration("wallet"), ServiceInitialization(
-            features = FeatureCatalog,
-            featureAmendments = mapOf(
-                CommonsFeatureCatalog.openApiFeature to walletOpenApiPluginAmendment
-            ),
-            init = {
-                webWalletSetup()
-                WaltidServices.minimalInit()
-                WaltCryptoOci.init()
-                Db.start()
-            },
-            run = WebService(Application::webWalletModule).run()
-        )
-    ).main(args)
+    getService(WebService(Application::webWalletModule).run()).main(args)
 }
+
+fun getService(run: suspend () -> Unit) = ServiceMain(
+    ServiceConfiguration("wallet"), ServiceInitialization(
+        features = FeatureCatalog,
+        featureAmendments = mapOf(
+            CommonsFeatureCatalog.openApiFeature to walletOpenApiPluginAmendment
+        ),
+        init = {
+            webWalletSetup()
+            WaltidServices.minimalInit()
+            WaltCryptoOci.init()
+            Db.start()
+        },
+        run = suspend { run() },
+    )
+)
 
 fun webWalletSetup() {
     log.info { "Setting up..." }

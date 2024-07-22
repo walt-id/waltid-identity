@@ -15,7 +15,7 @@ object E2ETestWebService {
             configureStatusPages()
             configureSerialization()
 
-            module.invoke(this)
+            module()
         }
 
         fun run(): suspend () -> Unit = {
@@ -28,18 +28,10 @@ object E2ETestWebService {
         }
     }
 
-    suspend fun testBlock(block: suspend () -> Unit) {
-
-
-        //printStats
-    }
+    suspend fun testBlock(block: suspend () -> Unit) {}
 
     suspend fun test(name: String, function: suspend () -> Any?) {
-//        val id = testResults.size + 1
-//        testNames[id] = name
-
-        val result = runCatching { function.invoke() }
-        //logTestResult
+        runCatching { function.invoke() }
     }
 
     fun loadResource(relativePath: String): String =

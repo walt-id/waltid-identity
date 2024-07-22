@@ -38,7 +38,7 @@ data class WebService(
             port = webConfig.webPort,
             host = webConfig.webHost,
             module = webServiceModule
-        ).start(wait = true)
+        ).start(wait = false)
     }
 
 }

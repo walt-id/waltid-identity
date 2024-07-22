@@ -15,22 +15,24 @@ import id.walt.verifier.web.plugins.configureRouting
 import io.ktor.server.application.*
 
 suspend fun main(args: Array<String>) {
-    ServiceMain(
-        ServiceConfiguration("verifier"), ServiceInitialization(
-            features = FeatureCatalog,
-            init = {
-                //WaltidServices.init()
-                DidService.apply {
-                    registerResolver(LocalResolver())
-                    updateResolversForMethods()
-                }
-
-                PolicyManager.registerPolicies(PresentationDefinitionPolicy())
-            },
-            run = WebService(Application::verifierModule).run()
-        )
-    ).main(args)
+    getService(WebService(Application::verifierModule).run()).main(args)
 }
+
+fun getService(run: suspend () -> Unit) = ServiceMain(
+    ServiceConfiguration("verifier"),
+    ServiceInitialization(
+        features = FeatureCatalog,
+        init = {
+            DidService.apply {
+                registerResolver(LocalResolver())
+                updateResolversForMethods()
+            }
+
+            PolicyManager.registerPolicies(PresentationDefinitionPolicy())
+        },
+        run = suspend { run() }
+    )
+)
 
 fun Application.configurePlugins() {
     configureHTTP()
