@@ -66,4 +66,16 @@ class AndroidKeyTest {
         assertTrue { identicalEccPublicKey == eccPublicKey }
         assertFalse { identicalEccPublicKey.hasPrivateKey }
     }
+
+    //@Test
+    fun use_ECC_key() = runTest {
+        val keyPair = AndroidKeyGenerator.generate(KeyType.secp256r1)
+        val plaintext = "1234abcd".encodeToByteArray()
+        val signed = keyPair.signRaw(plaintext)
+        val result = keyPair.verifyRaw(signed, plaintext)
+
+        assertTrue { result.isSuccess }
+    }
+
+
 }
