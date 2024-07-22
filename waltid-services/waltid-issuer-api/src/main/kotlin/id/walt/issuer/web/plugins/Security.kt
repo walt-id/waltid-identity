@@ -8,7 +8,7 @@ import io.ktor.client.*
 import io.ktor.http.*
 import io.ktor.server.auth.*
 
-internal val issuerAuthenticationPluginAmendment: suspend () -> Unit = suspend {
+val issuerAuthenticationPluginAmendment: suspend () -> Unit = suspend {
     val authenticationServiceConfig = ConfigManager.getConfig<AuthenticationServiceConfig>()
     val issuerServiceConfig = ConfigManager.getConfig<OIDCIssuerServiceConfig>()
 
