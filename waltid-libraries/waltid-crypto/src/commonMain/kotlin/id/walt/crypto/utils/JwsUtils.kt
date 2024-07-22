@@ -34,18 +34,38 @@ object JwsUtils {
         }.$signature"
     }
 
-    fun String.decodeJws(withSignature: Boolean = false, allowMissingSignature: Boolean = false): JwsParts {
-        check(startsWith("ey")) { "String does not look like JWS: $this" }
-        check(count { it == '.' } == 2 || (allowMissingSignature && count { it == '.' } == 1)) { "String does not have JWS part amount of 3 (= 2 dots): $this" }
+    data class JwsStringParts(val header: String, val payload: String, val signature: String) {
+        fun getSignable() = "$header.$payload"
+    }
 
+    private fun checkJwsPreconditions(jws: String, allowMissingSignature: Boolean) {
+        check(jws.startsWith("ey")) { "String does not look like JWS: $this" }
+        val dots = jws.count { it == '.' }
+        check(
+            dots == 2
+                    || (allowMissingSignature && dots == 1)
+        ) { "String does not have correct JWS part amount (dots=$dots, allowMissingSignature=$allowMissingSignature): $this" }
+    }
+
+    fun String.decodeJwsStrings(): JwsStringParts {
+        checkJwsPreconditions(this, false)
         val splitted = split(".")
-        val header = runCatching { splitted[0].decodeJwsPart() }.getOrElse { ex ->
-            throw IllegalArgumentException("Could not parse JWT header (base64/json issue): ${splitted[0]}", ex)
+        val (header, payload, signature) = splitted
+        return JwsStringParts(header, payload, signature)
+    }
+
+    fun String.decodeJws(withSignature: Boolean = false, allowMissingSignature: Boolean = false): JwsParts {
+        checkJwsPreconditions(this, allowMissingSignature)
+
+        val parts = this.decodeJwsStrings()
+
+        val header = runCatching { parts.header.decodeJwsPart() }.getOrElse { ex ->
+            throw IllegalArgumentException("Could not parse JWT header (base64/json issue): ${parts.header}", ex)
         }
-        val payload = runCatching { splitted[1].decodeJwsPart() }.getOrElse { ex ->
-            throw IllegalArgumentException("Could not parse JWT payload (base64/json issue): ${splitted[1]}", ex)
+        val payload = runCatching { parts.payload.decodeJwsPart() }.getOrElse { ex ->
+            throw IllegalArgumentException("Could not parse JWT payload (base64/json issue): ${parts.payload}", ex)
         }
-        val signature = if (withSignature) splitted[2] else ""
+        val signature = if (withSignature) parts.signature else ""
 
         return JwsParts(header, payload, signature)
     }
