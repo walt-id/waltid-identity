@@ -1,3 +1,4 @@
+import extensions.IssuerServiceExtension
 import extensions.Login
 import extensions.ServicesExtension
 import extensions.StatsExtension
@@ -16,8 +17,9 @@ import java.net.URLDecoder
 import kotlin.test.Test
 
 
-@ExtendWith(ServicesExtension::class)
 @ExtendWith(StatsExtension::class)
+//@ExtendWith(ServicesExtension::class)
+@ExtendWith(IssuerServiceExtension::class)
 class ComponentTestBase() : ComponentTest {
 
     @Test

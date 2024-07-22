@@ -15,16 +15,16 @@ import id.walt.issuer.web.plugins.configureRouting
 import io.ktor.server.application.*
 
 suspend fun main(args: Array<String>) {
-    ServiceMain(
-        ServiceConfiguration("issuer"), ServiceInitialization(
-            features = FeatureCatalog,
-            init = {
-                WaltidServices.minimalInit()
-            },
-            run = WebService(Application::issuerModule).run()
-        )
-    ).main(args)
+    getService { WebService(Application::issuerModule).run() }.main(args)
 }
+
+fun getService(run: suspend () -> Unit) = ServiceMain(
+    ServiceConfiguration("issuer"), ServiceInitialization(
+        features = FeatureCatalog, init = {
+            WaltidServices.minimalInit()
+        }, run = run
+    )
+)
 
 fun Application.configurePlugins() {
     configureHTTP()

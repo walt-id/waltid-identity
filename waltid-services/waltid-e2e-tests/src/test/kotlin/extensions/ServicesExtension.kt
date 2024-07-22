@@ -15,6 +15,10 @@ import id.walt.webwallet.webWalletModule
 import id.walt.webwallet.webWalletSetup
 import io.ktor.server.application.*
 import org.junit.jupiter.api.extension.*
+import org.junit.platform.commons.support.AnnotationSupport.findAnnotatedFields
+import java.lang.reflect.Field
+import java.util.*
+import java.util.function.Predicate
 
 class ServicesExtension : BeforeAllCallback, ParameterResolver {
 
