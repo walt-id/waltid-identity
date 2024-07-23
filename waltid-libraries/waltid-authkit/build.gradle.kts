@@ -1,0 +1,53 @@
+
+val kotlin_version: String by project
+val logback_version: String by project
+
+plugins {
+    kotlin("jvm")
+    kotlin("plugin.serialization")
+    id("io.ktor.plugin") version "2.3.12"
+
+    application
+
+    id("com.github.ben-manes.versions")
+}
+
+group = "id.walt"
+version = "0.0.1"
+
+application {
+    mainClass.set("id.walt.ApplicationKt")
+
+    val isDevelopment: Boolean = project.ext.has("development")
+    applicationDefaultJvmArgs = listOf("-Dio.ktor.development=$isDevelopment")
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation("io.ktor:ktor-server-core-jvm")
+    implementation("io.ktor:ktor-server-auth-jvm")
+    implementation("io.ktor:ktor-server-auth-jwt-jvm")
+    implementation("io.ktor:ktor-server-auth-ldap-jvm")
+    implementation("io.ktor:ktor-client-core-jvm")
+    implementation("io.ktor:ktor-client-apache-jvm")
+    implementation("io.ktor:ktor-server-sessions-jvm")
+    implementation("io.ktor:ktor-server-auto-head-response-jvm")
+    implementation("io.ktor:ktor-server-double-receive-jvm")
+    implementation("io.ktor:ktor-server-webjars-jvm")
+    implementation("io.github.smiley4:ktor-swagger-ui:3.2.0")
+    implementation("io.ktor:ktor-server-host-common-jvm")
+    implementation("io.ktor:ktor-server-status-pages-jvm")
+    implementation("io.ktor:ktor-server-cors-jvm")
+    implementation("io.ktor:ktor-server-default-headers-jvm")
+    implementation("io.ktor:ktor-server-forwarded-header-jvm")
+    implementation("io.ktor:ktor-server-call-logging-jvm")
+    implementation("io.ktor:ktor-server-content-negotiation-jvm")
+    implementation("io.ktor:ktor-serialization-kotlinx-json-jvm")
+    implementation("io.ktor:ktor-server-cio-jvm")
+    implementation("ch.qos.logback:logback-classic:$logback_version")
+    testImplementation("io.ktor:ktor-server-tests-jvm")
+    testImplementation("org.jetbrains.kotlin:kotlin-test-junit:$kotlin_version")
+}
