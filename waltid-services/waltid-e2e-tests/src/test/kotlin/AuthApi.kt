@@ -22,24 +22,20 @@ class AuthApi(private val client: HttpClient) {
             }
         }
 
-    suspend fun create(request: AccountRequest) = test("/wallet-api/auth/create - wallet-api create") {
-        client.post("/wallet-api/auth/create") {
-            setBody(request)
-        }.expectSuccess()
-    }
+    suspend fun create(request: AccountRequest) = create(
+        client = client,
+        name = "/wallet-api/auth/create - wallet-api create",
+        url = "/wallet-api/auth/create",
+        request = request
+    )
 
-    suspend fun login(request: AccountRequest, output: ((JsonObject) -> Unit)? = null) =
-        test("/wallet-api/auth/login - wallet-api login") {
-            client.post("/wallet-api/auth/login") {
-                setBody(request)
-            }.expectSuccess().apply {
-                body<JsonObject>().let { result ->
-                    assertNotNull(result["token"])
-                    result["token"]!!.jsonPrimitive.content.expectLooksLikeJwt()
-                    output?.invoke(result)
-                }
-            }
-        }
+    suspend fun login(request: AccountRequest, output: ((JsonObject) -> Unit)? = null) = login(
+        client = client,
+        name = "/wallet-api/auth/login - wallet-api login",
+        url = "/wallet-api/auth/login",
+        request = request,
+        output = output
+    )
 
     suspend fun logout() = test("/wallet-api/auth/logout - wallet-api logout") {
         client.post("/wallet-api/auth/logout").expectSuccess()
@@ -73,7 +69,7 @@ class AuthApi(private val client: HttpClient) {
         }
     }
 
-    class KeyCloak(private val client: HttpClient) {
+    class Keycloak(private val client: HttpClient) {
         suspend fun token(output: ((String) -> Unit)? = null) =
             test("/wallet-api/auth/keycloak/token - wallet-api keycloak token") {
                 client.get("/wallet-api/auth/keycloak/token").expectSuccess().apply {
@@ -81,25 +77,20 @@ class AuthApi(private val client: HttpClient) {
                 }
             }
 
-        suspend fun create(request: AccountRequest) =
-            test("/wallet-api/auth/keycloak/create - wallet-api keycloak create") {
-                client.post("/wallet-api/auth/keycloak/create") {
-                    setBody(request)
-                }.expectSuccess()
-            }
+        suspend fun create(request: AccountRequest) = create(
+            client = client,
+            name = "/wallet-api/auth/keycloak/create - wallet-api keycloak create",
+            url = "/wallet-api/auth/keycloak/create",
+            request = request
+        )
 
-        suspend fun login(request: AccountRequest, output: ((JsonObject) -> Unit)? = null) =
-            test("/wallet-api/auth/keycloak/login - wallet-api keycloak login") {
-                client.post("/wallet-api/auth/keycloak/login") {
-                    setBody(request)
-                }.expectSuccess().apply {
-                    body<JsonObject>().let { result ->
-                        assertNotNull(result["token"])
-                        result["token"]!!.jsonPrimitive.content.expectLooksLikeJwt()
-                        output?.invoke(result)
-                    }
-                }
-            }
+        suspend fun login(request: AccountRequest, output: ((JsonObject) -> Unit)? = null) = login(
+            client = client,
+            name = "/wallet-api/auth/keycloak/login - wallet-api keycloak login",
+            url = "/wallet-api/auth/keycloak/login",
+            request = request,
+            output = output
+        )
 
         suspend fun logout(request: KeycloakLogoutRequest) =
             test("/wallet-api/auth/keycloak/logout - wallet-api keycloak logout") {
@@ -107,5 +98,36 @@ class AuthApi(private val client: HttpClient) {
                     setBody(request)
                 }.expectSuccess()
             }
+    }
+
+    private companion object {
+        suspend fun create(
+            client: HttpClient,
+            name: String,
+            url: String,
+            request: AccountRequest,
+        ) = test(name) {
+            client.post(url) {
+                setBody(request)
+            }.expectSuccess()
+        }
+
+        suspend fun login(
+            client: HttpClient,
+            name: String,
+            url: String,
+            request: AccountRequest,
+            output: ((JsonObject) -> Unit)? = null,
+        ) = test(name) {
+            client.post(url) {
+                setBody(request)
+            }.expectSuccess().apply {
+                body<JsonObject>().let { result ->
+                    assertNotNull(result["token"])
+                    result["token"]!!.jsonPrimitive.content.expectLooksLikeJwt()
+                    output?.invoke(result)
+                }
+            }
+        }
     }
 }
