@@ -67,7 +67,7 @@ sealed class Ed25519 {
             val signingInput = "$header.$payload"
 
             val verifyResult =
-                verifyRaw(Base64.UrlSafe.decode(signature), signingInput.encodeToByteArray())
+                verifyRaw(signature.decodeFromBase64Url(), signingInput.encodeToByteArray())
             return when {
                 verifyResult.isSuccess -> Result.success(
                     Json.parseToJsonElement(

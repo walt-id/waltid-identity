@@ -15,8 +15,8 @@ import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.OciKeyMeta
 import id.walt.crypto.keys.jwk.JWKKey
-import id.walt.crypto.utils.Base64Utils.base64Decode
-import id.walt.crypto.utils.Base64Utils.base64UrlDecode
+import id.walt.crypto.utils.Base64Utils.decodeFromBase64
+import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto.utils.JvmEccUtils
 import id.walt.crypto.utils.JwsUtils.jwsAlg
@@ -117,7 +117,7 @@ actual class OCIKey actual constructor(
         val signRequest = SignRequest.builder().signDataDetails(signDataDetails).build()
         val response = kmsCryptoClient.sign(signRequest)
 
-        return response.signedData.signature.base64Decode()
+        return response.signedData.signature.decodeFromBase64()
     }
 
     private val _internalJwsAlgorithm by lazy {
@@ -179,7 +179,7 @@ actual class OCIKey actual constructor(
         check(parts.size == 3) { "Invalid JWT part count: ${parts.size} instead of 3" }
 
         val header = parts[0]
-        val headers: Map<String, JsonElement> = Json.decodeFromString(header.base64UrlDecode().decodeToString())
+        val headers: Map<String, JsonElement> = Json.decodeFromString(header.decodeFromBase64Url().decodeToString())
         headers["alg"]?.let {
             val algValue = it.jsonPrimitive.content
             check(algValue == keyType.jwsAlg()) { "Invalid key algorithm for JWS: JWS has $algValue, key is ${keyType.jwsAlg()}!" }
@@ -187,7 +187,7 @@ actual class OCIKey actual constructor(
 
         val payload = parts[1]
 
-        val signature = parts[2].base64UrlDecode()
+        val signature = parts[2].decodeFromBase64Url()
 
         val signable = "$header.$payload".encodeToByteArray()
 

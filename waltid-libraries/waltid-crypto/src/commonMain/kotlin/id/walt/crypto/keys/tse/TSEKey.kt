@@ -4,7 +4,7 @@ import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.TseKeyMeta
 import id.walt.crypto.keys.jwk.JWKKey
-import id.walt.crypto.utils.Base64Utils.base64UrlDecode
+import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.crypto.utils.Base64Utils.base64toBase64Url
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto.utils.JwsUtils.jwsAlg
@@ -232,19 +232,19 @@ class TSEKey(
         check(parts.size == 3) { "Invalid JWT part count: ${parts.size} instead of 3" }
 
         val header = parts[0]
-        val headers: Map<String, JsonElement> = Json.decodeFromString(header.base64UrlDecode().decodeToString())
+        val headers: Map<String, JsonElement> = Json.decodeFromString(header.decodeFromBase64Url().decodeToString())
         headers["alg"]?.let {
             val algValue = it.jsonPrimitive.content
             check(algValue == keyType.jwsAlg()) { "Invalid key algorithm for JWS: JWS has $algValue, key is ${keyType.jwsAlg()}!" }
         }
 
         val payload = parts[1]
-        val signature = parts[2].base64UrlDecode()
+        val signature = parts[2].decodeFromBase64Url()
 
         val signable = "$header.$payload".encodeToByteArray()
 
         return verifyRaw(signature, signable).map {
-            val verifiedPayload = it.decodeToString().substringAfter(".").base64UrlDecode().decodeToString()
+            val verifiedPayload = it.decodeToString().substringAfter(".").decodeFromBase64Url().decodeToString()
             Json.parseToJsonElement(verifiedPayload).jsonObject
         }
     }

@@ -1,6 +1,7 @@
 package id.walt.sdjwt
 
 import dev.whyoleg.cryptography.random.CryptographyRandom
+import id.walt.sdjwt.SdjwtStringUtils.decodeFromBase64Url
 import korlibs.crypto.SecureRandom
 import korlibs.crypto.sha256
 import kotlinx.serialization.json.*
@@ -276,7 +277,7 @@ data class SDPayload internal constructor(
          */
         fun parse(jwtBody: String, disclosures: Set<String>): SDPayload {
             return SDPayload(
-                Json.parseToJsonElement(Base64.UrlSafe.decode(jwtBody).decodeToString()).jsonObject,
+                Json.parseToJsonElement(jwtBody.decodeFromBase64Url().decodeToString()).jsonObject,
                 disclosures.associate { Pair(digest(it), SDisclosure.parse(it)) })
         }
     }

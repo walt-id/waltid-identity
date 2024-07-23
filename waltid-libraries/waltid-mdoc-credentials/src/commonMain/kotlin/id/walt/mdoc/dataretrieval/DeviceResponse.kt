@@ -43,13 +43,18 @@ class DeviceResponse(
      */
     fun toCBORHex() = toMapElement().toCBORHex()
 
+
     /**
      * Serialize to CBOR base64 url-encoded string
      */
     @OptIn(ExperimentalEncodingApi::class)
-    fun toCBORBase64URL() = Base64.UrlSafe.encode(toCBOR())
+    fun toCBORBase64URL() = base64Url.encode(toCBOR())
 
     companion object {
+
+        @OptIn(ExperimentalEncodingApi::class)
+        private val base64Url = Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT)
+
         /**
          * Deserialize from CBOR data
          */
@@ -62,6 +67,6 @@ class DeviceResponse(
         fun fromCBORHex(cbor: String) = Cbor.decodeFromHexString<DeviceResponse>(cbor)
 
         @OptIn(ExperimentalEncodingApi::class)
-        fun fromCBORBase64URL(cbor: String) = fromCBOR(Base64.UrlSafe.decode(cbor))
+        fun fromCBORBase64URL(cbor: String) = fromCBOR(base64Url.decode(cbor))
     }
 }

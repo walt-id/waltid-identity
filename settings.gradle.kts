@@ -24,6 +24,9 @@ val baseModules = listOf(
     // Service commons
     "$services:waltid-service-commons",
 
+    // Auth Kit for services
+    "$libraries:waltid-authkit",
+
     // Services based on libs
     "$services:waltid-issuer-api",
     "$services:waltid-verifier-api",
