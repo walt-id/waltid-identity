@@ -1,3 +1,67 @@
+// # walt.id identity build configuration
+
+fun getSetting(name: String) = providers.gradleProperty(name).orNull.toBoolean()
+val enableAndroidBuild = getSetting("enableAndroidBuild")
+val enableIosBuild = getSetting("enableIosBuild")
+
+// Build setup:
+
+// Shorthands
+val libraries = ":waltid-libraries"
+val applications = ":waltid-applications"
+val services = ":waltid-services"
+
+val baseModules = listOf(
+    "$libraries:waltid-crypto",
+    "$libraries:waltid-did",
+    "$libraries:waltid-verifiable-credentials",
+    "$libraries:waltid-mdoc-credentials",
+    "$libraries:waltid-sdjwt",
+
+    // Protocols
+    "$libraries:waltid-openid4vc",
+
+    // Service commons
+    "$services:waltid-service-commons",
+
+    // Services based on libs
+    "$services:waltid-issuer-api",
+    "$services:waltid-verifier-api",
+    "$services:waltid-wallet-api",
+
+    // Service tests
+    "$services:waltid-e2e-tests",
+
+    // CLI
+    "$applications:waltid-cli",
+
+    // Reporting
+    "$libraries:waltid-reporting",
+
+    // OCI extension for waltid-crypto
+    "$libraries:waltid-crypto-oci",
+)
+
+val androidModules = listOf(
+    ":waltid-libraries:waltid-crypto-android",
+    ":waltid-applications:waltid-android"
+)
+
+val iosModules = listOf(
+    "$libraries:waltid-crypto-ios",
+    "$libraries:waltid-target-ios",
+    "$libraries:waltid-target-ios:implementation",
+    "$applications:waltid-openid4vc-ios-testApp",
+    "$applications:waltid-openid4vc-ios-testApp:shared"
+)
+
+val enabledModules = ArrayList<String>(baseModules)
+
+if (enableAndroidBuild) enabledModules.addAll(androidModules)
+if (enableIosBuild) enabledModules.addAll(iosModules)
+
+include(*enabledModules.toTypedArray())
+
 pluginManagement {
     repositories {
         google()
@@ -11,41 +75,3 @@ plugins {
 }
 
 rootProject.name = "waltid-identity"
-include(
-    // Base SSI libs
-    ":waltid-libraries:waltid-crypto",
-    ":waltid-libraries:waltid-did",
-    ":waltid-libraries:waltid-verifiable-credentials",
-    ":waltid-libraries:waltid-mdoc-credentials",
-    ":waltid-libraries:waltid-sdjwt",
-
-    // Protocols
-    ":waltid-libraries:waltid-openid4vc",
-
-    // Service commons
-    ":waltid-services:waltid-service-commons",
-
-    // Services based on libs
-    ":waltid-services:waltid-issuer-api",
-    ":waltid-services:waltid-verifier-api",
-    ":waltid-services:waltid-wallet-api",
-
-    // Service tests
-    ":waltid-services:waltid-e2e-tests",
-
-    // CLI
-    ":waltid-applications:waltid-cli",
-
-    // Reporting
-    ":waltid-libraries:waltid-reporting",
-
-    // OCI extension for waltid-crypto
-    ":waltid-libraries:waltid-crypto-oci",
-
-    // Android - uncomment to enable build, and set Android SDK in local.properties:
-    /*
-    ":waltid-libraries:waltid-crypto-android",
-    ":waltid-applications:waltid-android"
-    */
-)
-//include("waltid-e2e-tests")

@@ -9,7 +9,7 @@ plugins {
     id("com.github.ben-manes.versions")
 }
 
-group = "id.walt"
+group = "id.walt.openid4vc"
 
 repositories {
     mavenCentral()
@@ -36,6 +36,7 @@ tasks.withType(KotlinCompile::class.java) {
 }
 
 kotlin {
+    val isMacOS = System.getProperty("os.name") == "Mac OS X"
     targets.configureEach {
         compilations.configureEach {
             compileTaskProvider.configure {
@@ -66,17 +67,19 @@ kotlin {
         }
         binaries.library()
     }
-//    val hostOs = System.getProperty("os.name")
-//    val isMingwX64 = hostOs.startsWith("Windows")
-//    val nativeTarget = when {
-//        hostOs == "Mac OS X" -> macosX64("native")
-//        hostOs == "Linux" -> linuxX64("native")
-//        isMingwX64 -> mingwX64("native")
-//        else -> throw GradleException("Host OS is not supported in Kotlin/Native.")
-//    }
+
+    if (isMacOS) {
+        iosArm64()
+        iosSimulatorArm64()
+    }
+
     val ktor_version = "2.3.12"
 
     sourceSets {
+
+        all {
+            languageSettings.optIn("kotlinx.serialization.ExperimentalSerializationApi")
+        }
         val commonMain by getting {
             dependencies {
                 // Coroutines
@@ -90,7 +93,7 @@ kotlin {
                 implementation("io.github.oshai:kotlin-logging:7.0.0")
 
                 // JSON
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.1")
 
                 // walt.id
                 implementation(project(":waltid-libraries:waltid-crypto"))
@@ -100,7 +103,7 @@ kotlin {
 
                 // -- Multiplatform --
                 // Multiplatform / UUID
-                implementation("app.softwork:kotlinx-uuid-core:0.0.25")
+                implementation("app.softwork:kotlinx-uuid-core:0.0.26")
 
                 // Multiplatform / Date & time
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.0")
@@ -132,7 +135,7 @@ kotlin {
                 implementation("io.kotest:kotest-assertions-core:5.9.1")
                 implementation("io.kotest:kotest-assertions-json:5.9.1")
                 implementation("org.junit.jupiter:junit-jupiter-params:5.11.0-M2")
-                implementation("com.google.crypto.tink:tink:1.13.0") // for JOSE using Ed25519
+                implementation("com.google.crypto.tink:tink:1.14.0") // for JOSE using Ed25519
                 implementation("org.bouncycastle:bcprov-lts8on:2.73.6") // for secp256k1 (which was removed with Java 17)
                 implementation("org.bouncycastle:bcpkix-lts8on:2.73.6") // PEM import
 
@@ -169,6 +172,29 @@ kotlin {
 //        val nativeMain by getting
 //        val nativeTest by getting
         // Add for native: implementation("io.ktor:ktor-client-cio:$ktor_version")
+
+        if (isMacOS) {
+            val iosArm64Main by getting
+            val iosSimulatorArm64Main by getting
+
+            val iosMain by creating {
+                dependsOn(commonMain)
+                iosArm64Main.dependsOn(this)
+                iosSimulatorArm64Main.dependsOn(this)
+                dependencies {
+                    implementation("io.ktor:ktor-client-darwin:$ktor_version")
+                }
+            }
+
+            val iosArm64Test by getting
+            val iosSimulatorArm64Test by getting
+
+            val iosTest by creating {
+                dependsOn(commonTest)
+                iosArm64Test.dependsOn(this)
+                iosSimulatorArm64Test.dependsOn(this)
+            }
+        }
     }
 
     publishing {
@@ -177,14 +203,20 @@ kotlin {
             val envPassword = System.getenv("MAVEN_PASSWORD")
             val usernameFile = File("secret_maven_username.txt")
             val passwordFile = File("secret_maven_password.txt")
-            val secretMavenUsername = envUsername ?: usernameFile.let { if (it.isFile) it.readLines().first() else "" }
-            val secretMavenPassword = envPassword ?: passwordFile.let { if (it.isFile) it.readLines().first() else "" }
+            val secretMavenUsername =
+                envUsername ?: usernameFile.let { if (it.isFile) it.readLines().first() else "" }
+            val secretMavenPassword =
+                envPassword ?: passwordFile.let { if (it.isFile) it.readLines().first() else "" }
             val hasMavenAuth = secretMavenUsername.isNotEmpty() && secretMavenPassword.isNotEmpty()
             if (hasMavenAuth) {
                 maven {
                     val releasesRepoUrl = uri("https://maven.waltid.dev/releases")
                     val snapshotsRepoUrl = uri("https://maven.waltid.dev/snapshots")
-                    url = uri(if (version.toString().endsWith("SNAPSHOT")) snapshotsRepoUrl else releasesRepoUrl)
+                    url = uri(
+                        if (version.toString()
+                                .endsWith("SNAPSHOT")
+                        ) snapshotsRepoUrl else releasesRepoUrl
+                    )
                     credentials {
                         username = secretMavenUsername
                         password = secretMavenPassword
@@ -199,7 +231,8 @@ npmPublish {
     registries {
         val envToken = System.getenv("NPM_TOKEN")
         val npmTokenFile = File("secret_npm_token.txt")
-        val secretNpmToken = envToken ?: npmTokenFile.let { if (it.isFile) it.readLines().first() else "" }
+        val secretNpmToken =
+            envToken ?: npmTokenFile.let { if (it.isFile) it.readLines().first() else "" }
         val hasNPMToken = secretNpmToken.isNotEmpty()
         val isReleaseBuild = Regex("\\d+.\\d+.\\d+").matches(version.get())
         if (isReleaseBuild && hasNPMToken) {

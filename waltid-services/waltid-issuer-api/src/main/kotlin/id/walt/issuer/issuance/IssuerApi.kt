@@ -16,11 +16,12 @@ import io.ktor.server.plugins.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import kotlin.time.Duration.Companion.minutes
 
 private val logger = KotlinLogging.logger {}
-fun createCredentialOfferUri(issuanceRequests: List<IssuanceRequest>): String {
+suspend fun createCredentialOfferUri(issuanceRequests: List<IssuanceRequest>): String {
     val credentialOfferBuilder =
         OidcIssuance.issuanceRequestsToCredentialOfferBuilder(issuanceRequests)
 
@@ -147,7 +148,7 @@ fun Application.issuerApi() {
                         "No JWK key found in serialized key."
                     )
                     val finalJsonObject = jsonObject.toMutableMap().apply {
-                        this["jwk"] = Json.parseToJsonElement(jwkObject.jsonPrimitive.content).jsonObject
+                        this["jwk"] = jwkObject.jsonObject
                     }
                     JsonObject(finalJsonObject)
                 } else {
@@ -183,10 +184,10 @@ fun Application.issuerApi() {
                         response {
                             "200" to {
                                 description = "Signed Credential (with the *proof* attribute added)"
-                                body<JsonObject> {
+                                body<String> {
                                     example(
                                         "Signed UniversityDegreeCredential example",
-                                        IssuanceExamples.universityDegreeSignedSignCredentialExample
+                                        IssuanceExamples.universityDegreeSignResponseCredentialExample
                                     )
                                 }
                             }
@@ -198,11 +199,12 @@ fun Application.issuerApi() {
                         val keyJson = body["issuerKey"] ?: throw IllegalArgumentException("No key was passed.")
 
                         val key = KeyManager.resolveSerializedKey(keyJson.jsonObject)
-                        val issuerDid = body["issuerDid"]?.toString() ?: DidService.registerByKey("key", key).did
-                        val subjectDid = body["subjectDid"]?.toString()
+                        val issuerDid =
+                            body["issuerDid"]?.jsonPrimitive?.content ?: DidService.registerByKey("key", key).did
+                        val subjectDid = body["subjectDid"]?.jsonPrimitive?.content
                             ?: throw IllegalArgumentException("No subjectDid was passed.")
 
-                        val vc = W3CVC(body)
+                        val vc = W3CVC.fromJson(Json.encodeToString(body["credentialData"]))
 
                         // Sign VC
                         val jws = vc.signJws(

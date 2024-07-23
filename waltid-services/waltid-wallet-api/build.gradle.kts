@@ -94,7 +94,7 @@ dependencies {
     /* -- Kotlin -- */
 
     // Kotlinx.serialization
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.1")
 
     // Date
     implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.0")
@@ -103,8 +103,8 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
 
     // UUID
-    implementation("app.softwork:kotlinx-uuid-core:0.0.25")
-    implementation("app.softwork:kotlinx-uuid-exposed:0.0.25")
+    implementation("app.softwork:kotlinx-uuid-core:0.0.26")
+    implementation("app.softwork:kotlinx-uuid-exposed:0.0.26")
 
     /* -- Security -- */
     // Bouncy Castle
@@ -135,7 +135,7 @@ dependencies {
     implementation("io.github.reactivecircus.cache4k:cache4k:0.13.0")
 
     // Webauthn
-    implementation("com.webauthn4j:webauthn4j-core:0.24.1.RELEASE") {
+    implementation("com.webauthn4j:webauthn4j-core:0.25.0.RELEASE") {
         exclude("ch.qos.logback")
     }
 
@@ -165,14 +165,14 @@ dependencies {
     // Logging
     implementation("io.github.oshai:kotlin-logging-jvm:7.0.0")
     implementation("org.slf4j:jul-to-slf4j:2.0.13")
-    implementation("io.klogging:klogging-jvm:0.5.14")
-    implementation("io.klogging:slf4j-klogging:0.5.14")
+    implementation("io.klogging:klogging-jvm:0.6.1")
+    implementation("io.klogging:slf4j-klogging:0.6.0")
 
     // Test
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit:2.0.0")
     testImplementation(kotlin("test"))
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
     testImplementation("io.ktor:ktor-server-tests-jvm:$ktor_version")
-    testImplementation("io.mockk:mockk:1.13.11")
-    testImplementation("io.klogging:klogging-jvm:0.5.14")
+    testImplementation("io.mockk:mockk:1.13.12")
+    testImplementation("io.klogging:klogging-jvm:0.6.1")
 }

@@ -4,7 +4,6 @@ enum class DidMethod {
     KEY,
     JWK,
     WEB,
-    EBSI,
     CHEQD,
     IOTA
 }

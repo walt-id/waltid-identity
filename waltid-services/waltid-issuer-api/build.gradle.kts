@@ -1,4 +1,3 @@
-import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import java.util.Properties
@@ -86,8 +85,8 @@ dependencies {
     // Logging
     implementation("io.github.oshai:kotlin-logging-jvm:7.0.0")
     implementation("org.slf4j:jul-to-slf4j:2.0.13")
-    implementation("io.klogging:klogging-jvm:0.5.14")
-    implementation("io.klogging:slf4j-klogging:0.5.14")
+    implementation("io.klogging:klogging-jvm:0.6.1")
+    implementation("io.klogging:slf4j-klogging:0.6.0")
 
 
     // implementation("io.lettuce:lettuce-core:6.3.2.RELEASE")
@@ -164,10 +163,10 @@ publishing {
     publications {
         create<MavenPublication>("mavenJava") {
             pom {
-                name.set("walt.id XYZ Kit")
+                name.set("walt.id issuer")
                 description.set(
                     """
-                    Kotlin/Java library for XYZ core services
+                    Kotlin/Java library for walt.id issuer
                     """.trimIndent()
                 )
                 url.set("https://walt.id")
