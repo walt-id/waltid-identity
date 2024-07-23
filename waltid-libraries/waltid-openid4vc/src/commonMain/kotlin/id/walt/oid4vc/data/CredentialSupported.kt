@@ -79,10 +79,6 @@ data class CredentialSupported(
     val order: List<String>? = null,
     override val customParameters: Map<String, JsonElement> = mapOf()
 ) : JsonDataObject() {
-    /**
-     * cryptographic_suites_supported was renamed to credential_signing_alg_values_supported to clarify the purpose of the parameter
-     */
-    val cryptographicSuitesSupported: Set<String>? = credentialSigningAlgValuesSupported
 
     override fun toJSON(): JsonObject = Json.encodeToJsonElement(CredentialSupportedSerializer, this).jsonObject
 
