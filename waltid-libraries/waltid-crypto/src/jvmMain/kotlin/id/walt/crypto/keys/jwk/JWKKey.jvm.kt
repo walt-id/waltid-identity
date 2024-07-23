@@ -9,7 +9,7 @@ import com.nimbusds.jose.util.Base64URL
 import id.walt.crypto.keys.*
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
-import id.walt.crypto.utils.Base64Utils.base64UrlDecode
+import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.crypto.utils.JwsUtils.decodeJws
@@ -290,7 +290,7 @@ actual class JWKKey actual constructor(
             val (header, payload, signature) = signedJws.split(".")
 
             log.debug { "> Signature verification: Fallback verification checking... (NIMBUS VERIFICATION FAILED) for: $signedJws" }
-            val res = verifyRaw(signature.base64UrlDecode(), "$header.$payload".encodeToByteArray()).map {
+            val res = verifyRaw(signature.decodeFromBase64Url(), "$header.$payload".encodeToByteArray()).map {
                 it.decodeToString().decodeJws(allowMissingSignature = true).payload
             }
             res.getOrThrow()

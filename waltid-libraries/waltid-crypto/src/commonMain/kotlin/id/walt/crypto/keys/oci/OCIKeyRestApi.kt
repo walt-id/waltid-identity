@@ -5,8 +5,8 @@ import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.OciKeyMeta
 import id.walt.crypto.keys.jwk.JWKKey
-import id.walt.crypto.utils.Base64Utils.base64Decode
-import id.walt.crypto.utils.Base64Utils.base64UrlDecode
+import id.walt.crypto.utils.Base64Utils.decodeFromBase64
+import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.crypto.utils.JwsUtils.jwsAlg
@@ -152,7 +152,7 @@ class OCIKeyRestApi(
                 header("Host", host)
                 header("x-content-sha256", calculateSHA256(requestBody))
                 setBody(requestBody)
-            }.ociJsonDataBody().jsonObject["signature"]?.jsonPrimitive?.content?.base64Decode()
+            }.ociJsonDataBody().jsonObject["signature"]?.jsonPrimitive?.content?.decodeFromBase64()
             response ?: error("No signature returned from OCI.")
         }
     }
@@ -234,8 +234,8 @@ class OCIKeyRestApi(
         }
 
         val signable = "$header.$payload".encodeToByteArray()
-        return verifyRaw(signature.base64UrlDecode(), signable).map {
-            val verifiedPayload = it.decodeToString().substringAfter(".").base64UrlDecode().decodeToString()
+        return verifyRaw(signature.decodeFromBase64Url(), signable).map {
+            val verifiedPayload = it.decodeToString().substringAfter(".").decodeFromBase64Url().decodeToString()
             Json.parseToJsonElement(verifiedPayload)
         }
     }

@@ -36,15 +36,17 @@ class KeySignTests {
 
     @ParameterizedTest
     @ValueSource(strings = ["ed25519.private.json", "secp256k1.private.json", "secp256r1.private.json", "rsa.private.json"])
-    @Disabled // not implemented
+//    @Disabled // not implemented
     fun `given key and payload, when signing raw then the result is a valid signature`(keyFile: String) = runTest {
         // given
         val key = KeyManager.resolveSerializedKey(loadSerializedLocal(keyFile))
         // when
-        val signature = key.signRaw(payload.toString().encodeToByteArray())
-        val verificationResult = key.getPublicKey().verifyRaw(signature as ByteArray)
+        val plaintext = payload.toString().encodeToByteArray()
+        val signature = key.signRaw(plaintext)
+
+        val verificationResult = key.getPublicKey().verifyRaw(signature as ByteArray, plaintext)
         // then
         assertTrue(verificationResult.isSuccess)
-        assertEquals(payload.toString().encodeToByteArray(), verificationResult.getOrThrow())
+        assertEquals(plaintext.toList(), verificationResult.getOrThrow().toList())
     }
 }

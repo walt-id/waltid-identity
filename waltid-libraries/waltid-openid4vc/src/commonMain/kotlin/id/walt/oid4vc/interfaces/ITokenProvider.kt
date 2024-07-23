@@ -1,6 +1,7 @@
 package id.walt.oid4vc.interfaces
 
 import id.walt.crypto.keys.Key
+import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.oid4vc.providers.TokenTarget
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -23,14 +24,14 @@ interface ITokenProvider {
     @OptIn(ExperimentalEncodingApi::class)
     fun parseTokenPayload(token: String): JsonObject {
         return token.substringAfter(".").substringBefore(".").let {
-            Json.decodeFromString(Base64.UrlSafe.decode(it).decodeToString())
+            Json.decodeFromString(it.decodeFromBase64Url().decodeToString())
         }
     }
 
     @OptIn(ExperimentalEncodingApi::class)
     fun parseTokenHeader(token: String): JsonObject {
         return token.substringBefore(".").let {
-            Json.decodeFromString(Base64.UrlSafe.decode(it).decodeToString())
+            Json.decodeFromString(it.decodeFromBase64Url().decodeToString())
         }
     }
 }
