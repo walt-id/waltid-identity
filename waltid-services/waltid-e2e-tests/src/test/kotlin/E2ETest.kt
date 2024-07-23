@@ -9,7 +9,6 @@ import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.webwallet.config.RegistrationDefaultsConfig
 import id.walt.webwallet.web.model.EmailAccountRequest
 import io.ktor.client.*
-import io.ktor.client.call.*
 import io.ktor.client.engine.cio.*
 import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.*
@@ -46,7 +45,7 @@ class E2ETest {
                     password = "password"
                 )
             ) {
-                client = testHttpClient(token = it)
+                client = testHttpClient(token = it["token"]!!.jsonPrimitive.content)
                 authApi = AuthApi(client)
             }
             authApi.userInfo(HttpStatusCode.OK) {
