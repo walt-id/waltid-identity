@@ -165,7 +165,7 @@ object IssuanceExamples {
     """.trimIndent()
 
     // language=json
-    private val openBadgeCredentialIssuance = """
+    val openBadgeCredentialIssuance = """
         {
           "issuerKey": $issuerKey,
           "issuerDid": $issuerDid,
@@ -185,6 +185,21 @@ object IssuanceExamples {
           "mapping": $mapping
         }
         """.trimIndent()
+
+    //language=json
+    private val universityDegreeCredentialSignRequest = """
+        {
+          "issuerKey": $issuerKey,
+          "issuerDid": $issuerDid,
+          "subjectDid": $issuerDid,
+          "credentialData": ${universityDegreeCredentialData(withProof = false)}
+        }
+    """.trimIndent()
+
+    //language=text
+    private val universityDegreeCredentialSignResponse = """
+        "eyJhbGciOiJFZERTQSIsImtpZCI6ImRpZDprZXk6ejZNa2pvUmhxMWpTTkpkTGlydVNYckZGeGFncXJ6dFphWEhxSEdVVEtKYmNOeXdwIn0.eyJpc3MiOiJkaWQ6a2V5Ono2TWtqb1JocTFqU05KZExpcnVTWHJGRnhhZ3FyenRaYVhIcUhHVVRLSmJjTnl3cCIsInN1YiI6ImRpZDprZXk6ejZNa2pvUmhxMWpTTkpkTGlydVNYckZGeGFncXJ6dFphWEhxSEdVVEtKYmNOeXdwIiwidmMiOnsiQGNvbnRleHQiOlsiaHR0cHM6Ly93d3cudzMub3JnLzIwMTgvY3JlZGVudGlhbHMvdjEiLCJodHRwczovL3d3dy53My5vcmcvMjAxOC9jcmVkZW50aWFscy9leGFtcGxlcy92MSJdLCJpZCI6Imh0dHA6Ly9leGFtcGxlLmdvdi9jcmVkZW50aWFscy8zNzMyIiwidHlwZSI6WyJWZXJpZmlhYmxlQ3JlZGVudGlhbCIsIlVuaXZlcnNpdHlEZWdyZWVDcmVkZW50aWFsIl0sImlzc3VlciI6eyJpZCI6ImRpZDp3ZWI6dmMudHJhbnNtdXRlLndvcmxkIn0sImlzc3VhbmNlRGF0ZSI6IjIwMjAtMDMtMTBUMDQ6MjQ6MTIuMTY0WiIsImNyZWRlbnRpYWxTdWJqZWN0Ijp7ImlkIjoiZGlkOmV4YW1wbGU6ZWJmZWIxZjcxMmViYzZmMWMyNzZlMTJlYzIxIiwiZGVncmVlIjp7InR5cGUiOiJCYWNoZWxvckRlZ3JlZSIsIm5hbWUiOiJCYWNoZWxvciBvZiBTY2llbmNlIGFuZCBBcnRzIn19fX0.lEprwxQtj4a7k64OxjJV4dGNkuf3Fjks48fU0keJshm-dKtzmHktC3H3rh6iOZTi78p4m5Uu5Y9QmsJJOd8jCg"
+    """.trimIndent()
 
     //language=json
     private val bankIdCredentialIssuance = """
@@ -221,11 +236,11 @@ object IssuanceExamples {
     )
 
     val universityDegreeSignRequestCredentialExample = typedValueExampleDescriptorDsl<JsonObject>(
-        universityDegreeCredentialData(withProof = false)
+        universityDegreeCredentialSignRequest
     )
 
-    val universityDegreeSignedSignCredentialExample = typedValueExampleDescriptorDsl<JsonObject>(
-        universityDegreeCredentialData(withProof = true)
+    val universityDegreeSignResponseCredentialExample = typedValueExampleDescriptorDsl<String>(
+        universityDegreeCredentialSignResponse
     )
 
     val openBadgeCredentialIssuanceExample = typedValueExampleDescriptorDsl<IssuanceRequest>(

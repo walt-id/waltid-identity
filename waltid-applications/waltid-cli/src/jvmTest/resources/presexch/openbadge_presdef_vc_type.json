@@ -1,0 +1,33 @@
+{
+  "input": "32f54163-7166-48f1-93d8-ff217bdb0653",
+  "format": {
+    "jwt_vc": {
+      "alg": [
+        "ES256"
+      ]
+    },
+    "jwt_vp": {
+      "alg": [
+        "ES256"
+      ]
+    }
+  },
+  "input_descriptors": [
+    {
+      "id": "VerifiableCredential#1",
+      "constraints": {
+        "fields": [
+          {
+            "path": [
+              "$.vc.type"
+            ],
+            "filter": {
+              "type": "array",
+              "pattern": "OpenBadgeCredential"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

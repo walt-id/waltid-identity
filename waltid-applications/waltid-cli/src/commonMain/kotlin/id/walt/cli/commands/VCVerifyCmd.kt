@@ -1,9 +1,6 @@
 package id.walt.cli.commands
 
-import com.github.ajalt.clikt.core.CliktCommand
-import com.github.ajalt.clikt.core.Context
-import com.github.ajalt.clikt.core.FileNotFound
-import com.github.ajalt.clikt.core.MissingOption
+import com.github.ajalt.clikt.core.*
 import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.options.associate
 import com.github.ajalt.clikt.parameters.options.help
@@ -13,10 +10,10 @@ import com.github.ajalt.clikt.parameters.types.choice
 import com.github.ajalt.clikt.parameters.types.file
 import id.walt.cli.util.PrettyPrinter
 import id.walt.cli.util.VCUtil
+import id.walt.cli.util.WaltIdCmdHelpOptionMessage
 import id.walt.credentials.verification.ExpirationDatePolicyException
 import id.walt.credentials.verification.JsonSchemaVerificationException
 import id.walt.credentials.verification.NotBeforePolicyException
-import id.walt.credentials.verification.PolicyManager
 import id.walt.credentials.verification.models.PolicyResult
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import kotlinx.coroutines.runBlocking
@@ -26,45 +23,22 @@ import java.io.File
 
 class VCVerifyCmd : CliktCommand(
     name = "verify",
+    help = """Apply a wide range of verification policies on a W3C Verifiable Credential (VC).
+        
+        Example usage:
+        ----------------
+        waltid vc verify ./myVC.signed.json
+        waltid vc verify -p signature ./myVC.signed.json
+        waltid vc verify -p schema --arg=schema=mySchema.json ./myVC.signed.json
+        waltid vc verify -p signature -p schema --arg=schema=mySchema.json ./myVC.signed.json
+    """,
     printHelpOnEmptyArgs = true,
 ) {
 
-    override fun commandHelp(context: Context): String {
-        var help = """
-        VC verification command.
-            
-        Verifies the specified VC under a set of specified policies.
-
-        The available policies are:
-        
-        """.trimIndent()
-        help += "\u0085\u0085"
-
-        PolicyManager.listPolicyDescriptions().entries.forEach {
-            help += "- ${it.key}: ${it.value}\u0085"
+    init {
+        context {
+            localization = WaltIdCmdHelpOptionMessage
         }
-
-        help += "\u0085"
-
-        help += """
-        Multiple policies are accepted. e.g.
-
-            waltid vc verify --policy=signature --policy=expired vc.json
-
-        If no policy is specified, only the Signature Policy will be applied. i.e.
-
-            waltid vc verify vc.json
-
-        Some policies require parameters. To specify it, use --arg or -a options.
-
-            --arg=param1=value1 --a param2=value2
-
-        e.g.
-
-            waltid vc verify --policy=schema -a schema=mySchema.json vc.json
-        """.trimIndent()
-
-        return help
     }
 
     val print: PrettyPrinter = PrettyPrinter(this)
@@ -74,9 +48,17 @@ class VCVerifyCmd : CliktCommand(
     val policies: List<String> by option(
         "-p",
         "--policy",
-        help = """Specify a policy to be applied in the verification process."""
+        help = "Specify one, or more policies to be applied during the verification process of the VC (signature policy is always applied)."
     ).choice(
-        *PolicyManager.listPolicyDescriptions().keys.toTypedArray()
+        *listOf(
+            "signature",
+            "expired",
+            "not-before",
+            "revoked_status_list",
+            "schema",
+            "allowed-issuer",
+            "webhook",
+        ).toTypedArray()
     ).multiple()
 
     val policyArguments: Map<String, String> by option(
@@ -90,7 +72,10 @@ class VCVerifyCmd : CliktCommand(
             |signature| - |
             |expired| - |
             |not-before| - |
+            |revoked_status_list| - |
             |schema|schema=/path/to/schema.json|
+            |allowed-issuer|issuer=did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV|
+            |webhook|url=https://example.com|
         """.trimMargin()
     }
 
@@ -154,6 +139,14 @@ class VCVerifyCmd : CliktCommand(
     private fun checkAndLoadArguments(): MutableMap<String, JsonElement> {
         val args = emptyMap<String, JsonElement>().toMutableMap()
         args.putAll(getSchemaPolicyArguments())
+        args.putAll(getAllowedIssuerPolicyArguments())
+        args.putAll(getWebhookPolicyArguments())
+        args.putAll(getRevocationPolicyArguments())
+        for (noArgPolicyName in listOf("signature", "expired", "not-before", "revoked_status_list")) {
+            if (noArgPolicyName in policies) {
+                args[noArgPolicyName] = "".toJsonElement()
+            }
+        }
         return args
     }
 
@@ -177,6 +170,40 @@ class VCVerifyCmd : CliktCommand(
 
             val schema = File(schemaFilePath).readText()
             args["schema"] = Json.parseToJsonElement(schema).toJsonElement()
+        }
+
+        return args
+    }
+
+    private fun getAllowedIssuerPolicyArguments(): Map<out String, JsonElement> {
+        val args = mutableMapOf<String, JsonElement>()
+        if ("allowed-issuer" in policies) {
+            if ("issuer" !in policyArguments || policyArguments["issuer"]!!.isEmpty()) {
+                throw MissingOption(this.option("--arg for the 'allowed-issuer' policy (--arg=issuer=did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV"))
+            }
+            args["allowed-issuer"] = policyArguments["issuer"]!!.toJsonElement()
+        }
+
+        return args
+    }
+
+    private fun getWebhookPolicyArguments(): Map<out String, JsonElement> {
+        val args = mutableMapOf<String, JsonElement>()
+        if ("webhook" in policies) {
+            if ("url" !in policyArguments || policyArguments["url"]!!.isEmpty()) {
+                throw MissingOption(this.option("--arg for the 'webhook' policy (--arg=url=https://example.com"))
+            }
+            args["webhook"] = policyArguments["url"]!!.toJsonElement()
+            args["vc"] = vc.readText().toJsonElement()
+        }
+
+        return args
+    }
+
+    private fun getRevocationPolicyArguments(): Map<out String, JsonElement> {
+        val args = mutableMapOf<String, JsonElement>()
+        if ("revoked_status_list" in policies) {
+            args["vc"] = vc.readText().toJsonElement()
         }
 
         return args

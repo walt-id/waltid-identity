@@ -166,7 +166,10 @@ object OpenApiModule {
         }
         else -> {
             logger.trace("Example for: ${descriptor.type}; example is: $example (${example!!::class.simpleName})")
-            Json.encodeToString(Json.serializersModule.serializer(descriptor.type), example)
+            Json {
+                encodeDefaults = true
+                explicitNulls = false
+            }.encodeToString(Json.serializersModule.serializer(descriptor.type), example)
         }
     }
 }
