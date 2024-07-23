@@ -186,7 +186,9 @@ spec:
       containers:
         - name: wallet-api
           image: waltid/wallet-api:potential
-
+          env:
+            - name: KLOGGING_MIN_LOG_LEVEL
+              value: "DEBUG"
           imagePullPolicy: Always
           volumeMounts:
             - name: wallet-config

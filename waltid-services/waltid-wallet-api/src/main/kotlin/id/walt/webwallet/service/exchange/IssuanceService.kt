@@ -124,6 +124,10 @@ object IssuanceService {
 
         logger.debug { "Using issuer URL: ${credentialOffer.credentialIssuer}" }
         val credReqs = offeredCredentials.map { offeredCredential ->
+            println("Offered credential format: ${offeredCredential.format.name}")
+            println("Offered credential cryptographic binding methods: ${offeredCredential.cryptographicBindingMethodsSupported?.joinToString(", ") ?: ""}")
+            logger.info("Offered credential format: ${offeredCredential.format.name}")
+            logger.info("Offered credential cryptographic binding methods: ${offeredCredential.cryptographicBindingMethodsSupported?.joinToString(", ") ?: ""}")
             // Use key proof if supported cryptographic binding method is not empty, doesn't contain did and contains cose_key
             val useKeyProof = (offeredCredential.cryptographicBindingMethodsSupported != null &&
                 (offeredCredential.cryptographicBindingMethodsSupported!!.contains("cose_key") ||

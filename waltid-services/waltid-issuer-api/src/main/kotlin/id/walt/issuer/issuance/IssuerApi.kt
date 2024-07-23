@@ -402,7 +402,7 @@ fun Application.issuerApi() {
                     val offerUri = IssuanceRequest(
                         Json.parseToJsonElement(KeySerialization.serializeKey(jwkKey)).jsonObject,
                         "",
-                        "potential.light.profile",
+                        "org.iso.18013.5.1.mDL",
                         null,
                         mdocData = mapOf("org.iso.18013.5.1" to buildJsonObject {
                             put("family_name", "Doe")
