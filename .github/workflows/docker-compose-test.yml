@@ -52,8 +52,11 @@ jobs:
             exit 1
           fi
           echo "Project directory found."
-
-#      - name: Wait for Docker Compose containers to be ready
+          // list the files in the directory
+          kubectl -n compose exec -it "$POD_NAME" -- ls -l /waltid-identity
+          
+          
+          #      - name: Wait for Docker Compose containers to be ready
 #        run: |
 #          POD_NAME=${{ steps.get-pod.outputs.POD_NAME }}
 #          TIMEOUT=300  # 5 minutes timeout
@@ -95,6 +98,9 @@ jobs:
             echo "Waiting for wallet-api to be healthy... ($ELAPSED/$TIMEOUT seconds)"
             sleep $INTERVAL
             ELAPSED=$((ELAPSED + INTERVAL))
+            // test if the wallet-api is reachable
+            kubectl -n compose exec "$POD_NAME" -- sh -c "curl -sf -X GET http://localhost:7001/wallet-api/healthz"
+          
           done
           if [ $ELAPSED -ge $TIMEOUT ]; then
             echo "Error: wallet-api is not healthy within $TIMEOUT seconds"
