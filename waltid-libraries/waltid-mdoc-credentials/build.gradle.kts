@@ -17,8 +17,6 @@ val enableAndroidBuild = getSetting("enableAndroidBuild")
 val enableIosBuild = getSetting("enableIosBuild")
 
 kotlin {
-    val isMacOS = System.getProperty("os.name") == "Mac OS X"
-
     targets.configureEach {
         compilations.configureEach {
             compileTaskProvider.configure {
@@ -92,7 +90,7 @@ kotlin {
         }
 
 
-        if (isMacOS) {
+        if (enableIosBuild) {
             val iosArm64Main by getting
             val iosSimulatorArm64Main by getting
 
