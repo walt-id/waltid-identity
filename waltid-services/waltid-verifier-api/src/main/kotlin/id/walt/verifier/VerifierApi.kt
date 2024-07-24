@@ -184,6 +184,7 @@ fun Application.verfierApi() {
                         example("Example with presentation definition policy", VerifierApiExamples.presentationDefinitionPolicy)
                         example("Example with EBSI PDA1 Presentation Definition", VerifierApiExamples.EbsiVerifiablePDA1)
                         example("LSP Potential MDoc verification example", VerifierApiExamples.lspPotentialMdocExample)
+                        example("LSP Potential SD-JWT verification example", VerifierApiExamples.lspPotentialSDJwtVCExample)
                     }
                 }
             }) {
