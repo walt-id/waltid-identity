@@ -196,6 +196,7 @@ object OidcApi : CIProvider() {
 
                 } catch (exc: TokenError) {
                     logger.error(exc) { "Token error: " }
+                    exc.printStackTrace()
                     call.respond(HttpStatusCode.BadRequest, exc.toAuthorizationErrorResponse().toJSON())
                 }
             }
@@ -231,6 +232,7 @@ object OidcApi : CIProvider() {
                     call.respond(tokenResp.toJSON())
                 } catch (exc: TokenError) {
                     logger.error(exc) { "Token error: " }
+                    exc.printStackTrace()
                     call.respond(HttpStatusCode.BadRequest, exc.toAuthorizationErrorResponse().toJSON())
                 }
             }

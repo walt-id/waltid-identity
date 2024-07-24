@@ -3,14 +3,12 @@
 package id.walt.issuer.issuance
 
 import id.walt.commons.config.ConfigManager
+import id.walt.commons.persistence.ConfiguredPersistence
 import id.walt.commons.persistence.RedisPersistence
 import id.walt.credentials.issuance.Issuer.mergingJwtIssue
 import id.walt.credentials.issuance.Issuer.mergingSdJwtIssue
 import id.walt.credentials.vc.vcs.W3CVC
-import id.walt.crypto.keys.DirectSerializedKey
-import id.walt.crypto.keys.Key
-import id.walt.crypto.keys.KeySerialization
-import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.*
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.did.dids.DidService
 import id.walt.did.dids.DidUtils
@@ -69,13 +67,16 @@ open class CIProvider : OpenIDCredentialIssuer(
         val exampleIssuerKey by lazy { runBlocking { JWKKey.generate(KeyType.Ed25519) } }
         val exampleIssuerDid by lazy { runBlocking { DidService.registerByKey("jwk", exampleIssuerKey).did } }
 
-
-        private val CI_TOKEN_KEY by lazy { runBlocking { JWKKey.generate(KeyType.Ed25519) } }
+        // TODO: make configurable
+//        private val CI_TOKEN_KEY by lazy { KeyManager.resolveSerializedKeyBlocking("""""") }
+        private val CI_TOKEN_KEY =
+            runBlocking { KeyManager.resolveSerializedKey(ConfigManager.getConfig<OIDCIssuerServiceConfig>().ciTokenKey) }
+//        private val CI_TOKEN_KEY by lazy { runBlocking { JWKKey.generate(KeyType.Ed25519) } }
     }
 
     // -------------------------------
     // Simple in-memory session management
-    private val authSessions = RedisPersistence<IssuanceSession>(
+    private val authSessions = ConfiguredPersistence<IssuanceSession>(
         "auth_sessions", defaultExpiration = 5.minutes,
         encoding = { Json.encodeToString(it) },
         decoding = { Json.decodeFromString(it) },
@@ -83,7 +84,7 @@ open class CIProvider : OpenIDCredentialIssuer(
 
 
     var deferIssuance = false
-    val deferredCredentialRequests = RedisPersistence<CredentialRequest>(
+    val deferredCredentialRequests = ConfiguredPersistence<CredentialRequest>(
         "deferred_credential_requests", defaultExpiration = 5.minutes,
         encoding = { Json.encodeToString(it) },
         decoding = { Json.decodeFromString(it) },
@@ -390,7 +391,7 @@ open class CIProvider : OpenIDCredentialIssuer(
     }
 
     // TODO: Hack as this is non stateless because of oidc4vc lib API
-    val sessionCredentialPreMapping = RedisPersistence<List<IssuanceSessionData>>(
+    val sessionCredentialPreMapping = ConfiguredPersistence<List<IssuanceSessionData>>(
         // session id -> VC
         "sessionid_vc", defaultExpiration = 5.minutes,
         encoding = { Json.encodeToString(it) },
@@ -398,7 +399,7 @@ open class CIProvider : OpenIDCredentialIssuer(
     )
 
     // TODO: Hack as this is non stateless because of oidc4vc lib API
-    private val tokenCredentialMapping = RedisPersistence<List<IssuanceSessionData>>(
+    private val tokenCredentialMapping = ConfiguredPersistence<List<IssuanceSessionData>>(
         // token -> VC
         "token_vc", defaultExpiration = 5.minutes,
         encoding = { Json.encodeToString(it) },

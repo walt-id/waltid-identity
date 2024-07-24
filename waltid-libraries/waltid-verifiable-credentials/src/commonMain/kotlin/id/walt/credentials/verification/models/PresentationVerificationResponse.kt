@@ -1,21 +1,17 @@
 package id.walt.credentials.verification.models
 
-import id.walt.crypto.utils.JsonUtils.toJsonElement
-import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 import kotlin.time.Duration
-import kotlin.time.DurationUnit
 
 @Serializable
 data class PresentationVerificationResponseSurrogate(
     val results: List<PresentationResultEntrySurrogate>,
     val time: Duration,
     val policiesRun: Int,
+    val policiesSuccessful: Int = results.sumOf { it.policyResults.count { it.isSuccess } },
+    val policiesFailed: Int = results.sumOf { it.policyResults.count { !it.isSuccess } }
 ) {
     constructor(original: PresentationVerificationResponse) : this(
         results = original.results.map { PresentationResultEntrySurrogate(it) },

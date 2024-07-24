@@ -1,7 +1,6 @@
 package id.walt.commons.persistence
 
-import io.klogging.config.seq
-import redis.clients.jedis.JedisPooled
+import redis.clients.jedis.UnifiedJedis
 import redis.clients.jedis.params.ScanParams
 import kotlin.time.Duration
 
@@ -10,8 +9,8 @@ class RedisPersistence<V>(
     defaultExpiration: Duration,
     val encoding: (V) -> String,
     val decoding: (String) -> V,
+    val pool: UnifiedJedis,
 ) : Persistence<V>(discriminator, defaultExpiration) {
-    val pool: JedisPooled = JedisPooled("localhost", 6379)
 
     override operator fun get(id: String): V {
         return decoding.invoke(pool.get("$discriminator:$id") ?: error("No such id: $id"))
@@ -27,6 +26,8 @@ class RedisPersistence<V>(
 
     override fun contains(id: String): Boolean = pool.exists("$discriminator:$id")
 
+    override fun listAllKeys(): Set<String> = pool.keys("$discriminator:*").map { it.removePrefix("session_type:") }.toSet()
+
     override fun getAll(): Sequence<V> {
         val keys = pool.scan("", ScanParams().match("$discriminator:")).result
 
@@ -36,4 +37,13 @@ class RedisPersistence<V>(
             }
         }
     }
+
+    override fun listAdd(id: String, value: V) {
+        pool.sadd("$discriminator:$id", value.toString())
+        pool.expire("$discriminator:$id", defaultExpiration.inWholeSeconds)
+    }
+
+    override fun listSize(id: String): Int = pool.scard(id).toInt()
+
+
 }

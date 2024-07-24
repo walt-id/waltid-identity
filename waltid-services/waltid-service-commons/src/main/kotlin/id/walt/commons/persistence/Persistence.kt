@@ -17,7 +17,11 @@ abstract class Persistence<V>(
     }
     abstract operator fun contains(id: String): Boolean
 
+    abstract fun listAllKeys(): Set<String>
     abstract fun getAll(): Sequence<V>
+
+    abstract fun listAdd(id: String, value: V)
+    abstract fun listSize(id: String): Int
 }
 
 

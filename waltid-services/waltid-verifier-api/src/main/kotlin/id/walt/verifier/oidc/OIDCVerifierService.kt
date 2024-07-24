@@ -6,12 +6,10 @@ import COSE.AlgorithmID
 import COSE.OneKey
 import com.upokecenter.cbor.CBORObject
 import id.walt.commons.config.ConfigManager
-import id.walt.commons.persistence.RedisPersistence
+import id.walt.commons.persistence.ConfiguredPersistence
 import id.walt.credentials.verification.VerificationPolicy
 import id.walt.credentials.verification.Verifier
 import id.walt.credentials.verification.models.PolicyRequest
-import id.walt.credentials.verification.models.PolicyResultSurrogate
-import id.walt.credentials.verification.models.PresentationVerificationResponse
 import id.walt.credentials.verification.models.PresentationVerificationResponseSurrogate
 import id.walt.credentials.verification.policies.*
 import id.walt.credentials.verification.policies.vp.HolderBindingPolicy
@@ -40,7 +38,6 @@ import id.walt.verifier.policies.PresentationDefinitionPolicy
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import kotlinx.serialization.modules.SerializersModule
@@ -88,7 +85,7 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
 
 
     // PERSISTENCE
-    val presentationSessions = RedisPersistence<PresentationSession>(
+    val presentationSessions = ConfiguredPersistence<PresentationSession>(
         "presentation_session", defaultExpiration = 5.minutes,
         encoding = { Json.encodeToString(it) },
         decoding = {
@@ -113,14 +110,14 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
         }
     }
 
-    val format = Json { serializersModule = module }
+    val format = Json { serializersModule = module; encodeDefaults = true }
 
-    val sessionVerificationInfos = RedisPersistence<SessionVerificationInformation>(
+    val sessionVerificationInfos = ConfiguredPersistence<SessionVerificationInformation>(
         "session_verification_infos", defaultExpiration = 5.minutes,
         encoding = { format.encodeToString(it) },
         decoding = { format.decodeFromString(it) },
     )
-    val policyResults = RedisPersistence<PresentationVerificationResponseSurrogate>(
+    val policyResults = ConfiguredPersistence<PresentationVerificationResponseSurrogate>(
         "policy_results", defaultExpiration = 5.minutes,
         encoding = { format.encodeToString(it) },
         decoding = { format.decodeFromString(it) },
