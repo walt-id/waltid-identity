@@ -9,6 +9,19 @@ class InMemoryPersistence<V : Any>(discriminator: String, defaultExpiration: Dur
         .expireAfterWrite(defaultExpiration)
         .build()
 
+    private val listStore by lazy { Cache.Builder<String, ArrayList<V>>()
+        .expireAfterWrite(defaultExpiration)
+        .build() }
+
+    override fun listAdd(id: String, value: V) {
+        if (!listStore.asMap().containsKey(id)) {
+            listStore.put(id, arrayListOf(value))
+        } else {
+            listStore.put(id, listStore.get(id)!!.apply { add(value) })
+        }
+    }
+    override fun listSize(id: String): Int = listStore.get(id)?.size ?: 0
+
     override operator fun get(id: String): V {
         return store.get(id) ?: error("No such id")
     }
@@ -22,5 +35,8 @@ class InMemoryPersistence<V : Any>(discriminator: String, defaultExpiration: Dur
     }
 
     override fun contains(id: String): Boolean = store.get(id) != null
+    @Suppress("UNCHECKED_CAST") // see line 8
+    override fun listAllKeys(): Set<String> = store.asMap().keys as Set<String>
+
     override fun getAll(): Sequence<V> = store.asMap().values.asSequence()
 }

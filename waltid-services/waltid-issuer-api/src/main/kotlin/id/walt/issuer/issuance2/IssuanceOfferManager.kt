@@ -1,6 +1,6 @@
 package id.walt.issuer.issuance2
 
-import id.walt.commons.persistence.RedisPersistence
+import id.walt.commons.persistence.ConfiguredPersistence
 import id.walt.issuer.issuance.NewIssuanceRequest
 import id.walt.oid4vc.data.CredentialOffer
 import id.walt.oid4vc.data.GrantType
@@ -12,9 +12,17 @@ import kotlin.time.Duration.Companion.minutes
 
 object IssuanceOfferManager {
 
-    val offerPersistence = RedisPersistence<NewIssuanceRequest>("offer", 5.minutes,
+    val offerPersistence = ConfiguredPersistence<NewIssuanceRequest>("offer", 5.minutes,
         encoding = { Json.encodeToString(it) },
         decoding = { Json.decodeFromString(it) }
+    )
+    val sessionTypePersistence = ConfiguredPersistence<String>("session_type", 5.minutes,
+        encoding = { it },
+        decoding = { it }
+    )
+    val sessionTypeDocumentPersistence = ConfiguredPersistence<String>("session_type_document", 5.minutes,
+        encoding = { it },
+        decoding = { it }
     )
 
 
@@ -24,12 +32,12 @@ object IssuanceOfferManager {
 
     fun getAllActiveSessionTypes(): Set<List<String>> {
         val activeSessionTypes = mutableSetOf<List<String>>()
-        val keys = offerPersistence.pool.keys("session_type:*")
+        val keys = sessionTypePersistence.listAllKeys()
+        //val keys = offerPersistence.pool.keys("session_type:*")
 
-        for (key in keys) {
-            if (offerPersistence.pool.scard(key) > 0) {
-                val typeId = key.removePrefix("session_type:")
-                val type = offerPersistence.pool.get("session_type_document:$typeId").split(";")
+        for (typeId in keys) {
+            if (sessionTypePersistence.listSize(typeId) > 0) {
+                val type = sessionTypeDocumentPersistence[typeId].split(";")
 
                 activeSessionTypes.add(type)
             }
@@ -72,9 +80,8 @@ object IssuanceOfferManager {
         }
 
         val offer = offerBuilder.build()
-        val transaction = offerPersistence.pool.transaction(true)
-//        transaction.comm
-        offerPersistence.set(sessionId, issuanceRequest)
+        // val transaction = offerPersistence.pool.transaction(true)
+        offerPersistence[sessionId] = issuanceRequest
 
         // Also store active types
         issuanceRequest.credential.forEach {
@@ -82,9 +89,11 @@ object IssuanceOfferManager {
             val type = it.credentialData.getType()
             val typeId = type.last()
 
-            offerPersistence.pool.sadd("session_type:$typeId", sessionId)
-            offerPersistence.pool.expire("session_type:$typeId", expiry)
-            offerPersistence.pool.setex("session_type_document:$typeId", expiry, type.joinToString(";"))
+            sessionTypePersistence.listAdd(typeId, sessionId)
+//            sessionTypePersistence.pool.sadd("session_type:$typeId", sessionId)
+//            sessionTypePersistence.pool.expire("session_type:$typeId", expiry)
+            sessionTypeDocumentPersistence[typeId] = type.joinToString(";")
+//            offerPersistence.pool.setex("session_type_document:$typeId", expiry, type.joinToString(";"))
         }
 
         return offer

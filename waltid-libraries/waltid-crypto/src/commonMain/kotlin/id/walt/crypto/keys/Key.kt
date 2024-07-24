@@ -1,6 +1,5 @@
 package id.walt.crypto.keys
 
-import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.JsonUtils.prettyJson
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
@@ -22,7 +21,7 @@ import kotlin.js.JsExport
 object DirectKeySerializer : KSerializer<DirectSerializedKey> {
 
     override val descriptor: SerialDescriptor = JsonObject.serializer().descriptor
-    override fun deserialize(decoder: Decoder): DirectSerializedKey = DirectSerializedKey(KeyManager.resolveSerializedKey(decoder.decodeSerializableValue(JsonObject.serializer())))
+    override fun deserialize(decoder: Decoder): DirectSerializedKey = DirectSerializedKey(resolveSerializedKeyBlocking(decoder.decodeSerializableValue(JsonObject.serializer())))
     override fun serialize(encoder: Encoder, value: DirectSerializedKey) = encoder.encodeSerializableValue(JsonElement.serializer(), KeySerialization.serializeKeyToJson(value.key))
 }
 
