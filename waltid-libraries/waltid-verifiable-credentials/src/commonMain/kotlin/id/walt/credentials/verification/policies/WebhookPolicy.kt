@@ -24,16 +24,19 @@ class WebhookPolicy : CredentialWrapperValidatorPolicy(
     "Sends the credential data to an webhook URL as HTTP POST, and returns the verified status based on the webhooks set status code (success = 200 - 299)."
 ) {
 
-    val http = HttpClient {
-        install(ContentNegotiation) {
-            json()
+    companion object {
+        private val http = HttpClient {
+            install(ContentNegotiation) {
+                json()
+            }
         }
     }
+
     @JvmBlocking
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    override suspend fun verify(data: JsonElement, args: Any?, context: Map<String, Any>): Result<Any> {
+    override suspend fun verify(data: JsonObject, args: Any?, context: Map<String, Any>): Result<Any> {
         val url = (args as JsonPrimitive).content
 
         val response = http.post(url) {
