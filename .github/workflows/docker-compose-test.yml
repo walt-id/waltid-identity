@@ -97,9 +97,10 @@ jobs:
             ELAPSED=$((ELAPSED + INTERVAL))
           done
           if [ $ELAPSED -ge $TIMEOUT ]; then
-             echo "Error: wallet-api is not healthy within 1 minute"
-             exit 1
-           fi
-           echo "wallet-api is healthy."
+            echo "Error: wallet-api is not healthy within $TIMEOUT seconds"
+            exit 1
+          fi
+          echo "wallet-api is healthy."
+
       - name: Run Tests
         run: kubectl -n compose exec --stdin ${{ steps.get-pod.outputs.POD_NAME }}  -- sh -c "cd waltid-identity/docker-compose && pip3 install requests && python3 api-test.py"
