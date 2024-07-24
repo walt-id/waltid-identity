@@ -93,7 +93,7 @@ jobs:
           INTERVAL=5  # Check every 5 seconds
           ELAPSED=0
           POD_NAME=${{ steps.get-pod.outputs.POD_NAME }}
-          until kubectl -n compose exec "$POD_NAME" -- sh -c "curl -sf -X GET http://localhost:7001/livez > /dev/null 2>&1" || [ $ELAPSED -ge $TIMEOUT ]; do
+          until kubectl -n compose exec "$POD_NAME" -- sh -c "curl -s -f -X GET http://localhost:7001/livez 2>&1" || [ $ELAPSED -ge $TIMEOUT ]; do
             echo "Waiting for wallet-api to be healthy... ($ELAPSED/$TIMEOUT seconds)"
             sleep $INTERVAL
             ELAPSED=$((ELAPSED + INTERVAL))
