@@ -366,23 +366,29 @@ fun Application.issuerApi() {
                     }
                 }
 
-                /*route("mdoc") {
+                route("mdoc") {
                     post("issue", {
                         summary = "Signs a credential based on the IEC/ISO18013-5 mdoc/mDL format."
                         description = "This endpoint issues a mdoc and returns an issuance URL "
 
                         request {
-                            headerParameter<String>("walt-key") {
+                            body<IssuanceRequest> {
                                 description =
-                                    "Supply a  key representation to use to issue the credential, " + "e.g. a local key (internal JWK) or a TSE key."
-                                example("JWK example", IssuanceExamples.jwkKeyExample)
-                                required = false
+                                    "Pass the unsigned credential that you intend to issue as the body of the request."
+                                example("OpenBadgeCredential example", IssuanceExamples.mDLCredentialIssuance)
+                                required = true
                             }
                         }
                     }) {
-                        context.respond(HttpStatusCode.OK, "mdoc issued")
+                        val mdocIssuanceRequest = context.receive<IssuanceRequest>()
+
+                        val offerUri = createCredentialOfferUri(listOf(mdocIssuanceRequest))
+
+                        context.respond(
+                            HttpStatusCode.OK, offerUri
+                        )
                     }
-                }*/
+                }
 
                 get("credentialOffer", {
                     summary = "Gets a credential offer based on the session id"
