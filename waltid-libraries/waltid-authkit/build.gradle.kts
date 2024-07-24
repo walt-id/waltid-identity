@@ -1,7 +1,3 @@
-
-val kotlin_version: String by project
-val logback_version: String by project
-
 plugins {
     kotlin("jvm")
     kotlin("plugin.serialization")
@@ -27,6 +23,7 @@ repositories {
 }
 
 dependencies {
+    // Ktor server
     implementation("io.ktor:ktor-server-core-jvm")
     implementation("io.ktor:ktor-server-auth-jvm")
     implementation("io.ktor:ktor-server-auth-jwt-jvm")
@@ -37,7 +34,6 @@ dependencies {
     implementation("io.ktor:ktor-server-auto-head-response-jvm")
     implementation("io.ktor:ktor-server-double-receive-jvm")
     implementation("io.ktor:ktor-server-webjars-jvm")
-    implementation("io.github.smiley4:ktor-swagger-ui:3.2.0")
     implementation("io.ktor:ktor-server-host-common-jvm")
     implementation("io.ktor:ktor-server-status-pages-jvm")
     implementation("io.ktor:ktor-server-cors-jvm")
@@ -47,7 +43,20 @@ dependencies {
     implementation("io.ktor:ktor-server-content-negotiation-jvm")
     implementation("io.ktor:ktor-serialization-kotlinx-json-jvm")
     implementation("io.ktor:ktor-server-cio-jvm")
-    implementation("ch.qos.logback:logback-classic:$logback_version")
+
+    // Ktor server external
+    implementation("io.github.smiley4:ktor-swagger-ui:3.2.0")
+
+    // Logging
+    implementation("io.klogging:klogging-jvm:0.6.1")
+    implementation("io.klogging:slf4j-klogging:0.6.0")
+
+    /* --- Testing --- */
+
+    // Ktor
+    testImplementation("io.ktor:ktor-server-cio-jvm")
     testImplementation("io.ktor:ktor-server-tests-jvm")
-    testImplementation("org.jetbrains.kotlin:kotlin-test-junit:$kotlin_version")
+
+    // Kotlin
+    testImplementation("org.jetbrains.kotlin:kotlin-test-junit")
 }
