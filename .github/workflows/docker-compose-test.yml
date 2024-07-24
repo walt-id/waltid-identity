@@ -101,4 +101,4 @@ jobs:
            fi
            echo "wallet-api is healthy."
       - name: Run Tests
-        run : kubectl -n compose exec --stdin --tty ${{ steps.get-pod.outputs.POD_NAME }}  -- sh -c "cd waltid-identity/docker-compose && pip3 install requests && python3 api-test.py"
+        run: kubectl -n compose exec --stdin ${{ steps.get-pod.outputs.POD_NAME }}  -- sh -c "cd waltid-identity/docker-compose && pip3 install requests && python3 api-test.py"
