@@ -11,6 +11,11 @@ repositories {
     mavenCentral()
 }
 
+
+fun getSetting(name: String) = providers.gradleProperty(name).orNull.toBoolean()
+val enableAndroidBuild = getSetting("enableAndroidBuild")
+val enableIosBuild = getSetting("enableIosBuild")
+
 kotlin {
     val isMacOS = System.getProperty("os.name") == "Mac OS X"
 
@@ -44,7 +49,7 @@ kotlin {
         }
         binaries.library()
     }
-    if (isMacOS) {
+    if (enableIosBuild) {
         iosArm64()
         iosSimulatorArm64()
     }

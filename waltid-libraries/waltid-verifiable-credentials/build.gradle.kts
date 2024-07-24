@@ -39,6 +39,10 @@ kotlin {
     jvmToolchain(17)
 }
 
+fun getSetting(name: String) = providers.gradleProperty(name).orNull.toBoolean()
+val enableAndroidBuild = getSetting("enableAndroidBuild")
+val enableIosBuild = getSetting("enableIosBuild")
+
 kotlin {
     val isMacOS = System.getProperty("os.name") == "Mac OS X"
     targets.configureEach {
@@ -76,7 +80,7 @@ kotlin {
         binaries.library()
     }
 
-    if (isMacOS) {
+    if (enableIosBuild) {
         iosArm64()
         iosSimulatorArm64()
     }
