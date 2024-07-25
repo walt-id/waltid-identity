@@ -60,14 +60,10 @@ data class ProofOfPossession @OptIn(ExperimentalSerializationApi::class) private
             nonce?.let { put("nonce", it) }
         }
 
-        override suspend fun build(key: Key): ProofOfPossession {
-            return ProofOfPossession(ProofType.jwt, key.signJws(payload.toString().toByteArray(), headers),
-                null, null)
-        }
+        override suspend fun build(key: Key) =
+            ProofOfPossession(ProofType.jwt, key.signJws(payload.toString().toByteArray(), headers), null, null)
 
-        fun build(signedJwt: String): ProofOfPossession {
-            return ProofOfPossession(ProofType.jwt, signedJwt, null, null)
-        }
+        fun build(signedJwt: String) = ProofOfPossession(ProofType.jwt, signedJwt, null, null)
 
     }
 
