@@ -4,7 +4,8 @@ import id.walt.credentials.Claims
 import id.walt.credentials.JwtClaims
 import id.walt.credentials.VcClaims
 import id.walt.credentials.verification.CredentialWrapperValidatorPolicy
-import id.walt.credentials.verification.DatePolicyUtils
+import id.walt.credentials.verification.DatePolicyUtils.checkJwt
+import id.walt.credentials.verification.DatePolicyUtils.checkVc
 import id.walt.credentials.verification.NotBeforePolicyException
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
@@ -25,7 +26,7 @@ class NotBeforeDatePolicy : CredentialWrapperValidatorPolicy(
     "Verifies that the credentials not-before date (for JWT: `nbf`, if unavailable: `iat` - 1 min) is correctly exceeded."
 ) {
     private val vcClaims = listOf<Claims>(VcClaims.V2.NotBefore, VcClaims.V1.NotBefore)
-    private val jwtClaims = listOf(JwtClaims.NotBefore, JwtClaims.IssuedAt)
+    private val jwtClaims = listOf<Claims>(JwtClaims.NotBefore, JwtClaims.IssuedAt)
 
     @JvmBlocking
     @JvmAsync
@@ -49,8 +50,8 @@ class NotBeforeDatePolicy : CredentialWrapperValidatorPolicy(
     }
 
     private fun getIssuanceDateKeyValuePair(data: JsonObject): Pair<Claims, Instant>? =
-        DatePolicyUtils.checkVc(data["vc"]?.jsonObject, vcClaims) ?: DatePolicyUtils.checkVc(data, vcClaims)
-        ?: DatePolicyUtils.checkJwt(data, jwtClaims)
+        checkVc(data["vc"]?.jsonObject, vcClaims) ?: checkVc(data, vcClaims)
+        ?: checkJwt(data, jwtClaims)
 
     private fun buildPolicyUnavailableResult() =
         Result.success(JsonObject(mapOf("policy_available" to JsonPrimitive(false))))
