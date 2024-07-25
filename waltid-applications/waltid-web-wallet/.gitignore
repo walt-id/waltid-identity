@@ -40,5 +40,6 @@ web/node_modules
 ### Database files ###
 *.db
 
-### Config ###
-#/k8s/
+# local env files
+/**/.env.*
+/**/.env
