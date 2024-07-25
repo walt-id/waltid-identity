@@ -20,7 +20,7 @@ class AllowedIssuerPolicy : CredentialWrapperValidatorPolicy(
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    override suspend fun verify(data: JsonElement, args: Any?, context: Map<String, Any>): Result<Any> {
+    override suspend fun verify(data: JsonObject, args: Any?, context: Map<String, Any>): Result<Any> {
         val allowedIssuers = when (args) {
             is JsonPrimitive -> listOf(args.content)
             is JsonArray -> args.map { it.jsonPrimitive.content }
@@ -28,8 +28,8 @@ class AllowedIssuerPolicy : CredentialWrapperValidatorPolicy(
         }
 
         val issuer =
-            data.jsonObject[JwsOption.ISSUER]?.jsonPrimitive?.content
-                ?: data.jsonObject["issuer"]?.jsonPrimitive?.content
+            data[JwsOption.ISSUER]?.jsonPrimitive?.content
+                ?: data["issuer"]?.jsonPrimitive?.content
                 ?: throw IllegalArgumentException("No issuer found in credential: $data")
 
         return when (issuer) {

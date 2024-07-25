@@ -22,10 +22,10 @@ class NotBeforeDatePolicy : CredentialWrapperValidatorPolicy(
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    override suspend fun verify(data: JsonElement, args: Any?, context: Map<String, Any>): Result<Any> {
+    override suspend fun verify(data: JsonObject, args: Any?, context: Map<String, Any>): Result<Any> {
         var successfulKey = ""
         fun getEpochTimestamp(key: String) =
-            data.jsonObject[key]?.jsonPrimitive?.longOrNull?.let { Instant.fromEpochSeconds(it) }.also {
+            data[key]?.jsonPrimitive?.longOrNull?.let { Instant.fromEpochSeconds(it) }.also {
                 successfulKey = key
             }
 
