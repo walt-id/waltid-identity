@@ -58,34 +58,24 @@ object OpenID4VCI {
         return getCIProviderMetadataUrl(credOffer.credentialIssuer)
     }
 
-    fun getCIProviderMetadataUrl(baseUrl: String): String {
-        return URLBuilder(baseUrl).apply {
+    fun getCIProviderMetadataUrl(baseUrl: String) = URLBuilder(baseUrl).apply {
             appendPathSegments(".well-known", "openid-credential-issuer")
         }.buildString()
-    }
 
-    fun getCommonProviderMetadataUrl(baseUrl: String): String {
-        return URLBuilder(baseUrl).apply {
+    fun getCommonProviderMetadataUrl(baseUrl: String) = URLBuilder(baseUrl).apply {
             appendPathSegments(".well-known", "openid-configuration")
         }.buildString()
-    }
 
-    fun getOAuthProviderMetadataUrl(baseUrl: String): String {
-        return URLBuilder(baseUrl).apply {
+    fun getOAuthProviderMetadataUrl(baseUrl: String) = URLBuilder(baseUrl).apply {
             appendPathSegments(".well-known", "oauth-authorization-server")
         }.buildString()
-    }
 
-    fun getJWTIssuerProviderMetadataUrl(baseUrl: String): String {
-        return URLBuilder(baseUrl).apply {
+    fun getJWTIssuerProviderMetadataUrl(baseUrl: String) = URLBuilder(baseUrl).apply {
             appendPathSegments(".well-known", "jwt-issuer")
         }.buildString()
-    }
 
-    suspend fun resolveCIProviderMetadata(credOffer: CredentialOffer): OpenIDProviderMetadata {
-        return http.get(getCIProviderMetadataUrl(credOffer)).bodyAsText().let {
-            OpenIDProviderMetadata.fromJSONString(it)
-        }
+    suspend fun resolveCIProviderMetadata(credOffer: CredentialOffer) = http.get(getCIProviderMetadataUrl(credOffer)).bodyAsText().let {
+        OpenIDProviderMetadata.fromJSONString(it)
     }
 
     fun resolveOfferedCredentials(credentialOffer: CredentialOffer, providerMetadata: OpenIDProviderMetadata): List<OfferedCredential> {

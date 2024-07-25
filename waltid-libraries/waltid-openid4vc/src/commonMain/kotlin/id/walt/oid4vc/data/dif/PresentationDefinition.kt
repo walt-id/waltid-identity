@@ -69,7 +69,7 @@ data class PresentationDefinition(
             })
         }
 
-        fun generateDefaultInputDescriptor(type: String, openId4VPProfile: OpenId4VPProfile = OpenId4VPProfile.DEFAULT): InputDescriptor {
+        private fun generateDefaultInputDescriptor(type: String, openId4VPProfile: OpenId4VPProfile = OpenId4VPProfile.DEFAULT): InputDescriptor {
             return when(openId4VPProfile) {
                 OpenId4VPProfile.HAIP -> InputDescriptor(
                     id = type,
