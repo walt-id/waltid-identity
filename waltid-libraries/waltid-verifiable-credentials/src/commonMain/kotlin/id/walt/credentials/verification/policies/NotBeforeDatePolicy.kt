@@ -1,10 +1,16 @@
 package id.walt.credentials.verification.policies
 
+import id.walt.credentials.Claims
+import id.walt.credentials.JwtClaims
+import id.walt.credentials.VcClaims
 import id.walt.credentials.verification.CredentialWrapperValidatorPolicy
+import id.walt.credentials.verification.DatePolicyUtils
 import id.walt.credentials.verification.NotBeforePolicyException
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
-import kotlinx.serialization.json.*
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonObject
 import love.forte.plugin.suspendtrans.annotation.JsPromise
 import love.forte.plugin.suspendtrans.annotation.JvmAsync
 import love.forte.plugin.suspendtrans.annotation.JvmBlocking
@@ -18,50 +24,69 @@ class NotBeforeDatePolicy : CredentialWrapperValidatorPolicy(
     "not-before",
     "Verifies that the credentials not-before date (for JWT: `nbf`, if unavailable: `iat` - 1 min) is correctly exceeded."
 ) {
+    private val vcClaims = listOf<Claims>(VcClaims.V2.NotBefore, VcClaims.V1.NotBefore)
+    private val jwtClaims = listOf(JwtClaims.NotBefore, JwtClaims.IssuedAt)
+
     @JvmBlocking
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
     override suspend fun verify(data: JsonObject, args: Any?, context: Map<String, Any>): Result<Any> {
-        var successfulKey = ""
-        fun getEpochTimestamp(key: String) =
-            data[key]?.jsonPrimitive?.longOrNull?.let { Instant.fromEpochSeconds(it) }.also {
-                successfulKey = key
-            }
-
-        val nbf = getEpochTimestamp("nbf") ?: getEpochTimestamp("iat")?.minus(1.minutes)
-        ?: return Result.success(JsonObject(mapOf("policy_available" to JsonPrimitive(false))))
-
+        val nbf = getIssuanceDateKeyValuePair(data) ?: return buildPolicyUnavailableResult()
         val now = Clock.System.now()
-
-        if (nbf > now) {
-            val availableIn = nbf - now
-            return Result.failure(
-                NotBeforePolicyException(
-                    date = nbf,
-                    dateSeconds = nbf.epochSeconds,
-                    availableIn = availableIn,
-                    availableInSeconds = availableIn.inWholeSeconds,
-                    key = successfulKey
-                )
-            )
+        return if (isBeyondNow(nbf, now)) {
+            buildFailureResult(now, nbf.second, nbf.first)
         } else {
-            check(successfulKey != "")
+            buildSuccessResult(now, nbf.second, nbf.first)
+        }
+    }
 
-            val availableSince = now - nbf
+    private fun isBeyondNow(nbf: Pair<Claims, Instant>, now: Instant) = when (nbf.first) {
+        JwtClaims.IssuedAt -> nbf.second.minus(1.minutes)
+        else -> nbf.second
+    }.let {
+        it > now
+    }
 
-            return Result.success(
-                JsonObject(
-                    mapOf(
-                        "date" to JsonPrimitive(nbf.toString()),
-                        "date_seconds" to JsonPrimitive(nbf.epochSeconds),
-                        "available_since" to JsonPrimitive(availableSince.toString()),
-                        "available_since_seconds" to JsonPrimitive(availableSince.inWholeSeconds),
-                        "used_key" to JsonPrimitive(successfulKey),
-                        "policy_available" to JsonPrimitive(true)
-                    )
+    private fun getIssuanceDateKeyValuePair(data: JsonObject): Pair<Claims, Instant>? =
+        DatePolicyUtils.checkVc(data["vc"]?.jsonObject, vcClaims) ?: DatePolicyUtils.checkVc(data, vcClaims)
+        ?: DatePolicyUtils.checkJwt(data, jwtClaims)
+
+    private fun buildPolicyUnavailableResult() =
+        Result.success(JsonObject(mapOf("policy_available" to JsonPrimitive(false))))
+
+    private fun buildFailureResult(
+        now: Instant,
+        nbf: Instant,
+        key: Claims,
+    ): Result<Any> = (nbf - now).let {
+        Result.failure(
+            NotBeforePolicyException(
+                date = nbf,
+                dateSeconds = nbf.epochSeconds,
+                availableIn = it,
+                availableInSeconds = it.inWholeSeconds,
+                key = key.getValue()
+            )
+        )
+    }
+
+    private fun buildSuccessResult(
+        now: Instant,
+        nbf: Instant,
+        key: Claims,
+    ) = (now - nbf).let {
+        Result.success(
+            JsonObject(
+                mapOf(
+                    "date" to JsonPrimitive(nbf.toString()),
+                    "date_seconds" to JsonPrimitive(nbf.epochSeconds),
+                    "available_since" to JsonPrimitive(it.toString()),
+                    "available_since_seconds" to JsonPrimitive(it.inWholeSeconds),
+                    "used_key" to JsonPrimitive(key.getValue()),
+                    "policy_available" to JsonPrimitive(true)
                 )
             )
-        }
+        )
     }
 }
