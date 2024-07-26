@@ -4,7 +4,7 @@ import id.walt.credentials.Claims
 import id.walt.credentials.JwtClaims
 import id.walt.credentials.VcClaims
 import id.walt.credentials.verification.CredentialWrapperValidatorPolicy
-import id.walt.credentials.verification.NotBeforePolicyException
+import id.walt.credentials.verification.ExpirationDatePolicyException
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.serialization.json.JsonObject
@@ -16,22 +16,22 @@ import org.junit.jupiter.params.provider.Arguments.arguments
 import java.util.stream.Stream
 import kotlin.time.Duration.Companion.days
 
-class NotBeforeDatePolicyTest : DatePolicyTestBase() {
+class ExpirationDatePolicyTest : DatePolicyTestBase() {
 
-    override val sut: CredentialWrapperValidatorPolicy = NotBeforeDatePolicy()
+    override val sut: CredentialWrapperValidatorPolicy = ExpirationDatePolicy()
 
     companion object {
-        private val vcClaims = listOf<Claims>(VcClaims.V1.NotBefore, VcClaims.V2.NotBefore)
-        private val jwtClaims = listOf<Claims>(JwtClaims.NotBefore, JwtClaims.IssuedAt)
+        private val vcClaims = listOf<Claims>(VcClaims.V1.NotAfter, VcClaims.V2.NotAfter)
+        private val jwtClaims = listOf<Claims>(JwtClaims.NotAfter)
 
         @JvmStatic
         fun vcSource(): Stream<Arguments> = vcClaims.flatMap {
             listOf(
                 arguments(
-                    named(it.getValue(), it), named("past", Clock.System.now().minus(1.days)), ::assertSuccessResult
+                    named(it.getValue(), it), named("past", Clock.System.now().minus(1.days)), ::assertFailureResult
                 ),
                 arguments(
-                    named(it.getValue(), it), named("future", Clock.System.now().plus(1.days)), ::assertFailureResult
+                    named(it.getValue(), it), named("future", Clock.System.now().plus(1.days)), ::assertSuccessResult
                 ),
             )
         }.let { Stream.of(*it.toTypedArray()) }
@@ -40,15 +40,15 @@ class NotBeforeDatePolicyTest : DatePolicyTestBase() {
         fun jwtSource(): Stream<Arguments> = jwtClaims.flatMap {
             listOf(
                 arguments(
-                    named(it.getValue(), it), named("past", Clock.System.now().minus(1.days)), ::assertSuccessResult
+                    named(it.getValue(), it), named("past", Clock.System.now().minus(1.days)), ::assertFailureResult
                 ),
                 arguments(
-                    named(it.getValue(), it), named("future", Clock.System.now().plus(1.days)), ::assertFailureResult
+                    named(it.getValue(), it), named("future", Clock.System.now().plus(1.days)), ::assertSuccessResult
                 ),
             )
         }.let { Stream.of(*it.toTypedArray()) }
 
-        private fun assertSuccessResult(result: Result<Any>, claim: Claims, nbf: Instant) {
+        private fun assertSuccessResult(result: Result<Any>, claim: Claims, exp: Instant) {
             assert(result.isSuccess)
             val json = result.getOrThrow() as JsonObject
             assert(json.containsKey("policy_available"))
@@ -56,19 +56,19 @@ class NotBeforeDatePolicyTest : DatePolicyTestBase() {
             assert(json.containsKey("used_key"))
             assert(json["used_key"]!!.jsonPrimitive.content == claim.getValue())
             assert(json.containsKey("date_seconds"))
-            assert(json["date_seconds"]!!.jsonPrimitive.content == nbf.epochSeconds.toString())
-            assert(json.containsKey("available_since_seconds"))
-            assert(json["available_since_seconds"]!!.jsonPrimitive.content == (Clock.System.now() - nbf).inWholeSeconds.toString())
+            assert(json["date_seconds"]!!.jsonPrimitive.content == exp.epochSeconds.toString())
+            assert(json.containsKey("expires_in_seconds"))
+            assert(json["expires_in_seconds"]!!.jsonPrimitive.content == (exp - Clock.System.now()).inWholeSeconds.toString())
         }
 
-        private fun assertFailureResult(result: Result<Any>, claim: Claims, nbf: Instant) {
+        private fun assertFailureResult(result: Result<Any>, claim: Claims, exp: Instant) {
             assert(result.isFailure)
-            assert(result.exceptionOrNull() is NotBeforePolicyException)
-            val exception = result.exceptionOrNull() as NotBeforePolicyException
+            assert(result.exceptionOrNull() is ExpirationDatePolicyException)
+            val exception = result.exceptionOrNull() as ExpirationDatePolicyException
             assert(exception.policyAvailable)
             assert(exception.key == claim.getValue())
-            assert(exception.date.epochSeconds == nbf.epochSeconds)
-            assert(exception.availableInSeconds == (nbf - Clock.System.now()).inWholeSeconds)
+            assert(exception.date.epochSeconds == exp.epochSeconds)
+            assert(exception.expiredSinceSeconds == (Clock.System.now() - exp).inWholeSeconds)
         }
     }
 }
