@@ -6,6 +6,7 @@ import id.walt.credentials.VcClaims
 import id.walt.credentials.verification.CredentialWrapperValidatorPolicy
 import id.walt.credentials.verification.DatePolicyUtils.checkJwt
 import id.walt.credentials.verification.DatePolicyUtils.checkVc
+import id.walt.credentials.verification.DatePolicyUtils.policyUnavailable
 import id.walt.credentials.verification.ExpirationDatePolicyException
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
@@ -31,10 +32,8 @@ class ExpirationDatePolicy : CredentialWrapperValidatorPolicy(
     @JsPromise
     @JsExport.Ignore
     override suspend fun verify(data: JsonObject, args: Any?, context: Map<String, Any>): Result<Any> {
-        val (key, exp) = getExpirationKeyValuePair(data) ?: return buildPolicyUnavailableResult()
-
+        val (key, exp) = getExpirationKeyValuePair(data) ?: return policyUnavailable
         val now = Clock.System.now()
-
         return if (now > exp) {
             buildFailureResult(now, exp, key)
         } else {
@@ -44,10 +43,6 @@ class ExpirationDatePolicy : CredentialWrapperValidatorPolicy(
 
     private fun getExpirationKeyValuePair(data: JsonObject): Pair<Claims, Instant>? =
         checkVc(data["vc"]?.jsonObject, vcClaims) ?: checkVc(data, vcClaims) ?: checkJwt(data, jwtClaims)
-
-    private fun buildPolicyUnavailableResult() = Result.success(
-        JsonObject(mapOf("policy_available" to JsonPrimitive(false)))
-    )
 
     private fun buildFailureResult(now: Instant, exp: Instant, key: Claims) = (now - exp).let {
         Result.failure<ExpirationDatePolicyException>(
