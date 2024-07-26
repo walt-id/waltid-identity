@@ -6,6 +6,7 @@ import id.walt.credentials.VcClaims
 import id.walt.credentials.verification.CredentialWrapperValidatorPolicy
 import id.walt.credentials.verification.DatePolicyUtils.checkJwt
 import id.walt.credentials.verification.DatePolicyUtils.checkVc
+import id.walt.credentials.verification.DatePolicyUtils.policyUnavailable
 import id.walt.credentials.verification.NotBeforePolicyException
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
@@ -33,7 +34,7 @@ class NotBeforeDatePolicy : CredentialWrapperValidatorPolicy(
     @JsPromise
     @JsExport.Ignore
     override suspend fun verify(data: JsonObject, args: Any?, context: Map<String, Any>): Result<Any> {
-        val nbf = getIssuanceDateKeyValuePair(data) ?: return buildPolicyUnavailableResult()
+        val nbf = getIssuanceDateKeyValuePair(data) ?: return policyUnavailable
         val now = Clock.System.now()
         return if (isBeyondNow(nbf, now)) {
             buildFailureResult(now, nbf.second, nbf.first)
@@ -52,9 +53,6 @@ class NotBeforeDatePolicy : CredentialWrapperValidatorPolicy(
     private fun getIssuanceDateKeyValuePair(data: JsonObject): Pair<Claims, Instant>? =
         checkVc(data["vc"]?.jsonObject, vcClaims) ?: checkVc(data, vcClaims)
         ?: checkJwt(data, jwtClaims)
-
-    private fun buildPolicyUnavailableResult() =
-        Result.success(JsonObject(mapOf("policy_available" to JsonPrimitive(false))))
 
     private fun buildFailureResult(
         now: Instant,

@@ -3,10 +3,14 @@ package id.walt.credentials.verification
 import id.walt.credentials.Claims
 import kotlinx.datetime.Instant
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
 object DatePolicyUtils {
+
+    val policyUnavailable = Result.success(JsonObject(mapOf("policy_available" to JsonPrimitive(false))))
+
     fun checkVc(data: JsonObject?, claims: List<Claims>) = check(data, claims) {
         instantConverter(it)
     }
