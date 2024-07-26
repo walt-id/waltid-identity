@@ -28,10 +28,28 @@ class NotBeforeDatePolicyTest : DatePolicyTestBase() {
         fun vcSource(): Stream<Arguments> = vcClaims.flatMap {
             listOf(
                 arguments(
-                    named(it.getValue(), it), named("past", Clock.System.now().minus(1.days)), ::assertSuccessResult
+                    named(it.getValue(), it),
+                    named("past", Clock.System.now().minus(1.days)),
+                    named("vc", "vc"),
+                    ::assertSuccessResult
                 ),
                 arguments(
-                    named(it.getValue(), it), named("future", Clock.System.now().plus(1.days)), ::assertFailureResult
+                    named(it.getValue(), it),
+                    named("future", Clock.System.now().plus(1.days)),
+                    named("vc", "vc"),
+                    ::assertFailureResult
+                ),
+                arguments(
+                    named(it.getValue(), it),
+                    named("past", Clock.System.now().minus(1.days)),
+                    named("root", null),
+                    ::assertSuccessResult
+                ),
+                arguments(
+                    named(it.getValue(), it),
+                    named("future", Clock.System.now().plus(1.days)),
+                    named("root", null),
+                    ::assertFailureResult
                 ),
             )
         }.let { Stream.of(*it.toTypedArray()) }
@@ -46,6 +64,46 @@ class NotBeforeDatePolicyTest : DatePolicyTestBase() {
                     named(it.getValue(), it), named("future", Clock.System.now().plus(1.days)), ::assertFailureResult
                 ),
             )
+        }.let { Stream.of(*it.toTypedArray()) }
+
+        @JvmStatic
+        fun processOrderSource(): Stream<Arguments> = vcClaims.flatMap { vcClaim ->
+            jwtClaims.flatMap { jwtClaim ->
+                listOf(
+                    arguments(
+                        named(vcClaim.getValue(), vcClaim),
+                        named("past", Clock.System.now().minus(1.days)),
+                        named(jwtClaim.getValue(), jwtClaim),
+                        named("future", Clock.System.now().plus(1.days)),
+                        named("vc", "vc"),
+                        ::assertSuccessResult
+                    ),
+                    arguments(
+                        named(vcClaim.getValue(), vcClaim),
+                        named("future", Clock.System.now().plus(1.days)),
+                        named(jwtClaim.getValue(), jwtClaim),
+                        named("past", Clock.System.now().minus(1.days)),
+                        named("vc", "vc"),
+                        ::assertFailureResult
+                    ),
+                    arguments(
+                        named(vcClaim.getValue(), vcClaim),
+                        named("past", Clock.System.now().minus(1.days)),
+                        named(jwtClaim.getValue(), jwtClaim),
+                        named("future", Clock.System.now().plus(1.days)),
+                        named("root", null),
+                        ::assertSuccessResult
+                    ),
+                    arguments(
+                        named(vcClaim.getValue(), vcClaim),
+                        named("future", Clock.System.now().plus(1.days)),
+                        named(jwtClaim.getValue(), jwtClaim),
+                        named("past", Clock.System.now().minus(1.days)),
+                        named("root", null),
+                        ::assertFailureResult
+                    ),
+                )
+            }
         }.let { Stream.of(*it.toTypedArray()) }
 
         private fun assertSuccessResult(result: Result<Any>, claim: Claims, nbf: Instant) {

@@ -15,11 +15,13 @@ abstract class DatePolicyTestBase {
     protected abstract val sut: CredentialWrapperValidatorPolicy
 
     @DisplayName("given a vc with a valid claim, when verifying, then returns the correct result")
-    @ParameterizedTest(name = "[{0}: {1}]")
+    @ParameterizedTest(name = "[({2}) - {0}:{1}]")
     @MethodSource("vcSource")
-    fun verifyVcResult(claim: Claims, instant: Instant, expected: (Result<Any>, Claims, Instant) -> Unit) = runTest {
+    fun verifyVcResult(
+        claim: Claims, instant: Instant, root: String?, expected: (Result<Any>, Claims, Instant) -> Unit
+    ) = runTest {
         // given
-        val vc = buildJson(claim.getValue(), instant.toString(), "vc")
+        val vc = buildJson(claim.getValue(), instant.toString(), root)
         // when
         val result = sut.verify(vc, context = emptyMap())
         // then
@@ -36,6 +38,31 @@ abstract class DatePolicyTestBase {
         val result = sut.verify(jwt, context = emptyMap())
         // then
         expected(result, claim, instant)
+    }
+
+    @DisplayName("given data with both a vc and a jwt claim, when verifying, then returns the correct result according to the vc claim")
+    @ParameterizedTest(name = "[{4}({0}:{1}) - jwt({2}:{3})]")
+    @MethodSource("processOrderSource")
+    fun verifyProcessingOrderResult(
+        vcClaim: Claims,
+        vcInstant: Instant,
+        jwtClaim: Claims,
+        jwtInstant: Instant,
+        root: String?,
+        expected: (Result<Any>, Claims, Instant) -> Unit
+    ) = runTest {
+        // given
+        val data = buildJson(
+            vcClaim.getValue(), vcInstant.toString(), root
+        ).plus(
+            Pair(
+                jwtClaim.getValue(), Json.encodeToJsonElement(jwtInstant.epochSeconds.toString())
+            )
+        ).let { JsonObject(it) }
+        // when
+        val result = sut.verify(data, context = emptyMap())
+        // then
+        expected(result, vcClaim, vcInstant)
     }
 
     @DisplayName("given data with missing any claim, when verifying, then returns the policy not available result")
