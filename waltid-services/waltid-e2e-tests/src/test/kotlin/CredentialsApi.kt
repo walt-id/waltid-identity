@@ -28,10 +28,9 @@ class CredentialsApi(private val client: HttpClient, val wallet: UUID) {
         expectedCredential.onEach { cid -> assertNotNull(credentials.single { it.id == cid }) { "credential not found for id: $cid" } }
     }
 
-    suspend fun get(credential: String, output: ((WalletCredential) -> Unit)? = null) =
-        client.get("/wallet-api/wallet/$wallet/credentials/$credential").expectSuccess().apply {
-            val credential = body<WalletCredential>()
-            output?.invoke(credential)
+    suspend fun get(credential: String) =
+        client.get("/wallet-api/wallet/$wallet/credentials/$credential").expectSuccess().run {
+            body<WalletCredential>()
         }
 
     suspend fun delete(credential: String, permanent: Boolean = false) =
@@ -41,9 +40,9 @@ class CredentialsApi(private val client: HttpClient, val wallet: UUID) {
             }
         }.expectSuccess()
 
-    suspend fun restore(credential: String, output: ((WalletCredential) -> Unit)? = null) =
-        client.post("/wallet-api/wallet/$wallet/credentials/$credential/restore").expectSuccess().apply {
-            output?.invoke(body<WalletCredential>())
+    suspend fun restore(credential: String) =
+        client.post("/wallet-api/wallet/$wallet/credentials/$credential/restore").expectSuccess().run {
+            body<WalletCredential>()
         }
 
     suspend fun accept(credential: String) =
@@ -54,10 +53,9 @@ class CredentialsApi(private val client: HttpClient, val wallet: UUID) {
             setBody(mapOf("note" to note))
         }.expectSuccess()
 
-    suspend fun status(credential: String, output: ((List<CredentialStatusResult>) -> Unit)? = null) =
-        client.get("/wallet-api/wallet/$wallet/credentials/$credential/status").expectSuccess().apply {
-            val result = body<List<CredentialStatusResult>>()
-            output?.invoke(result)
+    suspend fun status(credential: String) =
+        client.get("/wallet-api/wallet/$wallet/credentials/$credential/status").expectSuccess().run {
+            body<List<CredentialStatusResult>>()
         }
 
     suspend fun attachCategory(credential: String, vararg categories: String) =
