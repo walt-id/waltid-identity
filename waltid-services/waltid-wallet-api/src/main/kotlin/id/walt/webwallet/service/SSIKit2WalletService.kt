@@ -127,7 +127,7 @@ class SSIKit2WalletService(
     }
 
     override suspend fun restoreCredential(id: String): WalletCredential =
-        credentialService.restore(walletId, id) ?: throw NotFoundException("Credential not found: $id")
+        credentialService.restore(walletId, id) ?: throw NotFoundException("Credential with id $id not found")
 
     override suspend fun getCredential(credentialId: String): WalletCredential =
         credentialService.get(walletId, credentialId)
@@ -346,7 +346,7 @@ class SSIKit2WalletService(
 
     override suspend fun loadDid(did: String): JsonObject =
         DidsService.get(walletId, did)?.let { Json.parseToJsonElement(it.document).jsonObject }
-            ?: throw NotFoundException("Did not found: $did for account: $walletId")
+            ?: throw NotFoundException("The DID ($did) could not be found for Wallet ID: $walletId")
 
     override suspend fun deleteDid(did: String): Boolean {
         DidsService.get(walletId, did).also {
