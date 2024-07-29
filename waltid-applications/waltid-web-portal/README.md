@@ -22,6 +22,16 @@ pnpm install
 pnpm dev
 ```
 
+***Note!*** The web portal requires the environment variables to run.
+Locally, they can be set up using a `.env` or `.env.local` file:
+
+```text
+NEXT_PUBLIC_VC_REPO=https://credentials.walt.id
+NEXT_PUBLIC_ISSUER=https://issuer.portal.walt.id
+NEXT_PUBLIC_VERIFIER=https://verifier.portal.walt.id
+NEXT_PUBLIC_WALLET=https://wallet.walt.id
+``` 
+
 Build for production
 
 ```bash
