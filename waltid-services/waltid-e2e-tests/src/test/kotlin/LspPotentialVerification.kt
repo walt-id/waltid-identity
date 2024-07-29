@@ -18,6 +18,7 @@ import id.walt.mdoc.dataelement.MapElement
 import id.walt.mdoc.dataelement.NullElement
 import id.walt.mdoc.dataretrieval.DeviceResponse
 import id.walt.mdoc.doc.MDoc
+import id.walt.mdoc.doc.MDocTypes
 import id.walt.mdoc.doc.MDocVerificationParams
 import id.walt.mdoc.doc.VerificationType
 import id.walt.mdoc.docrequest.MDocRequestBuilder
@@ -67,7 +68,7 @@ class LspPotentialVerification(private val client: HttpClient) {
       ))
       assertEquals(200, issueResponse.status.value)
       val mdoc = MDoc.fromCBORHex(issueResponse.bodyAsText())
-      assertEquals("org.iso.18013.5.1.mDL", mdoc.docType.value)
+      assertEquals(MDocTypes.ISO_MDL, mdoc.docType.value)
 
       // Step 2: Create an openid4vc verification request
       val createReqResponse = client.post("/openid4vc/verify") {
@@ -76,7 +77,7 @@ class LspPotentialVerification(private val client: HttpClient) {
         contentType(ContentType.Application.Json)
         setBody(
           buildJsonObject {
-            put("request_credentials", JsonArray(listOf(JsonPrimitive("org.iso.18013.5.1.mDL"))))
+            put("request_credentials", JsonArray(listOf(JsonPrimitive(MDocTypes.ISO_MDL))))
           })
       }
       assertEquals(200, createReqResponse.status.value)
