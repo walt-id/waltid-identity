@@ -55,7 +55,7 @@ class SDJwtVC(sdJwt: SDJwt): SDJwt(sdJwt.jwt, sdJwt.header, sdJwt.sdPayload, sdJ
      * @return SD-JWT VC verification result, with parsed SD-JWT VC
      * @throws Exception if SD-JWT VC cannot be parsed
      */
-    fun verifyAndParse(sdJwtVC: String, jwtCryptoProvider: JWTCryptoProvider, requiresHolderKeyBinding: Boolean,
+    fun parseAndVerify(sdJwtVC: String, jwtCryptoProvider: JWTCryptoProvider, requiresHolderKeyBinding: Boolean,
                        audience: String? = null, nonce: String? = null): VCVerificationResult {
       val parsedVC = parse(sdJwtVC)
       return parsedVC.verifyVC(jwtCryptoProvider, requiresHolderKeyBinding, audience, nonce)

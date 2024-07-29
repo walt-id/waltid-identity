@@ -229,7 +229,9 @@ class LspPotentialVerification(private val client: HttpClient) {
       println(vp_token)
 
       assertTrue(SDJwtVC.isSdJwtVCPresentation(vp_token))
-      assertTrue(SDJwtVC.verifyAndParse(vp_token, cryptoProvider, false, audience = presReq.clientId, nonce = presReq.nonce).verified)
+      val parseAndVerifyResult = SDJwtVC.parseAndVerify(vp_token, cryptoProvider, false, audience = presReq.clientId, nonce = presReq.nonce)
+      assertTrue(parseAndVerifyResult.verified)
+      assertTrue(parseAndVerifyResult.sdJwtVC.toString().equals(vp_token))
 
       val tokenResp = OpenID4VP.generatePresentationResponse(PresentationResult(
         listOf(JsonPrimitive(vp_token)),
