@@ -16,6 +16,7 @@ import id.walt.mdoc.dataelement.DataElement
 import id.walt.mdoc.dataelement.FullDateElement
 import id.walt.mdoc.dataelement.toDataElement
 import id.walt.mdoc.doc.MDocBuilder
+import id.walt.mdoc.doc.MDocTypes
 import id.walt.mdoc.mso.DeviceKeyInfo
 import id.walt.mdoc.mso.ValidityInfo
 import id.walt.sdjwt.SDJwtVC
@@ -125,7 +126,7 @@ fun Application.lspPotentialVerificationTestApi() {
         val deviceJwk = context.request.call.receiveParameters().toMap()["jwk"]
         val devicePubKey = JWK.parse(deviceJwk!!.first()).toECKey().toPublicKey()
 
-        val mdoc = MDocBuilder("org.iso.18013.5.1.mDL")
+        val mdoc = MDocBuilder(MDocTypes.ISO_MDL)
           .addItemToSign("org.iso.18013.5.1", "family_name", "Doe".toDataElement())
           .addItemToSign("org.iso.18013.5.1", "given_name", "John".toDataElement())
           .addItemToSign("org.iso.18013.5.1", "birth_date", FullDateElement(LocalDate(1990, 1, 15)))

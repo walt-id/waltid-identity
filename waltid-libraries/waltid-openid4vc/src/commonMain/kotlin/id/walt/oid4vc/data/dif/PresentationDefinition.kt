@@ -1,5 +1,6 @@
 package id.walt.oid4vc.data.dif
 
+import id.walt.mdoc.doc.MDocTypes
 import id.walt.oid4vc.data.JsonDataObject
 import id.walt.oid4vc.data.JsonDataObjectFactory
 import id.walt.oid4vc.data.JsonDataObjectSerializer
@@ -43,27 +44,7 @@ data class PresentationDefinition(
         fun primitiveGenerationFromVcTypes(types: List<String>, openId4VPProfile: OpenId4VPProfile = OpenId4VPProfile.DEFAULT): PresentationDefinition {
             return PresentationDefinition(inputDescriptors = types.map { type ->
                 when(type) {
-                    "org.iso.18013.5.1.mDL" -> InputDescriptor(
-                        id = type,
-                        format = mapOf(VCFormat.mso_mdoc to VCFormatDefinition(setOf("EdDSA", "ES256"))),
-                        constraints = InputDescriptorConstraints(
-                            limitDisclosure = DisclosureLimitation.required,
-                            fields = listOf(
-                                InputDescriptorField(
-                                    path = listOf("$['org.iso.18013.5.1']['family_name']"),
-                                    intentToRetain = false
-                                ),
-                                InputDescriptorField(
-                                    path = listOf("$['org.iso.18013.5.1']['given_name']"),
-                                    intentToRetain = false
-                                ),
-                                InputDescriptorField(
-                                    path = listOf("$['org.iso.18013.5.1']['birth_date']"),
-                                    intentToRetain = false
-                                )
-                            )
-                        )
-                    )
+                    MDocTypes.ISO_MDL -> generateDefaultMDLInputDescriptor()
                     else -> generateDefaultInputDescriptor(type, openId4VPProfile)
                 }
             })
@@ -124,6 +105,28 @@ data class PresentationDefinition(
                 )
             }
         }
+
+        private fun generateDefaultMDLInputDescriptor() = InputDescriptor(
+            id = MDocTypes.ISO_MDL,
+            format = mapOf(VCFormat.mso_mdoc to VCFormatDefinition(setOf("EdDSA", "ES256"))),
+            constraints = InputDescriptorConstraints(
+                limitDisclosure = DisclosureLimitation.required,
+                fields = listOf(
+                    InputDescriptorField(
+                        path = listOf("$['org.iso.18013.5.1']['family_name']"),
+                        intentToRetain = false
+                    ),
+                    InputDescriptorField(
+                        path = listOf("$['org.iso.18013.5.1']['given_name']"),
+                        intentToRetain = false
+                    ),
+                    InputDescriptorField(
+                        path = listOf("$['org.iso.18013.5.1']['birth_date']"),
+                        intentToRetain = false
+                    )
+                )
+            )
+        )
 
     }
 }

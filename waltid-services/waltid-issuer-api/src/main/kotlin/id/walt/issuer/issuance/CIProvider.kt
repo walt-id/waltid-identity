@@ -28,6 +28,7 @@ import id.walt.mdoc.SimpleCOSECryptoProvider
 import id.walt.mdoc.cose.COSESign1
 import id.walt.mdoc.dataelement.*
 import id.walt.mdoc.doc.MDocBuilder
+import id.walt.mdoc.doc.MDocTypes
 import id.walt.mdoc.mso.DeviceKeyInfo
 import id.walt.mdoc.mso.ValidityInfo
 import id.walt.oid4vc.data.CredentialFormat
@@ -79,12 +80,13 @@ open class CIProvider : OpenIDCredentialIssuer(
                 types = entry.value
             ))
         }
-    }.plus(Pair("org.iso.18013.5.1.mDL", CredentialSupported(
+    }.plus(Pair(
+        MDocTypes.ISO_MDL, CredentialSupported(
         format = CredentialFormat.mso_mdoc,
         cryptographicBindingMethodsSupported = setOf("cose_key"),
         cryptographicSuitesSupported = setOf("ES256"),
-        types = listOf("org.iso.18013.5.1.mDL"),
-        docType = "org.iso.18013.5.1.mDL"
+        types = listOf(MDocTypes.ISO_MDL),
+        docType = MDocTypes.ISO_MDL
     ))).plus(
         Pair("urn:eu.europa.ec.eudi:pid:1", CredentialSupported(
         format = CredentialFormat.sd_jwt_vc,

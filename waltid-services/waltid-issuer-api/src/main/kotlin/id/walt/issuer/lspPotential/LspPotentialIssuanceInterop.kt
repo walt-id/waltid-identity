@@ -11,6 +11,7 @@ import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.issuer.issuance.IssuanceRequest
 import id.walt.issuer.issuance.createCredentialOfferUri
 import id.walt.mdoc.COSECryptoProviderKeyInfo
+import id.walt.mdoc.doc.MDocTypes
 import id.walt.sdjwt.SimpleJWTCryptoProvider
 import io.github.smiley4.ktorswaggerui.dsl.routing.get
 import io.github.smiley4.ktorswaggerui.dsl.routing.route
@@ -88,7 +89,7 @@ fun Application.lspPotentialIssuanceTestApi() {
         val offerUri = IssuanceRequest(
           Json.parseToJsonElement(KeySerialization.serializeKey(jwkKey)).jsonObject,
           "",
-          "org.iso.18013.5.1.mDL",
+          MDocTypes.ISO_MDL,
           null,
           mdocData = mapOf("org.iso.18013.5.1" to buildJsonObject {
             put("family_name", "Doe")
