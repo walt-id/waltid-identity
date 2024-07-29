@@ -1,0 +1,56 @@
+{
+  "private": true,
+  "packageManager": "pnpm@8.1.0",
+  "engines": {
+    "node": "^16.11.0 || ^17.0.0 || || ^18.0.0"
+  },
+  "scripts": {
+    "dev": "nuxi dev",
+    "build": "nuxi build",
+    "generate": "nuxi generate",
+    "start": "node .output/server/index.mjs",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "allupdate": "yarn upgrade-interactive"
+  },
+  "dependencies": {
+    "@github/webauthn-json": "^2.1.1",
+    "@headlessui/vue": "1.7.22",
+    "@heroicons/vue": "^2.1.4",
+    "@julr/unocss-preset-forms": "^0.1.0",
+    "@pinia/nuxt": "^0.5.1",
+    "jsonpath-plus": "^9.0.0",
+    "qr-scanner": "^1.4.2",
+    "qrcode.vue": "^3.4.1"
+  },
+  "devDependencies": {
+    "@antfu/eslint-config": "2.21.1",
+    "@iconify-json/carbon": "1.1.35",
+    "@iconify-json/ic": "1.1.17",
+    "@iconify-json/ph": "1.1.13",
+    "@iconify-json/twemoji": "1.1.15",
+    "@nuxt/content": "^2.12.1",
+    "@nuxtjs/color-mode": "3.4.1",
+    "@nuxtjs/i18n": "8.3.1",
+    "@sidebase/nuxt-auth": "^0.7.2",
+    "@unocss/nuxt": "0.61.0",
+    "@unocss/transformer-directives": "^0.61.0",
+    "@unocss/transformer-variant-group": "^0.61.0",
+    "@vite-pwa/nuxt": "^0.8.0",
+    "@vueuse/core": "^10.11.0",
+    "@vueuse/nuxt": "10.11.0",
+    "eslint": "9.5.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-prettier": "^5.1.3",
+    "eslint-plugin-vue": "9.26.0",
+    "nuxt": "^3.12.2",
+    "nuxt-icon": "^0.6.10",
+    "nuxt-oidc-auth": "^0.12.0",
+    "prettier": "^3.3.2",
+    "prettier-plugin-tailwindcss": "^0.6.5",
+    "sass": "1.77.6",
+    "sass-loader": "14.2.1",
+    "typescript": "5.4.5",
+    "vite-plugin-pwa": "^0.20.0"
+  }
+}
