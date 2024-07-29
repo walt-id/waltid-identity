@@ -31,6 +31,7 @@ import id.walt.oid4vc.interfaces.PresentationResult
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.sdjwt.SDJwtVC
 import id.walt.sdjwt.SimpleJWTCryptoProvider
+import id.walt.sdjwt.SimpleMultiKeyJWTCryptoProvider
 import id.walt.verifier.lspPotential.LspPotentialVerificationInterop
 import io.ktor.client.*
 import io.ktor.client.request.*
@@ -42,12 +43,6 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.*
 import kotlinx.uuid.UUID
 import kotlinx.uuid.generateUUID
-import java.security.KeyFactory
-import java.security.cert.CertificateFactory
-import java.security.cert.X509Certificate
-import java.security.spec.PKCS8EncodedKeySpec
-import java.security.spec.X509EncodedKeySpec
-import java.util.*
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -223,14 +218,18 @@ class LspPotentialVerification(private val client: HttpClient) {
       assertEquals(VCFormat.sd_jwt_vc, presReq.presentationDefinition!!.inputDescriptors.firstOrNull()?.format?.keys?.first())
       assertEquals("urn:eu.europa.ec.eudi:pid:1", presReq.presentationDefinition!!.inputDescriptors.flatMap { it.constraints!!.fields!! }.first { it.path.contains("$.vct") }.filter?.get("const")?.jsonPrimitive?.content)
 
+      val ecHolderKey = ECKey.parse(holderKey.exportJWK())
+      val cryptoProvider = SimpleMultiKeyJWTCryptoProvider(mapOf(
+        holderKey.getKeyId() to SimpleJWTCryptoProvider(JWSAlgorithm.ES256, ECDSASigner(ecHolderKey), ECDSAVerifier(ecHolderKey)),
+        LspPotentialVerificationInterop.POTENTIAL_ISSUER_KEY_ID to LspPotentialVerificationInterop.POTENTIAL_JWT_CRYPTO_PROVIDER
+      ))
       // 4. present (wallet)
-      val vp_token = sdJwtVc.present(true, presReq.clientId, presReq.nonce!!, SimpleJWTCryptoProvider(
-        JWSAlgorithm.ES256, ECDSASigner(ECKey.parse(holderKey.exportJWK())), null
-      )).toString()
+      val vp_token = sdJwtVc.present(true, presReq.clientId, presReq.nonce!!, cryptoProvider, holderKey.getKeyId()).toString()
 
       println(vp_token)
 
       assertTrue(SDJwtVC.isSdJwtVCPresentation(vp_token))
+      assertTrue(SDJwtVC.verifyAndParse(vp_token, cryptoProvider, false, audience = presReq.clientId, nonce = presReq.nonce).verified)
 
       val tokenResp = OpenID4VP.generatePresentationResponse(PresentationResult(
         listOf(JsonPrimitive(vp_token)),
