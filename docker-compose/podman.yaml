@@ -27,7 +27,7 @@ spec:
           apk upgrade && \
           apk add --no-cache podman-compose git py3-pip && \
           adduser -D waltid && \
-          git clone https://github.com/walt-id/waltid-identity.git && \
+          git clone --branch docker-tests https://github.com/walt-id/waltid-identity.git && \
           chown -R waltid:waltid /waltid-identity && \
           cd /waltid-identity/docker-compose && \
           chmod -R a+rw wallet-api/data && \
