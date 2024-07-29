@@ -230,6 +230,8 @@ class LspPotentialVerification(private val client: HttpClient) {
 
       println(vp_token)
 
+      assertTrue(SDJwtVC.isSdJwtVCPresentation(vp_token))
+
       val tokenResp = OpenID4VP.generatePresentationResponse(PresentationResult(
         listOf(JsonPrimitive(vp_token)),
         PresentationSubmission("presentation_1", presReq.presentationDefinition!!.id, listOf(

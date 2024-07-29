@@ -121,7 +121,7 @@ kotlin {
         val jvmMain by getting {
             dependencies {
                 implementation("com.nimbusds:nimbus-jose-jwt:9.40")
-                implementation(project(":waltid-libraries:waltid-crypto"))
+                api(project(":waltid-libraries:waltid-crypto"))
             }
         }
         val jvmTest by getting {
