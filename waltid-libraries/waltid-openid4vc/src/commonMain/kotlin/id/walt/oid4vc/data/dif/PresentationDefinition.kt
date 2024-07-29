@@ -45,66 +45,31 @@ data class PresentationDefinition(
             return PresentationDefinition(inputDescriptors = types.map { type ->
                 when(type) {
                     MDocTypes.ISO_MDL -> generateDefaultMDLInputDescriptor()
-                    else -> generateDefaultInputDescriptor(type, openId4VPProfile)
+                    else -> when(openId4VPProfile) {
+                        OpenId4VPProfile.HAIP -> generateDefaultHAIPInputDescriptor(type)
+                        OpenId4VPProfile.ISO_18013_7_MDOC -> generateDefaultMDOCInputDescriptor(type)
+                        OpenId4VPProfile.EBSIV3 -> generateDefaultEBSIV3InputDescriptor(type)
+                        else -> generateDefaultInputDescriptor(type)
+                    }
                 }
             })
         }
 
-        private fun generateDefaultInputDescriptor(type: String, openId4VPProfile: OpenId4VPProfile = OpenId4VPProfile.DEFAULT): InputDescriptor {
-            return when(openId4VPProfile) {
-                OpenId4VPProfile.HAIP -> InputDescriptor(
-                    id = type,
-                    format = mapOf(VCFormat.sd_jwt_vc to VCFormatDefinition()),
-                    constraints = InputDescriptorConstraints(
-                        limitDisclosure = DisclosureLimitation.required,
-                        fields = listOf(
-                            InputDescriptorField(path = listOf("$.vct"), filter = JsonObject(
-                                mapOf("type" to JsonPrimitive("string"), "const" to JsonPrimitive(type))
-                            ))
-                        )
-                    )
-                )
-                OpenId4VPProfile.ISO_18013_7_MDOC -> InputDescriptor(
-                    id = type,
-                    format = mapOf(VCFormat.mso_mdoc to VCFormatDefinition(setOf("EdDSA", "ES256"))),
-                    constraints = InputDescriptorConstraints(
-                        limitDisclosure = DisclosureLimitation.required,
-                        fields = listOf()
-                    )
-                )
-              OpenId4VPProfile.EBSIV3 ->
-                InputDescriptor(
-                  id = type,
-                  format = mapOf(VCFormat.jwt_vc to VCFormatDefinition(alg = setOf("ES256"))),
-                  constraints = InputDescriptorConstraints(
-                    listOf(
-                      InputDescriptorField(
+        private fun generateDefaultInputDescriptor(type: String) = InputDescriptor(
+            id = type,
+            format = mapOf(VCFormat.jwt_vc_json to VCFormatDefinition(alg = setOf("EdDSA"))),
+            constraints = InputDescriptorConstraints(
+                listOf(
+                    InputDescriptorField(
                         path = listOf("$.type"), filter = JsonObject(
-                          mapOf(
-                            "type" to JsonPrimitive("array"), "pattern" to JsonPrimitive(type)
-                          )
-                        )
-                      ),
-                    )
-                  )
-                )
-                else -> InputDescriptor(
-                    id = type,
-                    format = mapOf(VCFormat.jwt_vc_json to VCFormatDefinition(alg = setOf("EdDSA"))),
-                    constraints = InputDescriptorConstraints(
-                        listOf(
-                            InputDescriptorField(
-                                path = listOf("$.type"), filter = JsonObject(
-                                    mapOf(
-                                        "type" to JsonPrimitive("string"), "pattern" to JsonPrimitive(type)
-                                    )
-                                )
+                            mapOf(
+                                "type" to JsonPrimitive("string"), "pattern" to JsonPrimitive(type)
                             )
                         )
                     )
                 )
-            }
-        }
+            )
+        )
 
         private fun generateDefaultMDLInputDescriptor() = InputDescriptor(
             id = MDocTypes.ISO_MDL,
@@ -124,6 +89,44 @@ data class PresentationDefinition(
                         path = listOf("$['org.iso.18013.5.1']['birth_date']"),
                         intentToRetain = false
                     )
+                )
+            )
+        )
+
+        private fun generateDefaultHAIPInputDescriptor(type: String) = InputDescriptor(
+            id = type,
+            format = mapOf(VCFormat.sd_jwt_vc to VCFormatDefinition()),
+            constraints = InputDescriptorConstraints(
+                limitDisclosure = DisclosureLimitation.required,
+                fields = listOf(
+                    InputDescriptorField(path = listOf("$.vct"), filter = JsonObject(
+                        mapOf("type" to JsonPrimitive("string"), "const" to JsonPrimitive(type))
+                    ))
+                )
+            )
+        )
+
+        private fun generateDefaultMDOCInputDescriptor(type: String) = InputDescriptor(
+            id = type,
+            format = mapOf(VCFormat.mso_mdoc to VCFormatDefinition(setOf("EdDSA", "ES256"))),
+            constraints = InputDescriptorConstraints(
+                limitDisclosure = DisclosureLimitation.required,
+                fields = listOf()
+            )
+        )
+
+        private fun generateDefaultEBSIV3InputDescriptor(type: String) = InputDescriptor(
+            id = type,
+            format = mapOf(VCFormat.jwt_vc to VCFormatDefinition(alg = setOf("ES256"))),
+            constraints = InputDescriptorConstraints(
+                listOf(
+                    InputDescriptorField(
+                        path = listOf("$.type"), filter = JsonObject(
+                            mapOf(
+                                "type" to JsonPrimitive("array"), "pattern" to JsonPrimitive(type)
+                            )
+                        )
+                    ),
                 )
             )
         )
