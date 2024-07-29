@@ -33,6 +33,5 @@ spec:
           chmod -R a+rw wallet-api/data && \
           echo '127.0.0.1 host.docker.internal' >> /etc/hosts && \
           echo '127.0.0.1 gateway.docker.internal' >> /etc/hosts && \
-          podman compose pull && \
-          podman run --name test-postgres -e POSTGRES_DB=waltid -e POSTGRES_USER=waltid -e POSTGRES_PASSWORD=waltid -p 5432:5432 -d postgres && \
-          podman compose up " ]
+          docker compose pull && \
+          docker compose up " ]
