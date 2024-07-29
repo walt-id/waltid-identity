@@ -6,6 +6,7 @@ import com.nimbusds.jose.jwk.ECKey
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.jwk.KeyUse
 import com.nimbusds.jose.util.Base64URL
+import id.walt.commons.interop.LspPotentialInterop
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeyType
@@ -115,7 +116,7 @@ class LspPotentialVerification(private val client: HttpClient) {
       val verificationResult = presentedMdoc.verify(
         MDocVerificationParams(
           VerificationType.forPresentation,
-          issuerKeyID = LspPotentialVerificationInterop.POTENTIAL_ISSUER_KEY_ID, deviceKeyID = holderKey.getKeyId(),
+          issuerKeyID = LspPotentialInterop.POTENTIAL_ISSUER_KEY_ID, deviceKeyID = holderKey.getKeyId(),
           deviceAuthentication = DeviceAuthentication(
             ListElement(listOf(NullElement(), NullElement(), mdocHandover)),
             presReq.presentationDefinition?.inputDescriptors?.first()?.id!!, EncodedCBORElement(MapElement(mapOf()))
@@ -168,7 +169,7 @@ class LspPotentialVerification(private val client: HttpClient) {
       ))
       assertEquals(200, issueResponse.status.value)
       val sdJwtVc = SDJwtVC.parse(issueResponse.bodyAsText())
-      assertEquals(LspPotentialVerificationInterop.POTENTIAL_ISSUER_KEY_ID, sdJwtVc.issuer)
+      assertEquals(LspPotentialInterop.POTENTIAL_ISSUER_KEY_ID, sdJwtVc.issuer)
 
       // 3. make presentation request (verifier)
       val createReqResponse = client.post("/openid4vc/verify") {
@@ -192,7 +193,7 @@ class LspPotentialVerification(private val client: HttpClient) {
       val ecHolderKey = ECKey.parse(holderKey.exportJWK())
       val cryptoProvider = SimpleMultiKeyJWTCryptoProvider(mapOf(
         holderKey.getKeyId() to SimpleJWTCryptoProvider(JWSAlgorithm.ES256, ECDSASigner(ecHolderKey), ECDSAVerifier(ecHolderKey)),
-        LspPotentialVerificationInterop.POTENTIAL_ISSUER_KEY_ID to LspPotentialVerificationInterop.POTENTIAL_JWT_CRYPTO_PROVIDER
+        LspPotentialInterop.POTENTIAL_ISSUER_KEY_ID to LspPotentialVerificationInterop.POTENTIAL_JWT_CRYPTO_PROVIDER
       ))
       // 4. present (wallet)
       val vp_token = sdJwtVc.present(true, presReq.clientId, presReq.nonce!!, cryptoProvider, holderKey.getKeyId()).toString()
