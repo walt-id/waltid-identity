@@ -117,6 +117,12 @@ data class ProofOfPossession @OptIn(ExperimentalSerializationApi::class) private
         override fun fromJSON(jsonObject: JsonObject) =
             Json.decodeFromJsonElement(ProofOfPossessionSerializer, jsonObject)
     }
+
+    @Transient
+    val isCwtProofType get() = proofType == ProofType.cwt && !cwt.isNullOrEmpty()
+
+    @Transient
+    val isJwtProofType get() = proofType == ProofType.jwt && !jwt.isNullOrEmpty()
 }
 
 object ProofOfPossessionSerializer : JsonDataObjectSerializer<ProofOfPossession>(ProofOfPossession.serializer())

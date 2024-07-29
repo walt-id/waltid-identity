@@ -341,17 +341,19 @@ abstract class OpenIDCredentialIssuer(
         else -> null
     }
 
-    @OptIn(ExperimentalSerializationApi::class)
     private fun validateProofOfPossession(credentialRequest: CredentialRequest, nonce: String): Boolean {
         log.debug { "VALIDATING: ${credentialRequest.proof} with nonce $nonce" }
         log.debug { "VERIFYING ITS SIGNATURE" }
-        if (credentialRequest.proof?.proofType == ProofType.jwt && credentialRequest.proof.jwt != null) {
-            return verifyTokenSignature(TokenTarget.PROOF_OF_POSSESSION, credentialRequest.proof.jwt) &&
-                getNonceFromProof(credentialRequest.proof) == nonce
-        } else if(credentialRequest.proof?.proofType == ProofType.cwt && credentialRequest.proof.cwt != null) {
-            return verifyCOSESign1Signature(TokenTarget.PROOF_OF_POSSESSION, credentialRequest.proof.cwt) &&
-                getNonceFromProof(credentialRequest.proof) == nonce
-        } else return false
+        if(credentialRequest.proof == null) return false
+        return when {
+            credentialRequest.proof.isJwtProofType -> verifyTokenSignature(
+                TokenTarget.PROOF_OF_POSSESSION, credentialRequest.proof.jwt!!
+            ) && getNonceFromProof(credentialRequest.proof) == nonce
+            credentialRequest.proof.isCwtProofType -> verifyCOSESign1Signature(
+                TokenTarget.PROOF_OF_POSSESSION, credentialRequest.proof.cwt!!
+            ) && getNonceFromProof(credentialRequest.proof) == nonce
+            else -> false
+        }
     }
 
     fun getCIProviderMetadataUrl(): String {
