@@ -106,8 +106,7 @@ dependencies {
     api(project(":waltid-libraries:waltid-sdjwt"))
     api(project(":waltid-libraries:waltid-mdoc-credentials"))
 
-    // TODO: REMOVE:
-    implementation("com.nimbusds:nimbus-jose-jwt:9.37.3")
+    implementation("com.nimbusds:nimbus-jose-jwt:9.40")
 
     // crypto
     implementation("com.augustcellars.cose:cose-java:1.1.0")
