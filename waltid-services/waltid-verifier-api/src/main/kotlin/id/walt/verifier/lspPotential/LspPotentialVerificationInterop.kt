@@ -24,6 +24,7 @@ import id.walt.sdjwt.SDJwtVC
 import id.walt.sdjwt.SDMapBuilder
 import id.walt.sdjwt.SDPayload
 import id.walt.sdjwt.SimpleJWTCryptoProvider
+import io.github.oshai.kotlinlogging.KotlinLogging
 import io.github.smiley4.ktorswaggerui.dsl.routing.post
 import io.github.smiley4.ktorswaggerui.dsl.routing.route
 import io.ktor.http.*
@@ -45,8 +46,8 @@ import java.security.spec.PKCS8EncodedKeySpec
 import java.security.spec.X509EncodedKeySpec
 import java.util.*
 
+private val logger = KotlinLogging.logger {}
 object LspPotentialVerificationInterop {
-
   val POTENTIAL_ISSUER_CRYPTO_PROVIDER_INFO = loadPotentialIssuerKeys()
   val POTENTIAL_JWT_CRYPTO_PROVIDER = SimpleJWTCryptoProvider(
     JWSAlgorithm.ES256,
@@ -54,7 +55,7 @@ object LspPotentialVerificationInterop {
       ECKey.parseFromPEMEncodedObjects(LspPotentialInterop.POTENTIAL_ISSUER_PUB).toECKey())
   )
 
-  fun readKeySpec(pem: String): ByteArray {
+  private fun readKeySpec(pem: String): ByteArray {
     val publicKeyPEM = pem
       .replace("-----BEGIN PUBLIC KEY-----", "")
       .replace("-----BEGIN PRIVATE KEY-----", "")
@@ -65,7 +66,7 @@ object LspPotentialVerificationInterop {
     return Base64.getDecoder().decode(publicKeyPEM)
   }
 
-  fun loadPotentialIssuerKeys(): COSECryptoProviderKeyInfo {
+  private fun loadPotentialIssuerKeys(): COSECryptoProviderKeyInfo {
     val factory = CertificateFactory.getInstance("X.509")
     val rootCaCert = (factory.generateCertificate(LspPotentialInterop.POTENTIAL_ROOT_CA_CERT.byteInputStream())) as X509Certificate
     val issuerCert = (factory.generateCertificate(LspPotentialInterop.POTENTIAL_ISSUER_CERT.byteInputStream())) as X509Certificate
@@ -122,8 +123,8 @@ fun Application.lspPotentialVerificationTestApi() {
               )
             ), LspPotentialInterop.POTENTIAL_ISSUER_KEY_ID
           )
-        println("SIGNED MDOC (mDL):")
-        println(Cbor.encodeToHexString(mdoc))
+        logger.debug { "SIGNED MDOC (mDL):" }
+        logger.debug { Cbor.encodeToHexString(mdoc) }
         call.respond(mdoc.toCBORHex())
       }
       post("issueSdJwtVC", {
@@ -136,7 +137,7 @@ fun Application.lspPotentialVerificationTestApi() {
             example("jwk") {
               value = LSPPotentialIssueFormDataParam(
                 Json.parseToJsonElement(ECKeyGenerator(Curve.P_256).generate().toPublicJWK().toString().also {
-                  println(it)
+                  logger.debug { it }
                 }).jsonObject
               )
             }
@@ -157,8 +158,8 @@ fun Application.lspPotentialVerificationTestApi() {
           additionalJwtHeader = mapOf("x5c" to listOf(LspPotentialInterop.POTENTIAL_ISSUER_CERT))
         )
 
-        println("SIGNED SD-JWT-VC:")
-        println(sdJwtVc.toString(false))
+        logger.debug { "SIGNED SD-JWT-VC:" }
+        logger.debug { sdJwtVc.toString(false) }
         call.respond(sdJwtVc.toString(false))
       }
     }

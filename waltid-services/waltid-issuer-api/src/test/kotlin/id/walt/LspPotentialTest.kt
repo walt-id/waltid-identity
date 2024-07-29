@@ -23,7 +23,9 @@ import kotlinx.serialization.decodeFromHexString
 import kotlin.test.*
 
 object LspPotentialTest {
-
+  init {
+    runBlocking { DidService.minimalInit() }
+  }
 
   @Test
   fun testParseCWTExample() {
