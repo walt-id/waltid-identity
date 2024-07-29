@@ -198,14 +198,6 @@ open class CIProvider : OpenIDCredentialIssuer(
         val cryptoProvider = SimpleCOSECryptoProvider(listOf(keyInfo))
 
         cryptoProvider.verify1(coseSign1, "pub-key")
-//        if (tokenHeader.value[MapKey] != null) {
-//            val did = tokenHeader["kid"]!!.jsonPrimitive.content.split("#")[0]
-//            println("Resolving DID: $did")
-//            val key = DidService.resolveToKey(did).getOrThrow()
-//            key.verifyJws(token).also { println("VERIFICATION IS: $it") }
-//        } else {
-//            CI_TOKEN_KEY.verifyJws(token)
-//        }
     }
 
     // -------------------------------------
@@ -304,22 +296,6 @@ open class CIProvider : OpenIDCredentialIssuer(
                             WaltIdJWTCryptoProvider(mapOf(issuerKey.getKeyId() to issuerKey)),
                             issuerDid = issuerDid, holderDid = holderDid!!, issuerKeyId = issuerKey.getKeyId(),
                             vct = data.request.credentialConfigurationId)).toString()
-                    //
-                    //                    vc.mergingSdJwtIssue(
-//                        issuerKey = issuerKey,
-//                        issuerDid = issuerDid,
-//                        subjectDid = holderDid ?: "",
-//                        mappings = request.mapping ?: JsonObject(emptyMap()),
-//                        additionalJwtHeader = emptyMap(),
-//                        additionalJwtOptions = holderKey?.let { mapOf(
-//                            "cnf" to buildJsonObject { put("jwk", it) }
-//                        ) } ?: emptyMap(),
-//                        disclosureMap = data.request.selectiveDisclosure ?: SDMap.Companion.generateSDMap(
-//                            JsonObject(emptyMap()),
-//                            JsonObject(emptyMap())
-//                        )
-//                    )
-
                     else -> vc.mergingJwtIssue(
                         issuerKey = issuerKey,
                         issuerDid = issuerDid,
