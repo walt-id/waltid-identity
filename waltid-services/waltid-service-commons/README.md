@@ -110,12 +110,13 @@ The services now benefit from a more advanced logging system based on the servic
     - Splunk
 
 3. [**Multiple Log Output Formats**](https://github.com/walt-id/waltid-identity/blob/main/waltid-services/waltid-service-commons/src/main/kotlin/id/walt/commons/logging/LogStrings.kt): Supports various formats for log output, including:
-    - CLEF compact JSON format
-    - Elastic Common Schema (ECS)
-    - ECS for .NET
-    - GELF JSON format
+    - CLEF compact JSON format (e.g. Serilog) (https://clef-json.org/)
+    - Elastic Common Schema (ECS) (can be sent directly to ELK stack) (https://www.elastic.co/guide/en/ecs/current/index.html)
+    - ECS for .NET (https://github.com/elastic/ecs-dotnet/blob/main/examples/aspnetcore-with-serilog/)
+    - GELF JSON format (for e.g. Graylog)
     - JSON format for Splunk HTTP Event Collector
-    - Simple & ISO 8601 rendering
+    - Simple & ISO 8601 & ANSI rendering
+    - "Standard" JSON format (e.g. Datadog, New Relic, etc.)
 
 4. **Custom Logging Configurations**: Users can provide custom logging configurations without needing to recompile the module.
 5. **Structured and Context Logging**:
