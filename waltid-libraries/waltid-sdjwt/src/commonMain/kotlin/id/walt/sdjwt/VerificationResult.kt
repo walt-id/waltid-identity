@@ -24,9 +24,9 @@ data class VerificationResult<T : SDJwt>(
 
 class VCVerificationResult(
     val sdJwtVC: SDJwtVC,
-    val sdJwtVerificationResult: VerificationResult<SDJwt>,
-    val sdJwtVCVerified: Boolean,
-    val vcVerificationMessage: String? = null
+    private val sdJwtVerificationResult: VerificationResult<SDJwt>,
+    private val sdJwtVCVerified: Boolean,
+    private val vcVerificationMessage: String? = null
 ) {
     val verified
         get() = sdJwtVCVerified && sdJwtVerificationResult.verified
