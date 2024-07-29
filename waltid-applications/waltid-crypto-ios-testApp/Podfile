@@ -1,0 +1,13 @@
+# Uncomment the next line to define a global platform for your project
+platform :ios, '15.4'
+
+target 'waltid.crypto.ios.testApp' do
+  # Comment the next line if you don't want to use dynamic frameworks
+  use_frameworks!
+
+  # Pods for waltid.crypto.ios.testApp
+  # in order to find the artifact run :waltid-crypto-ios:podPublishDebugXCFramework
+  pod 'waltid_crypto_ios', :path => '../../waltid-libraries/waltid-crypto-ios/build/cocoapods/publish/debug/waltid_crypto_ios.podspec'
+
+
+end
