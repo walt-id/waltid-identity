@@ -29,23 +29,33 @@ import kotlin.test.assertNotNull
 
 class E2ETest {
 
+    var walletHttpPort: Int = 22222
+    // var walletHttpPort: Int = 7001
+    var issuerHttp: Int = 22222
+    // var issuerHttp: Int = 7002
+    var verifierHttp: Int = 22222
+    // var verifierHttp: Int = 7003
+
     @Test
     fun e2e() = testBlock(defaultTestTimeout) {
-        var client = testHttpClient()
+        var walletHttp = testHttpClient(port = walletHttpPort)
+        val issuerHttp = testHttpClient(port = issuerHttp)
+        val verifierHttp = testHttpClient(port = verifierHttp)
+
         lateinit var wallet: UUID
 
         // E2E tests here:
 
         testGroup("Authentication") {
-            var authApi = AuthApi(client)
+            var authApi = AuthApi(walletHttp)
             with(authApi) {
                 test("Should be unauthorized when not logged in") {
                     userInfo(HttpStatusCode.Unauthorized) ?: "Unauthorized -> no account"
                 }
                 test("Login") {
                     val token = login(defaultEmailAccount)
-                    client = testHttpClient(token)
-                    authApi = AuthApi(client)
+                    walletHttp = testHttpClient(token, port = walletHttpPort)
+                    authApi = AuthApi(walletHttp)
                     token
                 }
             }
@@ -61,7 +71,7 @@ class E2ETest {
         }
 
         testGroup("Keys") {
-            val keysApi = KeysApi(client, wallet)
+            val keysApi = KeysApi(walletHttp, wallet)
             with(keysApi) {
                 "Test key listing" inlineTest { keysApi.list() }
                 val keyGenRequest = KeyGenerationRequest("jwk", KeyType.Ed25519)
@@ -77,7 +87,7 @@ class E2ETest {
 
         lateinit var did: String
         testGroup("DIDs") {
-            val didsApi = DidsApi(client, wallet)
+            val didsApi = DidsApi(walletHttp, wallet)
 
             with(didsApi) {
                 test("Has default DID") {
@@ -116,14 +126,14 @@ class E2ETest {
 
         lateinit var offerUrl: String
         testGroup("Issuer / offer URL") {
-            val issuerApi = IssuerApi(client)
+            val issuerApi = IssuerApi(issuerHttp)
             val issuanceRequest = Json.decodeFromJsonElement<IssuanceRequest>(jwtCredential)
             println("issuance-request: $issuanceRequest")
 
             "Issue JWT" inlineTest { offerUrl = issuerApi.jwt(issuanceRequest); offerUrl }
         }
 
-        val exchangeApi = ExchangeApi(client, wallet)
+        val exchangeApi = ExchangeApi(walletHttp, wallet)
         lateinit var newCredentialId: String
         testGroup("Claim credential") {
             "Resolve credential offer" inlineTest { exchangeApi.resolveCredentialOffer(offerUrl) }
@@ -132,7 +142,7 @@ class E2ETest {
             newCredentialId
         }
 
-        val credentialsApi = CredentialsApi(client, wallet)
+        val credentialsApi = CredentialsApi(walletHttp, wallet)
         testGroup("Credentials") {
             with(credentialsApi) {
                 "List credentials" inlineTest { list(expectedSize = 1, expectedCredential = arrayOf(newCredentialId)) }
@@ -148,8 +158,8 @@ class E2ETest {
 
         lateinit var verificationUrl: String
         lateinit var verificationId: String
-        val sessionApi = Verifier.SessionApi(client)
-        val verificationApi = Verifier.VerificationApi(client)
+        val sessionApi = Verifier.SessionApi(verifierHttp)
+        val verificationApi = Verifier.VerificationApi(verifierHttp)
         testGroup("Verifier / request url") {
             "Start verification" inlineTest { verificationUrl = verificationApi.verify(simplePresentationRequestPayload); verificationUrl }
             verificationId = Url(verificationUrl).parameters.getOrFail("state")
@@ -186,7 +196,7 @@ class E2ETest {
             }
         }
 
-        val categoryApi = CategoryApi(client, wallet)
+        val categoryApi = CategoryApi(walletHttp, wallet)
         testGroup("Categories") {
             val categoryName = "name#1"
             val categoryNewName = "name#2"
@@ -224,7 +234,7 @@ class E2ETest {
 
         testGroup("History") {
             test("Test history") {
-                HistoryApi(client).list(wallet).also { history ->
+                HistoryApi(walletHttp).list(wallet).also { history ->
                     assert(history.size >= 2) { "missing history items" }
                     assert(history.any { it.operation == "useOfferRequest" } && history.any { it.operation == "usePresentationRequest" }) { "incorrect history items" }
                 }.last()
@@ -240,7 +250,7 @@ class E2ETest {
             test("SD-JWT") {
 
                 //region -Issuer / offer url-
-                val issuerApi = IssuerApi(client)
+                val issuerApi = IssuerApi(issuerHttp)
                 val issuanceRequest = Json.decodeFromJsonElement<IssuanceRequest>(sdjwtCredential)
                 println("issuance-request:")
                 println(issuanceRequest)
@@ -248,14 +258,14 @@ class E2ETest {
                 //endregion -Issuer / offer url-
 
                 //region -Exchange / claim-
-                val exchangeApi = ExchangeApi(client, wallet)
+                val exchangeApi = ExchangeApi(walletHttp, wallet)
                 exchangeApi.resolveCredentialOffer(offerUrl)
                 val newCredential = exchangeApi.useOfferRequest(offerUrl, 1).first()
                 //endregion -Exchange / claim-
 
                 //region -Verifier / request url-
-                val sessionApi = Verifier.SessionApi(client)
-                val verificationApi = Verifier.VerificationApi(client)
+                val sessionApi = Verifier.SessionApi(verifierHttp)
+                val verificationApi = Verifier.VerificationApi(verifierHttp)
                 val verificationUrl: String = verificationApi.verify(nameFieldSchemaPresentationRequestPayload)
                 val verificationId: String = Url(verificationUrl).parameters.getOrFail("state")
                 //endregion -Verifier / request url-

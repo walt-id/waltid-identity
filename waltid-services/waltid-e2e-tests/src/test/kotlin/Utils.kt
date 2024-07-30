@@ -13,13 +13,13 @@ import kotlinx.serialization.json.*
 fun String.expectLooksLikeJwt(): String =
     also { assert(startsWith("ey") && count { it == '.' } == 2) { "Does not look like JWT" } }
 
-fun HttpResponse.expectSuccess(): HttpResponse = also {
-    assert(status.isSuccess()) { "HTTP status is non-successful" }
+suspend fun HttpResponse.expectSuccess(): HttpResponse = also {
+    assert(status.isSuccess()) { "HTTP response status is non-successful: ${bodyAsText()}" }
 }
 
 //todo: temporary
 fun HttpResponse.expectFailure(): HttpResponse = also {
-    assert(!status.isSuccess()) { "HTTP status is successful" }
+    assert(!status.isSuccess()) { "HTTP response status is successful, but should be failure" }
 }
 
 fun JsonElement.tryGetData(key: String): JsonElement? = key.split('.').let {
@@ -39,14 +39,14 @@ fun JsonElement.tryGetData(key: String): JsonElement? = key.split('.').let {
     element
 }
 
-fun testHttpClient(token: String? = null) = HttpClient(CIO) {
+fun testHttpClient(token: String? = null, port: Int = 22222) = HttpClient(CIO) {
     install(ContentNegotiation) {
         json(httpJson)
     }
     install(DefaultRequest) {
         contentType(ContentType.Application.Json)
         host = "127.0.0.1"
-        port = 22222
+        this.port = port
 
         if (token != null) bearerAuth(token)
     }

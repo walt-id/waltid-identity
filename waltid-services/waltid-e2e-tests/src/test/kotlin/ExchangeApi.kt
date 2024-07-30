@@ -69,7 +69,7 @@ class ExchangeApi(private val client: HttpClient, val wallet: UUID) {
 
     suspend fun usePresentationRequest(
         request: UsePresentationRequest,
-        expectStatus: HttpResponse.() -> HttpResponse = HttpResponse::expectSuccess,
+        expectStatus: suspend HttpResponse.() -> HttpResponse = { this.expectSuccess() },
     ) =
         client.post("/wallet-api/wallet/$wallet/exchange/usePresentationRequest") {
             setBody(request)
