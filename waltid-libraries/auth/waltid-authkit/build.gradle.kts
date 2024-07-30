@@ -32,7 +32,8 @@ dependencies {
     //implementation("org.apache.directory.server:apacheds-server-integ:2.0.0.AM27")
     implementation("org.apache.directory.api:api-all:2.1.6")
 
-
+    // TOTP/HOTP
+    implementation("com.atlassian:onetime:2.1.1")
 
     // Ktor server
     implementation("io.ktor:ktor-server-core-jvm")

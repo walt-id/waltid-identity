@@ -187,13 +187,29 @@ fun Application.test() {
             reqCache[req.state!!] = token
             urlCache[req.state!!] = url
 
+
+            val walletUrl = "http://localhost:7101/api/siop/initiatePresentation?" + url.substringAfter("?")
+            println("Wallet url: $walletUrl")
+
             //language=HTML
             call.respondText(
                 """
                     <html><body>
-                    <p>Present your credential: <code>$url</code> (just imagine real hard that this is a QR code)</p>
-                    <button><a href="/login?state=${req.state!!}">Present</a></button> Click here when presented (just imagine real hard that this is automatic)
+                    <p>Present your credential: <code>$url</code></p>
+                    <div id="qrcode"></div>
+                    <p>
+                    <a href="/login?state=${req.state!!}"><button>Click here when presented</button></a> (just imagine real hard that this is automatic)
+                    </p>
+                    <p>
+                    <a href="$walletUrl"><button>Present with web wallet</button></a>
+                    </p>
                     <p>Debug query: <code>$queryString</code></p>
+                    
+                    
+                    <script src='https://cdn.jsdelivr.net/gh/davidshimjs/qrcodejs@gh-pages/qrcode.min.js'></script>
+                    <script>
+                        new QRCode(document.getElementById("qrcode"), "$url");
+                    </script>
                 </body></html>
                 """.trimIndent(), ContentType.Text.Html
             )
@@ -225,7 +241,7 @@ fun Application.test() {
                     <html><body>
                     <p>Not presented yet, please try again<p>
                     <p>Present your credential: <code>$url</code> (just imagine real hard that this is a QR code)</p>
-                    <button><a href="/login?state=${state}">Present</a></button> Click here when presented (just imagine real hard that this is automatic)
+                    <a href="/login?state=${state}"><button>Present</button></a> Click here when presented (just imagine real hard that this is automatic)
                 </body></html>
                 """.trimIndent(), ContentType.Text.Html
                 )
