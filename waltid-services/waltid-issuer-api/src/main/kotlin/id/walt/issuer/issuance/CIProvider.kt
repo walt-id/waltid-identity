@@ -252,7 +252,7 @@ open class CIProvider : OpenIDCredentialIssuer(
             credentialRequest,
             CredentialErrorCode.invalid_or_missing_proof, message = "Proof must contain nonce")
 
-        val data: IssuanceSessionData = (if (holderDid == null || nonce == null) {
+        val data: IssuanceSessionData = (if (holderDid == null) {
             repeat(10) {
                 log.debug { "WARNING: RETURNING DEMO/EXAMPLE (= BOGUS) CREDENTIAL: subjectDid or nonce is null (was deferred issuance tried?)" }
             }

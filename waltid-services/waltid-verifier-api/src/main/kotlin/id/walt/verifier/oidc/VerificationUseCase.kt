@@ -1,17 +1,11 @@
 package id.walt.verifier.oidc
 
-import COSE.AlgorithmID
-import com.nimbusds.jose.JWSAlgorithm
-import com.nimbusds.jose.crypto.ECDSASigner
-import com.nimbusds.jose.crypto.ECDSAVerifier
-import com.nimbusds.jose.jwk.ECKey
 import id.walt.credentials.verification.models.PolicyRequest
 import id.walt.credentials.verification.models.PolicyRequest.Companion.parsePolicyRequests
 import id.walt.credentials.verification.policies.JwtSignaturePolicy
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeyType
-import id.walt.mdoc.COSECryptoProviderKeyInfo
 import id.walt.oid4vc.data.ClientIdScheme
 import id.walt.oid4vc.data.OpenId4VPProfile
 import id.walt.oid4vc.data.ResponseMode
@@ -20,19 +14,12 @@ import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.providers.PresentationSession
 import id.walt.oid4vc.responses.TokenResponse
 import id.walt.sdjwt.JWTCryptoProvider
-import id.walt.sdjwt.SimpleJWTCryptoProvider
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.http.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.*
-import java.security.KeyFactory
-import java.security.cert.CertificateFactory
-import java.security.cert.X509Certificate
-import java.security.spec.PKCS8EncodedKeySpec
-import java.security.spec.X509EncodedKeySpec
-import java.util.Base64
 import kotlin.collections.set
 
 class VerificationUseCase(
