@@ -21,6 +21,8 @@ import id.walt.webwallet.webWalletSetup
 import io.ktor.server.application.*
 import io.ktor.server.cio.*
 import io.ktor.server.engine.*
+import java.io.File
+import java.net.URLDecoder
 
 object E2ETestWebService {
 
@@ -125,6 +127,9 @@ object E2ETestWebService {
         val failedStr = if (failed == 0) "none failed ✅" else TextColors.red("$failed failed")
         t.println(TextColors.magenta("Current test stats: ${testResults.size} overall | $overallSuccess succeeded | $failedStr\n"))
     }
+
+    fun loadResource(relativePath: String): String =
+        URLDecoder.decode(object {}.javaClass.getResource(relativePath)!!.path, "UTF-8").let { File(it).readText() }
 }
 
 typealias TestFunctionType = (String, suspend() -> Any?) -> Unit

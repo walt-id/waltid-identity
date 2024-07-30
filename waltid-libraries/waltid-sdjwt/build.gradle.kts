@@ -150,9 +150,6 @@ kotlin {
                 dependsOn(commonMain)
                 iosArm64Main.dependsOn(this)
                 iosSimulatorArm64Main.dependsOn(this)
-                dependencies {
-                    implementation(project(":waltid-libraries:waltid-crypto-ios"))
-                }
             }
 
             val iosArm64Test by getting
@@ -161,9 +158,6 @@ kotlin {
                 dependsOn(commonTest)
                 iosArm64Test.dependsOn(this)
                 iosSimulatorArm64Test.dependsOn(this)
-                dependencies {
-                    implementation(project(":waltid-libraries:waltid-crypto-ios"))
-                }
             }
         }
     }
