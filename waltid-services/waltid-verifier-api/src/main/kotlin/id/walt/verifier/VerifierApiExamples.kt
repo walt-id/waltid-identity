@@ -1,5 +1,6 @@
 package id.walt.verifier
 
+import id.walt.commons.interop.LspPotentialInterop
 import id.walt.verifier.VerifierApiExamples.jwtFormat
 import id.walt.verifier.VerifierApiExamples.vcPoliciesData
 import id.walt.verifier.lspPotential.LspPotentialVerificationInterop
@@ -284,7 +285,7 @@ object VerifierApiExamples {
         """
             {
                 "request_credentials": [ "org.iso.18013.5.1.mDL" ],
-                "trusted_root_cas":[ ${Json.encodeToJsonElement(LspPotentialVerificationInterop.POTENTIAL_ROOT_CA_CERT)} ]
+                "trusted_root_cas":[ ${Json.encodeToJsonElement(LspPotentialInterop.POTENTIAL_ROOT_CA_CERT)} ]
             }
 
         """.trimIndent()

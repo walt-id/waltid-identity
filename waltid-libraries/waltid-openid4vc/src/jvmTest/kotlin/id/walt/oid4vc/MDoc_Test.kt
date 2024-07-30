@@ -15,6 +15,7 @@ import id.walt.mdoc.SimpleCOSECryptoProvider
 import id.walt.mdoc.dataelement.*
 import id.walt.mdoc.dataretrieval.DeviceResponse
 import id.walt.mdoc.doc.MDocBuilder
+import id.walt.mdoc.doc.MDocTypes
 import id.walt.mdoc.doc.MDocVerificationParams
 import id.walt.mdoc.doc.VerificationType
 import id.walt.mdoc.docrequest.MDocRequestBuilder
@@ -196,7 +197,7 @@ class MDoc_Test: AnnotationSpec() {
     // 1) Create self-issued mDL credential (Issuer)
     // build mdoc of type mDL and sign using issuer key with holder binding to device key
     val lspPotentialCryptoProvider = SimpleCOSECryptoProvider(listOf(issuerProviderKeyInfo))
-    val mdoc = MDocBuilder("org.iso.18013.5.1.mDL")
+    val mdoc = MDocBuilder(MDocTypes.ISO_MDL)
       .addItemToSign("org.iso.18013.5.1", "family_name", "Doe".toDataElement())
       .addItemToSign("org.iso.18013.5.1", "given_name", "John".toDataElement())
       .addItemToSign("org.iso.18013.5.1", "birth_date", FullDateElement(LocalDate(1990, 1, 15)))

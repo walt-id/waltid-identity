@@ -1,3 +1,4 @@
+import id.walt.commons.interop.LspPotentialInterop
 import id.walt.credentials.vc.vcs.W3CVC
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeySerialization
@@ -92,7 +93,7 @@ class LspPotentialWallet(val client: HttpClient, val walletId: String) {
       setBody(
         buildJsonObject {
           put("request_credentials", JsonArray(listOf(JsonPrimitive("org.iso.18013.5.1.mDL"))))
-          put("trusted_root_cas", JsonArray(listOf(JsonPrimitive(LspPotentialVerificationInterop.POTENTIAL_ROOT_CA_CERT))))
+          put("trusted_root_cas", JsonArray(listOf(JsonPrimitive(LspPotentialInterop.POTENTIAL_ROOT_CA_CERT))))
         })
     }
     assertEquals(200, createReqResponse.status.value)
@@ -128,8 +129,8 @@ class LspPotentialWallet(val client: HttpClient, val walletId: String) {
         put("family_name", "Doe")
         put("given_name", "John")
       }), null,
-      x5Chain = listOf(LspPotentialIssuanceInterop.POTENTIAL_ISSUER_CERT),
-      trustedRootCAs = listOf(LspPotentialIssuanceInterop.POTENTIAL_ROOT_CA_CERT)
+      x5Chain = listOf(LspPotentialInterop.POTENTIAL_ISSUER_CERT),
+      trustedRootCAs = listOf(LspPotentialInterop.POTENTIAL_ROOT_CA_CERT)
     )
     val offerResp = client.post("/openid4vc/sdjwt/issue") {
       contentType(ContentType.Application.Json)

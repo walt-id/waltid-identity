@@ -3,6 +3,7 @@ package id.walt.mdoc
 import cbor.Cbor
 import id.walt.mdoc.dataelement.*
 import id.walt.mdoc.doc.MDocBuilder
+import id.walt.mdoc.doc.MDocTypes
 import id.walt.mdoc.mso.DeviceKeyInfo
 import id.walt.mdoc.mso.ValidityInfo
 import korlibs.crypto.encoding.Hex
@@ -39,7 +40,7 @@ class JSTest {
     val deviceKeyInfo = DeviceKeyInfo(MapElement(mapOf(MapKey("k") to StringElement("1234"))))
     println("device key info: $deviceKeyInfo")
     // build mdoc of type mDL and sign using issuer key with holder binding to device key
-    val mdoc = MDocBuilder("org.iso.18013.5.1.mDL")
+    val mdoc = MDocBuilder(MDocTypes.ISO_MDL)
       .addItemToSign("org.iso.18013.5.1", "family_name", "Doe".toDataElement())
       .addItemToSign("org.iso.18013.5.1", "given_name", "John".toDataElement())
       .addItemToSign("org.iso.18013.5.1", "birth_date", FullDateElement(LocalDate(1990, 1, 15)))

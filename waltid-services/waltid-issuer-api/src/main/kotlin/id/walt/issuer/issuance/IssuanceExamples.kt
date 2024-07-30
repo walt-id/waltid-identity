@@ -1,5 +1,6 @@
 package id.walt.issuer.issuance
 
+import id.walt.commons.interop.LspPotentialInterop
 import id.walt.credentials.verification.policies.get
 import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.KeyType
@@ -288,8 +289,8 @@ object IssuanceExamples {
                   put("birth_date", "1980-01-01")
               })
     }},
-          "x5Chain": ${buildJsonArray { add(LspPotentialIssuanceInterop.POTENTIAL_ISSUER_CERT) }},
-          "trustedRootCAs": ${buildJsonArray { add(LspPotentialIssuanceInterop.POTENTIAL_ROOT_CA_CERT) }}
+          "x5Chain": ${buildJsonArray { add(LspPotentialInterop.POTENTIAL_ISSUER_CERT) }},
+          "trustedRootCAs": ${buildJsonArray { add(LspPotentialInterop.POTENTIAL_ROOT_CA_CERT) }}
        }
         """.trimIndent())
 

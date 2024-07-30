@@ -1,10 +1,12 @@
 import COSE.AlgorithmID
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.crypto.ECDSASigner
+import com.nimbusds.jose.crypto.ECDSAVerifier
 import com.nimbusds.jose.jwk.ECKey
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.jwk.KeyUse
 import com.nimbusds.jose.util.Base64URL
+import id.walt.commons.interop.LspPotentialInterop
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeyType
@@ -17,6 +19,7 @@ import id.walt.mdoc.dataelement.MapElement
 import id.walt.mdoc.dataelement.NullElement
 import id.walt.mdoc.dataretrieval.DeviceResponse
 import id.walt.mdoc.doc.MDoc
+import id.walt.mdoc.doc.MDocTypes
 import id.walt.mdoc.doc.MDocVerificationParams
 import id.walt.mdoc.doc.VerificationType
 import id.walt.mdoc.docrequest.MDocRequestBuilder
@@ -29,6 +32,7 @@ import id.walt.oid4vc.interfaces.PresentationResult
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.sdjwt.SDJwtVC
 import id.walt.sdjwt.SimpleJWTCryptoProvider
+import id.walt.sdjwt.SimpleMultiKeyJWTCryptoProvider
 import id.walt.verifier.lspPotential.LspPotentialVerificationInterop
 import io.ktor.client.*
 import io.ktor.client.request.*
@@ -60,7 +64,7 @@ class LspPotentialVerification(private val client: HttpClient) {
       ))
       assertEquals(200, issueResponse.status.value)
       val mdoc = MDoc.fromCBORHex(issueResponse.bodyAsText())
-      assertEquals("org.iso.18013.5.1.mDL", mdoc.docType.value)
+      assertEquals(MDocTypes.ISO_MDL, mdoc.docType.value)
 
       // Step 2: Create an openid4vc verification request
       val createReqResponse = client.post("/openid4vc/verify") {
@@ -69,8 +73,8 @@ class LspPotentialVerification(private val client: HttpClient) {
         contentType(ContentType.Application.Json)
         setBody(
           buildJsonObject {
-            put("request_credentials", JsonArray(listOf(JsonPrimitive("org.iso.18013.5.1.mDL"))))
-            put("trusted_root_cas", JsonArray(listOf(JsonPrimitive(LspPotentialVerificationInterop.POTENTIAL_ROOT_CA_CERT))))
+            put("request_credentials", JsonArray(listOf(JsonPrimitive(MDocTypes.ISO_MDL))))
+            put("trusted_root_cas", JsonArray(listOf(JsonPrimitive(LspPotentialInterop.POTENTIAL_ROOT_CA_CERT))))
 
           })
       }
@@ -114,7 +118,7 @@ class LspPotentialVerification(private val client: HttpClient) {
       val verificationResult = presentedMdoc.verify(
         MDocVerificationParams(
           VerificationType.forPresentation,
-          issuerKeyID = LspPotentialVerificationInterop.POTENTIAL_ISSUER_KEY_ID, deviceKeyID = holderKey.getKeyId(),
+          issuerKeyID = LspPotentialInterop.POTENTIAL_ISSUER_KEY_ID, deviceKeyID = holderKey.getKeyId(),
           deviceAuthentication = DeviceAuthentication(
             ListElement(listOf(NullElement(), NullElement(), mdocHandover)),
             presReq.presentationDefinition?.inputDescriptors?.first()?.id!!, EncodedCBORElement(MapElement(mapOf()))
@@ -154,35 +158,6 @@ class LspPotentialVerification(private val client: HttpClient) {
   }
 
   fun testPotentialInteropTrack4() {
-//    val testVC = "eyJhbGciOiAiRVMyNTYiLCAidHlwIjogInZjK3NkLWp3dCIsICJraWQiOiAiZG9jLXNp" +
-//        "Z25lci0wNS0yNS0yMDIyIn0.eyJfc2QiOiBbIjA5dktySk1PbHlUV00wc2pwdV9wZE9C" +
-//        "VkJRMk0xeTNLaHBINTE1blhrcFkiLCAiMnJzakdiYUMwa3k4bVQwcEpyUGlvV1RxMF9k" +
-//        "YXcxc1g3NnBvVWxnQ3diSSIsICJFa084ZGhXMGRIRUpidlVIbEVfVkNldUM5dVJFTE9p" +
-//        "ZUxaaGg3WGJVVHRBIiwgIklsRHpJS2VpWmREd3BxcEs2WmZieXBoRnZ6NUZnbldhLXNO" +
-//        "NndxUVhDaXciLCAiSnpZakg0c3ZsaUgwUjNQeUVNZmVadTZKdDY5dTVxZWhabzdGN0VQ" +
-//        "WWxTRSIsICJQb3JGYnBLdVZ1Nnh5bUphZ3ZrRnNGWEFiUm9jMkpHbEFVQTJCQTRvN2NJ" +
-//        "IiwgIlRHZjRvTGJnd2Q1SlFhSHlLVlFaVTlVZEdFMHc1cnREc3JaemZVYW9tTG8iLCAi" +
-//        "amRyVEU4WWNiWTRFaWZ1Z2loaUFlX0JQZWt4SlFaSUNlaVVRd1k5UXF4SSIsICJqc3U5" +
-//        "eVZ1bHdRUWxoRmxNXzNKbHpNYVNGemdsaFFHMERwZmF5UXdMVUs0Il0sICJpc3MiOiAi" +
-//        "aHR0cHM6Ly9leGFtcGxlLmNvbS9pc3N1ZXIiLCAiaWF0IjogMTY4MzAwMDAwMCwgImV4" +
-//        "cCI6IDE4ODMwMDAwMDAsICJ2Y3QiOiAiaHR0cHM6Ly9jcmVkZW50aWFscy5leGFtcGxl" +
-//        "LmNvbS9pZGVudGl0eV9jcmVkZW50aWFsIiwgIl9zZF9hbGciOiAic2hhLTI1NiIsICJj" +
-//        "bmYiOiB7Imp3ayI6IHsia3R5IjogIkVDIiwgImNydiI6ICJQLTI1NiIsICJ4IjogIlRD" +
-//        "QUVSMTladnUzT0hGNGo0VzR2ZlNWb0hJUDFJTGlsRGxzN3ZDZUdlbWMiLCAieSI6ICJa" +
-//        "eGppV1diWk1RR0hWV0tWUTRoYlNJaXJzVmZ1ZWNDRTZ0NGpUOUYySFpRIn19fQ.D43eE" +
-//        "W1ae2yAzhzriJuBz-_cgX1wwNJIgNMjsdO28QE0fU8KC8ugjTPaylIp48HMVS0xV2wDQ" +
-//        "9bl1zFzlbDULg~WyIyR0xDNDJzS1F2ZUNmR2ZyeU5STjl3IiwgImdpdmVuX25hbWUiLC" +
-//        "AiSm9obiJd~WyJlbHVWNU9nM2dTTklJOEVZbnN4QV9BIiwgImZhbWlseV9uYW1lIiwgI" +
-//        "kRvZSJd~WyI2SWo3dE0tYTVpVlBHYm9TNXRtdlZBIiwgImVtYWlsIiwgImpvaG5kb2VA" +
-//        "ZXhhbXBsZS5jb20iXQ~WyJlSThaV205UW5LUHBOUGVOZW5IZGhRIiwgInBob25lX251b" +
-//        "WJlciIsICIrMS0yMDItNTU1LTAxMDEiXQ~WyJRZ19PNjR6cUF4ZTQxMmExMDhpcm9BIi" +
-//        "wgImFkZHJlc3MiLCB7InN0cmVldF9hZGRyZXNzIjogIjEyMyBNYWluIFN0IiwgImxvY2" +
-//        "FsaXR5IjogIkFueXRvd24iLCAicmVnaW9uIjogIkFueXN0YXRlIiwgImNvdW50cnkiOi" +
-//        "AiVVMifV0~WyJBSngtMDk1VlBycFR0TjRRTU9xUk9BIiwgImJpcnRoZGF0ZSIsICIxOT" +
-//        "QwLTAxLTAxIl0~WyJQYzMzSk0yTGNoY1VfbEhnZ3ZfdWZRIiwgImlzX292ZXJfMTgiLC" +
-//        "B0cnVlXQ~WyJHMDJOU3JRZmpGWFE3SW8wOXN5YWpBIiwgImlzX292ZXJfMjEiLCB0cnV" +
-//        "lXQ~WyJsa2x4RjVqTVlsR1RQVW92TU5JdkNBIiwgImlzX292ZXJfNjUiLCB0cnVlXQ~"
-
     runBlocking {
       // 1. holder key
       val holderKey = KeyManager.createKey(KeyGenerationRequest(keyType = KeyType.secp256r1))
@@ -196,7 +171,7 @@ class LspPotentialVerification(private val client: HttpClient) {
       ))
       assertEquals(200, issueResponse.status.value)
       val sdJwtVc = SDJwtVC.parse(issueResponse.bodyAsText())
-      assertEquals(LspPotentialVerificationInterop.POTENTIAL_ISSUER_KEY_ID, sdJwtVc.issuer)
+      assertEquals(LspPotentialInterop.POTENTIAL_ISSUER_KEY_ID, sdJwtVc.issuer)
 
       // 3. make presentation request (verifier)
       val createReqResponse = client.post("/openid4vc/verify") {
@@ -217,12 +192,20 @@ class LspPotentialVerification(private val client: HttpClient) {
       assertEquals(VCFormat.sd_jwt_vc, presReq.presentationDefinition!!.inputDescriptors.firstOrNull()?.format?.keys?.first())
       assertEquals("urn:eu.europa.ec.eudi:pid:1", presReq.presentationDefinition!!.inputDescriptors.flatMap { it.constraints!!.fields!! }.first { it.path.contains("$.vct") }.filter?.get("const")?.jsonPrimitive?.content)
 
+      val ecHolderKey = ECKey.parse(holderKey.exportJWK())
+      val cryptoProvider = SimpleMultiKeyJWTCryptoProvider(mapOf(
+        holderKey.getKeyId() to SimpleJWTCryptoProvider(JWSAlgorithm.ES256, ECDSASigner(ecHolderKey), ECDSAVerifier(ecHolderKey)),
+        LspPotentialInterop.POTENTIAL_ISSUER_KEY_ID to LspPotentialVerificationInterop.POTENTIAL_JWT_CRYPTO_PROVIDER
+      ))
       // 4. present (wallet)
-      val vp_token = sdJwtVc.present(true, presReq.clientId, presReq.nonce!!, SimpleJWTCryptoProvider(
-        JWSAlgorithm.ES256, ECDSASigner(ECKey.parse(holderKey.exportJWK())), null
-      )).toString()
+      val vp_token = sdJwtVc.present(true, presReq.clientId, presReq.nonce!!, cryptoProvider, holderKey.getKeyId()).toString()
 
       println(vp_token)
+
+      assertTrue(SDJwtVC.isSdJwtVCPresentation(vp_token))
+      val parseAndVerifyResult = SDJwtVC.parseAndVerify(vp_token, cryptoProvider, false, audience = presReq.clientId, nonce = presReq.nonce)
+      assertTrue(parseAndVerifyResult.verified)
+      assertTrue(parseAndVerifyResult.sdJwtVC.toString().equals(vp_token))
 
       val tokenResp = OpenID4VP.generatePresentationResponse(PresentationResult(
         listOf(JsonPrimitive(vp_token)),

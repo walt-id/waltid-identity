@@ -13,17 +13,17 @@ import platform.Foundation.create
 import platform.Foundation.dataWithBytes
 import platform.posix.memcpy
 
-internal fun String.toNSData(): NSData = memScoped {
+fun String.toNSData(): NSData = memScoped {
     NSData.dataWithBytes(this@toNSData.cstr.ptr, this@toNSData.length.toULong())
 }
 
-internal inline fun ByteArray.toNSData() = memScoped {
+inline fun ByteArray.toNSData() = memScoped {
     NSData.create(
         bytes = allocArrayOf(this@toNSData), length = this@toNSData.size.toULong()
     )
 }
 
-internal inline fun NSData.toByteArray() = memScoped {
+inline fun NSData.toByteArray() = memScoped {
     ByteArray(length.toInt()).apply {
         usePinned {
             memcpy(it.addressOf(0), bytes, length)

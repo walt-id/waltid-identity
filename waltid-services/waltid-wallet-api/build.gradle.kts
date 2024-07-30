@@ -167,14 +167,14 @@ dependencies {
     // Logging
     implementation("io.github.oshai:kotlin-logging-jvm:7.0.0")
     implementation("org.slf4j:jul-to-slf4j:2.0.13")
-    implementation("io.klogging:klogging-jvm:0.5.14")
-    implementation("io.klogging:slf4j-klogging:0.5.14")
+    implementation("io.klogging:klogging-jvm:0.6.1")
+    implementation("io.klogging:slf4j-klogging:0.6.0")
 
     // Test
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit:2.0.0")
     testImplementation(kotlin("test"))
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
     testImplementation("io.ktor:ktor-server-tests-jvm:$ktor_version")
-    testImplementation("io.mockk:mockk:1.13.11")
-    testImplementation("io.klogging:klogging-jvm:0.5.14")
+    testImplementation("io.mockk:mockk:1.13.12")
+    testImplementation("io.klogging:klogging-jvm:0.6.1")
 }

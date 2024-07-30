@@ -1,5 +1,6 @@
 package id.walt.issuer.issuance
 
+import id.walt.commons.interop.LspPotentialInterop
 import id.walt.credentials.vc.vcs.W3CVC
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeySerialization
@@ -19,7 +20,6 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.*
 import kotlinx.serialization.json.*
 import kotlin.time.Duration.Companion.minutes
 
@@ -415,8 +415,8 @@ fun Application.issuerApi() {
                             put("given_name", "John")
                             put("birth_date", "1980-01-01")
                         }),
-                        x5Chain = listOf(LspPotentialIssuanceInterop.POTENTIAL_ISSUER_CERT),
-                        trustedRootCAs = listOf(LspPotentialIssuanceInterop.POTENTIAL_ROOT_CA_CERT)
+                        x5Chain = listOf(LspPotentialInterop.POTENTIAL_ISSUER_CERT),
+                        trustedRootCAs = listOf(LspPotentialInterop.POTENTIAL_ROOT_CA_CERT)
                     ).let { createCredentialOfferUri(listOf(it)) }
                     context.respond(
                         HttpStatusCode.OK, offerUri
