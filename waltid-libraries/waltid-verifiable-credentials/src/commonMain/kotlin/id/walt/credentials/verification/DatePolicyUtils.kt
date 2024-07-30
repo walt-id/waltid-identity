@@ -28,6 +28,6 @@ object DatePolicyUtils {
 
     private fun instantConverter(value: String) = Instant.parse(value)
 
-    private fun epochInstantConverter(value: String) =
-        value.toLongOrNull()?.let { Instant.fromEpochSeconds(it) } ?: error("Couldn't parse epoch seconds from: $value")
+    private fun epochInstantConverter(value: String) = value.toLongOrNull()?.let { Instant.fromEpochSeconds(it) }
+        ?: throw IllegalArgumentException("Couldn't parse epoch seconds from: $value")
 }
