@@ -28,6 +28,7 @@ import id.walt.mdoc.SimpleCOSECryptoProvider
 import id.walt.mdoc.cose.COSESign1
 import id.walt.mdoc.dataelement.*
 import id.walt.mdoc.doc.MDocBuilder
+import id.walt.mdoc.doc.MDocTypes
 import id.walt.mdoc.mso.DeviceKeyInfo
 import id.walt.mdoc.mso.ValidityInfo
 import id.walt.oid4vc.data.*
@@ -77,13 +78,14 @@ open class CIProvider : OpenIDCredentialIssuer(
                 types = entry.value
             ))
         }
-    }.plus(Pair("org.iso.18013.5.1.mDL", CredentialSupported(
+    }.plus(Pair(
+        MDocTypes.ISO_MDL, CredentialSupported(
         format = CredentialFormat.mso_mdoc,
         cryptographicBindingMethodsSupported = setOf("cose_key"),
         credentialSigningAlgValuesSupported = setOf("ES256"),
         proofTypesSupported = mapOf(ProofType.cwt to ProofTypeMetadata(setOf("ES256"))),
-        types = listOf("org.iso.18013.5.1.mDL"),
-        docType = "org.iso.18013.5.1.mDL"
+        types = listOf(MDocTypes.ISO_MDL),
+        docType = MDocTypes.ISO_MDL
     ))).plus(
         Pair("urn:eu.europa.ec.eudi:pid:1", CredentialSupported(
         format = CredentialFormat.sd_jwt_vc,
@@ -205,14 +207,6 @@ open class CIProvider : OpenIDCredentialIssuer(
         val cryptoProvider = SimpleCOSECryptoProvider(listOf(keyInfo))
 
         cryptoProvider.verify1(coseSign1, "pub-key")
-//        if (tokenHeader.value[MapKey] != null) {
-//            val did = tokenHeader["kid"]!!.jsonPrimitive.content.split("#")[0]
-//            println("Resolving DID: $did")
-//            val key = DidService.resolveToKey(did).getOrThrow()
-//            key.verifyJws(token).also { println("VERIFICATION IS: $it") }
-//        } else {
-//            CI_TOKEN_KEY.verifyJws(token)
-//        }
     }
 
     // -------------------------------------
@@ -267,7 +261,7 @@ open class CIProvider : OpenIDCredentialIssuer(
             credentialRequest,
             CredentialErrorCode.invalid_or_missing_proof, message = "Proof must contain nonce")
 
-        val data: IssuanceSessionData = (if (holderDid == null || nonce == null) {
+        val data: IssuanceSessionData = (if (holderDid == null) {
             repeat(10) {
                 log.debug { "WARNING: RETURNING DEMO/EXAMPLE (= BOGUS) CREDENTIAL: subjectDid or nonce is null (was deferred issuance tried?)" }
             }
@@ -316,22 +310,6 @@ open class CIProvider : OpenIDCredentialIssuer(
                             vct = data.request.credentialConfigurationId, additionalJwtHeader = data.request.x5Chain?.first()?.let {
                                 mapOf("x5c" to JsonPrimitive(it))
                             } ?: mapOf())).toString()
-                    //
-                    //                    vc.mergingSdJwtIssue(
-//                        issuerKey = issuerKey,
-//                        issuerDid = issuerDid,
-//                        subjectDid = holderDid ?: "",
-//                        mappings = request.mapping ?: JsonObject(emptyMap()),
-//                        additionalJwtHeader = emptyMap(),
-//                        additionalJwtOptions = holderKey?.let { mapOf(
-//                            "cnf" to buildJsonObject { put("jwk", it) }
-//                        ) } ?: emptyMap(),
-//                        disclosureMap = data.request.selectiveDisclosure ?: SDMap.Companion.generateSDMap(
-//                            JsonObject(emptyMap()),
-//                            JsonObject(emptyMap())
-//                        )
-//                    )
-
                     else -> vc.mergingJwtIssue(
                         issuerKey = issuerKey,
                         issuerDid = issuerDid,

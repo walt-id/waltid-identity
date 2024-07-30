@@ -119,7 +119,7 @@ kotlin {
         val jvmMain by getting {
             dependencies {
                 implementation("com.nimbusds:nimbus-jose-jwt:9.40")
-                implementation(project(":waltid-libraries:waltid-crypto"))
+                api(project(":waltid-libraries:waltid-crypto"))
             }
         }
         val jvmTest by getting {
@@ -148,9 +148,6 @@ kotlin {
                 dependsOn(commonMain)
                 iosArm64Main.dependsOn(this)
                 iosSimulatorArm64Main.dependsOn(this)
-                dependencies {
-                    implementation(project(":waltid-libraries:waltid-crypto-ios"))
-                }
             }
 
             val iosArm64Test by getting
@@ -159,9 +156,6 @@ kotlin {
                 dependsOn(commonTest)
                 iosArm64Test.dependsOn(this)
                 iosSimulatorArm64Test.dependsOn(this)
-                dependencies {
-                    implementation(project(":waltid-libraries:waltid-crypto-ios"))
-                }
             }
         }
     }

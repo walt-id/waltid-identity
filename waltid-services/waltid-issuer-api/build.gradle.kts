@@ -85,8 +85,8 @@ dependencies {
     // Logging
     implementation("io.github.oshai:kotlin-logging-jvm:7.0.0")
     implementation("org.slf4j:jul-to-slf4j:2.0.13")
-    implementation("io.klogging:klogging-jvm:0.5.14")
-    implementation("io.klogging:slf4j-klogging:0.5.14")
+    implementation("io.klogging:klogging-jvm:0.6.1")
+    implementation("io.klogging:slf4j-klogging:0.6.0")
 
 
     // Test
@@ -106,8 +106,7 @@ dependencies {
     api(project(":waltid-libraries:waltid-sdjwt"))
     api(project(":waltid-libraries:waltid-mdoc-credentials"))
 
-    // TODO: REMOVE:
-    implementation("com.nimbusds:nimbus-jose-jwt:9.37.3")
+    implementation("com.nimbusds:nimbus-jose-jwt:9.40")
 
     // crypto
     implementation("com.augustcellars.cose:cose-java:1.1.0")

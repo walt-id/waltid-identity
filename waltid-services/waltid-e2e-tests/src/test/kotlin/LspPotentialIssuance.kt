@@ -17,6 +17,7 @@ import id.walt.mdoc.dataelement.MapElement
 import id.walt.mdoc.dataelement.MapKey
 import id.walt.mdoc.dataelement.toDataElement
 import id.walt.mdoc.doc.MDoc
+import id.walt.mdoc.doc.MDocTypes
 import id.walt.mdoc.doc.MDocVerificationParams
 import id.walt.mdoc.doc.VerificationType
 import id.walt.mdoc.docrequest.MDocRequestBuilder
@@ -78,7 +79,7 @@ class LspPotentialIssuance(val client: HttpClient) {
     val offeredCredentials = OpenID4VCI.resolveOfferedCredentials(parsedOffer, providerMetadata)
     val offeredCredential = offeredCredentials.first()
     assertEquals(CredentialFormat.mso_mdoc, offeredCredential.format)
-    assertEquals("org.iso.18013.5.1.mDL", offeredCredential.docType)
+    assertEquals(MDocTypes.ISO_MDL, offeredCredential.docType)
 
     // ### step 11: confirm issuance (nothing to do)
 

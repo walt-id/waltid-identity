@@ -13,7 +13,7 @@ data class IssuanceRequest(
 
     val credentialConfigurationId: String,
     val credentialData: W3CVC?,
-    val mdocData: Map<String, JsonObject>?,
+    val mdocData: Map<String, JsonObject>? = null,
     val mapping: JsonObject? = null,
     val selectiveDisclosure: SDMap? = null,
     val x5Chain: List<String>? = null,

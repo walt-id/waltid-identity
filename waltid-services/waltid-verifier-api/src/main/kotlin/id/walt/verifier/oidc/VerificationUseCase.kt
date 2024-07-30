@@ -21,7 +21,6 @@ import id.walt.oid4vc.providers.PresentationSession
 import id.walt.oid4vc.responses.TokenResponse
 import id.walt.sdjwt.JWTCryptoProvider
 import id.walt.sdjwt.SimpleJWTCryptoProvider
-import id.walt.verifier.lspPotential.LspPotentialVerificationInterop
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
 import io.ktor.client.request.*

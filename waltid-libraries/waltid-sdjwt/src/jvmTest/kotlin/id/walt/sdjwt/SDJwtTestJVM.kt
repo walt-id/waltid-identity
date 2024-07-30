@@ -4,17 +4,11 @@ import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.crypto.MACSigner
 import com.nimbusds.jose.crypto.MACVerifier
 import com.nimbusds.jwt.JWTClaimsSet
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
-import kotlin.test.*
 import korlibs.crypto.SHA256
 import korlibs.crypto.encoding.ASCII
-import korlibs.crypto.encoding.base64Url
+import kotlinx.datetime.Clock
 import kotlinx.serialization.json.*
-import kotlin.math.sign
-import kotlin.test.Test
+import kotlin.test.*
 
 class SDJwtTestJVM {
     // Generate shared secret for HMAC crypto algorithm
@@ -139,6 +133,7 @@ class SDJwtTestJVM {
         val cryptoProvider = SimpleJWTCryptoProvider(JWSAlgorithm.HS256, MACSigner(sharedSecret), MACVerifier(sharedSecret))
         val aud = "test-audience"
         val nonce = "test-nonce"
+        val issuanceTime = Clock.System.now()
         val signedJwt = SDJwt.sign(SDPayload.Companion.createSDPayload(
             buildJsonObject { put("test", JsonPrimitive("hello")) },
             SDMapBuilder().addField("test", true).build()), cryptoProvider)
@@ -147,6 +142,7 @@ class SDJwtTestJVM {
         val presentedJwtWithKb = signedJwt.present(true, aud, nonce, cryptoProvider)
         assertNotNull(presentedJwtWithKb.keyBindingJwt)
         assertTrue(presentedJwtWithKb.toString().startsWith(presentedJwtNoKb.toString()))
+        assertTrue(presentedJwtWithKb.keyBindingJwt!!.issuedAt >= issuanceTime.epochSeconds)
         assertEquals(aud, presentedJwtWithKb.keyBindingJwt!!.audience)
         assertEquals(nonce, presentedJwtWithKb.keyBindingJwt!!.nonce)
         assertEquals(SHA256.digest(ASCII.encode(presentedJwtNoKb.toString())).base64Url, presentedJwtWithKb.keyBindingJwt!!.sdHash)

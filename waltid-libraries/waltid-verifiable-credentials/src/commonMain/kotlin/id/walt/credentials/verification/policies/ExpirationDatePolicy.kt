@@ -22,7 +22,7 @@ class ExpirationDatePolicy : CredentialWrapperValidatorPolicy(
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    override suspend fun verify(data: JsonElement, args: Any?, context: Map<String, Any>): Result<Any> {
+    override suspend fun verify(data: JsonObject, args: Any?, context: Map<String, Any>): Result<Any> {
         val (key, exp) = getExpirationKeyValuePair(data) ?: return buildPolicyUnavailableResult()
 
         val now = Clock.System.now()
@@ -34,18 +34,18 @@ class ExpirationDatePolicy : CredentialWrapperValidatorPolicy(
         }
     }
 
-    private fun getExpirationKeyValuePair(data: JsonElement): Pair<String, Instant>? =
-        checkVc(data.jsonObject["vc"]) ?: checkVc(data) ?: checkJwt(data)
+    private fun getExpirationKeyValuePair(data: JsonObject): Pair<String, Instant>? =
+        checkVc(data["vc"]?.jsonObject) ?: checkVc(data) ?: checkJwt(data)
 
-    private fun checkJwt(data: JsonElement?) =
+    private fun checkJwt(data: JsonObject?) =
         data?.jsonObject?.get(JwtClaims.NotAfter.getValue())?.jsonPrimitive?.longOrNull?.let {
             Pair("jwt:${JwtClaims.NotAfter.getValue()}", Instant.fromEpochSeconds(it))
         }
 
-    private fun checkVc(data: JsonElement?) =
-        data?.jsonObject?.get(VcClaims.V2.NotAfter.getValue())?.jsonPrimitive?.let {
+    private fun checkVc(data: JsonObject?) =
+        data?.get(VcClaims.V2.NotAfter.getValue())?.jsonPrimitive?.let {
             Pair(VcClaims.V2.NotAfter.getValue(), Instant.parse(it.content))
-        } ?: data?.jsonObject?.get(VcClaims.V1.NotAfter.getValue())?.jsonPrimitive?.let {
+        } ?: data?.get(VcClaims.V1.NotAfter.getValue())?.jsonPrimitive?.let {
             Pair(VcClaims.V1.NotAfter.getValue(), Instant.parse(it.content))
         }
 

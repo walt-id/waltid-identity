@@ -7,6 +7,7 @@ import kotlinx.serialization.json.*
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 
+@Suppress("NON_EXPORTABLE_TYPE")
 @OptIn(ExperimentalJsExport::class)
 @JsExport
 class KeyBindingJwt(jwt: String, header: JsonObject, payload: SDPayload): SDJwt(jwt, header, payload) {

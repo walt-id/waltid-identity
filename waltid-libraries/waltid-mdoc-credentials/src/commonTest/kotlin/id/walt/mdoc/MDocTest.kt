@@ -9,6 +9,7 @@ import id.walt.mdoc.dataretrieval.DeviceRequest
 import id.walt.mdoc.dataretrieval.DeviceResponse
 import id.walt.mdoc.devicesigned.DeviceAuth
 import id.walt.mdoc.doc.MDocBuilder
+import id.walt.mdoc.doc.MDocTypes
 import id.walt.mdoc.docrequest.MDocRequestBuilder
 import id.walt.mdoc.issuersigned.IssuerSignedItem
 import id.walt.mdoc.mdocauth.DeviceAuthentication
@@ -49,7 +50,7 @@ class MDocTest {
 
         val mdocResp = DeviceResponse(
             documents = listOf(
-                MDocBuilder("org.iso.18013.5.1.mDL").
+                MDocBuilder(MDocTypes.ISO_MDL).
                 addIssuerSignedItems(
                     "org.iso.18013.5.1", textItem, byteStringItem, intItem, floatItem, booleanItem, listItem, mapItem, nullItem, cborItem, tdateItem, tdateIntItem, tdateDblItem, fullDateStrItem, fullDateIntItem
                 ).build(COSESign1())
@@ -103,7 +104,7 @@ class MDocTest {
         // try decode MSO
         val mso = mdocResp.documents[0].MSO
         assertNotEquals(illegal = null, actual = mso)
-        assertEquals(expected = "org.iso.18013.5.1.mDL", actual = mso!!.docType.value)
+        assertEquals(expected = MDocTypes.ISO_MDL, actual = mso!!.docType.value)
         assertEquals(expected = "SHA-256", actual = mso.digestAlgorithm.value)
         assertEquals(expected = "1.0", actual = mso.version.value)
         assertEquals(
@@ -218,7 +219,7 @@ class MDocTest {
         val devRequest = DeviceRequest.fromCBORHex(exampleRequest)
         assertEquals(expected = "1.0", actual = devRequest.version.value)
         assertEquals(expected = 1, actual = devRequest.docRequests.size)
-        assertEquals(expected = "org.iso.18013.5.1.mDL", actual = devRequest.docRequests[0].docType)
+        assertEquals(expected = MDocTypes.ISO_MDL, actual = devRequest.docRequests[0].docType)
         assertContains(iterable = devRequest.docRequests[0].nameSpaces, element = "org.iso.18013.5.1")
         assertEquals(
             expected = mapOf(
@@ -235,7 +236,7 @@ class MDocTest {
 
     @Test
     fun testDeviceRequestBuilderAndSerialization() {
-        val docReq = MDocRequestBuilder("org.iso.18013.5.1.mDL")
+        val docReq = MDocRequestBuilder(MDocTypes.ISO_MDL)
             .addDataElementRequest("org.iso.18013.5.1", "family_name", true)
             .addDataElementRequest("org.iso.18013.5.1", "birth_date", false)
             .build()
