@@ -138,7 +138,7 @@ object IssuanceService {
 
                 val credentialResponse = http.post(providerMetadata.credentialEndpoint!!) {
                     contentType(ContentType.Application.Json)
-                    bearerAuth(tokenResp.accessToken!!)
+                    bearerAuth(tokenResp.accessToken ?: error("No access token in token response"))
                     setBody(credReq.toJSON())
                 }.body<JsonObject>().let { CredentialResponse.fromJSON(it) }
                 logger.debug { "credentialResponse: $credentialResponse" }
