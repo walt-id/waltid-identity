@@ -4,6 +4,7 @@ plugins {
 }
 
 kotlin {
+
     iosArm64()
     iosSimulatorArm64()
 
@@ -12,25 +13,26 @@ kotlin {
         homepage = "Link to the Shared Module homepage"
         version = "1.0"
         ios.deploymentTarget = "15.4"
+
         framework {
-            baseName = "shared"
+            baseName = "waltid-crypto-ios"
             isStatic = true
+            export(project(":waltid-libraries:waltid-target-ios"))
+            export(project(":waltid-libraries:crypto:waltid-crypto"))
         }
 
         pod("JOSESwift") {
             version = "2.4.0"
         }
     }
-    
-    sourceSets {
-        commonMain.dependencies {
-            implementation(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
-            implementation(project(":waltid-libraries:waltid-did"))
-            implementation(project(":waltid-libraries:protocols:waltid-openid4vc"))
-            implementation(project(":waltid-libraries:credentials:waltid-verifiable-credentials"))
-        }
-        commonTest.dependencies {
 
+    sourceSets {
+
+        all {
+            languageSettings.optIn("kotlinx.cinterop.ExperimentalForeignApi")
+            languageSettings.optIn("kotlin.ExperimentalStdlibApi")
+            languageSettings.optIn("kotlinx.serialization.ExperimentalSerializationApi")
+            languageSettings.optIn("kotlinx.cinterop.BetaInteropApi")
         }
 
         val iosArm64Main by getting
@@ -41,9 +43,12 @@ kotlin {
             iosArm64Main.dependsOn(this)
             iosSimulatorArm64Main.dependsOn(this)
             dependencies {
-                implementation(project(":waltid-libraries:waltid-crypto-ios"))
-                implementation("io.ktor:ktor-client-darwin:2.3.12")
+                api(project(":waltid-libraries:crypto:waltid-crypto"))
+                api(project(":waltid-libraries:waltid-target-ios"))
             }
         }
     }
 }
+
+
+task("testClasses")
