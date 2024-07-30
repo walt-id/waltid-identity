@@ -10,6 +10,7 @@ import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.did.dids.DidService
 import id.walt.did.dids.DidUtils
 import id.walt.issuer.config.CredentialTypeConfig
@@ -35,7 +36,6 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
-import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.time.Duration.Companion.minutes
 
@@ -137,7 +137,7 @@ open class CIProvider : OpenIDCredentialIssuer(
         log.debug { "Verifying JWS: $token" }
         log.debug { "JWS Verification: target: $target" }
 
-        val tokenHeader = Json.parseToJsonElement(Base64.decode(token.split(".")[0]).decodeToString()).jsonObject
+        val tokenHeader = Json.parseToJsonElement(token.split(".")[0].decodeFromBase64Url().decodeToString()).jsonObject
         if (tokenHeader["kid"] != null) {
             val did = tokenHeader["kid"]!!.jsonPrimitive.content.split("#")[0]
             log.debug { "Resolving DID: $did" }
@@ -279,7 +279,7 @@ open class CIProvider : OpenIDCredentialIssuer(
         val jwtParts = jwt.split(".")
 
         fun decodeJwtPart(idx: Int) =
-            Json.parseToJsonElement(Base64.decode(jwtParts[idx]).decodeToString()).jsonObject
+            Json.parseToJsonElement(jwtParts[idx].decodeFromBase64Url().decodeToString()).jsonObject
 
         val header = decodeJwtPart(0)
         val payload = decodeJwtPart(1)
