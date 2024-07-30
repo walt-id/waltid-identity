@@ -4,7 +4,7 @@ services:
     pull_policy: always
     build:
       context: ../
-      dockerfile: waltid-wallet-api/Dockerfile
+      dockerfile: waltid-services/waltid-wallet-api/Dockerfile
     depends_on:
       postgres:
         condition: service_healthy
@@ -23,6 +23,9 @@ services:
     platform: linux/x86_64
     image: docker.io/waltid/issuer-api:${VERSION_TAG:-latest}
     pull_policy: always
+    build:
+      context: ../
+      dockerfile: waltid-services/waltid-issuer-api/Dockerfile
     depends_on:
       - caddy
     env_file:
@@ -34,6 +37,9 @@ services:
     platform: linux/x86_64
     image: docker.io/waltid/verifier-api:${VERSION_TAG:-latest}
     pull_policy: always
+    build:
+      context: ../
+      dockerfile: waltid-services/waltid-verifier-api/Dockerfile
     depends_on:
       - caddy
     env_file:
@@ -44,6 +50,9 @@ services:
   waltid-web-wallet:
     image: docker.io/waltid/waltid-web-wallet:${VERSION_TAG:-latest}
     pull_policy: always
+    build:
+      context: ../
+      dockerfile: waltid-applications/waltid-web-wallet/Dockerfile
     depends_on:
       - wallet-api
       - caddy
@@ -55,6 +64,9 @@ services:
     platform: linux/x86_64
     image: docker.io/waltid/portal:${VERSION_TAG:-latest}
     pull_policy: always
+    build:
+      context: ../
+      dockerfile: waltid-applications/waltid-web-portal/Dockerfile
     depends_on:
       - caddy
     environment:
