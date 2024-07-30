@@ -58,11 +58,11 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                api(project(":waltid-libraries:waltid-crypto"))
+                api(project(":waltid-libraries:crypto:waltid-crypto"))
                 api(project(":waltid-libraries:waltid-did"))
-                api(project(":waltid-libraries:waltid-verifiable-credentials"))
-                api(project(":waltid-libraries:waltid-sdjwt"))
-                api(project(":waltid-libraries:waltid-openid4vc"))
+                api(project(":waltid-libraries:credentials:waltid-verifiable-credentials"))
+                api(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
+                api(project(":waltid-libraries:protocols:waltid-openid4vc"))
 
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.1")
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.0")

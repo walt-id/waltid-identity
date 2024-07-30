@@ -103,13 +103,13 @@ dependencies {
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:${Versions.COROUTINES_VERSION}")
 
     // OIDC
-    api(project(":waltid-libraries:waltid-openid4vc"))
+    api(project(":waltid-libraries:protocols:waltid-openid4vc"))
 
     // SSI Kit 2
-    api(project(":waltid-libraries:waltid-crypto"))
-    api(project(":waltid-libraries:waltid-verifiable-credentials"))
+    api(project(":waltid-libraries:crypto:waltid-crypto"))
+    api(project(":waltid-libraries:credentials:waltid-verifiable-credentials"))
     api(project(":waltid-libraries:waltid-did"))
-    api(project(":waltid-libraries:waltid-mdoc-credentials"))
+    api(project(":waltid-libraries:credentials:waltid-mdoc-credentials"))
 }
 tasks.withType<Zip> {
     isZip64 = true

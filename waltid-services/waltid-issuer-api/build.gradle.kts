@@ -95,14 +95,14 @@ dependencies {
     //testImplementation("io.ktor:ktor-server-tests-jvm:${Versions.KTOR_VERSION}")
 
     // OIDC
-    api(project(":waltid-libraries:waltid-openid4vc"))
+    api(project(":waltid-libraries:protocols:waltid-openid4vc"))
 
     // walt.id
-    api(project(":waltid-libraries:waltid-crypto"))
+    api(project(":waltid-libraries:crypto:waltid-crypto"))
     api(project(":waltid-libraries:waltid-did"))
 
-    api(project(":waltid-libraries:waltid-verifiable-credentials"))
-    api(project(":waltid-libraries:waltid-sdjwt"))
+    api(project(":waltid-libraries:credentials:waltid-verifiable-credentials"))
+    api(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
 }
 
 tasks.withType<Test> {

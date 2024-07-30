@@ -10,20 +10,16 @@ plugins {
     kotlin("multiplatform")
     kotlin("plugin.serialization")
     id("maven-publish")
-    id("com.github.ben-manes.versions")
+    id("dev.petuska.npm.publish") version "3.4.3"
     id("love.forte.plugin.suspend-transform") version "2.0.20-Beta1-0.9.2"
+    id("com.github.ben-manes.versions")
 }
 
-group = "id.walt.did"
+group = "id.walt.credentials"
 
 repositories {
     mavenCentral()
     maven("https://jitpack.io")
-}
-
-java {
-    sourceCompatibility = JavaVersion.VERSION_15
-    targetCompatibility = JavaVersion.VERSION_15
 }
 
 suspendTransform {
@@ -34,6 +30,10 @@ suspendTransform {
     includeAnnotation = false // Required in the current version to avoid "compileOnly" warning
 }
 
+java {
+    sourceCompatibility = JavaVersion.VERSION_15
+    targetCompatibility = JavaVersion.VERSION_15
+}
 
 kotlin {
     jvmToolchain(17)
@@ -65,7 +65,7 @@ kotlin {
         }
     }
     js(IR) {
-        moduleName = "dids"
+        moduleName = "verifiable-credentials"
         /*browser {
             commonWebpackConfig {
                 cssSupport {
@@ -90,6 +90,7 @@ kotlin {
             dependencies {
                 // JSON
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.1")
+                implementation("io.github.optimumcode:json-schema-validator:0.2.1")
 
                 // Ktor client
                 implementation("io.ktor:ktor-client-core:$ktor_version")
@@ -102,20 +103,17 @@ kotlin {
                 // Coroutines
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
 
-                // Date
+                // Kotlinx
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.0")
-
-                // UUID
                 implementation("app.softwork:kotlinx-uuid-core:0.0.26")
 
-                // Crypto
-                api(project(":waltid-libraries:crypto:waltid-crypto"))
-
-                // Encodings
-                implementation("net.thauvin.erik.urlencoder:urlencoder-lib:1.5.0")
-
-                // Logging
+                // Loggin
                 implementation("io.github.oshai:kotlin-logging:7.0.0")
+
+                // walt.id
+                api(project(":waltid-libraries:crypto:waltid-crypto"))
+                api(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
+                api(project(":waltid-libraries:waltid-did"))
 
                 // suspend-transform plugin annotations (required in the current version to avoid "compileOnly" warning)
                 implementation("${SuspendTransPluginConstants.ANNOTATION_GROUP}:${SuspendTransPluginConstants.ANNOTATION_NAME}:${SuspendTransPluginConstants.ANNOTATION_VERSION}")
@@ -134,26 +132,16 @@ kotlin {
 
                 // Json canonicalization
                 implementation("io.github.erdtman:java-json-canonicalization:1.1")
-
-                // Multiformat
-//                implementation("com.github.multiformats:java-multibase:v1.1.1")
             }
         }
         val jvmTest by getting {
             dependencies {
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.1")
-                implementation(kotlin("test"))
-                implementation("org.junit.jupiter:junit-jupiter-params:5.11.0-M2")
-                implementation("io.ktor:ktor-server-test-host:$ktor_version")
-                implementation("io.ktor:ktor-server-content-negotiation:$ktor_version")
-                implementation("io.ktor:ktor-server-netty:2.3.12")
+                implementation("org.slf4j:slf4j-simple:2.0.13")
             }
         }
         val jsMain by getting {
             dependencies {
-                implementation("io.ktor:ktor-client-js:$ktor_version")
-
-                implementation(npm("canonicalize", "2.0.0"))
                 implementation(npm("uuid", "9.0.1"))
             }
         }
@@ -177,6 +165,7 @@ kotlin {
                 iosSimulatorArm64Test.dependsOn(this)
             }
         }
+
         publishing {
             repositories {
                 maven {
@@ -218,4 +207,21 @@ extensions.getByType<SuspendTransformGradleExtension>().apply {
             )
         )
     )
+}
+
+npmPublish {
+    registries {
+        val envToken = System.getenv("NPM_TOKEN")
+        val npmTokenFile = File("secret_npm_token.txt")
+        val secretNpmToken = envToken ?: npmTokenFile.let { if (it.isFile) it.readLines().first() else "" }
+        val hasNPMToken = secretNpmToken.isNotEmpty()
+        val isReleaseBuild = Regex("\\d+.\\d+.\\d+").matches(version.get())
+        if (isReleaseBuild && hasNPMToken) {
+            readme.set(File("README.md"))
+            register("npmjs") {
+                uri.set(uri("https://registry.npmjs.org"))
+                authToken.set(secretNpmToken)
+            }
+        }
+    }
 }

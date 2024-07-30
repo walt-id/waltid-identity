@@ -55,8 +55,8 @@ dependencies {
     api(project(":waltid-libraries:waltid-crypto-android"))
 
     api(project(":waltid-libraries:waltid-did"))
-    api(project(":waltid-libraries:waltid-verifiable-credentials"))
-    api(project(":waltid-libraries:waltid-sdjwt"))
+    api(project(":waltid-libraries:credentials:waltid-verifiable-credentials"))
+    api(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
 
     // JSON
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.1")
