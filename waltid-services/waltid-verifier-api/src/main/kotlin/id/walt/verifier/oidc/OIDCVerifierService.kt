@@ -4,21 +4,15 @@ package id.walt.verifier.oidc
 
 import COSE.AlgorithmID
 import COSE.OneKey
-import com.nimbusds.jose.JWSAlgorithm
-import com.nimbusds.jose.crypto.ECDSAVerifier
-import com.nimbusds.jose.jwk.ECKey
 import com.nimbusds.jose.util.X509CertUtils
 import com.upokecenter.cbor.CBORObject
 import id.walt.commons.config.ConfigManager
-import id.walt.commons.featureflag.FeatureManager.feature
 import id.walt.commons.featureflag.FeatureManager.whenFeature
 import id.walt.credentials.verification.Verifier
 import id.walt.credentials.verification.models.PolicyRequest
 import id.walt.credentials.verification.models.PresentationVerificationResponse
 import id.walt.crypto.keys.Key
-import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.jwk.JWKKey
-import id.walt.crypto.utils.Base64Utils
 import id.walt.did.dids.DidService
 import id.walt.did.dids.DidUtils
 import id.walt.mdoc.COSECryptoProviderKeyInfo
@@ -39,17 +33,16 @@ import id.walt.oid4vc.providers.OpenIDCredentialVerifier
 import id.walt.oid4vc.providers.PresentationSession
 import id.walt.oid4vc.responses.TokenResponse
 import id.walt.oid4vc.util.randomUUID
-import id.walt.verifier.config.OIDCVerifierServiceConfig
 import id.walt.sdjwt.SDJwtVC
 import id.walt.sdjwt.WaltIdJWTCryptoProvider
 import id.walt.verifier.FeatureCatalog
+import id.walt.verifier.config.OIDCVerifierServiceConfig
 import id.walt.verifier.lspPotential.LspPotentialVerificationInterop
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.internal.throwMissingFieldException
 import kotlinx.serialization.json.*
 import java.security.cert.X509Certificate
-import java.util.Base64
+import java.util.*
 import kotlin.time.Duration
 
 /**
@@ -195,10 +188,10 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
 
     private suspend fun resolveIssuerKeyFromSdJwt(sdJwt: SDJwtVC): Key {
         val kid = sdJwt.header.get("kid")?.jsonPrimitive?.content ?: randomUUID()
-        if(DidUtils.isDidUrl(kid)) {
-            return DidService.resolveToKey(kid).getOrThrow()
+        return if(DidUtils.isDidUrl(kid)) {
+            DidService.resolveToKey(kid).getOrThrow()
         } else {
-            return sdJwt.header.get("x5c")?.jsonArray?.last()?.let {
+            sdJwt.header.get("x5c")?.jsonArray?.last()?.let {
                 return JWKKey.importPEM(it.jsonPrimitive.content).getOrThrow().let { JWKKey(it.jwk, kid) }
             } ?: throw UnsupportedOperationException("Resolving issuer key from SD-JWT is only supported for issuer did in kid header and PEM cert in x5c header parameter")
         }

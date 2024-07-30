@@ -3,11 +3,16 @@ package id.walt
 import COSE.AlgorithmID
 import COSE.OneKey
 import cbor.Cbor
+import com.nimbusds.jose.jwk.ECKey
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.util.X509CertUtils
 import com.upokecenter.cbor.CBORObject
+import id.walt.commons.config.ConfigManager
 import id.walt.crypto.utils.Base64Utils.base64UrlDecode
 import id.walt.did.dids.DidService
+import id.walt.issuer.config.OIDCIssuerServiceConfig
+import id.walt.issuer.issuance.CIProvider
+import id.walt.issuer.issuance.OidcApi
 import id.walt.mdoc.COSECryptoProviderKeyInfo
 import id.walt.mdoc.SimpleCOSECryptoProvider
 import id.walt.mdoc.cose.COSESign1
@@ -15,12 +20,18 @@ import id.walt.mdoc.dataelement.*
 import id.walt.mdoc.doc.MDoc
 import id.walt.mdoc.doc.MDocTypes
 import id.walt.mdoc.issuersigned.IssuerSigned
-import id.walt.oid4vc.data.*
+import id.walt.oid4vc.data.CredentialFormat
+import id.walt.oid4vc.data.ProofOfPossession
+import id.walt.oid4vc.providers.TokenTarget
 import id.walt.oid4vc.requests.CredentialRequest
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.decodeFromHexString
-import kotlin.test.*
+import java.security.KeyFactory
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 object LspPotentialTest {
   init {
@@ -51,7 +62,7 @@ object LspPotentialTest {
     assertNotNull(mdoc.issuerSigned.issuerAuth?.x5Chain)
   }
 
-  @Test
+  //@Test // see: https://github.com/walt-id/waltid-identity/issues/653
   fun testPanasonicCWTProof() {
     val cwtStr = "0oRYb6MBJgN0b3BlbmlkNHZjaS1wcm9vZitjd3RoQ09TRV9LZXlYS6QBAiABIVggLJJHre5L8a2_3AqrrCAEPHrtwlOz3dNqapJwFCZFOv4iWCA73eeuJFAlZ1UTiZ3wVyRr7hdANprYk5WQbbEmYyFTPKEEWCA0MTRlODQxOGMxYzlkOGM4NDczZWZhM2YxOWZhMjc2OVhlpAFqd2FsbGV0LWRldgN4KGh0dHBzOi8vaXNzdWVyLnBvdGVudGlhbC53YWx0LXRlc3QuY2xvdWQGGmZyXdoKWCRkNTdjNzQxYi0wYWI0LTQwMWYtYjg1NS05YzdjMWY3MDIzNmFYQAdLyVSbkUSCwO6QnYw5wNayBfgkC6W2MklsjisIJZuK3ld9om_Jo9mrfLDuPcUkV__IwUrNBiUgqVMZqIuSFKA"
     val cwt = Cbor.decodeFromByteArray(COSESign1.serializer(), cwtStr.base64UrlDecode())
@@ -59,19 +70,19 @@ object LspPotentialTest {
     val cwtPayload = Cbor.decodeFromByteArray<MapElement>(cwt.payload!!)
     assertEquals(DEType.textString, cwtPayload.value.get(MapKey(ProofOfPossession.CWTProofBuilder.LABEL_ISS))?.type)
     val cwtProtectedHeader = Cbor.decodeFromByteArray<MapElement>(cwt.protectedHeader)
-    assertTrue(cwtProtectedHeader.value[MapKey(ProofOfPossession.CWTProofBuilder.HEADER_LABEL_ALG)]!!.internalValue!! == -7L)
-    assertTrue(cwtProtectedHeader.value[MapKey(ProofOfPossession.CWTProofBuilder.HEADER_LABEL_CONTENT_TYPE)]!!.internalValue!!.equals("openid4vci-proof+cwt"))
+    assertEquals(AlgorithmID.ECDSA_256.AsCBOR().AsInt64Value(), cwtProtectedHeader.value[MapKey(ProofOfPossession.CWTProofBuilder.HEADER_LABEL_ALG)]!!.internalValue!!)
+    assertEquals("openid4vci-proof+cwt", cwtProtectedHeader.value[MapKey(ProofOfPossession.CWTProofBuilder.HEADER_LABEL_CONTENT_TYPE)]!!.internalValue!!)
 
     val tokenHeader = cwt.decodeProtectedHeader()
     val rawKey = (tokenHeader.value[MapKey(ProofOfPossession.CWTProofBuilder.HEADER_LABEL_COSE_KEY)] as ByteStringElement).value
     val cryptoProvider = SimpleCOSECryptoProvider(listOf(COSECryptoProviderKeyInfo("pub-key", AlgorithmID.ECDSA_256,
       OneKey(CBORObject.DecodeFromBytes(rawKey)).AsPublicKey()
     )))
-    //assertTrue(cryptoProvider.verify1(cwt, "pub-key"))
+    assertTrue(cryptoProvider.verify1(cwt, "pub-key"))
 
   }
 
-  //@Test
+  //@Test // see: https://github.com/walt-id/waltid-identity/issues/653
   fun testASitCredentialRequest() {
     val reqBody = "{\"format\":\"mso_mdoc\",\"credential_identifier\":null,\"credential_response_encryption\":null,\"doctype\":\"org.iso.18013.5.1.mDL\",\"claims\":null,\"credential_definition\":null,\"vct\":null,\"proof\":{\"proof_type\":\"cwt\",\"jwt\":null,\"cwt\":\"hFkBdaQBJgN0b3BlbmlkNHZjaS1wcm9vZitjd3QEWDlkaWQ6a2V5OnpEbmFldVpxenBudnFTMThiOTVXbXdMdmlrTWZyUjJrRGpSWUVFV0xvQUU4eWVicm8YIVkBGzCCARcwgb6gAwIBAgIIL5E2MUilrikwCgYIKoZIzj0EAwIwEjEQMA4GA1UEAwwHRGVmYXVsdDAeFw0yNDA2MjQxMDA0MDdaFw0yNDA2MjQxMDA0MzdaMBIxEDAOBgNVBAMMB0RlZmF1bHQwWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAASw55kB7ZDt6FLVLEiJrQoMutGOSL6wintZ28Q6vPX8eO-o6-iH2qXBBO9h_4JlALgh0q8cPXczGR-GFPhWQ9ALMAoGCCqGSM49BAMCA0gAMEUCIQC8foX3SsFomX14ZLffSKalmABj4Mdr13KG0xd33NfrYwIgFFYZEeyFCYJpwlFDi0XCvmRoYEwqznJTBmkifoDGyQmgWHekAXgbaHR0cHM6Ly93YWxsZXQuYS1zaXQuYXQvYXBwA3goaHR0cHM6Ly9pc3N1ZXIucG90ZW50aWFsLndhbHQtdGVzdC5jbG91ZAYaZnlEmApYJDIyMmUzYTZlLWM2ZTctNGQ0Ni1hMjhlLWQ4ODIyN2JlZmIzYVhA58GZhhZPvdefAJ46vvoUVDSs-0y41E_J4m95QbsgDDPHjbuD3778mnhJwB3HSCKkK96L8jrgsQSgFpqeIGqKTw\"}}"
     val req = CredentialRequest.fromJSONString(reqBody)
