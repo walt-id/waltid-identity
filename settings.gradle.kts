@@ -50,6 +50,7 @@ val androidModules = listOf(
 
 val iosModules = listOf(
     "$libraries:waltid-crypto-ios",
+    "$libraries:waltid-sdjwt-ios",
     "$libraries:waltid-target-ios",
     "$libraries:waltid-target-ios:implementation",
     "$applications:waltid-openid4vc-ios-testApp",

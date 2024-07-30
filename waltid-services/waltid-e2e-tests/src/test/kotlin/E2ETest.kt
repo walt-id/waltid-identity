@@ -1,4 +1,4 @@
-import E2ETestWebService.test
+import E2ETestWebService.loadResource
 import E2ETestWebService.testBlock
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.web.plugins.httpJson
@@ -6,18 +6,11 @@ import id.walt.oid4vc.OpenID4VCI
 import id.walt.oid4vc.data.OpenIDProviderMetadata
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyType
+import id.walt.issuer.issuance.IssuanceRequest
 import id.walt.oid4vc.data.dif.PresentationDefinition
-import id.walt.verifier.oidc.PresentationSessionInfo
 import id.walt.webwallet.config.RegistrationDefaultsConfig
-import id.walt.webwallet.db.models.Account
-import id.walt.webwallet.db.models.AccountWalletListing
-import id.walt.webwallet.db.models.WalletCredential
-import id.walt.webwallet.db.models.WalletOperationHistory
-import id.walt.webwallet.web.controllers.UsePresentationRequest
-import id.walt.webwallet.web.model.AccountRequest
 import id.walt.webwallet.web.model.EmailAccountRequest
 import io.ktor.client.*
-import io.ktor.client.call.*
 import io.ktor.client.engine.cio.*
 import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.*
@@ -30,8 +23,6 @@ import io.ktor.server.util.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.*
 import kotlinx.uuid.UUID
-import java.io.File
-import java.net.URLDecoder
 import kotlin.test.Test
 import kotlin.test.assertNotNull
 import kotlin.time.Duration.Companion.minutes
@@ -42,60 +33,32 @@ class E2ETest {
     fun e2e() = runTest(timeout = 5.minutes) {
         testBlock {
             var client = testHttpClient()
+            lateinit var accountId: UUID
+            lateinit var wallet: UUID
+            var authApi = AuthApi(client)
 
             // the e2e http request tests here
 
-            //region -Login-
-            test("/wallet-api/auth/user-info - not logged in without token") {
-                client.get("/wallet-api/auth/user-info").apply {
-                    assert(status == HttpStatusCode.Unauthorized) { "Was authorized without authorizing!" }
-                }
+            //region -Auth-
+            authApi.userInfo(HttpStatusCode.Unauthorized)
+            authApi.login(
+                EmailAccountRequest(
+                    email = "user@email.com",
+                    password = "password"
+                )
+            ) {
+                client = testHttpClient(token = it["token"]!!.jsonPrimitive.content)
+                authApi = AuthApi(client)
             }
-
-            test("/wallet-api/auth/login - wallet-api login") {
-                client.post("/wallet-api/auth/login") {
-                    setBody(
-                        EmailAccountRequest(
-                            email = "user@email.com", password = "password"
-                        ) as AccountRequest
-                    )
-                }.expectSuccess().apply {
-                    body<JsonObject>().let { result ->
-                        assertNotNull(result["token"])
-                        val token = result["token"]!!.jsonPrimitive.content.expectLooksLikeJwt()
-
-                        client = testHttpClient(token = token)
-                    }
-                }
+            authApi.userInfo(HttpStatusCode.OK) {
+                accountId = it.id
             }
-
-            lateinit var accountId: UUID
-
-            test("/wallet-api/auth/user-info - logged in after login") {
-                client.get("/wallet-api/auth/user-info").expectSuccess().apply {
-                    body<Account>().let { account ->
-                        accountId = account.id
-                    }
-                }
+            authApi.userSession()
+            authApi.userWallets(accountId) {
+                wallet = it.wallets.first().id
+                println("Selected wallet: $wallet")
             }
-
-            test("/wallet-api/auth/session - logged in after login") {
-                client.get("/wallet-api/auth/session").expectSuccess()
-            }
-
-            lateinit var wallet: UUID
-
-            test("/wallet-api/wallet/accounts/wallets - get wallets") {
-                client.get("/wallet-api/wallet/accounts/wallets").expectSuccess().apply {
-                    val listing = body<AccountWalletListing>()
-                    assert(listing.account == accountId) { "Wallet listing is for wrong account!" }
-
-                    assert(listing.wallets.isNotEmpty()) { "No wallets available!" }
-                    wallet = listing.wallets.first().id
-                    println("Selected wallet: $wallet")
-                }
-            }
-            //endregion -Login-
+            //endregion -Auth-
 
             //region -Keys-
             val keysApi = KeysApi(client)
@@ -112,8 +75,8 @@ class E2ETest {
             keysApi.import(wallet, rsaJwkImport)
             //endregion -Keys-
 
-            val didsApi = DidsApi(client)
             //region -Dids-
+            val didsApi = DidsApi(client)
             lateinit var did: String
             val createdDids = mutableListOf<String>()
             didsApi.list(wallet, 1, DidsApi.DefaultDidOption.Any) {
@@ -156,279 +119,140 @@ class E2ETest {
             didsApi.list(wallet, 1, DidsApi.DefaultDidOption.Some(did))
             //endregion -Dids-
 
-            test("/wallet-api/wallet/{wallet}/credentials - list credentials") {
-                client.get("/wallet-api/wallet/$wallet/credentials").expectSuccess().apply {
-                    val credentials = body<List<JsonObject>>()
-                    assert(credentials.isEmpty()) { "should not have any credentials yet" }
-                }
+            //region -Categories-
+            val categoryApi = CategoryApi(client)
+            val categoryName = "name#1"
+            val categoryNewName = "name#2"
+            categoryApi.list(wallet, 0)
+            categoryApi.add(wallet, categoryName)
+            categoryApi.list(wallet, 1){
+                assertNotNull(it.single { it["name"]?.jsonPrimitive?.content == categoryName })
             }
+            categoryApi.rename(wallet, categoryName, categoryNewName)
+            categoryApi.list(wallet, 1){
+                assertNotNull(it.single { it["name"]?.jsonPrimitive?.content == categoryNewName })
+            }
+            categoryApi.delete(wallet, categoryNewName)
+            //endregion -Categories
 
+            //region -Issuer / offer url-
             lateinit var offerUrl: String
-            test("/openid4vc/jwt/issue - issue credential") {
-                client.post("/openid4vc/jwt/issue") {
-                    //language=JSON
-                    setBody(
-                        """
-                    {
-                      "issuerKey": {
-                        "type": "jwk",
-                        "jwk": {
-                          "kty": "OKP",
-                          "d": "mDhpwaH6JYSrD2Bq7Cs-pzmsjlLj4EOhxyI-9DM1mFI",
-                          "crv": "Ed25519",
-                          "kid": "Vzx7l5fh56F3Pf9aR3DECU5BwfrY6ZJe05aiWYWzan8",
-                          "x": "T3T4-u1Xz3vAV2JwPNxWfs4pik_JLiArz_WTCvrCFUM"
-                        }
-                      },
-                      "issuerDid": "did:key:z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp",
-                      "credentialConfigurationId": "OpenBadgeCredential_jwt_vc_json",
-                      "credentialData": {
-                        "@context": [
-                          "https://www.w3.org/2018/credentials/v1",
-                          "https://purl.imsglobal.org/spec/ob/v3p0/context.json"
-                        ],
-                        "id": "urn:uuid:THIS WILL BE REPLACED WITH DYNAMIC DATA FUNCTION (see below)",
-                        "type": [
-                          "VerifiableCredential",
-                          "OpenBadgeCredential"
-                        ],
-                        "name": "JFF x vc-edu PlugFest 3 Interoperability",
-                        "issuer": {
-                          "type": [
-                            "Profile"
-                          ],
-                          "id": "did:key:THIS WILL BE REPLACED WITH DYNAMIC DATA FUNCTION FROM CONTEXT (see below)",
-                          "name": "Jobs for the Future (JFF)",
-                          "url": "https://www.jff.org/",
-                          "image": "https://w3c-ccg.github.io/vc-ed/plugfest-1-2022/images/JFF_LogoLockup.png"
-                        },
-                        "issuanceDate": "2023-07-20T07:05:44Z (THIS WILL BE REPLACED BY DYNAMIC DATA FUNCTION (see below))",
-                        "expirationDate": "WILL BE MAPPED BY DYNAMIC DATA FUNCTION (see below)",
-                        "credentialSubject": {
-                          "id": "did:key:123 (THIS WILL BE REPLACED BY DYNAMIC DATA FUNCTION (see below))",
-                          "type": [
-                            "AchievementSubject"
-                          ],
-                          "achievement": {
-                            "id": "urn:uuid:ac254bd5-8fad-4bb1-9d29-efd938536926",
-                            "type": [
-                              "Achievement"
-                            ],
-                            "name": "JFF x vc-edu PlugFest 3 Interoperability",
-                            "description": "This wallet supports the use of W3C Verifiable Credentials and has demonstrated interoperability during the presentation request workflow during JFF x VC-EDU PlugFest 3.",
-                            "criteria": {
-                              "type": "Criteria",
-                              "narrative": "Wallet solutions providers earned this badge by demonstrating interoperability during the presentation request workflow. This includes successfully receiving a presentation request, allowing the holder to select at least two types of verifiable credentials to create a verifiable presentation, returning the presentation to the requestor, and passing verification of the presentation and the included credentials."
-                            },
-                            "image": {
-                              "id": "https://w3c-ccg.github.io/vc-ed/plugfest-3-2023/images/JFF-VC-EDU-PLUGFEST3-badge-image.png",
-                              "type": "Image"
-                            }
-                          }
-                        }
-                      },
-                      "mapping": {
-                        "id": "<uuid>",
-                        "issuer": {
-                          "id": "<issuerDid>"
-                        },
-                        "credentialSubject": {
-                          "id": "<subjectDid>"
-                        },
-                        "issuanceDate": "<timestamp>",
-                        "expirationDate": "<timestamp-in:365d>"
-                      }
-                    }
-                    """.trimIndent()
-                    )
-                }.expectSuccess().apply {
-                    offerUrl = body<String>()
-                    println("offer: $offerUrl")
-                }
+            val issuerApi = IssuerApi(client)
+            val issuanceRequest =
+                Json.decodeFromString<IssuanceRequest>(loadResource("issuance/openbadgecredential-issuance-request.json"))
+            issuerApi.issue(issuanceRequest) {
+                offerUrl = it
+                println("offer: $offerUrl")
             }
+            //endregion -Issuer / offer url-
 
-            test("/wallet-api/wallet/{wallet}/exchange/resolveCredentialOffer - resolve credential offer") {
-                client.post("/wallet-api/wallet/$wallet/exchange/resolveCredentialOffer") {
-                    setBody(offerUrl)
-                }.expectSuccess()
-            }
-
+            //region -Exchange / claim-
+            val exchangeApi = ExchangeApi(client)
             lateinit var newCredentialId: String
-            test("/wallet-api/wallet/{wallet}/exchange/useOfferRequest - claim credential from issuer") {
-                client.post("/wallet-api/wallet/$wallet/exchange/useOfferRequest") {
-                    setBody(offerUrl)
-                }.expectSuccess().run {
-                    val newCredentials = body<List<WalletCredential>>()
-                    assert(newCredentials.size == 1) { "should have received a credential" }
-
-                    val cred = newCredentials.first()
-                    newCredentialId = cred.id
-                    newCredentialId
-                }
+            exchangeApi.resolveCredentialOffer(wallet, offerUrl)
+            exchangeApi.useOfferRequest(wallet, offerUrl, 1) {
+                val cred = it.first()
+                newCredentialId = cred.id
             }
+            //endregion -Exchange / claim-
 
-            test("/wallet-api/wallet/{wallet}/credentials - list credentials after issuance") {
-                client.get("/wallet-api/wallet/$wallet/credentials").expectSuccess().apply {
-                    val credentials = body<List<WalletCredential>>()
-                    assert(credentials.size == 1) { "should have exactly 1 credential by now" }
+            //region -Credentials-
+            val credentialsApi = CredentialsApi(client)
+            credentialsApi.list(wallet, expectedSize = 1, expectedCredential = arrayOf(newCredentialId))
+            credentialsApi.get(wallet, newCredentialId)
+            credentialsApi.accept(wallet, newCredentialId)
+            credentialsApi.delete(wallet, newCredentialId)
+            credentialsApi.restore(wallet, newCredentialId)
+            credentialsApi.status(wallet, newCredentialId)
+            categoryApi.add(wallet, categoryName)
+            categoryApi.add(wallet, categoryNewName)
+            credentialsApi.attachCategory(wallet, newCredentialId, categoryName, categoryNewName)
+            credentialsApi.detachCategory(wallet, newCredentialId, categoryName, categoryNewName)
+//            credentialsApi.reject(wallet, newCredentialId)
+//            credentialsApi.delete(wallet, newCredentialId, true)
+            //endregion -Credentials-
 
-                    assert(credentials.first().id == newCredentialId) { "credential should be the one received" }
-                    credentials.map { it.id }
-                }
-            }
-
+            //region -Verifier / request url-
             lateinit var verificationUrl: String
             lateinit var verificationId: String
-            test("/openid4vc/verify") {
-                client.post("/openid4vc/verify") {
-                    //language=JSON
-                    setBody(
-                        """
-                        {
-                          "request_credentials": [
-                            "OpenBadgeCredential"
-                          ]
-                        }
-                    """.trimIndent()
-                    )
-                }.expectSuccess().apply {
-                    verificationUrl = body<String>()
-                }
+            val sessionApi = Verifier.SessionApi(client)
+            val verificationApi = Verifier.VerificationApi(client)
+            verificationApi.verify(loadResource("presentation/openbadgecredential-presentation-request.json")) {
+                verificationUrl = it
                 assert(verificationUrl.contains("presentation_definition_uri="))
                 assert(!verificationUrl.contains("presentation_definition="))
-
                 verificationId = Url(verificationUrl).parameters.getOrFail("state")
-
                 verificationUrl
             }
+            //endregion -Verifier / request url-
 
+            //region -Exchange / presentation-
             lateinit var resolvedPresentationOfferString: String
             lateinit var presentationDefinition: String
-            test("/wallet-api/wallet/{wallet}/exchange/resolvePresentationRequest - get presentation definition") {
-                client.post("/wallet-api/wallet/$wallet/exchange/resolvePresentationRequest") {
-                    contentType(ContentType.Text.Plain)
-                    setBody(verificationUrl)
-                }.expectSuccess().apply {
-                    resolvedPresentationOfferString = body<String>()
-                }
-                assert(resolvedPresentationOfferString.contains("presentation_definition="))
-
-                presentationDefinition =
-                    Url(resolvedPresentationOfferString).parameters.getOrFail("presentation_definition")
-
-                presentationDefinition
+            exchangeApi.resolvePresentationRequest(wallet, verificationUrl) {
+                resolvedPresentationOfferString = it
+                presentationDefinition = Url(it).parameters.getOrFail("presentation_definition")
             }
 
-            test("/openid4vc/session/{id} - check if presentation definitions match") {
-                client.get("/openid4vc/session/$verificationId").expectSuccess().apply {
-                    val info = body<PresentationSessionInfo>()
-
-                    assert(info.presentationDefinition == PresentationDefinition.fromJSONString(presentationDefinition))
-                }
+            sessionApi.get(verificationId) {
+                assert(it.presentationDefinition == PresentationDefinition.fromJSONString(presentationDefinition))
             }
 
-            test("/wallet-api/wallet/{wallet}/exchange/matchCredentialsForPresentationDefinition - should match OpenBadgeCredential in wallet") {
-                client.post("/wallet-api/wallet/$wallet/exchange/matchCredentialsForPresentationDefinition") {
-                    setBody(presentationDefinition)
-                }.expectSuccess().run {
-                    val matched = body<List<WalletCredential>>()
-                    assert(matched.size == 1) { "presentation definition should match 1 credential" }
-                    assert(newCredentialId == matched.first().id) { "matched credential should be the received one" }
-                    matched.map { it.id }
+            exchangeApi.matchCredentialsForPresentationDefinition(
+                wallet, presentationDefinition, listOf(newCredentialId)
+            )
+            exchangeApi.unmatchedCredentialsForPresentationDefinition(wallet, presentationDefinition)
+            exchangeApi.usePresentationRequest(wallet, did, resolvedPresentationOfferString, listOf(newCredentialId))
+
+            sessionApi.get(verificationId){
+                assert(it.tokenResponse?.vpToken?.jsonPrimitive?.contentOrNull?.expectLooksLikeJwt() != null) { "Received no valid token response!" }
+                assert(it.tokenResponse?.presentationSubmission != null) { "should have a presentation submission after submission" }
+
+                assert(it.verificationResult == true) { "overall verification should be valid" }
+                it.policyResults.let {
+                    require(it != null) { "policyResults should be available after running policies" }
+                    assert(it.size > 1) { "no policies have run" }
                 }
             }
-
-            test("/wallet-api/wallet/{wallet}/exchange/unmatchedCredentialsForPresentationDefinition - none should be missing") {
-                client.post("/wallet-api/wallet/$wallet/exchange/unmatchedCredentialsForPresentationDefinition") {
-                    setBody(presentationDefinition)
-                }.expectSuccess().run {
-                    val unmatched = body<List<WalletCredential>>()
-                    assert(unmatched.isEmpty()) { "should not have not matched credentials (all 1 credential should match)" }
-                    unmatched
-                }
-            }
-
-            test("/wallet-api/wallet/{wallet}/exchange/usePresentationRequest - present credentials") {
-                client.post("/wallet-api/wallet/$wallet/exchange/usePresentationRequest") {
-                    setBody(
-                        UsePresentationRequest(
-                            did = did,
-                            presentationRequest = resolvedPresentationOfferString,
-                            selectedCredentials = listOf(newCredentialId)
-                        )
-                    )
-                }.expectSuccess()
-            }
-
-            test("/openid4vc/session/{id} - check if presentation definitions match") {
-                client.get("/openid4vc/session/$verificationId").expectSuccess().apply {
-                    val info = body<PresentationSessionInfo>()
-
-                    assert(info.tokenResponse?.vpToken?.jsonPrimitive?.contentOrNull?.expectLooksLikeJwt() != null) { "Received no valid token response!" }
-                    assert(info.tokenResponse?.presentationSubmission != null) { "should have a presentation submission after submission" }
-
-                    assert(info.verificationResult == true) { "overall verification should be valid" }
-                    info.policyResults.let {
-                        require(it != null) { "policyResults should be available after running policies" }
-                        assert(it.size > 1) { "no policies have run" }
-                    }
-                }
-            }
-
-            test("/wallet-api/wallet/{wallet}/history - get operation history") {
-                client.get("/wallet-api/wallet/$wallet/history").expectSuccess().apply {
-                    val history = body<List<WalletOperationHistory>>()
-                    assert(history.size >= 2) { "missing history items" }
-                    assert(history.any { it.operation == "useOfferRequest" } && history.any { it.operation == "usePresentationRequest" }) { "incorrect history items" }
-                }
-            }
-
             val lspPotentialIssuance = LspPotentialIssuance(testHttpClient(doFollowRedirects = false))
-            test("lsp issuance track1") {
-                lspPotentialIssuance.testTrack1()
-            }
-            test("lsp issuance track2") {
-              lspPotentialIssuance.testTrack2()
-            }
+            lspPotentialIssuance.testTrack1()
+            lspPotentialIssuance.testTrack2()
             val lspPotentialVerification = LspPotentialVerification(testHttpClient(doFollowRedirects = false))
-            test("lsp verification track 3"){
-              lspPotentialVerification.testPotentialInteropTrack3()
+            lspPotentialVerification.testPotentialInteropTrack3()
+            lspPotentialVerification.testPotentialInteropTrack4()
+            //endregion -Exchange / presentation-
+
+            //region -History-
+            val historyApi = HistoryApi(client)
+            historyApi.list(wallet) {
+                assert(it.size >= 2) { "missing history items" }
+                assert(it.any { it.operation == "useOfferRequest" } && it.any { it.operation == "usePresentationRequest" }) { "incorrect history items" }
             }
-            test("lsp verification track 4") {
-              lspPotentialVerification.testPotentialInteropTrack4()
-            }
+            //endregion -History-
         }
     }
 
-  //@Test // enable to execute test selectively
-  fun lspIssuanceTests() = runTest(timeout = 5.minutes) {
-    val client = testHttpClient(doFollowRedirects = false)
-    testBlock {
-      val lspPotentialIssuance = LspPotentialIssuance(client)
-      test("lsp issuance track 1") {
-        lspPotentialIssuance.testTrack1()
-      }
-      test("lsp issuance track 2") {
-        lspPotentialIssuance.testTrack2()
-      }
+    //@Test // enable to execute test selectively
+    fun lspIssuanceTests() = runTest(timeout = 5.minutes) {
+        val client = testHttpClient(doFollowRedirects = false)
+        testBlock {
+          val lspPotentialIssuance = LspPotentialIssuance(client)
+          lspPotentialIssuance.testTrack1()
+          lspPotentialIssuance.testTrack2()
+        }
     }
-  }
 
-  //@Test
-  fun lspVerifierTests() = runTest(timeout = 5.minutes) {
-    val client = testHttpClient(doFollowRedirects = false)
-    testBlock {
-      val lspPotentialVerification = LspPotentialVerification(client)
-      test("lsp verification track 3"){
-        lspPotentialVerification.testPotentialInteropTrack3()
-      }
-      test("lsp verification track 4") {
-        lspPotentialVerification.testPotentialInteropTrack4()
-      }
+    //@Test
+    fun lspVerifierTests() = runTest(timeout = 5.minutes) {
+        val client = testHttpClient(doFollowRedirects = false)
+        testBlock {
+          val lspPotentialVerification = LspPotentialVerification(client)
+          lspPotentialVerification.testPotentialInteropTrack3()
+          lspPotentialVerification.testPotentialInteropTrack4()
+        }
     }
-  }
 
-    fun testHttpClient(token: String? = null, doFollowRedirects: Boolean = true) = HttpClient(CIO) {
+    private fun testHttpClient(token: String? = null, doFollowRedirects: Boolean = true) = HttpClient(CIO) {
         install(ContentNegotiation) {
             json(httpJson)
         }
@@ -469,6 +293,3 @@ fun JsonElement.tryGetData(key: String): JsonElement? = key.split('.').let {
     }
     element
 }
-
-fun loadResource(relativePath: String): String =
-    URLDecoder.decode(object {}.javaClass.getResource(relativePath)!!.path, "UTF-8").let { File(it).readText() }
