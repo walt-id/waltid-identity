@@ -22,6 +22,7 @@ import id.walt.oid4vc.providers.OpenIDClientConfig
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.requests.CredentialOfferRequest
 import id.walt.oid4vc.responses.AuthorizationErrorCode
+import id.walt.oid4vc.responses.TokenResponse
 import id.walt.webwallet.config.KeyGenerationDefaultsConfig
 import id.walt.webwallet.config.RegistrationDefaultsConfig
 import id.walt.webwallet.db.models.WalletCategoryData
@@ -41,6 +42,7 @@ import id.walt.webwallet.service.exchange.IssuanceService
 import id.walt.webwallet.service.keys.KeysService
 import id.walt.webwallet.service.keys.SingleKeyResponse
 import id.walt.webwallet.service.oidc4vc.TestCredentialWallet
+import id.walt.webwallet.service.oidc4vc.VPresentationSession
 import id.walt.webwallet.service.report.ReportRequestParameter
 import id.walt.webwallet.service.report.ReportService
 import id.walt.webwallet.service.settings.SettingsService
@@ -202,21 +204,7 @@ class SSIKit2WalletService(
         logger.debug { "Resolved presentation definition: ${presentationSession.authorizationRequest!!.presentationDefinition!!.toJSONString()}" }
 
         val tokenResponse = credentialWallet.processImplicitFlowAuthorization(presentationSession.authorizationRequest!!)
-        val submitFormParams = if(presentationSession.authorizationRequest.responseMode == ResponseMode.direct_post_jwt) {
-            val encKey = presentationSession.authorizationRequest.clientMetadata?.jwks?.get("keys")?.jsonArray?.first {
-                    jwk -> JWK.parse(jwk.toString()).keyUse?.equals(KeyUse.ENCRYPTION) ?: false }?.jsonObject ?: throw Exception("No ephemeral reader key found")
-            val ephemeralWalletKey = runBlocking { KeyManager.createKey(KeyGenerationRequest(keyType = KeyType.secp256r1)) }
-            tokenResponse.toDirecPostJWTParameters(encKey,
-                alg = presentationSession.authorizationRequest.clientMetadata!!.authorizationEncryptedResponseAlg!!,
-                enc = presentationSession.authorizationRequest.clientMetadata!!.authorizationEncryptedResponseEnc!!,
-                mapOf(
-                    "epk" to runBlocking{ ephemeralWalletKey.getPublicKey().exportJWKObject() },
-                    "apu" to JsonPrimitive(Base64URL.encode(presentationSession.nonce).toString()),
-                    "apv" to JsonPrimitive(Base64URL.encode(presentationSession.authorizationRequest.nonce!!).toString())
-                )
-            )
-        }
-        else tokenResponse.toHttpParameters()
+        val submitFormParams = getFormParameters(presentationSession.authorizationRequest, tokenResponse, presentationSession)
 
         val resp = this.http.submitForm(
             presentationSession.authorizationRequest.responseUri
@@ -581,5 +569,34 @@ class SSIKit2WalletService(
 
             else -> throw IllegalArgumentException("Did method not supported: $method")
         }
+
+    private fun getFormParameters(
+        authorizationRequest: AuthorizationRequest,
+        tokenResponse: TokenResponse,
+        presentationSession: VPresentationSession
+    ) = if (authorizationRequest.responseMode == ResponseMode.direct_post_jwt) {
+        directPostJwtParameters(authorizationRequest, tokenResponse, presentationSession)
+    } else tokenResponse.toHttpParameters()
+
+    private fun directPostJwtParameters(
+        authorizationRequest: AuthorizationRequest,
+        tokenResponse: TokenResponse,
+        presentationSession: VPresentationSession
+    ): Map<String, List<String>> {
+        val encKey = authorizationRequest.clientMetadata?.jwks?.get("keys")?.jsonArray?.first { jwk ->
+            JWK.parse(jwk.toString()).keyUse?.equals(KeyUse.ENCRYPTION) ?: false
+        }?.jsonObject ?: throw Exception("No ephemeral reader key found")
+        val ephemeralWalletKey = runBlocking { KeyManager.createKey(KeyGenerationRequest(keyType = KeyType.secp256r1)) }
+        return tokenResponse.toDirecPostJWTParameters(
+            encKey,
+            alg = authorizationRequest.clientMetadata!!.authorizationEncryptedResponseAlg!!,
+            enc = authorizationRequest.clientMetadata!!.authorizationEncryptedResponseEnc!!,
+            mapOf(
+                "epk" to runBlocking { ephemeralWalletKey.getPublicKey().exportJWKObject() },
+                "apu" to JsonPrimitive(Base64URL.encode(presentationSession.nonce).toString()),
+                "apv" to JsonPrimitive(Base64URL.encode(authorizationRequest.nonce!!).toString())
+            )
+        )
+    }
 }
 
