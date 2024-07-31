@@ -3,73 +3,27 @@ package id.walt
 import COSE.AlgorithmID
 import COSE.OneKey
 import cbor.Cbor
-import com.nimbusds.jose.jwk.ECKey
 import com.nimbusds.jose.jwk.JWK
-import com.nimbusds.jose.util.X509CertUtils
 import com.upokecenter.cbor.CBORObject
-import id.walt.commons.config.ConfigManager
-import id.walt.commons.config.list.WebConfig
-import id.walt.commons.web.WebService
-import id.walt.commons.web.plugins.configureSerialization
-import id.walt.crypto.keys.KeyGenerationRequest
-import id.walt.crypto.keys.KeyManager
-import id.walt.crypto.keys.KeyType
 import id.walt.crypto.utils.Base64Utils.base64UrlDecode
 import id.walt.did.dids.DidService
-import id.walt.issuer.config.OIDCIssuerServiceConfig
-import id.walt.issuer.issuance.CIProvider
-import id.walt.issuer.issuance.OidcApi
-import id.walt.did.helpers.WaltidServices
-import id.walt.did.utils.randomUUID
-import id.walt.issuer.issuerModule
 import id.walt.mdoc.COSECryptoProviderKeyInfo
 import id.walt.mdoc.SimpleCOSECryptoProvider
 import id.walt.mdoc.cose.COSESign1
 import id.walt.mdoc.dataelement.*
 import id.walt.mdoc.doc.MDoc
 import id.walt.mdoc.doc.MDocTypes
-import id.walt.mdoc.doc.MDocVerificationParams
-import id.walt.mdoc.doc.VerificationType
-import id.walt.mdoc.docrequest.MDocRequestBuilder
 import id.walt.mdoc.issuersigned.IssuerSigned
 import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.data.ProofOfPossession
-import id.walt.oid4vc.providers.TokenTarget
-import id.walt.oid4vc.OpenID4VCI
-import id.walt.oid4vc.data.*
-import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.requests.CredentialRequest
-import id.walt.oid4vc.requests.TokenRequest
-import id.walt.oid4vc.responses.CredentialResponse
-import id.walt.oid4vc.responses.TokenResponse
-import io.ktor.client.*
-import io.ktor.client.call.*
-import io.ktor.client.plugins.contentnegotiation.*
-import io.ktor.client.request.*
-import io.ktor.client.request.forms.*
-import io.ktor.client.statement.*
-import io.ktor.http.*
-import io.ktor.serialization.kotlinx.json.*
-import io.ktor.server.application.*
-import io.ktor.server.cio.*
-import io.ktor.server.engine.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.decodeFromHexString
-import java.security.KeyFactory
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
-import org.kotlincrypto.hash.sha2.SHA256
-import java.io.FileReader
-import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
-import kotlin.test.*
 
 object LspPotentialTest {
   init {
@@ -128,9 +82,7 @@ object LspPotentialTest {
     val coseSign1 = Cbor.decodeFromByteArray<COSESign1>(req.proof!!.cwt!!.base64UrlDecode())
     assertNotNull(coseSign1.payload)
     val tokenHeader = coseSign1.decodeProtectedHeader()
-    val x5c = X509CertUtils.parse((tokenHeader.value[MapKey(ProofOfPossession.CWTProofBuilder.HEADER_LABEL_X5CHAIN)] as ByteStringElement).value)
     val keyId = (tokenHeader.value[MapKey(4)] as ByteStringElement).value.decodeToString()
-    //val rawKey = (tokenHeader.value[MapKey(ProofOfPossession.CWTProofBuilder.HEADER_LABEL_COSE_KEY)] as ByteStringElement).value
     val cryptoProvider = SimpleCOSECryptoProvider(listOf(COSECryptoProviderKeyInfo("pub-key", AlgorithmID.ECDSA_256,
       JWK.parse(runBlocking { DidService.resolveToKey(keyId).getOrThrow().exportJWK() }).toECKey().toECPublicKey()
     )))
