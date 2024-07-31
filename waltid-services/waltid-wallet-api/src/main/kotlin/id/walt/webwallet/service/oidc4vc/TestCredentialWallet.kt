@@ -1,7 +1,6 @@
 package id.walt.webwallet.service.oidc4vc
 
 import COSE.AlgorithmID
-import COSE.OneKey
 import com.nimbusds.jose.jwk.ECKey
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyManager
@@ -37,7 +36,6 @@ import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.requests.TokenRequest
 import id.walt.sdjwt.SDJwtVC
 import id.walt.sdjwt.WaltIdJWTCryptoProvider
-import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.service.SessionAttributes.HACK_outsideMappedSelectedCredentialsPerSession
 import id.walt.webwallet.service.SessionAttributes.HACK_outsideMappedSelectedDisclosuresPerSession
 import id.walt.webwallet.service.credentials.CredentialsService
@@ -140,8 +138,6 @@ class TestCredentialWallet(
 
         val result = runBlocking { key.verifyJws(token) }
         return result.isSuccess
-
-        // JwtService.getService().verify(token).verified
     }
 
     override fun verifyCOSESign1Signature(target: TokenTarget, token: String): Boolean {
@@ -273,20 +269,7 @@ class TestCredentialWallet(
                 }
             )
         )
-        /*val presentation: String = Custodian.getService()
-            .createPresentation(Custodian.getService().listCredentials().map { PresentableCredential(it) }, TEST_DID)
-        return PresentationResult(
-            listOf(Json.parseToJsonElement(presentation)), PresentationSubmission(
-                "submission 1", presentationDefinition.id, listOf(
-                    DescriptorMapping(
-                        "presentation 1", VCFormat.jwt_vc, "$"
-                    )
-                )
-            )
-        )*/
     }
-
-    //val TEST_DID: String = DidService.create(DidMethod.jwk)
 
     val keyMapping = HashMap<String, Key>() // TODO: Hack as this is non stateless because of oidc4vc lib API
 
@@ -307,21 +290,6 @@ class TestCredentialWallet(
         println("RESOLVED DID: $did to keyId: $keyId")
 
         return did
-
-        /*val didDoc = runBlocking { DidService.resolve(did) }.getOrElse {
-            throw IllegalArgumentException(
-                "Could not resolve DID in CredentialWallet: $did, error cause attached.",
-                it
-            )
-        }
-        return (didDoc["authentication"] ?: didDoc["assertionMethod"]
-        ?: didDoc["verificationMethod"])?.jsonArray?.firstOrNull()?.jsonObject?.get("id")?.jsonPrimitive?.contentOrNull
-            ?: did*/
-        //return (didObj.authentication ?: didObj.assertionMethod ?: didObj.verificationMethod)?.firstOrNull()?.id ?: did
-    }
-
-    fun resolveJSON(url: String): JsonObject? {
-        return runBlocking { ktorClient.get(url).body() }
     }
 
     override fun isPresentationDefinitionSupported(presentationDefinition: PresentationDefinition): Boolean {
