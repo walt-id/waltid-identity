@@ -45,6 +45,8 @@ kotlin {
                 // JSON
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.1")
                 implementation("io.github.optimumcode:json-schema-validator:0.2.2")
+
+                implementation(project(":waltid-libraries:credentials:waltid-verifiable-credentials"))
             }
         }
         val commonTest by getting {
