@@ -11,13 +11,8 @@ import com.nimbusds.jose.jwk.ECKey
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.jwk.gen.ECKeyGenerator
 import id.walt.commons.interop.LspPotentialInterop
-import com.nimbusds.jose.util.X509CertChainUtils
-import id.walt.credentials.vc.vcs.W3CVC
-import id.walt.crypto.keys.KeySerialization
-import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.mdoc.COSECryptoProviderKeyInfo
 import id.walt.mdoc.SimpleCOSECryptoProvider
-import id.walt.mdoc.cose.X5_CHAIN
 import id.walt.mdoc.dataelement.DataElement
 import id.walt.mdoc.dataelement.FullDateElement
 import id.walt.mdoc.dataelement.toDataElement

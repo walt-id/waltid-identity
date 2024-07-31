@@ -1,16 +1,10 @@
 package id.walt.verifier
 
 import id.walt.commons.interop.LspPotentialInterop
-import id.walt.verifier.VerifierApiExamples.jwtFormat
-import id.walt.verifier.VerifierApiExamples.vcPoliciesData
-import id.walt.verifier.lspPotential.LspPotentialVerificationInterop
 import io.github.smiley4.ktorswaggerui.dsl.routes.ValueExampleDescriptorDsl
-import io.ktor.http.*
-import io.ktor.util.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.encodeToJsonElement
-import kotlinx.serialization.json.jsonPrimitive
 
 object VerifierApiExamples {
 
