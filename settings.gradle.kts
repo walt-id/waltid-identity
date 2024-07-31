@@ -27,6 +27,7 @@ val modules = listOf(
     * "$libraries:credentials".group(
         "waltid-verifiable-credentials",
         "waltid-mdoc-credentials",
+        "waltid-dif-presentation-exchange"
     ),
 
     * "$libraries:auth".group(
@@ -86,3 +87,5 @@ plugins {
 }
 
 rootProject.name = "waltid-identity"
+include("waltid-libraries:credentials:waltid-dif-presentation-exchange")
+findProject(":waltid-libraries:credentials:waltid-dif-presentation-exchange")?.name = "waltid-dif-presentation-exchange"
