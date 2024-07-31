@@ -46,7 +46,7 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
      */
     abstract fun getDidFor(session: S): String
 
-    fun httpGetAsJson(url: Url): JsonElement? = httpGet(url).body?.let { Json.decodeFromString<JsonElement>(it) }
+    private fun httpGetAsJson(url: Url): JsonElement? = httpGet(url).body?.let { Json.decodeFromString<JsonElement>(it) }
 
     open fun generateDidProof(
         did: String,
