@@ -1,4 +1,4 @@
-package id.walt.sessions
+package id.walt.authkit.sessions
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable

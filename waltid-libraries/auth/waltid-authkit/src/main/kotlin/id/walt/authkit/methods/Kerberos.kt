@@ -1,4 +1,4 @@
-package id.walt.methods
+package id.walt.authkit.methods
 
 /*
 import org.ietf.jgss.*

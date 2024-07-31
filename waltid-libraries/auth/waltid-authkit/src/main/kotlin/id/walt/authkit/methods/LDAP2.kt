@@ -1,4 +1,4 @@
-package id.walt.methods
+package id.walt.authkit.methods
 
 import org.apache.directory.api.ldap.model.exception.LdapException
 import org.apache.directory.ldap.client.api.LdapConnection

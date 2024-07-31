@@ -1,0 +1,70 @@
+package id.walt.authkit.methods
+
+import io.ktor.http.*
+import io.ktor.server.application.*
+import io.ktor.server.auth.*
+import io.ktor.server.request.*
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+
+/**
+ * Authentication method based on an id (username, email) and password
+ *
+ * Handles passing the auth credential as basic auth header, as JSON document body, or as form post.
+ */
+abstract class UserPassBasedAuthMethod(val usernameName: String = DEFAULT_USER_NAME, val passwordName: String = DEFAULT_PASSWORD_NAME) : AuthenticationMethod() {
+
+    companion object {
+        const val DEFAULT_USER_NAME = "username"
+        const val DEFAULT_PASSWORD_NAME = "password"
+    }
+
+    val EXPLANATION_MESSAGE by lazy {
+        """Pass authentication credential either as 1) Basic Auth header (`Authorization: Basic <credentials>`) as per RFC 7617; OR 2) JSON document (`{"$usernameName": "<$usernameName>", "$passwordName": "<$passwordName>"}`); OR 3) Form post ($usernameName=<$usernameName>&$passwordName=<$passwordName>)!"""
+    }
+
+    /**
+     * Handle username and password as:
+     * 1. Basic auth header
+     * 2. JSON document body
+     * 3. Form post
+     */
+    internal suspend fun ApplicationCall.getUsernamePasswordFromRequest(): UserPasswordCredential {
+        when (val contentType = request.contentType()) {
+            // Basic auth (fallback)
+            ContentType.Any -> {
+                val basicAuth = request.basicAuthenticationCredentials()
+                if (basicAuth != null)
+                    return basicAuth
+                else error("No basic auth credential header found. $EXPLANATION_MESSAGE")
+            }
+            // As JSON document
+            ContentType.Application.Json -> {
+                val body = receive<JsonObject>()
+
+                val username = body[usernameName] as? JsonPrimitive ?: body[DEFAULT_USER_NAME] as? JsonPrimitive
+                val password = body[passwordName] as? JsonPrimitive ?: body[DEFAULT_PASSWORD_NAME] as? JsonPrimitive
+
+                check(username?.isString == true) { "Invalid or missing $usernameName in JSON request. $EXPLANATION_MESSAGE" }
+                check(password?.isString == true) { "Invalid or missing $passwordName in JSON request. $EXPLANATION_MESSAGE" }
+                username!!
+                password!!
+
+                return UserPasswordCredential(username.content, password.content)
+            }
+            // As form post
+            ContentType.Application.FormUrlEncoded -> {
+                val form = receiveParameters()
+
+                val username = form[usernameName] ?: form[DEFAULT_USER_NAME] ?: error("Invalid or missing $usernameName in form post request. $EXPLANATION_MESSAGE")
+                val password = form[passwordName] ?: form[DEFAULT_PASSWORD_NAME] ?: error("Invalid or missing $passwordName in form post request. $EXPLANATION_MESSAGE")
+
+                return UserPasswordCredential(username, password)
+            }
+
+            else -> error("Invalid content type: $contentType. $EXPLANATION_MESSAGE")
+        }
+    }
+
+    abstract suspend fun auth(credential: UserPasswordCredential)
+}
