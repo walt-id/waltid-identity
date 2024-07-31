@@ -23,6 +23,8 @@ object UserPass : UserPassBasedAuthMethod() {
         val storedData: UserPassStoredData = lookupStoredData(identifier /*context()*/)
 
         authCheck(credential.password == storedData.password) { "Invalid password" }
+
+        // TODO: Open session
     }
 
     override fun Route.register(context: PipelineContext<Unit, ApplicationCall>.() -> AuthContext) {
