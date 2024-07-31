@@ -278,7 +278,7 @@ object IssuanceExamples {
         {
           "issuerKey":${buildJsonObject { 
             put("type", "jwk")
-            put("jwk", Json.parseToJsonElement(LspPotentialIssuanceInterop.POTENTIAL_ISSUER_KEY_JWK)) }},
+            put("jwk", Json.parseToJsonElement(LspPotentialIssuanceInterop.POTENTIAL_ISSUER_JWK_KEY.jwk!!)) }},
           "issuerDid":"",
           "credentialConfigurationId":"org.iso.18013.5.1.mDL",
           "credentialData":null,

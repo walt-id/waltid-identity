@@ -403,40 +403,6 @@ fun Application.issuerApi() {
                         ?: throw BadRequestException("Session has no credential offer set")
                     context.respond(credentialOffer.toJSON())
                 }
-                get("lspPotentialCredentialOffer") {
-                    val jwkKey = JWKKey.importJWK(LspPotentialIssuanceInterop.POTENTIAL_ISSUER_KEY_JWK).getOrThrow()
-                    val offerUri = IssuanceRequest(
-                        Json.parseToJsonElement(KeySerialization.serializeKey(jwkKey)).jsonObject,
-                        "",
-                        "org.iso.18013.5.1.mDL",
-                        null,
-                        mdocData = mapOf("org.iso.18013.5.1" to buildJsonObject {
-                            put("family_name", "Doe")
-                            put("given_name", "John")
-                            put("birth_date", "1980-01-01")
-                        }),
-                        x5Chain = listOf(LspPotentialInterop.POTENTIAL_ISSUER_CERT),
-                        trustedRootCAs = listOf(LspPotentialInterop.POTENTIAL_ROOT_CA_CERT)
-                    ).let { createCredentialOfferUri(listOf(it)) }
-                    context.respond(
-                        HttpStatusCode.OK, offerUri
-                    )
-                }
-                get("lspPotentialCredentialOfferT2") {
-                    val jwkKey = JWKKey.importJWK(LspPotentialIssuanceInterop.POTENTIAL_ISSUER_KEY_JWK).getOrThrow()
-                    val offerUri = IssuanceRequest(
-                        Json.parseToJsonElement(KeySerialization.serializeKey(jwkKey)).jsonObject,
-                        "",
-                        "urn:eu.europa.ec.eudi:pid:1",
-                        credentialData = W3CVC(buildJsonObject {
-                            put("family_name", "Doe")
-                            put("given_name", "John")
-                        }), null
-                    ).let { createCredentialOfferUri(listOf(it)) }
-                    context.respond(
-                        HttpStatusCode.OK, offerUri
-                    )
-                }
             }
         }
     }

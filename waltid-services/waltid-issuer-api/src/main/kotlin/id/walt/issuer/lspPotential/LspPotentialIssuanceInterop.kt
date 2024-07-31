@@ -18,12 +18,13 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.*
 
 object LspPotentialIssuanceInterop {
-  val POTENTIAL_ISSUER_KEY_JWK: String = ECKey.parseFromPEMEncodedObjects(LspPotentialInterop.POTENTIAL_ISSUER_PRIV + LspPotentialInterop.POTENTIAL_ISSUER_PUB).toJSONString()
+  val POTENTIAL_ISSUER_JWK_KEY: JWKKey = runBlocking {
+    JWKKey.importJWK(ECKey.parseFromPEMEncodedObjects(LspPotentialInterop.POTENTIAL_ISSUER_PRIV + LspPotentialInterop.POTENTIAL_ISSUER_PUB).toJSONString()).getOrThrow()
+  }
 
   fun createInteropSampleCredentialOfferUri(credentialConfigurationId: String, credentialData: W3CVC?, mdocData: Map<String, JsonObject>?): String = runBlocking {
-    val jwkKey = JWKKey.importJWK(POTENTIAL_ISSUER_KEY_JWK).getOrThrow()
     IssuanceRequest(
-      Json.parseToJsonElement(KeySerialization.serializeKey(jwkKey)).jsonObject,
+      Json.parseToJsonElement(KeySerialization.serializeKey(POTENTIAL_ISSUER_JWK_KEY)).jsonObject,
       "",
       credentialConfigurationId,
       credentialData,
