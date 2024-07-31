@@ -33,6 +33,10 @@ object KeysService {
         }.insertedCount
     }
 
+    fun exists(wallet: UUID, keyId: String): Boolean = transaction {
+        WalletKeys.selectAll().where { (WalletKeys.wallet eq wallet) and (WalletKeys.keyId eq keyId) }.count() > 0
+    }
+
     fun delete(wallet: UUID, keyId: String): Boolean =
         transaction { WalletKeys.deleteWhere { (WalletKeys.wallet eq wallet) and (WalletKeys.keyId eq keyId) } } > 0
 
