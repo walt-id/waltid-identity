@@ -52,6 +52,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Clock
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.plus
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.MissingFieldException
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.encodeToString
@@ -69,7 +70,7 @@ open class CIProvider : OpenIDCredentialIssuer(
     baseUrl = let {
         ConfigManager.getConfig<OIDCIssuerServiceConfig>().baseUrl
     }, config = CredentialIssuerConfig(credentialConfigurationsSupported = supportedCredentialTypes.flatMap { entry ->
-        CredentialFormat.values().map { format -> Pair(
+        CredentialFormat.entries.map { format -> Pair(
           "${entry.key}_${format.value}",
             CredentialSupported(
                 format = format,
@@ -199,6 +200,7 @@ open class CIProvider : OpenIDCredentialIssuer(
         key.verifyJws(token).also { log.debug { "VERIFICATION IS: $it" } }
     }.isSuccess
 
+    @OptIn(ExperimentalSerializationApi::class)
     override fun verifyCOSESign1Signature(target: TokenTarget, token: String) = runBlocking {
         println("Verifying JWS: $token")
         println("JWS Verification: target: $target")
@@ -234,6 +236,7 @@ open class CIProvider : OpenIDCredentialIssuer(
             ?: throw DeferredCredentialError(CredentialErrorCode.invalid_request, message = "Invalid credential ID given")
     }
 
+    @OptIn(ExperimentalSerializationApi::class)
     private fun doGenerateCredential(
         credentialRequest: CredentialRequest
     ): CredentialResult {
@@ -296,31 +299,8 @@ open class CIProvider : OpenIDCredentialIssuer(
                     issuerKid = issuerDid + "#" + issuerKey.getKeyId()
 
                 when (credentialRequest.format) {
-                    CredentialFormat.sd_jwt_vc -> (holderKey?.let {
-                        SDJwtVC.sign(SDPayload.Companion.createSDPayload(vc.toJsonObject(), buildJsonObject {}),
-                            WaltIdJWTCryptoProvider(mapOf(issuerKey.getKeyId() to issuerKey)),
-                            issuerDid = issuerDid.ifEmpty { issuerKey.getKeyId() }, holderKeyJWK = holderKey, issuerKeyId = issuerKey.getKeyId(),
-                            vct = data.request.credentialConfigurationId, additionalJwtHeader = data.request.x5Chain?.let {
-                                mapOf("x5c" to JsonArray(it.map { cert -> cert.toJsonElement() }))
-                            } ?: mapOf()
-                        ) } ?:
-                        SDJwtVC.sign(SDPayload.Companion.createSDPayload(vc.toJsonObject(), buildJsonObject {}),
-                            WaltIdJWTCryptoProvider(mapOf(issuerKey.getKeyId() to issuerKey)),
-                            issuerDid = issuerDid.ifEmpty { issuerKey.getKeyId() }, holderDid = holderDid!!, issuerKeyId = issuerKey.getKeyId(),
-                            vct = data.request.credentialConfigurationId, additionalJwtHeader = data.request.x5Chain?.first()?.let {
-                                mapOf("x5c" to JsonPrimitive(it))
-                            } ?: mapOf())).toString()
-                    else -> vc.mergingJwtIssue(
-                        issuerKey = issuerKey,
-                        issuerDid = issuerDid,
-                        issuerKid = issuerKid,
-                        subjectDid = holderDid ?: "",
-                        mappings = request.mapping ?: JsonObject(emptyMap()),
-                        additionalJwtHeader = emptyMap(),
-                        additionalJwtOptions = holderKey?.let { mapOf(
-                            "cnf" to buildJsonObject { put("jwk", it) }
-                        ) } ?: emptyMap(),
-                    )
+                    CredentialFormat.sd_jwt_vc -> sdJwtVc(holderKey, vc, data, holderDid)
+                    else -> nonSdJwtVc(vc, issuerKid, holderDid, holderKey)
                 }
             }.also { log.debug { "Respond VC: $it" } }
         }))
@@ -509,4 +489,50 @@ open class CIProvider : OpenIDCredentialIssuer(
         log.debug { "SWAPPING PRE-MAPPED VC FROM SESSION ID TO NEW TOKEN: $token" }
         tokenCredentialMapping[token] = premappedVc
     }
+
+    private suspend fun IssuanceSessionData.sdJwtVc(
+        holderKey: JsonObject?,
+        vc: W3CVC,
+        data: IssuanceSessionData,
+        holderDid: String?
+    ) = (holderKey?.let {
+        SDJwtVC.sign(SDPayload.createSDPayload(vc.toJsonObject(), buildJsonObject {}),
+            WaltIdJWTCryptoProvider(mapOf(issuerKey.getKeyId() to issuerKey)),
+            issuerDid = issuerDid.ifEmpty { issuerKey.getKeyId() },
+            holderKeyJWK = holderKey,
+            issuerKeyId = issuerKey.getKeyId(),
+            vct = data.request.credentialConfigurationId,
+            additionalJwtHeader = data.request.x5Chain?.let {
+                mapOf("x5c" to JsonArray(it.map { cert -> cert.toJsonElement() }))
+            } ?: mapOf()
+        )
+    } ?: SDJwtVC.sign(
+        SDPayload.createSDPayload(vc.toJsonObject(), buildJsonObject {}),
+        WaltIdJWTCryptoProvider(mapOf(issuerKey.getKeyId() to issuerKey)),
+        issuerDid = issuerDid.ifEmpty { issuerKey.getKeyId() },
+        holderDid = holderDid!!,
+        issuerKeyId = issuerKey.getKeyId(),
+        vct = data.request.credentialConfigurationId,
+        additionalJwtHeader = data.request.x5Chain?.first()?.let {
+            mapOf("x5c" to JsonPrimitive(it))
+        } ?: mapOf())).toString()
+
+    private suspend fun IssuanceSessionData.nonSdJwtVc(
+        vc: W3CVC,
+        issuerKid: String,
+        holderDid: String?,
+        holderKey: JsonObject?
+    ) = vc.mergingJwtIssue(
+        issuerKey = issuerKey,
+        issuerDid = issuerDid,
+        issuerKid = issuerKid,
+        subjectDid = holderDid ?: "",
+        mappings = request.mapping ?: JsonObject(emptyMap()),
+        additionalJwtHeader = emptyMap(),
+        additionalJwtOptions = holderKey?.let {
+            mapOf(
+                "cnf" to buildJsonObject { put("jwk", it) }
+            )
+        } ?: emptyMap(),
+    )
 }
