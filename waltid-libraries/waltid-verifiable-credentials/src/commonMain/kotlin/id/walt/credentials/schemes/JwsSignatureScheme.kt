@@ -76,25 +76,25 @@ class JwsSignatureScheme : SignatureScheme {
 
     val issuerDid = (payload[JwsOption.ISSUER] ?: header[JwsHeader.KEY_ID])!!.jsonPrimitive.content
     if (DidUtils.isDidUrl(issuerDid)) {
-      log.trace { "Verifying with issuer did: $issuerDid" }
-
-//        val subjectDid = payload["sub"]!!.jsonPrimitive.content
-//        println("Issuer: $issuerDid")
-//        println("Subject: $subjectDid")
-
-      DidService.resolveToKey(issuerDid)
-        .also {
-          if (log.isTraceEnabled()) {
-            val exportedJwk = it.getOrNull()?.getPublicKey()?.exportJWK()
-            log.trace { "Imported key: $it from did: $issuerDid, public is: $exportedJwk" }
-          }
-        }
-        .getOrThrow()
-        .verifyJws(data.split("~")[0])
-        .also { log.trace { "Verification result: $it" } }
-        .getOrThrow()
+      verifyForIssuerDid(issuerDid, data)
     } else {
       TODO()
     }
+  }
+
+  private suspend fun verifyForIssuerDid(issuerDid: String, data: String): JsonElement {
+    log.trace { "Verifying with issuer did: $issuerDid" }
+
+    return DidService.resolveToKey(issuerDid)
+      .also {
+        if (log.isTraceEnabled()) {
+          val exportedJwk = it.getOrNull()?.getPublicKey()?.exportJWK()
+          log.trace { "Imported key: $it from did: $issuerDid, public is: $exportedJwk" }
+        }
+      }
+      .getOrThrow()
+      .verifyJws(data.split("~")[0])
+      .also { log.trace { "Verification result: $it" } }
+      .getOrThrow()
   }
 }

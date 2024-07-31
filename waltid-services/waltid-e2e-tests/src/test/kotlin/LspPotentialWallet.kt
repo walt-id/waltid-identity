@@ -58,9 +58,8 @@ class LspPotentialWallet(val client: HttpClient, val walletId: String) {
     // === resolve credential offer ===
     val resolvedOffer = client.post("/wallet-api/wallet/$walletId/exchange/resolveCredentialOffer") {
       setBody(offerUri)
-    }.expectSuccess().let {
-      it.body<CredentialOffer>()
-    }
+    }.expectSuccess().body<CredentialOffer>()
+
     assertEquals(1, resolvedOffer.credentialConfigurationIds.size)
     assertEquals("org.iso.18013.5.1.mDL", resolvedOffer.credentialConfigurationIds.first())
 

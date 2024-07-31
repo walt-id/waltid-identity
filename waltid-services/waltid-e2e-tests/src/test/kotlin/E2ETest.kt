@@ -275,9 +275,8 @@ class E2ETest {
         client = testHttpClient(token = token)
       }
     }
-    val walletId = client.get("/wallet-api/wallet/accounts/wallets").expectSuccess().let {
-      it.body<AccountWalletListing>().wallets.first().id.toString()
-    }
+    val walletId = client.get("/wallet-api/wallet/accounts/wallets").expectSuccess()
+        .body<AccountWalletListing>().wallets.first().id.toString()
     return LspPotentialWallet(client, walletId)
   }
 
