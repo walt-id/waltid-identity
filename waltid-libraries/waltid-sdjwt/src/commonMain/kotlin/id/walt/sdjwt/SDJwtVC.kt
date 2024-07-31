@@ -13,7 +13,7 @@ class SDJwtVC(sdJwt: SDJwt): SDJwt(sdJwt.jwt, sdJwt.header, sdJwt.sdPayload, sdJ
   val vct = undisclosedPayload["vct"]?.jsonPrimitive?.content
   val status = undisclosedPayload["status"]?.jsonPrimitive?.content
 
-  protected fun verifyHolderKeyBinding(jwtCryptoProvider: JWTCryptoProvider, requiresHolderKeyBinding: Boolean,
+  private fun verifyHolderKeyBinding(jwtCryptoProvider: JWTCryptoProvider, requiresHolderKeyBinding: Boolean,
                                        audience: String? = null, nonce: String? = null): Boolean {
     return if(!holderDid.isNullOrEmpty()) TODO("Holder DID verification not yet supported")
     else if(holderKeyJWK != null) {
@@ -106,8 +106,8 @@ class SDJwtVC(sdJwt: SDJwt): SDJwt(sdJwt.jwt, sdJwt.header, sdJwt.sdPayload, sdJ
         status?.let { put("status", JsonPrimitive(it)) }
       }.let { JsonObject(it) }
 
-      val sdPayload = SDPayload(undisclosedPayload, sdPayload.digestedDisclosures)
-      return SDJwtVC(sign(sdPayload, jwtCryptoProvider, issuerKeyId, typ = "vc+sd-jwt", additionalJwtHeader))
+      val finalSdPayload = SDPayload(undisclosedPayload, sdPayload.digestedDisclosures)
+      return SDJwtVC(sign(finalSdPayload, jwtCryptoProvider, issuerKeyId, typ = "vc+sd-jwt", additionalJwtHeader))
     }
 
     fun isSdJwtVCPresentation(token: String): Boolean = parse(token).isPresentation
