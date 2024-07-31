@@ -1,4 +1,4 @@
-package id.walt.methods
+package id.walt.authkit.methods
 
 import io.ktor.server.auth.*
 import java.util.*

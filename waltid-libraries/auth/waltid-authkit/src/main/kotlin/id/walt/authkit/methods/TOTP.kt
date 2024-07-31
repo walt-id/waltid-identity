@@ -1,4 +1,4 @@
-package id.walt.methods
+package id.walt.authkit.methods
 
 import com.atlassian.onetime.core.TOTP
 import com.atlassian.onetime.core.TOTPGenerator

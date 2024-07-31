@@ -1,6 +1,8 @@
-package id.walt
+package id.walt.authkit
 
-import id.walt.plugins.*
+import id.walt.authkit.plugins.configureMonitoring
+import id.walt.authkit.plugins.configureRouting
+import id.walt.authkit.plugins.configureSerialization
 import io.klogging.Level
 import io.klogging.config.loggingConfiguration
 import io.klogging.rendering.RENDER_ANSI
@@ -44,9 +46,11 @@ fun main() {
 }
 
 fun Application.module() {
-    configureSecurity()
-    configureHTTP()
+    // configureSecurity()
+    // configureHTTP()
     configureMonitoring()
     configureSerialization()
     configureRouting()
+
+    testApp()
 }

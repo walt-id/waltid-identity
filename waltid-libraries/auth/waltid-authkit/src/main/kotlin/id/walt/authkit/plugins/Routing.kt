@@ -1,4 +1,4 @@
-package id.walt.plugins
+package id.walt.authkit.plugins
 
 import io.github.smiley4.ktorswaggerui.SwaggerUI
 import io.ktor.http.*
@@ -16,9 +16,6 @@ import io.ktor.server.webjars.*
 fun Application.configureRouting() {
     install(AutoHeadResponse)
     install(DoubleReceive)
-    install(Webjars) {
-        path = "/webjars" //defaults to /webjars
-    }
     install(SwaggerUI) {
         swagger {
 //            swaggerUrl = "swagger-ui"
@@ -37,19 +34,6 @@ fun Application.configureRouting() {
     install(StatusPages) {
         exception<Throwable> { call, cause ->
             call.respondText(text = "500: $cause" , status = HttpStatusCode.InternalServerError)
-        }
-    }
-    routing {
-        get("/") {
-            call.respondText("Hello World!")
-        }
-        post("/double-receive") {
-            val first = call.receiveText()
-            val theSame = call.receiveText()
-            call.respondText(first + " " + theSame)
-        }
-        get("/webjars") {
-            call.respondText("<script src='/webjars/jquery/jquery.js'></script>", ContentType.Text.Html)
         }
     }
 }

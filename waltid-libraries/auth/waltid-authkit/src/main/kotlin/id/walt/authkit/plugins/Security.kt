@@ -1,4 +1,4 @@
-package id.walt.plugins
+package id.walt.authkit.plugins
 
 import io.ktor.server.application.*
 
