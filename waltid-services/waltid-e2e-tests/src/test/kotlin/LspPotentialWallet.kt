@@ -120,9 +120,8 @@ class LspPotentialWallet(val client: HttpClient, val walletId: String) {
 
   fun testSDJwtVCIssuance() = runBlocking {
     // === get credential offer from test issuer API ===
-    val jwkKey = JWKKey.importJWK(LspPotentialIssuanceInterop.POTENTIAL_ISSUER_KEY_JWK).getOrThrow()
     val issuanceReq = IssuanceRequest(
-      Json.parseToJsonElement(KeySerialization.serializeKey(jwkKey)).jsonObject,
+      Json.parseToJsonElement(KeySerialization.serializeKey(LspPotentialIssuanceInterop.POTENTIAL_ISSUER_JWK_KEY)).jsonObject,
       "",
       "urn:eu.europa.ec.eudi:pid:1",
       credentialData = W3CVC(buildJsonObject {

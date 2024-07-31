@@ -63,9 +63,6 @@ object OidcApi : CIProvider() {
             get("/.well-known/jwt-issuer") {
                 call.respond(metadata.toJSON())
             }
-            get("/.well-known/jwt-issuer") {
-                call.respond(metadata.toJSON())
-            }
         }
 
         route("", {
