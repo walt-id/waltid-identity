@@ -1,12 +1,9 @@
 package id.walt.issuer.issuance
 
-import id.walt.commons.interop.LspPotentialInterop
 import id.walt.credentials.vc.vcs.W3CVC
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeySerialization
-import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.did.dids.DidService
-import id.walt.issuer.lspPotential.LspPotentialIssuanceInterop
 import id.walt.oid4vc.definitions.CROSS_DEVICE_CREDENTIAL_OFFER_URL
 import id.walt.oid4vc.requests.CredentialOfferRequest
 import io.github.oshai.kotlinlogging.KotlinLogging

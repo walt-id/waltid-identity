@@ -1,15 +1,9 @@
 package id.walt.issuer.issuance
 
 import id.walt.commons.interop.LspPotentialInterop
-import id.walt.credentials.verification.policies.get
-import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.jwk.JWKKey
-import id.walt.crypto.utils.JsonUtils.toJsonElement
-import id.walt.crypto.utils.JsonUtils.toJsonObject
 import id.walt.issuer.lspPotential.LspPotentialIssuanceInterop
 import io.github.smiley4.ktorswaggerui.dsl.routes.ValueExampleDescriptorDsl
-import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.*
 
 object IssuanceExamples {

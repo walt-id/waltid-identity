@@ -7,7 +7,6 @@ import COSE.OneKey
 import com.nimbusds.jose.util.X509CertUtils
 import com.upokecenter.cbor.CBORObject
 import id.walt.commons.config.ConfigManager
-import id.walt.commons.featureflag.FeatureManager.whenFeature
 import id.walt.credentials.verification.Verifier
 import id.walt.credentials.verification.models.PolicyRequest
 import id.walt.credentials.verification.models.PresentationVerificationResponse
@@ -34,12 +33,8 @@ import id.walt.oid4vc.providers.PresentationSession
 import id.walt.oid4vc.responses.TokenResponse
 import id.walt.oid4vc.util.randomUUID
 import id.walt.sdjwt.SDJwtVC
-import id.walt.sdjwt.SimpleJWTCryptoProvider
-import id.walt.sdjwt.SimpleMultiKeyJWTCryptoProvider
 import id.walt.sdjwt.WaltIdJWTCryptoProvider
-import id.walt.verifier.FeatureCatalog
 import id.walt.verifier.config.OIDCVerifierServiceConfig
-import id.walt.verifier.lspPotential.LspPotentialVerificationInterop
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.*
@@ -196,7 +191,7 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
 
     private suspend fun verifySdJwtVC(tokenResponse: TokenResponse, session: PresentationSession): Boolean {
         val sdJwtVC = SDJwtVC.parse(tokenResponse.vpToken!!.jsonPrimitive.content)
-        if(!sdJwtVC.isPresentation || sdJwtVC.keyBindingJwt == null) throw IllegalArgumentException("SD-JWT is not a presentation and/or doesn't contain a holder key binding JWT")
+        require(!sdJwtVC.isPresentation || sdJwtVC.keyBindingJwt == null) { "SD-JWT is not a presentation and/or doesn't contain a holder key binding JWT" }
         val holderKey = JWKKey.importJWK(sdJwtVC.holderKeyJWK.toString()).getOrThrow()
         val issuerKey = resolveIssuerKeyFromSdJwt(sdJwtVC)
         val verificationResult = sdJwtVC.verifyVC(

@@ -1,8 +1,6 @@
 package id.walt.webwallet.service.exchange
 
-import COSE.OneKey
 import cbor.Cbor
-import com.nimbusds.jose.jwk.ECKey
 import id.walt.crypto.utils.Base64Utils.base64UrlDecode
 import id.walt.crypto.utils.JwsUtils
 import id.walt.crypto.utils.JwsUtils.decodeJws
@@ -11,7 +9,10 @@ import id.walt.mdoc.dataelement.toDataElement
 import id.walt.mdoc.doc.MDoc
 import id.walt.mdoc.issuersigned.IssuerSigned
 import id.walt.oid4vc.OpenID4VCI
-import id.walt.oid4vc.data.*
+import id.walt.oid4vc.data.CredentialFormat
+import id.walt.oid4vc.data.CredentialOffer
+import id.walt.oid4vc.data.GrantType
+import id.walt.oid4vc.data.OpenIDProviderMetadata
 import id.walt.oid4vc.providers.TokenTarget
 import id.walt.oid4vc.requests.*
 import id.walt.oid4vc.responses.*
