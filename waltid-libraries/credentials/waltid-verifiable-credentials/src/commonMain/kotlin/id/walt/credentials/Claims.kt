@@ -6,7 +6,8 @@ interface Claims {
 
 enum class JwtClaims(private val value: String) : Claims {
     NotBefore("nbf"),
-    NotAfter("exp");
+    NotAfter("exp"),
+    IssuedAt("iat");
 
     override fun getValue() = value
 }
