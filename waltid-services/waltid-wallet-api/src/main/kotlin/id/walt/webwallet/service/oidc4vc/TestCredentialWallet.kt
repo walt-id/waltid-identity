@@ -88,32 +88,18 @@ class TestCredentialWallet(
         }
     }
 
-    override fun signToken(target: TokenTarget, payload: JsonObject, header: JsonObject?, keyId: String?, privKey: Key?): String {
+    override fun signToken(target: TokenTarget, payload: JsonObject, header: JsonObject?, keyId: String?, privKey: Key?): String = runBlocking {
         fun debugStateMsg() = "(target: $target, payload: $payload, header: $header, keyId: $keyId)"
 
-        keyId ?: throw IllegalArgumentException("No keyId provided for signToken ${debugStateMsg()}")
+        val key = privKey ?: keyId?.let { tryResolveKeyId(it) }
+        key ?: throw IllegalArgumentException("No key given or found for given keyId ${debugStateMsg()}")
 
-//        val key = runBlocking { walletService.getKeyByDid(keyId) }
-        val key = runBlocking {
-            runCatching {
-                KeysService.get(if(DidUtils.isDidUrl(keyId)) DidService.resolveToKey(keyId).getOrThrow().getKeyId() else keyId)?.let {
-                    KeyManager.resolveSerializedKey(it.document)
-                }
-            }.getOrElse { throw IllegalArgumentException("Could not resolve key to sign token", it) }
-                ?: error("No key was resolved when trying to resolve key to sign token")
-        }
-
-        return runBlocking {
-            val authKeyId = resolveDidAuthentication(did)
-
-            val payloadToSign = Json.encodeToString(payload).encodeToByteArray()
-            val headersToSign = mapOf("typ" to "JWT".toJsonElement(), "kid" to authKeyId.toJsonElement()).plus(
-                header?.toMap() ?: mapOf()
-            )
-            key.signJws(payloadToSign, headersToSign)
-        }
-
-        //JwtService.getService().sign(payload, keyId)
+        val authKeyId = resolveDidAuthentication(did)
+        val payloadToSign = Json.encodeToString(payload).encodeToByteArray()
+        val headersToSign = mapOf("typ" to "JWT".toJsonElement(), "kid" to authKeyId.toJsonElement()).plus(
+            header?.toMap() ?: mapOf()
+        )
+        key.signJws(payloadToSign, headersToSign)
     }
 
     override fun signCWTToken(
@@ -125,18 +111,7 @@ class TestCredentialWallet(
     ): String = runBlocking {
         fun debugStateMsg() = "(target: $target, payload: $payload, header: $header, keyId: $keyId)"
 
-        val key = privKey ?: keyId?.let {
-            runCatching {
-                if(DidUtils.isDidUrl(keyId))
-                    DidService.resolveToKey(keyId).getOrThrow()
-                else
-                    KeysService.get(keyId)?.let {
-                        KeyManager.resolveSerializedKey(it.document)
-                }
-            }.getOrElse { throw IllegalArgumentException("Could not resolve key to sign token", it) }
-                ?: error("No key was resolved when trying to resolve key to sign token")
-        }
-
+        val key = privKey ?: keyId?.let { tryResolveKeyId(it) }
         key ?: throw IllegalArgumentException("No key given or found for given keyId ${debugStateMsg()}")
 
         val ecKey = ECKey.parseFromPEMEncodedObjects(key.exportPEM()).toECKey()
@@ -231,7 +206,7 @@ class TestCredentialWallet(
 
         val mdocsPresented = runBlocking {
             val matchingMDocs = matchedCredentials.filter { it.format == CredentialFormat.mso_mdoc }
-            if(matchingMDocs.size > 0) {
+            if(matchingMDocs.isNotEmpty()) {
                 val mdocHandover = OpenID4VP.generateMDocOID4VPHandover(session.authorizationRequest, session.nonce!!)
                 val ecKey = ECKey.parse(key.exportJWK()).toECKey()
                 val cryptoProvider = SimpleCOSECryptoProvider(listOf(
@@ -451,4 +426,14 @@ class TestCredentialWallet(
         presentationDefinition?.inputDescriptors?.find {
             (it.name ?: it.id) == type
         }?.id
+
+    private suspend fun tryResolveKeyId(keyId: String) = runCatching {
+        val kid = keyId.takeIf { DidUtils.isDidUrl(it) }?.let {
+            DidService.resolveToKey(it).getOrThrow().getKeyId()
+        } ?: keyId
+        KeysService.get(kid)?.let {
+            KeyManager.resolveSerializedKey(it.document)
+        }
+    }.getOrElse { throw IllegalArgumentException("Could not resolve key to sign token", it) }
+        ?: error("No key was resolved when trying to resolve key to sign token")
 }
