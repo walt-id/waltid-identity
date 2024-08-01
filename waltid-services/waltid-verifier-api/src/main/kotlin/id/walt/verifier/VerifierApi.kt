@@ -337,6 +337,7 @@ fun Application.verfierApi() {
                 verificationUseCase.getResult(id).onSuccess {
                     call.respond(HttpStatusCode.OK, it)
                 }.onFailure {
+                    logger.debug(it) { "Verification failed ($it)" }
                     call.respond(HttpStatusCode.BadRequest, it.localizedMessage)
                 }
             }
