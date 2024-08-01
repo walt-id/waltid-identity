@@ -3,6 +3,7 @@ package id.walt.mdoc.dataretrieval
 import cbor.Cbor
 import id.walt.mdoc.dataelement.*
 import id.walt.mdoc.doc.MDoc
+import id.walt.mdoc.utils.Base64Utils.base64UrlDecode
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromByteArray
@@ -61,7 +62,6 @@ class DeviceResponse(
         @OptIn(ExperimentalSerializationApi::class)
         fun fromCBORHex(cbor: String) = Cbor.decodeFromHexString<DeviceResponse>(cbor)
 
-        @OptIn(ExperimentalEncodingApi::class)
-        fun fromCBORBase64URL(cbor: String) = fromCBOR(Base64.UrlSafe.decode(cbor))
+        fun fromCBORBase64URL(cbor: String) = fromCBOR(cbor.base64UrlDecode())
     }
 }
