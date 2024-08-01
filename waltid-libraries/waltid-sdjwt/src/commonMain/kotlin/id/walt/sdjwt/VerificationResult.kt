@@ -21,3 +21,16 @@ data class VerificationResult<T : SDJwt>(
     val verified
         get() = signatureVerified && disclosuresVerified
 }
+
+class VCVerificationResult(
+    val sdJwtVC: SDJwtVC,
+    private val sdJwtVerificationResult: VerificationResult<SDJwt>,
+    private val sdJwtVCVerified: Boolean,
+    private val vcVerificationMessage: String? = null
+) {
+    val verified
+        get() = sdJwtVCVerified && sdJwtVerificationResult.verified
+
+    val message
+        get() = listOf((vcVerificationMessage ?: ""), (sdJwtVerificationResult.message ?: "")).joinToString("; ")
+}

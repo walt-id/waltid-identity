@@ -32,8 +32,8 @@ abstract class JavaKey : Key() {
     abstract fun javaSignRaw(plaintext: ByteArray): Any
     override suspend fun signRaw(plaintext: ByteArray): Any = javaSignRaw(plaintext)
 
-    abstract fun javaSignJws(plaintext: ByteArray, headers: Map<String, String>): String
-    override suspend fun signJws(plaintext: ByteArray, headers: Map<String, String>): String = javaSignJws(plaintext, headers)
+    abstract fun javaSignJws(plaintext: ByteArray, headers: Map<String, JsonElement>): String
+    override suspend fun signJws(plaintext: ByteArray, headers: Map<String, JsonElement>): String = javaSignJws(plaintext, headers)
 
     abstract fun javaVerifyRaw(signed: ByteArray, detachedPlaintext: ByteArray?): ByteArray
     override suspend fun verifyRaw(signed: ByteArray, detachedPlaintext: ByteArray?): Result<ByteArray> =

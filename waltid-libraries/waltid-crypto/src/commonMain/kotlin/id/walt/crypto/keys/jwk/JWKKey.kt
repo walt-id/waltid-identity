@@ -11,7 +11,7 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.*
 
-expect class JWKKey(jwk: String?) : Key {
+expect class JWKKey(jwk: String?, _keyId: String? = null) : Key {
     override val keyType: KeyType
 
     override suspend fun getKeyId(): String
@@ -31,7 +31,7 @@ expect class JWKKey(jwk: String?) : Key {
      * @return signed (JWS)
      */
     override suspend fun signRaw(plaintext: ByteArray): ByteArray
-    override suspend fun signJws(plaintext: ByteArray, headers: Map<String, String>): String
+    override suspend fun signJws(plaintext: ByteArray, headers: Map<String, JsonElement>): String
 
     /**
      * Verifies JWS: Verifies a signed message using this public key

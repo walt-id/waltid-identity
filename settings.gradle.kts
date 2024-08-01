@@ -40,6 +40,7 @@ val baseModules = listOf(
 
     // OCI extension for waltid-crypto
     "$libraries:waltid-crypto-oci",
+    "$libraries:waltid-credentials-base"
 )
 
 val androidModules = listOf(

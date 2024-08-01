@@ -171,6 +171,7 @@ object IssuanceExamples {
           "issuerDid": $issuerDid,
           "credentialConfigurationId": "OpenBadgeCredential_jwt_vc_json",
           "credentialData": $openBadgeCredentialData,
+          "mdocData": null,
           "mapping": $mapping
         }
         """.trimIndent()
@@ -182,6 +183,7 @@ object IssuanceExamples {
           "issuerDid": $issuerDid,
           "credentialConfigurationId": "UniversityDegree_jwt_vc_json",
           "credentialData": ${universityDegreeCredentialData()},
+          "mdocData": null,
           "mapping": $mapping
         }
         """.trimIndent()
@@ -208,6 +210,7 @@ object IssuanceExamples {
           "issuerDid":$issuerDid,
           "credentialConfigurationId":"BankId_jwt_vc_json",
           "credentialData":$bankIdCredentialData,
+          "mdocData": null,
           "mapping":$mapping
        }
         """.trimIndent()
@@ -267,6 +270,7 @@ object IssuanceExamples {
                     "issuerDid": $issuerDid,
                     "credentialConfigurationId": "OpenBadgeCredential_vc+sd-jwt",
                     "credentialData": $openBadgeCredentialData,
+                    "mdocData": null,
                     "mapping": $mapping,
                     "selectiveDisclosure":
                     {
@@ -284,6 +288,7 @@ object IssuanceExamples {
                     "issuerDid": $issuerDid,
                     "credentialConfigurationId": "BankId_vc+sd-jwt",
                     "credentialData": $bankIdCredentialData,
+                    "mdocData": null,
                     "mapping": $mapping,
                     "selectiveDisclosure":
                     {
@@ -308,6 +313,7 @@ object IssuanceExamples {
                 "issuerDid": $issuerDid,
                 "credentialConfigurationId": "OpenBadgeCredential_vc+sd-jwt",
                 "credentialData": $openBadgeCredentialData,
+                "mdocData": null,
                 "mapping": $mapping,
                 "selectiveDisclosure":
                 {

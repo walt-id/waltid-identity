@@ -38,35 +38,40 @@ data class CredentialResponse private constructor(
             format: CredentialFormat,
             credentialString: String,
             cNonce: String? = null,
-            cNonceExpiresIn: Duration? = null
-        ) = CredentialResponse(format, JsonPrimitive(credentialString), null, cNonce, cNonceExpiresIn)
+            cNonceExpiresIn: Duration? = null,
+            customParameters: Map<String, JsonElement> = mapOf()
+        ) = CredentialResponse(format, JsonPrimitive(credentialString), null, cNonce, cNonceExpiresIn, customParameters = customParameters)
 
         fun success(
             format: CredentialFormat,
             credential: JsonElement,
             cNonce: String? = null,
-            cNonceExpiresIn: Duration? = null
-        ) = CredentialResponse(format, credential, null, cNonce, cNonceExpiresIn)
+            cNonceExpiresIn: Duration? = null,
+            customParameters: Map<String, JsonElement> = mapOf()
+        ) = CredentialResponse(format, credential, null, cNonce, cNonceExpiresIn, customParameters = customParameters)
 
         fun deferred(
             format: CredentialFormat,
             acceptanceToken: String,
             cNonce: String? = null,
-            cNonceExpiresIn: Duration? = null
-        ) = CredentialResponse(format, null, acceptanceToken, cNonce, cNonceExpiresIn)
+            cNonceExpiresIn: Duration? = null,
+            customParameters: Map<String, JsonElement> = mapOf()
+        ) = CredentialResponse(format, null, acceptanceToken, cNonce, cNonceExpiresIn, customParameters = customParameters)
 
         fun error(
             error: CredentialErrorCode,
             errorDescription: String? = null,
             errorUri: String? = null,
             cNonce: String? = null,
-            cNonceExpiresIn: Duration? = null
+            cNonceExpiresIn: Duration? = null,
+            customParameters: Map<String, JsonElement> = mapOf()
         ) = CredentialResponse(
             error = error.name,
             errorDescription = errorDescription,
             errorUri = errorUri,
             cNonce = cNonce,
-            cNonceExpiresIn = cNonceExpiresIn
+            cNonceExpiresIn = cNonceExpiresIn,
+            customParameters = customParameters
         )
     }
 }

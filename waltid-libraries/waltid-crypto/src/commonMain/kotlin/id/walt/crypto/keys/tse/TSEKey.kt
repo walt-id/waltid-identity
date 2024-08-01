@@ -7,6 +7,7 @@ import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.base64UrlDecode
 import id.walt.crypto.utils.Base64Utils.base64toBase64Url
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
+import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.crypto.utils.JwsUtils.jwsAlg
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
@@ -178,10 +179,10 @@ class TSEKey(
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    override suspend fun signJws(plaintext: ByteArray, headers: Map<String, String>): String {
+    override suspend fun signJws(plaintext: ByteArray, headers: Map<String, JsonElement>): String {
         val header = Json.encodeToString(mutableMapOf(
-            "typ" to "JWT",
-            "alg" to keyType.jwsAlg(),
+            "typ" to "JWT".toJsonElement(),
+            "alg" to keyType.jwsAlg().toJsonElement(),
         ).apply { putAll(headers) }).encodeToByteArray().encodeToBase64Url()
 
         val payload = plaintext.encodeToBase64Url()

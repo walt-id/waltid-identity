@@ -104,6 +104,16 @@ dependencies {
 
     api(project(":waltid-libraries:waltid-verifiable-credentials"))
     api(project(":waltid-libraries:waltid-sdjwt"))
+    api(project(":waltid-libraries:waltid-mdoc-credentials"))
+
+    implementation("com.nimbusds:nimbus-jose-jwt:9.40")
+
+    // crypto
+    implementation("com.augustcellars.cose:cose-java:1.1.0")
+
+    // Multiplatform / Hashes
+    testImplementation(project.dependencies.platform("org.kotlincrypto.hash:bom:0.4.0"))
+    testImplementation("org.kotlincrypto.hash:sha2")
 }
 
 tasks.withType<Test> {
