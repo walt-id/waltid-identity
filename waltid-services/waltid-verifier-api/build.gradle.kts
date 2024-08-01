@@ -18,7 +18,6 @@ plugins {
     id("org.owasp.dependencycheck") version "9.2.0"
     id("com.github.jk1.dependency-license-report") version "2.8"
     application
-    `maven-publish`
 
     id("com.github.ben-manes.versions")
 }
@@ -104,13 +103,13 @@ dependencies {
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:${Versions.COROUTINES_VERSION}")
 
     // OIDC
-    api(project(":waltid-libraries:waltid-openid4vc"))
+    api(project(":waltid-libraries:protocols:waltid-openid4vc"))
 
     // SSI Kit 2
-    api(project(":waltid-libraries:waltid-crypto"))
-    api(project(":waltid-libraries:waltid-verifiable-credentials"))
+    api(project(":waltid-libraries:crypto:waltid-crypto"))
+    api(project(":waltid-libraries:credentials:waltid-verifiable-credentials"))
     api(project(":waltid-libraries:waltid-did"))
-    api(project(":waltid-libraries:waltid-mdoc-credentials"))
+    api(project(":waltid-libraries:credentials:waltid-mdoc-credentials"))
 }
 tasks.withType<Zip> {
     isZip64 = true
@@ -161,44 +160,6 @@ application {
     mainClass.set("id.walt.verifier.MainKt")
     val isDevelopment: Boolean = project.ext.has("development")
     applicationDefaultJvmArgs = listOf("-Dio.ktor.development=$isDevelopment")
-}
-
-publishing {
-    publications {
-        create<MavenPublication>("mavenJava") {
-            pom {
-                name.set("walt.id verifier")
-                description.set(
-                    """
-                    Kotlin/Java library for the walt.id verifier
-                    """.trimIndent()
-                )
-                url.set("https://walt.id")
-            }
-            from(components["java"])
-        }
-    }
-
-    repositories {
-        maven {
-            val releasesRepoUrl = uri("https://maven.waltid.dev/releases")
-            val snapshotsRepoUrl = uri("https://maven.waltid.dev/snapshots")
-            url = uri(if (version.toString().endsWith("SNAPSHOT")) snapshotsRepoUrl else releasesRepoUrl)
-            val envUsername = System.getenv("MAVEN_USERNAME")
-            val envPassword = System.getenv("MAVEN_PASSWORD")
-
-            val usernameFile = File("secret_maven_username.txt")
-            val passwordFile = File("secret_maven_password.txt")
-
-            val secretMavenUsername = envUsername ?: usernameFile.let { if (it.isFile) it.readLines().first() else "" }
-            val secretMavenPassword = envPassword ?: passwordFile.let { if (it.isFile) it.readLines().first() else "" }
-
-            credentials {
-                username = secretMavenUsername
-                password = secretMavenPassword
-            }
-        }
-    }
 }
 
 //licenseReport {

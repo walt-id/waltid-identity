@@ -24,10 +24,10 @@ kotlin {
     
     sourceSets {
         commonMain.dependencies {
-            implementation(project(":waltid-libraries:waltid-sdjwt"))
+            implementation(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
             implementation(project(":waltid-libraries:waltid-did"))
-            implementation(project(":waltid-libraries:waltid-openid4vc"))
-            implementation(project(":waltid-libraries:waltid-verifiable-credentials"))
+            implementation(project(":waltid-libraries:protocols:waltid-openid4vc"))
+            implementation(project(":waltid-libraries:credentials:waltid-verifiable-credentials"))
         }
         commonTest.dependencies {
 

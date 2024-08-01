@@ -1,6 +1,6 @@
 package id.walt.webwallet.service.push
 
-import id.walt.crypto.utils.Base64Utils.base64Decode
+import id.walt.crypto.utils.Base64Utils.decodeFromBase64
 import kotlinx.serialization.Serializable
 import org.bouncycastle.jce.ECNamedCurveTable
 import org.bouncycastle.jce.provider.BouncyCastleProvider
@@ -17,12 +17,12 @@ data class Subscription(
     /**
      * Returns the base64 encoded auth string as a byte[]
      */
-    fun authAsBytes(): ByteArray = auth.base64Decode()
+    fun authAsBytes(): ByteArray = auth.decodeFromBase64()
 
     /**
      * Returns the base64 encoded public key string as a byte[]
      */
-    fun keyAsBytes(): ByteArray = key.base64Decode()
+    fun keyAsBytes(): ByteArray = key.decodeFromBase64()
 
     /**
      * Returns the base64 encoded public key as a PublicKey object

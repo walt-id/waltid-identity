@@ -115,11 +115,11 @@ dependencies {
 
 
     // OIDC
-    implementation(project(":waltid-libraries:waltid-openid4vc"))
-    implementation(project(":waltid-libraries:waltid-sdjwt"))
+    implementation(project(":waltid-libraries:protocols:waltid-openid4vc"))
+    implementation(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
 
-    implementation(project(":waltid-libraries:waltid-crypto"))
-    implementation(project(":waltid-libraries:waltid-crypto-oci"))
+    implementation(project(":waltid-libraries:crypto:waltid-crypto"))
+    implementation(project(":waltid-libraries:crypto:waltid-crypto-oci"))
     implementation(project(":waltid-libraries:waltid-did"))
 
     testImplementation(project(":waltid-services:waltid-issuer-api"))
@@ -174,5 +174,4 @@ dependencies {
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
     testImplementation("io.ktor:ktor-server-tests-jvm:$ktor_version")
     testImplementation("io.mockk:mockk:1.13.12")
-    testImplementation("io.klogging:klogging-jvm:0.6.1")
 }

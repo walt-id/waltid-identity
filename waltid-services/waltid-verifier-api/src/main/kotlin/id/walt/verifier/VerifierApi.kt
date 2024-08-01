@@ -30,6 +30,7 @@ import id.walt.verifier.oidc.VerificationUseCase
 import io.github.smiley4.ktorswaggerui.dsl.routing.get
 import io.github.smiley4.ktorswaggerui.dsl.routing.post
 import io.github.smiley4.ktorswaggerui.dsl.routing.route
+import io.klogging.logger
 import io.ktor.client.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.plugins.logging.*
@@ -128,7 +129,7 @@ private const val fixedPresentationDefinitionForEbsiConformanceTest =
     "{\"id\":\"any\",\"format\":{\"jwt_vp\":{\"alg\":[\"ES256\"]}},\"input_descriptors\":[{\"id\":\"any\",\"format\":{\"jwt_vc\":{\"alg\":[\"ES256\"]}},\"constraints\":{\"fields\":[{\"path\":[\"$.vc.type\"],\"filter\":{\"type\":\"array\",\"contains\":{\"const\":\"VerifiableAttestation\"}}}]}},{\"id\":\"any\",\"format\":{\"jwt_vc\":{\"alg\":[\"ES256\"]}},\"constraints\":{\"fields\":[{\"path\":[\"$.vc.type\"],\"filter\":{\"type\":\"array\",\"contains\":{\"const\":\"VerifiableAttestation\"}}}]}},{\"id\":\"any\",\"format\":{\"jwt_vc\":{\"alg\":[\"ES256\"]}},\"constraints\":{\"fields\":[{\"path\":[\"$.vc.type\"],\"filter\":{\"type\":\"array\",\"contains\":{\"const\":\"VerifiableAttestation\"}}}]}}]}"
 
 private val verificationUseCase = VerificationUseCase(httpClient, SimpleJWTCryptoProvider(JWSAlgorithm.EdDSA, null, null))
-
+private val logger = logger("Verifier")
 
 @OptIn(ExperimentalSerializationApi::class)
 fun Application.verfierApi() {
@@ -304,6 +305,7 @@ fun Application.verfierApi() {
                                 context.respondRedirect("openid://?state=$state&error=invalid_request&error_description=$errorDescription")
                             }
                         } else {
+                            logger.error(it) { "/verify error: $errorDescription" }
                             call.respond(HttpStatusCode.BadRequest, errorDescription)
                         }
                     }.also {
@@ -333,6 +335,7 @@ fun Application.verfierApi() {
                 verificationUseCase.getResult(id).onSuccess {
                     call.respond(HttpStatusCode.OK, it)
                 }.onFailure {
+                    it.printStackTrace()
                     call.respond(HttpStatusCode.BadRequest, it.localizedMessage)
                 }
             }
@@ -378,6 +381,7 @@ fun Application.verfierApi() {
                 verificationUseCase.getSignedAuthorizationRequestObject(id).onSuccess {
                     call.respondText(it, ContentType.parse("application/oauth-authz-req+jwt"), HttpStatusCode.OK)
                 }.onFailure {
+                    it.printStackTrace()
                     call.respond(HttpStatusCode.BadRequest, it.localizedMessage)
                 }
             }

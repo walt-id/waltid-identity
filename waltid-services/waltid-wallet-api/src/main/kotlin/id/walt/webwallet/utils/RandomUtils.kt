@@ -1,10 +1,9 @@
 package id.walt.webwallet.utils
 
+import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import java.security.SecureRandom
-import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 
-@OptIn(ExperimentalEncodingApi::class)
 object RandomUtils {
 
     val random = SecureRandom()
@@ -19,6 +18,6 @@ object RandomUtils {
      * Make sure bits % 8 == 0
      */
     fun randomBase64UrlString(bits: Int) =
-        Base64.UrlSafe.encode(randomBytes(bits / 8)).replace("=", "")
+        randomBytes(bits / 8).encodeToBase64Url()
 
 }
