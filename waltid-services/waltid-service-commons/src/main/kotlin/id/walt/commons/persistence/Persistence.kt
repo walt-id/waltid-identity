@@ -8,12 +8,12 @@ abstract class Persistence<V>(
     val defaultExpiration: Duration,
 ) {
 
-    abstract operator fun get(id: String): V
+    abstract operator fun get(id: String): V?
     abstract operator fun set(id: String, value: V)
     fun put(id: String, value: V) = set(id, value)
     abstract fun remove(id: String)
     fun mutate(id: String, mutation: (V) -> V) {
-        set(id, mutation.invoke(get(id)))
+        set(id, mutation.invoke(get(id) ?: error("Not found in $discriminator: $id")))
     }
     abstract operator fun contains(id: String): Boolean
 
