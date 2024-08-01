@@ -125,7 +125,7 @@ class VerificationUseCase(
         val maybePresentationSessionResult = runCatching { OIDCVerifierService.verify(tokenResponse, session) }
 
         if (maybePresentationSessionResult.isFailure) {
-            return Result.failure(IllegalStateException("Verification failed: ${maybePresentationSessionResult.exceptionOrNull()!!.message}"))
+            return Result.failure(IllegalStateException("Verification failed: ${maybePresentationSessionResult.exceptionOrNull()!!.message}", maybePresentationSessionResult.exceptionOrNull()))
         }
 
         val presentationSession = maybePresentationSessionResult.getOrThrow()
