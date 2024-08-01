@@ -291,15 +291,15 @@ fun Application.issuerApi() {
 
                 route("sdjwt") {
                     post("issue", {
-                        summary = "Signs credential and starts an OIDC credential exchange flow."
-                        description = "This endpoint issues a W3C Verifiable Credential, and returns an issuance URL "
+                        summary = "Signs credential using SD-JWT and starts an OIDC credential exchange flow."
+                        description = "This endpoint issues a W3C or SD-JWT-VC Verifiable Credential, and returns an issuance URL "
 
                         request {
                             body<IssuanceRequest> {
                                 description =
-                                    "Pass the unsigned credential that you intend to issue as the body of the request."
-                                example("SD-JWT example", IssuanceExamples.sdJwtExample)
-                                //example("UniversityDegreeCredential example", universityDegreeCredential)
+                                    "Pass the unsigned credential that you intend to issue in the body of the request."
+                                example("W3C SD-JWT example", IssuanceExamples.sdJwtW3CExample)
+                                example("SD-JWT-VC example", IssuanceExamples.sdJwtVCExample)
                                 required = true
                             }
                         }
@@ -372,7 +372,7 @@ fun Application.issuerApi() {
                             body<IssuanceRequest> {
                                 description =
                                     "Pass the unsigned credential that you intend to issue as the body of the request."
-                                example("OpenBadgeCredential example", IssuanceExamples.mDLCredentialIssuance)
+                                example("mDL/MDOC example", IssuanceExamples.mDLCredentialIssuanceExample)
                                 required = true
                             }
                         }

@@ -260,7 +260,7 @@ class LspPotentialIssuance(val client: HttpClient) {
     val offeredCredentials = OpenID4VCI.resolveOfferedCredentials(parsedOffer, providerMetadata)
     val offeredCredential = offeredCredentials.first()
     assertEquals(CredentialFormat.sd_jwt_vc, offeredCredential.format)
-    assertEquals("urn:eu.europa.ec.eudi:pid:1", offeredCredential.docType)
+    assertEquals("identity_credential_vc+sd-jwt", offeredCredential.docType)
 
     // ### step 11: confirm issuance (nothing to do)
 

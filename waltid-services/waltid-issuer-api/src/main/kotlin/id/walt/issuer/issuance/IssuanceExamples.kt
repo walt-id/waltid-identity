@@ -251,42 +251,29 @@ object IssuanceExamples {
         openBadgeCredentialIssuance
     )
 
-//    val mDLIssuanceExample = typedValueExampleDescriptorDsl<IssuanceRequest>(IssuanceRequest(
-//        Json.parseToJsonElement(KeySerialization.serializeKey( runBlocking {
-//            JWKKey.importJWK(LspPotentialIssuanceInterop.POTENTIAL_ISSUER_KEY_JWK).getOrThrow()
-//        })).jsonObject,
-//        "",
-//        "org.iso.18013.5.1.mDL",
-//        null,
-//        mdocData = mapOf("org.iso.18013.5.1" to buildJsonObject {
-//            put("family_name", "Doe")
-//            put("given_name", "John")
-//            put("birth_date", "1980-01-01")
-//        }),
-//        x5Chain = listOf(LspPotentialIssuanceInterop.POTENTIAL_ISSUER_CERT),
-//        trustedRootCAs = listOf(LspPotentialIssuanceInterop.POTENTIAL_ROOT_CA_CERT)
-//    ).toJsonElement().toString())
-
-    //language=json
-    val mDLCredentialIssuance = typedValueExampleDescriptorDsl<IssuanceRequest>("""
+    // language=json
+    val mDLCredentialIssuanceData = """
         {
-          "issuerKey":${buildJsonObject { 
-            put("type", "jwk")
-            put("jwk", Json.parseToJsonElement(LspPotentialIssuanceInterop.POTENTIAL_ISSUER_JWK_KEY.jwk!!)) }},
+          "issuerKey": { 
+            "type": "jwk",
+            "jwk": ${Json.parseToJsonElement(LspPotentialIssuanceInterop.POTENTIAL_ISSUER_JWK_KEY.jwk!!)}
+          },
           "issuerDid":"",
           "credentialConfigurationId":"org.iso.18013.5.1.mDL",
           "credentialData":null,
-          "mdocData": ${buildJsonObject { 
-              put("org.iso.18013.5.1", buildJsonObject {
-                  put("family_name", "Doe")
-                  put("given_name", "John")
-                  put("birth_date", "1980-01-01")
-              })
-    }},
+          "mdocData": { 
+              "org.iso.18013.5.1": {
+                  "family_name": "Doe",
+                  "given_name": "John",
+                  "birth_date": "1980-01-02"
+              }
+          },
           "x5Chain": ${buildJsonArray { add(LspPotentialInterop.POTENTIAL_ISSUER_CERT) }},
           "trustedRootCAs": ${buildJsonArray { add(LspPotentialInterop.POTENTIAL_ROOT_CA_CERT) }}
        }
-        """.trimIndent())
+    """.trimIndent()
+
+    val mDLCredentialIssuanceExample = typedValueExampleDescriptorDsl<IssuanceRequest>(mDLCredentialIssuanceData)
 
     // language=JSON
     val batchExampleJwt = typedValueExampleDescriptorDsl<List<IssuanceRequest>>(
@@ -306,7 +293,7 @@ object IssuanceExamples {
                 {
                     "issuerKey": $issuerKey,
                     "issuerDid": $issuerDid,
-                    "credentialConfigurationId": "OpenBadgeCredential_vc+sd-jwt",
+                    "credentialConfigurationId": "OpenBadgeCredential_sd-jwt",
                     "credentialData": $openBadgeCredentialData,
                     "mdocData": null,
                     "mapping": $mapping,
@@ -324,7 +311,7 @@ object IssuanceExamples {
                 {
                     "issuerKey": $issuerKey,
                     "issuerDid": $issuerDid,
-                    "credentialConfigurationId": "BankId_vc+sd-jwt",
+                    "credentialConfigurationId": "BankId_sd-jwt",
                     "credentialData": $bankIdCredentialData,
                     "mdocData": null,
                     "mapping": $mapping,
@@ -344,12 +331,12 @@ object IssuanceExamples {
     )
 
     // language=JSON
-    val sdJwtExample = typedValueExampleDescriptorDsl<IssuanceRequest>(
+    val sdJwtW3CExample = typedValueExampleDescriptorDsl<IssuanceRequest>(
         """
             {
                 "issuerKey": $issuerKey,
                 "issuerDid": $issuerDid,
-                "credentialConfigurationId": "OpenBadgeCredential_vc+sd-jwt",
+                "credentialConfigurationId": "OpenBadgeCredential_sd-jwt",
                 "credentialData": $openBadgeCredentialData,
                 "mdocData": null,
                 "mapping": $mapping,
@@ -675,4 +662,49 @@ object IssuanceExamples {
             }
         """.trimIndent()
     )
+
+    // language=json
+    val sdjwt_vc_identity_credential = """
+    {
+     "vct": "https://credentials.example.com/identity_credential",
+     "given_name": "John",
+     "family_name": "Doe",
+     "email": "johndoe@example.com",
+     "phone_number": "+1-202-555-0101",
+     "address": {
+       "street_address": "123 Main St",
+       "locality": "Anytown",
+       "region": "Anystate",
+       "country": "US"
+     },
+     "birthdate": "1940-01-01",
+     "is_over_18": true,
+     "is_over_21": true,
+     "is_over_65": true
+    }
+    """.trimIndent()
+
+    // language=json
+    val sdJwtVCData = """
+        {
+            "issuerKey": $issuerKey,
+            "issuerDid": $issuerDid,
+            "credentialConfigurationId": "identity_credential_vc+sd-jwt",
+            "credentialData": $sdjwt_vc_identity_credential,
+            "mdocData": null,
+            "mapping": $mapping,
+            "selectiveDisclosure":
+            {
+                "fields":
+                {
+                    "name":
+                    {
+                        "sd": true
+                    }
+                }
+            }
+        }
+    """.trimIndent()
+
+    val sdJwtVCExample = typedValueExampleDescriptorDsl<IssuanceRequest>(sdJwtVCData)
 }
