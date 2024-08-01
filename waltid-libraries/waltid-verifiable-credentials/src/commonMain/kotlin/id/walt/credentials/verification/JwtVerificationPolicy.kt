@@ -22,3 +22,14 @@ abstract class JwtVerificationPolicy(
     abstract suspend fun verify(credential: String, args: Any? = null, context: Map<String, Any>): Result<Any>
 
 }
+
+abstract class JavaJwtVerificationPolicy(
+    override val name: String,
+    override val description: String? = null
+): JwtVerificationPolicy(name, description) {
+    override suspend fun verify(credential: String, args: Any?, context: Map<String, Any>): Result<Any> {
+        return runCatching { javaVerify(credential, args, context) }
+    }
+
+    abstract fun javaVerify(credential: String, args: Any? = null, context: Map<String, Any>): Any
+}

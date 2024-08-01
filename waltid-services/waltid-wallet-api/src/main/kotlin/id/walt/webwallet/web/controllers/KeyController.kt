@@ -121,9 +121,20 @@ fun Application.keys() = walletRoute {
             }
         }) {
             val body = call.receiveText()
-            getWalletService().importKey(body)
 
-            context.respond(HttpStatusCode.OK)
+            runCatching {
+                getWalletService().importKey(body)
+            }
+
+                .onSuccess { key ->
+                    context.respond(
+                        HttpStatusCode.Created,
+                        key
+                    )
+                }.onFailure {
+                    throw it
+                }
+
         }
         route("{keyId}", {
             request {

@@ -25,12 +25,8 @@ export default function RowCredential({ credentialToEdit, credentialsToIssue, se
           if (credentialSubject !== credential.offer.credentialSubject) {
             updatedCredential.offer.credentialSubject = credentialSubject;
           }
-          if (selectedFormat !== CredentialFormats[0]) {
-            updatedCredential.selectedFormat = selectedFormat;
-          }
-          if (selectedDID !== DIDMethods[0]) {
-            updatedCredential.selectedDID = selectedDID;
-          }
+          updatedCredential.selectedFormat = selectedFormat;
+          updatedCredential.selectedDID = selectedDID;
 
           return updatedCredential;
         } else {

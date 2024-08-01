@@ -20,7 +20,7 @@ import java.util.zip.GZIPInputStream
 actual class RevocationPolicy  : RevocationPolicyMp() {
     @JvmBlocking
     @JvmAsync
-    actual override suspend fun verify(data: JsonElement, args: Any?, context: Map<String, Any>): Result<Any> {
+    actual override suspend fun verify(data: JsonObject, args: Any?, context: Map<String, Any>): Result<Any> {
 
         var successfulKey = ""
 
@@ -28,7 +28,7 @@ actual class RevocationPolicy  : RevocationPolicyMp() {
             successfulKey = key
         }
 
-        val credentialStatus = data.jsonObject["vc"]?.jsonObject?.get("credentialStatus")
+        val credentialStatus = data["vc"]?.jsonObject?.get("credentialStatus")
             ?: return Result.success(
                 JsonObject(mapOf("policy_available" to JsonPrimitive(false)))
             )

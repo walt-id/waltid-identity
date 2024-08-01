@@ -1,8 +1,9 @@
 package id.walt.webwallet.service.account
 
 import de.mkammerer.argon2.Argon2Factory
+import id.walt.commons.web.ConflictException
+import id.walt.commons.web.UnauthorizedException
 import id.walt.webwallet.db.models.Accounts
-import id.walt.webwallet.web.UnauthorizedException
 import id.walt.webwallet.web.controllers.ByteLoginRequest
 import id.walt.webwallet.web.model.EmailAccountRequest
 import kotlinx.datetime.Clock
@@ -17,10 +18,14 @@ import org.jetbrains.exposed.sql.transactions.transaction
 object EmailAccountStrategy : PasswordAccountStrategy<EmailAccountRequest>() {
 
     override suspend fun register(tenant: String, request: EmailAccountRequest): Result<RegistrationResult> = runCatching {
-        val name = request.name ?: throw IllegalArgumentException("No name provided!")
+        val name = request.name
         val email = request.email
 
-        require(!AccountsService.hasAccountEmail(tenant, email)) { "Account already exists!" }
+        require(email.isNotBlank()) { "Email must not be blank!" }
+        require(request.password.isNotBlank()) { "Password must not be blank!" }
+        if (AccountsService.hasAccountEmail(tenant, email)) {
+            throw ConflictException("An account with email $email already exists.")
+        }
 
         val hash = hashPassword(ByteLoginRequest(request).password)
 

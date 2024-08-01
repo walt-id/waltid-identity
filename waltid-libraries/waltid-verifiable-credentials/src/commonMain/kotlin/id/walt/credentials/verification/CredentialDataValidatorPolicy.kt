@@ -21,4 +21,16 @@ abstract class CredentialDataValidatorPolicy(
     @JsPromise
     @JsExport.Ignore
     abstract suspend fun verify(data: JsonObject, args: Any? = null, context: Map<String, Any>): Result<Any>
+
+}
+
+abstract class JavaCredentialDataValidatorPolicy(
+    override val name: String,
+    override val description: String? = null
+): CredentialDataValidatorPolicy(name, description) {
+    override suspend fun verify(data: JsonObject, args: Any?, context: Map<String, Any>): Result<Any> {
+        return runCatching { javaVerify(data, args, context) }
+    }
+
+    abstract fun javaVerify(data: JsonObject, args: Any? = null, context: Map<String, Any>): Any
 }

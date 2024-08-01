@@ -5,10 +5,7 @@ import id.walt.credentials.verification.CredentialWrapperValidatorPolicy
 import id.walt.credentials.verification.HolderBindingException
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.*
 import love.forte.plugin.suspendtrans.annotation.JsPromise
 import love.forte.plugin.suspendtrans.annotation.JvmAsync
 import love.forte.plugin.suspendtrans.annotation.JvmBlocking
@@ -26,10 +23,10 @@ class HolderBindingPolicy : CredentialWrapperValidatorPolicy(
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    override suspend fun verify(data: JsonElement, args: Any?, context: Map<String, Any>): Result<Any> {
-        val presenterDid = data.jsonObject[JwsOption.ISSUER]!!.jsonPrimitive.content
+    override suspend fun verify(data: JsonObject, args: Any?, context: Map<String, Any>): Result<Any> {
+        val presenterDid = data[JwsOption.ISSUER]!!.jsonPrimitive.content
 
-        val vp = data.jsonObject["vp"]?.jsonObject ?: throw IllegalArgumentException("No \"vp\" field in VP!")
+        val vp = data["vp"]?.jsonObject ?: throw IllegalArgumentException("No \"vp\" field in VP!")
 
         val credentials =
             vp["verifiableCredential"]?.jsonArray ?: throw IllegalArgumentException("No \"verifiableCredential\" field in \"vp\"!")
