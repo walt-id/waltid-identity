@@ -12,9 +12,12 @@ data class IssuanceRequest(
     val issuerDid: String,
 
     val credentialConfigurationId: String,
-    val credentialData: W3CVC,
+    val credentialData: W3CVC?,
+    val mdocData: Map<String, JsonObject>? = null,
     val mapping: JsonObject? = null,
     val selectiveDisclosure: SDMap? = null,
+    val x5Chain: List<String>? = null,
+    val trustedRootCAs: List<String>? = null
 )
 
 @Serializable

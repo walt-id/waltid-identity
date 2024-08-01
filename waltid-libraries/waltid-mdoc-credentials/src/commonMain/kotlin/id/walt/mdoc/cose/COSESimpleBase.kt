@@ -1,7 +1,10 @@
 package id.walt.mdoc.cose
 
+import cbor.Cbor
 import id.walt.mdoc.dataelement.*
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerializationException
+import kotlinx.serialization.decodeFromByteArray
 
 /**
  * Common base for COSESign1 and COSEMac0 data structures, with high level dynamic properties and methods
@@ -97,4 +100,8 @@ abstract class COSESimpleBase<T: COSESimpleBase<T>> {
    * Serialize to CBOR hex string
    */
   fun toCBORHex() = toDE().toCBORHex()
+
+  @OptIn(ExperimentalSerializationApi::class)
+  fun decodeProtectedHeader() = Cbor.decodeFromByteArray<MapElement>(protectedHeader)
+  fun decodePayload() = payload?.let { Cbor.decodeFromByteArray<MapElement>(it) }
 }

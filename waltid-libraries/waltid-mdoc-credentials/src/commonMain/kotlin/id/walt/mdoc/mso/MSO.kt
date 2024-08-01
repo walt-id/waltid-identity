@@ -50,7 +50,7 @@ class MSO (
     "deviceKeyInfo" to deviceKeyInfo.toMapElement(),
     "docType" to docType,
     "validityInfo" to validityInfo.toMapElement()
-  ).toDE()
+  ).toDataElement()
 
   /**
    * Decode and verify the given items of the given name space
@@ -90,8 +90,8 @@ class MSO (
                   validityInfo: ValidityInfo,
                   digestAlgorithm: DigestAlgorithm = DigestAlgorithm.SHA256): MSO {
       return MSO(
-        "1.0".toDE(),
-        digestAlgorithm.value.toDE(),
+        "1.0".toDataElement(),
+        digestAlgorithm.value.toDataElement(),
         nameSpaces.mapValues { entry ->
           entry.value.associate { item ->
             Pair(
@@ -100,10 +100,10 @@ class MSO (
                 digestItem(EncodedCBORElement(item.toMapElement()), digestAlgorithm)
               )
             )
-          }.toDE()
-        }.toDE(),
+          }.toDataElement()
+        }.toDataElement(),
         deviceKeyInfo,
-        docType.toDE(),
+        docType.toDataElement(),
         validityInfo
       )
     }

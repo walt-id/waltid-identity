@@ -135,7 +135,7 @@ class IssuerApiTest {
         val jsonMappingObj = Json.decodeFromString<JsonObject>(TEST_MAPPING)
 
         val issueRequest =
-            IssuanceRequest(jsonKeyObj, TEST_ISSUER_DID, "OpenBadgeCredential_jwt_vc_json", w3cVc, jsonMappingObj)
+            IssuanceRequest(jsonKeyObj, TEST_ISSUER_DID, "OpenBadgeCredential_jwt_vc_json", w3cVc, null, jsonMappingObj)
 
         ConfigManager.testWithConfigs(testConfigs)
         val offerUri = createCredentialOfferUri(listOf(issueRequest))
@@ -156,7 +156,7 @@ class IssuerApiTest {
             jsonKeyObj,
             TEST_ISSUER_DID,
             "OpenBadgeCredential",
-            w3cVc,
+            w3cVc, null,
             jsonMappingObj,
             selectiveDisclosureMap
         )
@@ -193,9 +193,9 @@ class IssuerApiTest {
         val jsonMappingObj = Json.decodeFromString<JsonObject>(TEST_MAPPING)
 
         val issueRequest1 =
-            IssuanceRequest(jsonKeyObj, TEST_ISSUER_DID, "OpenBadgeCredential_jwt_vc_json", w3cVc1, jsonMappingObj)
+            IssuanceRequest(jsonKeyObj, TEST_ISSUER_DID, "OpenBadgeCredential_jwt_vc_json", w3cVc1, null, jsonMappingObj)
         val issueRequest2 =
-            IssuanceRequest(jsonKeyObj, TEST_ISSUER_DID, "BankId_jwt_vc_json", w3cVc2, jsonMappingObj)
+            IssuanceRequest(jsonKeyObj, TEST_ISSUER_DID, "BankId_jwt_vc_json", w3cVc2, null, jsonMappingObj)
 
         val issuanceRequests = listOf(issueRequest1, issueRequest2)
 
