@@ -14,19 +14,24 @@ import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 
 @OptIn(ExperimentalJsExport::class)
+@Serializable
 @JsExport
 class JsonSchemaPolicy : CredentialDataValidatorPolicy(
-    "schema",
-    "Verifies a credentials data against a JSON Schema (Draft 7 - see https://json-schema.org/specification-links#draft-7)."
 ) {
+
+    override val name = "schema"
+    override val description =
+        "Verifies a credentials data against a JSON Schema (Draft 7 - see https://json-schema.org/specification-links#draft-7)."
+
     @Serializable
     data class SerializableValidationError(
         val schemaPath: String,
         val objectPath: String,
         val message: String,
         val details: Map<String, String>?,
-        val absoluteLocation: String?
+        val absoluteLocation: String?,
     )
+
     @JvmBlocking
     @JvmAsync
     @JsPromise
@@ -49,7 +54,7 @@ class JsonSchemaPolicy : CredentialDataValidatorPolicy(
         val success = schema.validate(data, errors::add)
 
         return if (success) {
-            Result.success(Unit)
+            Result.success(args ?: args.toString())
         } else {
             val serializableErrors = errors.map {
                 SerializableValidationError(

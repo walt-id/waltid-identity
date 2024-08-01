@@ -58,4 +58,9 @@ object KeyManager {
         val fields = json.filterKeys { it != "type" }.mapValues { it.value }
         Json.decodeFromJsonElement(serializer(type), JsonObject(fields)) as Key
     }?.apply { init() } ?: error("No type in serialized key")
+
+    fun resolveSerializedKeyBlocking(jsonString: String) = resolveSerializedKeyBlocking(json = Json.parseToJsonElement(jsonString).jsonObject)
+
 }
+
+expect fun resolveSerializedKeyBlocking(json: JsonObject): Key
