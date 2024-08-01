@@ -27,7 +27,7 @@ kotlin {
         }
     }
 
-    jvmToolchain(16)
+    jvmToolchain(17)
     jvm {
         withJava()
         testRuns["test"].executionTask.configure {
