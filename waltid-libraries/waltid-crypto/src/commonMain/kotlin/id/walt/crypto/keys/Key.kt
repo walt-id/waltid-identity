@@ -116,7 +116,7 @@ abstract class Key {
     @JsPromise
     @JsExport.Ignore
     @Throws(Exception::class)
-    abstract suspend fun signJws(plaintext: ByteArray, headers: Map<String, String> = emptyMap()): String
+    abstract suspend fun signJws(plaintext: ByteArray, headers: Map<String, JsonElement> = emptyMap()): String
 
     /**
      * verifies a signed message using this public key

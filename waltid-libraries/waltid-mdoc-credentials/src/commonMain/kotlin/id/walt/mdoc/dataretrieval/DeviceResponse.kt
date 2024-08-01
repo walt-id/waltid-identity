@@ -15,10 +15,10 @@ import kotlin.io.encoding.ExperimentalEncodingApi
  */
 @Serializable
 class DeviceResponse(
-    val documents: List<MDoc>,
-    val version: StringElement = "1.0".toDE(),
-    val status: NumberElement = DeviceResponseStatus.OK.status.toDE(),
-    val documentErrors: MapElement? = null
+  val documents: List<MDoc>,
+  val version: StringElement = "1.0".toDataElement(),
+  val status: NumberElement = DeviceResponseStatus.OK.status.toDataElement(),
+  val documentErrors: MapElement? = null
 ) {
     /**
      * Convert to CBOR map element
@@ -26,7 +26,7 @@ class DeviceResponse(
     fun toMapElement() = MapElement(
         buildMap {
             put(MapKey("version"), version)
-            put(MapKey("documents"), documents.map { it.toMapElement() }.toDE())
+            put(MapKey("documents"), documents.map { it.toMapElement() }.toDataElement())
             put(MapKey("status"), status)
             documentErrors?.let {
                 put(MapKey("documentErrors"), it)

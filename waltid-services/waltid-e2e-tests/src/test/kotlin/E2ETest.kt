@@ -2,6 +2,8 @@ import E2ETestWebService.loadResource
 import E2ETestWebService.testBlock
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.web.plugins.httpJson
+import id.walt.oid4vc.OpenID4VCI
+import id.walt.oid4vc.data.OpenIDProviderMetadata
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyType
 import id.walt.issuer.issuance.IssuanceRequest
@@ -212,6 +214,12 @@ class E2ETest {
                     assert(it.size > 1) { "no policies have run" }
                 }
             }
+            val lspPotentialIssuance = LspPotentialIssuance(testHttpClient(doFollowRedirects = false))
+            lspPotentialIssuance.testTrack1()
+            lspPotentialIssuance.testTrack2()
+            val lspPotentialVerification = LspPotentialVerification(testHttpClient(doFollowRedirects = false))
+            lspPotentialVerification.testPotentialInteropTrack3()
+            lspPotentialVerification.testPotentialInteropTrack4()
             //endregion -Exchange / presentation-
 
             //region -History-
@@ -224,7 +232,27 @@ class E2ETest {
         }
     }
 
-    private fun testHttpClient(token: String? = null) = HttpClient(CIO) {
+    //@Test // enable to execute test selectively
+    fun lspIssuanceTests() = runTest(timeout = 5.minutes) {
+        val client = testHttpClient(doFollowRedirects = false)
+        testBlock {
+          val lspPotentialIssuance = LspPotentialIssuance(client)
+          lspPotentialIssuance.testTrack1()
+          lspPotentialIssuance.testTrack2()
+        }
+    }
+
+    //@Test
+    fun lspVerifierTests() = runTest(timeout = 5.minutes) {
+        val client = testHttpClient(doFollowRedirects = false)
+        testBlock {
+          val lspPotentialVerification = LspPotentialVerification(client)
+          lspPotentialVerification.testPotentialInteropTrack3()
+          lspPotentialVerification.testPotentialInteropTrack4()
+        }
+    }
+
+    private fun testHttpClient(token: String? = null, doFollowRedirects: Boolean = true) = HttpClient(CIO) {
         install(ContentNegotiation) {
             json(httpJson)
         }
@@ -238,6 +266,7 @@ class E2ETest {
         install(Logging) {
             level = LogLevel.ALL
         }
+      followRedirects = doFollowRedirects
     }
 }
 

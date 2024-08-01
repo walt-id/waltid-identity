@@ -8,10 +8,7 @@ import id.walt.mdoc.cose.COSESign1Serializer
 import id.walt.mdoc.dataelement.*
 import id.walt.mdoc.dataretrieval.DeviceRequest
 import id.walt.mdoc.dataretrieval.DeviceResponse
-import id.walt.mdoc.doc.MDocBuilder
-import id.walt.mdoc.doc.MDocVerificationParams
-import id.walt.mdoc.doc.VerificationType
-import id.walt.mdoc.doc.and
+import id.walt.mdoc.doc.*
 import id.walt.mdoc.docrequest.MDocRequestBuilder
 import id.walt.mdoc.docrequest.MDocRequestVerificationParams
 import id.walt.mdoc.mdocauth.DeviceAuthentication
@@ -124,8 +121,8 @@ class JVMMdocTest {
             DeviceKeyInfo(DataElement.fromCBOR(OneKey(deviceKeyPair.public, null).AsCBOR().EncodeToBytes()))
 
         // build mdoc of type mDL and sign using issuer key with holder binding to device key
-        val mdoc = MDocBuilder("org.iso.18013.5.1.mDL").addItemToSign("org.iso.18013.5.1", "family_name", "Doe".toDE())
-            .addItemToSign("org.iso.18013.5.1", "given_name", "John".toDE())
+        val mdoc = MDocBuilder(MDocTypes.ISO_MDL).addItemToSign("org.iso.18013.5.1", "family_name", "Doe".toDataElement())
+            .addItemToSign("org.iso.18013.5.1", "given_name", "John".toDataElement())
             .addItemToSign("org.iso.18013.5.1", "birth_date", FullDateElement(LocalDate(1990, 1, 15))).sign(
                 ValidityInfo(
                     Clock.System.now(), Clock.System.now(), Clock.System.now().plus(365 * 24, DateTimeUnit.HOUR)
@@ -150,7 +147,7 @@ class JVMMdocTest {
         )
 
         val mdocTampered =
-            MDocBuilder("org.iso.18013.5.1.mDL").addItemToSign("org.iso.18013.5.1", "family_name", "Foe".toDE())
+            MDocBuilder(MDocTypes.ISO_MDL).addItemToSign("org.iso.18013.5.1", "family_name", "Foe".toDataElement())
                 .build(mdoc.issuerSigned.issuerAuth)
         // MSO is valid, signature check should succeed
         assertEquals(
@@ -229,7 +226,7 @@ class JVMMdocTest {
 
         // create and sign mdoc request
         val docReq =
-            MDocRequestBuilder("org.iso.18013.5.1.mDL").addDataElementRequest("org.iso.18013.5.1", "family_name", true)
+            MDocRequestBuilder(MDocTypes.ISO_MDL).addDataElementRequest("org.iso.18013.5.1", "family_name", true)
                 .addDataElementRequest("org.iso.18013.5.1", "birth_date", false)
                 .sign(sessionTranscript, cryptoProvider, READER_KEY_ID)
 
@@ -396,16 +393,16 @@ class JVMMdocTest {
             DeviceKeyInfo(DataElement.fromCBOR(OneKey(deviceKeyPair.public, null).AsCBOR().EncodeToBytes()))
 
         // build mdoc of type mID and sign using issuer key with holder binding to device key
-        val mdoc = MDocBuilder("org.iso.23220.mID.1").addItemToSign("org.iso.23220.1", "family_name", "Doe".toDE())
-            .addItemToSign("org.iso.23220.1", "given_name", "John".toDE())
+        val mdoc = MDocBuilder("org.iso.23220.mID.1").addItemToSign("org.iso.23220.1", "family_name", "Doe".toDataElement())
+            .addItemToSign("org.iso.23220.1", "given_name", "John".toDataElement())
             .addItemToSign("org.iso.23220.1", "birth_date", FullDateElement(LocalDate(1990, 1, 15)))
-            .addItemToSign("org.iso.23220.1", "sex", "1".toDE()) // ISO/IEC 5218
-            .addItemToSign("org.iso.23220.1", "height", "175".toDE())
-            .addItemToSign("org.iso.23220.1", "weight", "70".toDE())
-            .addItemToSign("org.iso.23220.1", "birthplace", "Vienna".toDE())
-            .addItemToSign("org.iso.23220.1", "nationality", "AT".toDE())
-            .addItemToSign("org.iso.23220.1", "telephone_number", "0987654".toDE())
-            .addItemToSign("org.iso.23220.1", "email_address", "john@email.com".toDE()).sign(
+            .addItemToSign("org.iso.23220.1", "sex", "1".toDataElement()) // ISO/IEC 5218
+            .addItemToSign("org.iso.23220.1", "height", "175".toDataElement())
+            .addItemToSign("org.iso.23220.1", "weight", "70".toDataElement())
+            .addItemToSign("org.iso.23220.1", "birthplace", "Vienna".toDataElement())
+            .addItemToSign("org.iso.23220.1", "nationality", "AT".toDataElement())
+            .addItemToSign("org.iso.23220.1", "telephone_number", "0987654".toDataElement())
+            .addItemToSign("org.iso.23220.1", "email_address", "john@email.com".toDataElement()).sign(
                 ValidityInfo(
                     Clock.System.now(), Clock.System.now(), Clock.System.now().plus(365 * 24, DateTimeUnit.HOUR)
                 ), deviceKeyInfo, cryptoProvider, ISSUER_KEY_ID
