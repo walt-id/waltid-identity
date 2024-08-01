@@ -19,11 +19,11 @@ interface JWTCryptoProvider {
      * @param payload The JSON payload of the JWT to be signed
      * @param keyID Optional keyID of the signing key to be used, if required by crypto provider
      */
-    fun sign(payload: JsonObject, keyID: String? = null, typ: String = "JWT"): String
+    fun sign(payload: JsonObject, keyID: String? = null, typ: String = "JWT", headers: Map<String, Any> = mapOf()): String
 
     /**
      * Interface method for verifying a JWT signature
      * @param jwt A signed JWT token to be verified
      */
-    fun verify(jwt: String): JwtVerificationResult
+    fun verify(jwt: String, keyID: String? = null): JwtVerificationResult
 }

@@ -4,10 +4,10 @@ import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.crypto.MACSigner
 import com.nimbusds.jose.crypto.MACVerifier
 import com.nimbusds.jwt.JWTClaimsSet
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
+import korlibs.crypto.SHA256
+import korlibs.crypto.encoding.ASCII
+import kotlinx.datetime.Clock
+import kotlinx.serialization.json.*
 import kotlin.test.*
 
 class SDJwtTestJVM {
@@ -106,5 +106,46 @@ class SDJwtTestJVM {
         // print full payload with disclosed fields
         println("Disclosed JWT payload:")
         println(parsedDisclosedJwtVerifyResult.sdJwt.fullPayload.toString())
+    }
+
+    @Test
+    fun testJwtWithCustomHeaders() {
+        // Create SimpleJWTCryptoProvider with MACSigner and MACVerifier
+        val cryptoProvider = SimpleJWTCryptoProvider(JWSAlgorithm.HS256, MACSigner(sharedSecret), MACVerifier(sharedSecret))
+        val signedJwt = cryptoProvider.sign(buildJsonObject { put("test", JsonPrimitive("hello")) },
+            headers = mapOf(
+                "h1" to "v1",
+                "h2" to 2,
+                "h3" to mapOf("h3.1" to "v3")
+            )
+        )
+        val parsedJwt = SDJwt.parse(signedJwt)
+        assertContains(parsedJwt.header.keys, "h1")
+        assertContains(parsedJwt.header.keys, "h2")
+        assertContains(parsedJwt.header.keys, "h3")
+        assertEquals("v1", parsedJwt.header["h1"]!!.jsonPrimitive.content)
+        assertEquals(2, parsedJwt.header["h2"]!!.jsonPrimitive.int)
+        assertEquals("v3", parsedJwt.header["h3"]!!.jsonObject["h3.1"]!!.jsonPrimitive.content)
+    }
+
+    @Test
+    fun testPresentingSdJwtWithKeyBindingJwt() {
+        val cryptoProvider = SimpleJWTCryptoProvider(JWSAlgorithm.HS256, MACSigner(sharedSecret), MACVerifier(sharedSecret))
+        val aud = "test-audience"
+        val nonce = "test-nonce"
+        val issuanceTime = Clock.System.now()
+        val signedJwt = SDJwt.sign(SDPayload.Companion.createSDPayload(
+            buildJsonObject { put("test", JsonPrimitive("hello")) },
+            SDMapBuilder().addField("test", true).build()), cryptoProvider)
+        val presentedJwtNoKb = signedJwt.present(true)
+        assertNull(presentedJwtNoKb.keyBindingJwt)
+        val presentedJwtWithKb = signedJwt.present(true, aud, nonce, cryptoProvider)
+        assertNotNull(presentedJwtWithKb.keyBindingJwt)
+        assertTrue(presentedJwtWithKb.toString().startsWith(presentedJwtNoKb.toString()))
+        assertTrue(presentedJwtWithKb.keyBindingJwt!!.issuedAt >= issuanceTime.epochSeconds)
+        assertEquals(aud, presentedJwtWithKb.keyBindingJwt!!.audience)
+        assertEquals(nonce, presentedJwtWithKb.keyBindingJwt!!.nonce)
+        assertEquals(SHA256.digest(ASCII.encode(presentedJwtNoKb.toString())).base64Url, presentedJwtWithKb.keyBindingJwt!!.sdHash)
+
     }
 }

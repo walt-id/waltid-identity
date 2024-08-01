@@ -28,7 +28,8 @@ data class PinConfiguration(
     val description: String,
     val pin: String? = null,
 
-    val type: TxInputMode = TxInputMode.forPin(pin) ?: error("If no pin is provided, pin input `type` has to be provided, allowed values: ${TxInputMode.entries.joinToString()}."),
+    val type: TxInputMode = TxInputMode.forPin(pin)
+        ?: error("If no pin is provided, pin input `type` has to be provided, allowed values: ${TxInputMode.entries.joinToString()}."),
     val pinLength: Int = pin?.length ?: error("Neither pin nor pin length was supplied"),
 
     /**
@@ -39,8 +40,9 @@ data class PinConfiguration(
     fun toTxCode() = TxCode(type, pinLength, description)
 
     init {
-        require((pin == null && callbackAuthenticationUrl != null)
-                || (pin != null && callbackAuthenticationUrl == null)
+        require(
+            (pin == null && callbackAuthenticationUrl != null)
+                    || (pin != null && callbackAuthenticationUrl == null)
         ) { "Either pin directly or authentication URL (and no pin) has to be provided." }
     }
 }
@@ -79,19 +81,13 @@ data class IssuanceRequest(
     val issuerKey: JsonObject,
     val issuerDid: String,
 
-    val credentialData: W3CVC,
-    val credentialConfigurationId: String = credentialData.getType().last() + "_jwt_vc_json", // TODO <-- test
-
-    /**
-     * full auth or pre-auth
-     * // TODO
-     */
-//    val flow: GrantType = GrantType.authorization_code,
-
-//    val callbackUrl: String? = null, // TODO
-
+    val credentialConfigurationId: String = credentialData.getType().last() + "_jwt_vc_json",
+    val credentialData: W3CVC?,
+    val mdocData: Map<String, JsonObject>? = null,
     val mapping: JsonObject? = null,
     val selectiveDisclosure: SDMap? = null,
+    val x5Chain: List<String>? = null,
+    val trustedRootCAs: List<String>? = null,
 )
 
 @Serializable

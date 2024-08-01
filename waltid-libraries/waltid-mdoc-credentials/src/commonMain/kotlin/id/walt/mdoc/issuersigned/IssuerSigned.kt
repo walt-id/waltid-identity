@@ -23,10 +23,10 @@ data class IssuerSigned(
             nameSpaces?.let {
                 put(MapKey("nameSpaces"), it.map { entry ->
                     Pair(MapKey(entry.key), ListElement(entry.value))
-                }.toMap().toDE())
+                }.toMap().toDataElement())
             }
             issuerAuth?.let {
-                put(MapKey("issuerAuth"), it.data.toDE())
+                put(MapKey("issuerAuth"), it.data.toDataElement())
             }
         }
     )

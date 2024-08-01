@@ -3,6 +3,7 @@ package id.walt
 import id.walt.commons.config.ConfigManager
 import id.walt.credentials.vc.vcs.W3CVC
 import id.walt.crypto.keys.KeyManager
+import id.walt.crypto.keys.KeySerialization
 import id.walt.issuer.issuance.IssuanceRequest
 import id.walt.issuer.issuance.createCredentialOfferUri
 import id.walt.sdjwt.SDMapBuilder

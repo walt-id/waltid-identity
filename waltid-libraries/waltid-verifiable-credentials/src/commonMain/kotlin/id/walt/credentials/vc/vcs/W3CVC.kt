@@ -66,9 +66,9 @@ data class W3CVC(
 
         val signed = issuerKey.signJws(
             signable, mapOf(
-                "typ" to "vc+sd-jwt",
-                "cty" to "credential-claims-set+json",
-                "kid" to issuerDid
+                "typ" to "vc+sd-jwt".toJsonElement(),
+                "cty" to "credential-claims-set+json".toJsonElement(),
+                "kid" to issuerDid.toJsonElement()
             )
         )
 
@@ -84,7 +84,7 @@ data class W3CVC(
         issuerKid: String? = null,
         subjectDid: String,
         /** Set additional options in the JWT header */
-        additionalJwtHeader: Map<String, String> = emptyMap(),
+        additionalJwtHeader: Map<String, JsonElement> = emptyMap(),
         /** Set additional options in the JWT payload */
         additionalJwtOptions: Map<String, JsonElement> = emptyMap()
     ): String {
@@ -94,7 +94,7 @@ data class W3CVC(
             data = this.toJsonObject(),
             key = issuerKey,
             jwtHeaders = mapOf(
-                JwsHeader.KEY_ID to kid,
+                JwsHeader.KEY_ID to kid.toJsonElement(),
                 *(additionalJwtHeader.entries.map { it.toPair() }.toTypedArray())
             ),
             jwtOptions = mapOf(

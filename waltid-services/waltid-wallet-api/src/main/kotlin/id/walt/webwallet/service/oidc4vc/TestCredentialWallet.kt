@@ -87,7 +87,7 @@ class TestCredentialWallet(
             val authKeyId = resolveDidAuthentication(did)
 
             val payloadToSign = Json.encodeToString(payload).encodeToByteArray()
-            key.signJws(payloadToSign, mapOf("typ" to "JWT", "kid" to authKeyId))
+            key.signJws(payloadToSign, mapOf("typ" to "JWT".toJsonElement(), "kid" to authKeyId.toJsonElement()))
         }
 
         //JwtService.getService().sign(payload, keyId)
@@ -114,6 +114,10 @@ class TestCredentialWallet(
         return result.isSuccess
 
         // JwtService.getService().verify(token).verified
+    }
+
+    override fun verifyCOSESign1Signature(target: TokenTarget, token: String): Boolean {
+        TODO("Not yet implemented")
     }
 
     override fun httpGet(url: Url, headers: Headers?): SimpleHttpResponse {
@@ -194,8 +198,8 @@ class TestCredentialWallet(
 
             key.signJws(
                 vp.toByteArray(), mapOf(
-                    "kid" to authKeyId,
-                    "typ" to "JWT"
+                    "kid" to authKeyId.toJsonElement(),
+                    "typ" to "JWT".toJsonElement()
                 )
             )
         }

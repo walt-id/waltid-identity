@@ -164,8 +164,8 @@ object DidService {
     suspend fun register(options: DidCreateOptions) =
         getRegistrarForMethod(options.method).create(options)
 
-    //    @JvmBlocking
-//    @JvmAsync
+    //@JvmBlocking
+    //@JvmAsync
     @JsPromise
     @JsExport.Ignore
     suspend fun registerByKey(

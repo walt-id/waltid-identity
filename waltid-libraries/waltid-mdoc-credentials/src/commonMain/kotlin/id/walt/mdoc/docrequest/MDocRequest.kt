@@ -78,5 +78,5 @@ data class MDocRequest internal constructor(
     readerAuth?.let {
       put(MapKey("readerAuth"), it.toDE())
     }
-  }.toDE()
+  }.toDataElement()
 }

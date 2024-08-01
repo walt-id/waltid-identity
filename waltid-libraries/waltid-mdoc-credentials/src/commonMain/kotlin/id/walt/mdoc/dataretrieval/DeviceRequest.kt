@@ -11,7 +11,7 @@ import kotlinx.serialization.*
 @Serializable
 class DeviceRequest(
   val docRequests: List<MDocRequest>,
-  val version: StringElement = "1.0".toDE()
+  val version: StringElement = "1.0".toDataElement()
 ) {
   /**
    * Convert to CBOR map element
@@ -19,7 +19,7 @@ class DeviceRequest(
   fun toMapElement() = mapOf(
     MapKey("version") to version,
     MapKey("docRequests") to ListElement(docRequests.map { it.toMapElement() })
-  ).toDE()
+  ).toDataElement()
 
   /**
    * Serialize to CBOR data
