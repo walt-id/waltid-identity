@@ -26,7 +26,10 @@ object JwsUtils {
 
     @OptIn(ExperimentalEncodingApi::class)
     fun String.decodeJwsPart(): JsonObject =
-        Json.parseToJsonElement(Base64.decode(this.base64UrlToBase64()).decodeToString()).jsonObject
+        Json.parseToJsonElement(
+            Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT_OPTIONAL).decode(this.base64UrlToBase64())
+                .decodeToString()
+        ).jsonObject
 
     data class JwsParts(val header: JsonObject, val payload: JsonObject, val signature: String) {
         override fun toString() = "${Json.encodeToString(header).encodeToByteArray().encodeToBase64Url()}.${
