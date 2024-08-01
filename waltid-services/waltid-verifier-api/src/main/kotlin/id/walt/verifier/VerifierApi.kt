@@ -17,6 +17,7 @@ import id.walt.verifier.config.OIDCVerifierServiceConfig
 import id.walt.verifier.oidc.PresentationSessionInfo
 import id.walt.verifier.oidc.RequestSigningCryptoProvider
 import id.walt.verifier.oidc.VerificationUseCase
+import io.github.oshai.kotlinlogging.KotlinLogging
 import io.github.smiley4.ktorswaggerui.dsl.routing.get
 import io.github.smiley4.ktorswaggerui.dsl.routing.post
 import io.github.smiley4.ktorswaggerui.dsl.routing.route
@@ -42,7 +43,7 @@ private val SERVER_URL by lazy {
         ConfigManager.getConfig<OIDCVerifierServiceConfig>().baseUrl
     }
 }
-
+private val logger = KotlinLogging.logger {}
 
 @Serializable
 data class DescriptorMappingFormParam(val id: String, val format: VCFormat, val path: String)
@@ -258,7 +259,9 @@ fun Application.verfierApi() {
                     }
                 }
             }) {
+                logger.info { "POST verify/state" }
                 val sessionId = call.parameters["state"]
+                logger.info { "State: $sessionId" }
                 verificationUseCase.verify(sessionId, context.request.call.receiveParameters().toMap())
                     .onSuccess {
                         val session = verificationUseCase.getSession(sessionId!!)
@@ -271,7 +274,7 @@ fun Application.verfierApi() {
                         }
                     }.onFailure {
                         var errorDescription = it.localizedMessage
-
+                        logger.error { "Error: $errorDescription" }
                         if (sessionId != null) {
                             val session = verificationUseCase.getSession(sessionId)
                             if (session.walletInitiatedAuthState != null) {

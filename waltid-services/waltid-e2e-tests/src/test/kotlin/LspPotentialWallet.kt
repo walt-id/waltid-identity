@@ -169,7 +169,8 @@ class LspPotentialWallet(val client: HttpClient, val walletId: String) {
 
   fun testSDJwtPresentation() = runBlocking {
     val createReqResponse = client.post("/openid4vc/verify") {
-      header("authorizeBaseUrl", "haip://")
+      header("authorizeBaseUrl", "openid4vp://")
+      header("openId4VPProfile","HAIP")
       header("responseMode", "direct_post")
       contentType(ContentType.Application.Json)
       setBody(
