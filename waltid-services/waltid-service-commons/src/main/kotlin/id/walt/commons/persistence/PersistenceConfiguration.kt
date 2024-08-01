@@ -9,10 +9,8 @@ data class PersistenceNode(
 
 @Serializable
 data class PersistenceConfiguration(
-
     val type: String = "memory", // memory, redis, redis-cluster
     val nodes: List<PersistenceNode>? = null,
     val user: String? = null,
     val password: String? = null,
-
-    )
+)
