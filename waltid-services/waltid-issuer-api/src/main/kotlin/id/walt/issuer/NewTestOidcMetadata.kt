@@ -49,12 +49,13 @@ fun main() {
                         "id_token"
                     ),  // (EBSI) this is required one  https://www.rfc-editor.org/rfc/rfc8414.html#section-2
                     idTokenSigningAlgValuesSupported = setOf("ES256"), // (EBSI) https://openid.net/specs/openid-connect-self-issued-v2-1_0.html#name-self-issued-openid-provider-
-                    credentialConfigurationsSupported = IssuanceOfferManager.getAllActiveSessionTypes().associate {
-                        it.last() to CredentialSupported(
-                            it.last(), CredentialFormat.jwt_vc_json,
+                    credentialConfigurationsSupported = IssuanceOfferManager.getAllActiveSessionTypes().associate { activeSessionType ->
+                        activeSessionType.last() to CredentialSupported(
+                            // id = activeSessionType.last(),
+                            format = CredentialFormat.jwt_vc_json,
                             cryptographicBindingMethodsSupported = setOf("did"),
                             cryptographicSuitesSupported = setOf("ES256K"),
-                            types = it
+                            types = activeSessionType
                         )
                     }
                 )

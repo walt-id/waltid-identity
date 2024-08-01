@@ -7,6 +7,9 @@ import COSE.OneKey
 import com.nimbusds.jose.util.X509CertUtils
 import com.upokecenter.cbor.CBORObject
 import id.walt.commons.config.ConfigManager
+import id.walt.commons.featureflag.FeatureManager.whenFeature
+import id.walt.commons.persistence.ConfiguredPersistence
+import id.walt.credentials.verification.VerificationPolicy
 import id.walt.credentials.verification.Verifier
 import id.walt.credentials.verification.models.PolicyRequest
 import id.walt.credentials.verification.models.PresentationVerificationResponseSurrogate
@@ -40,6 +43,7 @@ import id.walt.sdjwt.SDJwtVC
 import id.walt.sdjwt.WaltIdJWTCryptoProvider
 import id.walt.verifier.FeatureCatalog
 import id.walt.verifier.config.OIDCVerifierServiceConfig
+import id.walt.verifier.lspPotential.LspPotentialVerificationInterop
 import id.walt.verifier.policies.PresentationDefinitionPolicy
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.runBlocking
@@ -49,6 +53,7 @@ import kotlinx.serialization.json.*
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.polymorphic
 import kotlinx.serialization.modules.subclass
+import java.security.cert.X509Certificate
 import java.util.Base64
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
