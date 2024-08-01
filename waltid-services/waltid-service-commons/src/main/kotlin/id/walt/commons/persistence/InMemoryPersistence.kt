@@ -22,8 +22,8 @@ class InMemoryPersistence<V : Any>(discriminator: String, defaultExpiration: Dur
     }
     override fun listSize(id: String): Int = listStore.get(id)?.size ?: 0
 
-    override operator fun get(id: String): V {
-        return store.get(id) ?: error("No such id")
+    override operator fun get(id: String): V? {
+        return store.get(id)
     }
 
     override operator fun set(id: String, value: V) {

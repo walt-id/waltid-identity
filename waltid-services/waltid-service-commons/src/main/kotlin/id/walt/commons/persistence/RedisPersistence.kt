@@ -12,9 +12,8 @@ class RedisPersistence<V>(
     val pool: UnifiedJedis,
 ) : Persistence<V>(discriminator, defaultExpiration) {
 
-    override operator fun get(id: String): V {
-        return decoding.invoke(pool.get("$discriminator:$id") ?: error("No such id: $id"))
-    }
+    override operator fun get(id: String): V? =
+        pool.get("$discriminator:$id")?.let { decoding.invoke(it) }
 
     override operator fun set(id: String, value: V) {
         pool.setex("$discriminator:$id", defaultExpiration.inWholeSeconds, encoding.invoke(value))
@@ -33,7 +32,7 @@ class RedisPersistence<V>(
 
         return sequence {
             keys.forEach {
-                yield(get(it))
+                yield(get(it)!!)
             }
         }
     }

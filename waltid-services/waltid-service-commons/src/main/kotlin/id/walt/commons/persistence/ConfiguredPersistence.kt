@@ -1,6 +1,8 @@
 package id.walt.commons.persistence
 
 import id.walt.commons.config.ConfigManager
+import id.walt.commons.featureflag.CommonsFeatureCatalog
+import id.walt.commons.featureflag.FeatureManager
 import redis.clients.jedis.HostAndPort
 import redis.clients.jedis.JedisCluster
 import redis.clients.jedis.JedisPooled
@@ -15,7 +17,7 @@ class ConfiguredPersistence<V : Any>(
 ) : Persistence<V>(discriminator, defaultExpiration) {
 
     companion object {
-        private val config = ConfigManager.getConfig<PersistenceConfiguration>()
+        private val config = if (FeatureManager.isFeatureEnabled(CommonsFeatureCatalog.persistenceFeature)) ConfigManager.getConfig<PersistenceConfiguration>() else PersistenceConfiguration()
     }
 
     val underlyingPersistence: Persistence<V> = when (config.type) {
@@ -38,7 +40,7 @@ class ConfiguredPersistence<V : Any>(
         else -> throw IllegalArgumentException("Unknown persistence type ${config.type}")
     }
 
-    override fun get(id: String): V = underlyingPersistence[id]
+    override fun get(id: String): V? = underlyingPersistence[id]
     override fun remove(id: String) = underlyingPersistence.remove(id)
     override fun contains(id: String): Boolean = underlyingPersistence.contains(id)
     override fun listAllKeys(): Set<String> = underlyingPersistence.listAllKeys()
