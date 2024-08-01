@@ -18,6 +18,7 @@ import id.walt.oid4vc.providers.OpenIDCredentialWallet
 import id.walt.oid4vc.providers.TokenTarget
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.requests.TokenRequest
+import id.walt.oid4vc.util.Base64Utils.base64UrlDecode
 import id.walt.webwallet.service.SessionAttributes.HACK_outsideMappedSelectedCredentialsPerSession
 import id.walt.webwallet.service.SessionAttributes.HACK_outsideMappedSelectedDisclosuresPerSession
 import id.walt.webwallet.service.credentials.CredentialsService
@@ -35,8 +36,6 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import kotlinx.uuid.UUID
 import kotlinx.uuid.generateUUID
-import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 
@@ -93,11 +92,10 @@ class TestCredentialWallet(
         //JwtService.getService().sign(payload, keyId)
     }
 
-    @OptIn(ExperimentalEncodingApi::class)
     override fun verifyTokenSignature(target: TokenTarget, token: String): Boolean {
         println("VERIFYING TOKEN: ($target) $token")
         val jwtHeader = runCatching {
-            Json.parseToJsonElement(Base64.UrlSafe.decode(token.split(".")[0]).decodeToString()).jsonObject
+            Json.parseToJsonElement(token.split(".")[0].base64UrlDecode().decodeToString()).jsonObject
         }.getOrElse {
             throw IllegalArgumentException(
                 "Could not verify token signature, as JWT header could not be coded for token: $token, cause attached.", it
