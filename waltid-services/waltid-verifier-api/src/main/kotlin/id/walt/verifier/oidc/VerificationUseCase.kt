@@ -28,7 +28,6 @@ import java.security.cert.X509Certificate
 import java.security.spec.PKCS8EncodedKeySpec
 import java.security.spec.X509EncodedKeySpec
 import java.util.Base64
-import kotlin.collections.set
 
 class VerificationUseCase(
     val http: HttpClient, cryptoProvider: JWTCryptoProvider,
@@ -125,7 +124,12 @@ class VerificationUseCase(
         val maybePresentationSessionResult = runCatching { OIDCVerifierService.verify(tokenResponse, session) }
 
         if (maybePresentationSessionResult.isFailure) {
-            return Result.failure(IllegalStateException("Verification failed: ${maybePresentationSessionResult.exceptionOrNull()!!.message}", maybePresentationSessionResult.exceptionOrNull()))
+            return Result.failure(
+                IllegalStateException(
+                    "Verification failed: ${maybePresentationSessionResult.exceptionOrNull()!!.message}",
+                    maybePresentationSessionResult.exceptionOrNull()
+                )
+            )
         }
 
         val presentationSession = maybePresentationSessionResult.getOrThrow()
@@ -154,13 +158,12 @@ class VerificationUseCase(
         val session = OIDCVerifierService.getSession(sessionId)
             ?: return Result.failure(IllegalArgumentException("Invalid id provided (expired?): $sessionId"))
 
-        val policyResults = OIDCVerifierService.policyResults[session.id]
+        val policyResults = OIDCVerifierService.policyResults[session.id]?.let { Json.encodeToJsonElement(it).jsonObject }
 
         return Result.success(
-//            Json { prettyPrint = true }.encodeToString(
-                PresentationSessionInfo.fromPresentationSession(
-                    session, Json.encodeToJsonElement(policyResults).jsonObject
-//                )
+            PresentationSessionInfo.fromPresentationSession(
+                session = session,
+                policyResults = policyResults
             )
         )
     }
