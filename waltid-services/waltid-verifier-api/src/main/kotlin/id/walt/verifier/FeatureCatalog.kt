@@ -13,7 +13,6 @@ object FeatureCatalog : ServiceFeatureCatalog {
     val entra = OptionalFeature("entra", "Enable Microsoft Entra support", EntraConfig::class, false)
     val lspPotential = OptionalFeature("lsp-potential", "Enable LSP Potential Interop test endpoints", default = false)
 
-
     override val baseFeatures = listOf(verifierService)
     override val optionalFeatures = listOf(entra, lspPotential)
 }

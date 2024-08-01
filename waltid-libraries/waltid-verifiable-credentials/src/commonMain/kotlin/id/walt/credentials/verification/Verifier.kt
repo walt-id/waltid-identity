@@ -63,12 +63,13 @@ object Verifier {
             else -> throw IllegalArgumentException("Unsupported policy type: ${policy::class.simpleName}")
         }
     }
+
     @JvmBlocking
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
     suspend fun verifyCredential(
-        jwt: String, policies: List<PolicyRequest>, context: Map<String, Any> = emptyMap()
+        jwt: String, policies: List<PolicyRequest>, context: Map<String, Any> = emptyMap(),
     ): List<PolicyResult> {
         val results = ArrayList<PolicyResult>()
         val resultMutex = Mutex()
@@ -85,6 +86,7 @@ object Verifier {
 
         return results
     }
+
     @JvmBlocking
     @JvmAsync
     @JsPromise
@@ -94,7 +96,7 @@ object Verifier {
         policyRequests: List<PolicyRequest>,
         context: Map<String, Any> = emptyMap(),
         onSuccess: suspend (PolicyResult) -> Unit,
-        onError: suspend (PolicyResult, Throwable) -> Unit
+        onError: suspend (PolicyResult, Throwable) -> Unit,
     ) {
         coroutineScope {
             policyRequests.forEach { policyRequest ->
@@ -117,6 +119,7 @@ object Verifier {
             }
         }
     }
+
     @JvmBlocking
     @JvmAsync
     @JsPromise
@@ -126,7 +129,7 @@ object Verifier {
         vpPolicies: List<PolicyRequest>,
         globalVcPolicies: List<PolicyRequest>,
         specificCredentialPolicies: Map<String, List<PolicyRequest>>,
-        presentationContext: Map<String, Any> = emptyMap()
+        presentationContext: Map<String, Any> = emptyMap(),
     ): PresentationVerificationResponse {
         val providedJws = vpTokenJwt.decodeJws() // usually VP
         val payload = providedJws.payload
@@ -135,9 +138,10 @@ object Verifier {
             else -> "" // else is IdToken
         }
 
-        val verifiableCredentialJwts = when (payload.contains("vp")){
+        val verifiableCredentialJwts = when (payload.contains("vp")) {
             true -> (payload["vp"]?.jsonObject?.get("verifiableCredential") ?: payload["verifiableCredential"]
-                ?: TODO("Provided data does not have `verifiableCredential` array.")).jsonArray.map { it.jsonPrimitive.content }
+            ?: TODO("Provided data does not have `verifiableCredential` array.")).jsonArray.map { it.jsonPrimitive.content }
+
             else -> emptyList()
         }
 
@@ -167,11 +171,12 @@ object Verifier {
                     })
 
                 /* VP Policies */
-                when(payload.contains("vp")){
+                when (payload.contains("vp")) {
                     true -> {
                         val vpIdx = addResultEntryFor(vpType)
                         runPolicyRequests(vpIdx, vpTokenJwt, vpPolicies)
                     }
+
                     else -> {
                         val vpIdx = 0
                         results.add(PresentationResultEntry(vpTokenJwt))
@@ -199,6 +204,7 @@ object Verifier {
     }
 
     private val EMPTY_MAP = emptyMap<String, Any>()
+
     @JvmBlocking
     @JvmAsync
     @JsPromise

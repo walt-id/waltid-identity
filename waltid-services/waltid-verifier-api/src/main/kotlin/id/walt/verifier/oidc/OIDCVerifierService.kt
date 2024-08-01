@@ -8,9 +8,15 @@ import com.nimbusds.jose.util.X509CertUtils
 import com.upokecenter.cbor.CBORObject
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.featureflag.FeatureManager.whenFeature
+import id.walt.commons.persistence.ConfiguredPersistence
+import id.walt.credentials.verification.VerificationPolicy
 import id.walt.credentials.verification.Verifier
 import id.walt.credentials.verification.models.PolicyRequest
-import id.walt.credentials.verification.models.PresentationVerificationResponse
+import id.walt.credentials.verification.models.PresentationVerificationResponseSurrogate
+import id.walt.credentials.verification.policies.*
+import id.walt.credentials.verification.policies.vp.HolderBindingPolicy
+import id.walt.credentials.verification.policies.vp.MaximumCredentialsPolicy
+import id.walt.credentials.verification.policies.vp.MinimumCredentialsPolicy
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.did.dids.DidService
@@ -38,12 +44,19 @@ import id.walt.sdjwt.WaltIdJWTCryptoProvider
 import id.walt.verifier.FeatureCatalog
 import id.walt.verifier.config.OIDCVerifierServiceConfig
 import id.walt.verifier.lspPotential.LspPotentialVerificationInterop
+import id.walt.verifier.policies.PresentationDefinitionPolicy
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
+import kotlinx.serialization.modules.SerializersModule
+import kotlinx.serialization.modules.polymorphic
+import kotlinx.serialization.modules.subclass
 import java.security.cert.X509Certificate
-import java.util.*
+import java.util.Base64
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
 
 /**
  * OIDC for Verifiable Presentations service provider, implementing abstract base provider from OIDC4VC library.
@@ -56,10 +69,12 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
 ) {
     private val logger = KotlinLogging.logger {}
 
+
     // ------------------------------------
     // Simple in-memory session management
-    private val presentationSessions = HashMap<String, PresentationSession>()
+//    private val presentationSessions = HashMap<String, PresentationSession>()
 
+    @Serializable
     data class SessionVerificationInformation(
         val vpPolicies: List<PolicyRequest>,
         val vcPolicies: List<PolicyRequest>,
@@ -70,15 +85,55 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
         val walletInitiatedAuthState: String? = null,
     )
 
+    @Serializable
     data class StatusCallback(
         val statusCallbackUri: String,
         val statusCallbackApiKey: String? = null,
     )
 
-    val sessionVerificationInfos = HashMap<String, SessionVerificationInformation>()
-    val policyResults = HashMap<String, PresentationVerificationResponse>()
+//    val sessionVerificationInfos = HashMap<String, SessionVerificationInformation>()
+//    val policyResults = HashMap<String, PresentationVerificationResponse>()
 
-    data class CredentialPolicyResult(val type: String, val policyResults: List<JsonObject>)
+
+    // PERSISTENCE
+    val presentationSessions = ConfiguredPersistence<PresentationSession>(
+        "presentation_session", defaultExpiration = 5.minutes,
+        encoding = { Json.encodeToString(it) },
+        decoding = {
+            println("Decoding $it to PresentationSession")
+
+            Json.decodeFromString(it) },
+    )
+
+    val module = SerializersModule {
+        polymorphic(VerificationPolicy::class) {
+            subclass(HolderBindingPolicy::class)
+            subclass(MaximumCredentialsPolicy::class)
+            subclass(MinimumCredentialsPolicy::class)
+            subclass(AllowedIssuerPolicy::class)
+            subclass(ExpirationDatePolicy::class)
+            subclass(JsonSchemaPolicy::class)
+            subclass(JwtSignaturePolicy::class)
+            subclass(NotBeforeDatePolicy::class)
+            subclass(RevocationPolicy::class)
+            subclass(WebhookPolicy::class)
+            subclass(PresentationDefinitionPolicy::class)
+        }
+    }
+
+    val format = Json { serializersModule = module; encodeDefaults = true }
+
+    val sessionVerificationInfos = ConfiguredPersistence<SessionVerificationInformation>(
+        "session_verification_infos", defaultExpiration = 5.minutes,
+        encoding = { format.encodeToString(it) },
+        decoding = { format.decodeFromString(it) },
+    )
+    val policyResults = ConfiguredPersistence<PresentationVerificationResponseSurrogate>(
+        "policy_results", defaultExpiration = 5.minutes,
+        encoding = { format.encodeToString(it) },
+        decoding = { format.decodeFromString(it) },
+    )
+
 
     override fun getSession(id: String) = presentationSessions[id]
     override fun putSession(id: String, session: PresentationSession) = presentationSessions.put(id, session)
@@ -142,7 +197,7 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
                     )
                 }
 
-                policyResults[session.id] = results
+                policyResults[session.id] = PresentationVerificationResponseSurrogate(results)
 
                 results.overallSuccess()
             }

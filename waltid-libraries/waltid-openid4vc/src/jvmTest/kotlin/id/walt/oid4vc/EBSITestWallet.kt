@@ -49,7 +49,7 @@ const val EBSI_WALLET_TEST_DID =
     "did:key:z2dmzD81cgPx8Vki7JbuuMmFYrWPgYoytykUZ3eyqht1j9KbrksdXfcbvmhgF2h7YfpxWuywkXxDZ7ohTPNPTQpD39Rm9WiBWuEpvvgtfuPHtHi2wTEkZ95KC2ijUMUowyKMueaMhtA5bLYkt9k8Y8Gq4sm6PyTCHTxuyedMMrBKdRXNZS"
 
 class EBSITestWallet(
-    config: CredentialWalletConfig
+    config: CredentialWalletConfig,
 ) : OpenIDCredentialWallet<SIOPSession>(EBSI_WALLET_BASE_URL, config) {
     private val sessionCache = mutableMapOf<String, SIOPSession>()
     private val ktorClient = HttpClient {
@@ -83,7 +83,7 @@ class EBSITestWallet(
     override fun createSIOPSession(
         id: String,
         authorizationRequest: AuthorizationRequest?,
-        expirationTimestamp: Instant
+        expirationTimestamp: Instant,
     ) = SIOPSession(id, authorizationRequest, expirationTimestamp)
 
     override val metadata: OpenIDProviderMetadata
@@ -94,7 +94,9 @@ class EBSITestWallet(
         TODO("Not yet implemented")
     }
 
-    override fun removeSession(id: String): SIOPSession? = sessionCache.remove(id)
+    override fun removeSession(id: String) {
+        sessionCache.remove(id)
+    }
 
     val jwtCryptoProvider = runBlocking {
         SimpleJWTCryptoProvider(
@@ -209,7 +211,9 @@ class EBSITestWallet(
         )
     }
 
-    override fun putSession(id: String, session: SIOPSession): SIOPSession? = sessionCache.put(id, session)
+    override fun putSession(id: String, session: SIOPSession) {
+        sessionCache[id] = session
+    }
 
     private fun generatePresentationJwt(credentialTypes: List<String>, session: SIOPSession): String =
         runBlocking {
@@ -232,7 +236,7 @@ class EBSITestWallet(
         }
 
     private fun getDescriptorMap(
-        jwtCredentials: List<String>, credentialDescriptor: List<CredentialDescriptorMapping>
+        jwtCredentials: List<String>, credentialDescriptor: List<CredentialDescriptorMapping>,
     ): List<DescriptorMapping> = jwtCredentials.mapIndexedNotNull { index, vc ->
         vc.decodeJws().let {
             it.payload["vc"]?.jsonObject?.get("type")?.jsonArray?.last()?.jsonPrimitive?.contentOrNull
