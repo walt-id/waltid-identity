@@ -8,7 +8,10 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
-import kotlinx.serialization.json.*
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.encodeToJsonElement
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 
@@ -28,7 +31,7 @@ data class PolicyResultSurrogate(
         check(result != null || error != null) { "Either result or error has to exist in PolicyResult" }
     }
 
-    constructor(value: PolicyResult): this(
+    constructor(value: PolicyResult) : this(
         policy = value.request.policy.name,
         description = value.request.policy.description,
 

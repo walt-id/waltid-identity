@@ -5,7 +5,10 @@ import id.walt.credentials.verification.CredentialWrapperValidatorPolicy
 import id.walt.credentials.verification.HolderBindingException
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.*
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import love.forte.plugin.suspendtrans.annotation.JsPromise
 import love.forte.plugin.suspendtrans.annotation.JvmAsync
 import love.forte.plugin.suspendtrans.annotation.JvmBlocking
@@ -16,9 +19,13 @@ import kotlin.js.JsExport
 @JsExport
 @Serializable
 class HolderBindingPolicy : CredentialWrapperValidatorPolicy(
-    "holder-binding",
-    "Verifies that issuer of the Verifiable Presentation (presenter) is also the subject of all Verifiable Credentials contained within."
 ) {
+
+    override val name = "holder-binding"
+    override val description =
+        "Verifies that issuer of the Verifiable Presentation (presenter) is also the subject of all Verifiable Credentials contained within."
+
+
     @JvmBlocking
     @JvmAsync
     @JsPromise

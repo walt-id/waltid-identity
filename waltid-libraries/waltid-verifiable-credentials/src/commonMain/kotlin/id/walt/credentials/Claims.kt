@@ -1,9 +1,13 @@
 package id.walt.credentials
 
-interface Claims {
+import kotlinx.serialization.Serializable
+
+@Serializable
+sealed interface Claims {
     fun getValue(): String
 }
 
+@Serializable
 enum class JwtClaims(private val value: String) : Claims {
     NotBefore("nbf"),
     NotAfter("exp"),
@@ -12,8 +16,10 @@ enum class JwtClaims(private val value: String) : Claims {
     override fun getValue() = value
 }
 
+@Serializable
 enum class VcClaims {;
 
+    @Serializable
     enum class V1(private val value: String) : Claims {
         NotBefore("issuanceDate"),
         NotAfter("expirationDate");
@@ -21,6 +27,7 @@ enum class VcClaims {;
         override fun getValue() = value
     }
 
+    @Serializable
     enum class V2(private val value: String) : Claims {
         NotBefore("validFrom"),
         NotAfter("validUntil");
