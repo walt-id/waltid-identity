@@ -2,10 +2,9 @@ package id.walt.oid4vc.interfaces
 
 import id.walt.crypto.keys.Key
 import id.walt.oid4vc.providers.TokenTarget
+import id.walt.oid4vc.util.Base64Utils.base64UrlDecode
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
-import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
 
 interface ITokenProvider {
     /**
@@ -26,17 +25,15 @@ interface ITokenProvider {
      */
     fun verifyCOSESign1Signature(target: TokenTarget, token: String): Boolean
 
-    @OptIn(ExperimentalEncodingApi::class)
     fun parseTokenPayload(token: String): JsonObject {
         return token.substringAfter(".").substringBefore(".").let {
-            Json.decodeFromString(Base64.UrlSafe.decode(it).decodeToString())
+            Json.decodeFromString(it.base64UrlDecode().decodeToString())
         }
     }
 
-    @OptIn(ExperimentalEncodingApi::class)
     fun parseTokenHeader(token: String): JsonObject {
         return token.substringBefore(".").let {
-            Json.decodeFromString(Base64.UrlSafe.decode(it).decodeToString())
+            Json.decodeFromString(it.base64UrlDecode().decodeToString())
         }
     }
 }
