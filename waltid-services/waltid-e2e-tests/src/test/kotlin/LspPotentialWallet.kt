@@ -122,7 +122,7 @@ class LspPotentialWallet(val client: HttpClient, val walletId: String) {
     val issuanceReq = IssuanceRequest(
       Json.parseToJsonElement(KeySerialization.serializeKey(LspPotentialIssuanceInterop.POTENTIAL_ISSUER_JWK_KEY)).jsonObject,
       "",
-      "urn:eu.europa.ec.eudi:pid:1",
+      "identity_credential_vc+sd-jwt",
       credentialData = W3CVC(buildJsonObject {
         put("family_name", "Doe")
         put("given_name", "John")
@@ -144,7 +144,7 @@ class LspPotentialWallet(val client: HttpClient, val walletId: String) {
       it.body<CredentialOffer>()
     }
     assertEquals(1, resolvedOffer.credentialConfigurationIds.size)
-    assertEquals("urn:eu.europa.ec.eudi:pid:1", resolvedOffer.credentialConfigurationIds.first())
+    assertEquals("identity_credential_vc+sd-jwt", resolvedOffer.credentialConfigurationIds.first())
 
     // === resolve issuer metadata ===
     val issuerMetadata = client.get("${resolvedOffer.credentialIssuer}/.well-known/openid-credential-issuer").expectSuccess().let {
@@ -174,7 +174,7 @@ class LspPotentialWallet(val client: HttpClient, val walletId: String) {
       contentType(ContentType.Application.Json)
       setBody(
         buildJsonObject {
-          put("request_credentials", JsonArray(listOf(JsonPrimitive("urn:eu.europa.ec.eudi:pid:1"))))
+          put("request_credentials", JsonArray(listOf(JsonPrimitive("identity_credential_vc+sd-jwt"))))
         })
     }
     assertEquals(200, createReqResponse.status.value)
@@ -189,10 +189,10 @@ class LspPotentialWallet(val client: HttpClient, val walletId: String) {
     assertNotNull(parsedRequest.presentationDefinition)
 
     // === find matching credential ===
-//    val matchingCreds = client.post("/wallet-api/wallet/$walletId/exchange/matchCredentialsForPresentationDefinition") {
-//      setBody(parsedRequest.presentationDefinition!!)
-//    }.expectSuccess().let { response -> response.body<List<WalletCredential>>()}
-//    assertNotEquals(0, matchingCreds.size)
+    val matchingCreds = client.post("/wallet-api/wallet/$walletId/exchange/matchCredentialsForPresentationDefinition") {
+      setBody(parsedRequest.presentationDefinition!!)
+    }.expectSuccess().let { response -> response.body<List<WalletCredential>>()}
+    assertNotEquals(0, matchingCreds.size)
 
     client.post("/wallet-api/wallet/$walletId/exchange/usePresentationRequest") {
       setBody(UsePresentationRequest(generatedDid, presReqUrl, listOf(issuedSDJwtVCId)))

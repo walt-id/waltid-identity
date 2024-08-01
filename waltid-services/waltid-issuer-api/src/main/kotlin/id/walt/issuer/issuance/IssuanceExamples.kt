@@ -666,7 +666,7 @@ object IssuanceExamples {
     // language=json
     val sdjwt_vc_identity_credential = """
     {
-     "vct": "https://credentials.example.com/identity_credential",
+     "vct": "identity_credential_vc+sd-jwt",
      "given_name": "John",
      "family_name": "Doe",
      "email": "johndoe@example.com",

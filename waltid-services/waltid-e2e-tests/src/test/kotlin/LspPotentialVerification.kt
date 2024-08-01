@@ -180,7 +180,7 @@ class LspPotentialVerification(private val client: HttpClient) {
         contentType(ContentType.Application.Json)
         setBody(
           buildJsonObject {
-            put("request_credentials", JsonArray(listOf(JsonPrimitive("urn:eu.europa.ec.eudi:pid:1"))))
+            put("request_credentials", JsonArray(listOf(JsonPrimitive("identity_credential_vc+sd-jwt"))))
           })
       }
       assertEquals(200, createReqResponse.status.value)
@@ -190,7 +190,7 @@ class LspPotentialVerification(private val client: HttpClient) {
       assertNotNull(presReq.presentationDefinition)
       assertNotNull(presReq.responseUri)
       assertEquals(VCFormat.sd_jwt_vc, presReq.presentationDefinition!!.inputDescriptors.firstOrNull()?.format?.keys?.first())
-      assertEquals("urn:eu.europa.ec.eudi:pid:1", presReq.presentationDefinition!!.inputDescriptors.flatMap { it.constraints!!.fields!! }.first { it.path.contains("$.vct") }.filter?.get("const")?.jsonPrimitive?.content)
+      assertEquals("identity_credential_vc+sd-jwt", presReq.presentationDefinition!!.inputDescriptors.flatMap { it.constraints!!.fields!! }.first { it.path.contains("$.vct") }.filter?.get("pattern")?.jsonPrimitive?.content)
 
       val ecHolderKey = ECKey.parse(holderKey.exportJWK())
       val cryptoProvider = SimpleMultiKeyJWTCryptoProvider(mapOf(

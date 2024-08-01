@@ -310,6 +310,48 @@ spec:
                 port:
                   name: http
 ---
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: waltid-web-wallet
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: waltid-web-wallet
+  template:
+    metadata:
+      labels:
+        app: waltid-web-wallet
+      annotations:
+        deployment/id: "_DEFAULT_DEPLOYMENT_"
+    spec:
+      containers:
+        - name: waltid-web-wallet
+          image: waltid/waltid-web-wallet:potential
+          imagePullPolicy: Always
+          env:
+            - name: NUXT_PUBLIC_ISSUER_CALLBACK_URL
+              value: "https://wallet.potential.walt-test.cloud"
+            - name: NUXT_PUBLIC_DEMO_WALLET_URL
+              value: "https://wallet.potential.walt-test.cloud"
+          ports:
+            - containerPort: 7101
+              name: http-api
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: waltid-web-wallet
+spec:
+  ports:
+    - name: http
+      port: 80
+      targetPort: http-api
+      protocol: TCP
+  selector:
+    app: waltid-web-wallet
+---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -372,10 +414,10 @@ spec:
                 name: wallet-api
                 port:
                   name: http
-#          - path: /
-#            pathType: Prefix
-#            backend:
-#              service:
-#                name: waltid-web-wallet
-#                port:
-#                  name: http
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: waltid-web-wallet
+                port:
+                  name: http
