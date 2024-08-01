@@ -1,10 +1,10 @@
 package id.walt.sdjwt
 
+import id.walt.sdjwt.utils.Base64Utils.base64UrlDecode
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
-import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
@@ -28,8 +28,7 @@ data class SDisclosure internal constructor(
         /**
          * Parse an encoded disclosure string
          */
-        @OptIn(ExperimentalEncodingApi::class)
-        fun parse(disclosure: String) = Json.parseToJsonElement(Base64.UrlSafe.decode(disclosure).decodeToString()).jsonArray.let {
+        fun parse(disclosure: String) = Json.parseToJsonElement(disclosure.base64UrlDecode().decodeToString()).jsonArray.let {
             if (it.size != 3) {
                 throw Exception("Invalid selective disclosure")
             }
