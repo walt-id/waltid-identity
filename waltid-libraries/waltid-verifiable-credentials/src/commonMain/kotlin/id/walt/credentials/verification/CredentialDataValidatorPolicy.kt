@@ -1,7 +1,6 @@
 package id.walt.credentials.verification
 
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.Transient
 import kotlinx.serialization.json.JsonObject
 import love.forte.plugin.suspendtrans.annotation.JsPromise
 import love.forte.plugin.suspendtrans.annotation.JvmAsync
@@ -12,10 +11,7 @@ import kotlin.js.JsExport
 @Serializable
 @OptIn(ExperimentalJsExport::class)
 @JsExport
-abstract class CredentialDataValidatorPolicy(
-    @Transient override val name: String = "unknown CredentialDataValidatorPolicy",
-    @Transient override val description: String? = null
-) : VerificationPolicy(name, description) {
+abstract class CredentialDataValidatorPolicy : VerificationPolicy() {
     @JvmBlocking
     @JvmAsync
     @JsPromise
@@ -24,10 +20,7 @@ abstract class CredentialDataValidatorPolicy(
 
 }
 
-abstract class JavaCredentialDataValidatorPolicy(
-    override val name: String,
-    override val description: String? = null
-): CredentialDataValidatorPolicy(name, description) {
+abstract class JavaCredentialDataValidatorPolicy : CredentialDataValidatorPolicy() {
     override suspend fun verify(data: JsonObject, args: Any?, context: Map<String, Any>): Result<Any> {
         return runCatching { javaVerify(data, args, context) }
     }

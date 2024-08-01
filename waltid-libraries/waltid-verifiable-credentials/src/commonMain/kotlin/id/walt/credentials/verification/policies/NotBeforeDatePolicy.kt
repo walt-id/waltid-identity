@@ -11,7 +11,9 @@ import id.walt.credentials.verification.NotBeforePolicyException
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.*
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonObject
 import love.forte.plugin.suspendtrans.annotation.JsPromise
 import love.forte.plugin.suspendtrans.annotation.JvmAsync
 import love.forte.plugin.suspendtrans.annotation.JvmBlocking
@@ -23,11 +25,16 @@ import kotlin.time.Duration.Companion.minutes
 @JsExport
 @Serializable
 class NotBeforeDatePolicy : CredentialWrapperValidatorPolicy(
-    "not-before",
-    "Verifies that the credentials not-before date (for JWT: `nbf`, if unavailable: `iat` - 1 min) is correctly exceeded."
 ) {
-    private val vcClaims = listOf<Claims>(VcClaims.V2.NotBefore, VcClaims.V1.NotBefore)
-    private val jwtClaims = listOf<Claims>(JwtClaims.NotBefore, JwtClaims.IssuedAt)
+
+    override val name = "not-before"
+    override val description =
+        "Verifies that the credentials not-before date (for JWT: `nbf`, if unavailable: `iat` - 1 min) is correctly exceeded."
+
+    companion object {
+        private val vcClaims = listOf<Claims>(VcClaims.V2.NotBefore, VcClaims.V1.NotBefore)
+        private val jwtClaims = listOf<Claims>(JwtClaims.NotBefore, JwtClaims.IssuedAt)
+    }
 
     @JvmBlocking
     @JvmAsync

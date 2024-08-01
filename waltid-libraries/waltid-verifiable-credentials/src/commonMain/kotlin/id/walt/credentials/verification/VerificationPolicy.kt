@@ -1,6 +1,7 @@
 package id.walt.credentials.verification
 
-import kotlinx.serialization.*
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonClassDiscriminator
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
@@ -9,7 +10,7 @@ import kotlin.js.JsExport
 @OptIn(ExperimentalJsExport::class, ExperimentalSerializationApi::class)
 @JsExport
 @JsonClassDiscriminator("type")
-abstract class VerificationPolicy(
-    open val name: String,
-    /*@Transient*/ open val description: String? = null,
-)
+abstract class VerificationPolicy {
+    abstract val name: String
+    abstract val description: String
+}

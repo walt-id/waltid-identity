@@ -14,9 +14,11 @@ import kotlin.js.JsExport
 @JsExport
 @Serializable
 class MinimumCredentialsPolicy : CredentialWrapperValidatorPolicy(
-    name = "minimum-credentials",
-    description = "Verifies that a minimum number of credentials are included in the Verifiable Presentation"
 ) {
+
+    override val name = "minimum-credentials"
+    override val description = "Verifies that a minimum number of credentials are included in the Verifiable Presentation"
+
     @JvmBlocking
     @JvmAsync
     @JsPromise

@@ -14,9 +14,10 @@ import kotlin.js.JsExport
 @JsExport
 @Serializable
 class MaximumCredentialsPolicy : CredentialWrapperValidatorPolicy(
-    name = "maximum-credentials",
-    description = "Verifies that a maximum number of credentials in the Verifiable Presentation is not exceeded"
 ) {
+    override val name = "maximum-credentials"
+    override val description = "Verifies that a maximum number of credentials in the Verifiable Presentation is not exceeded"
+
     @JvmBlocking
     @JvmAsync
     @JsPromise

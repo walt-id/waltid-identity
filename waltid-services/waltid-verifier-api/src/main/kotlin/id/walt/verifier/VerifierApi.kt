@@ -30,6 +30,7 @@ import id.walt.verifier.oidc.VerificationUseCase
 import io.github.smiley4.ktorswaggerui.dsl.routing.get
 import io.github.smiley4.ktorswaggerui.dsl.routing.post
 import io.github.smiley4.ktorswaggerui.dsl.routing.route
+import io.klogging.logger
 import io.ktor.client.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.plugins.logging.*
@@ -90,6 +91,8 @@ data class CredentialVerificationRequest(
 )
 
 const val defaultAuthorizeBaseUrl = "openid4vp://authorize"
+
+private val logger = logger("Verifier API")
 
 private val prettyJson = Json { prettyPrint = true }
 private val httpClient = HttpClient {
@@ -285,6 +288,7 @@ fun Application.verfierApi() {
                             call.respond(HttpStatusCode.OK, it)
                         }
                     }.onFailure {
+                        logger.debug(it) { "Verification failed ($it)" }
                         var errorDescription = it.localizedMessage
 
                         if (sessionId != null) {

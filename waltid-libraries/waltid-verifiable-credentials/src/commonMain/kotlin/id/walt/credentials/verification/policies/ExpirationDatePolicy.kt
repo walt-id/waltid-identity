@@ -11,7 +11,9 @@ import id.walt.credentials.verification.ExpirationDatePolicyException
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.*
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonObject
 import love.forte.plugin.suspendtrans.annotation.JsPromise
 import love.forte.plugin.suspendtrans.annotation.JvmAsync
 import love.forte.plugin.suspendtrans.annotation.JvmBlocking
@@ -22,10 +24,15 @@ import kotlin.js.JsExport
 @JsExport
 @Serializable
 class ExpirationDatePolicy : CredentialWrapperValidatorPolicy(
-    "expired", "Verifies that the credentials expiration date (`exp` for JWTs) has not been exceeded."
 ) {
-    private val vcClaims = listOf<Claims>(VcClaims.V2.NotAfter, VcClaims.V1.NotAfter)
-    private val jwtClaims = listOf(JwtClaims.NotAfter)
+
+    override val name = "expired"
+    override val description = "Verifies that the credentials expiration date (`exp` for JWTs) has not been exceeded."
+
+    companion object {
+        private val vcClaims = listOf<Claims>(VcClaims.V2.NotAfter, VcClaims.V1.NotAfter)
+        private val jwtClaims = listOf(JwtClaims.NotAfter)
+    }
 
     @JvmBlocking
     @JvmAsync
