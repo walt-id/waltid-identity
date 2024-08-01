@@ -1,19 +1,17 @@
-import id.walt.platform.utils.ios.DS_Operations
-import id.walt.sdjwt.JWTCryptoProvider
-import id.walt.sdjwt.JwtVerificationResult
-import kotlinx.cinterop.ExperimentalForeignApi
-import kotlinx.serialization.json.JsonObject
-import platform.Security.SecKeyRef
+package id.walt.sdjwt
 
-@OptIn(ExperimentalForeignApi::class)
-class DigitalSignaturesJWTCryptoProvider(private val algorithm: String, private val key: SecKeyRef) :
+import id.walt.platform.utils.ios.HMAC_Operations
+import id.walt.target.ios.keys.toNSData
+import kotlinx.serialization.json.JsonObject
+
+class HMACJWTCryptoProvider(private val algorithm: String, private val key: ByteArray) :
     JWTCryptoProvider {
     override fun sign(payload: JsonObject, keyID: String?, typ: String): String {
 
-        val result = DS_Operations.signWithBody(
+        val result = HMAC_Operations.signWithBody(
             body = payload.toString(),
             alg = algorithm,
-            key = key,
+            key = key.toNSData(),
             typ = typ,
             keyId = keyID
         )
@@ -25,7 +23,7 @@ class DigitalSignaturesJWTCryptoProvider(private val algorithm: String, private 
     }
 
     override fun verify(jwt: String): JwtVerificationResult {
-        val result = DS_Operations.verifyWithJws(jws = jwt, key = key)
+        val result = HMAC_Operations.verifyWithJws(jws = jwt, key = key.toNSData())
 
         return when {
             result.success() -> JwtVerificationResult(result.success()!!)

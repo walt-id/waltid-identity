@@ -33,11 +33,12 @@ class WebhookPolicy : CredentialWrapperValidatorPolicy(
             }
         }
     }
+
     @JvmBlocking
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    override suspend fun verify(data: JsonElement, args: Any?, context: Map<String, Any>): Result<Any> {
+    override suspend fun verify(data: JsonObject, args: Any?, context: Map<String, Any>): Result<Any> {
         val url = (args as JsonPrimitive).content
 
         val response = http.post(url) {

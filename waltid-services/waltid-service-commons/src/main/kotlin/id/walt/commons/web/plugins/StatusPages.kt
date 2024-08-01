@@ -11,8 +11,10 @@ import kotlinx.serialization.json.JsonPrimitive
 
 
 private fun statusCodeForException(cause: Throwable) = when (cause) {
-    is IllegalArgumentException -> HttpStatusCode.BadRequest
     is NotFoundException -> HttpStatusCode.NotFound
+    is IllegalArgumentException -> HttpStatusCode.BadRequest
+    is BadRequestException -> HttpStatusCode.BadRequest
+    is IllegalStateException -> HttpStatusCode.InternalServerError
     is WebException -> cause.status
 
     else -> HttpStatusCode.InternalServerError

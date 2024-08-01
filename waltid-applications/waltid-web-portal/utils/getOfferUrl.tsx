@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { v4 as uuidv4 } from 'uuid';
-import { AvailableCredential, DIDMethodsConfig } from '@/types/credentials';
+import {AvailableCredential, CredentialFormats, DIDMethods, DIDMethodsConfig} from '@/types/credentials';
 
 const getOfferUrl = async (credentials: Array<AvailableCredential>, NEXT_PUBLIC_VC_REPO: string, NEXT_PUBLIC_ISSUER: string) => {
   const data = await fetch(`${NEXT_PUBLIC_ISSUER}/.well-known/openid-credential-issuer`).then(data => {
@@ -9,7 +9,7 @@ const getOfferUrl = async (credentials: Array<AvailableCredential>, NEXT_PUBLIC_
   const credential_configurations_supported = data.credential_configurations_supported;
 
   const payload = await Promise.all(credentials.map(async (c) => {
-    c = { ...c, selectedFormat: c.selectedFormat ?? "JWT + VCDM", selectedDID: c.selectedDID ?? "did:key" };
+    c = {...c, selectedFormat: c.selectedFormat ?? CredentialFormats[0], selectedDID: c.selectedDID ?? DIDMethods[0]};
 
     const offer = { ...c.offer, id: uuidv4() };
     const mapping = await (await fetch(`${NEXT_PUBLIC_VC_REPO}/api/mapping/${c.id}`).then(data => {
