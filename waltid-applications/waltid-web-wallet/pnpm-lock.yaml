@@ -26,12 +26,18 @@ importers:
       jsonpath-plus:
         specifier: ^9.0.0
         version: 9.0.0
+      pinia:
+        specifier: ^2.2.0
+        version: 2.2.0(typescript@5.5.4)(vue@3.4.35(typescript@5.5.4))
       qr-scanner:
         specifier: ^1.4.2
         version: 1.4.2
       qrcode.vue:
         specifier: ^3.4.1
         version: 3.4.1(vue@3.4.35(typescript@5.5.4))
+      unocss:
+        specifier: ^0.61.9
+        version: 0.61.9(@unocss/webpack@0.61.9(rollup@4.19.2)(webpack@5.93.0(esbuild@0.23.0)))(postcss@8.4.40)(rollup@4.19.2)(vite@5.3.5(@types/node@22.0.2)(sass@1.77.8)(terser@5.31.3))
     devDependencies:
       '@antfu/eslint-config':
         specifier: 2.24.1
@@ -63,6 +69,9 @@ importers:
       '@unocss/nuxt':
         specifier: 0.61.9
         version: 0.61.9(magicast@0.3.4)(postcss@8.4.40)(rollup@4.19.2)(vite@5.3.5(@types/node@22.0.2)(sass@1.77.8)(terser@5.31.3))(webpack@5.93.0(esbuild@0.23.0))
+      '@unocss/preset-icons':
+        specifier: ^0.61.9
+        version: 0.61.9
       '@unocss/transformer-directives':
         specifier: ^0.61.9
         version: 0.61.9
