@@ -104,9 +104,10 @@ object OidcApi : CIProvider() {
                 try {
                     val authResp = if (authReq.responseType.contains(ResponseType.Code)) {
                         if (authReq.clientId.startsWith("did:key") && authReq.clientId.length == 186) {  // EBSI conformance
-                            // TODO: test following two lines:
-                            val idTokenRequestKid = OidcApi.sessionCredentialPreMapping[authReq.issuerState!!].first().issuerKey.key.getKeyId()
-                            val privKey = OidcApi.sessionCredentialPreMapping[authReq.issuerState!!].first().issuerKey
+                            val issuanceSessionData = OidcApi.sessionCredentialPreMapping[authReq.issuerState!!] ?: error("No such pre mapping: ${authReq.issuerState}")
+
+                            val idTokenRequestKid = issuanceSessionData.first().issuerKey.key.getKeyId()
+                            val privKey = issuanceSessionData.first().issuerKey
                             logger.info { "PrivateKey is: $privKey" }
                             logger.info { "KID is: $idTokenRequestKid" }
                             processCodeFlowAuthorizationWithIdTokenRequest(authReq, idTokenRequestKid, privKey.key)

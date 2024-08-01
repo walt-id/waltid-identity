@@ -37,9 +37,9 @@ object IssuanceOfferManager {
 
         for (typeId in keys) {
             if (sessionTypePersistence.listSize(typeId) > 0) {
-                val type = sessionTypeDocumentPersistence[typeId].split(";")
-
-                activeSessionTypes.add(type)
+                sessionTypeDocumentPersistence[typeId]?.split(";")?.let { type ->
+                    activeSessionTypes.add(type)
+                }
             }
         }
 

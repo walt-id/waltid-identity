@@ -183,7 +183,7 @@ open class CIProvider : OpenIDCredentialIssuer(
     override fun getDeferredCredential(credentialID: String): CredentialResult {
         if (deferredCredentialRequests.contains(credentialID)) {
             return doGenerateCredential(
-                deferredCredentialRequests[credentialID], null, null
+                deferredCredentialRequests[credentialID] ?: error("No such deferred credential request: $credentialID"), null, null
             ) // TODO: the null parameters
         }
         throw DeferredCredentialError(CredentialErrorCode.invalid_request, message = "Invalid credential ID given")
