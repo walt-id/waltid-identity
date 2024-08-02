@@ -254,14 +254,83 @@ async function acceptCredential() {
         console.log("DIDs:" + dids.value[0]);
         return;
     }
-    console.log("Issue to: " + did);
-    try {
-        await $fetch(`/wallet-api/wallet/${currentWallet.value}/exchange/useOfferRequest?did=${did}`, {
-            method: "POST",
-            body: request,
+  console.log(credentialOffer)
+  console.log("credentialOffer")
+  console.log("credentialOffer")
+  console.log("credentialOffer")
+  console.log("credentialOffer")
+
+  console.log("Issueaaa to: " + did);
+
+  console.log("credentialOffer")
+  console.log("credentialOffer")
+  console.log("credentialOffer")
+  console.log(credentialOffer["grants"])
+  console.log(credentialOffer["grants"]["authorization_code"]["issuer_state"] != null)
+  console.log(credentialOffer["grants"]["urn:ietf:params:oauth:grant-type:pre-authorized_code"]  == null )
+
+  console.log("credentialOffer")
+  console.log("credentialOffer")
+  console.log("credentialOffer")
+  console.log("credentialOffer")
+
+    if (!credentialOffer["grants"]["urn:ietf:params:oauth:grant-type:pre-authorized_code"]) {
+      console.log("IssuerStateeee")
+      console.log("IssuerStateeee")
+      console.log("IssuerStateeee")
+      console.log("IssuerStateeee")
+      console.log("IssuerStateeee")
+      try {
+        // let consentPageUri = `http://localhost:7101/wallet/${currentWallet.value}/exchange/presentation`
+        let consentPageUri = `http://localhost:7101/api/siop/initiatePresentation?response_type=vp_token&client_id=https://verifier.portal.walt-test.cloud/openid4vc/verify&response_mode=direct_post&state=iEBA6LxeQUNk&presentation_definition_uri=https://verifier.portal.walt-test.cloud/openid4vc/pd/iEBA6LxeQUNk&client_id_scheme=redirect_uri&client_metadata={"authorization_encrypted_response_alg":"ECDH-ES","authorization_encrypted_response_enc":"A256GCM"}&nonce=87736c12-084f-4984-88a7-c936cb03cd72&response_uri=https://verifier.portal.walt-test.cloud/openid4vc/verify/iEBA6LxeQUNk`
+        let response = await $fetch(`/wallet-api/wallet/${currentWallet.value}/exchange/useOfferRequestAuth?did=${did}&offer=${request}&consentPageUri=${consentPageUri}`, {
+          method: "get",
         });
-        navigateTo(`/wallet/${currentWallet.value}`);
-    } catch (e) {
+        //
+        console.log("aaaaa")
+        console.log("aaaaa")
+        console.log("aaaaa")
+        console.log("aaaaa")
+        console.log("aaaaa")
+
+        console.log(response)
+        console.log(response)
+        console.log(response["request"])
+        console.log(response["type"])
+        console.log(response)
+
+        const requestUrl = new URL(decodeRequest(response["request"]));
+        const requestParams = requestUrl.searchParams;
+        console.log("requestParams")
+        console.log("requestParams")
+        console.log("requestParams")
+        console.log("requestParams")
+        console.log("requestParams")
+        console.log(requestParams["request"])
+        console.log(response["type"])
+        console.log(requestParams)
+        console.log("requestParams")
+        console.log("requestParams")
+        console.log("requestParams")
+        console.log("requestParams")
+        console.log("requestParams")
+        console.log("requestParams")
+
+        let reqBase64HardCode = "b3BlbmlkOi8vP3Jlc3BvbnNlX3R5cGU9dnBfdG9rZW4mY2xpZW50X2lkPWh0dHBzOi8vdmVyaWZpZXIucG9ydGFsLndhbHQtdGVzdC5jbG91ZC9vcGVuaWQ0dmMvdmVyaWZ5JnJlc3BvbnNlX21vZGU9ZGlyZWN0X3Bvc3Qmc3RhdGU9NnFWSkFibXd3U2lBJnByZXNlbnRhdGlvbl9kZWZpbml0aW9uX3VyaT1odHRwczovL3ZlcmlmaWVyLnBvcnRhbC53YWx0LXRlc3QuY2xvdWQvb3BlbmlkNHZjL3BkLzZxVkpBYm13d1NpQSZjbGllbnRfaWRfc2NoZW1lPXJlZGlyZWN0X3VyaSZjbGllbnRfbWV0YWRhdGE9JTdCJTIyYXV0aG9yaXphdGlvbl9lbmNyeXB0ZWRfcmVzcG9uc2VfYWxnJTIyOiUyMkVDREgtRVMlMjIsJTIyYXV0aG9yaXphdGlvbl9lbmNyeXB0ZWRfcmVzcG9uc2VfZW5jJTIyOiUyMkEyNTZHQ00lMjIlN0Qmbm9uY2U9YTJhMGIwM2UtZjAxNi00YTkwLTk2ZWUtY2VkODU0YWMzZmRjJnJlc3BvbnNlX3VyaT1odHRwczovL3ZlcmlmaWVyLnBvcnRhbC53YWx0LXRlc3QuY2xvdWQvb3BlbmlkNHZjL3ZlcmlmeS82cVZKQWJtd3dTaUE"
+
+        if (response["type"] === "id_token"){
+          navigateTo({ path: `/wallet/${currentWallet.value}/exchange/idpresentation`, query: { request: response["request"] } });
+        } else if (response["type"] === "vp_token"){
+          navigateTo({ path: `/wallet/${currentWallet.value}/exchange/presentation`, query: { request: response["request"]} });
+        } else {
+          failed.value = true;
+          failMessage.value = "Error when getting type of authentication request. No id_toke/vp_token value"
+          console.log("Error: ", failMessage.value);
+          alert("Error occurred while trying to receive credential: " + failMessage.value);
+          throw failMessage;
+        }
+
+      } catch (e) {
         failed.value = true;
 
         let errorMessage = e?.data.startsWith("{") ? JSON.parse(e.data) : e.data ?? e;
@@ -273,7 +342,38 @@ async function acceptCredential() {
         alert("Error occurred while trying to receive credential: " + failMessage.value);
 
         throw e;
+      }
+    } else if (credentialOffer["grants"]["urn:ietf:params:oauth:grant-type:pre-authorized_code"] ) {
+      console.log("PreAuth")
+      console.log("PreAuth")
+      console.log("PreAuth")
+      console.log("PreAuth")
+      console.log("PreAuth")
+      console.log("PreAuth")
+      try {
+        await $fetch(`/wallet-api/wallet/${currentWallet.value}/exchange/useOfferRequest?did=${did}`, {
+          method: "POST",
+          body: request,
+        });
+        navigateTo(`/wallet/${currentWallet.value}`);
+      } catch (e) {
+        failed.value = true;
+
+        let errorMessage = e?.data.startsWith("{") ? JSON.parse(e.data) : e.data ?? e;
+        errorMessage = errorMessage?.message ?? errorMessage;
+
+        failMessage.value = errorMessage;
+
+        console.log("Error: ", e?.data);
+        alert("Error occurred while trying to receive credential: " + failMessage.value);
+
+        throw e;
+      }
+    } else{
+      failed.value = true
+      alert("Error occurred while trying to receive credential offer - no flow specified ");
     }
+
 }
 
 if (query.accept) {

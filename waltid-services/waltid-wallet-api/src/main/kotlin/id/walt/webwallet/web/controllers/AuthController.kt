@@ -20,6 +20,7 @@ import id.walt.webwallet.service.WalletServiceManager
 import id.walt.webwallet.service.WalletServiceManager.oidcConfig
 import id.walt.webwallet.service.account.AccountsService
 import id.walt.webwallet.service.account.KeycloakAccountStrategy
+import id.walt.webwallet.service.exchange.authReqSessions
 import id.walt.webwallet.web.ForbiddenException
 import id.walt.webwallet.web.InsufficientPermissionsException
 import id.walt.webwallet.web.UnauthorizedException
@@ -408,6 +409,14 @@ private fun PipelineContext<Unit, ApplicationCall>.clearUserSession() {
     }
 }
 
+fun PipelineContext<Unit, ApplicationCall>.getUserUUIDByAuthReqSessions() : UUID {
+    runCatching {
+        val authReqSessionId = call.parameters["authReqSessionId"] ?: throw UnauthorizedException("Could not find user for the authorization request.")
+        val userId = authReqSessions[authReqSessionId]?.accountId ?: throw UnauthorizedException("Could not find account id for the authorization request.")
+        return userId
+    }.getOrElse { throw IllegalArgumentException("Invalid user id: $it") }
+}
+
 fun PipelineContext<Unit, ApplicationCall>.getUserId() =
     call.principal<UserIdPrincipal>("auth-session")
         ?: call.principal<UserIdPrincipal>("auth-bearer")
@@ -419,16 +428,24 @@ fun PipelineContext<Unit, ApplicationCall>.getUserUUID() =
     runCatching { UUID(getUserId().name) }
         .getOrElse { throw IllegalArgumentException("Invalid user id: $it") }
 
-fun PipelineContext<Unit, ApplicationCall>.getWalletId() =
+fun PipelineContext<Unit, ApplicationCall>.getWalletId(userId: UUID? = null) =
     runCatching {
         UUID(call.parameters["wallet"] ?: throw IllegalArgumentException("No wallet ID provided"))
     }.getOrElse { throw IllegalArgumentException("Invalid wallet ID provided: ${it.message}") }
         .also {
-            ensurePermissionsForWallet(AccountWalletPermissions.READ_ONLY, walletId = it)
+            println(it)
+            when (userId) {
+                null -> ensurePermissionsForWallet(AccountWalletPermissions.READ_ONLY, walletId = it)
+                else -> ensurePermissionsForWallet(AccountWalletPermissions.READ_ONLY, walletId = it, userId = userId)
+            }
         }
 
 fun PipelineContext<Unit, ApplicationCall>.getWalletService(walletId: UUID) =
     WalletServiceManager.getWalletService("", getUserUUID(), walletId) // FIXME -> TENANT HERE
+
+fun PipelineContext<Unit, ApplicationCall>.getWalletServiceUnprotected() =
+    WalletServiceManager.getWalletService("", getUserUUIDByAuthReqSessions(), getWalletId(getUserUUIDByAuthReqSessions())) // FIXME -> TENANT HERE
+
 
 fun PipelineContext<Unit, ApplicationCall>.getWalletService() =
     WalletServiceManager.getWalletService("", getUserUUID(), getWalletId()) // FIXME -> TENANT HERE
@@ -439,12 +456,12 @@ fun PipelineContext<Unit, ApplicationCall>.getUsersSessionToken(): String? =
 
 fun PipelineContext<Unit, ApplicationCall>.ensurePermissionsForWallet(
     required: AccountWalletPermissions,
-
     userId: UUID = getUserUUID(),
     walletId: UUID = getWalletId(),
 ): Boolean {
 
-
+println(userId)
+    println(walletId)
     val permissions = transaction {
         (AccountWalletMappings.selectAll()
             .where {

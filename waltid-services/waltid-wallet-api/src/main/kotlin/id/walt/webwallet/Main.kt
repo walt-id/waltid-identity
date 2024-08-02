@@ -58,6 +58,7 @@ fun Application.webWalletModule(withPlugins: Boolean = true) {
     if (withPlugins) {
         configurePlugins()
     }
+
     auth()
     accounts();
     { push() } whenFeature FeatureCatalog.pushFeature
@@ -67,6 +68,7 @@ fun Application.webWalletModule(withPlugins: Boolean = true) {
     dids()
     credentials()
     exchange()
+    redirects()
     history();
     { web3accounts() } whenFeature FeatureCatalog.web3
     issuers()

@@ -676,7 +676,7 @@ class CI_JVM_Test {
         println("// --Authentication method is NONE--")
         // Issuer Client generates authorization code
         var authorizationCode = "secured_code"
-        var authCodeResponse: AuthorizationCodeResponse = AuthorizationCodeResponse.success(authorizationCode,  mapOf("state" to listOf(authReqWallet.state!!)))
+        var authCodeResponse: AuthorizationCodeResponse = AuthorizationCodeResponse.success(authorizationCode,  authReqWallet.state)
         var redirectUri = testCredentialIssuanceIsolatedFunctionsAuthCodeFlowRedirectWithCode(authCodeResponse, authReqWallet)
 
         // Issuer client redirects the request to redirectUri
@@ -820,7 +820,7 @@ class CI_JVM_Test {
 
         // Issuer client generates authorization code
         authorizationCode = "secured_code_idtoken"
-        authCodeResponse = AuthorizationCodeResponse.success(authorizationCode,  mapOf("state" to listOf(authReqWallet.state!!)))
+        authCodeResponse = AuthorizationCodeResponse.success(authorizationCode,  authReqWallet.state)
 
         redirectUri = authCodeResponse.toRedirectUri(authReq.redirectUri ?: TODO(), authReq.responseMode ?: ResponseMode.query)
         Url(redirectUri).let {
@@ -971,7 +971,7 @@ class CI_JVM_Test {
 
         // Issuer client generates authorization code
         authorizationCode = "secured_code_vptoken"
-        authCodeResponse = AuthorizationCodeResponse.success(authorizationCode,  mapOf("state" to listOf(authReqWallet.state!!)))
+        authCodeResponse = AuthorizationCodeResponse.success(authorizationCode,  authReqWallet.state)
 
         redirectUri = authCodeResponse.toRedirectUri(authReq.redirectUri ?: TODO(), authReq.responseMode ?: ResponseMode.query)
         Url(redirectUri).let {

@@ -32,6 +32,7 @@ data class AuthorizationRequest(
     val walletIssuer: String? = null,
     val userHint: String? = null,
     val issuerState: String? = null,
+    val request: String? = null,
     val requestUri: String? = null,
     val presentationDefinition: PresentationDefinition? = null,
     val presentationDefinitionUri: String? = null,
@@ -65,6 +66,7 @@ data class AuthorizationRequest(
             walletIssuer?.let { put("wallet_issuer", listOf(it)) }
             userHint?.let { put("user_hint", listOf(it)) }
             issuerState?.let { put("issuer_state", listOf(it)) }
+            request?.let { put("request", listOf(it)) }
             requestUri?.let { put("request_uri", listOf(it)) }
             presentationDefinition?.let { put("presentation_definition", listOf(it.toJSONString())) }
             presentationDefinitionUri?.let { put("presentation_definition_uri", listOf(it)) }
@@ -187,6 +189,9 @@ data class AuthorizationRequest(
         return IHTTPDataObject.toHttpQueryString(toRequestObjectByReferenceHttpParameters(requestUri))
     }
 
+    fun compareWithJwtRequestObject(other: AuthorizationRequest): Boolean {
+        return this.copy(customParameters = mapOf(), requestUri = null, request = null) == other.copy(customParameters = mapOf(), requestUri = null, request = null)
+    }
     companion object : HTTPDataObjectFactory<AuthorizationRequest>() {
         private val knownKeys = setOf(
             "response_type",
@@ -198,6 +203,8 @@ data class AuthorizationRequest(
             "wallet_issuer",
             "user_hint",
             "issuer_state",
+            "request",
+            "request_uri",
             "presentation_definition",
             "presentation_definition_uri",
             "client_id_scheme",
@@ -259,6 +266,7 @@ data class AuthorizationRequest(
                 parameters["wallet_issuer"]?.firstOrNull(),
                 parameters["user_hint"]?.firstOrNull(),
                 parameters["issuer_state"]?.firstOrNull(),
+                parameters["request"]?.firstOrNull(),
                 parameters["request_uri"]?.firstOrNull(),
                 parameters["presentation_definition"]?.firstOrNull()?.let { PresentationDefinition.fromJSONString(it) },
                 parameters["presentation_definition_uri"]?.firstOrNull(),

@@ -175,7 +175,7 @@ class SSIKit2WalletService(
     /**
      * @return redirect uri
      */
-    override suspend fun usePresentationRequest(parameter: PresentationRequestParameter): Result<String?> {
+    override suspend fun usePresentationRequest(parameter: PresentationRequestParameter): Result<Map<String, String?>?> {
         val credentialWallet = getCredentialWallet(parameter.did)
 
         val authReq =
@@ -213,7 +213,8 @@ class SSIKit2WalletService(
         val isResponseRedirectUrl = httpResponseBody != null && httpResponseBody.take(10).lowercase().let {
             @Suppress("HttpUrlsUsage")
             it.startsWith("http://") || it.startsWith("https://")
-        }
+        } || (resp.status.value == 302 && !resp.headers["location"].toString().contains("error"))
+
         logger.debug { "HTTP Response: $resp, body: $httpResponseBody" }
         parameter.selectedCredentials.forEach {
             credentialService.get(walletId, it)?.run {
@@ -236,12 +237,10 @@ class SSIKit2WalletService(
             }
         }
 
-
-
         return if (resp.status.value == 302 && !resp.headers["location"].toString().contains("error")) {
-            Result.success(if (isResponseRedirectUrl) httpResponseBody else null)
+            Result.success(if (isResponseRedirectUrl) mapOf("isRedirect" to "true", "redirectUri" to resp.headers["location"])  else null)
         } else if (resp.status.isSuccess()) {
-            Result.success(if (isResponseRedirectUrl) httpResponseBody else null)
+            Result.success(if (isResponseRedirectUrl) mapOf("isRedirect" to "true", "redirectUri" to httpResponseBody) else null)
         } else {
             if (isResponseRedirectUrl) {
                 Result.failure(

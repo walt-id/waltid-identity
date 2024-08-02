@@ -82,6 +82,7 @@ dependencies {
     implementation("io.ktor:ktor-server-cio-jvm:$ktor_version")
     implementation("io.ktor:ktor-server-method-override:$ktor_version")
     implementation("io.ktor:ktor-server-rate-limit:$ktor_version")
+    implementation("io.ktor:ktor-server-cors:$ktor_version")
 
     // Ktor client
     implementation("io.ktor:ktor-client-core-jvm:$ktor_version")

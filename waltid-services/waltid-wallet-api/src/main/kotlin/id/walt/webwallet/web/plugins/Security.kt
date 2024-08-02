@@ -24,9 +24,11 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.seconds
-
+import io.ktor.server.plugins.cors.*
+import io.ktor.server.plugins.cors.routing.CORS
 
 fun Application.configureSecurity() {
+
     install(Sessions) {
         cookie<LoginTokenSession>("login") {
             // cookie.encoding = CookieEncoding.BASE64_ENCODING

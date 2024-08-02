@@ -118,8 +118,6 @@ data class OpenIDProviderMetadata @OptIn(ExperimentalSerializationApi::class) co
     override val customParameters: Map<String, JsonElement> = mapOf()
 ) : JsonDataObject() {
 
-
-
     @EncodeDefault @SerialName("credentials_supported") @Serializable(CredentialSupportedListSerializer::class)
     val credentialsSupported = credentialConfigurationsSupported?.values?.toList()
     override fun toJSON(): JsonObject = Json.encodeToJsonElement(OpenIDProviderMetadataSerializer, this).jsonObject
@@ -127,6 +125,16 @@ data class OpenIDProviderMetadata @OptIn(ExperimentalSerializationApi::class) co
     companion object : JsonDataObjectFactory<OpenIDProviderMetadata>() {
         override fun fromJSON(jsonObject: JsonObject): OpenIDProviderMetadata =
             Json.decodeFromJsonElement(OpenIDProviderMetadataSerializer, jsonObject)
+    }
+
+    fun validateBasic() {
+        requireNotNull(this.credentialIssuer) { "Error in issuer-metadata - Credential Issuer must not be null" }
+        requireNotNull(this.issuer) { "Error in issuer-metadata - Issuer must not be null" }
+        requireNotNull(this.authorizationEndpoint) { "Error in issuer-metadata - Authorization endpoint must not be null" }
+        requireNotNull(this.tokenEndpoint) { "Error in issuer-metadata - Token endpoint must not be null" }
+        requireNotNull(this.jwksUri) { "Error in issuer-metadata - JWKS URI must not be null" }
+        requireNotNull(this.credentialEndpoint) { "Error in issuer-metadata - Credential endpoint must not be null" }
+        requireNotNull(this.credentialConfigurationsSupported)  { "Error in issuer-metadata - Credential Configuration Supported must not be null" }
     }
 }
 

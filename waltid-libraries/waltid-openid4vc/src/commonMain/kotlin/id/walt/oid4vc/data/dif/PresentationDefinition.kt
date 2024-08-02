@@ -1,10 +1,7 @@
 package id.walt.oid4vc.data.dif
 
-import id.walt.oid4vc.data.JsonDataObject
-import id.walt.oid4vc.data.JsonDataObjectFactory
-import id.walt.oid4vc.data.JsonDataObjectSerializer
+import id.walt.oid4vc.data.*
 import id.walt.oid4vc.util.ShortIdUtils
-import id.walt.oid4vc.data.OpenId4VPProfile
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -21,7 +18,6 @@ data class PresentationDefinition(
     override val customParameters: Map<String, JsonElement> = mapOf()
 ) : JsonDataObject() {
     override fun toJSON() = Json.encodeToJsonElement(PresentationDefinitionSerializer, this).jsonObject
-
 
     /**
      * https://identity.foundation/presentation-exchange/spec/v1.0.0/#input-descriptor

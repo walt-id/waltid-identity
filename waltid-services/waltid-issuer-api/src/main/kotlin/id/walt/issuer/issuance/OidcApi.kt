@@ -185,7 +185,7 @@ object OidcApi : CIProvider() {
                     }
 
                     val redirectUri = when(authMethod) {
-                        AuthenticationMethod.VP_TOKEN, AuthenticationMethod.ID_TOKEN -> authReq.clientMetadata!!.customParameters["authorization_endpoint"]?.jsonPrimitive?.content ?: "openid://"
+                        AuthenticationMethod.VP_TOKEN, AuthenticationMethod.ID_TOKEN -> authReq.clientMetadata?.customParameters?.get("authorization_endpoint")?.jsonPrimitive?.content ?: "openid://"
                         else -> if (authReq.isReferenceToPAR) {
                                     getPushedAuthorizationSession(authReq).authorizationRequest?.redirectUri
                                 } else {
@@ -249,7 +249,9 @@ object OidcApi : CIProvider() {
                     // Verify and Parse VP Token
                     val policies = Json.parseToJsonElement("""["signature", "expired", "not-before"]""").jsonArray.parsePolicyRequests()
 
-                   Verifier.verifyPresentation(vpTokenJwt = vpToken, vpPolicies = policies, globalVcPolicies = policies, specificCredentialPolicies = emptyMap(), mapOf("presentationSubmission" to presSub))
+                    val result = Verifier.verifyPresentation(vpTokenJwt = vpToken, vpPolicies = policies, globalVcPolicies = policies, specificCredentialPolicies = emptyMap(), mapOf("presentationSubmission" to presSub)).overallSuccess()
+
+                    require(result){"Verification failed"}
                 }
 
                 // Process response

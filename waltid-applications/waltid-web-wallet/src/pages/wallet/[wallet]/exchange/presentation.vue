@@ -152,20 +152,19 @@ import {encodeDisclosure, parseDisclosures} from "~/composables/disclosures";
 const currentWallet = useCurrentWallet();
 
 async function resolvePresentationRequest(request) {
-    try {
-        console.log("RESOLVING request", request);
-        const response = await $fetch(`/wallet-api/wallet/${currentWallet.value}/exchange/resolvePresentationRequest`, {
-            method: "POST",
-            body: request
-        });
-        console.log(response);
-        return response;
-    } catch (e) {
-        failed.value = true;
-        throw e;
-    }
+  try {
+    console.log("RESOLVING request", request);
+    const response = await $fetch(`/wallet-api/wallet/${currentWallet.value}/exchange/resolvePresentationRequest`, {
+      method: "POST",
+      body: request
+    });
+    console.log(response);
+    return response;
+  } catch (e) {
+    failed.value = true;
+    throw e;
+  }
 }
-
 
 const query = useRoute().query;
 
@@ -258,18 +257,40 @@ async function acceptPresentation() {
     const response = await fetch(`/wallet-api/wallet/${currentWallet.value}/exchange/usePresentationRequest`, {
         method: "POST",
         body: JSON.stringify(req),
-        redirect: "manual",
+        // redirect: "manual",
         headers: {
             "Content-Type": "application/json"
         }
     });
-
+  console.log(response)
+  console.log(response)
+  console.log(response)
+  console.log(response)
+  console.log(response)
+  console.log(response)
+  console.log(response)
+  console.log(response)
+  console.log(response)
     if (response.ok) {
-        console.log("Response: " + response);
+        console.log("Response: " + JSON.stringify(response));
         const parsedResponse: { redirectUri: string } = await response.json();
+      console.log(parsedResponse)
+      console.log(parsedResponse)
+      console.log(parsedResponse)
+      console.log(parsedResponse)
+      console.log(parsedResponse)
+      console.log(parsedResponse)
+      console.log(parsedResponse)
 
         if (parsedResponse.redirectUri) {
-            navigateTo(parsedResponse.redirectUri, {
+          console.log("navigateTo")
+          console.log("navigateTo")
+          console.log("navigateTo")
+          console.log("navigateTo")
+          console.log("navigateTo")
+          console.log("navigateTo")
+
+          navigateTo(parsedResponse.redirectUri, {
                 external: true
             });
         } else {

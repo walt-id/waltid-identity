@@ -33,7 +33,11 @@ abstract class HTTPDataObject : IHTTPDataObject {
 
 abstract class HTTPDataObjectFactory<T : HTTPDataObject> {
     abstract fun fromHttpParameters(parameters: Map<String, List<String>>): T
-    fun fromHttpQueryString(query: String) = fromHttpParameters(
+    fun fromHttpQueryString(query: String) :T
+    { val resp = fromHttpParameters(
         parseQueryString(query).toMap()
     )
+        println(resp)
+        return resp
+    }
 }

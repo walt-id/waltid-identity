@@ -18,7 +18,6 @@ fun Application.configureHTTP() {
         allowMethod(HttpMethod.Patch)
         allowNonSimpleContentTypes = true
         allowCredentials = true
-
         allowOrigins { true }
         anyHost()
     }

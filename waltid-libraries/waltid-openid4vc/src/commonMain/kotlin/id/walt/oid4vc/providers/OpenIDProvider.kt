@@ -161,7 +161,7 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
             )
         val authorizationSession = getOrInitAuthorizationSession(authorizationRequest)
         val code = generateAuthorizationCodeFor(authorizationSession)
-        return AuthorizationCodeResponse.success(code,  mapOf("state" to listOf(authorizationRequest.state ?: randomUUID())))
+        return AuthorizationCodeResponse.success(code, authorizationRequest.state)
     }
 
     open fun processDirectPost(state: String, tokenPayload: JsonObject) : AuthorizationCodeResponse {
@@ -173,10 +173,9 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
         // if (payload[JWTClaims.Payload.nonce] != session.)
 
         // Generate code and proceed as regular authorization request
-        val mappedState = mapOf("state" to listOf(session.authorizationRequest?.state!!))
         val code = generateAuthorizationCodeFor(session)
 
-        return AuthorizationCodeResponse.success(code, mappedState)
+        return AuthorizationCodeResponse.success(code, session.authorizationRequest?.state)
     }
 
     // TO-DO: JAR OAuth2.0 specification https://www.rfc-editor.org/rfc/rfc9101.html
