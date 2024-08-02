@@ -72,27 +72,29 @@ object OpenID4VCI {
         return getCIProviderMetadataUrl(credOffer.credentialIssuer)
     }
 
-    fun getCIProviderMetadataUrl(baseUrl: String): String {
-        return URLBuilder(baseUrl).apply {
+    fun getCIProviderMetadataUrl(baseUrl: String) = URLBuilder(baseUrl).apply {
             appendPathSegments(".well-known", "openid-credential-issuer")
         }.buildString()
-    }
 
-    fun getCommonProviderMetadataUrl(baseUrl: String): String {
-        return URLBuilder(baseUrl).apply {
+    fun getCommonProviderMetadataUrl(baseUrl: String) = URLBuilder(baseUrl).apply {
             appendPathSegments(".well-known", "openid-configuration")
         }.buildString()
-    }
 
-    suspend fun resolveCIProviderMetadata(credOffer: CredentialOffer): OpenIDProviderMetadata {
-        return http.get(getCIProviderMetadataUrl(credOffer)).bodyAsText().let {
-            OpenIDProviderMetadata.fromJSONString(it)
-        }
+    fun getOAuthProviderMetadataUrl(baseUrl: String) = URLBuilder(baseUrl).apply {
+            appendPathSegments(".well-known", "oauth-authorization-server")
+        }.buildString()
+
+    fun getJWTIssuerProviderMetadataUrl(baseUrl: String) = URLBuilder(baseUrl).apply {
+            appendPathSegments(".well-known", "jwt-issuer")
+        }.buildString()
+
+    suspend fun resolveCIProviderMetadata(credOffer: CredentialOffer) = http.get(getCIProviderMetadataUrl(credOffer)).bodyAsText().let {
+        OpenIDProviderMetadata.fromJSONString(it)
     }
 
     fun resolveOfferedCredentials(credentialOffer: CredentialOffer, providerMetadata: OpenIDProviderMetadata): List<OfferedCredential> {
         val supportedCredentials =
-            providerMetadata.credentialsSupported?.filter { it.id.isNotEmpty() }?.associateBy { it.id } ?: mapOf()
+            providerMetadata.credentialConfigurationsSupported ?: mapOf()
         return credentialOffer.credentialConfigurationIds.mapNotNull { c ->
             supportedCredentials[c]?.let {
                 OfferedCredential.fromProviderMetadata(it)

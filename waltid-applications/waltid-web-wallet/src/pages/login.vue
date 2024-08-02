@@ -12,7 +12,7 @@
                         !
                     </p>
                     <p v-if="isOidcLogin" class="flex items-center">
-                        <LoadingIndicator> OIDC Login processing... </LoadingIndicator>
+                        <LoadingIndicator> OIDC Login processing...</LoadingIndicator>
                     </p>
                 </div>
 
@@ -78,11 +78,11 @@
                                     <input
                                         id="email"
                                         v-model="emailInput"
+                                        :required="true"
                                         autocomplete="email"
                                         autofocus
                                         class="block w-full rounded-md border-0 py-1.5 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6 px-2 text-gray-600"
                                         name="email"
-                                        :required="true"
                                         type="email"
                                     />
                                 </div>
@@ -99,10 +99,10 @@
                                     <input
                                         id="password"
                                         v-model="passwordInput"
+                                        :required="true"
                                         autocomplete="current-password"
                                         class="block w-full rounded-md border-0 py-1.5 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6 px-2 text-gray-600"
                                         name="password"
-                                        :required="true"
                                         type="password"
                                     />
                                 </div>
@@ -237,7 +237,7 @@ import useModalStore from "~/stores/useModalStore";
 import { useUserStore } from "~/stores/user";
 import { storeToRefs } from "pinia";
 import { useTenant } from "~/composables/tenants";
-import {decodeJwt} from "jose";
+import { decodeJwt } from "jose";
 
 const store = useModalStore();
 
@@ -275,9 +275,8 @@ async function login() {
     };
 
     // try {
-    await signIn({ email: emailInput, password: passwordInput, type: "email" }, { callbackUrl: signInRedirectUrl.value })
+    await signIn( { email: emailInput, password: passwordInput, type: "email" }, { callbackUrl: signInRedirectUrl.value })
         .then((data) => {
-
             user.value = {
                 id: "",
                 email: userData.email,
@@ -299,7 +298,7 @@ function closeModal() {
 
 function openWeb3() {
     console.log("open web3");
-    alert("Not supported in this version.")
+    alert("Not supported in this version.");
 
     /*store.openModal({
         component: ConnectWalletModal,
@@ -341,10 +340,8 @@ async function tryLoginWithOidcSession() {
         redirect: "manual",
     });
 
-
-
     const tokenText = await token.text();
-  console.log("text token : " + tokenText);
+    console.log("text token : " + tokenText);
 
     await signIn(
         {
@@ -355,17 +352,17 @@ async function tryLoginWithOidcSession() {
         { callbackUrl: signInRedirectUrl.value },
     )
         .then(() => {
-          console.log("Signed in with OIDC");
-          console.log("Token: " + decodeJwt(tokenText).sub);
+            console.log("Signed in with OIDC");
+            console.log("Token: " + decodeJwt(tokenText).sub);
             user.value = {
                 token: tokenText,
                 id: "",
-              email: decodeJwt(tokenText).email,
-              name: decodeJwt(tokenText).name,
-                oidcSession: true
+                email: decodeJwt(tokenText).email,
+                name: decodeJwt(tokenText).name,
+                oidcSession: true,
             };
 
-            console.log("Wrote to user: " + JSON.stringify(user.value))
+            console.log("Wrote to user: " + JSON.stringify(user.value));
         })
         .catch((err) => {
             console.log("Could not sign in", err);

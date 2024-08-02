@@ -52,7 +52,7 @@ data class IssuerSignedItem(
          * Create an issuer signed item, with random salt
          */
         fun createWithRandomSalt(digestID: UInt, elementIdentifier: String, elementValue: AnyDataElement): IssuerSignedItem {
-            return IssuerSignedItem(digestID.toDE(),  SecureRandom.nextBytes(16).toDE(), elementIdentifier.toDE(), elementValue)
+            return IssuerSignedItem(digestID.toDataElement(),  SecureRandom.nextBytes(16).toDataElement(), elementIdentifier.toDataElement(), elementValue)
         }
     }
 }

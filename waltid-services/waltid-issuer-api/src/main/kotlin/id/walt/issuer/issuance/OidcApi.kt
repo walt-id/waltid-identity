@@ -61,6 +61,12 @@ object OidcApi : CIProvider() {
             get("/.well-known/openid-credential-issuer") {
                 call.respond(metadata.toJSON())
             }
+            get("/.well-known/oauth-authorization-server") {
+                call.respond(metadata.toJSON())
+            }
+            get("/.well-known/jwt-issuer") {
+                call.respond(metadata.toJSON())
+            }
         }
 
         route("", {
@@ -80,15 +86,15 @@ object OidcApi : CIProvider() {
 
             get("/jwks") {
                 var jwks = buildJsonObject {}
-                OidcApi.sessionCredentialPreMapping.forEach {
-                    it.value.forEach {
+                OidcApi.sessionCredentialPreMapping.getAll().forEach {
+                    it.forEach {
                         jwks = buildJsonObject {
                             put("keys", buildJsonArray {
                                 val jwkWithKid = buildJsonObject {
-                                    it.issuerKey.getPublicKey().exportJWKObject().forEach {
+                                    it.issuerKey.key.getPublicKey().exportJWKObject().forEach {
                                         put(it.key, it.value)
                                     }
-                                    put("kid", it.issuerKey.getPublicKey().getKeyId())
+                                    put("kid", it.issuerKey.key.getPublicKey().getKeyId())
                                 }
                                 add(jwkWithKid)
                                 jwks.forEach {

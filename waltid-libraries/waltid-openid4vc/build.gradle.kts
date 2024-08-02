@@ -35,11 +35,15 @@ tasks.withType(KotlinCompile::class.java) {
     }
 }
 
+fun getSetting(name: String) = providers.gradleProperty(name).orNull.toBoolean()
+val enableAndroidBuild = getSetting("enableAndroidBuild")
+val enableIosBuild = getSetting("enableIosBuild")
+
 kotlin {
     targets.configureEach {
         compilations.configureEach {
             compileTaskProvider.configure {
-                compilerOptions { 
+                compilerOptions {
                     freeCompilerArgs.add("-Xexpect-actual-classes")
                 }
             }
@@ -66,17 +70,19 @@ kotlin {
         }
         binaries.library()
     }
-//    val hostOs = System.getProperty("os.name")
-//    val isMingwX64 = hostOs.startsWith("Windows")
-//    val nativeTarget = when {
-//        hostOs == "Mac OS X" -> macosX64("native")
-//        hostOs == "Linux" -> linuxX64("native")
-//        isMingwX64 -> mingwX64("native")
-//        else -> throw GradleException("Host OS is not supported in Kotlin/Native.")
-//    }
+
+    if (enableIosBuild) {
+        iosArm64()
+        iosSimulatorArm64()
+    }
+
     val ktor_version = "2.3.12"
 
     sourceSets {
+
+        all {
+            languageSettings.optIn("kotlinx.serialization.ExperimentalSerializationApi")
+        }
         val commonMain by getting {
             dependencies {
                 // Coroutines
@@ -101,7 +107,7 @@ kotlin {
 
                 // -- Multiplatform --
                 // Multiplatform / UUID
-                implementation("app.softwork:kotlinx-uuid-core:0.0.25")
+                implementation("app.softwork:kotlinx-uuid-core:0.0.26")
 
                 // Multiplatform / Date & time
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.0")
@@ -154,6 +160,7 @@ kotlin {
                 implementation("com.augustcellars.cose:cose-java:1.1.0")
                 implementation("com.soywiz.korlibs.krypto:krypto:4.0.10")
 
+                implementation("org.slf4j:slf4j-simple:2.0.13")
             }
         }
         val jsMain by getting {
@@ -169,6 +176,29 @@ kotlin {
 //        val nativeMain by getting
 //        val nativeTest by getting
         // Add for native: implementation("io.ktor:ktor-client-cio:$ktor_version")
+
+        if (enableIosBuild) {
+            val iosArm64Main by getting
+            val iosSimulatorArm64Main by getting
+
+            val iosMain by creating {
+                dependsOn(commonMain)
+                iosArm64Main.dependsOn(this)
+                iosSimulatorArm64Main.dependsOn(this)
+                dependencies {
+                    implementation("io.ktor:ktor-client-darwin:$ktor_version")
+                }
+            }
+
+            val iosArm64Test by getting
+            val iosSimulatorArm64Test by getting
+
+            val iosTest by creating {
+                dependsOn(commonTest)
+                iosArm64Test.dependsOn(this)
+                iosSimulatorArm64Test.dependsOn(this)
+            }
+        }
     }
 
     publishing {
@@ -177,14 +207,20 @@ kotlin {
             val envPassword = System.getenv("MAVEN_PASSWORD")
             val usernameFile = File("secret_maven_username.txt")
             val passwordFile = File("secret_maven_password.txt")
-            val secretMavenUsername = envUsername ?: usernameFile.let { if (it.isFile) it.readLines().first() else "" }
-            val secretMavenPassword = envPassword ?: passwordFile.let { if (it.isFile) it.readLines().first() else "" }
+            val secretMavenUsername =
+                envUsername ?: usernameFile.let { if (it.isFile) it.readLines().first() else "" }
+            val secretMavenPassword =
+                envPassword ?: passwordFile.let { if (it.isFile) it.readLines().first() else "" }
             val hasMavenAuth = secretMavenUsername.isNotEmpty() && secretMavenPassword.isNotEmpty()
             if (hasMavenAuth) {
                 maven {
                     val releasesRepoUrl = uri("https://maven.waltid.dev/releases")
                     val snapshotsRepoUrl = uri("https://maven.waltid.dev/snapshots")
-                    url = uri(if (version.toString().endsWith("SNAPSHOT")) snapshotsRepoUrl else releasesRepoUrl)
+                    url = uri(
+                        if (version.toString()
+                                .endsWith("SNAPSHOT")
+                        ) snapshotsRepoUrl else releasesRepoUrl
+                    )
                     credentials {
                         username = secretMavenUsername
                         password = secretMavenPassword
@@ -199,7 +235,8 @@ npmPublish {
     registries {
         val envToken = System.getenv("NPM_TOKEN")
         val npmTokenFile = File("secret_npm_token.txt")
-        val secretNpmToken = envToken ?: npmTokenFile.let { if (it.isFile) it.readLines().first() else "" }
+        val secretNpmToken =
+            envToken ?: npmTokenFile.let { if (it.isFile) it.readLines().first() else "" }
         val hasNPMToken = secretNpmToken.isNotEmpty()
         val isReleaseBuild = Regex("\\d+.\\d+.\\d+").matches(version.get())
         if (isReleaseBuild && hasNPMToken) {

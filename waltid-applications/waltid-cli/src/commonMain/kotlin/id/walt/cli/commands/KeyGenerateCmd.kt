@@ -1,6 +1,7 @@
 package id.walt.cli.commands
 
 import com.github.ajalt.clikt.core.CliktCommand
+import com.github.ajalt.clikt.core.context
 import com.github.ajalt.clikt.core.terminal
 import com.github.ajalt.clikt.parameters.groups.provideDelegate
 import com.github.ajalt.clikt.parameters.options.default
@@ -8,8 +9,10 @@ import com.github.ajalt.clikt.parameters.options.help
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.types.enum
 import com.github.ajalt.clikt.parameters.types.path
+import com.github.ajalt.mordant.rendering.TextColors
 import com.github.ajalt.mordant.terminal.YesNoPrompt
 import id.walt.cli.util.PrettyPrinter
+import id.walt.cli.util.WaltIdCmdHelpOptionMessage
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import kotlinx.coroutines.runBlocking
@@ -20,9 +23,22 @@ import kotlin.io.path.writeText
 
 class KeyGenerateCmd : CliktCommand(
     name = "generate",
-    help = "Generates a new cryptographic key.",
-    // printHelpOnEmptyArgs = true
+    help = """Generates a new cryptographic key.
+        
+        Example usage:
+        ---------------
+        waltid key generate
+        waltid key generate -t secp256k1
+        waltid key generate -t RSA
+        waltid key generate -t RSA -o myRsaKey.json
+    """
 ) {
+
+    init {
+        context {
+            localization = WaltIdCmdHelpOptionMessage
+        }
+    }
 
     val print: PrettyPrinter = PrettyPrinter(this)
 
@@ -30,8 +46,8 @@ class KeyGenerateCmd : CliktCommand(
 
     private val keyType by option("-t", "--keyType")
         .enum<KeyType>()
-        .help("Key type to use. Possible values are: [${acceptedKeyTypes}]. Default value is " + KeyType.Ed25519.name)
-        .default(KeyType.Ed25519)
+        .help("Key type to use. Possible values are: [${acceptedKeyTypes}]. Default value is ${TextColors.brightBlue(KeyType.secp256r1.name)}.")
+        .default(KeyType.secp256r1)
 
     private val optOutputFilePath by option("-o", "--output")
         .path()

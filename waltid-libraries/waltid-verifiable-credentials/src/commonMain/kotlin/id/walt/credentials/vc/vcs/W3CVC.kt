@@ -15,10 +15,7 @@ import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.*
 import love.forte.plugin.suspendtrans.annotation.JsPromise
 import love.forte.plugin.suspendtrans.annotation.JvmAsync
 import love.forte.plugin.suspendtrans.annotation.JvmBlocking
@@ -39,6 +36,9 @@ class W3CVCSerializer : KSerializer<W3CVC> {
 data class W3CVC(
     private val content: Map<String, JsonElement> = emptyMap()
 ) : Map<String, JsonElement> by content {
+
+
+    fun getType() = (get("type") ?: error("No `type` in W3C VC!")).jsonArray.map { it.jsonPrimitive.content }
 
 
     fun toJsonObject(): JsonObject = JsonObject(content)
@@ -66,9 +66,9 @@ data class W3CVC(
 
         val signed = issuerKey.signJws(
             signable, mapOf(
-                "typ" to "vc+sd-jwt",
-                "cty" to "credential-claims-set+json",
-                "kid" to issuerDid
+                "typ" to "vc+sd-jwt".toJsonElement(),
+                "cty" to "credential-claims-set+json".toJsonElement(),
+                "kid" to issuerDid.toJsonElement()
             )
         )
 
@@ -84,7 +84,7 @@ data class W3CVC(
         issuerKid: String? = null,
         subjectDid: String,
         /** Set additional options in the JWT header */
-        additionalJwtHeader: Map<String, String> = emptyMap(),
+        additionalJwtHeader: Map<String, JsonElement> = emptyMap(),
         /** Set additional options in the JWT payload */
         additionalJwtOptions: Map<String, JsonElement> = emptyMap()
     ): String {
@@ -94,7 +94,7 @@ data class W3CVC(
             data = this.toJsonObject(),
             key = issuerKey,
             jwtHeaders = mapOf(
-                JwsHeader.KEY_ID to kid,
+                JwsHeader.KEY_ID to kid.toJsonElement(),
                 *(additionalJwtHeader.entries.map { it.toPair() }.toTypedArray())
             ),
             jwtOptions = mapOf(

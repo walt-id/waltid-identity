@@ -25,12 +25,12 @@ class MDocRequestBuilder(val docType: String) {
   }
 
   private fun buildEncodedItemsRequest() = EncodedCBORElement(ItemsRequest(
-    docType = docType.toDE(),
+    docType = docType.toDataElement(),
     nameSpaces = nameSpaces.map { ns ->
       Pair(MapKey(ns.key), ns.value.map { item ->
         Pair(MapKey(item.key), BooleanElement(item.value))
-      }.toMap().toDE())
-    }.toMap().toDE()
+      }.toMap().toDataElement())
+    }.toMap().toDataElement()
   ).toMapElement())
 
   /**
@@ -45,7 +45,7 @@ class MDocRequestBuilder(val docType: String) {
 
   fun sign(sessionTranscript: ListElement, cryptoProvider: COSECryptoProvider, keyID: String? = null): MDocRequest {
     val encodedItemsRequest = buildEncodedItemsRequest()
-    val readerAuth = cryptoProvider.sign1(EncodedCBORElement(ReaderAuthentication(sessionTranscript, encodedItemsRequest).toCBOR()).toCBOR(), keyID)
+    val readerAuth = cryptoProvider.sign1(EncodedCBORElement(ReaderAuthentication(sessionTranscript, encodedItemsRequest).toCBOR()).toCBOR(), null, null, keyID)
     return MDocRequest(encodedItemsRequest, readerAuth.detachPayload())
   }
 }

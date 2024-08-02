@@ -2,8 +2,12 @@ package id.walt.crypto.keys
 
 import id.walt.crypto.utils.JsonUtils.prettyJson
 import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encodeToString
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonClassDiscriminator
 import kotlinx.serialization.json.JsonElement
@@ -13,6 +17,16 @@ import love.forte.plugin.suspendtrans.annotation.JvmAsync
 import love.forte.plugin.suspendtrans.annotation.JvmBlocking
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
+
+object DirectKeySerializer : KSerializer<DirectSerializedKey> {
+
+    override val descriptor: SerialDescriptor = JsonObject.serializer().descriptor
+    override fun deserialize(decoder: Decoder): DirectSerializedKey = DirectSerializedKey(resolveSerializedKeyBlocking(decoder.decodeSerializableValue(JsonObject.serializer())))
+    override fun serialize(encoder: Encoder, value: DirectSerializedKey) = encoder.encodeSerializableValue(JsonElement.serializer(), KeySerialization.serializeKeyToJson(value.key))
+}
+
+@Serializable(with = DirectKeySerializer::class)
+data class DirectSerializedKey(val key: Key)
 
 @JsExport
 @OptIn(ExperimentalSerializationApi::class, ExperimentalJsExport::class)
@@ -29,12 +43,14 @@ abstract class Key {
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
+    @Throws(Exception::class)
     abstract suspend fun getKeyId(): String
 
     @JvmBlocking
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
+    @Throws(Exception::class)
     abstract suspend fun getThumbprint(): String
 
 
@@ -46,12 +62,14 @@ abstract class Key {
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
+    @Throws(Exception::class)
     abstract suspend fun exportJWK(): String
 
     @JvmBlocking
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
+    @Throws(Exception::class)
     open suspend fun exportJWKPretty(): String = prettyJson.encodeToString(Json.parseToJsonElement(exportJWK()))
 
 
@@ -59,16 +77,19 @@ abstract class Key {
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
+    @Throws(Exception::class)
     abstract suspend fun exportJWKObject(): JsonObject
 
     /**
      * export this key as a PEM if supported
+     * yoy can validate at: https://8gwifi.org/PemParserFunctions.jsp various formats
      * @return encoded PEM
      */
     @JvmBlocking
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
+    @Throws(Exception::class)
     abstract suspend fun exportPEM(): String
 
     /**
@@ -81,6 +102,7 @@ abstract class Key {
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
+    @Throws(Exception::class)
     abstract suspend fun signRaw(plaintext: ByteArray): Any
 
     /**
@@ -93,7 +115,8 @@ abstract class Key {
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    abstract suspend fun signJws(plaintext: ByteArray, headers: Map<String, String> = emptyMap()): String
+    @Throws(Exception::class)
+    abstract suspend fun signJws(plaintext: ByteArray, headers: Map<String, JsonElement> = emptyMap()): String
 
     /**
      * verifies a signed message using this public key
@@ -104,12 +127,14 @@ abstract class Key {
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
+    @Throws(Exception::class)
     abstract suspend fun verifyRaw(signed: ByteArray, detachedPlaintext: ByteArray? = null): Result<ByteArray>
 
     @JvmBlocking
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
+    @Throws(Exception::class)
     abstract suspend fun verifyJws(signedJws: String): Result<JsonElement>
 
     /*/**
@@ -132,30 +157,34 @@ abstract class Key {
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
+    @Throws(Exception::class)
     abstract suspend fun getPublicKey(): Key
 
     @JvmBlocking
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
+    @Throws(Exception::class)
     abstract suspend fun getPublicKeyRepresentation(): ByteArray
 
     @JvmBlocking
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
+    @Throws(Exception::class)
     abstract suspend fun getMeta(): KeyMeta
 
     @JvmBlocking
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
+
     override fun toString() = "[walt.id crypto ${if (hasPrivateKey) "private" else "public"} $keyType key]"
 
     @JvmBlocking
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    open suspend fun init() {
-    }
+    open suspend fun init() {}
 }
+

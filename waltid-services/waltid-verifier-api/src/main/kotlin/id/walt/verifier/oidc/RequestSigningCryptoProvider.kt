@@ -43,9 +43,9 @@ object RequestSigningCryptoProvider : JWTCryptoProvider {
         }
     }
 
-    override fun sign(payload: JsonObject, keyID: String?, typ: String): String {
+    override fun sign(payload: JsonObject, keyID: String?, typ: String, headers: Map<String, Any>): String {
         return SignedJWT(
-            JWSHeader.Builder(JWSAlgorithm.ES256).keyID(signingKey.keyID).type(JOSEObjectType.JWT).also {
+            JWSHeader.Builder(JWSAlgorithm.ES256).keyID(signingKey.keyID).type(JOSEObjectType.JWT).customParams(headers).also {
                 if (certificateChain != null) {
                     it.x509CertChain(
                         X509CertChainUtils.parse(certificateChain).map { Base64.encode(it.encoded) }
@@ -56,7 +56,7 @@ object RequestSigningCryptoProvider : JWTCryptoProvider {
         ).also { it.sign(ECDSASigner(signingKey)) }.serialize()
     }
 
-    override fun verify(jwt: String): JwtVerificationResult {
+    override fun verify(jwt: String, keyID: String?): JwtVerificationResult {
         TODO("Not yet implemented")
     }
 }

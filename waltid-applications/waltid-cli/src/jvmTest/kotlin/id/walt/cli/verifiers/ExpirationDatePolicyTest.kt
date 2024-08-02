@@ -10,6 +10,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonObject
 import java.io.File
 import kotlin.test.*
 
@@ -47,7 +48,7 @@ class ExpirationDatePolicyTest {
     @Test
     fun `should NOT fail with a valid signed VC and data = jws-payload('vc')`() {
 
-        val data = notExpiredJws.decodeJws().payload["vc"]!!
+        val data = notExpiredJws.decodeJws().payload["vc"]!!.jsonObject
 
         val policy = ExpirationDatePolicy()
         val result = runBlocking { policy.verify(data = data, context = emptyMap()) }
@@ -58,7 +59,7 @@ class ExpirationDatePolicyTest {
     @Test
     fun `should NOT fail with a valid NOT signed VC and data = jwt`() {
 
-        val data = Json.parseToJsonElement(notExpiredJwt)
+        val data = Json.parseToJsonElement(notExpiredJwt).jsonObject
 
         val policy = ExpirationDatePolicy()
         val result = runBlocking { policy.verify(data = data, context = emptyMap()) }
@@ -69,7 +70,7 @@ class ExpirationDatePolicyTest {
     @Test
     fun `should fail ExpirationDatePolicy + jws-payload('vc')`() {
 
-        val data = expiredJws.decodeJws().payload["vc"]!!
+        val data = expiredJws.decodeJws().payload["vc"]!!.jsonObject
 
         val policy = ExpirationDatePolicy()
         val result = runBlocking { policy.verify(data = data, context = emptyMap()) }
@@ -80,7 +81,7 @@ class ExpirationDatePolicyTest {
     @Test
     fun `should fail ExpirationDatePolicy + jwt`() {
 
-        val data = Json.parseToJsonElement(expiredJwt)
+        val data = Json.parseToJsonElement(expiredJwt).jsonObject
 
         val policy = ExpirationDatePolicy()
         val result = runBlocking { policy.verify(data = data, context = emptyMap()) }

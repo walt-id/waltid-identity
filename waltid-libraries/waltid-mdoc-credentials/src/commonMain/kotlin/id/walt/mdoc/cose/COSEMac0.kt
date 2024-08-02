@@ -57,7 +57,7 @@ class COSEMac0(
     fun createWithHMAC256(payload: ByteArray, sharedSecret: ByteArray, externalData: ByteArray = byteArrayOf()): COSEMac0 {
       val protectedHeaderData = mapOf(
           MapKey(ALG_LABEL) to NumberElement(HMAC256)
-      ).toDE().toCBOR()
+      ).toDataElement().toCBOR()
 
       val mac0Content = createMacStructure(protectedHeaderData, payload, externalData).toCBOR()
       val tag = HMAC.hmacSHA256(sharedSecret, mac0Content).bytes

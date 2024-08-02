@@ -25,8 +25,8 @@ dependencies {
     implementation("io.ktor:ktor-client-okhttp-jvm:${Versions.KTOR_VERSION}")
 
     // Logging
-    api("io.klogging:klogging-jvm:0.5.14") // JVM + ~JS
-    implementation("io.klogging:slf4j-klogging:0.5.14")
+    api("io.klogging:klogging-jvm:0.7.0") // JVM + ~JS
+    implementation("io.klogging:slf4j-klogging:0.7.0")
     implementation("org.slf4j:jul-to-slf4j:2.0.13")
 
     // CLI
@@ -44,11 +44,16 @@ dependencies {
     api("com.sksamuel.cohort:cohort-ktor:2.5.1")
 
     // OpenAPI
-    api("io.github.smiley4:ktor-swagger-ui:3.1.0")
+    api("io.github.smiley4:ktor-swagger-ui:3.2.0")
     implementation("io.github.smiley4:schema-kenerator-core:1.0.1")
     implementation("io.github.smiley4:schema-kenerator-serialization:1.0.1")
     implementation("io.github.smiley4:schema-kenerator-reflection:1.0.1")
     implementation("io.github.smiley4:schema-kenerator-swagger:1.0.1")
+
+    // Persistence
+    api("io.github.reactivecircus.cache4k:cache4k:0.13.0")
+    api("app.softwork:kotlinx-uuid-core:0.0.26")
+    api("redis.clients:jedis:5.2.0-beta4")
 
     // Testing
     testImplementation(kotlin("test"))
