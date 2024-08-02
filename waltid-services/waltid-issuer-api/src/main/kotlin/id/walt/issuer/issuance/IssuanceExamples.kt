@@ -176,6 +176,45 @@ object IssuanceExamples {
         }
         """.trimIndent()
 
+    private val openBadgeCredentialIssuanceIdToken = """
+        {
+          "authenticationMethod": "ID_TOKEN",
+          "issuerKey": $issuerKey,
+          "issuerDid": $issuerDid,
+          "credentialConfigurationId": "OpenBadgeCredential_jwt_vc_json",
+          "credentialData": $openBadgeCredentialData,
+          "mdocData": null,
+          "mapping": $mapping
+        }
+        """.trimIndent()
+
+    private val openBadgeCredentialIssuanceVpToken = """
+        {
+          "authenticationMethod": "VP_TOKEN",
+          "vpRequestValue": "NaturalPersonVerifiableID",
+          "vpProfile": "EBSIV3",
+          "issuerKey": $issuerKey,
+          "issuerDid": $issuerDid,
+          "credentialConfigurationId": "OpenBadgeCredential_jwt_vc_json",
+          "credentialData": $openBadgeCredentialData,
+          "mdocData": null,
+          "mapping": $mapping
+        }
+        """.trimIndent()
+
+    private val openBadgeCredentialIssuancePwd = """
+        {
+          "authenticationMethod": "PWD",
+          "issuerKey": $issuerKey,
+          "issuerDid": $issuerDid,
+          "credentialConfigurationId": "OpenBadgeCredential_jwt_vc_json",
+          "credentialData": $openBadgeCredentialData,
+          "mdocData": null,
+          "mapping": $mapping
+        }
+        """.trimIndent()
+
+
     //language=json
     private val universityDegreeCredentialIssuance = """
         {
@@ -248,6 +287,16 @@ object IssuanceExamples {
 
     val openBadgeCredentialIssuanceExample = typedValueExampleDescriptorDsl<IssuanceRequest>(
         openBadgeCredentialIssuance
+    )
+
+    val openBadgeCredentialIssuanceExampleWithIdToken = typedValueExampleDescriptorDsl<IssuanceRequest>(
+        openBadgeCredentialIssuanceIdToken
+    )
+    val openBadgeCredentialIssuanceExampleWithVpToken = typedValueExampleDescriptorDsl<IssuanceRequest>(
+        openBadgeCredentialIssuanceVpToken
+    )
+    val openBadgeCredentialIssuanceExampleWithUsernamePassword = typedValueExampleDescriptorDsl<IssuanceRequest>(
+        openBadgeCredentialIssuancePwd
     )
 
     // language=JSON

@@ -142,7 +142,7 @@ object OpenID4VCI {
         return code == authorizationCode
     }
 
-    suspend fun signToken(privateKey: Key, payload: JsonObject, headers: Map<String, String>? = null): String {
+    suspend fun signToken(privateKey: Key, payload: JsonObject, headers: Map<String, JsonElement>? = null): String {
         return privateKey.signJws(payload.toString().toByteArray(), headers ?: emptyMap())
     }
 
@@ -193,7 +193,6 @@ object OpenID4VCI {
                         }
                     }
                 )
-
                 false -> null
             },
             presentationDefinition = when (responseType) {

@@ -19,7 +19,6 @@ import id.walt.webwallet.config.AuthConfig
 import id.walt.webwallet.db.models.Account
 import id.walt.webwallet.db.models.AccountWalletMappings
 import id.walt.webwallet.db.models.AccountWalletPermissions
-import id.walt.webwallet.service.OidcLoginService
 import id.walt.webwallet.service.WalletServiceManager
 import id.walt.webwallet.service.WalletServiceManager.oidcConfig
 import id.walt.webwallet.service.account.AccountsService
@@ -34,6 +33,7 @@ import io.github.smiley4.ktorswaggerui.dsl.routing.route
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
+import io.ktor.server.plugins.*
 import io.ktor.server.plugins.ratelimit.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
@@ -402,7 +402,7 @@ suspend fun ApplicationCall.getLoginRequest() = runCatching {
             }
         )
     }
-    Json.decodeFromJsonElement<AccountRequest>(jsonObject)
+    Json{ignoreUnknownKeys = true}.decodeFromJsonElement<AccountRequest>(jsonObject)
 }.getOrElse { throw LoginRequestError(it) }
 
 

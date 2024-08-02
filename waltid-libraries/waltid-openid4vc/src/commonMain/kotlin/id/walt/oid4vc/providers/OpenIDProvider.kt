@@ -185,7 +185,7 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
     // }
 
     // Create an ID or VP Token request using JAR OAuth2.0 specification https://www.rfc-editor.org/rfc/rfc9101.html
-    open fun processCodeFlowAuthorizationWithAuthorizationRequest(authorizationRequest: AuthorizationRequest, keyId: String, privKey: Key, responseType: ResponseType, isJar: Boolean, presentationDefinition: PresentationDefinition? = null):AuthorizationCodeWithAuthorizationRequestResponse {
+    open fun processCodeFlowAuthorizationWithAuthorizationRequest(authorizationRequest: AuthorizationRequest, keyId: String, privKey: Key, responseType: ResponseType, isJar: Boolean? = true, presentationDefinition: PresentationDefinition? = null):AuthorizationCodeWithAuthorizationRequestResponse {
         if (!authorizationRequest.responseType.contains(ResponseType.Code))
             throw AuthorizationError(
                 authorizationRequest,
@@ -240,7 +240,7 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
                     keyId,
                     privKey
                 )
-                false -> null
+                else -> null
             },
             presentationDefinition = when(responseType) {
                 ResponseType.VpToken -> presentationDefinition!!.toJSONString()

@@ -234,6 +234,9 @@ fun Application.issuerApi() {
                                     "Pass the unsigned credential that you intend to issue as the body of the request."
                                 example("OpenBadgeCredential example", IssuanceExamples.openBadgeCredentialIssuanceExample)
                                 example("UniversityDegreeCredential example", IssuanceExamples.universityDegreeIssuanceCredentialExample)
+                                example("OpenBadgeCredential example with Authorization Code Flow and Id Token", IssuanceExamples.openBadgeCredentialIssuanceExampleWithIdToken)
+                                example("OpenBadgeCredential example with Authorization Code Flow and Vp Token", IssuanceExamples.openBadgeCredentialIssuanceExampleWithVpToken)
+                                example("OpenBadgeCredential example with Authorization Code Flow and Username/Password Token", IssuanceExamples.openBadgeCredentialIssuanceExampleWithUsernamePassword)
                                 required = true
                             }
                         }

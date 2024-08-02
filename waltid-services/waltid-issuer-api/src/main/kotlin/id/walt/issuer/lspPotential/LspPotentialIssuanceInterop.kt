@@ -10,6 +10,7 @@ import id.walt.issuer.issuance.IssuanceRequest
 import id.walt.issuer.issuance.createCredentialOfferUri
 import id.walt.mdoc.COSECryptoProviderKeyInfo
 import id.walt.mdoc.doc.MDocTypes
+import id.walt.oid4vc.data.AuthenticationMethod
 import io.github.smiley4.ktorswaggerui.dsl.routing.get
 import io.github.smiley4.ktorswaggerui.dsl.routing.route
 import io.ktor.http.*
@@ -70,6 +71,7 @@ fun Application.lspPotentialIssuanceTestApi() {
             get("lspPotentialCredentialOfferT1") {
                 val jwkKey = JWKKey.importJWK(LspPotentialIssuanceInterop.POTENTIAL_ISSUER_KEY_JWK).getOrThrow()
                 val offerUri = IssuanceRequest(
+                    authenticationMethod = AuthenticationMethod.NONE,
                     issuerKey = Json.parseToJsonElement(KeySerialization.serializeKey(jwkKey)).jsonObject,
                     issuerDid = "",
                     credentialConfigurationId = MDocTypes.ISO_MDL,
@@ -89,6 +91,7 @@ fun Application.lspPotentialIssuanceTestApi() {
             get("lspPotentialCredentialOfferT2") {
                 val jwkKey = JWKKey.importJWK(LspPotentialIssuanceInterop.POTENTIAL_ISSUER_KEY_JWK).getOrThrow()
                 val offerUri = IssuanceRequest(
+                    authenticationMethod = AuthenticationMethod.NONE,
                     issuerKey = Json.parseToJsonElement(KeySerialization.serializeKey(jwkKey)).jsonObject,
                     issuerDid = "",
                     credentialConfigurationId = "urn:eu.europa.ec.eudi:pid:1",

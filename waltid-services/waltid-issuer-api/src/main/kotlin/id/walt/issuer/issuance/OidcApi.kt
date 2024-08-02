@@ -112,8 +112,8 @@ object OidcApi : CIProvider() {
             get("/authorize") {
                 val authReq = runBlocking { AuthorizationRequest.fromHttpParametersAuto(call.parameters.toMap()) }
                 try {
-                    val issuerState = OidcApi.sessionCredentialPreMapping[authReq.issuerState] ?: throw IllegalArgumentException("missing issuer state parameter")
-                    val authMethod = issuerState.first().request.authenticationMethod ?: AuthenticationMethod.NONE
+                    val issuanceSessionData = OidcApi.sessionCredentialPreMapping[authReq.issuerState!!] ?: error("No such pre mapping: ${authReq.issuerState}")
+                    val authMethod = issuanceSessionData.first().request.authenticationMethod ?: AuthenticationMethod.NONE
                     val authResp: Any = when {
                         ResponseType.Code in authReq.responseType -> {
                             when (authMethod) {
@@ -129,22 +129,22 @@ object OidcApi : CIProvider() {
                                 }
 
                                 AuthenticationMethod.ID_TOKEN -> {
-                                    val idTokenRequestJwtKid = issuerState.first().issuerKey.getKeyId()
-                                    val idTokenRequestJwtPrivKey = issuerState.first().issuerKey
+                                    val idTokenRequestJwtKid = issuanceSessionData.first().issuerKey.key.getKeyId()
+                                    val idTokenRequestJwtPrivKey = issuanceSessionData.first().issuerKey
                                     processCodeFlowAuthorizationWithAuthorizationRequest(
                                         authReq,
                                         idTokenRequestJwtKid,
-                                        idTokenRequestJwtPrivKey,
+                                        idTokenRequestJwtPrivKey.key,
                                         ResponseType.IdToken,
-                                        issuerState.first().request.useJar!!
+                                        issuanceSessionData.first().request.useJar
                                     )
                                 }
 
                                 AuthenticationMethod.VP_TOKEN -> {
-                                    val vpTokenRequestJwtKid = issuerState.first().issuerKey.getKeyId()
-                                    val vpTokenRequestJwtPrivKey = issuerState.first().issuerKey
-                                    val vpProfile  = issuerState.first().request.vpProfile
-                                    val vpRequestValue  = issuerState.first().request.vpRequestValue ?: throw IllegalArgumentException("missing vpRequestValue parameter")
+                                    val vpTokenRequestJwtKid = issuanceSessionData.first().issuerKey.key.getKeyId()
+                                    val vpTokenRequestJwtPrivKey = issuanceSessionData.first().issuerKey
+                                    val vpProfile  = issuanceSessionData.first().request.vpProfile ?: OpenId4VPProfile.DEFAULT
+                                    val vpRequestValue  = issuanceSessionData.first().request.vpRequestValue ?: throw IllegalArgumentException("missing vpRequestValue parameter")
 
                                     // Generate Presentation Definition
                                     val requestCredentialsArr = buildJsonArray { add(vpRequestValue) }
@@ -155,14 +155,14 @@ object OidcApi : CIProvider() {
                                             else -> throw IllegalArgumentException("Invalid JSON type for requested credential: $it")
                                         } ?: throw IllegalArgumentException("Invalid VC type for requested credential: $it")
                                     }
-                                    val presentationDefinition = PresentationDefinition.primitiveGenerationFromVcTypes(requestedTypes, vpProfile!!)
+                                    val presentationDefinition = PresentationDefinition.primitiveGenerationFromVcTypes(requestedTypes, vpProfile)
 
                                     processCodeFlowAuthorizationWithAuthorizationRequest(
                                         authReq,
                                         vpTokenRequestJwtKid,
-                                        vpTokenRequestJwtPrivKey,
+                                        vpTokenRequestJwtPrivKey.key,
                                         ResponseType.VpToken,
-                                        issuerState.first().request.useJar!!,
+                                        issuanceSessionData.first().request.useJar,
                                         presentationDefinition
                                     )
                                 }

@@ -2,17 +2,10 @@ import E2ETestWebService.loadResource
 import E2ETestWebService.testBlock
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.web.plugins.httpJson
-import id.walt.oid4vc.OpenID4VCI
-import id.walt.oid4vc.data.OpenIDProviderMetadata
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyType
-import id.walt.crypto.utils.JsonUtils.toJsonElement
-import id.walt.oid4vc.data.*
 import id.walt.issuer.issuance.IssuanceRequest
 import id.walt.oid4vc.data.dif.PresentationDefinition
-import id.walt.oid4vc.requests.AuthorizationRequest
-import id.walt.oid4vc.requests.CredentialOfferRequest
-import id.walt.verifier.oidc.PresentationSessionInfo
 import id.walt.webwallet.config.RegistrationDefaultsConfig
 import id.walt.webwallet.web.model.EmailAccountRequest
 import io.ktor.client.*
@@ -25,26 +18,14 @@ import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.util.*
-import io.ktor.util.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.*
 import kotlinx.uuid.UUID
 import kotlin.test.Test
 import kotlin.test.assertNotNull
-import java.io.File
-import java.net.URLDecoder
-import kotlin.test.*
 import kotlin.time.Duration.Companion.minutes
 
 class E2ETest {
-    lateinit var wallet: UUID
-    lateinit var newCredentialId: String
-    lateinit var verificationUrl: String
-    lateinit var verificationId: String
-    lateinit var did: String
-    lateinit var offerUrl: String
-
-    var client = testHttpClient()
 
     @Test
     fun e2e() = runTest(timeout = 5.minutes) {
@@ -246,8 +227,15 @@ class E2ETest {
                 assert(it.any { it.operation == "useOfferRequest" } && it.any { it.operation == "usePresentationRequest" }) { "incorrect history items" }
             }
             //endregion -History-
+
+            // Test Authorization Code flow with available authentication methods in Issuer API
+            val authorizationCodeFlow = AuthorizationCodeFlow(testHttpClient(doFollowRedirects = false))
+            authorizationCodeFlow.testIssuerAPI()
+
         }
     }
+
+
 
     //@Test // enable to execute test selectively
     fun lspIssuanceTests() = runTest(timeout = 5.minutes) {
