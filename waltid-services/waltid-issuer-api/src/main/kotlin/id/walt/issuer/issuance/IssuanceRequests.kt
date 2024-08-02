@@ -90,8 +90,8 @@ data class IssuanceRequest(
     val selectiveDisclosure: SDMap? = null,
     val authenticationMethod: AuthenticationMethod? = AuthenticationMethod.PRE_AUTHORIZED, // "PWD" OR "ID_TOKEN" OR "VP_TOKEN" OR "PRE_AUTHORIZED" OR "NONE"
     val vpRequestValue: String? = null,
-    val vpProfile: OpenId4VPProfile? = OpenId4VPProfile.DEFAULT,
-    val useJar: Boolean? = true,
+    val vpProfile: OpenId4VPProfile? = null,
+    val useJar: Boolean? = null,
     val x5Chain: List<String>? = null,
     val trustedRootCAs: List<String>? = null,
 )
