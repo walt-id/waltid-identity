@@ -11,6 +11,10 @@ import id.walt.issuer.entra.entraIssuance
 import id.walt.issuer.issuance.OidcApi.oidcApi
 import id.walt.issuer.issuance.issuerApi
 import id.walt.issuer.web.plugins.*
+import id.walt.issuer.lspPotential.lspPotentialIssuanceTestApi
+import id.walt.issuer.web.plugins.configureHTTP
+import id.walt.issuer.web.plugins.configureMonitoring
+import id.walt.issuer.web.plugins.configureRouting
 import io.ktor.server.application.*
 
 suspend fun main(args: Array<String>) {
@@ -42,5 +46,6 @@ fun Application.issuerModule(withPlugins: Boolean = true) {
     issuerApi();
 
     { entraIssuance() } whenFeature FeatureCatalog.entra
+    { lspPotentialIssuanceTestApi() } whenFeature FeatureCatalog.lspPotential
 }
 

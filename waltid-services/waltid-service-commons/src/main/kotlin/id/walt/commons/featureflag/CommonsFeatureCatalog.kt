@@ -1,11 +1,14 @@
 package id.walt.commons.featureflag
 
 import id.walt.commons.config.list.WebConfig
+import id.walt.commons.persistence.PersistenceConfiguration
 import id.walt.commons.web.modules.ServiceHealthChecksDebugModule
 
 object CommonsFeatureCatalog : ServiceFeatureCatalog {
 
     val webFeature = BaseFeature("web", "Web service", WebConfig::class)
+    val persistenceFeature = OptionalFeature("persistence", "Storage", PersistenceConfiguration::class, false)
+
     val featureFlagInformationEndpointFeature = OptionalFeature(
         "feature-flag-information-endpoint",
         "Enables endpoints related to showing information about available features on this service instance",
@@ -24,5 +27,5 @@ object CommonsFeatureCatalog : ServiceFeatureCatalog {
 
     override val baseFeatures: List<BaseFeature> = listOf(webFeature)
     override val optionalFeatures: List<OptionalFeature> =
-        listOf(featureFlagInformationEndpointFeature, healthChecksFeature, debugEndpointsFeature, openApiFeature, authenticationServiceFeature)
+        listOf(persistenceFeature, featureFlagInformationEndpointFeature, healthChecksFeature, debugEndpointsFeature, openApiFeature, authenticationServiceFeature)
 }

@@ -11,6 +11,11 @@ repositories {
     mavenCentral()
 }
 
+
+fun getSetting(name: String) = providers.gradleProperty(name).orNull.toBoolean()
+val enableAndroidBuild = getSetting("enableAndroidBuild")
+val enableIosBuild = getSetting("enableIosBuild")
+
 kotlin {
     targets.configureEach {
         compilations.configureEach {
@@ -22,7 +27,7 @@ kotlin {
         }
     }
 
-    jvmToolchain(16)
+    jvmToolchain(17)
     jvm {
         withJava()
         testRuns["test"].executionTask.configure {
@@ -42,14 +47,10 @@ kotlin {
         }
         binaries.library()
     }
-    val hostOs = System.getProperty("os.name")
-    val isMingwX64 = hostOs.startsWith("Windows")
-    /*val nativeTarget = when {
-        hostOs == "Mac OS X" -> macosX64("native")
-        hostOs == "Linux" -> linuxX64("native")
-        isMingwX64 -> mingwX64("native")
-        else -> throw GradleException("Host OS is not supported in Kotlin/Native.")
-    }*/
+    if (enableIosBuild) {
+        iosArm64()
+        iosSimulatorArm64()
+    }
 
     sourceSets {
         val commonMain by getting {
@@ -87,8 +88,27 @@ kotlin {
         }
         val jsTest by getting {
         }
-        //val nativeMain by getting
-        //val nativeTest by getting
+
+
+        if (enableIosBuild) {
+            val iosArm64Main by getting
+            val iosSimulatorArm64Main by getting
+
+            val iosMain by creating {
+                dependsOn(commonMain)
+                iosArm64Main.dependsOn(this)
+                iosSimulatorArm64Main.dependsOn(this)
+            }
+
+            val iosArm64Test by getting
+            val iosSimulatorArm64Test by getting
+
+            val iosTest by creating {
+                dependsOn(commonTest)
+                iosArm64Test.dependsOn(this)
+                iosSimulatorArm64Test.dependsOn(this)
+            }
+        }
     }
 
     publishing {
@@ -97,14 +117,20 @@ kotlin {
             val envPassword = System.getenv("MAVEN_PASSWORD")
             val usernameFile = File("secret_maven_username.txt")
             val passwordFile = File("secret_maven_password.txt")
-            val secretMavenUsername = envUsername ?: usernameFile.let { if (it.isFile) it.readLines().first() else "" }
-            val secretMavenPassword = envPassword ?: passwordFile.let { if (it.isFile) it.readLines().first() else "" }
+            val secretMavenUsername =
+                envUsername ?: usernameFile.let { if (it.isFile) it.readLines().first() else "" }
+            val secretMavenPassword =
+                envPassword ?: passwordFile.let { if (it.isFile) it.readLines().first() else "" }
             val hasMavenAuth = secretMavenUsername.isNotEmpty() && secretMavenPassword.isNotEmpty()
             if (hasMavenAuth) {
                 maven {
                     val releasesRepoUrl = uri("https://maven.waltid.dev/releases")
                     val snapshotsRepoUrl = uri("https://maven.waltid.dev/snapshots")
-                    url = uri(if (version.toString().endsWith("SNAPSHOT")) snapshotsRepoUrl else releasesRepoUrl)
+                    url = uri(
+                        if (version.toString()
+                                .endsWith("SNAPSHOT")
+                        ) snapshotsRepoUrl else releasesRepoUrl
+                    )
                     credentials {
                         username = secretMavenUsername
                         password = secretMavenPassword
@@ -119,7 +145,8 @@ npmPublish {
     registries {
         val envToken = System.getenv("NPM_TOKEN")
         val npmTokenFile = File("secret_npm_token.txt")
-        val secretNpmToken = envToken ?: npmTokenFile.let { if (it.isFile) it.readLines().first() else "" }
+        val secretNpmToken =
+            envToken ?: npmTokenFile.let { if (it.isFile) it.readLines().first() else "" }
         val hasNPMToken = secretNpmToken.isNotEmpty()
         val isReleaseBuild = Regex("\\d+.\\d+.\\d+").matches(version.get())
         if (isReleaseBuild && hasNPMToken) {

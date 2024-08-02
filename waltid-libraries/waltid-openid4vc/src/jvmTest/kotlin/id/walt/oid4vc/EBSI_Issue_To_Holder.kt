@@ -132,7 +132,10 @@ class EBSIIssueToHolderConformanceTest {
                     )
                 )
             }.toString().toByteArray(),
-            mapOf("kid" to ISSUER_MOCK_DID+"#"+ISSUER_MOCK_DID.replaceRange(0..7, ""), "typ" to "JWT", "alg" to "ES256")
+            mapOf(
+              "kid" to (ISSUER_MOCK_DID+"#"+ISSUER_MOCK_DID.replaceRange(0..7, "")).toJsonElement(),
+              "typ" to "JWT".toJsonElement(),
+              "alg" to "ES256".toJsonElement())
         )
 
         println(signedRequestObject)
@@ -174,7 +177,9 @@ class EBSIIssueToHolderConformanceTest {
                 put("state", idTokenReqMap["state"]!!.first())
                 put("nonce", idTokenReqMap["nonce"]!!.first())
             }.toString().toByteArray(),
-            mapOf("kid" to ISSUER_MOCK_DID+"#"+ISSUER_MOCK_DID.replaceRange(0..7, ""), "typ" to "JWT")
+            mapOf(
+              "kid" to (ISSUER_MOCK_DID+"#"+ISSUER_MOCK_DID.replaceRange(0..7, "")).toJsonElement(),
+              "typ" to "JWT".toJsonElement())
         )
 
         println("ID Token is: $idToken")

@@ -49,19 +49,19 @@ const val CI_PROVIDER_BASE_URL = "http://localhost:$CI_PROVIDER_PORT"
 class CITestProvider : OpenIDCredentialIssuer(
     baseUrl = CI_PROVIDER_BASE_URL,
     config = CredentialIssuerConfig(
-        credentialConfigurationsSupported = listOf(
-            CredentialSupported(
-                "VerifiableId", CredentialFormat.jwt_vc_json,
+        credentialConfigurationsSupported = mapOf(
+            "VerifiableId" to CredentialSupported(
+                CredentialFormat.jwt_vc_json,
                 cryptographicBindingMethodsSupported = setOf("did"), cryptographicSuitesSupported = setOf("ES256K"),
                 types = listOf("VerifiableCredential", "VerifiableId"),
                 customParameters = mapOf("foo" to JsonPrimitive("bar"))
             ),
-            CredentialSupported(
-                "VerifiableDiploma", CredentialFormat.jwt_vc_json,
+            "VerifiableDiploma" to CredentialSupported(
+                CredentialFormat.jwt_vc_json,
                 cryptographicBindingMethodsSupported = setOf("did"), cryptographicSuitesSupported = setOf("ES256K"),
                 types = listOf("VerifiableCredential", "VerifiableAttestation", "VerifiableDiploma")
             )
-        ).associateBy { it.id }
+        )
     )
 ) {
 
@@ -69,12 +69,16 @@ class CITestProvider : OpenIDCredentialIssuer(
     private val authSessions: MutableMap<String, IssuanceSession> = mutableMapOf()
 
     override fun getSession(id: String): IssuanceSession? = authSessions[id]
-    override fun putSession(id: String, session: IssuanceSession) = authSessions.put(id, session)
+    override fun putSession(id: String, session: IssuanceSession) {
+        authSessions[id] = session
+    }
     override fun getSessionByAuthServerState(authServerState: String): IssuanceSession? {
         TODO("Not yet implemented")
     }
 
-    override fun removeSession(id: String) = authSessions.remove(id)
+    override fun removeSession(id: String) {
+        authSessions.remove(id)
+    }
 
     // crypto operations and credential issuance
     val CI_TOKEN_KEY = runBlocking { JWKKey.generate(KeyType.RSA) }
@@ -89,8 +93,13 @@ class CITestProvider : OpenIDCredentialIssuer(
     fun getKeyFor(token: String): Key {
         return runBlocking { DidService.resolveToKey((JWTParser.parse(token).header as JWSHeader).keyID.substringBefore("#")) }.getOrThrow()
     }
+
     override fun verifyTokenSignature(target: TokenTarget, token: String) =
-        runBlocking { (if(target == TokenTarget.PROOF_OF_POSSESSION) getKeyFor(token) else CI_TOKEN_KEY).verifyJws(token).isSuccess }
+        runBlocking { (if (target == TokenTarget.PROOF_OF_POSSESSION) getKeyFor(token) else CI_TOKEN_KEY).verifyJws(token).isSuccess }
+
+    override fun verifyCOSESign1Signature(target: TokenTarget, token: String): Boolean {
+        TODO("Not yet implemented")
+    }
 
     override fun generateCredential(credentialRequest: CredentialRequest): CredentialResult {
         if (deferIssuance) return CredentialResult(credentialRequest.format, null, randomUUID()).also {
@@ -128,11 +137,13 @@ class CITestProvider : OpenIDCredentialIssuer(
             CredentialErrorCode.invalid_or_missing_proof,
             message = "Proof JWT header must contain kid claim"
         )
-        return runBlocking { CredentialBuilder(CredentialBuilderType.W3CV2CredentialBuilder).apply {
-            type = credentialRequest.types ?: listOf("VerifiableCredential")
-            issuerDid = CI_ISSUER_DID
-            subjectDid = holderKid
-        }.buildW3C().baseIssue(CI_DID_KEY, CI_ISSUER_DID, holderKid, mapOf(), mapOf(), mapOf(), mapOf()) }.let {
+        return runBlocking {
+            CredentialBuilder(CredentialBuilderType.W3CV2CredentialBuilder).apply {
+                type = credentialRequest.types ?: listOf("VerifiableCredential")
+                issuerDid = CI_ISSUER_DID
+                subjectDid = holderKid
+            }.buildW3C().baseIssue(CI_DID_KEY, CI_ISSUER_DID, holderKid, mapOf(), mapOf(), mapOf(), mapOf())
+        }.let {
             CredentialResult(CredentialFormat.jwt_vc_json, JsonPrimitive(it))
         }
     }

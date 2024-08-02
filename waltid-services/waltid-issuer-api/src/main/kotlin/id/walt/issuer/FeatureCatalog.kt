@@ -4,6 +4,7 @@ import id.walt.commons.featureflag.BaseFeature
 import id.walt.commons.featureflag.OptionalFeature
 import id.walt.commons.featureflag.ServiceFeatureCatalog
 import id.walt.issuer.config.AuthenticationServiceConfig
+import id.walt.commons.persistence.PersistenceConfiguration
 import id.walt.issuer.config.CredentialTypeConfig
 import id.walt.issuer.config.OIDCIssuerServiceConfig
 
@@ -28,8 +29,9 @@ object FeatureCatalog : ServiceFeatureCatalog {
     )
 
     val entra = OptionalFeature("entra", "Enable support for Microsoft Entra", default = false)
+    val lspPotential = OptionalFeature("lsp-potential", "Enable LSP Potential Interop test endpoints", default = false)
 
     override val baseFeatures = listOf(credentialTypes, issuerService, authenticationService)
-    override val optionalFeatures = listOf(entra)
+    override val optionalFeatures = listOf(entra, lspPotential)
 
 }

@@ -36,10 +36,10 @@ class WaltIdKeyGenerateCmdTest {
     }
 
     @Test
-    fun `should generate an Ed25519 key when no --keyType is provided`() = runTest {
+    fun `should generate an Secp256r1 key when no --keyType is provided`() = runTest {
         val command = KeyGenerateCmd()
         val result = command.test(emptyList())
-        val expected = ".*Generating key of type ${KeyType.Ed25519.name}.*".toRegex()
+        val expected = ".*Generating key of type ${KeyType.secp256r1.name}.*".toRegex()
         assertContains(result.output, expected)
 
         deleteGeneratedFile(result.output)

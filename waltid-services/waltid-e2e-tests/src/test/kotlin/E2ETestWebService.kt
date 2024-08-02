@@ -14,6 +14,8 @@ import id.walt.did.helpers.WaltidServices
 import id.walt.issuer.FeatureCatalog
 import id.walt.issuer.issuerModule
 import id.walt.webwallet.web.plugins.walletAuthenticationPluginAmendment
+import id.walt.issuer.lspPotential.lspPotentialIssuanceTestApi
+import id.walt.verifier.lspPotential.lspPotentialVerificationTestApi
 import id.walt.verifier.policies.PresentationDefinitionPolicy
 import id.walt.verifier.verifierModule
 import id.walt.webwallet.db.Db
@@ -22,6 +24,8 @@ import id.walt.webwallet.webWalletSetup
 import io.ktor.server.application.*
 import io.ktor.server.cio.*
 import io.ktor.server.engine.*
+import java.io.File
+import java.net.URLDecoder
 
 object E2ETestWebService {
 
@@ -130,6 +134,9 @@ object E2ETestWebService {
         val failedStr = if (failed == 0) "none failed ✅" else TextColors.red("$failed failed")
         t.println(TextColors.magenta("Current test stats: ${testResults.size} overall | $overallSuccess succeeded | $failedStr\n"))
     }
+
+    fun loadResource(relativePath: String): String =
+        URLDecoder.decode(object {}.javaClass.getResource(relativePath)!!.path, "UTF-8").let { File(it).readText() }
 }
 
 typealias TestFunctionType = (String, suspend() -> Any?) -> Unit
@@ -137,5 +144,7 @@ typealias TestFunctionType = (String, suspend() -> Any?) -> Unit
 private fun Application.e2eTestModule() {
     webWalletModule(true)
     issuerModule(false)
+    lspPotentialIssuanceTestApi()
     verifierModule(false)
+    lspPotentialVerificationTestApi()
 }

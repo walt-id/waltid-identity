@@ -133,7 +133,7 @@ fun Application.credentials() = walletRoute {
                 runCatching { getWalletService().restoreCredential(credentialId) }.onSuccess {
                     context.respond(HttpStatusCode.OK, it)
                 }.onFailure {
-                    context.respond(HttpStatusCode.BadRequest, it.localizedMessage)
+                    throw it
                 }
             }
             post("accept", {
@@ -147,7 +147,7 @@ fun Application.credentials() = walletRoute {
                 runCatching { getWalletService().acceptCredential(CredentialRequestParameter(credentialId)) }.onSuccess {
                     if (it) context.respond(HttpStatusCode.Accepted) else context.respond(HttpStatusCode.BadRequest)
                 }.onFailure {
-                    context.respond(HttpStatusCode.BadRequest, it.localizedMessage)
+                    throw it
                 }
             }
             post("reject", {

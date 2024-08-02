@@ -1,17 +1,21 @@
 import love.forte.plugin.suspendtrans.ClassInfo
 import love.forte.plugin.suspendtrans.SuspendTransformConfiguration
 import love.forte.plugin.suspendtrans.TargetPlatform
+import love.forte.plugin.suspendtrans.gradle.SuspendTransPluginConstants
 import love.forte.plugin.suspendtrans.gradle.SuspendTransformGradleExtension
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
+fun getSetting(name: String) = providers.gradleProperty(name).orNull.toBoolean()
+val enableAndroidBuild = getSetting("enableAndroidBuild")
+val enableIosBuild = getSetting("enableIosBuild")
 
 plugins {
     kotlin("multiplatform")
     kotlin("plugin.serialization")
     id("maven-publish")
     id("com.github.ben-manes.versions")
-//    id("com.android.library")
-    id("love.forte.plugin.suspend-transform") version "0.9.0"
+    id("love.forte.plugin.suspend-transform") version "2.0.20-Beta1-0.9.2"
 }
 
 group = "id.walt.crypto"
@@ -25,6 +29,8 @@ suspendTransform {
     enabled = true
     includeRuntime = true
     useDefault()
+
+    includeAnnotation = false // Required in the current version to avoid "compileOnly" warning
 }
 
 tasks.withType<ProcessResources> {
@@ -39,11 +45,6 @@ java {
 kotlin {
     jvmToolchain(17)
 }
-
-/*android {
-    namespace = "id.walt.crypto"
-    compileSdk = 34
-}*/
 
 kotlin {
     targets.configureEach {
@@ -71,8 +72,7 @@ kotlin {
         }
     }
     js(IR) {
-        moduleName = "crypto"
-        /*browser {
+        moduleName = "crypto"/*browser {
             commonWebpackConfig {
                 cssSupport {
                     enabled.set(true)
@@ -89,8 +89,19 @@ kotlin {
     }
 //    androidTarget()
 
+    if (enableIosBuild) {
+        iosArm64()
+        iosSimulatorArm64()
+    }
+
     val ktor_version = "2.3.12"
+
     sourceSets {
+
+        all {
+            languageSettings.optIn("kotlinx.cinterop.BetaInteropApi")
+
+        }
         val commonMain by getting {
             dependencies {
                 // JSON
@@ -118,6 +129,9 @@ kotlin {
 
                 // Logging
                 implementation("io.github.oshai:kotlin-logging:7.0.0")
+
+                // suspend-transform plugin annotations (required in the current version to avoid "compileOnly" warning)
+                implementation("${SuspendTransPluginConstants.ANNOTATION_GROUP}:${SuspendTransPluginConstants.ANNOTATION_NAME}:${SuspendTransPluginConstants.ANNOTATION_VERSION}")
             }
         }
         val commonTest by getting {
@@ -129,7 +143,6 @@ kotlin {
         }
         val jvmMain by getting {
             dependencies {
-                //implementation("dev.whyoleg.cryptography:cryptography-jdk:0.1.0")
                 implementation("com.google.crypto.tink:tink:1.14.0") // for JOSE using Ed25519
 
                 implementation("org.bouncycastle:bcprov-lts8on:2.73.6") // for secp256k1 (which was removed with Java 17)
@@ -185,12 +198,40 @@ kotlin {
 //                implementation(kotlin("test"))
 //            }
 //        }
+
+        if (enableIosBuild) {
+            val iosArm64Main by getting
+            val iosSimulatorArm64Main by getting
+
+            val iosMain by creating {
+                dependsOn(commonMain)
+                iosArm64Main.dependsOn(this)
+                iosSimulatorArm64Main.dependsOn(this)
+                dependencies {
+                    implementation(project(":waltid-libraries:waltid-target-ios"))
+                }
+            }
+
+            val iosArm64Test by getting
+            val iosSimulatorArm64Test by getting
+
+            val iosTest by creating {
+                dependsOn(commonTest)
+                iosArm64Test.dependsOn(this)
+                iosSimulatorArm64Test.dependsOn(this)
+            }
+        }
+
         publishing {
             repositories {
                 maven {
                     val releasesRepoUrl = uri("https://maven.waltid.dev/releases")
                     val snapshotsRepoUrl = uri("https://maven.waltid.dev/snapshots")
-                    url = uri(if (version.toString().endsWith("SNAPSHOT")) snapshotsRepoUrl else releasesRepoUrl)
+                    url = uri(
+                        if (version.toString()
+                                .endsWith("SNAPSHOT")
+                        ) snapshotsRepoUrl else releasesRepoUrl
+                    )
 
                     val envUsername = System.getenv("MAVEN_USERNAME")
                     val envPassword = System.getenv("MAVEN_PASSWORD")
@@ -198,9 +239,13 @@ kotlin {
                     val usernameFile = File("$rootDir/secret_maven_username.txt")
                     val passwordFile = File("$rootDir/secret_maven_password.txt")
 
-                    val secretMavenUsername = envUsername ?: usernameFile.let { if (it.isFile) it.readLines().first() else "" }
+                    val secretMavenUsername = envUsername ?: usernameFile.let {
+                        if (it.isFile) it.readLines().first() else ""
+                    }
                     //println("Deploy username length: ${secretMavenUsername.length}")
-                    val secretMavenPassword = envPassword ?: passwordFile.let { if (it.isFile) it.readLines().first() else "" }
+                    val secretMavenPassword = envPassword ?: passwordFile.let {
+                        if (it.isFile) it.readLines().first() else ""
+                    }
 
                     //if (secretMavenPassword.isBlank()) {
                     //   println("WARNING: Password is blank!")

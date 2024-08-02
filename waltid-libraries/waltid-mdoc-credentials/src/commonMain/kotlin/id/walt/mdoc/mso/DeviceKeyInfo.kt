@@ -1,7 +1,7 @@
 package id.walt.mdoc.mso
 
 import id.walt.mdoc.dataelement.MapElement
-import id.walt.mdoc.dataelement.toDE
+import id.walt.mdoc.dataelement.toDataElement
 import kotlinx.serialization.Serializable
 
 /**
@@ -23,5 +23,5 @@ class DeviceKeyInfo (
     put("deviceKey", deviceKey)
     keyAuthorizations?.let { put("keyAuthorizations", it) }
     keyInfo?.let { put("keyInfo", it) }
-  }.toDE()
+  }.toDataElement()
 }

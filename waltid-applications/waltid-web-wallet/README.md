@@ -30,7 +30,7 @@ cd docker-compose && docker compose up
 
 Update the containers by running the following commands from the root folder: 
 ```bash
-docker build -f waltid-web-wallet/Dockerfile -t waltid/waltid-web-wallet .
+docker build -f waltid-applications/waltid-web-wallet/Dockerfile -t waltid/waltid-web-wallet .
 ```
 Note that this is project only the frontend of the web-wallet. The corresponding backend is in the /waltid-wallet-api folder.
 

@@ -5,7 +5,7 @@ import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.serialization.kotlinx.json.*
-import kotlinx.datetime.Clock
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import love.forte.plugin.suspendtrans.annotation.JvmAsync
 import love.forte.plugin.suspendtrans.annotation.JvmBlocking
@@ -15,18 +15,12 @@ import java.util.Base64
 import java.util.zip.GZIPInputStream
 
 
-actual class RevocationPolicy  : RevocationPolicyMp() {
+@Serializable
+actual class RevocationPolicy : RevocationPolicyMp() {
     @JvmBlocking
     @JvmAsync
-    actual override suspend fun verify(data: JsonElement, args: Any?, context: Map<String, Any>): Result<Any> {
-
-        var successfulKey = ""
-
-        fun setKey(key: String) {
-            successfulKey = key
-        }
-
-        val credentialStatus = data.jsonObject["vc"]?.jsonObject?.get("credentialStatus")
+    actual override suspend fun verify(data: JsonObject, args: Any?, context: Map<String, Any>): Result<Any> {
+        val credentialStatus = data["vc"]?.jsonObject?.get("credentialStatus")
             ?: return Result.success(
                 JsonObject(mapOf("policy_available" to JsonPrimitive(false)))
             )
@@ -39,31 +33,29 @@ actual class RevocationPolicy  : RevocationPolicyMp() {
                 json(Json { ignoreUnknownKeys = true })
             }
         }
-        val now = Clock.System.now()
-        val availableIn = now - now
 
-         runCatching {httpClient.get(statusListCredentialUrl!!).bodyAsText() }
-             .onSuccess{
-                 return try {
-                     // response is a jwt
-                     val payload = it.substringAfter(".").substringBefore(".").let {  Json.decodeFromString<JsonObject>(Base64Utils.decode(it).decodeToString()) }
+        val response = runCatching { httpClient.get(statusListCredentialUrl!!).bodyAsText() }
 
-                     val credentialSubject = payload["vc"]!!.jsonObject["credentialSubject"]?.jsonObject!!
-                     val encodedList = credentialSubject["encodedList"]?.jsonPrimitive?.content ?: ""
-                     val bitValue = get(encodedList, statusListIndex)
-                     if (bitValue!![0].code == 0) {
-                         Result.success("")
-                     } else {
-                         Result.failure(Throwable("Credential has been revoked"))
-                     }
-                 } catch (e: NumberFormatException) {
-                     throw IllegalArgumentException()
-                 }
-             }
-             .onFailure {
-                 return Result.failure(Throwable("Error when getting Status List Credential from  $statusListCredentialUrl"))
-             }
-        return Result.success("")
+        if (response.isFailure) {
+            return Result.failure(Throwable("Error when getting Status List Credential from  $statusListCredentialUrl"))
+        }
+
+        return try {
+            // response is a jwt
+            val payload = response.getOrThrow().substringAfter(".").substringBefore(".")
+                .let { Json.decodeFromString<JsonObject>(Base64Utils.decode(it).decodeToString()) }
+
+            val credentialSubject = payload["vc"]!!.jsonObject["credentialSubject"]?.jsonObject!!
+            val encodedList = credentialSubject["encodedList"]?.jsonPrimitive?.content ?: ""
+            val bitValue = get(encodedList, statusListIndex)
+            if (bitValue!![0].code == 0) {
+                Result.success(statusListCredentialUrl!!)
+            } else {
+                Result.failure(Throwable("Credential has been revoked"))
+            }
+        } catch (e: NumberFormatException) {
+            throw IllegalArgumentException()
+        }
     }
 
 }

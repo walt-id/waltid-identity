@@ -15,10 +15,7 @@ actual fun sha256WithRsa(privateKeyAsPem: String, data: ByteArray): ByteArray {
 
      return signed*/
 
-    val minimalPem = privateKeyAsPem.lines()
-        .takeWhile { "PUBLIC KEY-" !in privateKeyAsPem }
-        .filter { "-" !in it }
-        .joinToString("")
+    val minimalPem = minimalPem(privateKeyAsPem)
 
     val decodedPrivateKeyBytes = Base64.decode(minimalPem)
     val privateKeySpec = PKCS8EncodedKeySpec(decodedPrivateKeyBytes)
