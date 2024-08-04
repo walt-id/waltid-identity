@@ -98,27 +98,27 @@ class MDoc_Test: AnnotationSpec() {
   fun writeKeyPairAndCert(name: String, keyPair: KeyPair, cert: X509Certificate) {
     FileWriter("$name-priv.pem").also {
       it.write(
-        "-----BEGIN PRIVATE KEY-----\n" +
+        "-----BEGIN PRIVATE KEY-----${System.lineSeparator()}" +
             java.util.Base64.getEncoder().encodeToString(keyPair.private.encoded) +
-            "\n-----END PRIVATE KEY-----\n"
+                "${System.lineSeparator()}-----END PRIVATE KEY-----${System.lineSeparator()}"
       )
       it.flush()
       it.close()
     }
     FileWriter("$name-pub.pem").also {
       it.write(
-      "-----BEGIN PUBLIC KEY-----\n" +
+        "-----BEGIN PUBLIC KEY-----${System.lineSeparator()}" +
           java.util.Base64.getEncoder().encodeToString(keyPair.public.encoded) +
-          "\n-----END PUBLIC KEY-----\n"
+                "${System.lineSeparator()}-----END PUBLIC KEY-----${System.lineSeparator()}"
       )
       it.flush()
       it.close()
     }
     FileWriter("$name-cert.pem").also {
       it.write(
-        "-----BEGIN CERTIFICATE-----\n" +
+        "-----BEGIN CERTIFICATE-----${System.lineSeparator()}" +
             java.util.Base64.getEncoder().encodeToString(cert.encoded) +
-            "\n-----END CERTIFICATE-----\n"
+                "${System.lineSeparator()}-----END CERTIFICATE-----${System.lineSeparator()}"
       )
       it.flush()
       it.close()
