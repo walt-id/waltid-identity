@@ -1,6 +1,7 @@
 package id.walt.issuer.issuance
 
 
+import id.walt.crypto.utils.Base64Utils.base64UrlDecode
 import id.walt.oid4vc.data.ResponseMode
 import id.walt.oid4vc.data.ResponseType
 import id.walt.oid4vc.errors.*
@@ -22,7 +23,6 @@ import io.ktor.util.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
-import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.time.Duration.Companion.minutes
 
@@ -221,12 +221,10 @@ object OidcApi : CIProvider() {
                     logger.info { "/token tokenResp: $tokenResp" }
 
                     val sessionId = Json.parseToJsonElement(
-                        Base64.decode(
-                            (tokenResp.accessToken
-                                ?: throw IllegalArgumentException("No access token was responded with tokenResp?")).split(
-                                "."
-                            )[1]
-                        ).decodeToString()
+                        (tokenResp.accessToken
+                            ?: throw IllegalArgumentException("No access token was responded with tokenResp?")).split(
+                            "."
+                        )[1].base64UrlDecode().decodeToString()
                     ).jsonObject["sub"]?.jsonPrimitive?.contentOrNull
                         ?: throw IllegalArgumentException("Could not get session ID from token response!")
                     val nonceToken = tokenResp.cNonce
