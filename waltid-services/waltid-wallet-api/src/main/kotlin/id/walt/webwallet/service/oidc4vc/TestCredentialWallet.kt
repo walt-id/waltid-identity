@@ -71,7 +71,7 @@ class TestCredentialWallet(
     private val ktorClient = getHttpClient()
     private val credentialsService = CredentialsService()
 
-    suspend fun resolveDidAuthentication(did: String): String {
+    private suspend fun resolveDidAuthentication(did: String): String {
         return DidService.resolve(did).getOrElse {
             ktorClient.post("https://core.ssikit.walt.id/v1/did/resolve") {
                 headers { contentType(ContentType.Application.Json) }
@@ -90,7 +90,7 @@ class TestCredentialWallet(
         fun debugStateMsg() = "(target: $target, payload: $payload, header: $header, keyId: $keyId)"
 
         val key = privKey ?: keyId?.let { tryResolveKeyId(it) }
-        key ?: throw IllegalArgumentException("No key given or found for given keyId ${debugStateMsg()}")
+            ?: throw IllegalArgumentException("No key given or found for given keyId ${debugStateMsg()}")
 
         val authKeyId = resolveDidAuthentication(did)
         val payloadToSign = Json.encodeToString(payload).encodeToByteArray()
@@ -110,7 +110,7 @@ class TestCredentialWallet(
         fun debugStateMsg() = "(target: $target, payload: $payload, header: $header, keyId: $keyId)"
 
         val key = privKey ?: keyId?.let { tryResolveKeyId(it) }
-        key ?: throw IllegalArgumentException("No key given or found for given keyId ${debugStateMsg()}")
+            ?: throw IllegalArgumentException("No key given or found for given keyId ${debugStateMsg()}")
 
         val ecKey = ECKey.parseFromPEMEncodedObjects(key.exportPEM()).toECKey()
         val cryptoProvider = SimpleCOSECryptoProvider(listOf(
@@ -234,7 +234,7 @@ class TestCredentialWallet(
 
         val presentationId = (session.presentationDefinition?.id ?: "urn:uuid:${UUID.generateUUID().toString().lowercase()}")
 
-        val vp = if(!jwtsPresented.isNullOrEmpty()) getVpJson(jwtsPresented, presentationId, session.nonce, session.authorizationRequest.clientId) else null
+        val vp = if(jwtsPresented.isNotEmpty()) getVpJson(jwtsPresented, presentationId, session.nonce, session.authorizationRequest.clientId) else null
 
         val signedJwtVP = if(!vp.isNullOrEmpty()) runBlocking {
             val authKeyId = resolveDidAuthentication(this@TestCredentialWallet.did)
@@ -247,7 +247,7 @@ class TestCredentialWallet(
             )
         } else null
 
-        val deviceResponse = if(!mdocsPresented.isNullOrEmpty()) mdocsPresented.let { DeviceResponse(it).toCBORBase64URL() } else null
+        val deviceResponse = if(mdocsPresented.isNotEmpty()) mdocsPresented.let { DeviceResponse(it).toCBORBase64URL() } else null
 
         println("GENERATED VP: $signedJwtVP")
 

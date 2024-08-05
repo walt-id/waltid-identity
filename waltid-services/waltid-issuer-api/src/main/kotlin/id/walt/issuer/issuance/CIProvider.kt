@@ -336,6 +336,7 @@ open class CIProvider : OpenIDCredentialIssuer(
         }
     }
 
+    @OptIn(ExperimentalSerializationApi::class)
     private fun doGenerateMDoc(
         credentialRequest: CredentialRequest
     ): CredentialResult {
