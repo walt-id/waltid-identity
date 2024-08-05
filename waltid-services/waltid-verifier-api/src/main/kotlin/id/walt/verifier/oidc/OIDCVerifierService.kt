@@ -69,11 +69,6 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
 ) {
     private val logger = KotlinLogging.logger {}
 
-
-    // ------------------------------------
-    // Simple in-memory session management
-//    private val presentationSessions = HashMap<String, PresentationSession>()
-
     @Serializable
     data class SessionVerificationInformation(
         val vpPolicies: List<PolicyRequest>,
@@ -91,11 +86,7 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
         val statusCallbackApiKey: String? = null,
     )
 
-//    val sessionVerificationInfos = HashMap<String, SessionVerificationInformation>()
-//    val policyResults = HashMap<String, PresentationVerificationResponse>()
-
-
-    // PERSISTENCE
+    // Persistence
     val presentationSessions = ConfiguredPersistence<PresentationSession>(
         "presentation_session", defaultExpiration = 5.minutes,
         encoding = { Json.encodeToString(it) },
@@ -105,7 +96,8 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
             Json.decodeFromString(it) },
     )
 
-    val module = SerializersModule {
+    // Todo: Make this automatic?
+    private val module = SerializersModule {
         polymorphic(VerificationPolicy::class) {
             subclass(HolderBindingPolicy::class)
             subclass(MaximumCredentialsPolicy::class)
