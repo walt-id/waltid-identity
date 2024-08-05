@@ -27,6 +27,7 @@ import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.util.*
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.json.Json
@@ -203,6 +204,7 @@ object IssuanceService {
         } else logger.debug { "No authorization request state or redirectUri found in Entra issuance request, skipping completion response callback" }
     }
 
+    @OptIn(ExperimentalSerializationApi::class)
     private suspend fun getCredentialData(
         processedOffer: ProcessedCredentialOffer, manifest: JsonObject?,
     ) = let {

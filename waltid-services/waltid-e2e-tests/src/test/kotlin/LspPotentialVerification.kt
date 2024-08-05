@@ -1,4 +1,5 @@
 import COSE.AlgorithmID
+import COSE.OneKey
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.crypto.ECDSASigner
 import com.nimbusds.jose.crypto.ECDSAVerifier
@@ -44,6 +45,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.*
 import kotlinx.uuid.UUID
 import kotlinx.uuid.generateUUID
+import java.security.PublicKey
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -90,7 +92,6 @@ class LspPotentialVerification(private val client: HttpClient) {
       assertEquals("A256GCM", presReq.clientMetadata!!.authorizationEncryptedResponseEnc!!)
 
       // Step 5: Create encrypted presentation response
-      val ephemeralReaderKey = JWKKey.importJWK(presReq.clientMetadata!!.jwks!!["keys"]!!.jsonArray.first().toString()).getOrNull()!!
       val mdocNonce = UUID.generateUUID().toString()
       val mdocHandover = OpenID4VP.generateMDocOID4VPHandover(presReq, mdocNonce)
       val holderKeyNimbus = ECKey.parse(holderKey.exportJWK())
@@ -99,11 +100,9 @@ class LspPotentialVerification(private val client: HttpClient) {
         COSECryptoProviderKeyInfo(holderKey.getKeyId(), AlgorithmID.ECDSA_256, holderKeyNimbus.toECPublicKey(),
           holderKeyNimbus.toECPrivateKey())
       ))
-      val deviceAuthentication = DeviceAuthentication(sessionTranscript = ListElement(listOf(
-        NullElement(),
-        NullElement(), //EncodedCBORElement(ephemeralReaderKey.getPublicKeyRepresentation()),
-        mdocHandover
-      )), mdoc.docType.value, EncodedCBORElement(MapElement(mapOf()))
+      val deviceAuthentication = DeviceAuthentication(sessionTranscript = ListElement(
+        listOf(NullElement(), NullElement(), mdocHandover)
+      ), mdoc.docType.value, EncodedCBORElement(MapElement(mapOf()))
       )
       val presentedMdoc = mdoc.presentWithDeviceSignature(
         MDocRequestBuilder(mdoc.docType.value).also {

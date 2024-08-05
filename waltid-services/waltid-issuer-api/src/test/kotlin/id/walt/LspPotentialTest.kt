@@ -18,8 +18,10 @@ import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.data.ProofOfPossession
 import id.walt.oid4vc.requests.CredentialRequest
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.decodeFromHexString
+import org.junit.jupiter.api.assertDoesNotThrow
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -30,6 +32,7 @@ object LspPotentialTest {
     runBlocking { DidService.minimalInit() }
   }
 
+  @OptIn(ExperimentalSerializationApi::class)
   @Test
   fun testParseCWTExample() {
     val data = "d28443a10126a104524173796d6d657472696345434453413235365850a701756" +
@@ -38,9 +41,7 @@ object LspPotentialTest {
         "9f0061a5610d9f007420b7158405427c1ff28d23fbad1f29c4c7c6a555e601d6f" +
         "a29f9179bc3d7438bacaca5acd08c8d4d4f96131680c429a01f85951ecee743a5" +
         "2b9b63632c57209120e1c9e30"
-    val parsedCwt = Cbor.decodeFromHexString(COSESign1.serializer(), data)
-    parsedCwt != null
-
+    assertDoesNotThrow { Cbor.decodeFromHexString(COSESign1.serializer(), data) }
   }
 
   @OptIn(ExperimentalStdlibApi::class)
