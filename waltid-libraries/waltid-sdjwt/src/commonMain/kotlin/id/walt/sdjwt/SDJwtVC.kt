@@ -47,6 +47,7 @@ class SDJwtVC(sdJwt: SDJwt): SDJwt(sdJwt.jwt, sdJwt.header, sdJwt.sdPayload, sdJ
   }
 
   companion object {
+    const val SD_JWT_VC_TYPE_HEADER = "vc+sd-jwt"
 
     fun parse(sdJwt: String) = SDJwtVC(SDJwt.parse(sdJwt))
 
@@ -102,7 +103,7 @@ class SDJwtVC(sdJwt: SDJwt): SDJwt(sdJwt.jwt, sdJwt.header, sdJwt.sdPayload, sdJ
       ).let { JsonObject(it) }
 
       val finalSdPayload = SDPayload(undisclosedPayload, sdPayload.digestedDisclosures)
-      return SDJwtVC(sign(finalSdPayload, jwtCryptoProvider, issuerKeyId, typ = "vc+sd-jwt", additionalJwtHeader))
+      return SDJwtVC(sign(finalSdPayload, jwtCryptoProvider, issuerKeyId, typ = SD_JWT_VC_TYPE_HEADER, additionalJwtHeader))
     }
 
     fun defaultPayloadProperties(issuerId: String, cnf: JsonObject, vct: String,

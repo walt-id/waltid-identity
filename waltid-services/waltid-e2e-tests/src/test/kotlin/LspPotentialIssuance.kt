@@ -337,6 +337,7 @@ class LspPotentialIssuance(val client: HttpClient) {
     assertNotNull(credResp.credential)
     val sdJwtVc = SDJwtVC.parse(credResp.credential!!.jsonPrimitive.content)
     assertNotNull(sdJwtVc.cnfObject)
+    assertEquals("vc+sd-jwt", sdJwtVc.type)
     // family_name is defined as non-selective disclosable in issuance request
     assertContains(sdJwtVc.undisclosedPayload.keys, "family_name")
     // birthdate is defined as selective disclosable in issuance request

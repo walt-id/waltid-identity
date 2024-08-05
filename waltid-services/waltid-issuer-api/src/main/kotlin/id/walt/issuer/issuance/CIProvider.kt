@@ -510,6 +510,7 @@ open class CIProvider : OpenIDCredentialIssuer(
         issuerKey, issuerDid.ifEmpty { issuerKey.getKeyId() },
         holderDid ?: holderKey?.getKeyId() ?: throw IllegalArgumentException("Either holderKey or holderDid must be given"),
         request.mapping ?: JsonObject(emptyMap()),
+        type = SDJwtVC.SD_JWT_VC_TYPE_HEADER,
         additionalJwtHeaders = request.x5Chain?.let {
             mapOf("x5c" to JsonArray(it.map { cert -> cert.toJsonElement() }))
         } ?: mapOf(),

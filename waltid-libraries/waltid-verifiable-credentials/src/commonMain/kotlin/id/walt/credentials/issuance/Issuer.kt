@@ -100,7 +100,7 @@ object Issuer {
         subjectDid: String,
 
         mappings: JsonObject,
-
+        type: String = "JWT",
         additionalJwtHeaders: Map<String, JsonElement>,
         additionalJwtOptions: Map<String, JsonElement>,
 
@@ -118,7 +118,7 @@ object Issuer {
             subjectDid = subjectDid,
             disclosureMap = disclosureMap,
             additionalJwtHeaders = additionalJwtHeaders.toMutableMap().apply {
-                put("typ", "JWT".toJsonElement())
+                put("typ", type.toJsonElement())
             },
             additionalJwtOptions = additionalJwtOptions.toMutableMap().apply {
                 putAll(jwtOptions)
