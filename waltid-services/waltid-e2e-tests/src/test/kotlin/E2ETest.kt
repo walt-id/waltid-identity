@@ -84,6 +84,7 @@ class E2ETest {
                 assert(it.first().default)
                 did = it.first().did
             }
+            //todo: test for optional registration defaults
             didsApi.create(wallet, DidsApi.DidCreateRequest(method = "key", options = mapOf("useJwkJcsPub" to false))) {
                 createdDids.add(it)
             }
