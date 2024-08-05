@@ -167,8 +167,8 @@ dependencies {
     // Logging
     implementation("io.github.oshai:kotlin-logging-jvm:7.0.0")
     implementation("org.slf4j:jul-to-slf4j:2.0.13")
-    implementation("io.klogging:klogging-jvm:0.6.1")
-    implementation("io.klogging:slf4j-klogging:0.6.0")
+    implementation("io.klogging:klogging-jvm:0.7.0")
+    implementation("io.klogging:slf4j-klogging:0.7.0")
 
     // Test
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit:2.0.0")

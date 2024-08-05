@@ -1,16 +1,16 @@
 package id.walt.credentials.verification
 
-import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.Serializable
 import love.forte.plugin.suspendtrans.annotation.JsPromise
 import love.forte.plugin.suspendtrans.annotation.JvmAsync
 import love.forte.plugin.suspendtrans.annotation.JvmBlocking
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 
+@Serializable
 @OptIn(ExperimentalJsExport::class)
 @JsExport
-abstract class JwtVerificationPolicy(override val name: String, override val description: String? = null) :
-    VerificationPolicy(name, description) {
+abstract class JwtVerificationPolicy : VerificationPolicy() {
     @JvmBlocking
     @JvmAsync
     @JsPromise
@@ -19,10 +19,7 @@ abstract class JwtVerificationPolicy(override val name: String, override val des
 
 }
 
-abstract class JavaJwtVerificationPolicy(
-    override val name: String,
-    override val description: String? = null
-): JwtVerificationPolicy(name, description) {
+abstract class JavaJwtVerificationPolicy : JwtVerificationPolicy() {
     override suspend fun verify(credential: String, args: Any?, context: Map<String, Any>): Result<Any> {
         return runCatching { javaVerify(credential, args, context) }
     }

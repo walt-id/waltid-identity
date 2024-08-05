@@ -24,47 +24,61 @@ object AccountsService {
 
     private val defaultGenerationConfig by lazy { ConfigManager.getConfig<RegistrationDefaultsConfig>() }
 
-    suspend fun register(tenant: String = "", request: AccountRequest): Result<RegistrationResult> = when (request) {
-        is EmailAccountRequest -> EmailAccountStrategy.register(tenant, request)
-        is AddressAccountRequest -> Web3WalletAccountStrategy.register(tenant, request)
-        is OidcAccountRequest -> OidcAccountStrategy.register(tenant, request)
-        is KeycloakAccountRequest -> KeycloakAccountStrategy.register(tenant, request)
-        is OidcUniqueSubjectRequest -> OidcUniqueSubjectStrategy.register(tenant, request)
 
-    }.onSuccess { registrationResult ->
-        val registeredUserId = registrationResult.id
+    private suspend fun initializeUserAccount(tenant: String, name: String?, registrationResult: RegistrationResult) =
+        let {
+            val registeredUserId = registrationResult.id
 
-        val createdInitialWalletId = transaction {
-            WalletServiceManager.createWallet(tenant, registeredUserId)
-        }.also { walletId ->
-            //TODO: inject
-            WalletServiceManager.issuerUseCase.add(IssuerDataTransferObject.default(walletId))
+            val createdInitialWalletId = transaction {
+                WalletServiceManager.createWallet(tenant, registeredUserId)
+            }.also { walletId ->
+                //TODO: inject
+                WalletServiceManager.issuerUseCase.add(IssuerDataTransferObject.default(walletId))
+            }
+
+            val walletService = WalletServiceManager.getWalletService(tenant, registeredUserId, createdInitialWalletId)
+            WalletServiceManager.eventUseCase.log(
+                action = EventType.Account.Create,
+                originator = "wallet",
+                tenant = tenant,
+                accountId = registeredUserId,
+                walletId = createdInitialWalletId,
+                data = AccountEventData(accountId = name)
+            )
+
+            // Add default data:
+
+            val createdKey = walletService.generateKey(defaultGenerationConfig.defaultKeyConfig)
+
+            val createdDid = walletService.createDid(
+                method = defaultGenerationConfig.didMethod,
+                args = defaultGenerationConfig.didConfig.toMutableMap().apply {
+                    put("keyId", JsonPrimitive(createdKey))
+                    put("alias", JsonPrimitive("Onboarding"))
+                }
+            )
+
+            walletService.setDefault(createdDid)
+            registrationResult
         }
 
-        val walletService = WalletServiceManager.getWalletService(tenant, registeredUserId, createdInitialWalletId)
-        WalletServiceManager.eventUseCase.log(
-            action = EventType.Account.Create,
-            originator = "wallet",
-            tenant = tenant,
-            accountId = registeredUserId,
-            walletId = createdInitialWalletId,
-            data = AccountEventData(accountId = request.name)
-        )
 
-        // Add default data:
+    suspend fun register(tenant: String = "", request: AccountRequest): Result<RegistrationResult> = runCatching {
+        when (request) {
+            is EmailAccountRequest -> EmailAccountStrategy.register(tenant, request)
+            is AddressAccountRequest -> Web3WalletAccountStrategy.register(tenant, request)
+            is OidcAccountRequest -> OidcAccountStrategy.register(tenant, request)
+            is KeycloakAccountRequest -> KeycloakAccountStrategy.register(tenant, request)
+            is OidcUniqueSubjectRequest -> OidcUniqueSubjectStrategy.register(tenant, request)
 
-        val createdKey = walletService.generateKey(defaultGenerationConfig.defaultKeyConfig)
+        }.fold(onSuccess = {
+            initializeUserAccount(tenant, request.name, it)
 
-        val createdDid = walletService.createDid(
-            method = defaultGenerationConfig.didMethod,
-            args = defaultGenerationConfig.didConfig.toMutableMap().apply {
-                put("keyId", JsonPrimitive(createdKey))
-                put("alias", JsonPrimitive("Onboarding"))
-            }
-        )
+        }, onFailure = {
+            throw it
+        })
+    }
 
-        walletService.setDefault(createdDid)
-    }.onFailure { throw IllegalStateException("Could not register user: ${it.message}", it) }
 
     suspend fun authenticate(tenant: String, request: AccountRequest): Result<AuthenticatedUser> = runCatching {
         when (request) {

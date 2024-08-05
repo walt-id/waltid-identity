@@ -35,6 +35,7 @@ class UniResolverTest {
     fun `given a did String, when calling resolveToKey, then the result is valid key`(
         did: String, key: String,
     ) = runTest {
+        println("Resolving: $did")
         val result = sut.resolveToKey(did)
         assertEquals(true, result.isSuccess)
         assertEquals(key, result.getOrNull()?.exportJWK())

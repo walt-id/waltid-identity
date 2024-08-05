@@ -57,7 +57,7 @@ const val WALLET_PORT = 8001
 const val WALLET_BASE_URL = "http://localhost:${WALLET_PORT}"
 
 class TestCredentialWallet(
-    config: CredentialWalletConfig
+    config: CredentialWalletConfig,
 ) : OpenIDCredentialWallet<SIOPSession>(WALLET_BASE_URL, config) {
 
     private val sessionCache = mutableMapOf<String, SIOPSession>()
@@ -70,7 +70,7 @@ class TestCredentialWallet(
     override fun createSIOPSession(
         id: String,
         authorizationRequest: AuthorizationRequest?,
-        expirationTimestamp: Instant
+        expirationTimestamp: Instant,
     ) = SIOPSession(id, authorizationRequest, expirationTimestamp)
 
     override fun signToken(target: TokenTarget, payload: JsonObject, header: JsonObject?, keyId: String?, privKey: Key?) =
@@ -193,7 +193,8 @@ class TestCredentialWallet(
     val TEST_WALLET_DID_ION =
         "did:ion:EiDh0EL8wg8oF-7rRiRzEZVfsJvh4sQX4Jock2Kp4j_zxg:eyJkZWx0YSI6eyJwYXRjaGVzIjpbeyJhY3Rpb24iOiJyZXBsYWNlIiwiZG9jdW1lbnQiOnsicHVibGljS2V5cyI6W3siaWQiOiI0OGQ4YTM0MjYzY2Y0OTJhYTdmZjYxYjYxODNlOGJjZiIsInB1YmxpY0tleUp3ayI6eyJjcnYiOiJzZWNwMjU2azEiLCJraWQiOiI0OGQ4YTM0MjYzY2Y0OTJhYTdmZjYxYjYxODNlOGJjZiIsImt0eSI6IkVDIiwidXNlIjoic2lnIiwieCI6IlRLYVE2c0NvY1REc211ajl0VFI5OTZ0RlhwRWNTMkVKTi0xZ09hZGFCdmsiLCJ5IjoiMFRySVlIY2ZDOTNWcEV1dmotSFhUbnlLdDBzbmF5T013R1NKQTFYaURYOCJ9LCJwdXJwb3NlcyI6WyJhdXRoZW50aWNhdGlvbiJdLCJ0eXBlIjoiRWNkc2FTZWNwMjU2azFWZXJpZmljYXRpb25LZXkyMDE5In1dfX1dLCJ1cGRhdGVDb21taXRtZW50IjoiRWlCQnlkZ2R5WHZkVERob3ZsWWItQkV2R3ExQnR2TWJSLURmbDctSHdZMUhUZyJ9LCJzdWZmaXhEYXRhIjp7ImRlbHRhSGFzaCI6IkVpRGJxa05ldzdUcDU2cEJET3p6REc5bThPZndxamlXRjI3bTg2d1k3TS11M1EiLCJyZWNvdmVyeUNvbW1pdG1lbnQiOiJFaUFGOXkzcE1lQ2RQSmZRYjk1ZVV5TVlfaUdCRkMwdkQzeDNKVTB6V0VjWUtBIn19"
 
-    val TEST_WALLET_DID_WEB_KEY = "{\"kty\":\"EC\",\"d\":\"uD-uxub011cplvr5Bd6MrIPSEUBsgLk-C1y3tnmfetQ\",\"use\":\"sig\",\"crv\":\"secp256k1\",\"kid\":\"48d8a34263cf492aa7ff61b6183e8bcf\",\"x\":\"TKaQ6sCocTDsmuj9tTR996tFXpEcS2EJN-1gOadaBvk\",\"y\":\"0TrIYHcfC93VpEuvj-HXTnyKt0snayOMwGSJA1XiDX8\"}"
+    val TEST_WALLET_DID_WEB_KEY =
+        "{\"kty\":\"EC\",\"d\":\"uD-uxub011cplvr5Bd6MrIPSEUBsgLk-C1y3tnmfetQ\",\"use\":\"sig\",\"crv\":\"secp256k1\",\"kid\":\"48d8a34263cf492aa7ff61b6183e8bcf\",\"x\":\"TKaQ6sCocTDsmuj9tTR996tFXpEcS2EJN-1gOadaBvk\",\"y\":\"0TrIYHcfC93VpEuvj-HXTnyKt0snayOMwGSJA1XiDX8\"}"
     /*val TEST_KEY = runBlocking { JWKKey.generate(KeyType.Ed25519) }
     val TEST_DID: String = runBlocking {
         DidJwkRegistrar().registerByKey(TEST_KEY, DidJwkCreateOptions())
@@ -219,9 +220,9 @@ class TestCredentialWallet(
     override fun resolveDID(did: String): String {
         val didObj = runBlocking { DidService.resolve(did) }.getOrThrow()
         return (didObj["authentication"] ?: didObj["assertionMethod"] ?: didObj["verificationMethod"])?.jsonArray?.firstOrNull()?.let {
-            if(it is JsonObject) it.jsonObject["id"]?.jsonPrimitive?.content
+            if (it is JsonObject) it.jsonObject["id"]?.jsonPrimitive?.content
             else it.jsonPrimitive.contentOrNull
-        }?: did
+        } ?: did
     }
 
     override fun getDidFor(session: SIOPSession): String {
@@ -240,8 +241,13 @@ class TestCredentialWallet(
         TODO("Not yet implemented")
     }
 
-    override fun putSession(id: String, session: SIOPSession) = sessionCache.put(id, session)
-    override fun removeSession(id: String) = sessionCache.remove(id)
+    override fun putSession(id: String, session: SIOPSession) {
+        sessionCache[id] = session
+    }
+
+    override fun removeSession(id: String) {
+        sessionCache.remove(id)
+    }
 
     fun start() {
         embeddedServer(Netty, port = WALLET_PORT) {
