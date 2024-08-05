@@ -1,6 +1,6 @@
 package id.walt.oid4vc.util
 
-import id.walt.oid4vc.util.Base64Utils.base64UrlDecode
+import id.walt.crypto.utils.Base64Utils.base64UrlDecode
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 
