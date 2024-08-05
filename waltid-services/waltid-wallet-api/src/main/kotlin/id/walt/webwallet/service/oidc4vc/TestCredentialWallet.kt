@@ -2,6 +2,7 @@ package id.walt.webwallet.service.oidc4vc
 
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyManager
+import id.walt.crypto.utils.Base64Utils.base64UrlDecode
 import id.walt.crypto.utils.Base64Utils.base64UrlToBase64
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.crypto.utils.JwsUtils.decodeJws
@@ -18,7 +19,6 @@ import id.walt.oid4vc.providers.OpenIDCredentialWallet
 import id.walt.oid4vc.providers.TokenTarget
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.requests.TokenRequest
-import id.walt.oid4vc.util.Base64Utils.base64UrlDecode
 import id.walt.webwallet.service.SessionAttributes.HACK_outsideMappedSelectedCredentialsPerSession
 import id.walt.webwallet.service.SessionAttributes.HACK_outsideMappedSelectedDisclosuresPerSession
 import id.walt.webwallet.service.credentials.CredentialsService
