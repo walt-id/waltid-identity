@@ -97,17 +97,22 @@ class SDJwtVC(sdJwt: SDJwt): SDJwt(sdJwt.jwt, sdJwt.header, sdJwt.sdPayload, sdJ
       /** Set additional options in the JWT header */
       additionalJwtHeader: Map<String, Any> = emptyMap()
     ): SDJwtVC {
-      val undisclosedPayload = sdPayload.undisclosedPayload.toMutableMap().apply {
-        put("iss", JsonPrimitive(issuerDid))
-        put("cnf", cnf)
-        put("vct", JsonPrimitive(vct))
-        nbf?.let { put("nbf", JsonPrimitive(it)) }
-        exp?.let { put("exp", JsonPrimitive(it)) }
-        status?.let { put("status", JsonPrimitive(it)) }
-      }.let { JsonObject(it) }
+      val undisclosedPayload = sdPayload.undisclosedPayload.plus(
+        defaultPayloadProperties(issuerDid, cnf, vct, nbf, exp, status)
+      ).let { JsonObject(it) }
 
       val finalSdPayload = SDPayload(undisclosedPayload, sdPayload.digestedDisclosures)
       return SDJwtVC(sign(finalSdPayload, jwtCryptoProvider, issuerKeyId, typ = "vc+sd-jwt", additionalJwtHeader))
+    }
+
+    fun defaultPayloadProperties(issuerId: String, cnf: JsonObject, vct: String,
+                                 notBefore: Long? = null, expirationDate: Long? = null, status: String? = null) = buildJsonObject {
+      put("iss", JsonPrimitive(issuerId))
+      put("cnf", cnf)
+      put("vct", JsonPrimitive(vct))
+      notBefore?.let { put("nbf", JsonPrimitive(it)) }
+      expirationDate?.let { put("exp", JsonPrimitive(it)) }
+      status?.let { put("status", JsonPrimitive(it)) }
     }
 
     fun isSdJwtVCPresentation(token: String): Boolean = parse(token).isPresentation
