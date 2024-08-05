@@ -138,8 +138,6 @@ object E2ETestWebService {
         URLDecoder.decode(object {}.javaClass.getResource(relativePath)!!.path, "UTF-8").let { File(it).readText() }
 }
 
-typealias TestFunctionType = (String, suspend() -> Any?) -> Unit
-
 private fun Application.e2eTestModule() {
     webWalletModule(true)
     issuerModule(false)
