@@ -273,9 +273,9 @@ open class CIProvider : OpenIDCredentialIssuer(
             credentialRequest,
             CredentialErrorCode.invalid_or_missing_proof, message = "Proof must contain nonce")
 
-        val data: IssuanceSessionData = (if (holderDid == null) {
+        val data: IssuanceSessionData = (if (!tokenCredentialMapping.containsKey(nonce)) {
             repeat(10) {
-                log.debug { "WARNING: RETURNING DEMO/EXAMPLE (= BOGUS) CREDENTIAL: subjectDid or nonce is null (was deferred issuance tried?)" }
+                log.debug { "WARNING: RETURNING DEMO/EXAMPLE (= BOGUS) CREDENTIAL: nonce is not mapped to issuance request data (was deferred issuance tried?)" }
             }
             listOf(
                 IssuanceSessionData(
@@ -308,7 +308,7 @@ open class CIProvider : OpenIDCredentialIssuer(
                     issuerKid = issuerDid + "#" + issuerKey.getKeyId()
 
                 when (credentialRequest.format) {
-                    CredentialFormat.sd_jwt_vc -> sdJwtVc(holderKey, vc, data, holderDid)
+                    CredentialFormat.sd_jwt_vc -> sdJwtVc(JWKKey.importJWK(holderKey.toString()).getOrNull(), vc, data, holderDid)
                     else -> nonSdJwtVc(vc, issuerKid, holderDid, holderKey)
                 }
             }.also { log.debug { "Respond VC: $it" } }
@@ -394,6 +394,7 @@ open class CIProvider : OpenIDCredentialIssuer(
         return Pair(subjectDid, nonce)
     }
 
+    @OptIn(ExperimentalSerializationApi::class)
     override fun generateBatchCredentialResponse(
         batchCredentialRequest: BatchCredentialRequest,
         accessToken: String,
@@ -443,7 +444,7 @@ open class CIProvider : OpenIDCredentialIssuer(
                                         issuerDid = issuerDid,
                                         subjectDid = subjectDid,
                                         mappings = request.mapping ?: JsonObject(emptyMap()),
-                                        additionalJwtHeader = emptyMap(),
+                                        additionalJwtHeaders = emptyMap(),
                                         additionalJwtOptions = emptyMap(),
                                         disclosureMap = data.request.selectiveDisclosure
                                             ?: SDMap.Companion.generateSDMap(
@@ -501,31 +502,26 @@ open class CIProvider : OpenIDCredentialIssuer(
     }
 
     private suspend fun IssuanceSessionData.sdJwtVc(
-        holderKey: JsonObject?,
+        holderKey: JWKKey?,
         vc: W3CVC,
         data: IssuanceSessionData,
         holderDid: String?
-    ) = (holderKey?.let {
-        SDJwtVC.sign(SDPayload.createSDPayload(vc.toJsonObject(), buildJsonObject {}),
-            WaltIdJWTCryptoProvider(mapOf(issuerKey.getKeyId() to issuerKey)),
-            issuerDid = issuerDid.ifEmpty { issuerKey.getKeyId() },
-            holderKeyJWK = holderKey,
-            issuerKeyId = issuerKey.getKeyId(),
-            vct = data.request.credentialConfigurationId,
-            additionalJwtHeader = data.request.x5Chain?.let {
-                mapOf("x5c" to JsonArray(it.map { cert -> cert.toJsonElement() }))
-            } ?: mapOf()
-        )
-    } ?: SDJwtVC.sign(
-        SDPayload.createSDPayload(vc.toJsonObject(), buildJsonObject {}),
-        WaltIdJWTCryptoProvider(mapOf(issuerKey.getKeyId() to issuerKey)),
-        issuerDid = issuerDid.ifEmpty { issuerKey.getKeyId() },
-        holderDid = holderDid!!,
-        issuerKeyId = issuerKey.getKeyId(),
-        vct = data.request.credentialConfigurationId,
-        additionalJwtHeader = data.request.x5Chain?.first()?.let {
-            mapOf("x5c" to JsonPrimitive(it))
-        } ?: mapOf())).toString()
+    ) = vc.mergingSdJwtIssue(
+        issuerKey, issuerDid.ifEmpty { issuerKey.getKeyId() },
+        holderDid ?: holderKey?.getKeyId() ?: throw IllegalArgumentException("Either holderKey or holderDid must be given"),
+        request.mapping ?: JsonObject(emptyMap()),
+        additionalJwtHeaders = request.x5Chain?.let {
+            mapOf("x5c" to JsonArray(it.map { cert -> cert.toJsonElement() }))
+        } ?: mapOf(),
+        additionalJwtOptions = SDJwtVC.defaultPayloadProperties(
+            issuerDid.ifEmpty { issuerKey.getKeyId() },
+            JsonObject(holderKey?.let {
+                buildJsonObject { put("jwk", it.exportJWKObject()) }
+            } ?: buildJsonObject { put("kid", holderDid) }),
+            vct = data.request.credentialConfigurationId
+        ),
+        disclosureMap = request.selectiveDisclosure ?: SDMap(emptyMap())
+    )
 
     private suspend fun IssuanceSessionData.nonSdJwtVc(
         vc: W3CVC,

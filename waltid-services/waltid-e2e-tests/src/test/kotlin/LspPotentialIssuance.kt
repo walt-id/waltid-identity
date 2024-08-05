@@ -63,7 +63,7 @@ import kotlin.test.*
 class LspPotentialIssuance(val client: HttpClient) {
 
   @OptIn(ExperimentalEncodingApi::class, ExperimentalSerializationApi::class)
-  fun testTrack1() = runBlocking {
+  suspend fun testTrack1() = E2ETestWebService.test("test track 1") {
     // ### steps 1-6
     val offerResp = client.get("/lsp-potential/lspPotentialCredentialOfferT1")
     assert(offerResp.status == HttpStatusCode.OK)
@@ -228,7 +228,7 @@ class LspPotentialIssuance(val client: HttpClient) {
   }
 
   @OptIn(ExperimentalEncodingApi::class)
-  fun testTrack2() = runBlocking {
+  suspend fun testTrack2() = E2ETestWebService.test("test track 1") {
     // ### steps 1-6
     val offerResp = client.get("/lsp-potential/lspPotentialCredentialOfferT2")
     assertEquals(HttpStatusCode.OK, offerResp.status)
@@ -337,5 +337,11 @@ class LspPotentialIssuance(val client: HttpClient) {
     assertNotNull(credResp.credential)
     val sdJwtVc = SDJwtVC.parse(credResp.credential!!.jsonPrimitive.content)
     assertNotNull(sdJwtVc.cnfObject)
+    // family_name is defined as non-selective disclosable in issuance request
+    assertContains(sdJwtVc.undisclosedPayload.keys, "family_name")
+    // birthdate is defined as selective disclosable in issuance request
+    assertFalse(sdJwtVc.undisclosedPayload.keys.contains("birthdate"))
+    assertContains(sdJwtVc.disclosureObjects.map { it.key }, "birthdate")
+    assertContains(sdJwtVc.fullPayload.keys, "birthdate")
   }
 }

@@ -29,15 +29,11 @@ object IssuanceExamples {
               "type": [
                 "Profile"
               ],
-              "id": "did:key:THIS WILL BE REPLACED WITH DYNAMIC DATA FUNCTION FROM CONTEXT (see below)",
               "name": "Jobs for the Future (JFF)",
               "url": "https://www.jff.org/",
               "image": "https://w3c-ccg.github.io/vc-ed/plugfest-1-2022/images/JFF_LogoLockup.png"
             },
-            "issuanceDate": "2023-07-20T07:05:44Z (THIS WILL BE REPLACED BY DYNAMIC DATA FUNCTION (see below))",
-            "expirationDate": "WILL BE MAPPED BY DYNAMIC DATA FUNCTION (see below)",
             "credentialSubject": {
-              "id": "did:key:123 (THIS WILL BE REPLACED BY DYNAMIC DATA FUNCTION (see below))",
               "type": [
                 "AchievementSubject"
               ],
@@ -118,10 +114,7 @@ object IssuanceExamples {
                 "givenName":"JOHN",
                 "id":"identity#bankId"
              },
-             "id":"identity#BankId#3add94f4-28ec-42a1-8704-4e4aa51006b4",
-             "issued":"2021-08-31T00:00:00Z",
              "issuer":{
-                "id":"did:key:z6MkrHKzgsahxBLyNAbLQyB1pcWNYC9GmywiWPgkrvntAZcj",
                 "image":{
                    "id":"https://images.squarespace-cdn.com/content/v1/609c0ddf94bcc0278a7cbdb4/1660296169313-K159K9WX8J8PPJE005HV/Walt+Bot_Logo.png?format=100w",
                    "type":"Image"
@@ -129,9 +122,7 @@ object IssuanceExamples {
                 "name":"CH Authority",
                 "type":"Profile",
                 "url":"https://images.squarespace-cdn.com/content/v1/609c0ddf94bcc0278a7cbdb4/1660296169313-K159K9WX8J8PPJE005HV/Walt+Bot_Logo.png?format=100w"
-             },
-             "validFrom":"2021-08-31T00:00:00Z",
-             "issuanceDate":"2021-08-31T00:00:00Z"
+             }
           }
     """.trimIndent()
 
@@ -697,9 +688,13 @@ object IssuanceExamples {
             {
                 "fields":
                 {
-                    "name":
+                    "birthdate":
                     {
                         "sd": true
+                    },
+                    "family_name":
+                    {
+                        "sd": false
                     }
                 }
             }
