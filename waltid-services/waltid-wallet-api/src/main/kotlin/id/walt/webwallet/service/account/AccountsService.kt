@@ -3,6 +3,7 @@ package id.walt.webwallet.service.account
 import id.walt.commons.config.ConfigManager
 import id.walt.webwallet.config.RegistrationDefaultsConfig
 import id.walt.webwallet.db.models.*
+import id.walt.webwallet.service.WalletService
 import id.walt.webwallet.service.WalletServiceManager
 import id.walt.webwallet.service.events.AccountEventData
 import id.walt.webwallet.service.events.EventType
@@ -18,13 +19,6 @@ import org.jetbrains.exposed.sql.transactions.transaction
 
 object AccountsService {
 
-    fun registerAuthenticationMethods() {
-//        val loginMethods = ConfigManager.getConfig<LoginMethodsConfig>().enabledLoginMethods
-    }
-
-    private val defaultGenerationConfig by lazy { ConfigManager.getConfig<RegistrationDefaultsConfig>() }
-
-
     private suspend fun initializeUserAccount(tenant: String, name: String?, registrationResult: RegistrationResult) =
         let {
             val registeredUserId = registrationResult.id
@@ -37,31 +31,19 @@ object AccountsService {
             }
 
             val walletService = WalletServiceManager.getWalletService(tenant, registeredUserId, createdInitialWalletId)
-            WalletServiceManager.eventUseCase.log(
-                action = EventType.Account.Create,
-                originator = "wallet",
-                tenant = tenant,
-                accountId = registeredUserId,
-                walletId = createdInitialWalletId,
-                data = AccountEventData(accountId = name)
-            )
-
-            // Add default data:
-
-            val createdKey = walletService.generateKey(defaultGenerationConfig.defaultKeyConfig)
-
-            val createdDid = walletService.createDid(
-                method = defaultGenerationConfig.didMethod,
-                args = defaultGenerationConfig.didConfig.toMutableMap().apply {
-                    put("keyId", JsonPrimitive(createdKey))
-                    put("alias", JsonPrimitive("Onboarding"))
-                }
-            )
-
-            walletService.setDefault(createdDid)
-            registrationResult
+            val defaultGenerationConfig by lazy { ConfigManager.getConfig<RegistrationDefaultsConfig>() }
+            tryAddDefaultData(defaultGenerationConfig, walletService)
+            registrationResult.also {
+                WalletServiceManager.eventUseCase.log(
+                    action = EventType.Account.Create,
+                    originator = "wallet",
+                    tenant = tenant,
+                    accountId = registeredUserId,
+                    walletId = createdInitialWalletId,
+                    data = AccountEventData(accountId = name)
+                )
+            }
         }
-
 
     suspend fun register(tenant: String = "", request: AccountRequest): Result<RegistrationResult> = runCatching {
         when (request) {
@@ -172,6 +154,20 @@ object AccountsService {
     fun get(account: UUID) = transaction {
         Accounts.selectAll().where { Accounts.id eq account }.single().let {
             Account(it)
+        }
+    }
+
+    private suspend fun tryAddDefaultData(
+        defaultGenerationConfig: RegistrationDefaultsConfig, walletService: WalletService
+    ) = runCatching {
+        defaultGenerationConfig.takeIf { !it.isEmpty() }?.let {
+            val createdKey = walletService.generateKey(it.defaultKeyConfig!!)
+            val createdDid =
+                walletService.createDid(method = it.didMethod!!, args = it.didConfig!!.toMutableMap().apply {
+                    put("keyId", JsonPrimitive(createdKey))
+                    put("alias", JsonPrimitive("Onboarding"))
+                })
+            walletService.setDefault(createdDid)
         }
     }
 }
