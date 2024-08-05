@@ -8,6 +8,9 @@ import com.nimbusds.jose.crypto.MACSigner
 import com.nimbusds.jose.crypto.MACVerifier
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.featureflag.FeatureManager
+import id.walt.commons.web.ForbiddenException
+import id.walt.commons.web.UnauthorizedException
+import id.walt.commons.web.WebException
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.oid4vc.definitions.JWTClaims
@@ -21,9 +24,7 @@ import id.walt.webwallet.service.WalletServiceManager
 import id.walt.webwallet.service.WalletServiceManager.oidcConfig
 import id.walt.webwallet.service.account.AccountsService
 import id.walt.webwallet.service.account.KeycloakAccountStrategy
-import id.walt.webwallet.web.ForbiddenException
 import id.walt.webwallet.web.InsufficientPermissionsException
-import id.walt.webwallet.web.UnauthorizedException
 import id.walt.webwallet.web.WebBaseRoutes.webWalletRoute
 import id.walt.webwallet.web.model.*
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -46,6 +47,7 @@ import io.ktor.util.pipeline.*
 import kotlinx.datetime.Clock
 import kotlinx.datetime.toJavaInstant
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import kotlinx.uuid.UUID
@@ -152,7 +154,7 @@ fun Application.configureSecurity() {
                     try {
                         parseAuthorizationHeader(it)
                     } catch (cause: ParseException) {
-                        throw BadRequestException("Invalid auth header", cause)
+                        throw BadRequestException("Invalid Authorization header", cause)
                     }
                 }
             }
@@ -295,15 +297,23 @@ fun Application.auth() {
                     response {
                         HttpStatusCode.Created to { description = "Registration succeeded " }
                         HttpStatusCode.BadRequest to { description = "Registration failed" }
+                        HttpStatusCode.Conflict to { description = "Account already exists!" }
                     }
                 }) {
-                val req = loginRequestJson.decodeFromString<AccountRequest>(call.receive())
-                AccountsService.register("", req)
+                val jsonObject = call.receive<JsonObject>()
+                val type = jsonObject["type"]?.jsonPrimitive?.contentOrNull
+                if (type.isNullOrEmpty()) {
+                    throw BadRequestException("No account type provided")
+                }
+                val accountRequest = loginRequestJson.decodeFromJsonElement<AccountRequest>(jsonObject)
+                AccountsService.register("", accountRequest)
                     .onSuccess {
                         call.response.status(HttpStatusCode.Created)
                         call.respond("Registration succeeded ")
                     }
-                    .onFailure { call.respond(HttpStatusCode.BadRequest, it.localizedMessage) }
+                    .onFailure {
+                        throw it
+                    }
             }
 
             authenticate("auth-session", "auth-bearer", "auth-bearer-alternative") {
@@ -491,8 +501,35 @@ suspend fun verifyToken(token: String): Result<String> {
     }
 }
 
+data class LoginRequestError(override val message: String) : WebException(
+    message = message,
+    status = HttpStatusCode.BadRequest
+) {
+    constructor(throwable: Throwable) : this(
+        when (throwable) {
+            is BadRequestException -> "Error processing request: ${throwable.localizedMessage ?: "Unknown reason"}"
+            is SerializationException -> "Failed to parse JSON string: ${throwable.localizedMessage ?: "Unknown reason"}"
+            is IllegalStateException -> "Invalid request: ${throwable.localizedMessage ?: "Unknown reason"}"
+            else -> "Unexpected error: ${throwable.localizedMessage ?: "Unknown reason"}"
+        }
+    )
+}
 
-suspend fun ApplicationCall.getLoginRequest() = loginRequestJson.decodeFromString<AccountRequest>(receive())
+suspend fun ApplicationCall.getLoginRequest() = runCatching {
+    val jsonObject = receive<JsonObject>()
+    val accountType = jsonObject["type"]?.jsonPrimitive?.contentOrNull
+    if (accountType.isNullOrEmpty()) {
+        throw BadRequestException(
+            if (jsonObject.containsKey("type")) {
+                "Account type '${jsonObject["type"]}' is not recognized"
+            } else {
+                "No account type provided"
+            }
+        )
+    }
+    Json.decodeFromJsonElement<AccountRequest>(jsonObject)
+}.getOrElse { throw LoginRequestError(it) }
+
 
 suspend fun PipelineContext<Unit, ApplicationCall>.doLogin() {
     val reqBody = call.getLoginRequest()
@@ -519,7 +556,9 @@ suspend fun PipelineContext<Unit, ApplicationCall>.doLogin() {
         call.respond(
             Json.encodeToJsonElement(it).jsonObject.minus("type").plus(Pair("token", token.toJsonElement()))
         )
-    }.onFailure { call.respond(HttpStatusCode.BadRequest, it.localizedMessage) }
+    }.onFailure {
+        throw BadRequestException(it.localizedMessage)
+    }
 }
 
 private fun PipelineContext<Unit, ApplicationCall>.clearUserSession() {
@@ -590,9 +629,10 @@ fun PipelineContext<Unit, ApplicationCall>.ensurePermissionsForWallet(
     }
 }
 
-private fun createHS256Token(tokenPayload: String) = JWSObject(JWSHeader(JWSAlgorithm.HS256), Payload(tokenPayload)).apply {
-    sign(MACSigner(AuthKeys.tokenKey))
-}.serialize()
+private fun createHS256Token(tokenPayload: String) =
+    JWSObject(JWSHeader(JWSAlgorithm.HS256), Payload(tokenPayload)).apply {
+        sign(MACSigner(AuthKeys.tokenKey))
+    }.serialize()
 
 private suspend fun createRsaToken(key: JWKKey, tokenPayload: String) =
     mapOf(JWTClaims.Header.keyID to key.getPublicKey().getKeyId().toJsonElement(), JWTClaims.Header.type to "JWT".toJsonElement()).let {

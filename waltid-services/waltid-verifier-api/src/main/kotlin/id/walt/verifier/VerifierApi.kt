@@ -9,9 +9,6 @@ import id.walt.oid4vc.data.OpenId4VPProfile
 import id.walt.oid4vc.data.ResponseMode
 import id.walt.oid4vc.data.ResponseType
 import id.walt.oid4vc.data.dif.*
-import id.walt.sdjwt.SDJwtVC
-import id.walt.sdjwt.SDMapBuilder
-import id.walt.sdjwt.SDPayload
 import id.walt.sdjwt.SimpleJWTCryptoProvider
 import id.walt.verifier.config.OIDCVerifierServiceConfig
 import id.walt.verifier.oidc.PresentationSessionInfo
@@ -21,6 +18,7 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import io.github.smiley4.ktorswaggerui.dsl.routing.get
 import io.github.smiley4.ktorswaggerui.dsl.routing.post
 import io.github.smiley4.ktorswaggerui.dsl.routing.route
+import io.klogging.logger
 import io.ktor.client.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.plugins.logging.*
@@ -43,7 +41,6 @@ private val SERVER_URL by lazy {
         ConfigManager.getConfig<OIDCVerifierServiceConfig>().baseUrl
     }
 }
-private val logger = KotlinLogging.logger {}
 
 @Serializable
 data class DescriptorMappingFormParam(val id: String, val format: VCFormat, val path: String)
@@ -73,6 +70,8 @@ data class CredentialVerificationRequest(
 )
 
 const val defaultAuthorizeBaseUrl = "openid4vp://authorize"
+
+private val logger = logger("Verifier API")
 
 private val prettyJson = Json { prettyPrint = true }
 private val httpClient = HttpClient {
@@ -273,6 +272,7 @@ fun Application.verfierApi() {
                             call.respond(HttpStatusCode.OK, it)
                         }
                     }.onFailure {
+                        logger.debug(it) { "Verification failed ($it)" }
                         var errorDescription = it.localizedMessage
                         logger.error { "Error: $errorDescription" }
                         if (sessionId != null) {
@@ -321,6 +321,7 @@ fun Application.verfierApi() {
                 verificationUseCase.getResult(id).onSuccess {
                     call.respond(HttpStatusCode.OK, it)
                 }.onFailure {
+                    logger.debug(it) { "Verification failed ($it)" }
                     call.respond(HttpStatusCode.BadRequest, it.localizedMessage)
                 }
             }

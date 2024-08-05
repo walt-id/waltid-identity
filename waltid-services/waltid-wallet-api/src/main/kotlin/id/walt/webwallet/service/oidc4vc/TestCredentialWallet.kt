@@ -314,8 +314,13 @@ class TestCredentialWallet(
         TODO("Not yet implemented")
     }
 
-    override fun putSession(id: String, session: VPresentationSession) = sessionCache.put(id, session)
-    override fun removeSession(id: String) = sessionCache.remove(id)
+    override fun putSession(id: String, session: VPresentationSession) {
+        sessionCache[id] = session
+    }
+
+    override fun removeSession(id: String) {
+        sessionCache.remove(id)
+    }
 
     suspend fun parsePresentationRequest(request: String): AuthorizationRequest {
         val reqParams = Url(request).parameters.toMap()
