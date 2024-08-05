@@ -21,6 +21,5 @@ object Base64Utils {
 
     private val base64Url = Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT_OPTIONAL)
 
-    @Suppress("NON_EXPORTABLE_TYPE")
-    val base64 = Base64
+    private val base64 = Base64
 }
