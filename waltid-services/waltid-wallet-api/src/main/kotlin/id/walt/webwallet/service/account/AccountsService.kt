@@ -53,7 +53,7 @@ object AccountsService {
             is OidcAccountRequest -> OidcAccountStrategy.register(tenant, request)
             is KeycloakAccountRequest -> KeycloakAccountStrategy.register(tenant, request)
             is OidcUniqueSubjectRequest -> OidcUniqueSubjectStrategy.register(tenant, request)
-
+            is X5CAccountRequest -> WalletServiceManager.x5cAccountStrategy.register(tenant, request)
         }.fold(onSuccess = {
             initializeUserAccount(tenant, request.name, it)
 
@@ -70,7 +70,7 @@ object AccountsService {
             is OidcAccountRequest -> OidcAccountStrategy.authenticate(tenant, request)
             is OidcUniqueSubjectRequest -> OidcUniqueSubjectStrategy.authenticate(tenant, request)
             is KeycloakAccountRequest -> KeycloakAccountStrategy.authenticate(tenant, request)
-
+            is X5CAccountRequest -> WalletServiceManager.x5cAccountStrategy.authenticate(tenant, request)
         }
     }.fold(onSuccess = {
         WalletServiceManager.eventUseCase.log(
@@ -152,6 +152,20 @@ object AccountsService {
             .firstOrNull()
     }
 
+    //todo: unify with [getAccountByOidcId]
+    fun getAccountByX5CId(tenant: String, x5cId: String) = transaction {
+        Accounts.crossJoin(OidcLogins)
+            .selectAll()
+            .where {
+                Accounts.tenant eq tenant and
+                        (Accounts.tenant eq X5CLogins.tenant) and
+                        (Accounts.id eq X5CLogins.accountId) and
+                        (X5CLogins.x5cId eq x5cId)
+            }
+            .map { Account(it) }
+            .firstOrNull()
+    }
+
     fun get(account: UUID) = transaction {
         Accounts.selectAll().where { Accounts.id eq account }.single().let {
             Account(it)
@@ -198,4 +212,9 @@ data class AddressAuthenticatedUser(
 data class KeycloakAuthenticatedUser(
     override val id: UUID,
     val keycloakUserId: String,
+) : AuthenticatedUser()
+
+@Serializable
+data class X5CAuthenticatedUser(
+    override val id: UUID,
 ) : AuthenticatedUser()

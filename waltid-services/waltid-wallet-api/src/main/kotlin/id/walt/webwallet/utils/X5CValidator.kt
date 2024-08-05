@@ -21,7 +21,7 @@ class X5CValidator(
         trustManager.init(null as? KeyStore)
     }
 
-    fun verifyX5Chain(certificates: List<String>): Result<Unit> = runCatching {
+    fun validate(certificates: List<String>): Result<Unit> = runCatching {
         require(certificates.isNotEmpty()) { "No signing certificate" }
         val chain = generateX509Chain(certificates)
         val trusted = generateX509Chain(trustedCA)
