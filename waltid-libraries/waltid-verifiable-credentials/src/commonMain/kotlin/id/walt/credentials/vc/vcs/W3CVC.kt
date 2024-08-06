@@ -40,8 +40,8 @@ data class W3CVC(
 
     fun getType() = (get("type") ?: error("No `type` in W3C VC!")).jsonArray.map { it.jsonPrimitive.content }
 
-
-    fun toJsonObject(): JsonObject = JsonObject(content)
+    fun toJsonObject(additionalProperties: Map<String, JsonElement> = emptyMap()): JsonObject
+        = JsonObject(content.plus(additionalProperties))
     fun toJson(): String = Json.encodeToString(content)
     fun toPrettyJson(): String = prettyJson.encodeToString(content)
 
@@ -55,11 +55,11 @@ data class W3CVC(
         subjectDid: String,
         disclosureMap: SDMap,
         /** Set additional options in the JWT header */
-        additionalJwtHeader: Map<String, String> = emptyMap(),
+        additionalJwtHeaders: Map<String, JsonElement> = emptyMap(),
         /** Set additional options in the JWT payload */
         additionalJwtOptions: Map<String, JsonElement> = emptyMap()
     ): String {
-        val vc = this.toJsonObject()
+        val vc = this.toJsonObject(additionalJwtOptions)
 
         val sdPayload = SDPayload.createSDPayload(vc, disclosureMap)
         val signable = Json.encodeToString(sdPayload.undisclosedPayload).toByteArray()
@@ -69,7 +69,7 @@ data class W3CVC(
                 "typ" to "vc+sd-jwt".toJsonElement(),
                 "cty" to "credential-claims-set+json".toJsonElement(),
                 "kid" to issuerDid.toJsonElement()
-            )
+            ).plus(additionalJwtHeaders)
         )
 
         return SDJwt.createFromSignedJwt(signed, sdPayload).toString()

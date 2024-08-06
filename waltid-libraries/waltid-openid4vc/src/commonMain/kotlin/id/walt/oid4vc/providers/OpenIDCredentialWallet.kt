@@ -1,5 +1,6 @@
 package id.walt.oid4vc.providers
 
+import id.walt.crypto.keys.Key
 import id.walt.oid4vc.OpenID4VCI
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.data.dif.PresentationDefinition
@@ -45,20 +46,57 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
      */
     abstract fun getDidFor(session: S): String
 
-    fun httpGetAsJson(url: Url): JsonElement? = httpGet(url).body?.let { Json.decodeFromString<JsonElement>(it) }
+    private fun httpGetAsJson(url: Url): JsonElement? = httpGet(url).body?.let { Json.decodeFromString<JsonElement>(it) }
 
     open fun generateDidProof(
         did: String,
         issuerUrl: String,
         nonce: String?,
-        client: OpenIDClientConfig? = null
+        client: OpenIDClientConfig? = null,
+        proofType: ProofType = ProofType.jwt
     ): ProofOfPossession {
         // NOTE: This object/method is obsolete and will be removed or replaced
         val keyId = resolveDID(did)
-        return ProofOfPossession.JWTProofBuilder(issuerUrl, client?.clientID, nonce, keyId).let { builder ->
-            builder.build(
-                signToken(TokenTarget.PROOF_OF_POSSESSION, builder.payload, builder.headers, keyId)
-            )
+        return when(proofType) {
+            ProofType.cwt ->
+                ProofOfPossession.CWTProofBuilder(issuerUrl, client?.clientID, nonce).let { builder ->
+                    builder.build(
+                        signCWTToken(TokenTarget.PROOF_OF_POSSESSION, builder.payload, builder.headers, keyId)
+                    )
+                }
+            ProofType.ldp_vp -> TODO("ldp_vp proof not yet implemented")
+            else ->
+                ProofOfPossession.JWTProofBuilder(issuerUrl, client?.clientID, nonce, keyId).let { builder ->
+                    builder.build(
+                        signToken(TokenTarget.PROOF_OF_POSSESSION, builder.payload, builder.headers, keyId)
+                    )
+                }
+        }
+    }
+
+    open suspend fun generateKeyProof(
+        key: Key,
+        cosePubKey: ByteArray?,
+        issuerUrl: String,
+        nonce: String?,
+        client: OpenIDClientConfig? = null,
+        proofType: ProofType = ProofType.jwt
+    ): ProofOfPossession {
+        return when(proofType) {
+            ProofType.cwt ->
+                ProofOfPossession.CWTProofBuilder(issuerUrl, client?.clientID, nonce, coseKey = cosePubKey).let { builder ->
+                    builder.build(
+                        signCWTToken(TokenTarget.PROOF_OF_POSSESSION, builder.payload, builder.headers, key.getKeyId())
+                    )
+                }
+            ProofType.ldp_vp -> TODO("ldp_vp proof not yet implemented")
+            else ->
+                ProofOfPossession.JWTProofBuilder(issuerUrl, client?.clientID, nonce,
+                    keyJwk = key.getPublicKey().exportJWKObject(), keyId = key.getKeyId()).let { builder ->
+                    builder.build(
+                        signToken(TokenTarget.PROOF_OF_POSSESSION, builder.payload, builder.headers, key.getKeyId())
+                    )
+                }
         }
     }
 

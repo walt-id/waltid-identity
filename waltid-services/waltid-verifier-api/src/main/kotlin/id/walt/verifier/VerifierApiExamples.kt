@@ -1,10 +1,10 @@
 package id.walt.verifier
 
-import id.walt.verifier.VerifierApiExamples.jwtFormat
-import id.walt.verifier.VerifierApiExamples.vcPoliciesData
+import id.walt.commons.interop.LspPotentialInterop
 import io.github.smiley4.ktorswaggerui.dsl.routes.ValueExampleDescriptorDsl
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.encodeToJsonElement
 
 object VerifierApiExamples {
 
@@ -272,6 +272,25 @@ object VerifierApiExamples {
                     }
                 }
             }
+        """.trimIndent()
+    )
+
+    val lspPotentialMdocExample = jsonObjectValueExampleDescriptorDsl(
+        """
+            {
+                "request_credentials": [ "org.iso.18013.5.1.mDL" ],
+                "trusted_root_cas":[ ${Json.encodeToJsonElement(LspPotentialInterop.POTENTIAL_ROOT_CA_CERT)} ]
+            }
+
+        """.trimIndent()
+    )
+
+    val lspPotentialSDJwtVCExample = jsonObjectValueExampleDescriptorDsl(
+        """
+            {
+                "request_credentials": [ "urn:eu.europa.ec.eudi:pid:1" ]
+            }
+
         """.trimIndent()
     )
 }

@@ -54,7 +54,7 @@ object E2ETestWebService {
         val failed: Int,
     )
 
-
+    var numTests = 0
     val testResults = ArrayList<Result<Any?>>()
     val testNames = HashMap<Int, String>()
     val t = Terminal(ansiLevel = AnsiLevel.TRUECOLOR)
@@ -83,9 +83,8 @@ object E2ETestWebService {
 
         t.println("\n" + TextColors.magenta("Test results:"))
         testResults.forEachIndexed { index, result ->
-            val idx = index + 1
-            val name = testNames[idx]!!
-            t.println(TextColors.magenta("$idx. $name: ${result.toSuccessString()}"))
+            val name = testNames[index]!!
+            t.println(TextColors.magenta("$index. $name: ${result.toSuccessString()}"))
         }
 
         val testStats = getTestStats()
@@ -107,7 +106,7 @@ object E2ETestWebService {
     }
 
     suspend fun test(name: String, function: suspend () -> Any?) {
-        val id = testResults.size + 1
+        val id = numTests++
         testNames[id] = name
 
         t.println("\n${TextColors.cyan(TextStyles.bold("---=== Start $id. test: $name === ---"))}")

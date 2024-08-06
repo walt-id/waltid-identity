@@ -80,9 +80,8 @@ data class NewIssuanceRequest(
 data class IssuanceRequest(
     val issuerKey: JsonObject,
     val issuerDid: String,
-
+    val credentialConfigurationId: String,
     val credentialData: W3CVC?,
-    val credentialConfigurationId: String = (credentialData?.getType()?.last() ?: "mdoc") + "_jwt_vc_json",
     val mdocData: Map<String, JsonObject>? = null,
     val mapping: JsonObject? = null,
     val selectiveDisclosure: SDMap? = null,
