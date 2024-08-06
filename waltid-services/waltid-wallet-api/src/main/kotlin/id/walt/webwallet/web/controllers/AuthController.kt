@@ -402,7 +402,8 @@ suspend fun ApplicationCall.getLoginRequest() = runCatching {
             }
         )
     }
-    Json{ignoreUnknownKeys = true}.decodeFromJsonElement<AccountRequest>(jsonObject)
+    val json = Json { ignoreUnknownKeys = true }
+    json.decodeFromJsonElement<AccountRequest>(jsonObject)
 }.getOrElse { throw LoginRequestError(it) }
 
 

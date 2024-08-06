@@ -57,8 +57,10 @@ class CI_JVM_Test {
         authorizationEndpoint = "https://localhost/oidc",
         credentialConfigurationsSupported = mapOf(
             "UniversityDegreeCredential_jwt_vc_json" to CredentialSupported(
-                CredentialFormat.jwt_vc_json, setOf("did"), setOf("ES256K"),
-                listOf(
+                CredentialFormat.jwt_vc_json,
+                cryptographicBindingMethodsSupported = setOf("did"),
+                credentialSigningAlgValuesSupported =  setOf("ES256K"),
+                display = listOf(
                     DisplayProperties(
                         "University Credential",
                         "en-US",
@@ -88,8 +90,10 @@ class CI_JVM_Test {
                 )
             ),
             "VerifiableId_ldp_vc" to CredentialSupported(
-                CredentialFormat.ldp_vc, setOf("did"), setOf("ES256K"),
-                listOf(DisplayProperties("Verifiable ID")),
+                CredentialFormat.ldp_vc,
+                cryptographicBindingMethodsSupported = setOf("did"),
+                credentialSigningAlgValuesSupported = setOf("ES256K"),
+                display = listOf(DisplayProperties("Verifiable ID")),
                 types = listOf("VerifiableCredential", "VerifiableId"),
                 context = listOf(
                     JsonPrimitive("https://www.w3.org/2018/credentials/v1"),

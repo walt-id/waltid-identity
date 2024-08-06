@@ -84,4 +84,7 @@ fun Application.webWalletModule(withPlugins: Boolean = true) {
 
     // DID Web Registry
     { didRegistry() } whenFeature FeatureCatalog.didWebRegistry
+
+    // utility APIs
+    utility()
 }

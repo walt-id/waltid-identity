@@ -96,7 +96,7 @@ internal class P256JwkPublicKey(private val jwk: String) : P256.PublicKey() {
     @OptIn(ExperimentalEncodingApi::class)
 
     private val x963Representation: ByteArray by lazy {
-        byteArrayOf(0x04) + Base64.UrlSafe.decode(_jwk.x) + Base64.UrlSafe.decode(_jwk.y)
+        byteArrayOf(0x04) + base64UrlDecode(_jwk.x) + base64UrlDecode(_jwk.y)
     }
 
     @Serializable
