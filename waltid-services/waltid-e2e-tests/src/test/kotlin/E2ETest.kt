@@ -63,6 +63,7 @@ class E2ETest {
 
             //region -Keys-
             val keysApi = KeysApi(client)
+            // requires registration-defaults to be enabled in _features.conf
             val defaultKeyConfig = ConfigManager.getConfig<RegistrationDefaultsConfig>().defaultKeyConfig
             val keyGenRequest = KeyGenerationRequest("jwk", KeyType.Ed25519)
             lateinit var generatedKeyId: String

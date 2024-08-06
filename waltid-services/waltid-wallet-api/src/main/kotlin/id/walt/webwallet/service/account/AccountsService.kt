@@ -33,7 +33,7 @@ object AccountsService {
             }
 
             val walletService = WalletServiceManager.getWalletService(tenant, registeredUserId, createdInitialWalletId)
-            tryAddDefaultData(walletService)
+            suspend { tryAddDefaultData(walletService) } whenFeature (FeatureCatalog.registrationDefaultsFeature)
             registrationResult.also {
                 WalletServiceManager.eventUseCase.log(
                     action = EventType.Account.Create,
@@ -158,7 +158,7 @@ object AccountsService {
         }
     }
 
-    private suspend fun tryAddDefaultData(walletService: WalletService) = suspend {
+    private suspend fun tryAddDefaultData(walletService: WalletService) = runCatching {
         val defaultGenerationConfig by lazy { ConfigManager.getConfig<RegistrationDefaultsConfig>() }
         val createdKey = walletService.generateKey(defaultGenerationConfig.defaultKeyConfig)
         val createdDid =
@@ -169,7 +169,7 @@ object AccountsService {
                     put("alias", JsonPrimitive("Onboarding"))
                 })
         walletService.setDefault(createdDid)
-    } whenFeature FeatureCatalog.registrationDefaultsFeature
+    }
 }
 
 @Serializable
