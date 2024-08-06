@@ -3,7 +3,6 @@ import id.walt.credentials.verification.models.PolicyRequest.Companion.parsePoli
 import id.walt.did.dids.DidService
 import id.walt.did.dids.resolver.LocalResolver
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonArray
@@ -76,11 +75,6 @@ class PresentationVerificationTest {
             )
         )
 
-        println(
-            Json { prettyPrint = true }.encodeToString(
-                r
-            )
-        )
 
         val x = r.results.flatMap { it.policyResults }
         println("Results: " + x.size)

@@ -2,6 +2,7 @@ package id.walt.mdoc.issuersigned
 
 import id.walt.mdoc.dataelement.*
 import korlibs.crypto.SecureRandom
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Serializer
@@ -57,6 +58,7 @@ data class IssuerSignedItem(
     }
 }
 
+@OptIn(ExperimentalSerializationApi::class)
 @Serializer(forClass = IssuerSignedItem::class)
 internal object IssuerSignedItemSerializer: KSerializer<IssuerSignedItem> {
     override fun serialize(encoder: Encoder, value: IssuerSignedItem) {

@@ -17,7 +17,7 @@ class ValidityInfo private constructor(
   val signed: TDateElement,
   val validFrom: TDateElement,
   val validUntil: TDateElement,
-  val expectedUpdate: TDateElement? = null
+  private val expectedUpdate: TDateElement? = null
 ) {
 
   /**

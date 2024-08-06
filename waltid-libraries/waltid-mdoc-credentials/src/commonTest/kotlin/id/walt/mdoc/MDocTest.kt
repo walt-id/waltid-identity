@@ -142,6 +142,7 @@ class MDocTest {
         println(Cbor.decodeFromByteArray<Map<Int, EncodedCBORElement>>(exampleCborData))
     }
 
+    @OptIn(ExperimentalSerializationApi::class)
     @Test
     fun testIntMap() {
         val intMap = mapOf(
@@ -156,6 +157,7 @@ class MDocTest {
         }
     }
 
+    @OptIn(ExperimentalSerializationApi::class)
     @Test
     fun testDeviceAuth() {
         val deviceAuth = DeviceAuth(
@@ -175,6 +177,7 @@ class MDocTest {
         assertEquals(expected = null, actual = parsedAuth.deviceSignature)
     }
 
+    @OptIn(ExperimentalSerializationApi::class)
     @Test
     fun testValidityInfoSerialization() {
         val validityInfo = ValidityInfo(
@@ -197,6 +200,7 @@ class MDocTest {
         assertEquals(expected = element, actual = decodedCbor)
     }
 
+    @OptIn(ExperimentalSerializationApi::class)
     @Test
     fun testListOfAny() {
         val listOfAny = ListElement(listOf(

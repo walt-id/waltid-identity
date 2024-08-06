@@ -18,5 +18,5 @@ object Base64Utils {
 
     fun String.base64Decode() = Base64.decode(this)
 
-    val base64 = Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT_OPTIONAL)
+    private val base64 = Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT_OPTIONAL)
 }

@@ -16,7 +16,7 @@ enum class MapKeyType {
  * Supports int or string keys
  */
 @Serializable(with = MapKeySerializer::class)
-data class MapKey private constructor (private val key: Any, val type: MapKeyType) {
+data class MapKey(private val key: Any, val type: MapKeyType) {
     constructor(key: String) : this(key, MapKeyType.string)
     constructor(key: Int) : this(key, MapKeyType.int)
 

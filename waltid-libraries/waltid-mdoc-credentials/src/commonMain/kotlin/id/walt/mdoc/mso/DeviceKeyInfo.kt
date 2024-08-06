@@ -13,8 +13,8 @@ import kotlinx.serialization.Serializable
 @Serializable
 class DeviceKeyInfo (
   val deviceKey: MapElement,
-  val keyAuthorizations: MapElement? = null,
-  val keyInfo: MapElement? = null
+  private val keyAuthorizations: MapElement? = null,
+  private val keyInfo: MapElement? = null
 ) {
   /**
    * Convert to CBOR map element

@@ -103,5 +103,7 @@ abstract class COSESimpleBase<T: COSESimpleBase<T>> {
 
   @OptIn(ExperimentalSerializationApi::class)
   fun decodeProtectedHeader() = Cbor.decodeFromByteArray<MapElement>(protectedHeader)
+
+  @OptIn(ExperimentalSerializationApi::class)
   fun decodePayload() = payload?.let { Cbor.decodeFromByteArray<MapElement>(it) }
 }

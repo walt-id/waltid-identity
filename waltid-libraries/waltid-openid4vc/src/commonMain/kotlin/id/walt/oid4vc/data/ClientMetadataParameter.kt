@@ -1,6 +1,6 @@
 package id.walt.oid4vc.data
 
-data class ClientMetadataParameter private constructor(
+data class ClientMetadataParameter(
   val clientMetadata: OpenIDClientMetadata?,
   val clientMetadataUri: String?
 ) {

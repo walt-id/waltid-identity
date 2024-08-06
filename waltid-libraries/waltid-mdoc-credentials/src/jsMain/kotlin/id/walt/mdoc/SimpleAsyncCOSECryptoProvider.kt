@@ -4,9 +4,11 @@ import cbor.Cbor
 import id.walt.mdoc.cose.COSESign1
 import id.walt.mdoc.cose.COSESign1Serializer
 import korlibs.crypto.encoding.Hex
+import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.await
 import kotlinx.coroutines.promise
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlin.js.Promise
 
 @JsModule("cose-js")
@@ -34,6 +36,8 @@ data class COSECryptoProviderKeyInfo(
 
 class SimpleAsyncCOSECryptoProvider(keys: List<COSECryptoProviderKeyInfo>): JSAsyncCOSECryptoProvider {
   private val keyMap: Map<String, COSECryptoProviderKeyInfo> = keys.associateBy { it.keyID }
+
+  @OptIn(ExperimentalSerializationApi::class)
   override suspend fun sign1(payload: ByteArray, keyID: String?): COSESign1 {
     val keyInfo = keyMap[keyID] ?: throw Exception("No key ID given, or key with given ID not found")
     val headers: dynamic = object {}
@@ -50,6 +54,7 @@ class SimpleAsyncCOSECryptoProvider(keys: List<COSECryptoProviderKeyInfo>): JSAs
     return Cbor.decodeFromByteArray(COSESign1Serializer, buf)
   }
 
+  @OptIn(DelicateCoroutinesApi::class)
   override fun sign1Async(payload: dynamic, keyID: String?) = GlobalScope.promise {
     sign1(JSON.stringify(payload).encodeToByteArray(), keyID)
   }

@@ -42,6 +42,7 @@ class VP_JVM_Test {
         }
         followRedirects = false
     }
+    val json = Json { prettyPrint = true }
     companion object {
         private lateinit var testWallet: TestCredentialWallet
         private lateinit var testVerifier: VPTestVerifier
@@ -308,7 +309,7 @@ class VP_JVM_Test {
         val debugPresentingPresentationSubmission =
             tokenResponse.toHttpParameters()["presentation_submission"]!!.first()
         val decoded = Json.parseToJsonElement(debugPresentingPresentationSubmission).jsonObject
-        val encoded = Json { prettyPrint = true }.encodeToString(decoded)
+        val encoded = json.encodeToString(decoded)
         println(encoded)
 
         println("Submitting...")
@@ -359,7 +360,7 @@ class VP_JVM_Test {
         val debugPresentingPresentationSubmission =
             tokenResponse.toHttpParameters()["presentation_submission"]!!.first()
         val decoded = Json.parseToJsonElement(debugPresentingPresentationSubmission).jsonObject
-        val encoded = Json { prettyPrint = true }.encodeToString(decoded)
+        val encoded = json.encodeToString(decoded)
         println(encoded)
 
         println("Submitting...")
@@ -505,7 +506,7 @@ class VP_JVM_Test {
         val debugPresentingPresentationSubmission =
             tokenResponse.toHttpParameters()["presentation_submission"]!!.first()
         val decoded = Json.parseToJsonElement(debugPresentingPresentationSubmission).jsonObject
-        val encoded = Json { prettyPrint = true }.encodeToString(decoded)
+        val encoded = json.encodeToString(decoded)
         println(encoded)
 
         println("Submitting...")

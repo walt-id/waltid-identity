@@ -1,10 +1,8 @@
 package id.walt.oid4vc.data
 
-import cbor.Cbor
 import id.walt.crypto.keys.Key
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.mdoc.cose.COSECryptoProvider
-import id.walt.mdoc.cose.COSESign1
 import id.walt.mdoc.dataelement.*
 import id.walt.oid4vc.util.JwtUtils
 import io.ktor.utils.io.core.*
@@ -13,7 +11,7 @@ import kotlinx.serialization.*
 import kotlinx.serialization.json.*
 
 @Serializable
-data class ProofOfPossession @OptIn(ExperimentalSerializationApi::class) private constructor(
+data class ProofOfPossession @OptIn(ExperimentalSerializationApi::class) constructor(
     @EncodeDefault @SerialName("proof_type") val proofType: ProofType,
     val jwt: String? = null,
     val cwt: String? = null,
@@ -121,9 +119,11 @@ data class ProofOfPossession @OptIn(ExperimentalSerializationApi::class) private
             Json.decodeFromJsonElement(ProofOfPossessionSerializer, jsonObject)
     }
 
+    @Suppress("TRANSIENT_IS_REDUNDANT")
     @Transient
     val isCwtProofType get() = proofType == ProofType.cwt && !cwt.isNullOrEmpty()
 
+    @Suppress("TRANSIENT_IS_REDUNDANT")
     @Transient
     val isJwtProofType get() = proofType == ProofType.jwt && !jwt.isNullOrEmpty()
 }

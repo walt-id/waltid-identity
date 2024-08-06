@@ -2,7 +2,7 @@ package id.walt.oid4vc.data
 
 import id.walt.oid4vc.data.dif.PresentationDefinition
 
-data class PresentationDefinitionParameter private constructor(
+data class PresentationDefinitionParameter(
   val presentationDefinition: PresentationDefinition?,
   val presentationDefinitionUri: String?,
   val presentationDefinitionScope: String?
