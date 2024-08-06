@@ -5,6 +5,7 @@ import id.walt.commons.config.ConfigManager
 import id.walt.commons.config.ConfigurationException
 import id.walt.commons.config.statics.RunConfiguration
 import io.klogging.logger
+import kotlinx.coroutines.runBlocking
 import kotlin.system.exitProcess
 
 object FeatureManager {
@@ -61,12 +62,15 @@ object FeatureManager {
     /**
      * Run block if provided feature is enabled
      */
-    fun runIfEnabled(feature: OptionalFeature, block: () -> Any?) {
-        if (isFeatureEnabled(feature)) block.invoke()
+    private fun <T> runIfEnabledBlocking(feature: OptionalFeature, block: () -> T?): T? = runBlocking {
+        runIfEnabled(feature, block)
     }
 
+    private suspend fun <T> runIfEnabled(feature: OptionalFeature, block: suspend () -> T?): T? =
+        feature.takeIf { isFeatureEnabled(it) }?.let { block.invoke() }
+
     infix fun OptionalFeature.feature(block: () -> Unit) {
-        runIfEnabled(this, block)
+        runIfEnabledBlocking(this, block)
     }
 
     /**
@@ -74,9 +78,9 @@ object FeatureManager {
      * { your code... } whenFeature (FeatureCatalog.xyz)
      * ```
      */
-    infix fun (() -> Any?).whenFeature(feature: OptionalFeature) {
-        runIfEnabled(feature, this)
-    }
+    infix fun <T> (() -> T?).whenFeature(feature: OptionalFeature) = runIfEnabledBlocking(feature, this)
+
+    suspend infix fun <T> (suspend () -> T?).whenFeature(feature: OptionalFeature) = runIfEnabled(feature, this)
 
     suspend fun registerBaseFeatures(baseFeatures: List<BaseFeature>) {
         baseFeatures.forEach {
