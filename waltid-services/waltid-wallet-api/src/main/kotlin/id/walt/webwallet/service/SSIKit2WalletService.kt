@@ -4,6 +4,7 @@ import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.jwk.KeyUse
 import com.nimbusds.jose.util.Base64URL
 import id.walt.commons.config.ConfigManager
+import id.walt.commons.featureflag.FeatureManager.whenFeature
 import id.walt.commons.web.ConflictException
 import id.walt.commons.web.UnsupportedMediaTypeException
 import id.walt.crypto.keys.*
@@ -25,6 +26,7 @@ import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.requests.CredentialOfferRequest
 import id.walt.oid4vc.responses.AuthorizationErrorCode
 import id.walt.oid4vc.responses.TokenResponse
+import id.walt.webwallet.FeatureCatalog
 import id.walt.webwallet.config.KeyGenerationDefaultsConfig
 import id.walt.webwallet.config.RegistrationDefaultsConfig
 import id.walt.webwallet.db.models.WalletCategoryData
@@ -330,9 +332,8 @@ class SSIKit2WalletService(
 
     override suspend fun createDid(method: String, args: Map<String, JsonPrimitive>): String {
         val keyId = args["keyId"]?.content?.takeIf { it.isNotEmpty() } ?: generateKey(
-            defaultGenerationConfig.defaultKeyConfig
-                ?: throw IllegalArgumentException("No valid keyId provided and no default key available.")
-        )
+            ({ defaultGenerationConfig.defaultKeyConfig } whenFeature FeatureCatalog.registrationDefaultsFeature)
+                ?: throw IllegalArgumentException("No valid keyId provided and no default key available."))
         val key = getKey(keyId)
         val result = DidService.registerDefaultDidMethodByKey(method, key, args)
 
