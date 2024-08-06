@@ -37,6 +37,7 @@ import kotlinx.datetime.Clock
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.plus
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToHexString
 import kotlinx.serialization.json.*
 import java.security.KeyFactory
@@ -82,7 +83,7 @@ object LspPotentialVerificationInterop {
     )
   }
 }
-
+@Serializable
 data class LSPPotentialIssueFormDataParam(
   val jwk: JsonObject,
 )

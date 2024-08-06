@@ -178,3 +178,9 @@ iOSInjectionProject/
 # End of https://www.toptal.com/developers/gitignore/api/xcode,swift,cocoapods
 
 /waltid-libraries/waltid-target-ios/implementation/DerivedData**/
+/waltid-openid4vc/issuer-cert.pem
+/waltid-openid4vc/issuer-priv.pem
+/waltid-openid4vc/issuer-pub.pem
+/waltid-openid4vc/root-ca-cert.pem
+/waltid-openid4vc/root-ca-priv.pem
+/waltid-openid4vc/root-ca-pub.pem

@@ -22,7 +22,8 @@
 
         <div class="mb-8">
             <div class="text-2xl font-bold bold">
-                {{ titleTitelized }}
+                {{ !isDetailView ? titleTitelized.length > 20 ? titleTitelized.slice(0, 20) + "..." : titleTitelized :
+                    titleTitelized }}
             </div>
             <p v-if="credentialSubtitle" class="text-sm text-clip">{{ credentialSubtitle }}</p>
         </div>
@@ -66,21 +67,35 @@ function parseJwt(token) {
     return JSON.parse(jsonPayload);
 }
 
-const credential = parseJwt(props.credential?.document).vc;
+let credential: any;
+if (props.credential.format && props.credential.format === "mso_mdoc") {
+    const resp: any = await $fetch(`/wallet-api/util/parseMDoc`, {
+        method: "POST",
+        body: props.credential.document,
+    });
+    credential = {
+        type: [resp.docType],
+    }
+}
+else {
+    credential = parseJwt(props.credential?.document)
+}
+const vc = credential?.vc ?? credential;
+
 const isDetailView = props.isDetailView ?? false;
-const manifest = credential?.manifest != "{}" ? credential?.manifest : null
+const manifest = vc?.manifest != "{}" ? vc?.manifest : null
 const manifestDisplay = manifest ? (typeof manifest === 'string' ? JSON.parse(manifest) : manifest)?.display : null;
 const manifestCard = manifestDisplay?.card;
 
-const title = manifestDisplay?.title ?? credential?.type?.at(-1);
-const titleTitelized = manifestDisplay?.title ?? credential?.type?.at(-1).replace(/([a-z0-9])([A-Z])/g, "$1 $2");
-const credentialSubtitle = manifestCard?.description ?? credential?.name;
+const title = manifestDisplay?.title ?? vc?.type?.at(-1)
+const titleTitelized = manifestDisplay?.title ?? vc?.type?.at(-1).replace(/([a-z0-9])([A-Z])/g, "$1 $2") ?? vc?.vct?.replace("_vc+sd-jwt", "").replace(/([a-z0-9])([A-Z])/g, "$1 $2");
+const credentialSubtitle = manifestCard?.description ?? vc?.name;
 
-const credentialImageUrl = manifestCard?.logo?.uri ?? credential?.issuer?.image?.id ?? credential?.issuer?.image;
+const credentialImageUrl = manifestCard?.logo?.uri ?? vc?.issuer?.image?.id ?? vc?.issuer?.image;
 
-const isNotExpired = credential?.expirationDate ? new Date(credential?.expirationDate).getTime() > new Date().getTime() : credential?.validUntil ? new Date(credential?.validUntil).getTime() > new Date().getTime() : true;
+const isNotExpired = vc?.expirationDate ? new Date(vc?.expirationDate).getTime() > new Date().getTime() : vc?.validUntil ? new Date(vc?.validUntil).getTime() > new Date().getTime() : true;
 
-const issuerName = manifestCard?.issuedBy ?? credential?.issuer?.name;
+const issuerName = manifestCard?.issuedBy ?? vc?.issuer?.name;
 
 const vcCardDiv = ref(null)
 

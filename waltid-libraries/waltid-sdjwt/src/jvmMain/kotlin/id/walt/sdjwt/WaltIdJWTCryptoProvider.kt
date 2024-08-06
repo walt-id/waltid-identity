@@ -9,10 +9,11 @@ class WaltIdJWTCryptoProvider(val keys: Map<String, Key>): JWTCryptoProvider {
   override fun sign(payload: JsonObject, keyID: String?, typ: String, headers: Map<String, Any>): String = runBlocking {
     val key = keyID?.let { keys[it] } ?: throw Exception("No key found")
     if(!key.hasPrivateKey) throw Exception("Key has no private key")
+    val allHeaders = mapOf("kid" to key.getKeyId(), "typ" to typ).plus(headers)
     return@runBlocking key.signJws(
       payload.toString().encodeToByteArray(),
-      headers.mapValues {
-        it.toJsonElement()
+      allHeaders.mapValues {
+        it.value.toJsonElement()
       })
   }
 

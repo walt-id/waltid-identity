@@ -100,7 +100,7 @@ data class PresentationDefinition(
                 limitDisclosure = DisclosureLimitation.required,
                 fields = listOf(
                     InputDescriptorField(path = listOf("$.vct"), filter = JsonObject(
-                        mapOf("type" to JsonPrimitive("string"), "const" to JsonPrimitive(type))
+                        mapOf("type" to JsonPrimitive("string"), "pattern" to JsonPrimitive(type))
                     ))
                 )
             )

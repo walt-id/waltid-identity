@@ -13,7 +13,7 @@ class SDJwtVC(sdJwt: SDJwt): SDJwt(sdJwt.jwt, sdJwt.header, sdJwt.sdPayload, sdJ
   val vct = undisclosedPayload["vct"]?.jsonPrimitive?.content
   val status = undisclosedPayload["status"]?.jsonPrimitive?.content
 
-  protected fun verifyHolderKeyBinding(jwtCryptoProvider: JWTCryptoProvider, requiresHolderKeyBinding: Boolean,
+  private fun verifyHolderKeyBinding(jwtCryptoProvider: JWTCryptoProvider, requiresHolderKeyBinding: Boolean,
                                        audience: String? = null, nonce: String? = null): Boolean {
     return if(!holderDid.isNullOrEmpty()) TODO("Holder DID verification not yet supported")
     else if(holderKeyJWK != null) {
@@ -47,6 +47,7 @@ class SDJwtVC(sdJwt: SDJwt): SDJwt(sdJwt.jwt, sdJwt.header, sdJwt.sdPayload, sdJ
   }
 
   companion object {
+    const val SD_JWT_VC_TYPE_HEADER = "vc+sd-jwt"
 
     fun parse(sdJwt: String) = SDJwtVC(SDJwt.parse(sdJwt))
 
@@ -97,17 +98,22 @@ class SDJwtVC(sdJwt: SDJwt): SDJwt(sdJwt.jwt, sdJwt.header, sdJwt.sdPayload, sdJ
       /** Set additional options in the JWT header */
       additionalJwtHeader: Map<String, Any> = emptyMap()
     ): SDJwtVC {
-      val undisclosedPayload = sdPayload.undisclosedPayload.toMutableMap().apply {
-        put("iss", JsonPrimitive(issuerDid))
-        put("cnf", cnf)
-        put("vct", JsonPrimitive(vct))
-        nbf?.let { put("nbf", JsonPrimitive(it)) }
-        exp?.let { put("exp", JsonPrimitive(it)) }
-        status?.let { put("status", JsonPrimitive(it)) }
-      }.let { JsonObject(it) }
+      val undisclosedPayload = sdPayload.undisclosedPayload.plus(
+        defaultPayloadProperties(issuerDid, cnf, vct, nbf, exp, status)
+      ).let { JsonObject(it) }
 
-      val sdPayload = SDPayload(undisclosedPayload, sdPayload.digestedDisclosures)
-      return SDJwtVC(sign(sdPayload, jwtCryptoProvider, issuerKeyId, typ = "vc+sd-jwt", additionalJwtHeader))
+      val finalSdPayload = SDPayload(undisclosedPayload, sdPayload.digestedDisclosures)
+      return SDJwtVC(sign(finalSdPayload, jwtCryptoProvider, issuerKeyId, typ = SD_JWT_VC_TYPE_HEADER, additionalJwtHeader))
+    }
+
+    fun defaultPayloadProperties(issuerId: String, cnf: JsonObject, vct: String,
+                                 notBefore: Long? = null, expirationDate: Long? = null, status: String? = null) = buildJsonObject {
+      put("iss", JsonPrimitive(issuerId))
+      put("cnf", cnf)
+      put("vct", JsonPrimitive(vct))
+      notBefore?.let { put("nbf", JsonPrimitive(it)) }
+      expirationDate?.let { put("exp", JsonPrimitive(it)) }
+      status?.let { put("status", JsonPrimitive(it)) }
     }
 
     fun isSdJwtVCPresentation(token: String): Boolean = parse(token).isPresentation

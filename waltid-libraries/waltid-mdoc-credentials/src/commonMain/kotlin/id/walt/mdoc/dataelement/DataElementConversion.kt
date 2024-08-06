@@ -56,6 +56,7 @@ fun LocalDate.toDataElement(subType: DEFullDateMode = DEFullDateMode.full_date_s
 fun JsonElement.toDataElement(): AnyDataElement = when(this) {
   is JsonObject -> this.mapValues { it.value.toDataElement() }.toDataElement()
   is JsonArray -> this.map { it.toDataElement() }.toDataElement()
+  is JsonNull -> NullElement()
   is JsonPrimitive ->
     this.intOrNull?.toDataElement() ?:
     this.longOrNull?.toDataElement() ?:
@@ -63,5 +64,19 @@ fun JsonElement.toDataElement(): AnyDataElement = when(this) {
     this.doubleOrNull?.toDataElement() ?:
     this.booleanOrNull?.toDataElement() ?:
     this.content.toDataElement()
+}
+
+fun DataElement.toJsonElement(): JsonElement = when(this) {
+  is NumberElement -> JsonPrimitive(this.value)
+  is StringElement -> JsonPrimitive(this.value)
+  is BooleanElement -> JsonPrimitive(this.value)
+  is ByteStringElement -> JsonArray(this.value.map { JsonPrimitive(it) })
+  is ListElement -> JsonArray(this.value.map { it.toJsonElement() })
+  is MapElement -> JsonObject(this.value.mapKeys { it.key.toString() }.mapValues { it.value.toJsonElement() })
+  is NullElement -> JsonNull
+  is DateTimeElement -> JsonPrimitive(this.value.epochSeconds)
+  is FullDateElement -> JsonPrimitive(this.value.toEpochDays() * 24 * 60 * 60)
+  is EncodedCBORElement -> this.decode().toJsonElement()
+  else -> throw Exception("Unsupported data type")
 }
 

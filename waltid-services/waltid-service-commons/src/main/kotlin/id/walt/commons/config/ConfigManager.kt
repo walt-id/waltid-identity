@@ -51,7 +51,7 @@ object ConfigManager {
                 .addDecoder(JsonElementDecoder())
                 .addCommandLineSource(args)
                 .addDefaultParsers()
-                .addEnvironmentSource()
+                .addEnvironmentSource(allowUppercaseNames = false)
                 .addFileSource("config/$id.conf", optional = true)
                 .withExplicitSealedTypes()
                 .build().also { loader -> configLoaders[id] = loader }

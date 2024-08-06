@@ -30,180 +30,192 @@
                 <VerifiableCredentialCard :credential="credential" :isDetailView="true" />
             </div>
             <div class="px-7 py-1">
-                <div class="text-gray-600 font-bold">
-                    {{ jwtJson?.type[jwtJson?.type.length - 1].replace(/([a-z0-9])([A-Z])/g, "$1 $2") }}
-                    Details
-                </div>
+                <div v-if="jwtJson?.type">
+                    <div class="text-gray-600 font-bold">
+                        {{ jwtJson?.type[jwtJson?.type.length - 1].replace(/([a-z0-9])([A-Z])/g, "$1 $2") }}
+                        Details
+                    </div>
 
-                <!-- VerifiableDiploma -->
-                <div v-if="jwtJson?.type[jwtJson?.type.length - 1] == 'VerifiableDiploma'">
-                    <hr class="my-5" />
-                    <div class="text-gray-500 mb-4 font-bold">Subject</div>
-                    <div class="md:flex text-gray-500 mb-3 md:mb-1">
-                        <div class="min-w-[19vw]">Given Name</div>
-                        <div class="font-bold">
-                            {{ jwtJson?.credentialSubject?.givenNames }}
-                        </div>
-                    </div>
-                    <div class="md:flex text-gray-500 mb-3 md:mb-1">
-                        <div class="min-w-[19vw]">Family Name</div>
-                        <div class="font-bold">
-                            {{ jwtJson?.credentialSubject?.familyName }}
-                        </div>
-                    </div>
-                    <div class="md:flex text-gray-500 mb-3 md:mb-1">
-                        <div class="min-w-[19vw]">Date Of Birth</div>
-                        <div class="font-bold">
-                            {{ jwtJson?.credentialSubject?.dateOfBirth }}
-                        </div>
-                    </div>
-                    <hr class="my-5" />
-                    <div class="text-gray-500 mb-4 font-bold">Achievement</div>
-                    <div class="md:flex text-gray-500 mb-3 md:mb-1">
-                        <div class="min-w-[19vw]">Identifier</div>
-                        <div class="font-bold">
-                            {{ jwtJson?.credentialSubject?.identifier }}
-                        </div>
-                    </div>
-                    <div class="md:flex text-gray-500 mb-3 md:mb-1">
-                        <div class="min-w-[19vw]">Title</div>
-                        <div class="font-bold">
-                            {{ jwtJson?.credentialSubject?.learningAchievement.title }}
-                        </div>
-                    </div>
-                    <div class="md:flex text-gray-500 mb-3 md:mb-1">
-                        <div class="min-w-[19vw]">Description</div>
-                        <div class="font-bold">
-                            {{ jwtJson?.credentialSubject?.learningAchievement.description }}
-                        </div>
-                    </div>
-                    <div class="md:flex text-gray-500 mb-3 md:mb-1">
-                        <div class="min-w-[19vw]">Additional Notes</div>
-                        <div class="font-bold">
-                            {{ jwtJson?.credentialSubject?.learningAchievement.additionalNote[0] }}
-                        </div>
-                    </div>
-                    <div class="md:flex text-gray-500 mb-3 md:mb-1">
-                        <div class="min-w-[19vw]">Grading Scheme</div>
-                        <div class="font-bold">
-                            {{ jwtJson?.credentialSubject?.gradingScheme.title }}
-                        </div>
-                    </div>
-                    <div class="md:flex text-gray-500 mb-3 md:mb-1">
-                        <div class="min-w-[19vw]">Graduation Location</div>
-                        <div class="font-bold">
-                            {{ jwtJson?.credentialSubject?.awardingOpportunity.location }}
-                        </div>
-                    </div>
-                    <div class="md:flex text-gray-500 mb-3 md:mb-1">
-                        <div class="min-w-[19vw]">Study Timeframe</div>
-                        <div class="font-bold"></div>
-                    </div>
-                    <hr class="my-5" />
-                    <div class="text-gray-500 mb-4 font-bold">University</div>
-                    <div class="md:flex text-gray-500 mb-3 md:mb-1">
-                        <div class="min-w-[19vw]">Legal Identifier</div>
-                        <div class="font-bold">
-                            {{ jwtJson?.credentialSubject?.awardingOpportunity.awardingBody.eidasLegalIdentifier }}
-                        </div>
-                    </div>
-                    <div class="md:flex text-gray-500 mb-3 md:mb-1">
-                        <div class="min-w-[19vw]">Name</div>
-                        <div class="font-bold">
-                            {{ jwtJson?.credentialSubject?.awardingOpportunity.awardingBody.preferredName }}
-                        </div>
-                    </div>
-                    <div class="md:flex text-gray-500 mb-3 md:mb-1">
-                        <div class="min-w-[19vw]">Registration</div>
-                        <div class="font-bold">
-                            {{ jwtJson?.credentialSubject?.awardingOpportunity.awardingBody.registration }}
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Open Badge 3.0 -->
-                <div v-else-if="jwtJson?.type[jwtJson?.type.length - 1] == 'OpenBadgeCredential'">
-                    <hr class="my-5" />
-                    <div class="flex items-center">
-                        <div>
-                            <div class="text-gray-500 mb-4 font-bold">Subject</div>
-                            <div class="md:flex text-gray-500 mb-3 md:mb-1">
-                                <div class="min-w-[19vw]">Name</div>
-                                <div class="font-bold">
-                                    {{ jwtJson?.credentialSubject?.achievement.name }}
-                                </div>
-                            </div>
-                            <div class="md:flex text-gray-500 mb-3 md:mb-1">
-                                <div class="min-w-[19vw]">Description</div>
-                                <div class="font-bold">
-                                    {{ jwtJson?.credentialSubject?.achievement.description }}
-                                </div>
-                            </div>
-                            <div class="md:flex text-gray-500 mb-3 md:mb-1">
-                                <div class="min-w-[19vw]">Criteria</div>
-                                <div class="font-bold grow-0">
-                                    {{ jwtJson?.credentialSubject?.achievement.criteria?.narrative }}
-                                </div>
-                            </div>
-                        </div>
-                        <img :src="jwtJson?.credentialSubject?.achievement.image?.id"
-                            class="w-32 h-20 hidden md:block" />
-                    </div>
-                </div>
-
-                <!-- Permanent Resident Card -->
-                <div v-else-if="jwtJson?.type[jwtJson?.type.length - 1] == 'PermanentResidentCard'">
-                    <hr class="my-5" />
-                    <div>
-                        <div class="text-gray-500 mb-4 font-bold">Subject Info</div>
+                    <!-- VerifiableDiploma -->
+                    <div v-if="jwtJson?.type[jwtJson?.type.length - 1] == 'VerifiableDiploma'">
+                        <hr class="my-5" />
+                        <div class="text-gray-500 mb-4 font-bold">Subject</div>
                         <div class="md:flex text-gray-500 mb-3 md:mb-1">
                             <div class="min-w-[19vw]">Given Name</div>
                             <div class="font-bold">
-                                {{ jwtJson?.credentialSubject?.givenName }}
+                                {{ jwtJson?.credentialSubject?.givenNames }}
                             </div>
                         </div>
                         <div class="md:flex text-gray-500 mb-3 md:mb-1">
-                            <div class="min-w-[19vw]">Surname</div>
+                            <div class="min-w-[19vw]">Family Name</div>
                             <div class="font-bold">
                                 {{ jwtJson?.credentialSubject?.familyName }}
                             </div>
                         </div>
                         <div class="md:flex text-gray-500 mb-3 md:mb-1">
                             <div class="min-w-[19vw]">Date Of Birth</div>
-                            <div class="font-bold grow-0">
-                                {{ jwtJson?.credentialSubject?.birthDate }}
+                            <div class="font-bold">
+                                {{ jwtJson?.credentialSubject?.dateOfBirth }}
+                            </div>
+                        </div>
+                        <hr class="my-5" />
+                        <div class="text-gray-500 mb-4 font-bold">Achievement</div>
+                        <div class="md:flex text-gray-500 mb-3 md:mb-1">
+                            <div class="min-w-[19vw]">Identifier</div>
+                            <div class="font-bold">
+                                {{ jwtJson?.credentialSubject?.identifier }}
                             </div>
                         </div>
                         <div class="md:flex text-gray-500 mb-3 md:mb-1">
-                            <div class="min-w-[19vw]">Sex</div>
-                            <div class="font-bold grow-0">
-                                {{ jwtJson?.credentialSubject?.gender }}
+                            <div class="min-w-[19vw]">Title</div>
+                            <div class="font-bold">
+                                {{ jwtJson?.credentialSubject?.learningAchievement.title }}
                             </div>
                         </div>
                         <div class="md:flex text-gray-500 mb-3 md:mb-1">
-                            <div class="min-w-[19vw]">Country Of Birth</div>
-                            <div class="font-bold grow-0">
-                                {{ jwtJson?.credentialSubject?.birthCountry }}
+                            <div class="min-w-[19vw]">Description</div>
+                            <div class="font-bold">
+                                {{ jwtJson?.credentialSubject?.learningAchievement.description }}
                             </div>
                         </div>
                         <div class="md:flex text-gray-500 mb-3 md:mb-1">
-                            <div class="min-w-[19vw]">Category</div>
-                            <div class="font-bold grow-0">
-                                {{ jwtJson?.credentialSubject?.lprCategory }}
+                            <div class="min-w-[19vw]">Additional Notes</div>
+                            <div class="font-bold">
+                                {{ jwtJson?.credentialSubject?.learningAchievement.additionalNote[0] }}
                             </div>
                         </div>
                         <div class="md:flex text-gray-500 mb-3 md:mb-1">
-                            <div class="min-w-[19vw]">USCIS</div>
-                            <div class="font-bold grow-0">
-                                {{ jwtJson?.credentialSubject?.lprNumber }}
+                            <div class="min-w-[19vw]">Grading Scheme</div>
+                            <div class="font-bold">
+                                {{ jwtJson?.credentialSubject?.gradingScheme.title }}
                             </div>
                         </div>
                         <div class="md:flex text-gray-500 mb-3 md:mb-1">
-                            <div class="min-w-[19vw]">Resident Since</div>
-                            <div class="font-bold grow-0">
-                                {{ jwtJson?.credentialSubject?.residentSince }}
+                            <div class="min-w-[19vw]">Graduation Location</div>
+                            <div class="font-bold">
+                                {{ jwtJson?.credentialSubject?.awardingOpportunity.location }}
                             </div>
                         </div>
+                        <div class="md:flex text-gray-500 mb-3 md:mb-1">
+                            <div class="min-w-[19vw]">Study Timeframe</div>
+                            <div class="font-bold"></div>
+                        </div>
+                        <hr class="my-5" />
+                        <div class="text-gray-500 mb-4 font-bold">University</div>
+                        <div class="md:flex text-gray-500 mb-3 md:mb-1">
+                            <div class="min-w-[19vw]">Legal Identifier</div>
+                            <div class="font-bold">
+                                {{ jwtJson?.credentialSubject?.awardingOpportunity.awardingBody.eidasLegalIdentifier }}
+                            </div>
+                        </div>
+                        <div class="md:flex text-gray-500 mb-3 md:mb-1">
+                            <div class="min-w-[19vw]">Name</div>
+                            <div class="font-bold">
+                                {{ jwtJson?.credentialSubject?.awardingOpportunity.awardingBody.preferredName }}
+                            </div>
+                        </div>
+                        <div class="md:flex text-gray-500 mb-3 md:mb-1">
+                            <div class="min-w-[19vw]">Registration</div>
+                            <div class="font-bold">
+                                {{ jwtJson?.credentialSubject?.awardingOpportunity.awardingBody.registration }}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Open Badge 3.0 -->
+                    <div v-else-if="jwtJson?.type[jwtJson?.type.length - 1] == 'OpenBadgeCredential'">
+                        <hr class="my-5" />
+                        <div class="flex items-center">
+                            <div>
+                                <div class="text-gray-500 mb-4 font-bold">Subject</div>
+                                <div class="md:flex text-gray-500 mb-3 md:mb-1">
+                                    <div class="min-w-[19vw]">Name</div>
+                                    <div class="font-bold">
+                                        {{ jwtJson?.credentialSubject?.achievement.name }}
+                                    </div>
+                                </div>
+                                <div class="md:flex text-gray-500 mb-3 md:mb-1">
+                                    <div class="min-w-[19vw]">Description</div>
+                                    <div class="font-bold">
+                                        {{ jwtJson?.credentialSubject?.achievement.description }}
+                                    </div>
+                                </div>
+                                <div class="md:flex text-gray-500 mb-3 md:mb-1">
+                                    <div class="min-w-[19vw]">Criteria</div>
+                                    <div class="font-bold grow-0">
+                                        {{ jwtJson?.credentialSubject?.achievement.criteria?.narrative }}
+                                    </div>
+                                </div>
+                            </div>
+                            <img :src="jwtJson?.credentialSubject?.achievement.image?.id"
+                                class="w-32 h-20 hidden md:block" />
+                        </div>
+                    </div>
+
+                    <!-- Permanent Resident Card -->
+                    <div v-else-if="jwtJson?.type[jwtJson?.type.length - 1] == 'PermanentResidentCard'">
+                        <hr class="my-5" />
+                        <div>
+                            <div class="text-gray-500 mb-4 font-bold">Subject Info</div>
+                            <div class="md:flex text-gray-500 mb-3 md:mb-1">
+                                <div class="min-w-[19vw]">Given Name</div>
+                                <div class="font-bold">
+                                    {{ jwtJson?.credentialSubject?.givenName }}
+                                </div>
+                            </div>
+                            <div class="md:flex text-gray-500 mb-3 md:mb-1">
+                                <div class="min-w-[19vw]">Surname</div>
+                                <div class="font-bold">
+                                    {{ jwtJson?.credentialSubject?.familyName }}
+                                </div>
+                            </div>
+                            <div class="md:flex text-gray-500 mb-3 md:mb-1">
+                                <div class="min-w-[19vw]">Date Of Birth</div>
+                                <div class="font-bold grow-0">
+                                    {{ jwtJson?.credentialSubject?.birthDate }}
+                                </div>
+                            </div>
+                            <div class="md:flex text-gray-500 mb-3 md:mb-1">
+                                <div class="min-w-[19vw]">Sex</div>
+                                <div class="font-bold grow-0">
+                                    {{ jwtJson?.credentialSubject?.gender }}
+                                </div>
+                            </div>
+                            <div class="md:flex text-gray-500 mb-3 md:mb-1">
+                                <div class="min-w-[19vw]">Country Of Birth</div>
+                                <div class="font-bold grow-0">
+                                    {{ jwtJson?.credentialSubject?.birthCountry }}
+                                </div>
+                            </div>
+                            <div class="md:flex text-gray-500 mb-3 md:mb-1">
+                                <div class="min-w-[19vw]">Category</div>
+                                <div class="font-bold grow-0">
+                                    {{ jwtJson?.credentialSubject?.lprCategory }}
+                                </div>
+                            </div>
+                            <div class="md:flex text-gray-500 mb-3 md:mb-1">
+                                <div class="min-w-[19vw]">USCIS</div>
+                                <div class="font-bold grow-0">
+                                    {{ jwtJson?.credentialSubject?.lprNumber }}
+                                </div>
+                            </div>
+                            <div class="md:flex text-gray-500 mb-3 md:mb-1">
+                                <div class="min-w-[19vw]">Resident Since</div>
+                                <div class="font-bold grow-0">
+                                    {{ jwtJson?.credentialSubject?.residentSince }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div v-if="credential?.format === 'mso_mdoc'">
+                    <div class="text-gray-600 font-bold">Details</div>
+                    <hr class="my-5" />
+                    <div class="md:flex text-gray-500 mb-3 md:mb-1" v-for="elem in
+                        jwtJson.issuerSigned.nameSpaces[Object.keys(jwtJson.issuerSigned.nameSpaces)[0]]">
+                        <div class="min-w-[19vw]">{{ elem.elementIdentifier }}</div>
+                        <div class="font-bold">{{ elem.elementValue }}</div>
                     </div>
                 </div>
 
@@ -261,7 +273,7 @@
                     <div v-else>No disclosable attributes!</div>
                 </div>
 
-                <div class="text-gray-600 flex justify-between">
+                <!-- <div class="text-gray-600 flex justify-between">
                     <hr class="mt-5 mb-3" />
                     <div>
                         {{
@@ -275,7 +287,7 @@
                         Issued:
                         {{ issuanceDate ? issuanceDate : "No issuance date" }}
                     </div>
-                </div>
+                </div> -->
             </div>
         </div>
         <div class="flex justify-between mt-12">
@@ -368,22 +380,32 @@ const showCredentialManifest = ref(false);
 const { data: credential, pending, refresh, error } = await useLazyFetch<WalletCredential>(`/wallet-api/wallet/${currentWallet.value}/credentials/${encodeURIComponent(credentialId)}`);
 refreshNuxtData();
 
-const jwtJson = computed(() => {
+const jwtJson = computedAsync(async () => {
     if (credential.value) {
-        const vcData = credential.value.document.split(".")[1];
-        console.log("Credential is: ", vcData);
-
-        const vcBase64 = vcData.replaceAll("-", "+").replaceAll("_", "/");
-        console.log("Base64 from base64url: ", vcBase64);
-
-        const decodedBase64 = decodeBase64ToUtf8(vcBase64).toString();
-        console.log("Decoded: ", decodedBase64);
-
         let parsed
-        try {
-            parsed = JSON.parse(decodedBase64);
-        } catch (e) {
-            console.log(e)
+
+        if (credential.value.format && credential.value.format === "mso_mdoc") {
+            const resp: any = await $fetch(`/wallet-api/util/parseMDoc`, {
+                method: "POST",
+                body: credential.value.document,
+            });
+            parsed = resp
+            console.log("Parsed: ", parsed)
+        } else {
+            const vcData = credential.value.document.split(".")[1];
+            console.log("Credential is: ", vcData);
+
+            const vcBase64 = vcData.replaceAll("-", "+").replaceAll("_", "/");
+            console.log("Base64 from base64url: ", vcBase64);
+
+            const decodedBase64 = decodeBase64ToUtf8(vcBase64).toString();
+            console.log("Decoded: ", decodedBase64);
+
+            try {
+                parsed = JSON.parse(decodedBase64)
+            } catch (e) {
+                console.log(e)
+            }
         }
 
         if (parsed?.vc) return parsed.vc;
@@ -401,6 +423,7 @@ type WalletCredential = {
     wallet: string;
     id: string;
     document: string;
+    format: string | null;
     disclosures: string | null;
     addedOn: string;
     manifest: string | null;

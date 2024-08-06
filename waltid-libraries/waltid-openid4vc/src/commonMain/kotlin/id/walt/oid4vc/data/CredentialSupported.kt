@@ -50,7 +50,10 @@ order: [...]
  * (https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html#name-objects-comprising-credenti)
  * @param id REQUIRED. A JSON string identifying the respective object. The value MUST be unique across all credentials_supported entries in the Credential Issuer Metadata.
  * @param format REQUIRED. A JSON string identifying the format of this credential, e.g. jwt_vc_json or ldp_vc. Depending on the format value, the object contains further elements defining the type and (optionally) particular claims the credential MAY contain, and information how to display the credential. Appendix E defines Credential Format Profiles introduced by this specification.
+ * @param scope OPTIONAL. A JSON string identifying the scope value that this Credential Issuer supports for this particular Credential. The value can be the same across multiple
  * @param cryptographicBindingMethodsSupported OPTIONAL. Array of case sensitive strings that identify how the Credential is bound to the identifier of the End-User who possesses the Credential as defined in Section 7.1. Support for keys in JWK format [RFC7517] is indicated by the value jwk. Support for keys expressed as a COSE Key object [RFC8152] (for example, used in [ISO.18013-5]) is indicated by the value cose_key. When Cryptographic Binding Method is a DID, valid values MUST be a did: prefix followed by a method-name using a syntax as defined in Section 3.1 of [DID-Core], but without a :and method-specific-id. For example, support for the DID method with a method-name "example" would be represented by did:example. Support for all DID methods listed in Section 13 of [DID_Specification_Registries] is indicated by sending a DID without any method-name.
+ * @param credentialSigningAlgValuesSupported OPTIONAL. Array of case sensitive strings that identify the algorithms that the Issuer uses to sign the issued Credential. Algorithm names used are determined by the Credential format
+ * @param proofTypesSupported  OPTIONAL. Object that describes specifics of the key proof(s) that the Credential Issuer supports
  * @param cryptographicSuitesSupported OPTIONAL. Array of case sensitive strings that identify the cryptographic suites that are supported for the cryptographic_binding_methods_supported. Cryptosuites for Credentials in jwt_vc format should use algorithm names defined in IANA JOSE Algorithms Registry. Cryptosuites for Credentials in ldp_vc format should use signature suites names defined in Linked Data Cryptographic Suite Registry.
  * @param display OPTIONAL. An array of objects, where each object contains the display properties of the supported credential for a certain language. Below is a non-exhaustive list of parameters that MAY be included. Note that the display name of the supported credential is obtained from display.name and individual claim names from claims.display.name values.
  * @param context REQUIRED (W3C JSON-LD credentials): JSON array as defined in [VC_DATA], Section 4.1.
@@ -63,8 +66,10 @@ order: [...]
 @Serializable
 data class CredentialSupported(
     val format: CredentialFormat,
+    val scope: String? = null,
     @SerialName("cryptographic_binding_methods_supported") val cryptographicBindingMethodsSupported: Set<String>? = null,
-    @SerialName("cryptographic_suites_supported") val cryptographicSuitesSupported: Set<String>? = null,
+    @SerialName("credential_signing_alg_values_supported") val credentialSigningAlgValuesSupported: Set<String>? = null,
+    @SerialName("proof_types_supported") val proofTypesSupported: Map<ProofType, ProofTypeMetadata>? = null,
     @Serializable(DisplayPropertiesListSerializer::class) val display: List<DisplayProperties>? = null,
     @SerialName("@context") val context: List<JsonElement>? = null,
     val types: List<String>? = null,
@@ -74,6 +79,7 @@ data class CredentialSupported(
     val order: List<String>? = null,
     override val customParameters: Map<String, JsonElement> = mapOf()
 ) : JsonDataObject() {
+
     override fun toJSON(): JsonObject = Json.encodeToJsonElement(CredentialSupportedSerializer, this).jsonObject
 
     companion object : JsonDataObjectFactory<CredentialSupported>() {

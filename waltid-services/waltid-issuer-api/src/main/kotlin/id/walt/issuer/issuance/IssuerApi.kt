@@ -291,15 +291,15 @@ fun Application.issuerApi() {
 
                 route("sdjwt") {
                     post("issue", {
-                        summary = "Signs credential and starts an OIDC credential exchange flow."
-                        description = "This endpoint issues a W3C Verifiable Credential, and returns an issuance URL "
+                        summary = "Signs credential using SD-JWT and starts an OIDC credential exchange flow."
+                        description = "This endpoint issues a W3C or SD-JWT-VC Verifiable Credential, and returns an issuance URL "
 
                         request {
                             body<IssuanceRequest> {
                                 description =
-                                    "Pass the unsigned credential that you intend to issue as the body of the request."
-                                example("SD-JWT example", IssuanceExamples.sdJwtExample)
-                                //example("UniversityDegreeCredential example", universityDegreeCredential)
+                                    "Pass the unsigned credential that you intend to issue in the body of the request."
+                                example("W3C SD-JWT example", IssuanceExamples.sdJwtW3CExample)
+                                example("SD-JWT-VC example", IssuanceExamples.sdJwtVCExample)
                                 required = true
                             }
                         }
@@ -363,23 +363,29 @@ fun Application.issuerApi() {
                     }
                 }
 
-                /*route("mdoc") {
+                route("mdoc") {
                     post("issue", {
                         summary = "Signs a credential based on the IEC/ISO18013-5 mdoc/mDL format."
                         description = "This endpoint issues a mdoc and returns an issuance URL "
 
                         request {
-                            headerParameter<String>("walt-key") {
+                            body<IssuanceRequest> {
                                 description =
-                                    "Supply a  key representation to use to issue the credential, " + "e.g. a local key (internal JWK) or a TSE key."
-                                example("JWK example", IssuanceExamples.jwkKeyExample)
-                                required = false
+                                    "Pass the unsigned credential that you intend to issue as the body of the request."
+                                example("mDL/MDOC example", IssuanceExamples.mDLCredentialIssuanceExample)
+                                required = true
                             }
                         }
                     }) {
-                        context.respond(HttpStatusCode.OK, "mdoc issued")
+                        val mdocIssuanceRequest = context.receive<IssuanceRequest>()
+
+                        val offerUri = createCredentialOfferUri(listOf(mdocIssuanceRequest))
+
+                        context.respond(
+                            HttpStatusCode.OK, offerUri
+                        )
                     }
-                }*/
+                }
 
                 get("credentialOffer", {
                     summary = "Gets a credential offer based on the session id"

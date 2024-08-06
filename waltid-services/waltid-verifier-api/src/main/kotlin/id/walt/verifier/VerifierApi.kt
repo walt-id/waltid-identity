@@ -41,7 +41,6 @@ private val SERVER_URL by lazy {
     }
 }
 
-
 @Serializable
 data class DescriptorMappingFormParam(val id: String, val format: VCFormat, val path: String)
 
@@ -55,10 +54,6 @@ data class TokenResponseFormParam(
     val vp_token: JsonElement?,
     val presentation_submission: PresentationSubmissionFormParam?,
     val response: String?,
-)
-
-data class LSPPotentialIssueFormDataParam(
-    val jwk: JsonObject,
 )
 
 @Serializable
@@ -187,6 +182,8 @@ fun Application.verfierApi() {
                         )
                         example("Example with presentation definition policy", VerifierApiExamples.presentationDefinitionPolicy)
                         example("Example with EBSI PDA1 Presentation Definition", VerifierApiExamples.EbsiVerifiablePDA1)
+                        example("LSP Potential MDoc verification example", VerifierApiExamples.lspPotentialMdocExample)
+                        example("LSP Potential SD-JWT verification example", VerifierApiExamples.lspPotentialSDJwtVCExample)
                     }
                 }
             }) {
@@ -213,7 +210,8 @@ fun Application.verfierApi() {
                     statusCallbackUri = statusCallbackUri,
                     statusCallbackApiKey = statusCallbackApiKey,
                     stateId = stateId,
-                    openId4VPProfile = openId4VPProfile
+                    openId4VPProfile = openId4VPProfile,
+                    trustedRootCAs = body["trusted_root_cas"]?.jsonArray
                 )
 
                 context.respond(
@@ -259,7 +257,9 @@ fun Application.verfierApi() {
                     }
                 }
             }) {
+                logger.info { "POST verify/state" }
                 val sessionId = call.parameters["state"]
+                logger.info { "State: $sessionId" }
                 verificationUseCase.verify(sessionId, context.request.call.receiveParameters().toMap())
                     .onSuccess {
                         val session = verificationUseCase.getSession(sessionId!!)
@@ -273,7 +273,7 @@ fun Application.verfierApi() {
                     }.onFailure {
                         logger.debug(it) { "Verification failed ($it)" }
                         var errorDescription = it.localizedMessage
-
+                        logger.error { "Error: $errorDescription" }
                         if (sessionId != null) {
                             val session = verificationUseCase.getSession(sessionId)
                             if (session.walletInitiatedAuthState != null) {

@@ -38,7 +38,7 @@ class SilentClaimStrategy(
         credentialWallet = SSIKit2WalletService.getCredentialWallet(did),
         clientId = SSIKit2WalletService.testCIClientConfig.clientID
     ).mapNotNull {
-        val credential = WalletCredential.parseDocument(it.document, it.id) ?: JsonObject(emptyMap())
+        val credential = WalletCredential.parseDocument(it.document, it.id, it.format) ?: JsonObject(emptyMap())
         val manifest = WalletCredential.tryParseManifest(it.manifest) ?: JsonObject(emptyMap())
         val issuerDid = WalletCredential.parseIssuerDid(credential, manifest) ?: "n/a"
         val type = credentialTypeSeeker.get(credential)
@@ -101,6 +101,7 @@ class SilentClaimStrategy(
                 manifest = data.manifest,
                 deletedOn = null,
                 pending = issuerUseCase.get(wallet = it, did = issuerDid).getOrNull()?.authorized ?: true,
+                format = data.format
             ), data.type
         )
     }

@@ -30,6 +30,7 @@ class ExplicitClaimStrategy(
             manifest = it.manifest,
             deletedOn = null,
             pending = pending,
+            format = it.format,
         ).also { credential ->
             eventUseCase.log(
                 action = EventType.Credential.Receive,

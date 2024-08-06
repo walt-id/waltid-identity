@@ -54,7 +54,7 @@ fun main() {
                             // id = activeSessionType.last(),
                             format = CredentialFormat.jwt_vc_json,
                             cryptographicBindingMethodsSupported = setOf("did"),
-                            cryptographicSuitesSupported = setOf("ES256K"),
+                            credentialSigningAlgValuesSupported = setOf("ES256K"),
                             types = activeSessionType
                         )
                     }

@@ -1,8 +1,13 @@
 package id.walt.webwallet.service.exchange
 
+import cbor.Cbor
+import id.walt.crypto.utils.Base64Utils.base64UrlDecode
 import id.walt.crypto.utils.JwsUtils
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.did.dids.DidService
+import id.walt.mdoc.dataelement.toDataElement
+import id.walt.mdoc.doc.MDoc
+import id.walt.mdoc.issuersigned.IssuerSigned
 import id.walt.oid4vc.OpenID4VCI
 import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.data.CredentialOffer
@@ -22,7 +27,9 @@ import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.util.*
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
@@ -43,7 +50,7 @@ object IssuanceService {
 
         // entra or openid4vc credential offer
         val isEntra = EntraIssuanceRequest.isEntraIssuanceRequestUri(offer)
-        val credentialResponses = if (isEntra) {
+        val processedCredentialOffers = if (isEntra) {
             processMSEntraIssuanceRequest(
                 EntraIssuanceRequest.fromAuthorizationRequest(
                     AuthorizationRequest.fromHttpParametersAuto(
@@ -60,12 +67,12 @@ object IssuanceService {
         }
         // === original ===
         logger.debug { "// parse and verify credential(s)" }
-        check(credentialResponses.any { it.credential != null }) { "No credential was returned from credentialEndpoint: $credentialResponses" }
+        check(processedCredentialOffers.any { it.credentialResponse.credential != null }) { "No credential was returned from credentialEndpoint: $processedCredentialOffers" }
 
         // ??multiple credentials manifests
         val manifest =
             isEntra.takeIf { it }?.let { EntraManifestExtractor().extract(offer) }
-        credentialResponses.map {
+        processedCredentialOffers.map {
             getCredentialData(it, manifest)
         }
     }
@@ -74,7 +81,7 @@ object IssuanceService {
         credentialOffer: CredentialOffer,
         credentialWallet: TestCredentialWallet,
         clientId: String,
-    ): List<CredentialResponse> {
+    ): List<ProcessedCredentialOffer> {
         logger.debug { "// get issuer metadata" }
         val providerMetadataUri =
             credentialWallet.getCIProviderMetadataUrl(credentialOffer.credentialIssuer)
@@ -89,9 +96,6 @@ object IssuanceService {
         val offeredCredentials = OpenID4VCI.resolveOfferedCredentials(credentialOffer, providerMetadata)
         logger.debug { "offeredCredentials: $offeredCredentials" }
 
-        //val offeredCredential = offeredCredentials.first()
-        //logger.debug { "offeredCredentials[0]: $offeredCredential" }
-
         logger.debug { "// fetch access token using pre-authorized code (skipping authorization step)" }
         val tokenReq = TokenRequest(
             grantType = GrantType.pre_authorized_code,
@@ -100,7 +104,6 @@ object IssuanceService {
             preAuthorizedCode = credentialOffer.grants[GrantType.pre_authorized_code.value]!!.preAuthorizedCode,
             txCode = null
         )
-//        logger.debug { "tokenReq: {}", tokenReq }
 
         val tokenResp = http.submitForm(
             providerMetadata.tokenEndpoint!!, formParameters = parametersOf(tokenReq.toHttpParameters())
@@ -108,8 +111,6 @@ object IssuanceService {
             logger.debug { "tokenResp raw: $it" }
             it.body<JsonObject>().let { TokenResponse.fromJSON(it) }
         }
-
-//        logger.debug { "tokenResp: {}", tokenResp }
 
         logger.debug { ">>> Token response = success: ${tokenResp.isSuccess}" }
 
@@ -119,54 +120,30 @@ object IssuanceService {
 
         logger.debug { "Using issuer URL: ${credentialOffer.credentialIssuer}" }
         val credReqs = offeredCredentials.map { offeredCredential ->
+            logger.info("Offered credential format: ${offeredCredential.format.name}")
+            logger.info("Offered credential cryptographic binding methods: ${offeredCredential.cryptographicBindingMethodsSupported?.joinToString(", ") ?: ""}")
+            // Use key proof if supported cryptographic binding method is not empty, doesn't contain did and contains cose_key
+            val useKeyProof = (offeredCredential.cryptographicBindingMethodsSupported != null &&
+                (offeredCredential.cryptographicBindingMethodsSupported!!.contains("cose_key") ||
+                    offeredCredential.cryptographicBindingMethodsSupported!!.contains("jwk")) &&
+                !offeredCredential.cryptographicBindingMethodsSupported!!.contains("did"))
             CredentialRequest.forOfferedCredential(
                 offeredCredential = offeredCredential,
-                proof = credentialWallet.generateDidProof(
-                    did = credentialWallet.did,
-                    issuerUrl = credentialOffer.credentialIssuer,
-                    nonce = nonce
-                )
+                proof = ProofOfPossessionFactory.new(useKeyProof, credentialWallet, offeredCredential, credentialOffer, nonce)
             )
         }
         logger.debug { "credReqs: $credReqs" }
 
         require(credReqs.isNotEmpty()) { "No credentials offered" }
 
-        return when {
-            credReqs.size == 1 -> {
-                val credReq = credReqs.first()
-
-                val credentialResponse = http.post(providerMetadata.credentialEndpoint!!) {
-                    contentType(ContentType.Application.Json)
-                    bearerAuth(tokenResp.accessToken!!)
-                    setBody(credReq.toJSON())
-                }.body<JsonObject>().let { CredentialResponse.fromJSON(it) }
-                logger.debug { "credentialResponse: $credentialResponse" }
-
-                listOf(credentialResponse)
-            }
-
-            else -> {
-                val batchCredentialRequest = BatchCredentialRequest(credReqs)
-
-                val credentialResponses = http.post(providerMetadata.batchCredentialEndpoint!!) {
-                    contentType(ContentType.Application.Json)
-                    bearerAuth(tokenResp.accessToken!!)
-                    setBody(batchCredentialRequest.toJSON())
-                }.body<JsonObject>().let { BatchCredentialResponse.fromJSON(it) }
-                logger.debug { "credentialResponses: $credentialResponses" }
-
-                credentialResponses.credentialResponses
-                    ?: throw IllegalArgumentException("No credential responses returned")
-            }
-        }
+        return CredentialOfferProcessor.process(credReqs, providerMetadata, tokenResp)
     }
 
     private suspend fun processMSEntraIssuanceRequest(
         entraIssuanceRequest: EntraIssuanceRequest,
         credentialWallet: TestCredentialWallet,
         pin: String? = null,
-    ): List<CredentialResponse> {
+    ): List<ProcessedCredentialOffer> {
         // *) Load key:
 //        val walletKey = getKeyByDid(credentialWallet.did)
         val walletKey = DidService.resolveToKey(credentialWallet.did).getOrThrow()
@@ -199,7 +176,11 @@ object IssuanceService {
                 throw IllegalArgumentException("Could not get Verifiable Credential from response: $responseBody")
             }
         msEntraSendIssuanceCompletionCB(entraIssuanceRequest, EntraIssuanceCompletionCode.issuance_successful)
-        return listOf(CredentialResponse.Companion.success(CredentialFormat.jwt_vc_json, vc))
+        return listOf(ProcessedCredentialOffer(
+            CredentialResponse.Companion.success(CredentialFormat.jwt_vc_json, vc),
+            null,
+            entraIssuanceRequest
+        ))
     }
 
     private suspend fun msEntraSendIssuanceCompletionCB(
@@ -223,21 +204,36 @@ object IssuanceService {
         } else logger.debug { "No authorization request state or redirectUri found in Entra issuance request, skipping completion response callback" }
     }
 
+    @OptIn(ExperimentalSerializationApi::class)
     private suspend fun getCredentialData(
-        credentialResp: CredentialResponse, manifest: JsonObject?,
+        processedOffer: ProcessedCredentialOffer, manifest: JsonObject?,
     ) = let {
-        val credential = credentialResp.credential!!.jsonPrimitive.content
-        val credentialJwt = credential.decodeJws(withSignature = true)
-        when (val typ = credentialJwt.header["typ"]?.jsonPrimitive?.content?.lowercase()) {
-            "jwt" -> parseJwtCredentialResponse(credentialJwt, credential, manifest, typ)
-            "vc+sd-jwt" -> parseSdJwtCredentialResponse(credentialJwt, credential, manifest, typ)
-            null -> throw IllegalArgumentException("WalletCredential JWT does not have \"typ\"")
-            else -> throw IllegalArgumentException("Invalid credential \"typ\": $typ")
+        val credential = processedOffer.credentialResponse.credential!!.jsonPrimitive.content
+        if(processedOffer.credentialResponse.format == CredentialFormat.mso_mdoc) {
+            val credentialEncoding = processedOffer.credentialResponse.customParameters["credential_encoding"]?.jsonPrimitive?.content ?: "issuer-signed"
+            val docType = processedOffer.credentialRequest?.docType ?: throw IllegalArgumentException("Credential request has no docType property")
+            val format = processedOffer.credentialResponse.format ?: throw IllegalArgumentException("Credential response has no format property")
+            val mdoc = when(credentialEncoding) {
+                "issuer-signed" -> MDoc(docType.toDataElement(), IssuerSigned.fromMapElement(
+                    Cbor.decodeFromByteArray(credential.base64UrlDecode())
+                ), null)
+                else -> throw IllegalArgumentException("Invalid credential encoding: $credentialEncoding")
+            }
+            // TODO: review ID generation for mdoc
+            CredentialDataResult(randomUUID(), mdoc.toCBORHex(), type = docType, format = format)
+        } else {
+            val credentialJwt = credential.decodeJws(withSignature = true)
+            when (val typ = credentialJwt.header["typ"]?.jsonPrimitive?.content?.lowercase()) {
+                "jwt" -> parseJwtCredentialResponse(credentialJwt, credential, manifest, typ, CredentialFormat.jwt_vc)
+                "vc+sd-jwt" -> parseSdJwtCredentialResponse(credentialJwt, credential, manifest, typ, CredentialFormat.sd_jwt_vc)
+                null -> throw IllegalArgumentException("WalletCredential JWT does not have \"typ\"")
+                else -> throw IllegalArgumentException("Invalid credential \"typ\": $typ")
+            }
         }
     }
 
     private suspend fun parseJwtCredentialResponse(
-        credentialJwt: JwsUtils.JwsParts, document: String, manifest: JsonObject?, type: String,
+        credentialJwt: JwsUtils.JwsParts, document: String, manifest: JsonObject?, type: String, format: CredentialFormat
     ) = let {
         val credentialId =
             credentialJwt.payload["vc"]!!.jsonObject["id"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
@@ -249,12 +245,12 @@ object IssuanceService {
             id = credentialId,
             document = document,
             manifest = manifest?.toString(),
-            type = type,
+            type = type, format = format
         )
     }
 
     private suspend fun parseSdJwtCredentialResponse(
-        credentialJwt: JwsUtils.JwsParts, document: String, manifest: JsonObject?, type: String,
+        credentialJwt: JwsUtils.JwsParts, document: String, manifest: JsonObject?, type: String, format: CredentialFormat
     ) = let {
         val credentialId =
             credentialJwt.payload["id"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() } ?: randomUUID()
@@ -274,6 +270,7 @@ object IssuanceService {
             disclosures = disclosuresString,
             manifest = manifest?.toString(),
             type = type,
+            format = format
         )
     }
 
@@ -283,6 +280,7 @@ object IssuanceService {
         val document: String,
         val manifest: String? = null,
         val disclosures: String? = null,
-        val type: String?,
+        val type: String,
+        val format: CredentialFormat
     )
 }
