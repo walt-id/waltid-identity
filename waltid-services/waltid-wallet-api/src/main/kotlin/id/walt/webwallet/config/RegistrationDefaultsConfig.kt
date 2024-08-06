@@ -7,11 +7,9 @@ import kotlinx.serialization.json.JsonPrimitive
 
 @Serializable
 data class RegistrationDefaultsConfig(
-    val defaultKeyConfig: KeyGenerationRequest?,
-    val defaultDidConfig: DidMethodConfig?,
+    val defaultKeyConfig: KeyGenerationRequest,
+    val defaultDidConfig: DidMethodConfig,
 ) : WalletConfig() {
-
-    fun isEmpty() = defaultKeyConfig == null || defaultDidConfig == null
 
     @Serializable
     data class DidMethodConfig(
@@ -20,10 +18,10 @@ data class RegistrationDefaultsConfig(
     )
 
     @Transient
-    val didMethod = defaultDidConfig?.method
+    val didMethod = defaultDidConfig.method
 
     @Transient
-    val didConfig: Map<String, JsonPrimitive>? = defaultDidConfig?.config
+    val didConfig: Map<String, JsonPrimitive>? = defaultDidConfig.config
 
     companion object {
         val Default = RegistrationDefaultsConfig(KeyGenerationRequest(), DidMethodConfig())

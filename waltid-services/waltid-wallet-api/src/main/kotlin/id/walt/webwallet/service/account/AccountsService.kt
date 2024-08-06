@@ -1,6 +1,8 @@
 package id.walt.webwallet.service.account
 
 import id.walt.commons.config.ConfigManager
+import id.walt.commons.featureflag.FeatureManager.whenFeature
+import id.walt.webwallet.FeatureCatalog
 import id.walt.webwallet.config.RegistrationDefaultsConfig
 import id.walt.webwallet.db.models.*
 import id.walt.webwallet.service.WalletService
@@ -31,8 +33,7 @@ object AccountsService {
             }
 
             val walletService = WalletServiceManager.getWalletService(tenant, registeredUserId, createdInitialWalletId)
-            val defaultGenerationConfig by lazy { ConfigManager.getConfig<RegistrationDefaultsConfig>() }
-            tryAddDefaultData(defaultGenerationConfig, walletService)
+            tryAddDefaultData(walletService)
             registrationResult.also {
                 WalletServiceManager.eventUseCase.log(
                     action = EventType.Account.Create,
@@ -157,19 +158,18 @@ object AccountsService {
         }
     }
 
-    private suspend fun tryAddDefaultData(
-        defaultGenerationConfig: RegistrationDefaultsConfig, walletService: WalletService
-    ) = runCatching {
-        defaultGenerationConfig.takeIf { !it.isEmpty() }?.let {
-            val createdKey = walletService.generateKey(it.defaultKeyConfig!!)
-            val createdDid =
-                walletService.createDid(method = it.didMethod!!, args = it.didConfig!!.toMutableMap().apply {
+    private suspend fun tryAddDefaultData(walletService: WalletService) = suspend {
+        val defaultGenerationConfig by lazy { ConfigManager.getConfig<RegistrationDefaultsConfig>() }
+        val createdKey = walletService.generateKey(defaultGenerationConfig.defaultKeyConfig)
+        val createdDid =
+            walletService.createDid(
+                method = defaultGenerationConfig.didMethod,
+                args = defaultGenerationConfig.didConfig!!.toMutableMap().apply {
                     put("keyId", JsonPrimitive(createdKey))
                     put("alias", JsonPrimitive("Onboarding"))
                 })
-            walletService.setDefault(createdDid)
-        }
-    }
+        walletService.setDefault(createdDid)
+    } whenFeature FeatureCatalog.registrationDefaultsFeature
 }
 
 @Serializable
