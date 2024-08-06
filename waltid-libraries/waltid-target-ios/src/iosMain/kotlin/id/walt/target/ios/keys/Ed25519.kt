@@ -67,11 +67,11 @@ sealed class Ed25519 {
             val signingInput = "$header.$payload"
 
             val verifyResult =
-                verifyRaw(Base64.UrlSafe.decode(signature), signingInput.encodeToByteArray())
+                verifyRaw(base64UrlDecode(signature), signingInput.encodeToByteArray())
             return when {
                 verifyResult.isSuccess -> Result.success(
                     Json.parseToJsonElement(
-                        Base64.UrlSafe.decode(
+                        base64UrlDecode(
                             payload
                         ).decodeToString()
                     ).jsonObject
@@ -251,7 +251,7 @@ internal class Ed25519PublicKeyJwk(private val jwk: String) : Ed25519.PublicKey(
     @OptIn(ExperimentalEncodingApi::class)
 
     private val externalRepresentation: ByteArray by lazy {
-        Base64.UrlSafe.decode(_jwk.x)
+        base64UrlDecode(_jwk.x)
     }
 
     @Serializable

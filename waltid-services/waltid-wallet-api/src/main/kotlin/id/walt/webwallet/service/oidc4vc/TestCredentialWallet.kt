@@ -4,6 +4,7 @@ import COSE.AlgorithmID
 import com.nimbusds.jose.jwk.ECKey
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyManager
+import id.walt.crypto.utils.Base64Utils.base64UrlDecode
 import id.walt.crypto.utils.Base64Utils.base64UrlToBase64
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto.utils.JsonUtils.toJsonElement
@@ -53,8 +54,6 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import kotlinx.uuid.UUID
 import kotlinx.uuid.generateUUID
-import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 
@@ -119,11 +118,10 @@ class TestCredentialWallet(
         return@runBlocking cryptoProvider.sign1(payload.toCBOR(), header, null, keyId).toCBOR().encodeToBase64Url()
     }
 
-    @OptIn(ExperimentalEncodingApi::class)
     override fun verifyTokenSignature(target: TokenTarget, token: String): Boolean {
         println("VERIFYING TOKEN: ($target) $token")
         val jwtHeader = runCatching {
-            Json.parseToJsonElement(Base64.UrlSafe.decode(token.split(".")[0]).decodeToString()).jsonObject
+            Json.parseToJsonElement(token.split(".")[0].base64UrlDecode().decodeToString()).jsonObject
         }.getOrElse {
             throw IllegalArgumentException(
                 "Could not verify token signature, as JWT header could not be coded for token: $token, cause attached.", it
