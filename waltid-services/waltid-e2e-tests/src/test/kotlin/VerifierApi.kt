@@ -22,6 +22,9 @@ object Verifier {
             client.post("/openid4vc/verify") {
                 setBody(Json.decodeFromString<JsonObject>(payload))
             }.expectSuccess().apply {
+                val url = bodyAsText()
+                assert(url.contains("presentation_definition_uri="))
+                assert(!url.contains("presentation_definition="))
                 output?.invoke(bodyAsText())
             }
         }
