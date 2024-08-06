@@ -3,16 +3,10 @@ package id.walt
 import COSE.AlgorithmID
 import COSE.OneKey
 import cbor.Cbor
-import com.nimbusds.jose.jwk.ECKey
 import com.nimbusds.jose.jwk.JWK
-import com.nimbusds.jose.util.X509CertUtils
 import com.upokecenter.cbor.CBORObject
-import id.walt.commons.config.ConfigManager
 import id.walt.crypto.utils.Base64Utils.base64UrlDecode
 import id.walt.did.dids.DidService
-import id.walt.issuer.config.OIDCIssuerServiceConfig
-import id.walt.issuer.issuance.CIProvider
-import id.walt.issuer.issuance.OidcApi
 import id.walt.mdoc.COSECryptoProviderKeyInfo
 import id.walt.mdoc.SimpleCOSECryptoProvider
 import id.walt.mdoc.cose.COSESign1
@@ -22,12 +16,12 @@ import id.walt.mdoc.doc.MDocTypes
 import id.walt.mdoc.issuersigned.IssuerSigned
 import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.data.ProofOfPossession
-import id.walt.oid4vc.providers.TokenTarget
 import id.walt.oid4vc.requests.CredentialRequest
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.decodeFromHexString
-import java.security.KeyFactory
+import org.junit.jupiter.api.assertDoesNotThrow
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -38,6 +32,7 @@ object LspPotentialTest {
     runBlocking { DidService.minimalInit() }
   }
 
+  @OptIn(ExperimentalSerializationApi::class)
   @Test
   fun testParseCWTExample() {
     val data = "d28443a10126a104524173796d6d657472696345434453413235365850a701756" +
@@ -46,9 +41,7 @@ object LspPotentialTest {
         "9f0061a5610d9f007420b7158405427c1ff28d23fbad1f29c4c7c6a555e601d6f" +
         "a29f9179bc3d7438bacaca5acd08c8d4d4f96131680c429a01f85951ecee743a5" +
         "2b9b63632c57209120e1c9e30"
-    val parsedCwt = Cbor.decodeFromHexString(COSESign1.serializer(), data)
-    parsedCwt != null
-
+    assertDoesNotThrow { Cbor.decodeFromHexString(COSESign1.serializer(), data) }
   }
 
   @OptIn(ExperimentalStdlibApi::class)
@@ -90,9 +83,7 @@ object LspPotentialTest {
     val coseSign1 = Cbor.decodeFromByteArray<COSESign1>(req.proof!!.cwt!!.base64UrlDecode())
     assertNotNull(coseSign1.payload)
     val tokenHeader = coseSign1.decodeProtectedHeader()
-    val x5c = X509CertUtils.parse((tokenHeader.value[MapKey(ProofOfPossession.CWTProofBuilder.HEADER_LABEL_X5CHAIN)] as ByteStringElement).value)
     val keyId = (tokenHeader.value[MapKey(4)] as ByteStringElement).value.decodeToString()
-    //val rawKey = (tokenHeader.value[MapKey(ProofOfPossession.CWTProofBuilder.HEADER_LABEL_COSE_KEY)] as ByteStringElement).value
     val cryptoProvider = SimpleCOSECryptoProvider(listOf(COSECryptoProviderKeyInfo("pub-key", AlgorithmID.ECDSA_256,
       JWK.parse(runBlocking { DidService.resolveToKey(keyId).getOrThrow().exportJWK() }).toECKey().toECPublicKey()
     )))

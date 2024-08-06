@@ -66,10 +66,10 @@ class DidsApi(private val client: HttpClient) {
         val alias: String? = null,
         val options: Map<String, Any> = emptyMap(),
     ) {
-        fun toMap() = emptyMap<String, String>().let {
-            keyId?.run { it.plus("keyId" to this) }
-            alias?.run { it.plus("alias" to this) }
-            it.plus(options)
+        fun toMap() = mutableMapOf<String, String>().apply {
+            keyId?.run { put("keyId", this) }
+            alias?.run { put("alias", this) }
+            putAll(options.mapValues { it.toString() })
         }
     }
 

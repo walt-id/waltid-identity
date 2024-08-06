@@ -21,5 +21,6 @@ data class PresentationSession(
     val walletInitiatedAuthState: String? = null,
     val customParameters: Map<String, JsonElement>? = null,
     val ephemeralEncKey: Key? = null,
-    val openId4VPProfile: OpenId4VPProfile = OpenId4VPProfile.DEFAULT
+    val openId4VPProfile: OpenId4VPProfile = OpenId4VPProfile.DEFAULT,
+    val trustedRootCAs: List<String>? = null
 ) : AuthorizationSession()
