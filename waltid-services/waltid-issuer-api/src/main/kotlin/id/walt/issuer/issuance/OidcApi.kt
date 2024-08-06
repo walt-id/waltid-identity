@@ -1,6 +1,7 @@
 package id.walt.issuer.issuance
 
 
+import id.walt.crypto.utils.Base64Utils.base64UrlDecode
 import id.walt.credentials.verification.Verifier
 import id.walt.credentials.verification.models.PolicyRequest.Companion.parsePolicyRequests
 import id.walt.oid4vc.data.*
@@ -26,7 +27,6 @@ import io.ktor.util.pipeline.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
-import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.time.Duration.Companion.minutes
 
@@ -287,21 +287,19 @@ object OidcApi : CIProvider() {
                 val tokenResp = processTokenRequest(tokenReq)
                 logger.info { "/token tokenResp: $tokenResp" }
 
-                val sessionId = Json.parseToJsonElement(
-                    Base64.decode(
+                    val sessionId = Json.parseToJsonElement(
                         (tokenResp.accessToken
                             ?: throw IllegalArgumentException("No access token was responded with tokenResp?")).split(
                             "."
-                        )[1]
-                    ).decodeToString()
-                ).jsonObject["sub"]?.jsonPrimitive?.contentOrNull
-                    ?: throw IllegalArgumentException("Could not get session ID from token response!")
-                val nonceToken = tokenResp.cNonce
-                    ?: throw IllegalArgumentException("No nonce token was responded with the tokenResp?")
-                OidcApi.mapSessionIdToToken(
-                    sessionId,
-                    nonceToken
-                )  // TODO: Hack as this is non stateless because of oidc4vc lib API
+                        )[1].base64UrlDecode().decodeToString()
+                    ).jsonObject["sub"]?.jsonPrimitive?.contentOrNull
+                        ?: throw IllegalArgumentException("Could not get session ID from token response!")
+                    val nonceToken = tokenResp.cNonce
+                        ?: throw IllegalArgumentException("No nonce token was responded with the tokenResp?")
+                    OidcApi.mapSessionIdToToken(
+                        sessionId,
+                        nonceToken
+                    )  // TODO: Hack as this is non stateless because of oidc4vc lib API
 
                 call.respond(tokenResp.toJSON())
             } catch (exc: TokenError) {

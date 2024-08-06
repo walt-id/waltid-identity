@@ -1,5 +1,4 @@
-
-package id.walt.crypto.utils
+package id.walt.sdjwt.utils
 
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
@@ -15,11 +14,9 @@ object Base64Utils {
 
     fun ByteArray.encodeToBase64Url() = Base64.UrlSafe.encode(this).trimEnd('=')
 
-    fun String.base64UrlDecode() = base64Url.decode(this)
+    fun String.base64UrlDecode()= base64.decode(this)
 
-    fun String.base64Decode() = base64.decode(this)
+    fun String.base64Decode() = Base64.decode(this)
 
-    private val base64Url = Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT_OPTIONAL)
-
-    private val base64 = Base64
+    val base64 = Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT_OPTIONAL)
 }
