@@ -107,7 +107,7 @@ object OpenID4VCI {
         return parseAuthorizationRequestQueryString(authorizationRequestQueryString)
     }
 
-    fun parseAuthorizationRequestQueryString(authorizationRequestQueryString: String): AuthorizationRequest {
+    private fun parseAuthorizationRequestQueryString(authorizationRequestQueryString: String): AuthorizationRequest {
         return AuthorizationRequest.fromHttpQueryString(authorizationRequestQueryString)
     }
 
@@ -119,11 +119,11 @@ object OpenID4VCI {
         return tokenRequest
     }
 
-    fun parseTokenRequest(tokenRequestRaw: Map<String, List<String>>): TokenRequest {
+    private fun parseTokenRequest(tokenRequestRaw: Map<String, List<String>>): TokenRequest {
         return TokenRequest.fromHttpParameters(tokenRequestRaw)
     }
 
-    fun validateAuthorizationCode(tokenRequest: TokenRequest, authorizationCode: String): Boolean {
+    private fun validateAuthorizationCode(tokenRequest: TokenRequest, authorizationCode: String): Boolean {
         val code = when (tokenRequest.grantType) {
             GrantType.authorization_code -> tokenRequest.code ?: throw TokenError(
                 tokenRequest = tokenRequest,
