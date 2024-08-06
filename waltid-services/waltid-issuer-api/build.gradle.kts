@@ -89,8 +89,6 @@ dependencies {
     implementation("io.klogging:slf4j-klogging:0.7.0")
 
 
-    // implementation("io.lettuce:lettuce-core:6.3.2.RELEASE")
-
     // Test
     testImplementation(kotlin("test"))
     //testImplementation("org.jetbrains.kotlin:kotlin-test-junit:${Versions.KOTLIN_VERSION}")

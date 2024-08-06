@@ -11,7 +11,6 @@ import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.did.dids.DidService
 import id.walt.did.helpers.WaltidServices
-import id.walt.issuer.issuance2.IssuanceOfferManager
 import id.walt.oid4vc.OpenID4VCI
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.definitions.JWTClaims
@@ -31,7 +30,6 @@ import io.ktor.http.*
 import io.ktor.util.reflect.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.*
-import okhttp3.internal.format
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 
