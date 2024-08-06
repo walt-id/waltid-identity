@@ -3,7 +3,6 @@ package id.walt.issuer
 import id.walt.commons.featureflag.BaseFeature
 import id.walt.commons.featureflag.OptionalFeature
 import id.walt.commons.featureflag.ServiceFeatureCatalog
-import id.walt.commons.persistence.PersistenceConfiguration
 import id.walt.issuer.config.CredentialTypeConfig
 import id.walt.issuer.config.OIDCIssuerServiceConfig
 
