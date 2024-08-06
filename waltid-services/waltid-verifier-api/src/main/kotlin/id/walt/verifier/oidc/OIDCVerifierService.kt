@@ -7,7 +7,6 @@ import COSE.OneKey
 import com.nimbusds.jose.util.X509CertUtils
 import com.upokecenter.cbor.CBORObject
 import id.walt.commons.config.ConfigManager
-import id.walt.commons.featureflag.FeatureManager.whenFeature
 import id.walt.commons.persistence.ConfiguredPersistence
 import id.walt.credentials.verification.VerificationPolicy
 import id.walt.credentials.verification.Verifier
@@ -41,9 +40,7 @@ import id.walt.oid4vc.responses.TokenResponse
 import id.walt.oid4vc.util.randomUUID
 import id.walt.sdjwt.SDJwtVC
 import id.walt.sdjwt.WaltIdJWTCryptoProvider
-import id.walt.verifier.FeatureCatalog
 import id.walt.verifier.config.OIDCVerifierServiceConfig
-import id.walt.verifier.lspPotential.LspPotentialVerificationInterop
 import id.walt.verifier.policies.PresentationDefinitionPolicy
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.runBlocking
@@ -54,7 +51,7 @@ import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.polymorphic
 import kotlinx.serialization.modules.subclass
 import java.security.cert.X509Certificate
-import java.util.Base64
+import java.util.*
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 
@@ -204,13 +201,8 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
         }
     }
 
-    private fun getAdditionalTrustedRootCAs(): List<X509Certificate> {
-        val trustedRootCAs = mutableListOf<X509Certificate>();
-        {
-            trustedRootCAs.addAll(LspPotentialVerificationInterop.POTENTIAL_ISSUER_CRYPTO_PROVIDER_INFO.trustedRootCAs)
-        } whenFeature FeatureCatalog.lspPotential
-
-        return trustedRootCAs
+    private fun getAdditionalTrustedRootCAs(session: PresentationSession): List<X509Certificate> {
+        return session.trustedRootCAs?.map { X509CertUtils.parse(it) } ?: listOf()
     }
 
     private fun verifyMdoc(tokenResponse: TokenResponse, session: PresentationSession): Boolean {
@@ -234,7 +226,7 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
                 )
             ), SimpleCOSECryptoProvider(
                 listOf(
-                    COSECryptoProviderKeyInfo("ISSUER_KEY_ID", AlgorithmID.ECDSA_256, issuerKey, null, listOf(), getAdditionalTrustedRootCAs()),
+                    COSECryptoProviderKeyInfo("ISSUER_KEY_ID", AlgorithmID.ECDSA_256, issuerKey, null, listOf(), getAdditionalTrustedRootCAs(session)),
                     COSECryptoProviderKeyInfo("DEVICE_KEY_ID", AlgorithmID.ECDSA_256, deviceKey.AsPublicKey(), null)
                 )
             )
@@ -254,6 +246,7 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
 
     private suspend fun verifySdJwtVC(tokenResponse: TokenResponse, session: PresentationSession): Boolean {
         val sdJwtVC = SDJwtVC.parse(tokenResponse.vpToken!!.jsonPrimitive.content)
+        require(sdJwtVC.isPresentation && sdJwtVC.keyBindingJwt != null) { "SD-JWT is not a presentation and/or doesn't contain a holder key binding JWT" }
         val holderKey = JWKKey.importJWK(sdJwtVC.holderKeyJWK.toString()).getOrThrow()
         val issuerKey = resolveIssuerKeyFromSdJwt(sdJwtVC)
         val verificationResult = sdJwtVC.verifyVC(
@@ -279,6 +272,7 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
         clientIdScheme: ClientIdScheme,
         openId4VPProfile: OpenId4VPProfile,
         walletInitiatedAuthState: String?,
+        trustedRootCAs: List<String>?
     ): PresentationSession {
         val presentationSession = super.initializeAuthorization(
             presentationDefinition = presentationDefinition,
@@ -290,7 +284,8 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
             ephemeralEncKey = ephemeralEncKey,
             clientIdScheme = clientIdScheme,
             openId4VPProfile = openId4VPProfile,
-            walletInitiatedAuthState = walletInitiatedAuthState
+            walletInitiatedAuthState = walletInitiatedAuthState,
+            trustedRootCAs = trustedRootCAs
         )
         return presentationSession.copy(
             authorizationRequest = presentationSession.authorizationRequest!!.copy(
