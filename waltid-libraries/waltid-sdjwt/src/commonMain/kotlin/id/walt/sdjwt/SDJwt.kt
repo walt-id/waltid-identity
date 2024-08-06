@@ -1,7 +1,7 @@
 package id.walt.sdjwt
 
+import id.walt.sdjwt.utils.Base64Utils.base64UrlDecode
 import kotlinx.serialization.json.*
-import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
@@ -188,7 +188,7 @@ open class SDJwt internal constructor(
             val disclosures = matchedGroups["disclosures"]?.value?.trim(SEPARATOR)?.split(SEPARATOR)?.toSet() ?: setOf()
             return SDJwt(
                 matchedGroups["sdjwt"]!!.value,
-                Json.parseToJsonElement(Base64.UrlSafe.decode(matchedGroups["header"]!!.value).decodeToString()).jsonObject,
+                Json.parseToJsonElement(matchedGroups["header"]!!.value.base64UrlDecode().decodeToString()).jsonObject,
                 SDPayload.parse(
                     matchedGroups["body"]!!.value,
                     disclosures

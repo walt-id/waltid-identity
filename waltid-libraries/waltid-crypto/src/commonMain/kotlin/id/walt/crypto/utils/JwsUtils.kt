@@ -1,14 +1,13 @@
 package id.walt.crypto.utils
 
 import id.walt.crypto.keys.KeyType
+import id.walt.crypto.utils.Base64Utils.base64UrlDecode
 import id.walt.crypto.utils.Base64Utils.base64UrlToBase64
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
-import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 
@@ -24,9 +23,8 @@ object JwsUtils {
         KeyType.RSA -> "RS256" // TODO: RS384 RS512
     }
 
-    @OptIn(ExperimentalEncodingApi::class)
-    fun String.decodeJwsPart(): JsonObject =
-        Json.parseToJsonElement(Base64.decode(this.base64UrlToBase64()).decodeToString()).jsonObject
+    private fun String.decodeJwsPart(): JsonObject =
+        Json.parseToJsonElement(this.base64UrlToBase64().base64UrlDecode().decodeToString()).jsonObject
 
     data class JwsParts(val header: JsonObject, val payload: JsonObject, val signature: String) {
         override fun toString() = "${Json.encodeToString(header).encodeToByteArray().encodeToBase64Url()}.${

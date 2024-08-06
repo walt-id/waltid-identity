@@ -60,7 +60,6 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
-import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.time.Duration.Companion.minutes
 
@@ -209,7 +208,7 @@ open class CIProvider : OpenIDCredentialIssuer(
         log.debug { "Verifying JWS: $token" }
         log.debug { "JWS Verification: target: $target" }
 
-        val tokenHeader = Json.parseToJsonElement(Base64.decode(token.split(".")[0]).decodeToString()).jsonObject
+        val tokenHeader = Json.parseToJsonElement(token.split(".")[0].base64UrlDecode().decodeToString()).jsonObject
         val key = if (tokenHeader["jwk"] != null) {
             JWKKey.importJWK(tokenHeader["jwk"].toString()).getOrThrow()
         } else if (tokenHeader["kid"] != null) {
@@ -418,7 +417,7 @@ open class CIProvider : OpenIDCredentialIssuer(
         val jwtParts = jwt.split(".")
 
         fun decodeJwtPart(idx: Int) =
-            Json.parseToJsonElement(Base64.decode(jwtParts[idx]).decodeToString()).jsonObject
+            Json.parseToJsonElement(jwtParts[idx].base64UrlDecode().decodeToString()).jsonObject
 
         val header = decodeJwtPart(0)
         val payload = decodeJwtPart(1)
