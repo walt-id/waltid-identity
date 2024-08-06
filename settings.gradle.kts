@@ -77,3 +77,4 @@ plugins {
 }
 
 rootProject.name = "waltid-identity"
+

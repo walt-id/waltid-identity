@@ -1,6 +1,7 @@
 package id.walt.webwallet.usecase.exchange
 
 import id.walt.crypto.utils.JsonUtils.toJsonElement
+import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.service.credentials.CredentialsService
@@ -36,6 +37,7 @@ class MatchPresentationDefinitionCredentialsUseCaseTest {
             disclosures = null,
             addedOn = Clock.System.now(),
             deletedOn = null,
+            format = CredentialFormat.ldp_vc
         ),
         WalletCredential(
             wallet = UUID(),
@@ -51,6 +53,7 @@ class MatchPresentationDefinitionCredentialsUseCaseTest {
             disclosures = null,
             addedOn = Clock.System.now(),
             deletedOn = null,
+            format = CredentialFormat.ldp_vc
         ),
     )
     val wallet = UUID()
