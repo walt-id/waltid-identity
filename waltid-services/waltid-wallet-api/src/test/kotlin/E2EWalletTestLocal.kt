@@ -41,7 +41,7 @@ class E2EWalletTestLocal : E2EWalletTestBase() {
             )
 
             ConfigManager.preloadAndRegisterConfig("web", WebConfig(webPort = 4545))
-            ConfigManager.preloadAndRegisterConfig("registration-defaults", RegistrationDefaultsConfig())
+            ConfigManager.preloadAndRegisterConfig("registration-defaults", RegistrationDefaultsConfig.Default)
             ConfigManager.preloadAndRegisterConfig("key-generation-defaults", KeyGenerationDefaultsConfig(emptyMap()))
             webWalletSetup()
             ConfigManager.loadConfigs(emptyArray())
