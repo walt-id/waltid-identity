@@ -1,11 +1,15 @@
 import TestUtils.loadSerializedLocal
+import com.nimbusds.jose.JWSObject
+import id.walt.crypto.keys.KeySerialization
+import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.crypto.keys.KeyManager
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.*
 import org.junit.jupiter.api.Disabled
+import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
+import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
@@ -27,8 +31,14 @@ class KeySignTests {
         // given
         val key = KeyManager.resolveSerializedKey(loadSerializedLocal(keyFile))
         // when
-        val signature = key.signJws(payload.toString().encodeToByteArray())
+        val signature = key.signJws(payload.toString().encodeToByteArray(), mapOf("h1" to buildJsonObject {
+           put("h1.1", "bla".toJsonElement())
+        }))
         val verificationResult = key.getPublicKey().verifyJws(signature)
+        val header = Json.parseToJsonElement(JWSObject.parse(signature).header.toString())
+        assertContains(header.jsonObject.keys, "h1")
+        assertContains(header.jsonObject["h1"]!!.jsonObject.keys, "h1.1")
+        assertEquals(header.jsonObject["h1"]!!.jsonObject["h1.1"]!!.jsonPrimitive.content, "bla")
         // then
         assertTrue(verificationResult.isSuccess)
         assertEquals(payload, verificationResult.getOrThrow())

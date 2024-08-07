@@ -106,6 +106,7 @@ kotlin {
                 implementation("dev.whyoleg.cryptography:cryptography-random:0.3.1")
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.1")
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
+                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.5.0")
                 implementation("com.soywiz.korlibs.krypto:krypto:4.0.10")
             }
         }
@@ -117,6 +118,7 @@ kotlin {
         val jvmMain by getting {
             dependencies {
                 implementation("com.nimbusds:nimbus-jose-jwt:9.40")
+                api(project(":waltid-libraries:crypto:waltid-crypto"))
             }
         }
         val jvmTest by getting {

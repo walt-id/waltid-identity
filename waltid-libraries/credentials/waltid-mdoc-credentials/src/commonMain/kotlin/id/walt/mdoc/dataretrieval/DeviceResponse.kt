@@ -15,10 +15,10 @@ import kotlin.io.encoding.ExperimentalEncodingApi
  */
 @Serializable
 class DeviceResponse(
-    val documents: List<MDoc>,
-    val version: StringElement = "1.0".toDE(),
-    val status: NumberElement = DeviceResponseStatus.OK.status.toDE(),
-    val documentErrors: MapElement? = null
+  val documents: List<MDoc>,
+  val version: StringElement = "1.0".toDataElement(),
+  val status: NumberElement = DeviceResponseStatus.OK.status.toDataElement(),
+  val documentErrors: MapElement? = null
 ) {
     /**
      * Convert to CBOR map element
@@ -26,7 +26,7 @@ class DeviceResponse(
     fun toMapElement() = MapElement(
         buildMap {
             put(MapKey("version"), version)
-            put(MapKey("documents"), documents.map { it.toMapElement() }.toDE())
+            put(MapKey("documents"), documents.map { it.toMapElement() }.toDataElement())
             put(MapKey("status"), status)
             documentErrors?.let {
                 put(MapKey("documentErrors"), it)
@@ -43,18 +43,13 @@ class DeviceResponse(
      */
     fun toCBORHex() = toMapElement().toCBORHex()
 
-
     /**
      * Serialize to CBOR base64 url-encoded string
      */
     @OptIn(ExperimentalEncodingApi::class)
-    fun toCBORBase64URL() = base64Url.encode(toCBOR())
+    fun toCBORBase64URL() = Base64.UrlSafe.encode(toCBOR())
 
     companion object {
-
-        @OptIn(ExperimentalEncodingApi::class)
-        private val base64Url = Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT)
-
         /**
          * Deserialize from CBOR data
          */
@@ -67,6 +62,6 @@ class DeviceResponse(
         fun fromCBORHex(cbor: String) = Cbor.decodeFromHexString<DeviceResponse>(cbor)
 
         @OptIn(ExperimentalEncodingApi::class)
-        fun fromCBORBase64URL(cbor: String) = fromCBOR(base64Url.decode(cbor))
+        fun fromCBORBase64URL(cbor: String) = fromCBOR(Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT_OPTIONAL).decode(cbor))
     }
 }

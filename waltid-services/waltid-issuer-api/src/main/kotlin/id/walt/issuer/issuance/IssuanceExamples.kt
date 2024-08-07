@@ -1,9 +1,10 @@
 package id.walt.issuer.issuance
 
+import id.walt.commons.interop.LspPotentialInterop
 import id.walt.crypto.keys.KeyType
+import id.walt.issuer.lspPotential.LspPotentialIssuanceInterop
 import io.github.smiley4.ktorswaggerui.dsl.routes.ValueExampleDescriptorDsl
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.*
 
 object IssuanceExamples {
 
@@ -28,15 +29,11 @@ object IssuanceExamples {
               "type": [
                 "Profile"
               ],
-              "id": "did:key:THIS WILL BE REPLACED WITH DYNAMIC DATA FUNCTION FROM CONTEXT (see below)",
               "name": "Jobs for the Future (JFF)",
               "url": "https://www.jff.org/",
               "image": "https://w3c-ccg.github.io/vc-ed/plugfest-1-2022/images/JFF_LogoLockup.png"
             },
-            "issuanceDate": "2023-07-20T07:05:44Z (THIS WILL BE REPLACED BY DYNAMIC DATA FUNCTION (see below))",
-            "expirationDate": "WILL BE MAPPED BY DYNAMIC DATA FUNCTION (see below)",
             "credentialSubject": {
-              "id": "did:key:123 (THIS WILL BE REPLACED BY DYNAMIC DATA FUNCTION (see below))",
               "type": [
                 "AchievementSubject"
               ],
@@ -117,10 +114,7 @@ object IssuanceExamples {
                 "givenName":"JOHN",
                 "id":"identity#bankId"
              },
-             "id":"identity#BankId#3add94f4-28ec-42a1-8704-4e4aa51006b4",
-             "issued":"2021-08-31T00:00:00Z",
              "issuer":{
-                "id":"did:key:z6MkrHKzgsahxBLyNAbLQyB1pcWNYC9GmywiWPgkrvntAZcj",
                 "image":{
                    "id":"https://images.squarespace-cdn.com/content/v1/609c0ddf94bcc0278a7cbdb4/1660296169313-K159K9WX8J8PPJE005HV/Walt+Bot_Logo.png?format=100w",
                    "type":"Image"
@@ -128,9 +122,7 @@ object IssuanceExamples {
                 "name":"CH Authority",
                 "type":"Profile",
                 "url":"https://images.squarespace-cdn.com/content/v1/609c0ddf94bcc0278a7cbdb4/1660296169313-K159K9WX8J8PPJE005HV/Walt+Bot_Logo.png?format=100w"
-             },
-             "validFrom":"2021-08-31T00:00:00Z",
-             "issuanceDate":"2021-08-31T00:00:00Z"
+             }
           }
     """.trimIndent()
 
@@ -171,9 +163,49 @@ object IssuanceExamples {
           "issuerDid": $issuerDid,
           "credentialConfigurationId": "OpenBadgeCredential_jwt_vc_json",
           "credentialData": $openBadgeCredentialData,
+          "mdocData": null,
           "mapping": $mapping
         }
         """.trimIndent()
+
+    private val openBadgeCredentialIssuanceIdToken = """
+        {
+          "authenticationMethod": "ID_TOKEN",
+          "issuerKey": $issuerKey,
+          "issuerDid": $issuerDid,
+          "credentialConfigurationId": "OpenBadgeCredential_jwt_vc_json",
+          "credentialData": $openBadgeCredentialData,
+          "mdocData": null,
+          "mapping": $mapping
+        }
+        """.trimIndent()
+
+    private val openBadgeCredentialIssuanceVpToken = """
+        {
+          "authenticationMethod": "VP_TOKEN",
+          "vpRequestValue": "NaturalPersonVerifiableID",
+          "vpProfile": "EBSIV3",
+          "issuerKey": $issuerKey,
+          "issuerDid": $issuerDid,
+          "credentialConfigurationId": "OpenBadgeCredential_jwt_vc_json",
+          "credentialData": $openBadgeCredentialData,
+          "mdocData": null,
+          "mapping": $mapping
+        }
+        """.trimIndent()
+
+    private val openBadgeCredentialIssuancePwd = """
+        {
+          "authenticationMethod": "PWD",
+          "issuerKey": $issuerKey,
+          "issuerDid": $issuerDid,
+          "credentialConfigurationId": "OpenBadgeCredential_jwt_vc_json",
+          "credentialData": $openBadgeCredentialData,
+          "mdocData": null,
+          "mapping": $mapping
+        }
+        """.trimIndent()
+
 
     //language=json
     private val universityDegreeCredentialIssuance = """
@@ -182,6 +214,7 @@ object IssuanceExamples {
           "issuerDid": $issuerDid,
           "credentialConfigurationId": "UniversityDegree_jwt_vc_json",
           "credentialData": ${universityDegreeCredentialData()},
+          "mdocData": null,
           "mapping": $mapping
         }
         """.trimIndent()
@@ -208,6 +241,7 @@ object IssuanceExamples {
           "issuerDid":$issuerDid,
           "credentialConfigurationId":"BankId_jwt_vc_json",
           "credentialData":$bankIdCredentialData,
+          "mdocData": null,
           "mapping":$mapping
        }
         """.trimIndent()
@@ -247,6 +281,41 @@ object IssuanceExamples {
         openBadgeCredentialIssuance
     )
 
+    val openBadgeCredentialIssuanceExampleWithIdToken = typedValueExampleDescriptorDsl<IssuanceRequest>(
+        openBadgeCredentialIssuanceIdToken
+    )
+    val openBadgeCredentialIssuanceExampleWithVpToken = typedValueExampleDescriptorDsl<IssuanceRequest>(
+        openBadgeCredentialIssuanceVpToken
+    )
+    val openBadgeCredentialIssuanceExampleWithUsernamePassword = typedValueExampleDescriptorDsl<IssuanceRequest>(
+        openBadgeCredentialIssuancePwd
+    )
+
+    // language=json
+    val mDLCredentialIssuanceData = """
+        {
+          "issuerKey": { 
+            "type": "jwk",
+            "jwk": ${Json.parseToJsonElement(LspPotentialIssuanceInterop.POTENTIAL_ISSUER_JWK_KEY.jwk!!)}
+          },
+          "issuerDid":"",
+          "credentialConfigurationId":"org.iso.18013.5.1.mDL",
+          "credentialData":null,
+          "mdocData": { 
+              "org.iso.18013.5.1": {
+                  "family_name": "Doe",
+                  "given_name": "John",
+                  "birth_date": "1980-01-02"
+              }
+          },
+          "x5Chain": ${buildJsonArray { add(LspPotentialInterop.POTENTIAL_ISSUER_CERT) }},
+          "trustedRootCAs": ${buildJsonArray { add(LspPotentialInterop.POTENTIAL_ROOT_CA_CERT) }},
+          "authenticationMethod": "NONE"
+       }
+    """.trimIndent()
+
+    val mDLCredentialIssuanceExample = typedValueExampleDescriptorDsl<IssuanceRequest>(mDLCredentialIssuanceData)
+
     // language=JSON
     val batchExampleJwt = typedValueExampleDescriptorDsl<List<IssuanceRequest>>(
         """
@@ -265,8 +334,9 @@ object IssuanceExamples {
                 {
                     "issuerKey": $issuerKey,
                     "issuerDid": $issuerDid,
-                    "credentialConfigurationId": "OpenBadgeCredential_vc+sd-jwt",
+                    "credentialConfigurationId": "OpenBadgeCredential_sd-jwt",
                     "credentialData": $openBadgeCredentialData,
+                    "mdocData": null,
                     "mapping": $mapping,
                     "selectiveDisclosure":
                     {
@@ -282,8 +352,9 @@ object IssuanceExamples {
                 {
                     "issuerKey": $issuerKey,
                     "issuerDid": $issuerDid,
-                    "credentialConfigurationId": "BankId_vc+sd-jwt",
+                    "credentialConfigurationId": "BankId_sd-jwt",
                     "credentialData": $bankIdCredentialData,
+                    "mdocData": null,
                     "mapping": $mapping,
                     "selectiveDisclosure":
                     {
@@ -301,13 +372,14 @@ object IssuanceExamples {
     )
 
     // language=JSON
-    val sdJwtExample = typedValueExampleDescriptorDsl<IssuanceRequest>(
+    val sdJwtW3CExample = typedValueExampleDescriptorDsl<IssuanceRequest>(
         """
             {
                 "issuerKey": $issuerKey,
                 "issuerDid": $issuerDid,
-                "credentialConfigurationId": "OpenBadgeCredential_vc+sd-jwt",
+                "credentialConfigurationId": "OpenBadgeCredential_sd-jwt",
                 "credentialData": $openBadgeCredentialData,
+                "mdocData": null,
                 "mapping": $mapping,
                 "selectiveDisclosure":
                 {
@@ -631,4 +703,54 @@ object IssuanceExamples {
             }
         """.trimIndent()
     )
+
+    // language=json
+    private val sdjwt_vc_identity_credential = """
+    {
+     "vct": "identity_credential_vc+sd-jwt",
+     "given_name": "John",
+     "family_name": "Doe",
+     "email": "johndoe@example.com",
+     "phone_number": "+1-202-555-0101",
+     "address": {
+       "street_address": "123 Main St",
+       "locality": "Anytown",
+       "region": "Anystate",
+       "country": "US"
+     },
+     "birthdate": "1940-01-01",
+     "is_over_18": true,
+     "is_over_21": true,
+     "is_over_65": true
+    }
+    """.trimIndent()
+
+    // language=json
+    val sdJwtVCData = """
+        {
+            "issuerKey": $issuerKey,
+            "issuerDid": $issuerDid,
+            "credentialConfigurationId": "identity_credential_vc+sd-jwt",
+            "credentialData": $sdjwt_vc_identity_credential,
+            "mdocData": null,
+            "mapping": $mapping,
+            "selectiveDisclosure":
+            {
+                "fields":
+                {
+                    "birthdate":
+                    {
+                        "sd": true
+                    },
+                    "family_name":
+                    {
+                        "sd": false
+                    }
+                }
+            },
+            "authenticationMethod": "NONE"
+        }
+    """.trimIndent()
+
+    val sdJwtVCExample = typedValueExampleDescriptorDsl<IssuanceRequest>(sdJwtVCData)
 }

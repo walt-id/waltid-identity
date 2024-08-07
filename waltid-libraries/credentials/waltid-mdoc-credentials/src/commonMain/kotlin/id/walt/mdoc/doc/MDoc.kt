@@ -188,7 +188,7 @@ data class MDoc(
      * @return MDoc with device-signed data containing the created signature
      */
     fun presentWithDeviceSignature(mDocRequest: MDocRequest, deviceAuthentication: DeviceAuthentication, cryptoProvider: COSECryptoProvider, keyID: String? = null): MDoc {
-        val coseSign1 = cryptoProvider.sign1(getDeviceSignedPayload(deviceAuthentication), keyID).detachPayload()
+        val coseSign1 = cryptoProvider.sign1(getDeviceSignedPayload(deviceAuthentication), null, null, keyID).detachPayload()
         return MDoc(
             docType,
             selectDisclosures(mDocRequest),

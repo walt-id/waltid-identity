@@ -7,8 +7,11 @@ import id.walt.crypto.keys.KeyType
 import id.walt.issuer.issuance.IssuanceRequest
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.webwallet.config.RegistrationDefaultsConfig
+import id.walt.webwallet.db.models.AccountWalletListing
+import id.walt.webwallet.web.model.AccountRequest
 import id.walt.webwallet.web.model.EmailAccountRequest
 import io.ktor.client.*
+import io.ktor.client.call.*
 import io.ktor.client.engine.cio.*
 import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.*
@@ -60,6 +63,7 @@ class E2ETest {
 
             //region -Keys-
             val keysApi = KeysApi(client)
+            // requires registration-defaults to not be disabled in _features.conf
             val defaultKeyConfig = ConfigManager.getConfig<RegistrationDefaultsConfig>().defaultKeyConfig
             val keyGenRequest = KeyGenerationRequest("jwk", KeyType.Ed25519)
             lateinit var generatedKeyId: String
@@ -81,6 +85,7 @@ class E2ETest {
                 assert(it.first().default)
                 did = it.first().did
             }
+            //todo: test for optional registration defaults
             didsApi.create(wallet, DidsApi.DidCreateRequest(method = "key", options = mapOf("useJwkJcsPub" to false))) {
                 createdDids.add(it)
             }
@@ -212,6 +217,18 @@ class E2ETest {
                     assert(it.size > 1) { "no policies have run" }
                 }
             }
+            val lspPotentialIssuance = LspPotentialIssuance(testHttpClient(doFollowRedirects = false))
+            lspPotentialIssuance.testTrack1()
+            lspPotentialIssuance.testTrack2()
+            val lspPotentialVerification = LspPotentialVerification(testHttpClient(doFollowRedirects = false))
+            lspPotentialVerification.testPotentialInteropTrack3()
+            lspPotentialVerification.testPotentialInteropTrack4()
+            val lspPotentialWallet = setupTestWallet()
+            lspPotentialWallet.testMDocIssuance()
+            lspPotentialWallet.testMdocPresentation()
+            lspPotentialWallet.testSDJwtVCIssuance()
+            lspPotentialWallet.testSDJwtPresentation()
+
             //endregion -Exchange / presentation-
 
             //region -History-
@@ -221,10 +238,70 @@ class E2ETest {
                 assert(it.any { it.operation == "useOfferRequest" } && it.any { it.operation == "usePresentationRequest" }) { "incorrect history items" }
             }
             //endregion -History-
+
+            // Test Authorization Code flow with available authentication methods in Issuer API
+            val authorizationCodeFlow = AuthorizationCodeFlow(testHttpClient(doFollowRedirects = false))
+            authorizationCodeFlow.testIssuerAPI()
+
         }
     }
 
-    private fun testHttpClient(token: String? = null) = HttpClient(CIO) {
+
+
+    //@Test // enable to execute test selectively
+    fun lspIssuanceTests() = runTest(timeout = 5.minutes) {
+        val client = testHttpClient(doFollowRedirects = false)
+        testBlock {
+          val lspPotentialIssuance = LspPotentialIssuance(client)
+          lspPotentialIssuance.testTrack1()
+          lspPotentialIssuance.testTrack2()
+        }
+    }
+
+    // @Test
+    fun lspVerifierTests() = runTest(timeout = 5.minutes) {
+        val client = testHttpClient(doFollowRedirects = false)
+        testBlock {
+          val lspPotentialVerification = LspPotentialVerification(client)
+          lspPotentialVerification.testPotentialInteropTrack3()
+          lspPotentialVerification.testPotentialInteropTrack4()
+        }
+    }
+
+  suspend fun setupTestWallet(): LspPotentialWallet {
+    var client = testHttpClient()
+    client.post("/wallet-api/auth/login") {
+      setBody(
+        EmailAccountRequest(
+          email = "user@email.com", password = "password"
+        ) as AccountRequest
+      )
+    }.expectSuccess().apply {
+      body<JsonObject>().let { result ->
+        assertNotNull(result["token"])
+        val token = result["token"]!!.jsonPrimitive.content.expectLooksLikeJwt()
+
+        client = testHttpClient(token = token)
+      }
+    }
+    val walletId = client.get("/wallet-api/wallet/accounts/wallets").expectSuccess()
+        .body<AccountWalletListing>().wallets.first().id.toString()
+    return LspPotentialWallet(client, walletId)
+  }
+
+  //@Test // enable to execute test selectively
+  fun lspWalletTests() = runTest(timeout = 5.minutes) {
+    testBlock {
+      val lspPotentialWallet = setupTestWallet()
+      lspPotentialWallet.testMDocIssuance()
+      lspPotentialWallet.testMdocPresentation()
+
+      lspPotentialWallet.testSDJwtVCIssuance()
+      lspPotentialWallet.testSDJwtPresentation()
+    }
+  }
+
+    private fun testHttpClient(token: String? = null, doFollowRedirects: Boolean = true) = HttpClient(CIO) {
         install(ContentNegotiation) {
             json(httpJson)
         }
@@ -238,14 +315,19 @@ class E2ETest {
         install(Logging) {
             level = LogLevel.ALL
         }
+      followRedirects = doFollowRedirects
     }
 }
 
 fun String.expectLooksLikeJwt(): String =
     also { assert(startsWith("ey") && count { it == '.' } == 2) { "Does not look like JWT" } }
 
-fun HttpResponse.expectSuccess(): HttpResponse = also {
-    assert(status.isSuccess()) { "HTTP status is non-successful" }
+suspend fun HttpResponse.expectSuccess(): HttpResponse = also {
+    assert(status.isSuccess()) { "HTTP status is non-successful for response: $it, body is ${it.bodyAsText()}" }
+}
+
+fun HttpResponse.expectRedirect(): HttpResponse = also {
+    assert(status == HttpStatusCode.Found) { "HTTP status is non-successful" }
 }
 
 fun JsonElement.tryGetData(key: String): JsonElement? = key.split('.').let {

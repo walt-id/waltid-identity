@@ -18,7 +18,7 @@ Add the crypto library as a dependency to your Kotlin or Java project.
 
 ```kotlin
 dependencies {
-  implementation(project(":waltid-libraries:waltid-crypto-ios"))
+  implementation(project(":waltid-libraries:crypto:waltid-crypto-ios"))
 }
 ```
 

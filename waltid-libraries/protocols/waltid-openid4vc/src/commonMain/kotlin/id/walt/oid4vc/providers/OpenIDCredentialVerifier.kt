@@ -43,6 +43,7 @@ abstract class OpenIDCredentialVerifier(val config: CredentialVerifierConfig) :
         clientIdScheme: ClientIdScheme = config.defaultClientIdScheme,
         openId4VPProfile: OpenId4VPProfile = OpenId4VPProfile.DEFAULT,
         walletInitiatedAuthState: String? = null,
+        trustedRootCAs: List<String>? = null
     ): PresentationSession {
         val session = PresentationSession(
             id = sessionId ?: ShortIdUtils.randomSessionId(),
@@ -51,12 +52,13 @@ abstract class OpenIDCredentialVerifier(val config: CredentialVerifierConfig) :
             presentationDefinition = presentationDefinition,
             walletInitiatedAuthState = walletInitiatedAuthState,
             ephemeralEncKey = ephemeralEncKey,
-            openId4VPProfile = openId4VPProfile
+            openId4VPProfile = openId4VPProfile,
+            trustedRootCAs = trustedRootCAs
         ).also {
             putSession(it.id, it)
         }
         val presentationDefinitionUri = when(openId4VPProfile) {
-            OpenId4VPProfile.ISO_18013_7_MDOC -> null
+            OpenId4VPProfile.ISO_18013_7_MDOC, OpenId4VPProfile.HAIP -> null
             else -> preparePresentationDefinitionUri(presentationDefinition, session.id)
         }
         val authReq = AuthorizationRequest(

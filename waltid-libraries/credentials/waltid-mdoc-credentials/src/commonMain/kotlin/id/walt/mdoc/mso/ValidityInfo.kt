@@ -1,7 +1,7 @@
 package id.walt.mdoc.mso
 
 import id.walt.mdoc.dataelement.TDateElement
-import id.walt.mdoc.dataelement.toDE
+import id.walt.mdoc.dataelement.toDataElement
 import kotlinx.datetime.Instant
 import kotlinx.serialization.Serializable
 
@@ -38,5 +38,5 @@ class ValidityInfo private constructor(
     put("validFrom", validFrom)
     put("validUntil", validUntil)
     expectedUpdate?.let { put("expectedUpdate", it) }
-  }.toDE()
+  }.toDataElement()
 }

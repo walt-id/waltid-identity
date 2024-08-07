@@ -1,13 +1,35 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: verifier-data-volume-claim
+  name: issuer-data-volume-claim
 spec:
   accessModes:
     - ReadWriteMany
   resources:
     requests:
       storage: 100Mi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: wallet-data-volume-claim
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: issuer-web-config
+data:
+  web.conf: |
+    webHost = "0.0.0.0"
+    webPort = 3000
+  issuer-service.conf: |
+    baseUrl = "https://issuer.potential.walt-test.cloud"
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -28,6 +50,85 @@ data:
     x509SanDnsClientId = "verifier.potential.walt-test.cloud"
   entra.conf: |
     callbackUrl = "https://verifier.potential.walt-test.cloud/entra/verification-callback/"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wallet-config
+data:
+  db.conf: |
+    dataSource {
+        jdbcUrl = "jdbc:sqlite:/waltid-wallet-api/data/data.db"
+        driverClassName = "org.sqlite.JDBC"
+        username = ""
+        password = ""
+        transactionIsolation = "TRANSACTION_SERIALIZABLE"
+        maximumPoolSize = 5
+        autoCommit = false
+        dataSource {
+            journalMode = "WAL"
+            fullColumnNames = false
+        }
+    }
+  web.conf: |
+    webHost = "0.0.0.0"
+    webPort = 4545
+  oidc.conf: |
+    publicBaseUrl = "https://wallet.potential.walt-test.cloud"
+    providerName = keycloak
+    oidcRealm = "https://keycloak.walt-test.cloud/realms/waltid-keycloak-ktor"
+    oidcJwks = "${oidcRealm}/protocol/openid-connect/certs"
+    authorizeUrl = "${oidcRealm}/protocol/openid-connect/auth"
+    accessTokenUrl = "${oidcRealm}/protocol/openid-connect/token"
+    logoutUrl = "${oidcRealm}/protocol/openid-connect/logout"
+    clientId = "waltid_backend"
+    clientSecret = "__DEFAULT_KEYCLOAK_CLIENT_SECRET__"
+    keycloakUserApi = "https://keycloak.walt-test.cloud/admin/realms/waltid-keycloak-ktor/users"
+    jwksCache = {
+        cacheSize = 10
+        cacheExpirationHours = 24
+        rateLimit: {
+            bucketSize: 10
+            refillRateMinutes: 1
+        }
+    }
+---
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: issuer
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: issuer
+  template:
+    metadata:
+      labels:
+        app: issuer
+      annotations:
+        deployment/id: "_DEFAULT_DEPLOYMENT_"
+    spec:
+      containers:
+        - name: issuer
+          image: waltid/issuer-api:potential
+          imagePullPolicy: Always
+          volumeMounts:
+            - name: issuer-web-config
+              mountPath: "/waltid-issuer-api/config/"
+              readOnly: true
+            - name: issuer-data
+              mountPath: "/waltid-issuer-api/data/"
+          ports:
+            - containerPort: 3000
+              name: http-api
+      volumes:
+        - name: issuer-data
+          persistentVolumeClaim:
+            claimName: issuer-data-volume-claim
+        - name: issuer-web-config
+          configMap:
+            name: issuer-web-config
 ---
 kind: Deployment
 apiVersion: apps/v1
@@ -53,23 +154,87 @@ spec:
             - name: verifier-web-config
               mountPath: "/waltid-verifier-api/config/"
               readOnly: true
-            - name: verifier-data
-              mountPath: "/waltid-verifier-api/data/"
             - name: verifier-request-signing
               mountPath: "/waltid-verifier-api/request-signing-secret/"
           ports:
             - containerPort: 3000
               name: http-api
       volumes:
-        - name: verifier-data
-          persistentVolumeClaim:
-            claimName: verifier-data-volume-claim
         - name: verifier-web-config
           configMap:
             name: verifier-web-config
         - name: verifier-request-signing
           secret:
             secretName: verifier-request-signing
+---
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: wallet-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: wallet-api
+  template:
+    metadata:
+      labels:
+        app: wallet-api
+      annotations:
+        deployment/id: "_DEFAULT_DEPLOYMENT_"
+    spec:
+      containers:
+        - name: wallet-api
+          image: waltid/wallet-api:potential
+          env:
+            - name: KLOGGING_MIN_LOG_LEVEL
+              value: "DEBUG"
+          imagePullPolicy: Always
+          volumeMounts:
+            - name: wallet-config
+              mountPath: /waltid-wallet-api/config/db.conf
+              readOnly: true
+              subPath: db.conf
+            - name: wallet-config
+              mountPath: /waltid-wallet-api/config/web.conf
+              readOnly: true
+              subPath: web.conf
+            - name: wallet-config
+              mountPath: /waltid-wallet-api/config/oidc.conf
+              readOnly: true
+              subPath: oidc.conf
+            - name: wallet-auth-secret
+              mountPath: /waltid-wallet-api/config/auth.conf
+              readOnly: true
+              subPath: auth.conf
+            - mountPath: "/waltid-wallet-api/data/"
+              name: wallet-data
+          ports:
+            - containerPort: 4545
+              name: http-api
+      volumes:
+        - name: wallet-config
+          configMap:
+            name: wallet-config
+        - name: wallet-auth-secret
+          secret:
+            secretName: wallet-auth-secret
+        - name: wallet-data
+          persistentVolumeClaim:
+            claimName: wallet-data-volume-claim
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: issuer
+spec:
+  ports:
+    - name: http
+      port: 80
+      targetPort: http-api
+      protocol: TCP
+  selector:
+    app: issuer
 ---
 kind: Service
 apiVersion: v1
@@ -83,6 +248,43 @@ spec:
       protocol: TCP
   selector:
     app: verifier
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: wallet-api
+spec:
+  ports:
+    - name: http
+      port: 80
+      targetPort: http-api
+      protocol: TCP
+  selector:
+    app: wallet-api
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: issuer
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  tls:
+    - hosts:
+        - issuer.potential.walt-test.cloud
+      secretName: issuer-tls-secret
+  rules:
+    - host: issuer.potential.walt-test.cloud
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: issuer
+                port:
+                  name: http
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -105,5 +307,117 @@ spec:
             backend:
               service:
                 name: verifier
+                port:
+                  name: http
+---
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: waltid-web-wallet
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: waltid-web-wallet
+  template:
+    metadata:
+      labels:
+        app: waltid-web-wallet
+      annotations:
+        deployment/id: "_DEFAULT_DEPLOYMENT_"
+    spec:
+      containers:
+        - name: waltid-web-wallet
+          image: waltid/waltid-web-wallet:potential
+          imagePullPolicy: Always
+          env:
+            - name: NUXT_PUBLIC_ISSUER_CALLBACK_URL
+              value: "https://wallet.potential.walt-test.cloud"
+            - name: NUXT_PUBLIC_DEMO_WALLET_URL
+              value: "https://wallet.potential.walt-test.cloud"
+          ports:
+            - containerPort: 7101
+              name: http-api
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: waltid-web-wallet
+spec:
+  ports:
+    - name: http
+      port: 80
+      targetPort: http-api
+      protocol: TCP
+  selector:
+    app: waltid-web-wallet
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: wallet-ingress
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    ingress.kubernetes.io/configuration-snippet: |
+      if ($host ~ ^(.+)\.waltid\.org$) {
+        return 301 https://$1.walt-test.cloud$request_uri;
+      }
+spec:
+  tls:
+    - hosts:
+        - wallet.potential.walt-test.cloud
+      secretName: wallet-tls-secret
+  rules:
+    - host: wallet.potential.walt-test.cloud
+      http:
+        paths:
+          - path: /wallet-api/
+            pathType: Prefix
+            backend:
+              service:
+                name: wallet-api
+                port:
+                  name: http
+          - path: /swagger
+            pathType: Prefix
+            backend:
+              service:
+                name: wallet-api
+                port:
+                  name: http
+          - path: /api.json
+            pathType: Prefix
+            backend:
+              service:
+                name: wallet-api
+                port:
+                  name: http
+          - path: /livez
+            pathType: Prefix
+            backend:
+              service:
+                name: wallet-api
+                port:
+                  name: http
+          - path: /features/
+            pathType: Prefix
+            backend:
+              service:
+                name: wallet-api
+                port:
+                  name: http
+          - path: /debug/
+            pathType: Prefix
+            backend:
+              service:
+                name: wallet-api
+                port:
+                  name: http
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: waltid-web-wallet
                 port:
                   name: http

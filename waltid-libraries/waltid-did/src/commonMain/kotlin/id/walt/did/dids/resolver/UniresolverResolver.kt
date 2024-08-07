@@ -60,7 +60,7 @@ class UniresolverResolver(var resolverUrl: String = DEFAULT_RESOLVER_URL) : DidR
         }.map { response ->
             runCatching { response.body<JsonObject>() }.getOrElse {
                 throw RuntimeException(
-                    "HTTP response (status ${response.status}) is not JSON, body: ${response.bodyAsText()}",
+                    "HTTP response (status ${response.status}) for resolving did $did is not JSON, body: ${response.bodyAsText()}",
                     it
                 )
             }

@@ -3,6 +3,9 @@ kind: ConfigMap
 metadata:
   name: wallet-config
 data:
+  _features.conf: |
+    enabledFeatures = [
+    ]
   db.conf: |
     dataSource {
         jdbcUrl = "jdbc:sqlite:/waltid-wallet-api/data/data.db"

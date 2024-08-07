@@ -1,6 +1,5 @@
 import E2ETestWebService.test
 import id.walt.crypto.keys.KeyGenerationRequest
-import id.walt.crypto.keys.KeyType
 import id.walt.webwallet.service.keys.SingleKeyResponse
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -13,12 +12,14 @@ import kotlin.test.assertNotNull
 
 class KeysApi(private val client: HttpClient) {
 
-    suspend fun list(wallet: UUID, expected: KeyGenerationRequest) =
+    suspend fun list(wallet: UUID, expected: KeyGenerationRequest?) =
         test("/wallet-api/wallet/{wallet}/keys - get keys") {
             client.get("/wallet-api/wallet/$wallet/keys").expectSuccess().apply {
                 val listing = body<List<SingleKeyResponse>>()
-                assert(listing.isNotEmpty()) { "No default key was created!" }
-                assert(KeyType.valueOf(listing[0].algorithm) == expected.keyType) { "Default key type not ${expected.keyType}" }
+                when (expected) {
+                    null -> assertNoDefaultKey(listing)
+                    else -> assertDefaultKey(listing, expected)
+                }
             }
         }
 

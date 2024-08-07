@@ -71,9 +71,7 @@ sealed class Ed25519 {
             return when {
                 verifyResult.isSuccess -> Result.success(
                     Json.parseToJsonElement(
-                        Base64.UrlSafe.decode(
-                            payload
-                        ).decodeToString()
+                        payload.decodeFromBase64Url().decodeToString()
                     ).jsonObject
                 )
 
@@ -251,7 +249,7 @@ internal class Ed25519PublicKeyJwk(private val jwk: String) : Ed25519.PublicKey(
     @OptIn(ExperimentalEncodingApi::class)
 
     private val externalRepresentation: ByteArray by lazy {
-        Base64.UrlSafe.decode(_jwk.x)
+        _jwk.x.decodeFromBase64Url()
     }
 
     @Serializable

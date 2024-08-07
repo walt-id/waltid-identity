@@ -7,7 +7,7 @@ import id.walt.oid4vc.requests.CredentialOfferRequest
 import kotlin.test.Test
 import kotlin.time.Duration.Companion.minutes
 
-class OidcTest {
+class OidcIssuanceTest {
 
     @Test
     fun testInitCredentialOffer() {

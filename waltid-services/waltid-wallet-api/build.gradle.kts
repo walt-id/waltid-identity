@@ -117,6 +117,7 @@ dependencies {
     // OIDC
     implementation(project(":waltid-libraries:protocols:waltid-openid4vc"))
     implementation(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
+    implementation(project(":waltid-libraries:credentials:waltid-mdoc-credentials"))
 
     implementation(project(":waltid-libraries:crypto:waltid-crypto"))
     implementation(project(":waltid-libraries:crypto:waltid-crypto-oci"))
@@ -126,6 +127,7 @@ dependencies {
     testImplementation(project(":waltid-services:waltid-verifier-api"))
 
     implementation("com.nimbusds:nimbus-jose-jwt:9.40")
+    implementation("com.augustcellars.cose:cose-java:1.1.0")
 
     implementation("io.ktor:ktor-client-java:$ktor_version")
 
@@ -174,4 +176,5 @@ dependencies {
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
     testImplementation("io.ktor:ktor-server-tests-jvm:$ktor_version")
     testImplementation("io.mockk:mockk:1.13.12")
+    testImplementation("io.klogging:klogging-jvm:0.6.1")
 }

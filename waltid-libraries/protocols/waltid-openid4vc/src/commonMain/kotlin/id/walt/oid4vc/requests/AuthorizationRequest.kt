@@ -7,6 +7,7 @@ import id.walt.sdjwt.JWTCryptoProvider
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import kotlinx.datetime.Clock
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
@@ -21,6 +22,7 @@ interface IAuthorizationRequest {
     val nonce: String?
 }
 
+@Serializable
 data class AuthorizationRequest(
     override val responseType: Set<ResponseType> = setOf(ResponseType.Code),
     override val clientId: String,
@@ -59,7 +61,7 @@ data class AuthorizationRequest(
             authorizationDetails?.let {
                 put(
                     "authorization_details",
-                    listOf(Json.encodeToString(AuthorizationDetailsListSerializer, authorizationDetails))
+                    listOf(json.encodeToString(AuthorizationDetailsListSerializer, authorizationDetails))
                 )
             }
             walletIssuer?.let { put("wallet_issuer", listOf(it)) }
@@ -251,7 +253,7 @@ data class AuthorizationRequest(
                 parameters["scope"]?.flatMap { it.split(" ") }?.toSet() ?: setOf(),
                 parameters["state"]?.firstOrNull(),
                 parameters["authorization_details"]?.flatMap {
-                    Json.decodeFromString(
+                    json.decodeFromString(
                         AuthorizationDetailsListSerializer,
                         it
                     )
@@ -271,7 +273,7 @@ data class AuthorizationRequest(
                 parameters["response_uri"]?.firstOrNull(),
                 parameters["code_challenge"]?.firstOrNull(),
                 parameters["code_challenge_method"]?.firstOrNull(),
-                parameters["claims"]?.firstOrNull()?.let { Json.decodeFromString(it) },
+                parameters["claims"]?.firstOrNull()?.let { json.decodeFromString(it) },
                 parameters["id_token_hint"]?.firstOrNull(),
                 parameters.filterKeys { !knownKeys.contains(it) }
             )

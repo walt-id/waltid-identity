@@ -1,5 +1,11 @@
 package id.walt.oid4vc.providers
 
+import cbor.Cbor
+import id.walt.crypto.utils.Base64Utils.base64UrlDecode
+import id.walt.mdoc.cose.COSESign1
+import id.walt.mdoc.dataelement.ByteStringElement
+import id.walt.mdoc.dataelement.MapKey
+import id.walt.mdoc.dataelement.StringElement
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.definitions.CROSS_DEVICE_CREDENTIAL_OFFER_URL
 import id.walt.oid4vc.definitions.JWTClaims
@@ -13,10 +19,14 @@ import id.walt.oid4vc.util.randomUUID
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.http.*
 import kotlinx.datetime.Clock
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.decodeFromByteArray
+import kotlinx.serialization.decodeFromHexString
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
+
 /**
  * Base object for a service, providing issuance of verifiable credentials via the OpenID4CI issuance protocol
  * e.g.: Credential issuer
@@ -34,7 +44,7 @@ abstract class OpenIDCredentialIssuer(
         )
     private var _supportedCredentialFormats: Set<CredentialFormat>? = null
     val supportedCredentialFormats
-        get() = _supportedCredentialFormats ?: (metadata.credentialsSupported?.map { it.format }?.toSet()
+        get() = _supportedCredentialFormats ?: (metadata.credentialConfigurationsSupported?.values?.map { it.format }?.toSet()
             ?: setOf()).also {
             _supportedCredentialFormats = it
         }
@@ -72,7 +82,7 @@ abstract class OpenIDCredentialIssuer(
     override fun initializeAuthorization(
         authorizationRequest: AuthorizationRequest,
         expiresIn: Duration,
-        idTokenRequestState: String?,
+        authServerState: String?, //the state used for additional authentication with pwd, id_token or vp_token.
     ): IssuanceSession {
         return if (authorizationRequest.issuerState.isNullOrEmpty()) {
             if (!validateAuthorizationRequest(authorizationRequest)) {
@@ -83,7 +93,7 @@ abstract class OpenIDCredentialIssuer(
             }
             IssuanceSession(
                 randomUUID(), authorizationRequest,
-                Clock.System.now().plus(expiresIn), idTokenRequestState = idTokenRequestState
+                Clock.System.now().plus(expiresIn), authServerState = authServerState
             )
         } else {
             getVerifiedSession(authorizationRequest.issuerState)?.copy(authorizationRequest = authorizationRequest)
@@ -96,7 +106,7 @@ abstract class OpenIDCredentialIssuer(
                 id = it.id,
                 authorizationRequest = authorizationRequest,
                 expirationTimestamp = Clock.System.now().plus(5.minutes),
-                idTokenRequestState = idTokenRequestState,
+                authServerState = authServerState,
                 txCode = it.txCode,
                 txCodeValue = it.txCodeValue,
                 credentialOffer = it.credentialOffer,
@@ -309,7 +319,7 @@ abstract class OpenIDCredentialIssuer(
         session: IssuanceSession
     ): CredentialResponse {
         return credentialResult.credential?.let {
-            CredentialResponse.success(credentialResult.format, it)
+            CredentialResponse.success(credentialResult.format, it, customParameters = credentialResult.customParameters)
         } ?: generateProofOfPossessionNonceFor(session).let { updatedSession ->
             CredentialResponse.deferred(
                 credentialResult.format,
@@ -320,15 +330,31 @@ abstract class OpenIDCredentialIssuer(
         }
     }
 
+    protected fun getNonceFromProof(proofOfPossession: ProofOfPossession) = when(proofOfPossession.proofType) {
+        ProofType.jwt -> parseTokenPayload(proofOfPossession.jwt!!)[JWTClaims.Payload.nonce]?.jsonPrimitive?.content
+        ProofType.cwt -> Cbor.decodeFromByteArray<COSESign1>(proofOfPossession.cwt!!.base64UrlDecode()).decodePayload()?.let { payload ->
+            payload.value[MapKey(ProofOfPossession.CWTProofBuilder.LABEL_NONCE)].let { when(it) {
+                is ByteStringElement -> io.ktor.utils.io.core.String(it.value)
+                is StringElement -> it.value
+                else -> throw Error("Invalid nonce type")
+            } }
+        }
+        else -> null
+    }
+
     private fun validateProofOfPossession(credentialRequest: CredentialRequest, nonce: String): Boolean {
         log.debug { "VALIDATING: ${credentialRequest.proof} with nonce $nonce" }
-        if (credentialRequest.proof?.proofType != ProofType.jwt || credentialRequest.proof.jwt == null)
-            return false
         log.debug { "VERIFYING ITS SIGNATURE" }
-        return verifyTokenSignature(TokenTarget.PROOF_OF_POSSESSION, credentialRequest.proof.jwt) &&
-                credentialRequest.proof.jwt.let {
-                    parseTokenPayload(it)
-                }[JWTClaims.Payload.nonce]?.jsonPrimitive?.content == nonce
+        if(credentialRequest.proof == null) return false
+        return when {
+            credentialRequest.proof.isJwtProofType -> verifyTokenSignature(
+                TokenTarget.PROOF_OF_POSSESSION, credentialRequest.proof.jwt!!
+            ) && getNonceFromProof(credentialRequest.proof) == nonce
+            credentialRequest.proof.isCwtProofType -> verifyCOSESign1Signature(
+                TokenTarget.PROOF_OF_POSSESSION, credentialRequest.proof.cwt!!
+            ) && getNonceFromProof(credentialRequest.proof) == nonce
+            else -> false
+        }
     }
 
     fun getCIProviderMetadataUrl(): String {

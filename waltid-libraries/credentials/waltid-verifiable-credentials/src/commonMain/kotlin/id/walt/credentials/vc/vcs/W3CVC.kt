@@ -15,10 +15,7 @@ import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.*
 import love.forte.plugin.suspendtrans.annotation.JsPromise
 import love.forte.plugin.suspendtrans.annotation.JvmAsync
 import love.forte.plugin.suspendtrans.annotation.JvmBlocking
@@ -41,7 +38,10 @@ data class W3CVC(
 ) : Map<String, JsonElement> by content {
 
 
-    fun toJsonObject(): JsonObject = JsonObject(content)
+    fun getType() = (get("type") ?: error("No `type` in W3C VC!")).jsonArray.map { it.jsonPrimitive.content }
+
+    fun toJsonObject(additionalProperties: Map<String, JsonElement> = emptyMap()): JsonObject
+        = JsonObject(content.plus(additionalProperties))
     fun toJson(): String = Json.encodeToString(content)
     fun toPrettyJson(): String = prettyJson.encodeToString(content)
 
@@ -55,21 +55,21 @@ data class W3CVC(
         subjectDid: String,
         disclosureMap: SDMap,
         /** Set additional options in the JWT header */
-        additionalJwtHeader: Map<String, String> = emptyMap(),
+        additionalJwtHeaders: Map<String, JsonElement> = emptyMap(),
         /** Set additional options in the JWT payload */
         additionalJwtOptions: Map<String, JsonElement> = emptyMap()
     ): String {
-        val vc = this.toJsonObject()
+        val vc = this.toJsonObject(additionalJwtOptions)
 
         val sdPayload = SDPayload.createSDPayload(vc, disclosureMap)
         val signable = Json.encodeToString(sdPayload.undisclosedPayload).toByteArray()
 
         val signed = issuerKey.signJws(
             signable, mapOf(
-                "typ" to "vc+sd-jwt",
-                "cty" to "credential-claims-set+json",
-                "kid" to issuerDid
-            )
+                "typ" to "vc+sd-jwt".toJsonElement(),
+                "cty" to "credential-claims-set+json".toJsonElement(),
+                "kid" to issuerDid.toJsonElement()
+            ).plus(additionalJwtHeaders)
         )
 
         return SDJwt.createFromSignedJwt(signed, sdPayload).toString()
@@ -84,7 +84,7 @@ data class W3CVC(
         issuerKid: String? = null,
         subjectDid: String,
         /** Set additional options in the JWT header */
-        additionalJwtHeader: Map<String, String> = emptyMap(),
+        additionalJwtHeader: Map<String, JsonElement> = emptyMap(),
         /** Set additional options in the JWT payload */
         additionalJwtOptions: Map<String, JsonElement> = emptyMap()
     ): String {
@@ -94,7 +94,7 @@ data class W3CVC(
             data = this.toJsonObject(),
             key = issuerKey,
             jwtHeaders = mapOf(
-                JwsHeader.KEY_ID to kid,
+                JwsHeader.KEY_ID to kid.toJsonElement(),
                 *(additionalJwtHeader.entries.map { it.toPair() }.toTypedArray())
             ),
             jwtOptions = mapOf(

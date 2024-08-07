@@ -3,7 +3,7 @@ package id.walt.mdoc.docrequest
 import id.walt.mdoc.dataelement.MapElement
 import id.walt.mdoc.dataelement.MapKey
 import id.walt.mdoc.dataelement.StringElement
-import id.walt.mdoc.dataelement.toDE
+import id.walt.mdoc.dataelement.toDataElement
 import kotlinx.serialization.Serializable
 
 /**
@@ -23,7 +23,7 @@ data class ItemsRequest internal constructor (
   fun toMapElement() = buildMap {
     put(MapKey("docType"), docType)
     put(MapKey("nameSpaces"), nameSpaces)
-  }.toDE()
+  }.toDataElement()
 
 }
 
