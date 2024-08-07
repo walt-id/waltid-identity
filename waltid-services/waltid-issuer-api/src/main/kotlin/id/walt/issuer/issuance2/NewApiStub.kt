@@ -7,7 +7,7 @@ import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.routing.*
 
-object NewApiTest {
+object NewApiStub {
 
     fun Application.newApi() {
         routing {
