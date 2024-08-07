@@ -27,6 +27,8 @@ val modules = listOf(
     * "$libraries:credentials".group(
         "waltid-verifiable-credentials",
         "waltid-mdoc-credentials",
+        "waltid-dif-presentation-exchange",
+        "waltid-credentials-base"
     ),
 
     * "$libraries:auth".group(
@@ -50,6 +52,7 @@ val modules = listOf(
     */
 
     "$libraries:waltid-did",
+    "$libraries:waltid-java-compat",
 
     // Service commons
     "$services:waltid-service-commons",

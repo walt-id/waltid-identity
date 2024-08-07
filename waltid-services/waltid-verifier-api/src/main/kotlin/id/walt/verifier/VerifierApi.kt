@@ -1,29 +1,16 @@
 package id.walt.verifier
 
-import COSE.OneKey
-import cbor.Cbor
 import com.nimbusds.jose.JWSAlgorithm
-import com.nimbusds.jose.jwk.Curve
-import com.nimbusds.jose.jwk.JWK
-import com.nimbusds.jose.jwk.gen.ECKeyGenerator
 import id.walt.commons.config.ConfigManager
 import id.walt.credentials.verification.PolicyManager
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.crypto.utils.JsonUtils.toJsonObject
-import id.walt.mdoc.SimpleCOSECryptoProvider
-import id.walt.mdoc.dataelement.DataElement
-import id.walt.mdoc.dataelement.FullDateElement
-import id.walt.mdoc.dataelement.toDE
-import id.walt.mdoc.doc.MDocBuilder
-import id.walt.mdoc.mso.DeviceKeyInfo
-import id.walt.mdoc.mso.ValidityInfo
 import id.walt.oid4vc.data.OpenId4VPProfile
 import id.walt.oid4vc.data.ResponseMode
 import id.walt.oid4vc.data.ResponseType
 import id.walt.oid4vc.data.dif.*
 import id.walt.sdjwt.SimpleJWTCryptoProvider
 import id.walt.verifier.config.OIDCVerifierServiceConfig
-import id.walt.verifier.oidc.LspPotentialInteropEvent
 import id.walt.verifier.oidc.PresentationSessionInfo
 import id.walt.verifier.oidc.RequestSigningCryptoProvider
 import id.walt.verifier.oidc.VerificationUseCase
@@ -43,10 +30,6 @@ import io.ktor.server.routing.*
 import io.ktor.server.util.*
 import io.ktor.util.*
 import kotlinx.coroutines.runBlocking
-import kotlinx.datetime.Clock
-import kotlinx.datetime.DateTimeUnit
-import kotlinx.datetime.LocalDate
-import kotlinx.datetime.plus
 import kotlinx.serialization.*
 import kotlinx.serialization.json.*
 import kotlinx.uuid.UUID
@@ -57,7 +40,6 @@ private val SERVER_URL by lazy {
         ConfigManager.getConfig<OIDCVerifierServiceConfig>().baseUrl
     }
 }
-
 
 @Serializable
 data class DescriptorMappingFormParam(val id: String, val format: VCFormat, val path: String)
@@ -74,10 +56,6 @@ data class TokenResponseFormParam(
     val response: String?,
 )
 
-data class LSPPotentialIssueFormDataParam(
-    val jwk: JsonObject,
-)
-
 @Serializable
 data class CredentialVerificationRequest(
     @SerialName("vp_policies")
@@ -91,6 +69,8 @@ data class CredentialVerificationRequest(
 )
 
 const val defaultAuthorizeBaseUrl = "openid4vp://authorize"
+
+private val logger = logger("Verifier API")
 
 private val prettyJson = Json { prettyPrint = true }
 private val httpClient = HttpClient {
@@ -129,7 +109,6 @@ private const val fixedPresentationDefinitionForEbsiConformanceTest =
     "{\"id\":\"any\",\"format\":{\"jwt_vp\":{\"alg\":[\"ES256\"]}},\"input_descriptors\":[{\"id\":\"any\",\"format\":{\"jwt_vc\":{\"alg\":[\"ES256\"]}},\"constraints\":{\"fields\":[{\"path\":[\"$.vc.type\"],\"filter\":{\"type\":\"array\",\"contains\":{\"const\":\"VerifiableAttestation\"}}}]}},{\"id\":\"any\",\"format\":{\"jwt_vc\":{\"alg\":[\"ES256\"]}},\"constraints\":{\"fields\":[{\"path\":[\"$.vc.type\"],\"filter\":{\"type\":\"array\",\"contains\":{\"const\":\"VerifiableAttestation\"}}}]}},{\"id\":\"any\",\"format\":{\"jwt_vc\":{\"alg\":[\"ES256\"]}},\"constraints\":{\"fields\":[{\"path\":[\"$.vc.type\"],\"filter\":{\"type\":\"array\",\"contains\":{\"const\":\"VerifiableAttestation\"}}}]}}]}"
 
 private val verificationUseCase = VerificationUseCase(httpClient, SimpleJWTCryptoProvider(JWSAlgorithm.EdDSA, null, null))
-private val logger = logger("Verifier")
 
 @OptIn(ExperimentalSerializationApi::class)
 fun Application.verfierApi() {
@@ -202,6 +181,8 @@ fun Application.verfierApi() {
                         )
                         example("Example with presentation definition policy", VerifierApiExamples.presentationDefinitionPolicy)
                         example("Example with EBSI PDA1 Presentation Definition", VerifierApiExamples.EbsiVerifiablePDA1)
+                        example("LSP Potential MDoc verification example", VerifierApiExamples.lspPotentialMdocExample)
+                        example("LSP Potential SD-JWT verification example", VerifierApiExamples.lspPotentialSDJwtVCExample)
                     }
                 }
             }) {
@@ -228,7 +209,8 @@ fun Application.verfierApi() {
                     statusCallbackUri = statusCallbackUri,
                     statusCallbackApiKey = statusCallbackApiKey,
                     stateId = stateId,
-                    openId4VPProfile = openId4VPProfile
+                    openId4VPProfile = openId4VPProfile,
+                    trustedRootCAs = body["trusted_root_cas"]?.jsonArray
                 )
 
                 context.respond(
@@ -274,7 +256,9 @@ fun Application.verfierApi() {
                     }
                 }
             }) {
+                logger.info { "POST verify/state" }
                 val sessionId = call.parameters["state"]
+                logger.info { "State: $sessionId" }
                 verificationUseCase.verify(sessionId, context.request.call.receiveParameters().toMap())
                     .onSuccess {
                         val session = verificationUseCase.getSession(sessionId!!)
@@ -286,8 +270,9 @@ fun Application.verfierApi() {
                             call.respond(HttpStatusCode.OK, it)
                         }
                     }.onFailure {
+                        logger.debug(it) { "Verification failed ($it)" }
                         var errorDescription = it.localizedMessage
-
+                        logger.error { "Error: $errorDescription" }
                         if (sessionId != null) {
                             val session = verificationUseCase.getSession(sessionId)
                             if (session.walletInitiatedAuthState != null) {
@@ -335,7 +320,7 @@ fun Application.verfierApi() {
                 verificationUseCase.getResult(id).onSuccess {
                     call.respond(HttpStatusCode.OK, it)
                 }.onFailure {
-                    it.printStackTrace()
+                    logger.debug(it) { "Verification failed ($it)" }
                     call.respond(HttpStatusCode.BadRequest, it.localizedMessage)
                 }
             }
@@ -381,7 +366,7 @@ fun Application.verfierApi() {
                 verificationUseCase.getSignedAuthorizationRequestObject(id).onSuccess {
                     call.respondText(it, ContentType.parse("application/oauth-authz-req+jwt"), HttpStatusCode.OK)
                 }.onFailure {
-                    it.printStackTrace()
+                    logger.debug(it) { "Cannot view request session ($it)" }
                     call.respond(HttpStatusCode.BadRequest, it.localizedMessage)
                 }
             }
@@ -460,45 +445,6 @@ fun Application.verfierApi() {
                 openId4VPProfile = OpenId4VPProfile.EBSIV3
             )
             context.respondRedirect("openid://?${session.authorizationRequest!!.toEbsiRequestObjectByReferenceHttpQueryString(SERVER_URL.let { "$it/openid4vc/request/${session.id}" })}")
-        }
-// ###### can be removed when LSP-Potential interop event is over ####
-        route("lsp-potential") {
-            post("issueMdl", {
-                tags = listOf("LSP POTENTIAL Interop Event")
-                summary = "Issue MDL for given device key, using internal issuer keys"
-                description = "Give device public key JWK in form body."
-                hidden = true
-                request {
-                    body<LSPPotentialIssueFormDataParam> {
-                        mediaTypes = listOf(ContentType.Application.FormUrlEncoded)
-                        example("jwk") {
-                            value = LSPPotentialIssueFormDataParam(
-                                Json.parseToJsonElement(ECKeyGenerator(Curve.P_256).generate().toPublicJWK().toString()).jsonObject
-                            )
-                        }
-                    }
-                }
-            }) {
-                val deviceJwk = context.request.call.receiveParameters().toMap()["jwk"]
-                val devicePubKey = JWK.parse(deviceJwk!!.first()).toECKey().toPublicKey()
-
-                val mdoc = MDocBuilder("org.iso.18013.5.1.mDL")
-                    .addItemToSign("org.iso.18013.5.1", "family_name", "Doe".toDE())
-                    .addItemToSign("org.iso.18013.5.1", "given_name", "John".toDE())
-                    .addItemToSign("org.iso.18013.5.1", "birth_date", FullDateElement(LocalDate(1990, 1, 15)))
-                    .sign(
-                        ValidityInfo(Clock.System.now(), Clock.System.now(), Clock.System.now().plus(365 * 24, DateTimeUnit.HOUR)),
-                        DeviceKeyInfo(DataElement.fromCBOR(OneKey(devicePubKey, null).AsCBOR().EncodeToBytes())),
-                        SimpleCOSECryptoProvider(
-                            listOf(
-                                LspPotentialInteropEvent.POTENTIAL_ISSUER_CRYPTO_PROVIDER_INFO
-                            )
-                        ), LspPotentialInteropEvent.POTENTIAL_ISSUER_KEY_ID
-                    )
-                println("SIGNED MDOC (mDL):")
-                println(Cbor.encodeToHexString(mdoc))
-                call.respond(mdoc.toCBORHex())
-            }
         }
     }
 }

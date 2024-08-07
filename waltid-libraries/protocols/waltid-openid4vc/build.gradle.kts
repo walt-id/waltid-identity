@@ -101,8 +101,9 @@ kotlin {
                 // walt.id
                 implementation(project(":waltid-libraries:crypto:waltid-crypto"))
                 implementation(project(":waltid-libraries:credentials:waltid-mdoc-credentials"))
-                implementation(project(":waltid-libraries:waltid-did"))
+                implementation(project(":waltid-libraries:credentials:waltid-verifiable-credentials"))
                 implementation(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
+                implementation(project(":waltid-libraries:waltid-did"))
 
                 // -- Multiplatform --
                 // Multiplatform / UUID
@@ -159,6 +160,7 @@ kotlin {
                 implementation("com.augustcellars.cose:cose-java:1.1.0")
                 implementation("com.soywiz.korlibs.krypto:krypto:4.0.10")
 
+                implementation("org.slf4j:slf4j-simple:2.0.13")
             }
         }
         val jsMain by getting {

@@ -7,6 +7,7 @@ import id.walt.credentials.utils.W3CVcUtils.overwrite
 import id.walt.credentials.utils.W3CVcUtils.update
 import id.walt.credentials.vc.vcs.W3CVC
 import id.walt.crypto.keys.Key
+import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.sdjwt.SDMap
 import kotlinx.datetime.Instant
 import kotlinx.serialization.json.JsonElement
@@ -37,7 +38,7 @@ object Issuer {
 
         dataOverwrites: Map<String, JsonElement>,
         dataUpdates: Map<String, Map<String, JsonElement>>,
-        additionalJwtHeader: Map<String, String>,
+        additionalJwtHeaders: Map<String, JsonElement>,
         additionalJwtOptions: Map<String, JsonElement>
     ): String {
         val overwritten = overwrite(dataOverwrites)
@@ -48,7 +49,7 @@ object Issuer {
             issuerKey = key,
             issuerDid = did,
             subjectDid = subject,
-            additionalJwtHeader = additionalJwtHeader,
+            additionalJwtHeader = additionalJwtHeaders,
             additionalJwtOptions = additionalJwtOptions
         )
     }
@@ -65,7 +66,7 @@ object Issuer {
 
         mappings: JsonObject,
 
-        additionalJwtHeader: Map<String, String>,
+        additionalJwtHeader: Map<String, JsonElement>,
         additionalJwtOptions: Map<String, JsonElement>,
 
         completeJwtWithDefaultCredentialData: Boolean = true,
@@ -81,7 +82,7 @@ object Issuer {
             issuerKid = issuerKid,
             subjectDid = subjectDid,
             additionalJwtHeader = additionalJwtHeader.toMutableMap().apply {
-                put("typ", "JWT")
+                put("typ", "JWT".toJsonElement())
             },
             additionalJwtOptions = additionalJwtOptions.toMutableMap().apply {
                 putAll(jwtOptions)
@@ -99,8 +100,8 @@ object Issuer {
         subjectDid: String,
 
         mappings: JsonObject,
-
-        additionalJwtHeader: Map<String, String>,
+        type: String = "JWT",
+        additionalJwtHeaders: Map<String, JsonElement>,
         additionalJwtOptions: Map<String, JsonElement>,
 
         completeJwtWithDefaultCredentialData: Boolean = true,
@@ -116,8 +117,8 @@ object Issuer {
             issuerDid = issuerDid,
             subjectDid = subjectDid,
             disclosureMap = disclosureMap,
-            additionalJwtHeader = additionalJwtHeader.toMutableMap().apply {
-                put("typ", "JWT")
+            additionalJwtHeaders = additionalJwtHeaders.toMutableMap().apply {
+                put("typ", type.toJsonElement())
             },
             additionalJwtOptions = additionalJwtOptions.toMutableMap().apply {
                 putAll(jwtOptions)

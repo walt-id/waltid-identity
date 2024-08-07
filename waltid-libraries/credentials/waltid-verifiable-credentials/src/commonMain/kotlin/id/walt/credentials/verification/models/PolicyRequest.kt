@@ -2,10 +2,12 @@ package id.walt.credentials.verification.models
 
 import id.walt.credentials.verification.PolicyManager
 import id.walt.credentials.verification.VerificationPolicy
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 
+@Serializable
 @OptIn(ExperimentalJsExport::class)
 @JsExport
 data class PolicyRequest(

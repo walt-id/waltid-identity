@@ -18,6 +18,10 @@ object Base64Utils {
     fun ByteArray.encodeToBase64() = base64.encode(this)
     fun String.decodeFromBase64() = base64.decode(this)
 
-    fun ByteArray.encodeToBase64Url() = base64Url.encode(this)
+
+    fun ByteArray.encodeToBase64Url() = Base64.UrlSafe.encode(this).trimEnd('=')
     fun String.decodeFromBase64Url() = base64Url.decode(this)
+
+    fun String.base64UrlDecode() = base64Url.decode(this)
+    fun String.base64Decode() = base64.decode(this)
 }

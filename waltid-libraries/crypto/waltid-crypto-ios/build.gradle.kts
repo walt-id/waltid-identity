@@ -44,7 +44,7 @@ kotlin {
             iosSimulatorArm64Main.dependsOn(this)
             dependencies {
                 api(project(":waltid-libraries:crypto:waltid-crypto"))
-                api(project(":waltid-libraries:waltid-target-ios"))
+                api(project(":waltid-libraries:crypto:waltid-target-ios"))
             }
         }
     }

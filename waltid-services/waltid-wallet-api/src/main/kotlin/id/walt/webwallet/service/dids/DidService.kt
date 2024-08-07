@@ -36,7 +36,7 @@ object DidsService {
         }
         WalletDids.insert {
             it[WalletDids.wallet] = wallet
-            it[WalletDids.did] = did.replace("%3A", ":")
+            it[WalletDids.did] = did.replace("%3A", ":").replace("%3D", "=")
             it[WalletDids.document] = document
             it[WalletDids.keyId] = keyId
             it[WalletDids.alias] = alias ?: "Unnamed from $now"
@@ -45,7 +45,7 @@ object DidsService {
     }.insertedCount
 
     fun delete(wallet: UUID, did: String): Boolean =
-        transaction { WalletDids.deleteWhere { (WalletDids.wallet eq wallet) and (WalletDids.did eq did.replace("%3A", ":")) } } > 0
+        transaction { WalletDids.deleteWhere { (WalletDids.wallet eq wallet) and (WalletDids.did eq did.replace("%3A", ":").replace("%3D", "=")) } } > 0
 
 
     fun makeDidDefault(wallet: UUID, newDefaultDid: String) {

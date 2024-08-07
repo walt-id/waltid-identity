@@ -86,7 +86,7 @@ class MDocBuilder(val docType: String) {
   fun sign(validityInfo: ValidityInfo,
            deviceKeyInfo: DeviceKeyInfo, cryptoProvider: COSECryptoProvider, keyID: String? = null): MDoc {
     val mso = MSO.createFor(nameSpacesMap, deviceKeyInfo, docType, validityInfo)
-    val issuerAuth = cryptoProvider.sign1(mso.toMapElement().toEncodedCBORElement().toCBOR(), keyID)
+    val issuerAuth = cryptoProvider.sign1(mso.toMapElement().toEncodedCBORElement().toCBOR(), null, null, keyID)
     return build(issuerAuth)
   }
 }

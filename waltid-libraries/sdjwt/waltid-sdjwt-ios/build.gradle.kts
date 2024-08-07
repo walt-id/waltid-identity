@@ -22,7 +22,7 @@ kotlin {
             version = "2.4.0"
         }
     }
-    
+
     sourceSets {
 
         all{
@@ -45,7 +45,7 @@ kotlin {
             iosSimulatorArm64Main.dependsOn(this)
             dependencies {
                 api(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
-                implementation(project(":waltid-libraries:waltid-crypto-ios"))
+                implementation(project(":waltid-libraries:crypto:waltid-crypto-ios"))
             }
         }
 

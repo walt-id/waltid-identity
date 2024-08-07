@@ -21,6 +21,8 @@ dependencies {
     api("io.ktor:ktor-server-status-pages-jvm:${Versions.KTOR_VERSION}")
     api("io.ktor:ktor-server-content-negotiation-jvm:${Versions.KTOR_VERSION}")
     api("io.ktor:ktor-serialization-kotlinx-json-jvm:${Versions.KTOR_VERSION}")
+    implementation("io.ktor:ktor-server-auth-jvm:${Versions.KTOR_VERSION}")
+    implementation("io.ktor:ktor-client-okhttp-jvm:${Versions.KTOR_VERSION}")
 
     // Logging
     api("io.klogging:klogging-jvm:0.7.0") // JVM + ~JS
@@ -47,6 +49,11 @@ dependencies {
     implementation("io.github.smiley4:schema-kenerator-serialization:1.0.1")
     implementation("io.github.smiley4:schema-kenerator-reflection:1.0.1")
     implementation("io.github.smiley4:schema-kenerator-swagger:1.0.1")
+
+    // Persistence
+    api("io.github.reactivecircus.cache4k:cache4k:0.13.0")
+    api("app.softwork:kotlinx-uuid-core:0.0.26")
+    api("redis.clients:jedis:5.2.0-beta4")
 
     // Testing
     testImplementation(kotlin("test"))

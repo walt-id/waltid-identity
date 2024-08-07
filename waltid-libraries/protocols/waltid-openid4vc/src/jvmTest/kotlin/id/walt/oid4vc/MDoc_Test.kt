@@ -15,6 +15,7 @@ import id.walt.mdoc.SimpleCOSECryptoProvider
 import id.walt.mdoc.dataelement.*
 import id.walt.mdoc.dataretrieval.DeviceResponse
 import id.walt.mdoc.doc.MDocBuilder
+import id.walt.mdoc.doc.MDocTypes
 import id.walt.mdoc.doc.MDocVerificationParams
 import id.walt.mdoc.doc.VerificationType
 import id.walt.mdoc.docrequest.MDocRequestBuilder
@@ -97,27 +98,27 @@ class MDoc_Test: AnnotationSpec() {
   fun writeKeyPairAndCert(name: String, keyPair: KeyPair, cert: X509Certificate) {
     FileWriter("$name-priv.pem").also {
       it.write(
-        "-----BEGIN PRIVATE KEY-----\n" +
+        "-----BEGIN PRIVATE KEY-----${System.lineSeparator()}" +
             java.util.Base64.getEncoder().encodeToString(keyPair.private.encoded) +
-            "\n-----END PRIVATE KEY-----\n"
+                "${System.lineSeparator()}-----END PRIVATE KEY-----${System.lineSeparator()}"
       )
       it.flush()
       it.close()
     }
     FileWriter("$name-pub.pem").also {
       it.write(
-      "-----BEGIN PUBLIC KEY-----\n" +
+        "-----BEGIN PUBLIC KEY-----${System.lineSeparator()}" +
           java.util.Base64.getEncoder().encodeToString(keyPair.public.encoded) +
-          "\n-----END PUBLIC KEY-----\n"
+                "${System.lineSeparator()}-----END PUBLIC KEY-----${System.lineSeparator()}"
       )
       it.flush()
       it.close()
     }
     FileWriter("$name-cert.pem").also {
       it.write(
-        "-----BEGIN CERTIFICATE-----\n" +
+        "-----BEGIN CERTIFICATE-----${System.lineSeparator()}" +
             java.util.Base64.getEncoder().encodeToString(cert.encoded) +
-            "\n-----END CERTIFICATE-----\n"
+                "${System.lineSeparator()}-----END CERTIFICATE-----${System.lineSeparator()}"
       )
       it.flush()
       it.close()
@@ -196,9 +197,9 @@ class MDoc_Test: AnnotationSpec() {
     // 1) Create self-issued mDL credential (Issuer)
     // build mdoc of type mDL and sign using issuer key with holder binding to device key
     val lspPotentialCryptoProvider = SimpleCOSECryptoProvider(listOf(issuerProviderKeyInfo))
-    val mdoc = MDocBuilder("org.iso.18013.5.1.mDL")
-      .addItemToSign("org.iso.18013.5.1", "family_name", "Doe".toDE())
-      .addItemToSign("org.iso.18013.5.1", "given_name", "John".toDE())
+    val mdoc = MDocBuilder(MDocTypes.ISO_MDL)
+      .addItemToSign("org.iso.18013.5.1", "family_name", "Doe".toDataElement())
+      .addItemToSign("org.iso.18013.5.1", "given_name", "John".toDataElement())
       .addItemToSign("org.iso.18013.5.1", "birth_date", FullDateElement(LocalDate(1990, 1, 15)))
       .sign(
         ValidityInfo(Clock.System.now(), Clock.System.now(), Clock.System.now().plus(365*24, DateTimeUnit.HOUR)),

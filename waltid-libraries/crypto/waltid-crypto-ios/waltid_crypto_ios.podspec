@@ -10,27 +10,27 @@ Pod::Spec.new do |spec|
     spec.libraries                = 'c++'
     spec.ios.deployment_target    = '15.4'
     spec.dependency 'JOSESwift', '2.4.0'
-                
+
     if !Dir.exist?('build/cocoapods/framework/waltid_crypto_ios.framework') || Dir.empty?('build/cocoapods/framework/waltid_crypto_ios.framework')
         raise "
 
         Kotlin framework 'waltid_crypto_ios' doesn't exist yet, so a proper Xcode project can't be generated.
         'pod install' should be executed after running ':generateDummyFramework' Gradle task:
 
-            ./gradlew :waltid-libraries:waltid-crypto-ios:generateDummyFramework
+            ./gradlew :waltid-libraries:crypto:waltid-crypto-ios:generateDummyFramework
 
         Alternatively, proper pod installation is performed during Gradle sync in the IDE (if Podfile location is set)"
     end
-                
+
     spec.xcconfig = {
         'ENABLE_USER_SCRIPT_SANDBOXING' => 'NO',
     }
-                
+
     spec.pod_target_xcconfig = {
-        'KOTLIN_PROJECT_PATH' => ':waltid-libraries:waltid-crypto-ios',
+        'KOTLIN_PROJECT_PATH' => ':waltid-libraries:crypto:waltid-crypto-ios',
         'PRODUCT_MODULE_NAME' => 'waltid_crypto_ios',
     }
-                
+
     spec.script_phases = [
         {
             :name => 'Build waltid_crypto_ios',
@@ -50,5 +50,5 @@ Pod::Spec.new do |spec|
             SCRIPT
         }
     ]
-                
+
 end

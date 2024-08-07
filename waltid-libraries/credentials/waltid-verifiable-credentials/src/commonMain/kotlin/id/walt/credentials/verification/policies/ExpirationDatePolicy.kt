@@ -10,6 +10,7 @@ import id.walt.credentials.verification.DatePolicyUtils.policyUnavailable
 import id.walt.credentials.verification.ExpirationDatePolicyException
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
@@ -21,11 +22,17 @@ import kotlin.js.JsExport
 
 @OptIn(ExperimentalJsExport::class)
 @JsExport
+@Serializable
 class ExpirationDatePolicy : CredentialWrapperValidatorPolicy(
-    "expired", "Verifies that the credentials expiration date (`exp` for JWTs) has not been exceeded."
 ) {
-    private val vcClaims = listOf<Claims>(VcClaims.V2.NotAfter, VcClaims.V1.NotAfter)
-    private val jwtClaims = listOf(JwtClaims.NotAfter)
+
+    override val name = "expired"
+    override val description = "Verifies that the credentials expiration date (`exp` for JWTs) has not been exceeded."
+
+    companion object {
+        private val vcClaims = listOf<Claims>(VcClaims.V2.NotAfter, VcClaims.V1.NotAfter)
+        private val jwtClaims = listOf(JwtClaims.NotAfter)
+    }
 
     @JvmBlocking
     @JvmAsync
@@ -34,6 +41,7 @@ class ExpirationDatePolicy : CredentialWrapperValidatorPolicy(
     override suspend fun verify(data: JsonObject, args: Any?, context: Map<String, Any>): Result<Any> {
         val (key, exp) = getExpirationKeyValuePair(data) ?: return policyUnavailable
         val now = Clock.System.now()
+
         return if (now > exp) {
             buildFailureResult(now, exp, key)
         } else {

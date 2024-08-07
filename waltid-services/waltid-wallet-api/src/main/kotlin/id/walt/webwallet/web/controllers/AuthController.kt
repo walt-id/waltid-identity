@@ -19,7 +19,6 @@ import id.walt.webwallet.config.AuthConfig
 import id.walt.webwallet.db.models.Account
 import id.walt.webwallet.db.models.AccountWalletMappings
 import id.walt.webwallet.db.models.AccountWalletPermissions
-import id.walt.webwallet.service.OidcLoginService
 import id.walt.webwallet.service.WalletServiceManager
 import id.walt.webwallet.service.WalletServiceManager.oidcConfig
 import id.walt.webwallet.service.account.AccountsService
@@ -31,13 +30,9 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import io.github.smiley4.ktorswaggerui.dsl.routing.get
 import io.github.smiley4.ktorswaggerui.dsl.routing.post
 import io.github.smiley4.ktorswaggerui.dsl.routing.route
-import io.ktor.client.*
 import io.ktor.http.*
-import io.ktor.http.auth.*
-import io.ktor.http.parsing.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
-import io.ktor.server.auth.jwt.*
 import io.ktor.server.plugins.*
 import io.ktor.server.plugins.ratelimit.*
 import io.ktor.server.request.*
@@ -56,9 +51,6 @@ import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.time.temporal.ChronoUnit
-import kotlin.collections.set
-import kotlin.time.Duration.Companion.days
-import kotlin.time.Duration.Companion.seconds
 
 private val logger = KotlinLogging.logger {}
 
@@ -85,123 +77,6 @@ object AuthKeys {
     val audTokenClaim: String? = config.audTokenClaim
     val tokenLifetime: Long = config.tokenLifetime.toLongOrNull() ?: 1
 
-}
-
-fun Application.configureSecurity() {
-    install(Sessions) {
-        cookie<LoginTokenSession>("login") {
-            // cookie.encoding = CookieEncoding.BASE64_ENCODING
-
-            // cookie.httpOnly = true
-            cookie.httpOnly = false // FIXME
-            // TODO cookie.secure = true
-            cookie.maxAge = 1.days
-            cookie.extensions["SameSite"] = "Strict"
-            transform(SessionTransportTransformerEncrypt(AuthKeys.encryptionKey, AuthKeys.signKey))
-        }
-        cookie<OidcTokenSession>("oidc-login") {
-            // cookie.encoding = CookieEncoding.BASE64_ENCODING
-
-            // cookie.httpOnly = true
-            cookie.httpOnly = false // FIXME
-            // TODO cookie.secure = true
-            cookie.maxAge = 1.days
-            cookie.extensions["SameSite"] = "Strict"
-            transform(SessionTransportTransformerEncrypt(AuthKeys.encryptionKey, AuthKeys.signKey))
-        }
-    }
-
-    install(Authentication) {
-        oauth("auth-oauth") {
-            client = HttpClient()
-            providerLookup = {
-                OAuthServerSettings.OAuth2ServerSettings(
-                    name = oidcConfig.providerName,
-                    authorizeUrl = oidcConfig.authorizeUrl,
-                    accessTokenUrl = oidcConfig.accessTokenUrl,
-                    clientId = oidcConfig.clientId,
-                    clientSecret = oidcConfig.clientSecret,
-                    accessTokenRequiresBasicAuth = false,
-                    requestMethod = HttpMethod.Post,
-                    defaultScopes = oidcConfig.oidcScopes
-                )
-            }
-            urlProvider = { "${oidcConfig.publicBaseUrl}/wallet-api/auth/oidc-session" }
-        }
-
-        if (FeatureManager.isFeatureEnabled(FeatureCatalog.oidcAuthenticationFeature)) {
-            jwt("auth-oauth-jwt") {
-                realm = OidcLoginService.oidcRealm
-                verifier(OidcLoginService.jwkProvider)
-
-                validate { credential -> JWTPrincipal(credential.payload) }
-                challenge { _, _ ->
-                    call.respond(HttpStatusCode.Unauthorized, "Token is not valid or has expired")
-                }
-            }
-        }
-
-        bearer("auth-bearer") {
-            authenticate { tokenCredential ->
-                val verificationResult = verifyToken(tokenCredential.token)
-                verificationResult.getOrNull()?.let { UserIdPrincipal(it) }
-            }
-        }
-
-        bearer("auth-bearer-alternative") {
-            authHeader { call ->
-                call.request.header("waltid-authorization")?.let {
-                    try {
-                        parseAuthorizationHeader(it)
-                    } catch (cause: ParseException) {
-                        throw BadRequestException("Invalid Authorization header", cause)
-                    }
-                }
-            }
-            authenticate { tokenCredential ->
-                val verificationResult = verifyToken(tokenCredential.token)
-                verificationResult.getOrNull()?.let { UserIdPrincipal(it) }
-            }
-        }
-
-        session<LoginTokenSession>("auth-session") {
-            validate { session ->
-                val verificationResult = verifyToken(session.token)
-                val userId = verificationResult.getOrNull()
-
-                if (userId != null) {
-                    UserIdPrincipal(userId)
-                } else {
-                    sessions.clear("login")
-                    null
-                }
-            }
-
-            challenge {
-                call.respond(
-                    HttpStatusCode.Unauthorized,
-                    JsonObject(mapOf("message" to JsonPrimitive("Login Required")))
-                )
-            }
-        }
-    }
-
-    install(RateLimit) {
-        register(RateLimitName("login")) {
-            rateLimiter(limit = 30, refillPeriod = 60.seconds) // allows 30 requests per minute
-            requestWeight { call, key ->
-                val req = call.getLoginRequest()
-                if (req is EmailAccountRequest || req is KeycloakAccountRequest) 1 else 0
-            }
-            requestKey { call ->
-                when (val req = call.getLoginRequest()) {
-                    is EmailAccountRequest -> req.email
-                    is KeycloakAccountRequest -> req.username ?: Unit
-                    else -> Unit
-                }
-            }
-        }
-    }
 }
 
 fun Application.auth() {
@@ -527,7 +402,8 @@ suspend fun ApplicationCall.getLoginRequest() = runCatching {
             }
         )
     }
-    Json.decodeFromJsonElement<AccountRequest>(jsonObject)
+    val json = Json { ignoreUnknownKeys = true }
+    json.decodeFromJsonElement<AccountRequest>(jsonObject)
 }.getOrElse { throw LoginRequestError(it) }
 
 
@@ -635,7 +511,7 @@ private fun createHS256Token(tokenPayload: String) =
     }.serialize()
 
 private suspend fun createRsaToken(key: JWKKey, tokenPayload: String) =
-    mapOf(JWTClaims.Header.keyID to key.getPublicKey().getKeyId(), JWTClaims.Header.type to "JWT").let {
+    mapOf(JWTClaims.Header.keyID to key.getPublicKey().getKeyId().toJsonElement(), JWTClaims.Header.type to "JWT".toJsonElement()).let {
         key.signJws(tokenPayload.toByteArray(), it)
     }
 

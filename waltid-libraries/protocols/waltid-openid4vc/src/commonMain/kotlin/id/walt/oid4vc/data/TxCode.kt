@@ -6,10 +6,20 @@ import kotlinx.serialization.encoding.Encoder
 
 @Serializable
 data class TxCode(
-  @SerialName("input_mode") val inputMode: TxInputMode? = TxInputMode.numeric,
-  @SerialName("length") val length: Int? = null,
-  @SerialName("description") val description: String? = null,
-)
+    @SerialName("input_mode") val inputMode: TxInputMode? = TxInputMode.numeric,
+    @SerialName("length") val length: Int? = null,
+    @SerialName("description") val description: String? = null,
+) {
+    companion object {
+        private val NUMERICS = '0'..'9'
+
+        fun makeFor(pin: String, description: String): TxCode {
+            val inputMode = if (pin.all { it in NUMERICS }) TxInputMode.numeric else TxInputMode.text
+
+            return TxCode(inputMode, pin.length, description)
+        }
+    }
+}
 
 @Serializable(TxInputModeSerializer::class)
 enum class TxInputMode(val value: String) {
@@ -20,6 +30,10 @@ enum class TxInputMode(val value: String) {
         fun fromValue(value: String): TxInputMode? {
             return entries.find { it.value == value }
         }
+
+        private val NUMERICS = '0'..'9'
+
+        fun forPin(pin: String?) = pin?.let { p -> if (p.all { it in NUMERICS }) numeric else text }
     }
 }
 

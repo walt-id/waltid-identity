@@ -1,4 +1,6 @@
 import RowCredential from '@/components/walt/credential/RowCredential';
+import Dropdown from '@/components/walt/forms/Dropdown';
+import {AuthenticationMethods, VpProfiles} from  '@/types/credentials'
 import Checkbox from '@/components/walt/forms/Checkbox';
 import InputField from '@/components/walt/forms/Input';
 import Button from '@/components/walt/button/Button';
@@ -10,14 +12,19 @@ import { getOfferUrl } from '@/utils/getOfferUrl';
 import { sendToWebWallet } from '@/utils/sendToWebWallet';
 import nextConfig from '@/next.config';
 import { AvailableCredential } from '@/types/credentials';
+import { LockClosedIcon } from '@heroicons/react/24/outline';
 
 export default function IssueSection() {
   const env = React.useContext(EnvContext);
   const [AvailableCredentials] = React.useContext(CredentialsContext);
 
-  const [preAuthorized, setPreAuthorized] = useState<boolean>(true);
-  const [requirePin, setRequirePin] = useState<boolean>(true);
+  const [selectedAuthenticationMethod, setSelectedAuthenticationMethod] = React.useState(AuthenticationMethods[0]);
+  const [requirePin, setRequirePin] = useState<boolean>(false);
   const [pin, setPin] = useState<string>('0235');
+  const [requireVpRequestValue, setRequireVpRequestValue] = useState<boolean>(false);
+  const [vpRequestValue, setVpRequestValue] = useState<string>('NaturalPersonVerifiableID');
+  const [requireVpProfile, setRequireVpProfile] = useState<boolean>(false);
+  const [selectedVpProfile, setSelectedVpProfile] = React.useState(VpProfiles[0]);
 
   const router = useRouter();
   const params = router.query;
@@ -48,7 +55,16 @@ export default function IssueSection() {
     } else {
       console.log("show qr-offer");
       localStorage.setItem('offer', JSON.stringify(credentialsToIssue));
-      await router.push(`/offer?ids=${idsToIssue.join(',')}`);
+      let url = `/offer?ids=${idsToIssue.join(',')}`;
+      url = url + `&authenticationMethod=${selectedAuthenticationMethod}`;
+      if (requireVpRequestValue && vpRequestValue?.trim().length) {
+        url = url + `&vpRequestValue=${vpRequestValue}`;
+      }
+      if (requireVpProfile && selectedVpProfile?.trim().length) {
+        url = url + `&vpProfile=${selectedVpProfile}`;
+      }
+
+      await router.push(url);
     }
   }
 
@@ -91,14 +107,21 @@ export default function IssueSection() {
       <h3 className="text-gray-500 text-left mt-2 font-semibold">
         Security Settings
       </h3>
-      <div className="mt-12 flex flex-row justify-between">
-        <div className="">
-          <Checkbox value={preAuthorized} onChange={setPreAuthorized}>
-            Pre-Authorized
-          </Checkbox>
-        </div>
-      </div>
       <div className="mt-5 flex flex-col sm:flex-row justify-between">
+        <div className="mt-2">
+          <div className="flex flex-row gap-2 items-center">
+            <LockClosedIcon className="h-5" />
+            {/* <div className="hidden sm:block bg-primary-400 w-[45px] h-[28px] rounded-lg"></div> */}
+            <span> Authentication Method</span>
+          </div>
+        </div>
+        <Dropdown 
+              values={AuthenticationMethods}
+              selected={selectedAuthenticationMethod}
+              setSelected={setSelectedAuthenticationMethod}
+            />
+      </div>
+      <div className="mt-3 flex flex-col sm:flex-row justify-between">
         <div className="">
           <Checkbox value={requirePin} onChange={setRequirePin}>
             Require User Pin
@@ -114,6 +137,36 @@ export default function IssueSection() {
           onChange={setPin}
         />
       </div>
+      <div className="mt-1 flex flex-col sm:flex-row justify-between">
+        <div className="">
+          <Checkbox value={requireVpRequestValue} onChange={setRequireVpRequestValue}>
+            VP Token Requested Value
+          </Checkbox>
+        </div>
+        <InputField
+          error={false}
+          label="Test"
+          value={vpRequestValue}
+          name="test"
+          type="id"
+          placeholder=""
+          onChange={setVpRequestValue}
+        />
+      </div>
+
+      <div className="mt-1 flex flex-col sm:flex-row justify-between">
+       <div className="">
+          <Checkbox value={requireVpProfile} onChange={setRequireVpProfile}>
+            VP Token Requested Profile
+          </Checkbox>
+        </div>
+        <Dropdown 
+              values={VpProfiles}
+              selected={selectedVpProfile}
+              setSelected={setSelectedVpProfile}
+            />
+      </div>
+
       <hr className="my-5" />
       <div className="flex flex-row justify-center gap-3 mt-14">
         <Button onClick={handleCancel} style="link" color="secondary">

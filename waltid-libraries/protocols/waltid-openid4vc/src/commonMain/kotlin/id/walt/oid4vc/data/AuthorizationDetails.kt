@@ -11,6 +11,11 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 
+
+val json = Json {
+    ignoreUnknownKeys = true
+}
+
 /**
  * The request parameter authorization_details defined in Section 2 of [I-D.ietf-oauth-rar] MUST be used to convey the details about the Credentials the Wallet wants to obtain.
  * (https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html#name-request-issuance-of-a-certa)
@@ -34,11 +39,11 @@ data class AuthorizationDetails @OptIn(ExperimentalSerializationApi::class) cons
     val locations: List<String>? = null,
     override val customParameters: Map<String, JsonElement> = mapOf()
 ) : JsonDataObject() {
-    override fun toJSON() = Json.encodeToJsonElement(AuthorizationDetailsSerializer, this).jsonObject
+    override fun toJSON() = json.encodeToJsonElement(AuthorizationDetailsSerializer, this).jsonObject
 
     companion object : JsonDataObjectFactory<AuthorizationDetails>() {
         override fun fromJSON(jsonObject: JsonObject): AuthorizationDetails =
-            Json.decodeFromJsonElement(AuthorizationDetailsSerializer, jsonObject)
+            json.decodeFromJsonElement(AuthorizationDetailsSerializer, jsonObject)
 
         fun fromOfferedCredential(offeredCredential: OfferedCredential, issuerLocation: String? = null) = AuthorizationDetails(
             OPENID_CREDENTIAL_AUTHORIZATION_TYPE,
