@@ -31,11 +31,6 @@ val modules = listOf(
         "waltid-credentials-base"
     ),
 
-    * "$libraries:auth".group(
-        "waltid-authkit",
-        "waltid-idpkit"
-    ),
-
     * "$libraries:protocols".group(
         "waltid-openid4vc"
     ),
