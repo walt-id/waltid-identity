@@ -63,6 +63,7 @@ class E2ETest {
 
             //region -Keys-
             val keysApi = KeysApi(client)
+            // requires registration-defaults to be enabled in _features.conf
             val defaultKeyConfig = ConfigManager.getConfig<RegistrationDefaultsConfig>().defaultKeyConfig
             val keyGenRequest = KeyGenerationRequest("jwk", KeyType.Ed25519)
             lateinit var generatedKeyId: String
@@ -84,6 +85,7 @@ class E2ETest {
                 assert(it.first().default)
                 did = it.first().did
             }
+            //todo: test for optional registration defaults
             didsApi.create(wallet, DidsApi.DidCreateRequest(method = "key", options = mapOf("useJwkJcsPub" to false))) {
                 createdDids.add(it)
             }
