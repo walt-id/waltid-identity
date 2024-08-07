@@ -80,7 +80,7 @@ object FeatureManager {
      */
     infix fun <T> (() -> T?).whenFeature(feature: OptionalFeature) = runIfEnabledBlocking(feature, this)
 
-    suspend infix fun <T> (suspend () -> T?).whenFeature(feature: OptionalFeature) = runIfEnabled(feature, this)
+    suspend infix fun <T> (suspend () -> T?).whenFeatureSuspend(feature: OptionalFeature) = runIfEnabled(feature, this)
 
     suspend fun registerBaseFeatures(baseFeatures: List<BaseFeature>) {
         baseFeatures.forEach {
