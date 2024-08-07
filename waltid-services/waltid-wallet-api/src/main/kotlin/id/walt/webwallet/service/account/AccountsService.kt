@@ -1,7 +1,7 @@
 package id.walt.webwallet.service.account
 
 import id.walt.commons.config.ConfigManager
-import id.walt.commons.featureflag.FeatureManager.whenFeature
+import id.walt.commons.featureflag.FeatureManager.whenFeatureSuspend
 import id.walt.webwallet.FeatureCatalog
 import id.walt.webwallet.config.RegistrationDefaultsConfig
 import id.walt.webwallet.db.models.*
@@ -33,7 +33,7 @@ object AccountsService {
             }
 
             val walletService = WalletServiceManager.getWalletService(tenant, registeredUserId, createdInitialWalletId)
-            suspend { tryAddDefaultData(walletService) } whenFeature (FeatureCatalog.registrationDefaultsFeature)
+            suspend { tryAddDefaultData(walletService) } whenFeatureSuspend (FeatureCatalog.registrationDefaultsFeature)
             registrationResult.also {
                 WalletServiceManager.eventUseCase.log(
                     action = EventType.Account.Create,
