@@ -5,12 +5,15 @@ import com.github.ajalt.mordant.terminal.Terminal
 import id.walt.commons.ServiceConfiguration
 import id.walt.commons.ServiceInitialization
 import id.walt.commons.ServiceMain
+import id.walt.commons.featureflag.CommonsFeatureCatalog
+import id.walt.commons.web.modules.AuthenticationServiceModule
 import id.walt.commons.web.plugins.configureSerialization
 import id.walt.commons.web.plugins.configureStatusPages
 import id.walt.credentials.verification.PolicyManager
 import id.walt.did.helpers.WaltidServices
 import id.walt.issuer.FeatureCatalog
 import id.walt.issuer.issuerModule
+import id.walt.webwallet.web.plugins.walletAuthenticationPluginAmendment
 import id.walt.issuer.lspPotential.lspPotentialIssuanceTestApi
 import id.walt.verifier.lspPotential.lspPotentialVerificationTestApi
 import id.walt.verifier.policies.PresentationDefinitionPolicy
@@ -32,7 +35,7 @@ object E2ETestWebService {
         private val webServiceModule: Application.() -> Unit = {
             configureStatusPages()
             configureSerialization()
-
+            AuthenticationServiceModule.run { enable() }
             module.invoke(this)
         }
 
@@ -71,6 +74,10 @@ object E2ETestWebService {
         ServiceMain(
             ServiceConfiguration("e2e-test"), ServiceInitialization(
                 features = listOf(FeatureCatalog, id.walt.verifier.FeatureCatalog, id.walt.webwallet.FeatureCatalog),
+                featureAmendments = mapOf(
+                    CommonsFeatureCatalog.authenticationServiceFeature to walletAuthenticationPluginAmendment,
+//                    CommonsFeatureCatalog.authenticationServiceFeature to issuerAuthenticationPluginAmendment
+                ),
                 init = {
                     webWalletSetup()
                     PolicyManager.registerPolicies(PresentationDefinitionPolicy())

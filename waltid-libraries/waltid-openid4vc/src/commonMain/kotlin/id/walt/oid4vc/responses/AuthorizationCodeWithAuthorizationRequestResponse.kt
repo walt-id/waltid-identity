@@ -5,7 +5,7 @@ import id.walt.oid4vc.data.HTTPDataObjectFactory
 import id.walt.oid4vc.data.ResponseMode
 
 // Naming :/
-data class AuthorizationCodeIDTokenRequestResponse private constructor(
+data class AuthorizationCodeWithAuthorizationRequestResponse private constructor(
     val state: String?,
     val clientId: String?,
     val redirectUri: String?,
@@ -15,6 +15,7 @@ data class AuthorizationCodeIDTokenRequestResponse private constructor(
     val nonce: String?,
     val requestUri: String? = null,
     val request: String?,
+    val presentationDefinition: String? = null,
     override val customParameters: Map<String, List<String>> = mapOf()
 ) : HTTPDataObject() {
 
@@ -29,14 +30,15 @@ data class AuthorizationCodeIDTokenRequestResponse private constructor(
             nonce?.let { put("nonce", listOf(it)) }
             requestUri?.let { put("request_uri", listOf(it)) }
             request?.let { put("request", listOf(it)) }
+            presentationDefinition?.let {  put("presentation_definition", listOf(it)) }
             putAll(customParameters)
         }
     }
 
-    companion object : HTTPDataObjectFactory<AuthorizationCodeIDTokenRequestResponse>() {
+    companion object : HTTPDataObjectFactory<AuthorizationCodeWithAuthorizationRequestResponse>() {
         private val knownKeys = setOf("code", "error", "error_description")
-        override fun fromHttpParameters(parameters: Map<String, List<String>>): AuthorizationCodeIDTokenRequestResponse {
-            return AuthorizationCodeIDTokenRequestResponse(
+        override fun fromHttpParameters(parameters: Map<String, List<String>>): AuthorizationCodeWithAuthorizationRequestResponse {
+            return AuthorizationCodeWithAuthorizationRequestResponse(
                 parameters["state"]?.firstOrNull(),
                 parameters["client_id"]?.firstOrNull(),
                 parameters["redirect_uri"]?.firstOrNull(),
@@ -46,12 +48,12 @@ data class AuthorizationCodeIDTokenRequestResponse private constructor(
                 parameters["nonce"]?.firstOrNull(),
                 parameters["request_uri"]?.firstOrNull(),
                 parameters["request"]?.firstOrNull(),
+                parameters["presentation_definition"]?.firstOrNull(),
                 parameters.filterKeys { !knownKeys.contains(it) }
             )
         }
 
-        fun success(state: String, clientId: String, redirectUri: String, responseType: String,  responseMode: ResponseMode, scope: Set<String>, nonce: String, requestUri: String? ,  request: String?, customParameters:Map<String, List<String>> = mapOf()) =
-            AuthorizationCodeIDTokenRequestResponse(state, clientId, redirectUri, responseType,  responseMode, scope, nonce, requestUri, request, customParameters)
-
+        fun success(state: String, clientId: String, redirectUri: String, responseType: String,  responseMode: ResponseMode, scope: Set<String>, nonce: String, requestUri: String?, request: String?,  presentationDefinition: String?, customParameters:Map<String, List<String>> = mapOf()) =
+            AuthorizationCodeWithAuthorizationRequestResponse(state, clientId, redirectUri, responseType,  responseMode, scope, nonce, requestUri, request,  presentationDefinition, customParameters)
     }
 }

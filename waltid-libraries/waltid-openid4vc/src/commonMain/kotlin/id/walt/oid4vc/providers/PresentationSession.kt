@@ -14,7 +14,7 @@ data class PresentationSession(
     override val id: String,
     override val authorizationRequest: AuthorizationRequest?,
     override val expirationTimestamp: Instant,
-    override val idTokenRequestState: String?  = null,      //the idTokenRequestState is added because of AuthorizationSession()
+    override val authServerState: String?  = null,  //the state used for additional authentication with pwd, id_token or vp_token.
     val presentationDefinition: PresentationDefinition,
     val tokenResponse: TokenResponse? = null,
     val verificationResult: Boolean? = null,

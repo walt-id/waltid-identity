@@ -1,6 +1,8 @@
 package id.walt.issuer.issuance
 
 import id.walt.credentials.vc.vcs.W3CVC
+import id.walt.oid4vc.data.AuthenticationMethod
+import id.walt.oid4vc.data.OpenId4VPProfile
 import id.walt.oid4vc.data.GrantType
 import id.walt.oid4vc.data.TxCode
 import id.walt.oid4vc.data.TxInputMode
@@ -85,6 +87,10 @@ data class IssuanceRequest(
     val mdocData: Map<String, JsonObject>? = null,
     val mapping: JsonObject? = null,
     val selectiveDisclosure: SDMap? = null,
+    val authenticationMethod: AuthenticationMethod? = AuthenticationMethod.PRE_AUTHORIZED, // "PWD" OR "ID_TOKEN" OR "VP_TOKEN" OR "PRE_AUTHORIZED" OR "NONE"
+    val vpRequestValue: String? = null,
+    val vpProfile: OpenId4VPProfile? = null,
+    val useJar: Boolean? = null,
     val x5Chain: List<String>? = null,
     val trustedRootCAs: List<String>? = null,
 )

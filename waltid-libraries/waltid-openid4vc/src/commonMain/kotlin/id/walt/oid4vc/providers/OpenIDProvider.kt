@@ -2,6 +2,8 @@ package id.walt.oid4vc.providers
 
 import id.walt.crypto.keys.Key
 import id.walt.oid4vc.data.*
+import id.walt.oid4vc.data.ResponseType.Companion.getResponseTypeString
+import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.definitions.JWTClaims
 import id.walt.oid4vc.errors.AuthorizationError
 import id.walt.oid4vc.errors.TokenError
@@ -10,12 +12,10 @@ import id.walt.oid4vc.interfaces.ITokenProvider
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.requests.TokenRequest
 import id.walt.oid4vc.responses.*
+import id.walt.oid4vc.util.randomUUID
 import io.ktor.http.*
 import kotlinx.datetime.Clock
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.put
+import kotlinx.serialization.json.*
 import kotlinx.uuid.UUID
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
@@ -151,7 +151,7 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
 
     protected abstract fun validateAuthorizationRequest(authorizationRequest: AuthorizationRequest): Boolean
 
-    abstract fun initializeAuthorization(authorizationRequest: AuthorizationRequest, expiresIn: Duration, idTokenRequestState: String? ): S
+    abstract fun initializeAuthorization(authorizationRequest: AuthorizationRequest, expiresIn: Duration, authServerState: String? ): S
 
     open fun processCodeFlowAuthorization(authorizationRequest: AuthorizationRequest): AuthorizationCodeResponse {
         if (!authorizationRequest.responseType.contains(ResponseType.Code))
@@ -162,12 +162,12 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
             )
         val authorizationSession = getOrInitAuthorizationSession(authorizationRequest)
         val code = generateAuthorizationCodeFor(authorizationSession)
-        return AuthorizationCodeResponse.success(code)
+        return AuthorizationCodeResponse.success(code,  mapOf("state" to listOf(authorizationRequest.state ?: randomUUID())))
     }
 
     open fun processDirectPost(state: String, tokenPayload: JsonObject) : AuthorizationCodeResponse {
         // here we get the initial session to retrieve the state of the initial authorization request
-        val session = getSessionByIdTokenRequestState(state)
+        val session = getSessionByAuthServerState(state)
             ?: throw IllegalStateException( "No authentication request found for given state")
 
         // Verify nonce - need to add Id token nonce session
@@ -184,8 +184,8 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
     // open fun proccessJar(authorizationRequest: AuthorizationRequest, kid: String){
     // }
 
-    // Create an ID Token request using JAR OAuth2.0 specification https://www.rfc-editor.org/rfc/rfc9101.html
-    open fun processCodeFlowAuthorizationWithIdTokenRequest(authorizationRequest: AuthorizationRequest, keyId: String, privKey: Key): AuthorizationCodeIDTokenRequestResponse {
+    // Create an ID or VP Token request using JAR OAuth2.0 specification https://www.rfc-editor.org/rfc/rfc9101.html
+    open fun processCodeFlowAuthorizationWithAuthorizationRequest(authorizationRequest: AuthorizationRequest, keyId: String, privKey: Key, responseType: ResponseType, isJar: Boolean? = true, presentationDefinition: PresentationDefinition? = null):AuthorizationCodeWithAuthorizationRequestResponse {
         if (!authorizationRequest.responseType.contains(ResponseType.Code))
             throw AuthorizationError(
                 authorizationRequest,
@@ -194,41 +194,59 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
             )
 
         // Bind authentication request with state
-        val idTokenRequestState = UUID().toString()
-        val idTokenRequestNonce = UUID().toString()
-        val responseMode = ResponseMode.direct_post
+        val authorizationRequestServerState = UUID().toString()
+        val authorizationRequestServerNonce = UUID().toString()
+        val authorizationResponseServerMode = ResponseMode.direct_post
 
         val clientId = this.metadata.issuer!!
         val redirectUri = this.metadata.issuer + "/direct_post"
-        val responseType = "id_token"
         val scope = setOf("openid")
 
-        // Create a jwt as request object as defined in JAR OAuth2.0 specification
-        val requestJar = signToken (
-            TokenTarget.TOKEN,
-            buildJsonObject {
-                put(JWTClaims.Payload.issuer, metadata.issuer)
-                put(JWTClaims.Payload.audience, authorizationRequest.clientId)
-                put(JWTClaims.Payload.nonce, idTokenRequestNonce)
-                put("state", idTokenRequestState)
-                put("client_id", clientId)
-                put("redirect_uri", redirectUri)
-                put("response_type", responseType)
-                put("response_mode", responseMode.name)
-                put("scope", "openid")
-            }, buildJsonObject {
-                put(JWTClaims.Header.algorithm, "ES256")
-                put(JWTClaims.Header.keyID, keyId)
-                put(JWTClaims.Header.type, "jwt")
-            },
-            keyId,
-            privKey
-        )
-
         // Create a session with the state of the ID Token request since it is needed in the direct_post endpoint
-        initializeAuthorization(authorizationRequest, 5.minutes, idTokenRequestState)
+        initializeAuthorization(authorizationRequest, 5.minutes, authorizationRequestServerState)
 
-        return AuthorizationCodeIDTokenRequestResponse.success(idTokenRequestState, clientId, redirectUri, responseType, responseMode, scope, idTokenRequestNonce, null,  requestJar)
+        return AuthorizationCodeWithAuthorizationRequestResponse.success(
+            state = authorizationRequestServerState,
+            clientId = clientId,
+            redirectUri = redirectUri,
+            responseType = getResponseTypeString(responseType),
+            responseMode = authorizationResponseServerMode,
+            scope = scope,
+            nonce = authorizationRequestServerNonce,
+            requestUri = null,
+            request = when(isJar){
+                // Create a jwt as request object as defined in JAR OAuth2.0 specification
+                true -> signToken (
+                    TokenTarget.TOKEN,
+                    buildJsonObject {
+                        put(JWTClaims.Payload.issuer, metadata.issuer)
+                        put(JWTClaims.Payload.audience, authorizationRequest.clientId)
+                        put(JWTClaims.Payload.nonce, authorizationRequestServerNonce)
+                        put("state", authorizationRequestServerState)
+                        put("client_id", clientId)
+                        put("redirect_uri", redirectUri)
+                        put("response_type", getResponseTypeString(responseType))
+                        put("response_mode", authorizationResponseServerMode.name)
+                        put("scope", "openid")
+                        when(responseType) {
+                            ResponseType.VpToken -> put("presentation_definition", presentationDefinition!!.toJSON())
+                            else -> null
+                        }
+                    }, buildJsonObject {
+                        put(JWTClaims.Header.algorithm, "ES256")
+                        put(JWTClaims.Header.keyID, keyId)
+                        put(JWTClaims.Header.type, "jwt")
+                    },
+                    keyId,
+                    privKey
+                )
+                else -> null
+            },
+            presentationDefinition = when(responseType) {
+                ResponseType.VpToken -> presentationDefinition!!.toJSONString()
+                else -> null
+            }
+        )
     }
 
     open fun processImplicitFlowAuthorization(authorizationRequest: AuthorizationRequest): TokenResponse {
@@ -308,10 +326,10 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
         expiresIn = authorizationSession.expirationTimestamp - Clock.System.now()
     )
 
-    protected open fun getOrInitAuthorizationSession(authorizationRequest: AuthorizationRequest, idTokenRequestState: String?=null): S {
+    protected open fun getOrInitAuthorizationSession(authorizationRequest: AuthorizationRequest, authServerState: String?=null): S {
         return when (authorizationRequest.isReferenceToPAR) {
             true -> getPushedAuthorizationSession(authorizationRequest)
-            false -> initializeAuthorization(authorizationRequest, 5.minutes, idTokenRequestState)
+            false -> initializeAuthorization(authorizationRequest, 5.minutes, authServerState)
         }
     }
 

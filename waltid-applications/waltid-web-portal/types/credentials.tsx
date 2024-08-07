@@ -86,3 +86,17 @@ export const DIDMethodsConfig = {
     }
   }
 }
+
+export const AuthenticationMethods = [
+  'PRE_AUTHORIZED',
+  'PWD',
+  'ID_TOKEN',
+  'VP_TOKEN',
+  'NONE',
+]
+
+export const VpProfiles = [
+  'EBSIV3',
+  'DEFAULT',
+  'ISO_18013_7_MDOC',
+]

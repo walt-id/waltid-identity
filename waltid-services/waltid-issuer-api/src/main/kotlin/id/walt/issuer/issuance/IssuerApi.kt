@@ -4,6 +4,7 @@ import id.walt.credentials.vc.vcs.W3CVC
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeySerialization
 import id.walt.did.dids.DidService
+import id.walt.oid4vc.data.AuthenticationMethod
 import id.walt.oid4vc.definitions.CROSS_DEVICE_CREDENTIAL_OFFER_URL
 import id.walt.oid4vc.requests.CredentialOfferRequest
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -18,15 +19,21 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 
 private val logger = KotlinLogging.logger {}
-suspend fun createCredentialOfferUri(issuanceRequests: List<IssuanceRequest>): String {
+suspend fun createCredentialOfferUri(issuanceRequests: List<IssuanceRequest>, expiresIn: Duration = 5.minutes): String {
     val credentialOfferBuilder =
         OidcIssuance.issuanceRequestsToCredentialOfferBuilder(issuanceRequests)
 
     val issuanceSession = OidcApi.initializeCredentialOffer(
-        credentialOfferBuilder = credentialOfferBuilder, expiresIn = 5.minutes, allowPreAuthorized = true
+        credentialOfferBuilder = credentialOfferBuilder,
+        expiresIn,
+        allowPreAuthorized = when (issuanceRequests[0].authenticationMethod) {
+            AuthenticationMethod.PRE_AUTHORIZED -> true
+            else -> false
+        }
     )
     OidcApi.setIssuanceDataForIssuanceId(issuanceSession.id, issuanceRequests.map {
         val key = KeyManager.resolveSerializedKey(it.issuerKey)
@@ -228,6 +235,9 @@ fun Application.issuerApi() {
                                     "Pass the unsigned credential that you intend to issue as the body of the request."
                                 example("OpenBadgeCredential example", IssuanceExamples.openBadgeCredentialIssuanceExample)
                                 example("UniversityDegreeCredential example", IssuanceExamples.universityDegreeIssuanceCredentialExample)
+                                example("OpenBadgeCredential example with Authorization Code Flow and Id Token", IssuanceExamples.openBadgeCredentialIssuanceExampleWithIdToken)
+                                example("OpenBadgeCredential example with Authorization Code Flow and Vp Token", IssuanceExamples.openBadgeCredentialIssuanceExampleWithVpToken)
+                                example("OpenBadgeCredential example with Authorization Code Flow and Username/Password Token", IssuanceExamples.openBadgeCredentialIssuanceExampleWithUsernamePassword)
                                 required = true
                             }
                         }

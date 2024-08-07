@@ -21,6 +21,8 @@ dependencies {
     api("io.ktor:ktor-server-status-pages-jvm:${Versions.KTOR_VERSION}")
     api("io.ktor:ktor-server-content-negotiation-jvm:${Versions.KTOR_VERSION}")
     api("io.ktor:ktor-serialization-kotlinx-json-jvm:${Versions.KTOR_VERSION}")
+    implementation("io.ktor:ktor-server-auth-jvm:${Versions.KTOR_VERSION}")
+    implementation("io.ktor:ktor-client-okhttp-jvm:${Versions.KTOR_VERSION}")
 
     // Logging
     api("io.klogging:klogging-jvm:0.7.0") // JVM + ~JS

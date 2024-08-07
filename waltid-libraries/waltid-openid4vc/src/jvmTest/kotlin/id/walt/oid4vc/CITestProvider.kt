@@ -75,8 +75,7 @@ class CITestProvider : OpenIDCredentialIssuer(
     override fun putSession(id: String, session: IssuanceSession) {
         authSessions[id] = session
     }
-
-    override fun getSessionByIdTokenRequestState(idTokenRequestState: String): IssuanceSession? {
+    override fun getSessionByAuthServerState(authServerState: String): IssuanceSession? {
         TODO("Not yet implemented")
     }
 
@@ -85,7 +84,7 @@ class CITestProvider : OpenIDCredentialIssuer(
     }
 
     // crypto operations and credential issuance
-    private val CI_TOKEN_KEY = runBlocking { JWKKey.generate(KeyType.RSA) }
+    val CI_TOKEN_KEY = runBlocking { JWKKey.generate(KeyType.RSA) }
     private val CI_DID_KEY = runBlocking { JWKKey.generate(KeyType.Ed25519) }
     val CI_ISSUER_DID = runBlocking { DidService.registerByKey("key", CI_DID_KEY).did }
     val deferredCredentialRequests = mutableMapOf<String, CredentialRequest>()
