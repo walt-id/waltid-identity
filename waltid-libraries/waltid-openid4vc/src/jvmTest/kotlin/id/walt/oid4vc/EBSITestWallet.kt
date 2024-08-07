@@ -91,7 +91,7 @@ class EBSITestWallet(
         get() = createDefaultProviderMetadata()
 
     override fun getSession(id: String): SIOPSession? = sessionCache[id]
-    override fun getSessionByIdTokenRequestState(idTokenRequestState: String): SIOPSession? {
+    override fun getSessionByAuthServerState(authServerState: String): SIOPSession? {
         TODO("Not yet implemented")
     }
 

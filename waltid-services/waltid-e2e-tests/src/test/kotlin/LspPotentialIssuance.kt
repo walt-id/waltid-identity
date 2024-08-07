@@ -228,7 +228,7 @@ class LspPotentialIssuance(val client: HttpClient) {
   }
 
   @OptIn(ExperimentalEncodingApi::class)
-  suspend fun testTrack2() = E2ETestWebService.test("test track 1") {
+  suspend fun testTrack2() = E2ETestWebService.test("test track 2") {
     // ### steps 1-6
     val offerResp = client.get("/lsp-potential/lspPotentialCredentialOfferT2")
     assertEquals(HttpStatusCode.OK, offerResp.status)

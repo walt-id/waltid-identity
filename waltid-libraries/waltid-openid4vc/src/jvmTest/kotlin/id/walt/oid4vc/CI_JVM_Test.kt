@@ -14,6 +14,7 @@ import id.walt.did.dids.registrar.dids.DidJwkCreateOptions
 import id.walt.did.dids.registrar.dids.DidKeyCreateOptions
 import id.walt.did.dids.registrar.dids.DidWebCreateOptions
 import id.walt.oid4vc.data.*
+import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.definitions.JWTClaims
 import id.walt.oid4vc.definitions.OPENID_CREDENTIAL_AUTHORIZATION_TYPE
 import id.walt.oid4vc.providers.CredentialWalletConfig
@@ -43,6 +44,7 @@ import io.ktor.server.routing.*
 import io.ktor.util.*
 import io.ktor.util.reflect.*
 import kotlinx.coroutines.test.runTest
+import kotlinx.datetime.Clock
 import kotlinx.serialization.json.*
 import org.junit.jupiter.api.BeforeAll
 import java.io.File
@@ -615,6 +617,1065 @@ class CI_JVM_Test {
         )
         assertTrue(actual = JwtSignaturePolicy().verify(credential, null, mapOf()).isSuccess)
     }
+
+    // Test case for available authentication methods are: NONE, ID_TOKEN, VP_TOKEN, PRE_AUTHORIZED PWD(Handled by third party authorization server)
+    @Test
+    fun testCredentialIssuanceIsolatedFunctionsAuthCodeFlow() = runTest {
+        // TODO: consider re-implementing CITestProvider, making use of new lib functions
+        // is it ok to generate the credential offer using the ciTestProvider (OpenIDCredentialIssuer class) ?
+        val issuedCredentialId = "VerifiableId"
+        val baseUrl = ciTestProvider.baseUrl
+        ciTestProvider.deferIssuance = false
+
+        println("// -------- CREDENTIAL ISSUER ----------")
+        // Init credential offer for full authorization code flow
+
+        // Issuer Client stores the authentication method in session.
+        // Available authentication methods are: NONE, ID_TOKEN, VP_TOKEN, PWD(Handled by third party authorization server), PRE_AUTHORIZED. The response for each method is a redirect to the proper location.
+        println("// --Authentication method is NONE--")
+        var issuerState = "test-state-none-auth"
+        var issueReqUrl = testIsolatedFunctionsCreateCredentialOffer(baseUrl, issuerState, issuedCredentialId)
+
+        // Issuer Client shows credential offer request as QR code
+        println(issueReqUrl)
+
+        println("// -------- WALLET ----------")
+        var parsedCredOffer = OpenID4VCI.parseAndResolveCredentialOfferRequestUrl(issueReqUrl)
+        var providerMetadata = OpenID4VCI.resolveCIProviderMetadata(parsedCredOffer)
+        assertEquals(expected = parsedCredOffer.credentialIssuer, actual = providerMetadata.credentialIssuer)
+
+        println("// resolve offered credentials")
+        var offeredCredentials = OpenID4VCI.resolveOfferedCredentials(parsedCredOffer, providerMetadata)
+        println("offeredCredentials: $offeredCredentials")
+        assertEquals(expected = 1, actual = offeredCredentials.size)
+        assertEquals(expected = CredentialFormat.jwt_vc_json, actual = offeredCredentials.first().format)
+        assertEquals(expected = "VerifiableId", actual = offeredCredentials.first().types?.last())
+        var offeredCredential = offeredCredentials.first()
+        println("offeredCredentials[0]: $offeredCredential")
+
+
+        println("// go through authorization code flow to receive offered credential")
+        println("// auth request (short-cut, without pushed authorization request)")
+        var authReqWalletState = "secured_state"
+        var authReqWallet = AuthorizationRequest(
+            setOf(ResponseType.Code), testCIClientConfig.clientID,
+            redirectUri = credentialWallet.config.redirectUri,
+            issuerState = parsedCredOffer.grants[GrantType.authorization_code.value]!!.issuerState,
+            state = authReqWalletState
+        )
+        println("authReq: $authReqWallet")
+
+        // Wallet client calls /authorize endpoint
+
+
+        println("// -------- CREDENTIAL ISSUER ----------")
+        var authReq = OpenID4VCI.validateAuthorizationRequestQueryString(authReqWallet.toHttpQueryString())
+
+        // Issuer Client retrieves issuance session based on issuer state and stores the credential request, including authReqWallet state
+        // Available authentication methods are: NONE, ID_TOKEN, VP_TOKEN, PWD(Handled by third party authorization server). The response for each method is a redirect to the proper location.
+        // Issuer Client checks the authentication method of the session
+
+        println("// --Authentication method is NONE--")
+        // Issuer Client generates authorization code
+        var authorizationCode = "secured_code"
+        var authCodeResponse: AuthorizationCodeResponse = AuthorizationCodeResponse.success(authorizationCode,  mapOf("state" to listOf(authReqWallet.state!!)))
+        var redirectUri = testCredentialIssuanceIsolatedFunctionsAuthCodeFlowRedirectWithCode(authCodeResponse, authReqWallet)
+
+        // Issuer client redirects the request to redirectUri
+
+        println("// -------- WALLET ----------")
+        println("// token req")
+        var tokenReq =
+            TokenRequest(
+                GrantType.authorization_code,
+                testCIClientConfig.clientID,
+                code = authCodeResponse.code!!
+            )
+        println("tokenReq: $tokenReq")
+
+
+        println("// -------- CREDENTIAL ISSUER ----------")
+        // Validate token request against authorization code
+        OpenID4VCI.validateTokenRequestRaw(tokenReq.toHttpParameters(), authorizationCode)
+
+        // Generate Access Token
+        var expirationTime = (Clock.System.now().epochSeconds + 864000L) // ten days in milliseconds
+
+        var accessToken = OpenID4VCI.signToken(
+            privateKey = ciTestProvider.CI_TOKEN_KEY,
+            payload = buildJsonObject {
+                put(JWTClaims.Payload.audience, ciTestProvider.baseUrl)
+                put(JWTClaims.Payload.subject, authReq.clientId)
+                put(JWTClaims.Payload.issuer, ciTestProvider.baseUrl)
+                put(JWTClaims.Payload.expirationTime, expirationTime)
+                put(JWTClaims.Payload.notBeforeTime, Clock.System.now().epochSeconds)
+            }
+        )
+
+        // Issuer client creates cPoPnonce
+        var cPoPNonce = "secured_cPoPnonce"
+        var tokenResponse: TokenResponse = TokenResponse.success(accessToken, "bearer", cNonce = cPoPNonce, expiresIn = expirationTime)
+
+        // Issuer client sends successful response with tokenResponse
+
+
+        println("// -------- WALLET ----------")
+        assertTrue(actual = tokenResponse.isSuccess)
+        assertNotNull(actual = tokenResponse.accessToken)
+        assertNotNull(actual = tokenResponse.cNonce)
+
+        println("// receive credential")
+        var nonce = tokenResponse.cNonce!!
+        val holderDid = TEST_WALLET_DID_WEB1
+//        val holderKey = runBlocking { JWKKey.importJWK(TEST_WALLET_KEY1) }.getOrThrow()
+        val holderKey = JWKKey.importJWK(TEST_WALLET_KEY1).getOrThrow()
+//        val holderKeyId = runBlocking { holderKey.getKeyId() }
+        val holderKeyId = holderKey.getKeyId()
+        val proofKeyId = "$holderDid#$holderKeyId"
+        var proofOfPossession =
+            ProofOfPossession.JWTProofBuilder(ciTestProvider.baseUrl, null, nonce, proofKeyId).build(holderKey)
+
+        var credReq = CredentialRequest.forOfferedCredential(offeredCredential, proofOfPossession)
+        println("credReq: $credReq")
+
+        println("// -------- CREDENTIAL ISSUER ----------")
+        // Issuer Client extracts Access Token from header
+        OpenID4VCI.verifyToken(tokenResponse.accessToken.toString(),  ciTestProvider.CI_TOKEN_KEY.getPublicKey())
+
+        //Then VC Stuff
+
+
+
+        // ----------------------------------
+        // Authentication Method is ID_TOKEN
+        // ----------------------------------
+        println("// --Authentication method is ID_TOKEN--")
+        issuerState = "test-state-idtoken-auth"
+        issueReqUrl = testIsolatedFunctionsCreateCredentialOffer(baseUrl, issuerState, issuedCredentialId)
+
+        // Issuer Client shows credential offer request as QR code
+        println(issueReqUrl)
+
+        println("// -------- WALLET ----------")
+        parsedCredOffer = OpenID4VCI.parseAndResolveCredentialOfferRequestUrl(issueReqUrl)
+        providerMetadata = OpenID4VCI.resolveCIProviderMetadata(parsedCredOffer)
+        assertEquals(expected = parsedCredOffer.credentialIssuer, actual = providerMetadata.credentialIssuer)
+
+        println("// resolve offered credentials")
+        offeredCredentials = OpenID4VCI.resolveOfferedCredentials(parsedCredOffer, providerMetadata)
+        println("offeredCredentials: $offeredCredentials")
+        assertEquals(expected = 1, actual = offeredCredentials.size)
+        assertEquals(expected = CredentialFormat.jwt_vc_json, actual = offeredCredentials.first().format)
+        assertEquals(expected = "VerifiableId", actual = offeredCredentials.first().types?.last())
+        offeredCredential = offeredCredentials.first()
+        println("offeredCredentials[0]: $offeredCredential")
+
+
+        authReqWalletState = "secured_state_idtoken"
+        authReqWallet = AuthorizationRequest(
+            setOf(ResponseType.Code), testCIClientConfig.clientID,
+            redirectUri = credentialWallet.config.redirectUri,
+            issuerState = parsedCredOffer.grants[GrantType.authorization_code.value]!!.issuerState,
+            state = authReqWalletState
+        )
+        println("authReq: $authReqWallet")
+
+        // Wallet client calls /authorize endpoint
+
+
+        println("// -------- CREDENTIAL ISSUER ----------")
+        authReq = OpenID4VCI.validateAuthorizationRequestQueryString(authReqWallet.toHttpQueryString())
+
+        // Issuer Client retrieves issuance session based on issuer state and stores the credential request, including authReqWallet state
+        // Available authentication methods are: NONE, ID_TOKEN, VP_TOKEN, PWD(Handled by third party authorization server). The response for each method is a redirect to the proper location.
+        // Issuer Client checks the authentication method of the session
+
+        // Issuer Client generates authorization code
+        // Issuer client creates state and nonce for the id token authorization request
+        var authReqIssuerState = "secured_state_issuer_idtoken"
+        var authReqIssuerNonce = "secured_nonce_issue_idtoken"
+
+        var authReqIssuer = OpenID4VCI.generateAuthorizationRequest(authReq, ciTestProvider.baseUrl, ciTestProvider.CI_TOKEN_KEY, ResponseType.IdToken, authReqIssuerState, authReqIssuerNonce)
+
+        // Redirect uri is located in the client_metadata.authorization_endpoint or "openid://"
+        var redirectUriReq = authReqIssuer.toRedirectUri(authReq.clientMetadata?.customParameters?.get("authorization_endpoint")?.jsonPrimitive?.content ?: "openid://", authReq.responseMode ?: ResponseMode.query)
+        Url(redirectUriReq).let {
+            assertContains(iterable = it.parameters.names(), element = "request")
+            assertContains(iterable = it.parameters.names(), element = "redirect_uri")
+            assertEquals(expected = ciTestProvider.baseUrl + "/direct_post", actual = it.parameters["redirect_uri"])
+        }
+
+        // Issuer Client redirects the request to redirectUri
+
+
+        println("// -------- WALLET ----------")
+        // wallet creates id token
+        val idToken = "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiIsImtpZCI6ImRpZDprZXk6ejJkbXpEODFjZ1B4OFZraTdKYnV1TW1GWXJXUGdZb3l0eWtVWjNleXFodDFqOUtib2o3ZzlQZlhKeGJiczRLWWVneXI3RUxuRlZucERNemJKSkRETlpqYXZYNmp2dERtQUxNYlhBR1c2N3BkVGdGZWEyRnJHR1NGczhFanhpOTZvRkxHSGNMNFA2YmpMRFBCSkV2UlJIU3JHNExzUG5lNTJmY3p0Mk1XakhMTEpCdmhBQyN6MmRtekQ4MWNnUHg4VmtpN0pidXVNbUZZcldQZ1lveXR5a1VaM2V5cWh0MWo5S2JvajdnOVBmWEp4YmJzNEtZZWd5cjdFTG5GVm5wRE16YkpKREROWmphdlg2anZ0RG1BTE1iWEFHVzY3cGRUZ0ZlYTJGckdHU0ZzOEVqeGk5Nm9GTEdIY0w0UDZiakxEUEJKRXZSUkhTckc0THNQbmU1MmZjenQyTVdqSExMSkJ2aEFDIn0.eyJub25jZSI6ImE4YWE1NDYwLTRmN2UtNDRmNy05ZGE3LWU1NmQ0YjIxMWE1MSIsInN1YiI6ImRpZDprZXk6ejJkbXpEODFjZ1B4OFZraTdKYnV1TW1GWXJXUGdZb3l0eWtVWjNleXFodDFqOUtib2o3ZzlQZlhKeGJiczRLWWVneXI3RUxuRlZucERNemJKSkRETlpqYXZYNmp2dERtQUxNYlhBR1c2N3BkVGdGZWEyRnJHR1NGczhFanhpOTZvRkxHSGNMNFA2YmpMRFBCSkV2UlJIU3JHNExzUG5lNTJmY3p0Mk1XakhMTEpCdmhBQyIsImlzcyI6ImRpZDprZXk6ejJkbXpEODFjZ1B4OFZraTdKYnV1TW1GWXJXUGdZb3l0eWtVWjNleXFodDFqOUtib2o3ZzlQZlhKeGJiczRLWWVneXI3RUxuRlZucERNemJKSkRETlpqYXZYNmp2dERtQUxNYlhBR1c2N3BkVGdGZWEyRnJHR1NGczhFanhpOTZvRkxHSGNMNFA2YmpMRFBCSkV2UlJIU3JHNExzUG5lNTJmY3p0Mk1XakhMTEpCdmhBQyIsImF1ZCI6Imh0dHBzOi8vMDFiYi01LTIwMy0xNzQtNjcubmdyb2stZnJlZS5hcHAiLCJpYXQiOjE3MjExNDQ3MzYsImV4cCI6MTcyMTE0NTAzNn0.VPWyLkMQAlcc40WCNSRH-Vxaj4LHi-wf2P9kcEKDvcdyVec2xJIwkg0JF4INMbLCkF0Y89lT0oswALd345wdUg"
+        // wallet calls POST /direct_post (e.g. redirect_uri of Issuer Auth Req) providing the id_token
+
+
+        println("// -------- CREDENTIAL ISSUER ----------")
+        // Create validateIdTokenResponse()
+        val idTokenPayload = OpenID4VCI.validateAuthorizationRequestToken(idToken)
+
+        // Issuer Client validates states and nonces based on idTokenPayload
+
+        // Issuer client generates authorization code
+        authorizationCode = "secured_code_idtoken"
+        authCodeResponse = AuthorizationCodeResponse.success(authorizationCode,  mapOf("state" to listOf(authReqWallet.state!!)))
+
+        redirectUri = authCodeResponse.toRedirectUri(authReq.redirectUri ?: TODO(), authReq.responseMode ?: ResponseMode.query)
+        Url(redirectUri).let {
+            assertContains(iterable = it.parameters.names(), element = ResponseType.Code.name.lowercase())
+            assertEquals(
+                expected = authCodeResponse.code,
+                actual = it.parameters[ResponseType.Code.name.lowercase()]
+            )
+        }
+
+
+        println("// -------- WALLET ----------")
+        println("// token req")
+        tokenReq =
+            TokenRequest(
+                GrantType.authorization_code,
+                testCIClientConfig.clientID,
+                code = authCodeResponse.code!!
+            )
+        println("tokenReq: $tokenReq")
+
+
+        println("// -------- CREDENTIAL ISSUER ----------")
+        // Validate token request against authorization code
+        OpenID4VCI.validateTokenRequestRaw(tokenReq.toHttpParameters(), authorizationCode)
+
+        // Generate Access Token
+        expirationTime = (Clock.System.now().epochSeconds + 864000L) // ten days in milliseconds
+
+        accessToken = OpenID4VCI.signToken(
+            privateKey = ciTestProvider.CI_TOKEN_KEY,
+            payload = buildJsonObject {
+                put(JWTClaims.Payload.audience, ciTestProvider.baseUrl)
+                put(JWTClaims.Payload.subject, authReq.clientId)
+                put(JWTClaims.Payload.issuer, ciTestProvider.baseUrl)
+                put(JWTClaims.Payload.expirationTime, expirationTime)
+                put(JWTClaims.Payload.notBeforeTime, Clock.System.now().epochSeconds)
+            }
+        )
+
+        // Issuer client creates cPoPnonce
+        cPoPNonce = "secured_cPoPnonce_idtoken"
+        tokenResponse = TokenResponse.success(accessToken, "bearer", cNonce = cPoPNonce, expiresIn = expirationTime)
+
+        // Issuer client sends successful response with tokenResponse
+
+        println("// -------- WALLET ----------")
+        assertTrue(actual = tokenResponse.isSuccess)
+        assertNotNull(actual = tokenResponse.accessToken)
+        assertNotNull(actual = tokenResponse.cNonce)
+
+        println("// receive credential")
+        nonce = tokenResponse.cNonce!!
+        proofOfPossession = ProofOfPossession.JWTProofBuilder(ciTestProvider.baseUrl, null, nonce, proofKeyId).build(holderKey)
+
+        credReq = CredentialRequest.forOfferedCredential(offeredCredential, proofOfPossession)
+        println("credReq: $credReq")
+
+        println("// -------- CREDENTIAL ISSUER ----------")
+        // Issuer Client extracts Access Token from header
+        OpenID4VCI.verifyToken(tokenResponse.accessToken.toString(),  ciTestProvider.CI_TOKEN_KEY.getPublicKey())
+
+        //Then VC Stuff
+
+
+
+        // ----------------------------------
+        // Authentication Method is VP_TOKEN
+        // ----------------------------------
+        println("// --Authentication method is VP_TOKEN--")
+        issuerState = "test-state-vptoken-auth"
+        issueReqUrl = testIsolatedFunctionsCreateCredentialOffer(baseUrl, issuerState, issuedCredentialId)
+
+        // Issuer Client shows credential offer request as QR code
+        println(issueReqUrl)
+
+        println("// -------- WALLET ----------")
+        parsedCredOffer = OpenID4VCI.parseAndResolveCredentialOfferRequestUrl(issueReqUrl)
+        providerMetadata = OpenID4VCI.resolveCIProviderMetadata(parsedCredOffer)
+        assertEquals(expected = parsedCredOffer.credentialIssuer, actual = providerMetadata.credentialIssuer)
+
+        println("// resolve offered credentials")
+        offeredCredentials = OpenID4VCI.resolveOfferedCredentials(parsedCredOffer, providerMetadata)
+        println("offeredCredentials: $offeredCredentials")
+        assertEquals(expected = 1, actual = offeredCredentials.size)
+        assertEquals(expected = CredentialFormat.jwt_vc_json, actual = offeredCredentials.first().format)
+        assertEquals(expected = "VerifiableId", actual = offeredCredentials.first().types?.last())
+        offeredCredential = offeredCredentials.first()
+        println("offeredCredentials[0]: $offeredCredential")
+
+
+        authReqWalletState = "secured_state_vptoken"
+        authReqWallet = AuthorizationRequest(
+            setOf(ResponseType.Code), testCIClientConfig.clientID,
+            redirectUri = credentialWallet.config.redirectUri,
+            issuerState = parsedCredOffer.grants[GrantType.authorization_code.value]!!.issuerState,
+            state = authReqWalletState
+        )
+        println("authReq: $authReqWallet")
+
+        // Wallet client calls /authorize endpoint
+
+
+        println("// -------- CREDENTIAL ISSUER ----------")
+        authReq = OpenID4VCI.validateAuthorizationRequestQueryString(authReqWallet.toHttpQueryString())
+
+        // Issuer Client retrieves issuance session based on issuer state and stores the credential request, including authReqWallet state
+        // Available authentication methods are: NONE, ID_TOKEN, VP_TOKEN, PWD(Handled by third party authorization server). The response for each method is a redirect to the proper location.
+        val requestedCredentialId = "OpenBadgeCredential"
+        val vpProfile = OpenId4VPProfile.EBSIV3
+        val requestCredentialsArr = buildJsonArray { add(requestedCredentialId) }
+        val requestedTypes = requestCredentialsArr.map {
+            when (it) {
+                is JsonPrimitive -> it.contentOrNull
+                is JsonObject -> it["credential"]?.jsonPrimitive?.contentOrNull
+                else -> throw IllegalArgumentException("Invalid JSON type for requested credential: $it")
+            } ?: throw IllegalArgumentException("Invalid VC type for requested credential: $it")
+        }
+
+        val presentationDefinition = PresentationDefinition.primitiveGenerationFromVcTypes(requestedTypes, vpProfile)
+
+        // Issuer Client creates state and nonce for the vp_token authorization request
+        authReqIssuerState = "secured_state_issuer_vptoken"
+        authReqIssuerNonce = "secured_nonce_issuer_vptoken"
+
+        authReqIssuer = OpenID4VCI.generateAuthorizationRequest(authReq, ciTestProvider.baseUrl, ciTestProvider.CI_TOKEN_KEY, ResponseType.VpToken, authReqIssuerState, authReqIssuerNonce, true, presentationDefinition)
+
+        // Redirect uri is located in the client_metadata.authorization_endpoint or "openid://"
+        redirectUriReq = authReqIssuer.toRedirectUri(authReq.clientMetadata?.customParameters?.get("authorization_endpoint")?.jsonPrimitive?.content ?: "openid://", authReq.responseMode ?: ResponseMode.query)
+        Url(redirectUriReq).let {
+            assertContains(iterable = it.parameters.names(), element = "request")
+            assertContains(iterable = it.parameters.names(), element = "redirect_uri")
+            assertContains(iterable = it.parameters.names(), element = "presentation_definition")
+            assertEquals(expected = ciTestProvider.baseUrl + "/direct_post", actual = it.parameters["redirect_uri"])
+        }
+        // Issuer Client redirects the request to redirectUri
+
+
+        println("// -------- WALLET ----------")
+        // wallet creates vp token
+        val vpToken = "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCIsImtpZCI6ImRpZDprZXk6ejZNa3A3QVZ3dld4bnNORHVTU2JmMTlzZ0t6cngyMjNXWTk1QXFaeUFHaWZGVnlWI3o2TWtwN0FWd3ZXeG5zTkR1U1NiZjE5c2dLenJ4MjIzV1k5NUFxWnlBR2lmRlZ5ViJ9.eyJzdWIiOiJkaWQ6a2V5Ono2TWtwN0FWd3ZXeG5zTkR1U1NiZjE5c2dLenJ4MjIzV1k5NUFxWnlBR2lmRlZ5ViIsIm5iZiI6MTcyMDc2NDAxOSwiaWF0IjoxNzIwNzY0MDc5LCJqdGkiOiJ1cm46dXVpZDpiNzE2YThlOC0xNzVlLTRhMTYtODZlMC0xYzU2Zjc4NTFhZDEiLCJpc3MiOiJkaWQ6a2V5Ono2TWtwN0FWd3ZXeG5zTkR1U1NiZjE5c2dLenJ4MjIzV1k5NUFxWnlBR2lmRlZ5ViIsIm5vbmNlIjoiNDY0YTAwMTUtNzQ1OS00Y2Y4LWJmNjgtNDg0ODQyYTE5Y2FmIiwiYXVkIjoiZGlkOmtleTp6Nk1rcDdBVnd2V3huc05EdVNTYmYxOXNnS3pyeDIyM1dZOTVBcVp5QUdpZkZWeVYiLCJ2cCI6eyJAY29udGV4dCI6WyJodHRwczovL3d3dy53My5vcmcvMjAxOC9jcmVkZW50aWFscy92MSJdLCJ0eXBlIjpbIlZlcmlmaWFibGVQcmVzZW50YXRpb24iXSwiaWQiOiJ1cm46dXVpZDpiNzE2YThlOC0xNzVlLTRhMTYtODZlMC0xYzU2Zjc4NTFhZDEiLCJob2xkZXIiOiJkaWQ6a2V5Ono2TWtwN0FWd3ZXeG5zTkR1U1NiZjE5c2dLenJ4MjIzV1k5NUFxWnlBR2lmRlZ5ViIsInZlcmlmaWFibGVDcmVkZW50aWFsIjpbImV5SmhiR2NpT2lKRlpFUlRRU0lzSW5SNWNDSTZJa3BYVkNJc0ltdHBaQ0k2SW1ScFpEcHJaWGs2ZWpaTmEzQTNRVlozZGxkNGJuTk9SSFZUVTJKbU1UbHpaMHQ2Y25neU1qTlhXVGsxUVhGYWVVRkhhV1pHVm5sV0luMC5leUpwYzNNaU9pSmthV1E2YTJWNU9ubzJUV3R3TjBGV2QzWlhlRzV6VGtSMVUxTmlaakU1YzJkTGVuSjRNakl6VjFrNU5VRnhXbmxCUjJsbVJsWjVWaUlzSW5OMVlpSTZJbVJwWkRwclpYazZlalpOYTJwdE1tZGhSM052WkVkamFHWkhOR3M0VURaTGQwTklXbk5XUlZCYWFHODFWblZGWWxrNU5IRnBRa0k1SWl3aWRtTWlPbnNpUUdOdmJuUmxlSFFpT2xzaWFIUjBjSE02THk5M2QzY3Vkek11YjNKbkx6SXdNVGd2WTNKbFpHVnVkR2xoYkhNdmRqRWlMQ0pvZEhSd2N6b3ZMM0IxY213dWFXMXpaMnh2WW1Gc0xtOXlaeTl6Y0dWakwyOWlMM1l6Y0RBdlkyOXVkR1Y0ZEM1cWMyOXVJbDBzSW1sa0lqb2lkWEp1T25WMWFXUTZNVEl6SWl3aWRIbHdaU0k2V3lKV1pYSnBabWxoWW14bFEzSmxaR1Z1ZEdsaGJDSXNJazl3Wlc1Q1lXUm5aVU55WldSbGJuUnBZV3dpWFN3aWJtRnRaU0k2SWtwR1JpQjRJSFpqTFdWa2RTQlFiSFZuUm1WemRDQXpJRWx1ZEdWeWIzQmxjbUZpYVd4cGRIa2lMQ0pwYzNOMVpYSWlPbnNpZEhsd1pTSTZXeUpRY205bWFXeGxJbDBzSW1sa0lqb2laR2xrT21WNFlXMXdiR1U2TVRJeklpd2libUZ0WlNJNklrcHZZbk1nWm05eUlIUm9aU0JHZFhSMWNtVWdLRXBHUmlraUxDSjFjbXdpT2lKb2RIUndjem92TDNkM2R5NXFabVl1YjNKbkx5SXNJbWx0WVdkbElqcDdJbWxrSWpvaWFIUjBjSE02THk5M00yTXRZMk5uTG1kcGRHaDFZaTVwYnk5Mll5MWxaQzl3YkhWblptVnpkQzB4TFRJd01qSXZhVzFoWjJWekwwcEdSbDlNYjJkdlRHOWphM1Z3TG5CdVp5SXNJblI1Y0dVaU9pSkpiV0ZuWlNKOWZTd2lhWE56ZFdGdVkyVkVZWFJsSWpvaU1qQXlNeTB3TnkweU1GUXdOem93TlRvME5Gb2lMQ0psZUhCcGNtRjBhVzl1UkdGMFpTSTZJakl3TXpNdE1EY3RNakJVTURjNk1EVTZORFJhSWl3aVkzSmxaR1Z1ZEdsaGJGTjFZbXBsWTNRaU9uc2lhV1FpT2lKa2FXUTZaWGhoYlhCc1pUb3hNak1pTENKMGVYQmxJanBiSWtGamFHbGxkbVZ0Wlc1MFUzVmlhbVZqZENKZExDSmhZMmhwWlhabGJXVnVkQ0k2ZXlKcFpDSTZJblZ5YmpwMWRXbGtPbUZqTWpVMFltUTFMVGhtWVdRdE5HSmlNUzA1WkRJNUxXVm1aRGt6T0RVek5qa3lOaUlzSW5SNWNHVWlPbHNpUVdOb2FXVjJaVzFsYm5RaVhTd2libUZ0WlNJNklrcEdSaUI0SUhaakxXVmtkU0JRYkhWblJtVnpkQ0F6SUVsdWRHVnliM0JsY21GaWFXeHBkSGtpTENKa1pYTmpjbWx3ZEdsdmJpSTZJbFJvYVhNZ2QyRnNiR1YwSUhOMWNIQnZjblJ6SUhSb1pTQjFjMlVnYjJZZ1Z6TkRJRlpsY21sbWFXRmliR1VnUTNKbFpHVnVkR2xoYkhNZ1lXNWtJR2hoY3lCa1pXMXZibk4wY21GMFpXUWdhVzUwWlhKdmNHVnlZV0pwYkdsMGVTQmtkWEpwYm1jZ2RHaGxJSEJ5WlhObGJuUmhkR2x2YmlCeVpYRjFaWE4wSUhkdmNtdG1iRzkzSUdSMWNtbHVaeUJLUmtZZ2VDQldReTFGUkZVZ1VHeDFaMFpsYzNRZ015NGlMQ0pqY21sMFpYSnBZU0k2ZXlKMGVYQmxJam9pUTNKcGRHVnlhV0VpTENKdVlYSnlZWFJwZG1VaU9pSlhZV3hzWlhRZ2MyOXNkWFJwYjI1eklIQnliM1pwWkdWeWN5QmxZWEp1WldRZ2RHaHBjeUJpWVdSblpTQmllU0JrWlcxdmJuTjBjbUYwYVc1bklHbHVkR1Z5YjNCbGNtRmlhV3hwZEhrZ1pIVnlhVzVuSUhSb1pTQndjbVZ6Wlc1MFlYUnBiMjRnY21WeGRXVnpkQ0IzYjNKclpteHZkeTRnVkdocGN5QnBibU5zZFdSbGN5QnpkV05qWlhOelpuVnNiSGtnY21WalpXbDJhVzVuSUdFZ2NISmxjMlZ1ZEdGMGFXOXVJSEpsY1hWbGMzUXNJR0ZzYkc5M2FXNW5JSFJvWlNCb2IyeGtaWElnZEc4Z2MyVnNaV04wSUdGMElHeGxZWE4wSUhSM2J5QjBlWEJsY3lCdlppQjJaWEpwWm1saFlteGxJR055WldSbGJuUnBZV3h6SUhSdklHTnlaV0YwWlNCaElIWmxjbWxtYVdGaWJHVWdjSEpsYzJWdWRHRjBhVzl1TENCeVpYUjFjbTVwYm1jZ2RHaGxJSEJ5WlhObGJuUmhkR2x2YmlCMGJ5QjBhR1VnY21WeGRXVnpkRzl5TENCaGJtUWdjR0Z6YzJsdVp5QjJaWEpwWm1sallYUnBiMjRnYjJZZ2RHaGxJSEJ5WlhObGJuUmhkR2x2YmlCaGJtUWdkR2hsSUdsdVkyeDFaR1ZrSUdOeVpXUmxiblJwWVd4ekxpSjlMQ0pwYldGblpTSTZleUpwWkNJNkltaDBkSEJ6T2k4dmR6TmpMV05qWnk1bmFYUm9kV0l1YVc4dmRtTXRaV1F2Y0d4MVoyWmxjM1F0TXkweU1ESXpMMmx0WVdkbGN5OUtSa1l0VmtNdFJVUlZMVkJNVlVkR1JWTlVNeTFpWVdSblpTMXBiV0ZuWlM1d2JtY2lMQ0owZVhCbElqb2lTVzFoWjJVaWZYMTlMQ0pqY21Wa1pXNTBhV0ZzVTJOb1pXMWhJanA3SW1sa0lqb2lhSFIwY0hNNkx5OXdkWEpzTG1sdGMyZHNiMkpoYkM1dmNtY3ZjM0JsWXk5dllpOTJNM0F3TDNOamFHVnRZUzlxYzI5dUwyOWlYM1l6Y0RCZllXTm9hV1YyWlcxbGJuUmpjbVZrWlc1MGFXRnNYM05qYUdWdFlTNXFjMjl1SWl3aWRIbHdaU0k2SWtaMWJHeEtjMjl1VTJOb1pXMWhWbUZzYVdSaGRHOXlNakF5TVNKOWZTd2lhblJwSWpvaWRYSnVPblYxYVdRNk1USXpJaXdpWlhod0lqb3lNREExTkRVMU9UUTBMQ0pwWVhRaU9qRTJPRGs0TXpZM05EUXNJbTVpWmlJNk1UWTRPVGd6TmpjME5IMC5PRHZUQXVMN2JrME1pX3hNLVFualg4azByZ3VUeWtiYzJ6bFdFMVU2SGlmVXFjWTdFVU5GcUdUZWFUWHRESkxrODBuZWN6YkNNTGh1YlZseEFkdl9DdyJdfX0.zTXluOVIP0sQzc5GzNvtVvWRiaC-x9qMZg0d-EvCuRIg7QSgY0hmrfVlAzh2IDEvaXZ1ahM3hSVDx_YI74ToAw"
+        // wallet calls POST /direct_post (e.g. redirect_uri of Issuer Auth Req) providing the vp_token and presentation submission
+
+        println("// -------- CREDENTIAL ISSUER ----------")
+        val vpTokenPayload = OpenID4VCI.validateAuthorizationRequestToken(vpToken)
+
+        // Issuer Client validates states and nonces based on vpTokenPayload
+
+        // Issuer client generates authorization code
+        authorizationCode = "secured_code_vptoken"
+        authCodeResponse = AuthorizationCodeResponse.success(authorizationCode,  mapOf("state" to listOf(authReqWallet.state!!)))
+
+        redirectUri = authCodeResponse.toRedirectUri(authReq.redirectUri ?: TODO(), authReq.responseMode ?: ResponseMode.query)
+        Url(redirectUri).let {
+            assertContains(iterable = it.parameters.names(), element = ResponseType.Code.name.lowercase())
+            assertEquals(
+                expected = authCodeResponse.code,
+                actual = it.parameters[ResponseType.Code.name.lowercase()]
+            )
+        }
+
+
+        println("// -------- WALLET ----------")
+        println("// token req")
+        tokenReq =
+            TokenRequest(
+                GrantType.authorization_code,
+                testCIClientConfig.clientID,
+                code = authCodeResponse.code!!
+            )
+        println("tokenReq: $tokenReq")
+
+
+        println("// -------- CREDENTIAL ISSUER ----------")
+        // Validate token request against authorization code
+        OpenID4VCI.validateTokenRequestRaw(tokenReq.toHttpParameters(), authorizationCode)
+
+        // Generate Access Token
+        expirationTime = (Clock.System.now().epochSeconds + 864000L) // ten days in milliseconds
+
+        accessToken = OpenID4VCI.signToken(
+            privateKey = ciTestProvider.CI_TOKEN_KEY,
+            payload = buildJsonObject {
+                put(JWTClaims.Payload.audience, ciTestProvider.baseUrl)
+                put(JWTClaims.Payload.subject, authReq.clientId)
+                put(JWTClaims.Payload.issuer, ciTestProvider.baseUrl)
+                put(JWTClaims.Payload.expirationTime, expirationTime)
+                put(JWTClaims.Payload.notBeforeTime, Clock.System.now().epochSeconds)
+            }
+        )
+
+        // Issuer client creates cPoPnonce
+        cPoPNonce = "secured_cPoPnonce_idtoken"
+        tokenResponse = TokenResponse.success(accessToken, "bearer", cNonce = cPoPNonce, expiresIn = expirationTime)
+
+        // Issuer client sends successful response with tokenResponse
+
+        println("// -------- WALLET ----------")
+        assertTrue(actual = tokenResponse.isSuccess)
+        assertNotNull(actual = tokenResponse.accessToken)
+        assertNotNull(actual = tokenResponse.cNonce)
+
+        println("// receive credential")
+        nonce = tokenResponse.cNonce!!
+        proofOfPossession = ProofOfPossession.JWTProofBuilder(ciTestProvider.baseUrl, null, nonce, proofKeyId).build(holderKey)
+
+        credReq = CredentialRequest.forOfferedCredential(offeredCredential, proofOfPossession)
+        println("credReq: $credReq")
+
+        println("// -------- CREDENTIAL ISSUER ----------")
+        // Issuer Client extracts Access Token from header
+        OpenID4VCI.verifyToken(tokenResponse.accessToken.toString(),  ciTestProvider.CI_TOKEN_KEY.getPublicKey())
+
+        //Then VC Stuff
+
+
+        // ----------------------------------
+        // Authentication Method is PRE_AUTHORIZED
+        // ----------------------------------
+        println("// --Authentication method is PRE_AUTHORIZED--")
+        val preAuthCode = "test-state-pre_auth"
+        val credOffer = CredentialOffer.Builder(baseUrl)
+            .addOfferedCredential(issuedCredentialId)
+            .addPreAuthorizedCodeGrant(preAuthCode)
+            .build()
+
+        issueReqUrl = OpenID4VCI.getCredentialOfferRequestUrl(credOffer)
+        // Issuer Client shows credential offer request as QR code
+        println(issueReqUrl)
+
+        println("// -------- WALLET ----------")
+        parsedCredOffer = OpenID4VCI.parseAndResolveCredentialOfferRequestUrl(issueReqUrl)
+        providerMetadata = OpenID4VCI.resolveCIProviderMetadata(parsedCredOffer)
+        assertEquals(expected = parsedCredOffer.credentialIssuer, actual = providerMetadata.credentialIssuer)
+
+        println("// resolve offered credentials")
+        offeredCredentials = OpenID4VCI.resolveOfferedCredentials(parsedCredOffer, providerMetadata)
+        println("offeredCredentials: $offeredCredentials")
+        assertEquals(expected = 1, actual = offeredCredentials.size)
+        assertEquals(expected = CredentialFormat.jwt_vc_json, actual = offeredCredentials.first().format)
+        assertEquals(expected = "VerifiableId", actual = offeredCredentials.first().types?.last())
+        offeredCredential = offeredCredentials.first()
+        println("offeredCredentials[0]: $offeredCredential")
+        assertNotNull(actual = parsedCredOffer.grants[GrantType.pre_authorized_code.value]?.preAuthorizedCode)
+
+
+        println("// token req")
+        tokenReq = TokenRequest(
+            grantType = GrantType.pre_authorized_code,
+            //clientId = testCIClientConfig.clientID,
+            redirectUri = credentialWallet.config.redirectUri,
+            preAuthorizedCode = parsedCredOffer.grants[GrantType.pre_authorized_code.value]!!.preAuthorizedCode,
+            txCode = null
+        )
+
+
+        println("// -------- CREDENTIAL ISSUER ----------")
+        // Validate token request against authorization code
+        OpenID4VCI.validateTokenRequestRaw(tokenReq.toHttpParameters(), preAuthCode)
+
+        // Generate Access Token
+        expirationTime = (Clock.System.now().epochSeconds + 864000L) // ten days in milliseconds
+
+        accessToken = OpenID4VCI.signToken(
+            privateKey = ciTestProvider.CI_TOKEN_KEY,
+            payload = buildJsonObject {
+                put(JWTClaims.Payload.audience, ciTestProvider.baseUrl)
+                put(JWTClaims.Payload.subject, authReq.clientId)
+                put(JWTClaims.Payload.issuer, ciTestProvider.baseUrl)
+                put(JWTClaims.Payload.expirationTime, expirationTime)
+                put(JWTClaims.Payload.notBeforeTime, Clock.System.now().epochSeconds)
+            }
+        )
+
+        // Issuer client creates cPoPnonce
+        cPoPNonce = "secured_cPoPnonce_preauthorized"
+        tokenResponse = TokenResponse.success(accessToken, "bearer", cNonce = cPoPNonce, expiresIn = expirationTime)
+
+        // Issuer client sends successful response with tokenResponse
+
+
+        println("// -------- WALLET ----------")
+        assertTrue(actual = tokenResponse.isSuccess)
+        assertNotNull(actual = tokenResponse.accessToken)
+        assertNotNull(actual = tokenResponse.cNonce)
+
+        println("// receive credential")
+        nonce = tokenResponse.cNonce!!
+        proofOfPossession = ProofOfPossession.JWTProofBuilder(ciTestProvider.baseUrl, null, nonce, proofKeyId).build(holderKey)
+
+        credReq = CredentialRequest.forOfferedCredential(offeredCredential, proofOfPossession)
+        println("credReq: $credReq")
+
+        println("// -------- CREDENTIAL ISSUER ----------")
+        // Issuer Client extracts Access Token from header
+        OpenID4VCI.verifyToken(tokenResponse.accessToken.toString(),  ciTestProvider.CI_TOKEN_KEY.getPublicKey())
+
+        //Then VC Stuff
+
+
+    }
+
+//
+//    @Test
+//    fun testCredentialIssuanceIsolatedFunctionsAuthCodeFlowWithNoneAuth() = runTest {
+//        // TODO: consider re-implementing CITestProvider, making use of new lib functions
+//        // is it ok to generate the credential offer using the ciTestProvider (OpenIDCredentialIssuer class) ?
+//
+//        println("// -------- CREDENTIAL ISSUER ----------")
+//        // init credential offer for full authorization code flow
+//        // Issuer Client stores the authentication method in session, NONE in this case (PRE_AUTHORIZED, PWD, ID_TOKEN, VP_TOKEN, NONE)
+//        val credOffer = CredentialOffer.Builder(ciTestProvider.baseUrl)
+//            .addOfferedCredential("VerifiableId")
+//            .addAuthorizationCodeGrant("test-state-none-auth")
+//            .build()
+//        val issueReqUrl = OpenID4VCI.getCredentialOfferRequestUrl(credOffer)
+//        ciTestProvider.deferIssuance = false
+//
+//        // Show credential offer request as QR code
+//        println(issueReqUrl)
+//
+//
+//        println("// -------- WALLET ----------")
+////        val parsedCredOffer = runBlocking { OpenID4VCI.parseAndResolveCredentialOfferRequestUrl(issueReqUrl) }
+//        val parsedCredOffer = OpenID4VCI.parseAndResolveCredentialOfferRequestUrl(issueReqUrl)
+//        assertEquals(expected = credOffer.toJSONString(), actual = parsedCredOffer.toJSONString())
+//
+////        val providerMetadata = runBlocking { OpenID4VCI.resolveCIProviderMetadata(parsedCredOffer) }
+//        val providerMetadata = OpenID4VCI.resolveCIProviderMetadata(parsedCredOffer)
+//        assertEquals(expected = parsedCredOffer.credentialIssuer, actual = providerMetadata.credentialIssuer)
+//
+//        println("// resolve offered credentials")
+//        val offeredCredentials = OpenID4VCI.resolveOfferedCredentials(parsedCredOffer, providerMetadata)
+//        println("offeredCredentials: $offeredCredentials")
+//        assertEquals(expected = 1, actual = offeredCredentials.size)
+//        assertEquals(expected = CredentialFormat.jwt_vc_json, actual = offeredCredentials.first().format)
+//        assertEquals(expected = "VerifiableId", actual = offeredCredentials.first().types?.last())
+//        val offeredCredential = offeredCredentials.first()
+//        println("offeredCredentials[0]: $offeredCredential")
+//
+//        println("// go through authorization code flow to receive offered credential")
+//        println("// auth request (short-cut, without pushed authorization request)")
+//        val authReqWalletState = "secured_state"
+//        val authReqWallet = AuthorizationRequest(
+//            setOf(ResponseType.Code), testCIClientConfig.clientID,
+//            redirectUri = credentialWallet.config.redirectUri,
+//            issuerState = parsedCredOffer.grants[GrantType.authorization_code.value]!!.issuerState,
+//            state = authReqWalletState
+//        )
+//        println("authReq: $authReqWallet")
+//
+//        // Wallet client calls /authorize endpoint
+//
+//
+//        println("// -------- CREDENTIAL ISSUER ----------")
+//        val authReq = validateAuthorizationRequestQueryString(authReqWallet.toHttpQueryString())
+//
+//        // Issuer client retrieves issuance session based on issuer state and stores the credential request, including authReqWallet state
+//        // Available authentication methods are: NONE, ID_TOKEN, VP_TOKEN, PWD(Handled by third party authorization server). The response for each method is a redirect to the proper location.
+//
+//        // Issuer client checks the authentication method of the session
+//        // A) authentication method is NONE
+//
+//        // Issuer client generates authorization code
+//
+//        val authorizationCode = "secured_code"
+//        val authCodeResponse: AuthorizationCodeResponse = AuthorizationCodeResponse.success(authorizationCode,  mapOf("state" to listOf(authReqWallet.state!!)))
+//
+//        val redirectUri = authCodeResponse.toRedirectUri(authReq.redirectUri ?: TODO(), authReq.responseMode ?: ResponseMode.query)
+//        Url(redirectUri).let {
+//            assertContains(iterable = it.parameters.names(), element = ResponseType.Code.name.lowercase())
+//            assertEquals(
+//                expected = authCodeResponse.code,
+//                actual = it.parameters[ResponseType.Code.name.lowercase()]
+//            )
+//        }
+//
+//        // Issuer client redirects the request to redirectUri
+//
+//        println("// -------- WALLET ----------")
+//        println("// token req")
+//        val tokenReq =
+//            TokenRequest(
+//                GrantType.authorization_code,
+//                testCIClientConfig.clientID,
+//                code = authCodeResponse.code!!
+//            )
+//        println("tokenReq: $tokenReq")
+//
+//
+//        println("// -------- CREDENTIAL ISSUER ----------")
+//        // Validate token request against authorization code
+//        validateTokenRequestRaw(tokenReq.toHttpParameters(), authorizationCode)
+//
+//        // Generate Access Token
+//        val expirationTime = (Clock.System.now().epochSeconds + 864000L) // ten days in milliseconds
+//
+//        val accessToken = signToken(
+//            privateKey = ciTestProvider.CI_TOKEN_KEY,
+//            payload = buildJsonObject {
+//                put(JWTClaims.Payload.audience, ciTestProvider.baseUrl)
+//                put(JWTClaims.Payload.subject, authReq.clientId)
+//                put(JWTClaims.Payload.issuer, ciTestProvider.baseUrl)
+//                put(JWTClaims.Payload.expirationTime, expirationTime)
+//                put(JWTClaims.Payload.notBeforeTime, Clock.System.now().epochSeconds)
+//            }
+//        )
+//
+//        // Issuer client creates cPoPnonce
+//        val cPoPNonce = "secured_cPoPnonce"
+//        val tokenResponse: TokenResponse = TokenResponse.success(accessToken, "bearer", cNonce = cPoPNonce, expiresIn = expirationTime)
+//
+//        // Issuer client sends successful response with tokenResponse
+//
+//
+//        println("// -------- WALLET ----------")
+//        assertTrue(actual = tokenResponse.isSuccess)
+//        assertNotNull(actual = tokenResponse.accessToken)
+//        assertNotNull(actual = tokenResponse.cNonce)
+//
+//        println("// receive credential")
+//        val nonce = tokenResponse.cNonce!!
+//        val holderDid = TEST_WALLET_DID_WEB1
+////        val holderKey = runBlocking { JWKKey.importJWK(TEST_WALLET_KEY1) }.getOrThrow()
+//        val holderKey = JWKKey.importJWK(TEST_WALLET_KEY1).getOrThrow()
+////        val holderKeyId = runBlocking { holderKey.getKeyId() }
+//        val holderKeyId = holderKey.getKeyId()
+//        val proofKeyId = "$holderDid#$holderKeyId"
+//        val proofOfPossession =
+//            ProofOfPossession.JWTProofBuilder(ciTestProvider.baseUrl, null, nonce, proofKeyId).build(holderKey)
+//
+//        val credReq = CredentialRequest.forOfferedCredential(offeredCredential, proofOfPossession)
+//        println("credReq: $credReq")
+//
+//
+//        println("// -------- CREDENTIAL ISSUER ----------")
+//        // Issuer Client extracts Access Token from header
+//        verifyToken(tokenResponse.accessToken.toString(),  ciTestProvider.CI_TOKEN_KEY.getPublicKey())
+//
+//        val parsedHolderKeyId = credReq.proof?.jwt?.let { JwtUtils.parseJWTHeader(it) }?.get("kid")?.jsonPrimitive?.content
+//        assertNotNull(actual = parsedHolderKeyId)
+//        assertTrue(actual = parsedHolderKeyId.startsWith("did:"))
+//        val parsedHolderDid = parsedHolderKeyId.substringBefore("#")
+////        val resolvedKeyForHolderDid = runBlocking { DidService.resolveToKey(parsedHolderDid) }.getOrThrow()
+//        val resolvedKeyForHolderDid = DidService.resolveToKey(parsedHolderDid).getOrThrow()
+//
+//        val validPoP = credReq.proof?.validateJwtProof(resolvedKeyForHolderDid, ciTestProvider.baseUrl,null, nonce, parsedHolderKeyId)
+//        assertTrue(actual = validPoP!!)
+//        val generatedCredential = ciTestProvider.generateCredential(credReq).credential
+//        assertNotNull(generatedCredential)
+//        val credentialResponse: CredentialResponse = CredentialResponse.success(credReq.format, generatedCredential)
+//
+//        println("// -------- WALLET ----------")
+//        assertTrue(actual = credentialResponse.isSuccess)
+//        assertFalse(actual = credentialResponse.isDeferred)
+//        assertEquals(expected = CredentialFormat.jwt_vc_json, actual = credentialResponse.format!!)
+//        assertTrue(actual = credentialResponse.credential!!.instanceOf(JsonPrimitive::class))
+//
+//        println("// parse and verify credential")
+//        val credential = credentialResponse.credential!!.jsonPrimitive.content
+//        println(">>> Issued credential: $credential")
+//        verifyIssuerAndSubjectId(
+//            SDJwt.parse(credential).fullPayload["vc"]?.jsonObject!!,
+//            ciTestProvider.CI_ISSUER_DID, credentialWallet.TEST_DID
+//        )
+//        assertTrue(actual = JwtSignaturePolicy().verify(credential, null, mapOf()).isSuccess)
+//    }
+//
+//    @Test
+//    fun testCredentialIssuanceIsolatedFunctionsAuthCodeFlowWithIdTokenAuth() = runTest {
+//        // TODO: consider re-implementing CITestProvider, making use of new lib functions
+//        // is it ok to generate the credential offer using the ciTestProvider (OpenIDCredentialIssuer class) ?
+//
+//        println("// -------- CREDENTIAL ISSUER ----------")
+//        // init credential offer for full authorization code flow
+//        // Issuer Client stores the authentication method in session, ID_TOKEN in this case (PRE_AUTHORIZED, PWD, ID_TOKEN, VP_TOKEN, NONE)
+//
+//        val credOffer = CredentialOffer.Builder(ciTestProvider.baseUrl)
+//            .addOfferedCredential("VerifiableId")
+//            .addAuthorizationCodeGrant("test-state-idtoken-auth")
+//            .build()
+//        val issueReqUrl = OpenID4VCI.getCredentialOfferRequestUrl(credOffer)
+//        ciTestProvider.deferIssuance = false
+//
+//        // Show credential offer request as QR code
+//        println(issueReqUrl)
+//
+//
+//        println("// -------- WALLET ----------")
+////        val parsedCredOffer = runBlocking { OpenID4VCI.parseAndResolveCredentialOfferRequestUrl(issueReqUrl) }
+//        val parsedCredOffer = OpenID4VCI.parseAndResolveCredentialOfferRequestUrl(issueReqUrl)
+//        assertEquals(expected = credOffer.toJSONString(), actual = parsedCredOffer.toJSONString())
+//
+////        val providerMetadata = runBlocking { OpenID4VCI.resolveCIProviderMetadata(parsedCredOffer) }
+//        val providerMetadata = OpenID4VCI.resolveCIProviderMetadata(parsedCredOffer)
+//        assertEquals(expected = parsedCredOffer.credentialIssuer, actual = providerMetadata.credentialIssuer)
+//
+//        println("// resolve offered credentials")
+//        val offeredCredentials = OpenID4VCI.resolveOfferedCredentials(parsedCredOffer, providerMetadata)
+//        println("offeredCredentials: $offeredCredentials")
+//        assertEquals(expected = 1, actual = offeredCredentials.size)
+//        assertEquals(expected = CredentialFormat.jwt_vc_json, actual = offeredCredentials.first().format)
+//        assertEquals(expected = "VerifiableId", actual = offeredCredentials.first().types?.last())
+//        val offeredCredential = offeredCredentials.first()
+//        println("offeredCredentials[0]: $offeredCredential")
+//
+//        println("// go through authorization code flow to receive offered credential")
+//        println("// auth request (short-cut, without pushed authorization request)")
+//        val authReqWalletState = "secured_state_wallet"
+//        val authReqWallet = AuthorizationRequest(
+//            setOf(ResponseType.Code), testCIClientConfig.clientID,
+//            redirectUri = credentialWallet.config.redirectUri,
+//            issuerState = parsedCredOffer.grants[GrantType.authorization_code.value]!!.issuerState,
+//            state = authReqWalletState,
+//            clientMetadata = OpenIDClientMetadata(customParameters=mapOf("authorization_endpoint" to "wallet-api.com/callback".toJsonElement()))
+//        )
+//        println("authReq: $authReqWallet")
+//
+//        // Wallet client calls /authorize endpoint
+//
+//        println("// -------- CREDENTIAL ISSUER ----------")
+//        val authReq = OpenID4VCI.validateAuthorizationRequestQueryString(authReqWallet.toHttpQueryString())
+//
+//        // Issuer client retrieves issuance session based on issuer state and stores the credential request, including authReqWallet state
+//        // Issuer client checks the authentication method of the session and find out that authentication method is ID_TOKEN
+//        // Issuer client creates state and nonce for the id token authorization request
+//        val authReqIssuerState = "secured_state_issuer"
+//        val authReqIssuerNonce = "secured_nonce_issuer"
+//
+//        val authReqIssuer = OpenID4VCI.generateAuthorizationRequest(authReq, ciTestProvider.baseUrl, ciTestProvider.CI_TOKEN_KEY, ResponseType.IdToken, authReqIssuerState, authReqIssuerNonce)
+//
+//        // Redirect uri is located in the client_metadata.authorization_endpoint or "openid://"
+//        val redirectUriReq = authReqIssuer.toRedirectUri(authReq.clientMetadata?.customParameters?.get("authorization_endpoint")?.jsonPrimitive?.content ?: "openid://", authReq.responseMode ?: ResponseMode.query)
+//        Url(redirectUriReq).let {
+//            assertContains(iterable = it.parameters.names(), element = "request")
+//            assertContains(iterable = it.parameters.names(), element = "redirect_uri")
+//            assertEquals(expected = ciTestProvider.baseUrl + "/direct_post", actual = it.parameters["redirect_uri"])
+//        }
+//
+//        // Issuer client redirects the request to redirectUri
+//        println("// -------- WALLET ----------")
+//        // wallet creates id token
+//        val idToken = "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiIsImtpZCI6ImRpZDprZXk6ejJkbXpEODFjZ1B4OFZraTdKYnV1TW1GWXJXUGdZb3l0eWtVWjNleXFodDFqOUtib2o3ZzlQZlhKeGJiczRLWWVneXI3RUxuRlZucERNemJKSkRETlpqYXZYNmp2dERtQUxNYlhBR1c2N3BkVGdGZWEyRnJHR1NGczhFanhpOTZvRkxHSGNMNFA2YmpMRFBCSkV2UlJIU3JHNExzUG5lNTJmY3p0Mk1XakhMTEpCdmhBQyN6MmRtekQ4MWNnUHg4VmtpN0pidXVNbUZZcldQZ1lveXR5a1VaM2V5cWh0MWo5S2JvajdnOVBmWEp4YmJzNEtZZWd5cjdFTG5GVm5wRE16YkpKREROWmphdlg2anZ0RG1BTE1iWEFHVzY3cGRUZ0ZlYTJGckdHU0ZzOEVqeGk5Nm9GTEdIY0w0UDZiakxEUEJKRXZSUkhTckc0THNQbmU1MmZjenQyTVdqSExMSkJ2aEFDIn0.eyJub25jZSI6ImE4YWE1NDYwLTRmN2UtNDRmNy05ZGE3LWU1NmQ0YjIxMWE1MSIsInN1YiI6ImRpZDprZXk6ejJkbXpEODFjZ1B4OFZraTdKYnV1TW1GWXJXUGdZb3l0eWtVWjNleXFodDFqOUtib2o3ZzlQZlhKeGJiczRLWWVneXI3RUxuRlZucERNemJKSkRETlpqYXZYNmp2dERtQUxNYlhBR1c2N3BkVGdGZWEyRnJHR1NGczhFanhpOTZvRkxHSGNMNFA2YmpMRFBCSkV2UlJIU3JHNExzUG5lNTJmY3p0Mk1XakhMTEpCdmhBQyIsImlzcyI6ImRpZDprZXk6ejJkbXpEODFjZ1B4OFZraTdKYnV1TW1GWXJXUGdZb3l0eWtVWjNleXFodDFqOUtib2o3ZzlQZlhKeGJiczRLWWVneXI3RUxuRlZucERNemJKSkRETlpqYXZYNmp2dERtQUxNYlhBR1c2N3BkVGdGZWEyRnJHR1NGczhFanhpOTZvRkxHSGNMNFA2YmpMRFBCSkV2UlJIU3JHNExzUG5lNTJmY3p0Mk1XakhMTEpCdmhBQyIsImF1ZCI6Imh0dHBzOi8vMDFiYi01LTIwMy0xNzQtNjcubmdyb2stZnJlZS5hcHAiLCJpYXQiOjE3MjExNDQ3MzYsImV4cCI6MTcyMTE0NTAzNn0.VPWyLkMQAlcc40WCNSRH-Vxaj4LHi-wf2P9kcEKDvcdyVec2xJIwkg0JF4INMbLCkF0Y89lT0oswALd345wdUg"
+//        // wallet calls POST /direct_post (e.g. redirect_uri of Issuer Auth Req) providing the id_token
+//
+//        println("// -------- CREDENTIAL ISSUER ----------")
+//        // Create validateIdTokenResponse()
+//        val idTokenPayload = validateAuthorizationRequestToken(idToken)
+//
+//        // Issuer Client validates states and nonces based on idTokenPayload
+//
+//        // Issuer client generates authorization code
+//        val authorizationCode = "secured_code"
+//        val authCodeResponse: AuthorizationCodeResponse = AuthorizationCodeResponse.success(authorizationCode,  mapOf("state" to listOf(authReqWallet.state!!)))
+//
+//        val redirectUri = authCodeResponse.toRedirectUri(authReq.redirectUri ?: TODO(), authReq.responseMode ?: ResponseMode.query)
+//        Url(redirectUri).let {
+//            assertContains(iterable = it.parameters.names(), element = ResponseType.Code.name.lowercase())
+//            assertEquals(
+//                expected = authCodeResponse.code,
+//                actual = it.parameters[ResponseType.Code.name.lowercase()]
+//            )
+//        }
+//
+//        // Issuer client redirects the request to redirectUri
+//
+//        println("// -------- WALLET ----------")
+//        println("// token req")
+//        val tokenReq =
+//            TokenRequest(
+//                GrantType.authorization_code,
+//                testCIClientConfig.clientID,
+//                code = authCodeResponse.code!!
+//            )
+//        println("tokenReq: $tokenReq")
+//
+//
+//        println("// -------- CREDENTIAL ISSUER ----------")
+//        // Validate token request against authorization code
+//        validateTokenRequestRaw(tokenReq.toHttpParameters(), authorizationCode)
+//
+//        // Generate Access Token
+//        val expirationTime = (Clock.System.now().epochSeconds + 864000L) // ten days in milliseconds
+//        val accessToken = signToken(
+//            privateKey = ciTestProvider.CI_TOKEN_KEY,
+//            payload = buildJsonObject {
+//                put(JWTClaims.Payload.audience, ciTestProvider.baseUrl)
+//                put(JWTClaims.Payload.subject, authReq.clientId)
+//                put(JWTClaims.Payload.issuer, ciTestProvider.baseUrl)
+//                put(JWTClaims.Payload.expirationTime, expirationTime)
+//                put(JWTClaims.Payload.notBeforeTime, Clock.System.now().epochSeconds)
+//            }
+//        )
+//        // Issuer client creates cPoPnonce
+//        val cPoPNonce = "secured_cPoPnonce"
+//        val tokenResponse: TokenResponse = TokenResponse.success(accessToken, "bearer", cNonce = cPoPNonce, expiresIn = expirationTime)
+//
+//        // Issuer client sends successful response with tokenResponse
+//
+//
+//        //
+//        println("// -------- WALLET ----------")
+//        assertTrue(actual = tokenResponse.isSuccess)
+//        assertNotNull(actual = tokenResponse.accessToken)
+//        assertNotNull(actual = tokenResponse.cNonce)
+//
+//        println("// receive credential")
+//        val nonce = tokenResponse.cNonce!!
+//        val holderDid = TEST_WALLET_DID_WEB1
+////        val holderKey = runBlocking { JWKKey.importJWK(TEST_WALLET_KEY1) }.getOrThrow()
+//        val holderKey = JWKKey.importJWK(TEST_WALLET_KEY1).getOrThrow()
+////        val holderKeyId = runBlocking { holderKey.getKeyId() }
+//        val holderKeyId = holderKey.getKeyId()
+//        val proofKeyId = "$holderDid#$holderKeyId"
+//        val proofOfPossession =
+//            ProofOfPossession.JWTProofBuilder(ciTestProvider.baseUrl, null, nonce, proofKeyId).build(holderKey)
+//
+//        val credReq = CredentialRequest.forOfferedCredential(offeredCredential, proofOfPossession)
+//        println("credReq: $credReq")
+//
+//
+//        println("// -------- CREDENTIAL ISSUER ----------")
+//        // Issuer Client extracts Access Token from header
+//        verifyToken(tokenResponse.accessToken.toString(),  ciTestProvider.CI_TOKEN_KEY)
+//
+//        val parsedHolderKeyId = credReq.proof?.jwt?.let { JwtUtils.parseJWTHeader(it) }?.get("kid")?.jsonPrimitive?.content
+//        assertNotNull(actual = parsedHolderKeyId)
+//        assertTrue(actual = parsedHolderKeyId.startsWith("did:"))
+//        val parsedHolderDid = parsedHolderKeyId.substringBefore("#")
+////        val resolvedKeyForHolderDid = runBlocking { DidService.resolveToKey(parsedHolderDid) }.getOrThrow()
+//        val resolvedKeyForHolderDid = DidService.resolveToKey(parsedHolderDid).getOrThrow()
+//
+//        val validPoP = credReq.proof?.validateJwtProof(resolvedKeyForHolderDid, ciTestProvider.baseUrl,null, nonce, parsedHolderKeyId)
+//        assertTrue(actual = validPoP!!)
+//        val generatedCredential = ciTestProvider.generateCredential(credReq).credential
+//        assertNotNull(generatedCredential)
+//        val credentialResponse: CredentialResponse = CredentialResponse.success(credReq.format, generatedCredential)
+//
+//        println("// -------- WALLET ----------")
+//        assertTrue(actual = credentialResponse.isSuccess)
+//        assertFalse(actual = credentialResponse.isDeferred)
+//        assertEquals(expected = CredentialFormat.jwt_vc_json, actual = credentialResponse.format!!)
+//        assertTrue(actual = credentialResponse.credential!!.instanceOf(JsonPrimitive::class))
+//
+//        println("// parse and verify credential")
+//        val credential = credentialResponse.credential!!.jsonPrimitive.content
+//        println(">>> Issued credential: $credential")
+//        verifyIssuerAndSubjectId(
+//            SDJwt.parse(credential).fullPayload["vc"]?.jsonObject!!,
+//            ciTestProvider.CI_ISSUER_DID, credentialWallet.TEST_DID
+//        )
+//        assertTrue(actual = JwtSignaturePolicy().verify(credential, null, mapOf()).isSuccess)
+//    }
+//
+//    @Test
+//    fun testCredentialIssuanceIsolatedFunctionsAuthCodeFlowWithVpTokenAuth() = runTest {
+//        // TODO: consider re-implementing CITestProvider, making use of new lib functions
+//        // is it ok to generate the credential offer using the ciTestProvider (OpenIDCredentialIssuer class) ?
+//
+//        println("// -------- CREDENTIAL ISSUER ----------")
+//        // init credential offer for full authorization code flow
+//        // Issuer Client stores the authentication method in session, ID_TOKEN in this case (PRE_AUTHORIZED, PWD, ID_TOKEN, VP_TOKEN, NONE)
+//
+//        val credOffer = CredentialOffer.Builder(ciTestProvider.baseUrl)
+//            .addOfferedCredential("VerifiableId")
+//            .addAuthorizationCodeGrant("test-state-vptoken-auth")
+//            .build()
+//        val issueReqUrl = OpenID4VCI.getCredentialOfferRequestUrl(credOffer)
+//        ciTestProvider.deferIssuance = false
+//
+//        // Show credential offer request as QR code
+//        println(issueReqUrl)
+//
+//
+//        println("// -------- WALLET ----------")
+////        val parsedCredOffer = runBlocking { OpenID4VCI.parseAndResolveCredentialOfferRequestUrl(issueReqUrl) }
+//        val parsedCredOffer = OpenID4VCI.parseAndResolveCredentialOfferRequestUrl(issueReqUrl)
+//        assertEquals(expected = credOffer.toJSONString(), actual = parsedCredOffer.toJSONString())
+//
+////        val providerMetadata = runBlocking { OpenID4VCI.resolveCIProviderMetadata(parsedCredOffer) }
+//        val providerMetadata = OpenID4VCI.resolveCIProviderMetadata(parsedCredOffer)
+//        assertEquals(expected = parsedCredOffer.credentialIssuer, actual = providerMetadata.credentialIssuer)
+//
+//        println("// resolve offered credentials")
+//        val offeredCredentials = OpenID4VCI.resolveOfferedCredentials(parsedCredOffer, providerMetadata)
+//        println("offeredCredentials: $offeredCredentials")
+//        assertEquals(expected = 1, actual = offeredCredentials.size)
+//        assertEquals(expected = CredentialFormat.jwt_vc_json, actual = offeredCredentials.first().format)
+//        assertEquals(expected = "VerifiableId", actual = offeredCredentials.first().types?.last())
+//        val offeredCredential = offeredCredentials.first()
+//        println("offeredCredentials[0]: $offeredCredential")
+//
+//        println("// go through authorization code flow to receive offered credential")
+//        println("// auth request (short-cut, without pushed authorization request)")
+//        val authReqWalletState = "secured_state_wallet"
+//        val authReqWallet = AuthorizationRequest(
+//            setOf(ResponseType.Code), testCIClientConfig.clientID,
+//            redirectUri = credentialWallet.config.redirectUri,
+//            issuerState = parsedCredOffer.grants[GrantType.authorization_code.value]!!.issuerState,
+//            state = authReqWalletState,
+//            clientMetadata = OpenIDClientMetadata(customParameters=mapOf("authorization_endpoint" to "wallet-api.com/callback".toJsonElement()))
+//        )
+//        println("authReq: $authReqWallet")
+//
+//        // Wallet client calls /authorize endpoint
+//
+//        println("// -------- CREDENTIAL ISSUER ----------")
+//        val authReq = validateAuthorizationRequestQueryString(authReqWallet.toHttpQueryString())
+//
+//        // Issuer client retrieves issuance session based on issuer state and stores the credential request, including authReqWallet state
+//        // Issuer client checks the authentication method of the session and find out that authentication method is VP_TOKEN
+//        // Issuer client generates presentation definition
+//        val requestedCredentialId = "OpenBadgeCredential"
+//        val vpProfile = OpenId4VPProfile.EBSIV3
+//        val requestCredentialsArr = buildJsonArray { add(requestedCredentialId) }
+//        val requestedTypes = requestCredentialsArr.map {
+//            when (it) {
+//                is JsonPrimitive -> it.contentOrNull
+//                is JsonObject -> it["credential"]?.jsonPrimitive?.contentOrNull
+//                else -> throw IllegalArgumentException("Invalid JSON type for requested credential: $it")
+//            } ?: throw IllegalArgumentException("Invalid VC type for requested credential: $it")
+//        }
+//
+//        val presentationDefinition = PresentationDefinition.primitiveGenerationFromVcTypes(requestedTypes, vpProfile)
+//
+//        // Issuer client creates state and nonce for the vp token authorization request
+//        val authReqIssuerState = "secured_state_issuer"
+//        val authReqIssuerNonce = "secured_nonce_issuer"
+//
+//        val authReqIssuer = generateAuthorizationRequest(authReq, ciTestProvider.baseUrl, ciTestProvider.CI_TOKEN_KEY, ResponseType.VpToken, authReqIssuerState, authReqIssuerNonce, true, presentationDefinition)
+//
+//        // Redirect uri is located in the client_metadata.authorization_endpoint or "openid://"
+//        val redirectUriReq = authReqIssuer.toRedirectUri(authReq.clientMetadata?.customParameters?.get("authorization_endpoint")?.jsonPrimitive?.content ?: "openid://", authReq.responseMode ?: ResponseMode.query)
+//        Url(redirectUriReq).let {
+//            assertContains(iterable = it.parameters.names(), element = "request")
+//            assertContains(iterable = it.parameters.names(), element = "redirect_uri")
+//            assertContains(iterable = it.parameters.names(), element = "presentation_definition")
+//            assertEquals(expected = ciTestProvider.baseUrl + "/direct_post", actual = it.parameters["redirect_uri"])
+//        }
+//
+//        // Issuer client redirects the request to redirectUri
+//        println("// -------- WALLET ----------")
+//        // wallet creates vp token
+//        val vpToken = "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCIsImtpZCI6ImRpZDprZXk6ejZNa3A3QVZ3dld4bnNORHVTU2JmMTlzZ0t6cngyMjNXWTk1QXFaeUFHaWZGVnlWI3o2TWtwN0FWd3ZXeG5zTkR1U1NiZjE5c2dLenJ4MjIzV1k5NUFxWnlBR2lmRlZ5ViJ9.eyJzdWIiOiJkaWQ6a2V5Ono2TWtwN0FWd3ZXeG5zTkR1U1NiZjE5c2dLenJ4MjIzV1k5NUFxWnlBR2lmRlZ5ViIsIm5iZiI6MTcyMDc2NDAxOSwiaWF0IjoxNzIwNzY0MDc5LCJqdGkiOiJ1cm46dXVpZDpiNzE2YThlOC0xNzVlLTRhMTYtODZlMC0xYzU2Zjc4NTFhZDEiLCJpc3MiOiJkaWQ6a2V5Ono2TWtwN0FWd3ZXeG5zTkR1U1NiZjE5c2dLenJ4MjIzV1k5NUFxWnlBR2lmRlZ5ViIsIm5vbmNlIjoiNDY0YTAwMTUtNzQ1OS00Y2Y4LWJmNjgtNDg0ODQyYTE5Y2FmIiwiYXVkIjoiZGlkOmtleTp6Nk1rcDdBVnd2V3huc05EdVNTYmYxOXNnS3pyeDIyM1dZOTVBcVp5QUdpZkZWeVYiLCJ2cCI6eyJAY29udGV4dCI6WyJodHRwczovL3d3dy53My5vcmcvMjAxOC9jcmVkZW50aWFscy92MSJdLCJ0eXBlIjpbIlZlcmlmaWFibGVQcmVzZW50YXRpb24iXSwiaWQiOiJ1cm46dXVpZDpiNzE2YThlOC0xNzVlLTRhMTYtODZlMC0xYzU2Zjc4NTFhZDEiLCJob2xkZXIiOiJkaWQ6a2V5Ono2TWtwN0FWd3ZXeG5zTkR1U1NiZjE5c2dLenJ4MjIzV1k5NUFxWnlBR2lmRlZ5ViIsInZlcmlmaWFibGVDcmVkZW50aWFsIjpbImV5SmhiR2NpT2lKRlpFUlRRU0lzSW5SNWNDSTZJa3BYVkNJc0ltdHBaQ0k2SW1ScFpEcHJaWGs2ZWpaTmEzQTNRVlozZGxkNGJuTk9SSFZUVTJKbU1UbHpaMHQ2Y25neU1qTlhXVGsxUVhGYWVVRkhhV1pHVm5sV0luMC5leUpwYzNNaU9pSmthV1E2YTJWNU9ubzJUV3R3TjBGV2QzWlhlRzV6VGtSMVUxTmlaakU1YzJkTGVuSjRNakl6VjFrNU5VRnhXbmxCUjJsbVJsWjVWaUlzSW5OMVlpSTZJbVJwWkRwclpYazZlalpOYTJwdE1tZGhSM052WkVkamFHWkhOR3M0VURaTGQwTklXbk5XUlZCYWFHODFWblZGWWxrNU5IRnBRa0k1SWl3aWRtTWlPbnNpUUdOdmJuUmxlSFFpT2xzaWFIUjBjSE02THk5M2QzY3Vkek11YjNKbkx6SXdNVGd2WTNKbFpHVnVkR2xoYkhNdmRqRWlMQ0pvZEhSd2N6b3ZMM0IxY213dWFXMXpaMnh2WW1Gc0xtOXlaeTl6Y0dWakwyOWlMM1l6Y0RBdlkyOXVkR1Y0ZEM1cWMyOXVJbDBzSW1sa0lqb2lkWEp1T25WMWFXUTZNVEl6SWl3aWRIbHdaU0k2V3lKV1pYSnBabWxoWW14bFEzSmxaR1Z1ZEdsaGJDSXNJazl3Wlc1Q1lXUm5aVU55WldSbGJuUnBZV3dpWFN3aWJtRnRaU0k2SWtwR1JpQjRJSFpqTFdWa2RTQlFiSFZuUm1WemRDQXpJRWx1ZEdWeWIzQmxjbUZpYVd4cGRIa2lMQ0pwYzNOMVpYSWlPbnNpZEhsd1pTSTZXeUpRY205bWFXeGxJbDBzSW1sa0lqb2laR2xrT21WNFlXMXdiR1U2TVRJeklpd2libUZ0WlNJNklrcHZZbk1nWm05eUlIUm9aU0JHZFhSMWNtVWdLRXBHUmlraUxDSjFjbXdpT2lKb2RIUndjem92TDNkM2R5NXFabVl1YjNKbkx5SXNJbWx0WVdkbElqcDdJbWxrSWpvaWFIUjBjSE02THk5M00yTXRZMk5uTG1kcGRHaDFZaTVwYnk5Mll5MWxaQzl3YkhWblptVnpkQzB4TFRJd01qSXZhVzFoWjJWekwwcEdSbDlNYjJkdlRHOWphM1Z3TG5CdVp5SXNJblI1Y0dVaU9pSkpiV0ZuWlNKOWZTd2lhWE56ZFdGdVkyVkVZWFJsSWpvaU1qQXlNeTB3TnkweU1GUXdOem93TlRvME5Gb2lMQ0psZUhCcGNtRjBhVzl1UkdGMFpTSTZJakl3TXpNdE1EY3RNakJVTURjNk1EVTZORFJhSWl3aVkzSmxaR1Z1ZEdsaGJGTjFZbXBsWTNRaU9uc2lhV1FpT2lKa2FXUTZaWGhoYlhCc1pUb3hNak1pTENKMGVYQmxJanBiSWtGamFHbGxkbVZ0Wlc1MFUzVmlhbVZqZENKZExDSmhZMmhwWlhabGJXVnVkQ0k2ZXlKcFpDSTZJblZ5YmpwMWRXbGtPbUZqTWpVMFltUTFMVGhtWVdRdE5HSmlNUzA1WkRJNUxXVm1aRGt6T0RVek5qa3lOaUlzSW5SNWNHVWlPbHNpUVdOb2FXVjJaVzFsYm5RaVhTd2libUZ0WlNJNklrcEdSaUI0SUhaakxXVmtkU0JRYkhWblJtVnpkQ0F6SUVsdWRHVnliM0JsY21GaWFXeHBkSGtpTENKa1pYTmpjbWx3ZEdsdmJpSTZJbFJvYVhNZ2QyRnNiR1YwSUhOMWNIQnZjblJ6SUhSb1pTQjFjMlVnYjJZZ1Z6TkRJRlpsY21sbWFXRmliR1VnUTNKbFpHVnVkR2xoYkhNZ1lXNWtJR2hoY3lCa1pXMXZibk4wY21GMFpXUWdhVzUwWlhKdmNHVnlZV0pwYkdsMGVTQmtkWEpwYm1jZ2RHaGxJSEJ5WlhObGJuUmhkR2x2YmlCeVpYRjFaWE4wSUhkdmNtdG1iRzkzSUdSMWNtbHVaeUJLUmtZZ2VDQldReTFGUkZVZ1VHeDFaMFpsYzNRZ015NGlMQ0pqY21sMFpYSnBZU0k2ZXlKMGVYQmxJam9pUTNKcGRHVnlhV0VpTENKdVlYSnlZWFJwZG1VaU9pSlhZV3hzWlhRZ2MyOXNkWFJwYjI1eklIQnliM1pwWkdWeWN5QmxZWEp1WldRZ2RHaHBjeUJpWVdSblpTQmllU0JrWlcxdmJuTjBjbUYwYVc1bklHbHVkR1Z5YjNCbGNtRmlhV3hwZEhrZ1pIVnlhVzVuSUhSb1pTQndjbVZ6Wlc1MFlYUnBiMjRnY21WeGRXVnpkQ0IzYjNKclpteHZkeTRnVkdocGN5QnBibU5zZFdSbGN5QnpkV05qWlhOelpuVnNiSGtnY21WalpXbDJhVzVuSUdFZ2NISmxjMlZ1ZEdGMGFXOXVJSEpsY1hWbGMzUXNJR0ZzYkc5M2FXNW5JSFJvWlNCb2IyeGtaWElnZEc4Z2MyVnNaV04wSUdGMElHeGxZWE4wSUhSM2J5QjBlWEJsY3lCdlppQjJaWEpwWm1saFlteGxJR055WldSbGJuUnBZV3h6SUhSdklHTnlaV0YwWlNCaElIWmxjbWxtYVdGaWJHVWdjSEpsYzJWdWRHRjBhVzl1TENCeVpYUjFjbTVwYm1jZ2RHaGxJSEJ5WlhObGJuUmhkR2x2YmlCMGJ5QjBhR1VnY21WeGRXVnpkRzl5TENCaGJtUWdjR0Z6YzJsdVp5QjJaWEpwWm1sallYUnBiMjRnYjJZZ2RHaGxJSEJ5WlhObGJuUmhkR2x2YmlCaGJtUWdkR2hsSUdsdVkyeDFaR1ZrSUdOeVpXUmxiblJwWVd4ekxpSjlMQ0pwYldGblpTSTZleUpwWkNJNkltaDBkSEJ6T2k4dmR6TmpMV05qWnk1bmFYUm9kV0l1YVc4dmRtTXRaV1F2Y0d4MVoyWmxjM1F0TXkweU1ESXpMMmx0WVdkbGN5OUtSa1l0VmtNdFJVUlZMVkJNVlVkR1JWTlVNeTFpWVdSblpTMXBiV0ZuWlM1d2JtY2lMQ0owZVhCbElqb2lTVzFoWjJVaWZYMTlMQ0pqY21Wa1pXNTBhV0ZzVTJOb1pXMWhJanA3SW1sa0lqb2lhSFIwY0hNNkx5OXdkWEpzTG1sdGMyZHNiMkpoYkM1dmNtY3ZjM0JsWXk5dllpOTJNM0F3TDNOamFHVnRZUzlxYzI5dUwyOWlYM1l6Y0RCZllXTm9hV1YyWlcxbGJuUmpjbVZrWlc1MGFXRnNYM05qYUdWdFlTNXFjMjl1SWl3aWRIbHdaU0k2SWtaMWJHeEtjMjl1VTJOb1pXMWhWbUZzYVdSaGRHOXlNakF5TVNKOWZTd2lhblJwSWpvaWRYSnVPblYxYVdRNk1USXpJaXdpWlhod0lqb3lNREExTkRVMU9UUTBMQ0pwWVhRaU9qRTJPRGs0TXpZM05EUXNJbTVpWmlJNk1UWTRPVGd6TmpjME5IMC5PRHZUQXVMN2JrME1pX3hNLVFualg4azByZ3VUeWtiYzJ6bFdFMVU2SGlmVXFjWTdFVU5GcUdUZWFUWHRESkxrODBuZWN6YkNNTGh1YlZseEFkdl9DdyJdfX0.zTXluOVIP0sQzc5GzNvtVvWRiaC-x9qMZg0d-EvCuRIg7QSgY0hmrfVlAzh2IDEvaXZ1ahM3hSVDx_YI74ToAw"
+//        // wallet calls POST /direct_post (e.g. redirect_uri of Issuer Auth Req) providing the id_token
+//
+//        println("// -------- CREDENTIAL ISSUER ----------")
+//        val vpTokenPayload = validateAuthorizationRequestToken(vpToken)
+//
+//        // Issuer Client validates states and nonces based on vpTokenPayload
+//
+//        // Issuer client generates authorization code
+//        val authorizationCode = "secured_code"
+//        val authCodeResponse: AuthorizationCodeResponse = AuthorizationCodeResponse.success(authorizationCode,  mapOf("state" to listOf(authReqWallet.state!!)))
+//
+//        val redirectUri = authCodeResponse.toRedirectUri(authReq.redirectUri ?: TODO(), authReq.responseMode ?: ResponseMode.query)
+//        Url(redirectUri).let {
+//            assertContains(iterable = it.parameters.names(), element = ResponseType.Code.name.lowercase())
+//            assertEquals(
+//                expected = authCodeResponse.code,
+//                actual = it.parameters[ResponseType.Code.name.lowercase()]
+//            )
+//        }
+//
+//        // Issuer client redirects the request to redirectUri
+//
+//        println("// -------- WALLET ----------")
+//        println("// token req")
+//        val tokenReq =
+//            TokenRequest(
+//                GrantType.authorization_code,
+//                testCIClientConfig.clientID,
+//                code = authCodeResponse.code!!
+//            )
+//        println("tokenReq: $tokenReq")
+//
+//
+//        println("// -------- CREDENTIAL ISSUER ----------")
+//        // Validate token request against authorization code
+//        validateTokenRequestRaw(tokenReq.toHttpParameters(), authorizationCode)
+//
+//        // Generate Access Token
+//        val expirationTime = (Clock.System.now().epochSeconds + 864000L) // ten days in milliseconds
+//        val accessToken = signToken(
+//            privateKey = ciTestProvider.CI_TOKEN_KEY,
+//            payload = buildJsonObject {
+//                put(JWTClaims.Payload.audience, ciTestProvider.baseUrl)
+//                put(JWTClaims.Payload.subject, authReq.clientId)
+//                put(JWTClaims.Payload.issuer, ciTestProvider.baseUrl)
+//                put(JWTClaims.Payload.expirationTime, expirationTime)
+//                put(JWTClaims.Payload.notBeforeTime, Clock.System.now().epochSeconds)
+//            }
+//        )
+//        // Issuer client creates cPoPnonce
+//        val cPoPNonce = "secured_cPoPnonce"
+//        val tokenResponse: TokenResponse = TokenResponse.success(accessToken, "bearer", cNonce = cPoPNonce, expiresIn = expirationTime)
+//
+//        // Issuer client sends successful response with tokenResponse
+//
+//
+//        //
+//        println("// -------- WALLET ----------")
+//        assertTrue(actual = tokenResponse.isSuccess)
+//        assertNotNull(actual = tokenResponse.accessToken)
+//        assertNotNull(actual = tokenResponse.cNonce)
+//
+//        println("// receive credential")
+//        val nonce = tokenResponse.cNonce!!
+//        val holderDid = TEST_WALLET_DID_WEB1
+////        val holderKey = runBlocking { JWKKey.importJWK(TEST_WALLET_KEY1) }.getOrThrow()
+//        val holderKey = JWKKey.importJWK(TEST_WALLET_KEY1).getOrThrow()
+////        val holderKeyId = runBlocking { holderKey.getKeyId() }
+//        val holderKeyId = holderKey.getKeyId()
+//        val proofKeyId = "$holderDid#$holderKeyId"
+//        val proofOfPossession =
+//            ProofOfPossession.JWTProofBuilder(ciTestProvider.baseUrl, null, nonce, proofKeyId).build(holderKey)
+//
+//        val credReq = CredentialRequest.forOfferedCredential(offeredCredential, proofOfPossession)
+//        println("credReq: $credReq")
+//
+//
+//        println("// -------- CREDENTIAL ISSUER ----------")
+//        // Issuer Client extracts Access Token from header
+//        verifyToken(tokenResponse.accessToken.toString(),  ciTestProvider.CI_TOKEN_KEY)
+//
+//        val parsedHolderKeyId = credReq.proof?.jwt?.let { JwtUtils.parseJWTHeader(it) }?.get("kid")?.jsonPrimitive?.content
+//        assertNotNull(actual = parsedHolderKeyId)
+//        assertTrue(actual = parsedHolderKeyId.startsWith("did:"))
+//        val parsedHolderDid = parsedHolderKeyId.substringBefore("#")
+////        val resolvedKeyForHolderDid = runBlocking { DidService.resolveToKey(parsedHolderDid) }.getOrThrow()
+//        val resolvedKeyForHolderDid = DidService.resolveToKey(parsedHolderDid).getOrThrow()
+//
+//        val validPoP = credReq.proof?.validateJwtProof(resolvedKeyForHolderDid, ciTestProvider.baseUrl,null, nonce, parsedHolderKeyId)
+//        assertTrue(actual = validPoP!!)
+//        val generatedCredential = ciTestProvider.generateCredential(credReq).credential
+//        assertNotNull(generatedCredential)
+//        val credentialResponse: CredentialResponse = CredentialResponse.success(credReq.format, generatedCredential)
+//
+//        println("// -------- WALLET ----------")
+//        assertTrue(actual = credentialResponse.isSuccess)
+//        assertFalse(actual = credentialResponse.isDeferred)
+//        assertEquals(expected = CredentialFormat.jwt_vc_json, actual = credentialResponse.format!!)
+//        assertTrue(actual = credentialResponse.credential!!.instanceOf(JsonPrimitive::class))
+//
+//        println("// parse and verify credential")
+//        val credential = credentialResponse.credential!!.jsonPrimitive.content
+//        println(">>> Issued credential: $credential")
+//        verifyIssuerAndSubjectId(
+//            SDJwt.parse(credential).fullPayload["vc"]?.jsonObject!!,
+//            ciTestProvider.CI_ISSUER_DID, credentialWallet.TEST_DID
+//        )
+//        assertTrue(actual = JwtSignaturePolicy().verify(credential, null, mapOf()).isSuccess)
+//    }
 
     @Test
     fun testCredentialOfferFullAuth() = runTest {
@@ -1493,4 +2554,42 @@ class CI_JVM_Test {
         println("== Did doc ==")
         println(did.didDocument.toString())
     }
+}
+
+fun testCredentialIssuanceIsolatedFunctionsAuthCodeFlowRedirectWithCode(authCodeResponse: AuthorizationCodeResponse, authReq: AuthorizationRequest): String {
+    val redirectUri = authCodeResponse.toRedirectUri(authReq.redirectUri ?: TODO(), authReq.responseMode ?: ResponseMode.query)
+    Url(redirectUri).let {
+        assertContains(iterable = it.parameters.names(), element = ResponseType.Code.name.lowercase())
+        assertEquals(
+            expected = authCodeResponse.code,
+            actual = it.parameters[ResponseType.Code.name.lowercase()]
+        )
+    }
+    return redirectUri
+}
+
+fun testIsolatedFunctionsCreateCredentialOffer(baseUrl: String, issuerState: String, issuedCredentialId: String): String {
+    val credOffer = CredentialOffer.Builder(baseUrl)
+        .addOfferedCredential(issuedCredentialId)
+        .addAuthorizationCodeGrant(issuerState)
+        .build()
+
+    return OpenID4VCI.getCredentialOfferRequestUrl(credOffer)
+}
+
+suspend fun testIsolatedFunctionsResolveCredentialOffer(credOfferUrl: String): OfferedCredential {
+    val parsedCredOffer = OpenID4VCI.parseAndResolveCredentialOfferRequestUrl(credOfferUrl)
+    val providerMetadata = OpenID4VCI.resolveCIProviderMetadata(parsedCredOffer)
+    assertEquals(expected = parsedCredOffer.credentialIssuer, actual = providerMetadata.credentialIssuer)
+
+    println("// resolve offered credentials")
+    val offeredCredentials = OpenID4VCI.resolveOfferedCredentials(parsedCredOffer, providerMetadata)
+    println("offeredCredentials: $offeredCredentials")
+    assertEquals(expected = 1, actual = offeredCredentials.size)
+    assertEquals(expected = CredentialFormat.jwt_vc_json, actual = offeredCredentials.first().format)
+    assertEquals(expected = "VerifiableId", actual = offeredCredentials.first().types?.last())
+    val offeredCredential = offeredCredentials.first()
+    println("offeredCredentials[0]: $offeredCredential")
+
+    return offeredCredential
 }

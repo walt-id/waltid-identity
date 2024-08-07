@@ -236,8 +236,15 @@ class E2ETest {
                 assert(it.any { it.operation == "useOfferRequest" } && it.any { it.operation == "usePresentationRequest" }) { "incorrect history items" }
             }
             //endregion -History-
+
+            // Test Authorization Code flow with available authentication methods in Issuer API
+            val authorizationCodeFlow = AuthorizationCodeFlow(testHttpClient(doFollowRedirects = false))
+            authorizationCodeFlow.testIssuerAPI()
+
         }
     }
+
+
 
     //@Test // enable to execute test selectively
     fun lspIssuanceTests() = runTest(timeout = 5.minutes) {
@@ -249,7 +256,7 @@ class E2ETest {
         }
     }
 
-    //@Test
+    // @Test
     fun lspVerifierTests() = runTest(timeout = 5.minutes) {
         val client = testHttpClient(doFollowRedirects = false)
         testBlock {
@@ -315,6 +322,10 @@ fun String.expectLooksLikeJwt(): String =
 
 suspend fun HttpResponse.expectSuccess(): HttpResponse = also {
     assert(status.isSuccess()) { "HTTP status is non-successful for response: $it, body is ${it.bodyAsText()}" }
+}
+
+fun HttpResponse.expectRedirect(): HttpResponse = also {
+    assert(status == HttpStatusCode.Found) { "HTTP status is non-successful" }
 }
 
 fun JsonElement.tryGetData(key: String): JsonElement? = key.split('.').let {
