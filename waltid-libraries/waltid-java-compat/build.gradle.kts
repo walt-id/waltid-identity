@@ -1,6 +1,7 @@
 plugins {
     kotlin("jvm")
-    `maven-publish`
+    id("maven-publish")
+    //`maven-publish`
 }
 
 group = "id.walt"
@@ -16,6 +17,21 @@ dependencies {
 
 
 publishing {
+    publications {
+        create<MavenPublication>("mavenJava") {
+            pom {
+                name.set("walt.id java compatability helpers")
+                description.set(
+                    """
+                    Kotlin/Java helper library to make it easier to use certain functions from Java.
+                    """.trimIndent()
+                )
+                url.set("https://walt.id")
+            }
+            from(components["java"])
+        }
+    }
+
     repositories {
         val envUsername = System.getenv("MAVEN_USERNAME")
         val envPassword = System.getenv("MAVEN_PASSWORD")
