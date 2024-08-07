@@ -35,12 +35,15 @@ RUN pnpm run build
 # copy production dependencies and source code into final image
 FROM base AS release
 COPY --from=install /temp/prod/node_modules node_modules
-COPY --from=prerelease /app/.output/ .
+COPY --from=prerelease /app/.output .output/
 COPY --from=prerelease /app/package.json .
+
+# Non-root user
+RUN useradd --create-home app
 
 # run the app
 RUN chmod -R a+r .
 USER app
 EXPOSE 7101/tcp
 ENV PORT=7101
-ENTRYPOINT [ "pnpm", "run", "server/index.mjs" ]
+ENTRYPOINT [ "pnpm", "start" ]

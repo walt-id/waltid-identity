@@ -14,7 +14,8 @@ export default defineNuxtConfig({
       "@sidebase/nuxt-auth",
       "@nuxt/content",
       "@pinia/nuxt",
-      "nuxt-icon"
+      "nuxt-icon",
+      "@nuxt/image"
   ],
 
   build: {
