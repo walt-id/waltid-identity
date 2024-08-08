@@ -115,12 +115,12 @@ dependencies {
 
 
     // OIDC
-    implementation(project(":waltid-libraries:waltid-openid4vc"))
-    implementation(project(":waltid-libraries:waltid-sdjwt"))
-    implementation(project(":waltid-libraries:waltid-mdoc-credentials"))
+    implementation(project(":waltid-libraries:protocols:waltid-openid4vc"))
+    implementation(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
+    implementation(project(":waltid-libraries:credentials:waltid-mdoc-credentials"))
 
-    implementation(project(":waltid-libraries:waltid-crypto"))
-    implementation(project(":waltid-libraries:waltid-crypto-oci"))
+    implementation(project(":waltid-libraries:crypto:waltid-crypto"))
+    implementation(project(":waltid-libraries:crypto:waltid-crypto-oci"))
     implementation(project(":waltid-libraries:waltid-did"))
 
     testImplementation(project(":waltid-services:waltid-issuer-api"))

@@ -70,7 +70,7 @@ fun Application.exchange() = walletRoute {
                 context.respond(HttpStatusCode.OK, it)
             }.onFailure { error ->
                 error.printStackTrace()
-                context.respond(HttpStatusCode.BadRequest, error.localizedMessage)
+                context.respond(HttpStatusCode.BadRequest, error.message ?: "Unknown error")
             }
         }
         post("matchCredentialsForPresentationDefinition", {
