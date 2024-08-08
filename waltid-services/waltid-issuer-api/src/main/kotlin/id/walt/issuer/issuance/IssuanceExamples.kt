@@ -309,8 +309,7 @@ object IssuanceExamples {
               }
           },
           "x5Chain": ${buildJsonArray { add(LspPotentialInterop.POTENTIAL_ISSUER_CERT) }},
-          "trustedRootCAs": ${buildJsonArray { add(LspPotentialInterop.POTENTIAL_ROOT_CA_CERT) }},
-          "authenticationMethod": "NONE"
+          "trustedRootCAs": ${buildJsonArray { add(LspPotentialInterop.POTENTIAL_ROOT_CA_CERT) }}
        }
     """.trimIndent()
 
@@ -727,9 +726,12 @@ object IssuanceExamples {
 
     // language=json
     val sdJwtVCData = """
-        {
-            "issuerKey": $issuerKey,
-            "issuerDid": $issuerDid,
+            {
+                "issuerKey": { 
+                "type": "jwk",
+                "jwk": ${Json.parseToJsonElement(LspPotentialIssuanceInterop.POTENTIAL_ISSUER_JWK_KEY.jwk!!)}
+            },
+            "issuerDid": "",
             "credentialConfigurationId": "identity_credential_vc+sd-jwt",
             "credentialData": $sdjwt_vc_identity_credential,
             "mdocData": null,
@@ -748,7 +750,8 @@ object IssuanceExamples {
                     }
                 }
             },
-            "authenticationMethod": "NONE"
+            "x5Chain": ${buildJsonArray { add(LspPotentialInterop.POTENTIAL_ISSUER_CERT) }},
+            "trustedRootCAs": ${buildJsonArray { add(LspPotentialInterop.POTENTIAL_ROOT_CA_CERT) }}
         }
     """.trimIndent()
 
