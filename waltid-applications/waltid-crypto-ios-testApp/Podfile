@@ -7,7 +7,7 @@ target 'waltid.crypto.ios.testApp' do
 
   # Pods for waltid.crypto.ios.testApp
   # in order to find the artifact run :waltid-crypto-ios:podPublishDebugXCFramework
-  pod 'waltid_crypto_ios', :path => '../../waltid-libraries/waltid-crypto-ios/build/cocoapods/publish/debug/waltid_crypto_ios.podspec'
+  pod 'waltid_crypto_ios', :path => '../../waltid-libraries/crypto/waltid-crypto-ios/build/cocoapods/publish/debug/waltid_crypto_ios.podspec'
 
 
 end

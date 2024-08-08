@@ -4,6 +4,9 @@ fun getSetting(name: String) = providers.gradleProperty(name).orNull.toBoolean()
 val enableAndroidBuild = getSetting("enableAndroidBuild")
 val enableIosBuild = getSetting("enableIosBuild")
 
+infix fun String.whenEnabled(setting: Boolean) = if (setting) this else null
+fun String.group(vararg elements: String?) = elements.map { it?.let { "$this:$it" } }.toTypedArray()
+
 // Build setup:
 
 // Shorthands
@@ -11,15 +14,39 @@ val libraries = ":waltid-libraries"
 val applications = ":waltid-applications"
 val services = ":waltid-services"
 
-val baseModules = listOf(
-    "$libraries:waltid-crypto",
-    "$libraries:waltid-did",
-    "$libraries:waltid-verifiable-credentials",
-    "$libraries:waltid-mdoc-credentials",
-    "$libraries:waltid-sdjwt",
+val modules = listOf(
+    * "$libraries:crypto".group(
+        "waltid-crypto",
+        "waltid-crypto-oci",
+        "waltid-crypto-android" whenEnabled enableAndroidBuild,
+        "waltid-crypto-ios" whenEnabled enableIosBuild,
+        "waltid-target-ios" whenEnabled enableIosBuild,
+        "waltid-target-ios:implementation" whenEnabled enableIosBuild,
+    ),
 
-    // Protocols
-    "$libraries:waltid-openid4vc",
+    * "$libraries:credentials".group(
+        "waltid-verifiable-credentials",
+        "waltid-mdoc-credentials",
+        "waltid-dif-presentation-exchange"
+    ),
+
+    * "$libraries:protocols".group(
+        "waltid-openid4vc"
+    ),
+
+    * "$libraries:sdjwt".group(
+        "waltid-sdjwt",
+        "waltid-sdjwt-ios" whenEnabled enableIosBuild,
+    ),
+
+    /*
+    * "$libraries:util".group(
+        "waltid-reporting"
+    ),
+    */
+
+    "$libraries:waltid-did",
+    "$libraries:waltid-java-compat",
 
     // Service commons
     "$services:waltid-service-commons",
@@ -35,36 +62,13 @@ val baseModules = listOf(
     // CLI
     "$applications:waltid-cli",
 
-    // Reporting
-    "$libraries:waltid-reporting",
+    ":waltid-applications:waltid-android" whenEnabled enableAndroidBuild,
 
-    // OCI extension for waltid-crypto
-    "$libraries:waltid-crypto-oci",
-    "$libraries:waltid-credentials-base",
+    "$applications:waltid-openid4vc-ios-testApp" whenEnabled enableIosBuild,
+    "$applications:waltid-openid4vc-ios-testApp:shared" whenEnabled enableIosBuild
+).filterNotNull()
 
-    "$libraries:waltid-java-compat"
-)
-
-val androidModules = listOf(
-    ":waltid-libraries:waltid-crypto-android",
-    ":waltid-applications:waltid-android"
-)
-
-val iosModules = listOf(
-    "$libraries:waltid-crypto-ios",
-    "$libraries:waltid-sdjwt-ios",
-    "$libraries:waltid-target-ios",
-    "$libraries:waltid-target-ios:implementation",
-    "$applications:waltid-openid4vc-ios-testApp",
-    "$applications:waltid-openid4vc-ios-testApp:shared"
-)
-
-val enabledModules = ArrayList<String>(baseModules)
-
-if (enableAndroidBuild) enabledModules.addAll(androidModules)
-if (enableIosBuild) enabledModules.addAll(iosModules)
-
-include(*enabledModules.toTypedArray())
+include(*modules.toTypedArray())
 
 pluginManagement {
     repositories {
