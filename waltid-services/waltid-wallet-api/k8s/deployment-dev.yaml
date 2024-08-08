@@ -5,7 +5,6 @@ metadata:
 data:
   _features.conf: |
     enabledFeatures = [
-        "registration-defaults",
     ]
   db.conf: |
     dataSource {

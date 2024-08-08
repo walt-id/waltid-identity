@@ -109,7 +109,7 @@ kotlin {
                 implementation("app.softwork:kotlinx-uuid-core:0.0.26")
 
                 // Crypto
-                api(project(":waltid-libraries:waltid-crypto"))
+                api(project(":waltid-libraries:crypto:waltid-crypto"))
 
                 // Encodings
                 implementation("net.thauvin.erik.urlencoder:urlencoder-lib:1.5.0")

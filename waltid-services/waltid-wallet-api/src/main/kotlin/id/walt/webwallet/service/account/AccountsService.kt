@@ -33,7 +33,7 @@ object AccountsService {
             }
 
             val walletService = WalletServiceManager.getWalletService(tenant, registeredUserId, createdInitialWalletId)
-            suspend { tryAddDefaultData(walletService) } whenFeature (FeatureCatalog.registrationDefaultsFeature)
+            suspend { tryAddDefaultData(walletService); println() } whenFeature (FeatureCatalog.registrationDefaultsFeature)
             registrationResult.also {
                 WalletServiceManager.eventUseCase.log(
                     action = EventType.Account.Create,
