@@ -110,7 +110,6 @@ private const val fixedPresentationDefinitionForEbsiConformanceTest =
 
 private val verificationUseCase = VerificationUseCase(httpClient, SimpleJWTCryptoProvider(JWSAlgorithm.EdDSA, null, null))
 
-
 @OptIn(ExperimentalSerializationApi::class)
 fun Application.verfierApi() {
     routing {
@@ -291,6 +290,7 @@ fun Application.verfierApi() {
                                 context.respondRedirect("openid://?state=$state&error=invalid_request&error_description=$errorDescription")
                             }
                         } else {
+                            logger.error(it) { "/verify error: $errorDescription" }
                             call.respond(HttpStatusCode.BadRequest, errorDescription)
                         }
                     }.also {
@@ -366,6 +366,7 @@ fun Application.verfierApi() {
                 verificationUseCase.getSignedAuthorizationRequestObject(id).onSuccess {
                     call.respondText(it, ContentType.parse("application/oauth-authz-req+jwt"), HttpStatusCode.OK)
                 }.onFailure {
+                    logger.debug(it) { "Cannot view request session ($it)" }
                     call.respond(HttpStatusCode.BadRequest, it.localizedMessage)
                 }
             }
