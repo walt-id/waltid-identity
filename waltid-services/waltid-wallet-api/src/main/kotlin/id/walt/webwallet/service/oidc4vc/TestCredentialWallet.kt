@@ -262,6 +262,7 @@ class TestCredentialWallet(
                 descriptorMap = matchedCredentials.mapIndexed { index, credential ->
                     when(credential.format) {
                         CredentialFormat.mso_mdoc -> buildDescriptorMappingMDoc(session, index, credential.document, rootPathMDoc)
+                        CredentialFormat.sd_jwt_vc -> buildDescriptorMappingSDJwtVC(session, index, credential.document, "$")
                         else -> buildDescriptorMappingJwtVP(session, index, credential.document, rootPathVP)
                     }
                 }
@@ -390,6 +391,18 @@ class TestCredentialWallet(
                 format = VCFormat.mso_mdoc,
                 path = "$rootPath.documents[$index]",
             )
+        )
+    }
+
+    private fun buildDescriptorMappingSDJwtVC(session: VPresentationSession, index: Int, vcJwsStr: String, rootPath: String = "$") = let {
+        val vcJws = vcJwsStr.base64UrlToBase64().decodeJws()
+        val type = vcJws.payload["vc"]?.jsonObject?.get("type")?.jsonArray?.last()?.jsonPrimitive?.contentOrNull
+            ?: "VerifiableCredential"
+
+        DescriptorMapping(
+            id = session.presentationDefinition!!.id,
+            format = VCFormat.sd_jwt_vc,
+            path = rootPath
         )
     }
 
