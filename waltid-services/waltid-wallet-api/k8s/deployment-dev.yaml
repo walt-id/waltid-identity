@@ -21,7 +21,7 @@ data:
     webHost = "0.0.0.0"
     webPort = 4545
   oidc.conf: |
-    publicBaseUrl = "https://wallet-dev.walt-test.cloud"
+    publicBaseUrl = "https://wallet.walt-test.cloud"
     providerName = keycloak
     oidcRealm = "https://keycloak.walt-test.cloud/realms/waltid-keycloak-ktor"
     oidcJwks = "${oidcRealm}/protocol/openid-connect/certs"
@@ -157,7 +157,7 @@ spec:
           imagePullPolicy: Always
           env:
             - name: NUXT_PUBLIC_ISSUER_CALLBACK_URL
-              value: "https://wallet-dev.walt-test.cloud"
+              value: "https://wallet.walt-test.cloud"
             - name: NUXT_PUBLIC_DEMO_WALLET_URL
               value: "https://wallet.walt-test.cloud"
           ports:
@@ -191,10 +191,10 @@ metadata:
 spec:
   tls:
     - hosts:
-        - wallet-dev.walt-test.cloud
+        - wallet.walt-test.cloud
       secretName: wallet-tls-secret
   rules:
-    - host: wallet-dev.walt-test.cloud
+    - host: wallet.walt-test.cloud
       http:
         paths:
           - path: /wallet-api/
