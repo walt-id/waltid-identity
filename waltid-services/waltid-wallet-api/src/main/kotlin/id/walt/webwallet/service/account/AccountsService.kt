@@ -53,7 +53,7 @@ object AccountsService {
             is OidcAccountRequest -> OidcAccountStrategy.register(tenant, request)
             is KeycloakAccountRequest -> KeycloakAccountStrategy.register(tenant, request)
             is OidcUniqueSubjectRequest -> OidcUniqueSubjectStrategy.register(tenant, request)
-
+            is X5CAccountRequest -> TODO()
         }.fold(onSuccess = {
             initializeUserAccount(tenant, request.name, it)
 
@@ -70,7 +70,7 @@ object AccountsService {
             is OidcAccountRequest -> OidcAccountStrategy.authenticate(tenant, request)
             is OidcUniqueSubjectRequest -> OidcUniqueSubjectStrategy.authenticate(tenant, request)
             is KeycloakAccountRequest -> KeycloakAccountStrategy.authenticate(tenant, request)
-
+            is X5CAccountRequest -> TODO()
         }
     }.fold(onSuccess = {
         WalletServiceManager.eventUseCase.log(
