@@ -198,25 +198,60 @@ fun Application.issuerApi() {
                                     )
                                 }
                             }
+                            "400" to {
+                                description = "Bad request"
+                            }
                         }
                     }) {
-
                         val body = context.receive<Map<String, JsonElement>>()
+                        val keyJson = body["issuerKey"]?.jsonObject
+                            ?: return@post context.respond(
+                                HttpStatusCode.BadRequest,
+                                "Missing issuerKey in the request body."
+                            )
 
-                        val keyJson = body["issuerKey"] ?: throw IllegalArgumentException("No key was passed.")
+                        val key = try {
+                            KeyManager.resolveSerializedKey(keyJson)
+                        } catch (e: Exception) {
+                            return@post context.respond(
+                                HttpStatusCode.BadRequest,
+                                "Invalid issuerKey format: ${e.message}"
+                            )
+                        }
 
-                        val key = KeyManager.resolveSerializedKey(keyJson.jsonObject)
-                        val issuerDid =
-                            body["issuerDid"]?.jsonPrimitive?.content ?: DidService.registerByKey("key", key).did
+                        val issuerDid = body["issuerDid"]?.jsonPrimitive?.content
+                            ?: DidService.registerByKey("key", key).did
+
                         val subjectDid = body["subjectDid"]?.jsonPrimitive?.content
-                            ?: throw IllegalArgumentException("No subjectDid was passed.")
+                            ?: return@post context.respond(
+                                HttpStatusCode.BadRequest,
+                                "Missing subjectDid in the request body."
+                            )
 
-                        val vc = W3CVC.fromJson(Json.encodeToString(body["credentialData"]))
-
-                        // Sign VC
-                        val jws = vc.signJws(
-                            issuerKey = key, issuerDid = issuerDid, subjectDid = subjectDid
+                        val credentialData = body["credentialData"]?.let {
+                            Json.encodeToString(it)
+                        } ?: return@post context.respond(
+                            HttpStatusCode.BadRequest,
+                            "Missing credentialData in the request body."
                         )
+
+                        val vc = try {
+                            W3CVC.fromJson(credentialData)
+                        } catch (e: Exception) {
+                            return@post context.respond(
+                                HttpStatusCode.BadRequest,
+                                "Invalid credentialData format: ${e.message}"
+                            )
+                        }
+
+                        val jws = try {
+                            vc.signJws(issuerKey = key, issuerDid = issuerDid, subjectDid = subjectDid)
+                        } catch (e: Exception) {
+                            return@post context.respond(
+                                HttpStatusCode.InternalServerError,
+                                "Failed to sign credential: ${e.message}"
+                            )
+                        }
 
                         context.respond(HttpStatusCode.OK, jws)
                     }
