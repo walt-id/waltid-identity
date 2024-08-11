@@ -32,6 +32,7 @@ jobs:
           mention-new-contributors: true
           include-compare-link: true
           use-github-autolink: true
+          semver: 'false'
       - name: Create Release
         uses: softprops/action-gh-release@v2
         env:
