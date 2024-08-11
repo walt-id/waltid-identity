@@ -119,3 +119,25 @@ jobs:
           KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
         with:
           args: apply -n dev -f waltid-applications/waltid-web-portal/k8s/deployment_mod.yaml
+
+      - name: Changelog
+        uses: ardalanamini/auto-changelog@v4
+        id: changelog
+        with:
+          github-token: ${{ github.token }}
+          default-commit-type: Other Changes
+          release-name: v${{ inputs.release_version }}
+          mention-authors: true
+          mention-new-contributors: true
+          include-compare-link: true
+          use-github-autolink: true
+          semver: true
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ env.release_version }}
+          body: |
+            ${{ steps.changelog.outputs.changelog }}
+          prerelease: ${{ steps.changelog.outputs.prerelease }}
