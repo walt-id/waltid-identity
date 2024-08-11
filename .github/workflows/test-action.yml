@@ -1,0 +1,43 @@
+name: Test action
+on:
+  push:
+    branches-ignore:
+      - main
+
+jobs:
+  build:
+    name: "Test action"
+    runs-on: "ubuntu-latest"
+    steps:
+      - name: Free Disk Space (Ubuntu)
+        uses: jlumbroso/free-disk-space@v1.3.1
+        with:
+          tool-cache: false
+          docker-images: false
+      - uses: actions/checkout@v3
+      - name: Calculate release version
+        run: |
+          BRANCH=$(echo ${{ github.ref }} | sed -e 's/refs\/heads\///' -e 's/\//-/g')
+          echo "BRANCH=${BRANCH}" >> $GITHUB_ENV
+          echo "release_version=1.0.$(date +'%g%m%d%H%M')-${BRANCH}" >> $GITHUB_ENV
+
+      - name: Changelog
+        uses: ardalanamini/auto-changelog@v4
+        id: changelog
+        with:
+          github-token: ${{ github.token }}
+          default-commit-type: Other Changes
+          release-name: v${{ inputs.release_version }}
+          mention-authors: true
+          mention-new-contributors: true
+          include-compare-link: true
+          use-github-autolink: true
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ env.release_version }}
+          body: |
+            ${{ steps.changelog.outputs.changelog }}
+          prerelease: ${{ steps.changelog.outputs.prerelease }}
