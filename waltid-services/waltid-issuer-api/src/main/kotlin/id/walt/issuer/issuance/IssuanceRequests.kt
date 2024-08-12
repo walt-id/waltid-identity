@@ -99,3 +99,21 @@ data class IssuanceRequest(
 data class IssuerOnboardingResponse(
     val issuerKey: JsonElement, val issuerDid: String,
 )
+
+fun validateIssuanceRequest(request: IssuanceRequest): Pair<HttpStatusCode, String> {
+    request.credentialData?.let {
+        require(it.isNotEmpty()) {
+            return HttpStatusCode.BadRequest to "Credential is required"
+        }
+    }
+    require(request.issuerDid.isNotEmpty()) {
+        return HttpStatusCode.BadRequest to "Issuer DID must not be empty"
+    }
+    require(request.credentialConfigurationId.isNotEmpty()) {
+        return HttpStatusCode.BadRequest to "Credential configuration ID must not be empty"
+    }
+    require(request.issuerKey.isNotEmpty()) {
+        return HttpStatusCode.BadRequest to "Issuer key must not be empty"
+    }
+    return HttpStatusCode.OK to "Validation passed"
+}
