@@ -35,11 +35,15 @@ object KeyManager {
         }
     }
 
+    fun registerByType(type: KType, typeId: String, createFunction: suspend (KeyGenerationRequest) -> Key) {
+        types[typeId] = type
+        keyTypeGeneration[typeId] = createFunction
+    }
+
     inline fun <reified T : Key> register(typeId: String, noinline createFunction: suspend (KeyGenerationRequest) -> T) {
         keyManagerLogger().trace { "Registering key type \"$typeId\" to ${T::class.simpleName}..." }
         val type = typeOf<T>()
-        types[typeId] = type
-        keyTypeGeneration[typeId] = createFunction
+        registerByType(type, typeId, createFunction)
     }
 
     suspend fun createKey(generationRequest: KeyGenerationRequest): Key {
@@ -59,7 +63,8 @@ object KeyManager {
         Json.decodeFromJsonElement(serializer(type), JsonObject(fields)) as Key
     }?.apply { init() } ?: error("No type in serialized key")
 
-    fun resolveSerializedKeyBlocking(jsonString: String) = resolveSerializedKeyBlocking(json = Json.parseToJsonElement(jsonString).jsonObject)
+    fun resolveSerializedKeyBlocking(jsonString: String) =
+        resolveSerializedKeyBlocking(json = Json.parseToJsonElement(jsonString).jsonObject)
 
 }
 
