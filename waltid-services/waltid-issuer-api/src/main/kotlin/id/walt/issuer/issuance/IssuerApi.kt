@@ -319,14 +319,30 @@ fun Application.issuerApi() {
                                         }
                                     }
                                 }
+                                "400" to {
+                                    description = "Bad request"
+                                }
                             }
                         }) {
                             val jwtIssuanceRequest = context.receive<IssuanceRequest>()
-                            val offerUri = createCredentialOfferUri(listOf(jwtIssuanceRequest))
+                            val validation = validateIssuanceRequest(jwtIssuanceRequest)
+                            if (validation.first != HttpStatusCode.OK) {
+                                return@post context.respond(
+                                    validation.first,
+                                    validation.second
+                                )
+                            } else {
+                                val offerUri = createCredentialOfferUri(listOf(jwtIssuanceRequest))
+                                context.respond(
+                                    HttpStatusCode.OK, offerUri
+                                )
+                            }
 
-                            context.respond(
-                                HttpStatusCode.OK, offerUri
-                            )
+//                            val offerUri = createCredentialOfferUri(listOf(jwtIssuanceRequest))
+//
+//                            context.respond(
+//                                HttpStatusCode.OK, offerUri
+//                            )
                         }
                         post("issueBatch", {
                             summary = "Signs a list of credentials and starts an OIDC credential exchange flow."
