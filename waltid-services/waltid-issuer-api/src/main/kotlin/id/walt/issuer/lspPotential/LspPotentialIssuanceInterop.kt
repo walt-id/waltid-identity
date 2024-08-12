@@ -6,6 +6,7 @@ import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.issuer.issuance.IssuanceExamples
 import id.walt.issuer.issuance.IssuanceRequest
 import id.walt.issuer.issuance.createCredentialOfferUri
+import id.walt.oid4vc.data.AuthenticationMethod
 import io.github.smiley4.ktorswaggerui.dsl.routing.get
 import io.github.smiley4.ktorswaggerui.dsl.routing.route
 import io.ktor.http.*
@@ -22,7 +23,7 @@ object LspPotentialIssuanceInterop {
 
   fun createInteropSampleCredentialOfferUri(issuanceRequestExample: String): String = runBlocking {
     createCredentialOfferUri(listOf(
-      Json.decodeFromString<IssuanceRequest>(issuanceRequestExample)
+      Json.decodeFromString<IssuanceRequest>(issuanceRequestExample).copy(authenticationMethod = AuthenticationMethod.NONE)
     ))
   }
 }

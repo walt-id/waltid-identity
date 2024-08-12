@@ -115,10 +115,10 @@ class LspPotentialWallet(val client: HttpClient, val walletId: String) {
     assertNotNull(parsedRequest.presentationDefinition)
 
     // === find matching credential ===
-//    val matchingCreds = client.post("/wallet-api/wallet/$walletId/exchange/matchCredentialsForPresentationDefinition") {
-//      setBody(parsedRequest.presentationDefinition!!)
-//    }.expectSuccess().let { response -> response.body<List<WalletCredential>>()}
-//    assertNotEquals(0, matchingCreds.size)
+    val matchingCreds = client.post("/wallet-api/wallet/$walletId/exchange/matchCredentialsForPresentationDefinition") {
+      setBody(parsedRequest.presentationDefinition!!)
+    }.expectSuccess().let { response -> response.body<List<WalletCredential>>()}
+    assertNotEquals(0, matchingCreds.size)
 
     client.post("/wallet-api/wallet/$walletId/exchange/usePresentationRequest") {
       setBody(UsePresentationRequest(generatedDid, presReqUrl, listOf(issuedMdocId)))

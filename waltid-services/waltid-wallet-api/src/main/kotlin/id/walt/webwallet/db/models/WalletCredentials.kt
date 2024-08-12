@@ -1,6 +1,8 @@
 package id.walt.webwallet.db.models
 
 import id.walt.crypto.utils.JwsUtils.decodeJws
+import id.walt.mdoc.dataelement.toJsonElement
+import id.walt.mdoc.doc.MDoc
 import id.walt.oid4vc.data.CredentialFormat
 import id.walt.webwallet.manifest.provider.ManifestProvider
 import id.walt.webwallet.utils.JsonUtils
@@ -57,7 +59,7 @@ data class WalletCredential(
                     CredentialFormat.jwt_vc, CredentialFormat.sd_jwt_vc, CredentialFormat.jwt_vc_json,
                     CredentialFormat.jwt_vc_json_ld -> document.decodeJws().payload
                         .run { jsonObject["vc"]?.jsonObject ?: jsonObject }
-                    CredentialFormat.mso_mdoc -> null // TODO: parse mdoc as json object for wallet UI (?)
+                    CredentialFormat.mso_mdoc -> MDoc.fromCBORHex(document).toMapElement().toJsonElement().jsonObject
                     else -> throw IllegalArgumentException("Unknown credential format")
                 }?.toMutableMap().also {
                     it?.putIfAbsent("id", JsonPrimitive(id))
