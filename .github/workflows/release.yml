@@ -117,15 +117,15 @@ jobs:
           include-compare: true
           semver: true
 
-      - name: Create Release
-        uses: softprops/action-gh-release@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: v${{ inputs.release_version }}
-          body: |
-            ${{ steps.changelog.outputs.changelog }}
-          prerelease: ${{ steps.changelog.outputs.prerelease }}
+#      - name: Create Release
+#        uses: softprops/action-gh-release@v2
+#        env:
+#          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+#        with:
+#          tag_name: v${{ inputs.release_version }}
+#          body: |
+#            ${{ steps.changelog.outputs.changelog }}
+#          prerelease: ${{ steps.changelog.outputs.prerelease }}
       #      issuer-api
       - name: Prepare CD - issuer
         run: sed "s/_DEFAULT_DEPLOYMENT_/$GITHUB_SHA/g" waltid-services/waltid-issuer-api/k8s/deployment-prod.yaml |
