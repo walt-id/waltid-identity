@@ -1,12 +1,9 @@
 package id.walt.issuer.issuance
 
 import id.walt.credentials.vc.vcs.W3CVC
-import id.walt.oid4vc.data.AuthenticationMethod
-import id.walt.oid4vc.data.OpenId4VPProfile
-import id.walt.oid4vc.data.GrantType
-import id.walt.oid4vc.data.TxCode
-import id.walt.oid4vc.data.TxInputMode
+import id.walt.oid4vc.data.*
 import id.walt.sdjwt.SDMap
+import io.ktor.http.*
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
