@@ -169,6 +169,7 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
         if (tokenResponse.vpToken is JsonObject) TODO("Token response is jsonobject - not yet handled")
 
         logger.debug { "VP token: $vpToken" }
+        logger.info { "OpenID4VP profile: ${session.openId4VPProfile}" }
 
         return when (session.openId4VPProfile) {
             OpenId4VPProfile.ISO_18013_7_MDOC -> verifyMdoc(tokenResponse, session)

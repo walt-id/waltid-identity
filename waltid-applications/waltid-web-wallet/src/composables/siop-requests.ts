@@ -6,6 +6,8 @@ export enum SiopRequestType {
 const siopPrefixMapping: Map<string, SiopRequestType> = new Map([
     ["openid://", SiopRequestType.PRESENTATION],
     ["openid4vp://", SiopRequestType.PRESENTATION],
+    ["mdoc-openid4vp://", SiopRequestType.PRESENTATION],
+    ["haip://", SiopRequestType.PRESENTATION],
     ["openid-initiate-issuance://", SiopRequestType.ISSUANCE],
     ["openid-credential-offer://", SiopRequestType.ISSUANCE],
     //["openid-vc://", SiopRequestType.ISSUANCE]

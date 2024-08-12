@@ -12,7 +12,7 @@ export default function Success() {
   const router = useRouter();
 
   const [policyResults, setPolicyResults] = useState<Array<{
-    policies: Array<{
+    policyResults: Array<{
       policy: string;
       is_success: boolean;
     }>
@@ -176,12 +176,12 @@ export default function Success() {
         <div className="mt-10 px-12">
           <div className="flex flex-row items-center justify-center mb-5 text-gray-500">
             {
-              policyResults[index + 1]?.policies.length ? "The VP was verified along with:" : "The VP was not verified against any policies"
+              policyResults[index + 1]?.policyResults.length ? "The VP was verified along with:" : "The VP was not verified against any policies"
             }
           </div>
           <div className="xs:grid xs:grid-cols-2 items-center justify-center">
             {
-              policyResults[index + 1]?.policies.map((policy) => {
+              policyResults[index + 1]?.policyResults.map((policy) => {
                 return {
                   name: policy.policy.charAt(0).toUpperCase() + policy.policy.slice(1) + ' Policy',
                   is_success: policy.is_success
