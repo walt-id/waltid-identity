@@ -7,6 +7,7 @@ import id.walt.crypto.keys.KeyType
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.crypto.utils.JwsUtils.jwsAlg
 import id.walt.did.dids.DidService
+import id.walt.mdoc.dataelement.MapElement
 import id.walt.oid4vc.data.CredentialOffer
 import id.walt.oid4vc.data.OpenIDProviderMetadata
 import id.walt.oid4vc.data.dif.DescriptorMapping
@@ -63,16 +64,20 @@ const val WALLET_BASE_URL = "https://issuer.portal.walt.id"
 internal sealed class DidMethod(val signingKeyInKeychainIdentifier: String) {
     abstract fun resolveDid(): String
 
-    internal class DidWeb(val didWeb: String, signingKeyInKeychainIdentifier: String): DidMethod(signingKeyInKeychainIdentifier) {
+    internal class DidWeb(val didWeb: String, signingKeyInKeychainIdentifier: String) :
+        DidMethod(signingKeyInKeychainIdentifier) {
         override fun resolveDid(): String {
             return didWeb
         }
     }
 
-    internal class DidJwk(signingKeyInKeychainIdentifier: String): DidMethod(signingKeyInKeychainIdentifier) {
+    internal class DidJwk(signingKeyInKeychainIdentifier: String) :
+        DidMethod(signingKeyInKeychainIdentifier) {
         override fun resolveDid(): String {
             val encodedJwk = runBlocking {
-                IosKey.load(signingKeyInKeychainIdentifier, KeyType.secp256r1)?.exportJWK()?.encodeBase64() ?: throw IllegalStateException("Loading key problem")
+                IosKey.load(signingKeyInKeychainIdentifier, KeyType.secp256r1).getPublicKey()
+                    .exportJWK().encodeBase64()
+                    ?: throw IllegalStateException("Loading key problem")
             }
 
             return "did:jwk:$encodedJwk"
@@ -81,26 +86,33 @@ internal sealed class DidMethod(val signingKeyInKeychainIdentifier: String) {
 }
 
 internal class TestCredentialWallet(
-    private val didMethod: DidMethod,
-    config: CredentialWalletConfig
+    private val didMethod: DidMethod, config: CredentialWalletConfig
 ) : OpenIDCredentialWallet<SIOPSession>(WALLET_BASE_URL, config) {
 
     private val jwtCryptoProvider: JWTCryptoProvider by lazy {
         object : JWTCryptoProvider {
-            override fun sign(payload: JsonObject, keyID: String?, typ: String): String {
+            override fun sign(
+                payload: JsonObject, keyID: String?, typ: String, headers: Map<String, Any>
+            ): String {
                 val kid = requireNotNull(keyID) { "Requires kid" }
 
-                val key = requireNotNull(IosKey.load(kid, KeyType.secp256r1)) { "Could not find key with kid in ios" }
+                val key = requireNotNull(
+                    IosKey.load(
+                        kid, KeyType.secp256r1
+                    )
+                ) { "Could not find key with kid in ios" }
 
                 val header = buildJsonObject {
                     put("typ", typ)
                     put("alg", key.keyType.jwsAlg())
                 }
 
-                return runBlocking { key.signJws(payload.toString().toByteArray(), header.mapValues { it.value.jsonPrimitive.content })}
+                return runBlocking {
+                    key.signJws(payload.toString().toByteArray(), header.mapValues { it.value })
+                }
             }
 
-            override fun verify(jwt: String): JwtVerificationResult {
+            override fun verify(jwt: String, keyID: String?): JwtVerificationResult {
                 TODO("verify skipped for now")
             }
         }
@@ -119,26 +131,18 @@ internal class TestCredentialWallet(
     }
 
     override fun createSIOPSession(
-        id: String,
-        authorizationRequest: AuthorizationRequest?,
-        expirationTimestamp: Instant
+        id: String, authorizationRequest: AuthorizationRequest?, expirationTimestamp: Instant
     ) = SIOPSession(id, authorizationRequest, expirationTimestamp)
 
     fun executePreAuthorizedCodeFlow(
-        credentialOffer: CredentialOffer,
-        client: OpenIDClientConfig,
-        userPIN: String?
-    ) : List<CredentialResponse> {
+        credentialOffer: CredentialOffer, client: OpenIDClientConfig, userPIN: String?
+    ): List<CredentialResponse> {
         val did = didMethod.resolveDid()
         return executePreAuthorizedCodeFlow(credentialOffer, did, client, userPIN)
     }
 
     override fun signToken(
-        target: TokenTarget,
-        payload: JsonObject,
-        header: JsonObject?,
-        keyId: String?,
-        privKey: Key?
+        target: TokenTarget, payload: JsonObject, header: JsonObject?, keyId: String?, privKey: Key?
     ): String {
         print(target)
         println("// keyId: $keyId")
@@ -147,7 +151,11 @@ internal class TestCredentialWallet(
         return when (target) {
             TokenTarget.PROOF_OF_POSSESSION -> {
                 runBlocking {
-                    requireNotNull(IosKey.load(didMethod.signingKeyInKeychainIdentifier, KeyType.secp256r1)).run {
+                    requireNotNull(
+                        IosKey.load(
+                            didMethod.signingKeyInKeychainIdentifier, KeyType.secp256r1
+                        )
+                    ).run {
 
                         val headerWithAlg = header?.let {
                             JsonObject(it.toMutableMap().apply {
@@ -157,10 +165,8 @@ internal class TestCredentialWallet(
                         } ?: buildJsonObject { }
 
                         runBlocking {
-                            signJws(
-                                plaintext = payload.toString().toByteArray(),
-                                headers = headerWithAlg.jsonObject.mapValues { it.value.jsonPrimitive.content }
-                            )
+                            signJws(plaintext = payload.toString().toByteArray(),
+                                headers = headerWithAlg.jsonObject.mapValues { it.value })
                         }
                     }
                 }
@@ -170,7 +176,16 @@ internal class TestCredentialWallet(
         }
     }
 
-    fun acceptOpenId4VPAuthorize(offerUri: String, kid: String) = credentialWallet.executeVpTokenAuthorization(Url(offerUri), didMethod.resolveDid(), testCIClientConfig)
+    override fun signCWTToken(
+        target: TokenTarget, payload: MapElement, header: MapElement?, keyId: String?, privKey: Key?
+    ): String {
+        TODO("Not yet implemented")
+    }
+
+    fun acceptOpenId4VPAuthorize(offerUri: String, kid: String) =
+        credentialWallet.executeVpTokenAuthorization(
+            Url(offerUri), didMethod.resolveDid(), testCIClientConfig
+        )
 
 
 //    override fun signToken(
@@ -192,6 +207,10 @@ internal class TestCredentialWallet(
     override fun verifyTokenSignature(target: TokenTarget, token: String) =
         SDJwt.verifyAndParse(token, jwtCryptoProvider).signatureVerified
 
+    override fun verifyCOSESign1Signature(target: TokenTarget, token: String): Boolean {
+        TODO("Not yet implemented")
+    }
+
     override fun httpGet(url: Url, headers: Headers?): SimpleHttpResponse {
         return runBlocking {
             ktorClient.get(url) {
@@ -200,18 +219,14 @@ internal class TestCredentialWallet(
                 }
             }.let { httpResponse ->
                 SimpleHttpResponse(
-                    httpResponse.status,
-                    httpResponse.headers,
-                    httpResponse.bodyAsText()
+                    httpResponse.status, httpResponse.headers, httpResponse.bodyAsText()
                 )
             }
         }
     }
 
     override fun httpPostObject(
-        url: Url,
-        jsonObject: JsonObject,
-        headers: Headers?
+        url: Url, jsonObject: JsonObject, headers: Headers?
     ): SimpleHttpResponse {
         return runBlocking {
             ktorClient.post(url) {
@@ -222,18 +237,14 @@ internal class TestCredentialWallet(
                 setBody(jsonObject)
             }.let { httpResponse ->
                 SimpleHttpResponse(
-                    httpResponse.status,
-                    httpResponse.headers,
-                    httpResponse.bodyAsText()
+                    httpResponse.status, httpResponse.headers, httpResponse.bodyAsText()
                 )
             }
         }
     }
 
     override fun httpSubmitForm(
-        url: Url,
-        formParameters: Parameters,
-        headers: Headers?
+        url: Url, formParameters: Parameters, headers: Headers?
     ): SimpleHttpResponse {
         return runBlocking {
             ktorClient.submitForm(formParameters) {
@@ -243,38 +254,35 @@ internal class TestCredentialWallet(
                 }
             }.let { httpResponse ->
                 SimpleHttpResponse(
-                    httpResponse.status,
-                    httpResponse.headers,
-                    httpResponse.bodyAsText()
+                    httpResponse.status, httpResponse.headers, httpResponse.bodyAsText()
                 )
             }
         }
     }
 
     override fun generatePresentationForVPToken(
-        session: SIOPSession,
-        tokenRequest: TokenRequest
+        session: SIOPSession, tokenRequest: TokenRequest
     ): PresentationResult {
         // find credential(s) matching the presentation definition
         // for this test wallet implementation, present all credentials in the wallet
         val presentationDefinition = session.presentationDefinition ?: throw PresentationError(
-            TokenErrorCode.invalid_request,
-            tokenRequest,
-            session.presentationDefinition
+            TokenErrorCode.invalid_request, tokenRequest, session.presentationDefinition
         )
         val filterString =
             presentationDefinition.inputDescriptors.flatMap { it.constraints?.fields ?: listOf() }
                 .firstOrNull { field -> field.path.any { it.contains("type") } }?.filter?.jsonObject?.get(
                     "pattern"
-                )?.jsonPrimitive?.contentOrNull
-                ?: presentationDefinition.inputDescriptors.flatMap {
-                    it.schema?.map { it.uri } ?: listOf()
-                }.firstOrNull()
+                )?.jsonPrimitive?.contentOrNull ?: presentationDefinition.inputDescriptors.flatMap {
+                it.schema?.map { it.uri } ?: listOf()
+            }.firstOrNull()
         val presentationBuilder = PresentationBuilder()
 
 
-        val signKey =
-            requireNotNull(IosKey.load(didMethod.signingKeyInKeychainIdentifier, KeyType.secp256r1)){"Load key failed"}
+        val signKey = requireNotNull(
+            IosKey.load(
+                didMethod.signingKeyInKeychainIdentifier, KeyType.secp256r1
+            )
+        ) { "Load key failed" }
 
         println("walletCredentials: $walletCredentials")
 
@@ -294,37 +302,31 @@ internal class TestCredentialWallet(
         println("================")
 
         val presentationJws = presentationJwtStr.decodeJws()
-        val jwtCredentials =
-            ((presentationJws.payload["vp"]
-                ?: throw IllegalArgumentException("VerifiablePresentation string does not contain `vp` attribute?"))
-                .jsonObject["verifiableCredential"]
-                ?: throw IllegalArgumentException("VerifiablePresentation does not contain verifiableCredential list?"))
-                .jsonArray.map { it.jsonPrimitive.content }
+        val jwtCredentials = ((presentationJws.payload["vp"]
+            ?: throw IllegalArgumentException("VerifiablePresentation string does not contain `vp` attribute?")).jsonObject["verifiableCredential"]
+            ?: throw IllegalArgumentException("VerifiablePresentation does not contain verifiableCredential list?")).jsonArray.map { it.jsonPrimitive.content }
 
-        return PresentationResult(
-            listOf(JsonPrimitive(presentationJwtStr)), PresentationSubmission(
-                id = session.presentationDefinition!!.id,
-                definitionId = session.presentationDefinition!!.id,
-                descriptorMap = jwtCredentials.mapIndexed { index, vcJwsStr ->
+        return PresentationResult(listOf(JsonPrimitive(presentationJwtStr)), PresentationSubmission(
+            id = session.presentationDefinition!!.id,
+            definitionId = session.presentationDefinition!!.id,
+            descriptorMap = jwtCredentials.mapIndexed { index, vcJwsStr ->
 
-                    val vcJws = vcJwsStr.decodeJws()
-                    val type =
-                        vcJws.payload["vc"]?.jsonObject?.get("type")?.jsonArray?.last()?.jsonPrimitive?.contentOrNull
-                            ?: "VerifiableCredential"
+                val vcJws = vcJwsStr.decodeJws()
+                val type =
+                    vcJws.payload["vc"]?.jsonObject?.get("type")?.jsonArray?.last()?.jsonPrimitive?.contentOrNull
+                        ?: "VerifiableCredential"
 
-                    DescriptorMapping(
+                DescriptorMapping(
+                    id = session.presentationDefinition?.inputDescriptors?.get(index)?.id,
+                    format = VCFormat.jwt_vp,  // jwt_vp_json
+                    path = "$",
+                    pathNested = DescriptorMapping(
                         id = session.presentationDefinition?.inputDescriptors?.get(index)?.id,
-                        format = VCFormat.jwt_vp,  // jwt_vp_json
-                        path = "$",
-                        pathNested = DescriptorMapping(
-                            id = session.presentationDefinition?.inputDescriptors?.get(index)?.id,
-                            format = VCFormat.jwt_vc,
-                            path = "$.verifiableCredential[0]",
-                        )
+                        format = VCFormat.jwt_vc,
+                        path = "$.verifiableCredential[0]",
                     )
-                }
-            )
-        )
+                )
+            }))
     }
 
 
@@ -350,12 +352,16 @@ internal class TestCredentialWallet(
         get() = createDefaultProviderMetadata()
 
     override fun getSession(id: String) = sessionCache[id]
-    override fun getSessionByIdTokenRequestState(idTokenRequestState: String): SIOPSession? {
+    override fun getSessionByAuthServerState(authServerState: String): SIOPSession? {
         TODO("Not yet implemented")
     }
 
-    override fun putSession(id: String, session: SIOPSession) = sessionCache.put(id, session)
-    override fun removeSession(id: String) = sessionCache.remove(id)
+    override fun putSession(id: String, session: SIOPSession): Unit {
+        sessionCache[id] = session
+    }
+    override fun removeSession(id: String): Unit {
+        sessionCache.remove(id)
+    }
 
     var walletCredentials: List<String> = listOf()
 }
