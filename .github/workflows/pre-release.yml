@@ -81,30 +81,16 @@ jobs:
           tags: waltid/portal:latest, waltid/portal:${{ env.release_version }}
 
       - name: Changelog
-        uses: ardalanamini/auto-changelog@v3
+        uses: ardalanamini/auto-changelog@v4
         id: changelog
         with:
           github-token: ${{ github.token }}
-          commit-types: |
-            breaking: Breaking Changes
-            feat: New Features
-            fix: Bug Fixes
-            revert: Reverts
-            perf: Performance Improvements
-            refactor: Refactors
-            deps: Dependencies
-            docs: Documentation Changes
-            style: Code Style Changes
-            build: Build System
-            ci: Continuous Integration
-            test: Tests
-            chore: Chores
-            other: Other Changes
           default-commit-type: Other Changes
           release-name: v${{ env.release_version }}
           mention-authors: true
           mention-new-contributors: true
-          include-compare: true
+          include-compare-link: true
+          use-github-autolink: true
           semver: true
       - name: Create Release
         uses: softprops/action-gh-release@v2
