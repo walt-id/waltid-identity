@@ -8,6 +8,7 @@ import id.walt.target.ios.keys.P256
 import id.walt.target.ios.keys.RSA
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 
 @Suppress("unused")
 class IosKey(
@@ -101,7 +102,7 @@ class IosKey(
         }.signRaw(plaintext)
     }
 
-    override suspend fun signJws(plaintext: ByteArray, headers: Map<String, String>): String {
+    override suspend fun signJws(plaintext: ByteArray, headers: Map<String, JsonElement>): String {
         check(hasPrivateKey) { "Only private key can do signing." }
 
         return when (keyType) {
@@ -149,6 +150,7 @@ class IosKey(
 }
 
 // utility functions for swift
+
 fun String.ExportedToByteArray(
     startIndex: Int, endIndex: Int, throwOnInvalidSequence: Boolean
 ): ByteArray {
@@ -159,3 +161,5 @@ fun ByteArray.ExportedToString(
 ): String {
     return this.decodeToString()
 }
+
+fun dictionaryToHeaders (input: Map<String, String>):  Map<String, JsonElement> = input.mapValues { (_,v) -> JsonPrimitive(v) }

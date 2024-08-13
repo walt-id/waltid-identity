@@ -4,13 +4,11 @@ import id.walt.platform.utils.ios.DS_Operations
 import id.walt.platform.utils.ios.ECKeyUtils
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.jsonObject
 import platform.Security.SecKeyRef
-import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
-
 
 sealed class P256 {
     sealed class PrivateKey : KeyRepresentation, Signing {
@@ -93,10 +91,8 @@ internal class P256JwkPublicKey(private val jwk: String) : P256.PublicKey() {
 
     private val _jwk by lazy { json.decodeFromJsonElement<Jwk>(jwk()) }
 
-    @OptIn(ExperimentalEncodingApi::class)
-
     private val x963Representation: ByteArray by lazy {
-        byteArrayOf(0x04) + base64UrlDecode(_jwk.x) + base64UrlDecode(_jwk.y)
+        byteArrayOf(0x04) + base64Url.decode(_jwk.x) + base64Url.decode(_jwk.y)
     }
 
     @Serializable
@@ -157,10 +153,10 @@ internal class P256KeychainPrivateKey(private val kid: String) : P256.PrivateKey
         }
     }
 
-    override fun signJws(plainText: ByteArray, headers: Map<String, String>): String {
+    override fun signJws(plainText: ByteArray, headers: Map<String, JsonElement>): String {
         return KeychainOperations.P256.withPrivateKey(kid) { privateKey ->
             val result = DS_Operations.signWithBody(
-                plainText.toNSData(), "ES256", privateKey, headers as Map<Any?, *>
+                plainText.toNSData(), "ES256", privateKey, headersData = JsonObject(headers).toString().toNSData()
             )
 
             check(result.success()) {
