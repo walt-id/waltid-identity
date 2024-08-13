@@ -9,4 +9,6 @@ data class KeyGenerationRequest(
     val keyType: KeyType = KeyType.Ed25519,
 
     var config: JsonObject? = null,
-)
+) {
+    fun getConfigAsMap() = config?.toMap() ?: emptyMap()
+}
