@@ -212,7 +212,7 @@ struct ContentView: View {
                 
                 Button("Private Key - Sign jws") {
                     if let p256Key {
-                        p256Key.signJws(plaintext: inputByteArray, headers: ["alg": "ES256"]) { sig, err in
+                        p256Key.signJws(plaintext: inputByteArray, headers: IosKeyKt.dictionaryToHeaders(input: ["alg": "ES256"])) { sig, err in
                             if let sig {
                                 print(sig)
                                 p256KeysignJwsResult = sig
@@ -243,7 +243,7 @@ struct ContentView: View {
             GroupBox("JWK secp256r1") {
                 TextField("JWK", text: $p256jwk)
                 Button("Public Key - Export pem") {
-                    JWKKey(jwk: p256jwk).exportPEM { result, err in
+                    JWKKey(jwk: p256jwk, _keyId: nil).exportPEM { result, err in
                         if let result {
                             print(result)
                         }
@@ -255,7 +255,7 @@ struct ContentView: View {
                 }.disabled(p256jwk.isEmpty)
                 
                 Button("Public Key - Verify jws") {
-                    JWKKey(jwk: p256jwk).verifyJws(signedJws: p256KeysignJwsResult!) { result, err in
+                    JWKKey(jwk: p256jwk, _keyId: nil).verifyJws(signedJws: p256KeysignJwsResult!) { result, err in
                         if let result {
                             print(result)
                         }
@@ -434,7 +434,7 @@ struct ContentView: View {
                 
                 Button("Private Key - Sign jws") {
                     if let edKey {
-                        edKey.signJws(plaintext: inputByteArray, headers: ["alg": "EdDSA", "crv": "Ed25519"]) { sig, err in
+                        edKey.signJws(plaintext: inputByteArray, headers: IosKeyKt.dictionaryToHeaders(input: ["alg": "EdDSA", "crv": "Ed25519"])) { sig, err in
                             if let sig {
                                 print(sig)
                                 edKeysignJwsResult = sig
@@ -465,7 +465,7 @@ struct ContentView: View {
             GroupBox("JWK Ed25519") {
                 TextField("JWK", text: $edjwk)
                 Button("Public Key - Export pem") {
-                    JWKKey(jwk: edjwk).exportPEM { result, err in
+                    JWKKey(jwk: edjwk, _keyId: nil).exportPEM { result, err in
                         if let result {
                             print(result)
                         }
@@ -477,7 +477,7 @@ struct ContentView: View {
                 }.disabled(edjwk.isEmpty)
                 
                 Button("Public Key - Verify jws") {
-                    JWKKey(jwk: edjwk).verifyJws(signedJws: edKeysignJwsResult!) { result, err in
+                    JWKKey(jwk: edjwk, _keyId: nil).verifyJws(signedJws: edKeysignJwsResult!) { result, err in
                         if let result {
                             print(result)
                         }
@@ -486,7 +486,7 @@ struct ContentView: View {
                             print(err)
                         }
                     }
-                }.disabled(edjwk.isEmpty || edKeysignJwsResult?.isEmpty == false)
+                }.disabled(edjwk.isEmpty || edKeysignJwsResult == nil)
             }
             
             GroupBox("iOS Keychain RSA") {
@@ -602,7 +602,7 @@ struct ContentView: View {
                 
                 Button("Private Key - Sign jws") {
                     if let rsaKey {
-                        rsaKey.signJws(plaintext: inputByteArray, headers: ["alg": "RS256"]) { sig, err in
+                        rsaKey.signJws(plaintext: inputByteArray, headers: IosKeyKt.dictionaryToHeaders(input:  ["alg": "RS256"])) { sig, err in
                             if let sig {
                                 print(sig)
                                 rsaKeysignJwsResult = sig
@@ -633,7 +633,7 @@ struct ContentView: View {
             GroupBox("JWK RSA") {
                 TextField("JWK", text: $rsajwk)
                 Button("Public Key - Export pem") {
-                    JWKKey(jwk: rsajwk).exportPEM { result, err in
+                    JWKKey(jwk: rsajwk, _keyId: nil).exportPEM { result, err in
                         if let result {
                             print(result)
                         }
@@ -645,7 +645,7 @@ struct ContentView: View {
                 }.disabled(rsajwk.isEmpty)
                 
                 Button("Public Key - Verify jws") {
-                    JWKKey(jwk: rsajwk).verifyJws(signedJws: rsaKeysignJwsResult!) { result, err in
+                    JWKKey(jwk: rsajwk, _keyId: nil).verifyJws(signedJws: rsaKeysignJwsResult!) { result, err in
                         if let result {
                             print(result)
                         }

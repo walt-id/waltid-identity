@@ -1,11 +1,13 @@
 package id.walt.credentials.verification.policies
 
-import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonObject
 
+@Serializable
 actual class RevocationPolicy actual constructor() :
     RevocationPolicyMp() {
     actual override suspend fun verify(
-        data: JsonElement,
+        data: JsonObject,
         args: Any?,
         context: Map<String, Any>
     ): Result<Any> {
