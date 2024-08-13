@@ -13,10 +13,10 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
-actual class JWKKey actual constructor(private val jwk: String?) : Key() {
+actual class JWKKey actual constructor(private val jwk: String?, private val _keyId: String?) : Key() {
 
     private var _jwkObj: JsonObject =
-        Json.parseToJsonElement(requireNotNull(jwk) { "jws is null" }).jsonObject
+        Json.parseToJsonElement(requireNotNull(jwk) { "jwk is null" }).jsonObject
 
     private val privateParameters = when (keyType) {
         KeyType.secp256r1, KeyType.Ed25519 -> listOf("d")
@@ -33,7 +33,7 @@ actual class JWKKey actual constructor(private val jwk: String?) : Key() {
         }
 
     actual override suspend fun getKeyId(): String {
-        return _jwkObj["kid"]?.jsonPrimitive?.content ?: error("Kid not found in $jwk")
+        return _keyId ?: _jwkObj["kid"]?.jsonPrimitive?.content ?: error("Kid not found in $jwk")
     }
 
 
@@ -67,7 +67,7 @@ actual class JWKKey actual constructor(private val jwk: String?) : Key() {
     }
 
     actual override suspend fun signJws(
-        plaintext: ByteArray, headers: Map<String, String>
+        plaintext: ByteArray, headers: Map<String, JsonElement>
     ): String {
         error("Not implemented")
     }

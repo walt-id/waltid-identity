@@ -4,6 +4,7 @@ import id.walt.platform.utils.ios.DS_Operations
 import id.walt.platform.utils.ios.RSAKeyUtils
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.jsonObject
@@ -107,10 +108,10 @@ internal class RSAPrivateKeyKeychain(private val kid: String) : RSA.PrivateKey()
         }
     }
 
-    override fun signJws(plainText: ByteArray, headers: Map<String, String>): String {
+    override fun signJws(plainText: ByteArray, headers: Map<String, JsonElement>): String {
         return KeychainOperations.RSA.withPrivateKey(kid) {
             val result = DS_Operations.signWithBody(
-                plainText.toNSData(), "RS256", it, headers as Map<Any?, *>
+                plainText.toNSData(), "RS256", it, headersData = JsonObject(headers).toString().toNSData()
             )
 
             check(result.success()) {
