@@ -1,5 +1,6 @@
 package id.walt.target.ios.keys
 
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import platform.Foundation.NSBundle
 
@@ -14,7 +15,7 @@ interface KeyRepresentation {
 }
 
 interface Signing {
-    fun signJws(plainText: ByteArray, headers: Map<String, String>): String
+    fun signJws(plainText: ByteArray, headers: Map<String, JsonElement>): String
 
     fun signRaw(plainText: ByteArray): ByteArray
 }
