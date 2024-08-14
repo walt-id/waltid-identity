@@ -1,4 +1,4 @@
-package id.walt.crypto.utils
+package id.walt.webwallet.utils
 
 import id.walt.crypto.utils.Base64Utils.base64Decode
 import java.io.ByteArrayInputStream
@@ -9,17 +9,29 @@ import java.util.*
 import javax.net.ssl.TrustManagerFactory
 import javax.net.ssl.X509TrustManager
 
-actual object X5CUtils {
+class X5CValidator(
+    private val trustedCA: List<String> = emptyList(),
+) {
+    //??not really required, as we have the trustedCA list we check against
     private val trustManager = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm())
     private val certificateFactory = CertificateFactory.getInstance("X509")
     private val certificatePathValidator = CertPathValidator.getInstance("PKIX")
 
-    actual fun verifyX5Chain(certificates: List<String>, trustedCA: List<String>): Boolean = let {
+    init {
+        trustManager.init(null as? KeyStore)
+    }
+
+    fun verifyX5Chain(certificates: List<String>): Result<Unit> = runCatching {
         require(certificates.isNotEmpty()) { "No signing certificate" }
         val chain = generateX509Chain(certificates)
         val trusted = generateX509Chain(trustedCA)
         checkDate(chain[0]) { "Expired or invalid certificate: ${it.subjectX500Principal.name} - notBefore (${it.notBefore}) and notAfter (${it.notAfter})" }
-        validateCertificateChain(chain, trusted)
+        validateCertificateChain(chain, trusted).toResult("Failed to validate X5 Chain")
+    }
+
+    private fun Boolean.toResult(message: String) = when (this) {
+        true -> Result.success(Unit)
+        false -> Result.failure(IllegalStateException(message))
     }
 
     /**
@@ -31,9 +43,10 @@ actual object X5CUtils {
     }
 
     /**
-     * Attempts to validate the [X509Certificate]
-     * [X509Certificate.getNotBefore] and [X509Certificate.getNotAfter]
-     * against the current date
+     * Attempts to validate the [X509Certificate]'s [notBefore][X509Certificate.getNotBefore]
+     * and [notAfter][X509Certificate.getNotAfter] against the current date
+     * @param certificate the [X509Certificate] certificate
+     * @param message optional message lambda
      * @throws [IllegalStateException] with the given [message], if validation fails
      *
      * TODO: potential candidate for common-utils
@@ -55,6 +68,7 @@ actual object X5CUtils {
     private fun validateCertificateChain(
         certChain: List<X509Certificate>, additionalTrustedRootCAs: List<X509Certificate>
     ): Boolean = findIssuerCA(certChain.first(), additionalTrustedRootCAs)?.let {
+        //todo: validate each certificate date
         validateCertificatePath(it, certificateFactory.generateCertPath(certChain))
     } ?: false
 
@@ -75,13 +89,11 @@ actual object X5CUtils {
      * and looks up for a [X509Certificate] of a trusted issuer
      */
     private fun findIssuerCA(cert: X509Certificate, trustedCAs: List<X509Certificate>): X509Certificate? =
-        trustManager.init(null as? KeyStore).let {
-            trustManager.trustManagers
-                .filterIsInstance<X509TrustManager>()
-                .flatMap { it.acceptedIssuers.toList() }//??required
-                .plus(trustedCAs)
-                .firstOrNull {
-                    cert.issuerX500Principal.name.equals(it.subjectX500Principal.name)
-                }
-        }
+        trustManager.trustManagers
+            .filterIsInstance<X509TrustManager>()
+            .flatMap { it.acceptedIssuers.toList() }//??required
+            .plus(trustedCAs)
+            .firstOrNull {
+                cert.issuerX500Principal.name.equals(it.subjectX500Principal.name)
+            }
 }
