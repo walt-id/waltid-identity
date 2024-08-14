@@ -8,6 +8,9 @@ import id.walt.webwallet.db.models.WalletOperationHistory
 import id.walt.webwallet.service.SSIKit2WalletService
 import id.walt.webwallet.service.WalletServiceManager
 import id.walt.webwallet.usecase.exchange.FilterData
+import id.walt.webwallet.web.controllers.auth.getUserUUID
+import id.walt.webwallet.web.controllers.auth.getWalletId
+import id.walt.webwallet.web.controllers.auth.getWalletService
 import io.github.smiley4.ktorswaggerui.dsl.routing.post
 import io.github.smiley4.ktorswaggerui.dsl.routing.route
 import io.ktor.http.*

@@ -1,4 +1,4 @@
-package id.walt.webwallet.web.controllers
+package id.walt.webwallet.web.controllers.auth
 
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.JWSHeader
