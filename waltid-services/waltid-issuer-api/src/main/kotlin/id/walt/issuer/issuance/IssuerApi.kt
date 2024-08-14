@@ -273,13 +273,13 @@ fun Application.issuerApi() {
                         context.respond(HttpStatusCode.OK, jws)
                     }
                 }
-                route("openid4vc") {
+            }
+            route("openid4vc") {
 
-                    route("jwt") {
-                        post("issue", {
-                            summary = "Signs credential with JWT and starts an OIDC credential exchange flow."
-                            description =
-                                "This endpoint issues a W3C Verifiable Credential, and returns an issuance URL "
+                route("jwt") {
+                    post("issue", {
+                        summary = "Signs credential with JWT and starts an OIDC credential exchange flow."
+                        description = "This endpoint issues a W3C Verifiable Credential, and returns an issuance URL "
 
                             request {
                                 body<IssuanceRequest> {
@@ -309,191 +309,190 @@ fun Application.issuerApi() {
                                 }
                             }
 
-                            response {
-                                "200" to {
-                                    description = "Credential signed (with the *proof* attribute added)"
-                                    body<String> {
-                                        example("Issuance URL") {
-                                            value =
-                                                "openid-credential-offer://localhost/?credential_offer=%7B%22credential_issuer%22%3A%22http%3A%2F%2Flocalhost%3A8000%22%2C%22credentials%22%3A%5B%22VerifiableId%22%5D%2C%22grants%22%3A%7B%22authorization_code%22%3A%7B%22issuer_state%22%3A%22501414a4-c461-43f0-84b2-c628730c7c02%22%7D%7D%7D"
-                                        }
-                                    }
-                                }
-                                "400" to {
-                                    description = "Bad request"
-                                }
-                            }
-                        }) {
-                            val jwtIssuanceRequest = context.receive<IssuanceRequest>()
-                            val validation = validateIssuanceRequest(jwtIssuanceRequest)
-                            if (validation.first != HttpStatusCode.OK) {
-                                return@post context.respond(
-                                    validation.first,
-                                    validation.second
-                                )
-                            } else {
-                                val offerUri = createCredentialOfferUri(listOf(jwtIssuanceRequest))
-                                context.respond(
-                                    HttpStatusCode.OK, offerUri
-                                )
-                            }
-
-//                            val offerUri = createCredentialOfferUri(listOf(jwtIssuanceRequest))
-//
-//                            context.respond(
-//                                HttpStatusCode.OK, offerUri
-//                            )
-                        }
-                        post("issueBatch", {
-                            summary = "Signs a list of credentials and starts an OIDC credential exchange flow."
-                            description =
-                                "This endpoint issues a list of W3C Verifiable Credentials, and returns an issuance URL "
-
-                            request {
-                                body<List<IssuanceRequest>> {
-                                    description =
-                                        "Pass the unsigned credential that you intend to issue as the body of the request."
-                                    example("Batch example", IssuanceExamples.batchExampleJwt)
-                                    required = true
-                                }
-                            }
-
-                            response {
-                                "200" to {
-                                    description = "Credential signed (with the *proof* attribute added)"
-                                    body<String> {
-                                        example("Issuance URL") {
-                                            value =
-                                                "openid-credential-offer://localhost/?credential_offer=%7B%22credential_issuer%22%3A%22http%3A%2F%2Flocalhost%3A8000%22%2C%22credentials%22%3A%5B%22VerifiableId%22%5D%2C%22grants%22%3A%7B%22authorization_code%22%3A%7B%22issuer_state%22%3A%22501414a4-c461-43f0-84b2-c628730c7c02%22%7D%7D%7D"
-                                        }
+                        response {
+                            "200" to {
+                                description = "Credential signed (with the *proof* attribute added)"
+                                body<String> {
+                                    example("Issuance URL") {
+                                        value =
+                                            "openid-credential-offer://localhost/?credential_offer=%7B%22credential_issuer%22%3A%22http%3A%2F%2Flocalhost%3A8000%22%2C%22credentials%22%3A%5B%22VerifiableId%22%5D%2C%22grants%22%3A%7B%22authorization_code%22%3A%7B%22issuer_state%22%3A%22501414a4-c461-43f0-84b2-c628730c7c02%22%7D%7D%7D"
                                     }
                                 }
                             }
-                        }) {
-
-
-                            val issuanceRequests = context.receive<List<IssuanceRequest>>()
-                            val offerUri = createCredentialOfferUri(issuanceRequests)
-                            logger.debug { "Offer URI: $offerUri" }
-
-                            context.respond(
-                                HttpStatusCode.OK, offerUri
-                            )
-                        }
-                    }
-
-                    route("sdjwt") {
-                        post("issue", {
-                            summary = "Signs credential using SD-JWT and starts an OIDC credential exchange flow."
-                            description =
-                                "This endpoint issues a W3C or SD-JWT-VC Verifiable Credential, and returns an issuance URL "
-
-                            request {
-                                body<IssuanceRequest> {
-                                    description =
-                                        "Pass the unsigned credential that you intend to issue in the body of the request."
-                                    example("W3C SD-JWT example", IssuanceExamples.sdJwtW3CExample)
-                                    example("SD-JWT-VC example", IssuanceExamples.sdJwtVCExample)
-                                    required = true
-                                }
+                            "400" to {
+                                description = "Bad request"
                             }
-
-                            response {
-                                "200" to {
-                                    description = "Credential signed (with the *proof* attribute added)"
-                                    body<String> {
-                                        example("Issuance URL") {
-                                            value =
-                                                "openid-credential-offer://localhost/?credential_offer=%7B%22credential_issuer%22%3A%22http%3A%2F%2Flocalhost%3A8000%22%2C%22credentials%22%3A%5B%22VerifiableId%22%5D%2C%22grants%22%3A%7B%22authorization_code%22%3A%7B%22issuer_state%22%3A%22501414a4-c461-43f0-84b2-c628730c7c02%22%7D%7D%7D"
-                                        }
-                                    }
-                                }
-                            }
-                        }) {
-                            val sdJwtIssuanceRequest = context.receive<IssuanceRequest>()
-
-                            val offerUri = createCredentialOfferUri(listOf(sdJwtIssuanceRequest))
-
-                            context.respond(
-                                HttpStatusCode.OK, offerUri
-                            )
-                        }
-
-                        post("issueBatch", {
-                            summary = "Signs a list of credentials with SD and starts an OIDC credential exchange flow."
-                            description =
-                                "This endpoint issues a list of W3C Verifiable Credentials, and returns an issuance URL "
-
-                            request {
-                                body<List<IssuanceRequest>> {
-                                    description =
-                                        "Pass the unsigned credential that you intend to issue as the body of the request."
-                                    example("Batch example", IssuanceExamples.batchExampleSdJwt)
-                                    required = true
-                                }
-                            }
-
-                            response {
-                                "200" to {
-                                    description = "Credential signed (with the *proof* attribute added)"
-                                    body<String> {
-                                        example("Issuance URL") {
-                                            value =
-                                                "openid-credential-offer://localhost/?credential_offer=%7B%22credential_issuer%22%3A%22http%3A%2F%2Flocalhost%3A8000%22%2C%22credentials%22%3A%5B%22VerifiableId%22%5D%2C%22grants%22%3A%7B%22authorization_code%22%3A%7B%22issuer_state%22%3A%22501414a4-c461-43f0-84b2-c628730c7c02%22%7D%7D%7D"
-                                        }
-                                    }
-                                }
-                            }
-                        }) {
-
-
-                            val issuanceRequests = context.receive<List<IssuanceRequest>>()
-                            val offerUri = createCredentialOfferUri(issuanceRequests)
-                            logger.debug { "Offer URI: $offerUri" }
-
-                            context.respond(
-                                HttpStatusCode.OK, offerUri
-                            )
-                        }
-                    }
-
-                    route("mdoc") {
-                        post("issue", {
-                            summary = "Signs a credential based on the IEC/ISO18013-5 mdoc/mDL format."
-                            description = "This endpoint issues a mdoc and returns an issuance URL "
-
-                            request {
-                                body<IssuanceRequest> {
-                                    description =
-                                        "Pass the unsigned credential that you intend to issue as the body of the request."
-                                    example("mDL/MDOC example", IssuanceExamples.mDLCredentialIssuanceExample)
-                                    required = true
-                                }
-                            }
-                        }) {
-                            val mdocIssuanceRequest = context.receive<IssuanceRequest>()
-
-                            val offerUri = createCredentialOfferUri(listOf(mdocIssuanceRequest))
-
-                            context.respond(
-                                HttpStatusCode.OK, offerUri
-                            )
-                        }
-                    }
-
-                    get("credentialOffer", {
-                        summary = "Gets a credential offer based on the session id"
-                        request {
-                            queryParameter<String>("id") { required = true }
                         }
                     }) {
-                        val sessionId = call.parameters["id"] ?: throw BadRequestException("Missing parameter \"id\"")
-                        val issuanceSession = OidcApi.getSession(sessionId)
-                            ?: throw NotFoundException("No active issuance session found by the given id")
-                        val credentialOffer = issuanceSession.credentialOffer
-                            ?: throw BadRequestException("Session has no credential offer set")
-                        context.respond(credentialOffer.toJSON())
+                        val jwtIssuanceRequest = context.receive<IssuanceRequest>()
+//                        val offerUri = createCredentialOfferUri(listOf(jwtIssuanceRequest))
+//
+//                        context.respond(
+//                            HttpStatusCode.OK, offerUri
+//                        )
+                        val validation = validateIssuanceRequest(jwtIssuanceRequest)
+                        if (validation.first != HttpStatusCode.OK) {
+                            return@post context.respond(
+                                validation.first,
+                                validation.second
+                            )
+                        } else {
+                            val offerUri = createCredentialOfferUri(listOf(jwtIssuanceRequest))
+                            context.respond(
+                                HttpStatusCode.OK, offerUri
+                            )
+                        }
+
                     }
+                    post("issueBatch", {
+                        summary = "Signs a list of credentials and starts an OIDC credential exchange flow."
+                        description =
+                            "This endpoint issues a list of W3C Verifiable Credentials, and returns an issuance URL "
+
+                        request {
+                            body<List<IssuanceRequest>> {
+                                description =
+                                    "Pass the unsigned credential that you intend to issue as the body of the request."
+                                example("Batch example", IssuanceExamples.batchExampleJwt)
+                                required = true
+                            }
+                        }
+
+                        response {
+                            "200" to {
+                                description = "Credential signed (with the *proof* attribute added)"
+                                body<String> {
+                                    example("Issuance URL") {
+                                        value =
+                                            "openid-credential-offer://localhost/?credential_offer=%7B%22credential_issuer%22%3A%22http%3A%2F%2Flocalhost%3A8000%22%2C%22credentials%22%3A%5B%22VerifiableId%22%5D%2C%22grants%22%3A%7B%22authorization_code%22%3A%7B%22issuer_state%22%3A%22501414a4-c461-43f0-84b2-c628730c7c02%22%7D%7D%7D"
+                                    }
+                                }
+                            }
+                        }
+                    }) {
+
+
+                        val issuanceRequests = context.receive<List<IssuanceRequest>>()
+                        val offerUri = createCredentialOfferUri(issuanceRequests)
+                        logger.debug { "Offer URI: $offerUri" }
+
+                        context.respond(
+                            HttpStatusCode.OK, offerUri
+                        )
+                    }
+                }
+
+                route("sdjwt") {
+                    post("issue", {
+                        summary = "Signs credential using SD-JWT and starts an OIDC credential exchange flow."
+                        description =
+                            "This endpoint issues a W3C or SD-JWT-VC Verifiable Credential, and returns an issuance URL "
+
+                        request {
+                            body<IssuanceRequest> {
+                                description =
+                                    "Pass the unsigned credential that you intend to issue in the body of the request."
+                                example("W3C SD-JWT example", IssuanceExamples.sdJwtW3CExample)
+                                example("SD-JWT-VC example", IssuanceExamples.sdJwtVCExample)
+                                required = true
+                            }
+                        }
+
+                        response {
+                            "200" to {
+                                description = "Credential signed (with the *proof* attribute added)"
+                                body<String> {
+                                    example("Issuance URL") {
+                                        value =
+                                            "openid-credential-offer://localhost/?credential_offer=%7B%22credential_issuer%22%3A%22http%3A%2F%2Flocalhost%3A8000%22%2C%22credentials%22%3A%5B%22VerifiableId%22%5D%2C%22grants%22%3A%7B%22authorization_code%22%3A%7B%22issuer_state%22%3A%22501414a4-c461-43f0-84b2-c628730c7c02%22%7D%7D%7D"
+                                    }
+                                }
+                            }
+                        }
+                    }) {
+                        val sdJwtIssuanceRequest = context.receive<IssuanceRequest>()
+
+                        val offerUri = createCredentialOfferUri(listOf(sdJwtIssuanceRequest))
+
+                        context.respond(
+                            HttpStatusCode.OK, offerUri
+                        )
+                    }
+
+                    post("issueBatch", {
+                        summary = "Signs a list of credentials with SD and starts an OIDC credential exchange flow."
+                        description =
+                            "This endpoint issues a list of W3C Verifiable Credentials, and returns an issuance URL "
+
+                        request {
+                            body<List<IssuanceRequest>> {
+                                description =
+                                    "Pass the unsigned credential that you intend to issue as the body of the request."
+                                example("Batch example", IssuanceExamples.batchExampleSdJwt)
+                                required = true
+                            }
+                        }
+
+                        response {
+                            "200" to {
+                                description = "Credential signed (with the *proof* attribute added)"
+                                body<String> {
+                                    example("Issuance URL") {
+                                        value =
+                                            "openid-credential-offer://localhost/?credential_offer=%7B%22credential_issuer%22%3A%22http%3A%2F%2Flocalhost%3A8000%22%2C%22credentials%22%3A%5B%22VerifiableId%22%5D%2C%22grants%22%3A%7B%22authorization_code%22%3A%7B%22issuer_state%22%3A%22501414a4-c461-43f0-84b2-c628730c7c02%22%7D%7D%7D"
+                                    }
+                                }
+                            }
+                        }
+                    }) {
+
+
+                        val issuanceRequests = context.receive<List<IssuanceRequest>>()
+                        val offerUri = createCredentialOfferUri(issuanceRequests)
+                        logger.debug { "Offer URI: $offerUri" }
+
+                        context.respond(
+                            HttpStatusCode.OK, offerUri
+                        )
+                    }
+                }
+
+                route("mdoc") {
+                    post("issue", {
+                        summary = "Signs a credential based on the IEC/ISO18013-5 mdoc/mDL format."
+                        description = "This endpoint issues a mdoc and returns an issuance URL "
+
+                        request {
+                            body<IssuanceRequest> {
+                                description =
+                                    "Pass the unsigned credential that you intend to issue as the body of the request."
+                                example("mDL/MDOC example", IssuanceExamples.mDLCredentialIssuanceExample)
+                                required = true
+                            }
+                        }
+                    }) {
+                        val mdocIssuanceRequest = context.receive<IssuanceRequest>()
+
+                        val offerUri = createCredentialOfferUri(listOf(mdocIssuanceRequest))
+
+                        context.respond(
+                            HttpStatusCode.OK, offerUri
+                        )
+                    }
+                }
+
+                get("credentialOffer", {
+                    summary = "Gets a credential offer based on the session id"
+                    request {
+                        queryParameter<String>("id") { required = true }
+                    }
+                }) {
+                    val sessionId = call.parameters["id"] ?: throw BadRequestException("Missing parameter \"id\"")
+                    val issuanceSession = OidcApi.getSession(sessionId)
+                        ?: throw NotFoundException("No active issuance session found by the given id")
+                    val credentialOffer = issuanceSession.credentialOffer
+                        ?: throw BadRequestException("Session has no credential offer set")
+                    context.respond(credentialOffer.toJSON())
                 }
             }
         }
