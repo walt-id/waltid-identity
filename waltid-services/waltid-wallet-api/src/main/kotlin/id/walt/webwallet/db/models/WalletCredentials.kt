@@ -29,7 +29,7 @@ object WalletCredentials : Table("credentials") {
 
     val deletedOn = timestamp("deleted_on").nullable().default(null)
     val pending = bool("pending").default(false)
-    val format = varchar("format", 32)
+    val format = varchar("format", 32).default(CredentialFormat.jwt_vc_json.value)
 
     override val primaryKey = PrimaryKey(wallet, id)
 }
