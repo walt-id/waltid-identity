@@ -13,6 +13,7 @@ import id.walt.webwallet.web.Administration.configureAdministration
 import id.walt.webwallet.web.controllers.*
 import id.walt.webwallet.web.controllers.NotificationController.notifications
 import id.walt.webwallet.web.controllers.PushController.push
+import id.walt.webwallet.web.controllers.auth.auth
 import id.walt.webwallet.web.plugins.*
 import id.walt.webwallet.web.plugins.walletOpenApiPluginAmendment
 import io.github.oshai.kotlinlogging.KotlinLogging
