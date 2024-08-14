@@ -10,5 +10,13 @@ enum class AuthSessionStatus(val value: String) {
 
 @OptIn(ExperimentalStdlibApi::class)
 data class AuthSession(
-    val id: Uuid
+    val id: Uuid,
+
+    /**
+     * Account ID, if known yet
+     * (could potentially only be determined when actually invoking auth method)
+     */
+    val accountId: Uuid? = null
+
+
 )
