@@ -1,6 +1,5 @@
 package id.walt.authkit.accounts
 
-import id.walt.authkit.AuthContext
 import id.walt.authkit.accounts.identifiers.AccountIdentifier
 import id.walt.authkit.accounts.identifiers.UsernameIdentifier
 import id.walt.authkit.methods.AuthenticationMethod
@@ -13,6 +12,8 @@ object AccountStore {
 
     // Account uuid -> account
     val wip_accounts = HashMap<Uuid, Account>()
+
+    // TODO: Missing context, for multi tenancy
 
     // AccountIdentifier -> Account uuid
     val wip_account_ids = HashMap<AccountIdentifier, Uuid>()
