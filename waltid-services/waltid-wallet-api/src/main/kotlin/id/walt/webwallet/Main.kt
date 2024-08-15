@@ -16,6 +16,7 @@ import id.walt.webwallet.web.controllers.PushController.push
 import id.walt.webwallet.web.controllers.auth.defaultAuthRoutes
 import id.walt.webwallet.web.controllers.auth.keycloak.keycloakAuthRoutes
 import id.walt.webwallet.web.controllers.auth.oidc.oidcAuthRoutes
+import id.walt.webwallet.web.controllers.auth.x5c.x5cAuthRoutes
 import id.walt.webwallet.web.plugins.*
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.server.application.*
@@ -60,9 +61,10 @@ fun Application.webWalletModule(withPlugins: Boolean = true) {
     if (withPlugins) {
         configurePlugins()
     }
-    { oidcAuthRoutes() } whenFeature FeatureCatalog.oidcAuthenticationFeature
     defaultAuthRoutes()
-    keycloakAuthRoutes()
+    keycloakAuthRoutes();
+    { oidcAuthRoutes() } whenFeature FeatureCatalog.oidcAuthenticationFeature
+    { x5cAuthRoutes() } whenFeature FeatureCatalog.x5cAuthFeature
     accounts();
     { push() } whenFeature FeatureCatalog.pushFeature
 
