@@ -109,7 +109,7 @@
                                             fill="currentColor"
                                         ></path>
                                     </svg>
-                                    <ArrowRightOnRectangleIcon v-else class="ml-1.5 h-5 w-5" />
+                                  <ArrowRightStartOnRectangleIcon v-else class="ml-1.5 h-5 w-5"/>
                                 </button>
                             </div>
                         </form>
