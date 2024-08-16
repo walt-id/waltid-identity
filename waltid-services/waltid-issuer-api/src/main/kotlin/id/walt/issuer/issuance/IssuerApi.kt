@@ -281,33 +281,33 @@ fun Application.issuerApi() {
                         summary = "Signs credential with JWT and starts an OIDC credential exchange flow."
                         description = "This endpoint issues a W3C Verifiable Credential, and returns an issuance URL "
 
-                            request {
-                                body<IssuanceRequest> {
-                                    description =
-                                        "Pass the unsigned credential that you intend to issue as the body of the request."
-                                    example(
-                                        "OpenBadgeCredential example",
-                                        IssuanceExamples.openBadgeCredentialIssuanceExample
-                                    )
-                                    example(
-                                        "UniversityDegreeCredential example",
-                                        IssuanceExamples.universityDegreeIssuanceCredentialExample
-                                    )
-                                    example(
-                                        "OpenBadgeCredential example with Authorization Code Flow and Id Token",
-                                        IssuanceExamples.openBadgeCredentialIssuanceExampleWithIdToken
-                                    )
-                                    example(
-                                        "OpenBadgeCredential example with Authorization Code Flow and Vp Token",
-                                        IssuanceExamples.openBadgeCredentialIssuanceExampleWithVpToken
-                                    )
-                                    example(
-                                        "OpenBadgeCredential example with Authorization Code Flow and Username/Password Token",
-                                        IssuanceExamples.openBadgeCredentialIssuanceExampleWithUsernamePassword
-                                    )
-                                    required = true
-                                }
+                        request {
+                            body<IssuanceRequest> {
+                                description =
+                                    "Pass the unsigned credential that you intend to issue as the body of the request."
+                                example(
+                                    "OpenBadgeCredential example",
+                                    IssuanceExamples.openBadgeCredentialIssuanceExample
+                                )
+                                example(
+                                    "UniversityDegreeCredential example",
+                                    IssuanceExamples.universityDegreeIssuanceCredentialExample
+                                )
+                                example(
+                                    "OpenBadgeCredential example with Authorization Code Flow and Id Token",
+                                    IssuanceExamples.openBadgeCredentialIssuanceExampleWithIdToken
+                                )
+                                example(
+                                    "OpenBadgeCredential example with Authorization Code Flow and Vp Token",
+                                    IssuanceExamples.openBadgeCredentialIssuanceExampleWithVpToken
+                                )
+                                example(
+                                    "OpenBadgeCredential example with Authorization Code Flow and Username/Password Token",
+                                    IssuanceExamples.openBadgeCredentialIssuanceExampleWithUsernamePassword
+                                )
+                                required = true
                             }
+                        }
 
                         response {
                             "200" to {
@@ -324,23 +324,25 @@ fun Application.issuerApi() {
                             }
                         }
                     }) {
-                        val jwtIssuanceRequest = context.receive<IssuanceRequest>()
-//                        val offerUri = createCredentialOfferUri(listOf(jwtIssuanceRequest))
-//
-//                        context.respond(
-//                            HttpStatusCode.OK, offerUri
-//                        )
-                        val validation = validateIssuanceRequest(jwtIssuanceRequest)
-                        if (validation.first != HttpStatusCode.OK) {
-                            return@post context.respond(
-                                validation.first,
-                                validation.second
-                            )
-                        } else {
+                        runCatching {
+                            val jwtIssuanceRequest = context.receive<IssuanceRequest>()
+
+                            val validationResult = validateIssuanceRequest(jwtIssuanceRequest)
+
+                            if (validationResult.first != HttpStatusCode.OK) {
+                                throw validationResult.second?.let { it1 -> BadRequestException(it1) }!!
+                            }
+
                             val offerUri = createCredentialOfferUri(listOf(jwtIssuanceRequest))
-                            context.respond(
-                                HttpStatusCode.OK, offerUri
-                            )
+                            context.respond(HttpStatusCode.OK, offerUri)
+                        }.onFailure {
+                            if (it.localizedMessage == "Failed to connect to any host resolved for DNS name.")
+                                context.respond(HttpStatusCode.InternalServerError, "Cannot connect to redis server.")
+                            else
+                                context.respond(
+                                    HttpStatusCode.InternalServerError,
+                                    it.localizedMessage ?: "Failed to issue credential."
+                                )
                         }
 
                     }
