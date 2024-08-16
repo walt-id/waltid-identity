@@ -202,7 +202,7 @@ async function submit() {
           });
 
 
-            // wait for modal close, then navigate
+          navigateTo("/");
 
         })
         .catch((err) => {
