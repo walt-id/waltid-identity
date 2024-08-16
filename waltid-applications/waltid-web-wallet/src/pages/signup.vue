@@ -206,11 +206,18 @@ async function submit() {
         })
         .catch((err) => {
             isProgress.value = false;
-            store.openModal({
+          let errorMessage = "An error occurred while registering your account.";
+          if (err.data.statusCode === 500) {
+            errorMessage = "Internal server error. Please try again later.";
+          } else if (err.data) {
+            errorMessage = err.data;
+          }
+
+          store.openModal({
                 component: ActionResultModal,
                 props: {
                     title: "Error",
-                    message: err.data,
+                  message: errorMessage.message,
                     isError: true,
                      open: true,
                   callback: () => {
