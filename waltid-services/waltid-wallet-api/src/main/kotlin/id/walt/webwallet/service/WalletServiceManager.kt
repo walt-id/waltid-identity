@@ -143,8 +143,8 @@ object WalletServiceManager {
         credentialService = credentialService,
         credentialStatusServiceFactory = credentialStatusServiceFactory,
     )
-    private val trutedCA by lazy { ConfigManager.getConfig<TrustedCAConfig>() }
-    private val x5cValidator by lazy { X5CValidator(trutedCA.certificates) }
+    private val trustedCAConfig by lazy { ConfigManager.getConfig<TrustedCAConfig>() }
+    private val x5cValidator by lazy { X5CValidator(trustedCAConfig.certificates) }
     val x5cAccountStrategy by lazy { X5CAccountStrategy(x5cValidator) }
 
     fun getWalletService(tenant: String, account: UUID, wallet: UUID): WalletService =
