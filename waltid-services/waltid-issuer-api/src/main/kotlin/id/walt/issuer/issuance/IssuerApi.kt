@@ -17,8 +17,11 @@ import io.ktor.server.plugins.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import io.ktor.util.pipeline.*
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
+import redis.clients.jedis.exceptions.JedisAccessControlException
+import redis.clients.jedis.exceptions.JedisConnectionException
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 
@@ -320,7 +323,8 @@ fun Application.issuerApi() {
                                 }
                             }
                             "400" to {
-                                description = "Bad request"
+                                description =
+                                    "Bad request - The request could not be understood or was missing required parameters."
                             }
                         }
                     }) {
@@ -336,13 +340,8 @@ fun Application.issuerApi() {
                             val offerUri = createCredentialOfferUri(listOf(jwtIssuanceRequest))
                             context.respond(HttpStatusCode.OK, offerUri)
                         }.onFailure {
-                            if (it.localizedMessage == "Failed to connect to any host resolved for DNS name.")
-                                context.respond(HttpStatusCode.InternalServerError, "Cannot connect to redis server.")
-                            else
-                                context.respond(
-                                    HttpStatusCode.InternalServerError,
-                                    it.localizedMessage ?: "Failed to issue credential."
-                                )
+
+                            throwError(it)
                         }
 
                     }
@@ -374,13 +373,17 @@ fun Application.issuerApi() {
                     }) {
 
 
-                        val issuanceRequests = context.receive<List<IssuanceRequest>>()
-                        val offerUri = createCredentialOfferUri(issuanceRequests)
-                        logger.debug { "Offer URI: $offerUri" }
+                        runCatching {
+                            val issuanceRequests = context.receive<List<IssuanceRequest>>()
+                            val offerUri = createCredentialOfferUri(issuanceRequests)
+                            logger.debug { "Offer URI: $offerUri" }
 
-                        context.respond(
-                            HttpStatusCode.OK, offerUri
-                        )
+                            context.respond(
+                                HttpStatusCode.OK, offerUri
+                            )
+                        }.onFailure {
+                            throwError(it)
+                        }
                     }
                 }
 
@@ -412,13 +415,13 @@ fun Application.issuerApi() {
                             }
                         }
                     }) {
-                        val sdJwtIssuanceRequest = context.receive<IssuanceRequest>()
-
-                        val offerUri = createCredentialOfferUri(listOf(sdJwtIssuanceRequest))
-
-                        context.respond(
-                            HttpStatusCode.OK, offerUri
-                        )
+                        runCatching {
+                            val sdJwtIssuanceRequest = context.receive<IssuanceRequest>()
+                            val offerUri = createCredentialOfferUri(listOf(sdJwtIssuanceRequest))
+                            context.respond(HttpStatusCode.OK, offerUri)
+                        }.onFailure {
+                            throwError(it)
+                        }
                     }
 
                     post("issueBatch", {
@@ -449,13 +452,17 @@ fun Application.issuerApi() {
                     }) {
 
 
-                        val issuanceRequests = context.receive<List<IssuanceRequest>>()
-                        val offerUri = createCredentialOfferUri(issuanceRequests)
-                        logger.debug { "Offer URI: $offerUri" }
+                        runCatching {
+                            val issuanceRequests = context.receive<List<IssuanceRequest>>()
+                            val offerUri = createCredentialOfferUri(issuanceRequests)
+                            logger.debug { "Offer URI: $offerUri" }
 
-                        context.respond(
-                            HttpStatusCode.OK, offerUri
-                        )
+                            context.respond(
+                                HttpStatusCode.OK, offerUri
+                            )
+                        }.onFailure {
+                            throwError(it)
+                        }
                     }
                 }
 
@@ -498,6 +505,25 @@ fun Application.issuerApi() {
                 }
             }
         }
+    }
+}
+
+private suspend fun PipelineContext<Unit, ApplicationCall>.throwError(
+    it: Throwable
+) {
+    when (it) {
+        is BadRequestException -> context.respond(HttpStatusCode.BadRequest, it.message ?: "Bad request.")
+        is JedisConnectionException -> context.respond(
+            HttpStatusCode.InternalServerError,
+            "Distributed session management couldn't be initialized : Cannot connect to redis server."
+        )
+
+        is JedisAccessControlException -> context.respond(
+            HttpStatusCode.InternalServerError,
+            "Distributed session management couldn't be initialized : Cannot access redis server, wrong username/password."
+        )
+
+        else -> context.respond(HttpStatusCode.InternalServerError, it.message ?: "Failed to issue credentials.")
     }
 }
 
