@@ -134,10 +134,10 @@
 </template>
 
 <script lang="ts" setup>
-import { ArrowRightOnRectangleIcon, EnvelopeIcon, IdentificationIcon, KeyIcon } from "@heroicons/vue/20/solid";
+import {ArrowRightStartOnRectangleIcon, EnvelopeIcon, IdentificationIcon, KeyIcon} from "@heroicons/vue/20/solid";
 import ActionResultModal from "~/components/modals/ActionResultModal.vue";
 import useModalStore from "~/stores/useModalStore";
-import { useTenant } from "~/composables/tenants";
+import {useTenant} from "~/composables/tenants";
 
 const tenant = await (useTenant()).value
 const bgImg = tenant?.bgImage
