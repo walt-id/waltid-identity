@@ -162,6 +162,7 @@ async function register() {
                 title: "Error",
                 message: "Passwords don't match",
                 isError: true,
+              open: true,
 
             },
         });
