@@ -1,8 +1,15 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
+object Versions {
+    const val KTOR_VERSION = "2.3.12"
+}
+
 plugins {
     kotlin("multiplatform")
     kotlin("plugin.serialization")
     id("maven-publish")
     id("com.github.ben-manes.versions")
+    id("io.ktor.plugin") version "2.3.12" // Versions.KTOR_VERSION
     // Apply the application plugin to add support for building a CLI application in Java.
     application
 }
@@ -26,15 +33,21 @@ kotlin {
 kotlin {
     targets.configureEach {
         compilations.configureEach {
-            compilerOptions.configure {
-                freeCompilerArgs.add("-Xexpect-actual-classes")
+            compileTaskProvider.configure {
+                compilerOptions {
+                    freeCompilerArgs.add("-Xexpect-actual-classes")
+                }
             }
         }
     }
 
     jvm {
         compilations.all {
-            kotlinOptions.jvmTarget = "15" // JVM got Ed25519 at version 15
+            compileTaskProvider.configure {
+                compilerOptions {
+                    jvmTarget = JvmTarget.JVM_15 // JVM got Ed25519 at version 15
+                }
+            }
         }
         withJava()
         tasks.withType<Test>().configureEach {
@@ -45,19 +58,18 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                api(project(":waltid-libraries:waltid-crypto"))
+                api(project(":waltid-libraries:crypto:waltid-crypto"))
                 api(project(":waltid-libraries:waltid-did"))
-                api(project(":waltid-libraries:waltid-verifiable-credentials"))
-                api(project(":waltid-libraries:waltid-sdjwt"))
-                api(project(":waltid-libraries:waltid-openid4vc"))
+                api(project(":waltid-libraries:credentials:waltid-verifiable-credentials"))
+                api(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
+                api(project(":waltid-libraries:protocols:waltid-openid4vc"))
 
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.1")
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.0")
-                implementation ("com.google.code.gson:gson:2.11.0")
+                implementation("com.google.code.gson:gson:2.11.0")
 
                 // CLI
-                implementation("com.varabyte.kotter:kotter-jvm:1.1.2")
-                implementation("com.github.ajalt.mordant:mordant:2.6.0")
+                implementation("com.github.ajalt.mordant:mordant:2.7.1")
                 implementation("com.github.ajalt.clikt:clikt:4.4.0")
 
                 // Coroutines
@@ -87,10 +99,37 @@ kotlin {
         }
         val jvmTest by getting {
             dependencies {
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.1")
                 implementation("com.wolpl.clikt-testkit:clikt-testkit:2.0.0")
 
-                implementation("org.junit.jupiter:junit-jupiter-params:5.10.2")
+                implementation("org.junit.jupiter:junit-jupiter-params:5.11.0-M2")
+
+                // Ktor server
+                implementation("io.ktor:ktor-server-core-jvm:${Versions.KTOR_VERSION}")
+                implementation("io.ktor:ktor-server-netty-jvm:${Versions.KTOR_VERSION}")
+                implementation("io.ktor:ktor-server-auth-jvm:${Versions.KTOR_VERSION}")
+                implementation("io.ktor:ktor-server-sessions-jvm:${Versions.KTOR_VERSION}")
+                implementation("io.ktor:ktor-server-auth-jwt-jvm:${Versions.KTOR_VERSION}")
+                implementation("io.ktor:ktor-server-auto-head-response-jvm:${Versions.KTOR_VERSION}")
+                implementation("io.ktor:ktor-server-double-receive-jvm:${Versions.KTOR_VERSION}")
+                implementation("io.ktor:ktor-server-host-common-jvm:${Versions.KTOR_VERSION}")
+                implementation("io.ktor:ktor-server-status-pages-jvm:${Versions.KTOR_VERSION}")
+                implementation("io.ktor:ktor-server-compression-jvm:${Versions.KTOR_VERSION}")
+                implementation("io.ktor:ktor-server-cors-jvm:${Versions.KTOR_VERSION}")
+                implementation("io.ktor:ktor-server-forwarded-header-jvm:${Versions.KTOR_VERSION}")
+                implementation("io.ktor:ktor-server-call-logging-jvm:${Versions.KTOR_VERSION}")
+                implementation("io.ktor:ktor-server-call-id-jvm:${Versions.KTOR_VERSION}")
+                implementation("io.ktor:ktor-server-content-negotiation-jvm:${Versions.KTOR_VERSION}")
+                implementation("io.ktor:ktor-server-cio-jvm:${Versions.KTOR_VERSION}")
+
+                // Ktor client
+                implementation("io.ktor:ktor-client-core-jvm:${Versions.KTOR_VERSION}")
+                implementation("io.ktor:ktor-client-serialization-jvm:${Versions.KTOR_VERSION}")
+                implementation("io.ktor:ktor-client-content-negotiation:${Versions.KTOR_VERSION}")
+                implementation("io.ktor:ktor-client-json-jvm:${Versions.KTOR_VERSION}")
+                implementation("io.ktor:ktor-client-okhttp-jvm:${Versions.KTOR_VERSION}")
+                implementation("io.ktor:ktor-client-logging-jvm:${Versions.KTOR_VERSION}")
+
             }
         }
         /*publishing {

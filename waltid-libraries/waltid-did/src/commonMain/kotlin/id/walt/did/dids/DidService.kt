@@ -57,13 +57,16 @@ object DidService {
             }
     }
 
+    /**
+     * Use a walt.id curated configuration of resolvers and registrars, including remote resolvers and registrars.
+     */
     @JvmBlocking
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    suspend fun init() {
-        registerAllResolvers(DidResolverRegistrations.didResolvers)
-        registerAllRegistrars(DidRegistrarRegistrations.didRegistrars)
+    suspend fun init(resolverUrl: String? = null, registrarUrl: String? = null, ) {
+        registerAllResolvers(DidResolverRegistrations.curatedDidResolvers(resolverUrl))
+        registerAllRegistrars(DidRegistrarRegistrations.curatedDidRegistrars(registrarUrl))
 
         updateResolversForMethods()
         updateRegistrarsForMethods()
@@ -72,6 +75,9 @@ object DidService {
         log.debug { "INIT -> REGISTRARS: $registrarMethods" }
     }
 
+    /**
+     * Do not initiate any remote resolvers or registrars, start out with a minimal set of resolvers and registrars get started with.
+     */
     @JvmBlocking
     @JvmAsync
     @JsPromise
@@ -158,8 +164,8 @@ object DidService {
     suspend fun register(options: DidCreateOptions) =
         getRegistrarForMethod(options.method).create(options)
 
-    //    @JvmBlocking
-//    @JvmAsync
+    //@JvmBlocking
+    //@JvmAsync
     @JsPromise
     @JsExport.Ignore
     suspend fun registerByKey(

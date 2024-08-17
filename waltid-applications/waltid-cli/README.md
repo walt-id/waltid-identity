@@ -7,48 +7,55 @@ Manage keys, DIDs, issue W3C Verifiable Credentials, and verify them using the W
 ## In development
 
 * `git clone https://github.com/walt-id/waltid-identity.git`
-* `cd waltid-identity/waltid-cli`
-* `../gradlew clean build`
+* `cd waltid-identity`
+* `./gradlew clean build`
+* `cd waltid-applications/waltid-cli`
 * `alias waltid="./waltid-cli.sh"` (for running the project)
 * `alias waltid="./waltid-cli-development.sh"` (for building and running the project)
 
 Now, you can run:
 
-| Command                                                                                                                                               | What it does                                                                                                                                           |
-|:------------------------------------------------------------------------------------------------------------------------------------------------------|:-------------------------------------------------------------------------------------------------------------------------------------------------------| 
-| `waltid -h`                                                                                                                                           | Print usage message                                                                                                                                    |
-| `waltid --help`                                                                                                                                       | Print WaltId CLI usage message                                                                                                                         |
-| `waltid key -h`                                                                                                                                       | Print WaltId CLI key command usage message                                                                                                             |
-| `waltid key generate -h`                                                                                                                              | Print WaltId CLI key generate command usage message                                                                                                    |
-| `waltid key convert -h`                                                                                                                               | Print WaltId CLI key convert command usage message                                                                                                     |
-| `waltid key generate`                                                                                                                                 | Generates a cryptographic key of type Ed25519                                                                                                          |
-| `waltid key generate -t secp256k1`                                                                                                                    | Generates a cryptographic key of type secp256k1                                                                                                        |
-| `waltid key generate --keyType=RSA`                                                                                                                   | Generates a cryptographic key of type RSA                                                                                                              |
-| `waltid key generate --keyType=RSA -o myRSAKey.json`                                                                                                  | Generates a cryptographic key of type RSA and save it in a file called myRSAKey.json                                                                   |
-| `waltid key generate --keyType=Ed25519 -o myEd25519Key.json`                                                                                          | Generates a cryptographic key of type Ed25519 and save it in a file called myEd25519.json                                                              |
-| `waltid key generate --keyType=secp256k1 -o mySecp256k1Key.json`                                                                                      | Generates a cryptographic key of type Secp256k1 and save it in a file called mySecp256k1.json                                                          |
-| `waltid key generate --keyType=secp256r1 -o mySecp256r1Key.json`                                                                                      | Generates a cryptographic key of type Secp256r1 and save it in a file called mySecp256r1.json                                                          |
-| `waltid key convert -i myRSAKey.json`                                                                                                                 | Convert the given JWK file with an RSA key to the PEM format. The converted file will be called myRSA.pem                                              |
-| ⚠️ `waltid key convert -i myEd25519Key.json`                                                                                                          | Not yet implemented. We don't export Ed25519 keys in PEM format yet.                                                                                   |
-| `waltid key convert -i mySecp256k1Key.json`                                                                                                           | Convert the given JWK with a Secp256k1 key file to the PEM format. The converted file will be called mySecp256k1Key.pem                                |
-| `waltid key convert -i mySecp256r1Key.json`                                                                                                           | Convert the given JWK with a Secp256r1 key file to the PEM format. The converted file will be called mySecp256r1Key.pem                                |
-| ⚠️️`waltid key convert --input=./myRSAKey.pem`                                                                                                        | Not yet implemented.                                                                                                                                   |
-| ⚠️`waltid key convert --input=./myEd25519Key.pem`                                                                                                     | Not yet implemented.                                                                                                                                   |
-| `waltid key convert --input=./mySecp256k1Key.pem`                                                                                                     | Converts the given PEM with a Sec256k1 key to the JWK format. The converted file will be called mySecp256k1Key.jwk                                     |
-| `waltid key convert --input=./mySecp256r1Key.pem --output=./convertedSecp256r1.json`                                                                  | Converts the given PEM with a Sec256r1 key to the JWK format. The converted file will be called convertedSecp256r1.jwk                                 |
-| `openssl ecparam -genkey -name secp256k1 -out secp256k1_by_openssl_pub_pvt_key.pem`                                                                   | Uses OpenSSL to generate a pair of keys in a PEM file.                                                                                                 |                                                                                                                         |
-| `waltid key convert --verbose -i secp256k1_by_openssl_pub_pvt_key.pem`                                                                                | Converts the Secp256k1 key in the given PEM file to the JWK format.                                                                                    |
-| `waltid did -h`                                                                                                                                       | Print WaltID CLI DID command usage message                                                                                                             |
-| `waltid did create -h`                                                                                                                                | Print WaltID CLI DID create command usage message                                                                                                      |
-| `waltid did create`                                                                                                                                   | Creates a new did:key                                                                                                                                  |
-| `waltid did create -k src/jvmTest/resources/key/ed25519_by_waltid_pvt_key.jwk`                                                                        | Creates a new did:key with the key provided in the specified file.                                                                                     |
-| `waltid did resolve -d did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV`                                                                      | Resolves the DID specified.                                                                                                                            |
-| `waltid vc sign --key=./myEd25519Key.json --subject=<your subject DID> --issuer=<your issuer DID> ./myCredential.json`                                | Signs a W3C Verifiable Credential (see [to be created first](#1-create-a-vc)). The issuer DID must be resolvable and associated with the provided key. |
-| `waltid vc sign --key=./myEd25519Key.json --subject=<your subject DID> ./myCredential.json`                                                           | Signs a W3C Verifiable Credential with a generated Issuer DID (did:key).                                                                               |
-| `waltid vc verify ./myCredential.signed.json`                                                                                                         | Verifies the signature of the provided VC.                                                                                                             |
-| `waltid vc verify --policy=signature ./myCredential.signed.json`                                                                                      | Verifies the signature of the provided VC.                                                                                                             |
-| `waltid vc verify --policy=schema --arg=schema=./src/jvmTest/resources/schema/OpenBadgeV3_schema.json  ./myCredential.signed.json`                    | Validates the VC's structure under the rules of the provided JSON schema file.                                                                         |
-| `waltid vc verify --policy=signature --policy=schema --arg=schema=./src/jvmTest/resources/schema/OpenBadgeV3_schema.json  ./myCredential.signed.json` | Verifies the VC according to both policies, signature and schema.                                                                                      |
+| Command                                                                                                                                               | What it does                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+|:------------------------------------------------------------------------------------------------------------------------------------------------------|:-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------| 
+| `waltid -h`                                                                                                                                           | Print usage message                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `waltid --help`                                                                                                                                       | Print WaltId CLI usage message                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `waltid key -h`                                                                                                                                       | Print WaltId CLI key command usage message                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `waltid key generate -h`                                                                                                                              | Print WaltId CLI key generate command usage message                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `waltid key convert -h`                                                                                                                               | Print WaltId CLI key convert command usage message                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `waltid key generate`                                                                                                                                 | Generates a cryptographic key of type Ed25519                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `waltid key generate -t secp256k1`                                                                                                                    | Generates a cryptographic key of type secp256k1                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `waltid key generate --keyType=RSA`                                                                                                                   | Generates a cryptographic key of type RSA                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `waltid key generate --keyType=RSA -o myRSAKey.json`                                                                                                  | Generates a cryptographic key of type RSA and save it in a file called myRSAKey.json                                                                                                                                                                                                                                                                                                                                                                   |
+| `waltid key generate --keyType=Ed25519 -o myEd25519Key.json`                                                                                          | Generates a cryptographic key of type Ed25519 and save it in a file called myEd25519.json                                                                                                                                                                                                                                                                                                                                                              |
+| `waltid key generate --keyType=secp256k1 -o mySecp256k1Key.json`                                                                                      | Generates a cryptographic key of type Secp256k1 and save it in a file called mySecp256k1.json                                                                                                                                                                                                                                                                                                                                                          |
+| `waltid key generate --keyType=secp256r1 -o mySecp256r1Key.json`                                                                                      | Generates a cryptographic key of type Secp256r1 and save it in a file called mySecp256r1.json                                                                                                                                                                                                                                                                                                                                                          |
+| `waltid key convert -i myRSAKey.json`                                                                                                                 | Convert the given JWK file with an RSA key to the PEM format. The converted file will be called myRSA.pem                                                                                                                                                                                                                                                                                                                                              |
+| ⚠️ `waltid key convert -i myEd25519Key.json`                                                                                                          | Not yet implemented. We don't export Ed25519 keys in PEM format yet.                                                                                                                                                                                                                                                                                                                                                                                   |
+| `waltid key convert -i mySecp256k1Key.json`                                                                                                           | Convert the given JWK with a Secp256k1 key file to the PEM format. The converted file will be called mySecp256k1Key.pem                                                                                                                                                                                                                                                                                                                                |
+| `waltid key convert -i mySecp256r1Key.json`                                                                                                           | Convert the given JWK with a Secp256r1 key file to the PEM format. The converted file will be called mySecp256r1Key.pem                                                                                                                                                                                                                                                                                                                                |
+| `waltid key convert --input=./myRSAKey.pem`                                                                                                           | Not yet implemented.                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| ⚠️`waltid key convert --input=./myEd25519Key.pem`                                                                                                     | Not yet implemented.                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `waltid key convert --input=./mySecp256k1Key.pem`                                                                                                     | Converts the given PEM with a Sec256k1 key to the JWK format. The converted file will be called mySecp256k1Key.jwk                                                                                                                                                                                                                                                                                                                                     |
+| `waltid key convert --input=./mySecp256r1Key.pem --output=./convertedSecp256r1.json`                                                                  | Converts the given PEM with a Sec256r1 key to the JWK format. The converted file will be called convertedSecp256r1.jwk                                                                                                                                                                                                                                                                                                                                 |
+| `openssl ecparam -genkey -name secp256k1 -out secp256k1_by_openssl_pub_pvt_key.pem`                                                                   | Uses OpenSSL to generate a pair of keys in a PEM file.                                                                                                                                                                                                                                                                                                                                                                                                 |                                                                                                                         |
+| `waltid key convert --verbose -i secp256k1_by_openssl_pub_pvt_key.pem`                                                                                | Converts the Secp256k1 key in the given PEM file to the JWK format.                                                                                                                                                                                                                                                                                                                                                                                    |
+| `waltid did -h`                                                                                                                                       | Print WaltID CLI DID command usage message                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `waltid did create -h`                                                                                                                                | Print WaltID CLI DID create command usage message                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `waltid did create`                                                                                                                                   | Creates a new did:key                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `waltid did create -k src/jvmTest/resources/key/ed25519_by_waltid_pvt_key.jwk`                                                                        | Creates a new did:key with the key provided in the specified file.                                                                                                                                                                                                                                                                                                                                                                                     |
+| `waltid did resolve -d did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV`                                                                      | Resolves the DID specified.                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `waltid vc sign -h`                                                                                                                                   | Print WaltID CLI VC sign usage message                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `waltid vc sign --key=./myEd25519Key.json --subject=<your subject DID> --issuer=<your issuer DID> ./myCredential.json`                                | Signs a W3C Verifiable Credential (see [to be created first](#1-create-a-vc)). The issuer DID must be resolvable and associated with the provided key.                                                                                                                                                                                                                                                                                                 |
+| `waltid vc sign --key=./myEd25519Key.json --subject=<your subject DID> ./myCredential.json`                                                           | Signs a W3C Verifiable Credential with a generated Issuer DID (did:key).                                                                                                                                                                                                                                                                                                                                                                               |
+| `waltid vc verify ./myCredential.signed.json`                                                                                                         | Verifies the signature of the provided VC.                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `waltid vc verify --policy=signature ./myCredential.signed.json`                                                                                      | Verifies the signature of the provided VC.                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `waltid vc verify --policy=schema --arg=schema=./src/jvmTest/resources/schema/OpenBadgeV3_schema.json  ./myCredential.signed.json`                    | Validates the VC's structure under the rules of the provided JSON schema file.                                                                                                                                                                                                                                                                                                                                                                         |
+| `waltid vc verify --policy=signature --policy=schema --arg=schema=./src/jvmTest/resources/schema/OpenBadgeV3_schema.json  ./myCredential.signed.json` | Verifies the VC according to both policies, signature and schema.                                                                                                                                                                                                                                                                                                                                                                                      |
+| `waltid vp -h`                                                                                                                                        | Print WaltID CLI VP usage message                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `waltid vp create -h`                                                                                                                                 | Print WaltID CLI VP create usage message                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `waltid vp create -hd did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV -hk ./holder-key.json -vd did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV -vc ./someVcFile.json -pd ./presDef.json -vp ./outputVp.jwt -ps ./outputPresSub.json`                                                                                                                                                      | Create a W3C Verifiable Presentation (VP) signed by the holder's key, which corresponds to the respective input DID. The VP created has a specific audience, which is defined by the verifier's input DID. From all the input VCs, only the ones that match the constraints of the input presentation definition will be included in the final VP token. An appropriate presentation submission is also output which is useful during VP verification. |
+| `waltid vp verify -h`                                                                                                                                 | Print WaltID CLI VP verify usage message                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `waltid vp verify -hd did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV -pd ./presDef.json -ps ./presSub.json -vp ./vpPath.jwt`                                                                                                                                                      | Verify a previously created VP by providing as input the serialized VP token, the original presentation definition and the presentation submission. Optionally, one can specify the holder's did, in which case the signature will be matched against this specific DID.                                                                                                                                                                               |
 
 ## In production
 
@@ -56,14 +63,14 @@ We are still preparing a nice distribution strategy. It will be available soon.
 
 In the meantime, you can use Gradle to generate the distribution package:
 
-* `cd waltid-identity/waltid-cli`
+* `cd waltid-identity/waltid-applications/waltid-cli`
 * `../gradlew distZip` or `../gradlew distTar`
 
 A `waltid-cli-1.0.0-SNAPSHOT` file will be created in the `build/distributions` directory.
 
 ```bash
 $ pwd
-.../waltid-identity/waltid-cli
+.../waltid-identity/waltid-applications/waltid-cli
 
 $ ls -la build/distributions/
 total 67024
@@ -125,8 +132,8 @@ Usage: waltid [<options>] <command> [<args>]...
   │    The walt.id CLI is a command line tool that allows you to onboard and                                           │
   │    use a SSI (Self-Sovereign-Identity) ecosystem. You can manage                                                   │
   │    cryptographic keys, generate and register W3C Decentralized                                                     │
-  │    Identifiers (DIDs) as well as create, issue & verify W3C Verifiable                                             │
-  │    credentials (VCs).                                                                                              │
+  │    Identifiers (DIDs), sign & verify W3C Verifiable Credentials (VCs) and                                          │
+  │    create & verify W3C Verifiable Presentations (VPs).                                                             │
   │                                                                                                                    │
   │    Example commands are:                                                                                           │
   │                                                                                                                    │
@@ -139,9 +146,13 @@ Usage: waltid [<options>] <command> [<args>]...
   │    waltid key convert -h                                                                                           │
   │    waltid did -h                                                                                                   │
   │    waltid did create -h                                                                                            │
+  │    waltid did resolve -h                                                                                           │
   │    waltid vc -h                                                                                                    │
   │    waltid vc sign -h                                                                                               │
   │    waltid vc verify -h                                                                                             │
+  │    waltid vp -h                                                                                                    │
+  │    waltid vp create -h                                                                                             │
+  │    waltid vp verify -h                                                                                             │
   │                                                                                                                    │
   │    Key generation                                                                                                  │
   │    ---------------                                                                                                 │
@@ -177,18 +188,53 @@ Usage: waltid [<options>] <command> [<args>]...
   │    waltid vc verify --policy=signature ./myVC.signed.json                                                          │
   │    waltid vc verify --policy=schema --arg=schema=mySchema.json ./myVC.signed.json                                  │
   │    waltid vc verify --policy=signature --policy=schema --arg=schema=mySchema.json ./myVC.signed.json               │
+  │                                                                                                                    │
+  │    VP creation                                                                                                     │
+  │    ----------------                                                                                                │
+  │    waltid vp create -hd did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV \                                 │
+  │    -hk ./holder-key.json \                                                                                         │
+  │    -vd did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV \                                                  │
+  │    -vc ./someVcFile.json \                                                                                         │
+  │    -pd ./presDef.json \                                                                                            │
+  │    -vp ./outputVp.jwt \                                                                                            │
+  │    -ps ./outputPresSub.json                                                                                        │
+  │    waltid vp create -hd did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV \                                 │
+  │    -hk ./holder-key.json \                                                                                         │
+  │    -vd did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV \                                                  │
+  │    -vc ./firstVcFile.json \                                                                                        │
+  │    -vc ./secondVcFile.json \                                                                                       │
+  │    -pd ./presDef.json \                                                                                            │
+  │    -vp ./outputVp.jwt \                                                                                            │
+  │    -ps ./outputPresSub.json                                                                                        │
+  │                                                                                                                    │
+  │    VP Verification                                                                                                 │
+  │    ----------------                                                                                                │
+  │    waltid vp verify -hd did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV \                                 │
+  │    -pd ./presDef.json \                                                                                            │
+  │    -ps ./presSub.json \                                                                                            │
+  │    -vp ./vpPath.jwt                                                                                                │
+  │    waltid vp verify -hd did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV \                                 │
+  │    -pd ./presDef.json \                                                                                            │
+  │    -ps ./presSub.json \                                                                                            │
+  │    -vp ./vpPath.jwt \                                                                                              │
+  │    -vpp maximum-credentials \                                                                                      │
+  │    -vppa=max=2 \                                                                                                   │
+  │    -vpp minimum-credentials \                                                                                      │
+  │    -vppa=min=1                                                                                                     │
   ╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-  
+
 Common Options:
-  --verbose  Set verbose mode ON
+  --verbose  Set verbose mode ON (currently always ON by default).
 
 Options:
-  -h, --help  Show this message and exit
+  -h, --help  Show this message and exit.
 
 Commands:
-  key  Key management features
-  did  DID management features
-  vc   Issuing, presenting and verifying Verifiable Credentials
+  key  Key management features.
+  did  DID management features.
+  vc   Sign and apply a wide range verification policies on W3C Verifiable Credentials (VCs).
+  vp   Create and apply a wide range of verification policies on W3C Verifiable Presentations (VPs).
+
 ```
 
 ## `waltid key` command
@@ -196,30 +242,44 @@ Commands:
 ```bash
 Usage: waltid key [<options>] <command> [<args>]...
 
-  Key management features
+  Key management features.
+
+Common Options:
+  --verbose  Set verbose mode ON (currently always ON by default).
 
 Options:
-  -h, --help  Show this message and exit
+  -h, --help  Show this message and exit.
 
 Commands:
   generate  Generates a new cryptographic key.
   convert   Convert key files between PEM and JWK formats.
+
 ```
 
-## `waltid key generate` command
+## `waltid key generate -h` command
 
 ```bash
 Usage: waltid key generate [<options>]
 
   Generates a new cryptographic key.
 
+  ╭───────────────────────────────────────────────╮
+  │    Example usage:                             │
+  │    ---------------                            │
+  │    waltid key generate                        │
+  │    waltid key generate -t secp256k1           │
+  │    waltid key generate -t RSA                 │
+  │    waltid key generate -t RSA -o myRsaKey.json│
+  ╰───────────────────────────────────────────────╯
+
+Common Options:
+  --verbose  Set verbose mode ON (currently always ON by default).
+
 Options:
-  -t, --keyType=(Ed25519|secp256k1|secp256r1|RSA)
-                       Key type to use. Possible values are: [Ed25519 |
-                       secp256k1 | secp256r1 | RSA]. Default value is Ed25519
-  -o, --output=<path>  File path to save the generated key. Default value is
-                       <keyId>.json
-  -h, --help           Show this message and exit
+  -t, --keyType=(Ed25519|secp256k1|secp256r1|RSA)  Key type to use. Possible values are: [Ed25519 | secp256k1 | secp256r1 | RSA]. Default value is secp256r1.
+  -o, --output=<path>                              File path to save the generated key. Default value is <keyId>.json
+  -h, --help                                       Show this message and exit.
+
 ```
 
 ## `waltid key convert` command
@@ -229,14 +289,22 @@ Usage: waltid key convert [<options>]
 
   Convert key files between PEM and JWK formats.
 
+  ╭─────────────────────────────────────────────────────────────────────────╮
+  │    Example usage:                                                       │
+  │    ---------------                                                      │
+  │    waltid key convert -i myRsaKey.pem                                   │
+  │    waltid key convert -i myEncryptedRsaKey.pem -p 123123 -o myRsaKey.jwk│
+  ╰─────────────────────────────────────────────────────────────────────────╯
+
+Common Options:
+  --verbose  Set verbose mode ON (currently always ON by default).
+
 Options:
-  -i, --input=<path>       The input file path. Accepted formats are: JWK and
-                           PEM
-  -o, --output=<path>      The output file path. Accepted formats are: JWK and
-                           PEM. If not provided the input filename will be used
-                           with a different extension.
-  -p, --passphrase=<text>  Passphrase to open an encrypted PEM
-  -h, --help               Show this message and exit
+  -i, --input=<path>       The input file path. Accepted formats are: JWK and PEM
+  -o, --output=<path>      The output file path. Accepted formats are: JWK and PEM. If not provided, the input filename will be used with a different extension.
+  -p, --passphrase=<text>  Passphrase to open an encrypted PEM.
+  -h, --help               Show this message and exit.
+
 ```
 
 ## `waltid did` command
@@ -244,38 +312,58 @@ Options:
 ```bash
 Usage: waltid did [<options>] <command> [<args>]...
 
-  DID management features
+  DID management features.
 
 Options:
-  -h, --help  Show this message and exit
+  -h, --help  Show this message and exit.
 
 Commands:
-  create   Create a brand new Decentralized Identity
-  resolve  Resolve the decentralized identity passed as an argument, i.e. it retrieves the sovereign identity document addressed by the given DID.
+  create   Create a Decentralized Identifier (DID).
+  resolve  Resolve the document associated with the input Decentralized Identifier (DID).
+
 ```
 
-## `waltid did create` command
+## `waltid did create -h` command
 
 ```bash
 Usage: waltid did create [<options>]
 
-  Create a brand new Decentralized Identity
+  Create a Decentralized Identifier (DID).
+
+  ╭───────────────────────────────────╮
+  │    Example usage:                 │
+  │    --------------                 │
+  │    waltid did create              │
+  │    waltid did create -k myKey.json│
+  │    waltid did create -m jwk       │
+  ╰───────────────────────────────────╯
 
 Options:
-  -m, --method=(KEY|JWK|WEB|EBSI|CHEQD|IOTA)  The DID method to be used.
-  -k, --key=<path>                            The Subject's key to be used. If none is provided, a new one will be generated.
-  -h, --help                                  Show this message and exit
+  -m, --method=(KEY|JWK|WEB|CHEQD|IOTA)  The DID method to be used.
+  -k, --key=<path>                       The subject's key to be used. If none is provided, a new one will be generated.
+  -j, --useJwkJcsPub                     Flag to enable JWK_JCS-Pub encoding (default=off). Applies only to the did:key method and is relevant in the context of EBSI.
+  -wd, --web-domain=<text>               The domain name to use when creating a did:web (required in this case).
+  -wp, --web-path=<text>                 The URL path to append when creating a did:web (optional).
+  -h, --help                             Show this message and exit.
 ```
 
 ## waltid did resolve
 
-```
+```bash
 Usage: waltid did resolve [<options>]
 
-Resolve the decentralized identity passed as an argument, i.e. it retrieves the sovereign identity document addressed by the given DID.
+  Resolve the document associated with the input Decentralized Identifier (DID).
 
-Options: -d, -did=<text>  the did to be resolved
--h, --help       Show this message and exit
+  ╭──────────────────────────────────────────────────────────────────────────────────╮
+  │    Example usage:                                                                │
+  │    --------------                                                                │
+  │    waltid did resolve -d did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV│
+  ╰──────────────────────────────────────────────────────────────────────────────────╯
+
+Options:
+  -d, -did=<text>  The DID to be resolved.
+  -h, --help       Show this message and exit.
+
 ```
 
 ## `waltid vc` command
@@ -283,14 +371,15 @@ Options: -d, -did=<text>  the did to be resolved
 ```bash
 Usage: waltid vc [<options>] <command> [<args>]...
 
-  Issuing, presenting and verifying Verifiable Credentials
+  Sign and apply a wide range verification policies on W3C Verifiable Credentials (VCs).
 
 Options:
-  -h, --help  Show this message and exit
+  -h, --help  Show this message and exit.
 
 Commands:
-  sign    Signs a Verifiable Credential.
-  verify  Verify the specified VC under a set of specified policies.
+  sign    Sign a W3C Verifiable Credential (VC).
+  verify  Apply a wide range of verification policies on a W3C Verifiable Credential (VC).
+
 ```
 
 ## `waltid vc sign` command
@@ -298,17 +387,28 @@ Commands:
 ```bash
 Usage: waltid vc sign [<options>] <vc>
 
-  Signs a Verifiable Credential.
+  Sign a W3C Verifiable Credential (VC).
+
+  ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+  │    Example usage:                                                                                        │
+  │    --------------                                                                                        │
+  │    waltid vc sign -k ./myKey.json -s did:key:z6Mkjm2gaGsodGchfG4k8P6KwCHZsVEPZho5VuEbY94qiBB9 ./myVC.json│
+  │    waltid vc sign -k ./myKey.json \                                                                      │
+  │                   -s did:key:z6Mkjm2gaGsodGchfG4k8P6KwCHZsVEPZho5VuEbY94qiBB9 \                          │
+  │                   -i did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV \                          │
+  │                   ./myVC.json                                                                            │
+  ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────╯
 
 Options:
-  -k, --key=<path>      A  key representation to sign the credential (required)
-  -i, --issuer=<text>   The verifiable credential's issuer DID
-  -s, --subject=<text>  The verifiable credential's subject DID (required)
-  -o, --overwrite       Flag to overwrite the signed output file if it exists
-  -h, --help            Show this message and exit
+  -k, --key=<path>      Key to be used to sign the credential, i.e., the issuer's signing key (required).
+  -i, --issuer=<text>   The DID of the verifiable credential's issuer. If not specified, a default will be generated based on the did:key method.
+  -s, --subject=<text>  The DID of the verifiable credential's subject, i.e., the to-be holder of the credential (required).
+  -o, --overwrite       Flag to overwrite the signed output file if it exists.
+  -h, --help            Show this message and exit.
 
 Arguments:
-  <vc>  the verifiable credential file (required)
+  <vc>  The file path to the Verifiable Credential that will be signed (required).
+
 ```
 
 Before signing a VC, we need
@@ -323,9 +423,8 @@ Walt.id
 provides [a repository of VCs](https://docs.oss.walt.id/issuer/sdks/manage-credentials/sign/w3c-credential#manual-create-credential)
 that can be used as templates for creating your own. Choose the one that best suits your needs.
 
-Let's choose the [OpenBadgeCredential](https://credentials.walt.id/credentials/openbadgecredential), adjust it
-accordingly and save it in a file called `openbadgecredential_sample.json`. For convenience, there
-is [an example file you can use](https://github.com/walt-id/waltid-identity/blob/main/waltid-applications/waltid-cli/src/jvmTest/resources/vc/openbadgecredential_sample.json).
+Let's choose the [OpenBadgeCredential](https://github.com/walt-id/waltid-identity/blob/main/waltid-applications/waltid-cli/src/jvmTest/resources/vc/openbadgecredential_sample.json), adjust it
+accordingly and save it in a file called `openbadgecredential_sample.json`.
 
 ```json
 {
@@ -393,63 +492,195 @@ $ waltid vc sign --key myKey.json
 
 ## `waltid vc verify` command
 
+Run the `verify` command to validate the credential. On default the signature is validated. You can easily extend the validation steps by applying [Verification Policies](https://docs.walt.id/v/ssikit/concepts/verification-policies). 
+
+For example, for validating the credential schema, apply the _schema_ policy. Download the [Schema for the OpenBadgeCredential](https://github.com/walt-id/waltid-identity/blob/main/waltid-applications/waltid-cli/src/jvmTest/resources/schema/OpenBadgeV3_schema.json) and place it in the file `mySchema.json`, to run the command. 
+
+
 ```bash
 Usage: waltid vc verify [<options>] <vc>
 
-  VC verification command.
+  Apply a wide range of verification policies on a W3C Verifiable Credential (VC).
 
-  ╭─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-  │     Verifies the specified VC under a set of specified policies.                                                                                                    │
-  │                                                                                                                                                                     │
-  │    The available policies are:                                                                                                                                      │
-  │                                                                                                                                                                     │
-  │    - schema: Verifies a credentials data against a JSON Schema (Draft 7 - see https://json-schema.org/specification-links#draft-7).                                 │
-  │    - holder-binding: Verifies that issuer of the Verifiable Presentation (presenter) is also the subject of all Verifiable Credentials contained within.            │
-  │    - presentation-definition: Verifies that with an Verifiable Presentation at minimum the list of credentials `request_credentials` has been presented.            │
-  │    - expired: Verifies that the credentials expiration date (`exp` for JWTs) has not been exceeded.                                                                 │
-  │    - webhook: Sends the credential data to an webhook URL as HTTP POST, and returns the verified status based on the webhooks set status code (success = 200 - 299).│
-  │    - maximum-credentials: Verifies that a maximum number of credentials in the Verifiable Presentation is not exceeded.                                             │
-  │    - minimum-credentials: Verifies that a minimum number of credentials are included in the Verifiable Presentation.                                                │
-  │    - signature: Checks a JWT credential by verifying its cryptographic signature using the key referenced by the DID in `iss`.                                      │
-  │    - allowed-issuer: Checks that the issuer of the credential is present in the supplied list.                                                                      │
-  │    - not-before: Verifies that the credentials not-before date (for JWT: `nbf`, if unavailable: `iat` - 1 min) is correctly exceeded.                               │
-  │                                                                                                                                                                     │
-  │    Multiple policies are accepted. e.g.                                                                                                                             │
-  │                                                                                                                                                                     │
-  │        waltid vc verify --policy=signature --policy=expired vc.json                                                                                                 │
-  │                                                                                                                                                                     │
-  │    If no policy is specified, only the Signature Policy will be applied. i.e.                                                                                       │
-  │                                                                                                                                                                     │
-  │        waltid vc verify vc.json                                                                                                                                     │
-  │                                                                                                                                                                     │
-  │    Some policies require parameters. To specify it, use --arg or -a options. e.g.                                                                                   │
-  │                                                                                                                                                                     │
-  │        --arg=param1=value1 --a param2=value2                                                                                                                        │
-  │                                                                                                                                                                     │
-  │        e.g.                                                                                                                                                         │
-  │                                                                                                                                                                     │
-  │        waltid vc verify --policy=schema -a schema=mySchema.json vc.json                                                                                             │
-  ╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+  ╭─────────────────────────────────────────────────────────────────────────────────────────╮
+  │    Example usage:                                                                       │
+  │    ----------------                                                                     │
+  │    waltid vc verify ./myVC.signed.json                                                  │
+  │    waltid vc verify -p signature ./myVC.signed.json                                     │
+  │    waltid vc verify -p schema --arg=schema=mySchema.json ./myVC.signed.json             │
+  │    waltid vc verify -p signature -p schema --arg=schema=mySchema.json ./myVC.signed.json│
+  ╰─────────────────────────────────────────────────────────────────────────────────────────╯
 
 Options:
-  -p, --policy=(schema|holder-binding|expired|webhook|maximum-credentials|minimum-credentials|signature|allowed-issuer|not-before)  Specify a policy to be applied in the verification process.
-  -a, --arg=<value>                                                                                                                 Argument required by some policies, namely:
+  -p, --policy=(signature|expired|not-before|revoked_status_list|schema|allowed-issuer|webhook)
+                     Specify one, or more policies to be applied during the verification process of the VC (signature policy is always applied).
+  -a, --arg=<value>  Argument required by some policies, namely:
 
-                                                                                                                                    ┌────────────┬─────────────────────────────┐
-                                                                                                                                    │ Policy     │ Expected Argument           │
-                                                                                                                                    ╞════════════╪═════════════════════════════╡
-                                                                                                                                    │ signature  │ -                           │
-                                                                                                                                    ├────────────┼─────────────────────────────┤
-                                                                                                                                    │ expired    │ -                           │
-                                                                                                                                    ├────────────┼─────────────────────────────┤
-                                                                                                                                    │ not-before │ -                           │
-                                                                                                                                    ├────────────┼─────────────────────────────┤
-                                                                                                                                    │ schema     │ schema=/path/to/schema.json │
-                                                                                                                                    └────────────┴─────────────────────────────┘
-  -h, --help                                                                                                                        Show this message and exit
+                     ┌─────────────────────┬─────────────────────────────────────────────────────────────────┐
+                     │ Policy              │ Expected Argument                                               │
+                     ╞═════════════════════╪═════════════════════════════════════════════════════════════════╡
+                     │ signature           │ -                                                               │
+                     ├─────────────────────┼─────────────────────────────────────────────────────────────────┤
+                     │ expired             │ -                                                               │
+                     ├─────────────────────┼─────────────────────────────────────────────────────────────────┤
+                     │ not-before          │ -                                                               │
+                     ├─────────────────────┼─────────────────────────────────────────────────────────────────┤
+                     │ revoked_status_list │ -                                                               │
+                     ├─────────────────────┼─────────────────────────────────────────────────────────────────┤
+                     │ schema              │ schema=/path/to/schema.json                                     │
+                     ├─────────────────────┼─────────────────────────────────────────────────────────────────┤
+                     │ allowed-issuer      │ issuer=did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV │
+                     ├─────────────────────┼─────────────────────────────────────────────────────────────────┤
+                     │ webhook             │ url=https://example.com                                         │
+                     └─────────────────────┴─────────────────────────────────────────────────────────────────┘
+  -h, --help         Show this message and exit.
 
 Arguments:
   <vc>  the verifiable credential file (in JWS format) to be verified (required)
+
+```
+
+## `waltid vp` command
+
+```bash
+Usage: waltid vp [<options>] <command> [<args>]...
+
+  Create and apply a wide range of verification policies on W3C Verifiable Presentations (VPs).
+
+Options:
+  -h, --help  Show this message and exit.
+
+Commands:
+  create  Create a W3C Verifiable Presentation (VP).
+  verify  Apply a wide range of verification policies on a W3C Verifiable Presentation (VP).
+  
+```
+
+## `waltid vp create` command
+
+```bash
+Usage: waltid vp create [<options>]
+
+  Create a W3C Verifiable Presentation (VP).
+
+  ╭───────────────────────────────────────────────────────────────────────────────────╮
+  │    Example usage:                                                                 │
+  │    ----------------                                                               │
+  │    waltid vp create -hd did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV \│
+  │    -hk ./holder-key.json \                                                        │
+  │    -vd did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV \                 │
+  │    -vc ./someVcFile.json \                                                        │
+  │    -pd ./presDef.json \                                                           │
+  │    -vp ./outputVp.jwt \                                                           │
+  │    -ps ./outputPresSub.json                                                       │
+  │    waltid vp create -hd did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV \│
+  │    -hk ./holder-key.json \                                                        │
+  │    -vd did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV \                 │
+  │    -vc ./firstVcFile.json \                                                       │
+  │    -vc ./secondVcFile.json \                                                      │
+  │    -pd ./presDef.json \                                                           │
+  │    -vp ./outputVp.jwt \                                                           │
+  │    -ps ./outputPresSub.json                                                       │
+  │    waltid vp create -hd did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV \│
+  │    -hk ./holder-key.json \                                                        │
+  │    -vd did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV \                 │
+  │    -n some-random-value-goes-here  \                                              │
+  │    -vc ./firstVcFile.json \                                                       │
+  │    -vc ./secondVcFile.json \                                                      │
+  │    -pd ./presDef.json \                                                           │
+  │    -vp ./outputVp.jwt \                                                           │
+  │    -ps ./outputPresSub.json                                                       │
+  ╰───────────────────────────────────────────────────────────────────────────────────╯
+
+Options:
+  -hd, --holder-did=<text>                      The DID of the verifiable credential's holder (required).
+  -hk, --holder-key=<path>                      The file path of the holder's (private) signing key in JWK format (required).
+  -vd, --verifier-did=<text>                    The DID of the verifier for whom the Verifiable Presentation is created (required).
+  -n, --nonce=<text>                            Unique value used in the context of the OID4VP protocol to mitigate replay attacks. Random value will be generated if not specified.
+  -vc, --vc-file=<path>                         The file path of the verifiable credential. Can be specified multiple times to include more than one vc in the vp (required - at least one vc
+                                                file must be provided).
+  -pd, --presentation-definition=<path>         The file path of the presentation definition based on which the VP token will be created (required).
+  -vp, --vp-output=<path>                       File path to save the created vp (required).
+  -ps, --presentation-submission-output=<path>  File path to save the created vp (required).
+  -h, --help                                    Show this message and exit.
+
+```
+
+## `waltid vp verify` command
+
+```bash
+Usage: waltid vp verify [<options>]
+
+  Apply a wide range of verification policies on a W3C Verifiable Presentation (VP).
+
+  ╭───────────────────────────────────────────────────────────────────────────────────╮
+  │    Example usage:                                                                 │
+  │    ----------------                                                               │
+  │    waltid vp verify -hd did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV \│
+  │    -pd ./presDef.json \                                                           │
+  │    -ps ./presSub.json \                                                           │
+  │    -vp ./vpPath.jwt                                                               │
+  │    waltid vp verify -hd did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV \│
+  │    -pd ./presDef.json \                                                           │
+  │    -ps ./presSub.json \                                                           │
+  │    -vp ./vpPath.jwt \                                                             │
+  │    -vpp maximum-credentials \                                                     │
+  │    -vppa=max=2 \                                                                  │
+  │    -vpp minimum-credentials \                                                     │
+  │    -vppa=min=1                                                                    │
+  │    waltid vp verify -hd did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV \│
+  │    -pd ./presDef.json \                                                           │
+  │    -ps ./presSub.json \                                                           │
+  │    -vp ./vpPath.jwt \                                                             │
+  │    -vpp maximum-credentials \                                                     │
+  │    -vppa=max=2 \                                                                  │
+  │    -vpp minimum-credentials \                                                     │
+  │    -vppa=min=1 \                                                                  │
+  │    -vcp allowed-issuer \                                                          │
+  │    -vcpa=issuer=did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV          │
+  ╰───────────────────────────────────────────────────────────────────────────────────╯
+
+Options:
+  -hd, --holder-did=<text>                                                 The DID of the holder that created (signed) the verifiable presentation. If specified, the VP token signature will
+                                                                           be validated against this value.
+  -pd, --presentation-definition=<path>                                    The file path of the presentation definition (required).
+  -ps, --presentation-submission=<path>                                    The file path of the presentation submission (required).
+  -vp, --verifiable-presentation=<path>                                    The file path of the verifiable presentation (required).
+  -vpp, --vp-policy=(signature|expired|not-before|holder-binding|maximum-credentials|minimum-credentials)
+                                                                           Specify one, or more policies to be applied while validating the VP JWT (signature policy is always applied).
+  -vppa, --vp-policy-arg=<value>                                           Argument required by some VP policies, namely:
+
+                                                                           ┌─────────────────────┬───────────────────┐
+                                                                           │ Policy              │ Expected Argument │
+                                                                           ╞═════════════════════╪═══════════════════╡
+                                                                           │ signature           │ -                 │
+                                                                           ├─────────────────────┼───────────────────┤
+                                                                           │ expired             │ -                 │
+                                                                           ├─────────────────────┼───────────────────┤
+                                                                           │ not-before          │ -                 │
+                                                                           ├─────────────────────┼───────────────────┤
+                                                                           │ maximum-credentials │ max=5             │
+                                                                           ├─────────────────────┼───────────────────┤
+                                                                           │ minimum-credentials │ min=2             │
+                                                                           └─────────────────────┴───────────────────┘
+  -vcp, --vc-policy=(signature|expired|not-before|allowed-issuer|webhook)  Specify one, or more policies to be applied to all credentials contained in the VP JWT (signature policy is always
+                                                                           applied).
+  -vcpa, --vc-policy-arg=<value>                                           Argument required by some VC policies, namely:
+
+                                                                           ┌────────────────┬─────────────────────────────────────────────────────────────────┐
+                                                                           │ Policy         │ Expected Argument                                               │
+                                                                           ╞════════════════╪═════════════════════════════════════════════════════════════════╡
+                                                                           │ signature      │ -                                                               │
+                                                                           ├────────────────┼─────────────────────────────────────────────────────────────────┤
+                                                                           │ expired        │ -                                                               │
+                                                                           ├────────────────┼─────────────────────────────────────────────────────────────────┤
+                                                                           │ not-before     │ -                                                               │
+                                                                           ├────────────────┼─────────────────────────────────────────────────────────────────┤
+                                                                           │ allowed-issuer │ issuer=did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV │
+                                                                           ├────────────────┼─────────────────────────────────────────────────────────────────┤
+                                                                           │ webhook        │ url=https://example.com                                         │
+                                                                           └────────────────┴─────────────────────────────────────────────────────────────────┘
+  -h, --help                                                               Show this message and exit.
 
 ```
 
@@ -479,9 +710,7 @@ This project is still a work in progress. As such, not all features are already 
   * RSA ✅
 * Export formats
   * JWK ✅
-  * PEM
-    * RSA ✅
-    * ❌
+  * PEM ❌
 
 ### key convert
 
@@ -492,7 +721,7 @@ This project is still a work in progress. As such, not all features are already 
     * secp256k1 ✅
     * secp256r1 ✅
   * PEM
-    * RSA ❌
+    * RSA ✅
     * ed25519 ❌
     * secp256k1 ✅
     * secp256r1 ✅
@@ -508,15 +737,15 @@ This project is still a work in progress. As such, not all features are already 
 
 * Supported DID methods
   * KEY ✅
-    * RSA ❌
+    * RSA ✅
     * Ed25519 ✅
-    * Secp256k1 ❌
-    * Secp256r1 ❌
-  * JWK ❌
-  * WEB ❌
+    * Secp256k1 ✅
+    * Secp256r1 ✅
+  * JWK ✅
+  * WEB ✅
   * EBSI ❌
-  * CHEQD ❌
-  * IOTA ❌
+  * CHEQD ✅
+  * IOTA ✅
 
 ### VC sign
 
@@ -528,7 +757,7 @@ This project is still a work in progress. As such, not all features are already 
 * Signature ✅
 * Expired ✅
 * Not before ✅
+* Revoked Status List ✅ 
 * Schema ✅
-* Holder Binding ❌
-* Allowed Issuer ❌
-* Webhook ❌
+* Allowed Issuer ✅
+* Webhook ✅

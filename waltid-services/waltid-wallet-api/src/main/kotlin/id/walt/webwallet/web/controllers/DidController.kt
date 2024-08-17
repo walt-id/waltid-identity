@@ -11,7 +11,6 @@ import io.ktor.server.application.*
 import io.ktor.server.response.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonObject
-import org.jetbrains.exposed.sql.transactions.transaction
 
 fun Application.dids() = walletRoute {
     route("dids", {
@@ -26,7 +25,7 @@ fun Application.dids() = walletRoute {
                 }
             }
         }) {
-            context.respond(getWalletService().run { transaction { runBlocking { listDids() } } })
+            context.respond(getWalletService().run { runBlocking { listDids() } })
         }
 
         route("{did}", {
@@ -107,9 +106,10 @@ fun Application.dids() = walletRoute {
                 }
             }
             response {
-                HttpStatusCode.OK to {
-                    description = "DID created"
-                }
+                HttpStatusCode.OK to { description = "DID created" }
+                HttpStatusCode.Conflict to { description = "DID already exists" }
+                HttpStatusCode.BadRequest to { description = "DID could not be created" }
+
             }
         }) {
             didCreate()

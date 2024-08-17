@@ -45,13 +45,16 @@ export default function Offer() {
         });
       }
       if (credentials) {
-        const response = await getOfferUrl(credentials, env.NEXT_PUBLIC_VC_REPO ? env.NEXT_PUBLIC_VC_REPO : nextConfig.publicRuntimeConfig!.NEXT_PUBLIC_VC_REPO, env.NEXT_PUBLIC_ISSUER ? env.NEXT_PUBLIC_ISSUER : nextConfig.publicRuntimeConfig!.NEXT_PUBLIC_ISSUER);
+        const response = await getOfferUrl(credentials, env.NEXT_PUBLIC_VC_REPO ? env.NEXT_PUBLIC_VC_REPO : nextConfig.publicRuntimeConfig!.NEXT_PUBLIC_VC_REPO, env.NEXT_PUBLIC_ISSUER ? env.NEXT_PUBLIC_ISSUER : nextConfig.publicRuntimeConfig!.NEXT_PUBLIC_ISSUER, router.query.authenticationMethod as string,  router.query.vpRequestValue as string,  router.query.vpProfile as string);
         setOfferURL(response.data);
         setLoading(false);
       }
     };
-    getOfferURL();
-  }, [router.query.credentialId]);
+  //   getOfferURL();
+  // }, [router.query.credentialId]);
+    if (router.isReady)
+      getOfferURL();
+  }, [router.isReady, router.query]);
 
   async function copyCurrentURLToClipboard() {
     navigator.clipboard.writeText(offerURL).then(

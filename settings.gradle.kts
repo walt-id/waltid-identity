@@ -1,3 +1,75 @@
+// # walt.id identity build configuration
+
+fun getSetting(name: String) = providers.gradleProperty(name).orNull.toBoolean()
+val enableAndroidBuild = getSetting("enableAndroidBuild")
+val enableIosBuild = getSetting("enableIosBuild")
+
+infix fun String.whenEnabled(setting: Boolean) = if (setting) this else null
+fun String.group(vararg elements: String?) = elements.map { it?.let { "$this:$it" } }.toTypedArray()
+
+// Build setup:
+
+// Shorthands
+val libraries = ":waltid-libraries"
+val applications = ":waltid-applications"
+val services = ":waltid-services"
+
+val modules = listOf(
+    * "$libraries:crypto".group(
+        "waltid-crypto",
+        "waltid-crypto-oci",
+        "waltid-crypto-android" whenEnabled enableAndroidBuild,
+        "waltid-crypto-ios" whenEnabled enableIosBuild,
+        "waltid-target-ios" whenEnabled enableIosBuild,
+        "waltid-target-ios:implementation" whenEnabled enableIosBuild,
+    ),
+
+    * "$libraries:credentials".group(
+        "waltid-verifiable-credentials",
+        "waltid-mdoc-credentials",
+        "waltid-dif-presentation-exchange"
+    ),
+
+    * "$libraries:protocols".group(
+        "waltid-openid4vc"
+    ),
+
+    * "$libraries:sdjwt".group(
+        "waltid-sdjwt",
+        "waltid-sdjwt-ios" whenEnabled enableIosBuild,
+    ),
+
+    /*
+    * "$libraries:util".group(
+        "waltid-reporting"
+    ),
+    */
+
+    "$libraries:waltid-did",
+    "$libraries:waltid-java-compat",
+
+    // Service commons
+    "$services:waltid-service-commons",
+
+    // Services based on libs
+    "$services:waltid-issuer-api",
+    "$services:waltid-verifier-api",
+    "$services:waltid-wallet-api",
+
+    // Service tests
+    "$services:waltid-e2e-tests",
+
+    // CLI
+    "$applications:waltid-cli",
+
+    ":waltid-applications:waltid-android" whenEnabled enableAndroidBuild,
+
+    "$applications:waltid-openid4vc-ios-testApp" whenEnabled enableIosBuild,
+    "$applications:waltid-openid4vc-ios-testApp:shared" whenEnabled enableIosBuild
+).filterNotNull()
+
+include(*modules.toTypedArray())
+
 pluginManagement {
     repositories {
         google()
@@ -7,45 +79,7 @@ pluginManagement {
 }
 
 plugins {
-    id("org.gradle.toolchains.foojay-resolver-convention") version "0.7.0"
+    id("org.gradle.toolchains.foojay-resolver-convention") version "0.8.0"
 }
 
 rootProject.name = "waltid-identity"
-include(
-    // Base SSI libs
-    ":waltid-libraries:waltid-crypto",
-    ":waltid-libraries:waltid-did",
-    ":waltid-libraries:waltid-verifiable-credentials",
-    ":waltid-libraries:waltid-mdoc-credentials",
-    ":waltid-libraries:waltid-sdjwt",
-
-    // Protocols
-    ":waltid-libraries:waltid-openid4vc",
-
-    // Service commons
-    ":waltid-services:waltid-service-commons",
-
-    // Services based on libs
-    ":waltid-services:waltid-issuer-api",
-    ":waltid-services:waltid-verifier-api",
-    ":waltid-services:waltid-wallet-api",
-
-    // Service tests
-    ":waltid-services:waltid-e2e-tests",
-
-    // CLI
-    ":waltid-applications:waltid-cli",
-
-    // Reporting
-    ":waltid-libraries:waltid-reporting",
-
-    // OCI extension for waltid-crypto
-    ":waltid-libraries:waltid-crypto-oci",
-
-    // Android - uncomment to enable build:
-    /*
-    ":waltid-libraries:waltid-crypto-android",
-    ":waltid-applications:waltid-android"
-    */
-)
-//include("waltid-e2e-tests")

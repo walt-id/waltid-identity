@@ -8,6 +8,11 @@ data:
     webPort = 3000
   issuer-service.conf: |
     baseUrl = "https://issuer.portal.walt.id"
+  authentication-service.conf: |
+    name = "keycloak"
+    authorizeUrl = "https://keycloak.walt-test.cloud/realms/waltid-keycloak-ktor/protocol/openid-connect/auth"
+    accessTokenUrl = "https://keycloak.walt-test.cloud/realms/waltid-keycloak-ktor/protocol/openid-connect/token"
+    clientId = "issuer_api"
   credential-issuer-metadata.conf: |
     supportedCredentialTypes = {
         BankId = [VerifiableCredential, BankId],

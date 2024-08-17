@@ -1,206 +1,211 @@
 import presetIcons from "@unocss/preset-icons";
 
 export default defineNuxtConfig({
-    devtools: { enabled: true },
+  devtools: { enabled: true },
+  srcDir: "src",
 
-    srcDir: "src",
-    modules: [
-        "@vueuse/nuxt",
-        ["@unocss/nuxt", { autoImport: false }],
-        "@nuxtjs/i18n",
-        "@nuxtjs/color-mode",
-        //'@huntersofbook/naive-ui-nuxt',
-        "@vite-pwa/nuxt",
-        "@sidebase/nuxt-auth",
-        "@nuxt/content",
-        "@pinia/nuxt",
-        "nuxt-icon"
-    ],
-    build: {
-        transpile: ["@headlessui/vue"]
-    },
+  modules: [
+      "@vueuse/nuxt",
+      ["@unocss/nuxt", { autoImport: false }],
+      "@nuxtjs/i18n",
+      "@nuxtjs/color-mode",
+      //'@huntersofbook/naive-ui-nuxt',
+      "@vite-pwa/nuxt",
+      "@sidebase/nuxt-auth",
+      "@nuxt/content",
+      "@pinia/nuxt",
+      "nuxt-icon"
+  ],
 
-    content: {
-        // https://content.nuxtjs.org/api/configuration
-    },
+  build: {
+      transpile: ["@headlessui/vue"]
+  },
 
-    auth: {
-        baseURL: "/wallet-api/auth",
+  content: {
+      // https://content.nuxtjs.org/api/configuration
+  },
 
-        provider: {
-            type: "local",
-            token: {
-                maxAgeInSeconds: 60 * 60 * 24 * 30 // 30 days
-            },
+  auth: {
+      baseURL: "/wallet-api/auth",
 
-            pages: {
-                login: "/login"
-            }
-        },
+      provider: {
+          type: "local",
+          token: {
+              maxAgeInSeconds: 60 * 60 * 24 * 30 // 30 days
+          },
 
-        globalAppMiddleware: {
-            isEnabled: true
-        }
-    },
-    pwa: {
-        registerWebManifestInRouteRules: true,
+          pages: {
+              login: "/login"
+          }
+      },
 
-        srcDir: "public/sw",
-        filename: "worker.js",
+      globalAppMiddleware: {
+          isEnabled: true
+      }
+  },
 
-        strategies: "injectManifest",
-        injectRegister: "script",
-        injectManifest: { injectionPoint: undefined },
-        registerType: "autoUpdate",
-        // notification-worker.js
-        manifest: {
-            name: "walt.id wallet",
-            short_name: "walt.id",
-            display: "standalone",
-            theme_color: "#0573f0",
-            icons: [
-                {
-                    src: "/icons/android-icon-36x36.png",
-                    sizes: "36x36",
-                    type: "image/png",
-                },
-                {
-                    src: "/icons/android-icon-48x48.png",
-                    sizes: "48x48",
-                    type: "image/png",
-                },
-                {
-                    src: "/icons/android-icon-72x72.png",
-                    sizes: "72x72",
-                    type: "image/png",
-                },
-                {
-                    src: "/icons/android-icon-96x96.png",
-                    sizes: "96x96",
-                    type: "image/png",
-                },
-                {
-                    src: "/icons/android-icon-144x144.png",
-                    sizes: "144x144",
-                    type: "image/png",
-                },
-                {
-                    src: "/icons/waltid-icon-192x192.png",
-                    sizes: "192x192",
-                    type: "image/png"
-                },
-                {
-                    src: "/icons/waltid-icon-512x512.png",
-                    sizes: "512x512",
-                    type: "image/png"
-                },
-                {
-                    src: "/icons/waltid-icon-512x512.png",
-                    sizes: "512x512",
-                    type: "image/png",
-                    purpose: "any maskable"
-                }
-            ],
-            shortcuts: [
-                // @ts-ignore
-                {
-                    name: "Scan QR code",
-                    short_name: "Scan QR",
-                    url: "/wallet/scan-qr",
-                    description: "Scan a QR code to receive/present credentials from/to a service."
-                }
-            ]
-        },
-        workbox: {
-            navigateFallback: null,
-            globPatterns: ["client/**/*.{js,css,ico,png,svg,webp,woff,woff2}"]
-        },
-        client: {
-            installPrompt: true,
-            // you don't need to include this: only for testing purposes
-            // if enabling periodic sync for update use 1 hour or so (periodicSyncForUpdates: 3600)
-            periodicSyncForUpdates: 20
-        },
-        devOptions: {
-            enabled: true,
-            type: "module"
-        }
-    },
+  pwa: {
+      registerWebManifestInRouteRules: true,
 
-    unocss: {
-        uno: false,
-        preflight: false,
-        icons: true,
-        presets: [
-            presetIcons({
-                scale: 1.2,
-                extraProperties: {
-                    display: "inline-block"
-                }
-            })
-        ],
-        safelist: ["i-twemoji-flag-us-outlying-islands", "i-twemoji-flag-turkey"]
-    },
+      srcDir: "public/sw",
+      filename: "worker.js",
 
-    typescript: {
-        tsConfig: {
-            compilerOptions: {
-                strict: true,
-                types: ["./type.d.ts"]
-            }
-        }
-    },
-    colorMode: {
-        classSuffix: "",
-        fallback: "light",
-        storageKey: "color-mode"
-    },
+      strategies: "injectManifest",
+      injectRegister: "script",
+      injectManifest: { injectionPoint: undefined },
+      registerType: "autoUpdate",
+      // notification-worker.js
+      manifest: {
+          name: "walt.id wallet",
+          short_name: "walt.id",
+          display: "standalone",
+          theme_color: "#0573f0",
+          icons: [
+              {
+                  src: "/icons/android-icon-36x36.png",
+                  sizes: "36x36",
+                  type: "image/png",
+              },
+              {
+                  src: "/icons/android-icon-48x48.png",
+                  sizes: "48x48",
+                  type: "image/png",
+              },
+              {
+                  src: "/icons/android-icon-72x72.png",
+                  sizes: "72x72",
+                  type: "image/png",
+              },
+              {
+                  src: "/icons/android-icon-96x96.png",
+                  sizes: "96x96",
+                  type: "image/png",
+              },
+              {
+                  src: "/icons/android-icon-144x144.png",
+                  sizes: "144x144",
+                  type: "image/png",
+              },
+              {
+                  src: "/icons/waltid-icon-192x192.png",
+                  sizes: "192x192",
+                  type: "image/png"
+              },
+              {
+                  src: "/icons/waltid-icon-512x512.png",
+                  sizes: "512x512",
+                  type: "image/png"
+              },
+              {
+                  src: "/icons/waltid-icon-512x512.png",
+                  sizes: "512x512",
+                  type: "image/png",
+                  purpose: "any maskable"
+              }
+          ],
+          shortcuts: [
+              // @ts-ignore
+              {
+                  name: "Scan QR code",
+                  short_name: "Scan QR",
+                  url: "/wallet/scan-qr",
+                  description: "Scan a QR code to receive/present credentials from/to a service."
+              }
+          ]
+      },
+      workbox: {
+          navigateFallback: null,
+          globPatterns: ["client/**/*.{js,css,ico,png,svg,webp,woff,woff2}"]
+      },
+      client: {
+          installPrompt: true,
+          // you don't need to include this: only for testing purposes
+          // if enabling periodic sync for update use 1 hour or so (periodicSyncForUpdates: 3600)
+          periodicSyncForUpdates: 20
+      },
+      devOptions: {
+          enabled: true,
+          type: "module"
+      }
+  },
 
-    vite: {
-        logLevel: "info"
-        /*server: {
-            proxy: {
-                '/api': {
-                    target: 'http://localhost:4545'
-                }
-            }
-        }*/
-    },
+  unocss: {
+      uno: false,
+      preflight: false,
+      icons: true,
+      presets: [
+          presetIcons({
+              scale: 1.2,
+              extraProperties: {
+                  display: "inline-block"
+              }
+          })
+      ],
+      safelist: ["i-twemoji-flag-us-outlying-islands", "i-twemoji-flag-turkey"]
+  },
 
-    runtimeConfig: {
-        public: {
-            projectId: process.env.ProjectId,
-            issuerCallbackUrl: process.env.IssuerCallbackUrl ?? "http://localhost:7100",
-        }
-    },
+  typescript: {
+      tsConfig: {
+          compilerOptions: {
+              strict: true,
+              types: ["./type.d.ts"]
+          }
+      }
+  },
 
-    nitro: {
-        compressPublicAssets: {
-            gzip: true,
-            brotli: false
-        },
-        devProxy: {
-            "/wallet-api/": "http://localhost:7001/wallet-api"
-        }
-    },
-    ssr: false
+  colorMode: {
+      classSuffix: "",
+      fallback: "light",
+      storageKey: "color-mode"
+  },
 
-    // i18n: {
-    //     lazy: true,
-    //     langDir: 'locales',  // need `lang` dir on `admin`
-    //     defaultLocale: "en-US",
-    //     detectBrowserLanguage: false,
-    //     locales: [
-    //         {
-    //             code: 'en',
-    //             file: 'en-US.json',
-    //         },
-    //         {
-    //             code: 'tr',
-    //             file: 'tr-TR.json',
-    //         },
-    //     ]
-    // }
+  vite: {
+      logLevel: "info"
+      /*server: {
+          proxy: {
+              '/api': {
+                  target: 'http://localhost:4545'
+              }
+          }
+      }*/
+  },
 
-    //proxy: [ 'http://localhost:4545/api' ]
+  runtimeConfig: {
+      public: {
+          projectId: process.env.ProjectId,
+          issuerCallbackUrl: process.env.IssuerCallbackUrl ?? "http://localhost:7100",
+          demoWalletUrl: "https://wallet.walt.id",
+      }
+  },
+
+  nitro: {
+      compressPublicAssets: {
+          gzip: true,
+          brotli: false
+      },
+      devProxy: {
+          "/wallet-api/": "http://localhost:7001/wallet-api"
+      }
+  },
+
+  // i18n: {
+  //     lazy: true,
+  //     langDir: 'locales',  // need `lang` dir on `admin`
+  //     defaultLocale: "en-US",
+  //     detectBrowserLanguage: false,
+  //     locales: [
+  //         {
+  //             code: 'en',
+  //             file: 'en-US.json',
+  //         },
+  //         {
+  //             code: 'tr',
+  //             file: 'tr-TR.json',
+  //         },
+  //     ]
+  // }
+  //proxy: [ 'http://localhost:4545/api' ]
+  ssr: false,
+
+  compatibilityDate: "2024-08-01"
 });

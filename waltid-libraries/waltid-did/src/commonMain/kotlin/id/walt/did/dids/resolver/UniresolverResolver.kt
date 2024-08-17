@@ -22,13 +22,16 @@ import kotlin.js.JsExport
 
 private val log = KotlinLogging.logger { }
 
+/**
+ * @param resolverUrl Resolver URL, e.g. "http://localhost:8080/1.0"
+ */
 @OptIn(ExperimentalJsExport::class)
 @JsExport
-class UniresolverResolver : DidResolver {
-    @Suppress("MemberVisibilityCanBePrivate")
-    //var resolverUrl = "http://localhost:8080/1.0"
-    var resolverUrl = "https://dev.uniresolver.io/1.0"
+class UniresolverResolver(var resolverUrl: String = DEFAULT_RESOLVER_URL) : DidResolver {
 
+    companion object {
+        const val DEFAULT_RESOLVER_URL = "https://dev.uniresolver.io/1.0"
+    }
 
     override val name = "uniresolver @ $resolverUrl"
 
@@ -57,7 +60,7 @@ class UniresolverResolver : DidResolver {
         }.map { response ->
             runCatching { response.body<JsonObject>() }.getOrElse {
                 throw RuntimeException(
-                    "HTTP response (status ${response.status}) is not JSON, body: ${response.bodyAsText()}",
+                    "HTTP response (status ${response.status}) for resolving did $did is not JSON, body: ${response.bodyAsText()}",
                     it
                 )
             }

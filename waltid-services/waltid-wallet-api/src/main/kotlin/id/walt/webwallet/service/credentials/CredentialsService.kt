@@ -6,6 +6,7 @@ import id.walt.webwallet.db.models.WalletCredentialCategoryMap
 import id.walt.webwallet.db.models.WalletCredentials
 import kotlinx.datetime.Clock
 import kotlinx.datetime.toJavaInstant
+import kotlinx.serialization.Serializable
 import kotlinx.uuid.UUID
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
@@ -101,6 +102,7 @@ class CredentialsService {
             this[WalletCredentials.addedOn] = Clock.System.now().toJavaInstant()
             this[WalletCredentials.manifest] = credential.manifest
             this[WalletCredentials.pending] = credential.pending
+            this[WalletCredentials.format] = credential.format.value
         }.map { it[WalletCredentials.id] }
     }
 
@@ -196,6 +198,7 @@ class CredentialsService {
     }
 }
 
+@Serializable
 data class CredentialFilterObject(
     val categories: List<String>?,
     val showDeleted: Boolean?,

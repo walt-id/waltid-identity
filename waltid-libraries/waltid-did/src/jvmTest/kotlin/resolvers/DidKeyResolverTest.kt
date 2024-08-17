@@ -68,12 +68,12 @@ class DidKeyResolverTest : DidResolverTestBase() {
                     Json.decodeFromString<JsonObject>("{\"kty\":\"EC\",\"crv\":\"secp256k1\",\"x\":\"W3Mx2h5m8laNqq5SpmHSzkG2Eqn9EWQ2_TTz1yNIkvU\",\"y\":\"YYFSF5mM7ppXw9r9gH63YSV2dL1CkmMmqTGUwfbi8-I\"}"),
                     secpAssertions
                 ),
-//                //rsa
-//                arguments(
-//                    "did:key:z4MXj1wBzi9jUstyQ7QXxaiUtzer96UgeJcWXBN1Z4vgX6Cpdu3yBRhaQDceisA4g8uUVgUMfmGkuRXJ22cFpJ5E2Qi49gz7r8jCSsxDQW4fsSqyF6d1Nd3H8k2rmU9D3U7rgisMBwZGE2fC2w1332WKzeXtSsyfdbWjDsEEwWHHtXRRnWFwQfPtp92KWL7H7awQhFJieh6We5hYVYA5JBRdPwUVFNTSyqYYhhtEJgiyHXDCevCgWnJmVwQ3dMpuwoj1QW4uN4WL1wUaD7ic8fLx3LxxmtXWA86GL4r1Prgistfymq7CJumGL5AEej42yqEya9rFfq2HzMi5DzypDqDVNEK1MLWwfFGHwqoxQ2m1JXpR8ZYZv",
-//                    Json.decodeFromString<JsonObject>("{\"kty\":\"RSA\",\"e\":\"AQAB\",\"use\":\"sig\",\"kid\":\"ab269ce10ce94b7c9565e30c034b5692\",\"alg\":\"RS256\",\"n\":\"0qbslQ5uMXL1Wk4dUD5ftrGWLhgaQENQn8AaPVREg12H_Mfr2GEL0IkBd7EQPeRFzRzngF2kWpij_nyueYKGQ3um_hione72pozP76etXNk4imTzmg3RsHcfPC5JBJAGpb5htnUQ5-VsuqbzlCUTOWNK4kIDWzbU0o-neglLAwU846_h6lTRI7xE1kh0iZyseAdx7sZ8Cd5eSYuvwQVxnNn0w-m9Bwd30g-s8xmqn9-7LBa0-UdumMLwtan4IGXltMJGYU9br1wsmz9vlG-TvfmxlgXzilJOJQMvlMKGXRmbUJRaNSYdrVJciEQEWK0tkaT45r3_LJw7dwx4DnNxzw\"}"),
-//                    rsaAssertions
-//                ),//not implemented core-crypto
+                //rsa
+                arguments(
+                    "did:key:z4MXj1wBzi9jUstyQ7QXxaiUtzer96UgeJcWXBN1Z4vgX6Cpdu3yBRhaQDceisA4g8uUVgUMfmGkuRXJ22cFpJ5E2Qi49gz7r8jCSsxDQW4fsSqyF6d1Nd3H8k2rmU9D3U7rgisMBwZGE2fC2w1332WKzeXtSsyfdbWjDsEEwWHHtXRRnWFwQfPtp92KWL7H7awQhFJieh6We5hYVYA5JBRdPwUVFNTSyqYYhhtEJgiyHXDCevCgWnJmVwQ3dMpuwoj1QW4uN4WL1wUaD7ic8fLx3LxxmtXWA86GL4r1Prgistfymq7CJumGL5AEej42yqEya9rFfq2HzMi5DzypDqDVNEK1MLWwfFGHwqoxQ2m1JXpR8ZYZv",
+                    Json.decodeFromString<JsonObject>("{\"kty\":\"RSA\",\"e\":\"AQAB\",\"use\":\"sig\",\"kid\":\"ab269ce10ce94b7c9565e30c034b5692\",\"alg\":\"RS256\",\"n\":\"0qbslQ5uMXL1Wk4dUD5ftrGWLhgaQENQn8AaPVREg12H_Mfr2GEL0IkBd7EQPeRFzRzngF2kWpij_nyueYKGQ3um_hione72pozP76etXNk4imTzmg3RsHcfPC5JBJAGpb5htnUQ5-VsuqbzlCUTOWNK4kIDWzbU0o-neglLAwU846_h6lTRI7xE1kh0iZyseAdx7sZ8Cd5eSYuvwQVxnNn0w-m9Bwd30g-s8xmqn9-7LBa0-UdumMLwtan4IGXltMJGYU9br1wsmz9vlG-TvfmxlgXzilJOJQMvlMKGXRmbUJRaNSYdrVJciEQEWK0tkaT45r3_LJw7dwx4DnNxzw\"}"),
+                    rsaAssertions
+                ),
             )
     }
 }

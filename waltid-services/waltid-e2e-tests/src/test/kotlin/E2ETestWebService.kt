@@ -5,12 +5,17 @@ import com.github.ajalt.mordant.terminal.Terminal
 import id.walt.commons.ServiceConfiguration
 import id.walt.commons.ServiceInitialization
 import id.walt.commons.ServiceMain
+import id.walt.commons.featureflag.CommonsFeatureCatalog
+import id.walt.commons.web.modules.AuthenticationServiceModule
 import id.walt.commons.web.plugins.configureSerialization
 import id.walt.commons.web.plugins.configureStatusPages
 import id.walt.credentials.verification.PolicyManager
 import id.walt.did.helpers.WaltidServices
 import id.walt.issuer.FeatureCatalog
 import id.walt.issuer.issuerModule
+import id.walt.webwallet.web.plugins.walletAuthenticationPluginAmendment
+import id.walt.issuer.lspPotential.lspPotentialIssuanceTestApi
+import id.walt.verifier.lspPotential.lspPotentialVerificationTestApi
 import id.walt.verifier.policies.PresentationDefinitionPolicy
 import id.walt.verifier.verifierModule
 import id.walt.webwallet.db.Db
@@ -19,6 +24,8 @@ import id.walt.webwallet.webWalletSetup
 import io.ktor.server.application.*
 import io.ktor.server.cio.*
 import io.ktor.server.engine.*
+import java.io.File
+import java.net.URLDecoder
 
 object E2ETestWebService {
 
@@ -28,7 +35,7 @@ object E2ETestWebService {
         private val webServiceModule: Application.() -> Unit = {
             configureStatusPages()
             configureSerialization()
-
+            AuthenticationServiceModule.run { enable() }
             module.invoke(this)
         }
 
@@ -50,7 +57,7 @@ object E2ETestWebService {
         val failed: Int,
     )
 
-
+    var numTests = 0
     val testResults = ArrayList<Result<Any?>>()
     val testNames = HashMap<Int, String>()
     val t = Terminal(ansiLevel = AnsiLevel.TRUECOLOR)
@@ -67,6 +74,10 @@ object E2ETestWebService {
         ServiceMain(
             ServiceConfiguration("e2e-test"), ServiceInitialization(
                 features = listOf(FeatureCatalog, id.walt.verifier.FeatureCatalog, id.walt.webwallet.FeatureCatalog),
+                featureAmendments = mapOf(
+                    CommonsFeatureCatalog.authenticationServiceFeature to walletAuthenticationPluginAmendment,
+//                    CommonsFeatureCatalog.authenticationServiceFeature to issuerAuthenticationPluginAmendment
+                ),
                 init = {
                     webWalletSetup()
                     PolicyManager.registerPolicies(PresentationDefinitionPolicy())
@@ -79,9 +90,8 @@ object E2ETestWebService {
 
         t.println("\n" + TextColors.magenta("Test results:"))
         testResults.forEachIndexed { index, result ->
-            val idx = index + 1
-            val name = testNames[idx]!!
-            t.println(TextColors.magenta("$idx. $name: ${result.toSuccessString()}"))
+            val name = testNames[index]!!
+            t.println(TextColors.magenta("$index. $name: ${result.toSuccessString()}"))
         }
 
         val testStats = getTestStats()
@@ -103,7 +113,7 @@ object E2ETestWebService {
     }
 
     suspend fun test(name: String, function: suspend () -> Any?) {
-        val id = testResults.size + 1
+        val id = numTests++
         testNames[id] = name
 
         t.println("\n${TextColors.cyan(TextStyles.bold("---=== Start $id. test: $name === ---"))}")
@@ -123,10 +133,15 @@ object E2ETestWebService {
         val failedStr = if (failed == 0) "none failed ✅" else TextColors.red("$failed failed")
         t.println(TextColors.magenta("Current test stats: ${testResults.size} overall | $overallSuccess succeeded | $failedStr\n"))
     }
+
+    fun loadResource(relativePath: String): String =
+        URLDecoder.decode(object {}.javaClass.getResource(relativePath)!!.path, "UTF-8").let { File(it).readText() }
 }
 
 private fun Application.e2eTestModule() {
     webWalletModule(true)
     issuerModule(false)
+    lspPotentialIssuanceTestApi()
     verifierModule(false)
+    lspPotentialVerificationTestApi()
 }

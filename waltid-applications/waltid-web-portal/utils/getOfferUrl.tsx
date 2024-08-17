@@ -1,15 +1,15 @@
 import axios from 'axios';
 import { v4 as uuidv4 } from 'uuid';
-import { AvailableCredential, DIDMethodsConfig } from '@/types/credentials';
+import {AvailableCredential, CredentialFormats, DIDMethods, DIDMethodsConfig} from '@/types/credentials';
 
-const getOfferUrl = async (credentials: Array<AvailableCredential>, NEXT_PUBLIC_VC_REPO: string, NEXT_PUBLIC_ISSUER: string) => {
+const getOfferUrl = async (credentials: Array<AvailableCredential>, NEXT_PUBLIC_VC_REPO: string, NEXT_PUBLIC_ISSUER: string, authenticationMethod?: string, vpRequestValue?: string,  vpProfile?: string) => {
   const data = await fetch(`${NEXT_PUBLIC_ISSUER}/.well-known/openid-credential-issuer`).then(data => {
     return data.json();
   });
   const credential_configurations_supported = data.credential_configurations_supported;
 
   const payload = await Promise.all(credentials.map(async (c) => {
-    c = { ...c, selectedFormat: c.selectedFormat ?? "JWT + VCDM", selectedDID: c.selectedDID ?? "did:key" };
+    c = {...c, selectedFormat: c.selectedFormat ?? CredentialFormats[0], selectedDID: c.selectedDID ?? DIDMethods[0]};
 
     const offer = { ...c.offer, id: uuidv4() };
     const mapping = await (await fetch(`${NEXT_PUBLIC_VC_REPO}/api/mapping/${c.id}`).then(data => {
@@ -20,11 +20,14 @@ const getOfferUrl = async (credentials: Array<AvailableCredential>, NEXT_PUBLIC_
 
     let payload: {
       'issuerDid': string,
-      'issuerKey': { "type": string, "jwk": string },
+      'issuerKey': { "type": string, "jwk": object },
       credentialConfigurationId: string,
       credentialData: any,
       mapping?: any,
-      selectiveDisclosure?: any
+      selectiveDisclosure?: any,
+      authenticationMethod?: string,
+      vpRequestValue?: string,
+      vpProfile?: string
     } = {
       'issuerDid': DIDMethodsConfig[c.selectedDID as keyof typeof DIDMethodsConfig].issuerDid,
       'issuerKey': DIDMethodsConfig[c.selectedDID as keyof typeof DIDMethodsConfig].issuerKey,
@@ -51,6 +54,17 @@ const getOfferUrl = async (credentials: Array<AvailableCredential>, NEXT_PUBLIC_
           }
         }
       }
+    }
+    if (authenticationMethod) {
+      payload.authenticationMethod = authenticationMethod;
+    }
+
+    if (vpRequestValue) {
+      payload.vpRequestValue = vpRequestValue;
+    }
+
+    if (vpProfile) {
+      payload.vpProfile = vpProfile;
     }
     return mapping ? { ...payload, mapping } : payload;
   }));

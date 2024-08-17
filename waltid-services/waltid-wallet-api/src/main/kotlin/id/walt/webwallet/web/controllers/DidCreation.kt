@@ -32,6 +32,12 @@ object DidCreation {
 
         post(DidJwkMethodName, {
             summary = "Create a did:jwk"
+            request {
+                queryParameter<String?>("keyId") {
+                    description = "Optionally set key ID"
+                    required = false
+                }
+            }
         }) {
             getWalletService().createDid(
                 DidJwkMethodName, extractDidCreateParameters(DidJwkMethodName, context.request.queryParameters)
@@ -49,9 +55,8 @@ object DidCreation {
                 }
             }
         }) {
-            getWalletService().createDid(
-                DidWebMethodName, extractDidCreateParameters(DidWebMethodName, context.request.queryParameters)
-            ).let { context.respond(it) }
+            val parameters = extractDidCreateParameters(DidWebMethodName, context.request.queryParameters)
+            getWalletService().createDid(DidWebMethodName, parameters).let { context.respond(it) }
         }
 
         post(DidEbsiMethodName, {

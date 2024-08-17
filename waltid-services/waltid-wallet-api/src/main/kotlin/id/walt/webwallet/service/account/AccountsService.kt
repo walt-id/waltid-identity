@@ -1,8 +1,11 @@
 package id.walt.webwallet.service.account
 
 import id.walt.commons.config.ConfigManager
+import id.walt.commons.featureflag.FeatureManager.whenFeatureSuspend
+import id.walt.webwallet.FeatureCatalog
 import id.walt.webwallet.config.RegistrationDefaultsConfig
 import id.walt.webwallet.db.models.*
+import id.walt.webwallet.service.WalletService
 import id.walt.webwallet.service.WalletServiceManager
 import id.walt.webwallet.service.events.AccountEventData
 import id.walt.webwallet.service.events.EventType
@@ -18,53 +21,47 @@ import org.jetbrains.exposed.sql.transactions.transaction
 
 object AccountsService {
 
-    fun registerAuthenticationMethods() {
-//        val loginMethods = ConfigManager.getConfig<LoginMethodsConfig>().enabledLoginMethods
-    }
+    private suspend fun initializeUserAccount(tenant: String, name: String?, registrationResult: RegistrationResult) =
+        let {
+            val registeredUserId = registrationResult.id
 
-    val defaultGenerationConfig by lazy { ConfigManager.getConfig<RegistrationDefaultsConfig>() }
+            val createdInitialWalletId = transaction {
+                WalletServiceManager.createWallet(tenant, registeredUserId)
+            }.also { walletId ->
+                //TODO: inject
+                WalletServiceManager.issuerUseCase.add(IssuerDataTransferObject.default(walletId))
+            }
 
-    suspend fun register(tenant: String = "", request: AccountRequest): Result<RegistrationResult> = when (request) {
-        is EmailAccountRequest -> EmailAccountStrategy.register(tenant, request)
-        is AddressAccountRequest -> Web3WalletAccountStrategy.register(tenant, request)
-        is OidcAccountRequest -> OidcAccountStrategy.register(tenant, request)
-        is KeycloakAccountRequest -> KeycloakAccountStrategy.register(tenant, request)
-        is OidcUniqueSubjectRequest -> OidcUniqueSubjectStrategy.register(tenant, request)
-
-    }.onSuccess { registrationResult ->
-        val registeredUserId = registrationResult.id
-
-        val createdInitialWalletId = transaction {
-            WalletServiceManager.createWallet(tenant, registeredUserId)
-        }.also { walletId ->
-            //TODO: inject
-            WalletServiceManager.issuerUseCase.add(IssuerDataTransferObject.default(walletId))
+            val walletService = WalletServiceManager.getWalletService(tenant, registeredUserId, createdInitialWalletId)
+            suspend { tryAddDefaultData(walletService) } whenFeatureSuspend (FeatureCatalog.registrationDefaultsFeature)
+            registrationResult.also {
+                WalletServiceManager.eventUseCase.log(
+                    action = EventType.Account.Create,
+                    originator = "wallet",
+                    tenant = tenant,
+                    accountId = registeredUserId,
+                    walletId = createdInitialWalletId,
+                    data = AccountEventData(accountId = name)
+                )
+            }
         }
 
-        val walletService = WalletServiceManager.getWalletService(tenant, registeredUserId, createdInitialWalletId)
-        WalletServiceManager.eventUseCase.log(
-            action = EventType.Account.Create,
-            originator = "wallet",
-            tenant = tenant,
-            accountId = registeredUserId,
-            walletId = createdInitialWalletId,
-            data = AccountEventData(accountId = request.name)
-        )
+    suspend fun register(tenant: String = "", request: AccountRequest): Result<RegistrationResult> = runCatching {
+        when (request) {
+            is EmailAccountRequest -> EmailAccountStrategy.register(tenant, request)
+            is AddressAccountRequest -> Web3WalletAccountStrategy.register(tenant, request)
+            is OidcAccountRequest -> OidcAccountStrategy.register(tenant, request)
+            is KeycloakAccountRequest -> KeycloakAccountStrategy.register(tenant, request)
+            is OidcUniqueSubjectRequest -> OidcUniqueSubjectStrategy.register(tenant, request)
 
-        // Add default data:
+        }.fold(onSuccess = {
+            initializeUserAccount(tenant, request.name, it)
 
-        val createdKey = walletService.generateKey(defaultGenerationConfig.defaultKeyConfig)
+        }, onFailure = {
+            throw it
+        })
+    }
 
-        val createdDid = walletService.createDid(
-            method = defaultGenerationConfig.didMethod,
-            args = defaultGenerationConfig.didConfig.toMutableMap().apply {
-                put("keyId", JsonPrimitive(createdKey))
-                put("alias", JsonPrimitive("Onboarding"))
-            }
-        )
-
-        walletService.setDefault(createdDid)
-    }.onFailure { throw IllegalStateException("Could not register user: ${it.message}", it) }
 
     suspend fun authenticate(tenant: String, request: AccountRequest): Result<AuthenticatedUser> = runCatching {
         when (request) {
@@ -159,6 +156,19 @@ object AccountsService {
         Accounts.selectAll().where { Accounts.id eq account }.single().let {
             Account(it)
         }
+    }
+
+    private suspend fun tryAddDefaultData(walletService: WalletService) = runCatching {
+        val defaultGenerationConfig by lazy { ConfigManager.getConfig<RegistrationDefaultsConfig>() }
+        val createdKey = walletService.generateKey(defaultGenerationConfig.defaultKeyConfig)
+        val createdDid =
+            walletService.createDid(
+                method = defaultGenerationConfig.didMethod,
+                args = defaultGenerationConfig.didConfig!!.toMutableMap().apply {
+                    put("keyId", JsonPrimitive(createdKey))
+                    put("alias", JsonPrimitive("Onboarding"))
+                })
+        walletService.setDefault(createdDid)
     }
 }
 

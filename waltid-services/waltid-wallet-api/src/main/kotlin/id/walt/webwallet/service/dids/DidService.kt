@@ -1,5 +1,6 @@
 package id.walt.webwallet.service.dids
 
+import id.walt.commons.web.ConflictException
 import id.walt.webwallet.db.models.WalletDid
 import id.walt.webwallet.db.models.WalletDids
 import kotlinx.datetime.Clock
@@ -15,7 +16,8 @@ object DidsService {
             .singleOrNull()?.let { WalletDid(it) }
     }
 
-    fun list(wallet: UUID): List<WalletDid> = WalletDids.selectAll().where { WalletDids.wallet eq wallet }.map { WalletDid(it) }
+    fun list(wallet: UUID): List<WalletDid> =
+        transaction { WalletDids.selectAll().where { WalletDids.wallet eq wallet }.map { WalletDid(it) } }
 
     fun getWalletsForDid(did: String): List<UUID> = transaction {
         WalletDids.selectAll().where { WalletDids.did eq did }.map {
@@ -25,10 +27,16 @@ object DidsService {
 
     fun add(wallet: UUID, did: String, document: String, keyId: String, alias: String? = null) = transaction {
         val now = Clock.System.now()
+        val didExists = WalletDids.selectAll()
+            .where { (WalletDids.wallet eq wallet) and (WalletDids.did eq did.replace("%3A", ":")) }
+            .count() > 0L
 
+        if (didExists) {
+            throw ConflictException("DID already exists")
+        }
         WalletDids.insert {
             it[WalletDids.wallet] = wallet
-            it[WalletDids.did] = did.replace("%3A", ":")
+            it[WalletDids.did] = did.replace("%3A", ":").replace("%3D", "=")
             it[WalletDids.document] = document
             it[WalletDids.keyId] = keyId
             it[WalletDids.alias] = alias ?: "Unnamed from $now"
@@ -37,7 +45,7 @@ object DidsService {
     }.insertedCount
 
     fun delete(wallet: UUID, did: String): Boolean =
-        transaction { WalletDids.deleteWhere { (WalletDids.wallet eq wallet) and (WalletDids.did eq did.replace("%3A", ":")) } } > 0
+        transaction { WalletDids.deleteWhere { (WalletDids.wallet eq wallet) and (WalletDids.did eq did.replace("%3A", ":").replace("%3D", "=")) } } > 0
 
 
     fun makeDidDefault(wallet: UUID, newDefaultDid: String) {

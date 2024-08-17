@@ -1,9 +1,10 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import java.util.Properties
 
 plugins {
     kotlin("jvm")
-    id("io.ktor.plugin") version "2.3.11"
+    id("io.ktor.plugin") version "2.3.12"
     kotlin("plugin.serialization")
 
     id("com.github.ben-manes.versions")
@@ -26,7 +27,9 @@ repositories {
 }
 
 tasks.withType<KotlinCompile> {
-    kotlinOptions.jvmTarget = "17"
+    compilerOptions {
+        jvmTarget = JvmTarget.JVM_17
+    }
 }
 
 tasks.withType<Zip> {
@@ -59,7 +62,7 @@ dependencies {
 
     /* -- KTOR -- */
 
-    val ktor_version = "2.3.11"
+    val ktor_version = "2.3.12"
     // Ktor server
     implementation("io.ktor:ktor-server-core-jvm:$ktor_version")
     implementation("io.ktor:ktor-server-auth-jvm:$ktor_version")
@@ -80,10 +83,6 @@ dependencies {
     implementation("io.ktor:ktor-server-method-override:$ktor_version")
     implementation("io.ktor:ktor-server-rate-limit:$ktor_version")
 
-    // Ktor server external libs
-    implementation("io.github.smiley4:ktor-swagger-ui:3.0.0")
-    //implementation("io.github.microutils:kotlin-logging-jvm:2.1.23")
-
     // Ktor client
     implementation("io.ktor:ktor-client-core-jvm:$ktor_version")
     implementation("io.ktor:ktor-client-serialization-jvm:$ktor_version")
@@ -95,7 +94,7 @@ dependencies {
     /* -- Kotlin -- */
 
     // Kotlinx.serialization
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.1")
 
     // Date
     implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.0")
@@ -104,8 +103,8 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
 
     // UUID
-    implementation("app.softwork:kotlinx-uuid-core:0.0.25")
-    implementation("app.softwork:kotlinx-uuid-exposed:0.0.25")
+    implementation("app.softwork:kotlinx-uuid-core:0.0.26")
+    implementation("app.softwork:kotlinx-uuid-exposed:0.0.26")
 
     /* -- Security -- */
     // Bouncy Castle
@@ -116,17 +115,19 @@ dependencies {
 
 
     // OIDC
-    implementation(project(":waltid-libraries:waltid-openid4vc"))
-    implementation(project(":waltid-libraries:waltid-sdjwt"))
+    implementation(project(":waltid-libraries:protocols:waltid-openid4vc"))
+    implementation(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
+    implementation(project(":waltid-libraries:credentials:waltid-mdoc-credentials"))
 
-    implementation(project(":waltid-libraries:waltid-crypto"))
-    implementation(project(":waltid-libraries:waltid-crypto-oci"))
+    implementation(project(":waltid-libraries:crypto:waltid-crypto"))
+    implementation(project(":waltid-libraries:crypto:waltid-crypto-oci"))
     implementation(project(":waltid-libraries:waltid-did"))
 
     testImplementation(project(":waltid-services:waltid-issuer-api"))
     testImplementation(project(":waltid-services:waltid-verifier-api"))
 
     implementation("com.nimbusds:nimbus-jose-jwt:9.40")
+    implementation("com.augustcellars.cose:cose-java:1.1.0")
 
     implementation("io.ktor:ktor-client-java:$ktor_version")
 
@@ -136,16 +137,16 @@ dependencies {
     implementation("io.github.reactivecircus.cache4k:cache4k:0.13.0")
 
     // Webauthn
-    implementation("com.webauthn4j:webauthn4j-core:0.24.1.RELEASE") {
+    implementation("com.webauthn4j:webauthn4j-core:0.25.0.RELEASE") {
         exclude("ch.qos.logback")
     }
 
     // DB
-    implementation("org.jetbrains.exposed:exposed-core:0.51.1")
-    implementation("org.jetbrains.exposed:exposed-jdbc:0.51.1")
-    implementation("org.jetbrains.exposed:exposed-dao:0.51.1")
-    implementation("org.jetbrains.exposed:exposed-java-time:0.51.1")
-    implementation("org.jetbrains.exposed:exposed-json:0.51.1")
+    implementation("org.jetbrains.exposed:exposed-core:0.52.0")
+    implementation("org.jetbrains.exposed:exposed-jdbc:0.52.0")
+    implementation("org.jetbrains.exposed:exposed-dao:0.52.0")
+    implementation("org.jetbrains.exposed:exposed-java-time:0.52.0")
+    implementation("org.jetbrains.exposed:exposed-json:0.52.0")
     // drivers
     implementation("org.xerial:sqlite-jdbc:3.46.0.0")
     implementation("org.postgresql:postgresql:42.7.3")
@@ -166,14 +167,14 @@ dependencies {
     // Logging
     implementation("io.github.oshai:kotlin-logging-jvm:7.0.0")
     implementation("org.slf4j:jul-to-slf4j:2.0.13")
-    implementation("io.klogging:klogging-jvm:0.5.14")
-    implementation("io.klogging:slf4j-klogging:0.5.14")
+    implementation("io.klogging:klogging-jvm:0.7.0")
+    implementation("io.klogging:slf4j-klogging:0.7.0")
 
     // Test
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit:2.0.0")
     testImplementation(kotlin("test"))
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
     testImplementation("io.ktor:ktor-server-tests-jvm:$ktor_version")
-    testImplementation("io.mockk:mockk:1.13.11")
-    testImplementation("io.klogging:klogging-jvm:0.5.14")
+    testImplementation("io.mockk:mockk:1.13.12")
+    testImplementation("io.klogging:klogging-jvm:0.6.1")
 }

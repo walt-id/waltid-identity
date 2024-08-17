@@ -8,6 +8,9 @@ import com.nimbusds.jose.crypto.MACSigner
 import com.nimbusds.jose.crypto.MACVerifier
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.featureflag.FeatureManager
+import id.walt.commons.web.ForbiddenException
+import id.walt.commons.web.UnauthorizedException
+import id.walt.commons.web.WebException
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.oid4vc.definitions.JWTClaims
@@ -16,27 +19,20 @@ import id.walt.webwallet.config.AuthConfig
 import id.walt.webwallet.db.models.Account
 import id.walt.webwallet.db.models.AccountWalletMappings
 import id.walt.webwallet.db.models.AccountWalletPermissions
-import id.walt.webwallet.service.OidcLoginService
 import id.walt.webwallet.service.WalletServiceManager
 import id.walt.webwallet.service.WalletServiceManager.oidcConfig
 import id.walt.webwallet.service.account.AccountsService
 import id.walt.webwallet.service.account.KeycloakAccountStrategy
-import id.walt.webwallet.web.ForbiddenException
 import id.walt.webwallet.web.InsufficientPermissionsException
-import id.walt.webwallet.web.UnauthorizedException
 import id.walt.webwallet.web.WebBaseRoutes.webWalletRoute
 import id.walt.webwallet.web.model.*
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.github.smiley4.ktorswaggerui.dsl.routing.get
 import io.github.smiley4.ktorswaggerui.dsl.routing.post
 import io.github.smiley4.ktorswaggerui.dsl.routing.route
-import io.ktor.client.*
 import io.ktor.http.*
-import io.ktor.http.auth.*
-import io.ktor.http.parsing.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
-import io.ktor.server.auth.jwt.*
 import io.ktor.server.plugins.*
 import io.ktor.server.plugins.ratelimit.*
 import io.ktor.server.request.*
@@ -46,6 +42,7 @@ import io.ktor.util.pipeline.*
 import kotlinx.datetime.Clock
 import kotlinx.datetime.toJavaInstant
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import kotlinx.uuid.UUID
@@ -54,9 +51,6 @@ import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.time.temporal.ChronoUnit
-import kotlin.collections.set
-import kotlin.time.Duration.Companion.days
-import kotlin.time.Duration.Companion.seconds
 
 private val logger = KotlinLogging.logger {}
 
@@ -83,123 +77,6 @@ object AuthKeys {
     val audTokenClaim: String? = config.audTokenClaim
     val tokenLifetime: Long = config.tokenLifetime.toLongOrNull() ?: 1
 
-}
-
-fun Application.configureSecurity() {
-    install(Sessions) {
-        cookie<LoginTokenSession>("login") {
-            // cookie.encoding = CookieEncoding.BASE64_ENCODING
-
-            // cookie.httpOnly = true
-            cookie.httpOnly = false // FIXME
-            // TODO cookie.secure = true
-            cookie.maxAge = 1.days
-            cookie.extensions["SameSite"] = "Strict"
-            transform(SessionTransportTransformerEncrypt(AuthKeys.encryptionKey, AuthKeys.signKey))
-        }
-        cookie<OidcTokenSession>("oidc-login") {
-            // cookie.encoding = CookieEncoding.BASE64_ENCODING
-
-            // cookie.httpOnly = true
-            cookie.httpOnly = false // FIXME
-            // TODO cookie.secure = true
-            cookie.maxAge = 1.days
-            cookie.extensions["SameSite"] = "Strict"
-            transform(SessionTransportTransformerEncrypt(AuthKeys.encryptionKey, AuthKeys.signKey))
-        }
-    }
-
-    install(Authentication) {
-        oauth("auth-oauth") {
-            client = HttpClient()
-            providerLookup = {
-                OAuthServerSettings.OAuth2ServerSettings(
-                    name = oidcConfig.providerName,
-                    authorizeUrl = oidcConfig.authorizeUrl,
-                    accessTokenUrl = oidcConfig.accessTokenUrl,
-                    clientId = oidcConfig.clientId,
-                    clientSecret = oidcConfig.clientSecret,
-                    accessTokenRequiresBasicAuth = false,
-                    requestMethod = HttpMethod.Post,
-                    defaultScopes = oidcConfig.oidcScopes
-                )
-            }
-            urlProvider = { "${oidcConfig.publicBaseUrl}/wallet-api/auth/oidc-session" }
-        }
-
-        if (FeatureManager.isFeatureEnabled(FeatureCatalog.oidcAuthenticationFeature)) {
-            jwt("auth-oauth-jwt") {
-                realm = OidcLoginService.oidcRealm
-                verifier(OidcLoginService.jwkProvider)
-
-                validate { credential -> JWTPrincipal(credential.payload) }
-                challenge { _, _ ->
-                    call.respond(HttpStatusCode.Unauthorized, "Token is not valid or has expired")
-                }
-            }
-        }
-
-        bearer("auth-bearer") {
-            authenticate { tokenCredential ->
-                val verificationResult = verifyToken(tokenCredential.token)
-                verificationResult.getOrNull()?.let { UserIdPrincipal(it) }
-            }
-        }
-
-        bearer("auth-bearer-alternative") {
-            authHeader { call ->
-                call.request.header("waltid-authorization")?.let {
-                    try {
-                        parseAuthorizationHeader(it)
-                    } catch (cause: ParseException) {
-                        throw BadRequestException("Invalid auth header", cause)
-                    }
-                }
-            }
-            authenticate { tokenCredential ->
-                val verificationResult = verifyToken(tokenCredential.token)
-                verificationResult.getOrNull()?.let { UserIdPrincipal(it) }
-            }
-        }
-
-        session<LoginTokenSession>("auth-session") {
-            validate { session ->
-                val verificationResult = verifyToken(session.token)
-                val userId = verificationResult.getOrNull()
-
-                if (userId != null) {
-                    UserIdPrincipal(userId)
-                } else {
-                    sessions.clear("login")
-                    null
-                }
-            }
-
-            challenge {
-                call.respond(
-                    HttpStatusCode.Unauthorized,
-                    JsonObject(mapOf("message" to JsonPrimitive("Login Required")))
-                )
-            }
-        }
-    }
-
-    install(RateLimit) {
-        register(RateLimitName("login")) {
-            rateLimiter(limit = 30, refillPeriod = 60.seconds) // allows 30 requests per minute
-            requestWeight { call, key ->
-                val req = call.getLoginRequest()
-                if (req is EmailAccountRequest || req is KeycloakAccountRequest) 1 else 0
-            }
-            requestKey { call ->
-                when (val req = call.getLoginRequest()) {
-                    is EmailAccountRequest -> req.email
-                    is KeycloakAccountRequest -> req.username ?: Unit
-                    else -> Unit
-                }
-            }
-        }
-    }
 }
 
 fun Application.auth() {
@@ -243,20 +120,20 @@ fun Application.auth() {
                         summary =
                             "Login with [email + password] or [wallet address + ecosystem] or [oidc session]"
                         request {
-                            body<EmailAccountRequest> {
+                            body<AccountRequest> {
                                 example("E-mail + password") {
                                     value = EmailAccountRequest(
                                         email = "user@email.com",
                                         password = "password"
-                                    ).encodeWithType("email")
+                                    )
                                 }
                                 example("Wallet address + ecosystem") {
                                     value = AddressAccountRequest(
                                         address = "0xABC",
                                         ecosystem = "ecosystem"
-                                    ).encodeWithType("address")
+                                    )
                                 }
-                                example("OIDC") { value = OidcAccountRequest(token = "ey...").encodeWithType("oidc") }
+                                example("OIDC") { value = OidcAccountRequest(token = "ey...") }
                             }
                         }
                         response {
@@ -274,36 +151,44 @@ fun Application.auth() {
                 {
                     summary = "Register with [email + password] or [wallet address + ecosystem]"
                     request {
-                        body<EmailAccountRequest> {
+                        body<AccountRequest> {
                             example("E-mail + password") {
                                 value = EmailAccountRequest(
                                     name = "Max Mustermann",
                                     email = "user@email.com",
                                     password = "password"
-                                ).encodeWithType("email")
+                                )
                             }
                             example("Wallet address + ecosystem") {
-                                value = AddressAccountRequest(address = "0xABC", ecosystem = "ecosystem").encodeWithType("address")
+                                value = AddressAccountRequest(address = "0xABC", ecosystem = "ecosystem")
                             }
-                            example("OIDC") { value = OidcAccountRequest(token = "ey...").encodeWithType("oidc") }
+                            example("OIDC") { value = OidcAccountRequest(token = "ey...") }
                             example("OIDC Unique Subject") {
-                                value = OidcUniqueSubjectRequest(token = "ey...").encodeWithType("oidc-unique-subject")
+                                value = OidcUniqueSubjectRequest(token = "ey...")
                             }
-                            example("Keycloak") { value = KeycloakAccountRequest().encodeWithType("keycloak") }
+                            example("Keycloak") { value = KeycloakAccountRequest() }
                         }
                     }
                     response {
                         HttpStatusCode.Created to { description = "Registration succeeded " }
                         HttpStatusCode.BadRequest to { description = "Registration failed" }
+                        HttpStatusCode.Conflict to { description = "Account already exists!" }
                     }
                 }) {
-                val req = loginRequestJson.decodeFromString<AccountRequest>(call.receive())
-                AccountsService.register("", req)
+                val jsonObject = call.receive<JsonObject>()
+                val type = jsonObject["type"]?.jsonPrimitive?.contentOrNull
+                if (type.isNullOrEmpty()) {
+                    throw BadRequestException("No account type provided")
+                }
+                val accountRequest = loginRequestJson.decodeFromJsonElement<AccountRequest>(jsonObject)
+                AccountsService.register("", accountRequest)
                     .onSuccess {
                         call.response.status(HttpStatusCode.Created)
                         call.respond("Registration succeeded ")
                     }
-                    .onFailure { call.respond(HttpStatusCode.BadRequest, it.localizedMessage) }
+                    .onFailure {
+                        throw it
+                    }
             }
 
             authenticate("auth-session", "auth-bearer", "auth-bearer-alternative") {
@@ -367,14 +252,14 @@ fun Application.auth() {
                     summary = "Keycloak registration with [username + email + password]"
                     description = "Creates a user in the configured Keycloak instance."
                     request {
-                        body<KeycloakAccountRequest> {
+                        body<AccountRequest> {
                             example("username + email + password") {
                                 value = KeycloakAccountRequest(
                                     username = "Max_Mustermann",
                                     email = "user@email.com",
                                     password = "password",
                                     token = "eyJhb..."
-                                ).encodeWithType("keycloak")
+                                )
                             }
                         }
                     }
@@ -401,24 +286,24 @@ fun Application.auth() {
                     summary = "Keycloak login with [username + password]"
                     description = "Login of a user managed by Keycloak."
                     request {
-                        body<KeycloakAccountRequest> {
+                        body<AccountRequest> {
                             example("Keycloak username + password") {
                                 value = KeycloakAccountRequest(
                                     username = "Max_Mustermann",
                                     password = "password"
-                                ).encodeWithType("keycloak")
+                                )
                             }
                             example("Keycloak username + Access Token ") {
                                 value = KeycloakAccountRequest(
                                     username = "Max_Mustermann",
                                     token = "eyJhb..."
-                                ).encodeWithType("keycloak")
+                                )
                             }
 
                             example("Keycloak user Access Token ") {
                                 value = KeycloakAccountRequest(
                                     token = "eyJhb..."
-                                ).encodeWithType("keycloak")
+                                )
                             }
                         }
                     }
@@ -491,8 +376,36 @@ suspend fun verifyToken(token: String): Result<String> {
     }
 }
 
+data class LoginRequestError(override val message: String) : WebException(
+    message = message,
+    status = HttpStatusCode.BadRequest
+) {
+    constructor(throwable: Throwable) : this(
+        when (throwable) {
+            is BadRequestException -> "Error processing request: ${throwable.localizedMessage ?: "Unknown reason"}"
+            is SerializationException -> "Failed to parse JSON string: ${throwable.localizedMessage ?: "Unknown reason"}"
+            is IllegalStateException -> "Invalid request: ${throwable.localizedMessage ?: "Unknown reason"}"
+            else -> "Unexpected error: ${throwable.localizedMessage ?: "Unknown reason"}"
+        }
+    )
+}
 
-suspend fun ApplicationCall.getLoginRequest() = loginRequestJson.decodeFromString<AccountRequest>(receive())
+suspend fun ApplicationCall.getLoginRequest() = runCatching {
+    val jsonObject = receive<JsonObject>()
+    val accountType = jsonObject["type"]?.jsonPrimitive?.contentOrNull
+    if (accountType.isNullOrEmpty()) {
+        throw BadRequestException(
+            if (jsonObject.containsKey("type")) {
+                "Account type '${jsonObject["type"]}' is not recognized"
+            } else {
+                "No account type provided"
+            }
+        )
+    }
+    val json = Json { ignoreUnknownKeys = true }
+    json.decodeFromJsonElement<AccountRequest>(jsonObject)
+}.getOrElse { throw LoginRequestError(it) }
+
 
 suspend fun PipelineContext<Unit, ApplicationCall>.doLogin() {
     val reqBody = call.getLoginRequest()
@@ -519,7 +432,9 @@ suspend fun PipelineContext<Unit, ApplicationCall>.doLogin() {
         call.respond(
             Json.encodeToJsonElement(it).jsonObject.minus("type").plus(Pair("token", token.toJsonElement()))
         )
-    }.onFailure { call.respond(HttpStatusCode.BadRequest, it.localizedMessage) }
+    }.onFailure {
+        throw BadRequestException(it.localizedMessage)
+    }
 }
 
 private fun PipelineContext<Unit, ApplicationCall>.clearUserSession() {
@@ -590,12 +505,13 @@ fun PipelineContext<Unit, ApplicationCall>.ensurePermissionsForWallet(
     }
 }
 
-private fun createHS256Token(tokenPayload: String) = JWSObject(JWSHeader(JWSAlgorithm.HS256), Payload(tokenPayload)).apply {
-    sign(MACSigner(AuthKeys.tokenKey))
-}.serialize()
+private fun createHS256Token(tokenPayload: String) =
+    JWSObject(JWSHeader(JWSAlgorithm.HS256), Payload(tokenPayload)).apply {
+        sign(MACSigner(AuthKeys.tokenKey))
+    }.serialize()
 
 private suspend fun createRsaToken(key: JWKKey, tokenPayload: String) =
-    mapOf(JWTClaims.Header.keyID to key.getPublicKey().getKeyId(), JWTClaims.Header.type to "JWT").let {
+    mapOf(JWTClaims.Header.keyID to key.getPublicKey().getKeyId().toJsonElement(), JWTClaims.Header.type to "JWT".toJsonElement()).let {
         key.signJws(tokenPayload.toByteArray(), it)
     }
 

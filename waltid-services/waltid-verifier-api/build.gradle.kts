@@ -1,9 +1,10 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import java.util.Properties
 
 object Versions {
     const val KOTLIN_VERSION = "2.0.0" // also change 2 plugins
-    const val KTOR_VERSION = "2.3.11" // also change 1 plugin
+    const val KTOR_VERSION = "2.3.12" // also change 1 plugin
     const val COROUTINES_VERSION = "1.8.1"
     const val EXPOSED_VERSION = "0.43.0"
     const val HOPLITE_VERSION = "2.8.0.RC3"
@@ -13,11 +14,10 @@ plugins {
     kotlin("jvm") // Versions.KOTLIN_VERSION
     kotlin("plugin.serialization") // Versions.KOTLIN_VERSION
 
-    id("io.ktor.plugin") version "2.3.11" // Versions.KTOR_VERSION
+    id("io.ktor.plugin") version "2.3.12" // Versions.KTOR_VERSION
     id("org.owasp.dependencycheck") version "9.2.0"
     id("com.github.jk1.dependency-license-report") version "2.8"
     application
-    `maven-publish`
 
     id("com.github.ben-manes.versions")
 }
@@ -26,7 +26,6 @@ group = "id.walt"
 
 repositories {
     mavenCentral()
-    //jcenter()
     maven("https://jitpack.io")
     maven("https://maven.waltid.dev/releases")
     maven("https://repo.danubetech.com/repository/maven-public/")
@@ -37,7 +36,7 @@ repositories {
 
 
 dependencies {
-    implementation(project(":waltid-services:waltid-service-commons"))
+    api(project(":waltid-services:waltid-service-commons"))
 
     /* -- KTOR -- */
 
@@ -57,9 +56,6 @@ dependencies {
     implementation("io.ktor:ktor-server-call-id-jvm:${Versions.KTOR_VERSION}")
     implementation("io.ktor:ktor-server-content-negotiation-jvm:${Versions.KTOR_VERSION}")
     implementation("io.ktor:ktor-server-cio-jvm:${Versions.KTOR_VERSION}")
-
-    // Ktor server external libs
-    implementation("io.github.smiley4:ktor-swagger-ui:3.0.0")
 
     // Ktor client
     implementation("io.ktor:ktor-client-core-jvm:${Versions.KTOR_VERSION}")
@@ -82,7 +78,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:${Versions.COROUTINES_VERSION}")
 
     // UUID
-    implementation("app.softwork:kotlinx-uuid-core:0.0.25")
+    implementation("app.softwork:kotlinx-uuid-core:0.0.26")
 
     /* -- Misc --*/
 
@@ -93,8 +89,8 @@ dependencies {
     // Logging
     implementation("io.github.oshai:kotlin-logging-jvm:7.0.0")
     implementation("org.slf4j:jul-to-slf4j:2.0.13")
-    implementation("io.klogging:klogging-jvm:0.5.14")
-    implementation("io.klogging:slf4j-klogging:0.5.14")
+    implementation("io.klogging:klogging-jvm:0.7.0")
+    implementation("io.klogging:slf4j-klogging:0.7.0")
 
     implementation("io.ktor:ktor-client-okhttp-jvm:${Versions.KTOR_VERSION}")
 
@@ -107,13 +103,13 @@ dependencies {
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:${Versions.COROUTINES_VERSION}")
 
     // OIDC
-    api(project(":waltid-libraries:waltid-openid4vc"))
+    api(project(":waltid-libraries:protocols:waltid-openid4vc"))
 
     // SSI Kit 2
-    api(project(":waltid-libraries:waltid-crypto"))
-    api(project(":waltid-libraries:waltid-verifiable-credentials"))
+    api(project(":waltid-libraries:crypto:waltid-crypto"))
+    api(project(":waltid-libraries:credentials:waltid-verifiable-credentials"))
     api(project(":waltid-libraries:waltid-did"))
-    api(project(":waltid-libraries:waltid-mdoc-credentials"))
+    api(project(":waltid-libraries:credentials:waltid-mdoc-credentials"))
 }
 tasks.withType<Zip> {
     isZip64 = true
@@ -147,7 +143,9 @@ java {
 }
 
 tasks.withType<KotlinCompile> {
-    kotlinOptions.jvmTarget = "17"
+    compilerOptions {
+        jvmTarget = JvmTarget.JVM_17
+    }
 }
 
 tasks.named<CreateStartScripts>("startScripts") {
@@ -162,44 +160,6 @@ application {
     mainClass.set("id.walt.verifier.MainKt")
     val isDevelopment: Boolean = project.ext.has("development")
     applicationDefaultJvmArgs = listOf("-Dio.ktor.development=$isDevelopment")
-}
-
-publishing {
-    publications {
-        create<MavenPublication>("mavenJava") {
-            pom {
-                name.set("walt.id verifier")
-                description.set(
-                    """
-                    Kotlin/Java library for the walt.id verifier
-                    """.trimIndent()
-                )
-                url.set("https://walt.id")
-            }
-            from(components["java"])
-        }
-    }
-
-    repositories {
-        maven {
-            val releasesRepoUrl = uri("https://maven.waltid.dev/releases")
-            val snapshotsRepoUrl = uri("https://maven.waltid.dev/snapshots")
-            url = uri(if (version.toString().endsWith("SNAPSHOT")) snapshotsRepoUrl else releasesRepoUrl)
-            val envUsername = System.getenv("MAVEN_USERNAME")
-            val envPassword = System.getenv("MAVEN_PASSWORD")
-
-            val usernameFile = File("secret_maven_username.txt")
-            val passwordFile = File("secret_maven_password.txt")
-
-            val secretMavenUsername = envUsername ?: usernameFile.let { if (it.isFile) it.readLines().first() else "" }
-            val secretMavenPassword = envPassword ?: passwordFile.let { if (it.isFile) it.readLines().first() else "" }
-
-            credentials {
-                username = secretMavenUsername
-                password = secretMavenPassword
-            }
-        }
-    }
 }
 
 //licenseReport {

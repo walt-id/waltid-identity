@@ -1,6 +1,12 @@
 package id.walt.webwallet.service
 
+import com.nimbusds.jose.jwk.JWK
+import com.nimbusds.jose.jwk.KeyUse
+import com.nimbusds.jose.util.Base64URL
 import id.walt.commons.config.ConfigManager
+import id.walt.commons.featureflag.FeatureManager.whenFeature
+import id.walt.commons.web.ConflictException
+import id.walt.commons.web.UnsupportedMediaTypeException
 import id.walt.crypto.keys.*
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.did.dids.DidService
@@ -12,13 +18,17 @@ import id.walt.did.dids.registrar.dids.DidWebCreateOptions
 import id.walt.did.dids.resolver.LocalResolver
 import id.walt.did.utils.EnumUtils.enumValueIgnoreCase
 import id.walt.oid4vc.data.CredentialOffer
+import id.walt.oid4vc.data.ResponseMode
 import id.walt.oid4vc.errors.AuthorizationError
 import id.walt.oid4vc.providers.CredentialWalletConfig
 import id.walt.oid4vc.providers.OpenIDClientConfig
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.requests.CredentialOfferRequest
 import id.walt.oid4vc.responses.AuthorizationErrorCode
+import id.walt.oid4vc.responses.TokenResponse
+import id.walt.webwallet.FeatureCatalog
 import id.walt.webwallet.config.KeyGenerationDefaultsConfig
+import id.walt.webwallet.config.RegistrationDefaultsConfig
 import id.walt.webwallet.db.models.WalletCategoryData
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.db.models.WalletOperationHistories
@@ -36,6 +46,7 @@ import id.walt.webwallet.service.exchange.IssuanceService
 import id.walt.webwallet.service.keys.KeysService
 import id.walt.webwallet.service.keys.SingleKeyResponse
 import id.walt.webwallet.service.oidc4vc.TestCredentialWallet
+import id.walt.webwallet.service.oidc4vc.VPresentationSession
 import id.walt.webwallet.service.report.ReportRequestParameter
 import id.walt.webwallet.service.report.ReportService
 import id.walt.webwallet.service.settings.SettingsService
@@ -48,6 +59,7 @@ import io.ktor.client.*
 import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
+import io.ktor.server.plugins.*
 import io.ktor.util.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Clock
@@ -77,6 +89,8 @@ class SSIKit2WalletService(
     private val credentialReportsService = ReportService.Credentials(credentialService, eventService)
 
     companion object {
+        val defaultGenerationConfig by lazy { ConfigManager.getConfig<RegistrationDefaultsConfig>() }
+
         init {
             runBlocking {
                 DidService.apply {
@@ -121,11 +135,11 @@ class SSIKit2WalletService(
     }
 
     override suspend fun restoreCredential(id: String): WalletCredential =
-        credentialService.restore(walletId, id) ?: error("Credential not found: $id")
+        credentialService.restore(walletId, id) ?: throw NotFoundException("Credential with id $id not found")
 
     override suspend fun getCredential(credentialId: String): WalletCredential =
         credentialService.get(walletId, credentialId)
-            ?: throw IllegalArgumentException("WalletCredential not found for credentialId: $credentialId")
+            ?: throw NotFoundException("WalletCredential not found for credentialId: $credentialId")
 
     override suspend fun attachCategory(credentialId: String, categories: List<String>): Boolean =
         credentialService.categoryService.add(
@@ -141,7 +155,7 @@ class SSIKit2WalletService(
     override suspend fun acceptCredential(parameter: CredentialRequestParameter): Boolean =
         credentialService.get(walletId, parameter.credentialId)?.takeIf { it.deletedOn == null }?.let {
             credentialService.setPending(walletId, parameter.credentialId, false) > 0
-        } ?: error("Credential not found: ${parameter.credentialId}")
+        } ?: throw NotFoundException("Credential not found: ${parameter.credentialId}")
 
     override suspend fun rejectCredential(parameter: CredentialRequestParameter): Boolean =
         credentialService.delete(walletId, parameter.credentialId, true)
@@ -195,6 +209,8 @@ class SSIKit2WalletService(
         logger.debug { "Resolved presentation definition: ${presentationSession.authorizationRequest!!.presentationDefinition!!.toJSONString()}" }
 
         val tokenResponse = credentialWallet.processImplicitFlowAuthorization(presentationSession.authorizationRequest!!)
+        val submitFormParams = getFormParameters(presentationSession.authorizationRequest, tokenResponse, presentationSession)
+
         val resp = this.http.submitForm(
             presentationSession.authorizationRequest.responseUri
                 ?: presentationSession.authorizationRequest.redirectUri ?: throw AuthorizationError(
@@ -202,9 +218,9 @@ class SSIKit2WalletService(
                     AuthorizationErrorCode.invalid_request,
                     "No response_uri or redirect_uri found on authorization request"
                 ), parameters {
-                tokenResponse.toHttpParameters().forEach { entry ->
-                    entry.value.forEach { append(entry.key, it) }
-                }
+                    submitFormParams.forEach { entry ->
+                        entry.value.forEach { append(entry.key, it) }
+                    }
             })
         val httpResponseBody = runCatching { resp.bodyAsText() }.getOrNull()
         val isResponseRedirectUrl = httpResponseBody != null && httpResponseBody.take(10).lowercase().let {
@@ -287,6 +303,7 @@ class SSIKit2WalletService(
                     manifest = it.manifest,
                     deletedOn = null,
                     pending = requireUserInput,
+                    format = it.format
                 ).also { credential ->
                     eventUseCase.log(
                         action = EventType.Credential.Receive,
@@ -314,7 +331,9 @@ class SSIKit2WalletService(
     /* DIDs */
 
     override suspend fun createDid(method: String, args: Map<String, JsonPrimitive>): String {
-        val keyId = args["keyId"]?.content?.takeIf { it.isNotEmpty() } ?: generateKey()
+        val keyId = args["keyId"]?.content?.takeIf { it.isNotEmpty() } ?: generateKey(
+            ({ defaultGenerationConfig.defaultKeyConfig } whenFeature FeatureCatalog.registrationDefaultsFeature)
+                ?: throw IllegalArgumentException("No valid keyId provided and no default key available."))
         val key = getKey(keyId)
         val result = DidService.registerDefaultDidMethodByKey(method, key, args)
 
@@ -336,11 +355,11 @@ class SSIKit2WalletService(
         return result.did
     }
 
-    override suspend fun listDids() = transaction { DidsService.list(walletId) }
+    override suspend fun listDids() =  DidsService.list(walletId)
 
     override suspend fun loadDid(did: String): JsonObject =
         DidsService.get(walletId, did)?.let { Json.parseToJsonElement(it.document).jsonObject }
-            ?: throw IllegalArgumentException("Did not found: $did for account: $walletId")
+            ?: throw NotFoundException("The DID ($did) could not be found for Wallet ID: $walletId")
 
     override suspend fun deleteDid(did: String): Boolean {
         DidsService.get(walletId, did).also {
@@ -362,9 +381,9 @@ class SSIKit2WalletService(
 
     /* Keys */
 
-    private fun getKey(keyId: String) = KeysService.get(walletId, keyId)?.let {
+    private suspend fun getKey(keyId: String) = KeysService.get(walletId, keyId)?.let {
         KeyManager.resolveSerializedKey(it.document)
-    } ?: throw IllegalArgumentException("Key not found: $keyId")
+    } ?: throw NotFoundException("Key not found: $keyId")
 
     suspend fun getKeyByDid(did: String): Key =
         DidService.resolveToKey(did)
@@ -433,34 +452,52 @@ class SSIKit2WalletService(
             }.getKeyId()
     }
 
-    override suspend fun importKey(jwkOrPem: String): String {
-        val type =
-            when {
-                jwkOrPem.lines().first().contains("BEGIN ") -> "pem"
-                else -> "jwk"
-            }
+    private fun getKeyType(jwkOrPem: String): String {
+        return when {
+            jwkOrPem.trim().startsWith("{") -> "jwk"
+            jwkOrPem.trim().startsWith("-----BEGIN ") -> "pem"
+            else -> throw UnsupportedMediaTypeException("Unknown key format")
+        }
+    }
 
-        val keyResult =
-            when (type) {
+
+    override suspend fun importKey(jwkOrPem: String): String {
+        return runCatching {
+            val keyType = getKeyType(jwkOrPem)
+            val key = when (keyType) {
                 "pem" -> JWKKey.importPEM(jwkOrPem)
                 "jwk" -> JWKKey.importJWK(jwkOrPem)
-                else -> throw IllegalArgumentException("Unknown key type: $type")
+                else -> throw UnsupportedMediaTypeException("Unknown key type: $keyType")
+            }.getOrThrow()
+
+            val keyId = key.getKeyId()
+
+            if (KeysService.exists(walletId, keyId)) {
+                throw ConflictException("Key with ID $keyId already exists in the database")
             }
 
-        require(keyResult.isSuccess) { "Could not import key as: $type; error message: " + keyResult.exceptionOrNull()?.message }
+            runBlocking {
+                eventUseCase.log(
+                    action = EventType.Key.Import,
+                    originator = "wallet",
+                    tenant = tenant,
+                    accountId = accountId,
+                    walletId = walletId,
+                    data = eventUseCase.keyEventData(key, EventDataNotAvailable)
+                )
+            }
 
-        val key = keyResult.getOrThrow()
-        val keyId = key.getKeyId()
-        eventUseCase.log(
-            action = EventType.Key.Import,
-            originator = "wallet",
-            tenant = tenant,
-            accountId = accountId,
-            walletId = walletId,
-            data = eventUseCase.keyEventData(key, EventDataNotAvailable)
-        )
-        KeysService.add(walletId, keyId, KeySerialization.serializeKey(key))
-        return keyId
+            KeysService.add(walletId, keyId, KeySerialization.serializeKey(key))
+            keyId
+        }.getOrElse { throwable ->
+            when (throwable) {
+                is IllegalArgumentException -> throw throwable
+                is UnsupportedMediaTypeException -> throw throwable
+                is ConflictException -> throw throwable
+                is IllegalStateException -> throw throwable
+                else -> throw BadRequestException("Unexpected error occurred: ${throwable.localizedMessage}", throwable)
+            }
+        }
     }
 
     override suspend fun deleteKey(alias: String): Boolean = runCatching {
@@ -557,5 +594,34 @@ class SSIKit2WalletService(
 
             else -> throw IllegalArgumentException("Did method not supported: $method")
         }
+
+    private fun getFormParameters(
+        authorizationRequest: AuthorizationRequest,
+        tokenResponse: TokenResponse,
+        presentationSession: VPresentationSession
+    ) = if (authorizationRequest.responseMode == ResponseMode.direct_post_jwt) {
+        directPostJwtParameters(authorizationRequest, tokenResponse, presentationSession)
+    } else tokenResponse.toHttpParameters()
+
+    private fun directPostJwtParameters(
+        authorizationRequest: AuthorizationRequest,
+        tokenResponse: TokenResponse,
+        presentationSession: VPresentationSession
+    ): Map<String, List<String>> {
+        val encKey = authorizationRequest.clientMetadata?.jwks?.get("keys")?.jsonArray?.first { jwk ->
+            JWK.parse(jwk.toString()).keyUse?.equals(KeyUse.ENCRYPTION) ?: false
+        }?.jsonObject ?: throw Exception("No ephemeral reader key found")
+        val ephemeralWalletKey = runBlocking { KeyManager.createKey(KeyGenerationRequest(keyType = KeyType.secp256r1)) }
+        return tokenResponse.toDirecPostJWTParameters(
+            encKey,
+            alg = authorizationRequest.clientMetadata!!.authorizationEncryptedResponseAlg!!,
+            enc = authorizationRequest.clientMetadata!!.authorizationEncryptedResponseEnc!!,
+            mapOf(
+                "epk" to runBlocking { ephemeralWalletKey.getPublicKey().exportJWKObject() },
+                "apu" to JsonPrimitive(Base64URL.encode(presentationSession.nonce).toString()),
+                "apv" to JsonPrimitive(Base64URL.encode(authorizationRequest.nonce!!).toString())
+            )
+        )
+    }
 }
 

@@ -1,22 +1,24 @@
 package id.walt.issuer.issuance
 
 import id.walt.crypto.keys.KeyGenerationRequest
+import id.walt.crypto.keys.KeyType
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.*
+import kotlinx.serialization.json.JsonObject
+
+@Serializable
+data class OnboardRequestDid(
+    val method: String,
+    val config: JsonObject? = null
+)
 
 @Serializable
 data class OnboardingRequest(
-    private val key: JsonObject = buildJsonObject {
-        put("backend", JsonPrimitive("jwk"))
-        put("keyType", JsonPrimitive("Ed25519"))
-    },
+    val key: KeyGenerationRequest = KeyGenerationRequest(
+        backend = "jwk",
+        keyType =  KeyType.Ed25519
+    ),
 
-    private val did: JsonObject = buildJsonObject {
-        put("method", JsonPrimitive("jwk"))
-    },
-) {
-    val keyGenerationRequest = Json.decodeFromJsonElement<KeyGenerationRequest>(key)
-
-    val didMethod = did["method"]!!.jsonPrimitive.content
-    val didConfig: Map<String, JsonPrimitive> = did["config"]?.jsonObject?.mapValues { it.value.jsonPrimitive } ?: emptyMap()
-}
+    val did: OnboardRequestDid = OnboardRequestDid(
+        method = "jwk"
+    )
+)

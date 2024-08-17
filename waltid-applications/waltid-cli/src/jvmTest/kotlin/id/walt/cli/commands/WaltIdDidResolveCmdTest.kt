@@ -1,6 +1,10 @@
 package id.walt.cli.commands
 
+import com.github.ajalt.clikt.testing.test
+import id.walt.cli.util.getResourcePath
+import id.walt.did.utils.randomUUID
 import org.junit.jupiter.api.assertDoesNotThrow
+import java.io.File
 import kotlin.test.Ignore
 import kotlin.test.Test
 
@@ -147,6 +151,25 @@ class WaltIdDidResolveCmdTest {
     fun `should resolve waltid-did lib Secp256r1 did-key`() {
         assertDoesNotThrow {
             command.parse(listOf("-d", waltidDidLibSecp256r1))
+        }
+    }
+
+    @Test
+    fun `should resolve did-key generated with jwk_jcs-pub encoding enabled`() {
+        val didCreateCmd = DidCreateCmd()
+        val keyFileList = listOf(
+            getResourcePath(this, "key/ed25519_by_waltid_pvt_key.jwk"),
+            getResourcePath(this, "key/rsa_by_waltid_pub_pvt_key.jwk"),
+            getResourcePath(this, "key/secp256k1_by_waltid_pvt_key.jwk"),
+            getResourcePath(this, "key/secp256r1_by_waltid_pub_pvt_key.jwk"),
+        )
+        assertDoesNotThrow {
+            for (keyFile in keyFileList) {
+                val tempOutputFile = "${randomUUID()}.json"
+                File(tempOutputFile).deleteOnExit()
+                val did = didCreateCmd.test("-j -k $keyFile -o $tempOutputFile").output.lines().let { lines -> lines[lines.lastIndex - 1] }
+                command.test("-d $did")
+            }
         }
     }
 }

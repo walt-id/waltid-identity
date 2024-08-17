@@ -134,12 +134,12 @@ class MainTest {
     }
 
     @Test
-    fun `should generate a new Ed25519 key when 'key generate' is called with no arguments`() {
+    fun `should generate a new Secp256r1 key when 'key generate' is called with no arguments`() {
         val output = tapSystemOut { main(arrayOf("key", "generate")) }
 
         val expected = "Done. Key saved at file \"(.*?)\"".toRegex()
 
-        assertExpectations(output, expected, ed25519JWKKeyPattern)
+        assertExpectations(output, expected, secp256r1JWKKeyPattern)
         deleteGeneratedFile(output, expected)
     }
 
