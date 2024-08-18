@@ -9,7 +9,7 @@ import io.ktor.server.routing.*
 import io.ktor.util.pipeline.*
 
 abstract class AuthenticationMethod {
-    abstract fun Route.register(context: PipelineContext<Unit, ApplicationCall>.() -> AuthContext)
+    abstract fun Route.register(authContext: PipelineContext<Unit, ApplicationCall>.() -> AuthContext)
 
 //    abstract val identifier: AccountIdentifier
 

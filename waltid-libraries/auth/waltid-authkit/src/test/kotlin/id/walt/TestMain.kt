@@ -1,5 +1,6 @@
-package id.walt.authkit
+package id.walt
 
+import id.walt.authkit.collectRoutes
 import id.walt.authkit.plugins.configureMonitoring
 import id.walt.authkit.plugins.configureRouting
 import id.walt.authkit.plugins.configureSerialization
@@ -41,7 +42,7 @@ fun main() {
         minDirectLogLevel(Level.TRACE)
     }
 
-    embeddedServer(CIO, port = 8080, host = "0.0.0.0", module = Application::module)
+    embeddedServer(CIO, port = 8088, host = "0.0.0.0", module = Application::module)
         .start(wait = true)
 }
 
@@ -53,4 +54,8 @@ fun Application.module() {
     configureRouting()
 
     testApp()
+
+    collectRoutes().forEach {
+        println(it)
+    }
 }

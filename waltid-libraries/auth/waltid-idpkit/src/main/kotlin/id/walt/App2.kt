@@ -232,31 +232,32 @@ fun Application.test() {
 
             val verificationResult = Verifier.getVerificationResult(reqCache[state] ?: error("No req for state: $state"), requestedClaims)
 
-            if (verificationResult.state == VerificationStatus.WAITING_FOR_SUBMISSION) {
-                val url = urlCache[state] ?: error("No such state: $state")
+            when (verificationResult.state) {
+                VerificationStatus.WAITING_FOR_SUBMISSION -> {
+                    val url = urlCache[state] ?: error("No such state: $state")
 
-                //language=HTML
-                call.respondText(
-                    """
-                    <html><body>
-                    <p>Not presented yet, please try again<p>
-                    <p>Present your credential: <code>$url</code> (just imagine real hard that this is a QR code)</p>
-                    <a href="/login?state=${state}"><button>Present</button></a> Click here when presented (just imagine real hard that this is automatic)
-                </body></html>
-                """.trimIndent(), ContentType.Text.Html
-                )
-                return@get
-            }
+                    //language=HTML
+                    call.respondText(
+                        """
+                            <html><body>
+                            <p>Not presented yet, please try again<p>
+                            <p>Present your credential: <code>$url</code> (just imagine real hard that this is a QR code)</p>
+                            <a href="/login?state=${state}"><button>Present</button></a> Click here when presented (just imagine real hard that this is automatic)
+                        </body></html>
+                        """.trimIndent(), ContentType.Text.Html
+                    )
+                }
+                VerificationStatus.RESPONSE_RECEIVED ->
+                    if (verificationResult.success == true) {
+                        val generatedCode = Uuid.random().toString()
 
-            if (verificationResult.success == true) {
-                val generatedCode = Uuid.random().toString()
+                        codeCache[generatedCode] = state
+                        verifyResultCache[generatedCode] = verificationResult.claims!!
 
-                codeCache[generatedCode] = state
-                verifyResultCache[generatedCode] = verificationResult.claims!!
-
-                call.respondRedirect(authReq.redirectUri + "?code=$generatedCode&state=${authReq.state}") // todo handle redirect URIs that already have parameters
-            } else {
-                call.respondText("Presentation failed!")
+                        call.respondRedirect(authReq.redirectUri + "?code=$generatedCode&state=${authReq.state}") // todo handle redirect URIs that already have parameters
+                    } else {
+                        call.respondText("Presentation failed!")
+                    }
             }
         }
 
@@ -275,7 +276,8 @@ fun Application.test() {
                     "Client id or client secret missing in basic auth"
                 )*/
 
-            val basicAuth = call.request.authorization()?.decodeBase64String()?.split(":")
+            val basicAuth = call.request.authorization()?.removePrefix("Basic ")?.decodeBase64String()?.split(":")
+
             val clientId = basicAuth?.get(0) ?: form["client_id"] ?: error("No client_id provided")
             val clientSecret = basicAuth?.get(1) ?: form["client_secret"] ?: error("No client_secret provided")
 
