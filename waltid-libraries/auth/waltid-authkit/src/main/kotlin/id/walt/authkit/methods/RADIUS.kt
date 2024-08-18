@@ -52,7 +52,7 @@ object RADIUS : UserPassBasedAuthMethod() {
     }
 
 
-    override fun Route.register(context: PipelineContext<Unit, ApplicationCall>.() -> AuthContext) {
+    override fun Route.register(authContext: PipelineContext<Unit, ApplicationCall>.() -> AuthContext) {
         post("userpass") {
             val credential = call.getUsernamePasswordFromRequest()
 

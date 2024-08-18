@@ -53,8 +53,15 @@ dependencies {
     implementation("io.ktor:ktor-server-forwarded-header-jvm")
     implementation("io.ktor:ktor-server-call-logging-jvm")
     implementation("io.ktor:ktor-server-content-negotiation-jvm")
-    implementation("io.ktor:ktor-serialization-kotlinx-json-jvm")
     implementation("io.ktor:ktor-server-cio-jvm")
+
+    // Ktor client
+    implementation("io.ktor:ktor-client-core")
+    implementation("io.ktor:ktor-client-cio")
+    implementation("io.ktor:ktor-client-content-negotiation")
+
+    // Ktor shared
+    implementation("io.ktor:ktor-serialization-kotlinx-json-jvm")
 
     // Ktor server external
     implementation("io.github.smiley4:ktor-swagger-ui:3.2.0")
