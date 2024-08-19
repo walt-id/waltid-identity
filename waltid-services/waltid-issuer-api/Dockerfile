@@ -39,6 +39,7 @@ COPY --from=buildstage /work/waltid-services/waltid-issuer-api/build/install/ /
 WORKDIR /waltid-issuer-api
 
 RUN mkdir /waltid-issuer-api/config && chown waltid:waltid /waltid-issuer-api/config
+COPY waltid-services/waltid-issuer-api/config /waltid-issuer-api/config
 USER waltid
 
 EXPOSE 7002

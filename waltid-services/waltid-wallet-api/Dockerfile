@@ -41,6 +41,7 @@ COPY --from=buildstage /work/waltid-services/waltid-wallet-api/build/install/ /
 WORKDIR /waltid-wallet-api
 
 RUN mkdir /waltid-wallet-api/config && mkdir /waltid-wallet-api/data && chown waltid:waltid /waltid-wallet-api/config /waltid-wallet-api/data
+COPY waltid-services/waltid-wallet-api/config /waltid-wallet-api/config
 USER waltid
 
 EXPOSE 7001
