@@ -25,7 +25,13 @@ class X5CValidator(
             Result.success(true)
         },
         onFailure = {
-            Result.failure(IllegalStateException("certificate path validation failed"))
+            when (it) {
+                is CertPathValidatorException -> {
+                    Result.failure(IllegalStateException("certificate path validation failed: ${it.localizedMessage}: ${it.reason}"))
+                }
+
+                else -> Result.failure(IllegalStateException("certificate path validation failed"))
+            }
         }
     )
 
@@ -49,7 +55,8 @@ class X5CValidator(
      * @param certificateList a list of PEM encoded X.509 certificates
      * @return a list of [X509Certificate] objects
      */
-    private fun parsePEMEncodedX509CertificateList(certificateList: List<String>) : List<X509Certificate> = certificateList.map {
-        certificateFactory.generateCertificate(ByteArrayInputStream(it.toByteArray())) as X509Certificate
-    }
+    private fun parsePEMEncodedX509CertificateList(certificateList: List<String>): List<X509Certificate> =
+        certificateList.map {
+            certificateFactory.generateCertificate(ByteArrayInputStream(it.toByteArray())) as X509Certificate
+        }
 }
