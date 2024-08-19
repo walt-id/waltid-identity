@@ -2,36 +2,39 @@ package id.walt.webwallet.utils
 
 import id.walt.crypto.utils.Base64Utils.base64Decode
 import java.io.ByteArrayInputStream
-import java.security.KeyStore
 import java.security.cert.*
 import java.time.Instant
 import java.util.*
-import javax.net.ssl.TrustManagerFactory
-import javax.net.ssl.X509TrustManager
 
 class X5CValidator(
-    private val trustedCA: List<String> = emptyList(),
+    pemEncodedTrustedCACertificates: List<String> = emptyList(),
 ) {
-    //??not really required, as we have the trustedCA list we check against
-    private val trustManager = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm())
     private val certificateFactory = CertificateFactory.getInstance("X509")
-    private val certificatePathValidator = CertPathValidator.getInstance("PKIX")
+    private val certificatePathValidator = CertPathValidator.getInstance(CertPathValidator.getDefaultType())
+    private val trustAnchorSet = parsePEMEncodedX509CertificateList(pemEncodedTrustedCACertificates)
+        .map {
+            TrustAnchor(it, null)
+        }.toSet()
 
-    init {
-        trustManager.init(null as? KeyStore)
-    }
-
-    fun validate(certificates: List<String>): Result<Unit> = runCatching {
+    fun validate(certificates: List<String>): Result<Boolean> = runCatching {
         require(certificates.isNotEmpty()) { "No signing certificate" }
         val chain = generateX509Chain(certificates)
-        val trusted = generateX509Chain(trustedCA)
-        checkDate(chain[0]) { "Expired or invalid certificate: ${it.subjectX500Principal.name} - notBefore (${it.notBefore}) and notAfter (${it.notAfter})" }
-        validateCertificateChain(chain, trusted).toResult("Failed to validate X5 Chain")
-    }
+        validateCertificateChainIsTrustworthy(chain)
+    }.fold(
+        onSuccess = {
+            Result.success(true)
+        },
+        onFailure = {
+            Result.failure(IllegalStateException("certificate path validation failed"))
+        }
+    )
 
-    private fun Boolean.toResult(message: String) = when (this) {
-        true -> Result.success(Unit)
-        false -> Result.failure(IllegalStateException(message))
+    private fun validateCertificateChainIsTrustworthy(chain: List<X509Certificate>) {
+        val pkixValidationParams = PKIXParameters(trustAnchorSet).apply {
+            isRevocationEnabled = false
+            date = Date.from(Instant.now())
+        }
+        certificatePathValidator.validate(certificateFactory.generateCertPath(chain), pkixValidationParams)
     }
 
     /**
@@ -43,57 +46,10 @@ class X5CValidator(
     }
 
     /**
-     * Attempts to validate the [X509Certificate]'s [notBefore][X509Certificate.getNotBefore]
-     * and [notAfter][X509Certificate.getNotAfter] against the current date
-     * @param certificate the [X509Certificate] certificate
-     * @param message optional message lambda
-     * @throws [IllegalStateException] with the given [message], if validation fails
-     *
-     * TODO: potential candidate for common-utils
-     * see [private validate()][id.walt.webwallet.service.trust.DefaultTrustValidationService.validate]
+     * @param certificateList a list of PEM encoded X.509 certificates
+     * @return a list of [X509Certificate] objects
      */
-    private fun checkDate(certificate: X509Certificate, message: ((X509Certificate) -> String)? = null) = let {
-        val notBefore = certificate.notBefore
-        val notAfter = certificate.notAfter
-        val now = Date.from(Instant.now())
-        now in notBefore..notAfter
-    }.takeIf { it }?.let { /*nop*/ } ?: throw IllegalStateException(
-        message?.invoke(certificate) ?: "Invalid date"
-    )
-
-    /**
-     * Validates the certificate chain
-     * @return true if validation succeeds, otherwise - false
-     */
-    private fun validateCertificateChain(
-        certChain: List<X509Certificate>, additionalTrustedRootCAs: List<X509Certificate>
-    ): Boolean = findIssuerCA(certChain.first(), additionalTrustedRootCAs)?.let {
-        //todo: validate each certificate date
-        validateCertificatePath(it, certificateFactory.generateCertPath(certChain))
-    } ?: false
-
-    /**
-     * Creates a [TrustAnchor] and attempts to validate the certificate path
-     * @return true - if validation succeeds, otherwise - false
-     */
-    private fun validateCertificatePath(it: X509Certificate, certificatePath: CertPath) = runCatching {
-        PKIXParameters(setOf(TrustAnchor(it, null))).apply {
-            isRevocationEnabled = false
-        }.run {
-            certificatePathValidator.validate(certificatePath, this)
-        }
-    }.fold(onSuccess = { true }, onFailure = { false })
-
-    /**
-     * Initializes the trust manager with [trustedCAs]
-     * and looks up for a [X509Certificate] of a trusted issuer
-     */
-    private fun findIssuerCA(cert: X509Certificate, trustedCAs: List<X509Certificate>): X509Certificate? =
-        trustManager.trustManagers
-            .filterIsInstance<X509TrustManager>()
-            .flatMap { it.acceptedIssuers.toList() }//??required
-            .plus(trustedCAs)
-            .firstOrNull {
-                cert.issuerX500Principal.name.equals(it.subjectX500Principal.name)
-            }
+    private fun parsePEMEncodedX509CertificateList(certificateList: List<String>) : List<X509Certificate> = certificateList.map {
+        certificateFactory.generateCertificate(ByteArrayInputStream(it.toByteArray())) as X509Certificate
+    }
 }

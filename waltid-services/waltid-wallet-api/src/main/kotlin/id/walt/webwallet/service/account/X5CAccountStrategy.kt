@@ -45,7 +45,7 @@ class X5CAccountStrategy(
      * @return the public key thumbprint corresponding to the 1st certificate in the x509 chain
      */
     private suspend fun validate(token: String) = let {
-        // extract x5.cert chain from header
+        // extract x.509 cert chain from header
         val certificateChain = tryGetX5C(token)
         // convert to public jwk key
         val key = getKey(certificateChain[0])
@@ -84,6 +84,7 @@ class X5CAccountStrategy(
     private fun tryGetX5C(jwt: String) = let {
         val x5cHeader = jwt.decodeJws().header["x5c"]
         require(x5cHeader is JsonArray) { "Invalid x5c header" }
+        require(x5cHeader.size >= 1) { "x5c header must have at least 1 entry" }
         x5cHeader.map { it.jsonPrimitive.content }
     }
 }
