@@ -45,6 +45,8 @@ object OIDC : AuthenticationMethod() {
 
         val clientId: String,
         val clientSecret: String,
+
+        val accountIdentifierClaim: String = "sub"
     ) {
         fun check() {
             require(openIdConfiguration != OpenIdConfiguration.INVALID || openIdConfigurationUrl != null) { "Either openIdConfiguration or openIdConfigurationUrl have to be provided!" }
