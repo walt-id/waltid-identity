@@ -135,7 +135,7 @@ jobs:
         run: sed "s/_DEFAULT_DEPLOYMENT_/$GITHUB_SHA/g" waltid-services/waltid-wallet-api/k8s/deployment-prod.yaml |
           sed "s/__DEFAULT_KEYCLOAK_CLIENT_SECRET__/$PROD_KEYCLOAK_CLIENT_SECRET/g" |
           sed "s/__DEFAULT_IMAGE_TAG__/$IMAGE_TAG/g" > waltid-services/waltid-wallet-api/k8s/deployment_mod.yaml
-      - name: Continuous deployment - wallet.walt.id
+      - name: Continuous deployment - web wallet
         uses: actions-hub/kubectl@master
         env:
           KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}

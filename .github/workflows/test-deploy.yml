@@ -104,14 +104,12 @@ jobs:
           KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
         with:
           args: apply -n dev -f waltid-services/waltid-verifier-api/k8s/deployment_mod.yaml
-      - name: Prepare CD - wallet.walt-test.cloud
+      - name: Prepare CD - web wallet
         env:
           DEV_KEYCLOAK_CLIENT_SECRET: ${{ secrets.DEV_KEYCLOAK_CLIENT_SECRET }}
-
         run: sed "s/_DEFAULT_DEPLOYMENT_/$GITHUB_SHA/g" waltid-services/waltid-wallet-api/k8s/deployment-dev.yaml |
           sed "s/__DEFAULT_KEYCLOAK_CLIENT_SECRET__/$DEV_KEYCLOAK_CLIENT_SECRET/g" > waltid-services/waltid-wallet-api/k8s/deployment_mod.yaml
-
-      - name: Continuous deployment - wallet.walt-test.cloud
+      - name: Continuous deployment - web wallet
         uses: actions-hub/kubectl@master
         env:
           KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
