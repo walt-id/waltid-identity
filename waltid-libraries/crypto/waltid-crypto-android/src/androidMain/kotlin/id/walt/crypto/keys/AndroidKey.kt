@@ -6,6 +6,7 @@ import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.crypto.utils.JwsUtils.decodeJwsStrings
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -113,13 +114,13 @@ class AndroidKey() : Key() {
         return signature
     }
 
-    override suspend fun signJws(plaintext: ByteArray, headers: Map<String, String>): String {
+    override suspend fun signJws(plaintext: ByteArray, headers: Map<String, JsonElement>): String {
         val signature: ByteArray = signWithKeystore(plaintext)
 
         val encodedSignature = signature.encodeToBase64Url()
 
         // Construct the JWS in the format: base64UrlEncode(headers) + '.' + base64UrlEncode(payload) + '.' + base64UrlEncode(signature)
-        val encodedHeaders = headers.toString().toByteArray().encodeToBase64Url()
+        val encodedHeaders = Json.encodeToString(headers).toByteArray().encodeToBase64Url()
         val encodedPayload = plaintext.encodeToBase64Url()
 
         return "$encodedHeaders.$encodedPayload.$encodedSignature"
