@@ -1,0 +1,38 @@
+{
+  "name": "@waltid-web-wallet/dev-wallet",
+  "private": true,
+  "scripts": {
+    "dev": "nuxi dev",
+    "build": "nuxi build",
+    "generate": "nuxi generate",
+    "start": "node .output/server/index.mjs"
+  },
+  "dependencies": {
+    "@github/webauthn-json": "^2.1.1",
+    "@headlessui/vue": "1.7.22",
+    "@heroicons/vue": "^2.1.5",
+    "@julr/unocss-preset-forms": "^0.1.0",
+    "@pinia/nuxt": "^0.5.2",
+    "jsonpath-plus": "^9.0.0",
+    "pinia": "^2.2.0",
+    "qr-scanner": "^1.4.2",
+    "qrcode.vue": "^3.4.1",
+    "unocss": "^0.61.9"
+  },
+  "devDependencies": {
+    "@nuxt/content": "^2.13.2",
+    "@nuxtjs/color-mode": "3.4.2",
+    "@nuxtjs/i18n": "8.3.3",
+    "@sidebase/nuxt-auth": "^0.7.2",
+    "@unocss/nuxt": "0.61.9",
+    "@unocss/preset-icons": "^0.61.9",
+    "@unocss/transformer-directives": "^0.61.9",
+    "@unocss/transformer-variant-group": "^0.61.9",
+    "@vite-pwa/nuxt": "^0.9.1",
+    "@vueuse/core": "^10.11.0",
+    "@vueuse/nuxt": "10.11.0",
+    "nuxt": "^3.12.4",
+    "nuxt-icon": "^0.6.10",
+    "typescript": "5.5.4"
+  }
+}

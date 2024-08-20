@@ -140,22 +140,22 @@ spec:
 kind: Deployment
 apiVersion: apps/v1
 metadata:
-  name: waltid-web-wallet
+  name: waltid-dev-wallet
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: waltid-web-wallet
+      app: waltid-dev-wallet
   template:
     metadata:
       labels:
-        app: waltid-web-wallet
+        app: waltid-dev-wallet
       annotations:
         deployment/id: "_DEFAULT_DEPLOYMENT_"
     spec:
       containers:
-        - name: waltid-web-wallet
-          image: waltid/waltid-web-wallet:__DEFAULT_IMAGE_TAG__
+        - name: waltid-dev-wallet
+          image: waltid/waltid-dev-wallet:__DEFAULT_IMAGE_TAG__
           env:
             - name: NUXT_PUBLIC_ISSUER_CALLBACK_URL
               value: "https://wallet-dev.walt.id"
@@ -168,7 +168,7 @@ spec:
 kind: Service
 apiVersion: v1
 metadata:
-  name: waltid-web-wallet
+  name: waltid-dev-wallet
 spec:
   ports:
     - name: http
@@ -176,7 +176,48 @@ spec:
       targetPort: http-api
       protocol: TCP
   selector:
-    app: waltid-web-wallet
+    app: waltid-dev-wallet
+---
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: waltid-demo-wallet
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: waltid-demo-wallet
+  template:
+    metadata:
+      labels:
+        app: waltid-demo-wallet
+      annotations:
+        deployment/id: "_DEFAULT_DEPLOYMENT_"
+    spec:
+      containers:
+        - name: waltid-demo-wallet
+          image: waltid/waltid-demo-wallet:__DEFAULT_IMAGE_TAG__
+          env:
+            - name: NUXT_PUBLIC_ISSUER_CALLBACK_URL
+              value: "https://wallet.walt.id"
+            - name: NUXT_PUBLIC_DEMO_WALLET_URL
+              value: "https://wallet-dev.walt.id"
+          ports:
+            - containerPort: 7101
+              name: http-api
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: waltid-demo-wallet
+spec:
+  ports:
+    - name: http
+      port: 80
+      targetPort: http-api
+      protocol: TCP
+  selector:
+    app: waltid-demo-wallet
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -189,7 +230,10 @@ spec:
   tls:
     - hosts:
         - wallet-dev.walt.id
-      secretName: wallet-tls-secret
+      secretName: wallet-dev-tls-secret
+    - hosts:
+        - wallet.walt.id
+      secretName: wallet-demo-tls-secret
   rules:
     - host: wallet-dev.walt.id
       http:
@@ -240,6 +284,58 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: waltid-web-wallet
+                name: waltid-dev-wallet
+                port:
+                  name: http
+    - host: wallet.walt.id
+      http:
+        paths:
+          - path: /wallet-api/
+            pathType: Prefix
+            backend:
+              service:
+                name: wallet-api
+                port:
+                  name: http
+          - path: /swagger
+            pathType: Prefix
+            backend:
+              service:
+                name: wallet-api
+                port:
+                  name: http
+          - path: /api.json
+            pathType: Prefix
+            backend:
+              service:
+                name: wallet-api
+                port:
+                  name: http
+          - path: /livez
+            pathType: Prefix
+            backend:
+              service:
+                name: wallet-api
+                port:
+                  name: http
+          - path: /features/
+            pathType: Prefix
+            backend:
+              service:
+                name: wallet-api
+                port:
+                  name: http
+          - path: /debug/
+            pathType: Prefix
+            backend:
+              service:
+                name: wallet-api
+                port:
+                  name: http
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: waltid-demo-wallet
                 port:
                   name: http
