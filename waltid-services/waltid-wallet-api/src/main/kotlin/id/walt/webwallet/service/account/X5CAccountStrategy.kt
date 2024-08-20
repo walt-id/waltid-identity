@@ -24,17 +24,26 @@ class X5CAccountStrategy(
     override suspend fun register(tenant: String, request: X5CAccountRequest): Result<RegistrationResult> =
         runCatching {
             val thumbprint = validate(request.token)
+
             AccountsService.getAccountByX5CId(tenant, thumbprint)?.let {
                 throw IllegalArgumentException("Account already exists: $thumbprint")
-            } ?: RegistrationResult(addAccount(tenant, thumbprint))
+            }
+
+            val createdAccountId = transaction {
+                addAccount(tenant, thumbprint)
+            }
+            return Result.success(RegistrationResult(createdAccountId))
         }
 
-    override suspend fun authenticate(tenant: String, request: X5CAccountRequest): AuthenticatedUser =
-        validate(request.token).let {
-            AccountsService.getAccountByX5CId(tenant, it)?.let {
-                X5CAuthenticatedUser(it.id)
-            } ?: throw IllegalArgumentException("Account not found: $it")
+    override suspend fun authenticate(tenant: String, request: X5CAccountRequest): AuthenticatedUser {
+        val thumbprint = validate(request.token)
+
+        val registeredUserId = AccountsService.getAccountByX5CId(tenant, thumbprint)?.id ?: transaction {
+            addAccount(tenant, thumbprint)
         }
+
+        return X5CAuthenticatedUser(registeredUserId)
+    }
 
     /**
      * Performs the following steps:
@@ -63,22 +72,20 @@ class X5CAccountStrategy(
         return JWKKey.importPEM(pem).getOrThrow()
     }
 
-    //todo: don't do transactions here
-    private fun addAccount(tenant: String, thumbprint: String) = transaction {
+    private fun addAccount(tenant: String, thumbprint: String): UUID {
         // add accounts record
         val accountId = Accounts.insert {
             it[Accounts.tenant] = tenant
-            it[Accounts.id] = UUID.generateUUID()
-//                it[Accounts.email] = null//todo: potential problem, as email has a unique index
-            it[Accounts.createdOn] = Clock.System.now().toJavaInstant()
+            it[id] = UUID.generateUUID()
+            it[createdOn] = Clock.System.now().toJavaInstant()
         }[Accounts.id]
         // add x5c logins record
         X5CLogins.insert {
             it[X5CLogins.tenant] = tenant
             it[X5CLogins.accountId] = accountId
-            it[X5CLogins.x5cId] = thumbprint
+            it[x5cId] = thumbprint
         }
-        accountId
+        return accountId
     }
 
     private fun tryGetX5C(jwt: String) = let {
