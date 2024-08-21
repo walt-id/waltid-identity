@@ -149,7 +149,7 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
     // Simple cryptographic operations interface implementation
     override fun doVerify(tokenResponse: TokenResponse, session: PresentationSession): Boolean {
         val policies = sessionVerificationInfos[session.id]
-            ?: throw IllegalArgumentException("Could not find policy listing for session: ${session.id}")
+            ?: throw NotFoundException("Could not find policy listing for session: ${session.id}")
 
         val vpToken = when (tokenResponse.idToken) {
             null -> when (tokenResponse.vpToken) {
@@ -206,7 +206,8 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
         val parsedDeviceResponse = DeviceResponse.fromCBORBase64URL(tokenResponse.vpToken!!.jsonPrimitive.content)
         val parsedMdoc = parsedDeviceResponse.documents[0]
         val deviceKey = OneKey(CBORObject.DecodeFromBytes(parsedMdoc.MSO!!.deviceKeyInfo.deviceKey.toCBOR()))
-        val issuerKey = parsedMdoc.issuerSigned.issuerAuth?.x5Chain?.let { X509CertUtils.parse(it) }?.publicKey ?: throw Exception("Issuer key not found in x5Chain header (33)")
+        val issuerKey = parsedMdoc.issuerSigned.issuerAuth?.x5Chain?.let { X509CertUtils.parse(it) }?.publicKey
+            ?: throw BadRequestException("Issuer key not found in x5Chain header (33)")
         return parsedMdoc.verify(
             MDocVerificationParams(
                 VerificationType.forPresentation,
