@@ -14,54 +14,54 @@ import io.ktor.http.*
 import kotlinx.serialization.json.JsonObject
 
 object CredentialOfferProcessor {
-  private val http = WalletHttpClients.getHttpClient()
-  private val logger = logger<CredentialOfferProcessor>()
-  suspend fun process(
-    credentialRequests: List<CredentialRequest>,
-    providerMetadata: OpenIDProviderMetadata,
-    tokenResponse: TokenResponse
-  ) = when (credentialRequests.size) {
-    1 -> processedSingleCredentialOffer(credentialRequests, providerMetadata, tokenResponse)
-    else -> processBatchCredentialOffer(credentialRequests, providerMetadata, tokenResponse)
-  }
-
-  private suspend fun processBatchCredentialOffer(
-    credReqs: List<CredentialRequest>,
-    providerMetadata: OpenIDProviderMetadata,
-    tokenResp: TokenResponse
-  ): List<ProcessedCredentialOffer> {
-    val batchCredentialRequest = BatchCredentialRequest(credReqs)
-
-    val batchResponse = http.post(providerMetadata.batchCredentialEndpoint!!) {
-      contentType(ContentType.Application.Json)
-      bearerAuth(tokenResp.accessToken!!)
-      setBody(batchCredentialRequest.toJSON())
-    }.body<JsonObject>().let { BatchCredentialResponse.fromJSON(it) }
-    logger.debug { "credential batch response: $batchResponse" }
-
-    return (batchResponse.credentialResponses
-      ?: throw IllegalArgumentException("No credential responses returned")).indices.map {
-      ProcessedCredentialOffer(
-        batchResponse.credentialResponses!![it],
-        batchCredentialRequest.credentialRequests[it]
-      )
+    private val http = WalletHttpClients.getHttpClient()
+    private val logger = logger<CredentialOfferProcessor>()
+    suspend fun process(
+      credentialRequests: List<CredentialRequest>,
+      providerMetadata: OpenIDProviderMetadata,
+      tokenResponse: TokenResponse,
+    ) = when (credentialRequests.size) {
+        1 -> processedSingleCredentialOffer(credentialRequests, providerMetadata, tokenResponse)
+        else -> processBatchCredentialOffer(credentialRequests, providerMetadata, tokenResponse)
     }
-  }
 
-  private suspend fun processedSingleCredentialOffer(
-    credReqs: List<CredentialRequest>,
-    providerMetadata: OpenIDProviderMetadata,
-    tokenResp: TokenResponse
-  ): List<ProcessedCredentialOffer> {
-    val credReq = credReqs.first()
+    private suspend fun processBatchCredentialOffer(
+      credReqs: List<CredentialRequest>,
+      providerMetadata: OpenIDProviderMetadata,
+      tokenResp: TokenResponse,
+    ): List<ProcessedCredentialOffer> {
+        val batchCredentialRequest = BatchCredentialRequest(credReqs)
 
-    val credentialResponse = http.post(providerMetadata.credentialEndpoint!!) {
-      contentType(ContentType.Application.Json)
-      bearerAuth(tokenResp.accessToken!!)
-      setBody(credReq.toJSON())
-    }.body<JsonObject>().let { ProcessedCredentialOffer(CredentialResponse.fromJSON(it), credReq) }
-    logger.debug { "credentialResponse: $credentialResponse" }
+        val batchResponse = http.post(providerMetadata.batchCredentialEndpoint!!) {
+            contentType(ContentType.Application.Json)
+            bearerAuth(tokenResp.accessToken!!)
+            setBody(batchCredentialRequest.toJSON())
+        }.body<JsonObject>().let { BatchCredentialResponse.fromJSON(it) }
+        logger.debug { "credential batch response: $batchResponse" }
 
-    return listOf(credentialResponse)
-  }
+        return (batchResponse.credentialResponses
+            ?: throw IllegalArgumentException("No credential responses returned")).indices.map {
+            ProcessedCredentialOffer(
+                batchResponse.credentialResponses!![it],
+                batchCredentialRequest.credentialRequests[it]
+            )
+        }
+    }
+
+    private suspend fun processedSingleCredentialOffer(
+      credReqs: List<CredentialRequest>,
+      providerMetadata: OpenIDProviderMetadata,
+      tokenResp: TokenResponse,
+    ): List<ProcessedCredentialOffer> {
+        val credReq = credReqs.first()
+
+        val credentialResponse = http.post(providerMetadata.credentialEndpoint!!) {
+            contentType(ContentType.Application.Json)
+            bearerAuth(tokenResp.accessToken!!)
+            setBody(credReq.toJSON())
+        }.body<JsonObject>().let { ProcessedCredentialOffer(CredentialResponse.fromJSON(it), credReq) }
+        logger.debug { "credentialResponse: $credentialResponse" }
+
+        return listOf(credentialResponse)
+    }
 }
