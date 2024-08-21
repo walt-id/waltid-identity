@@ -43,6 +43,7 @@ import id.walt.sdjwt.WaltIdJWTCryptoProvider
 import id.walt.verifier.config.OIDCVerifierServiceConfig
 import id.walt.verifier.policies.PresentationDefinitionPolicy
 import io.github.oshai.kotlinlogging.KotlinLogging
+import io.ktor.server.plugins.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
