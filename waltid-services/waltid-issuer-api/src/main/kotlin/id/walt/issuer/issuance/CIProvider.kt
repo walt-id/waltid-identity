@@ -48,6 +48,12 @@ import id.walt.oid4vc.util.randomUUID
 import id.walt.sdjwt.SDJwtVC
 import id.walt.sdjwt.SDMap
 import io.github.oshai.kotlinlogging.KotlinLogging
+import io.ktor.client.*
+import io.ktor.client.plugins.*
+import io.ktor.client.plugins.contentnegotiation.*
+import io.ktor.client.request.*
+import io.ktor.http.*
+import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Clock
 import kotlinx.datetime.DateTimeUnit
@@ -56,6 +62,7 @@ import kotlinx.serialization.*
 import kotlinx.serialization.json.*
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.time.Duration.Companion.minutes
+import kotlin.uuid.Uuid
 
 val supportedCredentialTypes = ConfigManager.getConfig<CredentialTypeConfig>().supportedCredentialTypes
 
@@ -65,47 +72,65 @@ val supportedCredentialTypes = ConfigManager.getConfig<CredentialTypeConfig>().s
 open class CIProvider : OpenIDCredentialIssuer(
     baseUrl = let {
         ConfigManager.getConfig<OIDCIssuerServiceConfig>().baseUrl
-    }, config = CredentialIssuerConfig(credentialConfigurationsSupported = supportedCredentialTypes.flatMap { entry ->
-        CredentialFormat.entries.map { format -> Pair(
-          "${entry.key}_${format.value}",
-            CredentialSupported(
-                format = format,
-                cryptographicBindingMethodsSupported = setOf("did"),
-                credentialSigningAlgValuesSupported = setOf("EdDSA", "ES256", "ES256K", "RSA"),
-                types = entry.value
-            ))
-        }
-    }.plus(Pair(
-        MDocTypes.ISO_MDL, CredentialSupported(
-        format = CredentialFormat.mso_mdoc,
-        cryptographicBindingMethodsSupported = setOf("cose_key"),
-        credentialSigningAlgValuesSupported = setOf("ES256"),
-        proofTypesSupported = mapOf(ProofType.cwt to ProofTypeMetadata(setOf("ES256"))),
-        types = listOf(MDocTypes.ISO_MDL),
-        docType = MDocTypes.ISO_MDL
-    ))).plus(
-        Pair("urn:eu.europa.ec.eudi:pid:1", CredentialSupported(
-        format = CredentialFormat.sd_jwt_vc,
-            cryptographicBindingMethodsSupported = setOf("jwk"),
-            credentialSigningAlgValuesSupported = setOf("ES256"),
-            types = listOf("urn:eu.europa.ec.eudi:pid:1"),
-            docType = "urn:eu.europa.ec.eudi:pid:1"
+    }, config = CredentialIssuerConfig(
+        credentialConfigurationsSupported = supportedCredentialTypes.flatMap { entry ->
+            CredentialFormat.entries.map { format ->
+                Pair(
+                    "${entry.key}_${format.value}",
+                    CredentialSupported(
+                        format = format,
+                        cryptographicBindingMethodsSupported = setOf("did"),
+                        credentialSigningAlgValuesSupported = setOf("EdDSA", "ES256", "ES256K", "RSA"),
+                        types = entry.value
+                    )
+                )
+            }
+        }.plus(
+            Pair(
+                MDocTypes.ISO_MDL, CredentialSupported(
+                    format = CredentialFormat.mso_mdoc,
+                    cryptographicBindingMethodsSupported = setOf("cose_key"),
+                    credentialSigningAlgValuesSupported = setOf("ES256"),
+                    proofTypesSupported = mapOf(ProofType.cwt to ProofTypeMetadata(setOf("ES256"))),
+                    types = listOf(MDocTypes.ISO_MDL),
+                    docType = MDocTypes.ISO_MDL
+                )
+            )
+        ).plus(
+            Pair(
+                "urn:eu.europa.ec.eudi:pid:1", CredentialSupported(
+                    format = CredentialFormat.sd_jwt_vc,
+                    cryptographicBindingMethodsSupported = setOf("jwk"),
+                    credentialSigningAlgValuesSupported = setOf("ES256"),
+                    types = listOf("urn:eu.europa.ec.eudi:pid:1"),
+                    docType = "urn:eu.europa.ec.eudi:pid:1"
+                )
+            )
+        ).plus(
+            Pair(
+                "identity_credential_vc+sd-jwt", CredentialSupported(
+                    format = CredentialFormat.sd_jwt_vc,
+                    cryptographicBindingMethodsSupported = setOf("jwk"),
+                    credentialSigningAlgValuesSupported = setOf("ES256"),
+                    types = listOf("identity_credential_vc+sd-jwt"),
+                    docType = "identity_credential_vc+sd-jwt"
+                )
+            )
+        ).toMap()
     )
-        )
-    ).plus(
-        Pair("identity_credential_vc+sd-jwt", CredentialSupported(
-            format = CredentialFormat.sd_jwt_vc,
-            cryptographicBindingMethodsSupported = setOf("jwk"),
-            credentialSigningAlgValuesSupported = setOf("ES256"),
-            types = listOf("identity_credential_vc+sd-jwt"),
-            docType = "identity_credential_vc+sd-jwt"
-        )
-        )
-    ).toMap())
 ) {
     private val log = KotlinLogging.logger { }
 
     companion object {
+
+        private val http = HttpClient() {
+            install(ContentNegotiation) {
+                json()
+            }
+            defaultRequest {
+                contentType(ContentType.Application.Json)
+            }
+        }
 
         val exampleIssuerKey by lazy { runBlocking { JWKKey.generate(KeyType.Ed25519) } }
         val exampleIssuerDid by lazy { runBlocking { DidService.registerByKey("jwk", exampleIssuerKey).did } }
@@ -192,12 +217,11 @@ open class CIProvider : OpenIDCredentialIssuer(
         payload: MapElement,
         header: MapElement?,
         keyId: String?,
-        privKey: Key?
+        privKey: Key?,
     ): String {
         TODO("Not yet implemented")
     }
 
-    @OptIn(ExperimentalEncodingApi::class)
     override fun verifyTokenSignature(target: TokenTarget, token: String) = runBlocking {
         log.debug { "Verifying JWS: $token" }
         log.debug { "JWS Verification: target: $target" }
@@ -239,7 +263,7 @@ open class CIProvider : OpenIDCredentialIssuer(
         }
 
         return when (credentialRequest.format) {
-            CredentialFormat.mso_mdoc -> doGenerateMDoc(credentialRequest)
+            CredentialFormat.mso_mdoc -> runBlocking { doGenerateMDoc(credentialRequest) }
             else -> doGenerateCredential(credentialRequest)
         }
     }
@@ -247,14 +271,14 @@ open class CIProvider : OpenIDCredentialIssuer(
     override fun getDeferredCredential(credentialID: String): CredentialResult {
         return deferredCredentialRequests[credentialID]?.let {
             when (it.format) {
-                CredentialFormat.mso_mdoc -> doGenerateMDoc(it)
+                CredentialFormat.mso_mdoc -> runBlocking { doGenerateMDoc(it) }
                 else -> doGenerateCredential(it)
             }
         }
             ?: throw DeferredCredentialError(CredentialErrorCode.invalid_request, message = "Invalid credential ID given")
     }
 
-    @OptIn(ExperimentalSerializationApi::class)
+    @OptIn(ExperimentalSerializationApi::class, ExperimentalStdlibApi::class)
     private fun doGenerateCredential(
         credentialRequest: CredentialRequest,
     ): CredentialResult {
@@ -289,6 +313,7 @@ open class CIProvider : OpenIDCredentialIssuer(
             }
             listOf(
                 IssuanceSessionData(
+                    id = Uuid.random().toString(),
                     exampleIssuerKey,
                     exampleIssuerDid,
                     IssuanceRequest(
@@ -297,7 +322,7 @@ open class CIProvider : OpenIDCredentialIssuer(
                         credentialConfigurationId = "OpenBadgeCredential_${credentialRequest.format.value}",
                         credentialData = W3CVC.fromJson(IssuanceExamples.openBadgeCredentialData),
                         mdocData = null
-                    )
+                    ),
                 )
             )
         } else {
@@ -347,7 +372,7 @@ open class CIProvider : OpenIDCredentialIssuer(
     }
 
     @OptIn(ExperimentalSerializationApi::class)
-    private fun doGenerateMDoc(
+    private suspend fun doGenerateMDoc(
         credentialRequest: CredentialRequest,
     ): CredentialResult {
         val coseSign1 = Cbor.decodeFromByteArray<COSESign1>(
@@ -399,7 +424,9 @@ open class CIProvider : OpenIDCredentialIssuer(
                     OneKey(holderKey.publicKey, null).AsCBOR().EncodeToBytes()
                 )
             ), cryptoProvider, keyId
-        )
+        ).also {
+            data.sendCallback("generated_mdoc", buildJsonObject { put("mdoc", it.toCBORHex()) })
+        }
         return CredentialResult(
             CredentialFormat.mso_mdoc, JsonPrimitive(mdoc.issuerSigned.toMapElement().toCBOR().encodeToBase64Url()),
             customParameters = mapOf("credential_encoding" to JsonPrimitive("issuer-signed"))
@@ -483,7 +510,11 @@ open class CIProvider : OpenIDCredentialIssuer(
                                                 JsonObject(emptyMap()),
                                                 JsonObject(emptyMap())
                                             )
-                                    )
+                                    ).also {
+                                        data.sendCallback("batch_sdjwt_issue", buildJsonObject {
+                                            put("sdjwt", it)
+                                        })
+                                    }
 
                                     else -> vc.mergingJwtIssue(
                                         issuerKey = issuerKey.key,
@@ -492,7 +523,11 @@ open class CIProvider : OpenIDCredentialIssuer(
                                         mappings = request.mapping ?: JsonObject(emptyMap()),
                                         additionalJwtHeader = emptyMap(),
                                         additionalJwtOptions = emptyMap(),
-                                    )
+                                    ).also {
+                                        data.sendCallback("batch_jwt_issue", buildJsonObject {
+                                            put("jwt", it)
+                                        })
+                                    }
                                 }
 
                             }.also { log.debug { "Respond VC: $it" } }
@@ -508,9 +543,31 @@ open class CIProvider : OpenIDCredentialIssuer(
 
     @Serializable
     data class IssuanceSessionData(
-        val issuerKey: DirectSerializedKey, val issuerDid: String, val request: IssuanceRequest,
+        val id: String,
+        val issuerKey: DirectSerializedKey,
+        val issuerDid: String,
+        val request: IssuanceRequest,
+        val callbackUrl: String? = null,
     ) {
-        constructor(issuerKey: Key, issuerDid: String, request: IssuanceRequest) : this(DirectSerializedKey(issuerKey), issuerDid, request)
+        constructor(
+            id: String,
+            issuerKey: Key,
+            issuerDid: String,
+            request: IssuanceRequest,
+            callbackUrl: String? = null,
+        ) : this(id, DirectSerializedKey(issuerKey), issuerDid, request, callbackUrl)
+
+        suspend fun sendCallback(type: String, data: JsonObject) {
+            if (callbackUrl != null) {
+                http.post(callbackUrl.replace("\$id", id)) {
+                    setBody(buildJsonObject {
+                        put("id", id)
+                        put("type", type)
+                        put("data", data)
+                    })
+                }
+            }
+        }
     }
 
     // TODO: Hack as this is non stateless because of oidc4vc lib API
@@ -532,26 +589,32 @@ open class CIProvider : OpenIDCredentialIssuer(
     //private val sessionTokenMapping = HashMap<String, String>() // session id -> token
 
     // TODO: Hack as this is non stateless because of oidc4vc lib API
-    fun setIssuanceDataForIssuanceId(issuanceId: String, data: List<IssuanceSessionData>) {
+    suspend fun setIssuanceDataForIssuanceId(issuanceId: String, data: List<IssuanceSessionData>) {
         log.debug { "DEPOSITED CREDENTIAL FOR ISSUANCE ID: $issuanceId" }
         sessionCredentialPreMapping[issuanceId] = data
     }
 
     // TODO: Hack as this is non stateless because of oidc4vc lib API
-    fun mapSessionIdToToken(sessionId: String, token: String) {
+    suspend fun mapSessionIdToToken(sessionId: String, token: String) {
         log.debug { "MAPPING SESSION ID TO TOKEN: $sessionId -->> $token" }
         val premappedVc = sessionCredentialPreMapping[sessionId]
             ?: throw IllegalArgumentException("No credential pre-mapped with any such session id: $sessionId (for use with token: $token)")
         sessionCredentialPreMapping.remove(sessionId)
         log.debug { "SWAPPING PRE-MAPPED VC FROM SESSION ID TO NEW TOKEN: $token" }
         tokenCredentialMapping[token] = premappedVc
+
+        premappedVc.first().let {
+            it.sendCallback("requested_token", buildJsonObject {
+                put("request", Json.encodeToJsonElement(it.request).jsonObject)
+            })
+        }
     }
 
     private suspend fun IssuanceSessionData.sdJwtVc(
         holderKey: JWKKey?,
         vc: W3CVC,
         data: IssuanceSessionData,
-        holderDid: String?
+        holderDid: String?,
     ) = vc.mergingSdJwtIssue(
         issuerKey = issuerKey.key,
         issuerDid = issuerDid.ifEmpty { issuerKey.key.getKeyId() },
@@ -569,13 +632,17 @@ open class CIProvider : OpenIDCredentialIssuer(
             vct = data.request.credentialConfigurationId
         ),
         disclosureMap = request.selectiveDisclosure ?: SDMap(emptyMap())
-    )
+    ).also {
+        sendCallback("sdjwt_issue", buildJsonObject {
+            put("sdjwt", it)
+        })
+    }
 
     private suspend fun IssuanceSessionData.nonSdJwtVc(
         vc: W3CVC,
         issuerKid: String,
         holderDid: String?,
-        holderKey: JsonObject?
+        holderKey: JsonObject?,
     ) = vc.mergingJwtIssue(
         issuerKey = issuerKey.key,
         issuerDid = issuerDid,
@@ -588,5 +655,9 @@ open class CIProvider : OpenIDCredentialIssuer(
                 "cnf" to buildJsonObject { put("jwk", it) }
             )
         } ?: emptyMap(),
-    )
+    ).also {
+        sendCallback("jwt_issue", buildJsonObject {
+            put("jwt", it)
+        })
+    }
 }
