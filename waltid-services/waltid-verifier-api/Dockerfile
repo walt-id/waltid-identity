@@ -41,5 +41,5 @@ RUN mkdir /waltid-verifier-api/config && chown waltid:waltid /waltid-verifier-ap
 COPY waltid-services/waltid-verifier-api/config /waltid-verifier-api/config
 USER waltid
 
-EXPOSE 7003
+EXPOSE 80
 ENTRYPOINT ["/waltid-verifier-api/bin/waltid-verifier-api"]
