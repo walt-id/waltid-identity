@@ -147,8 +147,7 @@
                                     </div>
                                 </div>
                             </div>
-                            <img :src="jwtJson?.credentialSubject?.achievement.image?.id"
-                                class="w-32 h-20 hidden md:block" />
+                            <img :src="jwtJson?.credentialSubject?.achievement.image?.id" class="w-32 h-20 hidden md:block" />
                         </div>
                     </div>
 
@@ -212,8 +211,7 @@
                 <div v-if="credential?.format === 'mso_mdoc'">
                     <div class="text-gray-600 font-bold">Details</div>
                     <hr class="my-5" />
-                    <div class="md:flex text-gray-500 mb-3 md:mb-1" v-for="elem in
-                        jwtJson.issuerSigned.nameSpaces[Object.keys(jwtJson.issuerSigned.nameSpaces)[0]]">
+                    <div v-for="elem in jwtJson.issuerSigned.nameSpaces[Object.keys(jwtJson.issuerSigned.nameSpaces)[0]]" class="md:flex text-gray-500 mb-3 md:mb-1">
                         <div class="min-w-[19vw]">{{ elem.elementIdentifier }}</div>
                         <div class="font-bold">{{ elem.elementValue }}</div>
                     </div>
@@ -234,7 +232,7 @@
                     </div>
                     <div class="md:flex text-gray-500 mb-3 md:mb-1">
                         <div class="min-w-[19vw]">Service endpoint</div>
-                        <NuxtLink class="font-bold truncate" :to="credentialIssuerService ?? ''" _blank>
+                        <NuxtLink :to="credentialIssuerService ?? ''" _blank class="font-bold truncate">
                             {{ credentialIssuerService }}
                         </NuxtLink>
                     </div>
@@ -244,16 +242,15 @@
                     <hr class="my-5" />
                     <div class="text-gray-500 mb-4 font-bold">Entra Manifest Claims</div>
                     <ul>
-                        <li v-for="[jsonKey, nameDescriptor] in Object.entries(manifestClaims)"
-                            class="md:flex text-gray-500 mb-3 md:mb-1">
+                        <li v-for="[jsonKey, nameDescriptor] in Object.entries(manifestClaims)" class="md:flex text-gray-500 mb-3 md:mb-1">
                             <div class="min-w-[19vw]">{{ nameDescriptor?.label ?? "Unknown" }}</div>
                             <div class="font-bold truncate hover:overflow-auto">
                                 {{
                                     credential
-                                        ? JSONPath({
-                                            path: jsonKey.replace(/^vc\./, ""),
-                                            json: jwtJson,
-                                        }).find((elem) => elem) ?? `Not found: ${jsonKey}`
+                                        ? (JSONPath({
+                                              path: jsonKey.replace(/^vc\./, ""),
+                                              json: jwtJson,
+                                          }).find((elem) => elem) ?? `Not found: ${jsonKey}`)
                                         : null
                                 }}
                             </div>
@@ -294,18 +291,25 @@
             <div class="flex gap-3">
                 <button
                     class="rounded bg-primary-400 px-2 py-1 text-white shadow-sm hover:bg-primary-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-400"
-                    type="button" @click="showCredentialJson = !showCredentialJson">
+                    type="button"
+                    @click="showCredentialJson = !showCredentialJson"
+                >
                     View Credential
                 </button>
-                <button v-if="manifest"
+                <button
+                    v-if="manifest"
                     class="rounded bg-primary-400 px-2 py-1 text-white shadow-sm hover:bg-primary-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-400"
-                    type="button" @click="showCredentialManifest = !showCredentialManifest">
+                    type="button"
+                    @click="showCredentialManifest = !showCredentialManifest"
+                >
                     View Credential Manifest
                 </button>
             </div>
             <button
                 class="rounded bg-red-500 px-2 py-1 text-white shadow-sm hover:bg-red-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-500"
-                type="button" @click="deleteCredential">
+                type="button"
+                @click="deleteCredential"
+            >
                 Delete Credential
             </button>
         </div>
@@ -321,12 +325,17 @@
             <div class="p-3 shadow mt-3">
                 <h3 class="font-semibold mb-2">QR code</h3>
                 <div v-if="credential && credential.document">
-                    <qrcode-vue v-if="credential.document && credential.document.length <= 4296"
-                        :value="credential.document" level="L" size="500"
-                        class="m-5++++++++++----------------------------------++++++++++++++++++++++++++++" />
-                    <p v-else>Unfortunately, this Verifiable Credential is too big to be viewable as QR code (credential
-                        size is {{ credential.document.length }} characters, but the maximum a QR code
-                        can hold is 4296).</p>
+                    <NuxtErrorBoundary>
+                        <qrcode-vue v-if="credential.document && credential.document.length <= 4296" :value="credential.document" class="m-5" level="L" size="500" />
+                        <p v-else>
+                            Unfortunately, this Verifiable Credential is too big to be viewable as QR code (credential size is
+                            {{ credential.document.length }} characters, but the maximum a QR code can hold is 4296).
+                        </p>
+
+                        <template #error="{ error }">
+                            <p>QR code is too long: {{ error }}</p>
+                        </template>
+                    </NuxtErrorBoundary>
                 </div>
             </div>
             <div class="shadow p-3 mt-2 font-mono overflow-scroll">
@@ -368,7 +377,7 @@ import { decodeBase64ToUtf8 } from "~/composables/base64";
 import VerifiableCredentialCard from "~/components/credentials/VerifiableCredentialCard.vue";
 import { parseDisclosures } from "~/composables/disclosures";
 import { JSONPath } from "jsonpath-plus";
-import QrcodeVue from 'qrcode.vue'
+import QrcodeVue from "qrcode.vue";
 
 const route = useRoute();
 const credentialId = route.params.credentialId as string;
@@ -382,15 +391,15 @@ refreshNuxtData();
 
 const jwtJson = computedAsync(async () => {
     if (credential.value) {
-        let parsed
+        let parsed;
 
         if (credential.value.format && credential.value.format === "mso_mdoc") {
             const resp: any = await $fetch(`/wallet-api/util/parseMDoc`, {
                 method: "POST",
                 body: credential.value.document,
             });
-            parsed = resp
-            console.log("Parsed: ", parsed)
+            parsed = resp;
+            console.log("Parsed: ", parsed);
         } else {
             const vcData = credential.value.document.split(".")[1];
             console.log("Credential is: ", vcData);
@@ -402,9 +411,9 @@ const jwtJson = computedAsync(async () => {
             console.log("Decoded: ", decodedBase64);
 
             try {
-                parsed = JSON.parse(decodedBase64)
+                parsed = JSON.parse(decodedBase64);
             } catch (e) {
-                console.log(e)
+                console.log(e);
             }
         }
 
@@ -430,7 +439,9 @@ type WalletCredential = {
     parsedDocument: object | null;
 };
 
-const manifest = computed(() => (credential.value?.manifest && credential.value?.manifest != "{}" ? (typeof credential.value?.manifest === 'string' ? JSON.parse(credential.value?.manifest) : credential.value?.manifest) : null));
+const manifest = computed(() =>
+    credential.value?.manifest && credential.value?.manifest != "{}" ? (typeof credential.value?.manifest === "string" ? JSON.parse(credential.value?.manifest) : credential.value?.manifest) : null,
+);
 const manifestClaims = computed(() => manifest.value?.display?.claims);
 
 const issuerName = ref(null);

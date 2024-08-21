@@ -23,19 +23,21 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 
 private val logger = KotlinLogging.logger {}
-suspend fun createCredentialOfferUri(issuanceRequests: List<IssuanceRequest>, expiresIn: Duration = 5.minutes): String {
+suspend fun createCredentialOfferUri(issuanceRequests: List<IssuanceRequest>, issuanceType: IssuanceType, expiresIn: Duration = 5.minutes): String {
+    val overwrittenIssuanceRequests = issuanceRequests.map { it.copy(issuanceType = issuanceType) }
+
     val credentialOfferBuilder =
-        OidcIssuance.issuanceRequestsToCredentialOfferBuilder(issuanceRequests)
+        OidcIssuance.issuanceRequestsToCredentialOfferBuilder(overwrittenIssuanceRequests)
 
     val issuanceSession = OidcApi.initializeCredentialOffer(
         credentialOfferBuilder = credentialOfferBuilder,
         expiresIn,
-        allowPreAuthorized = when (issuanceRequests[0].authenticationMethod) {
+        allowPreAuthorized = when (overwrittenIssuanceRequests[0].authenticationMethod) {
             AuthenticationMethod.PRE_AUTHORIZED -> true
             else -> false
         }
     )
-    OidcApi.setIssuanceDataForIssuanceId(issuanceSession.id, issuanceRequests.map {
+    OidcApi.setIssuanceDataForIssuanceId(issuanceSession.id, overwrittenIssuanceRequests.map {
         val key = KeyManager.resolveSerializedKey(it.issuerKey)
 
         CIProvider.IssuanceSessionData(
@@ -143,7 +145,10 @@ fun Application.issuerApi() {
 
                 val key = KeyManager.createKey(keyGenerationRequest)
 
-                val did = DidService.registerDefaultDidMethodByKey(req.did.method, key, req.did.config?.mapValues { it.value.jsonPrimitive } ?: emptyMap()).did
+                val did = DidService.registerDefaultDidMethodByKey(
+                    req.did.method,
+                    key,
+                    req.did.config?.mapValues { it.value.jsonPrimitive } ?: emptyMap()).did
 
 
                 val serializedKey = KeySerialization.serializeKeyToJson(key)
@@ -235,9 +240,18 @@ fun Application.issuerApi() {
                                     "Pass the unsigned credential that you intend to issue as the body of the request."
                                 example("OpenBadgeCredential example", IssuanceExamples.openBadgeCredentialIssuanceExample)
                                 example("UniversityDegreeCredential example", IssuanceExamples.universityDegreeIssuanceCredentialExample)
-                                example("OpenBadgeCredential example with Authorization Code Flow and Id Token", IssuanceExamples.openBadgeCredentialIssuanceExampleWithIdToken)
-                                example("OpenBadgeCredential example with Authorization Code Flow and Vp Token", IssuanceExamples.openBadgeCredentialIssuanceExampleWithVpToken)
-                                example("OpenBadgeCredential example with Authorization Code Flow and Username/Password Token", IssuanceExamples.openBadgeCredentialIssuanceExampleWithUsernamePassword)
+                                example(
+                                    "OpenBadgeCredential example with Authorization Code Flow and Id Token",
+                                    IssuanceExamples.openBadgeCredentialIssuanceExampleWithIdToken
+                                )
+                                example(
+                                    "OpenBadgeCredential example with Authorization Code Flow and Vp Token",
+                                    IssuanceExamples.openBadgeCredentialIssuanceExampleWithVpToken
+                                )
+                                example(
+                                    "OpenBadgeCredential example with Authorization Code Flow and Username/Password Token",
+                                    IssuanceExamples.openBadgeCredentialIssuanceExampleWithUsernamePassword
+                                )
                                 required = true
                             }
                         }
@@ -255,7 +269,7 @@ fun Application.issuerApi() {
                         }
                     }) {
                         val jwtIssuanceRequest = context.receive<IssuanceRequest>()
-                        val offerUri = createCredentialOfferUri(listOf(jwtIssuanceRequest))
+                        val offerUri = createCredentialOfferUri(listOf(jwtIssuanceRequest), IssuanceType.w3c)
 
                         context.respond(
                             HttpStatusCode.OK, offerUri
@@ -287,10 +301,8 @@ fun Application.issuerApi() {
                             }
                         }
                     }) {
-
-
                         val issuanceRequests = context.receive<List<IssuanceRequest>>()
-                        val offerUri = createCredentialOfferUri(issuanceRequests)
+                        val offerUri = createCredentialOfferUri(issuanceRequests, IssuanceType.w3c)
                         logger.debug { "Offer URI: $offerUri" }
 
                         context.respond(
@@ -328,7 +340,7 @@ fun Application.issuerApi() {
                     }) {
                         val sdJwtIssuanceRequest = context.receive<IssuanceRequest>()
 
-                        val offerUri = createCredentialOfferUri(listOf(sdJwtIssuanceRequest))
+                        val offerUri = createCredentialOfferUri(listOf(sdJwtIssuanceRequest), IssuanceType.sdjwt)
 
                         context.respond(
                             HttpStatusCode.OK, offerUri
@@ -361,10 +373,8 @@ fun Application.issuerApi() {
                             }
                         }
                     }) {
-
-
                         val issuanceRequests = context.receive<List<IssuanceRequest>>()
-                        val offerUri = createCredentialOfferUri(issuanceRequests)
+                        val offerUri = createCredentialOfferUri(issuanceRequests, IssuanceType.sdjwt)
                         logger.debug { "Offer URI: $offerUri" }
 
                         context.respond(
@@ -388,8 +398,7 @@ fun Application.issuerApi() {
                         }
                     }) {
                         val mdocIssuanceRequest = context.receive<IssuanceRequest>()
-
-                        val offerUri = createCredentialOfferUri(listOf(mdocIssuanceRequest))
+                        val offerUri = createCredentialOfferUri(listOf(mdocIssuanceRequest), IssuanceType.mdoc)
 
                         context.respond(
                             HttpStatusCode.OK, offerUri
