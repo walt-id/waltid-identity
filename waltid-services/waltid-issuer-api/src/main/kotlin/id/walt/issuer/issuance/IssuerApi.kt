@@ -143,7 +143,10 @@ fun Application.issuerApi() {
 
                 val key = KeyManager.createKey(keyGenerationRequest)
 
-                val did = DidService.registerDefaultDidMethodByKey(req.did.method, key, req.did.config?.mapValues { it.value.jsonPrimitive } ?: emptyMap()).did
+                val did = DidService.registerDefaultDidMethodByKey(
+                    req.did.method,
+                    key,
+                    req.did.config?.mapValues { it.value.jsonPrimitive } ?: emptyMap()).did
 
 
                 val serializedKey = KeySerialization.serializeKeyToJson(key)
@@ -235,9 +238,18 @@ fun Application.issuerApi() {
                                     "Pass the unsigned credential that you intend to issue as the body of the request."
                                 example("OpenBadgeCredential example", IssuanceExamples.openBadgeCredentialIssuanceExample)
                                 example("UniversityDegreeCredential example", IssuanceExamples.universityDegreeIssuanceCredentialExample)
-                                example("OpenBadgeCredential example with Authorization Code Flow and Id Token", IssuanceExamples.openBadgeCredentialIssuanceExampleWithIdToken)
-                                example("OpenBadgeCredential example with Authorization Code Flow and Vp Token", IssuanceExamples.openBadgeCredentialIssuanceExampleWithVpToken)
-                                example("OpenBadgeCredential example with Authorization Code Flow and Username/Password Token", IssuanceExamples.openBadgeCredentialIssuanceExampleWithUsernamePassword)
+                                example(
+                                    "OpenBadgeCredential example with Authorization Code Flow and Id Token",
+                                    IssuanceExamples.openBadgeCredentialIssuanceExampleWithIdToken
+                                )
+                                example(
+                                    "OpenBadgeCredential example with Authorization Code Flow and Vp Token",
+                                    IssuanceExamples.openBadgeCredentialIssuanceExampleWithVpToken
+                                )
+                                example(
+                                    "OpenBadgeCredential example with Authorization Code Flow and Username/Password Token",
+                                    IssuanceExamples.openBadgeCredentialIssuanceExampleWithUsernamePassword
+                                )
                                 required = true
                             }
                         }
@@ -361,8 +373,6 @@ fun Application.issuerApi() {
                             }
                         }
                     }) {
-
-
                         val issuanceRequests = context.receive<List<IssuanceRequest>>()
                         val offerUri = createCredentialOfferUri(issuanceRequests)
                         logger.debug { "Offer URI: $offerUri" }
