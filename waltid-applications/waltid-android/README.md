@@ -20,7 +20,9 @@ This project showcases the capabilities of the WALT ID library, demonstrating ho
 
 1. Clone the repository.
 2. Open the project in Android Studio.
-3. Run the application on your device or emulator.
+3. Set your `sdk.dir` in `local.properties` and then enable the Android build
+   with `enableAndroidBuild=true` in `gradle.properties`.
+4. Run the application on your device or emulator.
 
 ## Join the community
 
