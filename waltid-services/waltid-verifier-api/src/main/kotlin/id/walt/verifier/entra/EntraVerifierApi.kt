@@ -220,7 +220,7 @@ fun Application.entraVerifierApi() {
 
                 if (!EntraVerifierApi.callbackMapping.containsKey(nonce)) {
 
-                    context.respond(HttpStatusCode.BadRequest)
+                    context.respond(HttpStatusCode.BadRequest, "Invalid nonce")
                     return@post
                 }
 
