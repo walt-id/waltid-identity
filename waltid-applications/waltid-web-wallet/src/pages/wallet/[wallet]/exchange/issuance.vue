@@ -218,18 +218,32 @@ try {
     issuerHost = issuer;
 }
 
+
 console.log("Issuer host:", issuerHost);
 const credential_issuer = await $fetch(`${issuer}/.well-known/openid-credential-issuer`)
-const credentialList = credentialOffer.credential_configuration_ids.map((id) => credential_issuer.credential_configurations_supported[id]);
+const credentialList = credentialOffer.credential_configuration_ids.map(
+    (id) => {
+        const supportedElement = credential_issuer.credential_configurations_supported[id]
+
+        if (supportedElement != undefined) {
+            return supportedElement
+        } else {
+            window.alert(`Issuer does not support credential: ${id}`)
+            return null
+        }
+    }
+);
 
 let credentialTypes: String[] = [];
 
 for (let credentialListElement of credentialList) {
-    console.log(`Processing: ${credentialListElement}`)
-    const typeList = credentialListElement["types"] as Array<String>;
-    const lastType = typeList[typeList.length - 1] as String;
+    if (credentialListElement != null) {
+        console.log(`Processing: ${credentialListElement}`)
+        const typeList = credentialListElement["types"] as Array<String>;
+        const lastType = typeList[typeList.length - 1] as String;
 
-    credentialTypes.push(lastType);
+        credentialTypes.push(lastType);
+    }
 }
 
 const credentialCount = credentialTypes.length;
