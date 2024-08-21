@@ -161,6 +161,11 @@ const { data: dids, pending: pendingDids } = await useLazyAsyncData(() => $fetch
 
 const selectedDid: Ref<Object | null> = ref(null);
 
+
+
+const failed = ref(false);
+const failMessage = ref("Unknown error occurred.");
+
 //TODO: fix this hack for did-dropdown default selection
 watch(dids, async (newDids) => {
     await nextTick();
@@ -256,8 +261,6 @@ const groupedCredentialTypes = groupBy(
     (c) => c.name,
 );
 
-const failed = ref(false);
-const failMessage = ref("Unknown error occurred.");
 
 async function acceptCredential() {
     const did: string | null = selectedDid.value?.did ?? dids.value[0]?.did ?? null;
