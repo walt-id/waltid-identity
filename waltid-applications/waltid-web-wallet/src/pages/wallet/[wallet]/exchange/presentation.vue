@@ -148,15 +148,20 @@ import VerifiableCredentialCard from "~/components/credentials/VerifiableCredent
 import {Disclosure, DisclosureButton, DisclosurePanel} from "@headlessui/vue";
 import {encodeDisclosure, parseDisclosures} from "~/composables/disclosures";
 
-
 const currentWallet = useCurrentWallet();
 
-async function resolvePresentationRequest(request) {
+
+const immediateAccept = ref(false);
+
+const failed = ref(false);
+const failMessage = ref("Unknown error occurred.");
+
+async function resolvePresentationRequest(request: string) {
     try {
         console.log("RESOLVING request", request);
         const response = await $fetch(`/wallet-api/wallet/${currentWallet.value}/exchange/resolvePresentationRequest`, {
             method: "POST",
-            body: request
+            body: request,
         });
         console.log(response);
         return response;
@@ -193,10 +198,7 @@ let groupedCredentialTypes = groupBy(
 );
 console.log("groupedCredentialTypes: ", groupedCredentialTypes);
 
-const immediateAccept = ref(false);
 
-const failed = ref(false);
-const failMessage = ref("Unknown error occurred.");
 
 
 const matchedCredentials = await $fetch<Array<Object>>(`/wallet-api/wallet/${currentWallet.value}/exchange/matchCredentialsForPresentationDefinition`, {
