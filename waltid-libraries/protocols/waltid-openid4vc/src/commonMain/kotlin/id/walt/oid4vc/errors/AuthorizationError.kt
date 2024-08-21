@@ -9,7 +9,7 @@ class AuthorizationError(
     val authorizationRequest: IAuthorizationRequest,
     val errorCode: AuthorizationErrorCode,
     override val message: String? = null
-) : Exception() {
+) : IllegalStateException(message) {
     fun toAuthorizationErrorResponse() = AuthorizationCodeResponse.error(errorCode, message)
     fun toPushedAuthorizationErrorResponse() = PushedAuthorizationResponse.error(errorCode, message)
 }
