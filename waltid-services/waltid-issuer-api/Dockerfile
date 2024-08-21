@@ -42,5 +42,5 @@ RUN mkdir /waltid-issuer-api/config && chown waltid:waltid /waltid-issuer-api/co
 COPY waltid-services/waltid-issuer-api/config /waltid-issuer-api/config
 USER waltid
 
-EXPOSE 80
+EXPOSE 7002
 ENTRYPOINT ["/waltid-issuer-api/bin/waltid-issuer-api"]

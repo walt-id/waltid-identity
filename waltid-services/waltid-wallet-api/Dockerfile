@@ -44,5 +44,5 @@ RUN mkdir /waltid-wallet-api/config && mkdir /waltid-wallet-api/data && chown wa
 COPY waltid-services/waltid-wallet-api/config /waltid-wallet-api/config
 USER waltid
 
-EXPOSE 80
+EXPOSE 7001
 ENTRYPOINT ["/waltid-wallet-api/bin/waltid-wallet-api"]
