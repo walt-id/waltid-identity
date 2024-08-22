@@ -19,8 +19,8 @@
 }
 
 # Web Demo Wallet Frontend
-:{$WALLET_FRONTEND_PORT} {
-    reverse_proxy http://waltid-demo-wallet:{$WALLET_FRONTEND_PORT} # frontend
+:{$DEMO_WALLET_FRONTEND_PORT} {
+    reverse_proxy http://waltid-demo-wallet:{$DEMO_WALLET_FRONTEND_PORT} # frontend
     reverse_proxy /wallet-api/* http://wallet-api:{$WALLET_BACKEND_PORT} # backend
 }
 

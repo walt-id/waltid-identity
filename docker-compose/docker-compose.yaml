@@ -57,8 +57,8 @@ services:
       - wallet-api
       - caddy
     environment:
-      NUXT_PUBLIC_ISSUER_CALLBACK_URL: "http://localhost:$WALLET_FRONTEND_PORT"
-      PORT: $WALLET_FRONTEND_PORT
+      NUXT_PUBLIC_ISSUER_CALLBACK_URL: "http://localhost:$DEMO_WALLET_FRONTEND_PORT"
+      PORT: $DEMO_WALLET_FRONTEND_PORT
 
   waltid-dev-wallet:
     image: docker.io/waltid/waltid-dev-wallet:${VERSION_TAG:-latest}
@@ -86,7 +86,7 @@ services:
       NEXT_PUBLIC_VC_REPO: "http://localhost:$VC_REPO_PORT"
       NEXT_PUBLIC_ISSUER: "http://localhost:$ISSUER_API_PORT"
       NEXT_PUBLIC_VERIFIER: "http://localhost:$VERIFIER_API_PORT"
-      NEXT_PUBLIC_WALLET: "http://localhost:$WALLET_FRONTEND_PORT"
+      NEXT_PUBLIC_WALLET: "http://localhost:$DEMO_WALLET_FRONTEND_PORT"
       PORT: $WEB_PORTAL_PORT
 
   vc-repo:
@@ -141,8 +141,8 @@ services:
         protocol: tcp
         mode: host
 
-      - target: "$WALLET_FRONTEND_PORT"
-        published: $WALLET_FRONTEND_PORT # waltid-demo-wallet
+      - target: "$DEMO_WALLET_FRONTEND_PORT"
+        published: $DEMO_WALLET_FRONTEND_PORT # waltid-demo-wallet
         protocol: tcp
         mode: host
 
