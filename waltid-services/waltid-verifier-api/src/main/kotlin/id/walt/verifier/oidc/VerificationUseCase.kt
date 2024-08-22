@@ -157,7 +157,7 @@ class VerificationUseCase(
             } else {
                 val failedPolicies =
                     policyResults.results.flatMap { it.policyResults.map { it } }.filter { !it.isSuccess }
-                Result.failure(Exception("Verification policies did not succeed: ${failedPolicies.joinToString { it.policy }}"))
+                Result.failure(IllegalArgumentException("Verification policies did not succeed: ${failedPolicies.joinToString { it.policy + " (${it.error})" }}"))
             }
         }
     }
@@ -179,12 +179,12 @@ class VerificationUseCase(
     fun getPresentationDefinition(sessionId: String): Result<PresentationDefinition> =
         OIDCVerifierService.getSession(sessionId)?.presentationDefinition?.let {
             Result.success(it)
-        } ?: Result.failure(error("Invalid id provided (expired?): $sessionId"))
+        } ?: Result.failure(IllegalArgumentException("Invalid id provided (expired?): $sessionId"))
 
     fun getSignedAuthorizationRequestObject(sessionId: String): Result<String> =
         OIDCVerifierService.getSession(sessionId)?.authorizationRequest?.let {
             Result.success(it.toRequestObject(RequestSigningCryptoProvider, RequestSigningCryptoProvider.signingKey.keyID.orEmpty()))
-        } ?: Result.failure(error("Invalid id provided (expired?): $sessionId"))
+        } ?: Result.failure(IllegalArgumentException("Invalid id provided (expired?): $sessionId"))
 
     suspend fun notifySubscribers(sessionId: String) = runCatching {
         OIDCVerifierService.sessionVerificationInfos[sessionId]?.statusCallback?.let {
