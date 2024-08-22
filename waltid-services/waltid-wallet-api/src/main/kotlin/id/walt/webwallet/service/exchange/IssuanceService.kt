@@ -81,67 +81,70 @@ object IssuanceService {
         credentialWallet: TestCredentialWallet,
         clientId: String,
     ): List<ProcessedCredentialOffer> {
-        logger.debug { "// get issuer metadata" }
-        val providerMetadataUri =
-            credentialWallet.getCIProviderMetadataUrl(credentialOffer.credentialIssuer)
-        logger.debug { "Getting provider metadata from: $providerMetadataUri" }
-        val providerMetadataResult = http.get(providerMetadataUri)
-        logger.debug { "Provider metadata returned: " + providerMetadataResult.bodyAsText() }
+        try {
+            logger.debug { "// get issuer metadata" }
+            val providerMetadataUri =
+                credentialWallet.getCIProviderMetadataUrl(credentialOffer.credentialIssuer)
+            logger.debug { "Getting provider metadata from: $providerMetadataUri" }
+            val providerMetadataResult = http.get(providerMetadataUri)
+            logger.debug { "Provider metadata returned: " + providerMetadataResult.bodyAsText() }
 
-        val providerMetadata = providerMetadataResult.body<JsonObject>().let { OpenIDProviderMetadata.fromJSON(it) }
-        logger.debug { "providerMetadata: $providerMetadata" }
+            val providerMetadata = providerMetadataResult.body<JsonObject>().let { OpenIDProviderMetadata.fromJSON(it) }
+            logger.debug { "providerMetadata: $providerMetadata" }
 
-        logger.debug { "// resolve offered credentials" }
-        val offeredCredentials = OpenID4VCI.resolveOfferedCredentials(credentialOffer, providerMetadata)
-        logger.debug { "offeredCredentials: $offeredCredentials" }
+            logger.debug { "// resolve offered credentials" }
+            val offeredCredentials = OpenID4VCI.resolveOfferedCredentials(credentialOffer, providerMetadata)
+            logger.debug { "offeredCredentials: $offeredCredentials" }
 
-        logger.debug { "// fetch access token using pre-authorized code (skipping authorization step)" }
-        val tokenReq = TokenRequest(
-            grantType = GrantType.pre_authorized_code,
-            clientId = clientId,
-            redirectUri = credentialWallet.config.redirectUri,
-            preAuthorizedCode = credentialOffer.grants[GrantType.pre_authorized_code.value]!!.preAuthorizedCode,
-            txCode = null
-        )
-
-        val tokenResp = http.submitForm(
-            providerMetadata.tokenEndpoint!!, formParameters = parametersOf(tokenReq.toHttpParameters())
-        ).let {
-            logger.debug { "tokenResp raw: $it" }
-            it.body<JsonObject>().let { TokenResponse.fromJSON(it) }
-        }
-
-        logger.debug { ">>> Token response = success: ${tokenResp.isSuccess}" }
-
-        logger.debug { "// receive credential" }
-        val nonce = tokenResp.cNonce
-
-
-        logger.debug { "Using issuer URL: ${credentialOffer.credentialIssuer}" }
-        val credReqs = offeredCredentials.map { offeredCredential ->
-            logger.info("Offered credential format: ${offeredCredential.format.name}")
-            logger.info(
-                "Offered credential cryptographic binding methods: ${
-                    offeredCredential.cryptographicBindingMethodsSupported?.joinToString(
-                        ", "
-                    ) ?: ""
-                }"
+            logger.debug { "// fetch access token using pre-authorized code (skipping authorization step)" }
+            val tokenReq = TokenRequest(
+                grantType = GrantType.pre_authorized_code,
+                clientId = clientId,
+                redirectUri = credentialWallet.config.redirectUri,
+                preAuthorizedCode = credentialOffer.grants[GrantType.pre_authorized_code.value]!!.preAuthorizedCode,
+                txCode = null
             )
-            // Use key proof if supported cryptographic binding method is not empty, doesn't contain did and contains cose_key
-            val useKeyProof = (offeredCredential.cryptographicBindingMethodsSupported != null &&
-                    (offeredCredential.cryptographicBindingMethodsSupported!!.contains("cose_key") ||
-                            offeredCredential.cryptographicBindingMethodsSupported!!.contains("jwk")) &&
-                    !offeredCredential.cryptographicBindingMethodsSupported!!.contains("did"))
-            CredentialRequest.forOfferedCredential(
-                offeredCredential = offeredCredential,
-                proof = ProofOfPossessionFactory.new(useKeyProof, credentialWallet, offeredCredential, credentialOffer, nonce)
-            )
+
+            val tokenResp = http.submitForm(
+                providerMetadata.tokenEndpoint!!, formParameters = parametersOf(tokenReq.toHttpParameters())
+            ).let {
+                logger.debug { "tokenResp raw: $it" }
+                it.body<JsonObject>().let { TokenResponse.fromJSON(it) }
+            }
+
+            logger.debug { ">>> Token response = success: ${tokenResp.isSuccess}" }
+
+            logger.debug { "// receive credential" }
+            val nonce = tokenResp.cNonce
+
+
+            logger.debug { "Using issuer URL: ${credentialOffer.credentialIssuer}" }
+            val credReqs = offeredCredentials.map { offeredCredential ->
+                logger.info("Offered credential format: ${offeredCredential.format.name}")
+                logger.info(
+                    "Offered credential cryptographic binding methods: ${
+                        offeredCredential.cryptographicBindingMethodsSupported?.joinToString(
+                            ", "
+                        ) ?: ""
+                    }"
+                )
+                // Use key proof if supported cryptographic binding method is not empty, doesn't contain did and contains cose_key
+                val useKeyProof = (offeredCredential.cryptographicBindingMethodsSupported != null &&
+                        (offeredCredential.cryptographicBindingMethodsSupported!!.contains("cose_key") ||
+                                offeredCredential.cryptographicBindingMethodsSupported!!.contains("jwk")) &&
+                        !offeredCredential.cryptographicBindingMethodsSupported!!.contains("did"))
+                CredentialRequest.forOfferedCredential(
+                    offeredCredential = offeredCredential,
+                    proof = ProofOfPossessionFactory.new(useKeyProof, credentialWallet, offeredCredential, credentialOffer, nonce)
+                )
+            }
+            logger.debug { "credReqs: $credReqs" }
+
+            require(credReqs.isNotEmpty()) { "No credentials offered" }
+            return CredentialOfferProcessor.process(credReqs, providerMetadata, tokenResp)
+        } catch (exception: Exception){
+            throw IllegalArgumentException(exception.message)
         }
-        logger.debug { "credReqs: $credReqs" }
-
-        require(credReqs.isNotEmpty()) { "No credentials offered" }
-
-        return CredentialOfferProcessor.process(credReqs, providerMetadata, tokenResp)
     }
 
     private suspend fun processMSEntraIssuanceRequest(
