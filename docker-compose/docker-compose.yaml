@@ -142,7 +142,12 @@ services:
         mode: host
 
       - target: "$WALLET_FRONTEND_PORT"
-        published: $WALLET_FRONTEND_PORT # waltid-web-wallet
+        published: $WALLET_FRONTEND_PORT # waltid-demo-wallet
+        protocol: tcp
+        mode: host
+
+      - target: "$DEV_WALLET_FRONTEND_PORT"
+        published: $DEV_WALLET_FRONTEND_PORT # waltid-dev-wallet
         protocol: tcp
         mode: host
 
