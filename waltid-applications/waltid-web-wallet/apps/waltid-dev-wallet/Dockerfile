@@ -23,6 +23,6 @@ RUN chmod -R a+r .
 RUN groupadd -r app && useradd -r -g app app 
 USER app
 
-EXPOSE 7101/tcp
-ENV PORT=7101
+EXPOSE 7104/tcp
+ENV PORT=7104
 ENTRYPOINT [ "node", "server/index.mjs" ]
