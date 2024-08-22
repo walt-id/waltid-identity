@@ -322,8 +322,7 @@ fun Application.issuerApi() {
                         }
                     }) {
                         val issuanceRequests = context.receive<List<IssuanceRequest>>()
-                        val offerUri =
-                            createCredentialOfferUri(issuanceRequests, IssuanceType.w3c, getCallbackUriHeader())
+                        val offerUri = createCredentialOfferUri(issuanceRequests, IssuanceType.w3c, getCallbackUriHeader())
                         logger.debug { "Offer URI: $offerUri" }
 
                         context.respond(
@@ -397,8 +396,7 @@ fun Application.issuerApi() {
                         }
                     }) {
                         val issuanceRequests = context.receive<List<IssuanceRequest>>()
-                        val offerUri =
-                            createCredentialOfferUri(issuanceRequests, IssuanceType.sdjwt, getCallbackUriHeader())
+                        val offerUri = createCredentialOfferUri(issuanceRequests, IssuanceType.sdjwt, getCallbackUriHeader())
                         logger.debug { "Offer URI: $offerUri" }
 
                         context.respond(
