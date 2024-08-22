@@ -47,18 +47,12 @@ import id.walt.oid4vc.responses.CredentialResponse
 import id.walt.oid4vc.util.randomUUID
 import id.walt.sdjwt.SDJwtVC
 import id.walt.sdjwt.SDMap
-import id.walt.sdjwt.SDPayload
-import id.walt.sdjwt.WaltIdJWTCryptoProvider
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Clock
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.plus
-import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.MissingFieldException
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.decodeFromByteArray
-import kotlinx.serialization.encodeToString
+import kotlinx.serialization.*
 import kotlinx.serialization.json.*
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.time.Duration.Companion.minutes
@@ -243,6 +237,7 @@ open class CIProvider : OpenIDCredentialIssuer(
         if (deferIssuance) return CredentialResult(credentialRequest.format, null, randomUUID()).also {
             deferredCredentialRequests[it.credentialId!!] = credentialRequest
         }
+
         return when (credentialRequest.format) {
             CredentialFormat.mso_mdoc -> doGenerateMDoc(credentialRequest)
             else -> doGenerateCredential(credentialRequest)
@@ -322,8 +317,8 @@ open class CIProvider : OpenIDCredentialIssuer(
                 if (issuerDid.startsWith("did:ebsi"))
                     issuerKid = issuerDid + "#" + issuerKey.key.getKeyId()
 
-                when (credentialRequest.format) {
-                    CredentialFormat.sd_jwt_vc -> sdJwtVc(JWKKey.importJWK(holderKey.toString()).getOrNull(), vc, data, holderDid)
+                when (data.request.issuanceType) {
+                    IssuanceType.sdjwt -> sdJwtVc(JWKKey.importJWK(holderKey.toString()).getOrNull(), vc, data, holderDid)
                     else -> nonSdJwtVc(vc, issuerKid, holderDid, holderKey)
                 }
             }.also { log.debug { "Respond VC: $it" } }
@@ -558,16 +553,17 @@ open class CIProvider : OpenIDCredentialIssuer(
         data: IssuanceSessionData,
         holderDid: String?
     ) = vc.mergingSdJwtIssue(
-        issuerKey.key, issuerDid.ifEmpty { issuerKey.key.getKeyId() },
-        holderDid ?: holderKey?.getKeyId() ?: throw IllegalArgumentException("Either holderKey or holderDid must be given"),
-        request.mapping ?: JsonObject(emptyMap()),
+        issuerKey = issuerKey.key,
+        issuerDid = issuerDid.ifEmpty { issuerKey.key.getKeyId() },
+        subjectDid = holderDid ?: holderKey?.getKeyId() ?: throw IllegalArgumentException("Either holderKey or holderDid must be given"),
+        mappings = request.mapping ?: JsonObject(emptyMap()),
         type = SDJwtVC.SD_JWT_VC_TYPE_HEADER,
         additionalJwtHeaders = request.x5Chain?.let {
             mapOf("x5c" to JsonArray(it.map { cert -> cert.toJsonElement() }))
         } ?: mapOf(),
         additionalJwtOptions = SDJwtVC.defaultPayloadProperties(
-            issuerDid.ifEmpty { issuerKey.key.getKeyId() },
-            JsonObject(holderKey?.let {
+            issuerId = issuerDid.ifEmpty { issuerKey.key.getKeyId() },
+            cnf = JsonObject(holderKey?.let {
                 buildJsonObject { put("jwk", it.exportJWKObject()) }
             } ?: buildJsonObject { put("kid", holderDid) }),
             vct = data.request.credentialConfigurationId

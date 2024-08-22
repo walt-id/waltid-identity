@@ -321,12 +321,17 @@
             <div class="p-3 shadow mt-3">
                 <h3 class="font-semibold mb-2">QR code</h3>
                 <div v-if="credential && credential.document">
-                    <qrcode-vue v-if="credential.document && credential.document.length <= 4296"
-                        :value="credential.document" level="L" size="500"
-                        class="m-5++++++++++----------------------------------++++++++++++++++++++++++++++" />
-                    <p v-else>Unfortunately, this Verifiable Credential is too big to be viewable as QR code (credential
-                        size is {{ credential.document.length }} characters, but the maximum a QR code
-                        can hold is 4296).</p>
+                    <NuxtErrorBoundary>
+                        <qrcode-vue v-if="credential.document && credential.document.length <= 4296" :value="credential.document" class="m-5" level="L" size="500" />
+                        <p v-else>
+                            Unfortunately, this Verifiable Credential is too big to be viewable as QR code (credential size is
+                            {{ credential.document.length }} characters, but the maximum a QR code can hold is 4296).
+                        </p>
+
+                        <template #error="{ error }">
+                            <p>QR code is too long: {{ error }}</p>
+                        </template>
+                    </NuxtErrorBoundary>
                 </div>
             </div>
             <div class="shadow p-3 mt-2 font-mono overflow-scroll">
