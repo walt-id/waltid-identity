@@ -61,12 +61,20 @@ cd docker-compose && docker-compose up
 
 Learn more about the exposed ports [here](https://github.com/walt-id/waltid-identity/tree/main/docker-compose).
 
+## Use the Command Line Tool
+
+Use the [walt.id CLI](https://github.com/walt-id/waltid-identity/tree/main/waltid-applications/waltid-cli) to run the core functions from the command line. Make sure you have your Java Runtime set up.
+
+```bash
+cd waltid-applications/waltid-cli && ./waltid-cli.sh
+```
+
 ## Architecture
 
 The walt.id identity repo is part of The Community Stack, walt.id's collection of open-source products to build identity and wallet
 solutions. Learn more [here](https://walt.id/blog/p/community-stack).
 
-![waltid-identity-architecture](https://github.com/user-attachments/assets/00dfb365-4369-4133-9fb5-270916c2b2bc)
+![waltid-identity-architecture](https://github.com/user-attachments/assets/0400118b-3a38-421e-91dc-7293f6a44b6c)
 
 ## Join the community
 
