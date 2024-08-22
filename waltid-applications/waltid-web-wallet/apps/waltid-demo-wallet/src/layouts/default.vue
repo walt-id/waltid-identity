@@ -264,7 +264,7 @@ import { storeToRefs } from "pinia";
 import { useCurrentWallet } from "@waltid-web-wallet/composables/accountWallet.ts";
 import { useTenant } from "@waltid-web-wallet/composables/tenants.ts";
 import { logout } from "~/composables/authentication";
-import WaltButton from "~/components/buttons/WaltButton.vue";
+import WaltButton from "@waltid-web-wallet/components/buttons/WaltButton.vue";
 
 const runtimeConfig = useRuntimeConfig();
 const demoWalletUrl = runtimeConfig.public.demoWalletUrl as string;
