@@ -13,7 +13,7 @@ allprojects {
 
 plugins {
 //    val kotlinVersion = "2.0.0"
-    val kotlinVersion = "2.0.20-RC"
+    val kotlinVersion = "2.0.20-RC2"
     kotlin("multiplatform") version kotlinVersion apply false
     kotlin("jvm") version kotlinVersion
 
