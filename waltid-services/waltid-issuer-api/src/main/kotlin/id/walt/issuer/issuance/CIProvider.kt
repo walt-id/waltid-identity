@@ -425,12 +425,7 @@ open class CIProvider : OpenIDCredentialIssuer(
                 )
             ), cryptoProvider, keyId
         ).also {
-            try {
-                data.sendCallback("generated_mdoc", buildJsonObject { put("mdoc", it.toCBORHex()) })
-            } catch (exc: Exception) {
-                log.error{"Cannot reach Issuer's callback url - stopping issuance flow"}
-                throw IllegalArgumentException(exc.message + " Cannot reach Issuer's callback url")
-            }
+            data.sendCallback("generated_mdoc", buildJsonObject { put("mdoc", it.toCBORHex()) })
         }
         return CredentialResult(
             CredentialFormat.mso_mdoc, JsonPrimitive(mdoc.issuerSigned.toMapElement().toCBOR().encodeToBase64Url()),
@@ -516,14 +511,9 @@ open class CIProvider : OpenIDCredentialIssuer(
                                                 JsonObject(emptyMap())
                                             )
                                     ).also {
-                                        try {
-                                            data.sendCallback("batch_sdjwt_issue", buildJsonObject {
-                                                put("sdjwt", it)
-                                            })
-                                        } catch (exc: Exception) {
-                                            log.error{"Cannot reach Issuer's callback url - stopping issuance flow"}
-                                            throw IllegalArgumentException(exc.message + " Cannot reach Issuer's callback url")
-                                        }
+                                        data.sendCallback("batch_sdjwt_issue", buildJsonObject {
+                                            put("sdjwt", it)
+                                        })
                                     }
 
                                     else -> vc.mergingJwtIssue(
@@ -534,14 +524,9 @@ open class CIProvider : OpenIDCredentialIssuer(
                                         additionalJwtHeader = emptyMap(),
                                         additionalJwtOptions = emptyMap(),
                                     ).also {
-                                        try {
-                                            data.sendCallback("batch_jwt_issue", buildJsonObject {
-                                                put("jwt", it)
-                                            })
-                                        } catch (exc: Exception) {
-                                            log.error{"Cannot reach Issuer's callback url - stopping issuance flow"}
-                                            throw IllegalArgumentException(exc.message + " Cannot reach Issuer's callback url")
-                                        }
+                                        data.sendCallback("batch_jwt_issue", buildJsonObject {
+                                            put("jwt", it)
+                                        })
                                     }
                                 }
 
@@ -574,12 +559,16 @@ open class CIProvider : OpenIDCredentialIssuer(
 
         suspend fun sendCallback(type: String, data: JsonObject) {
             if (callbackUrl != null) {
-                http.post(callbackUrl.replace("\$id", id)) {
-                    setBody(buildJsonObject {
-                        put("id", id)
-                        put("type", type)
-                        put("data", data)
-                    })
+                try {
+                    http.post(callbackUrl.replace("\$id", id)) {
+                        setBody(buildJsonObject {
+                            put("id", id)
+                            put("type", type)
+                            put("data", data)
+                        })
+                    }
+                } catch (ex: Exception) {
+                    throw IllegalArgumentException("Error sending HTTP POST request to issuer callback url.", ex)
                 }
             }
         }
@@ -619,14 +608,9 @@ open class CIProvider : OpenIDCredentialIssuer(
         tokenCredentialMapping[token] = premappedVc
 
         premappedVc.first().let {
-            try {
-                it.sendCallback("requested_token", buildJsonObject {
-                    put("request", Json.encodeToJsonElement(it.request).jsonObject)
-                })
-            } catch (exc: Exception) {
-                log.error{"Cannot reach Issuer's callback url - stopping issuance flow"}
-                throw IllegalArgumentException(exc.message + " Cannot reach Issuer's callback url")
-            }
+            it.sendCallback("requested_token", buildJsonObject {
+                put("request", Json.encodeToJsonElement(it.request).jsonObject)
+            })
         }
     }
 
@@ -653,14 +637,9 @@ open class CIProvider : OpenIDCredentialIssuer(
         ),
         disclosureMap = request.selectiveDisclosure ?: SDMap(emptyMap())
     ).also {
-        try {
-            sendCallback("sdjwt_issue", buildJsonObject {
-                put("sdjwt", it)
-            })
-        } catch (exc: Exception) {
-            log.error{"Cannot reach Issuer's callback url - stopping issuance flow"}
-            throw IllegalArgumentException(exc.message + " Cannot reach Issuer's callback url")
-        }
+        sendCallback("sdjwt_issue", buildJsonObject {
+            put("sdjwt", it)
+        })
     }
 
     private suspend fun IssuanceSessionData.nonSdJwtVc(
@@ -681,14 +660,8 @@ open class CIProvider : OpenIDCredentialIssuer(
             )
         } ?: emptyMap(),
     ).also {
-        try {
-            sendCallback("jwt_issue", buildJsonObject {
-                put("jwt", it)
-            })
-        } catch (exc: Exception) {
-            log.error{"Cannot reach Issuer's callback url - stopping issuance flow"}
-            throw IllegalArgumentException(exc.message + " Cannot reach Issuer's callback url")
-        }
-
+        sendCallback("jwt_issue", buildJsonObject {
+            put("jwt", it)
+        })
     }
 }
