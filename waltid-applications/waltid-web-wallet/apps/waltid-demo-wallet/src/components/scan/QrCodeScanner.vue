@@ -1,18 +1,5 @@
 <template>
     <div class="flex flex-col items-center">
-        <!-- <div v-if="videoStarted && noError">
-            <div class="inline-flex flex-row justify-between gap-3 p-2">
-                <WaltButton :icon="ChevronUpDownIcon"> Choose camera </WaltButton>
-                <WaltButton :icon="ArrowPathRoundedSquareIcon"> Switch direction </WaltButton>
-                <WaltButton :icon="LightBulbIcon"> Flashlight </WaltButton>
-                <WaltButton>Inverted</WaltButton>
-                <div class="flex place-content-center place-items-center">
-                    <LightBulbIcon class="w-5 h-5 absolute text-gray-800" />
-                    <XMarkIcon class="w-8 h-8 absolute text-gray-600" />
-                </div>
-            </div>
-        </div> -->
-
         <!-- Video feed -->
         <div :class="[(!videoStarted && isLoading) || !noError ? 'hidden' : '']"
             class="flex place-content-center place-items-center mb-6">
@@ -109,99 +96,11 @@ async function startVideo() {
     }
 }
 
-/*async function startVideo(tries = 0) {
-    if (tries >= 1) {
-        console.error("QR Scanner: Giving up after too many tries.")
-        throwError({
-            title: "Could not start camera",
-            message: "Could not initialize your camera. Please make sure you have accepted the camera permission in your browser."
-        })
-        return
-    }
-
-    if (await QrScanner.hasCamera()) {
-        console.log("Starting video")
-        console.log("Camera list", await QrScanner.listCameras())
-        try {
-            console.log("Creating QR scanner...")
-            qrScanner = new QrScanner(scannerVideo.value,
-                result => {
-                    scanned.value = true
-                    console.log(result)
-                    const scannedText = result.data
-
-                    if (isSiopRequest(scannedText)) {
-                        qrScanner.stop()
-                        emit("request", scannedText)
-                    } else {
-                        console.log("Invalid QR")
-                    }
-                },
-                {
-                    highlightScanRegion: true,
-                    highlightCodeOutline: true,
-                    returnDetailedScanResult: true
-                });
-            console.log("Starting QR scanner...")
-            isLoading.value = false
-            await qrScanner.start();
-            videoStarted.value = true
-            console.log("Started QR scanner!")
-        } catch (exception) {
-            console.error("QR Error:", exception)
-            console.log("Restarting...")
-            window.setTimeout(async () => {
-                await startVideo(++tries)
-            }, 500)
-        }
-    } else {
-        throwError({
-            title: "No camera",
-            message: "You do not have any camera available."
-        })
-    }
-}*/
-
 if (process.client) {
     onMounted(async () => {
         await startVideo();
     });
 }
-
-//
-//console.log(await QrScanner.listCameras(true))
-
-/*
-qrScanner.hasFlash(); // check whether the browser and used camera support turning the flash on; async.
-qrScanner.isFlashOn(); // check whether the flash is on
-qrScanner.turnFlashOn(); // turn the flash on if supported; async
-qrScanner.turnFlashOff(); // turn the flash off if supported; async
-qrScanner.toggleFlash(); // toggle the flash if supported; async.
- */
 </script>
-<!--<script setup>
-import CenterMain from "~/components/CenterMain.vue";
-
-function logErrors(promise) {
-    promise.catch(console.error)
-}
-
-function paintOutline(detectedCodes, ctx) {
-    for (const detectedCode of detectedCodes) {
-        const [firstPoint, ...otherPoints] = detectedCode.cornerPoints
-
-        ctx.strokeStyle = "red";
-
-        ctx.beginPath();
-        ctx.moveTo(firstPoint.x, firstPoint.y);
-        for (const {x, y} of otherPoints) {
-            ctx.lineTo(x, y);
-        }
-        ctx.lineTo(firstPoint.x, firstPoint.y);
-        ctx.closePath();
-        ctx.stroke();
-    }
-}
-</script>-->
 
 <style scoped></style>
