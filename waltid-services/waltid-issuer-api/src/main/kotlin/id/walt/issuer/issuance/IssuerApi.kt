@@ -8,6 +8,7 @@ import id.walt.oid4vc.data.AuthenticationMethod
 import id.walt.oid4vc.definitions.CROSS_DEVICE_CREDENTIAL_OFFER_URL
 import id.walt.oid4vc.requests.CredentialOfferRequest
 import io.github.oshai.kotlinlogging.KotlinLogging
+import io.github.smiley4.ktorswaggerui.dsl.routes.OpenApiRequest
 import io.github.smiley4.ktorswaggerui.dsl.routing.get
 import io.github.smiley4.ktorswaggerui.dsl.routing.post
 import io.github.smiley4.ktorswaggerui.dsl.routing.route
@@ -17,13 +18,19 @@ import io.ktor.server.plugins.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import io.ktor.util.pipeline.*
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 
 private val logger = KotlinLogging.logger {}
-suspend fun createCredentialOfferUri(issuanceRequests: List<IssuanceRequest>, issuanceType: IssuanceType, expiresIn: Duration = 5.minutes): String {
+suspend fun createCredentialOfferUri(
+    issuanceRequests: List<IssuanceRequest>,
+    issuanceType: IssuanceType,
+    callbackUrl: String? = null,
+    expiresIn: Duration = 5.minutes,
+): String {
     val overwrittenIssuanceRequests = issuanceRequests.map { it.copy(issuanceType = issuanceType) }
 
     val credentialOfferBuilder =
@@ -37,11 +44,16 @@ suspend fun createCredentialOfferUri(issuanceRequests: List<IssuanceRequest>, is
             else -> false
         }
     )
+
     OidcApi.setIssuanceDataForIssuanceId(issuanceSession.id, overwrittenIssuanceRequests.map {
         val key = KeyManager.resolveSerializedKey(it.issuerKey)
 
         CIProvider.IssuanceSessionData(
-            key, it.issuerDid, it
+            id = issuanceSession.id,
+            issuerKey = key,
+            issuerDid = it.issuerDid,
+            request = it,
+            callbackUrl = callbackUrl
         )
     })  // TODO: Hack as this is non stateless because of oidc4vc lib API
 
@@ -61,7 +73,6 @@ suspend fun createCredentialOfferUri(issuanceRequests: List<IssuanceRequest>, is
 
 fun Application.issuerApi() {
     routing {
-
         route("onboard", {
             tags = listOf("Issuer onboarding")
         }) {
@@ -174,6 +185,13 @@ fun Application.issuerApi() {
         route("", {
             tags = listOf("Credential Issuance")
         }) {
+            fun OpenApiRequest.statusCallbackUriHeader() = headerParameter<String>("statusCallbackUri") {
+                description = "Callback to push state changes of the issuance process to"
+                required = false
+            }
+
+            fun PipelineContext<Unit, ApplicationCall>.getCallbackUriHeader() = context.request.header("statusCallbackUri")
+
             route("raw") {
                 route("jwt") {
                     post("sign", {
@@ -235,6 +253,7 @@ fun Application.issuerApi() {
                         description = "This endpoint issues a W3C Verifiable Credential, and returns an issuance URL "
 
                         request {
+                            statusCallbackUriHeader()
                             body<IssuanceRequest> {
                                 description =
                                     "Pass the unsigned credential that you intend to issue as the body of the request."
@@ -269,7 +288,7 @@ fun Application.issuerApi() {
                         }
                     }) {
                         val jwtIssuanceRequest = context.receive<IssuanceRequest>()
-                        val offerUri = createCredentialOfferUri(listOf(jwtIssuanceRequest), IssuanceType.w3c)
+                        val offerUri = createCredentialOfferUri(listOf(jwtIssuanceRequest), IssuanceType.w3c, getCallbackUriHeader())
 
                         context.respond(
                             HttpStatusCode.OK, offerUri
@@ -281,6 +300,7 @@ fun Application.issuerApi() {
                             "This endpoint issues a list of W3C Verifiable Credentials, and returns an issuance URL "
 
                         request {
+                            statusCallbackUriHeader()
                             body<List<IssuanceRequest>> {
                                 description =
                                     "Pass the unsigned credential that you intend to issue as the body of the request."
@@ -302,7 +322,7 @@ fun Application.issuerApi() {
                         }
                     }) {
                         val issuanceRequests = context.receive<List<IssuanceRequest>>()
-                        val offerUri = createCredentialOfferUri(issuanceRequests, IssuanceType.w3c)
+                        val offerUri = createCredentialOfferUri(issuanceRequests, IssuanceType.w3c, getCallbackUriHeader())
                         logger.debug { "Offer URI: $offerUri" }
 
                         context.respond(
@@ -317,6 +337,7 @@ fun Application.issuerApi() {
                         description = "This endpoint issues a W3C or SD-JWT-VC Verifiable Credential, and returns an issuance URL "
 
                         request {
+                            statusCallbackUriHeader()
                             body<IssuanceRequest> {
                                 description =
                                     "Pass the unsigned credential that you intend to issue in the body of the request."
@@ -340,7 +361,7 @@ fun Application.issuerApi() {
                     }) {
                         val sdJwtIssuanceRequest = context.receive<IssuanceRequest>()
 
-                        val offerUri = createCredentialOfferUri(listOf(sdJwtIssuanceRequest), IssuanceType.sdjwt)
+                        val offerUri = createCredentialOfferUri(listOf(sdJwtIssuanceRequest), IssuanceType.sdjwt, getCallbackUriHeader())
 
                         context.respond(
                             HttpStatusCode.OK, offerUri
@@ -353,6 +374,7 @@ fun Application.issuerApi() {
                             "This endpoint issues a list of W3C Verifiable Credentials, and returns an issuance URL "
 
                         request {
+                            statusCallbackUriHeader()
                             body<List<IssuanceRequest>> {
                                 description =
                                     "Pass the unsigned credential that you intend to issue as the body of the request."
@@ -374,7 +396,7 @@ fun Application.issuerApi() {
                         }
                     }) {
                         val issuanceRequests = context.receive<List<IssuanceRequest>>()
-                        val offerUri = createCredentialOfferUri(issuanceRequests, IssuanceType.sdjwt)
+                        val offerUri = createCredentialOfferUri(issuanceRequests, IssuanceType.sdjwt, getCallbackUriHeader())
                         logger.debug { "Offer URI: $offerUri" }
 
                         context.respond(
@@ -387,8 +409,8 @@ fun Application.issuerApi() {
                     post("issue", {
                         summary = "Signs a credential based on the IEC/ISO18013-5 mdoc/mDL format."
                         description = "This endpoint issues a mdoc and returns an issuance URL "
-
                         request {
+                            statusCallbackUriHeader()
                             body<IssuanceRequest> {
                                 description =
                                     "Pass the unsigned credential that you intend to issue as the body of the request."
@@ -398,7 +420,7 @@ fun Application.issuerApi() {
                         }
                     }) {
                         val mdocIssuanceRequest = context.receive<IssuanceRequest>()
-                        val offerUri = createCredentialOfferUri(listOf(mdocIssuanceRequest), IssuanceType.mdoc)
+                        val offerUri = createCredentialOfferUri(listOf(mdocIssuanceRequest), IssuanceType.mdoc, getCallbackUriHeader())
 
                         context.respond(
                             HttpStatusCode.OK, offerUri
@@ -417,6 +439,10 @@ fun Application.issuerApi() {
                         ?: throw NotFoundException("No active issuance session found by the given id")
                     val credentialOffer = issuanceSession.credentialOffer
                         ?: throw BadRequestException("Session has no credential offer set")
+
+                    OidcApi.sessionCredentialPreMapping[sessionId]?.first()
+                        ?.sendCallback("resolved_credential_offer", credentialOffer.toJSON())
+
                     context.respond(credentialOffer.toJSON())
                 }
             }
