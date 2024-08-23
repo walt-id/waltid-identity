@@ -140,7 +140,6 @@ object IssuanceService {
         logger.debug { "credReqs: $credReqs" }
 
         require(credReqs.isNotEmpty()) { "No credentials offered" }
-
         return CredentialOfferProcessor.process(credReqs, providerMetadata, tokenResp)
     }
 
@@ -238,11 +237,13 @@ object IssuanceService {
                 // TODO: review ID generation for mdoc
                 CredentialDataResult(randomUUID(), mdoc.toCBORHex(), type = docType, format = format)
             }
+
             else -> {
                 val credentialParts = credential.decodeJwsOrSdjwt()
                 logger.debug { "Got credential: $credentialParts" }
 
-                val typ = credentialParts.jwsParts.header["typ"]?.jsonPrimitive?.content?.lowercase() ?: error("Credential does not have `typ`!")
+                val typ = credentialParts.jwsParts.header["typ"]?.jsonPrimitive?.content?.lowercase()
+                    ?: error("Credential does not have `typ`!")
 
                 val vc = credentialParts.jwsParts.payload["vc"]?.jsonObject ?: credentialParts.jwsParts.payload
                 val credentialId = vc["id"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() } ?: randomUUID()
