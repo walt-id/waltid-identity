@@ -192,6 +192,8 @@ spec:
               value: "https://wallet.walt-test.cloud"
             - name: NUXT_PUBLIC_DEMO_WALLET_URL
               value: "https://wallet-dev.walt-test.cloud"
+            - name: NUXT_PUBLIC_CREDENTIALS_REPOSITORY_URL
+              value: "https://vc-repo.walt-test.cloud"
           ports:
             - containerPort: 7101
               name: http-api
