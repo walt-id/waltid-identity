@@ -126,7 +126,10 @@ class AndroidKey() : Key() {
         return "$encodedHeaders.$encodedPayload.$encodedSignature"
     }
 
-    override suspend fun verifyRaw(signed: ByteArray, detachedPlaintext: ByteArray?): Result<ByteArray> {
+    override suspend fun verifyRaw(
+        signed: ByteArray,
+        detachedPlaintext: ByteArray?
+    ): Result<ByteArray> {
         check(detachedPlaintext != null) { "An detached plaintext is needed." }
 
         val certificate: Certificate = keyStore.getCertificate(internalKeyId)
@@ -200,7 +203,10 @@ class AndroidKey() : Key() {
 
     private fun getSignature(): Signature {
         val sig = when (keyType) {
-            KeyType.secp256k1 -> Signature.getInstance("SHA256withECDSA", "BC")//Legacy SunEC curve disabled
+            KeyType.secp256k1 -> Signature.getInstance(
+                "SHA256withECDSA",
+                "BC"
+            )//Legacy SunEC curve disabled
             KeyType.secp256r1 -> Signature.getInstance("SHA256withECDSA")
             KeyType.Ed25519 -> Signature.getInstance("Ed25519")
             KeyType.RSA -> Signature.getInstance("SHA256withRSA")
@@ -209,10 +215,13 @@ class AndroidKey() : Key() {
         return sig
     }
 
-    companion object : AndroidKeyCreator {
+    companion object : AndroidKeyCreator, AndroidKeyLoader {
         override suspend fun generate(
             type: KeyType,
             metadata: JwkKeyMeta?,
         ): AndroidKey = AndroidKeyGenerator.generate(type, metadata)
+
+        override suspend fun load(type: KeyType, keyId: String): AndroidKey? =
+            AndroidKeystoreLoader.load(type, keyId)
     }
 }
