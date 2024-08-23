@@ -30,7 +30,10 @@ import io.ktor.server.routing.*
 import io.ktor.server.util.*
 import io.ktor.util.*
 import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.*
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import kotlinx.uuid.UUID
 
@@ -163,7 +166,7 @@ fun Application.verfierApi() {
                     }
                     headerParameter<String?>("openId4VPProfile") {
                         description =
-                            "Optional header to set the profile of the VP request " + "Available Profiles: DEFAULT: For W3C OpenID4VP, ISO_18013_7_MDOC: For MDOC OpenID4VP, EBSIV3: For EBSI V3 Compliant VP. " + "Defaults to DEFAULT"
+                            "Optional header to set the profile of the VP request, available profiles: ${OpenId4VPProfile.entries.joinToString()}"
                         // example = ""
                         required = false
                     }
@@ -194,8 +197,8 @@ fun Application.verfierApi() {
                 val statusCallbackUri = context.request.header("statusCallbackUri")
                 val statusCallbackApiKey = context.request.header("statusCallbackApiKey")
                 val stateId = context.request.header("stateId")
-                val openId4VPProfile = context.request.header("openId4VPProfile")?.let { OpenId4VPProfile.valueOf(it) }
-                    ?: OpenId4VPProfile.fromAuthorizeBaseURL(authorizeBaseUrl) ?: OpenId4VPProfile.DEFAULT
+                val openId4VPProfile = context.request.header("openId4VPProfile")
+
                 val body = context.receive<JsonObject>()
 
                 val session = verificationUseCase.createSession(
@@ -209,13 +212,14 @@ fun Application.verfierApi() {
                     statusCallbackUri = statusCallbackUri,
                     statusCallbackApiKey = statusCallbackApiKey,
                     stateId = stateId,
-                    openId4VPProfile = openId4VPProfile,
+                    openId4VPProfile = (body["openid_profile"]?.jsonPrimitive?.contentOrNull ?: openId4VPProfile)?.let { OpenId4VPProfile.valueOf(it.uppercase()) }
+                    ?: OpenId4VPProfile.fromAuthorizeBaseURL(authorizeBaseUrl),
                     trustedRootCAs = body["trusted_root_cas"]?.jsonArray
                 )
 
                 context.respond(
                     authorizeBaseUrl.plus("?").plus(
-                        when (openId4VPProfile) {
+                        when (session.openId4VPProfile) {
                             OpenId4VPProfile.ISO_18013_7_MDOC -> session.authorizationRequest!!.toRequestObjectByReferenceHttpQueryString(
                                 ConfigManager.getConfig<OIDCVerifierServiceConfig>().baseUrl.let { "$it/openid4vc/request/${session.id}" })
 

@@ -152,7 +152,7 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
             throw AuthorizationError(
                 authorizationRequest,
                 AuthorizationErrorCode.invalid_presentation_definition_reference,
-                exc.message
+                "Invalid presentation definition reference, deserialization failed due to: ${exc.message}"
             )
         }
     }
