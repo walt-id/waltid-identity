@@ -18,26 +18,25 @@
 
 Available for Kotlin/Java and JavaScript environments.
 
-- **Crypto** ([Docs](https://docs.oss.walt.id/issuer/sdks/manage-keys/overview) | [GitHub](https://github.com/walt-id/waltid-identity/blob/main/waltid-libraries/waltid-crypto/README.md)) -
-  create and use keys based on different algorithms.
+- **Crypto** ([Docs](https://docs.oss.walt.id/issuer/sdks/manage-keys/overview) | [GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/crypto/waltid-crypto)) - create and use keys based on different algorithms.
 - **DID** ([Docs](https://docs.oss.walt.id/issuer/sdks/manage-dids/overview) | [GitHub](https://github.com/walt-id/waltid-identity/blob/main/waltid-libraries/waltid-did/README.md)) -
   create, register, and resolve DIDs on different ecosystems.
-- **Verifiable Credentials** ([Docs](https://docs.oss.walt.id/issuer/sdks/manage-credentials/overview) | [GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/waltid-verifiable-credentials)) -
+- **Verifiable Credentials** ([Docs](https://docs.oss.walt.id/issuer/sdks/manage-credentials/overview) | [GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/credentials/waltid-verifiable-credentials)) -
   issue and verify W3C credentials as JWTs and SD-JWTs.
-- **mdoc Credentials** ([GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/waltid-mdoc-credentials)) - issue and
+- **mdoc Credentials** ([GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/credentials/waltid-mdoc-credentials)) - issue and
   verify mdoc credentials (mDL ISO/IEC 18013-5).
-- **OpenID4VC** ([GitHub](https://github.com/walt-id/waltid-identity/blob/main/waltid-libraries/waltid-openid4vc/README.md)) -
+- **OpenID4VC** ([GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/protocols/waltid-openid4vc)) -
   implementation of the OID4VCI and OIDC4VP protocols.
-- **SD-JWT** ([GitHub](https://github.com/walt-id/waltid-identity/blob/main/waltid-libraries/waltid-sdjwt/README.md)) - create and verify
+- **SD-JWT** ([GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/sdjwt/waltid-sdjwt)) - create and verify
   Selective Disclosure JWTs.
 
 ### Services
 
 A set of APIs to build issuer, verifier, and wallet capabilities into any app.
 
-- **Issuer API** ([Docs](https://docs.oss.walt.id/issuer/api/getting-started) | [GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-services/waltid-issuer-api)) -
+- **Issuer API** ([Docs](https://docs.walt.id/issuer/api/getting-started) | [GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-services/waltid-issuer-api)) -
   enable apps to issue credentials (W3C JWTs and SD-JWTs) via OID4VC.
-- **Verifier API**  ([Docs](https://docs.oss.walt.id/verifier/api/getting-started) | [GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-services/waltid-verifier-api)) -
+- **Verifier API**  ([Docs](https://docs.walt.id/verifier/api/getting-started) | [GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-services/waltid-verifier-api)) -
   enable apps to verify credentials (W3C JWTs and SD-JWTs) via OID4VP/SIOPv2.
 - **Wallet API** ([Docs](https://docs.oss.walt.id/wallet/api/getting-started) | [GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-services/waltid-wallet-api)) -
   extend apps with wallet capabilities to collect, store, manage and share identity credentials and tokens.
@@ -62,12 +61,20 @@ cd docker-compose && docker-compose up
 
 Learn more about the exposed ports [here](https://github.com/walt-id/waltid-identity/tree/main/docker-compose).
 
+## Use the Command Line Tool
+
+Use the [walt.id CLI](https://github.com/walt-id/waltid-identity/tree/main/waltid-applications/waltid-cli) to run the core functions from the command line. Make sure you have your Java Runtime set up.
+
+```bash
+cd waltid-applications/waltid-cli && ./waltid-cli.sh
+```
+
 ## Architecture
 
 The walt.id identity repo is part of The Community Stack, walt.id's collection of open-source products to build identity and wallet
 solutions. Learn more [here](https://walt.id/blog/p/community-stack).
 
-![waltid-identity-architecture](https://github.com/walt-id/waltid-identity/assets/48290617/b7ca5662-53cc-488c-bfe5-a58c89cd2ec0)
+![waltid-identity-architecture](https://github.com/user-attachments/assets/0400118b-3a38-421e-91dc-7293f6a44b6c)
 
 ## Join the community
 
