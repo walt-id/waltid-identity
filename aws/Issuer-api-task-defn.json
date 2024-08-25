@@ -7,9 +7,9 @@
             "cpu": 0,
             "portMappings": [
                 {
-                    "name": "port-80",
-                    "containerPort": 80,
-                    "hostPort": 80,
+                    "name": "port-7002",
+                    "containerPort": 7002,
+                    "hostPort": 7002,
                     "protocol": "tcp",
                     "appProtocol": "http"
                 },
