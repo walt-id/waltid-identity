@@ -1,5 +1,8 @@
 package id.walt.crypto.keys
 
+import com.hierynomus.asn1.ASN1InputStream
+import com.hierynomus.asn1.encodingrules.der.DERDecoder
+import com.hierynomus.asn1.types.constructed.ASN1Sequence
 import id.walt.crypto.keys.AndroidKeyGenerator.PUBLIC_KEY_ALIAS_PREFIX
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
@@ -11,6 +14,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import org.json.JSONObject
+import java.math.BigInteger
 import java.security.KeyFactory
 import java.security.KeyStore
 import java.security.PrivateKey
@@ -19,6 +23,7 @@ import java.security.cert.Certificate
 import java.security.spec.ECPublicKeySpec
 import java.security.spec.RSAPublicKeySpec
 import java.util.UUID
+import kotlin.io.encoding.Base64
 
 private val log = KotlinLogging.logger { }
 
@@ -115,15 +120,23 @@ class AndroidKey() : Key() {
     }
 
     override suspend fun signJws(plaintext: ByteArray, headers: Map<String, JsonElement>): String {
-        val signature: ByteArray = signWithKeystore(plaintext)
+        val signingInput = base64Url.encode(
+            Json.encodeToString(headers).toByteArray()
+        ).trimEnd('=') + "." + base64Url.encode(plaintext).trimEnd('=')
 
-        val encodedSignature = signature.encodeToBase64Url()
+        val signature: ByteArray = signWithKeystore(signingInput.encodeToByteArray()).let {
+            toP1363(it, 64)
+        }
 
-        // Construct the JWS in the format: base64UrlEncode(headers) + '.' + base64UrlEncode(payload) + '.' + base64UrlEncode(signature)
-        val encodedHeaders = Json.encodeToString(headers).toByteArray().encodeToBase64Url()
-        val encodedPayload = plaintext.encodeToBase64Url()
+        return "$signingInput.${base64Url.encode(signature).trimEnd('=')}"
+    }
 
-        return "$encodedHeaders.$encodedPayload.$encodedSignature"
+    private fun toP1363(derSignature: ByteArray, size: Int): ByteArray {
+        val stream = ASN1InputStream(DERDecoder(), derSignature)
+        val sequence = stream.readObject<ASN1Sequence>()
+        val r = (sequence.get(0).value as BigInteger).toString(16).padStart(size, '0')
+        val s = (sequence.get(1).value as BigInteger).toString(16).padStart(size, '0')
+        return (r + s).hexStringToByteArray()
     }
 
     override suspend fun verifyRaw(
@@ -218,10 +231,15 @@ class AndroidKey() : Key() {
     companion object : AndroidKeyCreator, AndroidKeyLoader {
         override suspend fun generate(
             type: KeyType,
-            metadata: JwkKeyMeta?,
+            metadata: AndroidKeyParameters?,
         ): AndroidKey = AndroidKeyGenerator.generate(type, metadata)
 
         override suspend fun load(type: KeyType, keyId: String): AndroidKey? =
             AndroidKeystoreLoader.load(type, keyId)
     }
 }
+
+private fun String.hexStringToByteArray() =
+    this.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+
+internal val base64Url = Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT_OPTIONAL)
