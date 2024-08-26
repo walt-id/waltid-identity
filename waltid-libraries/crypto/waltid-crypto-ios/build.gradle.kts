@@ -17,7 +17,7 @@ kotlin {
         framework {
             baseName = "waltid-crypto-ios"
             isStatic = true
-            export(project(":waltid-libraries:waltid-target-ios"))
+            export(project(":waltid-libraries:crypto:waltid-target-ios"))
             export(project(":waltid-libraries:crypto:waltid-crypto"))
         }
 

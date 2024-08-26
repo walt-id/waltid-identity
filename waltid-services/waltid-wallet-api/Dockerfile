@@ -1,4 +1,4 @@
-FROM docker.io/gradle:jdk17 as buildstage
+FROM docker.io/gradle:jdk17 AS buildstage
 
 COPY gradle/ /work/gradle
 COPY settings.gradle.kts build.gradle.kts gradle.properties gradlew /work/
@@ -9,7 +9,7 @@ COPY waltid-libraries/crypto/waltid-crypto/build.gradle.kts /work/waltid-librari
 COPY waltid-libraries/crypto/waltid-crypto-oci/build.gradle.kts /work/waltid-libraries/crypto/waltid-crypto-oci/
 COPY waltid-libraries/waltid-did/build.gradle.kts /work/waltid-libraries/waltid-did/
 COPY waltid-libraries/credentials/waltid-mdoc-credentials/build.gradle.kts /work/waltid-libraries/credentials/waltid-mdoc-credentials/
-COPY waltid-libraries/credentials/waltid-verifiable-credentials//build.gradle.kts /work/waltid-libraries/waltid-verifiable-credentials/
+COPY waltid-libraries/credentials/waltid-verifiable-credentials//build.gradle.kts /work/waltid-libraries/credentials/waltid-verifiable-credentials/
 
 COPY waltid-services/waltid-service-commons/build.gradle.kts /work/waltid-services/waltid-service-commons/
 COPY waltid-services/waltid-wallet-api/build.gradle.kts /work/waltid-services/waltid-wallet-api/
@@ -23,7 +23,7 @@ COPY waltid-libraries/crypto/waltid-crypto/. /work/waltid-libraries/crypto/walti
 COPY waltid-libraries/crypto/waltid-crypto-oci/. /work/waltid-libraries/crypto/waltid-crypto-oci
 COPY waltid-libraries/waltid-did/. /work/waltid-libraries/waltid-did
 COPY waltid-libraries/credentials/waltid-mdoc-credentials/. /work/waltid-libraries/credentials/waltid-mdoc-credentials
-COPY waltid-libraries/credentials/waltid-verifiable-credentials/. /work/waltid-libraries/waltid-verifiable-credentials
+COPY waltid-libraries/credentials/waltid-verifiable-credentials/. /work/waltid-libraries/credentials/waltid-verifiable-credentials
 
 COPY waltid-services/waltid-service-commons/. /work/waltid-services/waltid-service-commons
 COPY waltid-services/waltid-wallet-api/src/ /work/waltid-services/waltid-wallet-api/src

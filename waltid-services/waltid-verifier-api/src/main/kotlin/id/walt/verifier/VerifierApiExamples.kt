@@ -236,6 +236,7 @@ object VerifierApiExamples {
                 [
                     "VerifiablePortableDocumentA1"
                 ],
+                "openid_profile": "EBSIv3",
                 "presentation_definition":
                 {
                     "id": "70fc7fab-89c0-4838-ba77-4886f47c3761",
@@ -279,7 +280,8 @@ object VerifierApiExamples {
         """
             {
                 "request_credentials": [ "org.iso.18013.5.1.mDL" ],
-                "trusted_root_cas":[ ${Json.encodeToJsonElement(LspPotentialInterop.POTENTIAL_ROOT_CA_CERT)} ]
+                "trusted_root_cas":[ ${Json.encodeToJsonElement(LspPotentialInterop.POTENTIAL_ROOT_CA_CERT)} ],
+                "openid_profile": "ISO_18013_7_MDOC"
             }
 
         """.trimIndent()
@@ -288,7 +290,8 @@ object VerifierApiExamples {
     val lspPotentialSDJwtVCExample = jsonObjectValueExampleDescriptorDsl(
         """
             {
-                "request_credentials": [ "urn:eu.europa.ec.eudi:pid:1" ]
+                "request_credentials": [ "identity_credential_vc+sd-jwt" ],
+                "openid_profile": "HAIP"
             }
 
         """.trimIndent()

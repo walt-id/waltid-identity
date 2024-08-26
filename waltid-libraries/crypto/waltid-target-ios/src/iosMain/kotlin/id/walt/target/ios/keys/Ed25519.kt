@@ -9,8 +9,8 @@ import kotlinx.cinterop.ptr
 import kotlinx.cinterop.value
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.jsonObject
@@ -67,11 +67,11 @@ sealed class Ed25519 {
             val signingInput = "$header.$payload"
 
             val verifyResult =
-                verifyRaw(signature.decodeFromBase64Url(), signingInput.encodeToByteArray())
+                verifyRaw(base64Url.decode(signature), signingInput.encodeToByteArray())
             return when {
                 verifyResult.isSuccess -> Result.success(
                     Json.parseToJsonElement(
-                        payload.decodeFromBase64Url().decodeToString()
+                        base64Url.decode(payload).decodeToString()
                     ).jsonObject
                 )
 
@@ -113,7 +113,7 @@ sealed class Ed25519 {
                 put("crv", "Ed25519")
                 kid()?.let { put("kid", it) }
                 put("kty", "OKP")
-                put("x", Base64.UrlSafe.encode(externalRepresentation()))
+                put("x", base64Url.encode(externalRepresentation()))
             }
         }
 
@@ -131,7 +131,7 @@ sealed class Ed25519 {
             return jwk().toString().encodeToByteArray().toNSData().let {
                 SHA256Utils.hashWithData(it)
             }.let {
-                Base64.UrlSafe.encode(it.toByteArray())
+                base64Url.encode(it.toByteArray())
             }
         }
     }
@@ -142,16 +142,16 @@ internal class Ed25519KeychainPrivateKey(private val kid: String) : Ed25519.Priv
         return Ed25519KeychainPublicKey(kid)
     }
 
-    override fun signJws(plainText: ByteArray, headers: Map<String, String>): String {
-        val headersJsonObject = JsonObject(headers.mapValues { (_, v) -> JsonPrimitive(v) })
+    override fun signJws(plainText: ByteArray, headers: Map<String, JsonElement>): String {
+        val headersJsonObject = JsonObject(headers.mapValues { (_, v) -> v })
 
-        val signingInput = Base64.UrlSafe.encode(
+        val signingInput = base64Url.encode(
             headersJsonObject.toString().encodeToByteArray()
-        ).trimEnd('=') + "." + Base64.UrlSafe.encode(plainText).trimEnd('=')
+        ).trimEnd('=') + "." + base64Url.encode(plainText).trimEnd('=')
 
         val signature = signRaw(signingInput.encodeToByteArray())
 
-        return signingInput + "." + Base64.UrlSafe.encode(signature).trimEnd('=')
+        return signingInput + "." + base64Url.encode(signature).trimEnd('=')
     }
 
     override fun signRaw(plainText: ByteArray): ByteArray = memScoped {
@@ -172,10 +172,10 @@ internal class Ed25519KeychainPrivateKey(private val kid: String) : Ed25519.Priv
 
         return buildJsonObject {
             put("crv", "Ed25519")
-            put("d", Base64.UrlSafe.encode(privateRaw))
+            put("d", base64Url.encode(privateRaw))
             put("kid", kid)
             put("kty", "OKP")
-            put("x", Base64.UrlSafe.encode(publicRaw))
+            put("x", base64Url.encode(publicRaw))
         }
     }
 
@@ -183,7 +183,7 @@ internal class Ed25519KeychainPrivateKey(private val kid: String) : Ed25519.Priv
         return jwk().toString().encodeToByteArray().toNSData().let {
             SHA256Utils.hashWithData(it)
         }.let {
-            Base64.UrlSafe.encode(it.toByteArray())
+            base64Url.encode(it.toByteArray())
         }
     }
 
@@ -249,7 +249,7 @@ internal class Ed25519PublicKeyJwk(private val jwk: String) : Ed25519.PublicKey(
     @OptIn(ExperimentalEncodingApi::class)
 
     private val externalRepresentation: ByteArray by lazy {
-        _jwk.x.decodeFromBase64Url()
+        base64Url.decode(_jwk.x)
     }
 
     @Serializable

@@ -1,15 +1,14 @@
 package id.walt.crypto.utils
 
 import id.walt.crypto.keys.KeyType
-import id.walt.crypto.utils.Base64Utils.base64UrlToBase64
+import id.walt.crypto.utils.Base64Utils.base64toBase64Url
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
-import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 
@@ -26,12 +25,21 @@ object JwsUtils {
     }
 
     fun String.decodeJwsPart(): JsonObject =
-        Json.parseToJsonElement(this.decodeFromBase64Url().decodeToString()).jsonObject
+        Json.parseToJsonElement(this.base64toBase64Url().decodeFromBase64Url().decodeToString()).jsonObject
 
+    @Serializable
     data class JwsParts(val header: JsonObject, val payload: JsonObject, val signature: String) {
         override fun toString() = "${Json.encodeToString(header).encodeToByteArray().encodeToBase64Url()}.${
             Json.encodeToString(payload).encodeToByteArray().encodeToBase64Url()
         }.$signature"
+    }
+
+    @Serializable
+    data class JwsPartsSdJwt(val jwsParts: JwsParts, val sdJwtDisclosures: List<String>) {
+
+        fun sdJwtDisclosuresString() = if (sdJwtDisclosures.isNotEmpty()) "~${sdJwtDisclosures.joinToString("~")}" else ""
+        override fun toString() = "$jwsParts${sdJwtDisclosuresString()}"
+
     }
 
     data class JwsStringParts(val header: String, val payload: String, val signature: String) {
@@ -54,7 +62,7 @@ object JwsUtils {
         return JwsStringParts(header, payload, signature)
     }
 
-    fun String.decodeJws(withSignature: Boolean = false, allowMissingSignature: Boolean = false): JwsParts {
+    fun String.decodeJws(withSignature: Boolean = true, allowMissingSignature: Boolean = false): JwsParts {
         checkJwsPreconditions(this, allowMissingSignature)
 
         val parts = this.decodeJwsStrings()
@@ -68,6 +76,15 @@ object JwsUtils {
         val signature = if (withSignature) parts.signature else ""
 
         return JwsParts(header, payload, signature)
+    }
+
+    fun String.decodeJwsOrSdjwt(): JwsPartsSdJwt {
+        val jws = substringBefore("~")
+        val sdJwtClaims = substringAfter("~", "").split("~")
+
+        val jwsParts = jws.decodeJws()
+
+        return JwsPartsSdJwt(jwsParts, sdJwtClaims)
     }
 
 }
