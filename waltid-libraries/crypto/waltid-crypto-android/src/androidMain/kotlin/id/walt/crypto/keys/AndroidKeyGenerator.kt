@@ -45,8 +45,6 @@ object AndroidKeyGenerator : AndroidKeyCreator {
                     setSignaturePaddings(KeyProperties.SIGNATURE_PADDING_RSA_PKCS1)
 
                     setUserAuthenticationRequired(true)
-                    setUserAuthenticationValidityDurationSeconds(5)
-
                     build()
                 }
             )
