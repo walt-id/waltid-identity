@@ -58,6 +58,26 @@ object IssuanceExamples {
           }
     """.trimIndent()
 
+    private val customTypeCredentialData =  """
+        {
+           "@context":[
+              "https://www.w3.org/2018/credentials/v1"
+           ],
+           "id":"urn:uuid:THIS WILL BE REPLACED WITH DYNAMIC DATA FUNCTION (see below)",
+           "type":[
+              "MyCustomType"
+           ],
+           "credentialSubject":{
+              "id":"did:example:ebfeb1f712ebc6f1c276e12ec21",
+              "myCustomAttribute1":{
+                 "type":"BachelorDegree",
+                 "name":"Bachelor of Science and Arts"
+              },
+              "myCustomAttribute2":"Jane Doe"
+           }
+        }
+    """.trimIndent()
+
     // language=json
     private val universityDegreeCredentialProofData = """
         {
@@ -158,7 +178,18 @@ object IssuanceExamples {
     """.trimIndent()
 
     // language=json
-    val openBadgeCredentialIssuance = """
+    val customTypeCredentialIssuance = """
+        {
+          "issuerKey": $issuerKey,
+          "issuerDid": $issuerDid,
+          "credentialConfigurationId": "MyCustomType",
+          "credentialData": $customTypeCredentialData,
+          "mdocData": null,
+          "mapping": $mapping
+        }
+        """.trimIndent()
+
+    val openBadgeCredentialIssuance= """
         {
           "issuerKey": $issuerKey,
           "issuerDid": $issuerDid,
@@ -290,6 +321,10 @@ object IssuanceExamples {
     )
     val openBadgeCredentialIssuanceExampleWithUsernamePassword = typedValueExampleDescriptorDsl<IssuanceRequest>(
         openBadgeCredentialIssuancePwd
+    )
+
+    val customTypeCredentialIssuanceExample = typedValueExampleDescriptorDsl<IssuanceRequest>(
+        customTypeCredentialIssuance
     )
 
     // language=json

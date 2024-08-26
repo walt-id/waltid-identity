@@ -98,6 +98,11 @@ object OpenID4VCI {
         return credentialOffer.credentialConfigurationIds.mapNotNull { c ->
             supportedCredentials[c]?.let {
                 OfferedCredential.fromProviderMetadata(it)
+            } ?: supportedCredentials.entries.first().let {
+                    OfferedCredential.fromProviderMetadata(it.value.copy(
+                        format = CredentialFormat.jwt_vc_json,
+                        types = listOf(credentialOffer.credentialConfigurationIds.first())
+                ))
             }
         }
     }

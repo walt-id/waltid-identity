@@ -271,6 +271,7 @@ fun Application.issuerApi() {
                                     "OpenBadgeCredential example with Authorization Code Flow and Username/Password Token",
                                     IssuanceExamples.openBadgeCredentialIssuanceExampleWithUsernamePassword
                                 )
+                                example("Custom Type example", IssuanceExamples.customTypeCredentialIssuanceExample)
                                 required = true
                             }
                         }
