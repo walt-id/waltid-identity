@@ -92,12 +92,10 @@ class AndroidKeyTest {
     @Test
     fun create_then_load_key() = runTest {
         val randomKid = UUID.randomUUID().toString()
-        val key = AndroidKey.generate(KeyType.secp256r1, JwkKeyMeta(randomKid))
+        val key = AndroidKey.generate(KeyType.secp256r1, AndroidKeyParameters(randomKid))
         assertNotNull(key, "Should return key just created.")
         val loaded = AndroidKey.load(KeyType.secp256r1, randomKid)
         assertNotNull(loaded,"Should return loaded key.")
         assertEquals(key.getKeyId(), loaded.getKeyId(), "kid's are not equal")
     }
-
-
 }
