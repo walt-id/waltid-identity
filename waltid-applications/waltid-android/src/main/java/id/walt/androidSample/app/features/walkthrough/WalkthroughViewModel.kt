@@ -3,25 +3,15 @@ package id.walt.androidSample.app.features.walkthrough
 import android.util.Base64
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import id.walt.androidSample.app.features.walkthrough.model.KeyAlgorithmOption
-import id.walt.androidSample.app.features.walkthrough.model.MethodOption
-import id.walt.androidSample.app.features.walkthrough.model.SignOption
-import id.walt.androidSample.app.features.walkthrough.model.VerificationResult
-import id.walt.androidSample.app.features.walkthrough.model.WalkthroughEvent
+import id.walt.androidSample.app.features.walkthrough.model.*
 import id.walt.crypto.keys.AndroidKey
 import id.walt.crypto.keys.KeyType
 import id.walt.did.dids.DidService
 import id.walt.did.dids.registrar.DidResult
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharedFlow
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.receiveAsFlow
-import kotlinx.coroutines.flow.shareIn
-import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.JsonPrimitive
 import java.security.InvalidAlgorithmParameterException
 
 interface WalkthroughViewModel {
@@ -216,11 +206,12 @@ interface WalkthroughViewModel {
                             SignOption.JWS -> {
                                 val signedOutput = androidKey.signJws(
                                     plaintext = plainText.value.toByteArray(),
-                                    headers = mapOf("kid" to androidKey.getKeyId())
+                                    headers = mapOf("kid" to JsonPrimitive(androidKey.getKeyId()))
                                 )
                                 signedOutputJWS = signedOutput
                                 signedOutput
                             }
+
                             SignOption.Raw -> {
                                 val signedByteArray = androidKey.signRaw(plainText.value.toByteArray())
                                 signedOutputByteArray = signedByteArray

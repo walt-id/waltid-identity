@@ -39,12 +39,18 @@ jobs:
           push: false
           file: waltid-services/waltid-wallet-api/Dockerfile
           #tags: waltid/wallet-api:latest, waltid/wallet-api:${{ env.release_version }}
-      - name: Build and push Docker images (waltid-web-wallet)
+      - name: Build and push Docker images (waltid-dev-wallet)
         uses: docker/build-push-action@v6
         with:
           push: false
-          file: waltid-applications/waltid-web-wallet/Dockerfile
-          #tags: waltid/waltid-web-wallet:latest, waltid/waltid-web-wallet:${{ env.release_version }}
+          file: waltid-applications/waltid-web-wallet/apps/waltid-dev-wallet/Dockerfile
+          #tags: waltid/waltid-dev-wallet:latest, waltid/waltid-dev-wallet:${{ env.release_version }}
+      - name: Build and push Docker images (waltid-demo-wallet)
+        uses: docker/build-push-action@v6
+        with:
+          push: false
+          file: waltid-applications/waltid-web-wallet/apps/waltid-demo-wallet/Dockerfile
+          #tags: waltid/waltid-demo-wallet:latest, waltid/waltid-demo-wallet:${{ env.release_version }}
       - name: Build and push Docker images (wallet-portal)
         uses: docker/build-push-action@v6
         with:
