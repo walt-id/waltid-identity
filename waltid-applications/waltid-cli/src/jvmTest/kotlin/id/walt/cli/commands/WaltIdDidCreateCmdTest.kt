@@ -5,8 +5,12 @@ import com.github.ajalt.clikt.core.PrintHelpMessage
 import com.github.ajalt.clikt.testing.test
 import id.walt.cli.util.getResourcePath
 import id.walt.did.utils.randomUUID
+import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.assertDoesNotThrow
 import java.io.File
+import kotlin.io.path.Path
+import kotlin.io.path.deleteIfExists
+import kotlin.io.path.listDirectoryEntries
 import kotlin.test.*
 
 class WaltIdDidCreateCmdTest {
@@ -293,5 +297,12 @@ class WaltIdDidCreateCmdTest {
 // @Test
 // fun `should have --xx option if --method=iota`() {}
 
+    companion object {
+        @JvmStatic
+        @AfterAll
+        fun tearDown() {
+            Path(".").listDirectoryEntries("did%3Akey%3Az*").forEach { it.deleteIfExists() }
+        }
+    }
 
 }
