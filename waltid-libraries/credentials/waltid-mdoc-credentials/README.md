@@ -33,42 +33,8 @@ This library implements the mdoc specification: [ISO/IEC 18013-5:2021](https://w
 
 **Maven / Gradle repository**:
 
-`https://maven.walt.id/repository/waltid/`
+Take a look at this build file https://github.com/walt-id/waltid-examples/blob/main/build.gradle.kts of the example project, which shows how to use this dependency and other walt.id dependencies.
 
-**Maven**
-
-```xml
-[...]
-<repositories>
-  <repository>
-    <id>waltid</id>
-    <name>walt.id</name>
-    <url>https://maven.walt.id/repository/waltid/</url>
-  </repository>
-</repositories>
-[...]
-<dependency>
-    <groupId>id.walt</groupId>
-    <artifactId>waltid-mdoc-jvm</artifactId>
-    <version>[ version ]</version>
-</dependency>
-```
-
-**Gradle**
-
-_Kotlin DSL_
-```kotlin
-[...]
-repositories {
-  maven("https://maven.waltid.dev/releases")
-}
-[...]
-val mdocVersion = "1.xxx.0"
-[...]
-dependencies {
-  implementation("id.walt.mdoc-credentials:waltid-mdoc-jvm:$mdocVersion")
-}
-```
 
 ## Usage with NPM/NodeJs (JavaScript)
 

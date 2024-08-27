@@ -1,12 +1,13 @@
 plugins {
     kotlin("jvm")
     kotlin("plugin.serialization")
-    `maven-publish`
+    id("maven-publish")
 }
 
 group = "id.walt"
 
 repositories {
+    mavenLocal()
     mavenCentral()
 }
 
