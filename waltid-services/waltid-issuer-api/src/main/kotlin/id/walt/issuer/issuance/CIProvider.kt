@@ -62,61 +62,20 @@ import kotlinx.serialization.*
 import kotlinx.serialization.json.*
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.time.Duration.Companion.minutes
+import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
-val supportedCredentialTypes = ConfigManager.getConfig<CredentialTypeConfig>().supportedCredentialTypes
+val supportedCredentialTypes = ConfigManager.getConfig<CredentialTypeConfig>().parse()
 
 /**
  * OIDC for Verifiable Credential Issuance service provider, implementing abstract service provider from OIDC4VC library.
  */
+@OptIn(ExperimentalUuidApi::class)
 open class CIProvider : OpenIDCredentialIssuer(
     baseUrl = let {
         ConfigManager.getConfig<OIDCIssuerServiceConfig>().baseUrl
     }, config = CredentialIssuerConfig(
-        credentialConfigurationsSupported = supportedCredentialTypes.flatMap { entry ->
-            CredentialFormat.entries.map { format ->
-                Pair(
-                    "${entry.key}_${format.value}",
-                    CredentialSupported(
-                        format = format,
-                        cryptographicBindingMethodsSupported = setOf("did"),
-                        credentialSigningAlgValuesSupported = setOf("EdDSA", "ES256", "ES256K", "RSA"),
-                        types = entry.value
-                    )
-                )
-            }
-        }.plus(
-            Pair(
-                MDocTypes.ISO_MDL, CredentialSupported(
-                    format = CredentialFormat.mso_mdoc,
-                    cryptographicBindingMethodsSupported = setOf("cose_key"),
-                    credentialSigningAlgValuesSupported = setOf("ES256"),
-                    proofTypesSupported = mapOf(ProofType.cwt to ProofTypeMetadata(setOf("ES256"))),
-                    types = listOf(MDocTypes.ISO_MDL),
-                    docType = MDocTypes.ISO_MDL
-                )
-            )
-        ).plus(
-            Pair(
-                "urn:eu.europa.ec.eudi:pid:1", CredentialSupported(
-                    format = CredentialFormat.sd_jwt_vc,
-                    cryptographicBindingMethodsSupported = setOf("jwk"),
-                    credentialSigningAlgValuesSupported = setOf("ES256"),
-                    types = listOf("urn:eu.europa.ec.eudi:pid:1"),
-                    docType = "urn:eu.europa.ec.eudi:pid:1"
-                )
-            )
-        ).plus(
-            Pair(
-                "identity_credential_vc+sd-jwt", CredentialSupported(
-                    format = CredentialFormat.sd_jwt_vc,
-                    cryptographicBindingMethodsSupported = setOf("jwk"),
-                    credentialSigningAlgValuesSupported = setOf("ES256"),
-                    types = listOf("identity_credential_vc+sd-jwt"),
-                    docType = "identity_credential_vc+sd-jwt"
-                )
-            )
-        ).toMap()
+        credentialConfigurationsSupported = supportedCredentialTypes
     )
 ) {
     private val log = KotlinLogging.logger { }
