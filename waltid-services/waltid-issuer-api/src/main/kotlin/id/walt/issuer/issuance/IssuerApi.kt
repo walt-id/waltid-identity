@@ -5,6 +5,7 @@ import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeySerialization
 import id.walt.did.dids.DidService
 import id.walt.oid4vc.data.AuthenticationMethod
+import id.walt.oid4vc.data.CredentialSupported
 import id.walt.oid4vc.definitions.CROSS_DEVICE_CREDENTIAL_OFFER_URL
 import id.walt.oid4vc.requests.CredentialOfferRequest
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -445,6 +446,25 @@ fun Application.issuerApi() {
 
                     context.respond(credentialOffer.toJSON())
                 }
+            }
+        }
+        route("config", {
+            summary = "Experimental features, do not use in production yet."
+        }) {
+            /**
+             * HACK:
+             * @see OidcApi.HACK_overrideConfigCredentialConfigurationsSupported
+             */
+            post("overrideConfigCredentialConfigurationsSupported", {
+                description = "Override (by configuration file) configured credentialConfigurationsSupported"
+                request {
+                    body<Map<String, CredentialSupported>>()
+                }
+            }) {
+                val overriddenConfigCredentialConfigurationsSupported = context.receive<Map<String, CredentialSupported>>()
+                OidcApi.HACK_overrideConfigCredentialConfigurationsSupported(overriddenConfigCredentialConfigurationsSupported)
+
+                context.respond(HttpStatusCode.Accepted)
             }
         }
     }

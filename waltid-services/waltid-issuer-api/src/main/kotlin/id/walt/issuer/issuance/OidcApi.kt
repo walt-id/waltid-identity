@@ -41,6 +41,33 @@ object OidcApi : CIProvider() {
 
     private val logger = KotlinLogging.logger { }
 
+    /**
+     * FIXME: Hack required for customer quick-fix,
+     * as config in CIProvider is argument for OpenIDCredentialIssuer interface constructor
+     * (tag=OpenID4VC-lib-issues)
+     *
+     * Description:
+     *  - Dynamically override the suddenly required credentialConfigurationsSupported configuration
+     *    of the CredentialIssuerConfig required by the CIProvider of the OidcApi, as by default it's
+     *    a constructor argument and cannot be overridden later on.
+     *  - This is required for issuing arbitrary credentials (which is now no longer possible,
+     *    since the credential configuration id is required for the issue endpoints of the Issuer,
+     *    and as such all credentials have to be known before startup and preconfigured in a configuration
+     *    file).
+     *
+     * Issues / Will break:
+     *  - has to be manually configured
+     *  - has to be called for every instance in multi-instance deployment
+     *  - does no handling whatsoever for already active issuance sessions
+     *  - will be lost after restart
+     *  - [X - outdated] //not thread-safe// is now overriden directly
+     */
+    @Suppress("FunctionName", "LocalVariableName")
+    fun HACK_overrideConfigCredentialConfigurationsSupported(HACK_overriden_credentialConfigurationsSupported: Map<String, CredentialSupported>) {
+        // HACK: config.credentialConfigurationsSupported has
+        // HACK: been made non-immutable (even though type not mutable map)
+        config.credentialConfigurationsSupported = HACK_overriden_credentialConfigurationsSupported
+    }
 
     private fun Application.oidcRoute(build: Route.() -> Unit) {
         routing {

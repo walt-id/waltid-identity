@@ -5,5 +5,5 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 class CredentialIssuerConfig(
-    val credentialConfigurationsSupported: Map<String, CredentialSupported> = mapOf()
+    var credentialConfigurationsSupported: Map<String, CredentialSupported> = mapOf()
 ) : OpenIDProviderConfig()
