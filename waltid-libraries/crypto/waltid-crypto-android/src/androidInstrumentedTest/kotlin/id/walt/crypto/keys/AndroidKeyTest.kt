@@ -4,8 +4,13 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.util.UUID
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.uuid.Uuid
 
 
 @RunWith(AndroidJUnit4::class)
@@ -77,5 +82,20 @@ class AndroidKeyTest {
         assertTrue { result.isSuccess }
     }
 
+    @Test
+    fun load_not_existing_key() = runTest {
+        val randomKid = UUID.randomUUID().toString()
+        val key = AndroidKey.load(KeyType.secp256r1, randomKid)
+        assertNull(key, "Should not load key that does not exist.")
+    }
 
+    @Test
+    fun create_then_load_key() = runTest {
+        val randomKid = UUID.randomUUID().toString()
+        val key = AndroidKey.generate(KeyType.secp256r1, AndroidKeyParameters(randomKid))
+        assertNotNull(key, "Should return key just created.")
+        val loaded = AndroidKey.load(KeyType.secp256r1, randomKid)
+        assertNotNull(loaded,"Should return loaded key.")
+        assertEquals(key.getKeyId(), loaded.getKeyId(), "kid's are not equal")
+    }
 }
