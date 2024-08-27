@@ -165,7 +165,7 @@ class VerificationUseCase(
 
     fun getResult(sessionId: String): Result<PresentationSessionInfo> {
         val session = OIDCVerifierService.getSession(sessionId)
-            ?: return Result.failure(IllegalArgumentException("Invalid id provided (expired?): $sessionId"))
+            ?: return Result.failure(NotFoundException("Invalid id provided (expired?): $sessionId"))
 
         val policyResults = OIDCVerifierService.policyResults[session.id]?.let { Json.encodeToJsonElement(it).jsonObject }
 

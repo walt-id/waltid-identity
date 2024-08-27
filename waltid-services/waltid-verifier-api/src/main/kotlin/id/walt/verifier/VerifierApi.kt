@@ -315,9 +315,9 @@ fun Application.verfierApi() {
                         }
                 }.onFailure { e ->
                     when (e) {
-                        is IllegalArgumentException -> call.respond(HttpStatusCode.BadRequest, e.localizedMessage)
-                        is NotFoundException -> call.respond(HttpStatusCode.NotFound, e.localizedMessage)
-                        else -> call.respond(HttpStatusCode.BadRequest, e.localizedMessage)
+                        is IllegalArgumentException -> throw IllegalArgumentException(e.localizedMessage)
+                        is NotFoundException -> throw NotFoundException(e.localizedMessage)
+                        else -> throw BadRequestException(e.localizedMessage)
                     }
                 }
             }
@@ -338,7 +338,7 @@ fun Application.verfierApi() {
                             description = "Session info"
                         }
                     }
-                    HttpStatusCode.BadRequest to {
+                    HttpStatusCode.NotFound to {
                         body<String> {
                             description = "Session not found or invalid"
                             example("Session not found") {
@@ -355,7 +355,10 @@ fun Application.verfierApi() {
                     call.respond(HttpStatusCode.OK, it)
                 }.onFailure {
                     logger.debug(it) { "Verification failed ($it)" }
-                    call.respond(HttpStatusCode.BadRequest, it.localizedMessage)
+                    when (it) {
+                        is NotFoundException -> throw NotFoundException(it.localizedMessage)
+                        else -> throw BadRequestException(it.localizedMessage)
+                    }
                 }
             }
             get("/pd/{id}", {
@@ -379,7 +382,7 @@ fun Application.verfierApi() {
                 verificationUseCase.getPresentationDefinition(id ?: "").onSuccess {
                     call.respond(it.toJSON())
                 }.onFailure {
-                    call.respond(HttpStatusCode.NotFound, "Presentation definition not found")
+                    throw NotFoundException("Presentation definition not found")
                 }
             }
             get("policy-list", {
@@ -405,7 +408,7 @@ fun Application.verfierApi() {
                     call.respondText(it, ContentType.parse("application/oauth-authz-req+jwt"), HttpStatusCode.OK)
                 }.onFailure {
                     logger.debug(it) { "Cannot view request session ($it)" }
-                    call.respond(HttpStatusCode.BadRequest, it.localizedMessage)
+                    throw NotFoundException(it.localizedMessage)
                 }
             }
         }
