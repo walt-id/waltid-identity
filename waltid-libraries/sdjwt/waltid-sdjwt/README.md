@@ -59,9 +59,7 @@ verifiable credentials according to the **SD-JWT-VC** specification:
 
 **Maven / Gradle repository**:
 
-Take a look at the build-file of the example project how to include this an other walt.id liraries in your project:
-
-https://github.com/walt-id/waltid-examples/blob/main/build.gradle.kts
+Take a look at this build file https://github.com/walt-id/waltid-examples/blob/main/build.gradle.kts , which shows how to use this dependency and other walt.id dependencies.
 
 ## Usage with NPM/NodeJs (JavaScript)
 
