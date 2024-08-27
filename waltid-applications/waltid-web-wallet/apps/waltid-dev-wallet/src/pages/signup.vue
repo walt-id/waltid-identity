@@ -104,9 +104,9 @@
 
 <script lang="ts" setup>
 import {ArrowRightStartOnRectangleIcon, EnvelopeIcon, IdentificationIcon, KeyIcon} from "@heroicons/vue/20/solid";
-import ActionResultModal from "~/components/modals/ActionResultModal.vue";
-import useModalStore from "~/stores/useModalStore";
-import {useTenant} from "~/composables/tenants";
+import ActionResultModal from "@waltid-web-wallet/components/modals/ActionResultModal.vue";
+import useModalStore from "@waltid-web-wallet/stores/useModalStore.ts";
+import {useTenant} from "@waltid-web-wallet/composables/tenants.ts";
 
 const tenant = await (useTenant()).value
 const bgImg = tenant?.bgImage
