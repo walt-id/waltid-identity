@@ -3,8 +3,8 @@ package id.walt
 import id.walt.commons.config.ConfigManager
 import id.walt.credentials.vc.vcs.W3CVC
 import id.walt.crypto.keys.KeyManager
-import id.walt.crypto.keys.KeySerialization
 import id.walt.issuer.issuance.IssuanceRequest
+import id.walt.issuer.issuance.IssuanceType
 import id.walt.issuer.issuance.createCredentialOfferUri
 import id.walt.sdjwt.SDMapBuilder
 import kotlinx.coroutines.test.runTest
@@ -144,7 +144,7 @@ class IssuerApiTest {
             )
 
         ConfigManager.testWithConfigs(testConfigs)
-        val offerUri = createCredentialOfferUri(listOf(issueRequest))
+        val offerUri = createCredentialOfferUri(listOf(issueRequest), IssuanceType.w3c)
 
         assertEquals(true, offerUri.contains("//localhost:7002/?credential_offer"))
     }
@@ -168,7 +168,7 @@ class IssuerApiTest {
         )
 
         ConfigManager.testWithConfigs(testConfigs)
-        val offerUri = createCredentialOfferUri(listOf(issueRequest))
+        val offerUri = createCredentialOfferUri(listOf(issueRequest), IssuanceType.w3c)
 
         assertEquals(true, offerUri.contains("//localhost:7002/?credential_offer"))
     }
@@ -216,7 +216,7 @@ class IssuerApiTest {
         val issuanceRequests = listOf(issueRequest1, issueRequest2)
 
         ConfigManager.loadConfigs(emptyArray())
-        val offerUri = createCredentialOfferUri(issuanceRequests)
+        val offerUri = createCredentialOfferUri(issuanceRequests, IssuanceType.w3c)
 
         assertEquals(true, offerUri.contains("//localhost:7002/?credential_offer"))
 

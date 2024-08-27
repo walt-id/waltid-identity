@@ -158,7 +158,7 @@ class VerificationUseCase(
             } else {
                 val failedPolicies =
                     policyResults.results.flatMap { it.policyResults.map { it } }.filter { !it.isSuccess }
-                Result.failure(Exception("Verification policies did not succeed: ${failedPolicies.joinToString { it.policy }}"))
+                Result.failure(IllegalArgumentException("Verification policies did not succeed: ${failedPolicies.joinToString { it.policy + " (${it.error})" }}"))
             }
         }
     }

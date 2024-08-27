@@ -116,7 +116,7 @@ class NotBeforeDatePolicyTest : DatePolicyTestBase() {
             assert(json.containsKey("date_seconds"))
             assert(json["date_seconds"]!!.jsonPrimitive.content == nbf.epochSeconds.toString())
             assert(json.containsKey("available_since_seconds"))
-            assert(json["available_since_seconds"]!!.jsonPrimitive.content == (Clock.System.now() - nbf).inWholeSeconds.toString())
+            assert(json["available_since_seconds"]!!.jsonPrimitive.content.toLong() in withTolerance((Clock.System.now() - nbf).inWholeSeconds))
         }
 
         private fun assertFailureResult(result: Result<Any>, claim: Claims, nbf: Instant) {
@@ -126,7 +126,7 @@ class NotBeforeDatePolicyTest : DatePolicyTestBase() {
             assert(exception.policyAvailable)
             assert(exception.key == claim.getValue())
             assert(exception.date.epochSeconds == nbf.epochSeconds)
-            assert(exception.availableInSeconds == (nbf - Clock.System.now()).inWholeSeconds)
+            assert(exception.availableInSeconds in withTolerance((nbf - Clock.System.now()).inWholeSeconds))
         }
     }
 }

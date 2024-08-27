@@ -116,7 +116,7 @@ class ExpirationDatePolicyTest : DatePolicyTestBase() {
             assert(json.containsKey("date_seconds"))
             assert(json["date_seconds"]!!.jsonPrimitive.content == exp.epochSeconds.toString())
             assert(json.containsKey("expires_in_seconds"))
-            assert(json["expires_in_seconds"]!!.jsonPrimitive.content == (exp - Clock.System.now()).inWholeSeconds.toString())
+            assert(json["expires_in_seconds"]!!.jsonPrimitive.content.toLong() in withTolerance((exp - Clock.System.now()).inWholeSeconds))
         }
 
         private fun assertFailureResult(result: Result<Any>, claim: Claims, exp: Instant) {
@@ -126,7 +126,7 @@ class ExpirationDatePolicyTest : DatePolicyTestBase() {
             assert(exception.policyAvailable)
             assert(exception.key == claim.getValue())
             assert(exception.date.epochSeconds == exp.epochSeconds)
-            assert(exception.expiredSinceSeconds == (Clock.System.now() - exp).inWholeSeconds)
+            assert(exception.expiredSinceSeconds in withTolerance((Clock.System.now() - exp).inWholeSeconds))
         }
     }
 }

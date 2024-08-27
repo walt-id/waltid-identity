@@ -12,8 +12,7 @@ allprojects {
 }
 
 plugins {
-//    val kotlinVersion = "2.0.0"
-    val kotlinVersion = "2.0.20-RC"
+    val kotlinVersion = "2.0.20"
     kotlin("multiplatform") version kotlinVersion apply false
     kotlin("jvm") version kotlinVersion
 
@@ -21,8 +20,8 @@ plugins {
 
     kotlin("plugin.serialization") version kotlinVersion apply false
 
-    id("com.android.library") version "8.2.2" apply false
-    id("com.android.application") version "8.2.2" apply false
+    id("com.android.library") version "8.5.2" apply false
+    id("com.android.application") version "8.5.2" apply false
 
     id("com.github.ben-manes.versions") version "0.51.0" apply false
 }
