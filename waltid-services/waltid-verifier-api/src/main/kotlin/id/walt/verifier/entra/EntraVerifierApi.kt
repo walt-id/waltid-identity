@@ -219,9 +219,7 @@ fun Application.entraVerifierApi() {
                 println("URL: " + context.url())
 
                 if (!EntraVerifierApi.callbackMapping.containsKey(nonce)) {
-
-                    context.respond(HttpStatusCode.BadRequest, "Invalid nonce")
-                    return@post
+                    throw IllegalArgumentException("Invalid nonce: $nonce")
                 }
 
                 val body = context.receiveText()
