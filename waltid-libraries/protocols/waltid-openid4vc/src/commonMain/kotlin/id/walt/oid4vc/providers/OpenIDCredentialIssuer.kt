@@ -19,9 +19,7 @@ import id.walt.oid4vc.util.randomUUID
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.http.*
 import kotlinx.datetime.Clock
-import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.decodeFromByteArray
-import kotlinx.serialization.decodeFromHexString
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.time.Duration
@@ -33,10 +31,10 @@ import kotlin.time.Duration.Companion.minutes
  */
 abstract class OpenIDCredentialIssuer(
     baseUrl: String,
-    override val config: CredentialIssuerConfig
+    override val config: CredentialIssuerConfig,
 ) : OpenIDProvider<IssuanceSession>(baseUrl), ICredentialProvider {
 
-    private val log = KotlinLogging.logger {  }
+    private val log = KotlinLogging.logger { }
 
     override val metadata
         get() = createDefaultProviderMetadata().copy(
@@ -122,7 +120,7 @@ abstract class OpenIDCredentialIssuer(
         credentialOfferBuilder: CredentialOffer.Builder,
         expiresIn: Duration,
         allowPreAuthorized: Boolean,
-        txCode: TxCode? = null, txCodeValue: String? = null
+        txCode: TxCode? = null, txCodeValue: String? = null,
     ): IssuanceSession {
         val sessionId = randomUUID()
         credentialOfferBuilder.addAuthorizationCodeGrant(sessionId)
@@ -170,7 +168,7 @@ abstract class OpenIDCredentialIssuer(
 
     private fun createCredentialError(
         credReq: CredentialRequest, session: IssuanceSession,
-        errorCode: CredentialErrorCode, message: String?
+        errorCode: CredentialErrorCode, message: String?,
     ) =
         CredentialError(
             credReq, errorCode, null,
@@ -199,7 +197,7 @@ abstract class OpenIDCredentialIssuer(
 
     private fun doGenerateCredentialResponseFor(
         credentialRequest: CredentialRequest,
-        session: IssuanceSession
+        session: IssuanceSession,
     ): CredentialResponse {
         val nonce = session.cNonce ?: throw createCredentialError(
             credentialRequest,
@@ -262,7 +260,7 @@ abstract class OpenIDCredentialIssuer(
 
     open fun generateBatchCredentialResponse(
         batchCredentialRequest: BatchCredentialRequest,
-        accessToken: String
+        accessToken: String,
     ): BatchCredentialResponse {
         val accessInfo = verifyAndParseToken(accessToken, TokenTarget.ACCESS) ?: throw BatchCredentialError(
             batchCredentialRequest,
@@ -316,7 +314,7 @@ abstract class OpenIDCredentialIssuer(
 
     private fun createCredentialResponseFor(
         credentialResult: CredentialResult,
-        session: IssuanceSession
+        session: IssuanceSession,
     ): CredentialResponse {
         return credentialResult.credential?.let {
             CredentialResponse.success(credentialResult.format, it, customParameters = credentialResult.customParameters)
@@ -330,29 +328,34 @@ abstract class OpenIDCredentialIssuer(
         }
     }
 
-    protected fun getNonceFromProof(proofOfPossession: ProofOfPossession) = when(proofOfPossession.proofType) {
+    protected fun getNonceFromProof(proofOfPossession: ProofOfPossession) = when (proofOfPossession.proofType) {
         ProofType.jwt -> parseTokenPayload(proofOfPossession.jwt!!)[JWTClaims.Payload.nonce]?.jsonPrimitive?.content
         ProofType.cwt -> Cbor.decodeFromByteArray<COSESign1>(proofOfPossession.cwt!!.base64UrlDecode()).decodePayload()?.let { payload ->
-            payload.value[MapKey(ProofOfPossession.CWTProofBuilder.LABEL_NONCE)].let { when(it) {
-                is ByteStringElement -> io.ktor.utils.io.core.String(it.value)
-                is StringElement -> it.value
-                else -> throw Error("Invalid nonce type")
-            } }
+            payload.value[MapKey(ProofOfPossession.CWTProofBuilder.LABEL_NONCE)].let {
+                when (it) {
+                    is ByteStringElement -> io.ktor.utils.io.core.String(it.value)
+                    is StringElement -> it.value
+                    else -> throw Error("Invalid nonce type")
+                }
+            }
         }
+
         else -> null
     }
 
     private fun validateProofOfPossession(credentialRequest: CredentialRequest, nonce: String): Boolean {
         log.debug { "VALIDATING: ${credentialRequest.proof} with nonce $nonce" }
         log.debug { "VERIFYING ITS SIGNATURE" }
-        if(credentialRequest.proof == null) return false
+        if (credentialRequest.proof == null) return false
         return when {
             credentialRequest.proof.isJwtProofType -> verifyTokenSignature(
                 TokenTarget.PROOF_OF_POSSESSION, credentialRequest.proof.jwt!!
             ) && getNonceFromProof(credentialRequest.proof) == nonce
+
             credentialRequest.proof.isCwtProofType -> verifyCOSESign1Signature(
                 TokenTarget.PROOF_OF_POSSESSION, credentialRequest.proof.cwt!!
             ) && getNonceFromProof(credentialRequest.proof) == nonce
+
             else -> false
         }
     }
@@ -365,7 +368,7 @@ abstract class OpenIDCredentialIssuer(
 
     open fun getCredentialOfferRequestUrl(
         offerRequest: CredentialOfferRequest,
-        walletCredentialOfferEndpoint: String = CROSS_DEVICE_CREDENTIAL_OFFER_URL
+        walletCredentialOfferEndpoint: String = CROSS_DEVICE_CREDENTIAL_OFFER_URL,
     ): String {
         val url = URLBuilder(walletCredentialOfferEndpoint).apply {
             parameters.appendAll(parametersOf(offerRequest.toHttpParameters()))
@@ -387,7 +390,7 @@ abstract class OpenIDCredentialIssuer(
     }
 
     open fun getCredentialOfferRequest(
-        issuanceSession: IssuanceSession, byReference: Boolean = false
+        issuanceSession: IssuanceSession, byReference: Boolean = false,
     ): CredentialOfferRequest {
         return if (byReference) {
             CredentialOfferRequest(null, getCredentialOfferByReferenceUri(issuanceSession))
