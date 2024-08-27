@@ -33,9 +33,8 @@ This library implements the mdoc specification: [ISO/IEC 18013-5:2021](https://w
 
 **Maven / Gradle repository**:
 
-Take a look at the build-file of the example project how to include this an other walt.id liraries in your project:
+Take a look at this build file https://github.com/walt-id/waltid-examples/blob/main/build.gradle.kts of the example project, which shows how to use this dependency and other walt.id dependencies.
 
-https://github.com/walt-id/waltid-examples/blob/main/build.gradle.kts
 
 ## Usage with NPM/NodeJs (JavaScript)
 
