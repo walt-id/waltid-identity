@@ -6,7 +6,7 @@ plugins {
     kotlin("plugin.serialization")
     id("maven-publish")
     id("dev.petuska.npm.publish") version "3.4.3"
-    // id("love.forte.plugin.suspend-transform") version "2.0.20-Beta1-0.9.2"
+    // id("love.forte.plugin.suspend-transform") version "2.0.20-0.9.2"
     id("com.github.ben-manes.versions")
 }
 
