@@ -200,7 +200,13 @@ class TestCredentialWallet(
         val sdJwtVCsPresented = runBlocking {
             matchedCredentials.filter { it.format == CredentialFormat.sd_jwt_vc }.map {
                 // TODO: adopt selective disclosure selection (doesn't work with jwts other than sd_jwt anyway, like above)
-                SDJwtVC.parse(it.document).present(
+                val documentWithDisclosures = if (selectedDisclosures?.containsKey(it.id) == true) {
+                    it.document + "~${selectedDisclosures[it.id]!!.joinToString("~")}"
+                } else {
+                   it.document
+                }
+
+                SDJwtVC.parse(documentWithDisclosures).present(
                     true, audience = session.authorizationRequest.clientId, nonce = session.nonce ?: "",
                     WaltIdJWTCryptoProvider(mapOf(key.getKeyId() to key)), key.getKeyId()
                 )

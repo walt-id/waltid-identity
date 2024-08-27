@@ -56,9 +56,12 @@ class LspPotentialIssuance(val client: HttpClient) {
     suspend fun testTrack1() = E2ETestWebService.test("test track 1") {
         // ### steps 1-6
         val offerResp = client.get("/lsp-potential/lspPotentialCredentialOfferT1")
+        println("Offer resp: $offerResp")
         assert(offerResp.status == HttpStatusCode.OK)
         val offerUri = offerResp.bodyAsText()
+        println("Offer uri: $offerUri")
         val parsedOffer = OpenID4VCI.parseAndResolveCredentialOfferRequestUrl(offerUri)
+        println("parsedOffer: $parsedOffer")
         // ### get issuer metadata, steps 7-10
         val providerMetadataUri = OpenID4VCI.getCIProviderMetadataUrl(parsedOffer.credentialIssuer)
         val oauthMetadataUri = OpenID4VCI.getOAuthProviderMetadataUrl(parsedOffer.credentialIssuer)
@@ -70,6 +73,10 @@ class LspPotentialIssuance(val client: HttpClient) {
         assertNotNull(oauthMetadata.tokenEndpoint)
         // resolve offered credentials
         val offeredCredentials = OpenID4VCI.resolveOfferedCredentials(parsedOffer, providerMetadata)
+        println("offered credentials: $offeredCredentials")
+
+        assert(offeredCredentials.isNotEmpty()) { "Offered credentials is empty" }
+
         val offeredCredential = offeredCredentials.first()
         assertEquals(CredentialFormat.mso_mdoc, offeredCredential.format)
         assertEquals(MDocTypes.ISO_MDL, offeredCredential.docType)
