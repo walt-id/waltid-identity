@@ -86,4 +86,15 @@ abstract class DatePolicyTestBase {
             }
         } ?: put(claim, Json.encodeToJsonElement(instant))
     }
+
+    companion object {
+        @JvmStatic
+        protected fun withTolerance(value: Long, tolerance: Int = 5): ClosedRange<Long> =
+            object : ClosedRange<Long> {
+                override val endInclusive: Long
+                    get() = value + tolerance
+                override val start: Long
+                    get() = value - tolerance
+            }
+    }
 }
