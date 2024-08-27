@@ -90,7 +90,6 @@ kotlin {
                 api(project(":waltid-libraries:crypto:waltid-crypto"))
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.1")
                 implementation("io.github.oshai:kotlin-logging:7.0.0")
-                implementation ("com.hierynomus:asn-one:0.6.0")
             }
         }
         val androidInstrumentedTest by getting {
