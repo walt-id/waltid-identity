@@ -1,0 +1,15 @@
+{
+    "extends": "./.nuxt/tsconfig.json",
+    "compilerOptions": {
+        "skipLibCheck": true,
+        "paths": {
+            "~/*": [
+                "./src/*"
+            ],
+            "@waltid-web-wallet/*": [
+                "../../libs/*"
+            ]
+        },
+        "allowImportingTsExtensions": true
+    }
+}

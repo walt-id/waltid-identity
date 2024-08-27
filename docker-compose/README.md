@@ -26,7 +26,8 @@ docker-compose down
 
 ### Apps
 
-- Web Wallet: [http://localhost:7101](http://localhost:7101)
+- Demo Web Wallet: [http://localhost:7101](http://localhost:7101)
+- Dev Web Wallet: [http://localhost:7104](http://localhost:7104)
 - Web Portal: [http://localhost:7102](http://localhost:7102)
 - Credential Repo: [http://localhost:7103](http://localhost:7103)
 
