@@ -115,15 +115,15 @@ class AndroidKey() : Key() {
     }
 
     override suspend fun signJws(plaintext: ByteArray, headers: Map<String, JsonElement>): String {
-        val signature: ByteArray = signWithKeystore(plaintext)
+        val signingInput =
+            Json.encodeToString(headers).toByteArray()
+                .encodeToBase64Url() + "." + plaintext.encodeToBase64Url()
 
-        val encodedSignature = signature.encodeToBase64Url()
+        val signature = signWithKeystore(signingInput.encodeToByteArray()).let {
+            EccUtils.convertDERtoIEEEP1363(it)
+        }.encodeToBase64Url()
 
-        // Construct the JWS in the format: base64UrlEncode(headers) + '.' + base64UrlEncode(payload) + '.' + base64UrlEncode(signature)
-        val encodedHeaders = Json.encodeToString(headers).toByteArray().encodeToBase64Url()
-        val encodedPayload = plaintext.encodeToBase64Url()
-
-        return "$encodedHeaders.$encodedPayload.$encodedSignature"
+        return "$signingInput.$signature"
     }
 
     override suspend fun verifyRaw(
@@ -218,7 +218,7 @@ class AndroidKey() : Key() {
     companion object : AndroidKeyCreator, AndroidKeyLoader {
         override suspend fun generate(
             type: KeyType,
-            metadata: JwkKeyMeta?,
+            metadata: AndroidKeyParameters?,
         ): AndroidKey = AndroidKeyGenerator.generate(type, metadata)
 
         override suspend fun load(type: KeyType, keyId: String): AndroidKey? =
