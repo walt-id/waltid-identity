@@ -62,6 +62,7 @@ import kotlinx.serialization.*
 import kotlinx.serialization.json.*
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.time.Duration.Companion.minutes
+import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 val supportedCredentialTypes = ConfigManager.getConfig<CredentialTypeConfig>().parse()
@@ -69,6 +70,7 @@ val supportedCredentialTypes = ConfigManager.getConfig<CredentialTypeConfig>().p
 /**
  * OIDC for Verifiable Credential Issuance service provider, implementing abstract service provider from OIDC4VC library.
  */
+@OptIn(ExperimentalUuidApi::class)
 open class CIProvider : OpenIDCredentialIssuer(
     baseUrl = let {
         ConfigManager.getConfig<OIDCIssuerServiceConfig>().baseUrl
