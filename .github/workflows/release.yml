@@ -68,12 +68,18 @@ jobs:
           push: true
           file: waltid-services/waltid-wallet-api/Dockerfile
           tags: waltid/wallet-api:latest, waltid/wallet-api:${{ inputs.release_version }}
-      - name: Build and push Docker images (waltid-web-wallet)
+      - name: Build and push Docker images (waltid-demo-wallet)
         uses: docker/build-push-action@v6
         with:
           push: true
-          file: waltid-applications/waltid-web-wallet/Dockerfile
-          tags: waltid/waltid-web-wallet:latest, waltid/waltid-web-wallet:${{ inputs.release_version }}
+          file: waltid-applications/waltid-web-wallet/apps/waltid-demo-wallet/Dockerfile
+          tags: waltid/waltid-demo-wallet:latest, waltid/waltid-demo-wallet:${{ inputs.release_version }}
+      - name: Build and push Docker images (waltid-dev-wallet)
+        uses: docker/build-push-action@v6
+        with:
+          push: true
+          file: waltid-applications/waltid-web-wallet/apps/waltid-dev-wallet/Dockerfile
+          tags: waltid/waltid-dev-wallet:latest, waltid/waltid-dev-wallet:${{ inputs.release_version }}
       - name: Build and push Docker images (wallet-portal)
         uses: docker/build-push-action@v6
         with:
@@ -129,7 +135,7 @@ jobs:
         run: sed "s/_DEFAULT_DEPLOYMENT_/$GITHUB_SHA/g" waltid-services/waltid-wallet-api/k8s/deployment-prod.yaml |
           sed "s/__DEFAULT_KEYCLOAK_CLIENT_SECRET__/$PROD_KEYCLOAK_CLIENT_SECRET/g" |
           sed "s/__DEFAULT_IMAGE_TAG__/$IMAGE_TAG/g" > waltid-services/waltid-wallet-api/k8s/deployment_mod.yaml
-      - name: Continuous deployment - wallet.walt.id
+      - name: Continuous deployment - web wallet
         uses: actions-hub/kubectl@master
         env:
           KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}

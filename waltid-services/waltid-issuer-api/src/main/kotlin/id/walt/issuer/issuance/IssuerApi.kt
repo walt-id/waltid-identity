@@ -8,6 +8,7 @@ import id.walt.oid4vc.data.AuthenticationMethod
 import id.walt.oid4vc.definitions.CROSS_DEVICE_CREDENTIAL_OFFER_URL
 import id.walt.oid4vc.requests.CredentialOfferRequest
 import io.github.oshai.kotlinlogging.KotlinLogging
+import io.github.smiley4.ktorswaggerui.dsl.routes.OpenApiRequest
 import io.github.smiley4.ktorswaggerui.dsl.routing.get
 import io.github.smiley4.ktorswaggerui.dsl.routing.post
 import io.github.smiley4.ktorswaggerui.dsl.routing.route
@@ -26,23 +27,35 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 
 private val logger = KotlinLogging.logger {}
-suspend fun createCredentialOfferUri(issuanceRequests: List<IssuanceRequest>, expiresIn: Duration = 5.minutes): String {
+suspend fun createCredentialOfferUri(
+    issuanceRequests: List<IssuanceRequest>,
+    issuanceType: IssuanceType,
+    callbackUrl: String? = null,
+    expiresIn: Duration = 5.minutes,
+): String {
+    val overwrittenIssuanceRequests = issuanceRequests.map { it.copy(issuanceType = issuanceType) }
+
     val credentialOfferBuilder =
-        OidcIssuance.issuanceRequestsToCredentialOfferBuilder(issuanceRequests)
+        OidcIssuance.issuanceRequestsToCredentialOfferBuilder(overwrittenIssuanceRequests)
 
     val issuanceSession = OidcApi.initializeCredentialOffer(
         credentialOfferBuilder = credentialOfferBuilder,
         expiresIn,
-        allowPreAuthorized = when (issuanceRequests[0].authenticationMethod) {
+        allowPreAuthorized = when (overwrittenIssuanceRequests[0].authenticationMethod) {
             AuthenticationMethod.PRE_AUTHORIZED -> true
             else -> false
         }
     )
-    OidcApi.setIssuanceDataForIssuanceId(issuanceSession.id, issuanceRequests.map {
+
+    OidcApi.setIssuanceDataForIssuanceId(issuanceSession.id, overwrittenIssuanceRequests.map {
         val key = KeyManager.resolveSerializedKey(it.issuerKey)
 
         CIProvider.IssuanceSessionData(
-            key, it.issuerDid, it
+            id = issuanceSession.id,
+            issuerKey = key,
+            issuerDid = it.issuerDid,
+            request = it,
+            callbackUrl = callbackUrl
         )
     })  // TODO: Hack as this is non stateless because of oidc4vc lib API
 
@@ -62,7 +75,6 @@ suspend fun createCredentialOfferUri(issuanceRequests: List<IssuanceRequest>, ex
 
 fun Application.issuerApi() {
     routing {
-
         route("onboard", {
             tags = listOf("Issuer onboarding")
         }) {
@@ -189,6 +201,13 @@ fun Application.issuerApi() {
         route("", {
             tags = listOf("Credential Issuance")
         }) {
+            fun OpenApiRequest.statusCallbackUriHeader() = headerParameter<String>("statusCallbackUri") {
+                description = "Callback to push state changes of the issuance process to"
+                required = false
+            }
+
+            fun PipelineContext<Unit, ApplicationCall>.getCallbackUriHeader() = context.request.header("statusCallbackUri")
+
             route("raw") {
                 route("jwt") {
                     post("sign", {
@@ -285,17 +304,12 @@ fun Application.issuerApi() {
                         description = "This endpoint issues a W3C Verifiable Credential, and returns an issuance URL "
 
                         request {
+                            statusCallbackUriHeader()
                             body<IssuanceRequest> {
                                 description =
                                     "Pass the unsigned credential that you intend to issue as the body of the request."
-                                example(
-                                    "OpenBadgeCredential example",
-                                    IssuanceExamples.openBadgeCredentialIssuanceExample
-                                )
-                                example(
-                                    "UniversityDegreeCredential example",
-                                    IssuanceExamples.universityDegreeIssuanceCredentialExample
-                                )
+                                example("OpenBadgeCredential example", IssuanceExamples.openBadgeCredentialIssuanceExample)
+                                example("UniversityDegreeCredential example", IssuanceExamples.universityDegreeIssuanceCredentialExample)
                                 example(
                                     "OpenBadgeCredential example with Authorization Code Flow and Id Token",
                                     IssuanceExamples.openBadgeCredentialIssuanceExampleWithIdToken
@@ -337,7 +351,7 @@ fun Application.issuerApi() {
                                 throw validationResult.second?.let { it1 -> BadRequestException(it1) }!!
                             }
 
-                            val offerUri = createCredentialOfferUri(listOf(jwtIssuanceRequest))
+                            val offerUri = createCredentialOfferUri(listOf(jwtIssuanceRequest), IssuanceType.w3c, getCallbackUriHeader())
                             context.respond(HttpStatusCode.OK, offerUri)
                         }.onFailure {
 
@@ -351,6 +365,7 @@ fun Application.issuerApi() {
                             "This endpoint issues a list of W3C Verifiable Credentials, and returns an issuance URL "
 
                         request {
+                            statusCallbackUriHeader()
                             body<List<IssuanceRequest>> {
                                 description =
                                     "Pass the unsigned credential that you intend to issue as the body of the request."
@@ -375,7 +390,7 @@ fun Application.issuerApi() {
 
                         runCatching {
                             val issuanceRequests = context.receive<List<IssuanceRequest>>()
-                            val offerUri = createCredentialOfferUri(issuanceRequests)
+                            val offerUri = createCredentialOfferUri(issuanceRequests, IssuanceType.w3c, getCallbackUriHeader())
                             logger.debug { "Offer URI: $offerUri" }
 
                             context.respond(
@@ -394,6 +409,7 @@ fun Application.issuerApi() {
                             "This endpoint issues a W3C or SD-JWT-VC Verifiable Credential, and returns an issuance URL "
 
                         request {
+                            statusCallbackUriHeader()
                             body<IssuanceRequest> {
                                 description =
                                     "Pass the unsigned credential that you intend to issue in the body of the request."
@@ -417,7 +433,7 @@ fun Application.issuerApi() {
                     }) {
                         runCatching {
                             val sdJwtIssuanceRequest = context.receive<IssuanceRequest>()
-                            val offerUri = createCredentialOfferUri(listOf(sdJwtIssuanceRequest))
+                            val offerUri = createCredentialOfferUri(listOf(sdJwtIssuanceRequest), IssuanceType.sdjwt, getCallbackUriHeader())
                             context.respond(HttpStatusCode.OK, offerUri)
                         }.onFailure {
                             throwError(it)
@@ -430,6 +446,7 @@ fun Application.issuerApi() {
                             "This endpoint issues a list of W3C Verifiable Credentials, and returns an issuance URL "
 
                         request {
+                            statusCallbackUriHeader()
                             body<List<IssuanceRequest>> {
                                 description =
                                     "Pass the unsigned credential that you intend to issue as the body of the request."
@@ -454,7 +471,7 @@ fun Application.issuerApi() {
 
                         runCatching {
                             val issuanceRequests = context.receive<List<IssuanceRequest>>()
-                            val offerUri = createCredentialOfferUri(issuanceRequests)
+                            val offerUri = createCredentialOfferUri(issuanceRequests, IssuanceType.sdjwt, getCallbackUriHeader())
                             logger.debug { "Offer URI: $offerUri" }
 
                             context.respond(
@@ -470,8 +487,8 @@ fun Application.issuerApi() {
                     post("issue", {
                         summary = "Signs a credential based on the IEC/ISO18013-5 mdoc/mDL format."
                         description = "This endpoint issues a mdoc and returns an issuance URL "
-
                         request {
+                            statusCallbackUriHeader()
                             body<IssuanceRequest> {
                                 description =
                                     "Pass the unsigned credential that you intend to issue as the body of the request."
@@ -481,8 +498,7 @@ fun Application.issuerApi() {
                         }
                     }) {
                         val mdocIssuanceRequest = context.receive<IssuanceRequest>()
-
-                        val offerUri = createCredentialOfferUri(listOf(mdocIssuanceRequest))
+                        val offerUri = createCredentialOfferUri(listOf(mdocIssuanceRequest), IssuanceType.mdoc, getCallbackUriHeader())
 
                         context.respond(
                             HttpStatusCode.OK, offerUri
@@ -501,6 +517,10 @@ fun Application.issuerApi() {
                         ?: throw NotFoundException("No active issuance session found by the given id")
                     val credentialOffer = issuanceSession.credentialOffer
                         ?: throw BadRequestException("Session has no credential offer set")
+
+                    OidcApi.sessionCredentialPreMapping[sessionId]?.first()
+                        ?.sendCallback("resolved_credential_offer", credentialOffer.toJSON())
+
                     context.respond(credentialOffer.toJSON())
                 }
             }

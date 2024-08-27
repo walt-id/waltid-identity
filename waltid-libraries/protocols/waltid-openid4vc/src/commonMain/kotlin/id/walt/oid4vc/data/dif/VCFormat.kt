@@ -15,17 +15,17 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 
 @Serializable
-enum class VCFormat {
-    jwt,
-    jwt_vc,
-    jwt_vp,
-    ldp_vc,
-    ldp_vp,
-    ldp,
-    jwt_vc_json,
-    jwt_vp_json,
-    mso_mdoc,
-    @SerialName("vc+sd-jwt") sd_jwt_vc
+enum class VCFormat(val value: String) {
+    jwt("jwt"),
+    jwt_vc("jwt_vc"),
+    jwt_vp("jwt_vp"),
+    ldp_vc("ldp_vc"),
+    ldp_vp("ldp_vp"),
+    ldp("ldp"),
+    jwt_vc_json("jwt_vc_json"),
+    jwt_vp_json("jwt_vp_json"),
+    mso_mdoc("mso_mdoc"),
+    @SerialName("vc+sd-jwt") sd_jwt_vc("vc+sd-jwt")
 }
 
 @Serializable

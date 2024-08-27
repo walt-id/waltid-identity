@@ -75,6 +75,12 @@ data class NewIssuanceRequest(
     val credential: List<NewSingleCredentialIssuanceRequest>,
 )
 
+enum class IssuanceType {
+    w3c,
+    sdjwt,
+    mdoc
+}
+
 @Serializable
 data class IssuanceRequest(
     val issuerKey: JsonObject,
@@ -90,6 +96,8 @@ data class IssuanceRequest(
     val useJar: Boolean? = null,
     val x5Chain: List<String>? = null,
     val trustedRootCAs: List<String>? = null,
+
+    var issuanceType: IssuanceType? = null
 )
 
 @Serializable

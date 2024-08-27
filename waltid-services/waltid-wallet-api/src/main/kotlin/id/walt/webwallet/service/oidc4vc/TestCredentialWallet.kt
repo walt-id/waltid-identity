@@ -85,36 +85,39 @@ class TestCredentialWallet(
         }
     }
 
-    override fun signToken(target: TokenTarget, payload: JsonObject, header: JsonObject?, keyId: String?, privKey: Key?): String = runBlocking {
-        fun debugStateMsg() = "(target: $target, payload: $payload, header: $header, keyId: $keyId)"
+    override fun signToken(target: TokenTarget, payload: JsonObject, header: JsonObject?, keyId: String?, privKey: Key?): String =
+        runBlocking {
+            fun debugStateMsg() = "(target: $target, payload: $payload, header: $header, keyId: $keyId)"
 
-        val key = privKey ?: keyId?.let { tryResolveKeyId(it) }
+            val key = privKey ?: keyId?.let { tryResolveKeyId(it) }
             ?: throw IllegalArgumentException("No key given or found for given keyId ${debugStateMsg()}")
 
-        val authKeyId = resolveDidAuthentication(did)
-        val payloadToSign = Json.encodeToString(payload).encodeToByteArray()
-        val headersToSign = mapOf("typ" to "JWT".toJsonElement(), "kid" to authKeyId.toJsonElement()).plus(
-            header?.toMap() ?: mapOf()
-        )
-        key.signJws(payloadToSign, headersToSign)
-    }
+            val authKeyId = resolveDidAuthentication(did)
+            val payloadToSign = Json.encodeToString(payload).encodeToByteArray()
+            val headersToSign = mapOf("typ" to "JWT".toJsonElement(), "kid" to authKeyId.toJsonElement()).plus(
+                header?.toMap() ?: mapOf()
+            )
+            key.signJws(payloadToSign, headersToSign)
+        }
 
     override fun signCWTToken(
         target: TokenTarget,
         payload: MapElement,
         header: MapElement?,
         keyId: String?,
-        privKey: Key?
+        privKey: Key?,
     ): String = runBlocking {
         fun debugStateMsg() = "(target: $target, payload: $payload, header: $header, keyId: $keyId)"
 
         val key = privKey ?: keyId?.let { tryResolveKeyId(it) }
-            ?: throw IllegalArgumentException("No key given or found for given keyId ${debugStateMsg()}")
+        ?: throw IllegalArgumentException("No key given or found for given keyId ${debugStateMsg()}")
 
         val ecKey = ECKey.parseFromPEMEncodedObjects(key.exportPEM()).toECKey()
-        val cryptoProvider = SimpleCOSECryptoProvider(listOf(
-            COSECryptoProviderKeyInfo(key.getKeyId(), AlgorithmID.ECDSA_256, ecKey.toECPublicKey(), ecKey.toECPrivateKey())
-        ))
+        val cryptoProvider = SimpleCOSECryptoProvider(
+            listOf(
+                COSECryptoProviderKeyInfo(key.getKeyId(), AlgorithmID.ECDSA_256, ecKey.toECPublicKey(), ecKey.toECPrivateKey())
+            )
+        )
         return@runBlocking cryptoProvider.sign1(payload.toCBOR(), header, null, keyId).toCBOR().encodeToBase64Url()
     }
 
@@ -183,29 +186,44 @@ class TestCredentialWallet(
             throw IllegalArgumentException("Could not resolve key to sign JWS to generate presentation for vp_token", it)
         } ?: error("No key was resolved when trying to resolve key to sign JWS to generate presentation for vp_token")
 
-        val jwtsPresented = matchedCredentials.filter { setOf(CredentialFormat.jwt_vc, CredentialFormat.jwt_vc_json).contains(it.format) }.map {
+        val jwtsPresented = matchedCredentials.filter {
+            setOf(CredentialFormat.jwt_vc, CredentialFormat.jwt_vc_json).contains(it.format)
+        }.map {
             if (selectedDisclosures?.containsKey(it.id) == true) {
                 it.document + "~${selectedDisclosures[it.id]!!.joinToString("~")}"
             } else {
                 it.document
             }
         }
+        println("jwtsPresented: $jwtsPresented")
 
-        val sdJwtVCsPresented = runBlocking { matchedCredentials.filter { it.format == CredentialFormat.sd_jwt_vc }.map {
-            // TODO: adopt selective disclosure selection (doesn't work with jwts other than sd_jwt anyway, like above)
-            SDJwtVC.parse(it.document).present(
-                true, audience = session.authorizationRequest.clientId, nonce = session.nonce ?: "",
-                WaltIdJWTCryptoProvider(mapOf(key.getKeyId() to key)), key.getKeyId())
-        }}.map { it.toString(true, true) }
+        val sdJwtVCsPresented = runBlocking {
+            matchedCredentials.filter { it.format == CredentialFormat.sd_jwt_vc }.map {
+                // TODO: adopt selective disclosure selection (doesn't work with jwts other than sd_jwt anyway, like above)
+                val documentWithDisclosures = if (selectedDisclosures?.containsKey(it.id) == true) {
+                    it.document + "~${selectedDisclosures[it.id]!!.joinToString("~")}"
+                } else {
+                   it.document
+                }
+
+                SDJwtVC.parse(documentWithDisclosures).present(
+                    true, audience = session.authorizationRequest.clientId, nonce = session.nonce ?: "",
+                    WaltIdJWTCryptoProvider(mapOf(key.getKeyId() to key)), key.getKeyId()
+                )
+            }
+        }.map { it.toString(true, true) }
+        println("sdJwtVCsPresented: $sdJwtVCsPresented")
 
         val mdocsPresented = runBlocking {
             val matchingMDocs = matchedCredentials.filter { it.format == CredentialFormat.mso_mdoc }
-            if(matchingMDocs.isNotEmpty()) {
+            if (matchingMDocs.isNotEmpty()) {
                 val mdocHandover = OpenID4VP.generateMDocOID4VPHandover(session.authorizationRequest, session.nonce!!)
                 val ecKey = ECKey.parse(key.exportJWK()).toECKey()
-                val cryptoProvider = SimpleCOSECryptoProvider(listOf(
-                    COSECryptoProviderKeyInfo(key.getKeyId(), AlgorithmID.ECDSA_256, ecKey.toECPublicKey(), ecKey.toECPrivateKey())
-                ))
+                val cryptoProvider = SimpleCOSECryptoProvider(
+                    listOf(
+                        COSECryptoProviderKeyInfo(key.getKeyId(), AlgorithmID.ECDSA_256, ecKey.toECPublicKey(), ecKey.toECPrivateKey())
+                    )
+                )
                 matchingMDocs.map { cred ->
                     val mdoc = MDoc.fromCBORHex(cred.document)
                     mdoc.presentWithDeviceSignature(
@@ -229,12 +247,18 @@ class TestCredentialWallet(
                 }
             } else listOf()
         }
+        println("mdocsPresented: $mdocsPresented")
 
         val presentationId = (session.presentationDefinition?.id ?: "urn:uuid:${UUID.generateUUID().toString().lowercase()}")
 
-        val vp = if(jwtsPresented.isNotEmpty()) getVpJson(jwtsPresented, presentationId, session.nonce, session.authorizationRequest.clientId) else null
+        val vp = if (jwtsPresented.isNotEmpty()) getVpJson(
+            credentialsPresented = jwtsPresented,
+            presentationId = presentationId,
+            nonce = session.nonce,
+            aud = session.authorizationRequest.clientId
+        ) else null
 
-        val signedJwtVP = if(!vp.isNullOrEmpty()) runBlocking {
+        val signedJwtVP = if (!vp.isNullOrEmpty()) runBlocking {
             val authKeyId = resolveDidAuthentication(this@TestCredentialWallet.did)
 
             key.signJws(
@@ -245,7 +269,7 @@ class TestCredentialWallet(
             )
         } else null
 
-        val deviceResponse = if(mdocsPresented.isNotEmpty()) mdocsPresented.let { DeviceResponse(it).toCBORBase64URL() } else null
+        val deviceResponse = if (mdocsPresented.isNotEmpty()) mdocsPresented.let { DeviceResponse(it).toCBORBase64URL() } else null
 
         println("GENERATED VP: $signedJwtVP")
 
@@ -253,14 +277,16 @@ class TestCredentialWallet(
         // DONE: generate descriptor mappings based on type (vp or mdoc device response)
         // DONE: set root path of descriptor mapping based on whether there are multiple presentations or just one ("$" or "$[idx]")
         val presentations = listOf(signedJwtVP, deviceResponse).filterNotNull().plus(sdJwtVCsPresented).map { JsonPrimitive(it) }
-        val rootPathVP = "$" + (if(presentations.size == 2) "[0]" else "")
-        val rootPathMDoc = "$" + (if(presentations.size == 2) "[1]" else "")
+        println("presentations: $presentations")
+
+        val rootPathVP = "$" + (if (presentations.size == 2) "[0]" else "")
+        val rootPathMDoc = "$" + (if (presentations.size == 2) "[1]" else "")
         return PresentationResult(
             presentations, PresentationSubmission(
                 id = presentationId,
                 definitionId = presentationId,
                 descriptorMap = matchedCredentials.mapIndexed { index, credential ->
-                    when(credential.format) {
+                    when (credential.format) {
                         CredentialFormat.mso_mdoc -> buildDescriptorMappingMDoc(session, index, credential.document, rootPathMDoc)
                         CredentialFormat.sd_jwt_vc -> buildDescriptorMappingSDJwtVC(session, index, credential.document, "$")
                         else -> buildDescriptorMappingJwtVP(session, index, credential.document, rootPathVP)

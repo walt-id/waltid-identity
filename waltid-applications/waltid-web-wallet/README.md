@@ -25,20 +25,22 @@ From the root-folder you can run the wallet-api including the necessary configur
 cd docker-compose && docker compose up
 ```
 
-- Visit the web wallet hosted under [localhost:7101](http://localhost:7101).
-- Visit the wallet-api hosted under [localhost:7001](http://localhost:7001).
+- Visit the demo web wallet hosted under [localhost:7101](http://localhost:7101).
+- Visit the dev web wallet hosted under [localhost:7104](http://localhost:7104).
+- Visit the wallet-api hosted under /swagger endpoint.
 
 Update the containers by running the following commands from the root folder: 
 ```bash
-docker build -f waltid-applications/waltid-web-wallet/Dockerfile -t waltid/waltid-web-wallet .
+docker build -f waltid-applications/waltid-web-wallet/apps/waltid-demo-wallet/Dockerfile -t waltid/waltid-demo-wallet .
+docker build -f waltid-applications/waltid-web-wallet/apps/waltid-dev-wallet/Dockerfile -t waltid/waltid-dev-wallet .
 ```
 Note that this is project only the frontend of the web-wallet. The corresponding backend is in the /waltid-wallet-api folder.
 
-### Running the project using Bun for development
+### Running the project for development
 
 ```bash
-bun install
-bun --watch run dev
+npm install
+cd apps/waltid-demo-wallet && npm run dev
 ```
 
 ## What is the Web-Wallet?
