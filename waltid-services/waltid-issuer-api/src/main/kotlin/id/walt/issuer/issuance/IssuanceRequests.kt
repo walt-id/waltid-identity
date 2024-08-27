@@ -1,11 +1,7 @@
 package id.walt.issuer.issuance
 
 import id.walt.credentials.vc.vcs.W3CVC
-import id.walt.oid4vc.data.AuthenticationMethod
-import id.walt.oid4vc.data.OpenId4VPProfile
-import id.walt.oid4vc.data.GrantType
-import id.walt.oid4vc.data.TxCode
-import id.walt.oid4vc.data.TxInputMode
+import id.walt.oid4vc.data.*
 import id.walt.sdjwt.SDMap
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
@@ -78,6 +74,12 @@ data class NewIssuanceRequest(
     val credential: List<NewSingleCredentialIssuanceRequest>,
 )
 
+enum class IssuanceType {
+    w3c,
+    sdjwt,
+    mdoc
+}
+
 @Serializable
 data class IssuanceRequest(
     val issuerKey: JsonObject,
@@ -93,6 +95,8 @@ data class IssuanceRequest(
     val useJar: Boolean? = null,
     val x5Chain: List<String>? = null,
     val trustedRootCAs: List<String>? = null,
+
+    var issuanceType: IssuanceType? = null
 )
 
 @Serializable

@@ -3,6 +3,7 @@ package id.walt.issuer.issuance
 import id.walt.commons.interop.LspPotentialInterop
 import id.walt.crypto.keys.KeyType
 import id.walt.issuer.lspPotential.LspPotentialIssuanceInterop
+import id.walt.oid4vc.data.dif.VCFormat
 import io.github.smiley4.ktorswaggerui.dsl.routes.ValueExampleDescriptorDsl
 import kotlinx.serialization.json.*
 
@@ -333,7 +334,7 @@ object IssuanceExamples {
                 {
                     "issuerKey": $issuerKey,
                     "issuerDid": $issuerDid,
-                    "credentialConfigurationId": "OpenBadgeCredential_sd-jwt",
+                    "credentialConfigurationId": "OpenBadgeCredential_${VCFormat.jwt_vc.value}",
                     "credentialData": $openBadgeCredentialData,
                     "mdocData": null,
                     "mapping": $mapping,
@@ -351,7 +352,7 @@ object IssuanceExamples {
                 {
                     "issuerKey": $issuerKey,
                     "issuerDid": $issuerDid,
-                    "credentialConfigurationId": "BankId_sd-jwt",
+                    "credentialConfigurationId": "BankId_${VCFormat.jwt_vc.value}",
                     "credentialData": $bankIdCredentialData,
                     "mdocData": null,
                     "mapping": $mapping,
@@ -376,7 +377,7 @@ object IssuanceExamples {
             {
                 "issuerKey": $issuerKey,
                 "issuerDid": $issuerDid,
-                "credentialConfigurationId": "OpenBadgeCredential_sd-jwt",
+                "credentialConfigurationId": "OpenBadgeCredential_${VCFormat.jwt_vc.value}",
                 "credentialData": $openBadgeCredentialData,
                 "mdocData": null,
                 "mapping": $mapping,
@@ -726,8 +727,8 @@ object IssuanceExamples {
 
     // language=json
     val sdJwtVCData = """
-            {
-                "issuerKey": { 
+        {
+            "issuerKey": { 
                 "type": "jwk",
                 "jwk": ${Json.parseToJsonElement(LspPotentialIssuanceInterop.POTENTIAL_ISSUER_JWK_KEY.jwk!!)}
             },
