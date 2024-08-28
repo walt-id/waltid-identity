@@ -1,5 +1,6 @@
 package id.walt.authkit.methods
 
+import id.walt.authkit.sessions.AuthSession
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
@@ -12,7 +13,11 @@ import kotlinx.serialization.json.JsonPrimitive
  *
  * Handles passing the auth credential as basic auth header, as JSON document body, or as form post.
  */
-abstract class UserPassBasedAuthMethod(val usernameName: String = DEFAULT_USER_NAME, val passwordName: String = DEFAULT_PASSWORD_NAME) : AuthenticationMethod() {
+abstract class UserPassBasedAuthMethod(
+    override val id: String,
+    val usernameName: String = DEFAULT_USER_NAME,
+    val passwordName: String = DEFAULT_PASSWORD_NAME,
+) : AuthenticationMethod(id) {
 
     companion object {
         const val DEFAULT_USER_NAME = "username"
@@ -66,5 +71,5 @@ abstract class UserPassBasedAuthMethod(val usernameName: String = DEFAULT_USER_N
         }
     }
 
-    abstract suspend fun auth(credential: UserPasswordCredential)
+    abstract suspend fun auth(session: AuthSession, credential: UserPasswordCredential)
 }
