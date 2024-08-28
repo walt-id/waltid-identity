@@ -3,11 +3,11 @@ package id.walt.authkit.accounts
 import id.walt.authkit.accounts.identifiers.AccountIdentifier
 import id.walt.authkit.accounts.identifiers.UsernameIdentifier
 import id.walt.authkit.methods.AuthenticationMethod
+import id.walt.authkit.methods.TOTP
 import id.walt.authkit.methods.UserPass
 import id.walt.authkit.methods.data.AuthMethodStoredData
 import id.walt.authkit.sessions.AuthSession
 
-@OptIn(ExperimentalStdlibApi::class)
 object AccountStore {
 
     // Account uuid -> account
@@ -23,13 +23,16 @@ object AccountStore {
 
 
     init {
-        val newAccount = Account(Uuid.random(), "Alice")
+        val newAccount = Account("11111111-1111-1111-1111-000000000000", "Alice")
         wip_accounts[newAccount.id] = newAccount
 
         val accountIdentifier = UsernameIdentifier("alice1")
         wip_account_ids[accountIdentifier] = newAccount.id
 
-        wip_accountAuthMechanisms[newAccount.id] = hashMapOf(UserPass to UserPass.UserPassStoredData("123456"))
+        wip_accountAuthMechanisms[newAccount.id] = hashMapOf(
+            UserPass to UserPass.UserPassStoredData("123456"),
+            TOTP to TOTP.TOTPStoredData("JBSWY3DPEHPK3PXP") // https://totp.danhersam.com/
+        )
     }
 
     // TODO
