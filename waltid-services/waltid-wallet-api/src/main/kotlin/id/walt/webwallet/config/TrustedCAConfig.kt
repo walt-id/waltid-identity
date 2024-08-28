@@ -25,11 +25,11 @@ data class TrustedCAConfig(
             trustedCACertificate.checkValidity()
             //check that this is actually a CA certificate as per RFC 5280: https://datatracker.ietf.org/doc/html/rfc5280#section-4.2.1.9
             val certBasicConstraints = BasicConstraints(trustedCACertificate.basicConstraints)
-            if (!certBasicConstraints.isCA) throw IllegalArgumentException(
+            require(certBasicConstraints.isCA) {
                 "Trusted CA certificate loaded from config:\n" +
-                pemCertificate +
-                "\n is actually not a CA certificate. Basic constraints cA flag is set to false.\n"
-            )
+                        pemCertificate +
+                        "\n is actually not a CA certificate. Basic constraints cA flag is set to false.\n"
+            }
         }
     }
 }
