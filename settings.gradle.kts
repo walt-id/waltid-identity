@@ -39,6 +39,11 @@ val modules = listOf(
         "waltid-sdjwt-ios" whenEnabled enableIosBuild,
     ),
 
+    * "$libraries:auth".group(
+        "waltid-authkit",
+        "waltid-idpkit"
+    ),
+
     /*
     * "$libraries:util".group(
         "waltid-reporting"
