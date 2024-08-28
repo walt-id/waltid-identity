@@ -44,6 +44,9 @@ abstract class RegisterControllerBase(
                     value = OidcUniqueSubjectRequest(token = "ey...")
                 }
                 example("Keycloak") { value = KeycloakAccountRequest() }
+                example("x5c Trusted CA Certificate Chain") {
+                    value = X5CAccountRequest(token = "ey...")
+                }
             }
         }
         response {
