@@ -1,9 +1,6 @@
 package id.walt.webwallet.web.controllers.auth
 
-import id.walt.webwallet.web.model.AccountRequest
-import id.walt.webwallet.web.model.AddressAccountRequest
-import id.walt.webwallet.web.model.EmailAccountRequest
-import id.walt.webwallet.web.model.OidcAccountRequest
+import id.walt.webwallet.web.model.*
 import io.github.smiley4.ktorswaggerui.dsl.routes.OpenApiRoute
 import io.github.smiley4.ktorswaggerui.dsl.routing.post
 import io.github.smiley4.ktorswaggerui.dsl.routing.route
@@ -43,6 +40,9 @@ abstract class LoginControllerBase(
                     )
                 }
                 example("OIDC") { value = OidcAccountRequest(token = "ey...") }
+                example("x5c Trusted CA Certificate Chain") {
+                    value = X5CAccountRequest(token = "ey...")
+                }
             }
         }
         response {
