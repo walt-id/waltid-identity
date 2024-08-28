@@ -1,5 +1,7 @@
 package id.walt.webwallet.service.issuers
 
+import id.walt.commons.config.ConfigManager
+import id.walt.webwallet.config.RegistrationDefaultsConfig
 import id.walt.webwallet.db.models.WalletIssuers
 import kotlinx.serialization.Serializable
 import kotlinx.uuid.UUID
@@ -24,13 +26,20 @@ data class IssuerDataTransferObject(
     )
 
     companion object {
-        fun default(wallet: UUID) = IssuerDataTransferObject(
-            wallet = wallet,
-            did = "did:web:walt.id",
-            description = "walt.id issuer portal",
-            uiEndpoint = "https://portal.walt.id/credentials?ids=",
-            configurationEndpoint = "https://issuer.portal.walt.id/.well-known/openid-credential-issuer",
-            authorized = false,
-        )
+        fun default(wallet: UUID): IssuerDataTransferObject? {
+            val defaultGenerationConfig by lazy { ConfigManager.getConfig<RegistrationDefaultsConfig>() }
+            return if (defaultGenerationConfig.defaultIssuerConfig != null) {
+                IssuerDataTransferObject(
+                    wallet = wallet,
+                    did = defaultGenerationConfig.defaultIssuerConfig!!.did,
+                    description = defaultGenerationConfig.defaultIssuerConfig?.description ?: "",
+                    uiEndpoint = defaultGenerationConfig.defaultIssuerConfig!!.uiEndpoint,
+                    configurationEndpoint = defaultGenerationConfig.defaultIssuerConfig!!.configurationEndpoint,
+                    authorized = defaultGenerationConfig.defaultIssuerConfig?.authorized ?: false
+                )
+            } else {
+                null
+            }
+        }
     }
 }
