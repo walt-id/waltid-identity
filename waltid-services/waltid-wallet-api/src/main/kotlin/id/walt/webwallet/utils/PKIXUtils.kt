@@ -2,12 +2,16 @@ package id.walt.webwallet.utils
 
 import id.walt.crypto.keys.jwk.JWKKey
 import kotlinx.coroutines.runBlocking
+import org.bouncycastle.asn1.pkcs.PrivateKeyInfo
 import org.bouncycastle.asn1.x500.X500Name
 import org.bouncycastle.asn1.x509.BasicConstraints
 import org.bouncycastle.asn1.x509.Extension
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter
 import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder
+import org.bouncycastle.openssl.PEMParser
+import org.bouncycastle.openssl.jcajce.JcaPEMKeyConverter
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder
+import java.io.StringReader
 import java.math.BigInteger
 import java.security.KeyPair
 import java.security.PrivateKey
@@ -22,18 +26,18 @@ object PKIXUtils {
         validFrom: Date,
         validTo: Date,
         caName: X500Name,
-    ) = generateCASignedCertificate(caKeyPair, caKeyPair, validFrom, validTo, caName, caName)
+    ) = generateCASignedCertificate(caKeyPair.private, caKeyPair.public, validFrom, validTo, caName, caName)
 
     fun generateIntermediateCACertificate(
-        parentCAKeyPair: KeyPair,
-        intermediateCAKeyPair: KeyPair,
+        parentCAPrivateKey: PrivateKey,
+        intermediateCAPrivateKey: PublicKey,
         validFrom: Date,
         validTo: Date,
         parentCAName: X500Name,
         intermediateCAName: X500Name,
     ) = generateCASignedCertificate(
-        parentCAKeyPair,
-        intermediateCAKeyPair,
+        parentCAPrivateKey,
+        intermediateCAPrivateKey,
         validFrom,
         validTo,
         parentCAName,
@@ -41,17 +45,17 @@ object PKIXUtils {
     )
 
     fun generateSubjectCertificate(
-        caKeyPair: KeyPair,
-        subjectKeyPair: KeyPair,
+        caPrivateKey: PrivateKey,
+        subjectPublicKey: PublicKey,
         validFrom: Date,
         validTo: Date,
         caName: X500Name,
         subjectName: X500Name,
-    ) = generateCASignedCertificate(caKeyPair, subjectKeyPair, validFrom, validTo, caName, subjectName, false)
+    ) = generateCASignedCertificate(caPrivateKey, subjectPublicKey, validFrom, validTo, caName, subjectName, false)
 
     fun generateCASignedCertificate(
-        caKeyPair: KeyPair,
-        clientKeyPair: KeyPair,
+        caPrivateKey: PrivateKey,
+        clientPublicKey: PublicKey,
         validFrom: Date,
         validTo: Date,
         issuer: X500Name,
@@ -64,26 +68,22 @@ object PKIXUtils {
             validFrom,
             validTo,
             subject,
-            clientKeyPair.public
+            clientPublicKey,
         )
         if (isSubjectCA) certBuilder.addExtension(Extension.basicConstraints, true, BasicConstraints(true))
-        val signerBuilder = JcaContentSignerBuilder("SHA256WithRSAEncryption").build(caKeyPair.private)
+        val signerBuilder = JcaContentSignerBuilder("SHA256WithRSAEncryption").build(caPrivateKey)
         val certificateHolder = certBuilder.build(signerBuilder)
         val certificate = JcaX509CertificateConverter().getCertificate(certificateHolder)
         return certificate
     }
 
     fun javaPublicKeyToJWKKey(javaPublicKey: PublicKey) = runBlocking {
-        val keyPemString = "-----BEGIN PUBLIC KEY-----\n" +
-                Base64.getEncoder().encodeToString(javaPublicKey.encoded) +
-                "\n-----END PUBLIC KEY-----\n"
+        val keyPemString = pemEncodeJavaPublicKey(javaPublicKey)
         JWKKey.importPEM(keyPemString).getOrThrow()
     }
 
     fun javaPrivateKeyToJWKKey(javaPrivateKey: PrivateKey) = runBlocking {
-        val keyPemString = "-----BEGIN PRIVATE KEY-----\n" +
-                Base64.getEncoder().encodeToString(javaPrivateKey.encoded) +
-                "\n-----END PRIVATE KEY-----\n"
+        val keyPemString = pemEncodeJavaPrivateKey(javaPrivateKey)
         JWKKey.importPEM(keyPemString).getOrThrow()
     }
 
@@ -91,5 +91,23 @@ object PKIXUtils {
         "-----BEGIN CERTIFICATE-----\n" +
                 Base64.getEncoder().encodeToString(certificate.encoded) +
                 "\n-----END CERTIFICATE-----\n"
+    }
+
+    fun pemEncodeJavaPrivateKey(javaPrivateKey: PrivateKey) = runBlocking {
+        "-----BEGIN PRIVATE KEY-----\n" +
+                Base64.getEncoder().encodeToString(javaPrivateKey.encoded) +
+                "\n-----END PRIVATE KEY-----\n"
+    }
+
+    fun pemEncodeJavaPublicKey(javaPublicKey: PublicKey) = runBlocking {
+        "-----BEGIN PUBLIC KEY-----\n" +
+                Base64.getEncoder().encodeToString(javaPublicKey.encoded) +
+                "\n-----END PUBLIC KEY-----\n"
+    }
+
+    fun pemDecodeJavaPrivateKey(pemEncodedPrivateKey: String) = runBlocking {
+        val pemKey = PEMParser(StringReader(pemEncodedPrivateKey)).readObject()
+        val privateKeyInfo = PrivateKeyInfo.getInstance(pemKey)
+        JcaPEMKeyConverter().getPrivateKey(privateKeyInfo)
     }
 }
