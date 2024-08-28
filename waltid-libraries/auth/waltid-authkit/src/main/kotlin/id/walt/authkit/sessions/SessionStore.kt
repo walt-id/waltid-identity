@@ -1,14 +1,16 @@
 package id.walt.authkit.sessions
 
-import kotlin.uuid.Uuid
+import io.klogging.logger
 
-@OptIn(ExperimentalStdlibApi::class)
 object SessionStore {
 
     val log = logger("SessionStore")
     val wip_sessions = HashMap<String, AuthSession>()
 
-    fun store(session: AuthSession) {
+    fun resolveSessionId(sessionId: String): AuthSession = wip_sessions[sessionId] ?: error("Unknown session id: $sessionId")
+
+    suspend fun store(session: AuthSession) {
+        log.debug("saving session $session")
         wip_sessions[session.id] = session
     }
 }
