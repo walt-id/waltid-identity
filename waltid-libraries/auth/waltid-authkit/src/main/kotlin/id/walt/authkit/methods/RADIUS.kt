@@ -3,6 +3,7 @@ package id.walt.authkit.methods
 import id.walt.authkit.AuthContext
 import id.walt.authkit.exceptions.authCheck
 import id.walt.authkit.methods.data.AuthMethodStoredData
+import id.walt.authkit.sessions.AuthSession
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
 import io.ktor.server.routing.*
@@ -37,7 +38,7 @@ object RADIUS : UserPassBasedAuthMethod("radius") {
 
     // Todo: Move to configuration (is not stored data)
 
-    override suspend fun auth(credential: UserPasswordCredential) {
+    override suspend fun auth(session: AuthSession, credential: UserPasswordCredential) {
         val accessRequest = AccessRequest(
             listOf(
                 UserName(TextData(credential.name)),
@@ -53,10 +54,12 @@ object RADIUS : UserPassBasedAuthMethod("radius") {
 
 
     override fun Route.register(authContext: PipelineContext<Unit, ApplicationCall>.() -> AuthContext) {
-        post("userpass") {
+        post("radius") {
+            val session = getSession(authContext)
+
             val credential = call.getUsernamePasswordFromRequest()
 
-            auth(credential)
+            auth(session, credential)
         }
     }
 
