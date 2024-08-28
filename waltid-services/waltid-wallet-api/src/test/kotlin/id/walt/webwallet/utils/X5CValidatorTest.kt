@@ -53,8 +53,8 @@ class X5CValidatorTest {
         val subjectKeyPair = keyPairGenerator.generateKeyPair()
         val subjectDistinguishedName = X500Name("CN=SomeSubject")
         val subjectCert = PKIXUtils.generateSubjectCertificate(
-            rootCAKeyPair,
-            subjectKeyPair,
+            rootCAKeyPair.private,
+            subjectKeyPair.public,
             nonExpiredValidFrom,
             nonExpiredValidTo,
             rootCADistinguishedName,
@@ -71,8 +71,8 @@ class X5CValidatorTest {
         val subjectKeyPair = keyPairGenerator.generateKeyPair()
         val subjectDistinguishedName = X500Name("CN=SomeSubject")
         val subjectCert = PKIXUtils.generateSubjectCertificate(
-            rootCAKeyPair,
-            subjectKeyPair,
+            rootCAKeyPair.private,
+            subjectKeyPair.public,
             nonExpiredValidFrom,
             nonExpiredValidTo,
             rootCADistinguishedName,
@@ -89,8 +89,8 @@ class X5CValidatorTest {
         val subjectKeyPair = keyPairGenerator.generateKeyPair()
         val subjectDistinguishedName = X500Name("CN=SomeSubject")
         val subjectCert = PKIXUtils.generateSubjectCertificate(
-            rootCAKeyPair,
-            subjectKeyPair,
+            rootCAKeyPair.private,
+            subjectKeyPair.public,
             nonExpiredValidFrom,
             nonExpiredValidTo,
             rootCADistinguishedName,
@@ -107,8 +107,8 @@ class X5CValidatorTest {
         val subjectKeyPair = keyPairGenerator.generateKeyPair()
         val subjectDistinguishedName = X500Name("CN=SomeSubject")
         val subjectCert = PKIXUtils.generateSubjectCertificate(
-            rootCAKeyPair,
-            subjectKeyPair,
+            rootCAKeyPair.private,
+            subjectKeyPair.public,
             expiredValidFrom,
             expiredValidTo,
             rootCADistinguishedName,
@@ -127,16 +127,16 @@ class X5CValidatorTest {
         val subjectKeyPair = keyPairGenerator.generateKeyPair()
         val subjectDistinguishedName = X500Name("CN=SomeSubject")
         val intermediateCACert = PKIXUtils.generateIntermediateCACertificate(
-            rootCAKeyPair,
-            intermediateCAKeyPair,
+            rootCAKeyPair.private,
+            intermediateCAKeyPair.public,
             nonExpiredValidFrom,
             nonExpiredValidTo,
             rootCADistinguishedName,
             intermediateCADistinguishedName,
         )
         val subjectCert = PKIXUtils.generateSubjectCertificate(
-            intermediateCAKeyPair,
-            subjectKeyPair,
+            intermediateCAKeyPair.private,
+            subjectKeyPair.public,
             nonExpiredValidFrom,
             nonExpiredValidTo,
             intermediateCADistinguishedName,
@@ -173,16 +173,16 @@ class X5CValidatorTest {
         val subjectKeyPair = keyPairGenerator.generateKeyPair()
         val subjectDistinguishedName = X500Name("CN=SomeSubject")
         val intermediateCACert = PKIXUtils.generateIntermediateCACertificate(
-            rootCAKeyPair,
-            intermediateCAKeyPair,
+            rootCAKeyPair.private,
+            intermediateCAKeyPair.public,
             expiredValidFrom,
             expiredValidTo,
             rootCADistinguishedName,
             intermediateCADistinguishedName,
         )
         val subjectCert = PKIXUtils.generateSubjectCertificate(
-            intermediateCAKeyPair,
-            subjectKeyPair,
+            intermediateCAKeyPair.private,
+            subjectKeyPair.public,
             nonExpiredValidFrom,
             nonExpiredValidTo,
             intermediateCADistinguishedName,
@@ -219,16 +219,16 @@ class X5CValidatorTest {
         val subjectKeyPair = keyPairGenerator.generateKeyPair()
         val subjectDistinguishedName = X500Name("CN=SomeSubject")
         val intermediateCACert = PKIXUtils.generateIntermediateCACertificate(
-            rootCAKeyPair,
-            intermediateCAKeyPair,
+            rootCAKeyPair.private,
+            intermediateCAKeyPair.public,
             nonExpiredValidFrom,
             nonExpiredValidTo,
             rootCADistinguishedName,
             intermediateCADistinguishedName,
         )
         val subjectCert = PKIXUtils.generateSubjectCertificate(
-            intermediateCAKeyPair,
-            subjectKeyPair,
+            intermediateCAKeyPair.private,
+            subjectKeyPair.public,
             nonExpiredValidFrom,
             nonExpiredValidTo,
             intermediateCADistinguishedName,

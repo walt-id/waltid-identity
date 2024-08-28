@@ -81,8 +81,8 @@ class TrustedCAConfigTest {
     @Test
     fun checkNonCACertificateThrows() = runTest {
         val caCert = PKIXUtils.generateSubjectCertificate(
-            rootCAKeyPair,
-            keyPairGenerator.generateKeyPair(),
+            rootCAKeyPair.private,
+            keyPairGenerator.generateKeyPair().public,
             expiredValidFrom,
             expiredValidTo,
             rootCADistinguishedName,
@@ -131,8 +131,8 @@ class TrustedCAConfigTest {
                 X500Name("CN=SomeRoot1"),
             ),
             PKIXUtils.generateSubjectCertificate(
-                rootCAKeyPair,
-                keyPairGenerator.generateKeyPair(),
+                rootCAKeyPair.private,
+                keyPairGenerator.generateKeyPair().public,
                 expiredValidFrom,
                 expiredValidTo,
                 rootCADistinguishedName,
