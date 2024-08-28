@@ -218,9 +218,7 @@ fun Application.entraVerifierApi() {
                 //println("Body: " + context.receiveText())
                 println("URL: " + context.url())
 
-                if (!EntraVerifierApi.callbackMapping.containsKey(nonce)) {
-                    throw IllegalArgumentException("Invalid nonce: $nonce")
-                }
+                require(EntraVerifierApi.callbackMapping.containsKey(nonce)) { "Invalid nonce: $nonce" }
 
                 val body = context.receiveText()
                 println("Response: $body")
