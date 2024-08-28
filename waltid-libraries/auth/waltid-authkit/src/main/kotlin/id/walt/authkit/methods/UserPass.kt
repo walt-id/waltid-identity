@@ -19,21 +19,29 @@ object UserPass : UserPassBasedAuthMethod("userpass") {
         val password: String,
     ) : AuthMethodStoredData
 
-    override suspend fun auth(credential: UserPasswordCredential) {
+    override suspend fun auth(session: AuthSession, credential: UserPasswordCredential) {
         val identifier = UsernameIdentifier(credential.name)
 
         val storedData: UserPassStoredData = lookupStoredData(identifier /*context()*/)
 
         authCheck(credential.password == storedData.password) { "Invalid password" }
 
+        session.accountId = identifier.resolveToAccountId()
+        session.progressFlow(this@UserPass)
         // TODO: Open session
     }
 
     override fun Route.register(authContext: PipelineContext<Unit, ApplicationCall>.() -> AuthContext) {
         post("userpass") {
+            val session = getSession(authContext)
+
             val credential = call.getUsernamePasswordFromRequest()
 
-            auth(credential)
+            auth(session, credential)
+
+
+
+            context.respond(session.toInformation())
         }
     }
 
