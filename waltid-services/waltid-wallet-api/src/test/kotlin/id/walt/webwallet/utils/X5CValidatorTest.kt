@@ -3,7 +3,6 @@ package id.walt.webwallet.utils
 import kotlinx.coroutines.test.runTest
 import org.bouncycastle.asn1.x500.X500Name
 import org.bouncycastle.jce.provider.BouncyCastleProvider
-import utils.PKIXUtils
 import java.security.KeyPairGenerator
 import java.security.Security
 import java.util.*

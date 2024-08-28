@@ -1,4 +1,4 @@
-package utils
+package id.walt.webwallet.utils
 
 import id.walt.crypto.keys.jwk.JWKKey
 import kotlinx.coroutines.runBlocking

@@ -1,8 +1,8 @@
 package id.walt.webwallet.config
 
+import id.walt.webwallet.utils.PKIXUtils
 import kotlinx.coroutines.test.runTest
 import org.bouncycastle.asn1.x500.X500Name
-import utils.PKIXUtils
 import java.security.KeyPairGenerator
 import java.util.*
 import kotlin.test.Test
