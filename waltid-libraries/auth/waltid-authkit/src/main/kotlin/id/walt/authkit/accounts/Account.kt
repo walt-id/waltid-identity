@@ -1,9 +1,6 @@
 package id.walt.authkit.accounts
 
-import kotlin.uuid.Uuid
-
-@OptIn(ExperimentalStdlibApi::class)
 data class Account(
-    val id: Uuid,
+    val id: String,
     val name: String? = null
 )

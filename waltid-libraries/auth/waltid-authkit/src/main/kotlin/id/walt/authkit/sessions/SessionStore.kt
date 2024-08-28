@@ -5,7 +5,8 @@ import kotlin.uuid.Uuid
 @OptIn(ExperimentalStdlibApi::class)
 object SessionStore {
 
-    val wip_sessions = HashMap<Uuid, AuthSession>()
+    val log = logger("SessionStore")
+    val wip_sessions = HashMap<String, AuthSession>()
 
     fun store(session: AuthSession) {
         wip_sessions[session.id] = session

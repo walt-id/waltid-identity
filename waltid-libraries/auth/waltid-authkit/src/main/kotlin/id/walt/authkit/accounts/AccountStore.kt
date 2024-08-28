@@ -11,15 +11,15 @@ import kotlin.uuid.Uuid
 object AccountStore {
 
     // Account uuid -> account
-    val wip_accounts = HashMap<Uuid, Account>()
+    val wip_accounts = HashMap<String, Account>()
 
     // TODO: Missing context, for multi tenancy
 
     // AccountIdentifier -> Account uuid
-    val wip_account_ids = HashMap<AccountIdentifier, Uuid>()
+    val wip_account_ids = HashMap<AccountIdentifier, String>()
 
     // Account uuid -> auth mechanisms
-    val wip_accountAuthMechanisms = HashMap<Uuid, HashMap<AuthenticationMethod, AuthMethodStoredData>>()
+    val wip_accountAuthMechanisms = HashMap<String, Map<AuthenticationMethod, AuthMethodStoredData>>()
 
 
     init {
