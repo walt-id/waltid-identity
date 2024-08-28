@@ -229,6 +229,9 @@ class E2ETest {
             lspPotentialWallet.testSDJwtVCIssuance()
             lspPotentialWallet.testSDJwtPresentation()
 
+            // issue using issuer DID
+            lspPotentialWallet.testSDJwtVCIssuanceByIssuerDid()
+
             //endregion -Exchange / presentation-
 
             //region -History-
@@ -300,6 +303,14 @@ class E2ETest {
       lspPotentialWallet.testSDJwtPresentation()
     }
   }
+
+    //@Test // enable to execute test selectively
+    fun testSdJwtVCIssuanceWithIssuerDid() = runTest(timeout = 5.minutes) {
+        testBlock {
+            val lspPotentialWallet = setupTestWallet()
+            lspPotentialWallet.testSDJwtVCIssuanceByIssuerDid()
+        }
+    }
 
     private fun testHttpClient(token: String? = null, doFollowRedirects: Boolean = true) = HttpClient(CIO) {
         install(ContentNegotiation) {

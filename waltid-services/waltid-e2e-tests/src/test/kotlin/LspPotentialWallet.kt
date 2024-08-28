@@ -119,10 +119,8 @@ class LspPotentialWallet(val client: HttpClient, val walletId: String) {
         }.expectSuccess()
     }
 
-    suspend fun testSDJwtVCIssuance() = E2ETestWebService.test("test sd-jwt-vc issuance") {
-        // === get credential offer from test issuer API ===
-
-        val issuanceReq = IssuanceRequest(
+    suspend fun testSDJwtVCIssuance() = testSDJwtVCIssuance(
+        IssuanceRequest(
             Json.parseToJsonElement(KeySerialization.serializeKey(LspPotentialIssuanceInterop.POTENTIAL_ISSUER_JWK_KEY)).jsonObject,
             "",
             "identity_credential_vc+sd-jwt",
@@ -134,6 +132,23 @@ class LspPotentialWallet(val client: HttpClient, val walletId: String) {
             x5Chain = listOf(LspPotentialInterop.POTENTIAL_ISSUER_CERT),
             trustedRootCAs = listOf(LspPotentialInterop.POTENTIAL_ROOT_CA_CERT)
         )
+    )
+
+    suspend fun testSDJwtVCIssuanceByIssuerDid() = testSDJwtVCIssuance(
+        IssuanceRequest(
+            Json.parseToJsonElement(KeySerialization.serializeKey(LspPotentialIssuanceInterop.POTENTIAL_ISSUER_JWK_KEY)).jsonObject,
+            LspPotentialIssuanceInterop.ISSUER_DID,
+            "identity_credential_vc+sd-jwt",
+            credentialData = W3CVC(buildJsonObject {
+                put("family_name", "Doe")
+                put("given_name", "John")
+            }),
+            null
+        )
+    )
+
+    suspend fun testSDJwtVCIssuance(issuanceReq: IssuanceRequest) = E2ETestWebService.test("test sd-jwt-vc issuance") {
+        // === get credential offer from test issuer API ===
         val offerResp = client.post("/openid4vc/sdjwt/issue") {
             contentType(ContentType.Application.Json)
             setBody(Json.encodeToJsonElement(issuanceReq).toString())
