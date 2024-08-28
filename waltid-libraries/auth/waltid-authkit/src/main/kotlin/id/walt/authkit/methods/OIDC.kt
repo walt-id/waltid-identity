@@ -22,9 +22,10 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.jsonPrimitive
+import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
-object OIDC : AuthenticationMethod() {
+object OIDC : AuthenticationMethod("oidc") {
 
     /*
     Steps:
@@ -154,7 +155,7 @@ object OIDC : AuthenticationMethod() {
 
     val redirectUri = "http://localhost:8088/auth/oidc/callback"
 
-    @OptIn(ExperimentalStdlibApi::class)
+    @OptIn(ExperimentalUuidApi::class)
     fun createOidcSession(context: Unit): OidcAuthSession {
         val newSessionId = Uuid.random().toString()
         val newState = Uuid.random().toString()

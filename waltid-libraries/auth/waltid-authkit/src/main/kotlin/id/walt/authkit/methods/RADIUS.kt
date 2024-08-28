@@ -20,7 +20,7 @@ import org.aaa4j.radius.core.packet.packets.AccessAccept
 import org.aaa4j.radius.core.packet.packets.AccessRequest
 import java.net.InetSocketAddress
 
-object RADIUS : UserPassBasedAuthMethod() {
+object RADIUS : UserPassBasedAuthMethod("radius") {
 
     @Serializable
     data class RADIUSConfiguration(
