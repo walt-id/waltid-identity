@@ -39,7 +39,10 @@ data class AuthFlow(
             else -> "$prefix?"
         }
         return "${prefix}Method: $method$config\n$end"
+    }
 
+    companion object {
+        fun fromConfig(config: String): AuthFlow = Json.decodeFromString<AuthFlow>(config)
     }
 
 }
