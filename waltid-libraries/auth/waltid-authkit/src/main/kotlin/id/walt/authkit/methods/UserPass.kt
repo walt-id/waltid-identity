@@ -4,13 +4,15 @@ import id.walt.authkit.AuthContext
 import id.walt.authkit.accounts.identifiers.UsernameIdentifier
 import id.walt.authkit.exceptions.authCheck
 import id.walt.authkit.methods.data.AuthMethodStoredData
+import id.walt.authkit.sessions.AuthSession
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
+import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.util.pipeline.*
 import kotlinx.serialization.Serializable
 
-object UserPass : UserPassBasedAuthMethod() {
+object UserPass : UserPassBasedAuthMethod("userpass") {
 
     @Serializable
     data class UserPassStoredData(
