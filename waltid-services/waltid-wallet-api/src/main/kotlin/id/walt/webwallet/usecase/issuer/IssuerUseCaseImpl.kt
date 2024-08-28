@@ -49,12 +49,13 @@ class IssuerUseCaseImpl(
         }
 
     private suspend fun fetchCredentials(url: String): List<CredentialDataTransferObject> =
-        fetchConfiguration(url).jsonObject["credentials_supported"]!!.jsonArray.map {
-            CredentialDataTransferObject(id = it.jsonObject["id"]!!.jsonPrimitive.content,
-                format = it.jsonObject["format"]!!.jsonPrimitive.content,
-                types = it.jsonObject["types"]!!.jsonArray.map {
-                    it.jsonPrimitive.content
-                })
+        fetchConfiguration(url).jsonObject["credential_configurations_supported"]!!.jsonObject.entries.map { (key, value) ->
+            val jsonObject = value.jsonObject
+            CredentialDataTransferObject(
+                id = key,
+                format = jsonObject["format"]!!.jsonPrimitive.content,
+                types = jsonObject["types"]!!.jsonArray.map { it.jsonPrimitive.content }
+            )
         }
 
     private suspend fun fetchConfiguration(url: String): JsonObject = let {
