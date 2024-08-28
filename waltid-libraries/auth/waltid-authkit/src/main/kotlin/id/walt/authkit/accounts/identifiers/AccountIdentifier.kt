@@ -1,5 +1,7 @@
 package id.walt.authkit.accounts.identifiers
 
+import id.walt.authkit.accounts.AccountStore
+
 @Suppress("EqualsOrHashCode")
 abstract class AccountIdentifier(val identifierName: String) {
 
@@ -15,5 +17,7 @@ abstract class AccountIdentifier(val identifierName: String) {
 
         return true
     }
+
+    fun resolveToAccountId() = AccountStore.wip_account_ids[this] ?: error("No account for account id: $this")
 }
 
