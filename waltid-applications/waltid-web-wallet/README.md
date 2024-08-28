@@ -36,7 +36,7 @@ cd docker-compose && docker compose up
 
 #### Running the Wallet only
 
-Note that this is project only the frontend of the web-wallet. The corresponding backend is in the [/waltid-wallet-api](../../waltid-services/waltid-wallet-api) folder.
+Note that this project only includes the frontend of the web wallet. The corresponding backend can be found in the [/waltid-wallet-api](../../waltid-services/waltid-wallet-api) folder.
 
 Move to the root folder:
 
