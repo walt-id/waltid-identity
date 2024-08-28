@@ -5,7 +5,6 @@ import io.ktor.server.application.*
 import io.ktor.server.plugins.cors.routing.*
 import io.ktor.server.plugins.defaultheaders.*
 import io.ktor.server.plugins.forwardedheaders.*
-import io.ktor.server.response.*
 
 fun Application.configureHTTP() {
     install(CORS) {
