@@ -5,29 +5,68 @@ import com.atlassian.onetime.core.TOTPGenerator
 import com.atlassian.onetime.model.EmailAddress
 import com.atlassian.onetime.model.Issuer
 import com.atlassian.onetime.model.TOTPSecret
-import com.atlassian.onetime.service.AsciiRangeSecretProvider
-import com.atlassian.onetime.service.AsyncSecretProvider
 import com.atlassian.onetime.service.DefaultTOTPService
-import com.atlassian.onetime.service.TOTPConfiguration
-import java.util.concurrent.CompletableFuture
+import id.walt.authkit.AuthContext
+import id.walt.authkit.accounts.AccountStore
+import id.walt.authkit.exceptions.authCheck
+import id.walt.authkit.methods.data.AuthMethodStoredData
+import id.walt.authkit.sessions.AuthSession
+import io.ktor.http.*
+import io.ktor.server.application.*
+import io.ktor.server.request.*
+import io.ktor.server.response.*
+import io.ktor.server.routing.*
+import io.ktor.util.pipeline.*
+import kotlinx.serialization.Serializable
 
-class AsyncAsciiRangeSecretProvider : AsyncSecretProvider {
+object TOTP : AuthenticationMethod("totp") {
 
-    override fun generateSecret(): CompletableFuture<TOTPSecret> =
-        CompletableFuture.supplyAsync {
-            AsciiRangeSecretProvider.generateSecret()
+    @Serializable
+    data class TOTPStoredData(
+        val secret: String,
+    ) : AuthMethodStoredData
+
+    suspend fun auth(session: AuthSession, code: String) {
+        AccountStore.lookupStoredMultiDataForAccount(session, this)
+        val storedData = lookupStoredMultiData<TOTPStoredData>(session /* contect() */)
+
+        val userProvidedOtpCode = TOTP(code)
+        val secret = TOTPSecret.fromBase32EncodedString(storedData.secret)
+
+        val service = DefaultTOTPService()
+        authCheck(
+            service.verify(userProvidedOtpCode, secret).isSuccess()
+        ) { "Invalid OTP" }
+
+        // TODO: Open session
+    }
+
+    @Serializable
+    data class TOTPCode(val code: String)
+
+    override fun Route.register(authContext: PipelineContext<Unit, ApplicationCall>.() -> AuthContext) {
+        post("totp") {
+            val session = getSession(authContext)
+
+            val otp = when (call.request.contentType()) {
+                ContentType.Application.Json -> call.receive<TOTPCode>().code
+                ContentType.Application.FormUrlEncoded ->
+                    call.receiveParameters()["code"] ?: error("Invalid or missing OTP code form post request.")
+                else -> call.receiveText()
+            }
+
+            auth(session, otp)
+
+            session.progressFlow(this@TOTP)
+
+            context.respond(session.toInformation())
         }
-}
+    }
 
-fun interface CPSSecretProvider {
-    suspend fun generateSecret(): TOTPSecret
 }
 
 fun main() {
-    val service = DefaultTOTPService(
-        totpGenerator = TOTPGenerator(),
-        totpConfiguration = TOTPConfiguration()
-    )
+    val service = DefaultTOTPService()
 
     val secret = TOTPSecret.fromBase32EncodedString("ZIQL3WHUAGCS5FQQDKP74HZCFT56TJHR")
     val totpGenerator: TOTPGenerator = TOTPGenerator()
@@ -40,12 +79,4 @@ fun main() {
         Issuer("Acme Co")
     )
     println("URI: $totpUri")
-
-
-    val userInput: TOTP = TOTP("123456") //TOTP from user input
-    val result = service.verify(
-        userInput,
-        secret //NIQXUILREVGHIUKNORKHSJDHKMWS6UTY
-    )
-    println("Result: $result")
 }
