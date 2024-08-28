@@ -3,7 +3,6 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import java.util.Properties
 
 object Versions {
-    const val KOTLIN_VERSION = "2.0.0" // also change 2 plugins
     const val KTOR_VERSION = "2.3.12" // also change 1 plugin
     const val COROUTINES_VERSION = "1.8.1"
     const val EXPOSED_VERSION = "0.43.0"
@@ -11,9 +10,8 @@ object Versions {
 }
 
 plugins {
-    kotlin("jvm") // Versions.KOTLIN_VERSION
-    kotlin("plugin.serialization") // Versions.KOTLIN_VERSION
-
+    kotlin("jvm")
+    kotlin("plugin.serialization")
     id("io.ktor.plugin") version "2.3.12" // Versions.KTOR_VERSION
     id("org.owasp.dependencycheck") version "9.2.0"
     id("com.github.jk1.dependency-license-report") version "2.8"
