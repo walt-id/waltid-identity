@@ -5,7 +5,7 @@ import id.walt.authkit.accounts.identifiers.UsernameIdentifier
 import id.walt.authkit.methods.AuthenticationMethod
 import id.walt.authkit.methods.UserPass
 import id.walt.authkit.methods.data.AuthMethodStoredData
-import kotlin.uuid.Uuid
+import id.walt.authkit.sessions.AuthSession
 
 @OptIn(ExperimentalStdlibApi::class)
 object AccountStore {
@@ -32,6 +32,15 @@ object AccountStore {
         wip_accountAuthMechanisms[newAccount.id] = hashMapOf(UserPass to UserPass.UserPassStoredData("123456"))
     }
 
+    // TODO
+    fun lookupStoredMultiDataForAccount(session: AuthSession, method: AuthenticationMethod): AuthMethodStoredData {
+        check(session.accountId != null) { "No account id available for session yet (no AccountIdentifier used yet)." }
+        val storedData = wip_accountAuthMechanisms[session.accountId]!![method] ?: error("No stored data for method: $method")
+
+        return storedData
+    }
+
+    // TODO
     fun lookupStoredDataFor(identifier: AccountIdentifier, method: AuthenticationMethod): AuthMethodStoredData {
         val uuid = wip_account_ids[identifier] ?: error("No account for identifier: $identifier")
         val storedData = wip_accountAuthMechanisms[uuid]!![method] ?: error("No stored data for method: $method")
