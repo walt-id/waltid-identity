@@ -9,7 +9,7 @@ import id.walt.webwallet.db.models.Accounts
 import id.walt.webwallet.db.models.OidcLogins
 import id.walt.webwallet.service.OidcLoginService
 import id.walt.webwallet.service.WalletServiceManager.oidcConfig
-import id.walt.webwallet.web.controllers.ByteLoginRequest
+import id.walt.webwallet.web.controllers.auth.ByteLoginRequest
 import id.walt.webwallet.web.model.KeycloakAccountRequest
 import id.walt.webwallet.web.model.KeycloakLogoutRequest
 import io.ktor.client.*
