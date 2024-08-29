@@ -27,10 +27,10 @@ data class OnboardingRequest(
 
 fun validateOnboardingRequest(request: OnboardingRequest) {
     require(request.key.backend.isNotEmpty()) {
-        throw WebException(HttpStatusCode.BadRequest, "Key backend must not be empty")
+        throw WebException(HttpStatusCode.BadRequest, "Key backend in the request body cannot be empty")
     }
     require(request.did.method.isNotEmpty()) {
-        throw WebException(HttpStatusCode.BadRequest, "DID method must not be empty")
+        throw WebException(HttpStatusCode.BadRequest, "DID method in the request body cannot be empty")
     }
     require(request.did.method in listOf("jwk", "key", "web")) {
         throw WebException(HttpStatusCode.BadRequest, "Unsupported DID method: ${request.did.method}")
