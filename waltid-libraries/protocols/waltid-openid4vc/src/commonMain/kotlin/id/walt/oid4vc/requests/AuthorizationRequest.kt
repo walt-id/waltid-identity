@@ -22,6 +22,10 @@ interface IAuthorizationRequest {
     val nonce: String?
 }
 
+private val json = Json {
+    ignoreUnknownKeys = true
+}
+
 @Serializable
 data class AuthorizationRequest(
     override val responseType: Set<ResponseType> = setOf(ResponseType.Code),

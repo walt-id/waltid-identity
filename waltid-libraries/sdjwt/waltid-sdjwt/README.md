@@ -59,43 +59,7 @@ verifiable credentials according to the **SD-JWT-VC** specification:
 
 **Maven / Gradle repository**:
 
-`https://maven.walt.id/repository/waltid/`
-
-**Maven**
-
-```xml
-[...]
-<repositories>
-    <repository>
-        <id>waltid</id>
-        <name>waltid</name>
-        <url>https://maven.walt.id/repository/waltid/</url>
-    </repository>
-</repositories>
-        [...]
-<dependency>
-<groupId>id.walt.sdjwt</groupId>
-<artifactId>waltid-sdjwt-jvm</artifactId>
-<version>[ version ]</version>
-</dependency>
-```
-
-**Gradle**
-
-_Kotlin DSL_
-
-```kotlin
-[...]
-repositories {
-    maven("https://maven.waltid.dev/releases")
-}
-[...]
-val sdJwtVersion = "<version>"
-[...]
-dependencies {
-    implementation("id.walt:waltid-sdjwt-jvm:$sdJwtVersion")
-}
-```
+Take a look at this build file https://github.com/walt-id/waltid-examples/blob/main/build.gradle.kts , which shows how to use this dependency and other walt.id dependencies.
 
 ## Usage with NPM/NodeJs (JavaScript)
 
