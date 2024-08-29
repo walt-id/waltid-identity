@@ -238,7 +238,24 @@ fun Application.issuerApi() {
                                 }
                             }
                             "400" to {
-                                description = "Bad request"
+                                description = "The request could not be understood or was missing required parameters."
+                                body<String> {
+                                    example("Missing issuerKey in the request body") {
+                                        value = "Missing issuerKey in the request body."
+                                    }
+                                    example("Invalid issuerKey format.") {
+                                        value = "Invalid issuerKey format."
+                                    }
+                                    example("Missing subjectDid in the request body.") {
+                                        value = "Missing subjectDid in the request body."
+                                    }
+                                    example("Missing credentialData in the request body.") {
+                                        value = "Missing credentialData in the request body."
+                                    }
+                                    example("Invalid credentialData format.") {
+                                        value = "Invalid credentialData format."
+                                    }
+                                }
                             }
                         }
                     }) {
@@ -339,6 +356,26 @@ fun Application.issuerApi() {
                             "400" to {
                                 description =
                                     "Bad request - The request could not be understood or was missing required parameters."
+                                body<String> {
+                                    example("Missing issuerKey in the request body.") {
+                                        value = "Missing issuerKey in the request body."
+                                    }
+                                    example("Invalid issuerKey format.") {
+                                        value = "Invalid issuerKey format."
+                                    }
+                                    example("Missing issuerDid in the request body.") {
+                                        value = "Missing issuerDid in the request body."
+                                    }
+                                    example("Missing credentialConfigurationId in the request body.") {
+                                        value = "Missing credentialConfigurationId in the request body."
+                                    }
+                                    example("Missing credentialData in the request body.") {
+                                        value = "Missing credentialData in the request body."
+                                    }
+                                    example("Invalid credentialData format.") {
+                                        value = "Invalid credentialData format."
+                                    }
+                                }
                             }
                         }
                     }) {
