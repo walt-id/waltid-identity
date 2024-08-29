@@ -144,9 +144,7 @@ class AuthApi(private val client: HttpClient) {
                 null,
                 key.signJws(
                     Json.encodeToJsonElement(
-                        mapOf(
-                            "iss" to "nada",
-                        )
+                        emptyMap<String, String>()
                     ).toString().toByteArray(),
                     headers = mapOf(
                         "x5c" to listOf(Base64.getEncoder().encodeToString(cert.encoded)).toJsonElement(),
