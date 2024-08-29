@@ -3,8 +3,6 @@ package id.walt.webwallet.utils
 import id.walt.crypto.utils.Base64Utils.base64Decode
 import java.io.ByteArrayInputStream
 import java.security.cert.*
-import java.time.Instant
-import java.util.*
 
 class X5CValidator(
     pemEncodedTrustedCACertificates: List<String> = emptyList(),
@@ -25,20 +23,13 @@ class X5CValidator(
             Result.success(true)
         },
         onFailure = {
-            when (it) {
-                is CertPathValidatorException -> {
-                    Result.failure(IllegalStateException("certificate path validation failed: ${it.localizedMessage}: ${it.reason}"))
-                }
-
-                else -> Result.failure(IllegalStateException("certificate path validation failed"))
-            }
+            Result.failure(IllegalStateException("certificate path validation failed: ${it.cause}, ${it.message}"))
         }
     )
 
     private fun validateCertificateChainIsTrustworthy(chain: List<X509Certificate>) {
         val pkixValidationParams = PKIXParameters(trustAnchorSet).apply {
             isRevocationEnabled = false
-            date = Date.from(Instant.now())
         }
         certificatePathValidator.validate(certificateFactory.generateCertPath(chain), pkixValidationParams)
     }
