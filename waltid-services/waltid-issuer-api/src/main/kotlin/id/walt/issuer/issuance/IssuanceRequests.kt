@@ -108,17 +108,17 @@ data class IssuerOnboardingResponse(
 fun validateIssuanceRequest(request: IssuanceRequest): Pair<HttpStatusCode, String?> {
     request.credentialData?.let {
         require(it.isNotEmpty()) {
-            return HttpStatusCode.BadRequest to "Credential is required"
+            return HttpStatusCode.BadRequest to "CredentialData in the request body cannot be empty"
         }
     }
     require(request.issuerDid.isNotEmpty()) {
-        return HttpStatusCode.BadRequest to "Issuer DID must not be empty"
+        return HttpStatusCode.BadRequest to "Issuer DID in the request body cannot be empty"
     }
     require(request.credentialConfigurationId.isNotEmpty()) {
-        return HttpStatusCode.BadRequest to "Credential configuration ID must not be empty"
+        return HttpStatusCode.BadRequest to "Credential configuration ID in the request body cannot be empty"
     }
     require(request.issuerKey.isNotEmpty()) {
-        return HttpStatusCode.BadRequest to "Issuer key must not be empty"
+        return HttpStatusCode.BadRequest to "Issuer key in the request body cannot be empty"
     }
     return HttpStatusCode.OK to null
 
