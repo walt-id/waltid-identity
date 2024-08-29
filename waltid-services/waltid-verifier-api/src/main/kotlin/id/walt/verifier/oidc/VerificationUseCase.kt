@@ -90,8 +90,8 @@ class VerificationUseCase(
 
         val specificPolicies = requestCredentialsArr.filterIsInstance<JsonObject>().associate {
             (it["credential"]
-                ?: throw BadRequestException("No `credential` name supplied, in `request_credentials`.")).jsonPrimitive.content to (it["policies"]
-                ?: throw BadRequestException("No `policies` supplied, in `request_credentials`.")).jsonArray.parsePolicyRequests()
+                ?: throw BadRequestException("No `credential` name supplied in `request_credentials`.")).jsonPrimitive.content to (it["policies"]
+                ?: throw BadRequestException("No `policies` supplied in `request_credentials`.")).jsonArray.parsePolicyRequests()
         }
 
         OIDCVerifierService.sessionVerificationInfos[session.id] = OIDCVerifierService.SessionVerificationInformation(
@@ -112,12 +112,12 @@ class VerificationUseCase(
     }
 
     fun getSession(sessionId: String): PresentationSession = sessionId.let { OIDCVerifierService.getSession(it) }
-        ?: throw NotFoundException("State parameter doesn't refer to an existing session, or session expired: $sessionId")
+        ?: throw NotFoundException("State parameter $sessionId doesn't refer to an existing session, or session expired")
 
     fun verify(sessionId: String?, tokenResponseParameters: Map<String, List<String>>): Result<String> {
         logger.debug { "Verifying session $sessionId" }
         val session = sessionId?.let { OIDCVerifierService.getSession(it) }
-            ?: return Result.failure(NotFoundException("State parameter doesn't refer to an existing session, or session expired"))
+            ?: return Result.failure(NotFoundException("State parameter $sessionId doesn't refer to an existing session, or session expired"))
         val tokenResponse = when (TokenResponse.isDirectPostJWT(tokenResponseParameters)) {
             true -> TokenResponse.fromDirectPostJWT(
                 tokenResponseParameters,
@@ -127,7 +127,7 @@ class VerificationUseCase(
             else -> TokenResponse.fromHttpParameters(tokenResponseParameters)
         }
         val sessionVerificationInfo = OIDCVerifierService.sessionVerificationInfos[session.id] ?: return Result.failure(
-            NotFoundException("No session verification information found for session id!")
+            NotFoundException("No session verification information found for session id : ${session.id}")
         )
 
         val maybePresentationSessionResult = runCatching { OIDCVerifierService.verify(tokenResponse, session) }
@@ -165,7 +165,7 @@ class VerificationUseCase(
 
     fun getResult(sessionId: String): Result<PresentationSessionInfo> {
         val session = OIDCVerifierService.getSession(sessionId)
-            ?: return Result.failure(NotFoundException("Invalid id provided (expired?): $sessionId"))
+            ?: return Result.failure(NotFoundException("Id parameter $sessionId doesn't refer to an existing session, or session expired"))
 
         val policyResults = OIDCVerifierService.policyResults[session.id]?.let { Json.encodeToJsonElement(it).jsonObject }
 
@@ -180,12 +180,14 @@ class VerificationUseCase(
     fun getPresentationDefinition(sessionId: String): Result<PresentationDefinition> =
         OIDCVerifierService.getSession(sessionId)?.presentationDefinition?.let {
             Result.success(it)
-        } ?: Result.failure(IllegalArgumentException("Invalid id provided (expired?): $sessionId"))
+        }
+            ?: Result.failure(IllegalArgumentException("Id parameter $sessionId doesn't refer to an existing session, or session expired"))
 
     fun getSignedAuthorizationRequestObject(sessionId: String): Result<String> =
         OIDCVerifierService.getSession(sessionId)?.authorizationRequest?.let {
             Result.success(it.toRequestObject(RequestSigningCryptoProvider, RequestSigningCryptoProvider.signingKey.keyID.orEmpty()))
-        } ?: Result.failure(IllegalArgumentException("Invalid id provided (expired?): $sessionId"))
+        }
+            ?: Result.failure(IllegalArgumentException("Id parameter $sessionId doesn't refer to an existing session, or session expired"))
 
     suspend fun notifySubscribers(sessionId: String) = runCatching {
         OIDCVerifierService.sessionVerificationInfos[sessionId]?.statusCallback?.let {
