@@ -383,7 +383,7 @@ fun Application.verfierApi() {
                 verificationUseCase.getPresentationDefinition(id ?: "").onSuccess {
                     call.respond(it.toJSON())
                 }.onFailure {
-                    throw NotFoundException("Presentation definition not found")
+                    throw NotFoundException("Presentation definition not found for id: $id")
                 }
             }
             get("policy-list", {
