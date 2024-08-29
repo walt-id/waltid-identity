@@ -1,4 +1,4 @@
-@file:Suppress("INTERFACE_WITH_SUPERCLASS", "OVERRIDING_FINAL_MEMBER", "RETURN_TYPE_MISMATCH_ON_OVERRIDE", "CONFLICTING_OVERLOADS")
+@file:Suppress("PropertyName", "unused", "PackageDirectoryMismatch")
 
 open external class ProduceJWT(payload: JWTPayload) {
     open var _payload: JWTPayload

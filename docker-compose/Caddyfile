@@ -18,9 +18,15 @@
     reverse_proxy http://verifier-api:{$VERIFIER_API_PORT}
 }
 
-# Web Wallet Frontend
-:{$WALLET_FRONTEND_PORT} {
-    reverse_proxy http://waltid-web-wallet:{$WALLET_FRONTEND_PORT} # frontend
+# Web Demo Wallet Frontend
+:{$DEMO_WALLET_FRONTEND_PORT} {
+    reverse_proxy http://waltid-demo-wallet:{$DEMO_WALLET_FRONTEND_PORT} # frontend
+    reverse_proxy /wallet-api/* http://wallet-api:{$WALLET_BACKEND_PORT} # backend
+}
+
+# Web Dev Wallet Frontend
+:{$DEV_WALLET_FRONTEND_PORT} {
+    reverse_proxy http://waltid-dev-wallet:{$DEV_WALLET_FRONTEND_PORT} # frontend
     reverse_proxy /wallet-api/* http://wallet-api:{$WALLET_BACKEND_PORT} # backend
 }
 

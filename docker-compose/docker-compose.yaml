@@ -47,18 +47,31 @@ services:
     volumes:
       - ./verifier-api/config:/waltid-verifier-api/config
 
-  waltid-web-wallet:
-    image: docker.io/waltid/waltid-web-wallet:${VERSION_TAG:-latest}
+  waltid-demo-wallet:
+    image: docker.io/waltid/waltid-demo-wallet:${VERSION_TAG:-latest}
     pull_policy: always
     build:
       context: ../
-      dockerfile: waltid-applications/waltid-web-wallet/Dockerfile
+      dockerfile: waltid-applications/waltid-web-wallet/apps/waltid-demo-wallet/Dockerfile
     depends_on:
       - wallet-api
       - caddy
     environment:
-      NUXT_PUBLIC_ISSUER_CALLBACK_URL: "http://localhost:$WALLET_FRONTEND_PORT"
-      PORT: $WALLET_FRONTEND_PORT
+      NUXT_PUBLIC_ISSUER_CALLBACK_URL: "http://localhost:$DEMO_WALLET_FRONTEND_PORT"
+      PORT: $DEMO_WALLET_FRONTEND_PORT
+
+  waltid-dev-wallet:
+    image: docker.io/waltid/waltid-dev-wallet:${VERSION_TAG:-latest}
+    pull_policy: always
+    build:
+      context: ../
+      dockerfile: waltid-applications/waltid-web-wallet/apps/waltid-dev-wallet/Dockerfile
+    depends_on:
+      - wallet-api
+      - caddy
+    environment:
+      NUXT_PUBLIC_ISSUER_CALLBACK_URL: "http://localhost:$DEV_WALLET_FRONTEND_PORT"
+      PORT: $DEV_WALLET_FRONTEND_PORT
 
   web-portal:
     platform: linux/x86_64
@@ -73,7 +86,7 @@ services:
       NEXT_PUBLIC_VC_REPO: "http://localhost:$VC_REPO_PORT"
       NEXT_PUBLIC_ISSUER: "http://localhost:$ISSUER_API_PORT"
       NEXT_PUBLIC_VERIFIER: "http://localhost:$VERIFIER_API_PORT"
-      NEXT_PUBLIC_WALLET: "http://localhost:$WALLET_FRONTEND_PORT"
+      NEXT_PUBLIC_WALLET: "http://localhost:$DEMO_WALLET_FRONTEND_PORT"
       PORT: $WEB_PORTAL_PORT
 
   vc-repo:
@@ -128,8 +141,13 @@ services:
         protocol: tcp
         mode: host
 
-      - target: "$WALLET_FRONTEND_PORT"
-        published: $WALLET_FRONTEND_PORT # waltid-web-wallet
+      - target: "$DEMO_WALLET_FRONTEND_PORT"
+        published: $DEMO_WALLET_FRONTEND_PORT # waltid-demo-wallet
+        protocol: tcp
+        mode: host
+
+      - target: "$DEV_WALLET_FRONTEND_PORT"
+        published: $DEV_WALLET_FRONTEND_PORT # waltid-dev-wallet
         protocol: tcp
         mode: host
 

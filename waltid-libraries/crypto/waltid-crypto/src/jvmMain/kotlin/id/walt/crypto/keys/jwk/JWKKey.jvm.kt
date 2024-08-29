@@ -295,7 +295,7 @@ actual class JWKKey actual constructor(
 
             log.debug { "> Signature verification: Fallback verification checking... (NIMBUS VERIFICATION FAILED) for: $signedJws" }
             val res = verifyRaw(signature.decodeFromBase64Url(), "$header.$payload".encodeToByteArray()).map {
-                it.decodeToString().decodeJws(allowMissingSignature = true).payload
+                it.decodeToString().decodeJws().payload
             }
             res.getOrThrow()
         }

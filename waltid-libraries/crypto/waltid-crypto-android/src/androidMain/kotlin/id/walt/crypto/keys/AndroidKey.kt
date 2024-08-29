@@ -6,6 +6,7 @@ import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.crypto.utils.JwsUtils.decodeJwsStrings
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -113,19 +114,22 @@ class AndroidKey() : Key() {
         return signature
     }
 
-    override suspend fun signJws(plaintext: ByteArray, headers: Map<String, String>): String {
-        val signature: ByteArray = signWithKeystore(plaintext)
+    override suspend fun signJws(plaintext: ByteArray, headers: Map<String, JsonElement>): String {
+        val signingInput =
+            Json.encodeToString(headers).toByteArray()
+                .encodeToBase64Url() + "." + plaintext.encodeToBase64Url()
 
-        val encodedSignature = signature.encodeToBase64Url()
+        val signature = signWithKeystore(signingInput.encodeToByteArray()).let {
+            EccUtils.convertDERtoIEEEP1363(it)
+        }.encodeToBase64Url()
 
-        // Construct the JWS in the format: base64UrlEncode(headers) + '.' + base64UrlEncode(payload) + '.' + base64UrlEncode(signature)
-        val encodedHeaders = headers.toString().toByteArray().encodeToBase64Url()
-        val encodedPayload = plaintext.encodeToBase64Url()
-
-        return "$encodedHeaders.$encodedPayload.$encodedSignature"
+        return "$signingInput.$signature"
     }
 
-    override suspend fun verifyRaw(signed: ByteArray, detachedPlaintext: ByteArray?): Result<ByteArray> {
+    override suspend fun verifyRaw(
+        signed: ByteArray,
+        detachedPlaintext: ByteArray?
+    ): Result<ByteArray> {
         check(detachedPlaintext != null) { "An detached plaintext is needed." }
 
         val certificate: Certificate = keyStore.getCertificate(internalKeyId)
@@ -199,7 +203,10 @@ class AndroidKey() : Key() {
 
     private fun getSignature(): Signature {
         val sig = when (keyType) {
-            KeyType.secp256k1 -> Signature.getInstance("SHA256withECDSA", "BC")//Legacy SunEC curve disabled
+            KeyType.secp256k1 -> Signature.getInstance(
+                "SHA256withECDSA",
+                "BC"
+            )//Legacy SunEC curve disabled
             KeyType.secp256r1 -> Signature.getInstance("SHA256withECDSA")
             KeyType.Ed25519 -> Signature.getInstance("Ed25519")
             KeyType.RSA -> Signature.getInstance("SHA256withRSA")
@@ -208,10 +215,13 @@ class AndroidKey() : Key() {
         return sig
     }
 
-    companion object : AndroidKeyCreator {
+    companion object : AndroidKeyCreator, AndroidKeyLoader {
         override suspend fun generate(
             type: KeyType,
-            metadata: JwkKeyMeta?,
+            metadata: AndroidKeyParameters?,
         ): AndroidKey = AndroidKeyGenerator.generate(type, metadata)
+
+        override suspend fun load(type: KeyType, keyId: String): AndroidKey? =
+            AndroidKeystoreLoader.load(type, keyId)
     }
 }
