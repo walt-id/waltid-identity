@@ -4,6 +4,8 @@ import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.service.WalletServiceManager
 import id.walt.webwallet.service.credentials.CredentialFilterObject
 import id.walt.webwallet.usecase.credential.CredentialStatusResult
+import id.walt.webwallet.web.controllers.auth.getWalletId
+import id.walt.webwallet.web.controllers.auth.getWalletService
 import id.walt.webwallet.web.parameter.CredentialRequestParameter
 import id.walt.webwallet.web.parameter.NoteRequestParameter
 import io.github.smiley4.ktorswaggerui.dsl.routing.*
