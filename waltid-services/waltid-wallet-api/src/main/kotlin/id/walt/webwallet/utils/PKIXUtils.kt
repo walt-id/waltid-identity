@@ -110,4 +110,14 @@ object PKIXUtils {
         val privateKeyInfo = PrivateKeyInfo.getInstance(pemKey)
         JcaPEMKeyConverter().getPrivateKey(privateKeyInfo)
     }
+
+    fun convertToPemFormat(text: String): String = let {
+        text.replace(System.lineSeparator(), "")
+    }.chunked(64).joinToString(System.lineSeparator()).let {
+        "-----BEGIN CERTIFICATE-----" +
+                System.lineSeparator() +
+                it +
+                System.lineSeparator() +
+                "-----END CERTIFICATE-----"
+    }
 }

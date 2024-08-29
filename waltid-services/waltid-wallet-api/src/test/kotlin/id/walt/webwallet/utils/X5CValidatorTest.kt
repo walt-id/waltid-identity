@@ -1,5 +1,6 @@
 package id.walt.webwallet.utils
 
+import id.walt.webwallet.service.account.x5c.X5CValidator
 import kotlinx.coroutines.test.runTest
 import org.bouncycastle.asn1.x500.X500Name
 import org.bouncycastle.jce.provider.BouncyCastleProvider

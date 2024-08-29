@@ -6,23 +6,9 @@ import java.util.*
 
 @OptIn(ExperimentalStdlibApi::class)
 object StringUtils {
-    const val pemBeginMarker = "-----BEGIN CERTIFICATE-----"
-    const val pemEndMarker = "-----END CERTIFICATE-----"
-    const val pemLineSize = 64
-
     fun hexToInt(hex: String) = hex.removePrefix("0x").hexToInt()
     fun hexToByteArray(hex: String) = hex.removePrefix("0x").hexToByteArray()
     fun binToInt(bin: String) = bin.toInt(2)
-    fun convertToPemFormat(text: String): String = let {
-        //string preps
-        text.replace(System.lineSeparator(), "")
-    }.chunked(pemLineSize).joinToString(System.lineSeparator()).let {
-        pemBeginMarker +
-                System.lineSeparator() +
-                it +
-                System.lineSeparator() +
-                pemEndMarker
-    }
 }
 
 object HttpUtils {
