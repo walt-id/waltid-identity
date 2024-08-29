@@ -8,13 +8,14 @@ import java.security.cert.X509Certificate
 
 @Serializable
 data class TrustedCAConfig(
-    val pemEncodedTrustedCACertificates: List<String> = emptyList(),
+    val certificates: List<String> = emptyList(),
 ) : WalletConfig() {
 
     init {
         //add checks here
+        require(certificates.isNotEmpty()) { "At least one trusted ca certificate is required when this feature is enabled." }
         val certificateFactory = CertificateFactory.getInstance("X509")
-        for (pemCertificate in pemEncodedTrustedCACertificates) {
+        for (pemCertificate in certificates) {
             val trustedCACertificate = certificateFactory.generateCertificate(
                 ByteArrayInputStream(
                     pemCertificate.toByteArray()

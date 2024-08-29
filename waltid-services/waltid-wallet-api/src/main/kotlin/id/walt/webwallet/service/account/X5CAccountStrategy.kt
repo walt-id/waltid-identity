@@ -1,8 +1,10 @@
 package id.walt.webwallet.service.account
 
+import id.walt.commons.config.ConfigManager
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.JwsUtils.decodeJws
+import id.walt.webwallet.config.TrustedCAConfig
 import id.walt.webwallet.db.models.Accounts
 import id.walt.webwallet.db.models.X5CLogins
 import id.walt.webwallet.utils.StringUtils
@@ -17,9 +19,9 @@ import kotlinx.uuid.generateUUID
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.transactions.transaction
 
-class X5CAccountStrategy(
-    private val trustValidator: X5CValidator,
-) : PasswordlessAccountStrategy<X5CAccountRequest>() {
+object X5CAccountStrategy: PasswordlessAccountStrategy<X5CAccountRequest>() {
+
+    private val x5cValidator = X5CValidator(ConfigManager.getConfig<TrustedCAConfig>().certificates)
 
     override suspend fun register(tenant: String, request: X5CAccountRequest): Result<RegistrationResult> =
         runCatching {
@@ -61,7 +63,7 @@ class X5CAccountStrategy(
         // verify token with the holder's public key
         key.verifyJws(token).getOrThrow()
         // validate the chain
-        trustValidator.validate(certificateChain).getOrThrow()
+        x5cValidator.validate(certificateChain).getOrThrow()
         key.getThumbprint()
     }
 

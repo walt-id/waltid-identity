@@ -53,7 +53,7 @@ object AccountsService {
             is OidcAccountRequest -> OidcAccountStrategy.register(tenant, request)
             is KeycloakAccountRequest -> KeycloakAccountStrategy.register(tenant, request)
             is OidcUniqueSubjectRequest -> OidcUniqueSubjectStrategy.register(tenant, request)
-            is X5CAccountRequest -> WalletServiceManager.x5cAccountStrategy.register(tenant, request)
+            is X5CAccountRequest -> X5CAccountStrategy.register(tenant, request)
         }.fold(onSuccess = {
             initializeUserAccount(tenant, request.name, it)
 
@@ -70,7 +70,7 @@ object AccountsService {
             is OidcAccountRequest -> OidcAccountStrategy.authenticate(tenant, request)
             is OidcUniqueSubjectRequest -> OidcUniqueSubjectStrategy.authenticate(tenant, request)
             is KeycloakAccountRequest -> KeycloakAccountStrategy.authenticate(tenant, request)
-            is X5CAccountRequest -> WalletServiceManager.x5cAccountStrategy.authenticate(tenant, request)
+            is X5CAccountRequest -> X5CAccountStrategy.authenticate(tenant, request)
         }
     }.fold(onSuccess = {
         WalletServiceManager.eventUseCase.log(
@@ -154,7 +154,7 @@ object AccountsService {
 
     //todo: unify with [getAccountByOidcId]
     fun getAccountByX5CId(tenant: String, x5cId: String) = transaction {
-        Accounts.crossJoin(OidcLogins)
+        Accounts.crossJoin(X5CLogins)
             .selectAll()
             .where {
                 Accounts.tenant eq tenant and
