@@ -3,13 +3,11 @@ package id.walt.webwallet.service
 import id.walt.commons.config.ConfigManager
 import id.walt.webwallet.config.OidcConfiguration
 import id.walt.webwallet.config.TrustConfig
-import id.walt.webwallet.config.TrustedCAConfig
 import id.walt.webwallet.db.models.AccountWalletMappings
 import id.walt.webwallet.db.models.AccountWalletPermissions
 import id.walt.webwallet.db.models.Wallets
 import id.walt.webwallet.seeker.DefaultCredentialTypeSeeker
 import id.walt.webwallet.service.account.AccountsService
-import id.walt.webwallet.service.account.X5CAccountStrategy
 import id.walt.webwallet.service.cache.EntityNameResolutionCacheService
 import id.walt.webwallet.service.category.CategoryServiceImpl
 import id.walt.webwallet.service.credentials.CredentialStatusServiceFactory
@@ -48,7 +46,6 @@ import id.walt.webwallet.usecase.notification.NotificationDispatchUseCase
 import id.walt.webwallet.usecase.notification.NotificationFilterUseCase
 import id.walt.webwallet.usecase.notification.NotificationUseCase
 import id.walt.webwallet.utils.WalletHttpClients.getHttpClient
-import id.walt.webwallet.utils.X5CValidator
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.datetime.Clock
 import kotlinx.datetime.toJavaInstant
@@ -143,9 +140,6 @@ object WalletServiceManager {
         credentialService = credentialService,
         credentialStatusServiceFactory = credentialStatusServiceFactory,
     )
-    private val trustedCAConfig by lazy { ConfigManager.getConfig<TrustedCAConfig>() }
-    private val x5cValidator by lazy { X5CValidator(trustedCAConfig.pemEncodedTrustedCACertificates) }
-    val x5cAccountStrategy by lazy { X5CAccountStrategy(x5cValidator) }
 
     fun getWalletService(tenant: String, account: UUID, wallet: UUID): WalletService =
         walletServices.getOrPut(Pair(account, wallet)) {
