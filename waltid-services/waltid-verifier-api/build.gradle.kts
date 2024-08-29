@@ -12,12 +12,12 @@ object Versions {
 plugins {
     kotlin("jvm")
     kotlin("plugin.serialization")
+
     id("io.ktor.plugin") version "2.3.12" // Versions.KTOR_VERSION
     id("org.owasp.dependencycheck") version "9.2.0"
     id("com.github.jk1.dependency-license-report") version "2.8"
-    application
-
     id("com.github.ben-manes.versions")
+    application
 }
 
 group = "id.walt"
@@ -26,10 +26,6 @@ repositories {
     mavenCentral()
     maven("https://jitpack.io")
     maven("https://maven.waltid.dev/releases")
-    maven("https://repo.danubetech.com/repository/maven-public/")
-    maven("https://maven.walt.id/repository/waltid/id/walt/core-crypto/")
-    maven("https://maven.walt.id/repository/waltid/id/walt/waltid-ssikit2")
-    mavenLocal()
 }
 
 
