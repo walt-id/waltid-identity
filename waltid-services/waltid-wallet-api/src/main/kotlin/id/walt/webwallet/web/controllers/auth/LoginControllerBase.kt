@@ -40,9 +40,6 @@ abstract class LoginControllerBase(
                     )
                 }
                 example("OIDC") { value = OidcAccountRequest(token = "ey...") }
-                example("x5c Trusted CA Certificate Chain") {
-                    value = X5CAccountRequest(token = "ey...")
-                }
             }
         }
         response {
