@@ -4,6 +4,7 @@ import id.walt.webwallet.service.WalletServiceManager
 import id.walt.webwallet.service.push.PushManager
 import id.walt.webwallet.usecase.notification.NotificationDTO
 import id.walt.webwallet.usecase.notification.NotificationFilterParameter
+import id.walt.webwallet.web.controllers.auth.getWalletId
 import io.github.smiley4.ktorswaggerui.dsl.routing.*
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -14,7 +15,6 @@ import kotlinx.datetime.Clock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.uuid.UUID

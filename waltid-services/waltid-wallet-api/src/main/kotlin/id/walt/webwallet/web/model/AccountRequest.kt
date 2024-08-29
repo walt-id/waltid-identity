@@ -51,12 +51,20 @@ data class KeycloakLogoutRequest(val keycloakUserId: String? = null, val token: 
 data class OidcUniqueSubjectRequest(override val name: String? = null, val token: String) :
     AccountRequest()
 
+@Serializable
+@SerialName("x5c")
+data class X5CAccountRequest(
+    override val name: String? = null,
+    val token: String,
+) : AccountRequest()
+
 val accountRequestSerializer = SerializersModule {
     polymorphic(AccountRequest::class) {
         EmailAccountRequest::class
         AddressAccountRequest::class
         OidcAccountRequest::class
         KeycloakAccountRequest::class
+        X5CAccountRequest::class
     }
 }
 
