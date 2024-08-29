@@ -1,4 +1,4 @@
-package id.walt.webwallet.utils
+package id.walt.webwallet.service.account.x5c
 
 import id.walt.crypto.utils.Base64Utils.base64Decode
 import java.io.ByteArrayInputStream

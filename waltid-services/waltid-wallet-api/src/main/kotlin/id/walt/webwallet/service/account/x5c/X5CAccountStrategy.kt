@@ -1,4 +1,4 @@
-package id.walt.webwallet.service.account
+package id.walt.webwallet.service.account.x5c
 
 import id.walt.commons.config.ConfigManager
 import id.walt.crypto.keys.Key
@@ -7,8 +7,8 @@ import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.webwallet.config.TrustedCAConfig
 import id.walt.webwallet.db.models.Accounts
 import id.walt.webwallet.db.models.X5CLogins
-import id.walt.webwallet.utils.StringUtils
-import id.walt.webwallet.utils.X5CValidator
+import id.walt.webwallet.service.account.*
+import id.walt.webwallet.utils.PKIXUtils
 import id.walt.webwallet.web.model.X5CAccountRequest
 import kotlinx.datetime.Clock
 import kotlinx.datetime.toJavaInstant
@@ -69,7 +69,7 @@ object X5CAccountStrategy: PasswordlessAccountStrategy<X5CAccountRequest>() {
 
     private suspend fun getKey(certificate: String): Key {
         // convert holder certificate to pem format
-        val pem = StringUtils.convertToPemFormat(certificate)
+        val pem = PKIXUtils.convertToPemFormat(certificate)
         // convert to key
         return JWKKey.importPEM(pem).getOrThrow()
     }

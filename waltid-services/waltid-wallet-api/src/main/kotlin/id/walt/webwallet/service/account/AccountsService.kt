@@ -7,6 +7,7 @@ import id.walt.webwallet.config.RegistrationDefaultsConfig
 import id.walt.webwallet.db.models.*
 import id.walt.webwallet.service.WalletService
 import id.walt.webwallet.service.WalletServiceManager
+import id.walt.webwallet.service.account.x5c.X5CAccountStrategy
 import id.walt.webwallet.service.events.AccountEventData
 import id.walt.webwallet.service.events.EventType
 import id.walt.webwallet.service.issuers.IssuerDataTransferObject
