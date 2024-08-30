@@ -11,6 +11,7 @@ import kotlinx.serialization.json.*
 
 private fun vc(vararg extra: String) = JsonArray(listOf(*extra).map { JsonPrimitive(it) })
 private fun vc(credentialSupported: CredentialSupported) = Json.encodeToJsonElement(credentialSupported)
+private var baseUrl = ConfigManager.getConfig<OIDCIssuerServiceConfig>().baseUrl
 
 @Serializable
 data class CredentialTypeConfig(
@@ -57,8 +58,7 @@ data class CredentialTypeConfig(
                 format = CredentialFormat.sd_jwt_vc,
                 cryptographicBindingMethodsSupported = setOf("jwk"),
                 credentialSigningAlgValuesSupported = setOf("ES256"),
-                types = listOf("urn:eu.europa.ec.eudi:pid:1"),
-                docType = "urn:eu.europa.ec.eudi:pid:1"
+                vct = baseUrl.plus("/urn:eu.europa.ec.eudi:pid:1")
             )
         ),
         "identity_credential_vc+sd-jwt" to vc(
@@ -66,8 +66,7 @@ data class CredentialTypeConfig(
                 format = CredentialFormat.sd_jwt_vc,
                 cryptographicBindingMethodsSupported = setOf("jwk"),
                 credentialSigningAlgValuesSupported = setOf("ES256"),
-                types = listOf("identity_credential_vc+sd-jwt"),
-                docType = "identity_credential_vc+sd-jwt"
+                vct = baseUrl.plus("/identity_credential")
             )
         )
     ),
@@ -88,7 +87,8 @@ data class CredentialTypeConfig(
                             format = format,
                             cryptographicBindingMethodsSupported = setOf("did"),
                             credentialSigningAlgValuesSupported = setOf("EdDSA", "ES256", "ES256K", "RSA"),
-                            types = types
+                            types = if (format != CredentialFormat.sd_jwt_vc) types else null,
+                            vct = if (format != CredentialFormat.sd_jwt_vc) null else baseUrl.plus("/${entry.key}")
                         )
                     }.entries
                 }

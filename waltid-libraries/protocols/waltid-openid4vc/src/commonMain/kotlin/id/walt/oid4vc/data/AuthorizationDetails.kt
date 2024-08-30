@@ -32,6 +32,7 @@ data class AuthorizationDetails @OptIn(ExperimentalSerializationApi::class) cons
     @EncodeDefault val type: String = OPENID_CREDENTIAL_AUTHORIZATION_TYPE,
     val format: CredentialFormat? = null,
     val types: List<String>? = null,
+    val vct: String? = null,
     @Serializable(ClaimDescriptorMapSerializer::class) val credentialSubject: Map<String, ClaimDescriptor>? = null,
     @SerialName("doctype") val docType: String? = null,
     @Serializable(ClaimDescriptorNamespacedMapSerializer::class) val claims: Map<String, Map<String, ClaimDescriptor>>? = null,
@@ -47,7 +48,7 @@ data class AuthorizationDetails @OptIn(ExperimentalSerializationApi::class) cons
 
         fun fromOfferedCredential(offeredCredential: OfferedCredential, issuerLocation: String? = null) = AuthorizationDetails(
             OPENID_CREDENTIAL_AUTHORIZATION_TYPE,
-            offeredCredential.format, offeredCredential.types, null,
+            offeredCredential.format, offeredCredential.types, offeredCredential.vct, null,
             offeredCredential.docType, null,
             offeredCredential.credentialDefinition, issuerLocation?.let { listOf(it) }, offeredCredential.customParameters
         )
