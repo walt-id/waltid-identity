@@ -599,6 +599,7 @@ open class CIProvider : OpenIDCredentialIssuer(
                     buildJsonObject { put("jwk", it.exportJWKObject()) }
                 } ?: buildJsonObject { put("kid", holderDid) }),
                 vct = data.request.vct ?: throw IllegalArgumentException("Invalid VCT"),
+                subject =  holderDid ?: holderKey?.getKeyId()
             )}
             else -> emptyMap()
         },
