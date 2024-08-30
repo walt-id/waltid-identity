@@ -100,28 +100,7 @@ object OidcApi : CIProvider() {
             }
 
             get("/jwks") {
-                var jwks = buildJsonObject {}
-                OidcApi.sessionCredentialPreMapping.getAll().forEach {
-                    it.forEach {
-                        jwks = buildJsonObject {
-                            put("keys", buildJsonArray {
-                                val jwkWithKid = buildJsonObject {
-                                    it.issuerKey.key.getPublicKey().exportJWKObject().forEach {
-                                        put(it.key, it.value)
-                                    }
-                                    put("kid", it.issuerKey.key.getPublicKey().getKeyId())
-                                }
-                                add(jwkWithKid)
-                                jwks.forEach {
-                                    it.value.jsonArray.forEach {
-                                        add(it)
-                                    }
-                                }
-                            })
-                        }
-                    }
-                }
-                call.respond(HttpStatusCode.OK, jwks)
+                call.respond(HttpStatusCode.OK, getJwksSessions())
             }
 
             get("/authorize") {
