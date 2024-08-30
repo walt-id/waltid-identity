@@ -300,9 +300,9 @@ open class CIProvider : OpenIDCredentialIssuer(
                 if (issuerDid.startsWith("did:ebsi"))
                     issuerKid = issuerDid + "#" + issuerKey.key.getKeyId()
 
-                when (data.request.credentialFormat) {
-                    // Add CredentialFormat.jwt_vc_json for w3c sdjwts credentials
-                    CredentialFormat.sd_jwt_vc -> sdJwtVc(JWKKey.importJWK(holderKey.toString()).getOrNull(), vc, data, holderDid, credentialRequest.format)
+                val isSdJwtVc = data.request.credentialFormat == CredentialFormat.sd_jwt_vc || data.request.selectiveDisclosure != null
+                when {
+                    isSdJwtVc -> sdJwtVc(JWKKey.importJWK(holderKey.toString()).getOrNull(), vc, data, holderDid, credentialRequest.format)
                     else -> nonSdJwtVc(vc, issuerKid, holderDid, holderKey)
                 }
             }.also { log.debug { "Respond VC: $it" } }
