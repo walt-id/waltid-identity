@@ -573,7 +573,6 @@ open class CIProvider : OpenIDCredentialIssuer(
         }
     }
 
-    fun getVct(credentialConfigurationId: String) = OidcApi.metadata.credentialConfigurationsSupported?.get(credentialConfigurationId)?.vct ?: throw IllegalArgumentException("No credential configuration supported: $credentialConfigurationId for IETF SD-JWT profile" )
 
     private suspend fun IssuanceSessionData.sdJwtVc(
         holderKey: JWKKey?,
@@ -656,5 +655,23 @@ open class CIProvider : OpenIDCredentialIssuer(
             }
         }
         return jwks
+    }
+
+    fun getVctByCredentialConfigurationId(credentialConfigurationId: String) = OidcApi.metadata.credentialConfigurationsSupported?.get(credentialConfigurationId)?.vct
+
+    fun getVctBySupportedCredentialConfiguration(
+        supportedCredential: Map<String, CredentialSupported>?,
+        baseUrl: String,
+        credType: String
+    ): CredentialSupported {
+        val expectedVct = "$baseUrl/$credType"
+
+        supportedCredential?.entries?.forEach { entry ->
+            if (getVctByCredentialConfigurationId(entry.key) == expectedVct) {
+                return entry.value
+            }
+        }
+
+       throw IllegalArgumentException("Invalid type value: $credType. The $credType type is not supported")
     }
 }
