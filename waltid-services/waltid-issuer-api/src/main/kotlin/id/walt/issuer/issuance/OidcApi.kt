@@ -73,13 +73,13 @@ object OidcApi : CIProvider() {
             }
 
             get("/.well-known/vct/{type}") {
-                val credType = call.parameters["type"]
+                val credType = call.parameters["type"] ?: throw IllegalArgumentException("Type required")
 
-                requireNotNull(metadata.credentialConfigurationsSupported!!.entries.find{ it.key.startsWith("$credType") }) { "Invalid type value: $credType. The $credType type is not supported" }
-
+                // if this endpoint called, the <authority> is the issuer api
+                val vctMetadata = getVctBySupportedCredentialConfiguration(metadata.credentialConfigurationsSupported, baseUrl, credType)
                 call.respond(
                     HttpStatusCode.OK,
-                    SDTypeMetadata(vct = metadata.issuer + "/" + credType, name = credType, description = "$credType Verifiable Credential")
+                    SDTypeMetadata(vct = vctMetadata.vct, name = credType, description = "$credType Verifiable Credential")
                 )
             }
         }
