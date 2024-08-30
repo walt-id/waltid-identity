@@ -39,8 +39,6 @@ object UserPass : UserPassBasedAuthMethod("userpass") {
 
             auth(session, credential)
 
-
-
             context.respond(session.toInformation())
         }
     }

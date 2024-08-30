@@ -1,7 +1,9 @@
 package id.walt.authkit.sessions
 
 import id.walt.authkit.flows.AuthFlow
+import id.walt.authkit.flows.methods
 import id.walt.authkit.methods.AuthenticationMethod
+import kotlinx.coroutines.flow.flow
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
@@ -21,7 +23,7 @@ data class AuthSession(
     val id: String,
 
     var status: AuthSessionStatus = AuthSessionStatus.INIT,
-    var flow: AuthFlow? = null,
+    var flows: Set<AuthFlow>? = null,
 
     /**
      * Account ID, if known yet
@@ -31,15 +33,17 @@ data class AuthSession(
 
     var token: String? = null,
 ) {
-    fun toInformation() = AuthSessionInformation(id, status, flow?.method, token)
+    fun toInformation() = AuthSessionInformation(id, status, flows?.methods(), token)
     suspend fun progressFlow(method: AuthenticationMethod) {
-        check(flow!!.method == method.id) { "Trying to progress flow with wrong authentication method" }
+        check(flows!!.any { it.method == method.id }){ "Trying to progress flow with wrong authentication method. Allowed methods: ${flows!!.methods()}, tried method: ${method.id}" }
 
-        if (flow!!.continueWith != null) {
-            flow = flow!!.continueWith
+        val currentFlow = flows!!.first { it.method == method.id }
+
+        if (currentFlow.continueWith != null) {
+            flows = currentFlow.continueWith
             status = AuthSessionStatus.CONTINUE_NEXT_STEP
-        } else if (flow!!.ok) {
-            flow = null
+        } else if (currentFlow.ok) {
+            flows = null
             status = AuthSessionStatus.OK
 
             token = TokenManager.supplyNewToken(this)
@@ -61,7 +65,7 @@ data class AuthSessionInformation(
 
     @SerialName("next_step")
     @EncodeDefault(EncodeDefault.Mode.NEVER)
-    val nextStep: String? = null,
+    val nextStep: List<String>? = null,
 
     @EncodeDefault(EncodeDefault.Mode.NEVER)
     val token: String? = null,
