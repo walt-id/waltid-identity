@@ -7,14 +7,13 @@ import kotlin.uuid.Uuid
 @OptIn(ExperimentalUuidApi::class)
 object SessionManager {
 
-    // flow is explicitly provided when starting session
-    suspend fun openExplicitSession(authFlow: AuthFlow): AuthSession {
+    suspend fun newSession(authFlow: AuthFlow): AuthSession {
         val sessionId = Uuid.random().toString()
 
         val newSession = AuthSession(
             id = sessionId,
             status = AuthSessionStatus.CONTINUE_NEXT_STEP,
-            flow = authFlow
+            flows = setOf(authFlow)
         )
 
         SessionStore.store(newSession)
@@ -22,16 +21,24 @@ object SessionManager {
         return newSession
     }
 
-    // figure out flow based on first login method
-    suspend fun openImplicitSession(): AuthSession {
-        val sessionId = Uuid.random().toString()
-
-        val newSession = AuthSession(sessionId)
-
-        SessionStore.store(newSession)
-
-        return newSession
+    /**
+     * Session is explicitly started
+     */
+    suspend fun openExplicitSession(authFlow: AuthFlow): AuthSession {
+        return newSession(authFlow)
     }
+
+    /**
+     * Session is started through the first login method
+     */
+    suspend fun openImplicitSession(authFlow: AuthFlow): AuthSession {
+        return newSession(authFlow)
+    }
+
+    //  XXXXX figure out flow based on first login method
+
+
+
 
     suspend fun updateSession(updatedAuthSession: AuthSession) {
         SessionStore.store(updatedAuthSession)

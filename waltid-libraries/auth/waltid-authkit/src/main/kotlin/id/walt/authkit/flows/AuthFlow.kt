@@ -12,19 +12,25 @@ private operator fun String.times(index: Int): String {
     return sb.toString()
 }
 
+fun Set<AuthFlow>.methods() = map { it.method }
+
 @Serializable
 data class AuthFlow(
     val method: String,
     val config: JsonObject? = null,
 
     @SerialName("continue")
-    val continueWith: AuthFlow? = null,
+    val continueWith: Set<AuthFlow>? = null,
     val ok: Boolean = false,
 ) {
-
     init {
         check(ok || continueWith != null) { "No end condition in auth flow with method $method" }
-        check(ok xor (continueWith != null)) { "Multiple end conditions in auth flow with method $method" }
+        check(ok xor (continueWith != null)) { "Multiple end conditions in auth flow with method $method: OK and ${continueWith!!.methods()}" }
+
+        if (continueWith != null) {
+            check(continueWith.isNotEmpty()) { "Next flow list (`continueWith`) is empty at method $method" }
+            check(continueWith.methods().toSet().size == continueWith.size) { "Duplicated method in same flow in next flow list (`continueWith`) at method $method" }
+        }
     }
 
     override fun toString(): String = toString(0)
@@ -35,7 +41,7 @@ data class AuthFlow(
         val config = if (config != null) "\n${prefix}config=$config" else ""
         val end = when {
             ok -> "$prefix-> Flow end (success)"
-            continueWith != null -> "continue on success ->\n${continueWith.toString(index + 1)}"
+            continueWith != null -> "${prefix}continue on success ->\n${continueWith.joinToString("\n") { it.toString(index + 1) }}"
             else -> "$prefix?"
         }
         return "${prefix}Method: $method$config\n$end"
@@ -52,10 +58,16 @@ val flowConfig = """
 {
   "mid": {
     "method": "userpass",
-    "continue": {
+    "continue": [{
       "method": "totp",
       "ok": true
-    }
+    }, {
+      "method": "emailpass",
+      "continue": [{
+        "method": "totp",
+        "ok": true
+      }]
+    }]
   },
   
   "high": {
@@ -84,7 +96,7 @@ val flowConfig = """
       "client_id": "app123",
       "client_secret": "secret123"
     },
-    "continue": {
+    "continue": [{
       "method": "vc",
       "config": {
         "request_credentials": [
@@ -92,7 +104,7 @@ val flowConfig = """
         ]
       },
       "ok": true
-    }
+    }]
   }
 }
 """.trimIndent()
