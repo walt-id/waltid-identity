@@ -62,7 +62,8 @@ class ExchangeApi(private val client: HttpClient) {
             }.expectSuccess().apply {
                 val matched = body<List<WalletCredential>>()
                 assert(matched.size == expectedCredentialIds.size) { "presentation definition should match $expectedCredentialIds credential(s), but have ${matched.size}" }
-                assert(matched.map { it.id }.containsAll(expectedCredentialIds)) { "matched credentials does not contain all of the expected ones" }
+                assert(matched.map { it.id }
+                    .containsAll(expectedCredentialIds)) { "matched credentials does not contain all of the expected ones" }
                 output?.invoke(matched)
             }
         }

@@ -248,6 +248,8 @@ class E2ETest {
             val authorizationCodeFlow = AuthorizationCodeFlow(testHttpClient(doFollowRedirects = false))
             authorizationCodeFlow.testIssuerAPI()
 
+            // test External Signature API Endpoints
+            ExchangeExternalSignatures().executeTestCases()
         }
     }
 
