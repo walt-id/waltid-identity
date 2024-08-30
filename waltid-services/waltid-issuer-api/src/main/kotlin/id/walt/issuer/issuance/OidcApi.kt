@@ -67,8 +67,20 @@ object OidcApi : CIProvider() {
             get("/.well-known/oauth-authorization-server") {
                 call.respond(metadata.toJSON())
             }
-            get("/.well-known/jwt-issuer") {
-                call.respond(metadata.toJSON())
+
+            get("/.well-known/jwt-vc-issuer") {
+                call.respond(HttpStatusCode.OK, JWTVCIssuerMetadata(issuer = metadata.issuer, jwksUri = metadata.jwksUri))
+            }
+
+            get("/.well-known/vct/{type}") {
+                val credType = call.parameters["type"]
+
+                requireNotNull(metadata.credentialConfigurationsSupported!!.entries.find{ it.key.startsWith("$credType") }) { "Invalid type value: $credType. The $credType type is not supported" }
+
+                call.respond(
+                    HttpStatusCode.OK,
+                    SDTypeMetadata(vct = metadata.issuer + "/" + credType, name = credType, description = "$credType Verifiable Credential")
+                )
             }
         }
 
