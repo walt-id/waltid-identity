@@ -48,7 +48,8 @@ class LspPotentialWallet(val client: HttpClient, val walletId: String) {
     suspend fun testMDocIssuance() = E2ETestWebService.test("test mdoc issuance") {
         // === get credential offer from test issuer API ===
         val issuanceReq = Json.decodeFromString<IssuanceRequest>(IssuanceExamples.mDLCredentialIssuanceData).copy(
-            authenticationMethod = AuthenticationMethod.PRE_AUTHORIZED
+            authenticationMethod = AuthenticationMethod.PRE_AUTHORIZED,
+            credentialFormat = CredentialFormat.mso_mdoc
         )
         val offerResp = client.post("/openid4vc/sdjwt/issue") {
             contentType(ContentType.Application.Json)
@@ -130,9 +131,10 @@ class LspPotentialWallet(val client: HttpClient, val walletId: String) {
                 put("family_name", "Doe")
                 put("given_name", "John")
             }),
-            null,
+            "identity_credential",
             x5Chain = listOf(LspPotentialInterop.POTENTIAL_ISSUER_CERT),
-            trustedRootCAs = listOf(LspPotentialInterop.POTENTIAL_ROOT_CA_CERT)
+            trustedRootCAs = listOf(LspPotentialInterop.POTENTIAL_ROOT_CA_CERT),
+            credentialFormat = CredentialFormat.sd_jwt_vc
         )
         val offerResp = client.post("/openid4vc/sdjwt/issue") {
             contentType(ContentType.Application.Json)
