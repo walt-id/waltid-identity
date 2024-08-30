@@ -228,193 +228,193 @@ object OidcApi : CIProvider() {
                     }
                 }
             }
-        }
 
-        post("/direct_post") {
-            val params = call.receiveParameters().toMap()
-            logger.info { "/direct_post params: $params" }
+            post("/direct_post") {
+                val params = call.receiveParameters().toMap()
+                logger.info { "/direct_post params: $params" }
 
-            if (params["state"]?.get(0) == null || (params["id_token"]?.get(0) == null && params["vp_token"]?.get(0) == null)) {
-                call.respond(HttpStatusCode.BadRequest, "missing state/id_token/vp_token parameter")
-                throw IllegalArgumentException("missing missing state/id_token/vp_token  parameter")
-            }
-
-            try {
-                val state = params["state"]?.get(0)!!
-                if (params["id_token"]?.get(0) != null) {
-                    val idToken = params["id_token"]?.get(0)!!
-
-                    // Verify and Parse ID Token
-                    verifyAndParseIdToken(idToken)
-
-                } else {
-                    val vpToken = params["vp_token"]?.get(0)!!
-                    val presSub = params["presentation_submission"]?.get(0)!!
-
-                    // Verify and Parse VP Token
-                    val policies = Json.parseToJsonElement("""["signature", "expired", "not-before"]""").jsonArray.parsePolicyRequests()
-
-                    Verifier.verifyPresentation(
-                        vpTokenJwt = vpToken,
-                        vpPolicies = policies,
-                        globalVcPolicies = policies,
-                        specificCredentialPolicies = emptyMap(),
-                        mapOf("presentationSubmission" to presSub)
-                    )
+                if (params["state"]?.get(0) == null || (params["id_token"]?.get(0) == null && params["vp_token"]?.get(0) == null)) {
+                    call.respond(HttpStatusCode.BadRequest, "missing state/id_token/vp_token parameter")
+                    throw IllegalArgumentException("missing missing state/id_token/vp_token  parameter")
                 }
 
-                // Process response
-                val resp = processDirectPost(state, buildJsonObject { })
-
-                // Get the authorization_endpoint parameter which is the redirect_uri from the Authorization Request Parameter
-                val redirectUri = getSessionByAuthServerState(state)!!.authorizationRequest!!.redirectUri!!
-
-                call.response.apply {
-                    status(HttpStatusCode.Found)
-                    header(HttpHeaders.Location, resp.toRedirectUri(redirectUri, ResponseMode.query))
-                }
-
-            } catch (exc: TokenError) {
-                call.respond(HttpStatusCode.BadRequest, exc.toAuthorizationErrorResponse().toJSON())
-                throw IllegalArgumentException(exc.toAuthorizationErrorResponse().toString())
-            }
-        }
-
-        post("/token") {
-            val params = call.receiveParameters().toMap()
-
-            logger.info { "/token params: $params" }
-
-            val tokenReq = TokenRequest.fromHttpParameters(params)
-            logger.info { "/token tokenReq from params: $tokenReq" }
-
-            try {
-                val tokenResp = processTokenRequest(tokenReq)
-                logger.info { "/token tokenResp: $tokenResp" }
-
-                val sessionId = Json.parseToJsonElement(
-                    (tokenResp.accessToken
-                        ?: throw IllegalArgumentException("No access token was responded with tokenResp?")).split(
-                        "."
-                    )[1].base64UrlDecode().decodeToString()
-                ).jsonObject["sub"]?.jsonPrimitive?.contentOrNull
-                    ?: throw IllegalArgumentException("Could not get session ID from token response!")
-                val nonceToken = tokenResp.cNonce
-                    ?: throw IllegalArgumentException("No nonce token was responded with the tokenResp?")
-                OidcApi.mapSessionIdToToken(
-                    sessionId,
-                    nonceToken
-                )  // TODO: Hack as this is non stateless because of oidc4vc lib API
-
-                call.respond(tokenResp.toJSON())
-            } catch (exc: TokenError) {
-                logger.error(exc) { "Token error: " }
-                call.respond(HttpStatusCode.BadRequest, exc.toAuthorizationErrorResponse().toJSON())
-            }
-        }
-        post("/credential") {
-            val accessToken = call.request.header(HttpHeaders.Authorization)?.substringAfter(" ")
-            if (accessToken.isNullOrEmpty() || !verifyTokenSignature(TokenTarget.ACCESS, accessToken)) {
-                call.respond(HttpStatusCode.Unauthorized)
-            } else {
-                val credReq = CredentialRequest.fromJSON(call.receive<JsonObject>())
                 try {
-                    call.respond(generateCredentialResponse(credReq, accessToken).toJSON())
-                } catch (exc: CredentialError) {
-                    logger.error(exc) { "Credential error: " }
-                    call.respond(HttpStatusCode.BadRequest, exc.toCredentialErrorResponse().toJSON())
-                }
-            }
-        }
-        post("/credential_deferred") {
-            val accessToken = call.request.header(HttpHeaders.Authorization)?.substringAfter(" ")
-            if (accessToken.isNullOrEmpty() || !verifyTokenSignature(
-                    TokenTarget.DEFERRED_CREDENTIAL,
-                    accessToken
-                )
-            ) {
-                call.respond(HttpStatusCode.Unauthorized)
-            } else {
-                try {
-                    call.respond(generateDeferredCredentialResponse(accessToken).toJSON())
-                } catch (exc: DeferredCredentialError) {
-                    logger.error(exc) { "DeferredCredentialError: " }
-                    call.respond(HttpStatusCode.BadRequest, exc.toCredentialErrorResponse().toJSON())
-                }
-            }
-        }
-        post("/batch_credential") {
-            val accessToken = call.request.header(HttpHeaders.Authorization)?.substringAfter(" ")
-            if (accessToken.isNullOrEmpty() || !verifyTokenSignature(TokenTarget.ACCESS, accessToken)) {
-                call.respond(HttpStatusCode.Unauthorized)
-            } else {
-                val req = BatchCredentialRequest.fromJSON(call.receive())
-                try {
-                    call.respond(generateBatchCredentialResponse(req, accessToken).toJSON())
-                } catch (exc: BatchCredentialError) {
-                    logger.error(exc) { "BatchCredentialError: " }
-                    call.respond(HttpStatusCode.BadRequest, exc.toBatchCredentialErrorResponse().toJSON())
-                }
-            }
-        }
+                    val state = params["state"]?.get(0)!!
+                    if (params["id_token"]?.get(0) != null) {
+                        val idToken = params["id_token"]?.get(0)!!
 
-        val authorizationPhase = PipelinePhase("Authorization")
+                        // Verify and Parse ID Token
+                        verifyAndParseIdToken(idToken)
 
-        authenticate("auth-oauth") {
-            // intercept request and store the state
-            this.insertPhaseBefore(ApplicationCallPipeline.Call, authorizationPhase)
-            this.intercept(authorizationPhase) {
-                val externalAuthReq =
-                    when (val externalAuthReqStr = call.response.headers.allValues().toMap()["Location"]) {
-                        null -> null
-                        else -> runBlocking {
-                            AuthorizationRequest.fromHttpQueryString(externalAuthReqStr[0].substringAfter("?"))
-                        }
-                    }
-                val authReq = when (val internalAuthReqParams = call.parameters["internalAuthReq"]) {
-                    null -> null
-                    else -> runBlocking { AuthorizationRequest.fromHttpQueryString(internalAuthReqParams) }
-                }
-                if (authReq != null && externalAuthReq != null) {
-                    initializeAuthorization(authReq, 5.minutes, externalAuthReq.state)
-                }
+                    } else {
+                        val vpToken = params["vp_token"]?.get(0)!!
+                        val presSub = params["presentation_submission"]?.get(0)!!
 
-            }
+                        // Verify and Parse VP Token
+                        val policies = Json.parseToJsonElement("""["signature", "expired", "not-before"]""").jsonArray.parsePolicyRequests()
 
-            get("/external_login/{internalAuthReq}") {
-                // Redirects to 'authorizeUrl' automatically
-            }
-
-            get("/callback") {
-                // currentPrincipal contains the Access/ID/Refresh tokens from the Authorization Server
-                val currentPrincipal: OAuthAccessTokenResponse.OAuth2? = call.principal()
-
-                // should redirect to authorization request redirect uri with the code
-                val session = getSessionByAuthServerState(call.request.rawQueryParameters.toMap()["state"]!![0])
-                val authResp = processCodeFlowAuthorization(session?.authorizationRequest!!)
-
-                val redirectUri = when (session.authorizationRequest!!.isReferenceToPAR) {
-                    true -> getPushedAuthorizationSession(session.authorizationRequest!!).authorizationRequest?.redirectUri
-                    false -> session.authorizationRequest!!.redirectUri
-                } ?: throw AuthorizationError(
-                    session.authorizationRequest!!,
-                    AuthorizationErrorCode.invalid_request,
-                    "No redirect_uri found for this authorization request"
-                )
-
-                logger.info { "Redirect Uri is: $redirectUri" }
-
-                call.response.apply {
-                    status(HttpStatusCode.Found)
-                    val defaultResponseMode =
-                        if (session.authorizationRequest!!.responseType.contains(ResponseType.Code)) ResponseMode.query else ResponseMode.fragment
-                    header(
-                        HttpHeaders.Location,
-                        authResp.toRedirectUri(
-                            redirectUri,
-                            session.authorizationRequest!!.responseMode ?: defaultResponseMode
+                        Verifier.verifyPresentation(
+                            vpTokenJwt = vpToken,
+                            vpPolicies = policies,
+                            globalVcPolicies = policies,
+                            specificCredentialPolicies = emptyMap(),
+                            mapOf("presentationSubmission" to presSub)
                         )
+                    }
+
+                    // Process response
+                    val resp = processDirectPost(state, buildJsonObject { })
+
+                    // Get the authorization_endpoint parameter which is the redirect_uri from the Authorization Request Parameter
+                    val redirectUri = getSessionByAuthServerState(state)!!.authorizationRequest!!.redirectUri!!
+
+                    call.response.apply {
+                        status(HttpStatusCode.Found)
+                        header(HttpHeaders.Location, resp.toRedirectUri(redirectUri, ResponseMode.query))
+                    }
+
+                } catch (exc: TokenError) {
+                    call.respond(HttpStatusCode.BadRequest, exc.toAuthorizationErrorResponse().toJSON())
+                    throw IllegalArgumentException(exc.toAuthorizationErrorResponse().toString())
+                }
+            }
+
+            post("/token") {
+                val params = call.receiveParameters().toMap()
+
+                logger.info { "/token params: $params" }
+
+                val tokenReq = TokenRequest.fromHttpParameters(params)
+                logger.info { "/token tokenReq from params: $tokenReq" }
+
+                try {
+                    val tokenResp = processTokenRequest(tokenReq)
+                    logger.info { "/token tokenResp: $tokenResp" }
+
+                    val sessionId = Json.parseToJsonElement(
+                        (tokenResp.accessToken
+                            ?: throw IllegalArgumentException("No access token was responded with tokenResp?")).split(
+                            "."
+                        )[1].base64UrlDecode().decodeToString()
+                    ).jsonObject["sub"]?.jsonPrimitive?.contentOrNull
+                        ?: throw IllegalArgumentException("Could not get session ID from token response!")
+                    val nonceToken = tokenResp.cNonce
+                        ?: throw IllegalArgumentException("No nonce token was responded with the tokenResp?")
+                    OidcApi.mapSessionIdToToken(
+                        sessionId,
+                        nonceToken
+                    )  // TODO: Hack as this is non stateless because of oidc4vc lib API
+
+                    call.respond(tokenResp.toJSON())
+                } catch (exc: TokenError) {
+                    logger.error(exc) { "Token error: " }
+                    call.respond(HttpStatusCode.BadRequest, exc.toAuthorizationErrorResponse().toJSON())
+                }
+            }
+            post("/credential") {
+                val accessToken = call.request.header(HttpHeaders.Authorization)?.substringAfter(" ")
+                if (accessToken.isNullOrEmpty() || !verifyTokenSignature(TokenTarget.ACCESS, accessToken)) {
+                    call.respond(HttpStatusCode.Unauthorized)
+                } else {
+                    val credReq = CredentialRequest.fromJSON(call.receive<JsonObject>())
+                    try {
+                        call.respond(generateCredentialResponse(credReq, accessToken).toJSON())
+                    } catch (exc: CredentialError) {
+                        logger.error(exc) { "Credential error: " }
+                        call.respond(HttpStatusCode.BadRequest, exc.toCredentialErrorResponse().toJSON())
+                    }
+                }
+            }
+            post("/credential_deferred") {
+                val accessToken = call.request.header(HttpHeaders.Authorization)?.substringAfter(" ")
+                if (accessToken.isNullOrEmpty() || !verifyTokenSignature(
+                        TokenTarget.DEFERRED_CREDENTIAL,
+                        accessToken
                     )
+                ) {
+                    call.respond(HttpStatusCode.Unauthorized)
+                } else {
+                    try {
+                        call.respond(generateDeferredCredentialResponse(accessToken).toJSON())
+                    } catch (exc: DeferredCredentialError) {
+                        logger.error(exc) { "DeferredCredentialError: " }
+                        call.respond(HttpStatusCode.BadRequest, exc.toCredentialErrorResponse().toJSON())
+                    }
+                }
+            }
+            post("/batch_credential") {
+                val accessToken = call.request.header(HttpHeaders.Authorization)?.substringAfter(" ")
+                if (accessToken.isNullOrEmpty() || !verifyTokenSignature(TokenTarget.ACCESS, accessToken)) {
+                    call.respond(HttpStatusCode.Unauthorized)
+                } else {
+                    val req = BatchCredentialRequest.fromJSON(call.receive())
+                    try {
+                        call.respond(generateBatchCredentialResponse(req, accessToken).toJSON())
+                    } catch (exc: BatchCredentialError) {
+                        logger.error(exc) { "BatchCredentialError: " }
+                        call.respond(HttpStatusCode.BadRequest, exc.toBatchCredentialErrorResponse().toJSON())
+                    }
+                }
+            }
+
+            val authorizationPhase = PipelinePhase("Authorization")
+
+            authenticate("auth-oauth") {
+                // intercept request and store the state
+                this.insertPhaseBefore(ApplicationCallPipeline.Call, authorizationPhase)
+                this.intercept(authorizationPhase) {
+                    val externalAuthReq =
+                        when (val externalAuthReqStr = call.response.headers.allValues().toMap()["Location"]) {
+                            null -> null
+                            else -> runBlocking {
+                                AuthorizationRequest.fromHttpQueryString(externalAuthReqStr[0].substringAfter("?"))
+                            }
+                        }
+                    val authReq = when (val internalAuthReqParams = call.parameters["internalAuthReq"]) {
+                        null -> null
+                        else -> runBlocking { AuthorizationRequest.fromHttpQueryString(internalAuthReqParams) }
+                    }
+                    if (authReq != null && externalAuthReq != null) {
+                        initializeAuthorization(authReq, 5.minutes, externalAuthReq.state)
+                    }
+
+                }
+
+                get("/external_login/{internalAuthReq}") {
+                    // Redirects to 'authorizeUrl' automatically
+                }
+
+                get("/callback") {
+                    // currentPrincipal contains the Access/ID/Refresh tokens from the Authorization Server
+                    val currentPrincipal: OAuthAccessTokenResponse.OAuth2? = call.principal()
+
+                    // should redirect to authorization request redirect uri with the code
+                    val session = getSessionByAuthServerState(call.request.rawQueryParameters.toMap()["state"]!![0])
+                    val authResp = processCodeFlowAuthorization(session?.authorizationRequest!!)
+
+                    val redirectUri = when (session.authorizationRequest!!.isReferenceToPAR) {
+                        true -> getPushedAuthorizationSession(session.authorizationRequest!!).authorizationRequest?.redirectUri
+                        false -> session.authorizationRequest!!.redirectUri
+                    } ?: throw AuthorizationError(
+                        session.authorizationRequest!!,
+                        AuthorizationErrorCode.invalid_request,
+                        "No redirect_uri found for this authorization request"
+                    )
+
+                    logger.info { "Redirect Uri is: $redirectUri" }
+
+                    call.response.apply {
+                        status(HttpStatusCode.Found)
+                        val defaultResponseMode =
+                            if (session.authorizationRequest!!.responseType.contains(ResponseType.Code)) ResponseMode.query else ResponseMode.fragment
+                        header(
+                            HttpHeaders.Location,
+                            authResp.toRedirectUri(
+                                redirectUri,
+                                session.authorizationRequest!!.responseMode ?: defaultResponseMode
+                            )
+                        )
+                    }
                 }
             }
         }
