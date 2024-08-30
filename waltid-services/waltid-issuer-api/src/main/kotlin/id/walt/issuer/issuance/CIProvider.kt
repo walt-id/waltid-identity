@@ -632,4 +632,29 @@ open class CIProvider : OpenIDCredentialIssuer(
             put("jwt", it)
         })
     }
+
+    suspend fun getJwksSessions() : JsonObject{
+        var jwks = buildJsonObject {}
+        sessionCredentialPreMapping.getAll().forEach { it ->
+            it.forEach {
+                jwks = buildJsonObject {
+                    put("keys", buildJsonArray {
+                        val jwkWithKid = buildJsonObject {
+                            it.issuerKey.key.getPublicKey().exportJWKObject().forEach {
+                                put(it.key, it.value)
+                            }
+                            put("kid", it.issuerKey.key.getPublicKey().getKeyId())
+                        }
+                        add(jwkWithKid)
+                        jwks.forEach { it ->
+                            it.value.jsonArray.forEach {
+                                add(it)
+                            }
+                        }
+                    })
+                }
+            }
+        }
+        return jwks
+    }
 }
