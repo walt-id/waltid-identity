@@ -11,6 +11,7 @@ import kotlinx.serialization.json.jsonObject
 data class OfferedCredential(
     val format: CredentialFormat,
     val types: List<String>? = null,
+    val vct: String? = null,
     @SerialName("doctype") val docType: String? = null,
     @SerialName("credential_definition") val credentialDefinition: JsonLDCredentialDefinition? = null,
     @SerialName("proof_types_supported") val proofTypesSupported: Map<ProofType, ProofTypeMetadata>? = null,
@@ -24,7 +25,10 @@ data class OfferedCredential(
             Json.decodeFromJsonElement(OfferedCredentialSerializer, jsonObject)
 
         fun fromProviderMetadata(credential: CredentialSupported) = OfferedCredential(
-            credential.format, credential.types, credential.docType,
+            credential.format,
+            credential.types,
+            credential.vct,
+            credential.docType,
             JsonLDCredentialDefinition(credential.context, credential.types),
             credential.proofTypesSupported,
             credential.cryptographicBindingMethodsSupported,

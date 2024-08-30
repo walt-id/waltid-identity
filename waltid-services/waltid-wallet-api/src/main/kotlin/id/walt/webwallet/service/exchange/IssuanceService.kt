@@ -131,7 +131,7 @@ object IssuanceService {
             val useKeyProof = (offeredCredential.cryptographicBindingMethodsSupported != null &&
                     (offeredCredential.cryptographicBindingMethodsSupported!!.contains("cose_key") ||
                             offeredCredential.cryptographicBindingMethodsSupported!!.contains("jwk")) &&
-                    !offeredCredential.cryptographicBindingMethodsSupported!!.contains("did"))
+                    !offeredCredential.cryptographicBindingMethodsSupported!!.contains("did") || (offeredCredential.format.value == "vc+sd-jwt"))
             CredentialRequest.forOfferedCredential(
                 offeredCredential = offeredCredential,
                 proof = ProofOfPossessionFactory.new(useKeyProof, credentialWallet, offeredCredential, credentialOffer, nonce)

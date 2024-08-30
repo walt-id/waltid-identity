@@ -27,7 +27,6 @@ import id.walt.mdoc.SimpleCOSECryptoProvider
 import id.walt.mdoc.cose.COSESign1
 import id.walt.mdoc.dataelement.*
 import id.walt.mdoc.doc.MDocBuilder
-import id.walt.mdoc.doc.MDocTypes
 import id.walt.mdoc.mso.DeviceKeyInfo
 import id.walt.mdoc.mso.ValidityInfo
 import id.walt.oid4vc.data.*
@@ -301,8 +300,9 @@ open class CIProvider : OpenIDCredentialIssuer(
                 if (issuerDid.startsWith("did:ebsi"))
                     issuerKid = issuerDid + "#" + issuerKey.key.getKeyId()
 
-                when (data.request.issuanceType) {
-                    IssuanceType.sdjwt -> sdJwtVc(JWKKey.importJWK(holderKey.toString()).getOrNull(), vc, data, holderDid)
+                when (data.request.credentialFormat) {
+                    // Add CredentialFormat.jwt_vc_json for w3c sdjwts credentials
+                    CredentialFormat.sd_jwt_vc -> sdJwtVc(JWKKey.importJWK(holderKey.toString()).getOrNull(), vc, data, holderDid, credentialRequest.format)
                     else -> nonSdJwtVc(vc, issuerKid, holderDid, holderKey)
                 }
             }.also { log.debug { "Respond VC: $it" } }
@@ -573,27 +573,36 @@ open class CIProvider : OpenIDCredentialIssuer(
         }
     }
 
+    fun getVct(credentialConfigurationId: String) = OidcApi.metadata.credentialConfigurationsSupported?.get(credentialConfigurationId)?.vct ?: throw IllegalArgumentException("No credential configuration supported: $credentialConfigurationId for IETF SD-JWT profile" )
+
     private suspend fun IssuanceSessionData.sdJwtVc(
         holderKey: JWKKey?,
         vc: W3CVC,
         data: IssuanceSessionData,
         holderDid: String?,
+        format: CredentialFormat,
     ) = vc.mergingSdJwtIssue(
         issuerKey = issuerKey.key,
         issuerDid = issuerDid.ifEmpty { issuerKey.key.getKeyId() },
         subjectDid = holderDid ?: holderKey?.getKeyId() ?: throw IllegalArgumentException("Either holderKey or holderDid must be given"),
         mappings = request.mapping ?: JsonObject(emptyMap()),
-        type = SDJwtVC.SD_JWT_VC_TYPE_HEADER,
-        additionalJwtHeaders = request.x5Chain?.let {
-            mapOf("x5c" to JsonArray(it.map { cert -> cert.toJsonElement() }))
-        } ?: mapOf(),
-        additionalJwtOptions = SDJwtVC.defaultPayloadProperties(
-            issuerId = issuerDid.ifEmpty { issuerKey.key.getKeyId() },
-            cnf = JsonObject(holderKey?.let {
-                buildJsonObject { put("jwk", it.exportJWKObject()) }
-            } ?: buildJsonObject { put("kid", holderDid) }),
-            vct = data.request.credentialConfigurationId
-        ),
+        type = format.value,
+        additionalJwtHeaders = when(format) {
+            CredentialFormat.sd_jwt_vc -> {request.x5Chain?.let {
+                mapOf("x5c" to JsonArray(it.map { cert -> cert.toJsonElement() }), "typ" to CredentialFormat.sd_jwt_vc.toJsonElement(), "cty" to "credential-claims-set+json".toJsonElement(), "kid" to  issuerDid.ifEmpty { issuerKey.key.getKeyId() }.toJsonElement())
+            } ?: mapOf()}
+            else -> mapOf( "typ" to  format.toJsonElement(), "kid" to issuerDid.ifEmpty { issuerKey.key.getKeyId() }.toJsonElement())
+        },
+        additionalJwtOptions = when(format) {
+            CredentialFormat.sd_jwt_vc -> {  SDJwtVC.defaultPayloadProperties(
+                issuerId = issuerDid.ifEmpty { issuerKey.key.getKeyId() },
+                cnf = JsonObject(holderKey?.let {
+                    buildJsonObject { put("jwk", it.exportJWKObject()) }
+                } ?: buildJsonObject { put("kid", holderDid) }),
+                vct = data.request.vct ?: throw IllegalArgumentException("Invalid VCT"),
+            )}
+            else -> emptyMap()
+        },
         disclosureMap = request.selectiveDisclosure ?: SDMap(emptyMap())
     ).also {
         sendCallback("sdjwt_issue", buildJsonObject {
