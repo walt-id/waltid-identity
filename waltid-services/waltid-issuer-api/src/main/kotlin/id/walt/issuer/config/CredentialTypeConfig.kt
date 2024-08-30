@@ -1,5 +1,6 @@
 package id.walt.issuer.config
 
+import id.walt.commons.config.ConfigManager
 import id.walt.commons.config.WaltConfig
 import id.walt.mdoc.doc.MDocTypes
 import id.walt.oid4vc.data.CredentialFormat
