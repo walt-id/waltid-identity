@@ -29,8 +29,7 @@ object AccountsService {
                 WalletServiceManager.createWallet(tenant, registeredUserId)
             }.also { walletId ->
                 //TODO: inject
-                val issuer = IssuerDataTransferObject.default(walletId)
-                if (issuer != null) {
+                IssuerDataTransferObject.default(walletId)?.let { issuer ->
                     WalletServiceManager.issuerUseCase.add(issuer)
                 }
             }
