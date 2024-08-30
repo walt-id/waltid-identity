@@ -27,19 +27,15 @@ data class IssuerDataTransferObject(
 
     companion object {
         fun default(wallet: UUID): IssuerDataTransferObject? {
-            val defaultGenerationConfig by lazy { ConfigManager.getConfig<RegistrationDefaultsConfig>() }
-            return if (defaultGenerationConfig.defaultIssuerConfig != null) {
-                IssuerDataTransferObject(
-                    wallet = wallet,
-                    did = defaultGenerationConfig.defaultIssuerConfig!!.did,
-                    description = defaultGenerationConfig.defaultIssuerConfig?.description ?: "",
-                    uiEndpoint = defaultGenerationConfig.defaultIssuerConfig!!.uiEndpoint,
-                    configurationEndpoint = defaultGenerationConfig.defaultIssuerConfig!!.configurationEndpoint,
-                    authorized = defaultGenerationConfig.defaultIssuerConfig?.authorized ?: false
-                )
-            } else {
-                null
-            }
+            val config = ConfigManager.getConfig<RegistrationDefaultsConfig>().defaultIssuerConfig ?: return null
+            return IssuerDataTransferObject(
+                wallet = wallet,
+                did = config.did,
+                description = config.description,
+                uiEndpoint = config.uiEndpoint,
+                configurationEndpoint = config.configurationEndpoint,
+                authorized = config.authorized
+            )
         }
     }
 }
