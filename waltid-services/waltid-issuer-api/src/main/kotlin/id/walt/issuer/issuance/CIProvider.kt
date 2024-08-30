@@ -596,7 +596,7 @@ open class CIProvider : OpenIDCredentialIssuer(
             CredentialFormat.sd_jwt_vc -> {  SDJwtVC.defaultPayloadProperties(
                 issuerId = issuerDid.ifEmpty { issuerKey.key.getKeyId() },
                 cnf = JsonObject(holderKey?.let {
-                    buildJsonObject { put("jwk", it.exportJWKObject()) }
+                    buildJsonObject { put("jwk", it.exportJWKObject().plus("kid" to holderKey.getKeyId()).toJsonElement())}
                 } ?: buildJsonObject { put("kid", holderDid) }),
                 vct = data.request.vct ?: throw IllegalArgumentException("Invalid VCT"),
                 subject =  holderDid ?: holderKey?.getKeyId()
