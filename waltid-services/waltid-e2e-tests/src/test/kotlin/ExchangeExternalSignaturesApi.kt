@@ -243,6 +243,7 @@ class ExchangeExternalSignatures {
         client.post("/wallet-api/wallet/$walletId/exchange/external_signatures/oid4vp/submit") {
             setBody(
                 SubmitOID4VPRequest(
+                    holderDID,
                     signedVPToken,
                     prepareResponse.presentationRequest,
                     prepareResponse.sessionId,

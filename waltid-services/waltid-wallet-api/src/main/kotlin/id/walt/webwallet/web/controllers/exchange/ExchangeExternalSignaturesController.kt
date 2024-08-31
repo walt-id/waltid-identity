@@ -206,6 +206,9 @@ fun Application.exchangeExternalSignatures() = walletRoute {
             val authReq = req.resolvedAuthReq
             val presentationSubmission = req.presentationSubmission
             val presentedCredentialIdList = req.presentedCredentialIdList
+            val did = req.did
+
+            //TODO():: Use the did here to verify the signature on the vp token just to make sure...
 
             val tokenResponse = TokenResponse.success(
                 vpToken = VpTokenParameter.fromJsonElement(req.signedVP.toJsonElement()),
@@ -380,6 +383,7 @@ data class UnsignedVPTokenParameters(
 
 @Serializable
 data class SubmitOID4VPRequest(
+    val did: String,
     val signedVP: String,
     val presentationRequest: String,
     val sessionId: String,
