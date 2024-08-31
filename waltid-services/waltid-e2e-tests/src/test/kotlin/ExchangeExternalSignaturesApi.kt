@@ -240,11 +240,16 @@ class ExchangeExternalSignatures {
             prepareResponse.vpTokenParams.payload.toByteArray(),
             prepareResponse.vpTokenParams.header,
         )
-        response = client.post("/wallet-api/wallet/$walletId/exchange/external_signatures/oid4vp/submit") {
+        client.post("/wallet-api/wallet/$walletId/exchange/external_signatures/oid4vp/submit") {
             setBody(
                 SubmitOID4VPRequest(
                     signedVPToken,
-                    prepareResponse,
+                    prepareResponse.presentationRequest,
+                    prepareResponse.sessionId,
+                    prepareResponse.resolvedAuthReq,
+                    prepareResponse.presentationSubmission,
+                    prepareResponse.presentedCredentialIdList,
+
                 )
             )
         }.expectSuccess()
