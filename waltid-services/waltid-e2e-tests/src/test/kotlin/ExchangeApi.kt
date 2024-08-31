@@ -1,7 +1,7 @@
 import E2ETestWebService.test
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.usecase.exchange.FilterData
-import id.walt.webwallet.web.controllers.UsePresentationRequest
+import id.walt.webwallet.web.controllers.exchange.UsePresentationRequest
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*

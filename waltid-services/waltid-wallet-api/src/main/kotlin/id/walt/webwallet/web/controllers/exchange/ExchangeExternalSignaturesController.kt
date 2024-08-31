@@ -1,4 +1,4 @@
-package id.walt.webwallet.web.controllers
+package id.walt.webwallet.web.controllers.exchange
 
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.jwk.KeyUse
@@ -19,8 +19,6 @@ import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.responses.AuthorizationErrorCode
 import id.walt.oid4vc.responses.TokenResponse
 import id.walt.oid4vc.util.randomUUID
-import id.walt.webwallet.db.models.WalletOperationHistory
-import id.walt.webwallet.service.SSIKit2WalletService
 import id.walt.webwallet.service.SSIKit2WalletService.Companion.getCredentialWallet
 import id.walt.webwallet.service.SSIKit2WalletService.PresentationError
 import id.walt.webwallet.service.WalletServiceManager.eventUseCase
@@ -31,10 +29,10 @@ import id.walt.webwallet.service.events.EventType
 import id.walt.webwallet.service.oidc4vc.VPresentationSession
 import id.walt.webwallet.utils.WalletHttpClients
 import id.walt.webwallet.web.controllers.auth.getWalletService
+import id.walt.webwallet.web.controllers.walletRoute
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.github.smiley4.ktorswaggerui.dsl.routing.post
 import io.github.smiley4.ktorswaggerui.dsl.routing.route
-import io.ktor.client.*
 import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
@@ -175,6 +173,7 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                 ),
             )
         }
+
         post("submit", {
             summary = "Do second step of oid4vp with externally provided signatures"
 
@@ -198,42 +197,39 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                 }
             }
         }) {
-            //asdfasdfasd
             val logger = KotlinLogging.logger { }
             val req = call.receive<SubmitOID4VPRequest>()
             println("Request: $req")
             val wallet = getWalletService()
-            val vpSession = VPresentationSession(
-                req.prepareOid4vpResponse.sessionId,
-                req.prepareOid4vpResponse.resolvedAuthReq,
-                Instant.DISTANT_FUTURE,
-                req.prepareOid4vpResponse.presentedCredentialIdList.toSet(),
-            )
+
+            val authReq = req.prepareOid4vpResponse.resolvedAuthReq
+            val presentationSubmission = req.prepareOid4vpResponse.presentationSubmission
+            val presentedCredentialIdList = req.prepareOid4vpResponse.presentedCredentialIdList
 
             val tokenResponse = TokenResponse.success(
                 vpToken = VpTokenParameter.fromJsonElement(req.signedVP.toJsonElement()),
-                presentationSubmission = req.prepareOid4vpResponse.presentationSubmission,
+                presentationSubmission = presentationSubmission,
                 idToken = null,
-                state = req.prepareOid4vpResponse.resolvedAuthReq.state,
+                state = authReq.state,
             )
 
             val formParams =
-                if (req.prepareOid4vpResponse.resolvedAuthReq.responseMode == ResponseMode.direct_post_jwt) {
+                if (authReq.responseMode == ResponseMode.direct_post_jwt) {
                     val encKey =
-                        req.prepareOid4vpResponse.resolvedAuthReq.clientMetadata?.jwks?.get("keys")?.jsonArray?.first { jwk ->
+                        authReq.clientMetadata?.jwks?.get("keys")?.jsonArray?.first { jwk ->
                             JWK.parse(jwk.toString()).keyUse?.equals(KeyUse.ENCRYPTION) ?: false
                         }?.jsonObject ?: throw Exception("No ephemeral reader key found")
                     val ephemeralWalletKey =
                         runBlocking { KeyManager.createKey(KeyGenerationRequest(keyType = KeyType.secp256r1)) }
                     tokenResponse.toDirecPostJWTParameters(
                         encKey,
-                        alg = req.prepareOid4vpResponse.resolvedAuthReq.clientMetadata!!.authorizationEncryptedResponseAlg!!,
-                        enc = req.prepareOid4vpResponse.resolvedAuthReq.clientMetadata!!.authorizationEncryptedResponseEnc!!,
+                        alg = authReq.clientMetadata!!.authorizationEncryptedResponseAlg!!,
+                        enc = authReq.clientMetadata!!.authorizationEncryptedResponseEnc!!,
                         mapOf(
                             "epk" to runBlocking { ephemeralWalletKey.getPublicKey().exportJWKObject() },
-                            "apu" to JsonPrimitive(Base64URL.encode(vpSession.nonce).toString()),
+                            "apu" to JsonPrimitive(Base64URL.encode(authReq.nonce).toString()),
                             "apv" to JsonPrimitive(
-                                Base64URL.encode(req.prepareOid4vpResponse.resolvedAuthReq.nonce!!).toString()
+                                Base64URL.encode(authReq.nonce!!).toString()
                             )
                         )
                     )
@@ -242,9 +238,9 @@ fun Application.exchangeExternalSignatures() = walletRoute {
             val httpClient = WalletHttpClients.defaultMethod()
 
             val resp = httpClient.submitForm(
-                req.prepareOid4vpResponse.resolvedAuthReq.responseUri
-                    ?: req.prepareOid4vpResponse.resolvedAuthReq.redirectUri ?: throw AuthorizationError(
-                        req.prepareOid4vpResponse.resolvedAuthReq,
+                authReq.responseUri
+                    ?: authReq.redirectUri ?: throw AuthorizationError(
+                        authReq,
                         AuthorizationErrorCode.invalid_request,
                         "No response_uri or redirect_uri found on authorization request"
                     ),
@@ -260,11 +256,11 @@ fun Application.exchangeExternalSignatures() = walletRoute {
             }
             logger.debug { "HTTP Response: $resp, body: $httpResponseBody" }
             val credentialService = CredentialsService()
-            req.prepareOid4vpResponse.presentedCredentialIdList.forEach {
+            presentedCredentialIdList.forEach {
                 credentialService.get(wallet.walletId, it)?.run {
                     eventUseCase.log(
                         action = EventType.Credential.Present,
-                        originator = req.prepareOid4vpResponse.resolvedAuthReq.clientMetadata?.clientName
+                        originator = authReq.clientMetadata?.clientName
                             ?: EventDataNotAvailable,
                         tenant = wallet.tenant,
                         accountId = wallet.accountId,
@@ -272,7 +268,7 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                         data = eventUseCase.credentialEventData(
                             credential = this,
                             subject = eventUseCase.subjectData(this),
-                            organization = eventUseCase.verifierData(req.prepareOid4vpResponse.resolvedAuthReq),
+                            organization = eventUseCase.verifierData(authReq),
                             type = null
                         ),
                         credentialId = this.id,

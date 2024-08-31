@@ -3,13 +3,12 @@ import id.walt.commons.web.plugins.httpJson
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.did.utils.randomUUID
 import id.walt.issuer.issuance.IssuanceRequest
-import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.db.models.WalletDid
 import id.walt.webwallet.service.keys.SingleKeyResponse
-import id.walt.webwallet.web.controllers.PrepareOID4VPRequest
-import id.walt.webwallet.web.controllers.PrepareOID4VPResponse
-import id.walt.webwallet.web.controllers.SubmitOID4VPRequest
+import id.walt.webwallet.web.controllers.exchange.PrepareOID4VPRequest
+import id.walt.webwallet.web.controllers.exchange.PrepareOID4VPResponse
+import id.walt.webwallet.web.controllers.exchange.SubmitOID4VPRequest
 import id.walt.webwallet.web.model.EmailAccountRequest
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -28,7 +27,6 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.uuid.UUID
 import kotlin.test.assertFalse
-import kotlin.test.assertTrue
 
 class ExchangeExternalSignatures {
 
