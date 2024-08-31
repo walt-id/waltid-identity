@@ -3,10 +3,13 @@ import id.walt.commons.web.plugins.httpJson
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.did.utils.randomUUID
 import id.walt.issuer.issuance.IssuanceRequest
+import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.db.models.WalletDid
 import id.walt.webwallet.service.keys.SingleKeyResponse
 import id.walt.webwallet.web.controllers.PrepareOID4VPRequest
+import id.walt.webwallet.web.controllers.PrepareOID4VPResponse
+import id.walt.webwallet.web.controllers.SubmitOID4VPRequest
 import id.walt.webwallet.web.model.EmailAccountRequest
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -21,9 +24,11 @@ import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.util.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.uuid.UUID
 import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class ExchangeExternalSignatures {
 
@@ -222,7 +227,7 @@ class ExchangeExternalSignatures {
         ) {
             matchedCredentialList = it
         }
-        response = client.post("/wallet-api/wallet/$walletId/exchange/external_signatures/prepare_oid4vp") {
+        response = client.post("/wallet-api/wallet/$walletId/exchange/external_signatures/oid4vp/prepare") {
             setBody(
                 PrepareOID4VPRequest(
                     did = holderDID,
@@ -231,6 +236,29 @@ class ExchangeExternalSignatures {
                 )
             )
         }.expectSuccess()
-        println(response.bodyAsText())
+        val prepareResponse = response.body<PrepareOID4VPResponse>()
+        //na kanoume sign edw
+        val signedVPToken = holderKey.signJws(
+            prepareResponse.vpTokenParams.payload.toByteArray(),
+            prepareResponse.vpTokenParams.header,
+        )
+        response = client.post("/wallet-api/wallet/$walletId/exchange/external_signatures/oid4vp/submit") {
+            setBody(
+                SubmitOID4VPRequest(
+                    signedVPToken,
+                    prepareResponse,
+                )
+            )
+        }.expectSuccess()
+        verifierSessionApi.get(verificationID) {
+            assert(it.tokenResponse?.vpToken?.jsonPrimitive?.contentOrNull?.expectLooksLikeJwt() != null) { "Received no valid token response!" }
+            assert(it.tokenResponse?.presentationSubmission != null) { "should have a presentation submission after submission" }
+
+            assert(it.verificationResult == true) { "overall verification should be valid" }
+            it.policyResults.let {
+                require(it != null) { "policyResults should be available after running policies" }
+                assert(it.size > 1) { "no policies have run" }
+            }
+        }
     }
 }
