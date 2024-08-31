@@ -122,7 +122,7 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
                 )
     }
 
-    protected open fun resolveVPAuthorizationParameters(authorizationRequest: AuthorizationRequest): AuthorizationRequest {
+    open fun resolveVPAuthorizationParameters(authorizationRequest: AuthorizationRequest): AuthorizationRequest {
         try {
             return authorizationRequest.copy(
                 presentationDefinition = authorizationRequest.presentationDefinition
