@@ -72,10 +72,11 @@ fun Application.exchangeExternalSignatures() = walletRoute {
             }
             response {
                 HttpStatusCode.OK to {
+                    description = "Collection of parameters that are necessary to invoke the submit endpoint. " +
+                            "The client is expected to, in between, sign the vp token based on the " +
+                            "vpTokenParams object that is contained within."
                     body<PrepareOID4VPResponse> {
-                        description = "Collection of parameters that are necessary to invoke the submit endpoint. " +
-                                "The client is expected to, in between, sign the vp token based on the " +
-                                "vpTokenParams object that is contained within."
+                        required = true
                     }
                 }
             }

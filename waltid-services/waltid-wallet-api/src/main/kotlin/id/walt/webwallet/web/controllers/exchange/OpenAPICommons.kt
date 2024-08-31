@@ -9,7 +9,6 @@ object OpenAPICommons {
     const val rootPath = "exchange"
 
     fun route(): OpenApiRoute.() -> Unit = {
-//        tags(listOf("Credential exchange"))
         tags = listOf("Credential exchange")
     }
 
