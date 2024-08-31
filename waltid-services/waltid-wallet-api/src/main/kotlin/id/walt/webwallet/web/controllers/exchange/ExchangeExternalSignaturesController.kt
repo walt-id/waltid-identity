@@ -48,21 +48,34 @@ import kotlinx.uuid.UUID
 import kotlinx.uuid.generateUUID
 
 fun Application.exchangeExternalSignatures() = walletRoute {
-    route("exchange/external_signatures/oid4vp", {
-        tags = listOf("Credential exchange")
-    }) {
-        post("prepare", {
-            summary = "Do first step of oid4vp with externally provided signatures"
+    route(
+        OpenAPICommons.rootPath,
+        OpenAPICommons.route(),
+    ) {
+        post("external_signatures/oid4vp/prepare", {
+            summary = "Preparation (first) step for an OID4VP flow with externally provided signatures."
 
             request {
                 body<PrepareOID4VPRequest> {
-                    description = "Kati gia to description tou request"
+                    required = true
+                    example("default") {
+                        value = PrepareOID4VPRequest(
+                            "did:web:walt.id",
+                            "oid4vp://authorize?response_type=...",
+                            listOf(
+                                "56d2449b-c40e-4091-8edf-5fb4920b08a3",
+                                "a9df4e9c-3982-4ed2-999d-5b08603381c7",
+                            ),
+                        )
+                    }
                 }
             }
             response {
                 HttpStatusCode.OK to {
                     body<PrepareOID4VPResponse> {
-                        description = "Kati gia to description tou response"
+                        description = "Collection of parameters that are necessary to invoke the submit endpoint. " +
+                                "The client is expected to, in between, sign the vp token based on the " +
+                                "vpTokenParams object that is contained within."
                     }
                 }
             }
@@ -174,12 +187,12 @@ fun Application.exchangeExternalSignatures() = walletRoute {
             )
         }
 
-        post("submit", {
-            summary = "Do second step of oid4vp with externally provided signatures"
+        post("external_signatures/oid4vp/submit", {
+            summary = "Submission (second) step of an OID4VP flow with externally provided signatures. " +
+                    "The client is expected to provide the signed vp token in the respective input request field."
 
             request {
                 body<SubmitOID4VPRequest> {
-                    description = "Kati gia to description tou request"
                 }
             }
             response(OpenAPICommons.usePresentationRequestResponse())
@@ -189,9 +202,9 @@ fun Application.exchangeExternalSignatures() = walletRoute {
             println("Request: $req")
             val wallet = getWalletService()
 
-            val authReq = req.prepareOid4vpResponse.resolvedAuthReq
-            val presentationSubmission = req.prepareOid4vpResponse.presentationSubmission
-            val presentedCredentialIdList = req.prepareOid4vpResponse.presentedCredentialIdList
+            val authReq = req.resolvedAuthReq
+            val presentationSubmission = req.presentationSubmission
+            val presentedCredentialIdList = req.presentedCredentialIdList
 
             val tokenResponse = TokenResponse.success(
                 vpToken = VpTokenParameter.fromJsonElement(req.signedVP.toJsonElement()),
@@ -367,5 +380,9 @@ data class UnsignedVPTokenParameters(
 @Serializable
 data class SubmitOID4VPRequest(
     val signedVP: String,
-    val prepareOid4vpResponse: PrepareOID4VPResponse,
+    val presentationRequest: String,
+    val sessionId: String,
+    val resolvedAuthReq: AuthorizationRequest,
+    val presentationSubmission: PresentationSubmission,
+    val presentedCredentialIdList: List<String>,
 )

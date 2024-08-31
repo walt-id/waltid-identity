@@ -23,9 +23,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 
 fun Application.exchange() = walletRoute {
-    route("exchange", {
-        tags = listOf("Credential exchange")
-    }) {
+    route(OpenAPICommons.rootPath, OpenAPICommons.route()) {
         post("useOfferRequest", {
             summary = "Claim credential(s) from an issuer"
 
