@@ -149,7 +149,7 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
         return payload
     }
 
-    protected abstract fun validateAuthorizationRequest(authorizationRequest: AuthorizationRequest): Boolean
+    abstract fun validateAuthorizationRequest(authorizationRequest: AuthorizationRequest): Boolean
 
     abstract fun initializeAuthorization(authorizationRequest: AuthorizationRequest, expiresIn: Duration, authServerState: String? ): S
 
