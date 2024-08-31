@@ -182,20 +182,7 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                     description = "Kati gia to description tou request"
                 }
             }
-            response {
-                HttpStatusCode.OK to {
-                    description = "Successfully claimed credentials"
-                    body<JsonObject> {
-                        description = """{"redirectUri": String}"""
-                    }
-                }
-                HttpStatusCode.BadRequest to {
-                    description = "Presentation was not accepted"
-                    body<JsonObject> {
-                        description = """{"redirectUri": String?, "errorMessage": String}"""
-                    }
-                }
-            }
+            response(OpenAPICommons.usePresentationRequestResponse())
         }) {
             val logger = KotlinLogging.logger { }
             val req = call.receive<SubmitOID4VPRequest>()
