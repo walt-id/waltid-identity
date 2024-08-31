@@ -125,20 +125,7 @@ fun Application.exchange() = walletRoute {
             request {
                 body<UsePresentationRequest>()
             }
-            response {
-                HttpStatusCode.OK to {
-                    description = "Successfully claimed credentials"
-                    body<JsonObject> {
-                        description = """{"redirectUri": String}"""
-                    }
-                }
-                HttpStatusCode.BadRequest to {
-                    description = "Presentation was not accepted"
-                    body<JsonObject> {
-                        description = """{"redirectUri": String?, "errorMessage": String}"""
-                    }
-                }
-            }
+            response(OpenAPICommons.usePresentationRequestResponse())
         }) {
             val wallet = getWalletService()
 
