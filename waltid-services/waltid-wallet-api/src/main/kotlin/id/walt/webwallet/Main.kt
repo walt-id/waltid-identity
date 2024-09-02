@@ -17,6 +17,8 @@ import id.walt.webwallet.web.controllers.auth.defaultAuthRoutes
 import id.walt.webwallet.web.controllers.auth.keycloak.keycloakAuthRoutes
 import id.walt.webwallet.web.controllers.auth.oidc.oidcAuthRoutes
 import id.walt.webwallet.web.controllers.auth.x5c.x5cAuthRoutes
+import id.walt.webwallet.web.controllers.exchange.exchange
+import id.walt.webwallet.web.controllers.exchange.exchangeExternalSignatures
 import id.walt.webwallet.web.plugins.*
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.server.application.*
@@ -72,7 +74,8 @@ fun Application.webWalletModule(withPlugins: Boolean = true) {
     keys()
     dids()
     credentials()
-    exchange()
+    exchange();
+    { exchangeExternalSignatures() } whenFeature FeatureCatalog.externalSignatureEndpointsFeature
     history();
     { web3accounts() } whenFeature FeatureCatalog.web3
     issuers()

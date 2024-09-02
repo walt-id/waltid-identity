@@ -12,7 +12,7 @@ import id.walt.oid4vc.data.CredentialOffer
 import id.walt.oid4vc.data.OpenIDProviderMetadata
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.webwallet.db.models.WalletCredential
-import id.walt.webwallet.web.controllers.UsePresentationRequest
+import id.walt.webwallet.web.controllers.exchange.UsePresentationRequest
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*

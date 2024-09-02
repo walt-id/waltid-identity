@@ -14,7 +14,7 @@ import id.walt.webwallet.service.dto.WalletDataTransferObject
 import id.walt.webwallet.service.keys.SingleKeyResponse
 import id.walt.webwallet.service.report.ReportRequestParameter
 import id.walt.webwallet.service.settings.WalletSetting
-import id.walt.webwallet.web.controllers.PresentationRequestParameter
+import id.walt.webwallet.web.controllers.exchange.PresentationRequestParameter
 import id.walt.webwallet.web.parameter.CredentialRequestParameter
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
