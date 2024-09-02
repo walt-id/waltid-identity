@@ -246,7 +246,6 @@ class ExchangeExternalSignatures {
                     holderDID,
                     signedVPToken,
                     prepareResponse.presentationRequest,
-                    prepareResponse.sessionId,
                     prepareResponse.resolvedAuthReq,
                     prepareResponse.presentationSubmission,
                     prepareResponse.presentedCredentialIdList,

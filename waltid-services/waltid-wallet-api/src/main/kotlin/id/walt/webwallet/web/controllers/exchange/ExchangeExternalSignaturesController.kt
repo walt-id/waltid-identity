@@ -18,7 +18,6 @@ import id.walt.oid4vc.errors.AuthorizationError
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.responses.AuthorizationErrorCode
 import id.walt.oid4vc.responses.TokenResponse
-import id.walt.oid4vc.util.randomUUID
 import id.walt.webwallet.service.SSIKit2WalletService.Companion.getCredentialWallet
 import id.walt.webwallet.service.SSIKit2WalletService.PresentationError
 import id.walt.webwallet.service.WalletServiceManager.eventUseCase
@@ -26,7 +25,6 @@ import id.walt.webwallet.service.credentials.CredentialsService
 import id.walt.webwallet.service.dids.DidsService
 import id.walt.webwallet.service.events.EventDataNotAvailable
 import id.walt.webwallet.service.events.EventType
-import id.walt.webwallet.service.oidc4vc.VPresentationSession
 import id.walt.webwallet.utils.WalletHttpClients
 import id.walt.webwallet.web.controllers.auth.getWalletService
 import id.walt.webwallet.web.controllers.walletRoute
@@ -41,7 +39,6 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.util.*
 import kotlinx.coroutines.runBlocking
-import kotlinx.datetime.Instant
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import kotlinx.uuid.UUID
@@ -82,34 +79,34 @@ fun Application.exchangeExternalSignatures() = walletRoute {
             }
         }) {
             val logger = KotlinLogging.logger { }
-            val wallet = getWalletService()
+            val walletService = getWalletService()
 
             val req = call.receive<PrepareOID4VPRequest>()
-            println("Request: $req")
+            logger.debug { "Request: $req" }
+
             if (req.selectedCredentialIdList.isEmpty())
                 throw IllegalArgumentException("Unable to prepare oid4vp parameters with no input credential identifiers")
-            val walletDID = DidsService.get(wallet.walletId, req.did)
-                ?: throw IllegalArgumentException("did ${req.did} not found in wallet")
 
-            println("Retrieved DID: $walletDID")
+            val walletDID = DidsService.get(walletService.walletId, req.did)
+                ?: throw IllegalArgumentException("did ${req.did} not found in wallet")
+            logger.debug { "Retrieved wallet DID: $walletDID" }
 
             val credentialWallet = getCredentialWallet(walletDID.did)
 
-            val authReq =
-                AuthorizationRequest.fromHttpParametersAuto(parseQueryString(Url(req.presentationRequest).encodedQuery).toMap())
+            val authReq = AuthorizationRequest
+                .fromHttpParametersAuto(
+                    parseQueryString(
+                        Url(
+                            req.presentationRequest,
+                        ).encodedQuery,
+                    ).toMap()
+                )
             logger.debug { "Auth req: $authReq" }
 
-            logger.debug { "Using presentation request, selected credentials: ${req.selectedCredentialIdList}" }
+            logger.debug { "Selected credentials for presentation request: ${req.selectedCredentialIdList}" }
 
             val resolvedAuthReq = credentialWallet.resolveVPAuthorizationParameters(authReq)
             logger.debug { "Resolved Auth req: $resolvedAuthReq" }
-
-            val vpSession = VPresentationSession(
-                randomUUID(),
-                resolvedAuthReq,
-                Instant.DISTANT_FUTURE,
-                req.selectedCredentialIdList.toSet(),
-            )
 
             if (!credentialWallet.validateAuthorizationRequest(resolvedAuthReq)) {
                 throw AuthorizationError(
@@ -118,7 +115,7 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                     message = "Invalid VP authorization request"
                 )
             }
-            val matchedCredentials = wallet.getCredentialsByIds(req.selectedCredentialIdList)
+            val matchedCredentials = walletService.getCredentialsByIds(req.selectedCredentialIdList)
             logger.debug { "Matched credentials: $matchedCredentials" }
 
             val presentationId = "urn:uuid:" + UUID.generateUUID().toString().lowercase()
@@ -131,6 +128,7 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                         it.jsonPrimitive.content
                     }
                 }
+            logger.debug { "Resolved authorization keyId: $authKeyId" }
 
             val vpPayload = credentialWallet.getVpJson(
                 matchedCredentials.map { it.document },
@@ -138,15 +136,15 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                 resolvedAuthReq.nonce,
                 resolvedAuthReq.clientId,
             )
+            logger.debug { "Generated vp token payload: $vpPayload" }
 
             val vpHeader = mapOf(
                 "kid" to authKeyId.toJsonElement(),
                 "typ" to "JWT".toJsonElement()
             )
+            logger.debug { "Generated vp token headers: $vpHeader" }
 
             val rootPathVP = "$"
-
-
             val presentationSubmission = PresentationSubmission(
                 id = presentationId,
                 definitionId = presentationId,
@@ -170,21 +168,24 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                     )
                 }
             )
+            logger.debug { "Generated presentation submission: $presentationSubmission" }
+
+            val responsePayload = PrepareOID4VPResponse(
+                walletDID.did,
+                req.presentationRequest,
+                resolvedAuthReq,
+                presentationSubmission,
+                req.selectedCredentialIdList,
+                UnsignedVPTokenParameters(
+                    vpHeader,
+                    vpPayload,
+                ),
+            )
+            logger.debug { "Response payload: $responsePayload" }
 
             context.respond(
                 HttpStatusCode.OK,
-                PrepareOID4VPResponse(
-                    walletDID.did,
-                    req.presentationRequest,
-                    vpSession.id,
-                    resolvedAuthReq,
-                    presentationSubmission,
-                    req.selectedCredentialIdList,
-                    UnsignedVPTokenParameters(
-                        vpHeader,
-                        vpPayload,
-                    ),
-                ),
+                responsePayload,
             )
         }
 
@@ -199,11 +200,19 @@ fun Application.exchangeExternalSignatures() = walletRoute {
             response(OpenAPICommons.usePresentationRequestResponse())
         }) {
             val logger = KotlinLogging.logger { }
+
             val req = call.receive<SubmitOID4VPRequest>()
-            println("Request: $req")
-            val wallet = getWalletService()
+            logger.debug { "Request: $req" }
 
             val authReq = req.resolvedAuthReq
+            val authResponseURL = authReq.responseUri
+                ?: authReq.redirectUri ?: throw AuthorizationError(
+                    authReq,
+                    AuthorizationErrorCode.invalid_request,
+                    "No response_uri or redirect_uri found on authorization request"
+                )
+            logger.debug { "Authorization response URL: $authResponseURL" }
+
             val presentationSubmission = req.presentationSubmission
             val presentedCredentialIdList = req.presentedCredentialIdList
             val did = req.did
@@ -238,37 +247,35 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                         )
                     )
                 } else tokenResponse.toHttpParameters()
+            logger.debug { "Authorization response parameters: $formParams" }
 
-            val httpClient = WalletHttpClients.defaultMethod()
-
+            val httpClient = WalletHttpClients.getHttpClient()
             val resp = httpClient.submitForm(
-                authReq.responseUri
-                    ?: authReq.redirectUri ?: throw AuthorizationError(
-                        authReq,
-                        AuthorizationErrorCode.invalid_request,
-                        "No response_uri or redirect_uri found on authorization request"
-                    ),
+                authResponseURL,
                 parameters {
                     formParams.forEach { entry ->
                         entry.value.forEach { append(entry.key, it) }
                     }
                 })
-            val httpResponseBody = runCatching { resp.bodyAsText() }.getOrNull()
-            val isResponseRedirectUrl = httpResponseBody != null && httpResponseBody.take(10).lowercase().let {
+
+            val responseBody = runCatching { resp.bodyAsText() }.getOrNull()
+            val isResponseRedirectUrl = responseBody != null && responseBody.take(10).lowercase().let {
                 @Suppress("HttpUrlsUsage")
                 it.startsWith("http://") || it.startsWith("https://")
             }
-            logger.debug { "HTTP Response: $resp, body: $httpResponseBody" }
+            logger.debug { "HTTP Response: $resp, body: $responseBody" }
+
+            val walletService = getWalletService()
             val credentialService = CredentialsService()
             presentedCredentialIdList.forEach {
-                credentialService.get(wallet.walletId, it)?.run {
+                credentialService.get(walletService.walletId, it)?.run {
                     eventUseCase.log(
                         action = EventType.Credential.Present,
                         originator = authReq.clientMetadata?.clientName
                             ?: EventDataNotAvailable,
-                        tenant = wallet.tenant,
-                        accountId = wallet.accountId,
-                        walletId = wallet.walletId,
+                        tenant = walletService.tenant,
+                        accountId = walletService.accountId,
+                        walletId = walletService.walletId,
                         data = eventUseCase.credentialEventData(
                             credential = this,
                             subject = eventUseCase.subjectData(this),
@@ -281,23 +288,23 @@ fun Application.exchangeExternalSignatures() = walletRoute {
             }
 
             val result = if (resp.status.value == 302 && !resp.headers["location"].toString().contains("error")) {
-                Result.success(if (isResponseRedirectUrl) httpResponseBody else null)
+                Result.success(if (isResponseRedirectUrl) responseBody else null)
             } else if (resp.status.isSuccess()) {
-                Result.success(if (isResponseRedirectUrl) httpResponseBody else null)
+                Result.success(if (isResponseRedirectUrl) responseBody else null)
             } else {
                 if (isResponseRedirectUrl) {
                     Result.failure(
                         PresentationError(
                             message = "Presentation failed - redirecting to error page",
-                            redirectUri = httpResponseBody
+                            redirectUri = responseBody
                         )
                     )
                 } else {
-                    logger.debug { "Response body: $httpResponseBody" }
+                    logger.debug { "Response body: $responseBody" }
                     Result.failure(
                         PresentationError(
                             message =
-                            if (httpResponseBody != null) "Presentation failed:\n $httpResponseBody"
+                            if (responseBody != null) "Presentation failed:\n $responseBody"
                             else "Presentation failed",
                             redirectUri = ""
                         )
@@ -324,7 +331,7 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                 context.respond(HttpStatusCode.OK, mapOf("redirectUri" to result.getOrThrow()))
             } else {
                 val err = result.exceptionOrNull()
-                println("Presentation failed: $err")
+                logger.debug { "Presentation failed: $err" }
 
 //                wallet.addOperationHistory(
 //                    WalletOperationHistory.new(
@@ -368,7 +375,6 @@ data class PrepareOID4VPRequest(
 data class PrepareOID4VPResponse(
     val did: String,
     val presentationRequest: String,
-    val sessionId: String,
     val resolvedAuthReq: AuthorizationRequest,
     val presentationSubmission: PresentationSubmission,
     val presentedCredentialIdList: List<String>,
@@ -386,7 +392,6 @@ data class SubmitOID4VPRequest(
     val did: String,
     val signedVP: String,
     val presentationRequest: String,
-    val sessionId: String,
     val resolvedAuthReq: AuthorizationRequest,
     val presentationSubmission: PresentationSubmission,
     val presentedCredentialIdList: List<String>,
