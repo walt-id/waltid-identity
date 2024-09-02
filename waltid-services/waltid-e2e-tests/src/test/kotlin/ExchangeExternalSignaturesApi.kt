@@ -1,5 +1,4 @@
 import E2ETestWebService.loadResource
-import id.walt.commons.web.plugins.httpJson
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.did.utils.randomUUID
 import id.walt.issuer.issuance.IssuanceRequest
@@ -12,14 +11,9 @@ import id.walt.webwallet.web.controllers.exchange.SubmitOID4VPRequest
 import id.walt.webwallet.web.model.EmailAccountRequest
 import io.ktor.client.*
 import io.ktor.client.call.*
-import io.ktor.client.engine.cio.*
-import io.ktor.client.plugins.*
-import io.ktor.client.plugins.contentnegotiation.*
-import io.ktor.client.plugins.logging.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
-import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.util.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
@@ -53,29 +47,12 @@ class ExchangeExternalSignatures {
     private var accountId = UUID.NIL
     private var walletId = UUID.NIL
 
-    private fun testHttpClient(token: String? = null, doFollowRedirects: Boolean = true) = HttpClient(CIO) {
-        install(ContentNegotiation) {
-            json(httpJson)
-        }
-        install(DefaultRequest) {
-            contentType(ContentType.Application.Json)
-            host = "127.0.0.1"
-            port = 22222
-
-            if (token != null) bearerAuth(token)
-        }
-        install(Logging) {
-            level = LogLevel.ALL
-        }
-        followRedirects = doFollowRedirects
-    }
-
     private suspend fun registerAccountAndLogin() {
         authApi.register(accountRequest)
         authApi.login(
             accountRequest,
         ) {
-            client = testHttpClient(token = it["token"]!!.jsonPrimitive.content)
+            client = E2ETest.testHttpClient(token = it["token"]!!.jsonPrimitive.content)
             authApi = AuthApi(client)
         }
         authApi.userInfo(HttpStatusCode.OK) {
@@ -169,7 +146,7 @@ class ExchangeExternalSignatures {
             offerURL = it
             println("offer: $offerURL")
         }
-        var response = client.post("/wallet-api/wallet/$walletId/exchange/useOfferRequest") {
+        val response = client.post("/wallet-api/wallet/$walletId/exchange/useOfferRequest") {
             url {
                 parameters.append("did", holderDID)
                 parameters.append("requireUserInput", "false")
@@ -183,7 +160,7 @@ class ExchangeExternalSignatures {
     }
 
     init {
-        client = testHttpClient()
+        client = E2ETest.testHttpClient()
         verifierSessionApi = Verifier.SessionApi(client)
         verifierVerificationApi = Verifier.VerificationApi(client)
         authApi = AuthApi(client)
@@ -235,7 +212,7 @@ class ExchangeExternalSignatures {
             )
         }.expectSuccess()
         val prepareResponse = response.body<PrepareOID4VPResponse>()
-        //na kanoume sign edw
+        //client computes the externally provided signature value
         val signedVPToken = holderKey.signJws(
             prepareResponse.vpTokenParams.payload.toByteArray(),
             prepareResponse.vpTokenParams.header,

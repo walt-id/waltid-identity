@@ -45,6 +45,7 @@ import kotlinx.uuid.UUID
 import kotlinx.uuid.generateUUID
 
 fun Application.exchangeExternalSignatures() = walletRoute {
+    val logger = KotlinLogging.logger { }
     route(
         OpenAPICommons.rootPath,
         OpenAPICommons.route(),
@@ -78,7 +79,6 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                 }
             }
         }) {
-            val logger = KotlinLogging.logger { }
             val walletService = getWalletService()
 
             val req = call.receive<PrepareOID4VPRequest>()
@@ -199,8 +199,6 @@ fun Application.exchangeExternalSignatures() = walletRoute {
             }
             response(OpenAPICommons.usePresentationRequestResponse())
         }) {
-            val logger = KotlinLogging.logger { }
-
             val req = call.receive<SubmitOID4VPRequest>()
             logger.debug { "Request: $req" }
 
@@ -215,9 +213,6 @@ fun Application.exchangeExternalSignatures() = walletRoute {
 
             val presentationSubmission = req.presentationSubmission
             val presentedCredentialIdList = req.presentedCredentialIdList
-            val did = req.did
-
-            //TODO():: Use the did here to verify the signature on the vp token just to make sure...
 
             val tokenResponse = TokenResponse.success(
                 vpToken = VpTokenParameter.fromJsonElement(req.signedVP.toJsonElement()),
