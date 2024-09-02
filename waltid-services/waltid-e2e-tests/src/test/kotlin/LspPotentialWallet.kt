@@ -122,7 +122,6 @@ class LspPotentialWallet(val client: HttpClient, val walletId: String) {
     suspend fun testSDJwtVCIssuance() = testSDJwtVCIssuance(
         IssuanceRequest(
             Json.parseToJsonElement(KeySerialization.serializeKey(LspPotentialIssuanceInterop.POTENTIAL_ISSUER_JWK_KEY)).jsonObject,
-            "",
             "identity_credential_vc+sd-jwt",
             credentialData = W3CVC(buildJsonObject {
                 put("family_name", "Doe")
@@ -141,17 +140,17 @@ class LspPotentialWallet(val client: HttpClient, val walletId: String) {
     suspend fun testSDJwtVCIssuanceByIssuerDid() = testSDJwtVCIssuance(
         IssuanceRequest(
             Json.parseToJsonElement(KeySerialization.serializeKey(LspPotentialIssuanceInterop.POTENTIAL_ISSUER_JWK_KEY)).jsonObject,
-            LspPotentialIssuanceInterop.ISSUER_DID,
             "identity_credential_vc+sd-jwt",
             credentialData = W3CVC(buildJsonObject {
                 put("family_name", "Doe")
                 put("given_name", "John")
                 put("birthdate", "1940-01-01")
             }),
-            null,
+            mdocData = null,
             selectiveDisclosure = SDMap(mapOf(
                 "birthdate" to SDField(sd = true)
-            ))
+            )),
+            issuerDid = LspPotentialIssuanceInterop.ISSUER_DID
         )
     )
 

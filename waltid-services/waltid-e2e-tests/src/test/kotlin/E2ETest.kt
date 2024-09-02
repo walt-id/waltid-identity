@@ -232,9 +232,6 @@ class E2ETest {
             lspPotentialWallet.testSDJwtVCIssuanceByIssuerDid()
             lspPotentialWallet.testSDJwtPresentation(OpenId4VPProfile.DEFAULT)
 
-            // issue using issuer DID
-            lspPotentialWallet.testSDJwtVCIssuanceByIssuerDid()
-
             //endregion -Exchange / presentation-
 
             //region -History-
@@ -254,7 +251,7 @@ class E2ETest {
 
 
 
-    //@Test // enable to execute test selectively
+    // @Test // enable to execute test selectively
     fun lspIssuanceTests() = runTest(timeout = 5.minutes) {
         val client = testHttpClient(doFollowRedirects = false)
         testBlock {
