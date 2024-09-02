@@ -52,7 +52,7 @@ import id.walt.webwallet.service.report.ReportService
 import id.walt.webwallet.service.settings.SettingsService
 import id.walt.webwallet.service.settings.WalletSetting
 import id.walt.webwallet.usecase.event.EventLogUseCase
-import id.walt.webwallet.web.controllers.PresentationRequestParameter
+import id.walt.webwallet.web.controllers.exchange.PresentationRequestParameter
 import id.walt.webwallet.web.parameter.CredentialRequestParameter
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
