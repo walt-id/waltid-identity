@@ -5,7 +5,7 @@ import id.walt.commons.web.modules.AuthenticationServiceModule
 import id.walt.webwallet.FeatureCatalog
 import id.walt.webwallet.service.OidcLoginService
 import id.walt.webwallet.service.WalletServiceManager.oidcConfig
-import id.walt.webwallet.web.controllers.*
+import id.walt.webwallet.web.controllers.auth.*
 import id.walt.webwallet.web.model.EmailAccountRequest
 import id.walt.webwallet.web.model.KeycloakAccountRequest
 import io.ktor.client.*
