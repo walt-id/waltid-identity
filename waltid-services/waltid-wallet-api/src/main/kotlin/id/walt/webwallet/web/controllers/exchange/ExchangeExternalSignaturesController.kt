@@ -355,6 +355,32 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                 }
             }
         }
+        post("external_signatures/offer/prepare", {
+            summary = "Preparation (first) step for an OID4VCI flow with externally provided signatures."
+
+            request(OpenAPICommons.useOfferRequestEndpointRequestParams())
+
+            response {
+                HttpStatusCode.OK to {
+                    description = "Collection of parameters that are necessary to invoke the submit endpoint. " +
+                            "The client is expected to, in between, sign the vp token based on the " +
+                            "vpTokenParams object that is contained within."
+                    body<PrepareOID4VPResponse> {
+                        required = true
+                    }
+                }
+            }
+        }) {
+        }
+
+        post("external_signatures/offer/submit", {
+            summary = "Submission (second) step for an OID4VCI flow with externally provided signatures."
+
+            request(OpenAPICommons.useOfferRequestEndpointRequestParams())
+
+            response(OpenAPICommons.useOfferRequestEndpointResponseParams())
+        }) {
+        }
     }
 }
 

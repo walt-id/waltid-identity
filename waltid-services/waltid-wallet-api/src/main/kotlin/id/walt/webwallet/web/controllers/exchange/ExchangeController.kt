@@ -3,7 +3,6 @@ package id.walt.webwallet.web.controllers.exchange
 import id.walt.oid4vc.data.CredentialOffer
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.requests.CredentialOfferRequest
-import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.db.models.WalletOperationHistory
 import id.walt.webwallet.service.SSIKit2WalletService
 import id.walt.webwallet.service.WalletServiceManager
@@ -27,20 +26,9 @@ fun Application.exchange() = walletRoute {
         post("useOfferRequest", {
             summary = "Claim credential(s) from an issuer"
 
-            request {
-                queryParameter<String>("did") { description = "The DID to issue the credential(s) to" }
-                queryParameter<Boolean>("requireUserInput") { description = "Whether to claim as pending acceptance" }
-                body<String> {
-                    description = "The offer request to use"
-                }
-            }
-            response {
-                HttpStatusCode.OK to {
-                    body<List<WalletCredential>> {
-                        description = "List of credentials"
-                    }
-                }
-            }
+            request(OpenAPICommons.useOfferRequestEndpointRequestParams())
+
+            response(OpenAPICommons.useOfferRequestEndpointResponseParams())
         }) {
             val wallet = getWalletService()
 
