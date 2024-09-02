@@ -225,7 +225,7 @@ class ExchangeExternalSignatures {
         ) {
             matchedCredentialList = it
         }
-        response = client.post("/wallet-api/wallet/$walletId/exchange/external_signatures/oid4vp/prepare") {
+        response = client.post("/wallet-api/wallet/$walletId/exchange/external_signatures/presentation/prepare") {
             setBody(
                 PrepareOID4VPRequest(
                     did = holderDID,
@@ -240,7 +240,7 @@ class ExchangeExternalSignatures {
             prepareResponse.vpTokenParams.payload.toByteArray(),
             prepareResponse.vpTokenParams.header,
         )
-        client.post("/wallet-api/wallet/$walletId/exchange/external_signatures/oid4vp/submit") {
+        client.post("/wallet-api/wallet/$walletId/exchange/external_signatures/presentation/submit") {
             setBody(
                 SubmitOID4VPRequest(
                     holderDID,

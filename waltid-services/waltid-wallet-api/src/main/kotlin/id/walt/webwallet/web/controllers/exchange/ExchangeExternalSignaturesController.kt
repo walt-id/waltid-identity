@@ -52,7 +52,7 @@ fun Application.exchangeExternalSignatures() = walletRoute {
         OpenAPICommons.rootPath,
         OpenAPICommons.route(),
     ) {
-        post("external_signatures/oid4vp/prepare", {
+        post("external_signatures/presentation/prepare", {
             summary = "Preparation (first) step for an OID4VP flow with externally provided signatures."
 
             request {
@@ -188,7 +188,7 @@ fun Application.exchangeExternalSignatures() = walletRoute {
             )
         }
 
-        post("external_signatures/oid4vp/submit", {
+        post("external_signatures/presentation/submit", {
             summary = "Submission (second) step of an OID4VP flow with externally provided signatures. " +
                     "The client is expected to provide the signed vp token in the respective input request field."
 
