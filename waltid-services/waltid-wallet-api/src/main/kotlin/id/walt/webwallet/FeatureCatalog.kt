@@ -48,6 +48,12 @@ object FeatureCatalog : ServiceFeatureCatalog {
         default = false
     )
 
+    val externalSignatureEndpointsFeature = OptionalFeature(
+        name = "external-signature-endpoints",
+        description = "Expose endpoints that allow clients to provide signed payloads required in OID4VC flows",
+        default = false,
+    )
+
     override val baseFeatures = listOf(
         databaseFeature,
 //        loginsMethodFeature,
@@ -66,5 +72,6 @@ object FeatureCatalog : ServiceFeatureCatalog {
         runtimeMockFeature,
         didWebRegistry,
         x5cAuthFeature,
+        externalSignatureEndpointsFeature,
     )
 }
