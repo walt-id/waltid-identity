@@ -9,12 +9,22 @@ import kotlinx.serialization.json.JsonPrimitive
 data class RegistrationDefaultsConfig(
     val defaultKeyConfig: KeyGenerationRequest = KeyGenerationRequest(),
     val defaultDidConfig: DidMethodConfig = DidMethodConfig(),
+    val defaultIssuerConfig: IssuerConfig? = null
 ) : WalletConfig() {
 
     @Serializable
     data class DidMethodConfig(
         val method: String = "jwk",
         val config: Map<String, JsonPrimitive> = emptyMap(),
+    )
+
+    @Serializable
+    data class IssuerConfig(
+        val did: String,
+        val description: String,
+        val uiEndpoint: String,
+        val configurationEndpoint: String,
+        val authorized: Boolean
     )
 
     @Transient
