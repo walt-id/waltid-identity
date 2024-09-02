@@ -75,7 +75,7 @@ object OidcApi : CIProvider() {
             get("/.well-known/vct/{type}") {
                 val credType = call.parameters["type"] ?: throw IllegalArgumentException("Type required")
 
-                // if this endpoint called, the <authority> is the issuer api
+                // issuer api is the <authority>
                 val vctMetadata = getVctBySupportedCredentialConfiguration(metadata.credentialConfigurationsSupported, baseUrl, credType)
                 call.respond(
                     HttpStatusCode.OK,
