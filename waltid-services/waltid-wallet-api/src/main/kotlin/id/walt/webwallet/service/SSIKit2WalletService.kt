@@ -322,6 +322,8 @@ class SSIKit2WalletService(
         return addableCredentials
     }
 
+    override suspend fun resolveVct(vct: String) = IssuanceService.resolveVct(vct)
+
     override suspend fun resolveCredentialOffer(
         offerRequest: CredentialOfferRequest,
     ): CredentialOffer {

@@ -79,7 +79,10 @@ object OidcApi : CIProvider() {
                 val vctMetadata = getVctBySupportedCredentialConfiguration(metadata.credentialConfigurationsSupported, baseUrl, credType)
                 call.respond(
                     HttpStatusCode.OK,
-                    SDTypeMetadata(vct = vctMetadata.vct, name = credType, description = "$credType Verifiable Credential")
+                    when (vctMetadata.sdTypeMetadata != null) {
+                        true -> SDTypeMetadata.fromJSON(vctMetadata.sdTypeMetadata!!.toJSON())
+                        else -> SDTypeMetadata(vct = vctMetadata.vct!!, name = credType, description = "$credType Verifiable Credential")
+                    }
                 )
             }
         }
