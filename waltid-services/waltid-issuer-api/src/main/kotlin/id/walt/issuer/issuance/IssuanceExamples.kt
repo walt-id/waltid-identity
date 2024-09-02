@@ -157,6 +157,16 @@ object IssuanceExamples {
           }
     """.trimIndent()
 
+    private val ietfSdJwtmapping = """
+        {
+             "id":"<uuid>",
+            "iat": "<timestamp-seconds>",
+            "nbf": "<timestamp-seconds>",
+            "exp": "<timestamp-in-seconds:365d>"
+          }
+    """.trimIndent()
+
+
     // language=json
     val openBadgeCredentialIssuance = """
         {
@@ -377,7 +387,8 @@ object IssuanceExamples {
             {
                 "issuerKey": $issuerKey,
                 "issuerDid": $issuerDid,
-                "credentialConfigurationId": "OpenBadgeCredential_${VCFormat.jwt_vc.value}",
+                "credentialFormat" : "jwt_vc_json",
+                "credentialConfigurationId": "OpenBadgeCredential_${VCFormat.jwt_vc_json.value}",
                 "credentialData": $openBadgeCredentialData,
                 "mdocData": null,
                 "mapping": $mapping,
@@ -707,7 +718,6 @@ object IssuanceExamples {
     // language=json
     private val sdjwt_vc_identity_credential = """
     {
-     "vct": "identity_credential_vc+sd-jwt",
      "given_name": "John",
      "family_name": "Doe",
      "email": "johndoe@example.com",
@@ -733,10 +743,11 @@ object IssuanceExamples {
                 "jwk": ${Json.parseToJsonElement(LspPotentialIssuanceInterop.POTENTIAL_ISSUER_JWK_KEY.jwk!!)}
             },
             "issuerDid": "",
+            "credentialFormat" : "vc+sd-jwt",
             "credentialConfigurationId": "identity_credential_vc+sd-jwt",
             "credentialData": $sdjwt_vc_identity_credential,
             "mdocData": null,
-            "mapping": $mapping,
+            "mapping": $ietfSdJwtmapping,
             "selectiveDisclosure":
             {
                 "fields":
