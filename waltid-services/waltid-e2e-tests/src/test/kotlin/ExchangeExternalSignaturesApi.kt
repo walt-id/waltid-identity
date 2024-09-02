@@ -1,18 +1,16 @@
 import E2ETestWebService.loadResource
+import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.did.utils.randomUUID
 import id.walt.issuer.issuance.IssuanceRequest
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.db.models.WalletDid
 import id.walt.webwallet.service.keys.SingleKeyResponse
-import id.walt.webwallet.web.controllers.exchange.PrepareOID4VPRequest
-import id.walt.webwallet.web.controllers.exchange.PrepareOID4VPResponse
-import id.walt.webwallet.web.controllers.exchange.SubmitOID4VPRequest
+import id.walt.webwallet.web.controllers.exchange.*
 import id.walt.webwallet.web.model.EmailAccountRequest
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
-import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.server.util.*
 import kotlinx.coroutines.runBlocking
@@ -20,7 +18,6 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.uuid.UUID
-import kotlin.test.assertFalse
 
 class ExchangeExternalSignatures {
 
@@ -31,14 +28,14 @@ class ExchangeExternalSignatures {
     private lateinit var issuerApi: IssuerApi
     private lateinit var exchangeApi: ExchangeApi
     private lateinit var credentialsApi: CredentialsApi
-    private lateinit var holderKey: JWKKey
+    private lateinit var holderDID: String
+
     private val verifierSessionApi: Verifier.SessionApi
     private val verifierVerificationApi: Verifier.VerificationApi
 
-    //    private val holderKey = runBlocking {
-//        JWKKey.generate(KeyType.Ed25519)
-//    }
-    private lateinit var holderDID: String
+    private val holderKey = runBlocking {
+        JWKKey.generate(KeyType.Ed25519)
+    }
 
     private val accountRequest = EmailAccountRequest(
         email = "${randomUUID()}@email.com",
@@ -86,77 +83,28 @@ class ExchangeExternalSignatures {
         }
     }
 
-    /*
-    DO NOT DELETE, WILL BE OF USE WHEN EXTERNAL SIGNATURE ENDPOINTS FOR OID4VCI FLOWS
-    WILL BE IMPLEMENTED.
-    TODO: DELETE THIS COMMENT WHEN OID4VCI PULL REQUEST IS TO BE MERGED.
-    * */
-//        private suspend fun initializeWallet() {
-//            cleanWallet()
-//            //import the holder's public key to the wallet API
-//            keysApi.import(walletId, holderKey.getPublicKey().exportJWK())
-//            //check that its the only key in the wallet
-//            var response = client.get("/wallet-api/wallet/$walletId/keys").expectSuccess()
-//            val keyList = response.body<List<SingleKeyResponse>>()
-//            assert(keyList.size == 1) { "There should only be one key in the holder's wallet now" }
-//            assert(keyList[0].keyId.id == holderKey.getPublicKey().getKeyId()) { "keyId mismatch" }
-//            //generate a DID
-//            didsApi.create(
-//                walletId,
-//                DidsApi.DidCreateRequest(
-//                    method = "jwk",
-//                    holderKey.getPublicKey().getKeyId(),
-//                ),
-//            )
-//            //check that it is the only did in the wallet
-//            response = client.get("/wallet-api/wallet/$walletId/dids").expectSuccess()
-//            val didList = response.body<List<WalletDid>>()
-//            assert(didList.size == 1) { "There should only be one did in the holder's wallet now" }
-//            holderDID = didList[0].did
-//        }
-
-    /*
-    TODO: SWAP THIS FUNCTION WITH THE ONE ABOVE WHEN EXTERNAL SIGNATURE ENDPOINTS FOR OID4VCI FLOWS ARE IMPLEMENTED.
-    * */
-    private suspend fun getWalletDefaultGeneratedParams() {
+    private suspend fun initializeWallet() {
+        cleanWallet()
+        //import the holder's public key to the wallet API
+        keysApi.import(walletId, holderKey.getPublicKey().exportJWK())
+        //check that it's the only key in the wallet
         var response = client.get("/wallet-api/wallet/$walletId/keys").expectSuccess()
         val keyList = response.body<List<SingleKeyResponse>>()
-        assert(keyList.size == 1) { "Expecting to have a default key generated" }
-        response = client.get("/wallet-api/wallet/$walletId/keys/${keyList[0].keyId.id}/export") {
-            url {
-                parameters.append("format", "JWK")
-                parameters.append("loadPrivateKey", "true")
-            }
-        }.expectSuccess()
-        holderKey = response.bodyAsText().let {
-            JWKKey.importJWK(it)
-        }.getOrThrow()
+        assert(keyList.size == 1) { "There should only be one key in the holder's wallet now" }
+        assert(keyList[0].keyId.id == holderKey.getPublicKey().getKeyId()) { "keyId mismatch" }
+        //generate a DID
+        didsApi.create(
+            walletId,
+            DidsApi.DidCreateRequest(
+                method = "jwk",
+                holderKey.getPublicKey().getKeyId(),
+            ),
+        )
+        //check that it is the only did in the wallet
         response = client.get("/wallet-api/wallet/$walletId/dids").expectSuccess()
         val didList = response.body<List<WalletDid>>()
-        assert(didList.size == 1) { "Expecting to have a default did generated" }
-        holderDID = didList.first().did
-
-    }
-
-    private suspend fun issueCredentialToWallet() {
-        lateinit var offerURL: String
-        issuerApi.issue(
-            Json.decodeFromString<IssuanceRequest>(loadResource("issuance/openbadgecredential-issuance-request.json"))
-        ) {
-            offerURL = it
-            println("offer: $offerURL")
-        }
-        val response = client.post("/wallet-api/wallet/$walletId/exchange/useOfferRequest") {
-            url {
-                parameters.append("did", holderDID)
-                parameters.append("requireUserInput", "false")
-            }
-            setBody(offerURL)
-        }.expectSuccess()
-        val credList = response.body<List<WalletCredential>>()
-        assert(credList.size == 1) { "Expecting to have a credential in the wallet now" }
-        assertFalse(credList[0].pending,"Credential should not be pending")
-
+        assert(didList.size == 1) { "There should only be one did in the holder's wallet now" }
+        holderDID = didList[0].did
     }
 
     init {
@@ -168,13 +116,50 @@ class ExchangeExternalSignatures {
         runBlocking {
             registerAccountAndLogin()
             prepareApis()
-            getWalletDefaultGeneratedParams()
-//                initializeWallet()
-            issueCredentialToWallet()
+            initializeWallet()
         }
     }
 
     suspend fun executeTestCases() {
+        happyPathPreAuthorizedOID4VCI()
+        happyPathOID4VP()
+    }
+
+    private suspend fun happyPathPreAuthorizedOID4VCI() {
+        lateinit var offerURL: String
+        issuerApi.issue(
+            Json.decodeFromString<IssuanceRequest>(loadResource("issuance/openbadgecredential-issuance-request.json"))
+        ) {
+            offerURL = it
+            println("offer: $offerURL")
+        }
+        var response = client.post("/wallet-api/wallet/$walletId/exchange/external_signatures/offer/prepare") {
+            url {
+                parameters.append("did", holderDID)
+                parameters.append("requireUserInput", "false")
+            }
+            setBody(offerURL)
+        }.expectSuccess()
+        val prepareResponse = response.body<PrepareOID4VCIResponse>()
+        //compute the signature here
+        val signedProofOfPossession = holderKey.signJws(
+            prepareResponse.jwtParams.payload.toByteArray(),
+            prepareResponse.jwtParams.header,
+        )
+        response = client.post("/wallet-api/wallet/$walletId/exchange/external_signatures/offer/submit") {
+            setBody(SubmitOID4VCIRequest(
+                did = holderDID,
+                credentialIssuer = prepareResponse.credentialIssuer,
+                offeredCredentials = prepareResponse.offeredCredentials,
+                tokenResponse = prepareResponse.tokenResponse,
+                signedProofOfDIDPossession = signedProofOfPossession,
+            ))
+        }.expectSuccess()
+        val credList = response.body<List<WalletCredential>>()
+        assert( credList.size == 1 ) { "There should be one credential in the wallet now" }
+    }
+
+    private suspend fun happyPathOID4VP() {
         lateinit var presentationRequestURL: String
         lateinit var verificationID: String
         lateinit var resolvedPresentationRequestURL: String
@@ -227,7 +212,7 @@ class ExchangeExternalSignatures {
                     prepareResponse.presentationSubmission,
                     prepareResponse.presentedCredentialIdList,
 
-                )
+                    )
             )
         }.expectSuccess()
         verifierSessionApi.get(verificationID) {
