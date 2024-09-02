@@ -27,15 +27,14 @@ object AccountsService {
 
             val createdInitialWalletId = transaction {
                 WalletServiceManager.createWallet(tenant, registeredUserId)
-            }.also { walletId ->
-                //TODO: inject
-                IssuerDataTransferObject.default(walletId)?.let { issuer ->
-                    WalletServiceManager.issuerUseCase.add(issuer)
-                }
             }
 
             val walletService = WalletServiceManager.getWalletService(tenant, registeredUserId, createdInitialWalletId)
-            suspend { tryAddDefaultData(walletService) } whenFeatureSuspend (FeatureCatalog.registrationDefaultsFeature)
+            (suspend {
+                ConfigManager.getConfig<RegistrationDefaultsConfig>()
+            } whenFeatureSuspend (FeatureCatalog.registrationDefaultsFeature))?.run {
+                tryAddDefaultData(walletService, this)
+            }
             registrationResult.also {
                 WalletServiceManager.eventUseCase.log(
                     action = EventType.Account.Create,
@@ -160,8 +159,10 @@ object AccountsService {
         }
     }
 
-    private suspend fun tryAddDefaultData(walletService: WalletService) = runCatching {
-        val defaultGenerationConfig by lazy { ConfigManager.getConfig<RegistrationDefaultsConfig>() }
+    private suspend fun tryAddDefaultData(
+        walletService: WalletService,
+        defaultGenerationConfig: RegistrationDefaultsConfig
+    ) = runCatching {
         val createdKey = walletService.generateKey(defaultGenerationConfig.defaultKeyConfig)
         val createdDid =
             walletService.createDid(
@@ -171,6 +172,18 @@ object AccountsService {
                     put("alias", JsonPrimitive("Onboarding"))
                 })
         walletService.setDefault(createdDid)
+        defaultGenerationConfig.defaultIssuerConfig?.run {
+            WalletServiceManager.issuerUseCase.add(
+                IssuerDataTransferObject(
+                    wallet = walletService.walletId,
+                    did = did,
+                    description = description,
+                    uiEndpoint = uiEndpoint,
+                    configurationEndpoint = configurationEndpoint,
+                    authorized = authorized
+                )
+            )
+        }
     }
 }
 
