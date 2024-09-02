@@ -59,6 +59,11 @@ class E2ETest {
                 wallet = it.wallets.first().id
                 println("Selected wallet: $wallet")
             }
+
+            ///sub-region -x5c-based authentication method test case scenarios-
+            AuthApi.X5c(client).executeTestCases()
+            ///end sub-region -x5c-based authentication method test case scenarios-
+
             //endregion -Auth-
 
             //region -Keys-
@@ -128,11 +133,11 @@ class E2ETest {
             val categoryNewName = "name#2"
             categoryApi.list(wallet, 0)
             categoryApi.add(wallet, categoryName)
-            categoryApi.list(wallet, 1){
+            categoryApi.list(wallet, 1) {
                 assertNotNull(it.single { it["name"]?.jsonPrimitive?.content == categoryName })
             }
             categoryApi.rename(wallet, categoryName, categoryNewName)
-            categoryApi.list(wallet, 1){
+            categoryApi.list(wallet, 1) {
                 assertNotNull(it.single { it["name"]?.jsonPrimitive?.content == categoryNewName })
             }
             categoryApi.delete(wallet, categoryNewName)
@@ -207,7 +212,7 @@ class E2ETest {
             exchangeApi.unmatchedCredentialsForPresentationDefinition(wallet, presentationDefinition)
             exchangeApi.usePresentationRequest(wallet, did, resolvedPresentationOfferString, listOf(newCredentialId))
 
-            sessionApi.get(verificationId){
+            sessionApi.get(verificationId) {
                 assert(it.tokenResponse?.vpToken?.jsonPrimitive?.contentOrNull?.expectLooksLikeJwt() != null) { "Received no valid token response!" }
                 assert(it.tokenResponse?.presentationSubmission != null) { "should have a presentation submission after submission" }
 
@@ -247,14 +252,13 @@ class E2ETest {
     }
 
 
-
     //@Test // enable to execute test selectively
     fun lspIssuanceTests() = runTest(timeout = 5.minutes) {
         val client = testHttpClient(doFollowRedirects = false)
         testBlock {
-          val lspPotentialIssuance = LspPotentialIssuance(client)
-          lspPotentialIssuance.testTrack1()
-          lspPotentialIssuance.testTrack2()
+            val lspPotentialIssuance = LspPotentialIssuance(client)
+            lspPotentialIssuance.testTrack1()
+            lspPotentialIssuance.testTrack2()
         }
     }
 
@@ -262,44 +266,44 @@ class E2ETest {
     fun lspVerifierTests() = runTest(timeout = 5.minutes) {
         val client = testHttpClient(doFollowRedirects = false)
         testBlock {
-          val lspPotentialVerification = LspPotentialVerification(client)
-          lspPotentialVerification.testPotentialInteropTrack3()
-          lspPotentialVerification.testPotentialInteropTrack4()
+            val lspPotentialVerification = LspPotentialVerification(client)
+            lspPotentialVerification.testPotentialInteropTrack3()
+            lspPotentialVerification.testPotentialInteropTrack4()
         }
     }
 
-  suspend fun setupTestWallet(): LspPotentialWallet {
-    var client = testHttpClient()
-    client.post("/wallet-api/auth/login") {
-      setBody(
-        EmailAccountRequest(
-          email = "user@email.com", password = "password"
-        ) as AccountRequest
-      )
-    }.expectSuccess().apply {
-      body<JsonObject>().let { result ->
-        assertNotNull(result["token"])
-        val token = result["token"]!!.jsonPrimitive.content.expectLooksLikeJwt()
+    suspend fun setupTestWallet(): LspPotentialWallet {
+        var client = testHttpClient()
+        client.post("/wallet-api/auth/login") {
+            setBody(
+                EmailAccountRequest(
+                    email = "user@email.com", password = "password"
+                ) as AccountRequest
+            )
+        }.expectSuccess().apply {
+            body<JsonObject>().let { result ->
+                assertNotNull(result["token"])
+                val token = result["token"]!!.jsonPrimitive.content.expectLooksLikeJwt()
 
-        client = testHttpClient(token = token)
-      }
+                client = testHttpClient(token = token)
+            }
+        }
+        val walletId = client.get("/wallet-api/wallet/accounts/wallets").expectSuccess()
+            .body<AccountWalletListing>().wallets.first().id.toString()
+        return LspPotentialWallet(client, walletId)
     }
-    val walletId = client.get("/wallet-api/wallet/accounts/wallets").expectSuccess()
-        .body<AccountWalletListing>().wallets.first().id.toString()
-    return LspPotentialWallet(client, walletId)
-  }
 
-  //@Test // enable to execute test selectively
-  fun lspWalletTests() = runTest(timeout = 5.minutes) {
-    testBlock {
-      val lspPotentialWallet = setupTestWallet()
-      lspPotentialWallet.testMDocIssuance()
-      lspPotentialWallet.testMdocPresentation()
+    //@Test // enable to execute test selectively
+    fun lspWalletTests() = runTest(timeout = 5.minutes) {
+        testBlock {
+            val lspPotentialWallet = setupTestWallet()
+            lspPotentialWallet.testMDocIssuance()
+            lspPotentialWallet.testMdocPresentation()
 
-      lspPotentialWallet.testSDJwtVCIssuance()
-      lspPotentialWallet.testSDJwtPresentation()
+            lspPotentialWallet.testSDJwtVCIssuance()
+            lspPotentialWallet.testSDJwtPresentation()
+        }
     }
-  }
 
     private fun testHttpClient(token: String? = null, doFollowRedirects: Boolean = true) = HttpClient(CIO) {
         install(ContentNegotiation) {
@@ -315,7 +319,7 @@ class E2ETest {
         install(Logging) {
             level = LogLevel.ALL
         }
-      followRedirects = doFollowRedirects
+        followRedirects = doFollowRedirects
     }
 }
 
@@ -324,6 +328,10 @@ fun String.expectLooksLikeJwt(): String =
 
 suspend fun HttpResponse.expectSuccess(): HttpResponse = also {
     assert(status.isSuccess()) { "HTTP status is non-successful for response: $it, body is ${it.bodyAsText()}" }
+}
+
+suspend fun HttpResponse.expectFailure(): HttpResponse = also {
+    assert(!status.isSuccess()) { "HTTP status is successful for response: $it, body is ${it.bodyAsText()}" }
 }
 
 fun HttpResponse.expectRedirect(): HttpResponse = also {
