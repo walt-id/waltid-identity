@@ -248,6 +248,8 @@ class E2ETest {
             val authorizationCodeFlow = AuthorizationCodeFlow(testHttpClient(doFollowRedirects = false))
             authorizationCodeFlow.testIssuerAPI()
 
+            // test External Signature API Endpoints
+            ExchangeExternalSignatures().executeTestCases()
         }
     }
 
@@ -305,21 +307,24 @@ class E2ETest {
         }
     }
 
-    private fun testHttpClient(token: String? = null, doFollowRedirects: Boolean = true) = HttpClient(CIO) {
-        install(ContentNegotiation) {
-            json(httpJson)
-        }
-        install(DefaultRequest) {
-            contentType(ContentType.Application.Json)
-            host = "127.0.0.1"
-            port = 22222
+    companion object {
 
-            if (token != null) bearerAuth(token)
+        fun testHttpClient(token: String? = null, doFollowRedirects: Boolean = true) = HttpClient(CIO) {
+            install(ContentNegotiation) {
+                json(httpJson)
+            }
+            install(DefaultRequest) {
+                contentType(ContentType.Application.Json)
+                host = "127.0.0.1"
+                port = 22222
+
+                if (token != null) bearerAuth(token)
+            }
+            install(Logging) {
+                level = LogLevel.ALL
+            }
+            followRedirects = doFollowRedirects
         }
-        install(Logging) {
-            level = LogLevel.ALL
-        }
-        followRedirects = doFollowRedirects
     }
 }
 
