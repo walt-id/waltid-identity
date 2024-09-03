@@ -85,7 +85,7 @@ object IssuanceOfferManager {
 
         // Also store active types
         issuanceRequest.credential.forEach {
-            val expiry = offerPersistence.defaultExpiration.inWholeSeconds
+            val expiry = offerPersistence.defaultExpiration?.inWholeSeconds
             val type = it.credentialData.getType()
             val typeId = type.last()
 

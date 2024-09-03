@@ -1,6 +1,5 @@
 package id.walt
 
-import id.walt.authkit.collectRoutes
 import id.walt.authkit.plugins.configureMonitoring
 import id.walt.authkit.plugins.configureRouting
 import id.walt.authkit.plugins.configureSerialization
