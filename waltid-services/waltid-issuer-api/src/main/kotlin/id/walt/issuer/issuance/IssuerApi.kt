@@ -296,55 +296,47 @@ fun Application.issuerApi() {
                             }
                         }
 
-                        response {
-                            "200" to {
-                                description = "Credential signed (with the *proof* attribute added)"
-                                body<String> {
-                                    example("Issuance URL") {
-                                        value =
-                                            "openid-credential-offer://localhost/?credential_offer=%7B%22credential_issuer%22%3A%22http%3A%2F%2Flocalhost%3A8000%22%2C%22credentials%22%3A%5B%22VerifiableId%22%5D%2C%22grants%22%3A%7B%22authorization_code%22%3A%7B%22issuer_state%22%3A%22501414a4-c461-43f0-84b2-c628730c7c02%22%7D%7D%7D"
-                                    }
-                                }
-                            }
-                            "400" to {
-                                description =
-                                    "Bad request - The request could not be understood or was missing required parameters."
-                                body<String> {
-                                    example("Missing issuerKey in the request body.") {
-                                        value = "Missing issuerKey in the request body."
-                                    }
-                                    example("Invalid issuerKey format.") {
-                                        value = "Invalid issuerKey format."
-                                    }
-                                    example("Missing issuerDid in the request body.") {
-                                        value = "Missing issuerDid in the request body."
-                                    }
-                                    example("Missing credentialConfigurationId in the request body.") {
-                                        value = "Missing credentialConfigurationId in the request body."
-                                    }
-                                    example("Missing credentialData in the request body.") {
-                                        value = "Missing credentialData in the request body."
-                                    }
-                                    example("Invalid credentialData format.") {
-                                        value = "Invalid credentialData format."
-                                    }
-                                }
-                            }
-                        }
+//                        response {
+//                            "200" to {
+//                                description = "Credential signed (with the *proof* attribute added)"
+//                                body<String> {
+//                                    example("Issuance URL") {
+//                                        value =
+//                                            "openid-credential-offer://localhost/?credential_offer=%7B%22credential_issuer%22%3A%22http%3A%2F%2Flocalhost%3A8000%22%2C%22credentials%22%3A%5B%22VerifiableId%22%5D%2C%22grants%22%3A%7B%22authorization_code%22%3A%7B%22issuer_state%22%3A%22501414a4-c461-43f0-84b2-c628730c7c02%22%7D%7D%7D"
+//                                    }
+//                                }
+//                            }
+//                            "400" to {
+//                                description =
+//                                    "Bad request - The request could not be understood or was missing required parameters."
+//                                body<String> {
+//                                    example("Missing issuerKey in the request body.") {
+//                                        value = "Missing issuerKey in the request body."
+//                                    }
+//                                    example("Invalid issuerKey format.") {
+//                                        value = "Invalid issuerKey format."
+//                                    }
+//                                    example("Missing issuerDid in the request body.") {
+//                                        value = "Missing issuerDid in the request body."
+//                                    }
+//                                    example("Missing credentialConfigurationId in the request body.") {
+//                                        value = "Missing credentialConfigurationId in the request body."
+//                                    }
+//                                    example("Missing credentialData in the request body.") {
+//                                        value = "Missing credentialData in the request body."
+//                                    }
+//                                    example("Invalid credentialData format.") {
+//                                        value = "Invalid credentialData format."
+//                                    }
+//                                }
+//                            }
+//                        }
                     }) {
                         runCatching {
                             val jwtIssuanceRequest = context.receive<IssuanceRequest>()
-
-                            val validationResult = validateIssuanceRequest(jwtIssuanceRequest)
-
-                            if (validationResult.first != HttpStatusCode.OK) {
-                                throw validationResult.second?.let { it1 -> BadRequestException(it1) }!!
-                            }
-
                             val offerUri = createCredentialOfferUri(listOf(jwtIssuanceRequest), IssuanceType.w3c, getCallbackUriHeader())
                             context.respond(HttpStatusCode.OK, offerUri)
                         }.onFailure {
-
                             throwError(it)
                         }
 
@@ -522,7 +514,6 @@ private suspend fun PipelineContext<Unit, ApplicationCall>.throwError(
     it: Throwable
 ) {
     when (it) {
-        is BadRequestException -> context.respond(HttpStatusCode.BadRequest, it.message ?: "Bad request.")
         is JedisConnectionException -> context.respond(
             HttpStatusCode.InternalServerError,
             "Distributed session management couldn't be initialized : Cannot connect to redis server."
@@ -533,7 +524,7 @@ private suspend fun PipelineContext<Unit, ApplicationCall>.throwError(
             "Distributed session management couldn't be initialized : Cannot access redis server, wrong username/password."
         )
 
-        else -> context.respond(HttpStatusCode.InternalServerError, it.message ?: "Failed to issue credentials.")
+        else -> throw it
     }
 }
 
