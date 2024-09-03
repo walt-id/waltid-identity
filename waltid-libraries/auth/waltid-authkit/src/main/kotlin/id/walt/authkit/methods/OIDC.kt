@@ -1,6 +1,7 @@
 package id.walt.authkit.methods
 
 import id.walt.authkit.AuthContext
+import id.walt.authkit.accounts.identifiers.OIDCIdentifier
 import id.walt.authkit.methods.config.AuthMethodConfiguration
 import io.github.smiley4.ktorswaggerui.dsl.routing.route
 import io.ktor.client.*
@@ -209,9 +210,10 @@ object OIDC : AuthenticationMethod("oidc") {
                 val user = userInfo(contextConfig.openIdConfiguration, tokenResponse.accessToken)
                 val sub = user["sub"]!!.jsonPrimitive.content
 
-                session.progressFlow(this@OIDC)
+                // TODO: better OIDC Identifier (make sure malicious cannot generate a clash per URL)
+                val identifier = OIDCIdentifier(config.openIdConfiguration.authorizationEndpoint, sub)
 
-                context.respond(session.toInformation())
+                context.handleAuthSuccess(session, identifier.resolveToAccountId())
             }
         }
 

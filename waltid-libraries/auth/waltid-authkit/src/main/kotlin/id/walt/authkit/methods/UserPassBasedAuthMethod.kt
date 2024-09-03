@@ -1,5 +1,6 @@
 package id.walt.authkit.methods
 
+import id.walt.authkit.accounts.identifiers.AccountIdentifier
 import id.walt.authkit.sessions.AuthSession
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -71,5 +72,5 @@ abstract class UserPassBasedAuthMethod(
         }
     }
 
-    abstract suspend fun auth(session: AuthSession, credential: UserPasswordCredential)
+    abstract suspend fun auth(session: AuthSession, credential: UserPasswordCredential, context: ApplicationCall): AccountIdentifier
 }

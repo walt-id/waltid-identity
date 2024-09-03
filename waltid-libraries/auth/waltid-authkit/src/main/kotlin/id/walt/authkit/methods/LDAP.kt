@@ -1,6 +1,7 @@
 package id.walt.authkit.methods
 
 import id.walt.authkit.AuthContext
+import id.walt.authkit.accounts.identifiers.AccountIdentifier
 import id.walt.authkit.accounts.identifiers.RADIUSIdentifier
 import id.walt.authkit.exceptions.authFailure
 import id.walt.authkit.methods.config.AuthMethodConfiguration
@@ -22,7 +23,7 @@ object LDAP : UserPassBasedAuthMethod("ldap") {
         val userDNFormat: String
     ): AuthMethodConfiguration
 
-    override suspend fun auth(session: AuthSession, credential: UserPasswordCredential) {
+    override suspend fun auth(session: AuthSession, credential: UserPasswordCredential, context: ApplicationCall): AccountIdentifier {
         val config = session.lookupConfiguration<LDAPConfiguration>(this)
 
         val (hostname, port) = config.ldapServerUrl.removePrefix("ldap://").split(":")
@@ -36,8 +37,7 @@ object LDAP : UserPassBasedAuthMethod("ldap") {
             connection = LdapNetworkConnection(hostname, port.toInt())
             connection.bind(userDN, credential.password)
 
-            session.accountId = identifier.resolveToAccountId()
-            session.progressFlow(this@LDAP)
+            return identifier
         } catch (e: LdapException) {
             e.printStackTrace()
             authFailure(e.message ?: "LDAP auth failed")
@@ -53,7 +53,9 @@ object LDAP : UserPassBasedAuthMethod("ldap") {
 
             val credential = call.getUsernamePasswordFromRequest()
 
-            auth(session, credential)
+            val identifier = auth(session, credential, context)
+
+            context.handleAuthSuccess(session, identifier.resolveToAccountId())
         }
     }
 

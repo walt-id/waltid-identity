@@ -6,9 +6,11 @@ import id.walt.authkit.accounts.AccountStore
 import id.walt.authkit.accounts.identifiers.AccountIdentifier
 import id.walt.authkit.methods.data.AuthMethodStoredData
 import id.walt.authkit.sessions.AuthSession
+import id.walt.authkit.sessions.AuthSessionStatus
 import id.walt.authkit.sessions.SessionManager
-import id.walt.authkit.sessions.InMemorySessionStore
+import io.ktor.http.*
 import io.ktor.server.application.*
+import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.util.pipeline.*
 
@@ -16,8 +18,18 @@ abstract class AuthenticationMethod(open val id: String) {
     abstract fun Route.register(authContext: PipelineContext<Unit, ApplicationCall>.() -> AuthContext)
 
 
+    suspend fun ApplicationCall.handleAuthSuccess(session: AuthSession, accountId: String?) {
+        accountId?.let { session.accountId = it }
+        session.progressFlow(this@AuthenticationMethod)
 
-//    abstract val identifier: AccountIdentifier
+        if (session.status == AuthSessionStatus.OK) {
+            check(session.token != null) { "Session token does not exist after successful authentication?" }
+            this.response.cookies.append(Cookie("authkit-auth", session.token!!))
+        }
+
+        this.respond(session.toInformation())
+    }
+
 
     inline fun <reified V : AuthMethodStoredData> lookupStoredData(identifier: AccountIdentifier): V {
         val storedData = AccountStore.lookupStoredDataFor(identifier, this)

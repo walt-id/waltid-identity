@@ -14,7 +14,6 @@ import id.walt.authkit.sessions.AuthSession
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
-import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.util.pipeline.*
 import kotlinx.serialization.Serializable
@@ -37,8 +36,6 @@ object TOTP : AuthenticationMethod("totp") {
         authCheck(
             service.verify(userProvidedOtpCode, secret).isSuccess()
         ) { "Invalid OTP" }
-
-        // TODO: Open session
     }
 
     @Serializable
@@ -57,9 +54,7 @@ object TOTP : AuthenticationMethod("totp") {
 
             auth(session, otp)
 
-            session.progressFlow(this@TOTP)
-
-            context.respond(session.toInformation())
+            context.handleAuthSuccess(session, null)
         }
     }
 
