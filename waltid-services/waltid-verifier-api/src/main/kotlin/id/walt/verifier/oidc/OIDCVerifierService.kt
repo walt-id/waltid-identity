@@ -150,7 +150,7 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
     // Simple cryptographic operations interface implementation
     override fun doVerify(tokenResponse: TokenResponse, session: PresentationSession): Boolean {
         val policies = sessionVerificationInfos[session.id]
-            ?: throw NotFoundException("Could not find policy listing for session: ${session.id}")
+            ?: throw NotFoundException("Policy listing for session: ${session.id} is missing. Please ensure that the session ID is correct and that the policies have been properly configured.")
 
         val vpToken = when (tokenResponse.idToken) {
             null -> when (tokenResponse.vpToken) {
