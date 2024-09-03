@@ -1,8 +1,9 @@
 package id.walt.authkit.methods
 
 import id.walt.authkit.AuthContext
+import id.walt.authkit.accounts.identifiers.RADIUSIdentifier
 import id.walt.authkit.exceptions.authFailure
-import id.walt.authkit.methods.data.AuthMethodStoredData
+import id.walt.authkit.methods.config.AuthMethodConfiguration
 import id.walt.authkit.sessions.AuthSession
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
@@ -19,27 +20,24 @@ object LDAP : UserPassBasedAuthMethod("ldap") {
     data class LDAPConfiguration(
         val ldapServerUrl: String,
         val userDNFormat: String
-    ): AuthMethodStoredData
-
-    // Todo: Move to configuration (is not stored data)
+    ): AuthMethodConfiguration
 
     override suspend fun auth(session: AuthSession, credential: UserPasswordCredential) {
-        //val identifier = UsernameIdentifier(credential.name)
-        //val storedData: UserPassStoredData = lookupStoredData(identifier /*context()*/)
+        val config = session.lookupConfiguration<LDAPConfiguration>(this)
 
-        val ldapServerUrl = "ldap://localhost:3893"
-        val userDNFormat = "cn=%s,ou=superheros,dc=glauth,dc=com"
-        val username = "hackers"
-        val password = "dogood"
-
-        val (hostname, port) = ldapServerUrl.removePrefix("ldap://").split(":")
-        val userDN = userDNFormat.format(username)
+        val (hostname, port) = config.ldapServerUrl.removePrefix("ldap://").split(":")
+        val userDN = config.userDNFormat.format(credential.name)
 
         var connection: LdapConnection? = null
 
+        val identifier = RADIUSIdentifier(config.ldapServerUrl, credential.name)
+
         try {
             connection = LdapNetworkConnection(hostname, port.toInt())
-            connection.bind(userDN, password)
+            connection.bind(userDN, credential.password)
+
+            session.accountId = identifier.resolveToAccountId()
+            session.progressFlow(this@LDAP)
         } catch (e: LdapException) {
             e.printStackTrace()
             authFailure(e.message ?: "LDAP auth failed")
