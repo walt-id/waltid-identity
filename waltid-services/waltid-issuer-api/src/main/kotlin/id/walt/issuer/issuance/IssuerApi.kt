@@ -156,8 +156,6 @@ fun Application.issuerApi() {
                 }
             }) {
                 val req = context.receive<OnboardingRequest>()
-                validateOnboardingRequest(req)
-
                 val keyConfig = req.key.config?.mapValues { (key, value) ->
                     if (key == "signingKeyPem") {
                         JsonPrimitive(value.jsonPrimitive.content.trimIndent().replace(" ", ""))
@@ -168,8 +166,6 @@ fun Application.issuerApi() {
                 }
 
                 val keyGenerationRequest = req.key.copy(config = keyConfig?.let { it1 -> JsonObject(it1) })
-
-
                 val key = KeyManager.createKey(keyGenerationRequest)
 
                 val did = DidService.registerDefaultDidMethodByKey(
@@ -267,17 +263,6 @@ fun Application.issuerApi() {
                         }.onFailure {
                             throwError(it)
                         }
-
-                        val jws = try {
-                            vc.signJws(issuerKey = key, issuerDid = issuerDid, subjectDid = subjectDid)
-                        } catch (e: Exception) {
-                            return@post context.respond(
-                                HttpStatusCode.InternalServerError,
-                                "Failed to sign credential: ${e.message}"
-                            )
-                        }
-
-                        context.respond(HttpStatusCode.OK, jws)
                     }
                 }
             }
