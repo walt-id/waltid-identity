@@ -43,4 +43,8 @@ object SessionManager {
         AuthKitManager.sessionStore.store(updatedAuthSession)
     }
 
+    fun removeSession(authSession: AuthSession) {
+        AuthKitManager.sessionStore.dropSession(authSession.id)
+    }
+
 }

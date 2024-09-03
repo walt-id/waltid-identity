@@ -9,6 +9,10 @@ class InMemorySessionStore : SessionStore {
 
     override fun resolveSessionId(sessionId: String): AuthSession = wip_sessions[sessionId] ?: error("Unknown session id: $sessionId")
 
+    override fun dropSession(id: String) {
+        wip_sessions.remove(id)
+    }
+
     override suspend fun store(session: AuthSession) {
         log.debug("saving session $session")
         wip_sessions[session.id] = session
