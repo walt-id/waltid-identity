@@ -126,6 +126,7 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
 
 
     override fun getSession(id: String) = presentationSessions[id]
+        ?: throw NotFoundException("Id parameter $id doesn't refer to an existing session, or session expired")
     override fun putSession(id: String, session: PresentationSession) = presentationSessions.put(id, session)
     override fun getSessionByAuthServerState(authServerState: String): PresentationSession? {
         TODO("Not yet implemented")
