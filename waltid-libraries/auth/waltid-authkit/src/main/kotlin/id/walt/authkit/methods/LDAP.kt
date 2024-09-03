@@ -2,7 +2,7 @@ package id.walt.authkit.methods
 
 import id.walt.authkit.AuthContext
 import id.walt.authkit.accounts.identifiers.AccountIdentifier
-import id.walt.authkit.accounts.identifiers.RADIUSIdentifier
+import id.walt.authkit.accounts.identifiers.LDAPIdentifier
 import id.walt.authkit.exceptions.authFailure
 import id.walt.authkit.methods.config.AuthMethodConfiguration
 import id.walt.authkit.sessions.AuthSession
@@ -32,7 +32,7 @@ object LDAP : UserPassBasedAuthMethod("ldap") {
 
         var connection: LdapConnection? = null
 
-        val identifier = RADIUSIdentifier(config.ldapServerUrl, credential.name)
+        val identifier = LDAPIdentifier(config.ldapServerUrl, credential.name)
 
         try {
             connection = LdapNetworkConnection(hostname, port.toInt())
