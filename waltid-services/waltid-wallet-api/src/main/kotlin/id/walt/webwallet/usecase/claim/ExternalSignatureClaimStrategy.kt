@@ -2,7 +2,6 @@ package id.walt.webwallet.usecase.claim
 
 import id.walt.oid4vc.data.OfferedCredential
 import id.walt.oid4vc.responses.TokenResponse
-import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.service.SSIKit2WalletService
 import id.walt.webwallet.service.credentials.CredentialsService
 import id.walt.webwallet.service.exchange.IssuanceService
@@ -16,9 +15,6 @@ class ExternalSignatureClaimStrategy(
 ) {
 
     suspend fun prepareCredentialClaim(
-        tenantId: String,
-        accountId: UUID,
-        walletId: UUID,
         did: String,
         keyId: String,
         offer: String,
@@ -39,21 +35,31 @@ class ExternalSignatureClaimStrategy(
         signedJWT: String,
         tokenResponse: TokenResponse,
         offeredCredentials: List<OfferedCredential>,
-    ): List<WalletCredential> {
-        val offerCredentialDataResults = issuanceService.submitExternallySignedOfferRequest(
-            credentialIssuerURL = credentialIssuerURL,
-            credentialWallet = SSIKit2WalletService.getCredentialWallet(did),
-            offeredCredentials = offeredCredentials,
-            signedJWT = signedJWT,
-            tokenResponse = tokenResponse,
-        )
-        return ClaimCommons.mapCredentialDataResultsToWalletCredentials(
-            offerCredentialDataResults,
+    ) = issuanceService.submitExternallySignedOfferRequest(
+        credentialIssuerURL = credentialIssuerURL,
+        credentialWallet = SSIKit2WalletService.getCredentialWallet(did),
+        offeredCredentials = offeredCredentials,
+        signedJWT = signedJWT,
+        tokenResponse = tokenResponse,
+    ).map { credentialDataResult ->
+        ClaimCommons.convertCredentialDataResultToWalletCredential(
+            credentialDataResult,
             walletId,
-            tenantId,
-            accountId,
             pending,
-            eventUseCase,
+        ).also { credential ->
+            ClaimCommons.addReceiveCredentialToUseCaseLog(
+                tenantId,
+                accountId,
+                walletId,
+                credential,
+                credentialDataResult.type,
+                eventUseCase,
+            )
+        }
+    }.also {
+        ClaimCommons.storeWalletCredentials(
+            walletId,
+            it,
             credentialService,
         )
     }

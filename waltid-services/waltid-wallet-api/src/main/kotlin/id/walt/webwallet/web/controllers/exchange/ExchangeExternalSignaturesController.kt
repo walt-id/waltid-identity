@@ -380,9 +380,6 @@ fun Application.exchangeExternalSignatures() = walletRoute {
 
             runCatching {
                 WalletServiceManager.externalSignatureClaimStrategy.prepareCredentialClaim(
-                    tenantId = walletService.tenant,
-                    accountId = walletService.accountId,
-                    walletId = walletService.walletId,
                     did = walletDID.did,
                     keyId = authKeyId,
                     offer = offer,

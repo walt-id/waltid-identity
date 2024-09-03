@@ -65,7 +65,6 @@ object IssuanceService {
         did: String,
         keyId: String,
     ): PrepareExternalClaimResult {
-        logger.debug { "// get issuer metadata" }
         val providerMetadata = getCredentialIssuerOpenIDMetadata(
             credentialOffer.credentialIssuer,
             credentialWallet,
@@ -197,6 +196,7 @@ object IssuanceService {
         issuerURL: String,
         credentialWallet: TestCredentialWallet,
     ): OpenIDProviderMetadata {
+        logger.debug { "// get issuer metadata" }
         val providerMetadataUri =
             credentialWallet.getCIProviderMetadataUrl(issuerURL)
         logger.debug { "Getting provider metadata from: $providerMetadataUri" }
@@ -224,7 +224,6 @@ object IssuanceService {
         credentialWallet: TestCredentialWallet,
         clientId: String,
     ): List<ProcessedCredentialOffer> {
-        logger.debug { "// get issuer metadata" }
         val providerMetadata = getCredentialIssuerOpenIDMetadata(
             credentialOffer.credentialIssuer,
             credentialWallet,

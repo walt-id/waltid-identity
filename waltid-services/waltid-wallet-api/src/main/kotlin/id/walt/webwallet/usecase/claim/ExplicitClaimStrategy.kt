@@ -14,19 +14,29 @@ class ExplicitClaimStrategy(
 ) {
     suspend fun claim(
         tenant: String, account: UUID, wallet: UUID, did: String, offer: String, pending: Boolean = true,
-    ): List<WalletCredential> {
-        val offerCredentialDataResults = issuanceService.useOfferRequest(
-            offer = offer,
-            credentialWallet = SSIKit2WalletService.getCredentialWallet(did),
-            clientId = SSIKit2WalletService.testCIClientConfig.clientID
-        )
-        return ClaimCommons.mapCredentialDataResultsToWalletCredentials(
-            offerCredentialDataResults,
+    ): List<WalletCredential> = issuanceService.useOfferRequest(
+        offer = offer,
+        credentialWallet = SSIKit2WalletService.getCredentialWallet(did),
+        clientId = SSIKit2WalletService.testCIClientConfig.clientID
+    ).map { credentialDataResult ->
+        ClaimCommons.convertCredentialDataResultToWalletCredential(
+            credentialDataResult,
             wallet,
-            tenant,
-            account,
             pending,
-            eventUseCase,
+        ).also { credential ->
+            ClaimCommons.addReceiveCredentialToUseCaseLog(
+                tenant,
+                account,
+                wallet,
+                credential,
+                credentialDataResult.type,
+                eventUseCase,
+            )
+        }
+    }.also {
+        ClaimCommons.storeWalletCredentials(
+            wallet,
+            it,
             credentialService,
         )
     }
