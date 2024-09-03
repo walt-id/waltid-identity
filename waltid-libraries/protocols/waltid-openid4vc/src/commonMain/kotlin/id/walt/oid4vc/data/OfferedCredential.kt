@@ -10,6 +10,7 @@ import kotlinx.serialization.json.jsonObject
 @Serializable
 data class OfferedCredential(
     val format: CredentialFormat,
+    val types: List<String>? = null, // for draft 11
     val vct: String? = null,
     @SerialName("doctype") val docType: String? = null,
     @SerialName("credential_definition") val credentialDefinition: CredentialDefinition? = null,
@@ -25,6 +26,7 @@ data class OfferedCredential(
 
         fun fromProviderMetadata(credential: CredentialSupported) = OfferedCredential(
             credential.format,
+            credential.types,
             credential.vct,
             credential.docType,
             CredentialDefinition(type = credential.credentialDefinition?.type),
