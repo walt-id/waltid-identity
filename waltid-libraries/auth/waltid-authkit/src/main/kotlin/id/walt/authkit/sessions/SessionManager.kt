@@ -1,5 +1,6 @@
 package id.walt.authkit.sessions
 
+import id.walt.authkit.AuthKitManager
 import id.walt.authkit.flows.AuthFlow
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -16,7 +17,7 @@ object SessionManager {
             flows = setOf(authFlow)
         )
 
-        SessionStore.store(newSession)
+        AuthKitManager.sessionStore.store(newSession)
 
         return newSession
     }
@@ -38,10 +39,8 @@ object SessionManager {
     //  XXXXX figure out flow based on first login method
 
 
-
-
     suspend fun updateSession(updatedAuthSession: AuthSession) {
-        SessionStore.store(updatedAuthSession)
+        AuthKitManager.sessionStore.store(updatedAuthSession)
     }
 
 }

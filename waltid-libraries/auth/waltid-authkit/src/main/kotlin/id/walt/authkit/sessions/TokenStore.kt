@@ -1,7 +1,12 @@
 package id.walt.authkit.sessions
 
-object TokenStore {
+interface TokenStore {
 
-    val tokens = HashMap<String, AuthSession>()
+    /**
+     * Return session id
+     */
+    fun mapToken(token: String, sessionId: String)
+
+    fun removeToken(token: String)
 
 }
