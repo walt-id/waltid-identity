@@ -191,7 +191,7 @@ fun Application.verfierApi() {
                 }
 
             }) {
-                runCatching {
+
                     val authorizeBaseUrl = context.request.header("authorizeBaseUrl") ?: defaultAuthorizeBaseUrl
                     val responseMode =
                         context.request.header("responseMode")?.let { ResponseMode.fromString(it) }
@@ -223,6 +223,7 @@ fun Application.verfierApi() {
                         trustedRootCAs = body["trusted_root_cas"]?.jsonArray
                     )
 
+                context.respond(
                     authorizeBaseUrl.plus("?").plus(
                         when (session.openId4VPProfile) {
                             OpenId4VPProfile.ISO_18013_7_MDOC -> session.authorizationRequest!!.toRequestObjectByReferenceHttpQueryString(
@@ -234,13 +235,7 @@ fun Application.verfierApi() {
                             else -> session.authorizationRequest!!.toHttpQueryString()
                         }
                     )
-                }.onSuccess {
-                    call.respondText(it, ContentType.Text.Plain, HttpStatusCode.OK)
-                }.onFailure {
-                    logger.debug(it) { "Cannot create session ($it)" }
-                    throw it
-
-                }
+                    )
             }
 
             post("/verify/{state}", {
@@ -333,7 +328,7 @@ fun Application.verfierApi() {
                 }
                 response {
                     HttpStatusCode.OK to {
-                        body<PresentationSessionInfo> { // it's PresentationSessionInfo
+                        body<PresentationSessionInfo> {
                             description = "Session info"
                         }
                     }
@@ -350,14 +345,8 @@ fun Application.verfierApi() {
                 }
             }) {
                 val id = call.parameters.getOrFail("id")
-                verificationUseCase.getResult(id).onSuccess {
+                verificationUseCase.getResult(id).getOrThrow().let {
                     call.respond(HttpStatusCode.OK, it)
-                }.onFailure {
-                    logger.debug(it) { "Verification failed ($it)" }
-                    when (it) {
-                        is NotFoundException -> throw NotFoundException(it.localizedMessage)
-                        else -> throw BadRequestException(it.localizedMessage)
-                    }
                 }
             }
             get("/pd/{id}", {
