@@ -8,18 +8,18 @@ import id.walt.authkit.methods.UserPass
 import id.walt.authkit.methods.data.AuthMethodStoredData
 import id.walt.authkit.sessions.AuthSession
 
-object AccountStore {
+object AccountStore : AccountStoreInterface {
 
     // Account uuid -> account
-    val wip_accounts = HashMap<String, Account>()
+    private val wip_accounts = HashMap<String, Account>()
 
     // TODO: Missing context, for multi tenancy
 
     // AccountIdentifier -> Account uuid
-    val wip_account_ids = HashMap<AccountIdentifier, String>()
+    private val wip_account_ids = HashMap<AccountIdentifier, String>()
 
     // Account uuid -> auth mechanisms
-    val wip_accountAuthMechanisms = HashMap<String, Map<AuthenticationMethod, AuthMethodStoredData>>()
+    private val wip_accountAuthMechanisms = HashMap<String, Map<AuthenticationMethod, AuthMethodStoredData>>()
 
 
     init {
@@ -36,7 +36,7 @@ object AccountStore {
     }
 
     // TODO
-    fun lookupStoredMultiDataForAccount(session: AuthSession, method: AuthenticationMethod): AuthMethodStoredData {
+    override fun lookupStoredMultiDataForAccount(session: AuthSession, method: AuthenticationMethod): AuthMethodStoredData {
         check(session.accountId != null) { "No account id available for session yet (no AccountIdentifier used yet)." }
         val storedData = wip_accountAuthMechanisms[session.accountId]!![method] ?: error("No stored data for method: $method")
 
@@ -44,11 +44,15 @@ object AccountStore {
     }
 
     // TODO
-    fun lookupStoredDataFor(identifier: AccountIdentifier, method: AuthenticationMethod): AuthMethodStoredData {
+    override fun lookupStoredDataFor(identifier: AccountIdentifier, method: AuthenticationMethod): AuthMethodStoredData {
         val uuid = wip_account_ids[identifier] ?: error("No account for identifier: $identifier")
         val storedData = wip_accountAuthMechanisms[uuid]!![method] ?: error("No stored data for method: $method")
 
         return storedData
+    }
+
+    override fun lookupAccountUuid(identifier: AccountIdentifier): String {
+        return wip_account_ids[identifier] ?: error("No account for account id: $this")
     }
 
 }

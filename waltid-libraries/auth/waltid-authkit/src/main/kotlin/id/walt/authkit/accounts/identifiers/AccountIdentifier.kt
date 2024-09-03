@@ -18,6 +18,6 @@ abstract class AccountIdentifier(val identifierName: String) {
         return true
     }
 
-    fun resolveToAccountId() = AccountStore.wip_account_ids[this] ?: error("No account for account id: $this")
+    fun resolveToAccountId() = AccountStore.lookupAccountUuid(this)
 }
 
