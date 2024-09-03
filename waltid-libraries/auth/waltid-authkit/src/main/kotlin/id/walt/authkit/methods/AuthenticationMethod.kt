@@ -46,7 +46,7 @@ abstract class AuthenticationMethod(open val id: String) {
 
         val session = if (currentContext.implicitSessionGeneration && currentContext.sessionId == null) {
             // Implicit session start
-            SessionManager.openImplicitSession(currentContext.initialFlow!!)
+            SessionManager.openImplicitGlobalSession(currentContext.initialFlow!!)
         } else {
             // Session was started explicitly
             AuthKitManager.sessionStore.resolveSessionId(currentContext.sessionId ?: error("No session id"))

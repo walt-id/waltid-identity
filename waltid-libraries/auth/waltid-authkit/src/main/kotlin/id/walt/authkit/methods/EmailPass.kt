@@ -6,11 +6,16 @@ import id.walt.authkit.accounts.identifiers.EmailIdentifier
 import id.walt.authkit.exceptions.authCheck
 import id.walt.authkit.methods.data.AuthMethodStoredData
 import id.walt.authkit.sessions.AuthSession
+import io.github.smiley4.ktorswaggerui.dsl.routing.post
+import io.ktor.client.request.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
 import io.ktor.server.routing.*
 import io.ktor.util.pipeline.*
 import kotlinx.serialization.Serializable
+
+@Serializable
+data class EmailPassCredentials(val email: String, val password: String)
 
 object EmailPass : UserPassBasedAuthMethod("email", usernameName = "email") {
 
@@ -30,7 +35,11 @@ object EmailPass : UserPassBasedAuthMethod("email", usernameName = "email") {
     }
 
     override fun Route.register(authContext: PipelineContext<Unit, ApplicationCall>.() -> AuthContext) {
-        post("emailpass") {
+        post("emailpass", {
+            request {
+                body<EmailPassCredentials>()
+            }
+        }) {
             val session = getSession(authContext)
 
             val credential = call.getUsernamePasswordFromRequest()
