@@ -1,12 +1,13 @@
 package id.walt.authkit.methods
 
 import id.walt.authkit.AuthContext
+import id.walt.authkit.AuthKitManager
 import id.walt.authkit.accounts.AccountStore
 import id.walt.authkit.accounts.identifiers.AccountIdentifier
 import id.walt.authkit.methods.data.AuthMethodStoredData
 import id.walt.authkit.sessions.AuthSession
 import id.walt.authkit.sessions.SessionManager
-import id.walt.authkit.sessions.SessionStore
+import id.walt.authkit.sessions.InMemorySessionStore
 import io.ktor.server.application.*
 import io.ktor.server.routing.*
 import io.ktor.util.pipeline.*
@@ -36,7 +37,7 @@ abstract class AuthenticationMethod(open val id: String) {
             SessionManager.openImplicitSession(currentContext.initialFlow!!)
         } else {
             // Session was started explicitly
-            SessionStore.resolveSessionId(currentContext.sessionId ?: error("No session id"))
+            AuthKitManager.sessionStore.resolveSessionId(currentContext.sessionId ?: error("No session id"))
         }
 
         return session
