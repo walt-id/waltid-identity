@@ -307,12 +307,9 @@ fun Application.verfierApi() {
                         }.also {
                             sessionId?.run { verificationUseCase.notifySubscribers(this) }
                         }
-                }.onFailure { e ->
-                    when (e) {
-                        is IllegalArgumentException -> throw IllegalArgumentException(e.localizedMessage)
-                        is NotFoundException -> throw NotFoundException(e.localizedMessage)
-                        else -> throw BadRequestException(e.localizedMessage)
-                    }
+                }.onFailure {
+                    logger.error(it) { "Error: ${it.localizedMessage}" }
+                    throw it
                 }
             }
             get("/session/{id}", {
