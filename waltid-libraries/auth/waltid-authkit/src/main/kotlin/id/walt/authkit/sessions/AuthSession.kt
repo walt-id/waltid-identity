@@ -55,6 +55,13 @@ data class AuthSession(
         SessionManager.updateSession(this)
     }
 
+    fun logout() {
+        check(token != null) { "Cannot logout, as no token yet exists (session is not even authenticated yet). You can drop the session without invoking the logout procedure." }
+
+        TokenManager.dropToken(token!!)
+        SessionManager.removeSession(this)
+    }
+
     inline fun <reified V : AuthMethodConfiguration> lookupConfiguration(method: AuthenticationMethod): V {
         val flow = flows?.firstOrNull { it.method == method.id } ?: error("No flow for method: ${method.id}")
         val config = (flow.config as? V) ?: error("Invalid config for method ${method.id}, provided: ${flow.config}, requested: ${V::class.jvmName}")

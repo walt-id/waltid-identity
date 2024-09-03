@@ -8,7 +8,7 @@ class InMemoryTokenStore: TokenStore {
         tokens[token] = sessionId
     }
 
-    override fun removeToken(token: String) {
+    override fun dropToken(token: String) {
         tokens.remove(token)
     }
 

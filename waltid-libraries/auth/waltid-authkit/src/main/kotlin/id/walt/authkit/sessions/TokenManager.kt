@@ -15,4 +15,8 @@ object TokenManager {
         return newToken
     }
 
+    fun dropToken(token: String) {
+        AuthKitManager.tokenStore.dropToken(token)
+    }
+
 }

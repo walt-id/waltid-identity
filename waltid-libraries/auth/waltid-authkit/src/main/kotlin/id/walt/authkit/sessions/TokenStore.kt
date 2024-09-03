@@ -7,6 +7,6 @@ interface TokenStore {
      */
     fun mapToken(token: String, sessionId: String)
 
-    fun removeToken(token: String)
+    fun dropToken(token: String)
 
 }
