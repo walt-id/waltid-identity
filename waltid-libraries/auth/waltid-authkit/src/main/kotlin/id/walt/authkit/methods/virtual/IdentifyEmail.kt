@@ -1,7 +1,7 @@
 package id.walt.authkit.methods.virtual
 
 import id.walt.authkit.AuthContext
-import id.walt.authkit.accounts.AccountStore
+import id.walt.authkit.AuthKitManager
 import id.walt.authkit.accounts.identifiers.EmailIdentifier
 import id.walt.authkit.sessions.SessionManager
 import io.github.smiley4.ktorswaggerui.dsl.routing.post
@@ -25,12 +25,14 @@ object IdentifyEmail : IdentifyVirtualAuth("identify") {
             val email = context.receive<IdentifyEmailRequest>().email
             val identifier = EmailIdentifier(email)
 
-            val data = when {
-                AccountStore.hasStoredDataFor(identifier, this@IdentifyEmail) ->
-                    AccountStore.lookupStoredDataFor(identifier, this@IdentifyEmail)
+            val store = AuthKitManager.accountStore
 
-                AccountStore.hasStoredDataFor(identifier, GlobalIdentify) ->
-                    AccountStore.lookupStoredDataFor(identifier, GlobalIdentify)
+            val data = when {
+                store.hasStoredDataFor(identifier, this@IdentifyEmail) ->
+                    store.lookupStoredDataFor(identifier, this@IdentifyEmail)
+
+                store.hasStoredDataFor(identifier, GlobalIdentify) ->
+                    store.lookupStoredDataFor(identifier, GlobalIdentify)
 
                 else -> error("No global identifier found for $email")
             } as GlobalIdentify.FlowAmendmentData

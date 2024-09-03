@@ -8,7 +8,7 @@ import id.walt.authkit.methods.UserPass
 import id.walt.authkit.methods.data.AuthMethodStoredData
 import id.walt.authkit.sessions.AuthSession
 
-object AccountStore : AccountStoreInterface {
+object ExampleAccountStore : AccountStoreInterface {
 
     // Account uuid -> account
     private val wip_accounts = HashMap<String, Account>()
@@ -51,7 +51,7 @@ object AccountStore : AccountStoreInterface {
         return storedData
     }
 
-    fun hasStoredDataFor(identifier: AccountIdentifier, method: AuthenticationMethod): Boolean {
+    override fun hasStoredDataFor(identifier: AccountIdentifier, method: AuthenticationMethod): Boolean {
         val uuid = wip_account_ids[identifier] ?: error("No account for identifier: $identifier")
         return wip_accountAuthMechanisms[uuid]!!.containsKey(method)
     }

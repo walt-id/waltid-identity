@@ -1,6 +1,6 @@
 package id.walt.authkit.accounts.identifiers
 
-import id.walt.authkit.accounts.AccountStore
+import id.walt.authkit.AuthKitManager
 
 @Suppress("EqualsOrHashCode")
 abstract class AccountIdentifier(val identifierName: String) {
@@ -18,6 +18,6 @@ abstract class AccountIdentifier(val identifierName: String) {
         return true
     }
 
-    fun resolveToAccountId() = AccountStore.lookupAccountUuid(this)
+    fun resolveToAccountId() = AuthKitManager.accountStore.lookupAccountUuid(this)
 }
 

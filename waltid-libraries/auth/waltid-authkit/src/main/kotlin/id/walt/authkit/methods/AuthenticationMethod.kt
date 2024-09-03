@@ -2,7 +2,6 @@ package id.walt.authkit.methods
 
 import id.walt.authkit.AuthContext
 import id.walt.authkit.AuthKitManager
-import id.walt.authkit.accounts.AccountStore
 import id.walt.authkit.accounts.identifiers.AccountIdentifier
 import id.walt.authkit.methods.data.AuthMethodStoredData
 import id.walt.authkit.sessions.AuthSession
@@ -32,12 +31,12 @@ abstract class AuthenticationMethod(open val id: String) {
 
 
     inline fun <reified V : AuthMethodStoredData> lookupStoredData(identifier: AccountIdentifier): V {
-        val storedData = AccountStore.lookupStoredDataFor(identifier, this) ?: error("No stored data for method: $id")
+        val storedData = AuthKitManager.accountStore.lookupStoredDataFor(identifier, this) ?: error("No stored data for method: $id")
         return (storedData as? V) ?: error("${storedData::class.simpleName} is not requested ${V::class.simpleName}")
     }
 
     inline fun <reified V : AuthMethodStoredData> lookupStoredMultiData(session: AuthSession): V {
-        val storedData = AccountStore.lookupStoredMultiDataForAccount(session, this) ?: error("No stored data for method: $id")
+        val storedData = AuthKitManager.accountStore.lookupStoredMultiDataForAccount(session, this) ?: error("No stored data for method: $id")
         return (storedData as? V) ?: error("${storedData::class.simpleName} is not requested ${V::class.simpleName}")
     }
 
