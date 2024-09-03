@@ -4,7 +4,7 @@
  * For a copy, see <https://opensource.org/licenses/MIT>
  */
 
-package id.walt.authkit
+package id.walt
 
 import io.ktor.server.application.*
 import io.ktor.server.routing.*
