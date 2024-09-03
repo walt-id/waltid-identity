@@ -390,6 +390,7 @@ fun Application.exchangeExternalSignatures() = walletRoute {
             }.onSuccess { prepareClaimResult ->
                 val responsePayload = PrepareOID4VCIResponse(
                     did = walletDID.did,
+                    offerURL = req.offerURL,
                     tokenResponse = prepareClaimResult.tokenResponse,
                     offeredCredentials = prepareClaimResult.offeredCredentials,
                     credentialIssuer = prepareClaimResult.resolvedCredentialOffer.credentialIssuer,
@@ -496,6 +497,7 @@ data class PrepareOID4VCIRequest(
 @Serializable
 data class PrepareOID4VCIResponse(
     val did: String? = null,
+    val offerURL: String,
     val tokenResponse: TokenResponse,
     val offeredCredentials: List<OfferedCredential>,
     val credentialIssuer: String,
@@ -507,6 +509,7 @@ typealias UnsignedProofOfPossessionParameters = UnsignedVPTokenParameters
 @Serializable
 data class SubmitOID4VCIRequest(
     val did: String? = null,
+    val offerURL: String,
     val requireUserInput: Boolean,
     val tokenResponse: TokenResponse,
     val offeredCredentials: List<OfferedCredential>,
