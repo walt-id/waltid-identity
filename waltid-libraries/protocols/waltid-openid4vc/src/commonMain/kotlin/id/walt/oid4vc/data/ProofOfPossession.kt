@@ -1,10 +1,8 @@
 package id.walt.oid4vc.data
 
-import cbor.Cbor
 import id.walt.crypto.keys.Key
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.mdoc.cose.COSECryptoProvider
-import id.walt.mdoc.cose.COSESign1
 import id.walt.mdoc.dataelement.*
 import id.walt.oid4vc.util.JwtUtils
 import io.ktor.utils.io.core.*
@@ -41,8 +39,8 @@ data class ProofOfPossession @OptIn(ExperimentalSerializationApi::class) private
         abstract suspend fun build(key: Key): ProofOfPossession
     }
 
-    class JWTProofBuilder(private val issuerUrl: String, private val clientId: String?,
-                          private val nonce: String?, private val keyId: String?,
+    class JWTProofBuilder(private val issuerUrl: String, private val clientId: String? = null,
+                          private val nonce: String? = null, private val keyId: String? = null,
                           private val keyJwk: JsonObject? = null, private val x5c: JsonArray? = null,
                           private val trustChain: JsonArray? = null, private val audience: String? = null): ProofBuilder() {
         val headers = buildJsonObject {
