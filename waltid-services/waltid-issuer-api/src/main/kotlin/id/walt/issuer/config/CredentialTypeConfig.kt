@@ -7,6 +7,7 @@ import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.data.CredentialSupported
 import id.walt.oid4vc.data.ProofType
 import id.walt.oid4vc.data.ProofTypeMetadata
+import id.walt.oid4vc.data.CredentialDefinition
 import id.walt.sdjwt.SDTypeMetadata
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
@@ -51,7 +52,7 @@ data class CredentialTypeConfig(
                 cryptographicBindingMethodsSupported = setOf("cose_key"),
                 credentialSigningAlgValuesSupported = setOf("ES256"),
                 proofTypesSupported = mapOf(ProofType.cwt to ProofTypeMetadata(setOf("ES256"))),
-                types = listOf(MDocTypes.ISO_MDL),
+                credentialDefinition =  CredentialDefinition(type = listOf(MDocTypes.ISO_MDL)),
                 docType = MDocTypes.ISO_MDL
             )
         ),
@@ -91,15 +92,16 @@ data class CredentialTypeConfig(
                 }
 
                 is JsonArray -> {
-                    val types = element.jsonArray.map { it.jsonPrimitive.content }
+                    val type = element.jsonArray.map { it.jsonPrimitive.content }
 
                     CredentialFormat.entries.associate { format ->
                         "${entry.key}_${format.value}" to CredentialSupported(
                             format = format,
                             cryptographicBindingMethodsSupported = setOf("did"),
                             credentialSigningAlgValuesSupported = setOf("EdDSA", "ES256", "ES256K", "RSA"),
-                            types = if (format != CredentialFormat.sd_jwt_vc) types else null,
-                            vct = if (format != CredentialFormat.sd_jwt_vc) null else baseUrl.plus("/${entry.key}")
+                            credentialDefinition = if (format != CredentialFormat.sd_jwt_vc && format != CredentialFormat.mso_mdoc ) CredentialDefinition(type = type)  else null,
+                            vct = if (format == CredentialFormat.sd_jwt_vc) baseUrl.plus("/${entry.key}") else null,
+                            docType = if (format == CredentialFormat.mso_mdoc) MDocTypes.ISO_MDL else null,
                         )
                     }.entries
                 }

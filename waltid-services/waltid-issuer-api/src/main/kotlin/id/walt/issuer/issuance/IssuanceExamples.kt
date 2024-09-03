@@ -3,6 +3,7 @@ package id.walt.issuer.issuance
 import id.walt.commons.interop.LspPotentialInterop
 import id.walt.crypto.keys.KeyType
 import id.walt.issuer.lspPotential.LspPotentialIssuanceInterop
+import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.data.dif.VCFormat
 import io.github.smiley4.ktorswaggerui.dsl.routes.ValueExampleDescriptorDsl
 import kotlinx.serialization.json.*
@@ -320,7 +321,8 @@ object IssuanceExamples {
               }
           },
           "x5Chain": ${buildJsonArray { add(LspPotentialInterop.POTENTIAL_ISSUER_CERT) }},
-          "trustedRootCAs": ${buildJsonArray { add(LspPotentialInterop.POTENTIAL_ROOT_CA_CERT) }}
+          "trustedRootCAs": ${buildJsonArray { add(LspPotentialInterop.POTENTIAL_ROOT_CA_CERT) }},
+          "credentialFormat": "${CredentialFormat.mso_mdoc}"
        }
     """.trimIndent()
 
