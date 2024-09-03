@@ -1,9 +1,8 @@
 package id.walt.issuer.issuance
 
-import id.walt.commons.web.WebException
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyType
-import io.ktor.http.*
+import io.ktor.server.plugins.BadRequestException
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 
@@ -23,16 +22,16 @@ data class OnboardingRequest(
     val did: OnboardRequestDid = OnboardRequestDid(
         method = "jwk"
     )
-)
-
-fun validateOnboardingRequest(request: OnboardingRequest) {
-    require(request.key.backend.isNotEmpty()) {
-        throw WebException(HttpStatusCode.BadRequest, "Key backend in the request body cannot be empty")
-    }
-    require(request.did.method.isNotEmpty()) {
-        throw WebException(HttpStatusCode.BadRequest, "DID method in the request body cannot be empty")
-    }
-    require(request.did.method in listOf("jwk", "key", "web")) {
-        throw WebException(HttpStatusCode.BadRequest, "Unsupported DID method: ${request.did.method}")
+) {
+    init {
+        require(key.backend.isNotEmpty()) {
+            throw BadRequestException("Key backend in the request body cannot be empty")
+        }
+        require(did.method.isNotEmpty()) {
+            throw BadRequestException("DID method in the request body cannot be empty")
+        }
+        require(did.method in listOf("jwk", "key", "web")) {
+            throw BadRequestException("Unsupported DID method: ${did.method}")
+        }
     }
 }
