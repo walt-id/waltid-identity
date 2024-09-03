@@ -1,6 +1,7 @@
 package id.walt.authkit.methods
 
 import id.walt.authkit.AuthContext
+import id.walt.authkit.methods.config.AuthMethodConfiguration
 import io.github.smiley4.ktorswaggerui.dsl.routing.route
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -27,6 +28,9 @@ import kotlin.uuid.Uuid
 
 object OIDC : AuthenticationMethod("oidc") {
 
+
+//    override val config = OidcAuthConfiguration::class
+
     /*
     Steps:
     1. redirect to OP auth endpoint
@@ -48,7 +52,7 @@ object OIDC : AuthenticationMethod("oidc") {
         val clientSecret: String,
 
         val accountIdentifierClaim: String = "sub"
-    ) {
+    ): AuthMethodConfiguration {
         fun check() {
             require(openIdConfiguration != OpenIdConfiguration.INVALID || openIdConfigurationUrl != null) { "Either openIdConfiguration or openIdConfigurationUrl have to be provided!" }
         }
@@ -184,22 +188,30 @@ object OIDC : AuthenticationMethod("oidc") {
 
         route("oidc") {
             get("auth") {
-                val session = createOidcSession(context = Unit)
-                context.respondRedirect(session.authUrl)
+                val session = getSession(authContext)
+                val config = session.lookupConfiguration<OidcAuthConfiguration>(this@OIDC)
+
+                val oidcAuthSession = createOidcSession(context = Unit)
+                context.respondRedirect(oidcAuthSession.authUrl)
             }
             get("callback") {
+                val session = getSession(authContext)
+                val config = session.lookupConfiguration<OidcAuthConfiguration>(this@OIDC)
+
                 val params = context.parameters
                 val code = params.getOrFail("code")
                 val state = params.getOrFail("state")
 
-                val session = oidcSessionState[state] ?: error("No session for state")
+                val oidcSession = oidcSessionState[state] ?: error("No session for state")
                 val tokenResponse = codeToToken(contextConfig, code)
                 println(tokenResponse)
 
                 val user = userInfo(contextConfig.openIdConfiguration, tokenResponse.accessToken)
                 val sub = user["sub"]!!.jsonPrimitive.content
 
-                context.respond("Authorized with account identifier: $sub")
+                session.progressFlow(this@OIDC)
+
+                context.respond(session.toInformation())
             }
         }
 
