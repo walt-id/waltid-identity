@@ -3,7 +3,7 @@ package id.walt.issuer.issuance
 import id.walt.credentials.vc.vcs.W3CVC
 import id.walt.oid4vc.data.*
 import id.walt.sdjwt.SDMap
-import io.ktor.http.*
+import io.ktor.server.plugins.BadRequestException
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -96,32 +96,26 @@ data class IssuanceRequest(
     val useJar: Boolean? = null,
     val x5Chain: List<String>? = null,
     val trustedRootCAs: List<String>? = null,
-
     var issuanceType: IssuanceType? = null
-)
+) {
+    init {
+
+        credentialData?.let {
+            require(it.isNotEmpty()) {
+                throw BadRequestException("CredentialData in the request body cannot be empty")
+            }
+        }
+        require(credentialConfigurationId.isNotEmpty()) {
+            throw BadRequestException("Credential configuration ID in the request body cannot be empty")
+        }
+        require(issuerKey.isNotEmpty()) {
+            throw BadRequestException("Issuer key in the request body cannot be empty")
+        }
+
+    }
+}
 
 @Serializable
 data class IssuerOnboardingResponse(
     val issuerKey: JsonElement, val issuerDid: String,
 )
-
-fun validateIssuanceRequest(request: IssuanceRequest): Pair<HttpStatusCode, String?> {
-    request.credentialData?.let {
-        require(it.isNotEmpty()) {
-            return HttpStatusCode.BadRequest to "CredentialData in the request body cannot be empty"
-        }
-    }
-    require(request.issuerDid.isNotEmpty()) {
-        return HttpStatusCode.BadRequest to "Issuer DID in the request body cannot be empty"
-    }
-    require(request.credentialConfigurationId.isNotEmpty()) {
-        return HttpStatusCode.BadRequest to "Credential configuration ID in the request body cannot be empty"
-    }
-    require(request.issuerKey.isNotEmpty()) {
-        return HttpStatusCode.BadRequest to "Issuer key in the request body cannot be empty"
-    }
-    return HttpStatusCode.OK to null
-
-
-
-}
