@@ -73,6 +73,8 @@ suspend fun createCredentialOfferUri(
     return offerUri
 }
 
+private const val example_title = "Missing credentialData in the request body."
+
 fun Application.issuerApi() {
     routing {
         route("onboard", {
@@ -245,8 +247,8 @@ fun Application.issuerApi() {
                                     example("Missing subjectDid in the request body.") {
                                         value = "Missing subjectDid in the request body."
                                     }
-                                    example("Missing credentialData in the request body.") {
-                                        value = "Missing credentialData in the request body."
+                                    example(example_title) {
+                                        value = example_title
                                     }
                                     example("Invalid credentialData format.") {
                                         value = "Invalid credentialData format."
@@ -323,8 +325,8 @@ fun Application.issuerApi() {
                                     example("Missing credentialConfigurationId in the request body.") {
                                         value = "Missing credentialConfigurationId in the request body."
                                     }
-                                    example("Missing credentialData in the request body.") {
-                                        value = "Missing credentialData in the request body."
+                                    example(example_title) {
+                                        value = example_title
                                     }
                                     example("Invalid credentialData format.") {
                                         value = "Invalid credentialData format."
@@ -532,7 +534,7 @@ private suspend fun PipelineContext<Unit, ApplicationCall>.throwError(
 private fun validateRawSignatureRequest(body: JsonObject) {
     requireNotNull(body["issuerKey"]?.jsonObject) { "Missing issuerKey in the request body." }
     requireNotNull(body["subjectDid"]?.jsonPrimitive?.content) { "Missing subjectDid in the request body." }
-    requireNotNull(body["credentialData"]?.jsonObject) { "Missing credentialData in the request body." }
+    requireNotNull(body["credentialData"]?.jsonObject) { example_title }
 }
 
 
