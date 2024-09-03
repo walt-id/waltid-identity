@@ -352,9 +352,7 @@ fun Application.exchangeExternalSignatures() = walletRoute {
             summary = "Preparation (first) step for an OID4VCI flow with externally provided signatures."
 
             request {
-                queryParameter<String>("did") { description = "The DID to issue the credential(s) to" }
-                body<String> {
-                    description = "The offer request to use"
+                body<PrepareOID4VCIRequest> {
                 }
             }
 
@@ -370,10 +368,11 @@ fun Application.exchangeExternalSignatures() = walletRoute {
             }
         }) {
             val walletService = getWalletService()
-            val offer = call.receiveText()
-            logger.debug { "Request: queryParameters = ${call.request.queryParameters} body = $offer" }
+            val req = call.receive<PrepareOID4VCIRequest>()
+            val offer = req.offerURL
+            logger.debug { "Request: $req" }
 
-            val did = call.request.queryParameters["did"] ?: walletService.listDids().firstOrNull()?.did
+            val did = req.did ?: walletService.listDids().firstOrNull()?.did
             ?: throw IllegalArgumentException("No DID to use supplied and no DID was found in wallet.")
 
             //this can't fail due to the above block
@@ -425,6 +424,9 @@ fun Application.exchangeExternalSignatures() = walletRoute {
             val req = call.receive<SubmitOID4VCIRequest>()
             logger.debug { "Request: $req" }
 
+            val did = req.did ?: walletService.listDids().firstOrNull()?.did
+            ?: throw IllegalArgumentException("No DID to use supplied and no DID was found in wallet.")
+
             runCatching {
                 WalletServiceManager
                     .externalSignatureClaimStrategy
@@ -433,7 +435,7 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                         accountId = walletService.accountId,
                         walletId = walletService.walletId,
                         pending = false,
-                        did = req.did,
+                        did = did,
                         credentialIssuerURL = req.credentialIssuer,
                         signedJWT = req.signedProofOfDIDPossession,
                         tokenResponse = req.tokenResponse,
@@ -486,8 +488,14 @@ data class SubmitOID4VPRequest(
 )
 
 @Serializable
+data class PrepareOID4VCIRequest(
+    val did: String? = null,
+    val offerURL: String,
+)
+
+@Serializable
 data class PrepareOID4VCIResponse(
-    val did: String,
+    val did: String? = null,
     val tokenResponse: TokenResponse,
     val offeredCredentials: List<OfferedCredential>,
     val credentialIssuer: String,
@@ -498,7 +506,7 @@ typealias UnsignedProofOfPossessionParameters = UnsignedVPTokenParameters
 
 @Serializable
 data class SubmitOID4VCIRequest(
-    val did: String,
+    val did: String? = null,
     val requireUserInput: Boolean,
     val tokenResponse: TokenResponse,
     val offeredCredentials: List<OfferedCredential>,

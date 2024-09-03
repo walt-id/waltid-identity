@@ -134,11 +134,10 @@ class ExchangeExternalSignatures {
             println("offer: $offerURL")
         }
         var response = client.post("/wallet-api/wallet/$walletId/exchange/external_signatures/offer/prepare") {
-            url {
-                parameters.append("did", holderDID)
-                parameters.append("requireUserInput", "false")
-            }
-            setBody(offerURL)
+            setBody(PrepareOID4VCIRequest(
+                did =  holderDID,
+                offerURL = offerURL,
+            ))
         }.expectSuccess()
         val prepareResponse = response.body<PrepareOID4VCIResponse>()
         //compute the signature here
