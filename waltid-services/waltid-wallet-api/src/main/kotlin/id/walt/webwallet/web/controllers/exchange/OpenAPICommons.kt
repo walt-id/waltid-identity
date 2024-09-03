@@ -1,7 +1,6 @@
 package id.walt.webwallet.web.controllers.exchange
 
 import id.walt.webwallet.db.models.WalletCredential
-import io.github.smiley4.ktorswaggerui.dsl.routes.OpenApiRequest
 import io.github.smiley4.ktorswaggerui.dsl.routes.OpenApiResponses
 import io.github.smiley4.ktorswaggerui.dsl.routes.OpenApiRoute
 import io.ktor.http.*
@@ -26,14 +25,6 @@ object OpenAPICommons {
             body<JsonObject> {
                 description = """{"redirectUri": String?, "errorMessage": String}"""
             }
-        }
-    }
-
-    fun useOfferRequestEndpointRequestParams(): OpenApiRequest.() -> Unit = {
-        queryParameter<String>("did") { description = "The DID to issue the credential(s) to" }
-        queryParameter<Boolean>("requireUserInput") { description = "Whether to claim as pending acceptance" }
-        body<String> {
-            description = "The offer request to use"
         }
     }
 
