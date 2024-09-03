@@ -98,7 +98,7 @@ class EBSIIssueToHolderConformanceTest {
                 AuthorizationDetails(
                     format = CredentialFormat.jwt_vc,
                     type = "openid_credential",
-                    types = listOf("VerifiableCredential","VerifiableAttestation","CTIssueQualificationCredential"),
+                    types = listOf("VerifiableCredential", "VerifiableAttestation", "CTIssueQualificationCredential"),
                     locations = listOf(taoIssuerServer)
                 )
             ),
