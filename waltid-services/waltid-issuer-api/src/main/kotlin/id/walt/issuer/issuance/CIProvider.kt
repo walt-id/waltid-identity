@@ -45,8 +45,7 @@ import id.walt.oid4vc.responses.BatchCredentialResponse
 import id.walt.oid4vc.responses.CredentialErrorCode
 import id.walt.oid4vc.responses.CredentialResponse
 import id.walt.oid4vc.util.randomUUID
-import id.walt.sdjwt.SDJwtVC
-import id.walt.sdjwt.SDMap
+import id.walt.sdjwt.*
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
 import io.ktor.client.plugins.*
@@ -302,7 +301,7 @@ open class CIProvider : OpenIDCredentialIssuer(
                     issuerKid = issuerDid + "#" + issuerKey.key.getKeyId()
 
                 when (data.request.issuanceType) {
-                    IssuanceType.sdjwt -> sdJwtVc(JWKKey.importJWK(holderKey.toString()).getOrNull(), vc, data, holderDid)
+                    IssuanceType.sdjwt -> sdJwtVc(JWKKey.importJWK(holderKey.toString()).getOrNull(), vc, holderDid)
                     else -> nonSdJwtVc(vc, issuerKid, holderDid, holderKey)
                 }
             }.also { log.debug { "Respond VC: $it" } }
@@ -531,6 +530,9 @@ open class CIProvider : OpenIDCredentialIssuer(
                 }
             }
         }
+
+        val jwtCryptoProvider
+            get() = SingleKeyJWTCryptoProvider(issuerKey.key)
     }
 
     // TODO: Hack as this is non stateless because of oidc4vc lib API
@@ -572,11 +574,23 @@ open class CIProvider : OpenIDCredentialIssuer(
             })
         }
     }
+    // TODO: replace sdJwtVc function by this one
+    private suspend fun IssuanceSessionData.sdJwtVc2(
+        holderKey: JWKKey?,
+        vc: SDPayload,
+        holderDid: String?,
+    ) = SDJwtVC.sign(
+        sdPayload = vc,
+        jwtCryptoProvider = jwtCryptoProvider,
+        issuerDid = issuerDid.ifEmpty { issuerKey.key.getKeyId() },
+        holderDid = holderDid ?: holderKey?.getKeyId() ?: throw IllegalArgumentException("Either holderKey or holderDid must be given"),
+        issuerKeyId = issuerKey.key.getKeyId(),
+        vct = TODO("continue here!")
+    )
 
     private suspend fun IssuanceSessionData.sdJwtVc(
         holderKey: JWKKey?,
         vc: W3CVC,
-        data: IssuanceSessionData,
         holderDid: String?,
     ) = vc.mergingSdJwtIssue(
         issuerKey = issuerKey.key,
@@ -592,7 +606,7 @@ open class CIProvider : OpenIDCredentialIssuer(
             cnf = JsonObject(holderKey?.let {
                 buildJsonObject { put("jwk", it.exportJWKObject()) }
             } ?: buildJsonObject { put("kid", holderDid) }),
-            vct = data.request.credentialConfigurationId
+            vct = request.credentialConfigurationId
         ),
         disclosureMap = request.selectiveDisclosure ?: SDMap(emptyMap())
     ).also {
