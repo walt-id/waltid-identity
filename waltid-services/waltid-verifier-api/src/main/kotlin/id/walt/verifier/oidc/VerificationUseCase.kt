@@ -178,13 +178,17 @@ class VerificationUseCase(
         OIDCVerifierService.getSession(sessionId).presentationDefinition.let {
             Result.success(it)
         }
-            ?: Result.failure(IllegalArgumentException("Id parameter $sessionId doesn't refer to an existing session, or session expired"))
 
-    fun getSignedAuthorizationRequestObject(sessionId: String): Result<String> =
-        OIDCVerifierService.getSession(sessionId)?.authorizationRequest?.let {
-            Result.success(it.toRequestObject(RequestSigningCryptoProvider, RequestSigningCryptoProvider.signingKey.keyID.orEmpty()))
+
+    fun getSignedAuthorizationRequestObject(sessionId: String): Result<String> = runCatching {
+        checkNotNull(OIDCVerifierService.getSession(sessionId).authorizationRequest) {
+            "No authorization request found for session id: $sessionId"
         }
-            ?: Result.failure(IllegalArgumentException("Id parameter $sessionId doesn't refer to an existing session, or session expired"))
+        OIDCVerifierService.getSession(sessionId).authorizationRequest!!.toRequestObject(
+            RequestSigningCryptoProvider, RequestSigningCryptoProvider.signingKey.keyID.orEmpty()
+        )
+    }
+
 
     suspend fun notifySubscribers(sessionId: String) = runCatching {
         OIDCVerifierService.sessionVerificationInfos[sessionId]?.statusCallback?.let {
