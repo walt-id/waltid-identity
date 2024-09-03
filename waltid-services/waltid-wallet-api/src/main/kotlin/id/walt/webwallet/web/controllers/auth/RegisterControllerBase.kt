@@ -1,0 +1,74 @@
+package id.walt.webwallet.web.controllers.auth
+
+import id.walt.webwallet.service.account.AccountsService
+import id.walt.webwallet.web.model.*
+import io.github.oshai.kotlinlogging.KotlinLogging
+import io.github.smiley4.ktorswaggerui.dsl.routes.OpenApiRoute
+import io.github.smiley4.ktorswaggerui.dsl.routing.post
+import io.github.smiley4.ktorswaggerui.dsl.routing.route
+import io.ktor.http.*
+import io.ktor.server.application.*
+import io.ktor.server.request.*
+import io.ktor.server.response.*
+import io.ktor.server.routing.*
+import io.ktor.util.pipeline.*
+
+abstract class RegisterControllerBase(
+    private val path: String = defaultAuthPath,
+    private val tagList: List<String> = defaultAuthTags,
+) : Controller {
+    protected val logger = KotlinLogging.logger {}
+
+    override fun routes(name: String): Route.() -> Route = {
+        route(path, { tags = tagList }) {
+            post(name, apiBuilder()) { execute() }
+        }
+    }
+
+    override fun apiBuilder(): OpenApiRoute.() -> Unit = {
+        summary = "Register with [email + password] or [wallet address + ecosystem]"
+        request {
+            body<AccountRequest> {
+                example("E-mail + password") {
+                    value = EmailAccountRequest(
+                        name = "Max Mustermann",
+                        email = "user@email.com",
+                        password = "password"
+                    )
+                }
+                example("Wallet address + ecosystem") {
+                    value = AddressAccountRequest(address = "0xABC", ecosystem = "ecosystem")
+                }
+                example("OIDC") { value = OidcAccountRequest(token = "ey...") }
+                example("OIDC Unique Subject") {
+                    value = OidcUniqueSubjectRequest(token = "ey...")
+                }
+                example("Keycloak") { value = KeycloakAccountRequest() }
+            }
+        }
+        response {
+            HttpStatusCode.Created to { description = "Registration succeeded " }
+            HttpStatusCode.BadRequest to { description = "Registration failed" }
+            HttpStatusCode.Conflict to { description = "Account already exists!" }
+        }
+    }
+
+    override suspend fun PipelineContext<Unit, ApplicationCall>.execute() {
+//        val jsonObject = call.receive<JsonObject>()
+//        val type = jsonObject["type"]?.jsonPrimitive?.contentOrNull
+//        if (type.isNullOrEmpty()) {
+//            throw BadRequestException("No account type provided")
+//        }
+//        val accountRequest = loginRequestJson.decodeFromJsonElement<AccountRequest>(jsonObject)
+        val req = loginRequestJson.decodeFromString<AccountRequest>(call.receive())
+        logger.debug { "Creating ${req.javaClass.simpleName} user" }
+        AccountsService.register("", req)
+            .onSuccess {
+                call.response.status(HttpStatusCode.Created)
+                call.respond("Registration succeeded ")
+            }
+            .onFailure {
+                throw it
+            }
+    }
+}

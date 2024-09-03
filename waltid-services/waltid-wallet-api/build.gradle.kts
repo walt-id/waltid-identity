@@ -6,7 +6,6 @@ plugins {
     kotlin("jvm")
     id("io.ktor.plugin") version "2.3.12"
     kotlin("plugin.serialization")
-
     id("com.github.ben-manes.versions")
 }
 
@@ -23,7 +22,6 @@ repositories {
     mavenCentral()
     maven("https://jitpack.io")
     maven("https://maven.waltid.dev/releases")
-    maven("https://maven.walt.id/repository/waltid-ssi-kit/")
 }
 
 tasks.withType<KotlinCompile> {
@@ -109,6 +107,7 @@ dependencies {
     /* -- Security -- */
     // Bouncy Castle
     implementation("org.bouncycastle:bcprov-lts8on:2.73.6")
+    implementation("org.bouncycastle:bcpkix-lts8on:2.73.6")
 
     // Argon2
     implementation("de.mkammerer:argon2-jvm:2.11")

@@ -82,7 +82,7 @@
                                             d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                                             fill="currentColor"></path>
                                     </svg>
-                                    <ArrowRightOnRectangleIcon v-else class="ml-1.5 h-5 w-5" />
+                                  <ArrowRightStartOnRectangleIcon v-else class="ml-1.5 h-5 w-5"/>
                                 </button>
                             </div>
                         </form>
@@ -103,10 +103,10 @@
 </template>
 
 <script lang="ts" setup>
-import { ArrowRightOnRectangleIcon, EnvelopeIcon, IdentificationIcon, KeyIcon } from "@heroicons/vue/20/solid";
+import {ArrowRightStartOnRectangleIcon, EnvelopeIcon, IdentificationIcon, KeyIcon} from "@heroicons/vue/20/solid";
 import ActionResultModal from "@waltid-web-wallet/components/modals/ActionResultModal.vue";
 import useModalStore from "@waltid-web-wallet/stores/useModalStore.ts";
-import { useTenant } from "@waltid-web-wallet/composables/tenants.ts";
+import {useTenant} from "@waltid-web-wallet/composables/tenants.ts";
 
 const tenant = await (useTenant()).value
 const bgImg = tenant?.bgImage
@@ -131,6 +131,7 @@ async function register() {
                 title: "Error",
                 message: "Passwords don't match",
                 isError: true,
+                open: true,
 
             },
         });
@@ -155,36 +156,43 @@ async function submit() {
         .then((response) => {
             isProgress.value = false;
 
-            store.openModal({
-                component: ActionResultModal,
-                props: {
-                    title: "Account registered",
-                    message: "Welcome, " + nameInput + "! You can now login with your email address " + emailInput + " and your chosen password.",
-                    isError: false,
-                    open: true,
-                    callback: () => {
-                        navigateTo("/");
-                    }
+          store.openModal({
+            component: ActionResultModal,
+            props: {
+              title: "Account registered",
+              message: "Welcome, " + nameInput + "! You can now login with your email address " + emailInput + " and your chosen password.",
+              isError: false,
+              open: true,
+              callback: () => {
+                navigateTo("/");
+              }
 
-                },
-            });
+            },
+          });
 
 
-            // wait for modal close, then navigate
+          navigateTo("/");
 
         })
         .catch((err) => {
             isProgress.value = false;
-            store.openModal({
+          let errorMessage = "An error occurred while registering your account.";
+          if (err.data.statusCode === 500) {
+            errorMessage = "Internal server error. Please try again later.";
+          } else if (err.data) {
+            errorMessage = err.data;
+          }
+
+          store.openModal({
                 component: ActionResultModal,
                 props: {
                     title: "Error",
-                    message: err.data,
+                  message: errorMessage.message,
                     isError: true,
-                    open: true,
-                    callback: () => {
-                        navigateTo("/");
-                    }
+                     open: true,
+                  callback: () => {
+                    navigateTo("/");
+                  }
                 },
             });
         });
@@ -210,7 +218,6 @@ useHead({
 
 <style scoped>
 @keyframes zoom-in {
-
     25%,
     100% {
         transform: scale(2);
@@ -222,7 +229,6 @@ useHead({
     0% {
         transform: scale(2);
     }
-
     100% {
         transform: scale(1);
     }

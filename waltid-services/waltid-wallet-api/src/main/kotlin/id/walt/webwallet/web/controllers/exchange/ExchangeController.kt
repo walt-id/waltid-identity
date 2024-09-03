@@ -1,4 +1,4 @@
-package id.walt.webwallet.web.controllers
+package id.walt.webwallet.web.controllers.exchange
 
 import id.walt.oid4vc.data.CredentialOffer
 import id.walt.oid4vc.data.dif.PresentationDefinition
@@ -8,6 +8,10 @@ import id.walt.webwallet.db.models.WalletOperationHistory
 import id.walt.webwallet.service.SSIKit2WalletService
 import id.walt.webwallet.service.WalletServiceManager
 import id.walt.webwallet.usecase.exchange.FilterData
+import id.walt.webwallet.web.controllers.auth.getUserUUID
+import id.walt.webwallet.web.controllers.auth.getWalletId
+import id.walt.webwallet.web.controllers.auth.getWalletService
+import id.walt.webwallet.web.controllers.walletRoute
 import io.github.smiley4.ktorswaggerui.dsl.routing.post
 import io.github.smiley4.ktorswaggerui.dsl.routing.route
 import io.ktor.http.*
@@ -19,9 +23,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 
 fun Application.exchange() = walletRoute {
-    route("exchange", {
-        tags = listOf("Credential exchange")
-    }) {
+    route(OpenAPICommons.rootPath, OpenAPICommons.route()) {
         post("useOfferRequest", {
             summary = "Claim credential(s) from an issuer"
 
@@ -121,20 +123,7 @@ fun Application.exchange() = walletRoute {
             request {
                 body<UsePresentationRequest>()
             }
-            response {
-                HttpStatusCode.OK to {
-                    description = "Successfully claimed credentials"
-                    body<JsonObject> {
-                        description = """{"redirectUri": String}"""
-                    }
-                }
-                HttpStatusCode.BadRequest to {
-                    description = "Presentation was not accepted"
-                    body<JsonObject> {
-                        description = """{"redirectUri": String?, "errorMessage": String}"""
-                    }
-                }
-            }
+            response(OpenAPICommons.usePresentationRequestResponse())
         }) {
             val wallet = getWalletService()
 

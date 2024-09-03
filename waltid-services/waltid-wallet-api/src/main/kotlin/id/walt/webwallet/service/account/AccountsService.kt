@@ -7,6 +7,7 @@ import id.walt.webwallet.config.RegistrationDefaultsConfig
 import id.walt.webwallet.db.models.*
 import id.walt.webwallet.service.WalletService
 import id.walt.webwallet.service.WalletServiceManager
+import id.walt.webwallet.service.account.x5c.X5CAccountStrategy
 import id.walt.webwallet.service.events.AccountEventData
 import id.walt.webwallet.service.events.EventType
 import id.walt.webwallet.service.issuers.IssuerDataTransferObject
@@ -27,13 +28,14 @@ object AccountsService {
 
             val createdInitialWalletId = transaction {
                 WalletServiceManager.createWallet(tenant, registeredUserId)
-            }.also { walletId ->
-                //TODO: inject
-                WalletServiceManager.issuerUseCase.add(IssuerDataTransferObject.default(walletId))
             }
 
             val walletService = WalletServiceManager.getWalletService(tenant, registeredUserId, createdInitialWalletId)
-            suspend { tryAddDefaultData(walletService) } whenFeatureSuspend (FeatureCatalog.registrationDefaultsFeature)
+            (suspend {
+                ConfigManager.getConfig<RegistrationDefaultsConfig>()
+            } whenFeatureSuspend (FeatureCatalog.registrationDefaultsFeature))?.run {
+                tryAddDefaultData(walletService, this)
+            }
             registrationResult.also {
                 WalletServiceManager.eventUseCase.log(
                     action = EventType.Account.Create,
@@ -53,7 +55,7 @@ object AccountsService {
             is OidcAccountRequest -> OidcAccountStrategy.register(tenant, request)
             is KeycloakAccountRequest -> KeycloakAccountStrategy.register(tenant, request)
             is OidcUniqueSubjectRequest -> OidcUniqueSubjectStrategy.register(tenant, request)
-
+            is X5CAccountRequest -> X5CAccountStrategy.register(tenant, request)
         }.fold(onSuccess = {
             initializeUserAccount(tenant, request.name, it)
 
@@ -70,7 +72,7 @@ object AccountsService {
             is OidcAccountRequest -> OidcAccountStrategy.authenticate(tenant, request)
             is OidcUniqueSubjectRequest -> OidcUniqueSubjectStrategy.authenticate(tenant, request)
             is KeycloakAccountRequest -> KeycloakAccountStrategy.authenticate(tenant, request)
-
+            is X5CAccountRequest -> X5CAccountStrategy.authenticate(tenant, request)
         }
     }.fold(onSuccess = {
         WalletServiceManager.eventUseCase.log(
@@ -152,14 +154,30 @@ object AccountsService {
             .firstOrNull()
     }
 
+    //todo: unify with [getAccountByOidcId]
+    fun getAccountByX5CId(tenant: String, x5cId: String) = transaction {
+        Accounts.crossJoin(X5CLogins)
+            .selectAll()
+            .where {
+                Accounts.tenant eq tenant and
+                        (Accounts.tenant eq X5CLogins.tenant) and
+                        (Accounts.id eq X5CLogins.accountId) and
+                        (X5CLogins.x5cId eq x5cId)
+            }
+            .map { Account(it) }
+            .firstOrNull()
+    }
+
     fun get(account: UUID) = transaction {
         Accounts.selectAll().where { Accounts.id eq account }.single().let {
             Account(it)
         }
     }
 
-    private suspend fun tryAddDefaultData(walletService: WalletService) = runCatching {
-        val defaultGenerationConfig by lazy { ConfigManager.getConfig<RegistrationDefaultsConfig>() }
+    private suspend fun tryAddDefaultData(
+        walletService: WalletService,
+        defaultGenerationConfig: RegistrationDefaultsConfig
+    ) = runCatching {
         val createdKey = walletService.generateKey(defaultGenerationConfig.defaultKeyConfig)
         val createdDid =
             walletService.createDid(
@@ -169,6 +187,18 @@ object AccountsService {
                     put("alias", JsonPrimitive("Onboarding"))
                 })
         walletService.setDefault(createdDid)
+        defaultGenerationConfig.defaultIssuerConfig?.run {
+            WalletServiceManager.issuerUseCase.add(
+                IssuerDataTransferObject(
+                    wallet = walletService.walletId,
+                    did = did,
+                    description = description,
+                    uiEndpoint = uiEndpoint,
+                    configurationEndpoint = configurationEndpoint,
+                    authorized = authorized
+                )
+            )
+        }
     }
 }
 
@@ -198,4 +228,9 @@ data class AddressAuthenticatedUser(
 data class KeycloakAuthenticatedUser(
     override val id: UUID,
     val keycloakUserId: String,
+) : AuthenticatedUser()
+
+@Serializable
+data class X5CAuthenticatedUser(
+    override val id: UUID,
 ) : AuthenticatedUser()

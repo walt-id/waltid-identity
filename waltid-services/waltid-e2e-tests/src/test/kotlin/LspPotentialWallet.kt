@@ -12,7 +12,7 @@ import id.walt.sdjwt.SDField
 import id.walt.sdjwt.SDJwtVC
 import id.walt.sdjwt.SDMap
 import id.walt.webwallet.db.models.WalletCredential
-import id.walt.webwallet.web.controllers.UsePresentationRequest
+import id.walt.webwallet.web.controllers.exchange.UsePresentationRequest
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
