@@ -112,12 +112,10 @@ class VerificationUseCase(
     }
 
     fun getSession(sessionId: String): PresentationSession = sessionId.let { OIDCVerifierService.getSession(it) }
-        ?: throw NotFoundException("State parameter $sessionId doesn't refer to an existing session, or session expired")
 
     fun verify(sessionId: String?, tokenResponseParameters: Map<String, List<String>>): Result<String> {
         logger.debug { "Verifying session $sessionId" }
-        val session = sessionId?.let { OIDCVerifierService.getSession(it) }
-            ?: return Result.failure(NotFoundException("State parameter $sessionId doesn't refer to an existing session, or session expired"))
+        val session = sessionId?.let { OIDCVerifierService.getSession(it) }!!
         val tokenResponse = when (TokenResponse.isDirectPostJWT(tokenResponseParameters)) {
             true -> TokenResponse.fromDirectPostJWT(
                 tokenResponseParameters,
@@ -165,7 +163,6 @@ class VerificationUseCase(
 
     fun getResult(sessionId: String): Result<PresentationSessionInfo> {
         val session = OIDCVerifierService.getSession(sessionId)
-            ?: return Result.failure(NotFoundException("Id parameter $sessionId doesn't refer to an existing session, or session expired"))
 
         val policyResults = OIDCVerifierService.policyResults[session.id]?.let { Json.encodeToJsonElement(it).jsonObject }
 
