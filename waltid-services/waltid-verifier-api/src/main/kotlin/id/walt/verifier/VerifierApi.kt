@@ -189,30 +189,21 @@ fun Application.verfierApi() {
                         example("SD-JWT verification example", VerifierApiExamples.lspPotentialSDJwtVCExample)
                     }
                 }
-                response {
-                    "200" to {
-                        body<String> {
-                            description = "URL to start the OIDC presentation session"
-                            example("URL to start the OIDC presentation session") {
-                                value =
-                                    "openid4vp://authorize?response_type=vp_token&client_id=http%3A%2F%2Flocalhost%3A7003%2Fopenid4vc%2Fverify&response_mode=direct_post&state=bnJDPGVFNCwB&presentation_definition_uri=http%3A%2F%2Flocalhost%3A7003%2Fopenid4vc%2Fpd%2FbnJDPGVFNCwB&client_id_scheme=redirect_uri&client_metadata=%7B%22authorization_encrypted_response_alg%22%3A%22ECDH-ES%22%2C%22authorization_encrypted_response_enc%22%3A%22A256GCM%22%7D&nonce=27cc9647-e9c1-49db-ba41-a3c81b40ff0d&response_uri=http%3A%2F%2Flocalhost%3A7003%2Fopenid4vc%2Fverify%2FbnJDPGVFNCwB"
-                            }
-                        }
 
-                    }
-                }
             }) {
-                val authorizeBaseUrl = context.request.header("authorizeBaseUrl") ?: defaultAuthorizeBaseUrl
-                val responseMode =
-                    context.request.header("responseMode")?.let { ResponseMode.fromString(it) } ?: ResponseMode.direct_post
-                val successRedirectUri = context.request.header("successRedirectUri")
-                val errorRedirectUri = context.request.header("errorRedirectUri")
-                val statusCallbackUri = context.request.header("statusCallbackUri")
-                val statusCallbackApiKey = context.request.header("statusCallbackApiKey")
-                val stateId = context.request.header("stateId")
-                val openId4VPProfile = context.request.header("openId4VPProfile")
+                runCatching {
+                    val authorizeBaseUrl = context.request.header("authorizeBaseUrl") ?: defaultAuthorizeBaseUrl
+                    val responseMode =
+                        context.request.header("responseMode")?.let { ResponseMode.fromString(it) }
+                            ?: ResponseMode.direct_post
+                    val successRedirectUri = context.request.header("successRedirectUri")
+                    val errorRedirectUri = context.request.header("errorRedirectUri")
+                    val statusCallbackUri = context.request.header("statusCallbackUri")
+                    val statusCallbackApiKey = context.request.header("statusCallbackApiKey")
+                    val stateId = context.request.header("stateId")
+                    val openId4VPProfile = context.request.header("openId4VPProfile")
 
-                val body = context.receive<JsonObject>()
+                    val body = context.receive<JsonObject>()
 
                     val session = verificationUseCase.createSession(
                         vpPoliciesJson = body["vp_policies"],
@@ -232,7 +223,6 @@ fun Application.verfierApi() {
                         trustedRootCAs = body["trusted_root_cas"]?.jsonArray
                     )
 
-                context.respond(
                     authorizeBaseUrl.plus("?").plus(
                         when (session.openId4VPProfile) {
                             OpenId4VPProfile.ISO_18013_7_MDOC -> session.authorizationRequest!!.toRequestObjectByReferenceHttpQueryString(
@@ -244,7 +234,13 @@ fun Application.verfierApi() {
                             else -> session.authorizationRequest!!.toHttpQueryString()
                         }
                     )
-                )
+                }.onSuccess {
+                    call.respondText(it, ContentType.Text.Plain, HttpStatusCode.OK)
+                }.onFailure {
+                    logger.debug(it) { "Cannot create session ($it)" }
+                    throw it
+
+                }
             }
 
             post("/verify/{state}", {
