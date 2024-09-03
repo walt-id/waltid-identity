@@ -149,6 +149,7 @@ class ExchangeExternalSignatures {
         response = client.post("/wallet-api/wallet/$walletId/exchange/external_signatures/offer/submit") {
             setBody(SubmitOID4VCIRequest(
                 did = holderDID,
+                requireUserInput = false,
                 credentialIssuer = prepareResponse.credentialIssuer,
                 offeredCredentials = prepareResponse.offeredCredentials,
                 tokenResponse = prepareResponse.tokenResponse,

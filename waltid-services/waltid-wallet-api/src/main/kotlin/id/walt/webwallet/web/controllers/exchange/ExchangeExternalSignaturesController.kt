@@ -351,7 +351,12 @@ fun Application.exchangeExternalSignatures() = walletRoute {
         post("external_signatures/offer/prepare", {
             summary = "Preparation (first) step for an OID4VCI flow with externally provided signatures."
 
-            request(OpenAPICommons.useOfferRequestEndpointRequestParams())
+            request {
+                queryParameter<String>("did") { description = "The DID to issue the credential(s) to" }
+                body<String> {
+                    description = "The offer request to use"
+                }
+            }
 
             response {
                 HttpStatusCode.OK to {
@@ -370,7 +375,6 @@ fun Application.exchangeExternalSignatures() = walletRoute {
 
             val did = call.request.queryParameters["did"] ?: walletService.listDids().firstOrNull()?.did
             ?: throw IllegalArgumentException("No DID to use supplied and no DID was found in wallet.")
-            val requireUserInput = call.request.queryParameters["requireUserInput"].toBoolean()
 
             //this can't fail due to the above block
             val walletDID = DidsService.get(walletService.walletId, did)!!
@@ -495,6 +499,7 @@ typealias UnsignedProofOfPossessionParameters = UnsignedVPTokenParameters
 @Serializable
 data class SubmitOID4VCIRequest(
     val did: String,
+    val requireUserInput: Boolean,
     val tokenResponse: TokenResponse,
     val offeredCredentials: List<OfferedCredential>,
     val credentialIssuer: String,

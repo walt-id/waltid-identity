@@ -26,7 +26,13 @@ fun Application.exchange() = walletRoute {
         post("useOfferRequest", {
             summary = "Claim credential(s) from an issuer"
 
-            request(OpenAPICommons.useOfferRequestEndpointRequestParams())
+            request {
+                queryParameter<String>("did") { description = "The DID to issue the credential(s) to" }
+                queryParameter<Boolean>("requireUserInput") { description = "Whether to claim as pending acceptance" }
+                body<String> {
+                    description = "The offer request to use"
+                }
+            }
 
             response(OpenAPICommons.useOfferRequestEndpointResponseParams())
         }) {
