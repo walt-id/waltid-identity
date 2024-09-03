@@ -19,8 +19,10 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.util.pipeline.*
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
+import redis.clients.jedis.exceptions.JedisAccessControlException
+import redis.clients.jedis.exceptions.JedisConnectionException
+import kotlin.reflect.KClass
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 
@@ -71,6 +73,8 @@ suspend fun createCredentialOfferUri(
     return offerUri
 }
 
+private const val example_title = "Missing credentialData in the request body."
+
 fun Application.issuerApi() {
     routing {
         route("onboard", {
@@ -83,9 +87,18 @@ fun Application.issuerApi() {
                 request {
                     body<OnboardingRequest> {
                         description = "Issuer onboarding request (key & DID) config."
-                        example("did:jwk + JWK key (Ed25519)", IssuanceExamples.issuerOnboardingRequestDefaultEd25519Example)
-                        example("did:jwk + JWK key (secp256r1)", IssuanceExamples.issuerOnboardingRequestDefaultSecp256r1Example)
-                        example("did:jwk + JWK key (secp256k1)", IssuanceExamples.issuerOnboardingRequestDefaultSecp256k1Example)
+                        example(
+                            "did:jwk + JWK key (Ed25519)",
+                            IssuanceExamples.issuerOnboardingRequestDefaultEd25519Example
+                        )
+                        example(
+                            "did:jwk + JWK key (secp256r1)",
+                            IssuanceExamples.issuerOnboardingRequestDefaultSecp256r1Example
+                        )
+                        example(
+                            "did:jwk + JWK key (secp256k1)",
+                            IssuanceExamples.issuerOnboardingRequestDefaultSecp256k1Example
+                        )
                         example("did:jwk + JWK key (RSA)", IssuanceExamples.issuerOnboardingRequestDefaultRsaExample)
                         example("did:web + JWK key (Secp256k1)", IssuanceExamples.issuerOnboardingRequestDidWebExample)
                         example(
@@ -138,10 +151,13 @@ fun Application.issuerApi() {
                             )
                         }
                     }
+                    "400" to {
+                        description = "Bad request"
+
+                    }
                 }
             }) {
                 val req = context.receive<OnboardingRequest>()
-
                 val keyConfig = req.key.config?.mapValues { (key, value) ->
                     if (key == "signingKeyPem") {
                         JsonPrimitive(value.jsonPrimitive.content.trimIndent().replace(" ", ""))
@@ -152,8 +168,6 @@ fun Application.issuerApi() {
                 }
 
                 val keyGenerationRequest = req.key.copy(config = keyConfig?.let { it1 -> JsonObject(it1) })
-
-
                 val key = KeyManager.createKey(keyGenerationRequest)
 
                 val did = DidService.registerDefaultDidMethodByKey(
@@ -221,27 +235,37 @@ fun Application.issuerApi() {
                                     )
                                 }
                             }
+                            "400" to {
+                                description = "The request could not be understood or was missing required parameters."
+                                body<String> {
+                                    example("Missing issuerKey in the request body") {
+                                        value = "Missing issuerKey in the request body."
+                                    }
+                                    example("Invalid issuerKey format.") {
+                                        value = "Invalid issuerKey format."
+                                    }
+                                    example("Missing subjectDid in the request body.") {
+                                        value = "Missing subjectDid in the request body."
+                                    }
+                                    example(example_title) {
+                                        value = example_title
+                                    }
+                                    example("Invalid credentialData format.") {
+                                        value = "Invalid credentialData format."
+                                    }
+                                }
+                            }
                         }
                     }) {
 
-                        val body = context.receive<Map<String, JsonElement>>()
-
-                        val keyJson = body["issuerKey"] ?: throw IllegalArgumentException("No key was passed.")
-
-                        val key = KeyManager.resolveSerializedKey(keyJson.jsonObject)
-                        val issuerDid =
-                            body["issuerDid"]?.jsonPrimitive?.content ?: DidService.registerByKey("key", key).did
-                        val subjectDid = body["subjectDid"]?.jsonPrimitive?.content
-                            ?: throw IllegalArgumentException("No subjectDid was passed.")
-
-                        val vc = W3CVC.fromJson(Json.encodeToString(body["credentialData"]))
-
-                        // Sign VC
-                        val jws = vc.signJws(
-                            issuerKey = key, issuerDid = issuerDid, subjectDid = subjectDid
-                        )
-
-                        context.respond(HttpStatusCode.OK, jws)
+                        runCatching {
+                            val body = context.receive<JsonObject>()
+                            validateRawSignatureRequest(body)
+                            val signedCredential = executeCredentialSigning(body)
+                            context.respond(HttpStatusCode.OK, signedCredential)
+                        }.onFailure {
+                            throwError(it)
+                        }
                     }
                 }
             }
@@ -285,14 +309,40 @@ fun Application.issuerApi() {
                                     }
                                 }
                             }
+                            "400" to {
+                                description =
+                                    "Bad request - The request could not be understood or was missing required parameters."
+                                body<String> {
+                                    example("Missing issuerKey in the request body.") {
+                                        value = "Missing issuerKey in the request body."
+                                    }
+                                    example("Invalid issuerKey format.") {
+                                        value = "Invalid issuerKey format."
+                                    }
+                                    example("Missing issuerDid in the request body.") {
+                                        value = "Missing issuerDid in the request body."
+                                    }
+                                    example("Missing credentialConfigurationId in the request body.") {
+                                        value = "Missing credentialConfigurationId in the request body."
+                                    }
+                                    example(example_title) {
+                                        value = example_title
+                                    }
+                                    example("Invalid credentialData format.") {
+                                        value = "Invalid credentialData format."
+                                    }
+                                }
+                            }
                         }
                     }) {
-                        val jwtIssuanceRequest = context.receive<IssuanceRequest>()
-                        val offerUri = createCredentialOfferUri(listOf(jwtIssuanceRequest), IssuanceType.w3c, getCallbackUriHeader())
+                        runCatching {
+                            val jwtIssuanceRequest = context.receive<IssuanceRequest>()
+                            val offerUri = createCredentialOfferUri(listOf(jwtIssuanceRequest), IssuanceType.w3c, getCallbackUriHeader())
+                            context.respond(HttpStatusCode.OK, offerUri)
+                        }.onFailure {
+                            throwError(it)
+                        }
 
-                        context.respond(
-                            HttpStatusCode.OK, offerUri
-                        )
                     }
                     post("issueBatch", {
                         summary = "Signs a list of credentials and starts an OIDC credential exchange flow."
@@ -321,20 +371,27 @@ fun Application.issuerApi() {
                             }
                         }
                     }) {
-                        val issuanceRequests = context.receive<List<IssuanceRequest>>()
-                        val offerUri = createCredentialOfferUri(issuanceRequests, IssuanceType.w3c, getCallbackUriHeader())
-                        logger.debug { "Offer URI: $offerUri" }
 
-                        context.respond(
-                            HttpStatusCode.OK, offerUri
-                        )
+
+                        runCatching {
+                            val issuanceRequests = context.receive<List<IssuanceRequest>>()
+                            val offerUri = createCredentialOfferUri(issuanceRequests, IssuanceType.w3c, getCallbackUriHeader())
+                            logger.debug { "Offer URI: $offerUri" }
+
+                            context.respond(
+                                HttpStatusCode.OK, offerUri
+                            )
+                        }.onFailure {
+                            throwError(it)
+                        }
                     }
                 }
 
                 route("sdjwt") {
                     post("issue", {
                         summary = "Signs credential using SD-JWT and starts an OIDC credential exchange flow."
-                        description = "This endpoint issues a W3C or SD-JWT-VC Verifiable Credential, and returns an issuance URL "
+                        description =
+                            "This endpoint issues a W3C or SD-JWT-VC Verifiable Credential, and returns an issuance URL "
 
                         request {
                             statusCallbackUriHeader()
@@ -359,13 +416,13 @@ fun Application.issuerApi() {
                             }
                         }
                     }) {
-                        val sdJwtIssuanceRequest = context.receive<IssuanceRequest>()
-
-                        val offerUri = createCredentialOfferUri(listOf(sdJwtIssuanceRequest), IssuanceType.sdjwt, getCallbackUriHeader())
-
-                        context.respond(
-                            HttpStatusCode.OK, offerUri
-                        )
+                        runCatching {
+                            val sdJwtIssuanceRequest = context.receive<IssuanceRequest>()
+                            val offerUri = createCredentialOfferUri(listOf(sdJwtIssuanceRequest), IssuanceType.sdjwt, getCallbackUriHeader())
+                            context.respond(HttpStatusCode.OK, offerUri)
+                        }.onFailure {
+                            throwError(it)
+                        }
                     }
 
                     post("issueBatch", {
@@ -395,13 +452,19 @@ fun Application.issuerApi() {
                             }
                         }
                     }) {
-                        val issuanceRequests = context.receive<List<IssuanceRequest>>()
-                        val offerUri = createCredentialOfferUri(issuanceRequests, IssuanceType.sdjwt, getCallbackUriHeader())
-                        logger.debug { "Offer URI: $offerUri" }
 
-                        context.respond(
-                            HttpStatusCode.OK, offerUri
-                        )
+
+                        runCatching {
+                            val issuanceRequests = context.receive<List<IssuanceRequest>>()
+                            val offerUri = createCredentialOfferUri(issuanceRequests, IssuanceType.sdjwt, getCallbackUriHeader())
+                            logger.debug { "Offer URI: $offerUri" }
+
+                            context.respond(
+                                HttpStatusCode.OK, offerUri
+                            )
+                        }.onFailure {
+                            throwError(it)
+                        }
                     }
                 }
 
@@ -447,5 +510,76 @@ fun Application.issuerApi() {
                 }
             }
         }
+    }
+}
+
+private suspend fun PipelineContext<Unit, ApplicationCall>.throwError(
+    it: Throwable
+) {
+    when (it) {
+        is JedisConnectionException -> context.respond(
+            HttpStatusCode.InternalServerError,
+            "Distributed session management couldn't be initialized : Cannot connect to redis server."
+        )
+
+        is JedisAccessControlException -> context.respond(
+            HttpStatusCode.InternalServerError,
+            "Distributed session management couldn't be initialized : Cannot access redis server, wrong username/password."
+        )
+
+        else -> throw it
+    }
+}
+
+private fun validateRawSignatureRequest(body: JsonObject) {
+    requireNotNull(body["issuerKey"]?.jsonObject) { "Missing issuerKey in the request body." }
+    requireNotNull(body["subjectDid"]?.jsonPrimitive?.content) { "Missing subjectDid in the request body." }
+    requireNotNull(body["credentialData"]?.jsonObject) { example_title }
+}
+
+
+private suspend fun <T, k : Exception> executeWrapping(
+    runner: suspend () -> T, exception: KClass<k>, message: (() -> String)? = null
+): T {
+    runCatching {
+        runner()
+    }.fold(
+        onSuccess = { return it },
+        onFailure = {
+            if (it::class == exception) {
+                throw BadRequestException(message?.invoke() ?: it.message ?: "Bad request")
+            } else {
+                throw it
+            }
+        }
+    )
+}
+
+private suspend fun <T> requireValue(runner: suspend () -> T, message: (() -> String)? = null): T = executeWrapping(
+    runner, IllegalStateException::class, message
+)
+
+private suspend fun <T> checkValue(runner: suspend () -> T, message: (() -> String)? = null): T = executeWrapping(
+    runner, IllegalStateException::class, message
+)
+
+private suspend fun executeCredentialSigning(body: JsonObject) = run {
+    val issuerKey =
+        requireValue({ KeyManager.resolveSerializedKey(body["issuerKey"]!!.jsonObject) }) { "Invalid issuerKey Format" }
+    val issuerDid = body["subjectDid"]?.jsonPrimitive?.content ?: DidService.registerByKey("key", issuerKey).did
+    val vc =
+        requireValue({ W3CVC.fromJson(body["credentialData"]!!.jsonObject.toString()) }) { "Invalid credential format" }
+    val subjectDid = body["subjectDid"]!!.jsonPrimitive.content
+
+    checkValue(
+        {
+            vc.signJws(
+                issuerKey = issuerKey,
+                issuerDid = issuerDid,
+                subjectDid = subjectDid
+            )
+        }
+    ) {
+        "Failed to sign the credential"
     }
 }
