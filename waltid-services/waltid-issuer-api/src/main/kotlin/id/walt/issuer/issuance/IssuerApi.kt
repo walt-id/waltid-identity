@@ -19,10 +19,10 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.util.pipeline.*
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import redis.clients.jedis.exceptions.JedisAccessControlException
 import redis.clients.jedis.exceptions.JedisConnectionException
+import kotlin.reflect.KClass
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 
@@ -227,77 +227,45 @@ fun Application.issuerApi() {
                             }
                         }
 
-                        response {
-                            "200" to {
-                                description = "Signed Credential (with the *proof* attribute added)"
-                                body<String> {
-                                    example(
-                                        "Signed UniversityDegreeCredential example",
-                                        IssuanceExamples.universityDegreeSignResponseCredentialExample
-                                    )
-                                }
-                            }
-                            "400" to {
-                                description = "The request could not be understood or was missing required parameters."
-                                body<String> {
-                                    example("Missing issuerKey in the request body") {
-                                        value = "Missing issuerKey in the request body."
-                                    }
-                                    example("Invalid issuerKey format.") {
-                                        value = "Invalid issuerKey format."
-                                    }
-                                    example("Missing subjectDid in the request body.") {
-                                        value = "Missing subjectDid in the request body."
-                                    }
-                                    example("Missing credentialData in the request body.") {
-                                        value = "Missing credentialData in the request body."
-                                    }
-                                    example("Invalid credentialData format.") {
-                                        value = "Invalid credentialData format."
-                                    }
-                                }
-                            }
-                        }
+//                        response {
+//                            "200" to {
+//                                description = "Signed Credential (with the *proof* attribute added)"
+//                                body<String> {
+//                                    example(
+//                                        "Signed UniversityDegreeCredential example",
+//                                        IssuanceExamples.universityDegreeSignResponseCredentialExample
+//                                    )
+//                                }
+//                            }
+//                            "400" to {
+//                                description = "The request could not be understood or was missing required parameters."
+//                                body<String> {
+//                                    example("Missing issuerKey in the request body") {
+//                                        value = "Missing issuerKey in the request body."
+//                                    }
+//                                    example("Invalid issuerKey format.") {
+//                                        value = "Invalid issuerKey format."
+//                                    }
+//                                    example("Missing subjectDid in the request body.") {
+//                                        value = "Missing subjectDid in the request body."
+//                                    }
+//                                    example("Missing credentialData in the request body.") {
+//                                        value = "Missing credentialData in the request body."
+//                                    }
+//                                    example("Invalid credentialData format.") {
+//                                        value = "Invalid credentialData format."
+//                                    }
+//                                }
+//                            }
+//                        }
                     }) {
-                        val body = context.receive<Map<String, JsonElement>>()
-                        val keyJson = body["issuerKey"]?.jsonObject
-                            ?: return@post context.respond(
-                                HttpStatusCode.BadRequest,
-                                "Missing issuerKey in the request body."
-                            )
-
-                        val key = try {
-                            KeyManager.resolveSerializedKey(keyJson)
-                        } catch (e: Exception) {
-                            return@post context.respond(
-                                HttpStatusCode.BadRequest,
-                                "Invalid issuerKey format: ${e.message}"
-                            )
-                        }
-
-                        val issuerDid = body["issuerDid"]?.jsonPrimitive?.content
-                            ?: DidService.registerByKey("key", key).did
-
-                        val subjectDid = body["subjectDid"]?.jsonPrimitive?.content
-                            ?: return@post context.respond(
-                                HttpStatusCode.BadRequest,
-                                "Missing subjectDid in the request body."
-                            )
-
-                        val credentialData = body["credentialData"]?.let {
-                            Json.encodeToString(it)
-                        } ?: return@post context.respond(
-                            HttpStatusCode.BadRequest,
-                            "Missing credentialData in the request body."
-                        )
-
-                        val vc = try {
-                            W3CVC.fromJson(credentialData)
-                        } catch (e: Exception) {
-                            return@post context.respond(
-                                HttpStatusCode.BadRequest,
-                                "Invalid credentialData format: ${e.message}"
-                            )
+                        runCatching {
+                            val body = context.receive<JsonObject>()
+                            validateRawSignatureRequest(body)
+                            val signedCredential = executeCredentialSigning(body)
+                            context.respond(HttpStatusCode.OK, signedCredential)
+                        }.onFailure {
+                            throwError(it)
                         }
 
                         val jws = try {
@@ -584,3 +552,55 @@ private suspend fun PipelineContext<Unit, ApplicationCall>.throwError(
     }
 }
 
+private fun validateRawSignatureRequest(body: JsonObject) {
+    requireNotNull(body["issuerKey"]?.jsonObject) { "Missing issuerKey in the request body." }
+    requireNotNull(body["subjectDid"]?.jsonPrimitive?.content) { "Missing subjectDid in the request body." }
+    requireNotNull(body["credentialData"]?.jsonObject) { "Missing credentialData in the request body." }
+}
+
+
+private suspend fun <T, k : Exception> executeWrapping(
+    runner: suspend () -> T, exception: KClass<k>, message: (() -> String)? = null
+): T {
+    runCatching {
+        runner()
+    }.fold(
+        onSuccess = { return it },
+        onFailure = {
+            if (it::class == exception) {
+                throw BadRequestException(message?.invoke() ?: it.message ?: "Bad request")
+            } else {
+                throw it
+            }
+        }
+    )
+}
+
+private suspend fun <T> requireValue(runner: suspend () -> T, message: (() -> String)? = null): T = executeWrapping(
+    runner, IllegalStateException::class, message
+)
+
+private suspend fun <T> checkValue(runner: suspend () -> T, message: (() -> String)? = null): T = executeWrapping(
+    runner, IllegalStateException::class, message
+)
+
+private suspend fun executeCredentialSigning(body: JsonObject) = run {
+    val issuerKey =
+        requireValue({ KeyManager.resolveSerializedKey(body["issuerKey"]!!.jsonObject) }) { "Invalid issuerKey Format" }
+    val issuerDid = body["subjectDid"]?.jsonPrimitive?.content ?: DidService.registerByKey("key", issuerKey).did
+    val vc =
+        requireValue({ W3CVC.fromJson(body["credentialData"]!!.jsonObject.toString()) }) { "Invalid credential format" }
+    val subjectDid = body["subjectDid"]!!.jsonPrimitive.content
+
+    checkValue(
+        {
+            vc.signJws(
+                issuerKey = issuerKey,
+                issuerDid = issuerDid,
+                subjectDid = subjectDid
+            )
+        }
+    ) {
+        "Failed to sign the credential"
+    }
+}
