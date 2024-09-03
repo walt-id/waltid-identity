@@ -76,19 +76,42 @@ object IssuanceService {
         }
     }
 
+    private suspend fun getCredentialIssuerOpenIDMetadata(
+        issuerURL: String,
+        credentialWallet: TestCredentialWallet,
+    ): OpenIDProviderMetadata {
+        val providerMetadataUri =
+            credentialWallet.getCIProviderMetadataUrl(issuerURL)
+        logger.debug { "Getting provider metadata from: $providerMetadataUri" }
+        val providerMetadataResult = http.get(providerMetadataUri)
+        logger.debug { "Provider metadata returned: " + providerMetadataResult.bodyAsText() }
+        return providerMetadataResult
+            .body<JsonObject>()
+            .let {
+                OpenIDProviderMetadata.fromJSON(it)
+            }
+    }
+
+    private suspend fun issueTokenRequest(
+        tokenURL: String,
+        req: TokenRequest,
+    ) = http.submitForm(
+        tokenURL, formParameters = parametersOf(req.toHttpParameters())
+    ).let {
+        logger.debug { "Raw TokenResponse: $it" }
+        it.body<JsonObject>().let { TokenResponse.fromJSON(it) }
+    }
+
     private suspend fun processCredentialOffer(
         credentialOffer: CredentialOffer,
         credentialWallet: TestCredentialWallet,
         clientId: String,
     ): List<ProcessedCredentialOffer> {
         logger.debug { "// get issuer metadata" }
-        val providerMetadataUri =
-            credentialWallet.getCIProviderMetadataUrl(credentialOffer.credentialIssuer)
-        logger.debug { "Getting provider metadata from: $providerMetadataUri" }
-        val providerMetadataResult = http.get(providerMetadataUri)
-        logger.debug { "Provider metadata returned: " + providerMetadataResult.bodyAsText() }
-
-        val providerMetadata = providerMetadataResult.body<JsonObject>().let { OpenIDProviderMetadata.fromJSON(it) }
+        val providerMetadata = getCredentialIssuerOpenIDMetadata(
+            credentialOffer.credentialIssuer,
+            credentialWallet,
+        )
         logger.debug { "providerMetadata: $providerMetadata" }
 
         logger.debug { "// resolve offered credentials" }
@@ -103,19 +126,14 @@ object IssuanceService {
             preAuthorizedCode = credentialOffer.grants[GrantType.pre_authorized_code.value]!!.preAuthorizedCode,
             txCode = null
         )
-
-        val tokenResp = http.submitForm(
-            providerMetadata.tokenEndpoint!!, formParameters = parametersOf(tokenReq.toHttpParameters())
-        ).let {
-            logger.debug { "tokenResp raw: $it" }
-            it.body<JsonObject>().let { TokenResponse.fromJSON(it) }
-        }
-
+        val tokenResp = issueTokenRequest(
+            providerMetadata.tokenEndpoint!!,
+            tokenReq,
+        )
         logger.debug { ">>> Token response = success: ${tokenResp.isSuccess}" }
 
         logger.debug { "// receive credential" }
         val nonce = tokenResp.cNonce
-
 
         logger.debug { "Using issuer URL: ${credentialOffer.credentialIssuer}" }
         val credReqs = offeredCredentials.map { offeredCredential ->
@@ -134,7 +152,13 @@ object IssuanceService {
                     !offeredCredential.cryptographicBindingMethodsSupported!!.contains("did"))
             CredentialRequest.forOfferedCredential(
                 offeredCredential = offeredCredential,
-                proof = ProofOfPossessionFactory.new(useKeyProof, credentialWallet, offeredCredential, credentialOffer, nonce)
+                proof = ProofOfPossessionFactory.new(
+                    useKeyProof,
+                    credentialWallet,
+                    offeredCredential,
+                    credentialOffer,
+                    nonce
+                )
             )
         }
         logger.debug { "credReqs: $credReqs" }
@@ -219,12 +243,14 @@ object IssuanceService {
         when (val credentialFormat = processedOffer.credentialResponse.format) {
             CredentialFormat.mso_mdoc -> {
                 val credentialEncoding =
-                    processedOffer.credentialResponse.customParameters["credential_encoding"]?.jsonPrimitive?.content ?: "issuer-signed"
+                    processedOffer.credentialResponse.customParameters["credential_encoding"]?.jsonPrimitive?.content
+                        ?: "issuer-signed"
                 val docType =
                     processedOffer.credentialRequest?.docType
                         ?: throw IllegalArgumentException("Credential request has no docType property")
                 val format =
-                    processedOffer.credentialResponse.format ?: throw IllegalArgumentException("Credential response has no format property")
+                    processedOffer.credentialResponse.format
+                        ?: throw IllegalArgumentException("Credential response has no format property")
                 val mdoc = when (credentialEncoding) {
                     "issuer-signed" -> MDoc(
                         docType.toDataElement(), IssuerSigned.fromMapElement(
