@@ -17,9 +17,9 @@ class ExternalSignatureClaimStrategy(
     suspend fun prepareCredentialClaim(
         did: String,
         keyId: String,
-        offer: String,
+        offerURL: String,
     ) = issuanceService.prepareExternallySignedOfferRequest(
-        offer = offer,
+        offerURL = offerURL,
         did = did,
         keyId = keyId,
         credentialWallet = SSIKit2WalletService.getCredentialWallet(did),

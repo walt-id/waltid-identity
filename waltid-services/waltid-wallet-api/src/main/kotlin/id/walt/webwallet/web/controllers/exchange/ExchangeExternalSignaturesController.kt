@@ -385,7 +385,7 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                 WalletServiceManager.externalSignatureClaimStrategy.prepareCredentialClaim(
                     did = walletDID.did,
                     keyId = authKeyId,
-                    offer = offer,
+                    offerURL = offer,
                 )
             }.onSuccess { prepareClaimResult ->
                 val responsePayload = PrepareOID4VCIResponse(
@@ -435,7 +435,7 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                         tenantId = walletService.tenant,
                         accountId = walletService.accountId,
                         walletId = walletService.walletId,
-                        pending = false,
+                        pending = req.requireUserInput,
                         did = did,
                         credentialIssuerURL = req.credentialIssuer,
                         signedJWT = req.signedProofOfDIDPossession,
