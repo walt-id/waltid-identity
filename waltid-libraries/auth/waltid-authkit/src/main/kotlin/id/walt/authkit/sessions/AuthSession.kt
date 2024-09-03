@@ -1,13 +1,14 @@
 package id.walt.authkit.sessions
 
+import id.walt.authkit.methods.config.AuthMethodConfiguration
 import id.walt.authkit.flows.AuthFlow
 import id.walt.authkit.flows.methods
 import id.walt.authkit.methods.AuthenticationMethod
-import kotlinx.coroutines.flow.flow
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlin.reflect.jvm.jvmName
 
 enum class AuthSessionStatus(val value: String) {
     INIT("init"),
@@ -53,7 +54,13 @@ data class AuthSession(
 
         SessionManager.updateSession(this)
     }
-}
+
+    inline fun <reified V : AuthMethodConfiguration> lookupConfiguration(method: AuthenticationMethod): V {
+        val flow = flows?.firstOrNull { it.method == method.id } ?: error("No flow for method: ${method.id}")
+        val config = (flow.config as? V) ?: error("Invalid config for method ${method.id}, provided: ${flow.config}, requested: ${V::class.jvmName}")
+
+        return config
+    }}
 
 @OptIn(ExperimentalSerializationApi::class)
 @Serializable
