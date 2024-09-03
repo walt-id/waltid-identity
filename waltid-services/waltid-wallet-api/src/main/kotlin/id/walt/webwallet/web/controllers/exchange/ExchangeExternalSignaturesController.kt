@@ -131,14 +131,7 @@ fun Application.exchangeExternalSignatures() = walletRoute {
 
             val presentationId = "urn:uuid:" + UUID.generateUUID().toString().lowercase()
 
-            val authKeyId =
-                Json.decodeFromString<JsonObject>(walletDID.document)["authentication"]!!.jsonArray.first().let {
-                    if (it is JsonObject) {
-                        it.jsonObject["id"]!!.jsonPrimitive.content
-                    } else {
-                        it.jsonPrimitive.content
-                    }
-                }
+            val authKeyId = ExchangeUtils.getFirstAuthKeyIdFromDidDocument(walletDID.document)
             logger.debug { "Resolved authorization keyId: $authKeyId" }
 
             val vpPayload = credentialWallet.getVpJson(
@@ -460,6 +453,8 @@ fun Application.exchangeExternalSignatures() = walletRoute {
             }
              */
 
+            val authKeyId = ExchangeUtils.getFirstAuthKeyIdFromDidDocument(walletDID.document)
+            logger.debug { "Resolved authorization keyId: $authKeyId" }
 
             val responsePayload = PrepareOID4VCIResponse(
                 did = "kati",
@@ -468,8 +463,8 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                 credentialIssuer = credentialOffer.credentialIssuer,
                 jwtParams = UnsignedProofOfPossessionParameters(
                     header = mapOf(
-                        "typ" to "openid4vci-proof+jwt".toJsonElement(),
-                        "kid" to "${walletDID.did}#${walletDID.keyId}".toJsonElement(),
+                        "typ" to "JWT".toJsonElement(),
+                        "kid" to authKeyId.toJsonElement(),
                     ),
                     payload = buildJsonObject {
                         put("iss", walletDID.did)
