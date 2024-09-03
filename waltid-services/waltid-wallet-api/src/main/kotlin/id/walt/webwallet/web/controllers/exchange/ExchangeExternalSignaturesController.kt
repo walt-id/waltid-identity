@@ -10,22 +10,20 @@ import id.walt.crypto.utils.Base64Utils.base64UrlToBase64
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.crypto.utils.JwsUtils.decodeJwsOrSdjwt
-import id.walt.oid4vc.OpenID4VCI
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.data.dif.DescriptorMapping
 import id.walt.oid4vc.data.dif.PresentationSubmission
 import id.walt.oid4vc.data.dif.VCFormat
 import id.walt.oid4vc.errors.AuthorizationError
 import id.walt.oid4vc.requests.AuthorizationRequest
-import id.walt.oid4vc.requests.CredentialOfferRequest
 import id.walt.oid4vc.requests.CredentialRequest
-import id.walt.oid4vc.requests.TokenRequest
 import id.walt.oid4vc.responses.AuthorizationErrorCode
 import id.walt.oid4vc.responses.TokenResponse
 import id.walt.oid4vc.util.randomUUID
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.service.SSIKit2WalletService.Companion.getCredentialWallet
 import id.walt.webwallet.service.SSIKit2WalletService.PresentationError
+import id.walt.webwallet.service.WalletServiceManager
 import id.walt.webwallet.service.WalletServiceManager.eventUseCase
 import id.walt.webwallet.service.credentials.CredentialsService
 import id.walt.webwallet.service.dids.DidsService
@@ -386,98 +384,36 @@ fun Application.exchangeExternalSignatures() = walletRoute {
             //this can't fail due to the above block
             val walletDID = DidsService.get(walletService.walletId, did)!!
             logger.debug { "Retrieved wallet DID: $walletDID" }
-
-            val credentialWallet = getCredentialWallet(walletDID.did)
-
-            val reqParams = Url(offer).parameters.toMap()
-            val credentialOffer =
-                credentialWallet.resolveCredentialOffer(CredentialOfferRequest.fromHttpParameters(reqParams))
-
-            val httpClient = WalletHttpClients.getHttpClient()
-
-            logger.debug { "// get issuer metadata" }
-            val providerMetadataUri =
-                credentialWallet.getCIProviderMetadataUrl(credentialOffer.credentialIssuer)
-            logger.debug { "Getting provider metadata from: $providerMetadataUri" }
-            val providerMetadataResult = httpClient.get(providerMetadataUri)
-            val providerMetadataBody = providerMetadataResult.bodyAsText()
-            logger.debug { "Provider metadata returned: $providerMetadataBody" }
-
-            val providerMetadata =
-                providerMetadataResult.body<JsonObject>().let { OpenIDProviderMetadata.fromJSON(it) }
-            logger.debug { "providerMetadata: $providerMetadata" }
-
-            logger.debug { "// resolve offered credentials" }
-            val offeredCredentials = OpenID4VCI.resolveOfferedCredentials(credentialOffer, providerMetadata)
-            logger.debug { "offeredCredentials: $offeredCredentials" }
-
-            logger.debug { "// fetch access token using pre-authorized code (skipping authorization step)" }
-            val tokenReq = TokenRequest(
-                grantType = GrantType.pre_authorized_code,
-                clientId = walletDID.did,
-                redirectUri = credentialWallet.config.redirectUri,
-                preAuthorizedCode = credentialOffer.grants[GrantType.pre_authorized_code.value]!!.preAuthorizedCode,
-                txCode = null
-            )
-
-            val tokenResp = httpClient.submitForm(
-                providerMetadata.tokenEndpoint!!, formParameters = parametersOf(tokenReq.toHttpParameters())
-            ).let {
-                logger.debug { "tokenResp raw: $it" }
-                it.body<JsonObject>().let { TokenResponse.fromJSON(it) }
-            }
-
-            logger.debug { ">>> Token response = success: ${tokenResp.isSuccess}" }
-            val nonce = tokenResp.cNonce
-
-            /**
-            ProofOfPossession.JWTProofBuilder(issuerUrl, client?.clientID, nonce, keyId).let { builder ->
-            builder.build(
-            signToken(TokenTarget.PROOF_OF_POSSESSION, builder.payload, builder.headers, keyId)
-            )
-            }
-
-            val headers = buildJsonObject {
-            put("typ", JWT_HEADER_TYPE)
-            keyId?.let { put("kid", it) }
-            keyJwk?.let { put("jwk", it) }
-            x5c?.let { put("x5c", it) }
-            trustChain?.let { put("trust_chain", it) }
-            }
-            val payload = buildJsonObject {
-            clientId?.let { put("iss", it) }
-            put("aud", issuerUrl)
-            audience?.let { put("aud", it) }
-            put("iat", Clock.System.now().epochSeconds)
-            nonce?.let { put("nonce", it) }
-            }
-             */
-
             val authKeyId = ExchangeUtils.getFirstAuthKeyIdFromDidDocument(walletDID.document)
             logger.debug { "Resolved authorization keyId: $authKeyId" }
 
-            val responsePayload = PrepareOID4VCIResponse(
-                did = "kati",
-                tokenResponse = tokenResp,
-                offeredCredentials = offeredCredentials,
-                credentialIssuer = credentialOffer.credentialIssuer,
-                jwtParams = UnsignedProofOfPossessionParameters(
-                    header = mapOf(
-                        "typ" to "JWT".toJsonElement(),
-                        "kid" to authKeyId.toJsonElement(),
-                    ),
-                    payload = buildJsonObject {
-                        put("iss", walletDID.did)
-                        put("aud", credentialOffer.credentialIssuer)
-                        put("iat", Clock.System.now().epochSeconds)
-                        nonce?.let { put("nonce", it) }
-                    }.toString(),
+            runCatching {
+                WalletServiceManager.externalSignatureClaimStrategy.prepareCredentialClaim(
+                    tenantId = walletService.tenant,
+                    accountId = walletService.accountId,
+                    walletId = walletService.walletId,
+                    did = walletDID.did,
+                    keyId = authKeyId,
+                    offer = offer,
                 )
-            )
-            context.respond(
-                HttpStatusCode.OK,
-                responsePayload,
-            )
+            }.onSuccess { prepareClaimResult ->
+                val responsePayload = PrepareOID4VCIResponse(
+                    did = walletDID.did,
+                    tokenResponse = prepareClaimResult.tokenResponse,
+                    offeredCredentials = prepareClaimResult.offeredCredentials,
+                    credentialIssuer = prepareClaimResult.resolvedCredentialOffer.credentialIssuer,
+                    jwtParams = UnsignedProofOfPossessionParameters(
+                        header = prepareClaimResult.jwtParams.header,
+                        payload = prepareClaimResult.jwtParams.payload,
+                    )
+                )
+                context.respond(
+                    HttpStatusCode.OK,
+                    responsePayload,
+                )
+            }.onFailure { error ->
+                context.respond(HttpStatusCode.BadRequest, error.message ?: "Unknown error")
+            }
         }
 
         post("external_signatures/offer/submit", {
