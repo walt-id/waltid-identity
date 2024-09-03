@@ -36,17 +36,17 @@ object IssuanceService {
     private val logger = logger<IssuanceService>()
 
     suspend fun prepareExternallySignedOfferRequest(
-        offer: String,
+        offerURL: String,
         credentialWallet: TestCredentialWallet,
         keyId: String,
         did: String,
     ): PrepareExternalClaimResult {
         logger.debug { "// -------- WALLET: PREPARE STEP FOR OID4VCI WITH EXTERNAL SIGNATURES ----------" }
         logger.debug { "// parse credential URI" }
-        val reqParams = parseOfferParams(offer)
+        val reqParams = parseOfferParams(offerURL)
 
         // entra or openid4vc credential offer
-        val isEntra = EntraIssuanceRequest.isEntraIssuanceRequestUri(offer)
+        val isEntra = EntraIssuanceRequest.isEntraIssuanceRequestUri(offerURL)
         return if(isEntra) {
             TODO()
         } else {
