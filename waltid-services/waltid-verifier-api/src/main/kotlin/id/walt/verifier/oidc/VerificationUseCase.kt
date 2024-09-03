@@ -125,7 +125,7 @@ class VerificationUseCase(
             else -> TokenResponse.fromHttpParameters(tokenResponseParameters)
         }
         val sessionVerificationInfo = OIDCVerifierService.sessionVerificationInfos[session.id] ?: return Result.failure(
-            NotFoundException("No session verification information found for session id : ${session.id}")
+            NotFoundException("No session verification information found for session id: ${session.id}")
         )
 
         val maybePresentationSessionResult = runCatching { OIDCVerifierService.verify(tokenResponse, session) }
@@ -175,7 +175,7 @@ class VerificationUseCase(
     }
 
     fun getPresentationDefinition(sessionId: String): Result<PresentationDefinition> =
-        OIDCVerifierService.getSession(sessionId)?.presentationDefinition?.let {
+        OIDCVerifierService.getSession(sessionId).presentationDefinition.let {
             Result.success(it)
         }
             ?: Result.failure(IllegalArgumentException("Id parameter $sessionId doesn't refer to an existing session, or session expired"))
