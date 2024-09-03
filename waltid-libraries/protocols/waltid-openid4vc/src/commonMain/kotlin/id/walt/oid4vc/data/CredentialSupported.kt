@@ -75,6 +75,7 @@ data class CredentialSupported(
     @Serializable(DisplayPropertiesListSerializer::class) val display: List<DisplayProperties>? = null,
     @SerialName("@context") val context: List<JsonElement>? = null,
     @SerialName("credential_definition") val credentialDefinition: CredentialDefinition? = null,
+    val types: List<String>? = null, // for draft 11
     @SerialName("doctype") val docType: String? = null,
     @Serializable(ClaimDescriptorMapSerializer::class) val credentialSubject: Map<String, ClaimDescriptor>? = null,
     @Serializable(ClaimDescriptorNamespacedMapSerializer::class) val claims: Map<String, Map<String, ClaimDescriptor>>? = null,

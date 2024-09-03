@@ -229,7 +229,7 @@ class EBSIIssueToHolderConformanceTest {
         val credReq = CredentialRequest(
             CredentialFormat.jwt_vc,
             proof = jwtProof,
-            types = listOf("VerifiableCredential", "VerifiableAttestation", "CTIssueQualificationCredential")
+            credentialDefinition = CredentialDefinition(type = listOf("VerifiableCredential", "VerifiableAttestation", "CTIssueQualificationCredential"))
         )
 
         val credRespRaw = ktorClient.post("$taoIssuerServer/credential") {
