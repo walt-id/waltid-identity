@@ -214,21 +214,23 @@ fun Application.verfierApi() {
 
                 val body = context.receive<JsonObject>()
 
-                val session = verificationUseCase.createSession(
-                    vpPoliciesJson = body["vp_policies"],
-                    vcPoliciesJson = body["vc_policies"],
-                    requestCredentialsJson = body["request_credentials"]!!,
-                    presentationDefinitionJson = body["presentation_definition"],
-                    responseMode = responseMode,
-                    successRedirectUri = successRedirectUri,
-                    errorRedirectUri = errorRedirectUri,
-                    statusCallbackUri = statusCallbackUri,
-                    statusCallbackApiKey = statusCallbackApiKey,
-                    stateId = stateId,
-                    openId4VPProfile = (body["openid_profile"]?.jsonPrimitive?.contentOrNull ?: openId4VPProfile)?.let { OpenId4VPProfile.valueOf(it.uppercase()) }
-                    ?: OpenId4VPProfile.fromAuthorizeBaseURL(authorizeBaseUrl),
-                    trustedRootCAs = body["trusted_root_cas"]?.jsonArray
-                )
+                    val session = verificationUseCase.createSession(
+                        vpPoliciesJson = body["vp_policies"],
+                        vcPoliciesJson = body["vc_policies"],
+                        requestCredentialsJson = body["request_credentials"]
+                            ?: throw BadRequestException("Field request_credentials is required"),
+                        presentationDefinitionJson = body["presentation_definition"],
+                        responseMode = responseMode,
+                        successRedirectUri = successRedirectUri,
+                        errorRedirectUri = errorRedirectUri,
+                        statusCallbackUri = statusCallbackUri,
+                        statusCallbackApiKey = statusCallbackApiKey,
+                        stateId = stateId,
+                        openId4VPProfile = (body["openid_profile"]?.jsonPrimitive?.contentOrNull
+                            ?: openId4VPProfile)?.let { OpenId4VPProfile.valueOf(it.uppercase()) }
+                            ?: OpenId4VPProfile.fromAuthorizeBaseURL(authorizeBaseUrl),
+                        trustedRootCAs = body["trusted_root_cas"]?.jsonArray
+                    )
 
                 context.respond(
                     authorizeBaseUrl.plus("?").plus(
