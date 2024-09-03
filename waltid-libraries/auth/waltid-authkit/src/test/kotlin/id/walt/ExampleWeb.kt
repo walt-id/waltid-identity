@@ -1,12 +1,15 @@
 package id.walt
 
 import id.walt.authkit.AuthContext
+import id.walt.authkit.auth.authKit
+import id.walt.authkit.auth.getAuthenticatedSession
 import id.walt.authkit.flows.AuthFlow
 import id.walt.authkit.methods.AuthenticationMethod
 import id.walt.authkit.methods.TOTP
 import id.walt.authkit.methods.UserPass
 import id.walt.authkit.sessions.SessionManager
 import io.ktor.server.application.*
+import io.ktor.server.auth.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
@@ -114,13 +117,27 @@ fun Route.flowRoutes() {
 }
 
 fun Application.testApp() {
+    install(Authentication) {
+        authKit("authkit") {
+
+        }
+    }
+
+
     routing {
         route("auth") {
-
             route("flows") {
                 flowRoutes()
             }
         }
+
+        authenticate("authkit") {
+            get("/protected") {
+                val session = getAuthenticatedSession()
+                call.respondText("Hello token ${session.token}, you are ${session.accountId}")
+            }
+        }
+
     }
 }
 
