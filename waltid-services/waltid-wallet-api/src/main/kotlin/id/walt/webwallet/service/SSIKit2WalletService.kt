@@ -268,7 +268,10 @@ class SSIKit2WalletService(
                 Result.failure(
                     PresentationError(
                         message =
-                        if (httpResponseBody != null) "Presentation failed:\n $httpResponseBody"
+                        if (httpResponseBody != null) {
+                            Json.parseToJsonElement(httpResponseBody).jsonObject["message"]?.jsonPrimitive?.content
+                                ?: "Presentation failed"
+                        }
                         else "Presentation failed",
                         redirectUri = ""
                     )
