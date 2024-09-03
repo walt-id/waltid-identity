@@ -1,13 +1,13 @@
 package id.walt.authkit.methods
 
 import id.walt.authkit.AuthContext
+import id.walt.authkit.accounts.identifiers.AccountIdentifier
 import id.walt.authkit.accounts.identifiers.RADIUSIdentifier
 import id.walt.authkit.exceptions.authCheck
 import id.walt.authkit.methods.config.AuthMethodConfiguration
 import id.walt.authkit.sessions.AuthSession
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
-import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.util.pipeline.*
 import kotlinx.serialization.Serializable
@@ -34,7 +34,7 @@ object RADIUS : UserPassBasedAuthMethod("radius") {
     ): AuthMethodConfiguration
 
 
-    override suspend fun auth(session: AuthSession, credential: UserPasswordCredential) {
+    override suspend fun auth(session: AuthSession, credential: UserPasswordCredential, context: ApplicationCall): AccountIdentifier {
         val config = session.lookupConfiguration<RADIUSConfiguration>(this)
 
         val radiusClient: RadiusClient = UdpRadiusClient.newBuilder()
@@ -57,8 +57,7 @@ object RADIUS : UserPassBasedAuthMethod("radius") {
         val responsePacket: Packet = radiusClient.send(accessRequest)
         authCheck(responsePacket is AccessAccept) { "RADIUS server did not accept authentication" }
 
-        session.accountId = identifier.resolveToAccountId()
-        session.progressFlow(this@RADIUS)
+        return identifier
     }
 
 
@@ -68,9 +67,8 @@ object RADIUS : UserPassBasedAuthMethod("radius") {
 
             val credential = call.getUsernamePasswordFromRequest()
 
-            auth(session, credential)
-
-            context.respond(session.toInformation())
+            val identifier = auth(session, credential, context)
+            context.handleAuthSuccess(session, identifier.resolveToAccountId())
         }
     }
 

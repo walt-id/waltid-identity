@@ -1,17 +1,17 @@
 package id.walt.authkit.methods
 
-import io.ktor.server.auth.*
+/*import io.ktor.server.auth.*
 import java.util.Hashtable
 import javax.naming.Context
 import javax.naming.NamingException
 import javax.naming.directory.InitialDirContext
 
-/**
+*//**
  * Provides the ability to authenticate an LDAP user.
  * This function accepts a credential and validates it against a specified LDAP server.
  *
  * To learn more about LDAP authentication in Ktor, see [LDAP](https://ktor.io/docs/ldap.html).
- */
+ *//*
 public fun <K : Credential, P : Any> ldapAuthenticate(
     credential: K,
     ldapServerURL: String,
@@ -30,12 +30,12 @@ public fun <K : Credential, P : Any> ldapAuthenticate(
     }
 }
 
-/**
+*//**
  * Provides the ability to authenticates an LDAP user.
  * This function accepts [UserPasswordCredential] and validates it against a specified LDAP server.
  *
  * To learn more about LDAP authentication in Ktor, see [LDAP](https://ktor.io/docs/ldap.html).
- */
+ *//*
 public fun <P : Principal> ldapAuthenticate(
     credential: UserPasswordCredential,
     ldapServerURL: String,
@@ -51,12 +51,12 @@ public fun <P : Principal> ldapAuthenticate(
     return ldapAuthenticate(credential, ldapServerURL, configurator, validate)
 }
 
-/**
+*//**
  * Provides the ability to authenticates an LDAP user.
  * This function accepts [UserPasswordCredential] and validates it against a specified LDAP server.
  *
  * To learn more about LDAP authentication in Ktor, see [LDAP](https://ktor.io/docs/ldap.html).
- */
+ *//*
 public fun ldapAuthenticate(
     credential: UserPasswordCredential,
     ldapServerURL: String,
@@ -122,4 +122,4 @@ private fun Char.shouldEscape(): Boolean = this.code.let { codepoint ->
         0x21 -> false // exclamation
         else -> true
     }
-}
+}*/
