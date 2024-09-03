@@ -6,6 +6,7 @@ import id.walt.authkit.accounts.identifiers.RADIUSIdentifier
 import id.walt.authkit.exceptions.authCheck
 import id.walt.authkit.methods.config.AuthMethodConfiguration
 import id.walt.authkit.sessions.AuthSession
+import io.github.smiley4.ktorswaggerui.dsl.routing.post
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
 import io.ktor.server.routing.*
@@ -31,7 +32,7 @@ object RADIUS : UserPassBasedAuthMethod("radius") {
         val radiusServerPort: Int,
         val radiusServerSecret: String,
         val radiusNasIdentifier: String,
-    ): AuthMethodConfiguration
+    ) : AuthMethodConfiguration
 
 
     override suspend fun auth(session: AuthSession, credential: UserPasswordCredential, context: ApplicationCall): AccountIdentifier {
@@ -62,7 +63,11 @@ object RADIUS : UserPassBasedAuthMethod("radius") {
 
 
     override fun Route.register(authContext: PipelineContext<Unit, ApplicationCall>.() -> AuthContext) {
-        post("radius") {
+        post("radius", {
+            request {
+                body<UserPassCredentials>()
+            }
+        }) {
             val session = getSession(authContext)
 
             val credential = call.getUsernamePasswordFromRequest()

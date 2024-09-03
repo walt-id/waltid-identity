@@ -6,6 +6,7 @@ import id.walt.authkit.accounts.identifiers.RADIUSIdentifier
 import id.walt.authkit.exceptions.authFailure
 import id.walt.authkit.methods.config.AuthMethodConfiguration
 import id.walt.authkit.sessions.AuthSession
+import io.github.smiley4.ktorswaggerui.dsl.routing.post
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
 import io.ktor.server.routing.*
@@ -20,8 +21,8 @@ object LDAP : UserPassBasedAuthMethod("ldap") {
     @Serializable
     data class LDAPConfiguration(
         val ldapServerUrl: String,
-        val userDNFormat: String
-    ): AuthMethodConfiguration
+        val userDNFormat: String,
+    ) : AuthMethodConfiguration
 
     override suspend fun auth(session: AuthSession, credential: UserPasswordCredential, context: ApplicationCall): AccountIdentifier {
         val config = session.lookupConfiguration<LDAPConfiguration>(this)
@@ -48,7 +49,11 @@ object LDAP : UserPassBasedAuthMethod("ldap") {
     }
 
     override fun Route.register(authContext: PipelineContext<Unit, ApplicationCall>.() -> AuthContext) {
-        post("ldap") {
+        post("ldap", {
+            request {
+                body<UserPassCredentials>()
+            }
+        }) {
             val session = getSession(authContext)
 
             val credential = call.getUsernamePasswordFromRequest()

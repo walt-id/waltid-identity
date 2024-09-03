@@ -7,10 +7,10 @@ import com.atlassian.onetime.model.Issuer
 import com.atlassian.onetime.model.TOTPSecret
 import com.atlassian.onetime.service.DefaultTOTPService
 import id.walt.authkit.AuthContext
-import id.walt.authkit.accounts.AccountStore
 import id.walt.authkit.exceptions.authCheck
 import id.walt.authkit.methods.data.AuthMethodStoredData
 import id.walt.authkit.sessions.AuthSession
+import io.github.smiley4.ktorswaggerui.dsl.routing.post
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
@@ -26,7 +26,6 @@ object TOTP : AuthenticationMethod("totp") {
     ) : AuthMethodStoredData
 
     fun auth(session: AuthSession, code: String) {
-        AccountStore.lookupStoredMultiDataForAccount(session, this)
         val storedData = lookupStoredMultiData<TOTPStoredData>(session /* context() */)
 
         val userProvidedOtpCode = TOTP(code)
@@ -42,13 +41,16 @@ object TOTP : AuthenticationMethod("totp") {
     data class TOTPCode(val code: String)
 
     override fun Route.register(authContext: PipelineContext<Unit, ApplicationCall>.() -> AuthContext) {
-        post("totp") {
+        post("totp", {
+            request { body<TOTPCode>() }
+        }) {
             val session = getSession(authContext)
 
             val otp = when (call.request.contentType()) {
                 ContentType.Application.Json -> call.receive<TOTPCode>().code
                 ContentType.Application.FormUrlEncoded ->
                     call.receiveParameters()["code"] ?: error("Invalid or missing OTP code form post request.")
+
                 else -> call.receiveText()
             }
 

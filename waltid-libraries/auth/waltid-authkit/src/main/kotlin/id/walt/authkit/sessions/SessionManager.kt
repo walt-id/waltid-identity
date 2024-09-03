@@ -25,14 +25,14 @@ object SessionManager {
     /**
      * Session is explicitly started
      */
-    suspend fun openExplicitSession(authFlow: AuthFlow): AuthSession {
+    suspend fun openExplicitGlobalSession(authFlow: AuthFlow): AuthSession {
         return newSession(authFlow)
     }
 
     /**
      * Session is started through the first login method
      */
-    suspend fun openImplicitSession(authFlow: AuthFlow): AuthSession {
+    suspend fun openImplicitGlobalSession(authFlow: AuthFlow): AuthSession {
         return newSession(authFlow)
     }
 
