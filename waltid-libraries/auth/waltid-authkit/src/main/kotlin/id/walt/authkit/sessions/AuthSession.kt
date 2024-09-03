@@ -1,9 +1,9 @@
 package id.walt.authkit.sessions
 
-import id.walt.authkit.methods.config.AuthMethodConfiguration
 import id.walt.authkit.flows.AuthFlow
 import id.walt.authkit.flows.methods
 import id.walt.authkit.methods.AuthenticationMethod
+import id.walt.authkit.methods.config.AuthMethodConfiguration
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
