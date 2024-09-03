@@ -41,6 +41,4 @@ abstract class AuthenticationMethod(open val id: String) {
 
         return session
     }
-
-
 }
