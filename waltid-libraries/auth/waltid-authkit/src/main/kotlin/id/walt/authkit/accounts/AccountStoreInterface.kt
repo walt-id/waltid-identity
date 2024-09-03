@@ -12,4 +12,5 @@ interface AccountStoreInterface {
 
     fun lookupAccountUuid(identifier: AccountIdentifier): String
 
+    fun hasStoredDataFor(identifier: AccountIdentifier, method: AuthenticationMethod): Boolean
 }

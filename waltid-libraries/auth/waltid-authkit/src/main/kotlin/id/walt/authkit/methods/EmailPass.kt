@@ -7,7 +7,6 @@ import id.walt.authkit.exceptions.authCheck
 import id.walt.authkit.methods.data.AuthMethodStoredData
 import id.walt.authkit.sessions.AuthSession
 import io.github.smiley4.ktorswaggerui.dsl.routing.post
-import io.ktor.client.request.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
 import io.ktor.server.routing.*
