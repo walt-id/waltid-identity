@@ -208,7 +208,7 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
         val parsedMdoc = parsedDeviceResponse.documents[0]
         val deviceKey = OneKey(CBORObject.DecodeFromBytes(parsedMdoc.MSO!!.deviceKeyInfo.deviceKey.toCBOR()))
         val issuerKey = parsedMdoc.issuerSigned.issuerAuth?.x5Chain?.let { X509CertUtils.parse(it) }?.publicKey
-            ?: throw BadRequestException("Issuer key not found in x5Chain header (33)")
+            ?: throw BadRequestException("Issuer's Public Key Missing: The x5c header in the JWT is either missing or does not contain the expected X.509 certificate chain. Please ensure that the x5c header is correctly formatted and includes the issuer’s public key")
         return parsedMdoc.verify(
             MDocVerificationParams(
                 VerificationType.forPresentation,
