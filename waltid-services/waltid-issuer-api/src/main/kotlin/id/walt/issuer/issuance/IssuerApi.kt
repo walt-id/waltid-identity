@@ -223,38 +223,39 @@ fun Application.issuerApi() {
                             }
                         }
 
-//                        response {
-//                            "200" to {
-//                                description = "Signed Credential (with the *proof* attribute added)"
-//                                body<String> {
-//                                    example(
-//                                        "Signed UniversityDegreeCredential example",
-//                                        IssuanceExamples.universityDegreeSignResponseCredentialExample
-//                                    )
-//                                }
-//                            }
-//                            "400" to {
-//                                description = "The request could not be understood or was missing required parameters."
-//                                body<String> {
-//                                    example("Missing issuerKey in the request body") {
-//                                        value = "Missing issuerKey in the request body."
-//                                    }
-//                                    example("Invalid issuerKey format.") {
-//                                        value = "Invalid issuerKey format."
-//                                    }
-//                                    example("Missing subjectDid in the request body.") {
-//                                        value = "Missing subjectDid in the request body."
-//                                    }
-//                                    example("Missing credentialData in the request body.") {
-//                                        value = "Missing credentialData in the request body."
-//                                    }
-//                                    example("Invalid credentialData format.") {
-//                                        value = "Invalid credentialData format."
-//                                    }
-//                                }
-//                            }
-//                        }
+                        response {
+                            "200" to {
+                                description = "Signed Credential (with the *proof* attribute added)"
+                                body<String> {
+                                    example(
+                                        "Signed UniversityDegreeCredential example",
+                                        IssuanceExamples.universityDegreeSignResponseCredentialExample
+                                    )
+                                }
+                            }
+                            "400" to {
+                                description = "The request could not be understood or was missing required parameters."
+                                body<String> {
+                                    example("Missing issuerKey in the request body") {
+                                        value = "Missing issuerKey in the request body."
+                                    }
+                                    example("Invalid issuerKey format.") {
+                                        value = "Invalid issuerKey format."
+                                    }
+                                    example("Missing subjectDid in the request body.") {
+                                        value = "Missing subjectDid in the request body."
+                                    }
+                                    example("Missing credentialData in the request body.") {
+                                        value = "Missing credentialData in the request body."
+                                    }
+                                    example("Invalid credentialData format.") {
+                                        value = "Invalid credentialData format."
+                                    }
+                                }
+                            }
+                        }
                     }) {
+
                         runCatching {
                             val body = context.receive<JsonObject>()
                             validateRawSignatureRequest(body)
@@ -296,41 +297,41 @@ fun Application.issuerApi() {
                             }
                         }
 
-//                        response {
-//                            "200" to {
-//                                description = "Credential signed (with the *proof* attribute added)"
-//                                body<String> {
-//                                    example("Issuance URL") {
-//                                        value =
-//                                            "openid-credential-offer://localhost/?credential_offer=%7B%22credential_issuer%22%3A%22http%3A%2F%2Flocalhost%3A8000%22%2C%22credentials%22%3A%5B%22VerifiableId%22%5D%2C%22grants%22%3A%7B%22authorization_code%22%3A%7B%22issuer_state%22%3A%22501414a4-c461-43f0-84b2-c628730c7c02%22%7D%7D%7D"
-//                                    }
-//                                }
-//                            }
-//                            "400" to {
-//                                description =
-//                                    "Bad request - The request could not be understood or was missing required parameters."
-//                                body<String> {
-//                                    example("Missing issuerKey in the request body.") {
-//                                        value = "Missing issuerKey in the request body."
-//                                    }
-//                                    example("Invalid issuerKey format.") {
-//                                        value = "Invalid issuerKey format."
-//                                    }
-//                                    example("Missing issuerDid in the request body.") {
-//                                        value = "Missing issuerDid in the request body."
-//                                    }
-//                                    example("Missing credentialConfigurationId in the request body.") {
-//                                        value = "Missing credentialConfigurationId in the request body."
-//                                    }
-//                                    example("Missing credentialData in the request body.") {
-//                                        value = "Missing credentialData in the request body."
-//                                    }
-//                                    example("Invalid credentialData format.") {
-//                                        value = "Invalid credentialData format."
-//                                    }
-//                                }
-//                            }
-//                        }
+                        response {
+                            "200" to {
+                                description = "Credential signed (with the *proof* attribute added)"
+                                body<String> {
+                                    example("Issuance URL") {
+                                        value =
+                                            "openid-credential-offer://localhost/?credential_offer=%7B%22credential_issuer%22%3A%22http%3A%2F%2Flocalhost%3A8000%22%2C%22credentials%22%3A%5B%22VerifiableId%22%5D%2C%22grants%22%3A%7B%22authorization_code%22%3A%7B%22issuer_state%22%3A%22501414a4-c461-43f0-84b2-c628730c7c02%22%7D%7D%7D"
+                                    }
+                                }
+                            }
+                            "400" to {
+                                description =
+                                    "Bad request - The request could not be understood or was missing required parameters."
+                                body<String> {
+                                    example("Missing issuerKey in the request body.") {
+                                        value = "Missing issuerKey in the request body."
+                                    }
+                                    example("Invalid issuerKey format.") {
+                                        value = "Invalid issuerKey format."
+                                    }
+                                    example("Missing issuerDid in the request body.") {
+                                        value = "Missing issuerDid in the request body."
+                                    }
+                                    example("Missing credentialConfigurationId in the request body.") {
+                                        value = "Missing credentialConfigurationId in the request body."
+                                    }
+                                    example("Missing credentialData in the request body.") {
+                                        value = "Missing credentialData in the request body."
+                                    }
+                                    example("Invalid credentialData format.") {
+                                        value = "Invalid credentialData format."
+                                    }
+                                }
+                            }
+                        }
                     }) {
                         runCatching {
                             val jwtIssuanceRequest = context.receive<IssuanceRequest>()
