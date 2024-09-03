@@ -1,11 +1,13 @@
 package id.walt.authkit.methods
 
 import id.walt.authkit.AuthContext
+import id.walt.authkit.accounts.identifiers.RADIUSIdentifier
 import id.walt.authkit.exceptions.authCheck
-import id.walt.authkit.methods.data.AuthMethodStoredData
+import id.walt.authkit.methods.config.AuthMethodConfiguration
 import id.walt.authkit.sessions.AuthSession
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
+import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.util.pipeline.*
 import kotlinx.serialization.Serializable
@@ -29,27 +31,34 @@ object RADIUS : UserPassBasedAuthMethod("radius") {
         val radiusServerPort: Int,
         val radiusServerSecret: String,
         val radiusNasIdentifier: String,
-    ): AuthMethodStoredData
+    ): AuthMethodConfiguration
 
-    val radiusClient: RadiusClient = UdpRadiusClient.newBuilder()
-        .secret("sharedsecret".toByteArray())
-        .address(InetSocketAddress("10.1.1.10", 1812))
-        .build()
-
-    // Todo: Move to configuration (is not stored data)
 
     override suspend fun auth(session: AuthSession, credential: UserPasswordCredential) {
+        val config = session.lookupConfiguration<RADIUSConfiguration>(this)
+
+        val radiusClient: RadiusClient = UdpRadiusClient.newBuilder()
+            .secret(config.radiusServerSecret.toByteArray())
+            .address(InetSocketAddress(config.radiusServerHost, config.radiusServerPort))
+            .build()
+
+        val host = "${config.radiusServerHost}:${config.radiusServerPort}"
+
+        val identifier = RADIUSIdentifier(host, credential.name)
+
         val accessRequest = AccessRequest(
             listOf(
                 UserName(TextData(credential.name)),
                 UserPassword(StringData(credential.password.toByteArray())),
-                NasIdentifier(TextData("this is like a client id"))
+                NasIdentifier(TextData(config.radiusNasIdentifier))
             )
         )
 
         val responsePacket: Packet = radiusClient.send(accessRequest)
         authCheck(responsePacket is AccessAccept) { "RADIUS server did not accept authentication" }
 
+        session.accountId = identifier.resolveToAccountId()
+        session.progressFlow(this@RADIUS)
     }
 
 
@@ -60,6 +69,8 @@ object RADIUS : UserPassBasedAuthMethod("radius") {
             val credential = call.getUsernamePasswordFromRequest()
 
             auth(session, credential)
+
+            context.respond(session.toInformation())
         }
     }
 
