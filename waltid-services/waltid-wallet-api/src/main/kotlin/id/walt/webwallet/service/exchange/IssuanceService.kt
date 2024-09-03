@@ -108,8 +108,50 @@ object IssuanceService {
         )
     }
 
-    suspend fun submitExternallySignedOfferRequest(): List<CredentialDataResult> {
-        TODO()
+    suspend fun submitExternallySignedOfferRequest(
+        credentialIssuerURL: String,
+        credentialWallet: TestCredentialWallet,
+        offeredCredentials: List<OfferedCredential>,
+        signedJWT: String,
+        tokenResponse: TokenResponse,
+    ): List<CredentialDataResult> {
+        logger.debug { "// get issuer metadata" }
+        val providerMetadata = getCredentialIssuerOpenIDMetadata(
+            credentialIssuerURL,
+            credentialWallet,
+        )
+        logger.debug { "providerMetadata: $providerMetadata" }
+        logger.debug { "Using issuer URL: $credentialIssuerURL" }
+        val credReqs = offeredCredentials.map { offeredCredential ->
+            logger.info("Offered credential format: ${offeredCredential.format.name}")
+            logger.info(
+                "Offered credential cryptographic binding methods: ${
+                    offeredCredential.cryptographicBindingMethodsSupported?.joinToString(
+                        ", "
+                    ) ?: ""
+                }"
+            )
+            CredentialRequest.forOfferedCredential(
+                offeredCredential = offeredCredential,
+                proof = ProofOfPossession.JWTProofBuilder(
+                    issuerUrl = credentialIssuerURL,
+                ).build(signedJWT)
+            )
+        }
+        logger.debug { "credReqs: $credReqs" }
+
+        require(credReqs.isNotEmpty()) { "No credentials offered" }
+        val processedCredentialOffers = CredentialOfferProcessor.process(credReqs, providerMetadata, tokenResponse)
+        logger.debug { "// parse and verify credential(s)" }
+        check(processedCredentialOffers.any { it.credentialResponse.credential != null }) { "No credential was returned from credentialEndpoint: $processedCredentialOffers" }
+
+        // ??multiple credentials manifests
+//        val manifest =
+//            isEntra.takeIf { it }?.let { EntraManifestExtractor().extract(offer) }
+        return processedCredentialOffers.map {
+//            getCredentialData(it, manifest)
+            getCredentialData(it, null)
+        }
     }
 
     suspend fun useOfferRequest(
