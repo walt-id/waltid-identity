@@ -2,16 +2,14 @@ package id.walt.webwallet.service.exchange
 
 import cbor.Cbor
 import id.walt.crypto.utils.Base64Utils.base64UrlDecode
+import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.crypto.utils.JwsUtils.decodeJwsOrSdjwt
 import id.walt.did.dids.DidService
 import id.walt.mdoc.dataelement.toDataElement
 import id.walt.mdoc.doc.MDoc
 import id.walt.mdoc.issuersigned.IssuerSigned
 import id.walt.oid4vc.OpenID4VCI
-import id.walt.oid4vc.data.CredentialFormat
-import id.walt.oid4vc.data.CredentialOffer
-import id.walt.oid4vc.data.GrantType
-import id.walt.oid4vc.data.OpenIDProviderMetadata
+import id.walt.oid4vc.data.*
 import id.walt.oid4vc.providers.TokenTarget
 import id.walt.oid4vc.requests.*
 import id.walt.oid4vc.responses.*
@@ -26,18 +24,93 @@ import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.util.*
+import kotlinx.datetime.Clock
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromByteArray
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.*
 
 object IssuanceService {
 
     private val http = WalletHttpClients.getHttpClient()
     private val logger = logger<IssuanceService>()
+
+    suspend fun prepareExternallySignedOfferRequest(
+        offer: String,
+        credentialWallet: TestCredentialWallet,
+        keyId: String,
+        did: String,
+    ): PrepareExternalClaimResult {
+        logger.debug { "// -------- WALLET: PREPARE STEP FOR OID4VCI WITH EXTERNAL SIGNATURES ----------" }
+        logger.debug { "// parse credential URI" }
+        val reqParams = parseOfferParams(offer)
+
+        // entra or openid4vc credential offer
+        val isEntra = EntraIssuanceRequest.isEntraIssuanceRequestUri(offer)
+        return if(isEntra) {
+            TODO()
+        } else {
+            processPrepareCredentialOffer(
+                credentialWallet.resolveCredentialOffer(CredentialOfferRequest.fromHttpParameters(reqParams)),
+                credentialWallet,
+                did,
+                keyId,
+            )
+        }
+    }
+
+    private suspend fun processPrepareCredentialOffer(
+        credentialOffer: CredentialOffer,
+        credentialWallet: TestCredentialWallet,
+        did: String,
+        keyId: String,
+    ): PrepareExternalClaimResult {
+        logger.debug { "// get issuer metadata" }
+        val providerMetadata = getCredentialIssuerOpenIDMetadata(
+            credentialOffer.credentialIssuer,
+            credentialWallet,
+        )
+        logger.debug { "providerMetadata: $providerMetadata" }
+
+        logger.debug { "// resolve offered credentials" }
+        val offeredCredentials = OpenID4VCI.resolveOfferedCredentials(credentialOffer, providerMetadata)
+        logger.debug { "offeredCredentials: $offeredCredentials" }
+
+        logger.debug { "// fetch access token using pre-authorized code (skipping authorization step)" }
+        val tokenReq = TokenRequest(
+            grantType = GrantType.pre_authorized_code,
+            clientId = did,
+            redirectUri = credentialWallet.config.redirectUri,
+            preAuthorizedCode = credentialOffer.grants[GrantType.pre_authorized_code.value]!!.preAuthorizedCode,
+            txCode = null
+        )
+        val tokenResp = issueTokenRequest(
+            providerMetadata.tokenEndpoint!!,
+            tokenReq,
+        )
+        logger.debug { ">>> Token response = success: ${tokenResp.isSuccess}" }
+        return PrepareExternalClaimResult(
+            resolvedCredentialOffer = credentialOffer,
+            offeredCredentials = offeredCredentials,
+            tokenResponse = tokenResp,
+            jwtParams = UnsignedJWTParameters(
+                header = mapOf(
+                    "typ" to "JWT".toJsonElement(),
+                    "kid" to keyId.toJsonElement(),
+                ),
+                payload = buildJsonObject {
+                    put("iss", did)
+                    put("aud", credentialOffer.credentialIssuer)
+                    put("iat", Clock.System.now().epochSeconds)
+                    tokenResp.cNonce?.let { put("nonce", it) }
+                }.toString()
+            )
+        )
+    }
+
+    suspend fun submitExternallySignedOfferRequest(): List<CredentialDataResult> {
+        TODO()
+    }
 
     suspend fun useOfferRequest(
         offer: String, credentialWallet: TestCredentialWallet, clientId: String,
@@ -45,7 +118,7 @@ object IssuanceService {
         logger.debug { "// -------- WALLET ----------" }
         logger.debug { "// as WALLET: receive credential offer, either being called via deeplink or by scanning QR code" }
         logger.debug { "// parse credential URI" }
-        val reqParams = Url(offer).parameters.toMap()
+        val reqParams = parseOfferParams(offer)
 
         // entra or openid4vc credential offer
         val isEntra = EntraIssuanceRequest.isEntraIssuanceRequestUri(offer)
@@ -75,6 +148,8 @@ object IssuanceService {
             getCredentialData(it, manifest)
         }
     }
+
+    private fun parseOfferParams(offerURL: String) = Url(offerURL).parameters.toMap()
 
     private suspend fun getCredentialIssuerOpenIDMetadata(
         issuerURL: String,
@@ -297,5 +372,19 @@ object IssuanceService {
         val disclosures: String? = null,
         val type: String,
         val format: CredentialFormat,
+    )
+
+    @Serializable
+    data class PrepareExternalClaimResult(
+        val resolvedCredentialOffer: CredentialOffer,
+        val offeredCredentials: List<OfferedCredential>,
+        val tokenResponse: TokenResponse,
+        val jwtParams: UnsignedJWTParameters,
+    )
+
+    @Serializable
+    data class UnsignedJWTParameters(
+        val header: Map<String, JsonElement>,
+        val payload: String,
     )
 }
