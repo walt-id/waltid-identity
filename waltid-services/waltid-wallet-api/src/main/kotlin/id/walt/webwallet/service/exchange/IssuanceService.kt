@@ -96,30 +96,14 @@ object IssuanceService {
                     "Only ${ProofType.jwt} is supported in credential offer handling with external signatures." +
                             "Not found in issuer's supported proof types for offer: $offeredCredential"
                 )
-            val jwtBuilder = if (offeredCredential.cryptographicBindingMethodsSupported != null &&
-                !offeredCredential.cryptographicBindingMethodsSupported!!.contains("did")
-            ) {
-                val key = DidService.resolveToKey(did).getOrThrow()
-                ProofOfPossession.JWTProofBuilder(
-                    issuerUrl = credentialOffer.credentialIssuer,
-                    nonce = tokenResp.cNonce,
-                    keyJwk = key.getPublicKey().exportJWKObject(),
-                    keyId = key.getKeyId(),
-                )
-            } else { //proof of did possession here
-                ProofOfPossession.JWTProofBuilder(
-                    credentialOffer.credentialIssuer,
-                    did,
-                    tokenResp.cNonce,
-                    keyId,
-                )
-
-            }
             OfferedCredentialProofOfPossessionParameters(
                 offeredCredential,
-                UnsignedJWTParameters(
-                    header = jwtBuilder.headers.toMap(),
-                    payload = jwtBuilder.payload.toString(),
+                getOfferedCredentialUnsignedJWTParams(
+                    offeredCredential,
+                    credentialOffer.credentialIssuer,
+                    did,
+                    keyId,
+                    tokenResp.cNonce,
                 ),
             )
         }
@@ -127,6 +111,37 @@ object IssuanceService {
             resolvedCredentialOffer = credentialOffer,
             offeredCredentialsProofRequests = offeredCredentialsProofRequests,
             accessToken = tokenResp.accessToken,
+        )
+    }
+
+    private suspend fun getOfferedCredentialUnsignedJWTParams(
+        offeredCredential: OfferedCredential,
+        issuerURL: String,
+        did: String,
+        keyId: String,
+        nonce: String?,
+    ): UnsignedJWTParameters {
+        val jwtBuilder = if (offeredCredential.cryptographicBindingMethodsSupported != null &&
+            !offeredCredential.cryptographicBindingMethodsSupported!!.contains("did")
+        ) {
+            val key = DidService.resolveToKey(did).getOrThrow()
+            ProofOfPossession.JWTProofBuilder(
+                issuerUrl = issuerURL,
+                nonce = nonce,
+                keyJwk = key.getPublicKey().exportJWKObject(),
+                keyId = key.getKeyId(),
+            )
+        } else { //proof of did possession here
+            ProofOfPossession.JWTProofBuilder(
+                issuerURL,
+                did,
+                nonce,
+                keyId,
+            )
+        }
+        return UnsignedJWTParameters(
+            jwtBuilder.headers.toMap(),
+            jwtBuilder.payload.toString(),
         )
     }
 
