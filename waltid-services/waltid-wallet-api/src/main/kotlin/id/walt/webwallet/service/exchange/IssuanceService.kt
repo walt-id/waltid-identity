@@ -266,9 +266,7 @@ object IssuanceService {
 
     suspend fun resolveVct(vct: String): SDTypeMetadata {
         val authority = Url(vct).protocolWithAuthority
-        val type = Url(vct).pathSegments[1]
-
-        val response = http.get("$authority/.well-known/vct/$type")
+        val response = http.get("$authority/.well-known/vct${vct.substringAfter(authority)}")
 
         require(response.status.isSuccess()) {"VCT URL returns error: ${response.status}"}
 
