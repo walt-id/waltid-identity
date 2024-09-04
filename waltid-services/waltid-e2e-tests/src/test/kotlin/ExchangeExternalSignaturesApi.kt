@@ -83,8 +83,19 @@ class ExchangeExternalSignatures {
         }
     }
 
+    private suspend fun clearWalletCredentials() {
+        val response = client.get("/wallet-api/wallet/$walletId/credentials").expectSuccess()
+        val credsList = response.body<List<WalletCredential>>()
+        credsList.forEach {
+            credentialsApi.delete(
+                walletId,
+                it.id,
+                true,
+            )
+        }
+    }
+
     private suspend fun initializeWallet() {
-        cleanWallet()
         //import the holder's public key to the wallet API
         keysApi.import(walletId, holderKey.getPublicKey().exportJWK())
         //check that it's the only key in the wallet
@@ -116,16 +127,25 @@ class ExchangeExternalSignatures {
         runBlocking {
             registerAccountAndLogin()
             prepareApis()
-            initializeWallet()
+            cleanWallet()
         }
     }
 
     suspend fun executeTestCases() {
+        initializeWallet()
         happyPathPreAuthorizedOID4VCI()
         happyPathOID4VP()
+        clearWalletCredentials()
+        happyPathPreAuthorizedOID4VCI(
+            useOptionalParameters = false,
+        )
+        happyPathOID4VP()
+        clearWalletCredentials()
     }
 
-    private suspend fun happyPathPreAuthorizedOID4VCI() {
+    private suspend fun happyPathPreAuthorizedOID4VCI(
+        useOptionalParameters: Boolean = true,
+    ) {
         lateinit var offerURL: String
         issuerApi.issue(
             Json.decodeFromString<IssuanceRequest>(loadResource("issuance/openbadgecredential-issuance-request.json"))
@@ -134,10 +154,12 @@ class ExchangeExternalSignatures {
             println("offer: $offerURL")
         }
         var response = client.post("/wallet-api/wallet/$walletId/exchange/external_signatures/offer/prepare") {
-            setBody(PrepareOID4VCIRequest(
-                did =  holderDID,
-                offerURL = offerURL,
-            ))
+            setBody(
+                PrepareOID4VCIRequest(
+                    did = if (useOptionalParameters) holderDID else null,
+                    offerURL = offerURL,
+                )
+            )
         }.expectSuccess()
         val prepareResponse = response.body<PrepareOID4VCIResponse>()
         //compute the signature here
@@ -146,18 +168,19 @@ class ExchangeExternalSignatures {
             prepareResponse.jwtParams.header,
         )
         response = client.post("/wallet-api/wallet/$walletId/exchange/external_signatures/offer/submit") {
-            setBody(SubmitOID4VCIRequest(
-                did = holderDID,
-                offerURL = offerURL,
-                requireUserInput = false,
-                credentialIssuer = prepareResponse.credentialIssuer,
-                offeredCredentials = prepareResponse.offeredCredentials,
-                tokenResponse = prepareResponse.tokenResponse,
-                signedProofOfDIDPossession = signedProofOfPossession,
-            ))
+            setBody(
+                SubmitOID4VCIRequest(
+                    did = if (useOptionalParameters) holderDID else null,
+                    offerURL = offerURL,
+                    credentialIssuer = prepareResponse.credentialIssuer,
+                    offeredCredentials = prepareResponse.offeredCredentials,
+                    tokenResponse = prepareResponse.tokenResponse,
+                    signedProofOfDIDPossession = signedProofOfPossession,
+                )
+            )
         }.expectSuccess()
         val credList = response.body<List<WalletCredential>>()
-        assert( credList.size == 1 ) { "There should be one credential in the wallet now" }
+        assert(credList.size == 1) { "There should be one credential in the wallet now" }
     }
 
     private suspend fun happyPathOID4VP() {
