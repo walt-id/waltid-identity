@@ -91,19 +91,36 @@ object IssuanceService {
         validateTokenResponse(tokenResp)
 
         val offeredCredentialsProofRequests = offeredCredentials.map { offeredCredential ->
-            val jwtBuilder = ProofOfPossession.JWTProofBuilder(
-                issuerUrl = credentialOffer.credentialIssuer,
-                clientId = did,
-                nonce = tokenResp.cNonce,
-                keyId = keyId,
-                audience = credentialOffer.credentialIssuer,
-            )
+            if (offeredCredential.proofTypesSupported?.containsKey(ProofType.jwt) == false)
+                throw UnsupportedOperationException(
+                    "Only ${ProofType.jwt} is supported in credential offer handling with external signatures." +
+                            "Not found in issuer's supported proof types for offer: $offeredCredential"
+                )
+            val jwtBuilder = if (offeredCredential.cryptographicBindingMethodsSupported != null &&
+                !offeredCredential.cryptographicBindingMethodsSupported!!.contains("did")
+            ) {
+                val key = DidService.resolveToKey(did).getOrThrow()
+                ProofOfPossession.JWTProofBuilder(
+                    issuerUrl = credentialOffer.credentialIssuer,
+                    nonce = tokenResp.cNonce,
+                    keyJwk = key.getPublicKey().exportJWKObject(),
+                    keyId = key.getKeyId(),
+                )
+            } else { //proof of did possession here
+                ProofOfPossession.JWTProofBuilder(
+                    credentialOffer.credentialIssuer,
+                    did,
+                    tokenResp.cNonce,
+                    keyId,
+                )
+
+            }
             OfferedCredentialProofOfPossessionParameters(
                 offeredCredential,
                 UnsignedJWTParameters(
                     header = jwtBuilder.headers.toMap(),
                     payload = jwtBuilder.payload.toString(),
-                )
+                ),
             )
         }
         return PrepareExternalClaimResult(
