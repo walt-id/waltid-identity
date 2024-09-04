@@ -3,7 +3,6 @@ package id.walt.issuer.issuance
 import id.walt.commons.interop.LspPotentialInterop
 import id.walt.crypto.keys.KeyType
 import id.walt.issuer.lspPotential.LspPotentialIssuanceInterop
-import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.data.dif.VCFormat
 import io.github.smiley4.ktorswaggerui.dsl.routes.ValueExampleDescriptorDsl
 import kotlinx.serialization.json.*
@@ -321,8 +320,7 @@ object IssuanceExamples {
               }
           },
           "x5Chain": ${buildJsonArray { add(LspPotentialInterop.POTENTIAL_ISSUER_CERT) }},
-          "trustedRootCAs": ${buildJsonArray { add(LspPotentialInterop.POTENTIAL_ROOT_CA_CERT) }},
-          "credentialFormat": "${CredentialFormat.mso_mdoc}"
+          "trustedRootCAs": ${buildJsonArray { add(LspPotentialInterop.POTENTIAL_ROOT_CA_CERT) }}
        }
     """.trimIndent()
 
@@ -389,7 +387,6 @@ object IssuanceExamples {
             {
                 "issuerKey": $issuerKey,
                 "issuerDid": $issuerDid,
-                "credentialFormat" : "jwt_vc_json",
                 "credentialConfigurationId": "OpenBadgeCredential_${VCFormat.jwt_vc_json.value}",
                 "credentialData": $openBadgeCredentialData,
                 "mdocData": null,
@@ -745,7 +742,6 @@ object IssuanceExamples {
                 "jwk": ${Json.parseToJsonElement(LspPotentialIssuanceInterop.POTENTIAL_ISSUER_JWK_KEY.jwk!!)}
             },
             "issuerDid": "",
-            "credentialFormat" : "vc+sd-jwt",
             "credentialConfigurationId": "identity_credential_vc+sd-jwt",
             "credentialData": $sdjwt_vc_identity_credential,
             "mdocData": null,
