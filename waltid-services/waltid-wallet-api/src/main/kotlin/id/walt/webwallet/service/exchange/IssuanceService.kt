@@ -47,7 +47,7 @@ object IssuanceService {
 
         // entra or openid4vc credential offer
         val isEntra = EntraIssuanceRequest.isEntraIssuanceRequestUri(offerURL)
-        return if(isEntra) {
+        return if (isEntra) {
             TODO()
         } else {
             processPrepareCredentialOffer(
@@ -87,11 +87,13 @@ object IssuanceService {
             providerMetadata.tokenEndpoint!!,
             tokenReq,
         )
-        logger.debug { ">>> Token response = success: ${tokenResp.isSuccess}" }
+        logger.debug { ">>> Token response is: $tokenResp" }
+        validateTokenResponse(tokenResp)
+
         return PrepareExternalClaimResult(
             resolvedCredentialOffer = credentialOffer,
             offeredCredentials = offeredCredentials,
-            tokenResponse = tokenResp,
+            accessToken = tokenResp.accessToken,
             jwtParams = UnsignedJWTParameters(
                 header = mapOf(
                     "typ" to "JWT".toJsonElement(),
@@ -112,7 +114,7 @@ object IssuanceService {
         credentialWallet: TestCredentialWallet,
         offeredCredentials: List<OfferedCredential>,
         signedJWT: String,
-        tokenResponse: TokenResponse,
+        accessToken: String?,
     ): List<CredentialDataResult> {
         logger.debug { "// get issuer metadata" }
         val providerMetadata = getCredentialIssuerOpenIDMetadata(
@@ -140,7 +142,7 @@ object IssuanceService {
         logger.debug { "credReqs: $credReqs" }
 
         require(credReqs.isNotEmpty()) { "No credentials offered" }
-        val processedCredentialOffers = CredentialOfferProcessor.process(credReqs, providerMetadata, tokenResponse)
+        val processedCredentialOffers = CredentialOfferProcessor.process(credReqs, providerMetadata, accessToken!!)
         logger.debug { "// parse and verify credential(s)" }
         check(processedCredentialOffers.any { it.credentialResponse.credential != null }) { "No credential was returned from credentialEndpoint: $processedCredentialOffers" }
 
@@ -219,6 +221,19 @@ object IssuanceService {
         it.body<JsonObject>().let { TokenResponse.fromJSON(it) }
     }
 
+    private fun validateTokenResponse(
+        tokenResponse: TokenResponse,
+    ) {
+        require(tokenResponse.isSuccess) {
+            "token request failed: ${tokenResponse.error} ${tokenResponse.errorDescription}"
+        }
+        //there has to be an access token in the response, otherwise we are unable
+        //to invoke the credential endpoint
+        requireNotNull(tokenResponse.accessToken) {
+            "invalid Authorization Server token response: no access token included in the response: $tokenResponse "
+        }
+    }
+
     private suspend fun processCredentialOffer(
         credentialOffer: CredentialOffer,
         credentialWallet: TestCredentialWallet,
@@ -246,7 +261,11 @@ object IssuanceService {
             providerMetadata.tokenEndpoint!!,
             tokenReq,
         )
-        logger.debug { ">>> Token response = success: ${tokenResp.isSuccess}" }
+        logger.debug { ">>> Token response is: $tokenResp" }
+        validateTokenResponse(tokenResp)
+        //we know for a fact that there is an access token in the response
+        //due to the validation call above
+        val accessToken = tokenResp.accessToken!!
 
         logger.debug { "// receive credential" }
         val nonce = tokenResp.cNonce
@@ -280,7 +299,7 @@ object IssuanceService {
         logger.debug { "credReqs: $credReqs" }
 
         require(credReqs.isNotEmpty()) { "No credentials offered" }
-        return CredentialOfferProcessor.process(credReqs, providerMetadata, tokenResp)
+        return CredentialOfferProcessor.process(credReqs, providerMetadata, accessToken)
     }
 
     private suspend fun processMSEntraIssuanceRequest(
@@ -419,7 +438,7 @@ object IssuanceService {
     data class PrepareExternalClaimResult(
         val resolvedCredentialOffer: CredentialOffer,
         val offeredCredentials: List<OfferedCredential>,
-        val tokenResponse: TokenResponse,
+        val accessToken: String?,
         val jwtParams: UnsignedJWTParameters,
     )
 

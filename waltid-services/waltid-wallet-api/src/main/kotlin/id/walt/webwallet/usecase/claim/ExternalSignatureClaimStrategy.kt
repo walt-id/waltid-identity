@@ -1,7 +1,6 @@
 package id.walt.webwallet.usecase.claim
 
 import id.walt.oid4vc.data.OfferedCredential
-import id.walt.oid4vc.responses.TokenResponse
 import id.walt.webwallet.service.SSIKit2WalletService
 import id.walt.webwallet.service.credentials.CredentialsService
 import id.walt.webwallet.service.exchange.IssuanceService
@@ -33,14 +32,14 @@ class ExternalSignatureClaimStrategy(
         did: String,
         credentialIssuerURL: String,
         signedJWT: String,
-        tokenResponse: TokenResponse,
+        accessToken: String?,
         offeredCredentials: List<OfferedCredential>,
     ) = issuanceService.submitExternallySignedOfferRequest(
         credentialIssuerURL = credentialIssuerURL,
         credentialWallet = SSIKit2WalletService.getCredentialWallet(did),
         offeredCredentials = offeredCredentials,
         signedJWT = signedJWT,
-        tokenResponse = tokenResponse,
+        accessToken = accessToken,
     ).map { credentialDataResult ->
         ClaimCommons.convertCredentialDataResultToWalletCredential(
             credentialDataResult,

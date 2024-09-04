@@ -391,7 +391,7 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                 val responsePayload = PrepareOID4VCIResponse(
                     did = walletDID.did,
                     offerURL = req.offerURL,
-                    tokenResponse = prepareClaimResult.tokenResponse,
+                    accessToken = prepareClaimResult.accessToken,
                     offeredCredentials = prepareClaimResult.offeredCredentials,
                     credentialIssuer = prepareClaimResult.resolvedCredentialOffer.credentialIssuer,
                     jwtParams = UnsignedProofOfPossessionParameters(
@@ -439,7 +439,7 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                         did = did,
                         credentialIssuerURL = req.credentialIssuer,
                         signedJWT = req.signedProofOfDIDPossession,
-                        tokenResponse = req.tokenResponse,
+                        accessToken = req.accessToken,
                         offeredCredentials = req.offeredCredentials,
                     )
             }.onSuccess { walletCredentialList ->
@@ -498,7 +498,7 @@ data class PrepareOID4VCIRequest(
 data class PrepareOID4VCIResponse(
     val did: String? = null,
     val offerURL: String,
-    val tokenResponse: TokenResponse,
+    val accessToken: String? = null,
     val offeredCredentials: List<OfferedCredential>,
     val credentialIssuer: String,
     val jwtParams: UnsignedProofOfPossessionParameters,
@@ -511,7 +511,7 @@ data class SubmitOID4VCIRequest(
     val did: String? = null,
     val offerURL: String,
     val requireUserInput: Boolean? = false,
-    val tokenResponse: TokenResponse,
+    val accessToken: String? = null,
     val offeredCredentials: List<OfferedCredential>,
     val credentialIssuer: String,
     val signedProofOfDIDPossession: String,

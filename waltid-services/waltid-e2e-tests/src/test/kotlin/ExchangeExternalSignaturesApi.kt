@@ -18,6 +18,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.uuid.UUID
+import kotlin.test.assertNotNull
 
 class ExchangeExternalSignatures {
 
@@ -167,6 +168,7 @@ class ExchangeExternalSignatures {
             prepareResponse.jwtParams.payload.toByteArray(),
             prepareResponse.jwtParams.header,
         )
+        assertNotNull(prepareResponse.accessToken) { "There should be an access token in the response of the prepare endpoint"}
         response = client.post("/wallet-api/wallet/$walletId/exchange/external_signatures/offer/submit") {
             setBody(
                 SubmitOID4VCIRequest(
@@ -174,7 +176,7 @@ class ExchangeExternalSignatures {
                     offerURL = offerURL,
                     credentialIssuer = prepareResponse.credentialIssuer,
                     offeredCredentials = prepareResponse.offeredCredentials,
-                    tokenResponse = prepareResponse.tokenResponse,
+                    accessToken = prepareResponse.accessToken,
                     signedProofOfDIDPossession = signedProofOfPossession,
                 )
             )
