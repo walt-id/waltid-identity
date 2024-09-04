@@ -30,11 +30,13 @@ class ExternalSignatureClaimStrategy(
         walletId: UUID,
         pending: Boolean = true,
         did: String,
+        offerURL: String,
         credentialIssuerURL: String,
         signedJWT: String,
         accessToken: String?,
         offeredCredentials: List<OfferedCredential>,
     ) = issuanceService.submitExternallySignedOfferRequest(
+        offerURL = offerURL,
         credentialIssuerURL = credentialIssuerURL,
         credentialWallet = SSIKit2WalletService.getCredentialWallet(did),
         offeredCredentials = offeredCredentials,

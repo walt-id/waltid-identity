@@ -437,6 +437,7 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                         walletId = walletService.walletId,
                         pending = req.requireUserInput ?: true,
                         did = did,
+                        offerURL = req.offerURL,
                         credentialIssuerURL = req.credentialIssuer,
                         signedJWT = req.signedProofOfDIDPossession,
                         accessToken = req.accessToken,

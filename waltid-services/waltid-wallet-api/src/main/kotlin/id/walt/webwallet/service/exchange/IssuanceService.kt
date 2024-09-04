@@ -48,7 +48,8 @@ object IssuanceService {
         // entra or openid4vc credential offer
         val isEntra = EntraIssuanceRequest.isEntraIssuanceRequestUri(offerURL)
         return if (isEntra) {
-            TODO()
+            //TODO: Not yet implemented
+            throw UnsupportedOperationException("MS Entra credential issuance requests with externally provided signatures are not supported yet")
         } else {
             processPrepareCredentialOffer(
                 credentialWallet.resolveCredentialOffer(CredentialOfferRequest.fromHttpParameters(reqParams)),
@@ -110,12 +111,42 @@ object IssuanceService {
     }
 
     suspend fun submitExternallySignedOfferRequest(
+        offerURL: String,
         credentialIssuerURL: String,
         credentialWallet: TestCredentialWallet,
         offeredCredentials: List<OfferedCredential>,
         signedJWT: String,
         accessToken: String?,
     ): List<CredentialDataResult> {
+        val isEntra = EntraIssuanceRequest.isEntraIssuanceRequestUri(offerURL)
+        val processedCredentialOffers = if (isEntra) {
+            //TODO: Not yet implemented
+            throw UnsupportedOperationException("MS Entra credential issuance requests with externally provided signatures are not supported yet")
+        } else {
+            submitExternallySignedOID4VCICredentialRequests(
+                credentialIssuerURL,
+                credentialWallet,
+                offeredCredentials,
+                signedJWT,
+                accessToken,
+            )
+        }
+        logger.debug { "// parse and verify credential(s)" }
+        check(processedCredentialOffers.any { it.credentialResponse.credential != null }) { "No credential was returned from credentialEndpoint: $processedCredentialOffers" }
+
+        val manifest = if (isEntra) EntraManifestExtractor().extract(offerURL) else null
+        return processedCredentialOffers.map {
+            getCredentialData(it, manifest)
+        }
+    }
+
+    private suspend fun submitExternallySignedOID4VCICredentialRequests(
+        credentialIssuerURL: String,
+        credentialWallet: TestCredentialWallet,
+        offeredCredentials: List<OfferedCredential>,
+        signedJWT: String,
+        accessToken: String?,
+    ): List<ProcessedCredentialOffer> {
         logger.debug { "// get issuer metadata" }
         val providerMetadata = getCredentialIssuerOpenIDMetadata(
             credentialIssuerURL,
@@ -142,17 +173,7 @@ object IssuanceService {
         logger.debug { "credReqs: $credReqs" }
 
         require(credReqs.isNotEmpty()) { "No credentials offered" }
-        val processedCredentialOffers = CredentialOfferProcessor.process(credReqs, providerMetadata, accessToken!!)
-        logger.debug { "// parse and verify credential(s)" }
-        check(processedCredentialOffers.any { it.credentialResponse.credential != null }) { "No credential was returned from credentialEndpoint: $processedCredentialOffers" }
-
-        // ??multiple credentials manifests
-//        val manifest =
-//            isEntra.takeIf { it }?.let { EntraManifestExtractor().extract(offer) }
-        return processedCredentialOffers.map {
-//            getCredentialData(it, manifest)
-            getCredentialData(it, null)
-        }
+        return CredentialOfferProcessor.process(credReqs, providerMetadata, accessToken!!)
     }
 
     suspend fun useOfferRequest(
