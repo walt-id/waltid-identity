@@ -100,20 +100,58 @@ fun Route.globalExplicitMultiStep() {
         }
 
         post("start") {
-            val session = SessionManager.openExplicitSession(authFlow)
+            val session = SessionManager.openExplicitGlobalSession(authFlow)
             context.respond(session.toInformation())
         }
     }
 }
 
-fun Route.flowRoutes() {
+/*fun Route.accountImplicitMultiStep() {
+    route("flow-account1") {
+
+        *//*@Language("JSON")
+        val flowConfig = """
+            {
+                "method": "userpass",
+                "ok": true
+            }
+        """.trimIndent()
+        val authFlow = AuthFlow.fromConfig(flowConfig)
+
+
+        val contextFunction: PipelineContext<Unit, ApplicationCall>.() -> AuthContext = {
+            AuthContext(
+                tenant = call.request.host(),
+                sessionId = call.parameters["sessionId"],
+                implicitSessionGeneration = true,
+                initialFlow = authFlow
+            )
+        }*//*
+
+
+        registerAuthenticationMethod(UserPass, contextFunction)
+        route("{sessionId}") {
+            registerAuthenticationMethod(TOTP, contextFunction)
+        }
+
+
+        post("start") {
+            val session = SessionManager.openExplicitGlobalSession(authFlow)
+            context.respond(session.toInformation())
+        }
+    }
+}*/
+
+
+
+fun Route.authFlowRoutes() {
     // Global flows (service specifies flow)
     globalImplicitSingleStep()
     globalImplicitMultiStep()
     globalExplicitMultiStep()
 
     // Account flows (account specifies flow)
-
+    //accountImplicitMultiStep()
 }
 
 fun Application.testApp() {
@@ -127,7 +165,7 @@ fun Application.testApp() {
     routing {
         route("auth") {
             route("flows") {
-                flowRoutes()
+                authFlowRoutes()
             }
         }
 
