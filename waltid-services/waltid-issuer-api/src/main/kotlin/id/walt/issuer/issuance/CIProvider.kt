@@ -660,13 +660,12 @@ open class CIProvider : OpenIDCredentialIssuer(
     fun getVctByCredentialConfigurationId(credentialConfigurationId: String) = OidcApi.metadata.credentialConfigurationsSupported?.get(credentialConfigurationId)?.vct
 
     fun getVctBySupportedCredentialConfiguration(
-        supportedCredential: Map<String, CredentialSupported>?,
         baseUrl: String,
         credType: String
     ): CredentialSupported {
         val expectedVct = "$baseUrl/$credType"
 
-        supportedCredential?.entries?.forEach { entry ->
+        metadata.credentialConfigurationsSupported?.entries?.forEach { entry ->
             if (getVctByCredentialConfigurationId(entry.key) == expectedVct) {
                 return entry.value
             }
@@ -674,4 +673,6 @@ open class CIProvider : OpenIDCredentialIssuer(
 
        throw IllegalArgumentException("Invalid type value: $credType. The $credType type is not supported")
     }
+
+    fun getFormatByCredentialConfigurationId(id: String) = metadata.credentialConfigurationsSupported?.get(id)?.format
 }

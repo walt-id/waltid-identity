@@ -91,7 +91,7 @@ data class IssuanceRequest(
     val x5Chain: List<String>? = null,
     val trustedRootCAs: List<String>? = null,
 
-    var credentialFormat: CredentialFormat? = CredentialFormat.jwt_vc_json
+    var credentialFormat: CredentialFormat? = null
 )
 
 @Serializable
