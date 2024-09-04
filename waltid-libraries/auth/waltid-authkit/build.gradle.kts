@@ -2,6 +2,7 @@ plugins {
     kotlin("jvm")
     kotlin("plugin.serialization")
     id("io.ktor.plugin") version "2.3.12"
+    id("maven-publish")
 
     application
 
@@ -19,7 +20,9 @@ application {
 }
 
 repositories {
+    mavenLocal()
     mavenCentral()
+    maven("https://maven.waltid.dev/releases")
 }
 
 dependencies {
@@ -78,4 +81,42 @@ dependencies {
 
     // Kotlin
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit")
+}
+
+publishing {
+    publications {
+        create<MavenPublication>("mavenJava") {
+            pom {
+                name.set("walt.id AuthKit")
+                description.set(
+                    """
+                    Kotlin/Java library for AuthNZ
+                    """.trimIndent()
+                )
+                url.set("https://walt.id")
+            }
+            from(components["java"])
+        }
+    }
+
+    repositories {
+        maven {
+            val releasesRepoUrl = uri("https://maven.waltid.dev/releases")
+            val snapshotsRepoUrl = uri("https://maven.waltid.dev/snapshots")
+            url = uri(if (version.toString().endsWith("SNAPSHOT")) snapshotsRepoUrl else releasesRepoUrl)
+            val envUsername = System.getenv("MAVEN_USERNAME")
+            val envPassword = System.getenv("MAVEN_PASSWORD")
+
+            val usernameFile = File("secret_maven_username.txt")
+            val passwordFile = File("secret_maven_password.txt")
+
+            val secretMavenUsername = envUsername ?: usernameFile.let { if (it.isFile) it.readLines().first() else "" }
+            val secretMavenPassword = envPassword ?: passwordFile.let { if (it.isFile) it.readLines().first() else "" }
+
+            credentials {
+                username = secretMavenUsername
+                password = secretMavenPassword
+            }
+        }
+    }
 }
