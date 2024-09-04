@@ -634,10 +634,10 @@ open class CIProvider : OpenIDCredentialIssuer(
     }
 
     suspend fun getJwksSessions() : JsonObject{
-        var jwks = buildJsonObject {}
-        sessionCredentialPreMapping.getAll().forEach { it ->
-            it.forEach {
-                jwks = buildJsonObject {
+        var jwksList = buildJsonObject {}
+        sessionCredentialPreMapping.getAll().forEach { issuanceSessions ->
+            issuanceSessions.forEach {
+                jwksList = buildJsonObject {
                     put("keys", buildJsonArray {
                         val jwkWithKid = buildJsonObject {
                             it.issuerKey.key.getPublicKey().exportJWKObject().forEach {
@@ -646,8 +646,8 @@ open class CIProvider : OpenIDCredentialIssuer(
                             put("kid", it.issuerKey.key.getPublicKey().getKeyId())
                         }
                         add(jwkWithKid)
-                        jwks.forEach { it ->
-                            it.value.jsonArray.forEach {
+                        jwksList.forEach { jwks ->
+                            jwks.value.jsonArray.forEach {
                                 add(it)
                             }
                         }
@@ -655,7 +655,7 @@ open class CIProvider : OpenIDCredentialIssuer(
                 }
             }
         }
-        return jwks
+        return jwksList
     }
 
     fun getVctByCredentialConfigurationId(credentialConfigurationId: String) = OidcApi.metadata.credentialConfigurationsSupported?.get(credentialConfigurationId)?.vct
