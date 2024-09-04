@@ -435,7 +435,7 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                         tenantId = walletService.tenant,
                         accountId = walletService.accountId,
                         walletId = walletService.walletId,
-                        pending = req.requireUserInput,
+                        pending = req.requireUserInput ?: true,
                         did = did,
                         credentialIssuerURL = req.credentialIssuer,
                         signedJWT = req.signedProofOfDIDPossession,
@@ -510,7 +510,7 @@ typealias UnsignedProofOfPossessionParameters = UnsignedVPTokenParameters
 data class SubmitOID4VCIRequest(
     val did: String? = null,
     val offerURL: String,
-    val requireUserInput: Boolean,
+    val requireUserInput: Boolean? = false,
     val tokenResponse: TokenResponse,
     val offeredCredentials: List<OfferedCredential>,
     val credentialIssuer: String,
