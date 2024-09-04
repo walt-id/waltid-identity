@@ -2,7 +2,6 @@ package id.walt.webwallet.service.exchange
 
 import cbor.Cbor
 import id.walt.crypto.utils.Base64Utils.base64UrlDecode
-import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.crypto.utils.JwsUtils.decodeJwsOrSdjwt
 import id.walt.did.dids.DidService
 import id.walt.mdoc.dataelement.toDataElement
@@ -24,7 +23,6 @@ import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.util.*
-import kotlinx.datetime.Clock
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromByteArray
@@ -75,6 +73,7 @@ object IssuanceService {
         logger.debug { "// resolve offered credentials" }
         val offeredCredentials = OpenID4VCI.resolveOfferedCredentials(credentialOffer, providerMetadata)
         logger.debug { "offeredCredentials: $offeredCredentials" }
+        require(offeredCredentials.isNotEmpty()) { "Resolved an empty list of offered credentials" }
 
         logger.debug { "// fetch access token using pre-authorized code (skipping authorization step)" }
         val tokenReq = TokenRequest(
@@ -91,22 +90,21 @@ object IssuanceService {
         logger.debug { ">>> Token response is: $tokenResp" }
         validateTokenResponse(tokenResp)
 
+        val jwtBuilder = ProofOfPossession.JWTProofBuilder(
+            issuerUrl = credentialOffer.credentialIssuer,
+            clientId = did,
+            nonce = tokenResp.cNonce,
+            keyId = keyId,
+            audience = credentialOffer.credentialIssuer,
+        )
         return PrepareExternalClaimResult(
             resolvedCredentialOffer = credentialOffer,
             offeredCredentials = offeredCredentials,
             accessToken = tokenResp.accessToken,
             jwtParams = UnsignedJWTParameters(
-                header = mapOf(
-                    "typ" to "JWT".toJsonElement(),
-                    "kid" to keyId.toJsonElement(),
-                ),
-                payload = buildJsonObject {
-                    put("iss", did)
-                    put("aud", credentialOffer.credentialIssuer)
-                    put("iat", Clock.System.now().epochSeconds)
-                    tokenResp.cNonce?.let { put("nonce", it) }
-                }.toString()
-            )
+                header = jwtBuilder.headers.toMap(),
+                payload = jwtBuilder.payload.toString(),
+            ),
         )
     }
 
@@ -269,6 +267,7 @@ object IssuanceService {
         logger.debug { "// resolve offered credentials" }
         val offeredCredentials = OpenID4VCI.resolveOfferedCredentials(credentialOffer, providerMetadata)
         logger.debug { "offeredCredentials: $offeredCredentials" }
+        require(offeredCredentials.isNotEmpty()) { "Resolved an empty list of offered credentials" }
 
         logger.debug { "// fetch access token using pre-authorized code (skipping authorization step)" }
         val tokenReq = TokenRequest(
