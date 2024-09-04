@@ -635,8 +635,8 @@ open class CIProvider : OpenIDCredentialIssuer(
 
     suspend fun getJwksSessions() : JsonObject{
         var jwksList = buildJsonObject {}
-        sessionCredentialPreMapping.getAll().forEach { issuanceSessions ->
-            issuanceSessions.forEach {
+        sessionCredentialPreMapping.getAll().forEach {
+            it.forEach {
                 jwksList = buildJsonObject {
                     put("keys", buildJsonArray {
                         val jwkWithKid = buildJsonObject {
@@ -646,8 +646,7 @@ open class CIProvider : OpenIDCredentialIssuer(
                             put("kid", it.issuerKey.key.getPublicKey().getKeyId())
                         }
                         add(jwkWithKid)
-                        jwksList.forEach { jwks ->
-                            jwks.value.jsonArray.forEach {
+                        jwksList.forEach { it.value.jsonArray.forEach {
                                 add(it)
                             }
                         }
