@@ -90,21 +90,26 @@ object IssuanceService {
         logger.debug { ">>> Token response is: $tokenResp" }
         validateTokenResponse(tokenResp)
 
-        val jwtBuilder = ProofOfPossession.JWTProofBuilder(
-            issuerUrl = credentialOffer.credentialIssuer,
-            clientId = did,
-            nonce = tokenResp.cNonce,
-            keyId = keyId,
-            audience = credentialOffer.credentialIssuer,
-        )
+        val offeredCredentialsProofRequests = offeredCredentials.map { offeredCredential ->
+            val jwtBuilder = ProofOfPossession.JWTProofBuilder(
+                issuerUrl = credentialOffer.credentialIssuer,
+                clientId = did,
+                nonce = tokenResp.cNonce,
+                keyId = keyId,
+                audience = credentialOffer.credentialIssuer,
+            )
+            OfferedCredentialProofOfPossessionParameters(
+                offeredCredential,
+                UnsignedJWTParameters(
+                    header = jwtBuilder.headers.toMap(),
+                    payload = jwtBuilder.payload.toString(),
+                )
+            )
+        }
         return PrepareExternalClaimResult(
             resolvedCredentialOffer = credentialOffer,
-            offeredCredentials = offeredCredentials,
+            offeredCredentialsProofRequests = offeredCredentialsProofRequests,
             accessToken = tokenResp.accessToken,
-            jwtParams = UnsignedJWTParameters(
-                header = jwtBuilder.headers.toMap(),
-                payload = jwtBuilder.payload.toString(),
-            ),
         )
     }
 
@@ -112,8 +117,7 @@ object IssuanceService {
         offerURL: String,
         credentialIssuerURL: String,
         credentialWallet: TestCredentialWallet,
-        offeredCredentials: List<OfferedCredential>,
-        signedJWT: String,
+        offeredCredentialProofsOfPossession: List<OfferedCredentialProofOfPossession>,
         accessToken: String?,
     ): List<CredentialDataResult> {
         val isEntra = EntraIssuanceRequest.isEntraIssuanceRequestUri(offerURL)
@@ -124,8 +128,7 @@ object IssuanceService {
             submitExternallySignedOID4VCICredentialRequests(
                 credentialIssuerURL,
                 credentialWallet,
-                offeredCredentials,
-                signedJWT,
+                offeredCredentialProofsOfPossession,
                 accessToken,
             )
         }
@@ -141,8 +144,7 @@ object IssuanceService {
     private suspend fun submitExternallySignedOID4VCICredentialRequests(
         credentialIssuerURL: String,
         credentialWallet: TestCredentialWallet,
-        offeredCredentials: List<OfferedCredential>,
-        signedJWT: String,
+        offeredCredentialProofsOfPossession: List<OfferedCredentialProofOfPossession>,
         accessToken: String?,
     ): List<ProcessedCredentialOffer> {
         logger.debug { "// get issuer metadata" }
@@ -152,7 +154,9 @@ object IssuanceService {
         )
         logger.debug { "providerMetadata: $providerMetadata" }
         logger.debug { "Using issuer URL: $credentialIssuerURL" }
-        val credReqs = offeredCredentials.map { offeredCredential ->
+        val credReqs = offeredCredentialProofsOfPossession.map { offeredCredentialProofOfPossession ->
+            val offeredCredential = offeredCredentialProofOfPossession.offeredCredential
+            val proof = offeredCredentialProofOfPossession.signedProofOfPossession
             logger.info("Offered credential format: ${offeredCredential.format.name}")
             logger.info(
                 "Offered credential cryptographic binding methods: ${
@@ -165,7 +169,7 @@ object IssuanceService {
                 offeredCredential = offeredCredential,
                 proof = ProofOfPossession.JWTProofBuilder(
                     issuerUrl = credentialIssuerURL,
-                ).build(signedJWT)
+                ).build(proof)
             )
         }
         logger.debug { "credReqs: $credReqs" }
@@ -457,9 +461,20 @@ object IssuanceService {
     @Serializable
     data class PrepareExternalClaimResult(
         val resolvedCredentialOffer: CredentialOffer,
-        val offeredCredentials: List<OfferedCredential>,
+        val offeredCredentialsProofRequests: List<OfferedCredentialProofOfPossessionParameters>,
         val accessToken: String?,
+    )
+
+    @Serializable
+    data class OfferedCredentialProofOfPossessionParameters(
+        val offeredCredential: OfferedCredential,
         val jwtParams: UnsignedJWTParameters,
+    )
+
+    @Serializable
+    data class OfferedCredentialProofOfPossession(
+        val offeredCredential: OfferedCredential,
+        val signedProofOfPossession: String,
     )
 
     @Serializable

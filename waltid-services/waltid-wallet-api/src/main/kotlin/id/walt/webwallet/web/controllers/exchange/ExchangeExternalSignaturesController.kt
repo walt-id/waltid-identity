@@ -25,6 +25,7 @@ import id.walt.webwallet.service.credentials.CredentialsService
 import id.walt.webwallet.service.dids.DidsService
 import id.walt.webwallet.service.events.EventDataNotAvailable
 import id.walt.webwallet.service.events.EventType
+import id.walt.webwallet.service.exchange.IssuanceService
 import id.walt.webwallet.utils.WalletHttpClients
 import id.walt.webwallet.web.controllers.auth.getWalletService
 import id.walt.webwallet.web.controllers.walletRoute
@@ -392,12 +393,8 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                     did = walletDID.did,
                     offerURL = req.offerURL,
                     accessToken = prepareClaimResult.accessToken,
-                    offeredCredentials = prepareClaimResult.offeredCredentials,
+                    offeredCredentialsProofRequests = prepareClaimResult.offeredCredentialsProofRequests,
                     credentialIssuer = prepareClaimResult.resolvedCredentialOffer.credentialIssuer,
-                    jwtParams = UnsignedProofOfPossessionParameters(
-                        header = prepareClaimResult.jwtParams.header,
-                        payload = prepareClaimResult.jwtParams.payload,
-                    )
                 )
                 context.respond(
                     HttpStatusCode.OK,
@@ -439,9 +436,8 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                         did = did,
                         offerURL = req.offerURL,
                         credentialIssuerURL = req.credentialIssuer,
-                        signedJWT = req.signedProofOfDIDPossession,
                         accessToken = req.accessToken,
-                        offeredCredentials = req.offeredCredentials,
+                        offeredCredentialProofsOfPossession = req.offeredCredentialProofsOfPossession,
                     )
             }.onSuccess { walletCredentialList ->
                 context.respond(HttpStatusCode.OK, walletCredentialList)
@@ -500,12 +496,9 @@ data class PrepareOID4VCIResponse(
     val did: String? = null,
     val offerURL: String,
     val accessToken: String? = null,
-    val offeredCredentials: List<OfferedCredential>,
+    val offeredCredentialsProofRequests: List<IssuanceService.OfferedCredentialProofOfPossessionParameters>,
     val credentialIssuer: String,
-    val jwtParams: UnsignedProofOfPossessionParameters,
 )
-
-typealias UnsignedProofOfPossessionParameters = UnsignedVPTokenParameters
 
 @Serializable
 data class SubmitOID4VCIRequest(
@@ -513,7 +506,6 @@ data class SubmitOID4VCIRequest(
     val offerURL: String,
     val requireUserInput: Boolean? = false,
     val accessToken: String? = null,
-    val offeredCredentials: List<OfferedCredential>,
+    val offeredCredentialProofsOfPossession: List<IssuanceService.OfferedCredentialProofOfPossession>,
     val credentialIssuer: String,
-    val signedProofOfDIDPossession: String,
 )

@@ -5,6 +5,7 @@ import id.walt.did.utils.randomUUID
 import id.walt.issuer.issuance.IssuanceRequest
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.db.models.WalletDid
+import id.walt.webwallet.service.exchange.IssuanceService
 import id.walt.webwallet.service.keys.SingleKeyResponse
 import id.walt.webwallet.web.controllers.exchange.*
 import id.walt.webwallet.web.model.EmailAccountRequest
@@ -163,11 +164,16 @@ class ExchangeExternalSignatures {
             )
         }.expectSuccess()
         val prepareResponse = response.body<PrepareOID4VCIResponse>()
-        //compute the signature here
-        val signedProofOfPossession = holderKey.signJws(
-            prepareResponse.jwtParams.payload.toByteArray(),
-            prepareResponse.jwtParams.header,
-        )
+        //compute the signatures here
+        val offeredCredentialProofsOfPossession = prepareResponse.offeredCredentialsProofRequests.map {
+            IssuanceService.OfferedCredentialProofOfPossession(
+                it.offeredCredential,
+                holderKey.signJws(
+                    it.jwtParams.payload.toByteArray(),
+                    it.jwtParams.header,
+                )
+            )
+        }
         assertNotNull(prepareResponse.accessToken) { "There should be an access token in the response of the prepare endpoint"}
         response = client.post("/wallet-api/wallet/$walletId/exchange/external_signatures/offer/submit") {
             setBody(
@@ -175,9 +181,8 @@ class ExchangeExternalSignatures {
                     did = if (useOptionalParameters) holderDID else null,
                     offerURL = offerURL,
                     credentialIssuer = prepareResponse.credentialIssuer,
-                    offeredCredentials = prepareResponse.offeredCredentials,
+                    offeredCredentialProofsOfPossession = offeredCredentialProofsOfPossession,
                     accessToken = prepareResponse.accessToken,
-                    signedProofOfDIDPossession = signedProofOfPossession,
                 )
             )
         }.expectSuccess()

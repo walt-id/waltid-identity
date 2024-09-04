@@ -1,9 +1,9 @@
 package id.walt.webwallet.usecase.claim
 
-import id.walt.oid4vc.data.OfferedCredential
 import id.walt.webwallet.service.SSIKit2WalletService
 import id.walt.webwallet.service.credentials.CredentialsService
 import id.walt.webwallet.service.exchange.IssuanceService
+import id.walt.webwallet.service.exchange.IssuanceService.OfferedCredentialProofOfPossession
 import id.walt.webwallet.usecase.event.EventLogUseCase
 import kotlinx.uuid.UUID
 
@@ -32,15 +32,13 @@ class ExternalSignatureClaimStrategy(
         did: String,
         offerURL: String,
         credentialIssuerURL: String,
-        signedJWT: String,
         accessToken: String?,
-        offeredCredentials: List<OfferedCredential>,
+        offeredCredentialProofsOfPossession: List<OfferedCredentialProofOfPossession>,
     ) = issuanceService.submitExternallySignedOfferRequest(
         offerURL = offerURL,
         credentialIssuerURL = credentialIssuerURL,
         credentialWallet = SSIKit2WalletService.getCredentialWallet(did),
-        offeredCredentials = offeredCredentials,
-        signedJWT = signedJWT,
+        offeredCredentialProofsOfPossession = offeredCredentialProofsOfPossession,
         accessToken = accessToken,
     ).map { credentialDataResult ->
         ClaimCommons.convertCredentialDataResultToWalletCredential(
