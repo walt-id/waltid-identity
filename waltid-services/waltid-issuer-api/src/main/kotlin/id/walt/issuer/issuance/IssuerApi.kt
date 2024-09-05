@@ -400,6 +400,7 @@ fun Application.issuerApi() {
                                     "Pass the unsigned credential that you intend to issue in the body of the request."
                                 example("W3C SD-JWT example", IssuanceExamples.sdJwtW3CExample)
                                 example("SD-JWT-VC example", IssuanceExamples.sdJwtVCExample)
+                                example("SD-JWT-VC example with issuer DID", IssuanceExamples.sdJwtVCWithIssuerDidExample)
                                 required = true
                             }
                         }

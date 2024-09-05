@@ -157,6 +157,18 @@ object IssuanceExamples {
           }
     """.trimIndent()
 
+    //language=json
+    private val mappingNoIssuerDid = """
+        {
+             "id":"<uuid>",
+             "credentialSubject":{
+                "id":"<subjectDid>"
+             },
+             "issuanceDate":"<timestamp>",
+             "expirationDate":"<timestamp-in:365d>"
+          }
+    """.trimIndent()
+
     // language=json
     val openBadgeCredentialIssuance = """
         {
@@ -732,11 +744,10 @@ object IssuanceExamples {
                 "type": "jwk",
                 "jwk": ${Json.parseToJsonElement(LspPotentialIssuanceInterop.POTENTIAL_ISSUER_JWK_KEY.jwk!!)}
             },
-            "issuerDid": "",
             "credentialConfigurationId": "identity_credential_vc+sd-jwt",
             "credentialData": $sdjwt_vc_identity_credential,
             "mdocData": null,
-            "mapping": $mapping,
+            "mapping": $mappingNoIssuerDid,
             "selectiveDisclosure":
             {
                 "fields":
@@ -757,4 +768,34 @@ object IssuanceExamples {
     """.trimIndent()
 
     val sdJwtVCExample = typedValueExampleDescriptorDsl<IssuanceRequest>(sdJwtVCData)
+
+    val sdJwtVCDataWithIssuerDid = """
+        {
+            "issuerKey": { 
+                "type": "jwk",
+                "jwk": ${Json.parseToJsonElement(LspPotentialIssuanceInterop.POTENTIAL_ISSUER_JWK_KEY.jwk!!)}
+            },
+            "credentialConfigurationId": "identity_credential_vc+sd-jwt",
+            "credentialData": $sdjwt_vc_identity_credential,
+            "mdocData": null,
+            "mapping": $mappingNoIssuerDid,
+            "selectiveDisclosure":
+            {
+                "fields":
+                {
+                    "birthdate":
+                    {
+                        "sd": true
+                    },
+                    "family_name":
+                    {
+                        "sd": false
+                    }
+                }
+            },
+            "issuerDid": "${LspPotentialIssuanceInterop.ISSUER_DID}"
+        }
+    """.trimIndent()
+
+    val sdJwtVCWithIssuerDidExample = typedValueExampleDescriptorDsl<IssuanceRequest>(sdJwtVCDataWithIssuerDid)
 }
