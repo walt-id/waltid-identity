@@ -22,13 +22,12 @@ object ProofOfPossessionParameterFactory {
         credentialOffer: CredentialOffer,
         nonce: String?
     ): ProofOfPossessionParameters = when (useKeyProof) {
-        true -> keyProofParameters(did, keyId, offeredCredential, credentialOffer, nonce)
+        true -> keyProofParameters(did, offeredCredential, credentialOffer, nonce)
         false -> didProofParameters(did, keyId, offeredCredential, credentialOffer, nonce)
     }
 
     private suspend fun keyProofParameters(
         did: String,
-        keyId: String,
         offeredCredential: OfferedCredential,
         credentialOffer: CredentialOffer,
         nonce: String?
@@ -59,7 +58,7 @@ object ProofOfPossessionParameterFactory {
                     issuerUrl = credentialOffer.credentialIssuer,
                     nonce = nonce,
                     keyJwk = key.getPublicKey().exportJWKObject(),
-                    keyId = keyId,
+                    keyId = key.getKeyId(),
                 ).let {
                     ProofOfPossessionParameters(
                         ProofType.jwt,
@@ -119,27 +118,3 @@ data class ProofOfPossessionParameters(
     val header: JsonElement,
     val payload: JsonElement,
 )
-
-/*coseKey = when (key.keyType) {
-                        KeyType.RSA -> {
-                            OneKey(
-                                RSAKey.parse(key.getPublicKey().exportJWK()).toRSAPublicKey(),
-                                null,
-                            ).AsCBOR().EncodeToBytes()
-                        }
-
-                        KeyType.Ed25519 -> {
-                            OneKey(
-                                OctetKeyPair.parse(key.getPublicKey().exportJWK()).toPublicKey(),
-                                null,
-                            ).AsCBOR().EncodeToBytes()
-                        }
-
-                        else -> {
-                            OneKey(
-                                ECKey.parse(key.getPublicKey().exportJWK()).toECPublicKey(),
-                                null
-                            ).AsCBOR().EncodeToBytes()
-                        }
-                    }
-* */

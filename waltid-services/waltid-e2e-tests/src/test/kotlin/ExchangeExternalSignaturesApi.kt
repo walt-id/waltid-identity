@@ -1,8 +1,18 @@
+import COSE.AlgorithmID
 import E2ETestWebService.loadResource
+import cbor.Cbor
+import com.nimbusds.jose.jwk.ECKey
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.did.utils.randomUUID
+import id.walt.issuer.issuance.IssuanceExamples
 import id.walt.issuer.issuance.IssuanceRequest
+import id.walt.mdoc.COSECryptoProviderKeyInfo
+import id.walt.mdoc.SimpleCOSECryptoProvider
+import id.walt.mdoc.dataelement.*
+import id.walt.oid4vc.data.AuthenticationMethod
+import id.walt.oid4vc.data.ProofType
+import id.walt.sdjwt.utils.Base64Utils.encodeToBase64Url
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.db.models.WalletDid
 import id.walt.webwallet.service.exchange.IssuanceService
@@ -12,12 +22,13 @@ import id.walt.webwallet.web.model.EmailAccountRequest
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
+import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.server.util.*
 import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.decodeFromByteArray
+import kotlinx.serialization.json.*
 import kotlinx.uuid.UUID
 import kotlin.test.assertNotNull
 
@@ -36,7 +47,7 @@ class ExchangeExternalSignatures {
     private val verifierVerificationApi: Verifier.VerificationApi
 
     private val holderKey = runBlocking {
-        JWKKey.generate(KeyType.Ed25519)
+        JWKKey.generate(KeyType.secp256r1)
     }
 
     private val accountRequest = EmailAccountRequest(
@@ -135,17 +146,60 @@ class ExchangeExternalSignatures {
 
     suspend fun executeTestCases() {
         initializeWallet()
-        happyPathPreAuthorizedOID4VCI()
-        happyPathOID4VP()
+        testPreAuthorizedOID4VCI()
+        testOID4VP()
         clearWalletCredentials()
-        happyPathPreAuthorizedOID4VCI(
+        testPreAuthorizedOID4VCI(
             useOptionalParameters = false,
         )
-        happyPathOID4VP()
+        testOID4VP()
         clearWalletCredentials()
+        testMdocIssuance()
     }
 
-    private suspend fun happyPathPreAuthorizedOID4VCI(
+    @OptIn(ExperimentalSerializationApi::class)
+    private suspend fun computeProofOfPossessionFromProofRequest(
+        proofReq: IssuanceService.OfferedCredentialProofOfPossessionParameters,
+    ): IssuanceService.OfferedCredentialProofOfPossession {
+        return if (proofReq.jwtParams.proofType == ProofType.jwt) {
+            IssuanceService.OfferedCredentialProofOfPossession(
+                proofReq.offeredCredential,
+                ProofType.jwt,
+                holderKey.signJws(
+                    proofReq.jwtParams.payload.toString().toByteArray(),
+                    Json.decodeFromJsonElement<Map<String, JsonElement>>(proofReq.jwtParams.header),
+                )
+            )
+        } else {
+            val ecKey = ECKey.parseFromPEMEncodedObjects(holderKey.exportPEM()).toECKey()
+            val cryptoProvider = SimpleCOSECryptoProvider(
+                listOf(
+                    COSECryptoProviderKeyInfo(
+                        holderKey.getKeyId(),
+                        AlgorithmID.ECDSA_256,
+                        ecKey.toECPublicKey(),
+                        ecKey.toECPrivateKey(),
+                    )
+                )
+            )
+            val headers = Cbor.decodeFromByteArray<MapElement>(
+                Json.decodeFromJsonElement<ByteArray>(proofReq.jwtParams.header)
+            )
+            val payload = Json.decodeFromJsonElement<ByteArray>(proofReq.jwtParams.payload)
+            IssuanceService.OfferedCredentialProofOfPossession(
+                proofReq.offeredCredential,
+                ProofType.cwt,
+                cryptoProvider.sign1(
+                    payload = payload,
+                    headersProtected = headers,
+                    null,
+                    holderKey.getKeyId(),
+                ).toCBOR().encodeToBase64Url(),
+            )
+        }
+    }
+
+    private suspend fun testPreAuthorizedOID4VCI(
         useOptionalParameters: Boolean = true,
     ) {
         lateinit var offerURL: String
@@ -166,15 +220,9 @@ class ExchangeExternalSignatures {
         val prepareResponse = response.body<PrepareOID4VCIResponse>()
         //compute the signatures here
         val offeredCredentialProofsOfPossession = prepareResponse.offeredCredentialsProofRequests.map {
-            IssuanceService.OfferedCredentialProofOfPossession(
-                it.offeredCredential,
-                holderKey.signJws(
-                    it.jwtParams.payload.toByteArray(),
-                    it.jwtParams.header,
-                )
-            )
+            computeProofOfPossessionFromProofRequest(it)
         }
-        assertNotNull(prepareResponse.accessToken) { "There should be an access token in the response of the prepare endpoint"}
+        assertNotNull(prepareResponse.accessToken) { "There should be an access token in the response of the prepare endpoint" }
         response = client.post("/wallet-api/wallet/$walletId/exchange/external_signatures/offer/submit") {
             setBody(
                 SubmitOID4VCIRequest(
@@ -190,7 +238,7 @@ class ExchangeExternalSignatures {
         assert(credList.size == 1) { "There should be one credential in the wallet now" }
     }
 
-    private suspend fun happyPathOID4VP() {
+    private suspend fun testOID4VP() {
         lateinit var presentationRequestURL: String
         lateinit var verificationID: String
         lateinit var resolvedPresentationRequestURL: String
@@ -256,5 +304,47 @@ class ExchangeExternalSignatures {
                 assert(it.size > 1) { "no policies have run" }
             }
         }
+    }
+
+    private suspend fun testMdocIssuance(
+        useOptionalParameters: Boolean = true,
+    ) {
+        // === get credential offer from test issuer API ===
+        val issuanceReq = Json.decodeFromString<IssuanceRequest>(IssuanceExamples.mDLCredentialIssuanceData).copy(
+            authenticationMethod = AuthenticationMethod.PRE_AUTHORIZED
+        )
+        val offerResp = client.post("/openid4vc/sdjwt/issue") {
+            contentType(ContentType.Application.Json)
+            setBody(Json.encodeToJsonElement(issuanceReq).toString())
+        }
+        assert(offerResp.status == HttpStatusCode.OK)
+        val offerURL = offerResp.bodyAsText()
+        var response = client.post("/wallet-api/wallet/$walletId/exchange/external_signatures/offer/prepare") {
+            setBody(
+                PrepareOID4VCIRequest(
+                    did = if (useOptionalParameters) holderDID else null,
+                    offerURL = offerURL,
+                )
+            )
+        }.expectSuccess()
+        val prepareResponse = response.body<PrepareOID4VCIResponse>()
+        //compute the signatures here
+        val offeredCredentialProofsOfPossession = prepareResponse.offeredCredentialsProofRequests.map {
+            computeProofOfPossessionFromProofRequest(it)
+        }
+        assertNotNull(prepareResponse.accessToken) { "There should be an access token in the response of the prepare endpoint" }
+        response = client.post("/wallet-api/wallet/$walletId/exchange/external_signatures/offer/submit") {
+            setBody(
+                SubmitOID4VCIRequest(
+                    did = if (useOptionalParameters) holderDID else null,
+                    offerURL = offerURL,
+                    credentialIssuer = prepareResponse.credentialIssuer,
+                    offeredCredentialProofsOfPossession = offeredCredentialProofsOfPossession,
+                    accessToken = prepareResponse.accessToken,
+                )
+            )
+        }.expectSuccess()
+        val credList = response.body<List<WalletCredential>>()
+        assert(credList.size == 1) { "There should be one credential in the wallet now" }
     }
 }
