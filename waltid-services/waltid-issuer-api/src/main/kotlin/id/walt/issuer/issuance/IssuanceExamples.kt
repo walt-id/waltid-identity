@@ -766,4 +766,41 @@ object IssuanceExamples {
     """.trimIndent()
 
     val sdJwtVCExample = typedValueExampleDescriptorDsl<IssuanceRequest>(sdJwtVCData)
+
+    val sdJwtVCDataWithSDSub = """
+        {
+            "issuerKey": { 
+                "type": "jwk",
+                "jwk": ${Json.parseToJsonElement(LspPotentialIssuanceInterop.POTENTIAL_ISSUER_JWK_KEY.jwk!!)}
+            },
+            "issuerDid": "",
+            "credentialConfigurationId": "identity_credential_vc+sd-jwt",
+            "credentialData": $sdjwt_vc_identity_credential,
+            "mdocData": null,
+            "mapping": $ietfSdJwtmapping,
+            "selectiveDisclosure":
+            {
+                "fields":
+                {
+                    "birthdate":
+                    {
+                        "sd": true
+                    },
+                    "sub":
+                    {
+                        "sd": true
+                    },
+                    "iat":
+                    {
+                        "sd": true
+                    }
+                }
+            },
+            "x5Chain": ${buildJsonArray { add(LspPotentialInterop.POTENTIAL_ISSUER_CERT) }},
+            "trustedRootCAs": ${buildJsonArray { add(LspPotentialInterop.POTENTIAL_ROOT_CA_CERT) }}
+        }
+    """.trimIndent()
+
+    val sdJwtVCExampleWithSDSub = typedValueExampleDescriptorDsl<IssuanceRequest>(sdJwtVCDataWithSDSub)
+
 }

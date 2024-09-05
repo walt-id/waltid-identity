@@ -22,7 +22,6 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.util.pipeline.*
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import redis.clients.jedis.exceptions.JedisAccessControlException
 import redis.clients.jedis.exceptions.JedisConnectionException
@@ -401,6 +400,7 @@ fun Application.issuerApi() {
                                     "Pass the unsigned credential that you intend to issue in the body of the request."
                                 example("W3C SD-JWT example", IssuanceExamples.sdJwtW3CExample)
                                 example("SD-JWT-VC example", IssuanceExamples.sdJwtVCExample)
+                                example("SD-JWT-VC example featuring selectively disclosable sub and iat claims", IssuanceExamples.sdJwtVCExampleWithSDSub)
                                 required = true
                             }
                         }
