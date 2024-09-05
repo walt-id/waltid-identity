@@ -360,9 +360,9 @@ fun Application.exchangeExternalSignatures() = walletRoute {
 
             response {
                 HttpStatusCode.OK to {
-                    description = "Collection of parameters that are necessary to invoke the submit endpoint. " +
-                            "The client is expected to, in between, sign a JWT based on the " +
-                            "params object that is contained within."
+                    description = "Collection of parameters that are necessary to invoke the respective submit endpoint. " +
+                            "For each offered credential, the client is expected to compute a signature based on the provided " +
+                            "proof of possession parameters."
                     body<PrepareOID4VCIResponse> {
                         required = true
                         example("When proofType == cwt") {
@@ -391,7 +391,7 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                                 offeredCredentialsProofRequests = listOf(
                                     IssuanceService.OfferedCredentialProofOfPossessionParameters(
                                         OfferedCredential(
-                                            format = CredentialFormat.mso_mdoc,
+                                            format = CredentialFormat.jwt_vc_json,
                                         ),
                                         ProofOfPossessionParameters(
                                             ProofType.jwt,
