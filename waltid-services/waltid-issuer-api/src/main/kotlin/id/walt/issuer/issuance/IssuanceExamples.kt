@@ -159,25 +159,13 @@ object IssuanceExamples {
 
     private val ietfSdJwtmapping = """
         {
-             "id":"<uuid>",
+            "id":"<uuid>",
             "iat": "<timestamp-seconds>",
             "nbf": "<timestamp-seconds>",
             "exp": "<timestamp-in-seconds:365d>"
           }
     """.trimIndent()
 
-
-    //language=json
-    private val mappingNoIssuerDid = """
-        {
-             "id":"<uuid>",
-             "credentialSubject":{
-                "id":"<subjectDid>"
-             },
-             "issuanceDate":"<timestamp>",
-             "expirationDate":"<timestamp-in:365d>"
-          }
-    """.trimIndent()
 
     // language=json
     val openBadgeCredentialIssuance = """
@@ -756,7 +744,7 @@ object IssuanceExamples {
             "credentialConfigurationId": "identity_credential_vc+sd-jwt",
             "credentialData": $sdjwt_vc_identity_credential,
             "mdocData": null,
-            "mapping": $mappingNoIssuerDid,
+            "mapping": $ietfSdJwtmapping,
             "selectiveDisclosure":
             {
                 "fields":
@@ -787,7 +775,7 @@ object IssuanceExamples {
             "credentialConfigurationId": "identity_credential_vc+sd-jwt",
             "credentialData": $sdjwt_vc_identity_credential,
             "mdocData": null,
-            "mapping": $mappingNoIssuerDid,
+            "mapping": $ietfSdJwtmapping,
             "selectiveDisclosure":
             {
                 "fields":
