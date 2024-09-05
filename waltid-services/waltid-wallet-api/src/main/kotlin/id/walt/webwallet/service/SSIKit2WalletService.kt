@@ -195,18 +195,18 @@ class SSIKit2WalletService(
 
         logger.debug { "Using presentation request, selected credentials: ${parameter.selectedCredentials}" }
 
-        SessionAttributes.HACK_outsideMappedSelectedCredentialsPerSession[authReq.state + authReq.presentationDefinition] =
-            parameter.selectedCredentials
-        if (parameter.disclosures != null) {
-            SessionAttributes.HACK_outsideMappedSelectedDisclosuresPerSession[authReq.state + authReq.presentationDefinition] =
-                parameter.disclosures
-        }
-
         val presentationSession =
             credentialWallet.initializeAuthorization(authReq, 60.seconds, parameter.selectedCredentials.toSet())
         logger.debug { "Initialized authorization (VPPresentationSession): $presentationSession" }
 
         logger.debug { "Resolved presentation definition: ${presentationSession.authorizationRequest!!.presentationDefinition!!.toJSONString()}" }
+
+        SessionAttributes.HACK_outsideMappedSelectedCredentialsPerSession[presentationSession.authorizationRequest!!.state + presentationSession.authorizationRequest.presentationDefinition] =
+            parameter.selectedCredentials
+        if (parameter.disclosures != null) {
+            SessionAttributes.HACK_outsideMappedSelectedDisclosuresPerSession[presentationSession.authorizationRequest!!.state + presentationSession.authorizationRequest.presentationDefinition] =
+                parameter.disclosures
+        }
 
         val tokenResponse = credentialWallet.processImplicitFlowAuthorization(presentationSession.authorizationRequest!!)
         val submitFormParams = getFormParameters(presentationSession.authorizationRequest, tokenResponse, presentationSession)
