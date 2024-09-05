@@ -155,6 +155,8 @@ class ExchangeExternalSignatures {
         testOID4VP()
         clearWalletCredentials()
         testMdocIssuance()
+        clearWalletCredentials()
+        testJwtVcBatchIssuance()
     }
 
     @OptIn(ExperimentalSerializationApi::class)
@@ -313,7 +315,7 @@ class ExchangeExternalSignatures {
         val issuanceReq = Json.decodeFromString<IssuanceRequest>(IssuanceExamples.mDLCredentialIssuanceData).copy(
             authenticationMethod = AuthenticationMethod.PRE_AUTHORIZED
         )
-        val offerResp = client.post("/openid4vc/sdjwt/issue") {
+        val offerResp = client.post("/openid4vc/jwt/issue") {
             contentType(ContentType.Application.Json)
             setBody(Json.encodeToJsonElement(issuanceReq).toString())
         }
@@ -346,5 +348,52 @@ class ExchangeExternalSignatures {
         }.expectSuccess()
         val credList = response.body<List<WalletCredential>>()
         assert(credList.size == 1) { "There should be one credential in the wallet now" }
+    }
+
+    private suspend fun testJwtVcBatchIssuance(
+        useOptionalParameters: Boolean = true,
+    ) {
+        val offerResp = client.post("/openid4vc/jwt/issueBatch") {
+            contentType(ContentType.Application.Json)
+            setBody(
+                Json
+                    .encodeToJsonElement(
+                        listOf(
+                            Json.decodeFromString<IssuanceRequest>(loadResource("issuance/openbadgecredential-issuance-request.json")),
+                            Json.decodeFromString<IssuanceRequest>(loadResource("issuance/universitydegree-issuance-request.json")),
+                        )
+
+                    ).toString()
+            )
+        }
+        assert(offerResp.status == HttpStatusCode.OK)
+        val offerURL = offerResp.bodyAsText()
+        var response = client.post("/wallet-api/wallet/$walletId/exchange/external_signatures/offer/prepare") {
+            setBody(
+                PrepareOID4VCIRequest(
+                    did = if (useOptionalParameters) holderDID else null,
+                    offerURL = offerURL,
+                )
+            )
+        }.expectSuccess()
+        val prepareResponse = response.body<PrepareOID4VCIResponse>()
+        //compute the signatures here
+        val offeredCredentialProofsOfPossession = prepareResponse.offeredCredentialsProofRequests.map {
+            computeProofOfPossessionFromProofRequest(it)
+        }
+        assertNotNull(prepareResponse.accessToken) { "There should be an access token in the response of the prepare endpoint" }
+        response = client.post("/wallet-api/wallet/$walletId/exchange/external_signatures/offer/submit") {
+            setBody(
+                SubmitOID4VCIRequest(
+                    did = if (useOptionalParameters) holderDID else null,
+                    offerURL = offerURL,
+                    credentialIssuer = prepareResponse.credentialIssuer,
+                    offeredCredentialProofsOfPossession = offeredCredentialProofsOfPossession,
+                    accessToken = prepareResponse.accessToken,
+                )
+            )
+        }.expectSuccess()
+        val credList = response.body<List<WalletCredential>>()
+        assert(credList.size == 2) { "There should be two credentials in the wallet now" }
     }
 }
