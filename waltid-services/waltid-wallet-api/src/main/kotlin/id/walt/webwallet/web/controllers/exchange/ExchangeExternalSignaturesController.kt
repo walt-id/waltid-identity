@@ -381,7 +381,7 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                                         )
                                     )
                                 ),
-                                credentialIssuer = "https://walt.id"
+                                credentialIssuer = "https://issuer.portal.walt.id"
                             )
                         }
                         example("When proofType == jwt") {
@@ -400,7 +400,7 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                                         )
                                     )
                                 ),
-                                credentialIssuer = "https://walt.id"
+                                credentialIssuer = "https://issuer.portal.walt.id"
                             )
                         }
                     }
@@ -466,7 +466,7 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                                     "<<BASE64URL-ENCODED SIGNED CWT>>",
                                 )
                             ),
-                            credentialIssuer = "https://walt.id"
+                            credentialIssuer = "https://issuer.portal.walt.id"
                         )
                     }
                     example("When proofType == jwt") {
@@ -482,7 +482,7 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                                     "<<COMPACT-SERIALIZED SIGNED JWT>>",
                                 )
                             ),
-                            credentialIssuer = "https://walt.id"
+                            credentialIssuer = "https://issuer.portal.walt.id"
                         )
                     }
                 }
