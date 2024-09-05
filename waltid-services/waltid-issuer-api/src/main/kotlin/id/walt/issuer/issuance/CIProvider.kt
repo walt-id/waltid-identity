@@ -587,13 +587,13 @@ open class CIProvider : OpenIDCredentialIssuer(
         type = format.value,
         additionalJwtHeaders = when(format) {
             CredentialFormat.sd_jwt_vc -> {request.x5Chain?.let {
-                mapOf("x5c" to JsonArray(it.map { cert -> cert.toJsonElement() }), "typ" to CredentialFormat.sd_jwt_vc.toJsonElement(), "cty" to "credential-claims-set+json".toJsonElement(), "kid" to  issuerDid.ifEmpty { issuerKey.key.getKeyId() }.toJsonElement())
+                mapOf("x5c" to JsonArray(it.map { cert -> cert.toJsonElement() }), "typ" to CredentialFormat.sd_jwt_vc.toJsonElement(), "cty" to "credential-claims-set+json".toJsonElement(), "kid" to  issuerDid?.ifEmpty { issuerKey.key.getKeyId() }.toJsonElement())
             } ?: mapOf()}
             else -> mapOf( "typ" to  format.toJsonElement(), "kid" to issuerDid?.ifEmpty { issuerKey.key.getKeyId() }.toJsonElement())
         },
         additionalJwtOptions = when(format) {
             CredentialFormat.sd_jwt_vc -> {  SDJwtVC.defaultPayloadProperties(
-                issuerId = issuerDid ?: issuerKey.key.getKeyId(),,
+                issuerId = issuerDid ?: issuerKey.key.getKeyId(),
                 cnf = JsonObject(holderKey?.let {
                     buildJsonObject { put("jwk", it.exportJWKObject().plus("kid" to holderKey.getKeyId()).toJsonElement())}
                 } ?: buildJsonObject { put("kid", holderDid) }),
