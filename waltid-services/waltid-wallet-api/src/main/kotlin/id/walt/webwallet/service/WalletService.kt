@@ -3,7 +3,7 @@ package id.walt.webwallet.service
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.oid4vc.data.CredentialOffer
 import id.walt.oid4vc.requests.CredentialOfferRequest
-import id.walt.sdjwt.SDTypeMetadata
+import id.walt.sdjwt.SDJWTVCTypeMetadata
 import id.walt.webwallet.db.models.WalletCategoryData
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.db.models.WalletDid
@@ -41,7 +41,7 @@ abstract class WalletService(val tenant: String, val accountId: UUID, val wallet
     abstract suspend fun resolvePresentationRequest(request: String): String
     abstract suspend fun resolveCredentialOffer(offerRequest: CredentialOfferRequest): CredentialOffer
 
-    abstract suspend fun resolveVct(vct: String): SDTypeMetadata
+    abstract suspend fun resolveVct(vct: String): SDJWTVCTypeMetadata
 
     // DIDs
     abstract suspend fun listDids(): List<WalletDid>
