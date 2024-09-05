@@ -26,6 +26,7 @@ import id.walt.webwallet.service.dids.DidsService
 import id.walt.webwallet.service.events.EventDataNotAvailable
 import id.walt.webwallet.service.events.EventType
 import id.walt.webwallet.service.exchange.IssuanceService
+import id.walt.webwallet.service.exchange.ProofOfPossessionParameters
 import id.walt.webwallet.utils.WalletHttpClients
 import id.walt.webwallet.web.controllers.auth.getWalletService
 import id.walt.webwallet.web.controllers.walletRoute
@@ -364,6 +365,44 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                             "params object that is contained within."
                     body<PrepareOID4VCIResponse> {
                         required = true
+                        example("When proofType == cwt") {
+                            value = PrepareOID4VCIResponse(
+                                did = "did:web:walt.id",
+                                offerURL = "openid-credential-offer://?credential_offer=",
+                                offeredCredentialsProofRequests = listOf(
+                                    IssuanceService.OfferedCredentialProofOfPossessionParameters(
+                                        OfferedCredential(
+                                            format = CredentialFormat.mso_mdoc,
+                                        ),
+                                        ProofOfPossessionParameters(
+                                            ProofType.cwt,
+                                            "<<JSON-ENCODED BYTE ARRAY OF CBOR MAP>>".toJsonElement(),
+                                            "<<JSON-ENCODED BYTE ARRAY OF CBOR MAP>>".toJsonElement(),
+                                        )
+                                    )
+                                ),
+                                credentialIssuer = "https://walt.id"
+                            )
+                        }
+                        example("When proofType == jwt") {
+                            value = PrepareOID4VCIResponse(
+                                did = "did:web:walt.id",
+                                offerURL = "openid-credential-offer://?credential_offer=",
+                                offeredCredentialsProofRequests = listOf(
+                                    IssuanceService.OfferedCredentialProofOfPossessionParameters(
+                                        OfferedCredential(
+                                            format = CredentialFormat.mso_mdoc,
+                                        ),
+                                        ProofOfPossessionParameters(
+                                            ProofType.jwt,
+                                            "<<JWT HEADER SECTION>>".toJsonElement(),
+                                            "<<JWT CLAIMS SECTION>>".toJsonElement(),
+                                        )
+                                    )
+                                ),
+                                credentialIssuer = "https://walt.id"
+                            )
+                        }
                     }
                 }
             }
@@ -413,6 +452,39 @@ fun Application.exchangeExternalSignatures() = walletRoute {
 
             request {
                 body<SubmitOID4VCIRequest> {
+                    required = true
+                    example("When proofType == cwt") {
+                        value = SubmitOID4VCIRequest(
+                            did = "did:web:walt.id",
+                            offerURL = "openid-credential-offer://?credential_offer=",
+                            offeredCredentialProofsOfPossession = listOf(
+                                IssuanceService.OfferedCredentialProofOfPossession(
+                                    OfferedCredential(
+                                        format = CredentialFormat.mso_mdoc,
+                                    ),
+                                    ProofType.cwt,
+                                    "<<BASE64URL-ENCODED SIGNED CWT>>",
+                                )
+                            ),
+                            credentialIssuer = "https://walt.id"
+                        )
+                    }
+                    example("When proofType == jwt") {
+                        value = SubmitOID4VCIRequest(
+                            did = "did:web:walt.id",
+                            offerURL = "openid-credential-offer://?credential_offer=",
+                            offeredCredentialProofsOfPossession = listOf(
+                                IssuanceService.OfferedCredentialProofOfPossession(
+                                    OfferedCredential(
+                                        format = CredentialFormat.jwt_vc_json,
+                                    ),
+                                    ProofType.jwt,
+                                    "<<COMPACT-SERIALIZED SIGNED JWT>>",
+                                )
+                            ),
+                            credentialIssuer = "https://walt.id"
+                        )
+                    }
                 }
             }
 
